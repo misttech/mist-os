@@ -55,7 +55,6 @@ impl Header {
     /// Sets the length of the item the header refers to. Panics if not 8-byte aligned.
     fn set_len(&mut self, new_len: usize) {
         assert_eq!(new_len % 8, 0, "encoded message must be 8-byte aligned");
-        #[allow(clippy::bool_to_int_with_if)]
         self.set_size_words((new_len / 8) as u16 + u16::from(new_len % 8 > 0))
     }
 }
@@ -140,10 +139,12 @@ impl<'a> From<StringRef<'a>> for String {
     }
 }
 
-#[allow(clippy::to_string_trait_impl)]
-impl<'a> ToString for StringRef<'a> {
-    fn to_string(&self) -> String {
-        self.clone().into()
+impl std::fmt::Display for StringRef<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StringRef::Empty => write!(f, ""),
+            StringRef::Inline(s) => write!(f, "{s}"),
+        }
     }
 }
 

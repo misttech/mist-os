@@ -356,7 +356,6 @@ pub(crate) mod test {
     }
 
     #[fuchsia::test]
-    #[allow(clippy::approx_constant)]
     fn metric_value_from_json() {
         /*
             JSON subtypes:
@@ -393,7 +392,7 @@ pub(crate) mod test {
         test_from_int!(JsonValue::Number, MetricValue::Int, i64::MAX);
         test_from_int!(JsonValue::Number, MetricValue::Int, std::i64::MIN);
         test_from_to!(JsonValue::Number, MetricValue::Int, JsonNumber::from(u64::MAX), -1);
-        test_from_float!(JsonValue::Number, MetricValue::Float, 3.14);
+        test_from_float!(JsonValue::Number, MetricValue::Float, std::f64::consts::PI);
         test_from_float!(JsonValue::Number, MetricValue::Float, std::f64::MAX);
         test_from_float!(JsonValue::Number, MetricValue::Float, std::f64::MIN);
         test_from!(JsonValue::Bool, MetricValue::Bool, true);
@@ -408,7 +407,6 @@ pub(crate) mod test {
     }
 
     #[fuchsia::test]
-    #[allow(clippy::approx_constant)]
     fn metric_value_from_diagnostic_property() {
         /*
             DiagnosticProperty subtypes:
@@ -448,7 +446,7 @@ pub(crate) mod test {
         test_from!(DiagnosticProperty::Int, MetricValue::Int, std::i64::MIN);
         test_from!(DiagnosticProperty::Uint, MetricValue::Int, 3);
         test_from_to!(DiagnosticProperty::Uint, MetricValue::Int, u64::MAX, -1);
-        test_from!(DiagnosticProperty::Double, MetricValue::Float, 3.14);
+        test_from!(DiagnosticProperty::Double, MetricValue::Float, std::f64::consts::PI);
         test_from!(DiagnosticProperty::Double, MetricValue::Float, std::f64::MAX);
         test_from!(DiagnosticProperty::Double, MetricValue::Float, std::f64::MIN);
         test_from!(DiagnosticProperty::Bool, MetricValue::Bool, true);

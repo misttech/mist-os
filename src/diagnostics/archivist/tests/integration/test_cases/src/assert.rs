@@ -25,15 +25,12 @@ pub(crate) async fn assert_logs_sequence<S: LogStream>(
     component_moniker: &ExtendedMoniker,
     messages: Vec<LogMessage>,
 ) {
-    let mut m = 0; // the number of matches so far.
-    #[allow(clippy::explicit_counter_loop)]
-    for (expected_severity, expected_message) in &messages {
+    for (i, (expected_severity, expected_message)) in messages.iter().enumerate() {
         let data = logs.next().await.expect("got log response").expect("log isn't an error");
         if !logs_data_matches(data, component_moniker, expected_severity, expected_message) {
-            fail_on_incomplete_match(messages, m);
+            fail_on_incomplete_match(messages, i);
             return; // Rust thinks this loop can iterate again if this return statement is removed.
         }
-        m += 1;
     }
 }
 

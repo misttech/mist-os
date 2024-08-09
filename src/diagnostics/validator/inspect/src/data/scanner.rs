@@ -466,20 +466,22 @@ impl Scanner {
             }
             BlockType::ArrayValue => {
                 let entry_type = block.array_entry_type()?;
-                let array_format = block.array_format()?;
                 let slots = block.array_slots()? as usize;
                 match entry_type {
                     BlockType::IntValue => {
+                        let array_format = block.array_format()?;
                         let numbers: Result<Vec<i64>, _> =
                             (0..slots).map(|i| block.array_get_int_slot(i)).collect();
                         ScannedPayload::IntArray(numbers?, array_format)
                     }
                     BlockType::UintValue => {
+                        let array_format = block.array_format()?;
                         let numbers: Result<Vec<u64>, _> =
                             (0..slots).map(|i| block.array_get_uint_slot(i)).collect();
                         ScannedPayload::UintArray(numbers?, array_format)
                     }
                     BlockType::DoubleValue => {
+                        let array_format = block.array_format()?;
                         let numbers: Result<Vec<f64>, _> =
                             (0..slots).map(|i| block.array_get_double_slot(i)).collect();
                         ScannedPayload::DoubleArray(numbers?, array_format)
@@ -487,7 +489,7 @@ impl Scanner {
                     BlockType::StringReference => {
                         let indexes: Result<Vec<BlockIndex>, _> =
                             (0..slots).map(|i| block.array_get_string_index_slot(i)).collect();
-                        ScannedPayload::StringArray(indexes?, array_format)
+                        ScannedPayload::StringArray(indexes?)
                     }
                     illegal_type => {
                         return Err(format_err!(
@@ -513,7 +515,7 @@ impl Scanner {
                 ))?;
                 ScannedPayload::Link {
                     disposition: block.link_node_disposition()?,
-                    scanned_tree: Scanner::try_from(child_tree)?,
+                    scanned_tree: Box::new(Scanner::try_from(child_tree)?),
                 }
             }
             illegal_type => {
@@ -607,7 +609,7 @@ impl Scanner {
             ScannedPayload::IntArray(data, format) => Payload::IntArray(data, format),
             ScannedPayload::UintArray(data, format) => Payload::UintArray(data, format),
             ScannedPayload::DoubleArray(data, format) => Payload::DoubleArray(data, format),
-            ScannedPayload::StringArray(indexes, _) => Payload::StringArray(
+            ScannedPayload::StringArray(indexes) => Payload::StringArray(
                 indexes
                     .iter()
                     .map(|i| {
@@ -708,7 +710,6 @@ struct ScannedExtent {
     metrics: BlockMetrics,
 }
 
-#[allow(dead_code, clippy::large_enum_variant)] // TODO(https://fxbug.dev/318827209)
 #[derive(Debug)]
 enum ScannedPayload {
     String { length: usize, link: BlockIndex },
@@ -720,8 +721,8 @@ enum ScannedPayload {
     IntArray(Vec<i64>, ArrayFormat),
     UintArray(Vec<u64>, ArrayFormat),
     DoubleArray(Vec<f64>, ArrayFormat),
-    StringArray(Vec<BlockIndex>, ArrayFormat),
-    Link { disposition: LinkNodeDisposition, scanned_tree: Scanner },
+    StringArray(Vec<BlockIndex>),
+    Link { disposition: LinkNodeDisposition, scanned_tree: Box<Scanner> },
 }
 
 #[cfg(test)]
