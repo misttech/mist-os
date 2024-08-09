@@ -200,10 +200,6 @@ group("chromebook_config") {
   deps = [ "node_config:chromebook" ]
 }
 
-group("luis_config") {
-  deps = [ "node_config:luis" ]
-}
-
 group("nelson_config") {
   deps = [ "node_config:nelson" ]
 }
