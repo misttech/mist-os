@@ -13,6 +13,7 @@ ffx_plugin("ffx_repository_server_stop") {
   sources = [ "src/lib.rs" ]
 
   deps = [
+    "//src/developer/ffx/config:lib",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
@@ -22,7 +23,6 @@ ffx_plugin("ffx_repository_server_stop") {
     "//third_party/rust_crates:serde",
   ]
   test_deps = [
-    "//src/developer/ffx/config:lib",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//third_party/rust_crates:futures",
