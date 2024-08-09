@@ -10,7 +10,6 @@
 #include <inttypes.h>
 #include <lib/arch/x86/boot-cpuid.h>
 #include <lib/memalloc/range.h>
-#include <lib/zbitl/items/mem-config.h>
 #include <lib/zircon-internal/macros.h>
 #include <platform.h>
 #include <string.h>

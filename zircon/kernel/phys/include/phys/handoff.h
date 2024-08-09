@@ -134,12 +134,6 @@ struct PhysHandoff {
   ArchPhysHandoff arch_handoff;
   static_assert(std::is_default_constructible_v<ArchPhysHandoff>);
 
-  // ZBI_TYPE_MEM_CONFIG payload.
-  //
-  // TODO(https://fxbug.dev/347766366): Replace this with a span of normalized
-  // memalloc::Range.
-  PhysHandoffTemporarySpan<const zbi_mem_range_t> mem_config;
-
   // A normalized accounting of RAM (and peripheral ranges). It consists of
   // ranges that are maximally contiguous and in sorted order, and features
   // allocations that are of interest to the kernel.

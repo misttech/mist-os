@@ -97,7 +97,6 @@ test("zbitl-unittests") {
     "efi-tests.cc",
     "fd-tests.cc",
     "json-tests.cc",
-    "mem-config-test.cc",
     "span-tests.cc",
     "stdio-tests.cc",
     "tests.cc",
