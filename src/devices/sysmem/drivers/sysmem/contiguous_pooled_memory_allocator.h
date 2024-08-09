@@ -27,7 +27,8 @@ class ContiguousPooledMemoryAllocator : public MemoryAllocator {
   ContiguousPooledMemoryAllocator(Owner* parent_device, const char* allocation_name,
                                   inspect::Node* parent_node, fuchsia_sysmem2::Heap heap,
                                   uint64_t size, bool is_always_cpu_accessible,
-                                  bool is_ever_cpu_accessible, bool is_ready, bool can_be_torn_down,
+                                  bool is_ever_cpu_accessible, bool is_ever_zircon_accessible,
+                                  bool is_ready, bool can_be_torn_down,
                                   async_dispatcher_t* dispatcher);
 
   ~ContiguousPooledMemoryAllocator();

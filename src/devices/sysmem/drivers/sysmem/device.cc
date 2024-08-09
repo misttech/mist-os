@@ -605,12 +605,14 @@ zx_status_t Device::Initialize() {
   if (contiguous_memory_size) {
     constexpr bool kIsAlwaysCpuAccessible = true;
     constexpr bool kIsEverCpuAccessible = true;
+    constexpr bool kIsEverZirconAccessible = true;
     constexpr bool kIsReady = true;
     constexpr bool kCanBeTornDown = true;
     auto heap = sysmem::MakeHeap(bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM, 0);
     auto pooled_allocator = std::make_unique<ContiguousPooledMemoryAllocator>(
         this, "SysmemContiguousPool", &heaps_, std::move(heap), contiguous_memory_size,
-        kIsAlwaysCpuAccessible, kIsEverCpuAccessible, kIsReady, kCanBeTornDown, loop_dispatcher());
+        kIsAlwaysCpuAccessible, kIsEverCpuAccessible, kIsEverZirconAccessible, kIsReady,
+        kCanBeTornDown, loop_dispatcher());
     if (pooled_allocator->Init() != ZX_OK) {
       LOG(ERROR, "Contiguous system ram allocator initialization failed");
       return ZX_ERR_NO_MEMORY;
@@ -645,13 +647,15 @@ zx_status_t Device::Initialize() {
   if (pdev_device_info_vid_ == PDEV_VID_AMLOGIC && protected_memory_size > 0) {
     constexpr bool kIsAlwaysCpuAccessible = false;
     constexpr bool kIsEverCpuAccessible = true;
+    constexpr bool kIsEverZirconAccessible = true;
     constexpr bool kIsReady = false;
     // We have no way to tear down secure memory.
     constexpr bool kCanBeTornDown = false;
     auto heap = sysmem::MakeHeap(bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE, 0);
     auto amlogic_allocator = std::make_unique<ContiguousPooledMemoryAllocator>(
         this, "SysmemAmlogicProtectedPool", &heaps_, heap, protected_memory_size,
-        kIsAlwaysCpuAccessible, kIsEverCpuAccessible, kIsReady, kCanBeTornDown, loop_dispatcher());
+        kIsAlwaysCpuAccessible, kIsEverCpuAccessible, kIsEverZirconAccessible, kIsReady,
+        kCanBeTornDown, loop_dispatcher());
     // Request 64kB alignment because the hardware can only modify protections along 64kB
     // boundaries.
     status = amlogic_allocator->Init(16);
@@ -997,6 +1001,7 @@ zx_status_t Device::RegisterSecureMemInternal(
       // start fully protected.
       constexpr bool kIsAlwaysCpuAccessible = false;
       constexpr bool kIsEverCpuAccessible = false;
+      constexpr bool kIsEverZirconAccessible = false;
       constexpr bool kIsReady = false;
       constexpr bool kCanBeTornDown = true;
       const fuchsia_sysmem::SecureHeapRange& heap_range = heap.ranges()->at(0);
@@ -1008,7 +1013,8 @@ zx_status_t Device::RegisterSecureMemInternal(
       v2_heap.id() = 0;
       auto secure_allocator = std::make_unique<ContiguousPooledMemoryAllocator>(
           this, "tee_secure", &heaps_, v2_heap, *heap_range.size_bytes(), kIsAlwaysCpuAccessible,
-          kIsEverCpuAccessible, kIsReady, kCanBeTornDown, loop_dispatcher());
+          kIsEverCpuAccessible, kIsEverZirconAccessible, kIsReady, kCanBeTornDown,
+          loop_dispatcher());
       status = secure_allocator->InitPhysical(heap_range.physical_address().value());
       // A failing status is fatal for now.
       ZX_ASSERT_MSG(status == ZX_OK, "%s", zx_status_get_string(status));
