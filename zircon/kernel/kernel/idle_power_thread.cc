@@ -338,6 +338,9 @@ zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_boot_time_t resume_
             active_to_suspend_result.status, ToString(active_to_suspend_result.starting_state));
     }
 
+    dprintf(INFO, "Pending wake events:\n");
+    WakeEvent::DumpPending(stdout);
+
     // If the boot CPU is in the Wakeup state, set it to Active.
     StateMachine expected = kWakeup;
     const bool succeeded = boot_idle_power_thread.CompareExchangeState(expected, kActive);
