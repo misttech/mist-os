@@ -160,16 +160,15 @@ impl std::fmt::Debug for Peer {
     }
 }
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 /// Error from the run loops for a peer (client or server) - captures a little semantic detail
 /// to help direct reactions to this peer disappearing.
 #[derive(Debug)]
 enum RunnerError {
     RouterGone,
     ConnectionClosed(Option<String>),
-    BadFrameType(FrameType),
-    HandshakeError(Error),
-    ServiceError(Error),
+    BadFrameType { _frame_type: FrameType },
+    HandshakeError { _error: Error },
+    ServiceError { _error: Error },
 }
 
 impl Peer {
@@ -433,7 +432,7 @@ async fn client_conn_stream(
 
     let (conn_stream_writer, mut conn_stream_reader) =
         client_handshake(my_node_id, peer_node_id, writer, reader, conn)
-            .map_err(RunnerError::HandshakeError)
+            .map_err(|e| RunnerError::HandshakeError { _error: e })
             .await?;
 
     let _track_connection = TrackClientConnection::new(&get_router()?, peer_node_id).await;
@@ -454,24 +453,27 @@ async fn client_conn_stream(
             tracing::trace!(my_node_id = my_node_id.0, clipeer = peer_node_id.0, "done commands");
             Ok(())
         }
-        .map_err(RunnerError::ServiceError),
+        .map_err(|e| RunnerError::ServiceError { _error: e }),
         async move {
             loop {
-                let (frame_type, mut bytes) =
-                    match conn_stream_reader.next().await.map_err(RunnerError::ServiceError)? {
-                        FramedStreamReadResult::Frame(frame_type, bytes) => (frame_type, bytes),
-                        FramedStreamReadResult::Closed(s) => {
-                            return Err(RunnerError::ConnectionClosed(s))
-                        }
-                    };
+                let (frame_type, mut bytes) = match conn_stream_reader
+                    .next()
+                    .await
+                    .map_err(|e| RunnerError::ServiceError { _error: e })?
+                {
+                    FramedStreamReadResult::Frame(frame_type, bytes) => (frame_type, bytes),
+                    FramedStreamReadResult::Closed(s) => {
+                        return Err(RunnerError::ConnectionClosed(s))
+                    }
+                };
                 match frame_type {
                     FrameType::Hello | FrameType::Control | FrameType::Signal => {
-                        return Err(RunnerError::BadFrameType(frame_type));
+                        return Err(RunnerError::BadFrameType { _frame_type: frame_type });
                     }
                     FrameType::Data => {
                         client_conn_handle_incoming_frame(my_node_id, peer_node_id, &mut bytes)
                             .await
-                            .map_err(RunnerError::ServiceError)?;
+                            .map_err(|e| RunnerError::ServiceError { _error: e })?;
                     }
                 }
             }
@@ -498,7 +500,7 @@ async fn client_conn_stream(
                     .await?;
             }
         }
-        .map_err(RunnerError::ServiceError),
+        .map_err(|e| RunnerError::ServiceError { _error: e }),
     )
     .await?;
 
@@ -600,25 +602,28 @@ async fn server_conn_stream(
     let my_node_id = Weak::upgrade(&router).ok_or_else(|| RunnerError::RouterGone)?.node_id();
     let (conn_stream_writer, mut conn_stream_reader) =
         server_handshake(my_node_id, node_id, writer, reader, conn)
-            .map_err(RunnerError::HandshakeError)
+            .map_err(|e| RunnerError::HandshakeError { _error: e })
             .await?;
 
     loop {
         tracing::trace!(my_node_id = my_node_id.0, svrpeer = node_id.0, "await message");
-        let (frame_type, mut bytes) =
-            match conn_stream_reader.next().await.map_err(RunnerError::ServiceError)? {
-                FramedStreamReadResult::Frame(frame_type, bytes) => (frame_type, bytes),
-                FramedStreamReadResult::Closed(s) => return Err(RunnerError::ConnectionClosed(s)),
-            };
+        let (frame_type, mut bytes) = match conn_stream_reader
+            .next()
+            .await
+            .map_err(|e| RunnerError::ServiceError { _error: e })?
+        {
+            FramedStreamReadResult::Frame(frame_type, bytes) => (frame_type, bytes),
+            FramedStreamReadResult::Closed(s) => return Err(RunnerError::ConnectionClosed(s)),
+        };
 
         let router = Weak::upgrade(&router).ok_or_else(|| RunnerError::RouterGone)?;
         match frame_type {
             FrameType::Hello | FrameType::Control | FrameType::Signal => {
-                return Err(RunnerError::BadFrameType(frame_type));
+                return Err(RunnerError::BadFrameType { _frame_type: frame_type });
             }
             FrameType::Data => {
                 let msg: PeerMessage =
-                    decode_fidl(&mut bytes).map_err(RunnerError::ServiceError)?;
+                    decode_fidl(&mut bytes).map_err(|e| RunnerError::ServiceError { _error: e })?;
                 tracing::trace!(
                     my_node_id = my_node_id.0,
                     svrpeer = node_id.0,
@@ -638,20 +643,20 @@ async fn server_conn_stream(
                                     ZirconHandle::Channel(ChannelHandle { stream_ref, rights }),
                                     conn_stream_writer.conn(),
                                 )
-                                .map_err(RunnerError::ServiceError)
+                                .map_err(|e| RunnerError::ServiceError { _error: e })
                                 .await?,
                         );
                         router
                             .service_map()
                             .connect(&service_name, app_channel)
-                            .map_err(RunnerError::ServiceError)
+                            .map_err(|e| RunnerError::ServiceError { _error: e })
                             .await?;
                     }
                     PeerMessage::UpdateNodeDescription(PeerDescription { services, .. }) => {
                         router
                             .service_map()
                             .update_node(node_id, services.unwrap_or(vec![]))
-                            .map_err(RunnerError::ServiceError)
+                            .map_err(|e| RunnerError::ServiceError { _error: e })
                             .await?;
                     }
                     PeerMessage::OpenTransfer(OpenTransfer {
@@ -662,10 +667,10 @@ async fn server_conn_stream(
                             .conn()
                             .bind_id(stream_id)
                             .await
-                            .map_err(RunnerError::ServiceError)?;
+                            .map_err(|e| RunnerError::ServiceError { _error: e })?;
                         router
                             .post_transfer(transfer_key, FoundTransfer::Remote(tx, rx))
-                            .map_err(RunnerError::ServiceError)
+                            .map_err(|e| RunnerError::ServiceError { _error: e })
                             .await?;
                     }
                 }
