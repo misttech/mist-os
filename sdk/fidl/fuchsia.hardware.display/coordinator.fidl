@@ -30,30 +30,30 @@ open protocol CoordinatorListener {
     });
 
     /// Called on every display Vertical Synchronization (Vsync) signal.
-    ///
-    /// Response
-    ///
-    ///   A `CoordinatorListener` must respond to an `OnVsync` call
-    ///   immediately upon receipt. Failure to acknowledge `OnVsync` calls
-    ///   will result in the suspension of Vsync event notification.
-    ///
-    ///   If a `CoordinatorListener` fails to respond to vsync messages, the
-    ///   client will store incoming hardware-generated vsyncs in a circular
-    ///   buffer and send them to the listener once it resumes
-    ///   acknowledgement.
-    ///   Due to limited size of the buffers, only the most recently received
-    ///   Vsyncs will be stored and older ones will be dropped.
-    ///
-    /// + request `display_id` identifies the display on which the Vsync
-    ///   occurred.
-    /// + request `timestamp` indicates the time the Vsync occurred.
-    /// + request `applied_config_stamp` the stamp of the latest
-    ///   configuration that has been applied to the display.
-    strict OnVsync(resource struct {
+    strict OnVsync(struct {
+        /// The display on which the Vsync occurred.
         display_id fuchsia.hardware.display.types.DisplayId;
-        timestamp uint64;
+
+        /// The time the Vsync occurred.
+        timestamp zx.Time;
+
+        /// The stamp of the latest configuration that has been applied to the
+        /// display.
         applied_config_stamp fuchsia.hardware.display.types.ConfigStamp;
-    }) -> ();
+
+        /// If valid, the `Coordinator` client must acknowledge the Vsync
+        /// signal immediately upon receipt by calling `AcknowledgeVsync()`.
+        /// Failure to acknowledge `OnVsync` calls will result in the
+        /// suspension of Vsync event notification.
+        ///
+        /// If a `Coordinator` client fails to respond to vsync messages,
+        /// the client will throttle Vsync events. Information about the
+        /// throttled events is stored in a bounded queue, which drops the
+        /// oldest events when it reaches its capacity. When the client
+        /// acknowledges VSync receipt, the coordinator delivers all VSync
+        /// events for all the entries in the queue.
+        cookie VsyncAckCookie;
+    });
 
     /// Called when the corresponding `Coordinator` client gains or loses
     /// ownership of the displays.
