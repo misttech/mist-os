@@ -7030,14 +7030,23 @@ static zx_status_t brcmf_enable_bw40_2g(struct brcmf_cfg80211_info* cfg) {
 // Individual offloads (e.g. BTM) may require additional configuration.
 static zx_status_t brcmf_configure_wnm_offloads(struct brcmf_if* ifp) {
   bcme_status_t fwerr;
-  const uint32_t kAllWnmOffloadsDisabled = 0;
-  uint32_t wnm_offloads = kAllWnmOffloadsDisabled;
+  uint32_t wnm;
+  zx_status_t status = brcmf_fil_iovar_int_get(ifp, "wnm", &wnm, &fwerr);
+  if (status != ZX_OK) {
+    BRCMF_DBG(FIL, "BSS Transition Management firmware offload lookup failed, firmware error %s",
+              brcmf_fil_get_errstr(fwerr));
+  }
+
   if (brcmf_feat_is_enabled(ifp, BRCMF_FEAT_WNM_BTM)) {
     BRCMF_DBG(FIL, "WNM BTM firmware offload will be enabled in firmware");
-    wnm_offloads |= WL_WNM_BSSTRANS;
+    wnm |= WL_WNM_BSSTRANS;
+  } else {
+    BRCMF_DBG(FIL, "WNM BTM firmware offload will be disabled in firmware");
+    wnm &= ~WL_WNM_BSSTRANS;
   }
-  auto status = brcmf_fil_iovar_int_set(ifp, "wnm", wnm_offloads, &fwerr);
-  if (wnm_offloads != kAllWnmOffloadsDisabled) {
+
+  status = brcmf_fil_iovar_int_set(ifp, "wnm", wnm, &fwerr);
+  if (wnm & WL_WNM_BSSTRANS) {
     if (status == ZX_OK) {
       BRCMF_DBG(FIL, "WNM firmware offload(s) enabled in firmware");
     }
