@@ -4,13 +4,13 @@
 
 use anyhow::{Context as _, Error};
 use async_trait::async_trait;
-use block_client::{BlockClient, MutableBufferSlice, RemoteBlockClient, VmoId};
 use fidl_fuchsia_hardware_block::BlockProxy;
 use fidl_fuchsia_paver::{PayloadStreamRequest, PayloadStreamRequestStream, ReadInfo, ReadResult};
 use fuchsia_zircon as zx;
 use futures::lock::Mutex;
 use futures::prelude::*;
 use mapped_vmo::Mapping;
+use remote_block_device::{BlockClient, MutableBufferSlice, RemoteBlockClient, VmoId};
 use std::io::Read;
 
 /// Callback type, called with (data_read, data_total)

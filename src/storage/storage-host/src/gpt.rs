@@ -5,11 +5,13 @@
 use crate::partition::PartitionBackend;
 use crate::partitions_directory::PartitionsDirectory;
 use anyhow::{anyhow, Context as _, Error};
-use block_client::{BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient, VmoId};
 use block_server::async_interface::SessionManager;
 use block_server::BlockServer;
 use fs_management::filesystem::BlockConnector;
 use fuchsia_zircon as zx;
+use remote_block_device::{
+    BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient, VmoId,
+};
 use std::collections::BTreeMap;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
@@ -322,11 +324,13 @@ mod tests {
     use super::GptManager;
     use crate::gpt::format::testing::{format_gpt, PartitionDescriptor};
     use anyhow::Error;
-    use block_client::{BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient};
     use event_listener::{Event, EventListener};
     use fake_block_server::FakeServer;
     use fidl::endpoints::{ClientEnd, Proxy as _};
     use fs_management::filesystem::BlockConnector;
+    use remote_block_device::{
+        BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient,
+    };
     use std::sync::{Arc, Mutex};
     use vfs::directory::entry_container::Directory as _;
     use vfs::ObjectRequest;

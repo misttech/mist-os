@@ -90,10 +90,10 @@ impl VecReader {
 mod fuchsia {
     use super::{Reader, ReaderError};
     use anyhow::Error;
-    use block_client::{Cache, RemoteBlockClientSync};
     use fidl::endpoints::ClientEnd;
     use fidl_fuchsia_hardware_block::BlockMarker;
     use fuchsia_zircon as zx;
+    use remote_block_device::{Cache, RemoteBlockClientSync};
     use std::sync::{Arc, Mutex};
     use tracing::error;
 

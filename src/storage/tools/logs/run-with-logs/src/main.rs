@@ -3,10 +3,10 @@
 // found in the LICENSE file.
 
 use argh::FromArgs;
-use block_client::{Cache, RemoteBlockClientSync};
 use byteorder::{LittleEndian, WriteBytesExt};
 use fidl_fuchsia_hardware_block::BlockMarker;
 use fuchsia_component::client::connect_channel_to_protocol_at_path;
+use remote_block_device::{Cache, RemoteBlockClientSync};
 use std::io::Write;
 use std::process::{Command, Output};
 

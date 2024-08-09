@@ -4,7 +4,6 @@
 
 use crate::BootloaderType;
 use anyhow::{Context as _, Error};
-use block_client::{BlockClient, MutableBufferSlice, RemoteBlockClient};
 use fidl::endpoints::Proxy;
 use fidl_fuchsia_fshost::{BlockWatcherMarker, BlockWatcherProxy};
 use fidl_fuchsia_hardware_block::BlockMarker;
@@ -16,6 +15,7 @@ use futures::future::try_join;
 use futures::TryFutureExt;
 use payload_streamer::{BlockDevicePayloadStreamer, PayloadStreamer};
 use recovery_util_block::BlockDevice;
+use remote_block_device::{BlockClient, MutableBufferSlice, RemoteBlockClient};
 use std::cmp::min;
 use std::fmt;
 use std::sync::Mutex;

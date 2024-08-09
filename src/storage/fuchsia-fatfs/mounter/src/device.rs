@@ -3,11 +3,11 @@
 // found in the LICENSE file.
 
 use anyhow::{Context as _, Error};
-use block_client::RemoteBlockClientSync;
 use fidl::endpoints::{ClientEnd, Proxy as _};
 use fidl_fuchsia_hardware_block::{BlockMarker, BlockProxy};
 use fidl_fuchsia_hardware_block_partition::{Guid, PartitionMarker};
 use fuchsia_fatfs::FatFs;
+use remote_block_device::RemoteBlockClientSync;
 use tracing::info;
 use vfs::execution_scope::ExecutionScope;
 use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
@@ -48,7 +48,8 @@ impl FatDevice {
             .into_channel()
             .map_err(|_: BlockProxy| anyhow::anyhow!("failed to get block channel"))?;
         let client_end = ClientEnd::<BlockMarker>::new(channel.into());
-        let device = Box::new(block_client::Cache::new(RemoteBlockClientSync::new(client_end)?)?);
+        let device =
+            Box::new(remote_block_device::Cache::new(RemoteBlockClientSync::new(client_end)?)?);
         // TODO(simonshields): if this fails, we could try looking for another partition.
         let fs = FatFs::new(device)?;
 
@@ -289,14 +290,14 @@ pub mod test {
     pub fn format(client_end: ClientEnd<BlockMarker>) {
         // Create a filesystem on the ramdisk.
         let remote_block_client = RemoteBlockClientSync::new(client_end).unwrap();
-        let device = Box::new(block_client::Cache::new(remote_block_client).unwrap());
+        let device = Box::new(remote_block_device::Cache::new(remote_block_client).unwrap());
         fatfs::format_volume(device, fatfs::FormatVolumeOptions::new())
             .expect("Format volume succeeds");
     }
 
     pub fn setup_test_fs(client_end: ClientEnd<BlockMarker>, name: &str) {
         let remote_block_client = RemoteBlockClientSync::new(client_end).unwrap();
-        let device = Box::new(block_client::Cache::new(remote_block_client).unwrap());
+        let device = Box::new(remote_block_device::Cache::new(remote_block_client).unwrap());
         let fs = fatfs::FileSystem::new(device, fatfs::FsOptions::new())
             .expect("Create filesystem succeeds");
 

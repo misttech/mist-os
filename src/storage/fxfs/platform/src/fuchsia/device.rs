@@ -5,7 +5,6 @@ use crate::fuchsia::errors::map_to_status;
 use crate::fuchsia::file::FxFile;
 use crate::fuchsia::node::OpenedNode;
 use anyhow::Error;
-use block_client::{BlockFifoRequest, BlockFifoResponse};
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_hardware_block_volume::{
     self as volume, VolumeAndNodeMarker, VolumeAndNodeRequest,
@@ -15,6 +14,7 @@ use futures::stream::TryStreamExt;
 use futures::try_join;
 use fxfs::errors::FxfsError;
 use fxfs::round::{round_down, round_up};
+use remote_block_device::{BlockFifoRequest, BlockFifoResponse};
 use rustc_hash::FxHashMap as HashMap;
 use std::collections::BTreeMap;
 use std::hash::{Hash, Hasher};
@@ -197,34 +197,34 @@ impl BlockServer {
             status.into_raw()
         }
 
-        match block_client::BlockOpcode::from_primitive(request.command.opcode) {
-            Some(block_client::BlockOpcode::CloseVmo) => {
+        match remote_block_device::BlockOpcode::from_primitive(request.command.opcode) {
+            Some(remote_block_device::BlockOpcode::CloseVmo) => {
                 let mut vmos = self.vmos.lock().unwrap();
                 match vmos.remove(&request.vmoid) {
                     Some(_vmo) => zx::sys::ZX_OK,
                     None => zx::sys::ZX_ERR_NOT_FOUND,
                 }
             }
-            Some(block_client::BlockOpcode::Write) => {
+            Some(remote_block_device::BlockOpcode::Write) => {
                 into_raw_status(self.handle_blockio_write(&request).await)
             }
-            Some(block_client::BlockOpcode::Read) => {
+            Some(remote_block_device::BlockOpcode::Read) => {
                 into_raw_status(self.handle_blockio_read(&request).await)
             }
             // TODO(https://fxbug.dev/42171261): simply returning ZX_OK since we're
             // writing to device and no need to flush cache, but need to
             // check that flush goes down the stack
-            Some(block_client::BlockOpcode::Flush) => zx::sys::ZX_OK,
+            Some(remote_block_device::BlockOpcode::Flush) => zx::sys::ZX_OK,
             // TODO(https://fxbug.dev/42171261)
-            Some(block_client::BlockOpcode::Trim) => zx::sys::ZX_OK,
+            Some(remote_block_device::BlockOpcode::Trim) => zx::sys::ZX_OK,
             None => panic!("Unexpected message, request {:?}", request.command.opcode),
         }
     }
 
     async fn handle_fifo_request(&self, request: BlockFifoRequest) -> Option<BlockFifoResponse> {
-        let flags = block_client::BlockIoFlag::from_bits_truncate(request.command.flags);
-        let is_group = flags.contains(block_client::BlockIoFlag::GROUP_ITEM);
-        let wants_reply = flags.contains(block_client::BlockIoFlag::GROUP_LAST);
+        let flags = remote_block_device::BlockIoFlag::from_bits_truncate(request.command.flags);
+        let is_group = flags.contains(remote_block_device::BlockIoFlag::GROUP_ITEM);
+        let wants_reply = flags.contains(remote_block_device::BlockIoFlag::GROUP_LAST);
 
         // Set up the BlockFifoResponse for this request, but do no process request yet
         let mut maybe_reply = {
@@ -591,7 +591,6 @@ impl BlockServer {
 #[cfg(test)]
 mod tests {
     use crate::fuchsia::testing::{open_file_checked, TestFixture};
-    use block_client::{BlockClient, RemoteBlockClient, VmoId};
     use fidl::endpoints::{ClientEnd, ServerEnd};
     use fidl_fuchsia_device::ControllerMarker;
     use fidl_fuchsia_hardware_block::BlockMarker;
@@ -599,6 +598,7 @@ mod tests {
     use fs_management::filesystem::Filesystem;
     use fs_management::Blobfs;
     use futures::join;
+    use remote_block_device::{BlockClient, RemoteBlockClient, VmoId};
     use rustc_hash::FxHashSet as HashSet;
     use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
@@ -735,7 +735,7 @@ mod tests {
         let (client_channel, server_channel) = zx::Channel::create();
         join!(
             async {
-                let block_client = RemoteBlockClient::new(
+                let remote_block_device = RemoteBlockClient::new(
                     ClientEnd::<BlockMarker>::new(client_channel)
                         .into_proxy()
                         .expect("create proxy"),
@@ -745,7 +745,7 @@ mod tests {
                 let mut vmo_set = HashSet::default();
                 let vmo = zx::Vmo::create(1).expect("Vmo::create failed");
                 for _ in 1..5 {
-                    match block_client.attach_vmo(&vmo).await {
+                    match remote_block_device.attach_vmo(&vmo).await {
                         Ok(vmo_id) => {
                             // TODO(https://fxbug.dev/42171261): need to detach vmoid. into_id() is a
                             // temporary solution. Remove this after detaching vmo has been
@@ -780,7 +780,7 @@ mod tests {
         let (client_channel, server_channel) = zx::Channel::create();
         join!(
             async {
-                let block_client = RemoteBlockClient::new(
+                let remote_block_device = RemoteBlockClient::new(
                     ClientEnd::<BlockMarker>::new(client_channel)
                         .into_proxy()
                         .expect("create proxy"),
@@ -788,10 +788,10 @@ mod tests {
                 .await
                 .expect("RemoteBlockClient::new failed");
                 let vmo = zx::Vmo::create(1).expect("Vmo::create failed");
-                let vmo_id = block_client.attach_vmo(&vmo).await.expect("attach_vmo failed");
+                let vmo_id = remote_block_device.attach_vmo(&vmo).await.expect("attach_vmo failed");
                 let vmo_id_copy = VmoId::new(vmo_id.id());
-                block_client.detach_vmo(vmo_id).await.expect("detach failed");
-                block_client.detach_vmo(vmo_id_copy).await.expect_err("detach succeeded");
+                remote_block_device.detach_vmo(vmo_id).await.expect("detach failed");
+                remote_block_device.detach_vmo(vmo_id_copy).await.expect_err("detach succeeded");
             },
             async {
                 let root = fixture.root();
@@ -816,7 +816,7 @@ mod tests {
         let (client_channel, server_channel) = zx::Channel::create();
         join!(
             async {
-                let block_client = RemoteBlockClient::new(
+                let remote_block_device = RemoteBlockClient::new(
                     ClientEnd::<BlockMarker>::new(client_channel)
                         .into_proxy()
                         .expect("create proxy"),
@@ -824,20 +824,20 @@ mod tests {
                 .await
                 .expect("RemoteBlockClient::new failed");
                 let vmo = zx::Vmo::create(131072).expect("create vmo failed");
-                let vmo_id = block_client.attach_vmo(&vmo).await.expect("attach_vmo failed");
+                let vmo_id = remote_block_device.attach_vmo(&vmo).await.expect("attach_vmo failed");
 
                 // Must write with length as a multiple of the block_size
-                let offset = block_client.block_size() as usize;
-                let len = block_client.block_size() as usize;
+                let offset = remote_block_device.block_size() as usize;
+                let len = remote_block_device.block_size() as usize;
                 let write_buf = vec![0xa3u8; len];
-                block_client
+                remote_block_device
                     .write_at(write_buf[..].into(), offset as u64)
                     .await
                     .expect("write_at failed");
 
                 // Read back an extra block either side
-                let mut read_buf = vec![0u8; len + 2 * block_client.block_size() as usize];
-                block_client
+                let mut read_buf = vec![0u8; len + 2 * remote_block_device.block_size() as usize];
+                remote_block_device
                     .read_at(read_buf.as_mut_slice().into(), 0)
                     .await
                     .expect("read_at failed");
@@ -850,10 +850,10 @@ mod tests {
                 // We expect the extra block on the RHS of the read_buf to be 0
                 assert_eq!(
                     &read_buf[offset + len..],
-                    &vec![0; block_client.block_size() as usize][..]
+                    &vec![0; remote_block_device.block_size() as usize][..]
                 );
 
-                block_client.detach_vmo(vmo_id).await.expect("detach failed");
+                remote_block_device.detach_vmo(vmo_id).await.expect("detach failed");
             },
             async {
                 let root = fixture.root();
@@ -878,14 +878,14 @@ mod tests {
         let (client_channel, server_channel) = zx::Channel::create();
         join!(
             async {
-                let block_client = RemoteBlockClient::new(
+                let remote_block_device = RemoteBlockClient::new(
                     ClientEnd::<BlockMarker>::new(client_channel)
                         .into_proxy()
                         .expect("create proxy"),
                 )
                 .await
                 .expect("RemoteBlockClient::new failed");
-                block_client.flush().await.expect("flush failed");
+                remote_block_device.flush().await.expect("flush failed");
             },
             async {
                 let root = fixture.root();

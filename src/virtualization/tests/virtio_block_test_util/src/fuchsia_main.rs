@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use block_client::{BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient};
 use fidl_fuchsia_hardware_block::BlockMarker;
 use fuchsia_component::client;
 use fuchsia_fs::{directory, OpenFlags};
+use remote_block_device::{BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient};
 use structopt::StructOpt;
 
 const BLOCK_CLASS_PATH: &str = "/dev/class/block/";

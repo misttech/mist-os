@@ -7,12 +7,12 @@
 #![deny(missing_docs)]
 
 use anyhow::{bail, Context, Error};
-use block_client::cache::Cache;
-use block_client::RemoteBlockClientSync;
 use byteorder::{LittleEndian, WriteBytesExt};
 use fidl_fuchsia_hardware_block::BlockMarker;
 use fuchsia_fs::directory::{readdir_recursive, DirEntry, DirentKind};
 use futures::StreamExt;
+use remote_block_device::cache::Cache;
+use remote_block_device::RemoteBlockClientSync;
 use std::io::Write;
 use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 

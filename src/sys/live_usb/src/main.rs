@@ -144,9 +144,9 @@ mod tests {
         let builder = RamdiskClientBuilder::new(512, ramdisk_size / 512);
         let ramdisk = builder.build().await.expect("creating ramdisk succeeds");
         let channel = ramdisk.open().await.expect("opening ramdisk succeeds");
-        let block_client = block_client::RemoteBlockClientSync::new(channel)
+        let block_client = remote_block_device::RemoteBlockClientSync::new(channel)
             .expect("creating remote block client succeeds");
-        let cache = block_client::cache::Cache::new(block_client)
+        let cache = remote_block_device::cache::Cache::new(block_client)
             .expect("creating remote block client cache succeeds");
         let wrapper = Box::new(WrappedBlockDevice::new(cache, 512));
         let mut disk = GptConfig::new()

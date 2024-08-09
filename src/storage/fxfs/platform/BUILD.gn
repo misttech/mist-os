@@ -58,7 +58,7 @@ rustc_library("platform") {
       "//src/storage/fxfs/crypto",
       "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
       "//src/storage/fxfs/trace",
-      "//src/storage/lib/block_client/rust",
+      "//src/storage/lib/block_client/rust:remote-block-device",
       "//src/storage/lib/delivery_blob",
       "//src/storage/lib/fs_inspect",
       "//src/storage/lib/storage_device",

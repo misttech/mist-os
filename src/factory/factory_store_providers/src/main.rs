@@ -6,7 +6,6 @@ mod config;
 mod validators;
 
 use anyhow::{format_err, Error};
-use block_client::BlockClient as _;
 use config::{Config, ConfigContext, FactoryConfig};
 use fidl::endpoints::{create_proxy, ProtocolMarker, Request, RequestStream, ServerEnd};
 use fidl_fuchsia_boot::FactoryItemsMarker;
@@ -26,6 +25,7 @@ use fuchsia_bootfs::BootfsParser;
 use fuchsia_component::server::ServiceFs;
 use futures::lock::Mutex;
 use futures::{StreamExt as _, TryFutureExt as _, TryStreamExt as _};
+use remote_block_device::BlockClient as _;
 use std::io;
 use std::sync::Arc;
 use vfs::directory::entry_container::Directory;
@@ -245,7 +245,7 @@ async fn open_factory_source(factory_config: FactoryConfig) -> Result<fio::Direc
             let proxy = fuchsia_component::client::connect_to_protocol_at_path::<
                 fhardware_block::BlockMarker,
             >(&block_path)?;
-            let block_client = block_client::RemoteBlockClient::new(proxy).await?;
+            let block_client = remote_block_device::RemoteBlockClient::new(proxy).await?;
             let block_count = block_client.block_count();
             let block_size = block_client.block_size();
             let size = block_count.checked_mul(block_size.into()).ok_or_else(|| {
@@ -255,7 +255,7 @@ async fn open_factory_source(factory_config: FactoryConfig) -> Result<fio::Direc
                 let size = size.try_into()?;
                 let mut buf = vec![0u8; size];
                 let () = block_client
-                    .read_at(block_client::MutableBufferSlice::Memory(buf.as_mut_slice()), 0)
+                    .read_at(remote_block_device::MutableBufferSlice::Memory(buf.as_mut_slice()), 0)
                     .await?;
                 Ok::<_, Error>(buf)
             }

@@ -38,7 +38,7 @@ rustc_library("fshost_test_fixture") {
     "//src/storage/fxfs-crypt",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/storage/lib/blob_writer:blob-writer",
-    "//src/storage/lib/block_client/rust",
+    "//src/storage/lib/block_client/rust:remote-block-device",
     "//src/storage/lib/delivery_blob",
     "//src/storage/lib/fs_management/rust:fs_management",
     "//src/storage/lib/key-bag",
@@ -246,7 +246,7 @@ template("fshost_integration_test_package") {
       "//src/lib/fidl/rust/fidl",
       "//src/lib/fuchsia-fs",
       "//src/lib/zircon/rust:fuchsia-zircon",
-      "//src/storage/lib/block_client/rust",
+      "//src/storage/lib/block_client/rust:remote-block-device",
       "//src/storage/lib/fs_management/rust:fs_management",
     ]
   }
