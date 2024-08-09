@@ -34,6 +34,7 @@ class MockGpioImpl : public fdf::WireServer<fuchsia_hardware_gpioimpl::GpioImpl>
     fuchsia_hardware_gpio::GpioFlags flags;
     uint64_t alt_function = UINT64_MAX;
     uint64_t drive_strength = UINT64_MAX;
+    fuchsia_hardware_gpio::GpioPolarity polarity;
   };
 
   PinState pin_state(uint32_t index) { return pin_state_internal(index); }
@@ -103,7 +104,10 @@ class MockGpioImpl : public fdf::WireServer<fuchsia_hardware_gpioimpl::GpioImpl>
     completer.buffer(arena).ReplySuccess();
   }
   void SetPolarity(fuchsia_hardware_gpioimpl::wire::GpioImplSetPolarityRequest* request,
-                   fdf::Arena& arena, SetPolarityCompleter::Sync& completer) override {}
+                   fdf::Arena& arena, SetPolarityCompleter::Sync& completer) override {
+    pin_state_internal(request->index).polarity = request->polarity;
+    completer.buffer(arena).ReplySuccess();
+  }
   void SetDriveStrength(fuchsia_hardware_gpioimpl::wire::GpioImplSetDriveStrengthRequest* request,
                         fdf::Arena& arena, SetDriveStrengthCompleter::Sync& completer) override {
     if (request->index > kMaxInitStepPinIndex) {
@@ -248,6 +252,83 @@ TEST_F(GpioTest, TestFidlAll) {
       });
   driver_test().runtime().Run();
   driver_test().runtime().ResetQuit();
+
+  fidl::Arena arena;
+  auto interrupt_config = [&arena](fuchsia_hardware_gpio::InterruptMode mode) {
+    return fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena).mode(mode).Build();
+  };
+
+  gpio_client->ConfigureInterrupt(interrupt_config(fuchsia_hardware_gpio::InterruptMode::kEdgeHigh))
+      .ThenExactlyOnce(
+          [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ConfigureInterrupt>& result) {
+            ASSERT_OK(result.status());
+            EXPECT_TRUE(result->is_ok());
+            driver_test().runtime().Quit();
+          });
+  driver_test().runtime().Run();
+  driver_test().runtime().ResetQuit();
+
+  EXPECT_EQ(pin_state(1).polarity, fuchsia_hardware_gpio::GpioPolarity::kHigh);
+
+  gpio_client->ConfigureInterrupt(interrupt_config(fuchsia_hardware_gpio::InterruptMode::kEdgeLow))
+      .ThenExactlyOnce(
+          [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ConfigureInterrupt>& result) {
+            ASSERT_OK(result.status());
+            EXPECT_TRUE(result->is_ok());
+            driver_test().runtime().Quit();
+          });
+  driver_test().runtime().Run();
+  driver_test().runtime().ResetQuit();
+
+  EXPECT_EQ(pin_state(1).polarity, fuchsia_hardware_gpio::GpioPolarity::kLow);
+
+  gpio_client
+      ->ConfigureInterrupt(interrupt_config(fuchsia_hardware_gpio::InterruptMode::kLevelHigh))
+      .ThenExactlyOnce(
+          [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ConfigureInterrupt>& result) {
+            ASSERT_OK(result.status());
+            EXPECT_TRUE(result->is_ok());
+            driver_test().runtime().Quit();
+          });
+  driver_test().runtime().Run();
+  driver_test().runtime().ResetQuit();
+
+  EXPECT_EQ(pin_state(1).polarity, fuchsia_hardware_gpio::GpioPolarity::kHigh);
+
+  gpio_client->ConfigureInterrupt(interrupt_config(fuchsia_hardware_gpio::InterruptMode::kLevelLow))
+      .ThenExactlyOnce(
+          [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ConfigureInterrupt>& result) {
+            ASSERT_OK(result.status());
+            EXPECT_TRUE(result->is_ok());
+            driver_test().runtime().Quit();
+          });
+  driver_test().runtime().Run();
+  driver_test().runtime().ResetQuit();
+
+  EXPECT_EQ(pin_state(1).polarity, fuchsia_hardware_gpio::GpioPolarity::kLow);
+
+  gpio_client->ConfigureInterrupt(interrupt_config(fuchsia_hardware_gpio::InterruptMode::kEdgeBoth))
+      .ThenExactlyOnce(
+          [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ConfigureInterrupt>& result) {
+            ASSERT_OK(result.status());
+            EXPECT_TRUE(result->is_ok());
+            driver_test().runtime().Quit();
+          });
+  driver_test().runtime().Run();
+  driver_test().runtime().ResetQuit();
+
+  EXPECT_EQ(pin_state(1).polarity, fuchsia_hardware_gpio::GpioPolarity::kLow);
+
+  gpio_client->ConfigureInterrupt({}).ThenExactlyOnce(
+      [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ConfigureInterrupt>& result) {
+        ASSERT_OK(result.status());
+        EXPECT_TRUE(result->is_error());
+        driver_test().runtime().Quit();
+      });
+  driver_test().runtime().Run();
+  driver_test().runtime().ResetQuit();
+
+  EXPECT_EQ(pin_state(1).polarity, fuchsia_hardware_gpio::GpioPolarity::kLow);
 
   EXPECT_TRUE(driver_test().StopDriver().is_ok());
 }

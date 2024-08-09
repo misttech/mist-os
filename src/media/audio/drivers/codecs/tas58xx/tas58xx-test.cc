@@ -81,8 +81,7 @@ class Tas58xxTest : public inspect::InspectTestHelper, public zxtest::Test {
 
     auto fault_gpio_client = fault_gpio_.SyncCall(&fake_gpio::FakeGpio::Connect);
     fault_gpio_.SyncCall(&fake_gpio::FakeGpio::SetCurrentState,
-                         fake_gpio::State{.polarity = fuchsia_hardware_gpio::GpioPolarity::kHigh,
-                                          .sub_state = fake_gpio::ReadSubState()});
+                         fake_gpio::State{.sub_state = fake_gpio::ReadSubState()});
 
     ASSERT_OK(SimpleCodecServer::CreateAndAddToDdk<Tas58xxCodec>(
         fake_parent_.get(), std::move(endpoints.client), std::move(fault_gpio_client)));

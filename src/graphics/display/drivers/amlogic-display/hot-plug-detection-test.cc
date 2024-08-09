@@ -158,7 +158,7 @@ TEST_F(HotPlugDetectionTest, DisplayPlug) {
 
   runtime_.RunUntil([&] { return GetHotPlugDetectionStates().size() >= 1; });
   EXPECT_THAT(GetHotPlugDetectionStates(), testing::ElementsAre(HotPlugDetectionState::kDetected));
-  EXPECT_EQ(pin_gpio_.GetPolarity(), fuchsia_hardware_gpio::GpioPolarity::kLow);
+  EXPECT_EQ(pin_gpio_.GetInterruptMode(), fuchsia_hardware_gpio::InterruptMode::kLevelLow);
 
   DestroyHotPlugDetection(hpd);
 }
@@ -180,7 +180,7 @@ TEST_F(HotPlugDetectionTest, DisplayPlugUnplug) {
       GetHotPlugDetectionStates(),
       testing::ElementsAre(HotPlugDetectionState::kDetected, HotPlugDetectionState::kNotDetected));
 
-  EXPECT_EQ(pin_gpio_.GetPolarity(), fuchsia_hardware_gpio::GpioPolarity::kHigh);
+  EXPECT_EQ(pin_gpio_.GetInterruptMode(), fuchsia_hardware_gpio::InterruptMode::kLevelHigh);
 
   DestroyHotPlugDetection(hpd);
 }

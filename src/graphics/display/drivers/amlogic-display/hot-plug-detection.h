@@ -86,10 +86,10 @@ class HotPlugDetection {
   static HotPlugDetectionState GpioValueToState(bool gpio_value);
 
   // The GPIO polarity for detecting an HPD state change.
-  static fuchsia_hardware_gpio::wire::GpioPolarity GpioPolarityForStateChange(
+  static fuchsia_hardware_gpio::InterruptMode InterruptModeForStateChange(
       HotPlugDetectionState current_state);
 
-  zx::result<> SetPinGpioPolarity(fuchsia_hardware_gpio::GpioPolarity polarity);
+  zx::result<> SetPinInterruptMode(fuchsia_hardware_gpio::InterruptMode mode);
 
   zx::result<HotPlugDetectionState> ReadPinGpioState();
 

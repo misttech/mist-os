@@ -164,8 +164,7 @@ class BaseTestEnvironment : public fdf_testing::Environment {
       return result.take_error();
     }
 
-    gpio_.SetCurrentState(fake_gpio::State{.polarity = fuchsia_hardware_gpio::GpioPolarity::kHigh,
-                                           .sub_state = fake_gpio::WriteSubState{.value = 0}});
+    gpio_.SetCurrentState(fake_gpio::State{.sub_state = fake_gpio::WriteSubState{.value = 0}});
     gpio_.SetWriteCallback([this](fake_gpio::FakeGpio& gpio) {
       if (gpio_writes_.empty()) {
         EXPECT_FALSE(gpio_writes_.empty());
