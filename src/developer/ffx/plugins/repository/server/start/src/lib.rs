@@ -3,17 +3,22 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
+use ffx_config::EnvironmentContext;
 use ffx_repository_server_start_args::StartCommand;
+use ffx_target::TargetProxy;
 use fho::{
-    daemon_protocol, return_bug, return_user_error, Error, FfxContext, FfxMain, FfxTool, Result,
-    VerifiedMachineWriter,
+    daemon_protocol, return_bug, return_user_error, Connector, Error, FfxContext, FfxMain, FfxTool,
+    Result, VerifiedMachineWriter,
 };
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx_ext::RepositoryError;
+use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_net_ext::SocketAddress;
 use pkg::config as pkg_config;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+mod server;
 
 // The output is untagged and OK is flattened to match
 // the legacy output. One day, we'll update the schema and
@@ -39,6 +44,9 @@ pub struct ServerStartTool {
     cmd: StartCommand,
     #[with(daemon_protocol())]
     repos: ffx::RepositoryRegistryProxy,
+    context: EnvironmentContext,
+    pub target_proxy_connector: Connector<TargetProxy>,
+    pub rcs_proxy_connector: Connector<RemoteControlProxy>,
 }
 
 fho::embedded_plugin!(ServerStartTool);
@@ -47,7 +55,22 @@ fho::embedded_plugin!(ServerStartTool);
 impl FfxMain for ServerStartTool {
     type Writer = VerifiedMachineWriter<CommandStatus>;
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
-        match start_impl(self.cmd, self.repos).await {
+        let result = match (self.cmd.daemon, self.cmd.foreground) {
+            (true, false) | (false, false) => start_daemon_server(self.cmd, self.repos).await,
+            (false, true) => {
+                return server::run_foreground_server(
+                    self.cmd,
+                    self.context,
+                    self.target_proxy_connector,
+                    self.rcs_proxy_connector,
+                    writer,
+                )
+                .await
+            }
+            (true, true) => return_user_error!("--daemon and --foreground are mutually exclusive"),
+        };
+
+        match result {
             Ok(server_addr) => {
                 writer.machine_or(
                     &CommandStatus::Ok { address: ServerInfo { address: server_addr } },
@@ -72,10 +95,27 @@ pub struct ServerInfo {
     address: std::net::SocketAddr,
 }
 
-async fn start_impl(
+async fn start_daemon_server(
     cmd: StartCommand,
     repos: ffx::RepositoryRegistryProxy,
 ) -> Result<std::net::SocketAddr> {
+
+    if cmd.no_device
+        || !cmd.alias.is_empty()
+        || cmd.port_path.is_some()
+        || cmd.product_bundle.is_some()
+        || cmd.repo_path.is_some()
+        || cmd.repository.is_some()
+        || cmd.storage_type.is_some()
+        || cmd.trusted_root.is_some()
+        || cmd.refresh_metadata
+    {
+        return_user_error!(
+            "Daemon server mode does not support these options:\n\
+           \t--no-device, --alias, --port-path, --product-bundle, --repo-path,\n\
+           \t--repository, --storage-type, --trusted-root, --refresh-metadata"
+        )
+    }
     let listen_address = match {
         if let Some(addr_flag) = cmd.address {
             Ok(Some(addr_flag))
@@ -153,13 +193,14 @@ async fn start_impl(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use fho::{Format, TestBuffers};
+    use fho::testing::ToolEnv;
+    use fho::{Format, TestBuffers, TryFromEnv as _};
     use fidl_fuchsia_developer_ffx::{RepositoryError, RepositoryRegistryRequest};
     use futures::channel::oneshot::channel;
     use std::net::Ipv4Addr;
 
     #[fuchsia::test]
-    async fn test_start() {
+    async fn test_start_daemon() {
         let test_env = ffx_config::test_init().await.expect("test initialization");
 
         let address = (Ipv4Addr::LOCALHOST, 1234).into();
@@ -180,22 +221,57 @@ mod tests {
             }
             other => panic!("Unexpected request: {:?}", other),
         });
+        let empty_collection: TargetProxy =
+            fho::testing::fake_proxy(move |_| panic!("unepxected call"));
+        let tool_env = ToolEnv::new()
+            .remote_factory_closure(move || async move {
+                Ok(fho::testing::fake_proxy(move |_| panic!("unepxected call")))
+            })
+            .target_factory_closure(move || {
+                let fake_target_proxy = empty_collection.clone();
+                async { Ok(fake_target_proxy) }
+            });
 
-        let tool = ServerStartTool { cmd: StartCommand { address: None }, repos };
+        let env = tool_env.make_environment(test_env.context.clone());
+        let tool = ServerStartTool {
+            cmd: StartCommand {
+                daemon: true,
+                foreground: false,
+                address: None,
+                repository: None,
+                trusted_root: None,
+                repo_path: None,
+                product_bundle: None,
+                alias: vec![],
+                storage_type: None,
+                alias_conflict_mode: ffx_repository_serve_args::default_alias_conflict_mode(),
+                port_path: None,
+                no_device: false,
+                refresh_metadata: false,
+            },
+            repos,
+            context: test_env.context.clone(),
+            target_proxy_connector: Connector::try_from_env(&env)
+                .await
+                .expect("Could not make target proxy test connector"),
+            rcs_proxy_connector: Connector::try_from_env(&env)
+                .await
+                .expect("Could not make RCS test connector"),
+        };
         let buffers = TestBuffers::default();
         let writer = <ServerStartTool as FfxMain>::Writer::new_test(None, &buffers);
 
         let res = tool.main(writer).await;
 
         let (stdout, stderr) = buffers.into_strings();
-        assert!(res.is_ok(), "expected ok: {stdout} {stderr}");
+        assert!(res.is_ok(), "expected got {res:?} stdout == {stdout}");
         assert_eq!(stderr, "");
         assert_eq!(receiver.await, Ok(()));
     }
 
     #[fuchsia::test]
     async fn test_start_runtime_port() {
-        let _test_env = ffx_config::test_init().await.expect("test initialization");
+        let test_env = ffx_config::test_init().await.expect("test initialization");
 
         let address = (Ipv4Addr::LOCALHOST, 8084).into();
 
@@ -208,10 +284,42 @@ mod tests {
             }
             other => panic!("Unexpected request: {:?}", other),
         });
+        let empty_collection: TargetProxy =
+            fho::testing::fake_proxy(move |_| panic!("unepxected call"));
+        let tool_env = ToolEnv::new()
+            .remote_factory_closure(move || async move {
+                Ok(fho::testing::fake_proxy(move |_| panic!("unepxected call")))
+            })
+            .target_factory_closure(move || {
+                let fake_target_proxy = empty_collection.clone();
+                async { Ok(fake_target_proxy) }
+            });
 
+        let env = tool_env.make_environment(test_env.context.clone());
         let tool = ServerStartTool {
-            cmd: StartCommand { address: Some("127.0.0.1:8084".parse().unwrap()) },
+            cmd: StartCommand {
+                daemon: true,
+                foreground: false,
+                address: Some("127.0.0.1:8084".parse().unwrap()),
+                repository: None,
+                trusted_root: None,
+                repo_path: None,
+                product_bundle: None,
+                alias: vec![],
+                storage_type: None,
+                alias_conflict_mode: ffx_repository_serve_args::default_alias_conflict_mode(),
+                port_path: None,
+                no_device: false,
+                refresh_metadata: false,
+            },
             repos,
+            context: test_env.context.clone(),
+            target_proxy_connector: Connector::try_from_env(&env)
+                .await
+                .expect("Could not make target proxy test connector"),
+            rcs_proxy_connector: Connector::try_from_env(&env)
+                .await
+                .expect("Could not make RCS test connector"),
         };
         let buffers = TestBuffers::default();
         let writer = <ServerStartTool as FfxMain>::Writer::new_test(None, &buffers);
@@ -225,7 +333,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn test_start_machine() {
+    async fn test_start_daemon_machine() {
         let test_env = ffx_config::test_init().await.expect("test initialization");
 
         let address = (Ipv4Addr::LOCALHOST, 1234).into();
@@ -246,8 +354,43 @@ mod tests {
             }
             other => panic!("Unexpected request: {:?}", other),
         });
+        let empty_collection: TargetProxy =
+            fho::testing::fake_proxy(move |_| panic!("unepxected call"));
+        let tool_env = ToolEnv::new()
+            .remote_factory_closure(move || async move {
+                Ok(fho::testing::fake_proxy(move |_| panic!("unepxected call")))
+            })
+            .target_factory_closure(move || {
+                let fake_target_proxy = empty_collection.clone();
+                async { Ok(fake_target_proxy) }
+            });
 
-        let tool = ServerStartTool { cmd: StartCommand { address: None }, repos };
+        let env = tool_env.make_environment(test_env.context.clone());
+        let tool = ServerStartTool {
+            cmd: StartCommand {
+                daemon: true,
+                foreground: false,
+                address: None,
+                repository: None,
+                trusted_root: None,
+                repo_path: None,
+                product_bundle: None,
+                alias: vec![],
+                storage_type: None,
+                alias_conflict_mode: ffx_repository_serve_args::default_alias_conflict_mode(),
+                port_path: None,
+                no_device: false,
+                refresh_metadata: false,
+            },
+            repos,
+            context: test_env.context.clone(),
+            target_proxy_connector: Connector::try_from_env(&env)
+                .await
+                .expect("Could not make target proxy test connector"),
+            rcs_proxy_connector: Connector::try_from_env(&env)
+                .await
+                .expect("Could not make RCS test connector"),
+        };
         let buffers = TestBuffers::default();
         let writer = <ServerStartTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
 
@@ -268,7 +411,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_start_failed() {
-        let _test_env = ffx_config::test_init().await.expect("test initialization");
+        let test_env = ffx_config::test_init().await.expect("test initialization");
 
         let (sender, receiver) = channel();
         let mut sender = Some(sender);
@@ -279,8 +422,45 @@ mod tests {
             }
             other => panic!("Unexpected request: {:?}", other),
         });
+        let empty_collection: TargetProxy =
+            fho::testing::fake_proxy(move |_| panic!("unepxected call"));
 
-        let tool = ServerStartTool { cmd: StartCommand { address: None }, repos };
+        let tool_env = ToolEnv::new()
+            .remote_factory_closure(move || async move {
+                Ok(fho::testing::fake_proxy(move |_| panic!("unepxected call")))
+            })
+            .target_factory_closure(move || {
+                let fake_target_proxy = empty_collection.clone();
+                async { Ok(fake_target_proxy) }
+            });
+
+        let env = tool_env.make_environment(test_env.context.clone());
+
+        let tool = ServerStartTool {
+            cmd: StartCommand {
+                daemon: true,
+                foreground: false,
+                address: None,
+                repository: None,
+                trusted_root: None,
+                repo_path: None,
+                product_bundle: None,
+                alias: vec![],
+                storage_type: None,
+                alias_conflict_mode: ffx_repository_serve_args::default_alias_conflict_mode(),
+                port_path: None,
+                no_device: false,
+                refresh_metadata: false,
+            },
+            repos,
+            context: test_env.context.clone(),
+            target_proxy_connector: Connector::try_from_env(&env)
+                .await
+                .expect("Could not make target proxy test connector"),
+            rcs_proxy_connector: Connector::try_from_env(&env)
+                .await
+                .expect("Could not make RCS test connector"),
+        };
         let buffers = TestBuffers::default();
         let writer = <ServerStartTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
 
@@ -318,7 +498,46 @@ mod tests {
             }
             other => panic!("Unexpected request: {:?}", other),
         });
-        let tool = ServerStartTool { cmd: StartCommand { address: None }, repos };
+        let empty_collection: TargetProxy =
+            fho::testing::fake_proxy(move |_| panic!("unepxected call"));
+
+        let tool_env = ToolEnv::new()
+            .remote_factory_closure(move || async move {
+                Ok(fho::testing::fake_proxy(move |_| panic!("unepxected call")))
+            })
+            .target_factory_closure(move || {
+                let fake_target_proxy = empty_collection.clone();
+                async { Ok(fake_target_proxy) }
+            });
+
+        let env = tool_env.make_environment(test_env.context.clone());
+
+        let tool = ServerStartTool {
+            cmd: StartCommand {
+                daemon: true,
+                foreground: false,
+                address: None,
+                repository: None,
+                trusted_root: None,
+                repo_path: None,
+                product_bundle: None,
+                alias: vec![],
+                storage_type: None,
+                alias_conflict_mode: ffx_repository_serve_args::default_alias_conflict_mode(),
+                port_path: None,
+                no_device: false,
+                refresh_metadata: false,
+            },
+            repos,
+            context: env.context.clone(),
+            target_proxy_connector: Connector::try_from_env(&env)
+                .await
+                .expect("Could not make target proxy test connector"),
+            rcs_proxy_connector: Connector::try_from_env(&env)
+                .await
+                .expect("Could not make RCS test connector"),
+        };
+
         let buffers = TestBuffers::default();
         let writer = <ServerStartTool as FfxMain>::Writer::new_test(Some(Format::Json), &buffers);
 
