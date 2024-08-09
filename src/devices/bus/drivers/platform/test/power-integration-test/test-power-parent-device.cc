@@ -80,6 +80,20 @@ zx::result<> FakeParent::Start() {
       }
     }
 
+    server2_ =
+        std::make_unique<fake_parent_device::FakeParentServer>("test-parent-default-element");
+    {
+      auto result = outgoing()->AddService<fuchsia_hardware_power::PowerTokenService>(
+          fuchsia_hardware_power::PowerTokenService::InstanceHandler({
+              .token_provider = bindings_.CreateHandler(server2_.get(), dispatcher(),
+                                                        fidl::kIgnoreBindingClosure),
+          }));
+
+      if (!result.is_ok()) {
+        return zx::error(ZX_ERR_INTERNAL);
+      }
+    }
+
     // Next create a node for our child to bind to.
     fuchsia_driver_framework::NodeAddArgs node_args;
     node_args.name() = "fake-child";
@@ -96,15 +110,15 @@ zx::result<> FakeParent::Start() {
     // Create the offer for our token provider so the child can access it.
     {
       std::vector<fuchsia_component_decl::NameMapping> mappings =
-          std::vector<fuchsia_component_decl::NameMapping>{fuchsia_component_decl::NameMapping{{
-              .source_name = power_element_name,
-              .target_name = power_element_name,
-          }}};
+          std::vector<fuchsia_component_decl::NameMapping>{
+              {{.source_name = power_element_name, .target_name = power_element_name}},
+              {{.source_name = "default", .target_name = "default"}},
+          };
 
       fuchsia_component_decl::OfferService services = fuchsia_component_decl::OfferService{{
           .source_name = std::string(fuchsia_hardware_power::PowerTokenService::Name),
           .target_name = std::string(fuchsia_hardware_power::PowerTokenService::Name),
-          .source_instance_filter = std::vector<std::string>{power_element_name},
+          .source_instance_filter = std::vector<std::string>{power_element_name, "default"},
           .renamed_instances = mappings,
       }};
 
