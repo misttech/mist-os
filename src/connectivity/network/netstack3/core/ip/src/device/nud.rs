@@ -398,22 +398,34 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
         }
     }
 
-    fn new<I, CC, BC, DeviceId>(
+    fn new_with_packet<I, CC, BC, DeviceId, B, S>(
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
         timers: &mut TimerHeap<I, BC>,
         neighbor: SpecifiedAddr<I::Addr>,
-    ) -> Self
+        packet: S,
+    ) -> Result<Self, ErrorAndSerializer<SerializeError<Never>, S>>
     where
         I: Ip,
         D: LinkDevice,
         BC: NudBindingsContext<I, D, DeviceId>,
         CC: NudConfigContext<I>,
         DeviceId: StrongDeviceIdentifier,
+        B: BufferMut,
+        S: Serializer<Buffer = B>,
     {
+        // NB: it's important that we attempt to serialize the packet *before*
+        // scheduling a retransmission timer, so that if serialization fails and we
+        // propagate an error, we're not leaving a dangling timer.
+        let packet = packet
+            .serialize_vec_outer()
+            .map_err(|(error, serializer)| ErrorAndSerializer { error, serializer })?
+            .map_a(|b| Buf::new(b.as_ref().to_vec(), ..))
+            .into_inner();
+
         let mut this = Incomplete {
             transmit_counter: Some(core_ctx.max_multicast_solicit()),
-            pending_frames: VecDeque::new(),
+            pending_frames: VecDeque::from([packet]),
             notifiers: Vec::new(),
             _marker: PhantomData,
         };
@@ -422,7 +434,7 @@ impl<D: LinkDevice, N: LinkResolutionNotifier<D>> Incomplete<D, N> {
         // neighbor table lock held.
         assert!(this.schedule_timer_if_should_retransmit(core_ctx, bindings_ctx, timers, neighbor));
 
-        this
+        Ok(this)
     }
 
     fn new_with_notifier<I, CC, BC, DeviceId>(
@@ -2454,9 +2466,14 @@ impl<
                 let (entry, timer_heap) = state.entry_and_timer_heap(lookup_addr);
                 match entry {
                     Entry::Vacant(e) => {
-                        let mut incomplete =
-                            Incomplete::new(core_ctx, bindings_ctx, timer_heap, lookup_addr);
-                        incomplete.queue_packet(body).map_err(|e| e.err_into())?;
+                        let incomplete = Incomplete::new_with_packet(
+                            core_ctx,
+                            bindings_ctx,
+                            timer_heap,
+                            lookup_addr,
+                            body,
+                        )
+                        .map_err(|e| e.err_into())?;
                         insert_new_entry(
                             bindings_ctx,
                             device_id,
@@ -2746,7 +2763,9 @@ mod tests {
         FakeBindingsCtx, FakeCoreCtx, FakeInstant, FakeLinkAddress, FakeLinkDevice,
         FakeLinkDeviceId, FakeTimerCtxExt as _, FakeWeakDeviceId,
     };
-    use netstack3_base::{CtxPair, InstantContext, IntoCoreTimerCtx, SendFrameContext as _};
+    use netstack3_base::{
+        CtxPair, InstantContext, IntoCoreTimerCtx, SendFrameContext as _, SendFrameErrorReason,
+    };
     use test_case::test_case;
 
     use super::*;
@@ -3534,6 +3553,33 @@ mod tests {
             bindings_ctx.take_events(),
             [Event::removed(&FakeLinkDeviceId, neighbor, bindings_ctx.now())],
         );
+    }
+
+    #[ip_test(I)]
+    fn serialization_failure_doesnt_schedule_timer<I: TestIpExt>() {
+        let CtxPair { mut core_ctx, mut bindings_ctx } = new_context::<I>();
+
+        // Try to send a packet for which serialization will fail due to a size
+        // constraint.
+        let packet = Buf::new([0; 2], ..).with_size_limit(1);
+
+        let err = assert_matches!(
+            NudHandler::send_ip_packet_to_neighbor(
+                &mut core_ctx,
+                &mut bindings_ctx,
+                &FakeLinkDeviceId,
+                I::LOOKUP_ADDR1,
+                packet,
+            ),
+            Err(ErrorAndSerializer { error, serializer: _ }) => error
+        );
+        assert_eq!(err, SendFrameErrorReason::SizeConstraintsViolation);
+
+        // The neighbor should not be inserted in the table, a probe should not be sent,
+        // and no retransmission timer should be scheduled.
+        super::testutil::assert_neighbor_unknown(&mut core_ctx, FakeLinkDeviceId, I::LOOKUP_ADDR1);
+        assert_eq!(core_ctx.inner.take_frames(), []);
+        bindings_ctx.timers.assert_no_timers_installed();
     }
 
     #[ip_test(I)]
