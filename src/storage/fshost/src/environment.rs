@@ -873,16 +873,6 @@ impl Environment for FshostEnvironment {
     }
 }
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
-#[derive(Debug)]
-struct ReformatRequired(Error);
-impl std::error::Error for ReformatRequired {}
-impl std::fmt::Display for ReformatRequired {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{:?}", self)
-    }
-}
-
 pub struct FilesystemLauncher {
     config: Arc<fshost_config::Config>,
     boot_args: BootArgs,
