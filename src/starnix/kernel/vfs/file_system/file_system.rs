@@ -203,7 +203,7 @@ impl FileSystem {
     ) -> WeakFsNodeHandle {
         // TODO(b/355180447): Move this logic so the parent inode (if any) can be taken into account.
         if let Some(xattr) =
-            security::fs_node_security_xattr(current_task, &node, None).unwrap_or(None)
+            security::fs_node_init_security_and_xattr(current_task, &node, None).unwrap_or(None)
         {
             let _ = node.ops().set_xattr(
                 node,

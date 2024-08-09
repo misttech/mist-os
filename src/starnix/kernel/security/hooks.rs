@@ -110,13 +110,14 @@ pub struct FsNodeSecurityXattr {
 }
 
 /// Returns the security attribute to label a newly created inode with.
-pub fn fs_node_security_xattr(
+/// This is analgous to the `inode_init_security()` hook.
+pub fn fs_node_init_security_and_xattr(
     current_task: &CurrentTask,
     new_node: &FsNodeHandle,
     parent: Option<&FsNodeHandle>,
 ) -> Result<Option<FsNodeSecurityXattr>, Errno> {
     if let Some(security_server) = current_task.kernel().security_state.server.as_ref() {
-        selinux_hooks::fs_node_security_xattr(security_server, new_node, parent)
+        selinux_hooks::fs_node_init_security_and_xattr(security_server, new_node, parent)
     } else {
         Ok(None)
     }
@@ -372,12 +373,12 @@ pub fn sb_umount(
     })
 }
 
-/// Returns the value of the specified security attribute for `fs_node`.
-/// If SELinux is enabled then this will return the Security Context corresponding
-/// to the SID with which `fs_node` has been labelled, even if the node's file system
-/// does not generally support extended attributes.
-/// If SELinux is not enabled, or `fs_node` is not labeled with a SID, then the
-/// call is delegated to the [`crate::vfs::FsNodeOps`] to satisfy.
+/// Returns the value of the specified "security.*" attribute for `fs_node`.
+/// If SELinux is enabled then requests for the "security.selinux" attribute will return the
+/// Security Context corresponding to the SID with which `fs_node` has been labelled, even if the
+/// node's file system does not generally support extended attributes.
+/// If SELinux is not enabled, or the node is not labelled with a SID, then the call is delegated to
+/// the [`crate::vfs::FsNodeOps`], so the returned value may not be a valid Security Context.
 pub fn fs_node_getsecurity(
     current_task: &CurrentTask,
     fs_node: &FsNode,
