@@ -155,10 +155,9 @@ impl<'a> LogFile<'a> {
 
 // FIXME(https://github.com/notify-rs/notify/pull/336) We can use Watcher as a trait object once
 // this PR lands. That would let us get rid of much of this duplication.
-#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 enum LogWatcher {
-    Recommended(notify::RecommendedWatcher),
-    Poll(notify::PollWatcher),
+    Recommended { _watcher: notify::RecommendedWatcher },
+    Poll { _watcher: notify::PollWatcher },
 }
 
 impl LogWatcher {
@@ -186,7 +185,7 @@ impl LogWatcher {
         match notify::recommended_watcher(make_event_fn()) {
             Ok(mut watcher) => {
                 watcher.watch(path, notify::RecursiveMode::NonRecursive)?;
-                Ok((LogWatcher::Recommended(watcher), rx))
+                Ok((LogWatcher::Recommended { _watcher: watcher }, rx))
             }
             Err(_) => {
                 // Fall back to a polling watcher.
@@ -195,7 +194,7 @@ impl LogWatcher {
                     notify::Config::default().with_poll_interval(Duration::from_secs(1)),
                 )?;
                 watcher.watch(path, notify::RecursiveMode::NonRecursive)?;
-                Ok((LogWatcher::Poll(watcher), rx))
+                Ok((LogWatcher::Poll { _watcher: watcher }, rx))
             }
         }
     }

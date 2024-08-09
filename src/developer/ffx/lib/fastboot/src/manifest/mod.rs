@@ -35,10 +35,6 @@ pub mod v3;
 
 pub const UNKNOWN_VERSION: &str = "Unknown flash manifest version";
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
-#[derive(Default, Deserialize)]
-pub struct Images(Vec<Image>);
-
 #[derive(Default, Deserialize)]
 pub struct Image {
     pub name: String,

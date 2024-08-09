@@ -47,7 +47,7 @@ impl ForwardedSocket {
     /// Get the raw socket, as well as a keep alive token that must not be
     /// dropped while the socket is in use.
     pub fn split(self) -> (fidl::Socket, SocketKeepAliveToken) {
-        (self.socket, SocketKeepAliveToken(self.fidl))
+        (self.socket, SocketKeepAliveToken { _socket: self.fidl })
     }
 }
 
@@ -59,12 +59,13 @@ impl Deref for ForwardedSocket {
     }
 }
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 /// Container for a StreamSocketProxy that lets the user keep it around, thus
 /// keeping the represented socket alive, but doesn't make its internals usable,
 /// thus defending the API from unintended customers.
 #[derive(Debug)]
-pub struct SocketKeepAliveToken(fsock::StreamSocketProxy);
+pub struct SocketKeepAliveToken {
+    _socket: fsock::StreamSocketProxy,
+}
 
 /// Set up a port forward from the target. Returns the connected socket, and the
 /// FIDL from the socket provider that controls it. Dropping the latter will
