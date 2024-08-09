@@ -86,7 +86,7 @@
         },
         {
             protocol: [ "fuchsia.media.drm.Widevine" ],
-            from: "#trusted-apps/trusted-app-capabilities",
+            from: "#tee-clients/tee-client-capabilities",
             to: "#test_manager",
             source_availability: "unknown",
         },

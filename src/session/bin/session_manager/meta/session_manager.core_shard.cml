@@ -382,8 +382,8 @@
             source_availability: "unknown",
         },
         {
-            dictionary: "trusted-app-capabilities",
-            from: "#trusted-apps",
+            dictionary: "tee-clients-capabilities",
+            from: "#tee-clients",
             to: "#session-manager",
             source_availability: "unknown",
         },

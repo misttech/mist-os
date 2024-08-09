@@ -45,8 +45,13 @@ pub struct ProductConfig {
     pub component_policy: ComponentPolicyConfig,
 
     /// Components which depend on trusted applications running in the TEE.
+    /// Deprecated: Please use `tee_clients` instead.
     #[serde(default)]
-    pub trusted_apps: Vec<TrustedApp>,
+    pub trusted_apps: Vec<TeeClient>,
+
+    /// Components which depend on trusted applications running in the TEE.
+    #[serde(default)]
+    pub tee_clients: Vec<TeeClient>,
 }
 
 /// Packages provided by the product, to add to the assembled images.
@@ -168,7 +173,7 @@ pub struct ComponentPolicyConfig {
 }
 
 #[derive(Clone, Debug, Default, Deserialize, Serialize, JsonSchema)]
-pub struct TrustedAppFeatures {
+pub struct TeeClientFeatures {
     /// Whether this component needs /dev-class/securemem routed to it. If true, the securemem
     //// directory will be routed as dev-securemem.
     pub securemem: Option<bool>,
@@ -181,7 +186,7 @@ pub struct TrustedAppFeatures {
 /// A configuration for a component which depends on TEE-based protocols.
 /// Examples include components which implement DRM, or authentication services.
 #[derive(Clone, Debug, Deserialize, Serialize, JsonSchema)]
-pub struct TrustedApp {
+pub struct TeeClient {
     /// The URL of the component.
     pub component_url: String,
     /// GUIDs which of the form fuchsia.tee.Application.{GUID} will match a
@@ -200,7 +205,7 @@ pub struct TrustedApp {
     pub config_data: Option<BTreeMap<String, String>>,
     /// Additional features required for the component to function.
     #[serde(default)]
-    pub additional_required_features: TrustedAppFeatures,
+    pub additional_required_features: TeeClientFeatures,
 }
 
 #[cfg(test)]

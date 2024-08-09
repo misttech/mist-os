@@ -7,7 +7,7 @@ use anyhow::{anyhow, Context};
 use assembly_config_schema::assembly_config::{
     CompiledComponentDefinition, CompiledPackageDefinition,
 };
-use assembly_config_schema::product_config::TrustedApp as ProductTrustedApp;
+use assembly_config_schema::product_config::TeeClient as ProductTeeClient;
 use assembly_util::{BlobfsCompiledPackageDestination, CompiledPackageDestination, FileEntry};
 use fuchsia_url::AbsoluteComponentUrl;
 use std::io::Write;
@@ -16,14 +16,14 @@ fn create_name(name: &str) -> Result<cml::Name, anyhow::Error> {
     cml::Name::new(name).with_context(|| format!("Invalid name: {}", name))
 }
 
-pub(crate) struct TrustedAppsConfig;
-impl DefineSubsystemConfiguration<Vec<ProductTrustedApp>> for TrustedAppsConfig {
+pub(crate) struct TeeClientsConfig;
+impl DefineSubsystemConfiguration<Vec<ProductTeeClient>> for TeeClientsConfig {
     fn define_configuration(
         context: &ConfigurationContext<'_>,
-        config: &Vec<ProductTrustedApp>,
+        config: &Vec<ProductTeeClient>,
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
-        // If we don't have any trusted apps, we're done.
+        // If we don't have any tee clients, we're done.
         if config.is_empty() {
             return Ok(());
         }
@@ -32,11 +32,11 @@ impl DefineSubsystemConfiguration<Vec<ProductTrustedApp>> for TrustedAppsConfig 
 
         // Create a dictionary and expose it to the parent.
         let capabilities = vec![cml::Capability {
-            dictionary: Some(create_name("trusted-app-capabilities")?),
+            dictionary: Some(create_name("tee-client-capabilities")?),
             ..Default::default()
         }];
         let expose = vec![cml::Expose {
-            dictionary: Some(create_name("trusted-app-capabilities")?.into()),
+            dictionary: Some(create_name("tee-client-capabilities")?.into()),
             ..cml::Expose::new_from(cml::ExposeFromRef::Self_.into())
         }];
 
@@ -60,8 +60,8 @@ impl DefineSubsystemConfiguration<Vec<ProductTrustedApp>> for TrustedAppsConfig 
         // Offer all of the protocols our children require to them.
         // Offer all of the protocols our children expose to the dictionary we
         // just created.
-        for trusted_app in config {
-            let component_url = AbsoluteComponentUrl::parse(&trusted_app.component_url)?;
+        for tee_client in config {
+            let component_url = AbsoluteComponentUrl::parse(&tee_client.component_url)?;
             let component_name = create_name(
                 component_url
                     .resource()
@@ -80,7 +80,7 @@ impl DefineSubsystemConfiguration<Vec<ProductTrustedApp>> for TrustedAppsConfig 
                 environment: None,
             });
 
-            for capability in &trusted_app.capabilities {
+            for capability in &tee_client.capabilities {
                 // Expose the capabilities up from the component URL to the
                 // dictionary we provide to the parent
                 offer.push(cml::Offer {
@@ -88,13 +88,13 @@ impl DefineSubsystemConfiguration<Vec<ProductTrustedApp>> for TrustedAppsConfig 
                     availability: Some(cml::Availability::SameAsTarget),
                     ..cml::Offer::empty(
                         cml::OfferFromRef::Named(component_name.clone()).into(),
-                        cml::OfferToRef::OwnDictionary(create_name("trusted-app-capabilities")?)
+                        cml::OfferToRef::OwnDictionary(create_name("tee-client-capabilities")?)
                             .into(),
                     )
                 });
             }
 
-            for guid in &trusted_app.guids {
+            for guid in &tee_client.guids {
                 // Expose the guids from tee_manager to the component in question
                 let guid_protocol_name = create_name(&format!("fuchsia.tee.Application.{}", guid))?;
                 offer.push(cml::Offer {
@@ -106,7 +106,7 @@ impl DefineSubsystemConfiguration<Vec<ProductTrustedApp>> for TrustedAppsConfig 
                 });
             }
 
-            for protocol in &trusted_app.additional_required_protocols {
+            for protocol in &tee_client.additional_required_protocols {
                 let protocol_name = create_name(protocol)?;
                 offer.push(cml::Offer {
                     protocol: Some(protocol_name.into()),
@@ -122,7 +122,7 @@ impl DefineSubsystemConfiguration<Vec<ProductTrustedApp>> for TrustedAppsConfig 
                 });
             }
 
-            if let Some(config_data) = &trusted_app.config_data {
+            if let Some(config_data) = &tee_client.config_data {
                 // For each key in config data, add the file at the path of the value to config data
                 let package_name = component_url.package_url().name();
 
@@ -149,7 +149,7 @@ impl DefineSubsystemConfiguration<Vec<ProductTrustedApp>> for TrustedAppsConfig 
                 })
             }
 
-            if let Some(true) = trusted_app.additional_required_features.persistent_storage {
+            if let Some(true) = tee_client.additional_required_features.persistent_storage {
                 offer.push(cml::Offer {
                     storage: Some(create_name("data")?.into()),
                     ..cml::Offer::empty(
@@ -159,7 +159,7 @@ impl DefineSubsystemConfiguration<Vec<ProductTrustedApp>> for TrustedAppsConfig 
                 })
             }
 
-            if let Some(true) = trusted_app.additional_required_features.tmp_storage {
+            if let Some(true) = tee_client.additional_required_features.tmp_storage {
                 offer.push(cml::Offer {
                     storage: Some(create_name("tmp")?.into()),
                     ..cml::Offer::empty(
@@ -169,7 +169,7 @@ impl DefineSubsystemConfiguration<Vec<ProductTrustedApp>> for TrustedAppsConfig 
                 })
             }
 
-            if let Some(true) = trusted_app.additional_required_features.securemem {
+            if let Some(true) = tee_client.additional_required_features.securemem {
                 offer.push(cml::Offer {
                     directory: Some(create_name("dev-securemem")?.into()),
                     rights: Some(cml::Rights(vec![cml::Right::ReadAlias])),
@@ -189,18 +189,18 @@ impl DefineSubsystemConfiguration<Vec<ProductTrustedApp>> for TrustedAppsConfig 
             ..Default::default()
         };
 
-        let cml_name = "trusted-apps.cml";
+        let cml_name = "tee-clients.cml";
         let cml_path = gendir.join(cml_name);
         let mut cml_file = std::fs::File::create(&cml_path)?;
         cml_file.write_all(serde_json::to_string_pretty(&cml)?.as_bytes())?;
 
         let components = vec![CompiledComponentDefinition {
-            component_name: "trusted-apps".into(),
+            component_name: "tee-clients".into(),
             shards: vec![cml_path.into()],
         }];
 
         let destination =
-            CompiledPackageDestination::Blob(BlobfsCompiledPackageDestination::TrustedApps);
+            CompiledPackageDestination::Blob(BlobfsCompiledPackageDestination::TeeClients);
         let def = CompiledPackageDefinition {
             name: destination.clone(),
             components,
@@ -212,7 +212,7 @@ impl DefineSubsystemConfiguration<Vec<ProductTrustedApp>> for TrustedAppsConfig 
         builder
             .compiled_package(destination.clone(), def)
             .with_context(|| format!("Inserting compiled package: {}", destination))?;
-        builder.core_shard(&context.get_resource("trusted-apps.core_shard.cml"));
+        builder.core_shard(&context.get_resource("tee-clients.core_shard.cml"));
 
         Ok(())
     }
@@ -222,7 +222,7 @@ impl DefineSubsystemConfiguration<Vec<ProductTrustedApp>> for TrustedAppsConfig 
 mod tests {
     use super::*;
     use crate::subsystems::ConfigurationBuilderImpl;
-    use assembly_config_schema::product_config::TrustedAppFeatures;
+    use assembly_config_schema::product_config::TeeClientFeatures;
     use assembly_file_relative_path::FileRelativePathBuf;
     use std::collections::BTreeMap;
 
@@ -232,8 +232,8 @@ mod tests {
     // components which might have security implications.
     fn test_define_configuration() {
         let context = ConfigurationContext::default_for_tests();
-        let config = vec![ProductTrustedApp {
-            component_url: "fuchsia-pkg://fuchsia.com/trusted-apps/test-app#meta/test-app.cm"
+        let config = vec![ProductTeeClient {
+            component_url: "fuchsia-pkg://fuchsia.com/tee-clients/test-app#meta/test-app.cm"
                 .to_string(),
             guids: vec!["1234".to_string(), "5678".to_string()],
             additional_required_protocols: vec!["fuchsia.foo.bar".to_string()],
@@ -242,7 +242,7 @@ mod tests {
                 ("foo".to_string(), "bar".to_string()),
                 ("baz".to_string(), "qux".to_string()),
             ])),
-            additional_required_features: TrustedAppFeatures {
+            additional_required_features: TeeClientFeatures {
                 tmp_storage: Some(true),
                 persistent_storage: Some(true),
                 securemem: Some(true),
@@ -250,8 +250,8 @@ mod tests {
         }];
 
         let mut builder = ConfigurationBuilderImpl::default();
-        TrustedAppsConfig::define_configuration(&context, &config, &mut builder)
-            .expect("defining trusted_apps configuration");
+        TeeClientsConfig::define_configuration(&context, &config, &mut builder)
+            .expect("defining tee_clients configuration");
 
         let completed_configuration = builder.build();
         let compiled_packages = completed_configuration.compiled_packages;
@@ -261,7 +261,7 @@ mod tests {
 
         let shard: FileRelativePathBuf;
         if let CompiledPackageDefinition {
-            name: CompiledPackageDestination::Blob(BlobfsCompiledPackageDestination::TrustedApps),
+            name: CompiledPackageDestination::Blob(BlobfsCompiledPackageDestination::TeeClients),
             components,
             contents,
             includes,
@@ -273,7 +273,7 @@ mod tests {
             assert_eq!(contents.len(), 0);
             assert_eq!(includes.len(), 0);
 
-            assert_eq!(component.component_name, "trusted-apps");
+            assert_eq!(component.component_name, "tee-clients");
             assert_eq!(component.shards.len(), 1);
 
             shard = component.shards[0].clone();
@@ -288,17 +288,17 @@ mod tests {
         let expected_json = serde_json::json!({"children": [
           {
             "name": "test-app",
-            "url": "fuchsia-pkg://fuchsia.com/trusted-apps/test-app#meta/test-app.cm"
+            "url": "fuchsia-pkg://fuchsia.com/tee-clients/test-app#meta/test-app.cm"
           }
         ],
         "capabilities": [
           {
-            "dictionary": "trusted-app-capabilities"
+            "dictionary": "tee-client-capabilities"
           }
         ],
         "expose": [
           {
-            "dictionary": "trusted-app-capabilities",
+            "dictionary": "tee-client-capabilities",
             "from": "self"
           }
         ],
@@ -322,7 +322,7 @@ mod tests {
           {
             "protocol": "fuchsia.baz.bang",
             "from": "#test-app",
-            "to": "self/trusted-app-capabilities",
+            "to": "self/tee-client-capabilities",
             "availability": "same_as_target"
           },
           {
@@ -345,7 +345,7 @@ mod tests {
             "directory": "config-data",
             "from": "parent",
             "to": "#test-app",
-            "subdir": "trusted-apps",
+            "subdir": "tee-clients",
           },
           {
             "storage": "data",
