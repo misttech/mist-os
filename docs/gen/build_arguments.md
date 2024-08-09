@@ -5601,7 +5601,7 @@ Example:
 
 **Current value (from the default):** `[]`
 
-From //build/assembly/developer_overrides.gni:352
+From //build/assembly/developer_overrides.gni:372
 
 ### product_bootfs_packages
 
@@ -7598,7 +7598,7 @@ derives an ABI revision from the latest integration.git hash.
 TODO(https://fxbug.dev/324892812): Delete this option after a transition
 period.
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //build/sdk/config.gni:22
 
