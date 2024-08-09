@@ -656,7 +656,7 @@ impl VolumesDirectory {
         };
         let result = fsck::fsck_volume(fs.as_ref(), store_id, crypt).await?;
         // TODO(b/311550633): Stash result in inspect.
-        tracing::info!(%store_id, "{:?}", result);
+        info!(%store_id, "{result:?}");
         Ok(())
     }
 
@@ -680,7 +680,7 @@ impl VolumesDirectory {
         outgoing_directory: ServerEnd<fio::DirectoryMarker>,
         options: MountOptions,
     ) -> Result<(), Error> {
-        tracing::info!(%name, %store_id, ?options, "Received mount request");
+        info!(%name, %store_id, ?options, "Received mount request");
         let crypt = if let Some(crypt) = options.crypt {
             Some(Arc::new(RemoteCrypt::new(crypt)) as Arc<dyn Crypt>)
         } else {

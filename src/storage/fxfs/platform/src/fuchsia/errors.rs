@@ -8,18 +8,19 @@ use fuchsia_zircon::Status;
 use fxfs::errors::FxfsError;
 use fxfs::log::*;
 
-pub fn map_to_status(err: anyhow::Error) -> Status {
-    if let Some(status) = err.root_cause().downcast_ref::<Status>() {
+pub fn map_to_status(error: anyhow::Error) -> Status {
+    if let Some(status) = error.root_cause().downcast_ref::<Status>() {
         status.clone()
-    } else if let Some(fxfs_error) = err.root_cause().downcast_ref::<FxfsError>() {
+    } else if let Some(fxfs_error) = error.root_cause().downcast_ref::<FxfsError>() {
         fxfs_error.clone().into()
-    } else if let Some(delivery_blob_error) = err.root_cause().downcast_ref::<DeliveryBlobError>() {
+    } else if let Some(delivery_blob_error) = error.root_cause().downcast_ref::<DeliveryBlobError>()
+    {
         delivery_blob_error.clone().into()
-    } else if let Some(_) = err.root_cause().downcast_ref::<ChunkedArchiveError>() {
+    } else if let Some(_) = error.root_cause().downcast_ref::<ChunkedArchiveError>() {
         Status::IO_DATA_INTEGRITY
     } else {
         // Print the internal error if we re-map it because we will lose any context after this.
-        warn!("Internal error: {:?}", err);
+        warn!(?error, "Internal error");
         Status::INTERNAL
     }
 }

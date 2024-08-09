@@ -42,6 +42,7 @@ rustc_library("vfs") {
       "//src/developer/ffx/playground:*",
       "//src/developer/ffx/tools/playground:*",
       "//src/lib/fuchsia-fs:*",
+      "//src/storage/fvm:*",
       "//src/sys/pkg/lib/update-package:*",
     ]
   }
