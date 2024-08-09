@@ -30,12 +30,15 @@ pub use constants::DAEMON_LOG_FILENAME;
 
 pub use socket::SocketDetails;
 
+#[tracing::instrument]
 async fn create_daemon_proxy(
     node: &Arc<overnet_core::Router>,
     id: &mut NodeId,
 ) -> Result<DaemonProxy> {
     let (s, p) = fidl::Channel::create();
+    tracing::debug!("Connecting to daemon service on {id:?}");
     node.connect_to_service((*id).into(), DaemonMarker::PROTOCOL_NAME, s).await?;
+    tracing::debug!("Connected to daemon service on {id:?}");
     let proxy = fidl::AsyncChannel::from_channel(p);
     Ok(DaemonProxy::new(proxy))
 }
@@ -56,6 +59,7 @@ pub async fn run_single_ascendd_link(
     let unix_socket = loop {
         let safe_socket_path = ascendd::short_socket_path(&sockpath)?;
         let started = std::time::Instant::now();
+        tracing::debug!("Connecting to ascendd (starting at {started:?})");
         let conn = async_net::unix::UnixStream::connect(&safe_socket_path)
             .on_timeout(Duration::from_secs(30), || {
                 Err(std::io::Error::new(
@@ -71,6 +75,7 @@ pub async fn run_single_ascendd_link(
             // We got our connections.
             Ok(conn) => {
                 let elapsed = std::time::Instant::now() - started;
+                tracing::debug!("Made connection to ascendd (in {elapsed:?})");
                 if elapsed.as_millis() > 100 {
                     tracing::warn!("Socket connection took {elapsed:?}");
                 }
@@ -78,6 +83,7 @@ pub async fn run_single_ascendd_link(
             }
             // There was an error connecting that's likely due to the daemon not being ready yet.
             Err(e) if matches!(e.kind(), ErrorKind::NotFound | ErrorKind::ConnectionRefused) => {
+                tracing::debug!("ConnectionRefused when connecting to ascendd");
                 if now.elapsed()?.as_secs() > MAX_SINGLE_CONNECT_TIME {
                     bail!(
                         "took too long connecting to ascendd socket at {}. Last error: {e:#?}",
@@ -100,11 +106,13 @@ pub async fn run_single_ascendd_link(
     run_ascendd_connection(node, &mut rx, &mut tx).await
 }
 
+#[tracing::instrument(skip_all)]
 async fn run_ascendd_connection<'a>(
     node: Arc<overnet_core::Router>,
     rx: &'a mut (dyn AsyncRead + Unpin + Send),
     tx: &'a mut (dyn AsyncWrite + Unpin + Send),
 ) -> Result<(), anyhow::Error> {
+    tracing::debug!("Starting ascendd connection");
     let (errors_sender, errors) = futures::channel::mpsc::unbounded();
     tx.write_all(&ascendd::CIRCUIT_ID).await?;
     futures::future::join(
@@ -128,6 +136,7 @@ async fn run_ascendd_connection<'a>(
     .map_err(anyhow::Error::from)
 }
 
+#[tracing::instrument]
 pub async fn get_daemon_proxy_single_link(
     node: &Arc<overnet_core::Router>,
     socket_path: PathBuf,
@@ -144,6 +153,7 @@ pub async fn get_daemon_proxy_single_link(
     let mut find = Box::pin(find);
     let mut timeout = Timer::new(Duration::from_secs(5)).fuse();
 
+    tracing::debug!("Starting race to get daemon proxy");
     let res = futures::select! {
         r = link => {
             Err(ffx_error!("Daemon link lost while attempting to connect to socket {}: {:#?}\nRun `ffx doctor` for further diagnostics.", socket_path.display(), r))
@@ -153,17 +163,23 @@ pub async fn get_daemon_proxy_single_link(
         }
         proxy = find => proxy.map_err(|e| ffx_error!("Error connecting to Daemon at socket: {}: {:#?}\nRun `ffx doctor` for further diagnostics.", socket_path.display(), e)),
     };
+    tracing::debug!(
+        "Race of (<run_ascendd_link>, <timeout>, <find_next_daemon>) completed with {res:?}"
+    );
     res.map(|(nodeid, proxy)| (nodeid, proxy, link))
 }
 
+#[tracing::instrument]
 async fn find_next_daemon<'a>(
     node: &Arc<overnet_core::Router>,
     exclusions: Option<Vec<NodeId>>,
 ) -> Result<(NodeId, DaemonProxy)> {
     let lpc = node.new_list_peers_context().await;
     loop {
+        tracing::debug!("Waiting for ListPeers");
         let peers = lpc.list_peers().await?;
         for peer in peers.iter() {
+            tracing::debug!("Looking at peer {peer:?}");
             if !peer.services.iter().any(|name| *name == DaemonMarker::PROTOCOL_NAME) {
                 continue;
             }
@@ -175,6 +191,7 @@ async fn find_next_daemon<'a>(
                 }
                 None => {}
             }
+            tracing::debug!("Creating daemon proxy for {:?}", peer.node_id);
             return create_daemon_proxy(node, &mut peer.node_id.into())
                 .await
                 .map(|proxy| (peer.node_id.into(), proxy));
