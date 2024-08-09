@@ -409,19 +409,11 @@ impl Credentials {
         if let Some(uid) = maybe_set.uid {
             self.euid = uid;
             self.fsuid = uid;
-            if self.has_capability(CAP_SETUID) {
-                self.uid = uid;
-                self.saved_uid = uid;
-            }
         }
 
         if let Some(gid) = maybe_set.gid {
             self.egid = gid;
             self.fsgid = gid;
-            if self.has_capability(CAP_SETGID) {
-                self.gid = gid;
-                self.saved_gid = gid;
-            }
         }
 
         self.update_capabilities(prev);
@@ -437,6 +429,16 @@ impl Credentials {
         //   effective group ID of the calling process is set to the group of
         //   the program file.
         self.apply_suid_and_sgid(maybe_set);
+
+        // From <https://man7.org/linux/man-pages/man2/execve.2.html>:
+        //
+        //   The effective user ID of the process is copied to the saved set-
+        //   user-ID; similarly, the effective group ID is copied to the saved
+        //   set-group-ID.  This copying takes place after any effective ID
+        //   changes that occur because of the set-user-ID and set-group-ID
+        //   mode bits.
+        self.saved_uid = self.euid;
+        self.saved_gid = self.egid;
 
         // > Ambient capabilities are added to the permitted set and assigned to the effective set
         // > when execve(2) is called.
