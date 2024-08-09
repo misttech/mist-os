@@ -1793,7 +1793,9 @@ impl FsNode {
         if access.contains(Access::WRITE) {
             mount.check_readonly_filesystem()?;
         }
-
+        if access.contains(Access::EXEC) && !self.is_dir() {
+            mount.check_noexec_filesystem()?;
+        }
         self.ops.check_access(self, current_task, access, &self.info, reason)
     }
 

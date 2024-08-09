@@ -192,10 +192,18 @@ impl MountInfo {
         }
     }
 
-    /// Checks whether this `MountInfo` represents a writable file system mounted.
+    /// Checks whether this `MountInfo` represents a writable file system mount.
     pub fn check_readonly_filesystem(&self) -> Result<(), Errno> {
         if self.flags().contains(MountFlags::RDONLY) {
             return error!(EROFS);
+        }
+        Ok(())
+    }
+
+    /// Checks whether this `MountInfo` represents an executable file system mount.
+    pub fn check_noexec_filesystem(&self) -> Result<(), Errno> {
+        if self.flags().contains(MountFlags::NOEXEC) {
+            return error!(EACCES);
         }
         Ok(())
     }

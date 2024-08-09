@@ -493,7 +493,6 @@
                 "MountTest.MaxRecursiveBind",
                 "MountTest.MountInfo",
                 "MountTest.MountNamespaceSlavesNewUserNamespace",
-                "MountTest.MountNoExec",
                 "MountTest.MountProc",
                 "MountTest.MountTmpfsMagicValIgnored",
                 "MountTest.MountWithStrictAtime",
