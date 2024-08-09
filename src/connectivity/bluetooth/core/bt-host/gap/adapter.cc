@@ -941,15 +941,16 @@ void AdapterImpl::InitializeStep1() {
       hci::EmbossCommandPacket::New<
           pw::bluetooth::emboss::ReadLocalVersionInformationCommandView>(
           hci_spec::kReadLocalVersionInfo),
-      [this](const hci::EventPacket& cmd_complete) {
+      [this](const hci::EmbossEventPacket& cmd_complete) {
         if (hci_is_error(
                 cmd_complete, WARN, "gap", "read local version info failed")) {
           return;
         }
         auto params =
             cmd_complete
-                .return_params<hci_spec::ReadLocalVersionInfoReturnParams>();
-        state_.hci_version = params->hci_version;
+                .view<pw::bluetooth::emboss::
+                          ReadLocalVersionInfoCommandCompleteEventView>();
+        state_.hci_version = params.hci_version().Read();
       });
 
   // HCI_Read_Local_Supported_Commands
@@ -978,13 +979,13 @@ void AdapterImpl::InitializeStep1() {
   init_seq_runner_->QueueCommand(
       hci::EmbossCommandPacket::New<
           pw::bluetooth::emboss::ReadBdAddrCommandView>(hci_spec::kReadBDADDR),
-      [this](const hci::EventPacket& cmd_complete) {
+      [this](const hci::EmbossEventPacket& cmd_complete) {
         if (hci_is_error(cmd_complete, WARN, "gap", "read BR_ADDR failed")) {
           return;
         }
-        auto params =
-            cmd_complete.return_params<hci_spec::ReadBDADDRReturnParams>();
-        state_.controller_address = params->bd_addr;
+        auto packet = cmd_complete.view<
+            pw::bluetooth::emboss::ReadBdAddrCommandCompleteEventView>();
+        state_.controller_address = DeviceAddressBytes(packet.bd_addr());
       });
 
   if (state().IsControllerFeatureSupported(
@@ -1055,27 +1056,26 @@ void AdapterImpl::InitializeStep2() {
         hci::EmbossCommandPacket::New<
             pw::bluetooth::emboss::ReadBufferSizeCommandView>(
             hci_spec::kReadBufferSize),
-        [this](const hci::EventPacket& cmd_complete) {
+        [this](const hci::EmbossEventPacket& cmd_complete) {
           if (hci_is_error(
                   cmd_complete, WARN, "gap", "read buffer size failed")) {
             return;
           }
-          auto params =
-              cmd_complete
-                  .return_params<hci_spec::ReadBufferSizeReturnParams>();
-          uint16_t acl_mtu = pw::bytes::ConvertOrderFrom(
-              cpp20::endian::little, params->hc_acl_data_packet_length);
-          uint16_t acl_max_count = pw::bytes::ConvertOrderFrom(
-              cpp20::endian::little, params->hc_total_num_acl_data_packets);
+          auto packet = cmd_complete.view<
+              pw::bluetooth::emboss::ReadBufferSizeCommandCompleteEventView>();
+          uint16_t acl_mtu = packet.acl_data_packet_length().Read();
+          uint16_t acl_max_count = packet.total_num_acl_data_packets().Read();
           if (acl_mtu && acl_max_count) {
             state_.bredr_data_buffer_info =
                 hci::DataBufferInfo(acl_mtu, acl_max_count);
           }
-          uint16_t sco_mtu = pw::bytes::ConvertOrderFrom(
-              cpp20::endian::little, params->hc_synchronous_data_packet_length);
-          uint16_t sco_max_count = pw::bytes::ConvertOrderFrom(
-              cpp20::endian::little,
-              params->hc_total_num_synchronous_data_packets);
+          // Use UncheckedRead because this field is supposed to
+          // be 0x01-0xFF, but it is possible and harmless for controllers to
+          // set to 0x00 if not supported.
+          uint16_t sco_mtu =
+              packet.synchronous_data_packet_length().UncheckedRead();
+          uint16_t sco_max_count =
+              packet.total_num_synchronous_data_packets().Read();
           if (sco_mtu && sco_max_count) {
             state_.sco_buffer_info =
                 hci::DataBufferInfo(sco_mtu, sco_max_count);
@@ -1088,18 +1088,18 @@ void AdapterImpl::InitializeStep2() {
       hci::EmbossCommandPacket::New<
           pw::bluetooth::emboss::LEReadLocalSupportedFeaturesCommandView>(
           hci_spec::kLEReadLocalSupportedFeatures),
-      [this](const hci::EventPacket& cmd_complete) {
+      [this](const hci::EmbossEventPacket& cmd_complete) {
         if (hci_is_error(cmd_complete,
                          WARN,
                          "gap",
                          "LE read local supported features failed")) {
           return;
         }
-        auto params = cmd_complete.return_params<
-            hci_spec::LEReadLocalSupportedFeaturesReturnParams>();
+        auto packet = cmd_complete.view<
+            pw::bluetooth::emboss::
+                LEReadLocalSupportedFeaturesCommandCompleteEventView>();
         state_.low_energy_state.supported_features_ =
-            pw::bytes::ConvertOrderFrom(cpp20::endian::little,
-                                        params->le_features);
+            packet.le_features().BackingStorage().ReadUInt();
       });
 
   // HCI_LE_Read_Supported_States

@@ -200,8 +200,8 @@ pub fn combine_channel_parameters(
     other: &ChannelParameters,
 ) -> ChannelParameters {
     let channel_mode = match (params.channel_mode, other.channel_mode) {
-        (Some(fidl_bredr::ChannelMode::Basic), _) | (_, Some(fidl_bredr::ChannelMode::Basic)) => {
-            Some(fidl_bredr::ChannelMode::Basic)
+        (Some(fidl_bt::ChannelMode::Basic), _) | (_, Some(fidl_bt::ChannelMode::Basic)) => {
+            Some(fidl_bt::ChannelMode::Basic)
         }
         (Some(x), None) | (None, Some(x)) => Some(x),
         _ => None,
@@ -406,13 +406,13 @@ impl From<&ProtocolDescriptor> for fidl_bredr::ProtocolDescriptor {
 
 pub fn l2cap_connect_parameters(
     psm: Psm,
-    mode: fidl_bredr::ChannelMode,
+    mode: fidl_bt::ChannelMode,
 ) -> fidl_bredr::ConnectParameters {
     fidl_bredr::ConnectParameters::L2cap(fidl_bredr::L2capParameters {
         psm: Some(psm.into()),
-        parameters: Some(fidl_bredr::ChannelParameters {
+        parameters: Some(fidl_bt::ChannelParameters {
             channel_mode: Some(mode),
-            ..fidl_bredr::ChannelParameters::default()
+            ..fidl_bt::ChannelParameters::default()
         }),
         ..fidl_bredr::L2capParameters::default()
     })
@@ -676,8 +676,8 @@ pub struct SecurityRequirements {
     pub secure_connections_required: Option<bool>,
 }
 
-impl From<&fidl_bredr::SecurityRequirements> for SecurityRequirements {
-    fn from(src: &fidl_bredr::SecurityRequirements) -> SecurityRequirements {
+impl From<&fidl_bt::SecurityRequirements> for SecurityRequirements {
+    fn from(src: &fidl_bt::SecurityRequirements) -> SecurityRequirements {
         SecurityRequirements {
             authentication_required: src.authentication_required,
             secure_connections_required: src.secure_connections_required,
@@ -685,9 +685,9 @@ impl From<&fidl_bredr::SecurityRequirements> for SecurityRequirements {
     }
 }
 
-impl From<&SecurityRequirements> for fidl_bredr::SecurityRequirements {
-    fn from(src: &SecurityRequirements) -> fidl_bredr::SecurityRequirements {
-        fidl_bredr::SecurityRequirements {
+impl From<&SecurityRequirements> for fidl_bt::SecurityRequirements {
+    fn from(src: &SecurityRequirements) -> fidl_bt::SecurityRequirements {
+        fidl_bt::SecurityRequirements {
             authentication_required: src.authentication_required,
             secure_connections_required: src.secure_connections_required,
             ..Default::default()
@@ -706,16 +706,16 @@ const MIN_RX_SDU_SIZE: u16 = 48;
 /// See [fuchsia.bluetooth.bredr.ChannelParameters] for more documentation.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct ChannelParameters {
-    pub channel_mode: Option<fidl_bredr::ChannelMode>,
+    pub channel_mode: Option<fidl_bt::ChannelMode>,
     pub max_rx_sdu_size: Option<u16>,
     pub security_requirements: Option<SecurityRequirements>,
 }
 
-impl TryFrom<&fidl_bredr::ChannelParameters> for ChannelParameters {
+impl TryFrom<&fidl_bt::ChannelParameters> for ChannelParameters {
     type Error = Error;
 
-    fn try_from(src: &fidl_bredr::ChannelParameters) -> Result<ChannelParameters, Self::Error> {
-        if let Some(size) = src.max_rx_sdu_size {
+    fn try_from(src: &fidl_bt::ChannelParameters) -> Result<ChannelParameters, Self::Error> {
+        if let Some(size) = src.max_rx_packet_size {
             if size < MIN_RX_SDU_SIZE {
                 return Err(Error::conversion(format!(
                     "bredr.ChannelParameters.max_rx_sdu_size is too small: {size}"
@@ -725,7 +725,7 @@ impl TryFrom<&fidl_bredr::ChannelParameters> for ChannelParameters {
 
         Ok(ChannelParameters {
             channel_mode: src.channel_mode,
-            max_rx_sdu_size: src.max_rx_sdu_size,
+            max_rx_sdu_size: src.max_rx_packet_size,
             security_requirements: src
                 .security_requirements
                 .as_ref()
@@ -734,10 +734,10 @@ impl TryFrom<&fidl_bredr::ChannelParameters> for ChannelParameters {
     }
 }
 
-impl TryFrom<&ChannelParameters> for fidl_bredr::ChannelParameters {
+impl TryFrom<&ChannelParameters> for fidl_bt::ChannelParameters {
     type Error = Error;
 
-    fn try_from(src: &ChannelParameters) -> Result<fidl_bredr::ChannelParameters, Self::Error> {
+    fn try_from(src: &ChannelParameters) -> Result<fidl_bt::ChannelParameters, Self::Error> {
         if let Some(size) = src.max_rx_sdu_size {
             if size < MIN_RX_SDU_SIZE {
                 return Err(Error::conversion(format!(
@@ -746,13 +746,13 @@ impl TryFrom<&ChannelParameters> for fidl_bredr::ChannelParameters {
             }
         }
 
-        Ok(fidl_bredr::ChannelParameters {
+        Ok(fidl_bt::ChannelParameters {
             channel_mode: src.channel_mode,
-            max_rx_sdu_size: src.max_rx_sdu_size,
+            max_rx_packet_size: src.max_rx_sdu_size,
             security_requirements: src
                 .security_requirements
                 .as_ref()
-                .map(fidl_bredr::SecurityRequirements::from),
+                .map(fidl_bt::SecurityRequirements::from),
             ..Default::default()
         })
     }
@@ -1208,23 +1208,26 @@ mod tests {
 
     #[test]
     fn test_channel_parameters_conversions() {
-        let channel_mode = Some(fidl_bredr::ChannelMode::EnhancedRetransmission);
+        let channel_mode = Some(fidl_bt::ChannelMode::EnhancedRetransmission);
         let max_rx_sdu_size = Some(MIN_RX_SDU_SIZE);
 
         let local =
             ChannelParameters { channel_mode, max_rx_sdu_size, security_requirements: None };
-        let fidl =
-            fidl_bredr::ChannelParameters { channel_mode, max_rx_sdu_size, ..Default::default() };
+        let fidl = fidl_bt::ChannelParameters {
+            channel_mode,
+            max_rx_packet_size: max_rx_sdu_size,
+            ..Default::default()
+        };
 
         let local_to_fidl =
-            fidl_bredr::ChannelParameters::try_from(&local).expect("conversion should work");
+            fidl_bt::ChannelParameters::try_from(&local).expect("conversion should work");
         assert_eq!(local_to_fidl, fidl);
 
         let fidl_to_local = ChannelParameters::try_from(&fidl).expect("conversion should work");
         assert_eq!(fidl_to_local, local);
 
         // Empty FIDL parameters is OK.
-        let fidl = fidl_bredr::ChannelParameters::default();
+        let fidl = fidl_bt::ChannelParameters::default();
         let expected = ChannelParameters {
             channel_mode: None,
             max_rx_sdu_size: None,
@@ -1244,9 +1247,9 @@ mod tests {
             security_requirements: None,
         };
         let fidl =
-            fidl_bredr::ChannelParameters { max_rx_sdu_size: too_small_sdu, ..Default::default() };
+            fidl_bt::ChannelParameters { max_rx_packet_size: too_small_sdu, ..Default::default() };
 
-        let local_to_fidl = fidl_bredr::ChannelParameters::try_from(&local);
+        let local_to_fidl = fidl_bt::ChannelParameters::try_from(&local);
         assert!(local_to_fidl.is_err());
 
         let fidl_to_local = ChannelParameters::try_from(&fidl);
@@ -1259,13 +1262,13 @@ mod tests {
         let secure_connections_required = Some(true);
 
         let local = SecurityRequirements { authentication_required, secure_connections_required };
-        let fidl = fidl_bredr::SecurityRequirements {
+        let fidl = fidl_bt::SecurityRequirements {
             authentication_required,
             secure_connections_required,
             ..Default::default()
         };
 
-        let local_to_fidl = fidl_bredr::SecurityRequirements::from(&local);
+        let local_to_fidl = fidl_bt::SecurityRequirements::from(&local);
         assert_eq!(local_to_fidl, fidl);
 
         let fidl_to_local = SecurityRequirements::from(&fidl);
@@ -1339,17 +1342,17 @@ mod tests {
         assert_eq!(combine_channel_parameters(&p1, &p2), expected);
 
         let p1 = ChannelParameters {
-            channel_mode: Some(fidl_bredr::ChannelMode::EnhancedRetransmission),
+            channel_mode: Some(fidl_bt::ChannelMode::EnhancedRetransmission),
             max_rx_sdu_size: None,
             security_requirements: None,
         };
         let p2 = ChannelParameters {
-            channel_mode: Some(fidl_bredr::ChannelMode::Basic),
+            channel_mode: Some(fidl_bt::ChannelMode::Basic),
             max_rx_sdu_size: Some(70),
             security_requirements: None,
         };
         let expected = ChannelParameters {
-            channel_mode: Some(fidl_bredr::ChannelMode::Basic),
+            channel_mode: Some(fidl_bt::ChannelMode::Basic),
             max_rx_sdu_size: Some(70),
             security_requirements: None,
         };
@@ -1362,12 +1365,12 @@ mod tests {
             security_requirements: Some(empty_seq_reqs.clone()),
         };
         let p2 = ChannelParameters {
-            channel_mode: Some(fidl_bredr::ChannelMode::EnhancedRetransmission),
+            channel_mode: Some(fidl_bt::ChannelMode::EnhancedRetransmission),
             max_rx_sdu_size: None,
             security_requirements: None,
         };
         let expected = ChannelParameters {
-            channel_mode: Some(fidl_bredr::ChannelMode::EnhancedRetransmission),
+            channel_mode: Some(fidl_bt::ChannelMode::EnhancedRetransmission),
             max_rx_sdu_size: Some(75),
             security_requirements: Some(empty_seq_reqs),
         };
@@ -1388,12 +1391,12 @@ mod tests {
             security_requirements: Some(reqs1),
         };
         let p2 = ChannelParameters {
-            channel_mode: Some(fidl_bredr::ChannelMode::Basic),
+            channel_mode: Some(fidl_bt::ChannelMode::Basic),
             max_rx_sdu_size: Some(70),
             security_requirements: Some(reqs2),
         };
         let expected = ChannelParameters {
-            channel_mode: Some(fidl_bredr::ChannelMode::Basic),
+            channel_mode: Some(fidl_bt::ChannelMode::Basic),
             max_rx_sdu_size: Some(70),
             security_requirements: Some(combined_reqs),
         };

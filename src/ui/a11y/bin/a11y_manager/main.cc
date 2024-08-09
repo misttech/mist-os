@@ -35,7 +35,7 @@ int run_a11y_manager(int argc, const char** argv) {
   std::unique_ptr<a11y_manager::App> app;
 
   a11y::TtsManager tts_manager(context.get());
-  a11y::ColorTransformManager color_transform_manager(context.get());
+  a11y::ColorTransformManager color_transform_manager(loop.dispatcher(), context.get());
   a11y::GestureListenerRegistry gesture_listener_registry;
   a11y::BootInfoManager boot_info_manager(context.get());
   a11y::ScreenReaderContextFactory screen_reader_context_factory;

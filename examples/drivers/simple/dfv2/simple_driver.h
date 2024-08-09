@@ -33,6 +33,9 @@ class SimpleDriver : public fdf::DriverBase {
   // been shutdown and before it deallocates the driver.
   void Stop() override;
 
+  // Exposed for testing.
+  std::string_view GetName() const { return name(); }
+
  private:
   // Required for maintaining the topological path.
   compat::SyncInitializedDeviceServer compat_server_;

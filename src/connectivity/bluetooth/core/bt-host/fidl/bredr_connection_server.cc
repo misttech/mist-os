@@ -6,10 +6,11 @@
 
 #include <algorithm>
 namespace fidlbredr = fuchsia::bluetooth::bredr;
+namespace fidlbt = fuchsia::bluetooth;
 
 namespace bthost {
 
-BrEdrConnectionServer::BrEdrConnectionServer(fidl::InterfaceRequest<fidlbredr::Connection> request,
+BrEdrConnectionServer::BrEdrConnectionServer(fidl::InterfaceRequest<fidlbt::Channel> request,
                                              bt::l2cap::Channel::WeakPtr channel,
                                              fit::callback<void()> closed_callback)
     : ServerBase(this, std::move(request)),
@@ -30,9 +31,9 @@ void BrEdrConnectionServer::Send(std::vector<uint8_t> packet, SendCallback callb
   if (packet.size() > channel_->max_tx_sdu_size()) {
     bt_log(TRACE, "fidl", "Dropping %zu bytes for channel %u as max TX SDU is %u ", packet.size(),
            channel_->id(), channel_->max_tx_sdu_size());
-    fidlbredr::Connection_Send_Response response;
+    fidlbt::Channel_Send_Response response;
     // NOLINTNEXTLINE(performance-move-const-arg)
-    callback(fidlbredr::Connection_Send_Result::WithResponse(std::move(response)));
+    callback(fidlbt::Channel_Send_Result::WithResponse(std::move(response)));
     return;
   }
 
@@ -45,14 +46,20 @@ void BrEdrConnectionServer::Send(std::vector<uint8_t> packet, SendCallback callb
            channel_->id());
   }
 
-  fidlbredr::Connection_Send_Response response;
+  fidlbt::Channel_Send_Response response;
   // NOLINTNEXTLINE(performance-move-const-arg)
-  callback(fidlbredr::Connection_Send_Result::WithResponse(std::move(response)));
+  callback(fidlbt::Channel_Send_Result::WithResponse(std::move(response)));
 }
 
 void BrEdrConnectionServer::AckReceive() {
   receive_credits_ = std::min(static_cast<uint8_t>(receive_credits_ + 1), kDefaultReceiveCredits);
   ServiceReceiveQueue();
+}
+
+void BrEdrConnectionServer::WatchChannelParameters(WatchChannelParametersCallback callback) {
+  BT_ASSERT_MSG(!pending_watch_channel_parameters_.has_value(),
+                "WatchChannelParameters called while there was already a pending call.");
+  pending_watch_channel_parameters_ = std::move(callback);
 }
 
 void BrEdrConnectionServer::handle_unknown_method(uint64_t ordinal, bool method_has_response) {
@@ -164,7 +171,7 @@ void BrEdrConnectionServer::ServiceReceiveQueue() {
 }
 
 std::unique_ptr<BrEdrConnectionServer> BrEdrConnectionServer::Create(
-    fidl::InterfaceRequest<fidlbredr::Connection> request, bt::l2cap::Channel::WeakPtr channel,
+    fidl::InterfaceRequest<fidlbt::Channel> request, bt::l2cap::Channel::WeakPtr channel,
     fit::callback<void()> closed_callback) {
   if (!channel.is_alive()) {
     return nullptr;

@@ -7,7 +7,7 @@
 //! convenient for comparison, and the comparison algorithms.
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
-use std::fmt::Display;
+use std::fmt::{Display, Write as _};
 
 use anyhow::Result;
 use flyweights::FlyStr;
@@ -161,9 +161,8 @@ impl Method {
     ) -> CompatibilityProblems {
         let mut problems = CompatibilityProblems::default();
         if client.kind() != server.kind() {
-            problems.protocol(
-                &client.path,
-                &server.path,
+            problems.error(
+                [&client.path, &server.path],
                 format!(
                     "Interaction kind differs between client(@{}):{} and server(@{}):{}",
                     client.path.api_level(),
@@ -180,9 +179,8 @@ impl Method {
                 // Request
                 let compat = compare_types(c_request, s_request, &config);
                 if compat.is_incompatible() {
-                    problems.protocol(
-                        &client.path,
-                        &server.path,
+                    problems.error(
+                        [&client.path, &server.path],
                         format!(
                             "Incompatible request types, client(@{}), server(@{})",
                             client.path.api_level(),
@@ -194,9 +192,8 @@ impl Method {
                 // Response
                 let compat = compare_types(s_response, c_response, &config);
                 if compat.is_incompatible() {
-                    problems.protocol(
-                        &client.path,
-                        &server.path,
+                    problems.error(
+                        [&client.path, &server.path],
                         format!(
                             "Incompatible response types, client(@{}), server(@{})",
                             client.path.api_level(),
@@ -209,9 +206,8 @@ impl Method {
             (OneWay(c_request), OneWay(s_request)) => {
                 let compat = compare_types(c_request, s_request, &config);
                 if compat.is_incompatible() {
-                    problems.protocol(
-                        &client.path,
-                        &server.path,
+                    problems.error(
+                        [&client.path, &server.path],
                         format!(
                             "Incompatible request types, client(@{}), server(@{})",
                             client.path.api_level(),
@@ -224,9 +220,8 @@ impl Method {
             (Event(c_payload), Event(s_payload)) => {
                 let compat = compare_types(s_payload, c_payload, &config);
                 if compat.is_incompatible() {
-                    problems.protocol(
-                        &client.path,
-                        &server.path,
+                    problems.error(
+                        [&client.path, &server.path],
                         format!(
                             "Incompatible event types, client(@{}), server(@{})",
                             client.path.api_level(),
@@ -256,6 +251,20 @@ impl Scopes {
             Scope::External => self.external,
         }
     }
+
+    fn everywhere(&self) -> bool {
+        self.platform && self.external
+    }
+}
+impl std::fmt::Display for Scopes {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Scopes { platform: false, external: false } => Ok(()),
+            Scopes { platform: true, external: false } => f.write_str("platform"),
+            Scopes { platform: false, external: true } => f.write_str("external"),
+            Scopes { platform: true, external: true } => f.write_str("platform,external"),
+        }
+    }
 }
 
 #[derive(Clone, Eq, PartialEq, PartialOrd, Ord, Debug)]
@@ -263,6 +272,62 @@ pub struct Discoverable {
     pub name: String,
     pub client: Scopes,
     pub server: Scopes,
+}
+impl Discoverable {
+    fn render_for_message(&self) -> String {
+        let mut message = "@discoverable(".to_owned();
+        if !self.client.everywhere() {
+            write!(&mut message, "client=\"{}\"", self.client).unwrap();
+        }
+        if !self.client.everywhere() && !self.server.everywhere() {
+            message.push_str(", ");
+        }
+        if !self.server.everywhere() {
+            write!(&mut message, "server=\"{}\"", self.server).unwrap();
+        }
+        message.push(')');
+        message
+    }
+}
+
+#[test]
+fn discoverable_render_for_message() {
+    assert_eq!(
+        "@discoverable()",
+        Discoverable {
+            name: "".to_owned(),
+            client: Scopes { platform: true, external: true },
+            server: Scopes { platform: true, external: true }
+        }
+        .render_for_message()
+    );
+    assert_eq!(
+        "@discoverable(client=\"external\")",
+        Discoverable {
+            name: "".to_owned(),
+            client: Scopes { platform: false, external: true },
+            server: Scopes { platform: true, external: true }
+        }
+        .render_for_message()
+    );
+    assert_eq!(
+        "@discoverable(server=\"platform\")",
+        Discoverable {
+            name: "".to_owned(),
+            client: Scopes { platform: true, external: true },
+            server: Scopes { platform: true, external: false }
+        }
+        .render_for_message()
+    );
+    assert_eq!(
+        "@discoverable(client=\"platform\", server=\"external\")",
+        Discoverable {
+            name: "".to_owned(),
+            client: Scopes { platform: true, external: false },
+            server: Scopes { platform: false, external: true }
+        }
+        .render_for_message()
+    );
 }
 
 #[derive(Clone, Debug, PartialEq, PartialOrd)]
@@ -312,6 +377,36 @@ impl Protocol {
         let client_ordinals: BTreeSet<u64> = client.methods.keys().cloned().collect();
         let server_ordinals: BTreeSet<u64> = server.methods.keys().cloned().collect();
 
+        if let Some(disco) = &client.discoverable {
+            if !disco.client.contains(client.path.scope()) {
+                problems.error(
+                    [&client.path, &server.path],
+                    format!(
+                        "Protocol {}(@{}) used as a {} client, contradicting its {}.",
+                        client.name,
+                        client.path.api_level(),
+                        client.path.scope(),
+                        disco.render_for_message()
+                    ),
+                );
+            }
+        }
+
+        if let Some(disco) = &server.discoverable {
+            if !disco.server.contains(server.path.scope()) {
+                problems.error(
+                    [&client.path, &server.path],
+                    format!(
+                        "Protocol {}(@{}) used as a {} server, contradicting its {}.",
+                        server.name,
+                        server.path.api_level(),
+                        server.path.scope(),
+                        disco.render_for_message()
+                    ),
+                );
+            }
+        }
+
         // Compare common interactions
         for ordinal in client_ordinals.intersection(&server_ordinals) {
             problems.append(Method::compatible(
@@ -334,9 +429,8 @@ impl Protocol {
                     // fine with the server not recognizing it, and (b) the
                     // server is expecting messages with the "unknown" bit set.
                 } else {
-                    problems.protocol(
-                        &method.path,
-                        &server.path,
+                    problems.error(
+                        [&method.path, &server.path],
                         format!(
                             "Server(@{}) missing method {}.{}",
                             server.path.api_level(),
@@ -357,9 +451,8 @@ impl Protocol {
                 {
                     // The server thinks the event is flexible and the client thinks the protocol is open enough.
                 } else {
-                    problems.protocol(
-                        &client.path,
-                        &method.path,
+                    problems.error(
+                        [&client.path, &method.path],
                         format!(
                             "Client(@{}) missing event {}.{}",
                             client.path.api_level(),

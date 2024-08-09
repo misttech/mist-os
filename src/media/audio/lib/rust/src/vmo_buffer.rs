@@ -105,8 +105,8 @@ impl VmoBuffer {
         // Check whether the buffer can be read from contiguously or if the read needs to be
         // split into two: one until the end of the buffer and one starting from the beginning.
         if (frame_offset + num_frames_in_buf) <= self.num_frames {
-            // Flush cache so we read the hardware's most recent write.
-            self.flush_cache(byte_offset as usize, buf.len())
+            // Flush and invalidate cache so we read the hardware's most recent write.
+            self.flush_invalidate_cache(byte_offset as usize, buf.len())
                 .map_err(VmoBufferError::VmoFlushCache)?;
             self.vmo.read(buf, byte_offset as u64).map_err(VmoBufferError::VmoRead)?;
         } else {
@@ -114,14 +114,14 @@ impl VmoBuffer {
             let bytes_until_buffer_end =
                 frames_to_write_until_end as usize * self.format.bytes_per_frame() as usize;
 
-            // Flush cache so we read the hardware's most recent write.
-            self.flush_cache(byte_offset, bytes_until_buffer_end)
+            // Flush and invalidate cache so we read the hardware's most recent write.
+            self.flush_invalidate_cache(byte_offset, bytes_until_buffer_end)
                 .map_err(VmoBufferError::VmoFlushCache)?;
             self.vmo
                 .read(&mut buf[..bytes_until_buffer_end], byte_offset as u64)
                 .map_err(VmoBufferError::VmoRead)?;
 
-            self.flush_cache(0, buf.len() - bytes_until_buffer_end)
+            self.flush_invalidate_cache(0, buf.len() - bytes_until_buffer_end)
                 .map_err(VmoBufferError::VmoFlushCache)?;
             self.vmo
                 .read(&mut buf[bytes_until_buffer_end..], 0)
@@ -130,8 +130,8 @@ impl VmoBuffer {
         Ok(())
     }
 
-    /// Flush the cache for a portion of the memory mapped VMO.
-    // TODO(https://fxbug.dev/328478694): Remove flush_cache once VMOs are created without caching
+    /// Flush the cache for a portion of the memory-mapped VMO.
+    // TODO(https://fxbug.dev/328478694): Remove these methods once VMOs are created without caching
     fn flush_cache(&self, offset_bytes: usize, size_bytes: usize) -> Result<(), zx::Status> {
         assert!(offset_bytes + size_bytes <= self.vmo_size_bytes as usize);
         let status = unsafe {
@@ -140,6 +140,25 @@ impl VmoBuffer {
                 (self.base_address + offset_bytes) as *mut u8,
                 size_bytes,
                 zx::sys::ZX_CACHE_FLUSH_DATA,
+            )
+        };
+        zx::Status::ok(status)
+    }
+
+    /// Flush and invalidate cache for a portion of the memory-mapped VMO.
+    // TODO(https://fxbug.dev/328478694): Remove these methods once VMOs are created without caching
+    fn flush_invalidate_cache(
+        &self,
+        offset_bytes: usize,
+        size_bytes: usize,
+    ) -> Result<(), zx::Status> {
+        assert!(offset_bytes + size_bytes <= self.vmo_size_bytes as usize);
+        let status = unsafe {
+            // SAFETY: The range was asserted above to be within the mapped region of the VMO.
+            zx::sys::zx_cache_flush(
+                (self.base_address + offset_bytes) as *mut u8,
+                size_bytes,
+                zx::sys::ZX_CACHE_FLUSH_DATA | zx::sys::ZX_CACHE_FLUSH_INVALIDATE,
             )
         };
         zx::Status::ok(status)

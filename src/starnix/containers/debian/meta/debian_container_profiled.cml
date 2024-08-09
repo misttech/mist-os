@@ -4,13 +4,6 @@
 {
     include: [ "//src/starnix/containers/debian/meta/debian_container.base.cml" ],
     program: {
-        features: [
-            "container",
-            "custom_artifacts",
-            "framebuffer2",
-            "magma",
-            "self_profile",
-            "test_data",
-        ],
+        features: [ "self_profile" ],
     },
 }

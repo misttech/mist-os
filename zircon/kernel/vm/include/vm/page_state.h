@@ -25,6 +25,7 @@ enum class vm_page_state : uint8_t {
   CACHE,
   SLAB,
   ZRAM,
+  FREE_LOANED,
 
   COUNT_
 };

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::EscrowRequest;
+use super::{EscrowRequest, StopInfo};
 use fuchsia_sync::Mutex;
 use futures::channel::oneshot;
 use futures::future::{BoxFuture, Shared};
@@ -22,11 +22,19 @@ pub struct ComponentController {
     /// Receiver for epitaphs coming from the connection.
     epitaph_value_recv: Shared<oneshot::Receiver<zx::Status>>,
 
-    /// The last value seen in an `ComponentController.OnEscrow` event.
-    escrow: Arc<Mutex<Option<EscrowRequest>>>,
+    /// State stored by the `ComponentController` server.
+    state: Arc<Mutex<State>>,
 
     /// The task listening for events.
     _event_listener_task: fasync::Task<()>,
+}
+
+struct State {
+    /// The last value seen in an `ComponentController.OnEscrow` event.
+    escrow: Option<EscrowRequest>,
+
+    /// The last value seen in an `ComponentController.OnStopInfo` event.
+    stop_info: Option<StopInfo>,
 }
 
 impl Deref for ComponentController {
@@ -46,13 +54,13 @@ impl<'a> ComponentController {
         diagnostics_sender: Option<oneshot::Sender<fdiagnostics::ComponentDiagnostics>>,
     ) -> Self {
         let (epitaph_sender, epitaph_value_recv) = oneshot::channel();
-        let escrow = Arc::new(Mutex::new(None));
 
+        let state = Arc::new(Mutex::new(State { escrow: None, stop_info: None }));
         let event_stream = proxy.take_event_stream();
         let events_fut = Self::listen_for_events(
             event_stream,
             epitaph_sender,
-            escrow.clone(),
+            state.clone(),
             diagnostics_sender,
         );
         let event_listener_task = fasync::Task::spawn(events_fut);
@@ -60,14 +68,15 @@ impl<'a> ComponentController {
         Self {
             inner: proxy,
             epitaph_value_recv: epitaph_value_recv.shared(),
-            escrow,
+            state,
             _event_listener_task: event_listener_task,
         }
     }
 
-    /// The last value seen in a `ComponentController.OnEscrow` event.
-    pub fn escrow(&self) -> Arc<Mutex<Option<EscrowRequest>>> {
-        self.escrow.clone()
+    /// Returns state that the program has escrowed, if any.
+    pub fn finalize(self) -> (Option<EscrowRequest>, Option<StopInfo>) {
+        let mut state = self.state.lock();
+        (state.escrow.take(), state.stop_info.take())
     }
 
     /// Obtain a future for the epitaph value.
@@ -85,7 +94,7 @@ impl<'a> ComponentController {
     async fn listen_for_events(
         mut event_stream: fcrunner::ComponentControllerEventStream,
         epitaph_sender: oneshot::Sender<zx::Status>,
-        escrow: Arc<Mutex<Option<EscrowRequest>>>,
+        state: Arc<Mutex<State>>,
         mut diagnostics_sender: Option<oneshot::Sender<fdiagnostics::ComponentDiagnostics>>,
     ) {
         let mut epitaph_sender = Some(epitaph_sender);
@@ -106,7 +115,10 @@ impl<'a> ComponentController {
                         diagnostics_sender.take().and_then(|sender| sender.send(payload).ok());
                     }
                     fcrunner::ComponentControllerEvent::OnEscrow { payload } => {
-                        *escrow.lock() = Some(payload.into());
+                        state.lock().escrow = Some(payload.into());
+                    }
+                    fcrunner::ComponentControllerEvent::OnStopInfo { payload } => {
+                        state.lock().stop_info = Some(payload.into());
                     }
                 },
             }

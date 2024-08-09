@@ -6,7 +6,7 @@
 #ifndef ZIRCON_KERNEL_VM_PMM_NODE_H_
 #define ZIRCON_KERNEL_VM_PMM_NODE_H_
 
-#include <lib/zbi-format/memory.h>
+#include <lib/memalloc/range.h>
 
 #include <fbl/canary.h>
 #include <fbl/intrusive_double_list.h>
@@ -37,10 +37,7 @@ class PmmNode {
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(PmmNode);
 
-  // TODO(https://fxbug.dev/347766366): Make this a function of only the
-  // normalized ranges.
-  zx_status_t Init(ktl::span<const zbi_mem_range_t> unnormalized,
-                   ktl::span<const memalloc::Range> normalized);
+  zx_status_t Init(ktl::span<const memalloc::Range> ranges);
 
   paddr_t PageToPaddr(const vm_page_t* page) TA_NO_THREAD_SAFETY_ANALYSIS;
   vm_page_t* PaddrToPage(paddr_t addr) TA_NO_THREAD_SAFETY_ANALYSIS;
@@ -54,6 +51,8 @@ class PmmNode {
   void FreePage(vm_page* page);
   // The list can be a combination of loaned and non-loaned pages.
   void FreeList(list_node* list);
+
+  void UnwirePage(vm_page* page);
 
   // Contiguous page loaning routines
   void BeginLoan(list_node* page_list);
@@ -162,7 +161,17 @@ class PmmNode {
   void ReportAllocFailure() TA_EXCL(lock_);
 
  private:
-  zx_status_t InitArena(const zbi_mem_range_t& range);
+  zx_status_t InitArena(const PmmArenaSelection& selected);
+
+  // An initialization subroutine to update PMM bookkeeping to reflect that a
+  // given range is to be regarded as reserved (e.g., wired). This is used for
+  // both special pre-PMM allocations (e.g., the kernel memory image) as well as
+  // holes in RAM contained within arenas (indicated by type
+  // memalloc::Type::kReserved).
+  //
+  // `range` is expected to be page-aligned and to not intersect with past
+  // ranges provided to this method.
+  void InitReservedRange(const memalloc::Range& range);
 
   void FreePageHelperLocked(vm_page* page, bool already_filled) TA_REQ(lock_);
   void FreeListLocked(list_node* list, bool already_filled) TA_REQ(lock_);
@@ -245,6 +254,8 @@ class PmmNode {
   list_node free_list_ TA_GUARDED(lock_) = LIST_INITIAL_VALUE(free_list_);
   // Free pages where loaned && !loan_cancelled.
   list_node free_loaned_list_ TA_GUARDED(lock_) = LIST_INITIAL_VALUE(free_loaned_list_);
+  // Reserved pages.
+  list_node reserved_list_ TA_GUARDED(lock_) = LIST_INITIAL_VALUE(reserved_list_);
 
   // Controls the behavior of requests that have the PMM_ALLOC_FLAG_CAN_WAIT.
   enum class ShouldWaitState {

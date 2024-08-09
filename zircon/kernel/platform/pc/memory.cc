@@ -10,7 +10,6 @@
 #include <inttypes.h>
 #include <lib/arch/x86/boot-cpuid.h>
 #include <lib/memalloc/range.h>
-#include <lib/zbitl/items/mem-config.h>
 #include <lib/zircon-internal/macros.h>
 #include <platform.h>
 #include <string.h>
@@ -30,7 +29,6 @@
 #include <object/handle.h>
 #include <object/resource_dispatcher.h>
 #include <phys/handoff.h>
-#include <vm/bootreserve.h>
 #include <vm/vm.h>
 
 #include "platform_p.h"
@@ -75,8 +73,7 @@ void mark_pio_region_to_reserve(uint64_t base, size_t len) {
 }
 
 // Discover the basic memory map.
-void pc_mem_init(ktl::span<const zbi_mem_range_t> unnormalized,
-                 ktl::span<const memalloc::Range> normalized) {
+void pc_mem_init(ktl::span<const memalloc::Range> ranges) {
   pmm_checker_init_from_cmdline();
 
   // We don't want RAM under 1MiB to feature in to any arenas, so normalize that
@@ -84,32 +81,15 @@ void pc_mem_init(ktl::span<const zbi_mem_range_t> unnormalized,
   ktl::span<const memalloc::Range> low_reserved;
   {
     size_t low_reserved_end = 0;
-    while (low_reserved_end < normalized.size() &&
-           normalized[low_reserved_end].type == memalloc::Type::kReservedLow) {
+    while (low_reserved_end < ranges.size() &&
+           ranges[low_reserved_end].type == memalloc::Type::kReservedLow) {
       ++low_reserved_end;
     }
-    low_reserved = normalized.first(low_reserved_end);
-    normalized = normalized.last(normalized.size() - low_reserved.size());
+    low_reserved = ranges.first(low_reserved_end);
+    ranges = ranges.last(ranges.size() - low_reserved.size());
   }
 
-  // ...And do so for our "unnormalized" ranges as well.
-  //
-  // TODO(https://fxbug.dev/347766366): This will go away once PMM
-  // initialization can just deal in `normalized`.
-  for (const zbi_mem_range_t& range : unnormalized) {
-    if (range.type != ZBI_MEM_TYPE_RAM) {
-      continue;
-    }
-    zbi_mem_range_t& ram = const_cast<zbi_mem_range_t&>(range);
-    if (ram.paddr >= 1 * MB) {
-      break;
-    }
-    uint64_t end = ram.paddr + ram.length;
-    ram.paddr = 1 * MB;
-    ram.length = ram.paddr < end ? end - ram.paddr : 0;
-  }
-
-  if (zx_status_t status = pmm_init(unnormalized, normalized); status != ZX_OK) {
+  if (zx_status_t status = pmm_init(ranges); status != ZX_OK) {
     TRACEF("Error adding arenas from provided memory tables: error = %d\n", status);
   }
 
@@ -121,7 +101,7 @@ void pc_mem_init(ktl::span<const zbi_mem_range_t> unnormalized,
     return memalloc::Type::kFreeRam;
   };
   memalloc::NormalizeRanges(
-      normalized,
+      ranges,
       [](const memalloc::Range& range) {
         mark_mmio_region_to_reserve(range.addr, static_cast<size_t>(range.size));
         return true;

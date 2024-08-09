@@ -441,21 +441,11 @@ class ControlDeviceTest : public testing::Test, public loop_fixture::RealLoop {
     fake_parent_->AddFidlService(fuchsia_hardware_goldfish::SyncService::Name,
                                  std::move(endpoints->client), "goldfish-sync");
 
-    service_result = outgoing_.AddService<fuchsia_hardware_sysmem::Service>(
-        fuchsia_hardware_sysmem::Service::InstanceHandler({
-            .sysmem = hardware_sysmem_.bind_handler(sysmem_server_loop_.dispatcher()),
-            // specifically not filling out allocator_v1 since that's not what the driver uses
-            // (currently).
-            .allocator_v2 = sysmem_.bind_handler(sysmem_server_loop_.dispatcher()),
-        }));
-    ASSERT_EQ(service_result.status_value(), ZX_OK);
+    fake_parent_->AddNsProtocol<fuchsia_sysmem2::Allocator>(
+        sysmem_.bind_handler(sysmem_server_loop_.dispatcher()));
 
-    endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-    ASSERT_OK(endpoints.status_value());
-    ASSERT_OK(outgoing_.Serve(std::move(endpoints->server)).status_value());
-
-    fake_parent_->AddFidlService(fuchsia_hardware_sysmem::Service::Name,
-                                 std::move(endpoints->client), "sysmem");
+    fake_parent_->AddNsProtocol<fuchsia_hardware_sysmem::Sysmem>(
+        hardware_sysmem_.bind_handler(sysmem_server_loop_.dispatcher()));
 
     device_loop_.StartThread("device-loop");
     pipe_server_loop_.StartThread("goldfish-pipe-fidl-server");

@@ -11,6 +11,7 @@
 #include <zircon/types.h>
 
 #include <fbl/macros.h>
+#include <vm/phys/arena.h>
 #include <vm/pmm.h>
 
 class PmmNode;
@@ -23,15 +24,16 @@ class PmmArena {
   DISALLOW_COPY_ASSIGN_AND_MOVE(PmmArena);
 
   // initialize the arena and allocate memory for internal data structures
-  zx_status_t Init(const pmm_arena_info_t* info, PmmNode* node);
+  void Init(const PmmArenaSelection& selected, PmmNode* node);
 
-  zx_status_t InitForTest(const pmm_arena_info_t& info, vm_page_t* page_array);
+  void InitForTest(const pmm_arena_info_t& info, vm_page_t* page_array);
 
   // accessors
   const pmm_arena_info_t& info() const { return info_; }
   const char* name() const { return info_.name; }
   paddr_t base() const { return info_.base; }
   size_t size() const { return info_.size; }
+  paddr_t end() const { return base() + size(); }
   unsigned int flags() const { return info_.flags; }
 
   // Counts the number of pages in every state. For each page in the arena,

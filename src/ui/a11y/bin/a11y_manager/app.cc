@@ -4,9 +4,11 @@
 
 #include "src/ui/a11y/bin/a11y_manager/app.h"
 
+#include <fidl/fuchsia.accessibility/cpp/hlcpp_conversion.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/status.h>
 
+#include "lib/fidl/cpp/hlcpp_conversion.h"
 #include "src/ui/a11y/lib/screen_reader/focus/a11y_focus_manager_impl.h"
 #include "src/ui/a11y/lib/screen_reader/screen_reader_context.h"
 #include "src/ui/a11y/lib/util/util.h"
@@ -212,7 +214,8 @@ void App::UpdateMagnifierState() {
 void App::UpdateColorTransformState() {
   bool color_inversion = state_.color_inversion_enabled();
   fuchsia::accessibility::ColorCorrectionMode color_blindness_type = state_.color_correction_mode();
-  color_transform_manager_->ChangeColorTransform(color_inversion, color_blindness_type);
+  color_transform_manager_->ChangeColorTransform(color_inversion,
+                                                 fidl::HLCPPToNatural(color_blindness_type));
 }
 
 void App::UpdateGestureManagerState() {

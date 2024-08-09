@@ -19,13 +19,17 @@ source_set("test_view") {
     "test_view.h",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_hlcpp",
-    "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
+    "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_cpp",
+    "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_cpp",
     "//sdk/lib/fidl/cpp",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/ui/scenic/cpp",
     "//src/lib/fsl",
+
+    # TODO(https://fxbug.dev/355738783): remove after all test changed to new c++ bindings
+    "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_hlcpp",
+    "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_hlcpp",
   ]
 }
 
@@ -37,7 +41,25 @@ source_set("portable_ui_test") {
   ]
 
   public_deps = [
+    ":fidl_cpp_helpers",
     ":screenshot_helper",
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
+    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_cpp",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
+    "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_cpp",
+    "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_cpp",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_cpp",
+    "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_cpp",
+    "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_cpp",
+    "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_cpp",
+    "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_cpp",
+    "//sdk/lib/sys/component/cpp/testing:cpp",
+    "//src/lib/testing/loop_fixture",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
+    "//zircon/system/ulib/async-loop:async-loop-default",
+    "//zircon/system/ulib/zx",
+
+    # TODO(https://fxbug.dev/355738783): remove after all test changed to new c++ bindings
     "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_hlcpp",
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
@@ -48,11 +70,6 @@ source_set("portable_ui_test") {
     "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_hlcpp",
     "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_hlcpp",
     "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_hlcpp",
-    "//sdk/lib/sys/component/cpp/testing:cpp",
-    "//src/lib/testing/loop_fixture",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-    "//zircon/system/ulib/zx",
   ]
 }
 
@@ -66,10 +83,13 @@ source_set("screenshot_helper") {
   deps = [ "//src/ui/scenic/lib/utils" ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_cpp",
     "//sdk/lib/syslog/cpp",
     "//third_party/libpng",
     "//zircon/system/ulib/zx",
+
+    # TODO(https://fxbug.dev/355738783): remove after all test changed to new c++ bindings
+    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
   ]
 }
 
@@ -89,4 +109,9 @@ source_set("zxtest_helpers") {
   testonly = true
   sources = [ "zxtest_helpers.h" ]
   public_deps = [ "//zircon/system/ulib/zxtest" ]
+}
+
+source_set("fidl_cpp_helpers") {
+  testonly = true
+  sources = [ "fidl_cpp_helpers.h" ]
 }

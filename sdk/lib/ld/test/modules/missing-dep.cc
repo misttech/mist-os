@@ -6,9 +6,9 @@
 
 #include "test-start.h"
 
-// The .ifs file missing-dep-dep.ifs creates a stub shared object that defines
-// the symbol `missing_dep_sym` and specifies its soname as libmissing_dep.so.
-// This module doesn't exist so we expect a missing module error.
+// An .ifs file is generated for the dependency that defines `missing_dep_sym`
+// (see //sdk/lib/ld/test/modules:missing-dep-dep-ifs). This module doesn't
+// exist so we expect a missing module error.
 
 extern "C" int64_t missing_dep_sym();
 

@@ -43,7 +43,7 @@ mod parse_mount_options {
     use nom::branch::alt;
     use nom::bytes::complete::{is_not, tag};
     use nom::combinator::opt;
-    use nom::multi::separated_list;
+    use nom::multi::separated_list0;
     use nom::sequence::{delimited, separated_pair, terminated};
     use nom::IResult;
     use starnix_uapi::errors::{errno, error, Errno};
@@ -76,7 +76,7 @@ mod parse_mount_options {
 
     pub(super) fn parse_mount_options(input: &FsStr) -> Result<HashMap<FsString, FsString>, Errno> {
         let (input, options) =
-            terminated(separated_list(tag(b","), option), opt(tag(b",")))(input.into())
+            terminated(separated_list0(tag(b","), option), opt(tag(b",")))(input.into())
                 .map_err(|_| errno!(EINVAL))?;
 
         // `[...],last_key="mis"quoted` not allowed.

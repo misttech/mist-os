@@ -41,7 +41,7 @@ use starnix_uapi::arc_key::{ArcKey, PtrKey, WeakKey};
 use starnix_uapi::auth::UserAndOrGroupId;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::file_mode::{Access, FileMode};
+use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
 use starnix_uapi::inotify_mask::InotifyMask;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
@@ -1097,14 +1097,14 @@ impl NamespaceNode {
         locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         flags: OpenFlags,
-        check_access: bool,
+        access_check: AccessCheck,
     ) -> Result<FileHandle, Errno>
     where
         L: LockBefore<FileOpsCore>,
         L: LockBefore<DeviceOpen>,
     {
         FileObject::new(
-            self.entry.node.open(locked, current_task, &self.mount, flags, check_access)?,
+            self.entry.node.open(locked, current_task, &self.mount, flags, access_check)?,
             self.clone(),
             flags,
         )

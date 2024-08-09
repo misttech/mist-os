@@ -171,6 +171,7 @@ icu_source_set("lib") {
   icu_public_deps = [ "//src/ui/a11y/lib:lib" ]
 
   public_deps = [
+    "//sdk/fidl/fuchsia.accessibility:fuchsia.accessibility_cpp_hlcpp_conversion",
     "//sdk/fidl/fuchsia.accessibility:fuchsia.accessibility_hlcpp",
     "//sdk/fidl/fuchsia.accessibility.gesture:fuchsia.accessibility.gesture_hlcpp",
     "//sdk/fidl/fuchsia.accessibility.semantics:fuchsia.accessibility.semantics_hlcpp",
@@ -179,6 +180,7 @@ icu_source_set("lib") {
     "//sdk/fidl/fuchsia.math:fuchsia.math_hlcpp",
     "//sdk/fidl/fuchsia.settings:fuchsia.settings_hlcpp",
     "//sdk/fidl/fuchsia.ui.input.accessibility:fuchsia.ui.input.accessibility_hlcpp",
+    "//src/lib/fidl/cpp:hlcpp_conversion",
   ]
 
   deps = [

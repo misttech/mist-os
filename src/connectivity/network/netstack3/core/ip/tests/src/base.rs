@@ -1393,7 +1393,7 @@ fn receive_ip_packet_action<I: IpExt + TestIpExt>(
     dev: &DeviceId<FakeBindingsCtx>,
     dst_addr: I::Addr,
 ) -> ReceivePacketAction<I, DeviceId<FakeBindingsCtx>> {
-    let Ctx { core_ctx, bindings_ctx } = ctx;
+    let Ctx { core_ctx, bindings_ctx: _ } = ctx;
     let buf = new_ip_packet_buf::<I>(I::TEST_ADDRS.remote_ip.get(), dst_addr);
     let mut buf_ref = buf.as_ref();
     let packet = buf_ref.parse::<I::Packet<_>>().expect("parse should succeed");
@@ -1403,12 +1403,12 @@ fn receive_ip_packet_action<I: IpExt + TestIpExt>(
     struct Out<I: IpExt>(ReceivePacketAction<I, DeviceId<FakeBindingsCtx>>);
 
     let Out(action) = I::map_ip(
-        (&packet, IpInvariant((&mut core_ctx.context(), bindings_ctx, dev))),
-        |(packet, IpInvariant((core_ctx, bindings_ctx, dev)))| {
-            Out(ip::receive_ipv4_packet_action(core_ctx, bindings_ctx, dev, &packet))
+        (&packet, IpInvariant((&mut core_ctx.context(), dev))),
+        |(packet, IpInvariant((core_ctx, dev)))| {
+            Out(ip::receive_ipv4_packet_action(core_ctx, dev, &packet))
         },
-        |(packet, IpInvariant((core_ctx, bindings_ctx, dev)))| {
-            Out(ip::receive_ipv6_packet_action(core_ctx, bindings_ctx, dev, &packet))
+        |(packet, IpInvariant((core_ctx, dev)))| {
+            Out(ip::receive_ipv6_packet_action(core_ctx, dev, &packet))
         },
     );
     action

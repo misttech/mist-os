@@ -37,5 +37,6 @@
     "fuchsia.microbenchmarks.pin_to_cpu_29": { "affinity": [29] },
     "fuchsia.microbenchmarks.pin_to_cpu_30": { "affinity": [30] },
     "fuchsia.microbenchmarks.pin_to_cpu_31": { "affinity": [31] },
+    "fuchsia.microbenchmarks.pin_to_vim3_big_cores": {"affinity": [2, 3, 4, 5] },
   }
 }

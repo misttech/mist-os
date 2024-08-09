@@ -673,7 +673,6 @@ mod tests {
             // This write should span three transactions. This test mimics the behavior when the
             // last transaction gets interrupted by a filesystem.close().
             handle
-                .handle()
                 .write_new_attr_in_batches(
                     &mut transaction,
                     FSVERITY_MERKLE_ATTRIBUTE_ID,

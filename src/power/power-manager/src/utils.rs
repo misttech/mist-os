@@ -2,6 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::Error;
+use fuchsia_async::{DurationExt, TimeoutExt};
+use fuchsia_zircon::Duration;
+use futures::stream::FuturesUnordered;
+use futures::{StreamExt, TryFutureExt, TryStreamExt};
+use {fidl_fuchsia_hardware_temperature as ftemperature, fidl_fuchsia_io as fio};
+
 /// Logs an error message if the provided `cond` evaluates to false. Also passes the same expression
 /// and message into `debug_assert!`, which will panic if debug assertions are enabled.
 #[macro_export]
@@ -103,6 +110,88 @@ impl CobaltIntHistogram {
     /// Get the underlying Vec<HistogramBucket> of the histogram.
     pub fn get_data(&self) -> Vec<HistogramBucket> {
         self.data.clone()
+    }
+}
+
+const TEMPERATURE_DRIVER_TIMEOUT: Duration = Duration::from_seconds(5);
+
+pub async fn get_temperature_driver_proxy(
+    sensor_name: &str,
+) -> Result<ftemperature::DeviceProxy, Error> {
+    const TEMPERATURE_DRIVER_DIRS: [&str; 3] =
+        ["/dev/class/temperature", "/dev/class/thermal", "/dev/class/trippoint"];
+
+    let mut futures = FuturesUnordered::new();
+    for dir_path in TEMPERATURE_DRIVER_DIRS {
+        futures.push(get_temperature_driver_proxy_from_dir(dir_path, sensor_name));
+    }
+
+    let mut debug_messages = Vec::new();
+    while let Some(result) = futures.next().await {
+        match result {
+            Ok(proxy) => return Ok(proxy),
+            // It is ok that a driver directory listed above doesn't exist or timeout waiting for
+            // `sensor_name` to show up. Cache the error.
+            Err(err) => debug_messages.push(err),
+        };
+    }
+    // If `sensor_name` is not found, print all the error messages to help with debugging.
+    for (i, message) in debug_messages.into_iter().enumerate() {
+        tracing::error!("Failed to find temperature driver debug message [{}]: {:?}", i, message);
+    }
+    return Err(anyhow::anyhow!(
+        "Failed to find temperature driver with sensor name: {:?}.",
+        sensor_name
+    ));
+}
+
+async fn get_temperature_driver_proxy_from_dir(
+    dir_path: &str,
+    required_sensor_name: &str,
+) -> Result<ftemperature::DeviceProxy, Error> {
+    let dir = fuchsia_fs::directory::open_in_namespace(dir_path, fio::OpenFlags::RIGHT_READABLE)?;
+
+    let mut watcher = fuchsia_fs::directory::Watcher::new(&dir).await.map_err(|e| {
+        anyhow::anyhow!("Failed to create watcher for directory {:?}: {:?}", dir_path, e)
+    })?;
+
+    loop {
+        let next = watcher
+            .try_next()
+            .map_err(|e| anyhow::anyhow!("Failed to get next watch message: {e:?}"))
+            .on_timeout(TEMPERATURE_DRIVER_TIMEOUT.after_now(), || {
+                Err(anyhow::anyhow!("Timeout waiting for next watcher message."))
+            })
+            .await?;
+
+        if let Some(watch_msg) = next {
+            let filename = watch_msg
+                .filename
+                .as_path()
+                .to_str()
+                .ok_or(anyhow::anyhow!("Failed to convert filename to string"))?
+                .to_owned();
+            if filename != "." {
+                if watch_msg.event == fuchsia_fs::directory::WatchEvent::ADD_FILE
+                    || watch_msg.event == fuchsia_fs::directory::WatchEvent::EXISTING
+                {
+                    let proxy = fuchsia_component::client::connect_to_named_protocol_at_dir_root::<
+                        ftemperature::DeviceMarker,
+                    >(&dir, &filename)?;
+                    let sensor_name = proxy
+                        .get_sensor_name()
+                        .await
+                        .map_err(|e| anyhow::anyhow!("GetSensorName failed with err: {:?}", e))?;
+                    tracing::debug!(filename, dir_path, sensor_name, "Temperature driver detected");
+
+                    if required_sensor_name == sensor_name {
+                        return Ok(proxy);
+                    }
+                }
+            }
+        } else {
+            return Err(anyhow::anyhow!("Directory watcher returned None entry."));
+        }
     }
 }
 

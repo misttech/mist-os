@@ -12,7 +12,7 @@
             "--host_bootfs",
             "--config",
             "/boot/data/component_manager_config",
-            "fuchsia-boot:///hello_world#meta/hello_world.cm",
+            "fuchsia-boot:///trigger_pkg#meta/trigger.cm",
         ],
         job_policy_create_raw_processes: "true",
     },

@@ -926,7 +926,7 @@ mod tests {
     use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
     use crate::vfs::{MountInfo, NamespaceNode};
     use starnix_uapi::auth::Credentials;
-    use starnix_uapi::file_mode::FileMode;
+    use starnix_uapi::file_mode::{AccessCheck, FileMode};
     use starnix_uapi::signals::{SIGCHLD, SIGTTOU};
 
     fn ioctl<T: zerocopy::AsBytes + zerocopy::FromBytes + zerocopy::NoCell + Copy>(
@@ -979,7 +979,7 @@ mod tests {
         L: LockBefore<DeviceOpen>,
     {
         let node = lookup_node(current_task, fs, name)?;
-        node.open(locked, current_task, flags, true)
+        node.open(locked, current_task, flags, AccessCheck::default())
     }
 
     fn open_file<L>(
@@ -1073,7 +1073,7 @@ mod tests {
             })
             .expect("custom_pts");
         let node = NamespaceNode::new_anonymous(pts.clone());
-        assert!(node.open(&mut locked, &task, OpenFlags::RDONLY, true).is_err());
+        assert!(node.open(&mut locked, &task, OpenFlags::RDONLY, AccessCheck::skip()).is_err());
     }
 
     #[::fuchsia::test]
@@ -1138,7 +1138,10 @@ mod tests {
         let _ptmx_file = open_file(&mut locked, &task, fs, "ptmx".into()).expect("open file");
 
         let pts = lookup_node(&task, fs, "0".into()).expect("component_lookup");
-        assert_eq!(pts.open(&mut locked, &task, OpenFlags::RDONLY, true).map(|_| ()), error!(EIO));
+        assert_eq!(
+            pts.open(&mut locked, &task, OpenFlags::RDONLY, AccessCheck::default()).map(|_| ()),
+            error!(EIO)
+        );
     }
 
     #[::fuchsia::test]
@@ -1151,14 +1154,17 @@ mod tests {
         // Check that the lock is not set.
         assert_eq!(ioctl::<i32>(&mut locked, &task, &ptmx, TIOCGPTLCK, &0), Ok(0));
         // /dev/pts/0 can be opened
-        pts.open(&mut locked, &task, OpenFlags::RDONLY, true).expect("open");
+        pts.open(&mut locked, &task, OpenFlags::RDONLY, AccessCheck::default()).expect("open");
 
         // Lock the terminal
         ioctl::<i32>(&mut locked, &task, &ptmx, TIOCSPTLCK, &42).expect("ioctl");
         // Check that the lock is set.
         assert_eq!(ioctl::<i32>(&mut locked, &task, &ptmx, TIOCGPTLCK, &0), Ok(1));
         // /dev/pts/0 cannot be opened
-        assert_eq!(pts.open(&mut locked, &task, OpenFlags::RDONLY, true).map(|_| ()), error!(EIO));
+        assert_eq!(
+            pts.open(&mut locked, &task, OpenFlags::RDONLY, AccessCheck::default()).map(|_| ()),
+            error!(EIO)
+        );
     }
 
     #[::fuchsia::test]

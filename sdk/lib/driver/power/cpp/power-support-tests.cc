@@ -10,6 +10,9 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
+#include <lib/async/default.h>
+#include <lib/driver/power/cpp/element-description-builder.h>
+#include <lib/fidl/cpp/client.h>
 #include <lib/fidl/cpp/wire/arena.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
@@ -21,13 +24,18 @@
 #include <zircon/rights.h>
 #include <zircon/syscalls/object.h>
 
+#include <optional>
+
 #include <fbl/ref_ptr.h>
 #include <gtest/gtest.h>
+#include <sdk/lib/sys/component/cpp/testing/realm_builder.h>
 #include <src/lib/testing/loop_fixture/real_loop_fixture.h>
 #include <src/storage/lib/vfs/cpp/pseudo_dir.h>
 #include <src/storage/lib/vfs/cpp/service.h>
 #include <src/storage/lib/vfs/cpp/synchronous_vfs.h>
 
+#include "fidl/fuchsia.power.broker/cpp/common_types.h"
+#include "lib/sys/component/cpp/testing/realm_builder_types.h"
 #include "sdk/lib/driver/power/cpp/power-support.h"
 
 namespace power_lib_test {
@@ -214,6 +222,169 @@ AddInstanceResult AddServiceInstance(
       .token_handler = std::move(token_handler),
       .token = std::move(event),
   };
+}
+
+TEST_F(PowerLibTest, TestLeaseHelper) {
+  auto realm_builder = component_testing::RealmBuilder::Create();
+  realm_builder.AddChild("power-broker", "#meta/power-broker.cm");
+
+  realm_builder.AddRoute(component_testing::Route{
+      .capabilities = {component_testing::Protocol{"fuchsia.power.broker.Topology"}},
+      .source = component_testing::ChildRef{"power-broker"},
+      .targets = {component_testing::ParentRef{}},
+  });
+
+  auto root = realm_builder.Build(async_get_default_dispatcher());
+
+  fidl::Endpoints<fuchsia_power_broker::Topology> power_broker =
+      fidl::CreateEndpoints<fuchsia_power_broker::Topology>().value();
+  zx_status_t connect_result =
+      root.component().Connect("fuchsia.power.broker.Topology", power_broker.server.TakeChannel());
+  ASSERT_EQ(ZX_OK, connect_result);
+
+  fuchsia_hardware_power::PowerElementConfiguration config{{
+      .element = fuchsia_hardware_power::PowerElement{{
+          .name = "parent_element",
+          .levels =
+              {
+                  {{{.level = 0, .name = "zero"}}, {{.level = 1, .name = "one"}}},
+              },
+      }},
+  }};
+
+  fidl::Arena arena;
+  fdf_power::ElementDescBuilder element_builder(fidl::ToWire(arena, config), fdf_power::TokenMap());
+  fdf_power::ElementDesc description = element_builder.Build();
+  auto result = fdf_power::AddElement(power_broker.client, description);
+
+  ASSERT_FALSE(result.is_error()) << "Error value" << static_cast<uint32_t>(result.error_value());
+
+  bool level_rose = false;
+  bool lease_acquired = false;
+
+  // Now run the created element with an element runner
+  fdf_power::ElementRunner element_runner(
+      std::move(description.required_level_client_.value()),
+      std::move(description.current_level_client_.value()),
+      [level_rose = &level_rose, lease_acquired = &lease_acquired,
+       quit = QuitLoopClosure()](uint8_t new_level) {
+        if (new_level == 1) {
+          *level_rose = true;
+        }
+
+        if (*level_rose && *lease_acquired) {
+          quit();
+        }
+        return fit::success(new_level);
+      },
+      [&](fdf_power::ElementRunnerError e) {
+        ASSERT_TRUE(false) << "Unexpected error: " << static_cast<uint32_t>(e);
+      },
+      async_get_default_dispatcher());
+  element_runner.RunPowerElement();
+
+  std::vector<fdf_power::LeaseDependency> deps;
+  deps.push_back(fdf_power::LeaseDependency{
+      .levels_by_preference = {1},
+      .token = std::move(description.assertive_token_),
+      .type = fuchsia_power_broker::DependencyType::kAssertive,
+  });
+
+  // Now, let's create a direct lease on the element we created
+  fit::result<std::tuple<fidl::Status, std::optional<fuchsia_power_broker::AddElementError>>,
+              std::unique_ptr<fdf_power::LeaseHelper>>
+      creation_result = fdf_power::CreateLeaseHelper(
+          power_broker.client, std::move(deps), "test_lease", async_get_default_dispatcher(),
+          []() { ASSERT_TRUE(false) << "error callback triggered unexpectedly"; });
+  ASSERT_FALSE(creation_result.is_error());
+
+  fidl::ClientEnd<fuchsia_power_broker::LeaseControl> lease_ctl;
+  std::unique_ptr<fdf_power::LeaseHelper> lease = std::move(creation_result.value());
+  lease->AcquireLease(
+      [&lease_ctl, level_rose = &level_rose, lease_acquired = &lease_acquired,
+       quit = QuitLoopClosure()](fidl::Result<fuchsia_power_broker::Lessor::Lease>& lease) {
+        ASSERT_FALSE(lease.is_error());
+        *lease_acquired = true;
+        if (*level_rose && *lease_acquired) {
+          quit();
+        }
+        lease_ctl = std::move(lease->lease_control());
+      });
+
+  RunLoop();
+}
+
+/// Tries to create a direct lease, but passes in a closed channel. We then
+/// expect CreateLeaseHelper to return an appropriate error.
+TEST_F(PowerLibTest, TestCreateLeaseHelperWithClosedChannel) {
+  fidl::Endpoints<fuchsia_power_broker::Topology> power_broker =
+      fidl::CreateEndpoints<fuchsia_power_broker::Topology>().value();
+  power_broker.server.TakeChannel().reset();
+
+  zx::event not_registered;
+  zx::event::create(0, &not_registered);
+
+  std::vector<fdf_power::LeaseDependency> deps;
+  deps.push_back(fdf_power::LeaseDependency{
+      .levels_by_preference = {1},
+      .token = std::move(not_registered),
+      .type = fuchsia_power_broker::DependencyType::kAssertive,
+  });
+
+  fit::result<std::tuple<fidl::Status, std::optional<fuchsia_power_broker::AddElementError>>,
+              std::unique_ptr<fdf_power::LeaseHelper>>
+      creation_result = fdf_power::CreateLeaseHelper(
+          power_broker.client, std::move(deps), "test_lease", async_get_default_dispatcher(),
+          []() { ASSERT_TRUE(false) << "error callback triggered unexpectedly"; });
+  ASSERT_TRUE(creation_result.is_error());
+  std::tuple<fidl::Status, std::optional<fuchsia_power_broker::AddElementError>> error_val =
+      creation_result.error_value();
+  ASSERT_EQ(std::get<0>(error_val).status(), ZX_ERR_PEER_CLOSED);
+  ASSERT_EQ(std::get<1>(error_val), std::nullopt);
+}
+
+/// Tries to create a direct lease, but does not register the event token that
+/// the lease depends on. We expect Power Broker to return an error and then
+/// that CreateLeaseHelper returns the expected error.
+TEST_F(PowerLibTest, TestCreateLeaseHelperWithInvalidToken) {
+  auto realm_builder = component_testing::RealmBuilder::Create();
+  realm_builder.AddChild("power-broker", "#meta/power-broker.cm");
+
+  realm_builder.AddRoute(component_testing::Route{
+      .capabilities = {component_testing::Protocol{"fuchsia.power.broker.Topology"}},
+      .source = component_testing::ChildRef{"power-broker"},
+      .targets = {component_testing::ParentRef{}},
+  });
+
+  auto root = realm_builder.Build(async_get_default_dispatcher());
+
+  fidl::Endpoints<fuchsia_power_broker::Topology> power_broker =
+      fidl::CreateEndpoints<fuchsia_power_broker::Topology>().value();
+  zx_status_t connect_result =
+      root.component().Connect("fuchsia.power.broker.Topology", power_broker.server.TakeChannel());
+  ASSERT_EQ(ZX_OK, connect_result);
+
+  zx::event not_registered;
+  zx::event::create(0, &not_registered);
+
+  std::vector<fdf_power::LeaseDependency> deps;
+  deps.push_back(fdf_power::LeaseDependency{
+      .levels_by_preference = {1},
+      .token = std::move(not_registered),
+      .type = fuchsia_power_broker::DependencyType::kAssertive,
+  });
+
+  // Now, let's create a direct lease on the element we created
+  fit::result<std::tuple<fidl::Status, std::optional<fuchsia_power_broker::AddElementError>>,
+              std::unique_ptr<fdf_power::LeaseHelper>>
+      creation_result = fdf_power::CreateLeaseHelper(
+          power_broker.client, std::move(deps), "test_lease", async_get_default_dispatcher(),
+          []() { ASSERT_TRUE(false) << "error callback triggered unexpectedly"; });
+  ASSERT_TRUE(creation_result.is_error());
+  std::tuple<fidl::Status, std::optional<fuchsia_power_broker::AddElementError>> error_val =
+      creation_result.error_value();
+  ASSERT_EQ(std::get<0>(error_val).status(), fidl::Status::Ok().status());
+  ASSERT_EQ(std::get<1>(error_val), fuchsia_power_broker::AddElementError::kNotAuthorized);
 }
 
 /// Tests the ElementRunner by sending it two required values and then expects

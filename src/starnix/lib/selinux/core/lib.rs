@@ -7,7 +7,7 @@ pub mod permission_check;
 pub mod security_server;
 pub mod seq_lock;
 
-pub use selinux_common::InitialSid;
+pub use selinux::InitialSid;
 
 use std::num::NonZeroU32;
 

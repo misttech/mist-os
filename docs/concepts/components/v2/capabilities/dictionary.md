@@ -418,7 +418,8 @@ see the `dictionary` definition for `bundle` that extends the `Router`.
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/dictionaries/meta/dynamic_dictionary_provider.cml" region_tag="body" adjust_indentation="auto" %}
 ```
 
-At initialization, `dynamic-dictionary-provider` begins by creating a new
+At initialization, `dynamic-dictionary-provider` uses the
+[`CapabilityStore`][fidl-sandbox-capability-store] sandbox API to create a new
 `Dictionary` and adding three [`Connector`][fidl-sandbox-connector] to it. Each
 `Connector` represents one of the `Echo` protocol instances.
 
@@ -443,22 +444,15 @@ Finally, we need to expose the dictionary created earlier with a
 {% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/dictionaries/provider/src/main.rs" region_tag="serve" adjust_indentation="auto" %}
 ```
 
-Note that there are two levels of cloning involved here. The first clones the
-`DictionaryProxy` using Rust's standard `Clone` trait, so it can be shared
-between multiple `for_each_concurrent` futures. This creates an in-memory object
-clone but does not clone the underlying handle.
+The [`Router`][fidl-sandbox-router] request handler exports the dictionary and
+returns it. Note that it makes a
+[`CapabilityStore/Duplicate`][fidl-sandbox-capability-store] of the dictionary
+first because the framework may call `Router/Route` multiple times. This has the
+effect of duplicating the dictionary *handle*, without copying the inner
+contents.
 
 ```json5
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/dictionaries/provider/src/main.rs" region_tag="outer_clone" adjust_indentation="auto" %}
-```
-
-The second calls the `Dictionary/Clone` API to get a new
-[`Dictionary`][fidl-sandbox-dictionary] handle, which it returns to the `Route`
-request. This clone is necessary because the component framework may call
-`Route` multiple times.
-
-```json5
-{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/dictionaries/provider/src/main.rs" region_tag="inner_clone" adjust_indentation="auto" %}
+{% includecode gerrit_repo="fuchsia/fuchsia" gerrit_path="examples/components/dictionaries/provider/src/main.rs" region_tag="request" adjust_indentation="auto" %}
 ```
 
 ##### Client
@@ -502,6 +496,7 @@ The program just connects to each protocol in turn and tries to use it:
 [capability-protocol]: ./protocol.md
 [capability-protocol-consume]: ./protocol.md#consume
 [capability-routing]: /docs/concepts/components/v2/capabilities/README.md#routing
+[fidl-sandbox-capability-store]: https://fuchsia.dev/reference/fidl/fuchsia.component.sandbox#CapabilityStore
 [fidl-sandbox-connector]: https://fuchsia.dev/reference/fidl/fuchsia.component.sandbox#Connector
 [fidl-sandbox-dictionary]: https://fuchsia.dev/reference/fidl/fuchsia.component.sandbox#Dictionary
 [fidl-sandbox-router]: https://fuchsia.dev/reference/fidl/fuchsia.component.sandbox#Router

@@ -287,7 +287,7 @@ int OwnedWaitQueueTopologyTests::TestThread::Main() {
     Thread* const current_thread = Thread::Current::Get();
     ktl::array locks{&final_exit_queue_.get_lock(), &current_thread->get_lock()};
 
-    while (AcquireChainLockSet(locks) == ChainLock::LockResult::kBackoff) {
+    while (AcquireChainLockSet(locks) == ChainLock::Result::Backoff) {
       clt.Relax();
     }
 

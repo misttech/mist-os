@@ -180,13 +180,47 @@ mod inner_access {
             }
         }
 
+        pub fn is_nontrivial(&self) -> bool {
+            *self != Self::EXIST
+        }
+
         pub fn rwx_bits(&self) -> u32 {
-            self.bits() & 0o7
+            self.bits() & Self::ACCESS_MASK.bits()
         }
     }
 }
 
 pub use inner_access::Access;
+
+pub struct AccessCheck(Option<Access>);
+
+impl Default for AccessCheck {
+    /// Perform the default access checks.
+    fn default() -> Self {
+        Self(None)
+    }
+}
+
+impl AccessCheck {
+    /// Skip access checks.
+    pub fn skip() -> Self {
+        Self(Some(Access::EXIST))
+    }
+
+    /// Check for the given access values.
+    pub fn check_for(access: Access) -> Self {
+        Self(Some(access))
+    }
+
+    /// The actual access bits to check for given the open flags.
+    ///
+    /// If the access check is the default, then this function will return
+    /// the access bits needed to open the file with the rights specified in
+    /// open flags.
+    pub fn resolve(&self, flags: OpenFlags) -> Access {
+        self.0.unwrap_or_else(|| Access::from_open_flags(flags))
+    }
+}
 
 // Public re-export of macros allows them to be used like regular rust items.
 pub use mode;

@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/host.gni")
 import("//build/rust/rustc_binary.gni")
+import("//src/developer/ffx/lib/e2e_emu/ffx_e2e_test.gni")
 
 if (is_host) {
   group("host_tests") {
@@ -15,13 +16,12 @@ if (is_host) {
   }
 
   if (has_board) {
-    rustc_test("verify_ffx_component_run_parent_overrides") {
+    ffx_e2e_test("verify_ffx_component_run_parent_overrides") {
       testonly = true
       edition = "2021"
       source_root = "src/parent_overrides.rs"
       sources = [ source_root ]
       deps = [
-        "//src/developer/ffx/lib/e2e_emu",
         "//src/lib/fuchsia",
         "//third_party/rust_crates:futures",
         "//third_party/rust_crates:tracing",

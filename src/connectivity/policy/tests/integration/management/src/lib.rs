@@ -1273,7 +1273,7 @@ async fn observes_stop_events<M: Manager, N: Netstack>(name: &str) {
         event_matcher.wait::<events::Stopped>(&mut event_stream).await.expect("got stopped event");
     // NB: event::result below borrows from event, it needs to be in a different
     // statement.
-    let events::StoppedPayload { status } = event.result().expect("error event on stopped");
+    let events::StoppedPayload { status, .. } = event.result().expect("error event on stopped");
     assert_matches::assert_matches!(status, events::ExitStatus::Clean);
 }
 

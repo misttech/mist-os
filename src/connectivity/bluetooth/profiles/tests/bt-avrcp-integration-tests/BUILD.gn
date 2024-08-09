@@ -11,6 +11,7 @@ rustc_test("bin") {
   source_root = "src/main.rs"
 
   deps = [
+    "//sdk/fidl/fuchsia.bluetooth:fuchsia.bluetooth_rust",
     "//sdk/fidl/fuchsia.bluetooth.avrcp:fuchsia.bluetooth.avrcp_rust",
     "//sdk/fidl/fuchsia.bluetooth.bredr:fuchsia.bluetooth.bredr_rust",
     "//sdk/fidl/fuchsia.bluetooth.bredr.test:fuchsia.bluetooth.bredr.test_rust",

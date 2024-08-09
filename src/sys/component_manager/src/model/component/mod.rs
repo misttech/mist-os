@@ -41,7 +41,7 @@ use futures::lock::{MappedMutexGuard, Mutex, MutexGuard};
 use hooks::{Event, EventPayload, Hooks};
 use instance::{
     InstanceState, ResolvedInstanceState, ShutdownInstanceState, StartedInstanceState,
-    StopOutcomeWithEscrow, UnresolvedInstanceState,
+    StopConclusion, UnresolvedInstanceState,
 };
 use manager::ComponentManagerInstance;
 use moniker::{ChildName, Moniker};
@@ -702,7 +702,9 @@ impl ComponentInstance {
             .await
             .map_err(|err| StopActionError::DestroyDynamicChildrenFailed { err: Box::new(err) })?;
 
-        if let Some((StopOutcomeWithEscrow { outcome, escrow_request }, start_time)) = stop_result {
+        if let Some((StopConclusion { outcome, escrow_request, stop_info }, start_time)) =
+            stop_result
+        {
             let requested_escrow = escrow_request.is_some();
 
             // Store any escrowed state.
@@ -718,6 +720,7 @@ impl ComponentInstance {
             let stop_time = zx::Time::get_monotonic();
             let event = self.new_event(EventPayload::Stopped {
                 status: outcome.component_exit_status,
+                exit_code: stop_info.map(|info| info.exit_code).flatten(),
                 stop_time,
                 execution_duration: stop_time - start_time,
                 requested_escrow,
@@ -2280,14 +2283,7 @@ pub mod tests {
                 .validate_and_convert_dynamic_component(
                     Some(offers),
                     None,
-                    &ChildDecl {
-                        name: "foo".parse().unwrap(),
-                        url: "http://foo".parse().unwrap(),
-                        startup: fdecl::StartupMode::Lazy,
-                        on_terminate: None,
-                        environment: None,
-                        config_overrides: None,
-                    },
+                    &ChildBuilder::new().name("foo").url("http://foo").into(),
                     Some(&collection_decl),
                 )
         };
@@ -2433,14 +2429,7 @@ pub mod tests {
                 .validate_and_convert_dynamic_component(
                     None,
                     Some(capabilities),
-                    &ChildDecl {
-                        name: "foo".parse().unwrap(),
-                        url: "http://foo".parse().unwrap(),
-                        startup: fdecl::StartupMode::Lazy,
-                        on_terminate: None,
-                        environment: None,
-                        config_overrides: None,
-                    },
+                    &ChildBuilder::new().name("foo").url("http://foo").into(),
                     Some(&collection_decl),
                 )
         };

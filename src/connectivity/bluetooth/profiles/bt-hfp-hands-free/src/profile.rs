@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 
 use anyhow::Context as _;
-use fidl_fuchsia_bluetooth_bredr as bredr;
 use profile_client::ProfileClient;
+use {fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr};
 
 use crate::config::HandsFreeFeatureSupport;
 use crate::service_definition;
@@ -18,7 +18,7 @@ pub fn register_with_proxy(
     let mut profile = ProfileClient::advertise(
         proxy,
         vec![service_definition],
-        bredr::ChannelParameters::default(),
+        fidl_bt::ChannelParameters::default(),
     )?;
     // Register a search for remote peers that support the Audio Gateway role
     profile.add_search(bredr::ServiceClassProfileIdentifier::HandsfreeAudioGateway, None)?;

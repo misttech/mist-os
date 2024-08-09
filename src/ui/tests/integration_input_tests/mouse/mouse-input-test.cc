@@ -2,29 +2,32 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/accessibility/semantics/cpp/fidl.h>
-#include <fuchsia/buildinfo/cpp/fidl.h>
-#include <fuchsia/component/cpp/fidl.h>
-#include <fuchsia/fonts/cpp/fidl.h>
-#include <fuchsia/input/report/cpp/fidl.h>
-#include <fuchsia/kernel/cpp/fidl.h>
-#include <fuchsia/logger/cpp/fidl.h>
-#include <fuchsia/memorypressure/cpp/fidl.h>
-#include <fuchsia/metrics/cpp/fidl.h>
-#include <fuchsia/net/interfaces/cpp/fidl.h>
-#include <fuchsia/posix/socket/cpp/fidl.h>
-#include <fuchsia/process/cpp/fidl.h>
-#include <fuchsia/scheduler/cpp/fidl.h>
-#include <fuchsia/session/scene/cpp/fidl.h>
-#include <fuchsia/tracing/provider/cpp/fidl.h>
-#include <fuchsia/ui/app/cpp/fidl.h>
-#include <fuchsia/ui/input/cpp/fidl.h>
-#include <fuchsia/ui/scenic/cpp/fidl.h>
-#include <fuchsia/ui/test/input/cpp/fidl.h>
-#include <fuchsia/vulkan/loader/cpp/fidl.h>
-#include <fuchsia/web/cpp/fidl.h>
+#include <fidl/fuchsia.accessibility.semantics/cpp/fidl.h>
+#include <fidl/fuchsia.buildinfo/cpp/fidl.h>
+#include <fidl/fuchsia.component.decl/cpp/fidl.h>
+#include <fidl/fuchsia.component.decl/cpp/hlcpp_conversion.h>
+#include <fidl/fuchsia.component/cpp/fidl.h>
+#include <fidl/fuchsia.fonts/cpp/fidl.h>
+#include <fidl/fuchsia.input.report/cpp/fidl.h>
+#include <fidl/fuchsia.kernel/cpp/fidl.h>
+#include <fidl/fuchsia.logger/cpp/fidl.h>
+#include <fidl/fuchsia.memorypressure/cpp/fidl.h>
+#include <fidl/fuchsia.metrics/cpp/fidl.h>
+#include <fidl/fuchsia.net.interfaces/cpp/fidl.h>
+#include <fidl/fuchsia.posix.socket/cpp/fidl.h>
+#include <fidl/fuchsia.process/cpp/fidl.h>
+#include <fidl/fuchsia.scheduler/cpp/fidl.h>
+#include <fidl/fuchsia.session.scene/cpp/fidl.h>
+#include <fidl/fuchsia.tracing.provider/cpp/fidl.h>
+#include <fidl/fuchsia.ui.app/cpp/fidl.h>
+#include <fidl/fuchsia.ui.input/cpp/fidl.h>
+#include <fidl/fuchsia.ui.scenic/cpp/fidl.h>
+#include <fidl/fuchsia.ui.test.input/cpp/fidl.h>
+#include <fidl/fuchsia.vulkan.loader/cpp/fidl.h>
+#include <fidl/fuchsia.web/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
-#include <lib/fidl/cpp/binding_set.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/fidl/cpp/channel.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/syslog/cpp/macros.h>
@@ -42,8 +45,7 @@
 #include <vector>
 
 #include <gtest/gtest.h>
-
-#include "src/ui/testing/util/portable_ui_test.h"
+#include <src/ui/testing/util/portable_ui_test.h>
 
 namespace {
 
@@ -78,10 +80,10 @@ std::vector<T> merge(std::initializer_list<std::vector<T>> vecs) {
   return result;
 }
 
-int ButtonsToInt(const std::vector<fuchsia::ui::test::input::MouseButton>& buttons) {
+int ButtonsToInt(const std::vector<fuchsia_ui_test_input::MouseButton>& buttons) {
   int result = 0;
   for (const auto& button : buttons) {
-    result |= (0x1 >> button);
+    result |= (0x1 >> static_cast<uint32_t>(button));
   }
 
   return result;
@@ -97,13 +99,13 @@ class MouseInputState {
  public:
   size_t SizeOfEvents() const { return events_.size(); }
 
-  fuchsia::ui::test::input::MouseInputListenerReportMouseInputRequest PopEvent() {
+  fuchsia_ui_test_input::MouseInputListenerReportMouseInputRequest PopEvent() {
     auto e = std::move(events_.front());
     events_.pop();
     return e;
   }
 
-  const fuchsia::ui::test::input::MouseInputListenerReportMouseInputRequest& LastEvent() const {
+  const fuchsia_ui_test_input::MouseInputListenerReportMouseInputRequest& LastEvent() const {
     return events_.back();
   }
 
@@ -112,40 +114,62 @@ class MouseInputState {
  private:
   friend class MouseInputListenerServer;
 
-  std::queue<fuchsia::ui::test::input::MouseInputListenerReportMouseInputRequest> events_;
+  std::queue<fuchsia_ui_test_input::MouseInputListenerReportMouseInputRequest> events_;
 };
 
 // `MouseInputListener` is a local test protocol that our test apps use to let us know
 // what position and button press state the mouse cursor has.
-class MouseInputListenerServer : public fuchsia::ui::test::input::MouseInputListener,
+class MouseInputListenerServer : public fidl::Server<fuchsia_ui_test_input::MouseInputListener>,
+                                 public fidl::Server<fuchsia_ui_test_input::TestAppStatusListener>,
                                  public LocalComponentImpl {
  public:
   explicit MouseInputListenerServer(async_dispatcher_t* dispatcher,
-                                    std::weak_ptr<MouseInputState> state)
-      : dispatcher_(dispatcher), state_(std::move(state)) {}
+                                    std::weak_ptr<MouseInputState> mouse_state,
+                                    std::weak_ptr<bool> ready_to_inject)
+      : dispatcher_(dispatcher),
+        mouse_state_(std::move(mouse_state)),
+        ready_to_inject_(std::move(ready_to_inject)) {}
 
-  void ReportMouseInput(
-      fuchsia::ui::test::input::MouseInputListenerReportMouseInputRequest request) override {
-    if (auto s = state_.lock()) {
+  void ReportMouseInput(ReportMouseInputRequest& request,
+                        ReportMouseInputCompleter::Sync& completer) override {
+    if (auto s = mouse_state_.lock()) {
       s->events_.push(std::move(request));
     }
+  }
+
+  void ReportStatus(ReportStatusRequest& req, ReportStatusCompleter::Sync& completer) override {
+    if (req.status() == fuchsia_ui_test_input::TestAppStatus::kHandlersRegistered) {
+      if (auto ready = ready_to_inject_.lock()) {
+        *ready = true;
+      }
+    }
+
+    completer.Reply();
+  }
+
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_ui_test_input::TestAppStatusListener> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    FX_LOGS(WARNING) << "TestAppStatusListener Received an unknown method with ordinal "
+                     << metadata.method_ordinal;
   }
 
   // When the component framework requests for this component to start, this
   // method will be invoked by the realm_builder library.
   void OnStart() override {
-    FX_CHECK(outgoing()->AddPublicService(
-                 fidl::InterfaceRequestHandler<fuchsia::ui::test::input::MouseInputListener>(
-                     [this](auto request) {
-                       bindings_.AddBinding(this, std::move(request), dispatcher_);
-                     })) == ZX_OK);
+    outgoing()->AddProtocol<fuchsia_ui_test_input::MouseInputListener>(
+        mouse_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
+    outgoing()->AddProtocol<fuchsia_ui_test_input::TestAppStatusListener>(
+        app_status_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
   }
 
  private:
   // Not owned.
   async_dispatcher_t* dispatcher_ = nullptr;
-  fidl::BindingSet<fuchsia::ui::test::input::MouseInputListener> bindings_;
-  std::weak_ptr<MouseInputState> state_;
+  fidl::ServerBindingGroup<fuchsia_ui_test_input::MouseInputListener> mouse_bindings_;
+  fidl::ServerBindingGroup<fuchsia_ui_test_input::TestAppStatusListener> app_status_bindings_;
+  std::weak_ptr<MouseInputState> mouse_state_;
+  std::weak_ptr<bool> ready_to_inject_;
 };
 
 constexpr auto kMouseInputListener = "mouse_input_listener";
@@ -184,15 +208,15 @@ class MouseInputBase : public ui_testing::PortableUITest {
   virtual std::vector<Route> GetTestRoutes() { return {}; }
 
   // Helper method for checking the test.mouse.MouseInputListener response from the client app.
-  void VerifyEvent(
-      fuchsia::ui::test::input::MouseInputListenerReportMouseInputRequest& pointer_data,
+  static void VerifyEvent(
+      fuchsia_ui_test_input::MouseInputListenerReportMouseInputRequest& pointer_data,
       double expected_x, double expected_y,
-      std::vector<fuchsia::ui::test::input::MouseButton> expected_buttons,
-      const fuchsia::ui::test::input::MouseEventPhase expected_phase,
+      const std::vector<fuchsia_ui_test_input::MouseButton>& expected_buttons,
+      const fuchsia_ui_test_input::MouseEventPhase expected_phase,
       const std::string& component_name) {
-    FX_LOGS(INFO) << "Client received mouse change at (" << pointer_data.local_x() << ", "
-                  << pointer_data.local_y() << ") with buttons "
-                  << ButtonsToInt(pointer_data.buttons()) << ".";
+    FX_LOGS(INFO) << "Client received mouse change at (" << pointer_data.local_x().value() << ", "
+                  << pointer_data.local_y().value() << ") with buttons "
+                  << ButtonsToInt(pointer_data.buttons().value()) << ".";
     FX_LOGS(INFO) << "Expected mouse change is at approximately (" << expected_x << ", "
                   << expected_y << ") with buttons " << ButtonsToInt(expected_buttons) << ".";
 
@@ -200,39 +224,40 @@ class MouseInputBase : public ui_testing::PortableUITest {
     // Note: These approximations don't account for `PointerMotionDisplayScaleHandler`
     // or `PointerMotionSensorScaleHandler`. We will need to do so in order to validate
     // larger motion or different sized displays.
-    EXPECT_NEAR(pointer_data.local_x(), expected_x, 1);
-    EXPECT_NEAR(pointer_data.local_y(), expected_y, 1);
-    EXPECT_EQ(pointer_data.buttons(), expected_buttons);
-    EXPECT_EQ(pointer_data.phase(), expected_phase);
-    EXPECT_EQ(pointer_data.component_name(), component_name);
+    EXPECT_NEAR(pointer_data.local_x().value(), expected_x, 1);
+    EXPECT_NEAR(pointer_data.local_y().value(), expected_y, 1);
+    EXPECT_EQ(pointer_data.buttons().value(), expected_buttons);
+    EXPECT_EQ(pointer_data.phase().value(), expected_phase);
+    EXPECT_EQ(pointer_data.component_name().value(), component_name);
   }
 
-  void VerifyEventLocationOnTheRightOfExpectation(
-      fuchsia::ui::test::input::MouseInputListenerReportMouseInputRequest& pointer_data,
+  static void VerifyEventLocationOnTheRightOfExpectation(
+      fuchsia_ui_test_input::MouseInputListenerReportMouseInputRequest& pointer_data,
       double expected_x_min, double expected_y,
-      std::vector<fuchsia::ui::test::input::MouseButton> expected_buttons,
-      const fuchsia::ui::test::input::MouseEventPhase expected_phase,
+      const std::vector<fuchsia_ui_test_input::MouseButton>& expected_buttons,
+      const fuchsia_ui_test_input::MouseEventPhase expected_phase,
       const std::string& component_name) {
-    FX_LOGS(INFO) << "Client received mouse change at (" << pointer_data.local_x() << ", "
-                  << pointer_data.local_y() << ") with buttons "
-                  << ButtonsToInt(pointer_data.buttons()) << ".";
+    FX_LOGS(INFO) << "Client received mouse change at (" << pointer_data.local_x().value() << ", "
+                  << pointer_data.local_y().value() << ") with buttons "
+                  << ButtonsToInt(pointer_data.buttons().value()) << ".";
     FX_LOGS(INFO) << "Expected mouse change is at approximately (>" << expected_x_min << ", "
                   << expected_y << ") with buttons " << ButtonsToInt(expected_buttons) << ".";
 
-    EXPECT_GT(pointer_data.local_x(), expected_x_min);
-    EXPECT_NEAR(pointer_data.local_y(), expected_y, 1);
-    EXPECT_EQ(pointer_data.buttons(), expected_buttons);
-    EXPECT_EQ(pointer_data.phase(), expected_phase);
-    EXPECT_EQ(pointer_data.component_name(), component_name);
+    EXPECT_GT(pointer_data.local_x().value(), expected_x_min);
+    EXPECT_NEAR(pointer_data.local_y().value(), expected_y, 1);
+    EXPECT_EQ(pointer_data.buttons().value(), expected_buttons);
+    EXPECT_EQ(pointer_data.phase().value(), expected_phase);
+    EXPECT_EQ(pointer_data.component_name().value(), component_name);
   }
 
   void ExtendRealm() override {
     // Key part of service setup: have this test component vend the
     // |MouseInputListener| service in the constructed realm.
     auto* d = dispatcher();
-    realm_builder().AddLocalChild(kMouseInputListener, [d, s = mouse_state_]() {
-      return std::make_unique<MouseInputListenerServer>(d, s);
-    });
+    realm_builder().AddLocalChild(
+        kMouseInputListener, [d, mouse_state = mouse_state_, ready_to_inject = ready_to_inject_]() {
+          return std::make_unique<MouseInputListenerServer>(d, mouse_state, ready_to_inject);
+        });
 
     for (const auto& [name, component] : GetTestComponents()) {
       realm_builder().AddChild(name, component);
@@ -245,6 +270,7 @@ class MouseInputBase : public ui_testing::PortableUITest {
   }
 
   std::shared_ptr<MouseInputState> mouse_state_;
+  std::shared_ptr<bool> ready_to_inject_ = std::make_shared<bool>(false);
 
   // Use a DPR other than 1.0, so that logical and physical coordinate spaces
   // are different.
@@ -255,6 +281,16 @@ class MouseInputBase : public ui_testing::PortableUITest {
 };
 
 class ChromiumInputTest : public MouseInputBase {
+ public:
+  void SetUp() override {
+    MouseInputBase::SetUp();
+
+    LaunchClient();
+
+    FX_LOGS(INFO) << "Wait for Chromium send out ready";
+    RunLoopUntil([this]() { return *(ready_to_inject_); });
+  }
+
  protected:
   std::vector<std::pair<ChildName, std::string>> GetTestComponents() override {
     return {
@@ -271,7 +307,8 @@ class ChromiumInputTest : public MouseInputBase {
   std::vector<Route> GetTestRoutes() override {
     return merge({GetChromiumRoutes(ChildRef{kMouseInputChromium}),
                   {
-                      {.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
+                      {.capabilities = {Protocol{
+                           fidl::DiscoverableProtocolName<fuchsia_ui_app::ViewProvider>}},
                        .source = ChildRef{kMouseInputChromium},
                        .targets = {ParentRef()}},
                   }});
@@ -282,25 +319,26 @@ class ChromiumInputTest : public MouseInputBase {
     return {
         {.capabilities =
              {
-                 Protocol{fuchsia::accessibility::semantics::SemanticsManager::Name_},
-                 Protocol{fuchsia::ui::composition::Allocator::Name_},
-                 Protocol{fuchsia::ui::composition::Flatland::Name_},
-                 Protocol{fuchsia::ui::scenic::Scenic::Name_},
+                 Protocol{fidl::DiscoverableProtocolName<
+                     fuchsia_accessibility_semantics::SemanticsManager>},
+                 Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Allocator>},
+                 Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Flatland>},
+                 Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_scenic::Scenic>},
              },
          .source = kTestUIStackRef,
          .targets = {target}},
         {.capabilities =
              {
-                 Protocol{fuchsia::kernel::VmexResource::Name_},
-                 Protocol{fuchsia::process::Launcher::Name_},
-                 Protocol{fuchsia::vulkan::loader::Loader::Name_},
+                 Protocol{fidl::DiscoverableProtocolName<fuchsia_kernel::VmexResource>},
+                 Protocol{fidl::DiscoverableProtocolName<fuchsia_process::Launcher>},
+                 Protocol{fidl::DiscoverableProtocolName<fuchsia_vulkan_loader::Loader>},
              },
          .source = ParentRef(),
          .targets = {target}},
         {
             .capabilities =
                 {
-                    Protocol{fuchsia::logger::LogSink::Name_},
+                    Protocol{fidl::DiscoverableProtocolName<fuchsia_logger::LogSink>},
                 },
             .source = ParentRef(),
             .targets =
@@ -312,44 +350,54 @@ class ChromiumInputTest : public MouseInputBase {
                     // FATAL errors.
                 },
         },
-        {.capabilities = {Protocol{fuchsia::ui::test::input::MouseInputListener::Name_}},
+        {.capabilities =
+             {
+                 Protocol{
+                     fidl::DiscoverableProtocolName<fuchsia_ui_test_input::MouseInputListener>},
+                 Protocol{
+                     fidl::DiscoverableProtocolName<fuchsia_ui_test_input::TestAppStatusListener>},
+             },
          .source = ChildRef{kMouseInputListener},
          .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::fonts::Provider::Name_}},
+        {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_fonts::Provider>}},
          .source = ChildRef{kFontsProvider},
          .targets = {target}},
         {.capabilities =
              {
-                 Protocol{fuchsia::tracing::provider::Registry::Name_},
+                 Protocol{fidl::DiscoverableProtocolName<fuchsia_tracing_provider::Registry>},
              },
          .source = ParentRef(),
          .targets = {target, ChildRef{kFontsProvider}}},
-        {.capabilities = {Protocol{fuchsia::memorypressure::Provider::Name_}},
+        {.capabilities = {Protocol{
+             fidl::DiscoverableProtocolName<fuchsia_memorypressure::Provider>}},
          .source = ChildRef{kMemoryPressureProvider},
          .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::net::interfaces::State::Name_}},
+        {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_net_interfaces::State>}},
          .source = ChildRef{kNetstack},
          .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::web::ContextProvider::Name_}},
+        {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_web::ContextProvider>}},
          .source = ChildRef{kWebContextProvider},
          .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::metrics::MetricEventLoggerFactory::Name_}},
+        {.capabilities = {Protocol{
+             fidl::DiscoverableProtocolName<fuchsia_metrics::MetricEventLoggerFactory>}},
          .source = ChildRef{kMockCobalt},
          .targets = {ChildRef{kMemoryPressureProvider}}},
-        {.capabilities = {Protocol{fuchsia::sysmem::Allocator::Name_},
-                          Protocol{fuchsia::sysmem2::Allocator::Name_}},
+        {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_sysmem::Allocator>},
+                          Protocol{fidl::DiscoverableProtocolName<fuchsia_sysmem2::Allocator>}},
          .source = ParentRef(),
          .targets = {ChildRef{kMemoryPressureProvider}, target}},
-        {.capabilities = {Protocol{fuchsia::scheduler::RoleManager::Name_}},
+        {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_scheduler::RoleManager>}},
          .source = ParentRef(),
          .targets = {ChildRef{kMemoryPressureProvider}}},
-        {.capabilities = {Protocol{fuchsia::kernel::RootJobForInspect::Name_}},
+        {.capabilities = {Protocol{
+             fidl::DiscoverableProtocolName<fuchsia_kernel::RootJobForInspect>}},
          .source = ParentRef(),
          .targets = {ChildRef{kMemoryPressureProvider}}},
-        {.capabilities = {Protocol{fuchsia::kernel::Stats::Name_}},
+        {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_kernel::Stats>}},
          .source = ParentRef(),
          .targets = {ChildRef{kMemoryPressureProvider}}},
-        {.capabilities = {Protocol{fuchsia::tracing::provider::Registry::Name_}},
+        {.capabilities = {Protocol{
+             fidl::DiscoverableProtocolName<fuchsia_tracing_provider::Registry>}},
          .source = ParentRef(),
          .targets = {ChildRef{kMemoryPressureProvider}}},
         {.capabilities = {Config{kCaptureOnPressureChange}},
@@ -367,21 +415,21 @@ class ChromiumInputTest : public MouseInputBase {
         {.capabilities = {Config{kNormalCaptureDelay}},
          .source = VoidRef(),
          .targets = {ChildRef{kMemoryPressureProvider}}},
-        {.capabilities = {Protocol{fuchsia::posix::socket::Provider::Name_}},
+        {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_posix_socket::Provider>}},
          .source = ChildRef{kNetstack},
          .targets = {target}},
-        {.capabilities = {Protocol{fuchsia::buildinfo::Provider::Name_}},
+        {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_buildinfo::Provider>}},
          .source = ChildRef{kBuildInfoProvider},
          .targets = {target}},
         {.capabilities =
              {
                  Directory{
                      .name = "root-ssl-certificates",
-                     .type = fuchsia::component::decl::DependencyType::STRONG,
+                     .type = fidl::NaturalToHLCPP(fuchsia_component_decl::DependencyType::kStrong),
                  },
                  Directory{
                      .name = "tzdata-icu",
-                     .type = fuchsia::component::decl::DependencyType::STRONG,
+                     .type = fidl::NaturalToHLCPP(fuchsia_component_decl::DependencyType::kStrong),
                  },
              },
          .source = ParentRef(),
@@ -396,12 +444,12 @@ class ChromiumInputTest : public MouseInputBase {
   Position EnsureMouseIsReadyAndGetPosition() {
     for (int retry = 0; retry < kMaxRetry; retry++) {
       // Mouse down and up.
-      SimulateMouseEvent(/* pressed_buttons = */ {fuchsia::ui::test::input::MouseButton::FIRST},
+      SimulateMouseEvent(/* pressed_buttons = */ {fuchsia_ui_test_input::MouseButton::kFirst},
                          /* movement_x = */ 0, /* movement_y = */ 0);
       SimulateMouseEvent(/* pressed_buttons = */ {}, /* movement_x = */ 0, /* movement_y = */ 0);
 
       auto wait_until_last_event_phase_or_timeout =
-          [this](fuchsia::ui::test::input::MouseEventPhase event_phase) {
+          [this](fuchsia_ui_test_input::MouseEventPhase event_phase) {
             return RunLoopWithTimeoutOrUntil(
                 [this, event_phase] {
                   return mouse_state_->SizeOfEvents() > 0 &&
@@ -411,7 +459,7 @@ class ChromiumInputTest : public MouseInputBase {
           };
 
       bool got_mouse_up =
-          wait_until_last_event_phase_or_timeout(fuchsia::ui::test::input::MouseEventPhase::UP);
+          wait_until_last_event_phase_or_timeout(fuchsia_ui_test_input::MouseEventPhase::kUp);
 
       if (got_mouse_up) {
         // There is an issue we found in retry that the mouse up we got may
@@ -421,10 +469,10 @@ class ChromiumInputTest : public MouseInputBase {
         // only injected once, wheel we receive the wheel event, we know all
         // events from EnsureMouseIsReadyAndGetPosition are processed.
         SimulateMouseScroll(/* pressed_buttons = */ {}, /* scroll_x = */ 0, /* scroll_y = */ 1);
-        wait_until_last_event_phase_or_timeout(fuchsia::ui::test::input::MouseEventPhase::WHEEL);
+        wait_until_last_event_phase_or_timeout(fuchsia_ui_test_input::MouseEventPhase::kWheel);
         Position p;
-        p.x = mouse_state_->LastEvent().local_x();
-        p.y = mouse_state_->LastEvent().local_y();
+        p.x = mouse_state_->LastEvent().local_x().value();
+        p.y = mouse_state_->LastEvent().local_y().value();
         mouse_state_->ClearEvents();
         return p;
       }
@@ -486,21 +534,19 @@ TEST_F(ChromiumInputTest, ChromiumMouseMove) {
       /*expected_x_min=*/initial_x,
       /*expected_y=*/initial_y,
       /*expected_buttons=*/{},
-      /*expected_type=*/fuchsia::ui::test::input::MouseEventPhase::MOVE,
+      /*expected_phase=*/fuchsia_ui_test_input::MouseEventPhase::kMove,
       /*component_name=*/"mouse-input-chromium");
 }
 
 TEST_F(ChromiumInputTest, ChromiumMouseDownMoveUp) {
-  LaunchClient();
-
   auto initial_position = EnsureMouseIsReadyAndGetPosition();
 
   double initial_x = initial_position.x;
   double initial_y = initial_position.y;
 
-  SimulateMouseEvent(/* pressed_buttons = */ {fuchsia::ui::test::input::MouseButton::FIRST},
+  SimulateMouseEvent(/* pressed_buttons = */ {fuchsia_ui_test_input::MouseButton::kFirst},
                      /* movement_x = */ 0, /* movement_y = */ 0);
-  SimulateMouseEvent(/* pressed_buttons = */ {fuchsia::ui::test::input::MouseButton::FIRST},
+  SimulateMouseEvent(/* pressed_buttons = */ {fuchsia_ui_test_input::MouseButton::kFirst},
                      /* movement_x = */ kClickToDragThreshold, /* movement_y = */ 0);
   SimulateMouseEvent(/* pressed_buttons = */ {}, /* movement_x = */ 0, /* movement_y = */ 0);
 
@@ -513,27 +559,25 @@ TEST_F(ChromiumInputTest, ChromiumMouseDownMoveUp) {
   VerifyEvent(event_down,
               /*expected_x=*/initial_x,
               /*expected_y=*/initial_y,
-              /*expected_buttons=*/{fuchsia::ui::test::input::MouseButton::FIRST},
-              /*expected_type=*/fuchsia::ui::test::input::MouseEventPhase::DOWN,
+              /*expected_buttons=*/{fuchsia_ui_test_input::MouseButton::kFirst},
+              /*expected_phase=*/fuchsia_ui_test_input::MouseEventPhase::kDown,
               /*component_name=*/"mouse-input-chromium");
   VerifyEventLocationOnTheRightOfExpectation(
       event_move,
       /*expected_x_min=*/initial_x,
       /*expected_y=*/initial_y,
-      /*expected_buttons=*/{fuchsia::ui::test::input::MouseButton::FIRST},
-      /*expected_type=*/fuchsia::ui::test::input::MouseEventPhase::MOVE,
+      /*expected_buttons=*/{fuchsia_ui_test_input::MouseButton::kFirst},
+      /*expected_phase=*/fuchsia_ui_test_input::MouseEventPhase::kMove,
       /*component_name=*/"mouse-input-chromium");
   VerifyEvent(event_up,
-              /*expected_x=*/event_move.local_x(),
+              /*expected_x=*/event_move.local_x().value(),
               /*expected_y=*/initial_y,
               /*expected_buttons=*/{},
-              /*expected_type=*/fuchsia::ui::test::input::MouseEventPhase::UP,
+              /*expected_phase=*/fuchsia_ui_test_input::MouseEventPhase::kUp,
               /*component_name=*/"mouse-input-chromium");
 }
 
 TEST_F(ChromiumInputTest, ChromiumMouseWheel) {
-  LaunchClient();
-
   auto initial_position = EnsureMouseIsReadyAndGetPosition();
 
   double initial_x = initial_position.x;
@@ -548,7 +592,7 @@ TEST_F(ChromiumInputTest, ChromiumMouseWheel) {
               /*expected_x=*/initial_x,
               /*expected_y=*/initial_y,
               /*expected_buttons=*/{},
-              /*expected_type=*/fuchsia::ui::test::input::MouseEventPhase::WHEEL,
+              /*expected_phase=*/fuchsia_ui_test_input::MouseEventPhase::kWheel,
               /*component_name=*/"mouse-input-chromium");
   // Chromium will scale the count of ticks to pixel.
   // Positive delta in Fuchsia  means scroll left, and scroll left in JS is negative delta.
@@ -564,7 +608,7 @@ TEST_F(ChromiumInputTest, ChromiumMouseWheel) {
               /*expected_x=*/initial_x,
               /*expected_y=*/initial_y,
               /*expected_buttons=*/{},
-              /*expected_type=*/fuchsia::ui::test::input::MouseEventPhase::WHEEL,
+              /*expected_phase=*/fuchsia_ui_test_input::MouseEventPhase::kWheel,
               /*component_name=*/"mouse-input-chromium");
   // Chromium will scale the count of ticks to pixel.
   // Positive delta in Fuchsia means scroll up, and scroll up in JS is negative delta.

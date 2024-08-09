@@ -28,7 +28,6 @@ static_library("blobfs") {
   ]
   public = [
     "blob_layout.h",
-    "blobfs_inspector.h",
     "cache_policy.h",
     "common.h",
     "delivery_blob.h",
@@ -59,9 +58,6 @@ static_library("blobfs") {
     "compression/seekable_decompressor.h",
     "compression_settings.cc",
     "delivery_blob.cc",
-    "inspector/blobfs_inspector.cc",
-    "inspector/parser.cc",
-    "inspector/parser.h",
     "iterator/allocated_extent_iterator.cc",
     "iterator/allocated_extent_iterator.h",
     "iterator/allocated_node_iterator.cc",
@@ -97,7 +93,6 @@ static_library("blobfs") {
     "//src/lib/chunked-compression",
     "//src/lib/digest",
     "//src/storage/fvm",
-    "//src/storage/lib/disk_inspector",
     "//src/storage/lib/trace:cpp",
     "//src/storage/lib/vfs/cpp/journal",
     "//src/storage/lib/vfs/cpp/transaction",

@@ -702,7 +702,7 @@ mod test {
     use futures::{SinkExt, StreamExt};
     use starnix_core::testing::create_kernel_task_and_unlocked;
     use starnix_core::vfs::FdNumber;
-    use starnix_uapi::file_mode::FileMode;
+    use starnix_uapi::file_mode::{AccessCheck, FileMode};
     use starnix_uapi::open_flags::OpenFlags;
     use starnix_uapi::signals::SIGCHLD;
     use starnix_uapi::vfs::ResolveFlags;
@@ -722,6 +722,7 @@ mod test {
                 OpenFlags::CREAT,
                 FileMode::default(),
                 ResolveFlags::empty(),
+                AccessCheck::default(),
             )
             .expect("Failed to create file");
 
@@ -763,6 +764,7 @@ mod test {
                 OpenFlags::CREAT,
                 FileMode::default(),
                 ResolveFlags::empty(),
+                AccessCheck::default(),
             )
             .expect("Failed to create file");
 

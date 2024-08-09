@@ -8,7 +8,7 @@
 
 use crate::common::CreationMode;
 use crate::directory::dirents_sink;
-use crate::directory::entry::{DirectoryEntry, EntryInfo, FlagsOrProtocols, OpenRequest};
+use crate::directory::entry::{DirectoryEntry, EntryInfo, OpenRequest, RequestFlags};
 use crate::directory::entry_container::{Directory, DirectoryWatcher};
 use crate::directory::helper::{AlreadyExists, DirectlyMutable, NotDirectory};
 use crate::directory::immutable::connection::ImmutableConnection;
@@ -116,7 +116,7 @@ impl Simple {
         }
     }
 
-    fn open_impl<'a, P: ProtocolsExt + ToFlagsOrProtocols>(
+    fn open_impl<'a, P: ProtocolsExt + ToRequestFlags>(
         self: Arc<Self>,
         scope: ExecutionScope,
         mut path: Path,
@@ -162,7 +162,7 @@ impl Simple {
             }
             (Some(entry), _, _) => entry.open_entry(OpenRequest::new(
                 scope,
-                protocols.to_flags_or_protocols(),
+                protocols.to_request_flags(),
                 path,
                 object_request,
             )),
@@ -211,16 +211,6 @@ impl Directory for Simple {
         flags
             .to_object_request(server_end)
             .handle(|object_request| self.open_impl(scope, path, flags, object_request));
-    }
-
-    fn open2(
-        self: Arc<Self>,
-        scope: ExecutionScope,
-        path: Path,
-        protocols: fio::ConnectionProtocols,
-        object_request: ObjectRequestRef<'_>,
-    ) -> Result<(), Status> {
-        self.open_impl(scope, path, protocols, object_request)
     }
 
     #[cfg(fuchsia_api_level_at_least = "HEAD")]
@@ -367,26 +357,20 @@ impl DirectlyMutable for Simple {
     }
 }
 
-trait ToFlagsOrProtocols {
-    fn to_flags_or_protocols(&self) -> FlagsOrProtocols<'_>;
+trait ToRequestFlags {
+    fn to_request_flags(&self) -> RequestFlags;
 }
 
-impl ToFlagsOrProtocols for fio::OpenFlags {
-    fn to_flags_or_protocols(&self) -> FlagsOrProtocols<'_> {
-        FlagsOrProtocols::Flags(*self)
-    }
-}
-
-impl ToFlagsOrProtocols for fio::ConnectionProtocols {
-    fn to_flags_or_protocols(&self) -> FlagsOrProtocols<'_> {
-        FlagsOrProtocols::Protocols(self)
+impl ToRequestFlags for fio::OpenFlags {
+    fn to_request_flags(&self) -> RequestFlags {
+        RequestFlags::Open1(*self)
     }
 }
 
 #[cfg(fuchsia_api_level_at_least = "HEAD")]
-impl ToFlagsOrProtocols for fio::Flags {
-    fn to_flags_or_protocols(&self) -> FlagsOrProtocols<'_> {
-        FlagsOrProtocols::Flags3(*self)
+impl ToRequestFlags for fio::Flags {
+    fn to_request_flags(&self) -> RequestFlags {
+        RequestFlags::Open3(*self)
     }
 }
 

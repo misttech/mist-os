@@ -17,6 +17,9 @@ pub const FVM_HOST_TOOL: &'static str = "fvm";
 /// The SDK tool "zbi" used to modify the zbi image.
 pub const ZBI_HOST_TOOL: &'static str = "zbi";
 
+/// The SDK tool file OVMF_CODE.fd
+pub const OVMF_CODE: &'static str = "uefi_internal";
+
 /// The experimental flag for the console subcommand. Defaults to false.
 pub const EMU_CONSOLE_FLAG: &'static str = "emu.console.enabled";
 

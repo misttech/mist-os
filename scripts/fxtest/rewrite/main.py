@@ -256,7 +256,7 @@ async def async_main(
             f"Failed to initialize environment: {e}\nDid you run fx set?"
         )
         return 1
-    recorder.emit_process_env(exec_env.__dict__)
+    recorder.emit_process_env(exec_env)
 
     # Configure file logging based on flags.
     if flags.log and exec_env.log_file:
@@ -668,7 +668,9 @@ async def do_build(
     await asyncio.sleep(0.1)
 
     return_code = await run_build_with_suspended_output(
-        build_command_line, show_output=not exec_env.log_to_stdout()
+        build_command_line,
+        show_output=not exec_env.log_to_stdout(),
+        out_dir=exec_env.out_dir,
     )
 
     error = None
@@ -688,7 +690,9 @@ async def do_build(
                 "repository",
                 "publish",
                 "--trusted-root",
-                os.path.join(amber_directory, "repository/root.json"),
+                os.path.abspath(
+                    os.path.join(amber_directory, "repository/root.json")
+                ),
                 "--ignore-missing-packages",
                 "--time-versioning",
             ]
@@ -699,8 +703,10 @@ async def do_build(
             )
             + [
                 "--package-list",
-                os.path.join(exec_env.out_dir, "all_package_manifests.list"),
-                amber_directory,
+                os.path.abspath(
+                    os.path.join(exec_env.out_dir, "all_package_manifests.list")
+                ),
+                os.path.abspath(amber_directory),
             ]
         )
 
@@ -806,7 +812,9 @@ def has_tests_in_base(
 
 @functools.lru_cache
 async def has_device_connected(
-    recorder: event.EventRecorder, parent: event.Id | None = None
+    recorder: event.EventRecorder,
+    parent: event.Id | None = None,
+    out_dir: str | None = None,
 ) -> bool:
     """Check if a device is connected for running target tests.
 
@@ -817,8 +825,13 @@ async def has_device_connected(
     Returns:
         bool: True only if a device is available to run target tests.
     """
+    extra_args = ["--dir", out_dir] if out_dir else []
     output = await execution.run_command(
-        "fx", "is-package-server-running", recorder=recorder, parent=parent
+        "fx",
+        *extra_args,
+        "is-package-server-running",
+        recorder=recorder,
+        parent=parent,
     )
     return output is not None and output.return_code == 0
 
@@ -826,6 +839,7 @@ async def has_device_connected(
 async def run_build_with_suspended_output(
     build_command_line: list[str],
     show_output: bool = True,
+    out_dir: str | None = None,
 ) -> int:
     # Allow display to update.
     await asyncio.sleep(0.1)
@@ -837,8 +851,12 @@ async def run_build_with_suspended_output(
     stdout = None if show_output else subprocess.DEVNULL
     stderr = None if show_output else subprocess.DEVNULL
 
+    out_args = ["--dir", out_dir] if out_dir else []
+
     return_code = subprocess.call(
-        ["fx", "build"] + build_command_line, stdout=stdout, stderr=stderr
+        ["fx"] + out_args + ["build"] + build_command_line,
+        stdout=stdout,
+        stderr=stderr,
     )
     return return_code
 
@@ -861,7 +879,7 @@ async def post_build_checklist(
         bool: True only if post-build checks passed, False otherwise.
     """
     if tests.has_device_test() and await has_device_connected(
-        recorder, parent=build_id
+        recorder, parent=build_id, out_dir=exec_env.out_dir
     ):
         try:
             if has_tests_in_base(tests, recorder, exec_env):
@@ -898,7 +916,9 @@ async def run_all_tests(
         bool: True only if all tests ran successfully, False otherwise.
     """
     max_parallel = flags.parallel
-    if tests.has_device_test() and not await has_device_connected(recorder):
+    if tests.has_device_test() and not await has_device_connected(
+        recorder, out_dir=exec_env.out_dir
+    ):
         recorder.emit_warning_message(
             "\nCould not find a running package server."
         )

@@ -317,7 +317,7 @@ mod tests {
     use crate::capability;
     use crate::model::actions::test_utils::{is_discovered, is_resolved, is_shutdown};
     use crate::model::testing::test_helpers::{TestEnvironmentBuilder, TestModelResult};
-    use cm_rust_testing::ComponentDeclBuilder;
+    use cm_rust_testing::*;
     use fidl::endpoints;
     use fidl_fuchsia_component_decl::{ChildRef, CollectionRef};
     use {fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl};
@@ -338,37 +338,16 @@ mod tests {
             (
                 "root",
                 ComponentDeclBuilder::new()
-                    .child(cm_rust::ChildDecl {
-                        name: "a".parse().unwrap(),
-                        url: "test:///a".parse().unwrap(),
-                        startup: fdecl::StartupMode::Eager,
-                        environment: None,
-                        on_terminate: None,
-                        config_overrides: None,
-                    })
-                    .child(cm_rust::ChildDecl {
-                        name: "cant-resolve".parse().unwrap(),
-                        url: "cant-resolve://cant-resolve".parse().unwrap(),
-                        startup: fdecl::StartupMode::Eager,
-                        environment: None,
-                        on_terminate: None,
-                        config_overrides: None,
-                    })
+                    .child(ChildBuilder::new().name("a").eager())
+                    .child(
+                        ChildBuilder::new()
+                            .name("cant-resolve")
+                            .url("cant-resolve://cant-resolve")
+                            .eager(),
+                    )
                     .build(),
             ),
-            (
-                "a",
-                ComponentDeclBuilder::new()
-                    .child(cm_rust::ChildDecl {
-                        name: "b".parse().unwrap(),
-                        url: "test:///b".parse().unwrap(),
-                        startup: fdecl::StartupMode::Eager,
-                        environment: None,
-                        on_terminate: None,
-                        config_overrides: None,
-                    })
-                    .build(),
-            ),
+            ("a", ComponentDeclBuilder::new().child(ChildBuilder::new().name("b").eager()).build()),
             ("b", ComponentDeclBuilder::new().build()),
         ];
 
@@ -401,30 +380,9 @@ mod tests {
         let components = vec![
             (
                 "root",
-                ComponentDeclBuilder::new()
-                    .child(cm_rust::ChildDecl {
-                        name: "a".parse().unwrap(),
-                        url: "test:///a".parse().unwrap(),
-                        startup: fdecl::StartupMode::Eager,
-                        environment: None,
-                        on_terminate: None,
-                        config_overrides: None,
-                    })
-                    .build(),
+                ComponentDeclBuilder::new().child(ChildBuilder::new().name("a").eager()).build(),
             ),
-            (
-                "a",
-                ComponentDeclBuilder::new()
-                    .child(cm_rust::ChildDecl {
-                        name: "b".parse().unwrap(),
-                        url: "test:///b".parse().unwrap(),
-                        startup: fdecl::StartupMode::Eager,
-                        environment: None,
-                        on_terminate: None,
-                        config_overrides: None,
-                    })
-                    .build(),
-            ),
+            ("a", ComponentDeclBuilder::new().child(ChildBuilder::new().name("b").eager()).build()),
             ("b", ComponentDeclBuilder::new().build()),
         ];
 

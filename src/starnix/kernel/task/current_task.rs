@@ -44,7 +44,7 @@ use starnix_syscalls::SyscallResult;
 use starnix_uapi::auth::{Credentials, CAP_SYS_ADMIN};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::file_mode::{Access, FileMode};
+use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::ownership::{
     release_on_error, OwnedRef, Releasable, ReleaseGuard, Share, TempRef, WeakRef,
@@ -472,6 +472,7 @@ impl CurrentTask {
             flags,
             FileMode::default(),
             ResolveFlags::empty(),
+            AccessCheck::default(),
         )
     }
 
@@ -613,6 +614,7 @@ impl CurrentTask {
         flags: OpenFlags,
         mode: FileMode,
         resolve_flags: ResolveFlags,
+        access_check: AccessCheck,
     ) -> Result<FileHandle, Errno>
     where
         L: LockBefore<BeforeFsNodeAppend>,
@@ -624,7 +626,7 @@ impl CurrentTask {
         }
 
         let (dir, path) = self.resolve_dir_fd(dir_fd, path, resolve_flags)?;
-        self.open_namespace_node_at(locked, dir, path, flags, mode, resolve_flags)
+        self.open_namespace_node_at(locked, dir, path, flags, mode, resolve_flags, access_check)
     }
 
     pub fn open_namespace_node_at<L>(
@@ -635,6 +637,7 @@ impl CurrentTask {
         flags: OpenFlags,
         mode: FileMode,
         mut resolve_flags: ResolveFlags,
+        access_check: AccessCheck,
     ) -> Result<FileHandle, Errno>
     where
         L: LockBefore<FileOpsCore>,
@@ -754,7 +757,8 @@ impl CurrentTask {
         // > open() call that creates a read-only file may well return a  read/write  file
         // > descriptor.
 
-        name.open(locked, self, flags, !created)
+        let access_check = if created { AccessCheck::skip() } else { access_check };
+        name.open(locked, self, flags, access_check)
     }
 
     /// A wrapper for FsContext::lookup_parent_at that resolves the given
@@ -1266,9 +1270,7 @@ impl CurrentTask {
                     &initial_name_bytes,
                 )
             },
-            // If SELinux is enabled then `exec()` of the "init" executable will normally be
-            // configured by policy to transition to the desired init task Security Context.
-            security::task_alloc_for_kernel(),
+            security::task_alloc(&init_task, 0),
         )?;
         {
             let mut init_writer = init_task.thread_group.write();

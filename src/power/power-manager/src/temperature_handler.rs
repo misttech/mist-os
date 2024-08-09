@@ -7,6 +7,7 @@ use crate::error::PowerManagerError;
 use crate::message::{Message, MessageReturn};
 use crate::node::Node;
 use crate::types::{Celsius, Nanoseconds, Seconds};
+use crate::utils::get_temperature_driver_proxy;
 use crate::{log_if_err, ok_or_default_err};
 use anyhow::{format_err, Error};
 use async_trait::async_trait;
@@ -37,12 +38,12 @@ use {
 /// Sends Messages: N/A
 ///
 /// FIDL dependencies:
-///     - fuchsia.hardware.temperature: the node uses this protocol to query the temperature driver
-///       specified by `driver_path` in the TemperatureHandler constructor
+///     - fuchsia.hardware.temperature: the node uses this protocol to identify and query the
+///       temperature driver specified by `sensor_name` in the TemperatureHandler constructor
 
 /// A builder for constructing the TemperatureHandler node
 pub struct TemperatureHandlerBuilder<'a> {
-    driver_path: Option<String>,
+    sensor_name: Option<String>,
     driver_proxy: Option<ftemperature::DeviceProxy>,
     cache_duration: Option<zx::Duration>,
     inspect_root: Option<&'a inspect::Node>,
@@ -52,7 +53,7 @@ impl<'a> TemperatureHandlerBuilder<'a> {
     #[cfg(test)]
     pub fn new() -> Self {
         Self {
-            driver_path: Some("/test/driver/path".to_string()),
+            sensor_name: Some("therm-cpu-1".to_string()),
             driver_proxy: None,
             cache_duration: None,
             inspect_root: None,
@@ -80,7 +81,7 @@ impl<'a> TemperatureHandlerBuilder<'a> {
     pub fn new_from_json(json_data: json::Value, _nodes: &HashMap<String, Rc<dyn Node>>) -> Self {
         #[derive(Deserialize)]
         struct Config {
-            driver_path: String,
+            sensor_name: String,
             cache_duration_ms: u32,
         }
 
@@ -91,7 +92,7 @@ impl<'a> TemperatureHandlerBuilder<'a> {
 
         let data: JsonData = json::from_value(json_data).unwrap();
         Self {
-            driver_path: Some(data.config.driver_path),
+            sensor_name: Some(data.config.sensor_name),
             driver_proxy: None,
             cache_duration: Some(zx::Duration::from_millis(data.config.cache_duration_ms as i64)),
             inspect_root: None,
@@ -99,7 +100,7 @@ impl<'a> TemperatureHandlerBuilder<'a> {
     }
 
     pub fn build(self) -> Result<Rc<TemperatureHandler>, Error> {
-        let driver_path = ok_or_default_err!(self.driver_path).or_debug_panic()?;
+        let sensor_name = ok_or_default_err!(self.sensor_name).or_debug_panic()?;
 
         // Default `cache_duration`: 0
         let cache_duration = self.cache_duration.unwrap_or(zx::Duration::from_millis(0));
@@ -116,12 +117,12 @@ impl<'a> TemperatureHandlerBuilder<'a> {
 
         Ok(Rc::new(TemperatureHandler {
             init_done: AsyncEvent::new(),
-            driver_path: driver_path.clone(),
+            sensor_name: sensor_name.clone(),
             mutable_inner: RefCell::new(mutable_inner),
             cache_duration,
             inspect: InspectData::new(
                 inspect_root,
-                format!("TemperatureHandler ({})", driver_path),
+                format!("TemperatureHandler ({})", sensor_name),
             ),
         }))
     }
@@ -139,8 +140,8 @@ pub struct TemperatureHandler {
     /// its `init()` has completed.
     init_done: AsyncEvent,
 
-    /// Path to the temperature driver that this node reads from.
-    driver_path: String,
+    /// Sensor name of the temperature driver that this node reads from.
+    sensor_name: String,
 
     /// Mutable inner state.
     mutable_inner: RefCell<MutableInner>,
@@ -154,15 +155,15 @@ pub struct TemperatureHandler {
 }
 
 impl TemperatureHandler {
-    fn handle_get_driver_path(&self) -> Result<MessageReturn, PowerManagerError> {
-        Ok(MessageReturn::GetDriverPath(self.driver_path.clone()))
+    fn handle_get_sensor_name(&self) -> Result<MessageReturn, PowerManagerError> {
+        Ok(MessageReturn::GetSensorName(self.sensor_name.clone()))
     }
 
     async fn handle_read_temperature(&self) -> Result<MessageReturn, PowerManagerError> {
         fuchsia_trace::duration!(
             c"power_manager",
             c"TemperatureHandler::handle_read_temperature",
-            "driver" => self.driver_path.as_str()
+            "driver" => self.sensor_name.as_str()
         );
 
         self.init_done.wait().await;
@@ -184,13 +185,13 @@ impl TemperatureHandler {
         let result = self.read_temperature().await;
         log_if_err!(
             result,
-            format!("Failed to read temperature from {}", self.driver_path).as_str()
+            format!("Failed to read temperature from {}", self.sensor_name).as_str()
         );
         fuchsia_trace::instant!(
             c"power_manager",
             c"TemperatureHandler::read_temperature_result",
             fuchsia_trace::Scope::Thread,
-            "driver" => self.driver_path.as_str(),
+            "driver" => self.sensor_name.as_str(),
             "result" => format!("{:?}", result).as_str()
         );
 
@@ -214,7 +215,7 @@ impl TemperatureHandler {
         fuchsia_trace::duration!(
             c"power_manager",
             c"TemperatureHandler::read_temperature",
-            "driver" => self.driver_path.as_str()
+            "driver" => self.sensor_name.as_str()
         );
 
         // Extract `driver_proxy` from `mutable_inner`, returning an error (or asserting in debug)
@@ -301,7 +302,7 @@ struct MutableInner {
 #[async_trait(?Send)]
 impl Node for TemperatureHandler {
     fn name(&self) -> String {
-        format!("TemperatureHandler ({})", self.driver_path)
+        format!("TemperatureHandler ({})", self.sensor_name)
     }
 
     /// Initializes internal state.
@@ -313,9 +314,7 @@ impl Node for TemperatureHandler {
         // Connect to the temperature driver. Typically this is None, but it may be set by tests.
         let driver_proxy = match &self.mutable_inner.borrow().driver_proxy {
             Some(p) => p.clone(),
-            None => fuchsia_component::client::connect_to_protocol_at_path::<
-                ftemperature::DeviceMarker,
-            >(&self.driver_path)?,
+            None => get_temperature_driver_proxy(&self.sensor_name).await?,
         };
 
         self.mutable_inner.borrow_mut().driver_proxy = Some(driver_proxy);
@@ -327,7 +326,7 @@ impl Node for TemperatureHandler {
     async fn handle_message(&self, msg: &Message) -> Result<MessageReturn, PowerManagerError> {
         match msg {
             Message::ReadTemperature => self.handle_read_temperature().await,
-            Message::GetDriverPath => self.handle_get_driver_path(),
+            Message::GetSensorName => self.handle_get_sensor_name(),
             Message::Debug(command, args) => self.handle_debug_message(command, args),
             _ => Err(PowerManagerError::Unsupported),
         }
@@ -510,7 +509,7 @@ pub mod tests {
             node.handle_message(&Message::ReadTemperature).await.unwrap();
         }
 
-        let mut root = TreeAssertion::new("TemperatureHandler (/test/driver/path)", false);
+        let mut root = TreeAssertion::new("TemperatureHandler (therm-cpu-1)", false);
         let mut temperature_readings = TreeAssertion::new("temperature_readings", true);
 
         // Since we read 10 more samples than our limit allows, the first 10 should be dropped. So
@@ -535,29 +534,28 @@ pub mod tests {
             "type": "TemperatureHandler",
             "name": "temperature",
             "config": {
-                "driver_path": "/dev/class/temperature/000",
+                "sensor_name": "therm-cpu",
                 "cache_duration_ms": 1000
             }
         });
         let _ = TemperatureHandlerBuilder::new_from_json(json_data, &HashMap::new());
     }
 
-    /// Tests that the node correctly reports its driver path.
+    /// Tests that the node correctly reports its name.
     #[fasync::run_singlethreaded(test)]
-    async fn test_get_driver_path() {
+    async fn test_get_sensor_name() {
         let node = TemperatureHandlerBuilder::new()
             .driver_proxy(fake_temperature_driver(|| Celsius(0.0)))
             .build_and_init()
             .await;
 
-        let driver_path = match node.handle_message(&Message::GetDriverPath).await.unwrap() {
-            MessageReturn::GetDriverPath(driver_path) => driver_path,
+        let sensor_name = match node.handle_message(&Message::GetSensorName).await.unwrap() {
+            MessageReturn::GetSensorName(sensor_name) => sensor_name,
             e => panic!("Unexpected message response: {:?}", e),
         };
 
-        // "TestTemperatureHandler" is the driver path assigned in
-        // `TemperatureHandlerBuilder::new()`
-        assert_eq!(driver_path, "/test/driver/path".to_string());
+        // "therm-cpu-1" is the sensor name assigned in `TemperatureHandlerBuilder::new()`
+        assert_eq!(sensor_name, "therm-cpu-1".to_string());
     }
 
     /// Tests that messages sent to the node are asynchronously blocked until the node's `init()`

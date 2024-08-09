@@ -6,7 +6,7 @@ use a2dp_profile_config::Config;
 use anyhow::{format_err, Error};
 use std::collections::HashSet;
 use thiserror::Error;
-use {fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_zircon as zx};
+use {fidl_fuchsia_bluetooth as fidl_bt, fuchsia_zircon as zx};
 
 use crate::media::sources::AudioSourceType;
 
@@ -23,10 +23,10 @@ pub(crate) const MAX_RX_SDU_SIZE: u16 = 1014;
 /// Parses the ChannelMode
 ///
 /// Returns an Error if the provided argument is an invalid string.
-fn channel_mode_from_str(channel_mode: String) -> Result<bredr::ChannelMode, Error> {
+fn channel_mode_from_str(channel_mode: String) -> Result<fidl_bt::ChannelMode, Error> {
     match channel_mode.as_str() {
-        "basic" => Ok(bredr::ChannelMode::Basic),
-        "ertm" => Ok(bredr::ChannelMode::EnhancedRetransmission),
+        "basic" => Ok(fidl_bt::ChannelMode::Basic),
+        "ertm" => Ok(fidl_bt::ChannelMode::EnhancedRetransmission),
         s => return Err(format_err!("invalid channel mode: {}", s)),
     }
 }
@@ -42,7 +42,7 @@ pub struct A2dpConfiguration {
     /// The source for audio sent to sinks connected to this profile, if None, source is disabled.
     pub source: Option<AudioSourceType>,
     /// Mode used for A2DP signaling channel establishment.
-    pub channel_mode: bredr::ChannelMode,
+    pub channel_mode: fidl_bt::ChannelMode,
     /// Enable sink streams. defaults to true.
     pub enable_sink: bool,
     /// Enable AVRCP-Target. defaults to true.
@@ -61,7 +61,7 @@ impl Default for A2dpConfiguration {
         A2dpConfiguration {
             domain: DEFAULT_DOMAIN.into(),
             source: Some(AudioSourceType::AudioOut),
-            channel_mode: bredr::ChannelMode::Basic,
+            channel_mode: fidl_bt::ChannelMode::Basic,
             enable_sink: true,
             enable_avrcp_target: true,
             enable_aac: true,
@@ -125,10 +125,10 @@ impl A2dpConfiguration {
     }
 
     /// Returns the set of preferred channel parameters for outgoing and incoming L2CAP connections.
-    pub fn channel_parameters(&self) -> bredr::ChannelParameters {
-        bredr::ChannelParameters {
+    pub fn channel_parameters(&self) -> fidl_bt::ChannelParameters {
+        fidl_bt::ChannelParameters {
             channel_mode: Some(self.channel_mode),
-            max_rx_sdu_size: Some(MAX_RX_SDU_SIZE),
+            max_rx_packet_size: Some(MAX_RX_SDU_SIZE),
             ..Default::default()
         }
     }
@@ -151,12 +151,12 @@ mod tests {
     #[test]
     fn test_channel_mode_from_str() {
         let channel_string = "basic".to_string();
-        assert_matches!(channel_mode_from_str(channel_string), Ok(bredr::ChannelMode::Basic));
+        assert_matches!(channel_mode_from_str(channel_string), Ok(fidl_bt::ChannelMode::Basic));
 
         let channel_string = "ertm".to_string();
         assert_matches!(
             channel_mode_from_str(channel_string),
-            Ok(bredr::ChannelMode::EnhancedRetransmission)
+            Ok(fidl_bt::ChannelMode::EnhancedRetransmission)
         );
 
         let channel_string = "foobar123".to_string();
@@ -202,11 +202,11 @@ mod tests {
     #[test]
     fn generates_correct_parameters() {
         let mut config = A2dpConfiguration::default();
-        assert_eq!(Some(MAX_RX_SDU_SIZE), config.channel_parameters().max_rx_sdu_size);
-        assert_eq!(Some(bredr::ChannelMode::Basic), config.channel_parameters().channel_mode);
-        config.channel_mode = bredr::ChannelMode::EnhancedRetransmission;
+        assert_eq!(Some(MAX_RX_SDU_SIZE), config.channel_parameters().max_rx_packet_size);
+        assert_eq!(Some(fidl_bt::ChannelMode::Basic), config.channel_parameters().channel_mode);
+        config.channel_mode = fidl_bt::ChannelMode::EnhancedRetransmission;
         assert_eq!(
-            Some(bredr::ChannelMode::EnhancedRetransmission),
+            Some(fidl_bt::ChannelMode::EnhancedRetransmission),
             config.channel_parameters().channel_mode
         );
     }

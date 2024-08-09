@@ -28,12 +28,6 @@
             to: "#ctf-tests",
             scope: "#ctf-tests",
         },
-        {
-            // These hermetic protocols are offered to be used by tests.
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [ "#ctf-tests" ],
-        },
 
         // These system capabilities are offered for use by the ctf tests.
         {

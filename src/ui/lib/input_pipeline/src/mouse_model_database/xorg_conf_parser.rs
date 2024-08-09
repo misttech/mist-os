@@ -294,11 +294,11 @@ mod helper {
 
     /// Wraps a parser and replaces its error.
     pub(super) fn map_err<'a, O, P, G>(
-        parser: P,
+        mut parser: P,
         f: G,
-    ) -> impl Fn(NomSpan<'a>) -> IResult<NomSpan<'a>, O, XOrgConfParserError>
+    ) -> impl FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, XOrgConfParserError>
     where
-        P: Fn(NomSpan<'a>) -> IResult<NomSpan<'a>, O, (NomSpan<'a>, ErrorKind)>,
+        P: FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, (NomSpan<'a>, ErrorKind)>,
         G: Fn(/* bad_input: */ String) -> XOrgConfParserError,
     {
         move |input: NomSpan<'_>| {
@@ -313,11 +313,11 @@ mod helper {
     }
 
     pub(super) fn map_parser_err<'a, O, P, G>(
-        parser: P,
+        mut parser: P,
         f: G,
-    ) -> impl Fn(NomSpan<'a>) -> IResult<NomSpan<'a>, O, XOrgConfParserError>
+    ) -> impl FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, XOrgConfParserError>
     where
-        P: Fn(NomSpan<'a>) -> IResult<NomSpan<'a>, O, XOrgConfParserError>,
+        P: FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, XOrgConfParserError>,
         G: Fn(String) -> XOrgConfParserError,
     {
         move |input: NomSpan<'_>| {
@@ -336,9 +336,9 @@ mod helper {
     /// the AST spans contain no trailing whitespace.
     pub(super) fn skip_ws_or_comment<'a, O, F>(
         f: F,
-    ) -> impl Fn(NomSpan<'a>) -> IResult<NomSpan<'a>, O, XOrgConfParserError>
+    ) -> impl FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, XOrgConfParserError>
     where
-        F: Fn(NomSpan<'a>) -> IResult<NomSpan<'a>, O, XOrgConfParserError>,
+        F: FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, XOrgConfParserError>,
     {
         preceded(comment_or_whitespace, f)
     }
@@ -362,10 +362,10 @@ mod helper {
     /// consume input) and many_until_eof will panic if it doesn't, to prevent infinite loops. Returns
     /// the results of `f` in a Vec.
     pub(super) fn many_until_eof<'a, O, F>(
-        f: F,
-    ) -> impl Fn(NomSpan<'a>) -> IResult<NomSpan<'a>, Vec<O>, XOrgConfParserError>
+        mut f: F,
+    ) -> impl FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, Vec<O>, XOrgConfParserError>
     where
-        F: Fn(NomSpan<'a>) -> IResult<NomSpan<'a>, O, XOrgConfParserError>,
+        F: FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, XOrgConfParserError>,
     {
         move |mut input: NomSpan<'a>| {
             let mut result = vec![];
@@ -388,9 +388,9 @@ mod helper {
 
     pub(super) fn quoted<'a, O, F>(
         f: F,
-    ) -> impl Fn(NomSpan<'a>) -> IResult<NomSpan<'a>, O, XOrgConfParserError>
+    ) -> impl FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, XOrgConfParserError>
     where
-        F: Fn(NomSpan<'a>) -> IResult<NomSpan<'a>, O, XOrgConfParserError>,
+        F: FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, XOrgConfParserError>,
     {
         delimited(tag("\""), f, tag("\""))
     }

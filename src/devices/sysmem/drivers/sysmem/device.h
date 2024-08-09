@@ -115,6 +115,8 @@ class Device final : public fdf::DriverBase,
   // fuchsia_hardware_sysmem::DriverConnector impl
   void ConnectV1(ConnectV1Request& request, ConnectV1Completer::Sync& completer) override;
   void ConnectV2(ConnectV2Request& request, ConnectV2Completer::Sync& completer) override;
+  void ConnectSysmem(ConnectSysmemRequest& request,
+                     ConnectSysmemCompleter::Sync& completer) override;
   void SetAuxServiceDirectory(SetAuxServiceDirectoryRequest& request,
                               SetAuxServiceDirectoryCompleter::Sync& completer) override;
 

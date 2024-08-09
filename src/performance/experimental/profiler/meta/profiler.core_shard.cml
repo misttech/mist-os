@@ -20,7 +20,6 @@
                 "fuchsia.kernel.DebugResource",
                 "fuchsia.kernel.RootJob",
                 "fuchsia.logger.Log",
-                "fuchsia.logger.LogSink",
                 "fuchsia.sys2.LifecycleController.root",
             ],
             from: "parent",

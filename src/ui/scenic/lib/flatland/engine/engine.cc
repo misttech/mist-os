@@ -4,6 +4,8 @@
 
 #include "src/ui/scenic/lib/flatland/engine/engine.h"
 
+#include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.display.types/cpp/hlcpp_conversion.h>
 #include <lib/async/cpp/time.h>
 #include <lib/syslog/cpp/macros.h>
 
@@ -117,10 +119,10 @@ void Engine::RenderScheduledFrame(uint64_t frame_number, zx::time presentation_t
                             hw_display->device_pixel_ratio(), scene_state.snapshot);
 
   // TODO(https://fxbug.dev/42156567): hack!  need a better place to call AddDisplay().
-  if (hack_seen_display_id_values_.find(hw_display->display_id().value) ==
+  if (hack_seen_display_id_values_.find(hw_display->display_id().value()) ==
       hack_seen_display_id_values_.end()) {
     // This display hasn't been added to the DisplayCompositor yet.
-    hack_seen_display_id_values_.insert(hw_display->display_id().value);
+    hack_seen_display_id_values_.insert(hw_display->display_id().value());
 
     DisplayInfo display_info{
         .dimensions = glm::uvec2{hw_display->width_in_px(), hw_display->height_in_px()},

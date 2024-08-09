@@ -1,0 +1,125 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.bluetooth;
+
+using zx;
+
+/// A payload of data sourced from or sent to a protocol or service on the
+/// remote peer.
+@available(added=HEAD)
+type Packet = struct {
+    packet vector<byte>:MAX;
+};
+
+/// A duplex channel for sending/recieving [`Packet`]s. This protocol also
+/// serves as a token to keeping the `Channel` open. Closing this protocol (and
+/// the associated `socket` for BR/EDR channels) will close the underlying
+/// channel.
+@available(added=HEAD)
+open protocol Channel {
+    /// Send a single [`packet`] of data over the channel. More than one `Send`
+    /// can be pending simultaneously, but clients should limit the number of
+    /// pending calls to avoid overflow. `Channel`s with flow control may cause
+    /// packets to remain pending for an unknown and potentially unbounded
+    /// amount of time.
+    flexible Send(Packet) -> ();
+
+    /// Event that is sent for each arriving packet from the peer on the
+    /// channel. Servers may stop sending events to limit the number of
+    /// unacknowledged packets, so clients must acknowledge received packets
+    /// as they are received and handled. Additionally, the server may use
+    /// the number of pending unacknowledged packets to inform flow control.
+    /// Maintaining a maximum of 10 unacknowledged packets is recommended.
+    flexible -> OnReceive(Packet);
+
+    /// Acknowledge that a received packet from OnReceive has been handled.
+    flexible AckReceive();
+
+    /// For RFCOMM channels, this will not return and calls will hang
+    /// indefinitely.
+    ///
+    /// For BR/EDR L2CAP connection-oriented channels this will currently not
+    /// return and calls will hang indefinitely. The initial channel parameters
+    /// are provided in [`fuchsia.bluetooth.bredr/Channel`].
+    ///
+    /// For LE L2CAP connection-oriented channels, the first call will
+    /// immediately return the parameters of the remote side of the channel.
+    /// Subsequent calls will hang until the [`ChannelParameters`] change, at
+    /// which point it will return the new parameters, including those that have
+    /// not changed.
+    flexible WatchChannelParameters() -> (ChannelParameters);
+};
+
+/// The supported channel modes of operation of an L2CAP channel.
+///
+/// For BR/EDR, this is used to specify preferred and accepted L2CAP channel
+/// modes.  If the peer rejects a non-BASIC mode, the Bluetooth system will
+/// attempt to open the channel in BASIC mode instead.
+///
+/// For LE, this is used to specify the exact channel mode to use, if the
+/// peer rejects the requested mode, the channel will fail to be established.
+///
+/// For a description of each mode, see Bluetooth Spec v5.4, Vol 3, Part A, Sec 2.4.
+@available(added=HEAD)
+type ChannelMode = strict enum {
+    /// BR/EDR only.
+    BASIC = 1;
+    /// BR/EDR only.
+    ENHANCED_RETRANSMISSION = 2;
+    /// LE only.
+    LE_CREDIT_BASED_FLOW_CONTROL = 3;
+    /// LE_only.
+    ENHANCED_CREDIT_BASED_FLOW_CONTROL = 4;
+};
+
+/// Authentication and permission requirements to access an advertised service.
+/// BR/EDR only.
+@available(added=HEAD)
+type SecurityRequirements = table {
+    /// If present and true, the physical link must be authenticated with
+    /// on-path attacker protection to access this service.  If missing then
+    /// authentication is not required.
+    1: authentication_required bool;
+
+    /// If present and true, the physical link must be encrypted with a Secure
+    /// Connections key to access this service if the host is capable.
+    /// Advertisement will fail if the host does not support Secure Connections.
+    /// See Bluetooth Spec v5.2, Vol 3, Part C, Sec 5.2.2.8.
+    2: secure_connections_required bool;
+};
+
+/// The set of parameters to use or that were used to establish an L2CAP
+/// connection-oriented channel.
+@available(added=HEAD)
+type ChannelParameters = table {
+    /// Optional.
+    /// For BR/EDR: If not provided, BASIC will be used.
+    /// For LE: If not provided, LE_CREDIT_BASED_FLOW_CONTROL will be used.
+    1: channel_mode ChannelMode;
+
+    /// Maximum packet size this profile is capable of accepting. Must be >= 48.
+    /// Optional. If not provided, the size will be determined by the Bluetooth
+    /// system. No guarantees are given regarding the size selected.
+    2: max_rx_packet_size uint16;
+
+    /// For BR/EDR: Minimum security requirements a link must have before this
+    /// channel can be created. The requirements provided here will be
+    /// attempted with the peer before the channel is established. If a peer
+    /// cannot provide the requirements, the channel is closed.
+    /// Optional. If not provided, then the only security property guaranteed
+    /// is encryption.
+    ///
+    /// For LE: Unused, must not be present.
+    3: security_requirements SecurityRequirements;
+
+    /// For BR/EDR: The flush timeout indicates the maximum amount of time a
+    /// data packet should be buffered in the controller before it is dropped.
+    /// A flush timeout of infinity can be used to mark packets as flushable
+    /// without any particular flush timeout.
+    /// Range: 1ms - 1,279ms (or ∞). Rounded down.
+    /// Optional. If not provided, no flush timeout and packets are not flushable.
+    ///
+    /// For LE: Unused, must not be present.
+    4: flush_timeout zx.Duration;
+};

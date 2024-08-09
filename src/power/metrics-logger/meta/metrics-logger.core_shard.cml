@@ -57,7 +57,6 @@
             protocol: [
                 "fuchsia.boot.Items",
                 "fuchsia.kernel.Stats",
-                "fuchsia.logger.LogSink",
             ],
             from: "parent",
             to: "#metrics-logger",

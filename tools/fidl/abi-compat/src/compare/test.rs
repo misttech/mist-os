@@ -8,7 +8,7 @@ use crate::compare::problems::CompatibilityProblems;
 use crate::compare::{AbiSurface, Protocol, Type};
 use crate::convert::{Context, ConvertType};
 use crate::ir::IR;
-use crate::{Scope, Version};
+use crate::Version;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -40,19 +40,19 @@ impl TestLibrary {
         format!("{LIBRARY}/{name}")
     }
 
-    fn compile(&self, version: &Version) -> CompiledTestLibrary {
+    fn compile<'a>(&self, version: &Version) -> CompiledTestLibrary<'a> {
         CompiledTestLibrary::new(version, self)
     }
 }
 
-struct CompiledTestLibrary {
+struct CompiledTestLibrary<'a> {
     version: Version,
     source: String,
     ir: Rc<IR>,
-    context: Context,
+    context: Context<'a>,
 }
 
-impl CompiledTestLibrary {
+impl CompiledTestLibrary<'_> {
     fn new(version: &Version, library: &TestLibrary) -> Self {
         let ir =
             IR::from_source(version.api_level(), &library.source, LIBRARY).unwrap_or_else(|_| {
@@ -66,11 +66,7 @@ impl CompiledTestLibrary {
         self.version.api_level()
     }
 
-    fn scope(&self) -> Scope {
-        self.version.scope()
-    }
-
-    fn get_decl(&self, name: &str) -> Declaration {
+    fn get_decl(&self, name: &str) -> &Declaration {
         self.ir.get(name).unwrap_or_else(|_| {
             panic!(
                 "Couldn't find declaration {:?} at {:?} in:\n{}",
@@ -85,7 +81,7 @@ impl CompiledTestLibrary {
         let decl = self.get_decl(name);
         let context = self.context.nest_member(name, decl.identifier());
         use crate::convert::ConvertType;
-        decl.convert(context).unwrap_or_else(|_| {
+        decl.convert(&context).unwrap_or_else(|_| {
             panic!(
                 "Couldn't convert {name} to a type at {:?} in:\n{}",
                 self.api_level(),
@@ -99,7 +95,7 @@ impl CompiledTestLibrary {
         let context = self.context.nest_member(name, decl.identifier());
 
         if let Declaration::Protocol(protocol) = decl {
-            crate::convert::convert_protocol(&protocol, context).unwrap_or_else(|_| {
+            crate::convert::convert_protocol(&protocol, &context).unwrap_or_else(|_| {
                 panic!(
                     "Couldn't convert {name} to a protocol at {:?} in:\n{}",
                     self.api_level(),
@@ -118,29 +114,17 @@ impl CompiledTestLibrary {
     }
 }
 
-#[derive(Clone, Copy)]
-pub struct Versions {
-    pub external: &'static str,
-    pub platform: &'static str,
-}
-
 #[allow(unused)]
 pub(super) fn compare_fidl_library(
-    versions: Versions,
+    versions: [&'static str; 2],
     source_fragment: impl AsRef<str>,
 ) -> CompatibilityProblems {
     let lib = TestLibrary::new(source_fragment.as_ref());
 
-    let external = lib.compile(&Version::new(versions.external));
-    let platform = lib.compile(&Version::new(versions.platform));
-    assert_eq!(external.scope(), Scope::External);
-    assert_eq!(platform.scope(), Scope::Platform);
-    super::compatible(
-        [&external.get_abi_surface(), &platform.get_abi_surface()],
-        &Default::default(),
-    )
-    .unwrap_or_else(|_| {
-        panic!("Comparing {:?} and {:?}:\n{}", versions.external, versions.platform, lib.source)
+    let compiled = versions.map(|v| lib.compile(&Version::new(v)));
+    let surfaces = compiled.map(|c| c.get_abi_surface());
+    super::compatible(surfaces.each_ref(), &Default::default()).unwrap_or_else(|_| {
+        panic!("Comparing {:?} and {:?}:\n{}", versions[0], versions[1], lib.source)
     })
 }
 

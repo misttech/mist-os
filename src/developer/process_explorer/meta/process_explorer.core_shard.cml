@@ -11,10 +11,7 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.kernel.RootJob",
-                "fuchsia.logger.LogSink",
-            ],
+            protocol: [ "fuchsia.kernel.RootJob" ],
             from: "parent",
             to: "#process_explorer",
         },

@@ -486,7 +486,7 @@ mod tests {
         let (remote, _local) = zx::Socket::create_datagram();
         let chan = bredr::Channel {
             socket: Some(remote),
-            channel_mode: Some(bredr::ChannelMode::Basic),
+            channel_mode: Some(bt::ChannelMode::Basic),
             max_tx_sdu_size: Some(1004),
             flush_timeout: None,
             ..Default::default()
@@ -720,7 +720,7 @@ mod tests {
                     server.connections.push(local);
                     let chan = bredr::Channel {
                         socket: Some(remote),
-                        channel_mode: Some(bredr::ChannelMode::Basic),
+                        channel_mode: Some(bt::ChannelMode::Basic),
                         max_tx_sdu_size: Some(1004),
                         flush_timeout: None,
                         ..Default::default()

@@ -61,7 +61,7 @@ class DisplayCompositorTestBase : public gtest::RealLoopFixture {
   }
 
   std::vector<RenderData> GenerateDisplayListForTest(
-      const std::unordered_map</*fuchsia::hardware::display::types::DisplayId::value*/ uint64_t,
+      const std::unordered_map</*fuchsia_hardware_display_types::DisplayId::value*/ uint64_t,
                                std::pair<DisplayInfo, TransformHandle>>& display_map) {
     const auto snapshot = uber_struct_system_->Snapshot();
     const auto links = link_system_->GetResolvedTopologyLinks();
@@ -101,7 +101,7 @@ class DisplayCompositorTestBase : public gtest::RealLoopFixture {
 
       image_list_per_display.push_back({.rectangles = image_rectangles,
                                         .images = images,
-                                        .display_id = {.value = display_id_value}});
+                                        .display_id = {{.value = display_id_value}}});
     }
     return image_list_per_display;
   }

@@ -5,6 +5,7 @@
 import asyncio
 import unittest
 
+import environment
 import event
 import selection_types
 import test_list_file
@@ -81,7 +82,11 @@ class TestEvents(unittest.IsolatedAsyncioTestCase):
         recorder.emit_init()
 
         recorder.emit_parse_flags({"test": True})
-        recorder.emit_process_env({"CWD": "~/home"})
+        recorder.emit_process_env(
+            environment.ExecutionEnvironment(
+                fuchsia_dir=".", out_dir=".", log_file=None, test_json_file="."
+            )
+        )
         recorder.emit_instruction_message("This is just a test")
         recorder.emit_info_message("About to do testing")
         recorder.emit_warning_message("Still about to test, but in yellow")

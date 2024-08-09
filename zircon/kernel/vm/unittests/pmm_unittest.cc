@@ -708,7 +708,7 @@ static bool pmm_arena_find_free_contiguous_test() {
 
   vm_page_t page_array[kNumPages]{};
   PmmArena arena;
-  ASSERT_EQ(ZX_OK, arena.InitForTest(info, page_array));
+  arena.InitForTest(info, page_array);
 
   // page_array is as follow (0 == free, 1 == allocated):
   //

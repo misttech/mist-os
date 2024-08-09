@@ -2,7 +2,7 @@
   "name": "dai-format",
   "description": "Set the DAI format of device or signal processing element.",
   "examples": [
-    "Set the DAI format for a specific Dai Endpoint signal processing element:\n\n    $ ffx audio device --id 1 set dai-format --element-id 2 48000,2ch,0x3,pcm_signed,16in16,i2s"
+    "Set the DAI format for a specific Dai Endpoint signal processing element:\n\n    $ ffx audio device set dai-format --element-id 2 48000,2ch,0x3,pcm_signed,16in16,i2s"
   ],
   "flags": [
     {

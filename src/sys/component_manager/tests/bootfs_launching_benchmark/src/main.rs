@@ -11,6 +11,7 @@ use futures::stream::FuturesUnordered;
 use futures::{StreamExt, TryStreamExt};
 use std::fs::File;
 use std::io::Read;
+use test_case::test_case;
 use {
     fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_process as fprocess,
@@ -27,24 +28,31 @@ fn read_file_to_vmo(path: &str) -> zx::Vmo {
     vmo
 }
 
-/// This test starts [`NUMBER_OF_ECHO_CONNECTIONS`] ELF components, each of which
+/// This test starts `number_of_echo_connections` ELF components, each of which
 /// links some dynamic libraries, then waits for all of them to call back. It is
 /// intended to measure the latency from component_manager to hitting `main()` in
 /// a number of ELF components.
+#[test_case(1)]
+#[test_case(5)]
+#[test_case(10)]
+#[test_case(15)]
+#[test_case(20)]
+#[test_case(25)]
 #[fuchsia::test]
-async fn launch_elf_component() {
+async fn launch_elf_component(number_of_echo_connections: usize) {
     let vmo = read_file_to_vmo(ZBI_PATH);
     let numbered_handles = vec![fprocess::HandleInfo {
         handle: vmo.into_handle(),
         id: HandleInfo::from(HandleType::BootfsVmo).as_raw(),
     }];
-    let instance =
-        ScopedInstance::new("coll".into(), "#meta/component_manager.cm".into()).await.unwrap();
+    let cm_url = format!("#meta/component_manager_{number_of_echo_connections}.cm");
+    let instance = ScopedInstance::new("coll".into(), cm_url).await.unwrap();
 
     let (dict_ref, echo_receiver_stream) = build_echo_dictionary().await;
 
-    let receiver_task =
-        fasync::Task::local(async move { handle_receiver(echo_receiver_stream).await });
+    let receiver_task = fasync::Task::local(async move {
+        handle_receiver(echo_receiver_stream, number_of_echo_connections).await
+    });
 
     // Start component_manager.
     // TODO(https://fxbug.dev/355009003): Track start time here.
@@ -89,13 +97,16 @@ async fn build_echo_dictionary() -> (fsandbox::DictionaryRef, fsandbox::Receiver
     (dict_ref, echo_receiver_stream)
 }
 
-/// How many Echo protocol connection do we expect.
-/// TODO(https://fxbug.dev/355009003): Run more than one ELF test component.
-const NUMBER_OF_ECHO_CONNECTIONS: usize = 1;
-
-async fn handle_receiver(receiver_stream: fsandbox::ReceiverRequestStream) {
-    // Read `NUMBER_OF_ECHO_CONNECTIONS` echo connection requests while handling them concurrently.
-    let mut receiver_stream = receiver_stream.take(NUMBER_OF_ECHO_CONNECTIONS);
+/// Serve echo connection requests.
+///
+/// number_of_echo_connections: How many Echo protocol connection do we expect to wait for.
+///
+async fn handle_receiver(
+    receiver_stream: fsandbox::ReceiverRequestStream,
+    number_of_echo_connections: usize,
+) {
+    // Read `number_of_echo_connections` echo connection requests while handling them concurrently.
+    let mut receiver_stream = receiver_stream.take(number_of_echo_connections);
     let futures = FuturesUnordered::new();
     while let Some(request) = receiver_stream.try_next().await.unwrap() {
         match request {
@@ -109,7 +120,7 @@ async fn handle_receiver(receiver_stream: fsandbox::ReceiverRequestStream) {
     }
 
     // Wait to receive the first request in those connections.
-    let values: Vec<_> = futures.take(NUMBER_OF_ECHO_CONNECTIONS).collect().await;
+    let values: Vec<_> = futures.take(number_of_echo_connections).collect().await;
 
     // TODO(https://fxbug.dev/355009003): Track end time here.
 

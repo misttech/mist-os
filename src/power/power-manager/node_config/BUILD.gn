@@ -36,10 +36,6 @@ node_config("chromebook") {
   source = "chromebook_node_config.json5"
 }
 
-node_config("luis") {
-  source = "luis_node_config.json5"
-}
-
 node_config("nelson") {
   source = "nelson_node_config.json5"
 }
@@ -58,7 +54,6 @@ resource("test_config_data") {
     "astro_node_config.json5",
     "base_node_config.json5",
     "chromebook_node_config.json5",
-    "luis_node_config.json5",
     "nelson_node_config.json5",
     "sherlock_node_config.json5",
     "vim3_devicetree_node_config.json5",

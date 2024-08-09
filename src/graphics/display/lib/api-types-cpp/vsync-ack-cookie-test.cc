@@ -69,6 +69,45 @@ TEST(VsyncAckCookieTest, FidlVsyncAckCookieValueConversionRoundtrip) {
             ToVsyncAckCookie(ToFidlVsyncAckCookieValue(kInvalidVsyncAckCookie)));
 }
 
+TEST(VsyncAckCookieTest, ToFidlVsyncAckCookie) {
+  static constexpr fuchsia_hardware_display::wire::VsyncAckCookie kFidlOne = {.value = 1};
+  EXPECT_EQ(kFidlOne.value, ToFidlVsyncAckCookie(kOne).value);
+
+  static constexpr fuchsia_hardware_display::wire::VsyncAckCookie kFidlTwo = {.value = 2};
+  EXPECT_EQ(kFidlTwo.value, ToFidlVsyncAckCookie(kTwo).value);
+
+  static constexpr fuchsia_hardware_display::wire::VsyncAckCookie kFidlLargeCookie = {
+      .value = kLargeCookieValue};
+  EXPECT_EQ(kFidlLargeCookie.value, ToFidlVsyncAckCookie(kLargeCookie).value);
+
+  static constexpr fuchsia_hardware_display::wire::VsyncAckCookie kFidlInvalidCookie = {
+      .value = fuchsia_hardware_display_types::wire::kInvalidDispId};
+  EXPECT_EQ(kFidlInvalidCookie.value, ToFidlVsyncAckCookie(kInvalidVsyncAckCookie).value);
+}
+
+TEST(VsyncAckCookieTest, ToVsyncAckCookieWithFidlVsyncAckCookie) {
+  static constexpr fuchsia_hardware_display::wire::VsyncAckCookie kFidlOne = {.value = 1};
+  EXPECT_EQ(kOne, ToVsyncAckCookie(kFidlOne));
+
+  static constexpr fuchsia_hardware_display::wire::VsyncAckCookie kFidlTwo = {.value = 2};
+  EXPECT_EQ(kTwo, ToVsyncAckCookie(kFidlTwo));
+
+  static constexpr fuchsia_hardware_display::wire::VsyncAckCookie kFidlLargeCookie = {
+      .value = kLargeCookieValue};
+  EXPECT_EQ(kLargeCookie, ToVsyncAckCookie(kFidlLargeCookie));
+
+  static constexpr fuchsia_hardware_display::wire::VsyncAckCookie kFidlInvalidCookie = {
+      .value = fuchsia_hardware_display_types::wire::kInvalidDispId};
+  EXPECT_EQ(kInvalidVsyncAckCookie, ToVsyncAckCookie(kFidlInvalidCookie));
+}
+
+TEST(VsyncAckCookieTest, FidlVsyncAckCookieConversionRoundtrip) {
+  EXPECT_EQ(kOne, ToVsyncAckCookie(ToFidlVsyncAckCookie(kOne)));
+  EXPECT_EQ(kTwo, ToVsyncAckCookie(ToFidlVsyncAckCookie(kTwo)));
+  EXPECT_EQ(kLargeCookie, ToVsyncAckCookie(ToFidlVsyncAckCookie(kLargeCookie)));
+  EXPECT_EQ(kInvalidVsyncAckCookie, ToVsyncAckCookie(ToFidlVsyncAckCookie(kInvalidVsyncAckCookie)));
+}
+
 }  // namespace
 
 }  // namespace display

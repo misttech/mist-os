@@ -10,23 +10,10 @@ group("mouse-input-chromium") {
 }
 
 executable("bin") {
+  testonly = true
   output_name = "mouse-input-chromium"
   sources = [ "mouse-input-chromium.cc" ]
-  deps = [
-    "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_hlcpp",
-    "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_hlcpp",
-    "//sdk/fidl/fuchsia.web:fuchsia.web_hlcpp",
-    "//sdk/lib/sys/cpp",
-    "//sdk/lib/ui/scenic/cpp",
-    "//src/chromium/web_engine/meta/shards:context_provider_create_with_network",
-    "//src/chromium/web_engine/meta/shards:context_provider_create_with_view",
-    "//src/lib/fsl",
-    "//src/lib/fxl",
-    "//src/lib/json_parser",
-    "//third_party/rapidjson",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
-  ]
+  deps = [ "//src/ui/tests/integration_input_tests/web-test-base:web_app_base" ]
 }
 
 fuchsia_component("mouse-input-chromium-component") {

@@ -295,7 +295,7 @@ fn build_environment(
                 moniker,
                 program_input_dict_additions,
             )
-            .with_porcelain_type(CapabilityTypeName::Protocol),
+            .with_porcelain_type(CapabilityTypeName::Protocol, moniker.clone()),
             cm_rust::RegistrationSource::Self_ => program_output_router
                 .clone()
                 .lazy_get(
@@ -305,7 +305,7 @@ fn build_environment(
                         source_path.iter_segments().join("/"),
                     ),
                 )
-                .with_porcelain_type(CapabilityTypeName::Protocol),
+                .with_porcelain_type(CapabilityTypeName::Protocol, moniker.clone()),
             cm_rust::RegistrationSource::Child(child_name) => {
                 let child_name = ChildName::parse(child_name).expect("invalid child name");
                 let Some(child_component_output) =
@@ -323,7 +323,7 @@ fn build_environment(
                             debug_protocol.source_name.clone(),
                         ),
                     )
-                    .with_porcelain_type(CapabilityTypeName::Protocol)
+                    .with_porcelain_type(CapabilityTypeName::Protocol, moniker.clone())
             }
         };
         match environment.debug().insert_capability(&debug_protocol.target_name, router.into()) {
@@ -389,7 +389,7 @@ fn extend_dict_with_config_use(
             moniker,
             program_input_dict_additions,
         )
-        .with_porcelain_type(CapabilityTypeName::Config),
+        .with_porcelain_type(CapabilityTypeName::Config, moniker.clone()),
         cm_rust::UseSource::Self_ => program_output_router
             .clone()
             .lazy_get(
@@ -399,7 +399,7 @@ fn extend_dict_with_config_use(
                     source_path.iter_segments().join("/"),
                 ),
             )
-            .with_porcelain_type(CapabilityTypeName::Config),
+            .with_porcelain_type(CapabilityTypeName::Config, moniker.clone()),
         cm_rust::UseSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid child name");
             let Some(child_component_output) =
@@ -417,7 +417,7 @@ fn extend_dict_with_config_use(
                         config_use.source_name().clone(),
                     ),
                 )
-                .with_porcelain_type(CapabilityTypeName::Config)
+                .with_porcelain_type(CapabilityTypeName::Config, moniker.clone())
         }
         // The following are not used with config capabilities.
         cm_rust::UseSource::Environment => return,
@@ -427,7 +427,7 @@ fn extend_dict_with_config_use(
     };
     match program_input.config.insert_capability(
         &config_use.target_name,
-        router.with_availability(*config_use.availability()).into(),
+        router.with_availability(moniker.clone(), *config_use.availability()).into(),
     ) {
         Ok(()) => (),
         Err(e) => {
@@ -470,7 +470,7 @@ fn extend_dict_with_use(
             moniker,
             program_input_dict_additions,
         )
-        .with_porcelain_type(CapabilityTypeName::Protocol),
+        .with_porcelain_type(CapabilityTypeName::Protocol, moniker.clone()),
         cm_rust::UseSource::Self_ => program_output_router
             .clone()
             .lazy_get(
@@ -480,7 +480,7 @@ fn extend_dict_with_use(
                     source_path.iter_segments().join("/"),
                 ),
             )
-            .with_porcelain_type(CapabilityTypeName::Protocol),
+            .with_porcelain_type(CapabilityTypeName::Protocol, moniker.clone()),
         cm_rust::UseSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid child name");
             let Some(child_component_output) =
@@ -498,7 +498,7 @@ fn extend_dict_with_use(
                         use_.source_name().clone(),
                     ),
                 )
-                .with_porcelain_type(CapabilityTypeName::Protocol)
+                .with_porcelain_type(CapabilityTypeName::Protocol, moniker.clone())
         }
         cm_rust::UseSource::Framework if use_.is_from_dictionary() => {
             Router::new_error(RoutingError::capability_from_framework_not_found(
@@ -515,7 +515,7 @@ fn extend_dict_with_use(
                     source_path.iter_segments().join("/"),
                 ),
             )
-            .with_porcelain_type(CapabilityTypeName::Protocol),
+            .with_porcelain_type(CapabilityTypeName::Protocol, moniker.clone()),
         cm_rust::UseSource::Capability(capability_name) => {
             let err = RoutingError::capability_from_capability_not_found(
                 moniker,
@@ -538,13 +538,13 @@ fn extend_dict_with_use(
                     &use_protocol.source_name,
                 ),
             )
-            .with_porcelain_type(CapabilityTypeName::Protocol),
+            .with_porcelain_type(CapabilityTypeName::Protocol, moniker.clone()),
         // UseSource::Environment is not used for protocol capabilities
         cm_rust::UseSource::Environment => return,
     };
     match program_input.namespace.insert_capability(
         &use_protocol.target_path,
-        router.with_availability(*use_.availability()).into(),
+        router.with_availability(moniker.clone(), *use_.availability()).into(),
     ) {
         Ok(()) => (),
         Err(e) => {
@@ -626,7 +626,7 @@ fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
                     source_path.iter_segments().join("/"),
                 ),
             );
-            router.with_porcelain_type(offer.into())
+            router.with_porcelain_type(offer.into(), component.moniker().clone())
         }
         cm_rust::OfferSource::Self_ => {
             let router = program_output_router.clone().lazy_get(
@@ -636,7 +636,7 @@ fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
                     source_path.iter_segments().join("/"),
                 ),
             );
-            router.with_porcelain_type(offer.into())
+            router.with_porcelain_type(offer.into(), component.moniker().clone())
         }
         cm_rust::OfferSource::Child(child_ref) => {
             let child_name: ChildName = child_ref.clone().try_into().expect("invalid child ref");
@@ -653,7 +653,7 @@ fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
                     offer.source_name().clone(),
                 ),
             );
-            router.with_porcelain_type(offer.into())
+            router.with_porcelain_type(offer.into(), component.moniker().clone())
         }
         cm_rust::OfferSource::Framework => {
             if offer.is_from_dictionary() {
@@ -669,7 +669,7 @@ fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
                     source_path.iter_segments().join("/"),
                 ),
             );
-            router.with_porcelain_type(offer.into())
+            router.with_porcelain_type(offer.into(), component.moniker().clone())
         }
         cm_rust::OfferSource::Capability(capability_name) => {
             let err = RoutingError::capability_from_capability_not_found(
@@ -688,9 +688,10 @@ fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
         // This is only relevant for services, so this arm is never reached.
         cm_rust::OfferSource::Collection(_name) => return,
     };
-    match target_dict
-        .insert_capability(target_name, router.with_availability(*offer.availability()).into())
-    {
+    match target_dict.insert_capability(
+        target_name,
+        router.with_availability(component.moniker().clone(), *offer.availability()).into(),
+    ) {
         Ok(()) => (),
         Err(e) => warn!("failed to insert {target_name} into target dict: {e:?}"),
     }
@@ -734,7 +735,7 @@ fn extend_dict_with_expose<C: ComponentInstanceInterface + 'static>(
                     source_path.iter_segments().join("/"),
                 ),
             )
-            .with_porcelain_type(expose.into()),
+            .with_porcelain_type(expose.into(), component.moniker().clone()),
         cm_rust::ExposeSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid static child name");
             let Some(child_component_output) =
@@ -752,7 +753,7 @@ fn extend_dict_with_expose<C: ComponentInstanceInterface + 'static>(
                         expose.source_name().clone(),
                     ),
                 )
-                .with_porcelain_type(expose.into())
+                .with_porcelain_type(expose.into(), component.moniker().clone())
         }
         cm_rust::ExposeSource::Framework => {
             if expose.is_from_dictionary() {
@@ -770,7 +771,7 @@ fn extend_dict_with_expose<C: ComponentInstanceInterface + 'static>(
                         source_path.iter_segments().join("/"),
                     ),
                 )
-                .with_porcelain_type(expose.into())
+                .with_porcelain_type(expose.into(), component.moniker().clone())
         }
         cm_rust::ExposeSource::Capability(capability_name) => {
             let err = RoutingError::capability_from_capability_not_found(
@@ -789,9 +790,10 @@ fn extend_dict_with_expose<C: ComponentInstanceInterface + 'static>(
         // This is only relevant for services, so this arm is never reached.
         cm_rust::ExposeSource::Collection(_name) => return,
     };
-    match target_dict
-        .insert_capability(target_name, router.with_availability(*expose.availability()).into())
-    {
+    match target_dict.insert_capability(
+        target_name,
+        router.with_availability(component.moniker().clone(), *expose.availability()).into(),
+    ) {
         Ok(()) => (),
         Err(e) => warn!("failed to insert {target_name} into target_dict: {e:?}"),
     }
@@ -821,7 +823,10 @@ impl<C: ComponentInstanceInterface + 'static> sandbox::Routable for UnitRouter<C
         }
         match request.availability {
             cm_rust::Availability::Required | cm_rust::Availability::SameAsTarget => {
-                Err(RoutingError::SourceCapabilityIsVoid.into())
+                Err(RoutingError::SourceCapabilityIsVoid {
+                    moniker: self.component.moniker.clone(),
+                }
+                .into())
             }
             cm_rust::Availability::Optional | cm_rust::Availability::Transitional => {
                 Ok(Unit {}.into())

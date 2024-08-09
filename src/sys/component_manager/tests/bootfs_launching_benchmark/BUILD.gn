@@ -29,20 +29,42 @@ rustc_test("bootfs_launching_benchmark") {
     "//src/lib/fuchsia-runtime",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:test-case",
   ]
 
   sources = [ "src/main.rs" ]
 }
 
 if (current_toolchain == default_toolchain) {
-  fuchsia_component("root_component") {
-    component_name = "root_component"
-    manifest = "meta/root_component.cml"
-    testonly = true
+  number_of_components_list = [
+    1,
+    5,
+    10,
+    15,
+    20,
+    25,
+  ]
+
+  foreach(i, number_of_components_list) {
+    fuchsia_component("root_component_${i}") {
+      component_name = "root_component_${i}"
+      manifest = "meta/root_component_${i}.cml"
+      testonly = true
+    }
+
+    fuchsia_component("component-manager-cmp-${i}") {
+      testonly = true
+      component_name = "component_manager_${i}"
+      manifest = "meta/component_manager_${i}.cml"
+      deps = [ "//src/sys/component_manager:bin" ]
+    }
   }
 
   fuchsia_package("root_package") {
-    deps = [ ":root_component" ]
+    deps = []
+    foreach(i, number_of_components_list) {
+      deps += [ ":root_component_${i}" ]
+    }
     testonly = true
   }
 
@@ -50,13 +72,15 @@ if (current_toolchain == default_toolchain) {
     name = "test"
   }
 
+  img_name = "bootfs_launching_benchmark_test_zbi"
+
   product_assembly_configuration("product_config") {
     platform = {
       build_type = "user"
       feature_set_level = "empty"
       storage = {
         filesystems = {
-          image_name = "test_zbi"
+          image_name = img_name
           image_mode = "no_image"
         }
       }
@@ -66,12 +90,12 @@ if (current_toolchain == default_toolchain) {
   # `assembled_system` builds a zbi for consumption by the test.
   assembled_system("test_zbi") {
     testonly = true
+    image_name = img_name
     product_assembly_config_label = ":product_config"
     board_config_label = ":board_config"
     use_bringup_platform_bundles_only = true
     bootfs_labels = [ ":config" ]
     bootfs_package_labels = [
-      "//src/security/tests/pkg_test/assemblies/hello_world_v1:hello_world-package",
       "test_data/components",
       ":root_package",
     ]
@@ -90,7 +114,7 @@ if (current_toolchain == default_toolchain) {
     ]
 
     inputs = [
-      target_out_dir + "/test_zbi/test_zbi.zbi",
+      target_out_dir + "/${img_name}/${img_name}.zbi",
       zbi_tool_path,
     ]
     outputs = [ output_file ]
@@ -99,7 +123,8 @@ if (current_toolchain == default_toolchain) {
       "--zbi",
       rebase_path(zbi_tool_path, root_build_dir),
       "--zbi-image",
-      rebase_path(target_out_dir + "/test_zbi/test_zbi.zbi", root_build_dir),
+      rebase_path(target_out_dir + "/${img_name}/${img_name}.zbi",
+                  root_build_dir),
       "--output",
       rebase_path(outputs[0], root_build_dir),
     ]
@@ -126,23 +151,22 @@ if (current_toolchain == default_toolchain) {
 
   fuchsia_test_package("bootfs-launching-benchmark-integration-tests") {
     test_components = [ ":bootfs_launching_benchmark_component" ]
-    deps = [
-      ":bootfs_resource",
-      ":component-manager-cmp",
-    ]
+    deps = [ ":bootfs_resource" ]
+    foreach(i, number_of_components_list) {
+      deps += [ ":component-manager-cmp-${i}" ]
+    }
+
+    # We don't want to include the product bundle in build outputs.
+    metadata = {
+      product_bundles_barrier = []
+      images_barrier = []
+    }
   }
 
   component_config("config") {
     testonly = true
     sources = [ "config.json5" ]
     dest = "data/component_manager_config"
-  }
-
-  fuchsia_component("component-manager-cmp") {
-    testonly = true
-    component_name = "component_manager"
-    manifest = "meta/component_manager.cml"
-    deps = [ "//src/sys/component_manager:bin" ]
   }
 
   group("tests") {

@@ -21,6 +21,19 @@ import test_list_file
 import tests_json_file
 
 
+def _make_exec_env(
+    fuchsia_dir: str, out_dir: str
+) -> environment.ExecutionEnvironment:
+    """Create an execution environment for test."""
+    return environment.ExecutionEnvironment(
+        fuchsia_dir,
+        out_dir,
+        test_json_file="",
+        log_file=None,
+        test_list_file="",
+    )
+
+
 class TestExecution(unittest.IsolatedAsyncioTestCase):
     def assertContainsSublist(
         self, target: list[typing.Any], data: list[typing.Any]
@@ -151,9 +164,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
     ) -> None:
         """Test the usage of the TestExecution wrapper on a component test"""
 
-        exec_env = environment.ExecutionEnvironment(
-            "/fuchsia", "/out/fuchsia", None, "", ""
-        )
+        exec_env = _make_exec_env("/fuchsia", "/out/fuchsia")
 
         test = execution.TestExecution(
             test_list_file.Test(
@@ -225,9 +236,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
         expected_args: list[str],
     ) -> None:
         """Test the usage of the TestExecution wrapper on a component test"""
-        exec_env = environment.ExecutionEnvironment(
-            "/fuchsia", "/out/fuchsia", None, "", ""
-        )
+        exec_env = _make_exec_env("/fuchsia", "/out/fuchsia")
 
         test = execution.TestExecution(
             test_list_file.Test(
@@ -287,9 +296,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
     ) -> None:
         """Test the usage of the TestExecution wrapper on a component test while using test interface"""
 
-        exec_env = environment.ExecutionEnvironment(
-            "/fuchsia", "/out/fuchsia", None, "", ""
-        )
+        exec_env = _make_exec_env("/fuchsia", "/out/fuchsia")
 
         test = execution.TestExecution(
             test_list_file.Test(
@@ -382,9 +389,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(os.path.isfile, f"{ls_path} is not a file")
             os.symlink(ls_path, os.path.join(tmp, "ls"))
 
-            exec_env = environment.ExecutionEnvironment(
-                "/fuchsia", tmp, None, "", ""
-            )
+            exec_env = _make_exec_env("/fuchsia", tmp)
 
             flags = args.parse_args([])
 
@@ -435,9 +440,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
     ) -> None:
         """Test that execution of e2e depends on the --e2e flag"""
 
-        exec_env = environment.ExecutionEnvironment(
-            "/fuchsia", "/some_temp", None, "", ""
-        )
+        exec_env = _make_exec_env("/fuchsia", "/out/fuchsia")
 
         flags = args.parse_args(extra_flags)
 
@@ -465,8 +468,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(test.is_hermetic())
         env = test.environment()
         assert env is not None
-        # TODO: Add environment checking when added.
-        self.assertDictEqual(env, {"CWD": "/some_temp"})
+        self.assertDictEqual(env, {"CWD": "/out/fuchsia"})
         self.assertFalse(test.should_symbolize())
 
         recorder = event.EventRecorder()
@@ -485,9 +487,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
     ) -> None:
         """Test that boot tests are skipped"""
 
-        exec_env = environment.ExecutionEnvironment(
-            "/fuchsia", "/some_temp", None, "", ""
-        )
+        exec_env = _make_exec_env("/fuchsia", "/out/fuchsia")
 
         flags = args.parse_args([])
 
@@ -516,7 +516,7 @@ class TestExecution(unittest.IsolatedAsyncioTestCase):
         self.assertFalse(test.is_hermetic())
         env = test.environment()
         assert env is not None
-        self.assertDictEqual(env, {"CWD": "/some_temp"})
+        self.assertDictEqual(env, {"CWD": "/out/fuchsia"})
         self.assertFalse(test.should_symbolize())
 
         recorder = event.EventRecorder()
@@ -666,9 +666,7 @@ class TestExecutionUtils(unittest.IsolatedAsyncioTestCase):
 
     def setUp(self) -> None:
         self._temp_dir = tempfile.TemporaryDirectory()
-        self._env = environment.ExecutionEnvironment(
-            self._temp_dir.name, "", None, "", "", None
-        )
+        self._env = _make_exec_env(self._temp_dir.name, "")
         return super().setUp()
 
     def tearDown(self) -> None:
@@ -774,9 +772,7 @@ class TestExecutionUtils(unittest.IsolatedAsyncioTestCase):
         """Test TestExecution wrapper uses the environment provided by flags"""
 
         with tempfile.TemporaryDirectory() as tmp:
-            exec_env = environment.ExecutionEnvironment(
-                "/fuchsia", tmp, None, "", ""
-            )
+            exec_env = _make_exec_env("/fuchsia", tmp)
 
             flags = args.parse_args(
                 ["-e", "foo=bar", "--env", "my_setting=baz"]

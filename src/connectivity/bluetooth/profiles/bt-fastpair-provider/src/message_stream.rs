@@ -5,8 +5,9 @@
 use async_helpers::maybe_stream::MaybeStream;
 use core::pin::Pin;
 use core::task::{Context, Poll};
+use fidl_fuchsia_bluetooth::ChannelParameters;
 use fidl_fuchsia_bluetooth_bredr::{
-    ChannelParameters, ProfileProxy, ProtocolDescriptor, ProtocolIdentifier, ServiceDefinition,
+    ProfileProxy, ProtocolDescriptor, ProtocolIdentifier, ServiceDefinition,
 };
 use fuchsia_bluetooth::types::{Channel, PeerId, Uuid};
 use futures::ready;

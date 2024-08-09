@@ -1948,7 +1948,7 @@ LIBC_NO_SAFESTACK static void* dls3(zx_handle_t exec_vmo, const char* argv0,
   return laddr(&app, ehdr->e_entry);
 }
 
-LIBC_NO_SAFESTACK NO_ASAN static dl_start_return_t __dls3(void* start_arg) {
+LIBC_NO_SAFESTACK NO_ASAN NO_UBSAN_RISCV64 static dl_start_return_t __dls3(void* start_arg) {
   zx_handle_t bootstrap = (uintptr_t)start_arg;
 
   uint32_t nbytes, nhandles;

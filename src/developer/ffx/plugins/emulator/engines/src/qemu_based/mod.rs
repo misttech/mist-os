@@ -22,7 +22,7 @@ use ffx_emulator_common::{config, dump_log_to_out, host_is_mac, process};
 use ffx_emulator_config::{EmulatorEngine, EngineConsoleType, ShowDetail};
 use ffx_ssh::SshKeyFiles;
 use ffx_target::KnockError;
-use fho::{bug, return_bug, return_user_error, Result};
+use fho::{bug, return_bug, return_user_error, user_error, Result};
 use fidl_fuchsia_developer_ffx as ffx;
 use fuchsia_async::Timer;
 use serde_json::{json, Deserializer, Value};
@@ -118,22 +118,7 @@ pub(crate) struct PortPair {
 pub(crate) trait QemuBasedEngine: EmulatorEngine {
     /// Checks that the required files are present
     fn check_required_files(&self, guest: &GuestConfig) -> Result<()> {
-        let kernel_path = &guest.kernel_image;
-        let zbi_path = &guest.zbi_image;
-        let disk_image_path = &guest.disk_image;
-
-        if !kernel_path.exists() {
-            return_bug!("kernel file {:?} does not exist.", kernel_path);
-        }
-        if !zbi_path.exists() {
-            return_bug!("zbi file {:?} does not exist.", zbi_path);
-        }
-        if let Some(file_path) = disk_image_path.as_ref() {
-            if !file_path.exists() {
-                return_bug!("disk image file {:?} does not exist.", file_path);
-            }
-        }
-        Ok(())
+        guest.check_required_files().map_err(|e| user_error!(e))
     }
 
     /// Stages the source image files in an instance specific directory.
@@ -168,27 +153,34 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 .map_err(|e| bug!("cannot stage kernel file: {e}"))?;
         }
 
-        let zbi_path = instance_root.join(
-            emu_config
-                .guest
-                .zbi_image
-                .file_name()
-                .ok_or_else(|| bug!("cannot read zbi file name"))?,
-        );
+        // If the kernel is an efi image, skip the zbi processing.
+        let zbi_path = if !emu_config.guest.is_efi() {
+            let zbi_path = instance_root.join(
+                emu_config
+                    .guest
+                    .zbi_image
+                    .file_name()
+                    .ok_or_else(|| bug!("cannot read zbi file name"))?,
+            );
 
-        if zbi_path.exists() && reuse {
-            tracing::debug!("Using existing file for {:?}", zbi_path.file_name().unwrap());
-            // TODO(https://fxbug.dev/42063890): Make a decision to reuse zbi with no modifications or not.
-            // There is the potential that the ssh keys have changed, or the ip address
-            // of the host interface has changed, which will cause the connection
-            // to the emulator instance to fail.
+            if zbi_path.exists() && reuse {
+                tracing::debug!("Using existing file for {:?}", zbi_path.file_name().unwrap());
+                // TODO(https://fxbug.dev/42063890): Make a decision to reuse zbi with no modifications or not.
+                // There is the potential that the ssh keys have changed, or the ip address
+                // of the host interface has changed, which will cause the connection
+                // to the emulator instance to fail.
+            } else {
+                // Add the authorized public keys to the zbi image to enable SSH access to
+                // the guest.
+                Self::embed_boot_data(&emu_config.guest.zbi_image, &zbi_path)
+                    .await
+                    .map_err(|e| bug!("cannot embed boot data: {e}"))?;
+            }
+            zbi_path
         } else {
-            // Add the authorized public keys to the zbi image to enable SSH access to
-            // the guest.
-            Self::embed_boot_data(&emu_config.guest.zbi_image, &zbi_path)
-                .await
-                .map_err(|e| bug!("cannot embed boot data: {e}"))?;
-        }
+            tracing::debug!("Skipping zbi staging since this is an efi image");
+            emu_config.guest.zbi_image.clone()
+        };
 
         if let Some(disk_image) = &emu_config.guest.disk_image {
             let src_path = disk_image.as_ref();
@@ -249,7 +241,6 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                     }
                 };
             }
-
             // Update the guest config to reference the staged disk image.
             updated_guest.disk_image = match disk_image {
                 DiskImage::Fvm(_) => Some(DiskImage::Fvm(dest_path)),
@@ -261,6 +252,21 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
 
         updated_guest.kernel_image = kernel_path;
         updated_guest.zbi_image = zbi_path;
+        if emu_config.guest.is_efi() {
+            // Set the OVMF files
+            updated_guest.ovmf_code = get_host_tool(config::OVMF_CODE)
+                .await
+                .map_err(|e| bug!("cannot locate ovmf code: {e}"))?;
+            // vars is copied to the instance directory since it is not read-only.
+            let vars =
+                updated_guest.ovmf_code.parent().expect("ovmf has parent dir").join("OVMF_VARS.fd");
+            let dest = instance_root.join("OVMF_VARS.fd");
+            if !dest.exists() {
+                fs::copy(&vars, &dest).map_err(|e| bug!("cannot ovmf vars file: {e}"))?;
+            }
+
+            updated_guest.ovmf_vars = dest;
+        }
         Ok(updated_guest)
     }
 

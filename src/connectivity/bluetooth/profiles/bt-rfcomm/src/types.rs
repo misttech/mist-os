@@ -201,11 +201,11 @@ pub(crate) mod tests {
     use fidl_fuchsia_bluetooth_bredr::{
         Channel, ProfileDescriptor, ProtocolIdentifier, ServiceClassProfileIdentifier,
     };
-    use fuchsia_async as fasync;
     use fuchsia_bluetooth::profile::{Attribute, DataElement, ProtocolDescriptor};
     use fuchsia_bluetooth::types::Uuid;
     use futures::stream::StreamExt;
     use futures::task::Poll;
+    use {fidl_fuchsia_bluetooth as fidl_bt, fuchsia_async as fasync};
 
     /// Defines a Protocol requesting RFCOMM with the provided server `channel`.
     pub fn rfcomm_protocol_descriptor_list(
@@ -322,7 +322,7 @@ pub(crate) mod tests {
         let defs2 = vec![other_service_definition(psm), rfcomm_service_definition(sc2)];
         group2.set_service_defs(defs2.clone());
         let new_chan_params = ChannelParameters {
-            channel_mode: Some(bredr::ChannelMode::Basic),
+            channel_mode: Some(fidl_bt::ChannelMode::Basic),
             max_rx_sdu_size: None,
             security_requirements: None,
         };

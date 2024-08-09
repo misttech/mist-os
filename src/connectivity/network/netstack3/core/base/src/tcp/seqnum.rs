@@ -52,6 +52,26 @@ impl ops::Add<u32> for SeqNum {
     }
 }
 
+impl ops::Sub<u32> for SeqNum {
+    type Output = SeqNum;
+
+    fn sub(self, rhs: u32) -> Self::Output {
+        let Self(lhs) = self;
+        Self(lhs.wrapping_sub(rhs))
+    }
+}
+
+impl ops::Sub<WindowSize> for SeqNum {
+    type Output = SeqNum;
+
+    fn sub(self, WindowSize(wnd): WindowSize) -> Self::Output {
+        // The conversion from u32 to i32 will never truncate because the
+        // maximum window size is less than 2^30, which will comfortably fit
+        // into an i32.
+        self - i32::try_from(wnd).unwrap()
+    }
+}
+
 impl ops::Add<usize> for SeqNum {
     type Output = SeqNum;
 

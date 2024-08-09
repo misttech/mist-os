@@ -299,8 +299,8 @@ TEST_F(Gatt2RemoteServiceServerTest, ReadByTypeTooManyResults) {
         }
 
         // Dispatch callback to prevent recursing too deep and breaking the stack.
-        heap_dispatcher().Post([start, cb = std::move(callback), &value = value](
-                                   pw::async::Context /*ctx*/, pw::Status status) {
+        (void)heap_dispatcher().Post([start, cb = std::move(callback), &value = value](
+                                         pw::async::Context /*ctx*/, pw::Status status) {
           if (status.ok()) {
             std::vector<bt::gatt::Client::ReadByTypeValue> values = {
                 {start, value.view(), /*maybe_truncated=*/false}};

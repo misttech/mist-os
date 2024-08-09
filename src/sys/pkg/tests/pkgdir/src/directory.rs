@@ -506,14 +506,15 @@ fn generate_valid_file_paths(base: &str) -> Vec<String> {
 }
 
 async fn verify_directory_opened(node: fio::NodeProxy, flag: fio::OpenFlags) -> Result<(), Error> {
-    let protocol = node.query().await.context("failed to call describe")?;
+    let protocol =
+        String::from_utf8(node.query().await.context("failed to call describe")?).unwrap();
     let expected = if flag.intersects(fio::OpenFlags::NODE_REFERENCE) {
-        fio::NODE_PROTOCOL_NAME
+        crate::NODE_PROTOCOL_NAMES
     } else {
-        fio::DIRECTORY_PROTOCOL_NAME
+        crate::DIRECTORY_PROTOCOL_NAMES
     };
-    if protocol != expected.as_bytes() {
-        return Err(anyhow!("wrong protocol returned: {:?}", std::str::from_utf8(&protocol)));
+    if !expected.contains(&protocol.as_str()) {
+        return Err(anyhow!("wrong protocol returned: {:?}", protocol));
     }
 
     if flag.intersects(fio::OpenFlags::DESCRIBE) {
@@ -560,10 +561,10 @@ async fn verify_content_file_opened(
         None
     };
 
-    let protocol = node.query().await.context("failed to call query")?;
+    let protocol = String::from_utf8(node.query().await.context("failed to call query")?).unwrap();
     if flag.intersects(fio::OpenFlags::NODE_REFERENCE) {
-        if protocol != fio::NODE_PROTOCOL_NAME.as_bytes() {
-            return Err(anyhow!("wrong protocol returned: {:?}", std::str::from_utf8(&protocol)));
+        if !crate::NODE_PROTOCOL_NAMES.contains(&protocol.as_str()) {
+            return Err(anyhow!("wrong protocol returned: {:?}", protocol));
         }
         if let Some(event) = on_open_event {
             match event {
@@ -580,8 +581,8 @@ async fn verify_content_file_opened(
             }
         }
     } else {
-        if protocol != fio::FILE_PROTOCOL_NAME.as_bytes() {
-            return Err(anyhow!("wrong protocol returned: {:?}", std::str::from_utf8(&protocol)));
+        if !crate::FILE_PROTOCOL_NAMES.contains(&protocol.as_str()) {
+            return Err(anyhow!("wrong protocol returned: {:?}", protocol));
         }
         {
             let file = fio::FileProxy::new(node.into_channel().unwrap());
@@ -628,14 +629,15 @@ async fn verify_meta_as_file_opened(
     node: fio::NodeProxy,
     flag: fio::OpenFlags,
 ) -> Result<(), Error> {
-    let protocol = node.query().await.context("failed to call describe")?;
+    let protocol =
+        String::from_utf8(node.query().await.context("failed to call describe")?).unwrap();
     let expected = if flag.intersects(fio::OpenFlags::NODE_REFERENCE) {
-        fio::NODE_PROTOCOL_NAME
+        crate::NODE_PROTOCOL_NAMES
     } else {
-        fio::FILE_PROTOCOL_NAME
+        crate::FILE_PROTOCOL_NAMES
     };
-    if protocol != expected.as_bytes() {
-        return Err(anyhow!("wrong protocol returned: {:?}", std::str::from_utf8(&protocol)));
+    if !expected.contains(&protocol.as_str()) {
+        return Err(anyhow!("wrong protocol returned: {:?}", protocol));
     }
 
     if flag.intersects(fio::OpenFlags::DESCRIBE) {

@@ -296,21 +296,24 @@ macro_rules! create_event {
 
                             // Extract the additional data from the Payload object.
                             $(
-                                let $data_name: $data_ty = payload.$data_name.ok_or(
-                                    format_err!("Missing $data_name from $event_type object")
-                                )?.into();
+                                let $data_name: $data_ty = payload.$data_name.coerce().ok_or(
+                                    format_err!("Missing {} from {} object",
+                                        stringify!($data_name), stringify!($event_type))
+                                )?;
                             )*
 
                             // Extract the additional protocols from the Payload object.
                             $(
                                 let $client_protocol_name: $client_protocol_ty = payload.$client_protocol_name.ok_or(
-                                    format_err!("Missing $client_protocol_name from $event_type object")
+                                    format_err!("Missing {} from {} object",
+                                        stringify!($client_protocol_name), stringify!($event_type))
                                 )?.into_proxy()?;
                             )*
                             $(
                                 let $server_protocol_name: Option<zx::Channel> =
                                     Some(payload.$server_protocol_name.ok_or(
-                                        format_err!("Missing $server_protocol_name from $event_type object")
+                                        format_err!("Missing {} from {} object",
+                                            stringify!($server_protocol_name), stringify!($event_type))
                                     )?);
                             )*
 
@@ -369,6 +372,10 @@ create_event!(
                 name: status,
                 ty: ExitStatus,
             }
+            {
+                name: exit_code,
+                ty: Option<i64>,
+            }
         },
         client_protocols: {},
         server_protocols: {},
@@ -419,3 +426,25 @@ create_event!(
     },
     error_payload: {}
 );
+
+trait Coerce<T> {
+    fn coerce(self) -> Option<T>;
+}
+
+impl<T> Coerce<T> for Option<T> {
+    fn coerce(self) -> Option<T> {
+        self
+    }
+}
+
+impl<T> Coerce<Option<T>> for Option<T> {
+    fn coerce(self) -> Option<Option<T>> {
+        Some(self)
+    }
+}
+
+impl Coerce<ExitStatus> for Option<i32> {
+    fn coerce(self) -> Option<ExitStatus> {
+        self.map(Into::into)
+    }
+}

@@ -89,7 +89,7 @@ async fn watch_for_crash(realm: &netemul::TestRealm<'_>, component_moniker: &str
     let event = wait_for_component_stopped(&realm, component_moniker, None)
         .await
         .expect("observe stopped event");
-    let component_events::events::StoppedPayload { status } =
+    let component_events::events::StoppedPayload { status, .. } =
         event.result().expect("extract event payload");
     assert_eq!(status, &component_events::events::ExitStatus::Clean);
 }

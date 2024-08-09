@@ -28,7 +28,7 @@ class TA_CAP("mutex") ChainLock : protected ::concurrent::ChainLock {
   using Base = ::concurrent::ChainLock;
 
  public:
-  using Base::LockResult;
+  using Base::Result;
   using Base::Token;
 
   // When we obtain a chain lock, we need an active ChainLockTransaction.  CLTs
@@ -140,7 +140,7 @@ class TA_CAP("mutex") ChainLock : protected ::concurrent::ChainLock {
   // Acquire does not take a direct stance on ACQUIRE/TRY_ACQUIRE/RELEASE
   // annotations, but bounces to an internal implementation in order to hide
   // some gross template stuff from users.
-  LockResult Acquire() TA_REQ(chainlock_transaction_token) { return AcquireInternal(); }
+  Result Acquire() TA_REQ(chainlock_transaction_token) { return AcquireInternal(); }
 
   // Routines which do not need an internal implementation as they take no
   // direct stance on ACQUIRE/TRY_ACQUIRE/RELEASE annotations.
@@ -235,7 +235,7 @@ class TA_CAP("mutex") ChainLock : protected ::concurrent::ChainLock {
       TA_ACQ(static_cast<Base*>(this));
 
   template <typename = void>
-  LockResult AcquireInternal() TA_REQ(chainlock_transaction_token);
+  Result AcquireInternal() TA_REQ(chainlock_transaction_token);
 
   template <FinalizedTransactionAllowed FTAllowed>
   bool TryAcquireInternal() TA_REQ(chainlock_transaction_token)
@@ -269,9 +269,9 @@ class TA_CAP("mutex") ChainLock : protected ::concurrent::ChainLock {
 
   // Make single attempt to acquire the chain lock, and record the start of a
   // conflict in the active CLT if we fail for any reason. Returns
-  // LockResult::kOk if the lock was successfully obtained.
+  // Result::Ok if the lock was successfully obtained.
   template <typename = void>
-  inline LockResult AcquireInternalSingleAttempt(ChainLockTransaction& clt)
+  inline Result AcquireInternalSingleAttempt(ChainLockTransaction& clt)
       TA_REQ(chainlock_transaction_token);
 
   // Special methods used only in the core of the scheduler to handle some edge
@@ -357,12 +357,12 @@ class TA_SCOPED_CAP UnconditionalChainLockGuard {
 // is encountered, unlock any locks which had been obtained and return the
 // error.
 template <size_t N>
-ChainLock::LockResult AcquireChainLockSet(const ktl::array<ChainLock*, N>& lock_set)
+ChainLock::Result AcquireChainLockSet(const ktl::array<ChainLock*, N>& lock_set)
     TA_REQ(chainlock_transaction_token) {
   for (size_t lock_ndx = 0; lock_ndx < lock_set.size(); ++lock_ndx) {
-    const ChainLock::LockResult res = lock_set[lock_ndx]->Acquire();
+    const ChainLock::Result res = lock_set[lock_ndx]->Acquire();
 
-    if (res != ChainLock::LockResult::kOk) {
+    if (res != ChainLock::Result::Ok) {
       for (size_t unlock_ndx = 0; unlock_ndx < lock_ndx; ++unlock_ndx) {
         lock_set[unlock_ndx]->AssertAcquired();
         lock_set[unlock_ndx]->Release();
@@ -370,7 +370,7 @@ ChainLock::LockResult AcquireChainLockSet(const ktl::array<ChainLock*, N>& lock_
       return res;
     }
   }
-  return ChainLock::LockResult::kOk;
+  return ChainLock::Result::Ok;
 }
 
 #endif  // ZIRCON_KERNEL_LIB_KCONCURRENT_INCLUDE_LIB_KCONCURRENT_CHAINLOCK_H_

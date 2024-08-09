@@ -5263,10 +5263,21 @@ zx_status_t VmCowPages::TakePagesLocked(uint64_t offset, uint64_t len, VmPageSpl
   // sure we're not inside an interval; checking a single offset for membership should suffice.
   ASSERT(found_page || !page_list_.IsOffsetInZeroInterval(offset));
 
-  // The VmPageSpliceList should not have been modified by anything up to this point.
-  DEBUG_ASSERT(pages->IsEmpty());
+  // In the very likely case that the given VmPageSpliceList is empty, we can use the TakePages
+  // method to efficiently move the contents into the splice list. This is likely to be the case
+  // because a non-empty splice list can only ever be encountered when we are taking pages from a
+  // VMO whose parent is concurrently closed. In this case, we have to append to the splice list
+  // one VmPageOrMarker at a time.
+  if (likely(pages->IsEmpty())) {
+    *pages = page_list_.TakePages(offset, len);
+  } else {
+    for (uint64_t position = offset; position < offset + len; position += PAGE_SIZE) {
+      VmPageOrMarker content = page_list_.RemoveContent(position);
+      pages->Append(ktl::move(content));
+    }
+    pages->Finalize();
+  }
 
-  *pages = page_list_.TakePages(offset, len);
   *taken_len = len;
   RangeChangeUpdateLocked(offset, len, RangeChangeOp::Unmap);
 

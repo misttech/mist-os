@@ -2,7 +2,7 @@
     clients: {
         audio: [
             {
-                // missing `state` key
+                // missing `state` and `sensor_name` key
                 trip_points: [
                     {
                         sensor: '/dev/aml_thermal_pll/thermal',

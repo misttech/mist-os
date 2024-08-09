@@ -6,9 +6,9 @@
 
 #include <lib/fidl/cpp/clone.h>
 #include <lib/syslog/cpp/macros.h>
-#include <zircon/status.h>
 
-#include "src/ui/a11y/lib/util/util.h"
+#include <src/ui/a11y/lib/util/util.h>
+
 namespace a11y {
 
 // clang-format off
@@ -70,7 +70,7 @@ struct ColorAdjustmentArgs {
 
 ColorAdjustmentArgs GetColorAdjustmentArgs(
     bool color_inversion_enabled,
-    fuchsia::accessibility::ColorCorrectionMode color_correction_mode) {
+    fuchsia_accessibility::ColorCorrectionMode color_correction_mode) {
   std::array<float, 9> color_inversion_matrix = kIdentityMatrix;
   std::array<float, 9> color_correction_matrix = kIdentityMatrix;
   std::array<float, 3> color_adjustment_pre_offset = kZero3x1Vector;
@@ -82,16 +82,16 @@ ColorAdjustmentArgs GetColorAdjustmentArgs(
   }
 
   switch (color_correction_mode) {
-    case fuchsia::accessibility::ColorCorrectionMode::CORRECT_PROTANOMALY:
+    case fuchsia_accessibility::ColorCorrectionMode::kCorrectProtanomaly:
       color_correction_matrix = kCorrectProtanomaly;
       break;
-    case fuchsia::accessibility::ColorCorrectionMode::CORRECT_DEUTERANOMALY:
+    case fuchsia_accessibility::ColorCorrectionMode::kCorrectDeuteranomaly:
       color_correction_matrix = kCorrectDeuteranomaly;
       break;
-    case fuchsia::accessibility::ColorCorrectionMode::CORRECT_TRITANOMALY:
+    case fuchsia_accessibility::ColorCorrectionMode::kCorrectTritanomaly:
       color_correction_matrix = kCorrectTritanomaly;
       break;
-    case fuchsia::accessibility::ColorCorrectionMode::DISABLED:
+    case fuchsia_accessibility::ColorCorrectionMode::kDisabled:
       // fall through
     default:
       color_correction_matrix = kIdentityMatrix;
@@ -106,35 +106,41 @@ ColorAdjustmentArgs GetColorAdjustmentArgs(
 
 }  // namespace
 
-ColorTransformManager::ColorTransformManager(sys::ComponentContext* startup_context) {
+void ColorTransformHandlerErrorHandler::on_fidl_error(fidl::UnbindInfo info) {
+  FX_LOGS(ERROR) << "ColorTransformHandler disconnected: " << info;
+}
+
+ColorTransformManager::ColorTransformManager(async_dispatcher_t* dispatcher,
+                                             sys::ComponentContext* startup_context)
+    : dispatcher_(dispatcher) {
+  FX_CHECK(dispatcher_);
   FX_CHECK(startup_context);
-  startup_context->outgoing()->AddPublicService(bindings_.GetHandler(this));
+  startup_context->outgoing()->AddProtocol<fuchsia_accessibility::ColorTransform>(
+      bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
 }
 
 void ColorTransformManager::RegisterColorTransformHandler(
-    fidl::InterfaceHandle<fuchsia::accessibility::ColorTransformHandler> handle) {
-  color_transform_handler_ptr_ = handle.Bind();
-  color_transform_handler_ptr_.set_error_handler([](zx_status_t status) {
-    FX_LOGS(ERROR) << "ColorTransformHandler disconnected with status: "
-                   << zx_status_get_string(status);
-  });
+    RegisterColorTransformHandlerRequest& request,
+    RegisterColorTransformHandlerCompleter::Sync& completer) {
+  color_transform_handler_ = fidl::Client(std::move(request.handler()), dispatcher_,
+                                          &color_transform_handler_error_handler_);
 
   MaybeSetColorTransformConfiguration();
 }
 
 void ColorTransformManager::ChangeColorTransform(
     bool color_inversion_enabled,
-    fuchsia::accessibility::ColorCorrectionMode color_correction_mode) {
-  fuchsia::accessibility::ColorTransformConfiguration color_transform_configuration;
+    fuchsia_accessibility::ColorCorrectionMode color_correction_mode) {
+  fuchsia_accessibility::ColorTransformConfiguration color_transform_configuration;
   ColorAdjustmentArgs color_adjustment_args =
       GetColorAdjustmentArgs(color_inversion_enabled, color_correction_mode);
-  color_transform_configuration.set_color_inversion_enabled(color_inversion_enabled);
-  color_transform_configuration.set_color_correction(color_correction_mode);
-  color_transform_configuration.set_color_adjustment_matrix(
+  color_transform_configuration.color_inversion_enabled(color_inversion_enabled);
+  color_transform_configuration.color_correction(color_correction_mode);
+  color_transform_configuration.color_adjustment_matrix(
       color_adjustment_args.color_adjustment_matrix);
-  color_transform_configuration.set_color_adjustment_post_offset(
+  color_transform_configuration.color_adjustment_post_offset(
       color_adjustment_args.color_adjustment_post_offset);
-  color_transform_configuration.set_color_adjustment_pre_offset(
+  color_transform_configuration.color_adjustment_pre_offset(
       color_adjustment_args.color_adjustment_pre_offset);
 
   cached_color_transform_configuration_ = std::move(color_transform_configuration);
@@ -142,17 +148,19 @@ void ColorTransformManager::ChangeColorTransform(
 }
 
 void ColorTransformManager::MaybeSetColorTransformConfiguration() {
-  if (!color_transform_handler_ptr_ || !cached_color_transform_configuration_) {
+  if (!color_transform_handler_ || cached_color_transform_configuration_.IsEmpty()) {
     return;
   }
 
-  // The use of fidl::Clone here is preferred over std::move to handle the
-  // unlikely case in which ColorTransformHandler is re-bound. Color transform
-  // changes should be infrequent, so the performance penalty is worth the
-  // additional robustness.
-  color_transform_handler_ptr_->SetColorTransformConfiguration(
-      fidl::Clone(*cached_color_transform_configuration_),
-      [] { FX_LOGS(INFO) << "Color transform configuration changed."; });
+  // The use of copy here is preferred over std::move to handle the unlikely
+  // case in which ColorTransformHandler is re-bound. Color transform changes
+  // should be infrequent, so the performance penalty is worth the additional
+  // robustness.
+  auto cached_color_transform_configuration = cached_color_transform_configuration_;
+
+  color_transform_handler_
+      ->SetColorTransformConfiguration({std::move(cached_color_transform_configuration)})
+      .Then([](auto& resp) { FX_LOGS(INFO) << "Color transform configuration changed."; });
 }
 
 }  // namespace a11y

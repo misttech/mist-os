@@ -5,10 +5,12 @@
 #ifndef SRC_UI_TESTING_UTIL_PORTABLE_UI_TEST_H_
 #define SRC_UI_TESTING_UTIL_PORTABLE_UI_TEST_H_
 
+#include <fidl/fuchsia.ui.test.input/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
 #include <fuchsia/ui/test/input/cpp/fidl.h>
 #include <fuchsia/ui/test/scene/cpp/fidl.h>
+#include <lib/fidl/cpp/channel.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <zircon/status.h>
 
@@ -16,8 +18,8 @@
 #include <utility>
 #include <vector>
 
-#include "src/lib/testing/loop_fixture/real_loop_fixture.h"
-#include "src/ui/testing/util/screenshot_helper.h"
+#include <src/lib/testing/loop_fixture/real_loop_fixture.h>
+#include <src/ui/testing/util/screenshot_helper.h>
 
 namespace ui_testing {
 
@@ -97,14 +99,14 @@ class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
 
   // Helper method to simulate combinations of button presses/releases and/or
   // mouse movements.
-  void SimulateMouseEvent(std::vector<fuchsia::ui::test::input::MouseButton> pressed_buttons,
+  void SimulateMouseEvent(const std::vector<fuchsia_ui_test_input::MouseButton>& pressed_buttons,
                           int movement_x, int movement_y);
 
   // Helper method to simulate a mouse scroll event.
   //
   // Set `use_physical_units` to true to specify scroll in physical pixels and
   // false to specify scroll in detents.
-  void SimulateMouseScroll(std::vector<fuchsia::ui::test::input::MouseButton> pressed_buttons,
+  void SimulateMouseScroll(const std::vector<fuchsia_ui_test_input::MouseButton>& pressed_buttons,
                            int scroll_x, int scroll_y, bool use_physical_units = false);
 
  protected:
@@ -139,8 +141,9 @@ class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
   void ProcessViewGeometryResponse(fuchsia::ui::observation::geometry::WatchResponse response);
 
   fuchsia::ui::test::input::RegistryPtr input_registry_;
+  fidl::SyncClient<fuchsia_ui_test_input::Registry> mouse_input_registry_;
   fuchsia::ui::test::input::TouchScreenPtr fake_touchscreen_;
-  fuchsia::ui::test::input::MousePtr fake_mouse_;
+  fidl::SyncClient<fuchsia_ui_test_input::Mouse> fake_mouse_;
   fuchsia::ui::test::scene::ControllerPtr scene_provider_;
   fuchsia::ui::observation::geometry::ViewTreeWatcherPtr view_tree_watcher_;
   std::optional<fuchsia::ui::composition::ScreenshotPtr> screenshotter_;

@@ -59,7 +59,7 @@ class UnitTest : public LoopFixture {
         mock_property_provider_(&context_provider_),
         mock_boot_info_manager_(context_, true),
         tts_manager_(context_),
-        color_transform_manager_(context_),
+        color_transform_manager_(LoopFixture::dispatcher(), context_),
         screen_reader_context_factory_() {
     auto mock_a11y_view = std::make_unique<MockAccessibilityView>();
     mock_a11y_view->SetTouchSource(mock_local_hit_.NewTouchSource());
@@ -563,8 +563,8 @@ TEST_F(InspectTest, TreeGetsUpdates) {
   EXPECT_EQ(expected_mode_string.str(), actual_mode_string.str());
 }
 
-// TODO(https://fxbug.dev/42126946): Improve tests to cover what happens if services aren't available at
-// startup.
+// TODO(https://fxbug.dev/42126946): Improve tests to cover what happens if services aren't
+// available at startup.
 
 }  // namespace
 }  // namespace accessibility_test

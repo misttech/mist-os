@@ -29,7 +29,6 @@
 #include <arch/x86/mmu_mem_types.h>
 #include <kernel/mp.h>
 #include <vm/arch_vm_aspace.h>
-#include <vm/bootreserve.h>
 #include <vm/physmap.h>
 #include <vm/pmm.h>
 #include <vm/vm.h>
@@ -1083,11 +1082,8 @@ static void unwire_boot_mmu_page(uintptr_t addr) {
   vm_page_t* page = paddr_to_vm_page(paddr);
   ASSERT(page);
 
-  // Expect it to be wired.
-  ASSERT(page->state() == vm_page_state::WIRED);
-
   // Unwire and mark it as an MMU page.
-  boot_reserve_unwire_page(page);
+  pmm_unwire_page(page);
   page->set_state(vm_page_state::MMU);
 }
 

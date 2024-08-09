@@ -21,6 +21,10 @@ type SymlinkInfo = table {
 };
 
 /// A ['Node'] which contains a symbolic link.
+// TODO(https://fxbug.dev/324932108): This should be marked as discoverable for both platform and
+// external servers. Annotating this correctly breaks our binary compatibility checks, since
+// fuchsia.io/Node is currently a closed protocol. This should be fixed when we make it open.
+@discoverable(server="platform")
 @available(added=18)
 open protocol Symlink {
     compose Linkable;

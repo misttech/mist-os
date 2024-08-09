@@ -15,7 +15,7 @@ pub trait WalkStateUnit<Rhs = Self> {
 
     /// The error that is returned by the walk state when attempting to finalize with an invalid
     /// state.
-    fn finalize_error() -> Self::Error;
+    fn finalize_error(&self) -> Self::Error;
 }
 
 /// WalkState contains all information required to traverse offer and expose chains in a tree
@@ -74,7 +74,15 @@ impl<T: WalkStateUnit + Debug + Clone> WalkState<T> {
             panic!("Attempted to finalized a finished walk state.");
         }
         if state.is_none() {
-            return Err(T::finalize_error().into());
+            match self {
+                WalkState::Begin => panic!("finalizing a walk state that's only just begun"),
+                WalkState::Intermediate(last_seen_state) => {
+                    return Err(last_seen_state.finalize_error().into());
+                }
+                WalkState::Finished(_) => {
+                    unreachable!("Captured earlier");
+                }
+            }
         }
         let final_state = state.unwrap();
         match self {

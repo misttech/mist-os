@@ -68,7 +68,8 @@ void FakeController::Settings::ApplyDualModeDefaults() {
   total_num_acl_data_packets = 1;
   le_acl_data_packet_length = 512;
   le_total_num_acl_data_packets = 1;
-  synchronous_data_packet_length = 0;
+  // Must be 0x01-0xFF, even if not supported
+  synchronous_data_packet_length = 1;
   total_num_synchronous_data_packets = 0;
   iso_data_packet_length = 512;
   total_num_iso_data_packets = 1;
@@ -1686,12 +1687,13 @@ void FakeController::OnLEReadSupportedStates() {
 }
 
 void FakeController::OnLEReadLocalSupportedFeatures() {
-  hci_spec::LEReadLocalSupportedFeaturesReturnParams params;
-  params.status = pwemb::StatusCode::SUCCESS;
-  params.le_features =
-      pw::bytes::ConvertOrderTo(cpp20::endian::little, settings_.le_features);
-  RespondWithCommandComplete(hci_spec::kLEReadLocalSupportedFeatures,
-                             BufferView(&params, sizeof(params)));
+  auto packet = hci::EmbossEventPacket::New<
+      pwemb::LEReadLocalSupportedFeaturesCommandCompleteEventWriter>(
+      hci_spec::kCommandCompleteEventCode);
+  auto view = packet.view_t();
+  view.status().Write(pwemb::StatusCode::SUCCESS);
+  view.le_features().BackingStorage().WriteUInt(settings_.le_features);
+  RespondWithCommandComplete(hci_spec::kLEReadLocalSupportedFeatures, &packet);
 }
 
 void FakeController::OnLECreateConnectionCancel() {
@@ -1924,25 +1926,27 @@ void FakeController::OnCreateConnectionCancel() {
 }
 
 void FakeController::OnReadBufferSize() {
-  hci_spec::ReadBufferSizeReturnParams params;
-  std::memset(&params, 0, sizeof(params));
-  params.hc_acl_data_packet_length = pw::bytes::ConvertOrderTo(
-      cpp20::endian::little, settings_.acl_data_packet_length);
-  params.hc_total_num_acl_data_packets = settings_.total_num_acl_data_packets;
-  params.hc_synchronous_data_packet_length =
-      settings_.synchronous_data_packet_length;
-  params.hc_total_num_synchronous_data_packets =
-      settings_.total_num_synchronous_data_packets;
-  RespondWithCommandComplete(hci_spec::kReadBufferSize,
-                             BufferView(&params, sizeof(params)));
+  auto packet = hci::EmbossEventPacket::New<
+      pwemb::ReadBufferSizeCommandCompleteEventWriter>(
+      hci_spec::kCommandCompleteEventCode);
+  auto view = packet.view_t();
+  view.acl_data_packet_length().Write(settings_.acl_data_packet_length);
+  view.total_num_acl_data_packets().Write(settings_.total_num_acl_data_packets);
+  view.synchronous_data_packet_length().Write(
+      settings_.synchronous_data_packet_length);
+  view.total_num_synchronous_data_packets().Write(
+      settings_.total_num_synchronous_data_packets);
+  RespondWithCommandComplete(hci_spec::kReadBufferSize, &packet);
 }
 
 void FakeController::OnReadBRADDR() {
-  hci_spec::ReadBDADDRReturnParams params;
-  params.status = pwemb::StatusCode::SUCCESS;
-  params.bd_addr = settings_.bd_addr.value();
-  RespondWithCommandComplete(hci_spec::kReadBDADDR,
-                             BufferView(&params, sizeof(params)));
+  auto packet =
+      hci::EmbossEventPacket::New<pwemb::ReadBdAddrCommandCompleteEventWriter>(
+          hci_spec::kCommandCompleteEventCode);
+  auto view = packet.view_t();
+  view.status().Write(pwemb::StatusCode::SUCCESS);
+  view.bd_addr().CopyFrom(settings_.bd_addr.value().view());
+  RespondWithCommandComplete(hci_spec::kReadBDADDR, &packet);
 }
 
 void FakeController::OnLESetAdvertisingEnable(
@@ -2187,11 +2191,11 @@ void FakeController::OnReadLocalSupportedCommands() {
 }
 
 void FakeController::OnReadLocalVersionInfo() {
-  hci_spec::ReadLocalVersionInfoReturnParams params;
-  std::memset(&params, 0, sizeof(params));
-  params.hci_version = settings_.hci_version;
-  RespondWithCommandComplete(hci_spec::kReadLocalVersionInfo,
-                             BufferView(&params, sizeof(params)));
+  auto packet = hci::EmbossEventPacket::New<
+      pwemb::ReadLocalVersionInfoCommandCompleteEventWriter>(
+      hci_spec::kCommandCompleteEventCode);
+  packet.view_t().hci_version().Write(settings_.hci_version);
+  RespondWithCommandComplete(hci_spec::kReadLocalVersionInfo, &packet);
 }
 
 void FakeController::OnReadRemoteNameRequestCommandReceived(
@@ -2890,11 +2894,14 @@ void FakeController::OnLESetExtendedAdvertisingParameters(
   // only want to write if there are no errors)
   extended_advertising_states_[handle] = state;
 
-  hci_spec::LESetExtendedAdvertisingParametersReturnParams return_params;
-  return_params.status = pwemb::StatusCode::SUCCESS;
-  return_params.selected_tx_power = hci_spec::kLEAdvertisingTxPowerMax;
+  auto packet = hci::EmbossEventPacket::New<
+      pwemb::LESetExtendedAdvertisingParametersCommandCompleteEventWriter>(
+      hci_spec::kCommandCompleteEventCode);
+  auto view = packet.view_t();
+  view.status().Write(pwemb::StatusCode::SUCCESS);
+  view.selected_tx_power().Write(hci_spec::kLEAdvertisingTxPowerMax);
   RespondWithCommandComplete(hci_spec::kLESetExtendedAdvertisingParameters,
-                             BufferView(&return_params, sizeof(return_params)));
+                             &packet);
   NotifyAdvertisingState();
 }
 
@@ -3376,12 +3383,15 @@ void FakeController::OnLEReadAdvertisingChannelTxPower() {
     return;
   }
 
-  hci_spec::LEReadAdvertisingChannelTxPowerReturnParams params;
   // Send back arbitrary tx power.
-  params.status = pwemb::StatusCode::SUCCESS;
-  params.tx_power = 9;
+  auto packet = hci::EmbossEventPacket::New<
+      pwemb::LEReadAdvertisingChannelTxPowerCommandCompleteEventWriter>(
+      hci_spec::kCommandCompleteEventCode);
+  auto view = packet.view_t();
+  view.status().Write(pwemb::StatusCode::SUCCESS);
+  view.tx_power_level().Write(9);
   RespondWithCommandComplete(hci_spec::kLEReadAdvertisingChannelTxPower,
-                             BufferView(&params, sizeof(params)));
+                             &packet);
 }
 
 void FakeController::SendLEAdvertisingSetTerminatedEvent(

@@ -567,19 +567,18 @@ async fn add_address_removal<N: Netstack>(
     let sandbox = netemul::TestSandbox::new().expect("new sandbox");
     let realm = sandbox.create_netstack_realm::<N, _>(name).expect("create realm");
 
-    #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
-    enum InterfaceOrTun<'a> {
-        Interface(netemul::TestInterface<'a>),
-        Tun(
-            (
-                fidl_fuchsia_net_tun::DeviceProxy,
-                fidl_fuchsia_net_tun::PortProxy,
-                fidl_fuchsia_net_interfaces_admin::DeviceControlProxy,
-            ),
-        ),
+    enum KeepResource<'a> {
+        Interface {
+            _interface: netemul::TestInterface<'a>,
+        },
+        Tun {
+            _dev: fidl_fuchsia_net_tun::DeviceProxy,
+            _port: fidl_fuchsia_net_tun::PortProxy,
+            _dev_control: fidl_fuchsia_net_interfaces_admin::DeviceControlProxy,
+        },
     }
 
-    let (_interface_or_tun, control): (InterfaceOrTun<'_>, _) = if tun {
+    let (_interface_or_tun, control): (KeepResource<'_>, _) = if tun {
         let (tun_device, network_device) = create_tun_device();
         let admin_device_control = install_device(&realm, network_device);
         // Retain `_tun_port` to keep the FIDL channel open.
@@ -593,7 +592,14 @@ async fn add_address_removal<N: Netstack>(
             .await
             .expect("send enable tun interface request")
             .expect("enable tun interface"));
-        (InterfaceOrTun::Tun((tun_device, tun_port, admin_device_control)), admin_control)
+        (
+            KeepResource::Tun {
+                _dev: tun_device,
+                _port: tun_port,
+                _dev_control: admin_device_control,
+            },
+            admin_control,
+        )
     } else {
         let device = sandbox.create_endpoint(name).await.expect("create endpoint");
         let interface = realm
@@ -608,7 +614,7 @@ async fn add_address_removal<N: Netstack>(
             fidl_fuchsia_net_interfaces_ext::admin::Control::create_endpoints()
                 .expect("create Control proxy");
         let () = root_control.get_admin(id, server).expect("get admin");
-        (InterfaceOrTun::Interface(interface), admin_control)
+        (KeepResource::Interface { _interface: interface }, admin_control)
     };
 
     let valid_address_parameters = fidl_fuchsia_net_interfaces_admin::AddressParameters::default();
@@ -1736,10 +1742,9 @@ async fn control_terminal_events<N: Netstack>(
         control
     };
 
-    #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
     enum KeepResource {
-        Control(fidl_fuchsia_net_interfaces_ext::admin::Control),
-        Port(fidl_fuchsia_net_tun::PortProxy),
+        Control { _control: fidl_fuchsia_net_interfaces_ext::admin::Control },
+        Port { _port: fidl_fuchsia_net_tun::PortProxy },
     }
 
     let (control, _keep_alive): (_, Vec<KeepResource>) = match reason {
@@ -1759,7 +1764,13 @@ async fn control_terminal_events<N: Netstack>(
             // Create a new interface with the same port identifier.
             let control2 =
                 create_interface(port_id, fidl_fuchsia_net_interfaces_admin::Options::default());
-            (control2, vec![KeepResource::Control(control1), KeepResource::Port(port)])
+            (
+                control2,
+                vec![
+                    KeepResource::Control { _control: control1 },
+                    KeepResource::Port { _port: port },
+                ],
+            )
         }
         fidl_fuchsia_net_interfaces_admin::InterfaceRemovedReason::DuplicateName => {
             let (port1, port1_id) = create_port(base_port_config.clone()).await;
@@ -1795,9 +1806,9 @@ async fn control_terminal_events<N: Netstack>(
             (
                 control2,
                 vec![
-                    KeepResource::Control(control1),
-                    KeepResource::Port(port1),
-                    KeepResource::Port(port2),
+                    KeepResource::Control { _control: control1 },
+                    KeepResource::Port { _port: port1 },
+                    KeepResource::Port { _port: port2 },
                 ],
             )
         }
@@ -1811,7 +1822,7 @@ async fn control_terminal_events<N: Netstack>(
             .await;
             let control =
                 create_interface(port_id, fidl_fuchsia_net_interfaces_admin::Options::default());
-            (control, vec![KeepResource::Port(port)])
+            (control, vec![KeepResource::Port { _port: port }])
         }
         fidl_fuchsia_net_interfaces_admin::InterfaceRemovedReason::PortClosed => {
             // Port closed is equivalent to port doesn't exist.
@@ -1836,7 +1847,7 @@ async fn control_terminal_events<N: Netstack>(
             root_interfaces.get_admin(interface_id, server_end).expect("get admin failed");
             // Wait for the root handle to be fully installed by synchronizing on `get_id`.
             assert_eq!(root_control.get_id().await.expect("get id"), interface_id);
-            (root_control, vec![KeepResource::Port(port)])
+            (root_control, vec![KeepResource::Port { _port: port }])
         }
         unknown_reason => panic!("unknown reason {:?}", unknown_reason),
     };

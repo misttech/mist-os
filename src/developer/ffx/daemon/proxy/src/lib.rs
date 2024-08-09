@@ -325,6 +325,7 @@ async fn init_daemon_proxy(
         ffx_daemon::spawn_daemon(&context).await?;
     }
 
+    tracing::debug!("Daemon available, establishing Overnet link");
     let (nodeid, proxy, link) =
         get_daemon_proxy_single_link(&node, ascendd_path.clone(), None).await?;
 

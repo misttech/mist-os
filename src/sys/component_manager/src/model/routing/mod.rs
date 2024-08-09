@@ -23,6 +23,7 @@ use cm_types::{Availability, Name};
 use errors::ModelError;
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_io as fio;
+use moniker::Moniker;
 use router_error::{Explain, RouterError};
 use std::collections::BTreeMap;
 use std::sync::Arc;
@@ -99,7 +100,9 @@ pub(super) async fn route_and_open_capability_with_reporting(
     let result = route_and_open_capability(route_request, &target, open_request).await;
     match result {
         Ok(RoutingOutcome::Found) => Ok(()),
-        Ok(RoutingOutcome::FromVoid) => Err(RoutingError::SourceCapabilityIsVoid.into()),
+        Ok(RoutingOutcome::FromVoid) => {
+            Err(RoutingError::SourceCapabilityIsVoid { moniker: target.moniker.clone() }.into())
+        }
         Err(e) => {
             report_routing_failure(&route_request, &target, &e).await;
             Err(e)
@@ -135,12 +138,17 @@ pub(super) async fn open_capability<Proxy: fidl::endpoints::Proxy>(
 /// REQUIRES: `exposes` is nonempty.
 /// REQUIRES: `exposes` share the same type and target name.
 /// REQUIRES: `exposes.len() > 1` only if it is a service.
-pub fn request_for_namespace_capability_expose(exposes: Vec<&ExposeDecl>) -> Option<RouteRequest> {
+pub fn request_for_namespace_capability_expose(
+    moniker: &Moniker,
+    exposes: Vec<&ExposeDecl>,
+) -> Option<RouteRequest> {
     let first_expose = exposes.first().expect("invalid empty expose list");
     match first_expose {
         cm_rust::ExposeDecl::Protocol(_)
         | cm_rust::ExposeDecl::Service(_)
-        | cm_rust::ExposeDecl::Directory(_) => Some(exposes.try_into().unwrap()),
+        | cm_rust::ExposeDecl::Directory(_) => {
+            Some(RouteRequest::from_expose_decls(moniker, exposes).unwrap())
+        }
         // These do not add directory entries.
         cm_rust::ExposeDecl::Runner(_)
         | cm_rust::ExposeDecl::Resolver(_)

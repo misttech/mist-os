@@ -17,7 +17,7 @@ use config_encoder::ConfigFields;
 use fidl::prelude::*;
 use fuchsia_url::AbsoluteComponentUrl;
 use futures::FutureExt;
-use moniker::{ChildName, Moniker};
+use moniker::{ChildName, ExtendedMoniker, Moniker};
 use router_error::Explain;
 use routing::capability_source::{
     BuiltinSource, CapabilitySource, CapabilityToCapabilitySource, ComponentCapability,
@@ -73,16 +73,15 @@ pub enum BuildAnalyzerModelError {
 #[serde(rename_all = "snake_case")]
 pub enum AnalyzerModelError {
     #[error("the source instance `{0}` is not executable")]
-    SourceInstanceNotExecutable(String),
+    SourceInstanceNotExecutable(Moniker),
 
-    #[error("the capability `{0}` is not a valid source for the capability `{1}`")]
-    InvalidSourceCapability(String, String),
+    #[error(
+        "at component {0} the capability `{1}` is not a valid source for the capability `{2}`"
+    )]
+    InvalidSourceCapability(Moniker, String, String),
 
-    #[error("uses Event capability `{0}` without using the EventSource protocol")]
-    MissingEventSourceProtocol(String),
-
-    #[error("no resolver found in environment for scheme `{0}`")]
-    MissingResolverForScheme(String),
+    #[error("no resolver found in environment of component `{0}` for scheme `{1}`")]
+    MissingResolverForScheme(Moniker, String),
 
     #[error(transparent)]
     ComponentInstanceError(#[from] ComponentInstanceError),
@@ -95,11 +94,22 @@ impl AnalyzerModelError {
     pub fn as_zx_status(&self) -> zx_status::Status {
         match self {
             Self::SourceInstanceNotExecutable(_) => zx_status::Status::NOT_FOUND,
-            Self::InvalidSourceCapability(_, _) => zx_status::Status::NOT_FOUND,
-            Self::MissingEventSourceProtocol(_) => zx_status::Status::NOT_FOUND,
-            Self::MissingResolverForScheme(_) => zx_status::Status::NOT_FOUND,
+            Self::InvalidSourceCapability(_, _, _) => zx_status::Status::NOT_FOUND,
+            Self::MissingResolverForScheme(_, _) => zx_status::Status::NOT_FOUND,
             Self::ComponentInstanceError(err) => err.as_zx_status(),
             Self::RoutingError(err) => err.as_zx_status(),
+        }
+    }
+}
+
+impl From<AnalyzerModelError> for ExtendedMoniker {
+    fn from(err: AnalyzerModelError) -> ExtendedMoniker {
+        match err {
+            AnalyzerModelError::InvalidSourceCapability(moniker, _, _)
+            | AnalyzerModelError::MissingResolverForScheme(moniker, _)
+            | AnalyzerModelError::SourceInstanceNotExecutable(moniker) => moniker.into(),
+            AnalyzerModelError::ComponentInstanceError(err) => err.into(),
+            AnalyzerModelError::RoutingError(err) => err.into(),
         }
     }
 }
@@ -1040,7 +1050,10 @@ impl ComponentModelForAnalyzer {
             Ok(None) => VerifyRouteResult {
                 using_node: target.moniker().clone(),
                 capability: None,
-                error: Some(AnalyzerModelError::MissingResolverForScheme(scheme.to_string())),
+                error: Some(AnalyzerModelError::MissingResolverForScheme(
+                    target.moniker().clone(),
+                    scheme.to_string(),
+                )),
                 route: vec![],
                 source: None,
             },
@@ -1118,12 +1131,14 @@ impl ComponentModelForAnalyzer {
                 match source_component.decl.find_storage_source(source_capability_name) {
                     Some(_) => Ok(()),
                     None => Err(AnalyzerModelError::InvalidSourceCapability(
+                        source_component.moniker().clone(),
                         source_capability_name.to_string(),
                         fsys::StorageAdminMarker::PROTOCOL_NAME.to_string(),
                     )),
                 }
             }
             _ => Err(AnalyzerModelError::InvalidSourceCapability(
+                source_component.moniker().clone(),
                 source_capability_name.to_string(),
                 source_capability
                     .source_name()
@@ -1156,9 +1171,9 @@ impl ComponentModelForAnalyzer {
     ) -> Result<(), AnalyzerModelError> {
         match component.decl.program {
             Some(_) => Ok(()),
-            None => Err(AnalyzerModelError::SourceInstanceNotExecutable(
-                component.moniker().to_string(),
-            )),
+            None => {
+                Err(AnalyzerModelError::SourceInstanceNotExecutable(component.moniker().clone()))
+            }
         }
     }
 

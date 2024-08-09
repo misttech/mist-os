@@ -8,7 +8,6 @@
 
 #include <lib/arch/zbi-boot.h>
 #include <lib/memalloc/pool.h>
-#include <lib/zbitl/items/mem-config.h>
 #include <zircon/assert.h>
 
 #include <cstddef>

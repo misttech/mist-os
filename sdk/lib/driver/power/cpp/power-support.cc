@@ -645,4 +645,69 @@ fit::result<Error> AddElement(fidl::ClientEnd<fuchsia_power_broker::Topology>& p
       std::move(description.element_control_server_));
 }
 
+void LeaseHelper::AcquireLease(
+    fit::function<void(fidl::Result<fuchsia_power_broker::Lessor::Lease>&)> callback) {
+  lessor_->Lease({1}).Then(std::move(callback));
+}
+
+constexpr uint8_t LEVEL_OFF = 0;
+constexpr uint8_t LEVEL_ON = 1;
+
+fit::result<std::tuple<fidl::Status, std::optional<fuchsia_power_broker::AddElementError>>,
+            std::unique_ptr<LeaseHelper>>
+CreateLeaseHelper(const fidl::ClientEnd<fuchsia_power_broker::Topology>& topology,
+                  std::vector<LeaseDependency> dependencies, std::string lease_name,
+                  async_dispatcher_t* dispatcher, fit::function<void()> error_callback) {
+  // Create the channels
+  fidl::Endpoints<fuchsia_power_broker::CurrentLevel> current_level =
+      fidl::CreateEndpoints<fuchsia_power_broker::CurrentLevel>().value();
+  fidl::Endpoints<fuchsia_power_broker::RequiredLevel> required_level =
+      fidl::CreateEndpoints<fuchsia_power_broker::RequiredLevel>().value();
+  fidl::Endpoints<fuchsia_power_broker::Lessor> lessor =
+      fidl::CreateEndpoints<fuchsia_power_broker::Lessor>().value();
+  fidl::Endpoints<fuchsia_power_broker::ElementControl> element_control =
+      fidl::CreateEndpoints<fuchsia_power_broker::ElementControl>().value();
+
+  fuchsia_power_broker::ElementSchema element_definition;
+  element_definition.element_name() = std::move(lease_name);
+  element_definition.initial_current_level() = fuchsia_power_broker::PowerLevel{LEVEL_OFF};
+  element_definition.valid_levels() = std::vector{fuchsia_power_broker::PowerLevel{LEVEL_OFF},
+                                                  fuchsia_power_broker::PowerLevel{LEVEL_ON}};
+
+  std::vector<fuchsia_power_broker::LevelDependency> deps(dependencies.size());
+  int count = 0;
+  for (auto& dep : dependencies) {
+    deps[count] =
+        fuchsia_power_broker::LevelDependency(dep.type, fuchsia_power_broker::PowerLevel{1},
+                                              std::move(dep.token), dep.levels_by_preference);
+    count++;
+  }
+
+  element_definition.dependencies() = std::move(deps);
+
+  element_definition.level_control_channels() = fuchsia_power_broker::LevelControlChannels(
+      std::move(current_level.server), std::move(required_level.server));
+  element_definition.lessor_channel() = std::move(lessor.server);
+  element_definition.element_control() = std::move(element_control.server);
+
+  // Add the element
+  fidl::Arena arena;
+  fidl::WireResult<fuchsia_power_broker::Topology::AddElement> result =
+      fidl::WireCall(topology)->AddElement(fidl::ToWire(arena, std::move(element_definition)));
+
+  if (!result.ok()) {
+    return fit::error(std::make_tuple(fidl::Status(result.error()), std::nullopt));
+  }
+
+  if (result->is_error()) {
+    return fit::error(std::make_tuple(fidl::Status::Ok(), result->error_value()));
+  }
+
+  // Move the pieces from the FIDL creation result to the direct lease object
+  std::unique_ptr<LeaseHelper> helper = std::make_unique<LeaseHelper>(
+      std::move(element_control.client), std::move(lessor.client), std::move(required_level.client),
+      std::move(current_level.client), dispatcher, std::move(error_callback));
+  return fit::success(std::move(helper));
+}
+
 }  // namespace fdf_power

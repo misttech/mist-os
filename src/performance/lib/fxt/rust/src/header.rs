@@ -103,7 +103,9 @@ macro_rules! trace_header {
                 let size_bytes_without_header = (self.size_words() as usize - 1) * 8;
                 if size_bytes_without_header > buf.len() {
                     let needed = size_bytes_without_header - buf.len();
-                    return Err(nom::Err::Incomplete(nom::Needed::Size(needed)));
+                    return Err(nom::Err::Incomplete(nom::Needed::Size(
+                        std::num::NonZero::new(needed).unwrap())
+                    ));
                 }
                 let (payload, rem) = buf.split_at(size_bytes_without_header);
                 Ok((rem, payload))

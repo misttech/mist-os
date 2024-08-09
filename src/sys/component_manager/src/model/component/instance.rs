@@ -2,7 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::bedrock::program::{self as program, ComponentStopOutcome, Program, StopRequestSuccess};
+use crate::bedrock::program::{
+    self as program, ComponentStopOutcome, FinalizedProgram, Program, StopRequestSuccess,
+};
 use crate::framework::{build_framework_dictionary, controller};
 use crate::model::actions::{shutdown, StopAction};
 use crate::model::component::{
@@ -636,10 +638,12 @@ impl ResolvedInstanceState {
         let exposes = decl.exposes.iter().filter(|e| !sandbox_construction::is_supported_expose(e));
         let exposes_by_target_name = routing::aggregate_exposes(exposes);
         for (target_name, exposes) in exposes_by_target_name {
-            let request = match routing::request_for_namespace_capability_expose(exposes) {
-                Some(r) => r,
-                None => continue,
-            };
+            let request =
+                match routing::request_for_namespace_capability_expose(&component.moniker, exposes)
+                {
+                    Some(r) => r,
+                    None => continue,
+                };
             let capability = request.into_capability(component);
             match target_dict.insert_capability(target_name, capability) {
                 Ok(()) => (),
@@ -1031,6 +1035,10 @@ impl ResolvedInstanceState {
     fn get_child_component_output_dictionary_routers(&self) -> HashMap<ChildName, Router> {
         self.children.iter().map(|(name, child)| (name.clone(), child.component_output())).collect()
     }
+
+    pub fn moniker(&self) -> &Moniker {
+        &self.weak_component.moniker
+    }
 }
 
 impl ResolvedInstanceInterface for ResolvedInstanceState {
@@ -1098,9 +1106,10 @@ struct ProgramRuntime {
     exit_listener: fasync::Task<()>,
 }
 
-pub struct StopOutcomeWithEscrow {
+pub struct StopConclusion {
     pub outcome: ComponentStopOutcome,
     pub escrow_request: Option<program::EscrowRequest>,
+    pub stop_info: Option<program::StopInfo>,
 }
 
 impl ProgramRuntime {
@@ -1124,7 +1133,7 @@ impl ProgramRuntime {
         self,
         stop_timer: BoxFuture<'a, ()>,
         kill_timer: BoxFuture<'b, ()>,
-    ) -> Result<StopOutcomeWithEscrow, StopError> {
+    ) -> Result<StopConclusion, StopError> {
         let outcome = self.program.stop_or_kill_with_timeout(stop_timer, kill_timer).await;
         // Drop the program and join on the exit listener. Dropping the program
         // should cause the exit listener to stop waiting for the channel epitaph and
@@ -1134,10 +1143,10 @@ impl ProgramRuntime {
         // even after cancellation future may still run for a short period of time
         // before getting dropped. If that happens there is a chance of scheduling a
         // duplicate Stop action.
-        let escrow_request = self.program.finalize();
+        let FinalizedProgram { escrow_request, stop_info } = self.program.finalize();
         self.exit_listener.await;
         let outcome = outcome?;
-        Ok(StopOutcomeWithEscrow { outcome, escrow_request })
+        Ok(StopConclusion { outcome, escrow_request, stop_info })
     }
 }
 
@@ -1204,22 +1213,24 @@ impl StartedInstanceState {
         mut self,
         stop_timer: BoxFuture<'a, ()>,
         kill_timer: BoxFuture<'b, ()>,
-    ) -> Result<StopOutcomeWithEscrow, StopError> {
+    ) -> Result<StopConclusion, StopError> {
         let program = self.program.take();
         // If the component has a program, also stop the program.
         let ret = if let Some(program) = program {
             program.stop(stop_timer, kill_timer).await
         } else {
-            Ok(StopOutcomeWithEscrow {
+            Ok(StopConclusion {
                 outcome: ComponentStopOutcome {
                     request: StopRequestSuccess::NoController,
                     component_exit_status: zx::Status::OK,
                 },
                 escrow_request: None,
+                stop_info: None,
             })
         }?;
         if let Some(execution_controller_task) = self.execution_controller_task.as_mut() {
-            execution_controller_task.set_stop_status(ret.outcome.component_exit_status);
+            execution_controller_task
+                .set_stop_payload(ret.outcome.component_exit_status, ret.stop_info);
         }
         Ok(ret)
     }
@@ -1285,7 +1296,9 @@ impl Routable for CapabilityRequestedHook {
         } else if receiver.is_taken() {
             sender.into()
         } else {
-            self.capability.try_clone().map_err(|_| RoutingError::BedrockNotCloneable)?
+            self.capability.try_clone().map_err(|_| RoutingError::BedrockNotCloneable {
+                moniker: self.source.moniker.clone().into(),
+            })?
         };
         Ok(capability)
     }
@@ -1333,10 +1346,12 @@ impl Routable for ProgramRouter {
             .await
             .map_err(|e| open_error(OpenOutgoingDirError::Fidl(e)))?
             .map_err(RouterError::from)?;
-        let capability =
-            Capability::try_from(cap).map_err(|_| RoutingError::BedrockRemoteCapability)?;
+        let capability = Capability::try_from(cap).map_err(|_| {
+            RoutingError::BedrockRemoteCapability { moniker: self.component.moniker.clone() }
+        })?;
         if !matches!(capability, Capability::Dictionary(_)) {
             Err(RoutingError::BedrockWrongCapabilityType {
+                moniker: self.component.moniker.clone().into(),
                 actual: capability.debug_typename().into(),
                 expected: "Dictionary".into(),
             })?;

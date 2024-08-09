@@ -16,7 +16,7 @@ use starnix_logging::track_stub;
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::file_mode::FileMode;
+use starnix_uapi::file_mode::{AccessCheck, FileMode};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::vfs::ResolveFlags;
 use starnix_uapi::{errno, error, ino_t, off_t};
@@ -53,7 +53,7 @@ where
     L: LockBefore<DeviceOpen>,
 {
     // Reopen file object to not share state with the given FileObject.
-    let file = file.name.open(locked, current_task, file.flags(), false)?;
+    let file = file.name.open(locked, current_task, file.flags(), AccessCheck::skip())?;
     let open_flags = file.flags();
     let kernel = current_task.kernel();
     let starnix_file = StarnixNodeConnection::new(Arc::downgrade(kernel), file);
@@ -127,7 +127,8 @@ impl StarnixNodeConnection {
         L: LockBefore<FileOpsCore>,
         L: LockBefore<DeviceOpen>,
     {
-        let file = self.file.name.open(locked, current_task, flags.into(), true)?;
+        let file =
+            self.file.name.open(locked, current_task, flags.into(), AccessCheck::default())?;
         Ok(StarnixNodeConnection::new(self.kernel.clone(), file))
     }
 
@@ -276,6 +277,7 @@ impl StarnixNodeConnection {
                 flags.into(),
                 FileMode::ALLOW_ALL,
                 ResolveFlags::empty(),
+                AccessCheck::default(),
             ) {
                 Err(e) if e == errno!(EISDIR) && must_create_directory => {
                     let mode =
@@ -284,7 +286,7 @@ impl StarnixNodeConnection {
                         node.create_node(&mut locked, &current_task, name, mode, DeviceType::NONE)?;
                     let flags =
                         flags & !(fio::OpenFlags::CREATE | fio::OpenFlags::CREATE_IF_ABSENT);
-                    name.open(&mut locked, &current_task, flags.into(), false)?
+                    name.open(&mut locked, &current_task, flags.into(), AccessCheck::skip())?
                 }
                 f => f?,
             };

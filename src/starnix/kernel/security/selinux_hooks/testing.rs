@@ -4,11 +4,11 @@
 
 #![cfg(test)]
 
-use selinux::security_server::{Mode, SecurityServer};
+use selinux_core::security_server::{Mode, SecurityServer};
 use std::sync::Arc;
 
 use crate::vfs::FsNode;
-use selinux::SecurityId;
+use selinux_core::SecurityId;
 
 /// Returns the security id currently stored in `fs_node`, if any. This API should only be used
 /// by code that is responsible for controlling the cached security id; e.g., to check its

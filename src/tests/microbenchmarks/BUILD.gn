@@ -122,6 +122,13 @@ executable("fuchsia_microbenchmarks_bin") {
     ]
   }
 
+  # Check if the board is the vim3 to set a build define that will ultimately be used to control
+  # the affinity of the benchmarking threads.
+  # TODO(https://fxbug.dev/42050716): Find a better way of controlling what cores are used for
+  # benchmarking.
+  board_is_vim3 = board_name == "vim3"
+  defines = [ "BOARD_IS_VIM3=${board_is_vim3}" ]
+
   deps = fuchsia_microbenchmark_deps
 }
 

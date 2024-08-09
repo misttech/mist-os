@@ -44,7 +44,7 @@ class ProfileServer : public ServerBase<fuchsia::bluetooth::bredr::Profile> {
 
     bt::l2cap::Channel::UniqueId unique_id() const { return unique_id_; }
 
-    void RequestParameters(fuchsia::bluetooth::bredr::ChannelParameters requested,
+    void RequestParameters(fuchsia::bluetooth::ChannelParameters requested,
                            RequestParametersCallback callback) override;
 
     void handle_unknown_method(uint64_t ordinal, bool method_has_response) override;
@@ -233,9 +233,8 @@ class ProfileServer : public ServerBase<fuchsia::bluetooth::bredr::Profile> {
 
   // Create an Connection server for the given channel and set up callbacks.
   // Returns the client end of the channel, or null on failure.
-  std::optional<fidl::InterfaceHandle<fuchsia::bluetooth::bredr::Connection>>
-  BindBrEdrConnectionServer(bt::l2cap::Channel::WeakPtr channel,
-                            fit::callback<void()> closed_callback);
+  std::optional<fidl::InterfaceHandle<fuchsia::bluetooth::Channel>> BindBrEdrConnectionServer(
+      bt::l2cap::Channel::WeakPtr channel, fit::callback<void()> closed_callback);
 
   // Create a FIDL Channel from an l2cap::Channel. A Connection relay is created from |channel|
   // and returned in the FIDL Channel.

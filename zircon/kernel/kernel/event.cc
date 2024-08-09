@@ -73,7 +73,7 @@ zx_status_t Event::WaitWorker(const Deadline& deadline, Interruptible interrupti
       // Looks like we are not currently signaled.  Now try to obtain the
       // current thread's lock so we can block it.
       Thread* current_thread = Thread::Current::Get();
-      if (current_thread->get_lock().Acquire() == ChainLock::LockResult::kBackoff) {
+      if (current_thread->get_lock().Acquire() == ChainLock::Result::Backoff) {
         wait_.get_lock().Release();
         continue;
       }

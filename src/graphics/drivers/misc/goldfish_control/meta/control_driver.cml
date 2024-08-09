@@ -18,13 +18,13 @@
     capabilities: [
         { service: 'fuchsia.hardware.goldfish.ControlService' },
         { service: 'fuchsia.hardware.goldfish.pipe.Service' },
-        { service: 'fuchsia.hardware.sysmem.Service' },
     ],
     use: [
+        { protocol: "fuchsia.hardware.sysmem.Sysmem" },
+        { protocol: "fuchsia.sysmem2.Allocator" },
         { service: "fuchsia.hardware.goldfish.pipe.Service" },
         { service: "fuchsia.hardware.goldfish.SyncService" },
         { service: "fuchsia.hardware.goldfish.AddressSpaceService" },
-        { service: "fuchsia.hardware.sysmem.Service" },
     ],
     expose: [
         {
@@ -33,10 +33,6 @@
         },
         {
             service: 'fuchsia.hardware.goldfish.pipe.Service',
-            from: 'self',
-        },
-        {
-            service: 'fuchsia.hardware.sysmem.Service',
             from: 'self',
         },
     ],

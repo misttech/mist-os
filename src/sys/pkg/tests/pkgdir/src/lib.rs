@@ -4,6 +4,7 @@
 
 #![allow(clippy::let_unit_value)]
 
+use fidl::endpoints::DiscoverableProtocolMarker as _;
 use fidl_fuchsia_pkg_test::{RealmFactoryMarker, RealmOptions};
 use fio::DirectoryMarker;
 use fuchsia_component::client::connect_to_protocol;
@@ -37,3 +38,10 @@ async fn dirs_to_test() -> impl Iterator<Item = PackageSource> {
 struct PackageSource {
     dir: fio::DirectoryProxy,
 }
+
+// TODO(https://fxbug.dev/42056856): Once all fuchsia.io servers have transitioned to report
+// the discoverable protocol names, remove the hard-coded *_PROTOCOL_NAME constants below.
+const NODE_PROTOCOL_NAMES: [&str; 2] = [fio::NodeMarker::PROTOCOL_NAME, fio::NODE_PROTOCOL_NAME];
+const FILE_PROTOCOL_NAMES: [&str; 2] = [fio::FileMarker::PROTOCOL_NAME, fio::FILE_PROTOCOL_NAME];
+const DIRECTORY_PROTOCOL_NAMES: [&str; 2] =
+    [fio::DirectoryMarker::PROTOCOL_NAME, fio::DIRECTORY_PROTOCOL_NAME];

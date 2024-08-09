@@ -90,6 +90,14 @@ It will be set below and passed to other toolchains through toolchain_args
 
 From //build/config/BUILDCONFIG.gn:2118
 
+### allow_tear_off_abi_breakage
+
+Allow breakage in tear-off protocols.
+
+**Current value (from the default):** `true`
+
+From //tools/fidl/abi-compat/BUILD.gn:17
+
 ### allowed_test_device_types
 
 A list of device types this build is allowed to run tests on. If set, only
@@ -927,6 +935,14 @@ Point this to the location of external txt files to be included as extras
 
 From //src/lib/ui/carnelian/BUILD.gn:22
 
+### check_external_external_abi_compat
+
+Check external to external IPC ABI compatibility
+
+**Current value (from the default):** `false`
+
+From //tools/fidl/abi-compat/BUILD.gn:20
+
 ### check_output_dir_leaks
 
 If enabled, check that the output dir path does not leak into
@@ -1447,63 +1463,6 @@ Controls whether to promote warnings to errors.
 **Current value (from the default):** `true`
 
 From //build/config/BUILD.gn:37
-
-### dev_bootfs_labels
-
-List of labels for objects to include in the ZBI.
-
-**Current value (from the default):** `[]`
-
-From //build/dev.gni:14
-
-### dev_build_only_deps
-
-List of labels for targets that should be built but not included in any
-build outputs that are part of the build API (e.g. zbi's, package servers).
-
-**Current value (from the default):** `[]`
-
-From //build/dev.gni:11
-
-### dev_kernel_cmdline
-
-List of strings to append to the kernel command line.
-
-**Current value (from the default):** `[]`
-
-From //build/dev.gni:23
-
-### dev_recovery_bootfs_labels
-
-List of binary labels to include in the recovery ZBI.
-
-**Current value (from the default):** `[]`
-
-From //build/dev.gni:20
-
-### dev_recovery_kernel_cmdline
-
-List of strings to append to the recovery kernel command line.
-
-**Current value (from the default):** `[]`
-
-From //build/dev.gni:29
-
-### dev_zedboot_bootfs_labels
-
-List of binary labels to include in the zedboot ZBI.
-
-**Current value (from the default):** `[]`
-
-From //build/dev.gni:17
-
-### dev_zedboot_kernel_cmdline
-
-List of strings to append to the zedboot kernel command line.
-
-**Current value (from the default):** `[]`
-
-From //build/dev.gni:26
 
 ### developer_test_labels
 
@@ -5642,7 +5601,7 @@ Example:
 
 **Current value (from the default):** `[]`
 
-From //build/assembly/developer_overrides.gni:352
+From //build/assembly/developer_overrides.gni:372
 
 ### product_bootfs_packages
 
@@ -7615,7 +7574,7 @@ From //sdk/config.gni:13
 
 Identifier for the Core SDK.
 
-**Current value (from the default):** `"22.99991231.0.1"`
+**Current value (from the default):** `"23.99991231.0.1"`
 
 From //sdk/config.gni:7
 
@@ -7639,7 +7598,7 @@ derives an ABI revision from the latest integration.git hash.
 TODO(https://fxbug.dev/324892812): Delete this option after a transition
 period.
 
-**Current value (from the default):** `true`
+**Current value (from the default):** `false`
 
 From //build/sdk/config.gni:22
 

@@ -46,8 +46,8 @@ pub enum Message {
     /// Arg: the `PlatformMetric` to be logged
     LogPlatformMetric(PlatformMetric),
 
-    /// Gets the topological path of the driver associated with the target node
-    GetDriverPath,
+    /// Gets the sensor name of the driver associated with the target node
+    GetSensorName,
 
     /// Send a debug command.
     /// Arg0: node-specific command as a string
@@ -86,8 +86,8 @@ pub enum MessageReturn {
     /// There is no arg in this MessageReturn type. It only serves as an ACK.
     LogPlatformMetric,
 
-    /// Arg: the topological path of the driver associated with the target node
-    GetDriverPath(String),
+    /// Arg: the sensor name of the driver associated with the target node
+    GetSensorName(String),
 
     /// There is no arg in this MessageReturn type. It only serves as an ACK.
     Debug,

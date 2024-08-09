@@ -37,7 +37,7 @@ use anyhow::format_err;
 use nom::bits::bits;
 use nom::bits::complete::{tag, take};
 use nom::combinator::cond;
-use nom::error::{make_error, ErrorKind};
+use nom::error::{make_error, Error, ErrorKind};
 use nom::multi::count;
 use nom::{IResult, Offset};
 
@@ -524,9 +524,9 @@ impl<'a> AudioMuxElement<'a> {
     // Attempt to parse AudioMuxElement out of input slice.
     pub fn try_from_bytes(input: &'a [u8]) -> Result<AudioMuxElement<'a>, anyhow::Error> {
         // type checker was unsure about error type when mapping, specify it manually.
-        bits::<_, _, _, (&[u8], ErrorKind), _>(Self::parse_from_bits)(input)
+        bits::<_, _, Error<(&[u8], usize)>, Error<_>, _>(Self::parse_from_bits)(input)
             .map(|i| i.1)
-            .map_err(|_| format_err!("Failed to parse AudioMuxElement"))
+            .map_err(|_: nom::Err<_>| format_err!("Failed to parse AudioMuxElement"))
     }
 
     // Return payload frame at `index` if it exists

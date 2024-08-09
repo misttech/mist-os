@@ -154,7 +154,9 @@ fn extend_dict_with_dictionary<C: ComponentInstanceInterface + 'static>(
                 match child_component_output_dictionary_routers.get(&child_name) {
                     Some(output_dictionary_router) => output_dictionary_router.clone().lazy_get(
                         source_path.to_owned(),
-                        RoutingError::BedrockSourceDictionaryExposeNotFound,
+                        RoutingError::BedrockSourceDictionaryExposeNotFound {
+                            moniker: component.moniker().clone(),
+                        },
                     ),
                     None => Router::new_error(RoutingError::use_from_child_instance_not_found(
                         &child_name,
@@ -211,6 +213,7 @@ fn make_dict_extending_router(
         }
         let source_dict_router = source_dict_router.clone();
         let dict = dict.clone();
+        let source_moniker = source.source_moniker();
         async move {
             let source_dict = match source_dict_router.route(request).await? {
                 Capability::Dictionary(d) => Some(d),
@@ -218,6 +221,7 @@ fn make_dict_extending_router(
                 cap @ Capability::Unit(_) => return Ok(cap),
                 cap => {
                     return Err(RoutingError::BedrockWrongCapabilityType {
+                        moniker: source_moniker,
                         actual: cap.debug_typename().into(),
                         expected: "Dictionary".into(),
                     }
@@ -225,13 +229,20 @@ fn make_dict_extending_router(
                 }
             };
             let source_dict = source_dict.unwrap();
-            let out_dict = dict.shallow_copy().map_err(|_| RoutingError::BedrockNotCloneable)?;
+            let out_dict = dict.shallow_copy().map_err(|_| RoutingError::BedrockNotCloneable {
+                moniker: source_moniker.clone(),
+            })?;
             for (source_key, source_value) in source_dict.enumerate() {
                 let Ok(source_value) = source_value else {
-                    return Err(RoutingError::BedrockNotCloneable.into());
+                    return Err(
+                        RoutingError::BedrockNotCloneable { moniker: source_moniker }.into()
+                    );
                 };
                 if let Err(_) = out_dict.insert(source_key.clone(), source_value) {
-                    return Err(RoutingError::BedrockSourceDictionaryCollision.into());
+                    return Err(RoutingError::BedrockSourceDictionaryCollision {
+                        moniker: source_moniker,
+                    }
+                    .into());
                 }
             }
             Ok(out_dict.into())

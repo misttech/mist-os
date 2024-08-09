@@ -121,9 +121,11 @@ impl ImageAssemblyConfigBuilder {
             developer_only_options,
             kernel,
             platform: _,
+            product: _,
             packages,
             packages_to_compile,
             shell_commands,
+            developer_provided_files: _,
         } = developer_overrides;
 
         // Set the developer-only options for the buidler to use.

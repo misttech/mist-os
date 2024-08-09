@@ -24,7 +24,7 @@ use std::path::Path;
 ///                     state: 1,
 ///                     trip_points: [
 ///                         {
-///                             sensor: '/dev/sys/platform/05:03:a/thermal',
+///                             sensor_name: 'CPU thermal',
 ///                             activate_at: 75,
 ///                             deactivate_below: 71,
 ///                         },
@@ -34,7 +34,7 @@ use std::path::Path;
 ///                     state: 2,
 ///                     trip_points: [
 ///                         {
-///                             sensor: '/dev/sys/platform/05:03:a/thermal',
+///                             sensor_name: 'CPU thermal',
 ///                             activate_at: 86,
 ///                             deactivate_below: 82,
 ///                         },
@@ -69,8 +69,8 @@ pub struct StateConfig {
 /// Defines a trip point with hysteresis for a specific temperature sensor.
 #[derive(Deserialize, Debug, Clone)]
 pub struct TripPoint {
-    /// Topological path to the temperature sensor.
-    pub sensor: String,
+    /// Name of the temperature sensor.
+    pub sensor_name: String,
 
     /// Temperature at which this trip point becomes active.
     pub activate_at: u32,
@@ -85,7 +85,7 @@ impl TripPoint {
     /// Note: this is only intended for use in tests. However, it isn't marked as cfg(test) so that
     /// code outside of the library can use it in their tests as well.
     pub fn new(sensor: &str, deactivate_below: u32, activate_at: u32) -> Self {
-        Self { sensor: sensor.into(), deactivate_below, activate_at }
+        Self { sensor_name: sensor.into(), deactivate_below, activate_at }
     }
 }
 
@@ -209,10 +209,10 @@ impl ClientConfig {
 
                 for tp in state_config.trip_points.iter() {
                     ensure!(
-                        sensors_configured_for_state.insert(&tp.sensor) == true,
+                        sensors_configured_for_state.insert(&tp.sensor_name) == true,
                         "A sensor cannot be referenced by multiple trip points in the same thermal \
                         state (violated by sensor {} in state {})",
-                        tp.sensor,
+                        tp.sensor_name,
                         state_config.state
                     );
 
@@ -230,7 +230,7 @@ impl ClientConfig {
                     // observed highest activate_at value. Otherwise, the new trip point will be
                     // overlapping (or otherwise non-increasing) with a previously observed trip
                     // point.
-                    if let Some(activate_value) = highest_activate_value.get_mut(&tp.sensor) {
+                    if let Some(activate_value) = highest_activate_value.get_mut(&tp.sensor_name) {
                         ensure!(
                             tp.deactivate_below > *activate_value,
                             "Trip point ranges must not overlap (range for state {} ({} - {}) \
@@ -238,11 +238,11 @@ impl ClientConfig {
                             state_config.state,
                             tp.deactivate_below,
                             tp.activate_at,
-                            tp.sensor
+                            tp.sensor_name
                         );
                         *activate_value = tp.activate_at;
                     } else {
-                        highest_activate_value.insert(tp.sensor.clone(), tp.activate_at);
+                        highest_activate_value.insert(tp.sensor_name.clone(), tp.activate_at);
                     }
                 }
             }

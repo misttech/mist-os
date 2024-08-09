@@ -5,6 +5,7 @@
 import("//build/config/lto/config.gni")
 import("//build/dist/resource.gni")
 import("//build/testing/host_test_data.gni")
+import("//build/toolchain/generated_ifs_file.gni")
 import("//build/toolchain/ifs_shared_library.gni")
 import("//build/toolchain/toolchain_environment.gni")
 import("//build/toolchain/zircon/user_basic_redirect.gni")
@@ -239,6 +240,37 @@ template("test_shared_library") {
     # Make sure a system dlopen loading the shared library as a dependency of
     # another module will look for its own dependencies adjacent to it.
     configs += [ ":runpath-origin" ]
+  }
+}
+
+template("test_ifs_shared_library") {
+  generated_ifs_file("${target_name}.ifs") {
+    visibility = [ ":*" ]
+    testonly = true
+
+    forward_variables_from(invoker,
+                           [
+                             "soname",
+                             "symbols",
+                           ])
+  }
+  ifs_shared_library(target_name) {
+    visibility = [ ":*" ]
+    testonly = true
+    deps = []
+
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "abi",
+                             "soname",
+                             "symbols",
+                           ])
+
+    gen_outputs = get_target_outputs(":${target_name}.ifs")
+    abi = gen_outputs[0]
+
+    deps += [ ":${target_name}.ifs" ]
   }
 }
 
@@ -824,11 +856,24 @@ test_executable("tls-ie") {
   shlib_deps = [ ":tls-ie-dep" ]
 }
 
-ifs_shared_library("tls-ie-dep-weak") {
-  visibility = [ ":*" ]
-  testonly = true
-
-  abi = "tls-ie-dep-weak.ifs"
+test_ifs_shared_library("tls-ie-dep-weak") {
+  soname = "libtls-ie.so"
+  symbols = [
+    {
+      name = "tls_ie_data"
+      type = "Func"
+    },
+    {
+      name = "tls_ie_bss"
+      type = "Func"
+    },
+    {
+      # This is not actually defined in the runtime DSO.
+      name = "tls_ie_weak"
+      type = "TLS"
+      size = 4
+    },
+  ]
 
   public = [ "tls-ie-dep.h" ]
 
@@ -878,9 +923,15 @@ test_executable("missing-sym") {
   }
 }
 
-ifs_shared_library("missing-sym-dep-a") {
-  testonly = true
-  abi = "missing-sym-dep-a.ifs"
+test_ifs_shared_library("missing-sym-dep-a") {
+  soname = "libld-dep-a.so"
+  symbols = [
+    {
+      name = "c"
+      type = "Func"
+    },
+  ]
+
   data_deps = [ ":ld-dep-a" ]
 }
 
@@ -894,9 +945,14 @@ test_executable("missing-dep") {
   deps = [ ":missing-dep-dep" ]
 }
 
-ifs_shared_library("missing-dep-dep") {
-  testonly = true
-  abi = "missing-dep-dep.ifs"
+test_ifs_shared_library("missing-dep-dep") {
+  soname = "libmissing-dep-dep.so"
+  symbols = [
+    {
+      name = "missing_dep_sym"
+      type = "Func"
+    },
+  ]
 }
 
 # Includes a symbol that is provided by a dependency of a DT_NEEDED, but that
@@ -961,10 +1017,15 @@ test_executable("second-session") {
 
 # This is the link-time dependency necessary for the second-session test's
 # secondary dynamic linking domain.
-ifs_shared_library("second-session.lib") {
-  testonly = true
+test_ifs_shared_library("second-session.lib") {
+  soname = "libsecond-session-test.so.1"
+  symbols = [
+    {
+      name = "defined_in_main_executable"
+      type = "Func"
+    },
+  ]
   public = [ "second-session.h" ]
-  abi = "second-session.ifs"
 }
 
 test_loadable_module("second-session-module") {
@@ -998,10 +1059,25 @@ test_executable("zygote") {
   ]
 }
 
-ifs_shared_library("zygote.lib") {
-  testonly = true
+test_ifs_shared_library("zygote.lib") {
+  soname = "libzygote-test.so.1"
+  symbols = [
+    {
+      name = "called_by_zygote_dep"
+      type = "Func"
+    },
+    {
+      name = "initialized_data"
+      type = "Object"
+      size = 8
+    },
+    {
+      name = "zygote_test_main"
+      type = "Func"
+    },
+  ]
+
   public = [ "zygote.h" ]
-  abi = "zygote.ifs"
 }
 
 test_shared_library("zygote-dep") {

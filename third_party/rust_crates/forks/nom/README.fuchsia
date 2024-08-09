@@ -1,0 +1,19 @@
+Name: nom
+License File: LICENSE
+Description:
+
+nom is used in both host and target side for parsing.
+
+This is nom mainline (7.1.3) with a minimal change.
+
+The only files modified are Cargo.toml and Cargo.lock, to comment out the
+inclusion of the `minimal-lexical` crate. This crate is *unused* in the code.
+Its usage is commented out in the mainline release version. To easily identify
+the commented out pieces, they have been preceded by the comment `# FORK`.
+
+This fork can be removed when:
+
+* nom considers the issues with `minimal_lexical` to be fixed and starts using
+  the crate.
+* `minimal_lexical` fixes issues identified in
+  https://github.com/google/rust-crate-audits/blob/4af2be785e83b56d541c190914293aa915d80f42/audits.toml#L5083-L5092

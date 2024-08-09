@@ -10,7 +10,6 @@ import("//zircon/kernel/params.gni")
 zx_library("vm") {
   sources = [
     "anonymous_page_request.cc",
-    "bootreserve.cc",
     "compression.cc",
     "compressor.cc",
     "content_size_manager.cc",
@@ -79,6 +78,9 @@ zx_library("vm") {
   ]
 
   public_deps = [
+    # <vm/page.h> has #include <vm/phys/arena.h>.
+    "phys:headers",
+
     # <vm/vm_page_list.h> has #include <ktl/unique_ptr.h>.
     "//zircon/kernel/lib/ktl:headers",
 
@@ -96,10 +98,6 @@ zx_library("vm") {
 
     # "pmm_arena.h" has #include <lib/zx/result.h>.
     "//zircon/system/ulib/zx:headers",
-
-    # "pmm.h" has #include <lib/zbi-format/memory.h>
-    # "pmm_node.h" has #include <lib/zbi-format/memory.h>
-    "//sdk/lib/zbi-format",
 
     # <vm/pmm_checker.h> has #include <lib/boot-options/boot-options.h>.
     "//zircon/kernel/lib/boot-options:headers",

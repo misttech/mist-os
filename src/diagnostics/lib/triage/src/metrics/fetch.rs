@@ -783,7 +783,7 @@ mod test {
                 "{:?}",
                 SelectorString::try_from("INSPECT:not a selector".to_string()).err().unwrap()
             ),
-            "Failed to parse the input. Error: 0: at line 0, in Tag:\nnot a selector\n   ^\n\n"
+            "Failed to parse the input. Error: 0: at line 1, in Tag:\nnot a selector\n   ^\n\n"
         );
 
         // Test that an invalid selector results in a parse error.
@@ -792,7 +792,7 @@ mod test {
                 "{:?}",
             SelectorString::try_from("INSPECT:*/foo/*:root:data:Int".to_string()).err().unwrap()
             ),
-            "Failed to parse the input. Error: 0: at line 0, in Eof:\n*/foo/*:root:data:Int\n                 ^\n\n"
+            "Failed to parse the input. Error: 0: at line 1, in Eof:\n*/foo/*:root:data:Int\n                 ^\n\n"
         );
 
         Ok(())

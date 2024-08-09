@@ -17,7 +17,6 @@
 #include <kernel/range_check.h>
 #include <ktl/limits.h>
 #include <pretty/cpp/sizes.h>
-#include <vm/bootreserve.h>
 #include <vm/physmap.h>
 
 #include "pmm_node.h"
@@ -31,44 +30,43 @@
 // contiguous allocation.  See the comment where this counter is updated.
 KCOUNTER_DECLARE(counter_max_runs_examined, "vm.pmm.max_runs_examined", Max)
 
-zx_status_t PmmArena::Init(const pmm_arena_info_t* info, PmmNode* node) {
-  // TODO: validate that info is sane (page aligned, etc)
-  info_ = *info;
+void PmmArena::Init(const PmmArenaSelection& selected, PmmNode* node) {
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(selected.arena.base));
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(selected.arena.size));
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(selected.bookkeeping.base));
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(selected.bookkeeping.size));
 
-  // allocate an array of pages to back this one
-  size_t page_count = size() / PAGE_SIZE;
-  size_t page_array_size = ROUNDUP_PAGE_SIZE(page_count * sizeof(vm_page));
+  size_t page_count = selected.arena.size / PAGE_SIZE;
+  DEBUG_ASSERT(selected.bookkeeping.size == ROUNDUP_PAGE_SIZE(page_count * sizeof(vm_page)));
+  DEBUG_ASSERT(selected.bookkeeping.size < selected.arena.size);
 
-  // if the arena is too small to be useful, bail
-  if (page_array_size >= size()) {
-    printf("PMM: arena too small to be useful (size %zu)\n", size());
-    return ZX_ERR_BUFFER_TOO_SMALL;
-  }
+  dprintf(INFO, "PMM: adding arena [%#" PRIx64 ", %#" PRIx64 ")\n", selected.arena.base,
+          selected.arena.end());
 
-  // allocate a chunk to back the page array out of the arena itself, near the top of memory
-  reserve_range_t range;
-  auto status = boot_reserve_range_search(base(), size(), page_array_size, &range);
-  if (status != ZX_OK) {
-    printf("PMM: arena intersects with reserved memory in unresovable way\n");
-    return ZX_ERR_NO_MEMORY;
-  }
+  // Intentionally similar to the logging in PmmNode::InitReservedRange().
+  dprintf(INFO, "PMM: reserved [%#" PRIx64 ", %#" PRIx64 "): bookkeeping\n",
+          selected.bookkeeping.base, selected.bookkeeping.end());
 
-  DEBUG_ASSERT(range.pa >= base() && range.len >= page_array_size);
+  info_ = pmm_arena_info_t{
+      .flags = 0,
+      .base = selected.arena.base,
+      .size = selected.arena.size,
+  };
+  snprintf(info_.name, sizeof(info_.name), "%s", "ram");
 
   // get the kernel pointer
-  void* raw_page_array = paddr_to_physmap(range.pa);
+  size_t page_array_size = selected.bookkeeping.size;
+  void* raw_page_array = paddr_to_physmap(selected.bookkeeping.base);
   LTRACEF("arena for base 0%#" PRIxPTR " size %#zx page array at %p size %#zx\n", base(), size(),
           raw_page_array, page_array_size);
-
   memset(raw_page_array, 0, page_array_size);
-
   page_array_ = (vm_page_t*)raw_page_array;
 
   // we've just constructed |page_count| pages in the state vm_page_state::FREE
   vm_page::add_to_initial_count(vm_page_state::FREE, page_count);
 
   // compute the range of the array that backs the array itself
-  size_t array_start_index = (PAGE_ALIGN(range.pa) - info_.base) / PAGE_SIZE;
+  size_t array_start_index = (selected.bookkeeping.base - info_.base) / PAGE_SIZE;
   size_t array_end_index = array_start_index + page_array_size / PAGE_SIZE;
   LTRACEF("array_start_index %zu, array_end_index %zu, page_count %zu\n", array_start_index,
           array_end_index, page_count);
@@ -91,14 +89,11 @@ zx_status_t PmmArena::Init(const pmm_arena_info_t* info, PmmNode* node) {
   }
 
   node->AddFreePages(&list);
-
-  return ZX_OK;
 }
 
-zx_status_t PmmArena::InitForTest(const pmm_arena_info_t& info, vm_page_t* page_array) {
+void PmmArena::InitForTest(const pmm_arena_info_t& info, vm_page_t* page_array) {
   info_ = info;
   page_array_ = page_array;
-  return ZX_OK;
 }
 
 vm_page_t* PmmArena::FindSpecific(paddr_t pa) {
@@ -130,7 +125,7 @@ static uint64_t Align(uint64_t offset, uint8_t alignment_log2, uint64_t first_al
 zx::result<uint64_t> PmmArena::FindLastNonFree(uint64_t offset, size_t count) const {
   uint64_t i = offset + count - 1;
   do {
-    if (!page_array_[i].is_free() || page_array_[i].is_loaned()) {
+    if (!page_array_[i].is_free()) {
       return zx::ok(i);
     }
   } while (i-- > offset);

@@ -643,18 +643,6 @@ constexpr OpCode InformationalParamsOpCode(const uint16_t ocf) {
 // Read Local Version Information Command (v1.1)
 constexpr OpCode kReadLocalVersionInfo = InformationalParamsOpCode(0x0001);
 
-struct ReadLocalVersionInfoReturnParams {
-  // See enum StatusCode in hci_constants.h.
-  StatusCode status;
-
-  pw::bluetooth::emboss::CoreSpecificationVersion hci_version;
-
-  uint16_t hci_revision;
-  uint8_t lmp_pal_version;
-  uint16_t manufacturer_name;
-  uint16_t lmp_pal_subversion;
-} __attribute__((packed));
-
 // ============================================
 // Read Local Supported Commands Command (v1.2)
 constexpr OpCode kReadLocalSupportedCommands =
@@ -699,26 +687,9 @@ struct ReadLocalExtendedFeaturesReturnParams {
 // Read Buffer Size Command (v1.1)
 constexpr OpCode kReadBufferSize = InformationalParamsOpCode(0x0005);
 
-struct ReadBufferSizeReturnParams {
-  // See enum StatusCode in hci_constants.h.
-  StatusCode status;
-
-  uint16_t hc_acl_data_packet_length;
-  uint8_t hc_synchronous_data_packet_length;
-  uint16_t hc_total_num_acl_data_packets;
-  uint16_t hc_total_num_synchronous_data_packets;
-} __attribute__((packed));
-
 // ========================================
 // Read BD_ADDR Command (v1.1) (BR/EDR, LE)
 constexpr OpCode kReadBDADDR = InformationalParamsOpCode(0x0009);
-
-struct ReadBDADDRReturnParams {
-  // See enum StatusCode in hci_constants.h.
-  StatusCode status;
-
-  DeviceAddressBytes bd_addr;
-} __attribute__((packed));
 
 // =======================================================
 // Read Data Block Size Command (v3.0 + HS) (BR/EDR & AMP)
@@ -1391,15 +1362,6 @@ struct LEReadBufferSizeV1ReturnParams {
 constexpr OpCode kLEReadLocalSupportedFeatures =
     LEControllerCommandOpCode(0x0003);
 
-struct LEReadLocalSupportedFeaturesReturnParams {
-  // See enum StatusCode in hci_constants.h.
-  StatusCode status;
-
-  // Bit Mask List of supported LE features. See enum class LESupportedFeature
-  // in hci_constants.h.
-  uint64_t le_features;
-} __attribute__((packed));
-
 // =========================================
 // LE Set Random Address Command (v4.0) (LE)
 constexpr OpCode kLESetRandomAddress = LEControllerCommandOpCode(0x0005);
@@ -1417,18 +1379,6 @@ constexpr OpCode kLESetAdvertisingParameters =
 // LE Read Advertising Channel Tx Power Command (v4.0) (LE)
 constexpr OpCode kLEReadAdvertisingChannelTxPower =
     LEControllerCommandOpCode(0x0007);
-
-struct LEReadAdvertisingChannelTxPowerReturnParams {
-  // See enum StatusCode in hci_constants.h.
-  StatusCode status;
-
-  // The transmit power level used for LE advertising channel packets.
-  //
-  //   Range: -20 <= N <= +10
-  //   Units: dBm
-  //   Accuracy: +/- 4 dB
-  int8_t tx_power;
-} __attribute__((packed));
 
 // ===========================================
 // LE Set Advertising Data Command (v4.0) (LE)
@@ -2110,12 +2060,6 @@ constexpr OpCode kLESetAdvertisingSetRandomAddress =
 // LE Set Extended Advertising Parameters Command (v5.0) (LE)
 constexpr OpCode kLESetExtendedAdvertisingParameters =
     LEControllerCommandOpCode(0x0036);
-
-struct LESetExtendedAdvertisingParametersReturnParams {
-  // See enum StatusCode in hci_constants.h.
-  StatusCode status;
-  int8_t selected_tx_power;
-} __attribute__((packed));
 
 // ====================================================
 // LE Set Extended Advertising Data Command (v5.0) (LE)

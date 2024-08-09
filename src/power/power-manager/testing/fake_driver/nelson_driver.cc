@@ -20,9 +20,9 @@ Driver::Driver(fdf::DriverStartArgs start_args,
       soc_control_server_(&soc_temperature_),
       audio_control_server_(&audio_temperature_),
       thread_control_server_(&thread_temperature_),
-      soc_temperature_server_(&soc_temperature_),
-      audio_temperature_server_(&audio_temperature_),
-      thread_temperature_server_(&thread_temperature_) {}
+      soc_temperature_server_("CPU thermal", &soc_temperature_),
+      audio_temperature_server_("therm-audio", &audio_temperature_),
+      thread_temperature_server_("therm-thread", &thread_temperature_) {}
 
 zx::result<> Driver::Start() {
   auto soc_nodes_result = AddNodes(node(), {"05:05:a", "aml_thermal_pll"});

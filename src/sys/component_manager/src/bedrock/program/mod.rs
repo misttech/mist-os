@@ -174,10 +174,10 @@ impl Program {
     }
 
     /// Drops the program and returns state that the program has escrowed, if any.
-    pub fn finalize(self) -> Option<EscrowRequest> {
-        let escrowed_state = self.controller.escrow().lock().take();
-        drop(self);
-        escrowed_state
+    pub fn finalize(self) -> FinalizedProgram {
+        let Program { controller, .. } = self;
+        let (escrow_request, stop_info) = controller.finalize();
+        FinalizedProgram { escrow_request, stop_info }
     }
 
     /// Gets a [`Koid`] that will uniquely identify this program.
@@ -350,6 +350,25 @@ impl From<fcrunner::ComponentControllerOnEscrowRequest> for EscrowRequest {
     fn from(value: fcrunner::ComponentControllerOnEscrowRequest) -> Self {
         Self { outgoing_dir: value.outgoing_dir, escrowed_dictionary: value.escrowed_dictionary }
     }
+}
+
+/// Information about a stopped execution.
+#[derive(Debug, Default, Clone, Copy)]
+pub struct StopInfo {
+    /// Exit code of the program.
+    pub exit_code: Option<i64>,
+}
+
+impl From<fcrunner::ComponentStopInfo> for StopInfo {
+    fn from(value: fcrunner::ComponentStopInfo) -> Self {
+        Self { exit_code: value.exit_code }
+    }
+}
+
+#[derive(Debug, Default)]
+pub struct FinalizedProgram {
+    pub escrow_request: Option<EscrowRequest>,
+    pub stop_info: Option<StopInfo>,
 }
 
 #[cfg(test)]
@@ -629,7 +648,10 @@ pub mod tests {
         );
 
         drop(stop_fut);
-        assert!(program.finalize().is_none());
+        assert_matches!(
+            program.finalize(),
+            FinalizedProgram { escrow_request: None, stop_info: None }
+        );
     }
 
     #[fuchsia::test]
@@ -700,7 +722,10 @@ pub mod tests {
         );
 
         drop(stop_fut);
-        assert!(program.finalize().is_none());
+        assert_matches!(
+            program.finalize(),
+            FinalizedProgram { escrow_request: None, stop_info: None }
+        );
     }
 
     #[fuchsia::test]
@@ -788,7 +813,10 @@ pub mod tests {
         );
 
         drop(stop_fut);
-        assert!(program.finalize().is_none());
+        assert_matches!(
+            program.finalize(),
+            FinalizedProgram { escrow_request: None, stop_info: None }
+        );
     }
 
     /// Test that `Program::finalize` will reap the `OnEscrow` event received from the
@@ -810,7 +838,7 @@ pub mod tests {
         drop(stream);
         program.on_terminate().await;
 
-        let escrow = program.finalize();
+        let escrow = program.finalize().escrow_request;
         let received_outgoing_dir_server = escrow.unwrap().outgoing_dir.unwrap();
         assert_eq!(
             outgoing_dir_client.basic_info().unwrap().koid,

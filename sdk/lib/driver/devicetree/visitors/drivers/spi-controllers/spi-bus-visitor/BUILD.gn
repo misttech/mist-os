@@ -1,0 +1,73 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/components.gni")
+import("//build/devicetree/devicetree.gni")
+import("//build/devicetree/devicetree_visitor.gni")
+import("//build/test.gni")
+
+group("tests") {
+  deps = [ ":spi-bus-visitor-test" ]
+  testonly = true
+}
+
+devicetree_visitor("spi-bus-visitor") {
+  deps = [ ":spi-bus" ]
+}
+
+source_set("spi-bus") {
+  sources = [
+    "spi-bus-visitor.cc",
+    "spi-bus-visitor.h",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_bindlib_cpp",
+    "//sdk/lib/driver/component/cpp:cpp",
+    "//sdk/lib/driver/devicetree/manager",
+    "//sdk/lib/driver/devicetree/visitors:common-types",
+    "//sdk/lib/driver/devicetree/visitors:registration",
+    "//sdk/lib/driver/logging/cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/lib/ddk",
+    "//src/lib/ddk:ddk-metadata-headers",
+  ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.hardware.spi.businfo:fuchsia.hardware.spi.businfo_cpp",
+    "//sdk/lib/driver/devicetree/visitors:driver-visitor",
+  ]
+}
+
+test("spi-bus-visitor-test-bin") {
+  sources = [ "test/spi-bus-visitor-test.cc" ]
+  deps = [
+    ":spi-bus",
+    "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_bindlib_cpp",
+    "//sdk/lib/driver/devicetree/testing:visitor-test-helper",
+    "//sdk/lib/driver/devicetree/visitors:registry",
+    "//sdk/lib/driver/devicetree/visitors/default/bind-property",
+    "//sdk/lib/driver/devicetree/visitors/default/mmio",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
+    "//src/devices/bind/fuchsia.platform:fuchsia.platform_cpp",
+    "//src/lib/ddk:ddk-metadata-headers",
+    "//src/lib/fxl/test:gtest_main",
+  ]
+}
+
+dtb("spi-dtb") {
+  sources = [ "test/dts/spi.dts.S" ]
+}
+
+resource("spi-dtb-file") {
+  sources = get_target_outputs(":spi-dtb")
+  outputs = [ "test-data/{{source_file_part}}" ]
+  deps = [ ":spi-dtb" ]
+}
+
+fuchsia_unittest_package("spi-bus-visitor-test") {
+  component_name = "spi-bus-visitor-test"
+  deps = [
+    ":spi-bus-visitor-test-bin",
+    ":spi-dtb-file",
+  ]
+}

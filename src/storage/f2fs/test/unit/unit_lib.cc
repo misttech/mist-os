@@ -223,6 +223,10 @@ void FileTester::CheckDataExistFlagUnset(VnodeF2fs *vn) {
   ASSERT_EQ(vn->TestFlag(InodeInfoFlag::kDataExist), false);
 }
 
+void FileTester::CheckInlineXattr(VnodeF2fs *vn) {
+  ASSERT_NE(vn->TestFlag(InodeInfoFlag::kInlineXattr), false);
+}
+
 void FileTester::CheckChildrenFromReaddir(Dir *dir, std::unordered_set<std::string> childs) {
   childs.insert(".");
 

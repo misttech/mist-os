@@ -9,7 +9,8 @@ test("simple-driver-test") {
   output_name = "simple-driver-test"
   sources = [
     "//examples/drivers/simple/dfv2/simple_driver.cc",
-    "test.cc",
+    "background_test.cc",
+    "foreground_test.cc",
   ]
   deps = [
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",

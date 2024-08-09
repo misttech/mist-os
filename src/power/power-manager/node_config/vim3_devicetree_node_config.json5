@@ -21,7 +21,7 @@
         type: "TemperatureHandler",
         name: "temperature_soc_pll",
         config: {
-            driver_path: "/dev/sys/platform/temperature-sensor-ff634800/temperature-sensor-ff634800_group/aml-trip-device",
+            sensor_name: "temperature-sensor-ff634800",
             cache_duration_ms: 50,
         },
     },

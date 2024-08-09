@@ -7,6 +7,9 @@ using fuchsia.bluetooth;
 using fuchsia.media;
 using zx;
 
+alias ChannelMode = fuchsia.bluetooth.ChannelMode;
+alias ChannelParameters = fuchsia.bluetooth.ChannelParameters;
+
 /// The RFCOMM channel ID used when requesting to open a channel.
 /// This is known as a ServerChannel in RFCOMM. It must be within the
 /// range [1,30] (inclusive). See RFCOMM 5.4.
@@ -36,47 +39,6 @@ type ConnectParameters = strict union {
     2: rfcomm RfcommParameters;
 };
 
-/// Authentication and permission requirements to access an advertised service.
-type SecurityRequirements = table {
-    /// If present and true, the physical link must be authenticated with man-in-the-middle attack
-    /// protection to access this service.  If missing, authentication is not required.
-    1: authentication_required bool;
-
-    /// If present and true, the physical link must be encrypted with a Secure Connections key to
-    /// access this service if the host is capable.  Advertisement will fail if the host does not
-    /// support Secure Connections.  See Bluetooth Spec v5.2, Vol 3, Part C, Sec 5.2.2.8.
-    2: secure_connections_required bool;
-};
-
-/// Used to specify preferred and accepted L2CAP channel modes.  If the peer rejects a non-BASIC
-/// mode, the Bluetooth system will attempt to open the channel in BASIC mode instead.  For a
-/// description of each mode, see Bluetooth Spec v5.2, Vol 3, Part A, Sec 2.4.
-type ChannelMode = strict enum {
-    BASIC = 1;
-    ENHANCED_RETRANSMISSION = 2;
-};
-
-/// Used to specify preferred L2CAP channel parameters.
-type ChannelParameters = table {
-    /// Optional. If not provided, BASIC will be used.
-    1: channel_mode ChannelMode;
-    /// Maximum SDU size this profile is capable of accepting. Must be >= 48.  Optional. If not
-    /// provided, the size will be determined by the Bluetooth system.  No guarantees are given
-    /// regarding the size selected.
-    2: max_rx_sdu_size uint16;
-    /// Minimum security requirements a link must have before this channel can be created.
-    /// The requirements provided here will be attempted with the peer before the channel is
-    /// established. If a peer cannot provide the requirements, the channel is closed.
-    /// Optional. If not provided, then the only security property guaranteed is encryption.
-    3: security_requirements SecurityRequirements;
-    /// The flush timeout indicates the maximum amount of time a data packet should be buffered
-    /// in the controller before it is dropped. A flush timeout of infinity can be used to mark
-    /// packets as flushable without any particular flush timeout.
-    /// Range: 1ms - 1,279ms (or ∞). Rounded down.
-    /// Optional. If not provided, no flush timeout and packets are not flushable.
-    4: flush_timeout zx.Duration;
-};
-
 /// A channel opened to a peer.
 type Channel = resource table {
     /// Deprecated.
@@ -104,7 +66,7 @@ type Channel = resource table {
     7: ext_audio_offload client_end:AudioOffloadExt;
     /// Protocol for sending/receiving SDUs on the channel.
     /// If present, closing this and `socket` will close the channel.
-    8: connection client_end:Connection;
+    8: connection client_end:fuchsia.bluetooth.Channel;
 };
 
 /// A2DP packet priority used in `AudioDirectionExt`. `NORMAL` should be used whenever audio is not
@@ -136,26 +98,6 @@ open protocol L2capParametersExt {
     }) -> (struct {
         new ChannelParameters;
     });
-};
-
-type Packet = struct {
-    packet vector<byte>:MAX;
-};
-
-/// Protocol for sending/receiving SDUs on a channel. This protocol also serves as a token for
-/// keeping the connection and channel open. Closing the protocol and the socket (in `Channel`) will
-/// close the underlying channel.
-open protocol Connection {
-    /// More than one Send can be pending simultaneously.
-    /// Prefer to limit the number of pending calls to avoid overflow.
-    /// A maximum of 10 pending calls is suggested.
-    flexible Send(Packet) -> ();
-
-    /// More than one packet event can be sent before acknowledged. Each packet must be
-    /// acknowledged with `AckReceive`. Servers should limit the number of pending acknowledgements
-    /// to avoid channel overflow. A maximum of 10 unacked packets is recommended.
-    flexible -> OnReceive(Packet);
-    flexible AckReceive();
 };
 
 type AudioSbcSupport = table {};

@@ -6,8 +6,8 @@ use super::access_vector_cache::{Fixed, Locked, Query, QueryMut, DEFAULT_SHARED_
 use super::security_server::SecurityServer;
 use super::SecurityId;
 
-use selinux_common::{AbstractObjectClass, ClassPermission, ObjectClass, Permission};
-use selinux_policy::{AccessVector, AccessVectorComputer};
+use selinux::policy::{AccessVector, AccessVectorComputer};
+use selinux::{AbstractObjectClass, ClassPermission, ObjectClass, Permission};
 use std::sync::Weak;
 
 /// Private module for sealed traits with tightly controlled implementations.
@@ -143,8 +143,8 @@ mod tests {
     use super::*;
 
     use once_cell::sync::Lazy;
-    use selinux_common::ProcessPermission;
-    use selinux_policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
+    use selinux::policy::testing::{ACCESS_VECTOR_0001, ACCESS_VECTOR_0010};
+    use selinux::ProcessPermission;
     use std::any::Any;
     use std::num::NonZeroU32;
     use std::sync::atomic::{AtomicU32, Ordering};

@@ -5,14 +5,9 @@
 use super::test::*;
 use super::*;
 use crate::Version;
-use CompatibilityDegree::*;
 use Optionality::*;
 use StringPattern::*;
 use Type::*;
-
-pub fn type_compatible(sender: &Type, receiver: &Type) -> CompatibilityDegree {
-    compare_types(sender, receiver, &Default::default()).compatibility_degree()
-}
 
 #[test]
 fn primitive() {
@@ -39,9 +34,9 @@ fn primitive() {
     };",
     )
     .has_problems(vec![
-        ProblemPattern::type_error("1", "2")
+        ProblemPattern::error()
             .message("Incompatible primitive types, sender(@1):bool, receiver(@2):int8"),
-        ProblemPattern::type_error("2", "1")
+        ProblemPattern::error()
             .message("Incompatible primitive types, sender(@2):int8, receiver(@1):bool")
     ]));
 }
@@ -67,10 +62,10 @@ fn string() {
         };"
     )
     .has_problems(vec![
-        ProblemPattern::type_error("2", "1")
+        ProblemPattern::error()
             .message("Incompatible string lengths, sender(@2):20, receiver(@1):10")
             .path(Ends(".change_length")),
-        ProblemPattern::type_error("2", "1")
+        ProblemPattern::error()
             .message("Sender(@2) string is optional but receiver(@1) is required")
             .path(Ends(".become_optional"))
     ]));
@@ -88,9 +83,9 @@ fn enums() {
         type Enum = enum : int32 { M = 1; };"
     )
     .has_problems(vec![
-        ProblemPattern::type_error("1", "2")
+        ProblemPattern::error()
             .message("Incompatible enum types, sender(@1):uint32, receiver(@2):int32"),
-        ProblemPattern::type_error("2", "1")
+        ProblemPattern::error()
             .message("Incompatible enum types, sender(@2):int32, receiver(@1):uint32")
     ]));
 
@@ -120,8 +115,9 @@ fn enums() {
             B = 2;
         };"
     )
-    .has_problems(vec![ProblemPattern::type_error("2", "1")
-        .message("Extra strict enum members in sender(@2): B=2")]));
+    .has_problems(vec![
+        ProblemPattern::error().message("Extra strict enum members in sender(@2): B=2")
+    ]));
 
     // Flexible member difference
     assert!(compare_fidl_type(
@@ -133,8 +129,9 @@ fn enums() {
                     B = 2;
                 };"
     )
-    .has_problems(vec![ProblemPattern::type_warning("2", "1")
-        .message("Extra flexible enum members in sender(@2): B=2")]));
+    .has_problems(vec![
+        ProblemPattern::warning().message("Extra flexible enum members in sender(@2): B=2")
+    ]));
 
     // Strictness difference, member difference.
     assert!(compare_fidl_type(
@@ -153,10 +150,8 @@ fn enums() {
         "
     )
     .has_problems(vec![
-        ProblemPattern::type_warning("1", "2")
-            .message("Extra flexible enum members in sender(@1): B=2"),
-        ProblemPattern::type_error("2", "1")
-            .message("Extra strict enum members in sender(@2): C=3")
+        ProblemPattern::warning().message("Extra flexible enum members in sender(@1): B=2"),
+        ProblemPattern::error().message("Extra strict enum members in sender(@2): C=3")
     ]));
 
     // Primitive conversion
@@ -171,8 +166,12 @@ fn enums() {
         "
     )
     .has_problems(vec![
-        ProblemPattern::type_error("1", "2"),
-        ProblemPattern::type_error("2", "1")
+        ProblemPattern::error().message(
+            "Incompatible types, sender(@1):flexible enum : uint32 { 1 }, receiver(@2):uint32"
+        ),
+        ProblemPattern::error().message(
+            "Incompatible types, sender(@2):uint32, receiver(@1):flexible enum : uint32 { 1 }"
+        )
     ]));
 }
 
@@ -188,9 +187,9 @@ fn bits() {
         type Bits = bits : uint64 { M = 1; };"
     )
     .has_problems(vec![
-        ProblemPattern::type_error("1", "2")
+        ProblemPattern::error()
             .message("Incompatible bits types, sender(@1):uint32, receiver(@2):uint64"),
-        ProblemPattern::type_error("2", "1")
+        ProblemPattern::error()
             .message("Incompatible bits types, sender(@2):uint64, receiver(@1):uint32")
     ]));
 
@@ -220,8 +219,9 @@ fn bits() {
             B = 2;
         };"
     )
-    .has_problems(vec![ProblemPattern::type_error("2", "1")
-        .message("Extra strict bits members in sender(@2): B=2")]));
+    .has_problems(vec![
+        ProblemPattern::error().message("Extra strict bits members in sender(@2): B=2")
+    ]));
 
     // Flexible member difference
     assert!(compare_fidl_type(
@@ -233,8 +233,9 @@ fn bits() {
                     B = 2;
                 };"
     )
-    .has_problems(vec![ProblemPattern::type_warning("2", "1")
-        .message("Extra flexible bits members in sender(@2): B=2")]));
+    .has_problems(vec![
+        ProblemPattern::warning().message("Extra flexible bits members in sender(@2): B=2")
+    ]));
 
     // Strictness difference, member difference.
     assert!(compare_fidl_type(
@@ -253,10 +254,8 @@ fn bits() {
         "
     )
     .has_problems(vec![
-        ProblemPattern::type_warning("1", "2")
-            .message("Extra flexible bits members in sender(@1): B=2"),
-        ProblemPattern::type_error("2", "1")
-            .message("Extra strict bits members in sender(@2): C=4")
+        ProblemPattern::warning().message("Extra flexible bits members in sender(@1): B=2"),
+        ProblemPattern::error().message("Extra strict bits members in sender(@2): C=4")
     ]));
 
     // Primitive conversion
@@ -271,59 +270,63 @@ fn bits() {
         "
     )
     .has_problems(vec![
-        ProblemPattern::type_error("1", "2"),
-        ProblemPattern::type_error("2", "1")
+        ProblemPattern::error().message(
+            "Incompatible types, sender(@1):flexible bits : uint32 { 1 }, receiver(@2):uint32"
+        ),
+        ProblemPattern::error().message(
+            "Incompatible types, sender(@2):uint32, receiver(@1):flexible bits : uint32 { 1 }"
+        )
     ]));
 }
 
 #[test]
 fn handle() {
-    // Can't use compare_fidl_type because we don't have access to library zx.
-
     use HandleType::*;
+
+    // Can't use compare_fidl_type because we don't have access to library zx.
+    pub fn do_compare_types(sender: &Type, receiver: &Type) -> CompatibilityProblems {
+        compare_types(sender, receiver, &Default::default())
+    }
 
     let untyped = Handle(Path::empty(), None, Required, HandleRights::default());
     let channel = Handle(Path::empty(), Some(Channel), Required, HandleRights::default());
     let vmo = Handle(Path::empty(), Some(VMO), Required, HandleRights::default());
 
     // Handle types
-    assert_eq!(StronglyCompatible, type_compatible(&untyped, &untyped));
-    assert_eq!(StronglyCompatible, type_compatible(&channel, &untyped));
-    assert_eq!(StronglyCompatible, type_compatible(&channel, &channel));
-    assert_eq!(Incompatible, type_compatible(&untyped, &channel));
-    assert_eq!(Incompatible, type_compatible(&vmo, &channel));
+    assert!(do_compare_types(&untyped, &untyped).is_compatible());
+    assert!(do_compare_types(&channel, &untyped).is_compatible());
+    assert!(do_compare_types(&channel, &channel).is_compatible());
+    assert!(do_compare_types(&untyped, &channel)
+        .has_problems(vec![ProblemPattern::error().message(
+            "Incompatible handle types, sender(@0):zx.Handle:CHANNEL, receiver(@0):zx.Handle"
+        )]));
+    assert!(do_compare_types(&vmo, &channel).has_problems(vec![ProblemPattern::error().message(
+        "Incompatible handle types, sender(@0):zx.Handle:CHANNEL, receiver(@0):zx.Handle:VMO"
+    )]));
 
     // Optionality
-    assert_eq!(
-        StronglyCompatible,
-        type_compatible(
-            &Handle(Path::empty(), Some(Channel), Required, HandleRights::default()),
-            &Handle(Path::empty(), Some(Channel), Required, HandleRights::default())
-        )
-    );
-    assert_eq!(
-        StronglyCompatible,
-        type_compatible(
-            &Handle(Path::empty(), Some(Channel), Optional, HandleRights::default()),
-            &Handle(Path::empty(), Some(Channel), Optional, HandleRights::default())
-        )
-    );
+    assert!(do_compare_types(
+        &Handle(Path::empty(), Some(Channel), Required, HandleRights::default()),
+        &Handle(Path::empty(), Some(Channel), Required, HandleRights::default())
+    )
+    .is_compatible());
+    assert!(do_compare_types(
+        &Handle(Path::empty(), Some(Channel), Optional, HandleRights::default()),
+        &Handle(Path::empty(), Some(Channel), Optional, HandleRights::default())
+    )
+    .is_compatible());
+    assert!(do_compare_types(
+        &Handle(Path::empty(), Some(Channel), Required, HandleRights::default()),
+        &Handle(Path::empty(), Some(Channel), Optional, HandleRights::default())
+    )
+    .is_compatible());
 
-    assert_eq!(
-        StronglyCompatible,
-        type_compatible(
-            &Handle(Path::empty(), Some(Channel), Required, HandleRights::default()),
-            &Handle(Path::empty(), Some(Channel), Optional, HandleRights::default())
-        )
-    );
-
-    assert_eq!(
-        Incompatible,
-        type_compatible(
-            &Handle(Path::empty(), Some(Channel), Optional, HandleRights::default()),
-            &Handle(Path::empty(), Some(Channel), Required, HandleRights::default())
-        )
-    );
+    assert!(do_compare_types(
+        &Handle(Path::empty(), Some(Channel), Optional, HandleRights::default()),
+        &Handle(Path::empty(), Some(Channel), Required, HandleRights::default())
+    )
+    .has_problems(vec![ProblemPattern::error()
+        .message("Sender handle(@0) is optional but receiver(@0) is required")]));
 
     // Handle rights
     assert!(compare_fidl_type(
@@ -344,8 +347,12 @@ fn handle() {
     "
     )
     .has_problems(vec![
-        ProblemPattern::type_warning("1", "2").path(Ends("HandleRights.no_rights_to_some_rights")),
-        ProblemPattern::type_error("2", "1").path(Ends("HandleRights.reduce_rights")),
+        ProblemPattern::warning()
+            .path(Ends("HandleRights.no_rights_to_some_rights"))
+            .message("Sender(@1) doesn't specify handle rights but receiver(@2) does: HandleRights(READ | WRITE)"),
+        ProblemPattern::error()
+            .path(Ends("HandleRights.reduce_rights"))
+            .message("Incompatible handle rights, sender(@2):HandleRights(WRITE), receiver(@1):HandleRights(READ | WRITE)"),
     ]));
 }
 
@@ -373,11 +380,21 @@ fn array() {
     "
     )
     .has_problems(vec![
-        ProblemPattern::type_error("1", "2").path(Ends("Arrays.size_changed")),
-        ProblemPattern::type_error("2", "1").path(Ends("Arrays.size_changed")),
-        ProblemPattern::type_error("1", "2").path(Ends("Arrays.member_incompatible[]")),
-        ProblemPattern::type_error("2", "1").path(Ends("Arrays.member_incompatible[]")),
-        ProblemPattern::type_warning("2", "1").path(Ends("Arrays.member_soft_change[]"))
+        ProblemPattern::error()
+            .path(Ends("Arrays.size_changed"))
+            .message("Array length mismatch, sender(@1):10, receiver(@2):20"),
+        ProblemPattern::error()
+            .path(Ends("Arrays.size_changed"))
+            .message("Array length mismatch, sender(@2):20, receiver(@1):10"),
+        ProblemPattern::error()
+            .path(Ends("Arrays.member_incompatible[]"))
+            .message("Incompatible primitive types, sender(@1):uint32, receiver(@2):float32"),
+        ProblemPattern::error()
+            .path(Ends("Arrays.member_incompatible[]"))
+            .message("Incompatible primitive types, sender(@2):float32, receiver(@1):uint32"),
+        ProblemPattern::warning()
+            .path(Ends("Arrays.member_soft_change[]"))
+            .message("Extra flexible enum members in sender(@2): N=2")
     ]));
 }
 
@@ -405,10 +422,18 @@ fn vector() {
     "
     )
     .has_problems(vec![
-        ProblemPattern::type_error("2", "1").path(Ends("Vectors.size_changed")),
-        ProblemPattern::type_error("1", "2").path(Ends("Vectors.member_incompatible[]")),
-        ProblemPattern::type_error("2", "1").path(Ends("Vectors.member_incompatible[]")),
-        ProblemPattern::type_warning("2", "1").path(Ends("Vectors.member_soft_change[]"))
+        ProblemPattern::error().path(Ends("Vectors.size_changed")).message(
+            "Sender vector is larger than receiver vector, sender(@2):20, receiver(@1):10"
+        ),
+        ProblemPattern::error()
+            .path(Ends("Vectors.member_incompatible[]"))
+            .message("Incompatible primitive types, sender(@1):uint32, receiver(@2):float32"),
+        ProblemPattern::error()
+            .path(Ends("Vectors.member_incompatible[]"))
+            .message("Incompatible primitive types, sender(@2):float32, receiver(@1):uint32"),
+        ProblemPattern::warning()
+            .path(Ends("Vectors.member_soft_change[]"))
+            .message("Extra flexible enum members in sender(@2): N=2")
     ]));
 }
 
@@ -430,12 +455,14 @@ fn structs() {
     "
     )
     .has_problems(vec![
-        ProblemPattern::type_error("1", "2")
-            .message(Begins("Struct has different number of members")),
-        ProblemPattern::type_error("2", "1")
-            .message(Begins("Struct has different number of members")),
-        ProblemPattern::type_error("1", "2").message(Begins("Incompatible primitive types")),
-        ProblemPattern::type_error("2", "1").message(Begins("Incompatible primitive types")),
+        ProblemPattern::error()
+            .message("Struct has different number of members, sender(@1):3, receiver(@2):2"),
+        ProblemPattern::error()
+            .message("Struct has different number of members, sender(@2):2, receiver(@1):3"),
+        ProblemPattern::error()
+            .message("Incompatible primitive types, sender(@1):int16, receiver(@2):int32"),
+        ProblemPattern::error()
+            .message("Incompatible primitive types, sender(@2):int32, receiver(@1):int16"),
     ]));
 
     // Member Compatibility
@@ -456,15 +483,15 @@ fn structs() {
     "
     )
     .has_problems(vec![
-        ProblemPattern::type_error("1", "2")
+        ProblemPattern::error()
             .path(Ends(".strong"))
-            .message(Begins("Incompatible primitive types")),
-        ProblemPattern::type_error("2", "1")
+            .message("Incompatible primitive types, sender(@1):int32, receiver(@2):float32"),
+        ProblemPattern::error()
             .path(Ends(".strong"))
-            .message(Begins("Incompatible primitive types")),
-        ProblemPattern::type_warning("2", "1")
+            .message("Incompatible primitive types, sender(@2):float32, receiver(@1):int32"),
+        ProblemPattern::warning()
             .path(Ends(".weak"))
-            .message(Begins("Extra flexible enum members"))
+            .message("Extra flexible enum members in sender(@2): N=2")
     ]));
 }
 
@@ -500,16 +527,18 @@ fn table() {
     "
     )
     .has_problems(vec![
-        ProblemPattern::type_warning("1", "2")
+        ProblemPattern::warning()
             .path(Ends("/Table"))
             .message("Table in sender(@1) has members that receiver(@2) does not have."),
-        ProblemPattern::type_error("1", "2")
+        ProblemPattern::error()
             .path(Ends("Table.three"))
-            .message(Begins("Incompatible types")),
-        ProblemPattern::type_error("2", "1")
+            .message("Incompatible types, sender(@1):string:65535, receiver(@2):int32"),
+        ProblemPattern::error()
             .path(Ends("Table.three"))
-            .message(Begins("Incompatible types")),
-        ProblemPattern::type_warning("2", "1").path(Ends("Table.four")),
+            .message("Incompatible types, sender(@2):int32, receiver(@1):string:65535"),
+        ProblemPattern::warning()
+            .path(Ends("Table.four"))
+            .message("Extra flexible enum members in sender(@2): N=2"),
     ]));
 }
 
@@ -547,16 +576,18 @@ fn union() {
     "
     )
     .has_problems(vec![
-        ProblemPattern::type_warning("1", "2")
+        ProblemPattern::warning()
             .path(Ends("/Union"))
             .message("Union in sender(@1) has members that union in receiver(@2) does not have."),
-        ProblemPattern::type_error("1", "2")
+        ProblemPattern::error()
             .path(Ends("Union.three"))
-            .message(Begins("Incompatible types")),
-        ProblemPattern::type_error("2", "1")
+            .message("Incompatible types, sender(@1):string:65535, receiver(@2):int32"),
+        ProblemPattern::error()
             .path(Ends("Union.three"))
-            .message(Begins("Incompatible types")),
-        ProblemPattern::type_warning("2", "1").path(Ends("Union.four")),
+            .message("Incompatible types, sender(@2):int32, receiver(@1):string:65535"),
+        ProblemPattern::warning()
+            .path(Ends("Union.four"))
+            .message("Extra flexible enum members in sender(@2): N=2"),
     ]));
 }
 
@@ -572,8 +603,8 @@ fn similar() {
     "
     )
     .has_problems(vec![
-        ProblemPattern::type_error("2", "1"),
-        ProblemPattern::type_error("1", "2")
+        ProblemPattern::error().message("Incompatible types, sender(@2):flexible bits : uint32 {  }, receiver(@1):flexible enum : uint32 {  }"),
+        ProblemPattern::error().message("Incompatible types, sender(@1):flexible enum : uint32 {  }, receiver(@2):flexible bits : uint32 {  }")
     ]));
     assert!(compare_fidl_type(
         "Similar",
@@ -585,8 +616,10 @@ fn similar() {
     "
     )
     .has_problems(vec![
-        ProblemPattern::type_error("2", "1"),
-        ProblemPattern::type_error("1", "2")
+        ProblemPattern::error()
+            .message("Incompatible types, sender(@2):flexible union {  }, receiver(@1):table {  }"),
+        ProblemPattern::error()
+            .message("Incompatible types, sender(@1):table {  }, receiver(@2):flexible union {  }")
     ]));
 }
 
@@ -638,21 +671,21 @@ fn endpoints() {
     let versions = vec![TypeVersions { send: Version::new("1"), recv: Version::new("2") }];
 
     assert!(compare_fidl_type_between("ClientIncompatible", &versions, source)
-        .has_problems(vec![ProblemPattern::protocol("2", "1")
+        .has_problems(vec![ProblemPattern::error()
             .message(Equals("Server(@1) missing method fuchsia.compat.test/Incompatible.Bar"))]));
 
     assert!(compare_fidl_type_between("ServerIncompatible", &versions, source)
-        .has_problems(vec![ProblemPattern::protocol("1", "2")
+        .has_problems(vec![ProblemPattern::error()
             .message(Equals("Server(@2) missing method fuchsia.compat.test/Incompatible.Foo"))]));
 
     assert!(compare_fidl_type_between("ClientAddMethod", &versions, source)
-        .has_problems(vec![ProblemPattern::protocol("2", "1")
+        .has_problems(vec![ProblemPattern::error()
             .message(Equals("Server(@1) missing method fuchsia.compat.test/AddMethod.M"))]));
 
     assert!(compare_fidl_type_between("ServerAddMethod", &versions, source).has_problems(vec![]));
 
     assert!(compare_fidl_type_between("ClientRemoveMethod", &versions, source)
-        .has_problems(vec![ProblemPattern::protocol("2", "1")
+        .has_problems(vec![ProblemPattern::error()
             .message(Equals("Server(@1) missing method fuchsia.compat.test/RemoveMethod.M"))]));
 
     assert!(compare_fidl_type_between("ServerRemoveMethod", &versions, source).has_problems(vec![]));

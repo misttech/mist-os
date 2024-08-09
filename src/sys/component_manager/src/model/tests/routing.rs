@@ -360,27 +360,13 @@ async fn use_in_collection() {
     test.create_dynamic_child(
         &vec!["b"].try_into().unwrap(),
         "coll",
-        ChildDecl {
-            name: "c".parse().unwrap(),
-            url: "test:///c".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
+        ChildBuilder::new().name("c"),
     )
     .await;
     test.create_dynamic_child(
         &vec!["b"].try_into().unwrap(),
         "coll",
-        ChildDecl {
-            name: "d".parse().unwrap(),
-            url: "test:///d".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
+        ChildBuilder::new().name("d"),
     )
     .await;
     test.check_use(
@@ -452,14 +438,7 @@ async fn use_in_collection_not_offered() {
     test.create_dynamic_child(
         &vec!["b"].try_into().unwrap(),
         "coll",
-        ChildDecl {
-            name: "c".parse().unwrap(),
-            url: "test:///c".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
+        ChildBuilder::new().name("c"),
     )
     .await;
     test.check_use(
@@ -525,14 +504,7 @@ async fn dynamic_offer_from_parent() {
     test.create_dynamic_child_with_args(
         &vec!["b"].try_into().unwrap(),
         "coll",
-        ChildDecl {
-            name: "c".parse().unwrap(),
-            url: "test:///c".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
+        ChildBuilder::new().name("c"),
         fcomponent::CreateChildArgs {
             dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
                 source_name: Some("hippo".to_string()),
@@ -548,14 +520,7 @@ async fn dynamic_offer_from_parent() {
     test.create_dynamic_child(
         &vec!["b"].try_into().unwrap(),
         "coll",
-        ChildDecl {
-            name: "d".parse().unwrap(),
-            url: "test:///d".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
+        ChildBuilder::new().name("d"),
     )
     .await;
     test.check_use(
@@ -608,30 +573,11 @@ async fn dynamic_offer_siblings_same_collection() {
     ];
     let test = RoutingTest::new("a", components).await;
 
-    test.create_dynamic_child(
-        &Moniker::root(),
-        "coll",
-        ChildDecl {
-            name: "b".parse().unwrap(),
-            url: "test:///b".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
-    )
-    .await;
+    test.create_dynamic_child(&Moniker::root(), "coll", ChildBuilder::new().name("b")).await;
     test.create_dynamic_child_with_args(
         &Moniker::root(),
         "coll",
-        ChildDecl {
-            name: "c".parse().unwrap(),
-            url: "test:///c".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
+        ChildBuilder::new().name("c"),
         fcomponent::CreateChildArgs {
             dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
                 source_name: Some("hippo".to_string()),
@@ -690,30 +636,11 @@ async fn dynamic_offer_siblings_cross_collection() {
     ];
     let test = RoutingTest::new("a", components).await;
 
-    test.create_dynamic_child(
-        &Moniker::root(),
-        "source_coll",
-        ChildDecl {
-            name: "b".parse().unwrap(),
-            url: "test:///b".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
-    )
-    .await;
+    test.create_dynamic_child(&Moniker::root(), "source_coll", ChildBuilder::new().name("b")).await;
     test.create_dynamic_child_with_args(
         &Moniker::root(),
         "target_coll",
-        ChildDecl {
-            name: "c".parse().unwrap(),
-            url: "test:///c".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
+        ChildBuilder::new().name("c"),
         fcomponent::CreateChildArgs {
             dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
                 source: Some(fdecl::Ref::Child(fdecl::ChildRef {
@@ -771,30 +698,11 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
     ];
     let test = RoutingTest::new("a", components).await;
 
-    test.create_dynamic_child(
-        &Moniker::root(),
-        "coll",
-        ChildDecl {
-            name: "b".parse().unwrap(),
-            url: "test:///b".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
-    )
-    .await;
+    test.create_dynamic_child(&Moniker::root(), "coll", ChildBuilder::new().name("b")).await;
     test.create_dynamic_child_with_args(
         &Moniker::root(),
         "coll",
-        ChildDecl {
-            name: "c".parse().unwrap(),
-            url: "test:///c".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
+        ChildBuilder::new().name("c"),
         fcomponent::CreateChildArgs {
             dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
                 source_name: Some("hippo".to_string()),
@@ -817,19 +725,7 @@ async fn dynamic_offer_destroyed_on_source_destruction() {
     .await;
 
     test.destroy_dynamic_child(Moniker::root(), "coll", "b").await;
-    test.create_dynamic_child(
-        &Moniker::root(),
-        "coll",
-        ChildDecl {
-            name: "b".parse().unwrap(),
-            url: "test:///b".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
-    )
-    .await;
+    test.create_dynamic_child(&Moniker::root(), "coll", ChildBuilder::new().name("b")).await;
 
     test.check_use(
         vec!["coll:c"].try_into().unwrap(),
@@ -886,30 +782,11 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
     ];
     let test = RoutingTest::new("a", components).await;
 
-    test.create_dynamic_child(
-        &Moniker::root(),
-        "coll",
-        ChildDecl {
-            name: "b".parse().unwrap(),
-            url: "test:///b".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
-    )
-    .await;
+    test.create_dynamic_child(&Moniker::root(), "coll", ChildBuilder::new().name("b")).await;
     test.create_dynamic_child_with_args(
         &Moniker::root(),
         "coll",
-        ChildDecl {
-            name: "c".parse().unwrap(),
-            url: "test:///c".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
+        ChildBuilder::new().name("c"),
         fcomponent::CreateChildArgs {
             dynamic_offers: Some(vec![fdecl::Offer::Directory(fdecl::OfferDirectory {
                 source_name: Some("hippo_data".to_string()),
@@ -932,19 +809,7 @@ async fn dynamic_offer_destroyed_on_target_destruction() {
     .await;
 
     test.destroy_dynamic_child(Moniker::root(), "coll", "c").await;
-    test.create_dynamic_child(
-        &Moniker::root(),
-        "coll",
-        ChildDecl {
-            name: "c".parse().unwrap(),
-            url: "test:///c".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
-    )
-    .await;
+    test.create_dynamic_child(&Moniker::root(), "coll", ChildBuilder::new().name("c")).await;
 
     test.check_use(
         vec!["coll:c"].try_into().unwrap(),
@@ -1013,14 +878,7 @@ async fn dynamic_offer_to_static_offer() {
     test.create_dynamic_child_with_args(
         &Moniker::root(),
         "coll",
-        ChildDecl {
-            name: "c".parse().unwrap(),
-            url: "test:///c".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
+        ChildBuilder::new().name("c"),
         fcomponent::CreateChildArgs {
             dynamic_offers: Some(vec![fdecl::Offer::Protocol(fdecl::OfferProtocol {
                 source_name: Some("hippo".to_string()),
@@ -1096,14 +954,7 @@ async fn create_child_with_dict() {
     test.create_dynamic_child_with_args(
         &Moniker::root(),
         "coll",
-        ChildDecl {
-            name: "b".parse().unwrap(),
-            url: "test:///b".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
+        ChildBuilder::new().name("b"),
         fcomponent::CreateChildArgs { dictionary: Some(dict.into()), ..Default::default() },
     )
     .await;
@@ -1348,20 +1199,7 @@ async fn use_runner_from_environment_in_collection() {
         )
         .build()
         .await;
-    universe
-        .create_dynamic_child(
-            &Moniker::root(),
-            "coll",
-            ChildDecl {
-                name: "b".parse().unwrap(),
-                url: "test:///b".parse().unwrap(),
-                startup: fdecl::StartupMode::Lazy,
-                environment: None,
-                on_terminate: None,
-                config_overrides: None,
-            },
-        )
-        .await;
+    universe.create_dynamic_child(&Moniker::root(), "coll", ChildBuilder::new().name("b")).await;
 
     join!(
         // Bind "coll:b". We expect to see a call to our runner service for the new component.
@@ -1772,19 +1610,7 @@ async fn use_with_destroyed_parent() {
         ("c", ComponentDeclBuilder::new().use_(use_decl.clone()).build()),
     ];
     let test = RoutingTest::new("a", components).await;
-    test.create_dynamic_child(
-        &Moniker::root(),
-        "coll",
-        ChildDecl {
-            name: "b".parse().unwrap(),
-            url: "test:///b".parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        },
-    )
-    .await;
+    test.create_dynamic_child(&Moniker::root(), "coll", ChildBuilder::new().name("b")).await;
 
     // Confirm we can use service from "c".
     test.check_use(

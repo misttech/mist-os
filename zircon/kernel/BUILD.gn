@@ -100,11 +100,17 @@ if (current_toolchain == default_toolchain) {
         # <kernel/thread.h> has #include <vm/kstack.h>.
         "//zircon/kernel/vm:headers.config",
 
+        # <vm/page.h> has #include <vm/phys/arena.h>
+        "//zircon/kernel/vm/phys:headers.config",
+
         # <vm/vm_object.h> has #include <lib/user_copy/user_ptr.h>.
         "//zircon/kernel/lib/user_copy:headers.config",
 
         # <vm/pmm_checker.h> has #include <lib/boot-options/boot-options.h>.
         "//zircon/kernel/lib/boot-options:headers.config",
+
+        # <vm/phys/arena.h> has #include <lib/memalloc/range.h>
+        "//zircon/kernel/phys/lib/memalloc:range.headers.config",
 
         # <lib/ktrace.h> has #include <lib/zircon-internal/ktrace.h>.
         "//zircon/system/ulib/zircon-internal:headers.config",
@@ -812,6 +818,7 @@ if (is_kernel) {
       "phys:tests",
       "phys/lib:tests",
       "target:tests",
+      "vm/phys:tests",
     ]
 
     if (current_cpu == "x64") {

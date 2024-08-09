@@ -61,6 +61,15 @@ pub enum Scope {
     External,
 }
 
+impl std::fmt::Display for Scope {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Platform => write!(f, "platform"),
+            Self::External => write!(f, "external"),
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialOrd, PartialEq, Eq, Hash)]
 pub struct Version {
     scope: Scope,
@@ -125,25 +134,29 @@ fn main() -> Result<ExitCode> {
         }
     }
 
-    let mut out = File::create(args.out).unwrap();
+    let has_errors;
+    {
+        let mut out = File::create(args.out).unwrap();
 
-    let (errors, warnings) = problems.into_errors_and_warnings();
+        let (errors, warnings) = problems.into_errors_and_warnings();
 
-    let has_errors = errors.len() > 0;
+        has_errors = errors.len() > 0;
 
-    for inc in errors {
-        writeln!(out, "{}", inc)?;
-        if args.enforce {
-            writeln!(stderr(), "{}", inc)?;
+        for inc in errors {
+            writeln!(out, "{}", inc)?;
+            if args.enforce {
+                writeln!(stderr(), "{}", inc)?;
+            }
+        }
+        for inc in warnings {
+            writeln!(out, "{}", inc)?;
         }
     }
-    for inc in warnings {
-        writeln!(out, "{}", inc)?;
-    }
 
+    // Exiting rather than returning saves a lot of time in unnecessary Drop implementations.
     if args.enforce && has_errors {
-        Ok(ExitCode::from(1))
+        std::process::exit(1);
     } else {
-        Ok(ExitCode::SUCCESS)
+        std::process::exit(0);
     }
 }

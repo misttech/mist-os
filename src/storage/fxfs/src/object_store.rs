@@ -815,8 +815,7 @@ impl ObjectStore {
                     store.get_keys(object_id),
                     /* permanent: */ true,
                 )
-                .await?
-                .ok_or(anyhow!(FxfsError::Inconsistent).context("Missing encryption key"))?;
+                .await?;
             true
         } else {
             false
@@ -1002,6 +1001,7 @@ impl ObjectStore {
         object_id: u64,
         txn_options: Options<'_>,
     ) -> Result<(), Error> {
+        self.key_manager.remove(object_id).await;
         self.trim_or_tombstone(object_id, true, txn_options).await
     }
 
@@ -1899,14 +1899,12 @@ impl ObjectStore {
         }
     }
 
-    /// Retrieves the wrapped keys for the given object.
-    async fn get_keys(&self, object_id: u64) -> Result<Option<WrappedKeys>, Error> {
-        match self.tree.find(&ObjectKey::keys(object_id)).await? {
-            None => Ok(None),
-            Some(Item { value: ObjectValue::Keys(EncryptionKeys::AES256XTS(keys)), .. }) => {
-                Ok(Some(keys))
-            }
-            Some(_) => Err(anyhow!(FxfsError::Inconsistent).context("open_object: Expected keys")),
+    /// Retrieves the wrapped keys for the given object.  The keys *should* be known to exist and it
+    /// will be considered an inconsistency if they don't.
+    async fn get_keys(&self, object_id: u64) -> Result<WrappedKeys, Error> {
+        match self.tree.find(&ObjectKey::keys(object_id)).await?.ok_or(FxfsError::Inconsistent)? {
+            Item { value: ObjectValue::Keys(EncryptionKeys::AES256XTS(keys)), .. } => Ok(keys),
+            _ => Err(anyhow!(FxfsError::Inconsistent).context("open_object: Expected keys")),
         }
     }
 
@@ -2622,6 +2620,38 @@ mod tests {
 
         // Let fsck check allocations.
         fsck(fs.clone()).await.expect("fsck failed");
+    }
+
+    #[fuchsia::test]
+    async fn test_tombstone_purges_keys() {
+        let fs = test_filesystem().await;
+        let root_volume = root_volume(fs.clone()).await.expect("root_volume failed");
+        let store = root_volume
+            .new_volume("test", Some(Arc::new(InsecureCrypt::new())))
+            .await
+            .expect("new_volume failed");
+        let mut transaction = fs
+            .clone()
+            .new_transaction(lock_keys![], Options::default())
+            .await
+            .expect("new_transaction failed");
+        let child = ObjectStore::create_object(
+            &store,
+            &mut transaction,
+            HandleOptions::default(),
+            None,
+            None,
+        )
+        .await
+        .expect("create_object failed");
+        transaction.commit().await.expect("commit failed");
+        assert!(store.key_manager.get(child.object_id()).await.unwrap().is_some());
+        store
+            .tombstone_object(child.object_id(), Options::default())
+            .await
+            .expect("tombstone_object failed");
+        assert!(store.key_manager.get(child.object_id()).await.unwrap().is_none());
+        fs.close().await.expect("close failed");
     }
 
     #[fuchsia::test]

@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_test.gni")
+import("//tools/cmc/build/expect_includes.gni")
 
 group("tests") {
   testonly = true
@@ -27,6 +28,10 @@ rustc_test("routing_integration_test_bin") {
   ]
 
   sources = [ "integration_test.rs" ]
+}
+
+expect_includes("trigger_shard") {
+  includes = [ "meta/trigger.shard.cml" ]
 }
 
 fuchsia_component("trigger") {

@@ -4,7 +4,6 @@
 
 use bt_rfcomm::profile::{rfcomm_connect_parameters, server_channel_from_protocol};
 use bt_rfcomm::ServerChannel;
-use fidl_fuchsia_bluetooth_bredr as bredr;
 use fuchsia_async::{DurationExt, TimeoutExt};
 use fuchsia_bluetooth::profile::{l2cap_connect_parameters, ProtocolDescriptor, Psm};
 use fuchsia_bluetooth::types::{Channel, PeerId, Uuid};
@@ -14,6 +13,7 @@ use futures::stream::StreamExt;
 use mock_piconet_client::{BtProfileComponent, PiconetHarness, PiconetMember};
 use profile_client::{ProfileClient, ProfileEvent};
 use std::pin::pin;
+use {fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr};
 
 /// RFCOMM component URL.
 /// The RFCOMM component is a unique component in that it functions as a proxy for the
@@ -115,7 +115,7 @@ async fn setup_spp_client(
         .connect_to_protocol::<bredr::ProfileMarker>(topology)
         .expect("Profile should be available");
     let spp = spp_service_definition();
-    ProfileClient::advertise(profile, vec![spp], bredr::ChannelParameters::default()).unwrap()
+    ProfileClient::advertise(profile, vec![spp], fidl_bt::ChannelParameters::default()).unwrap()
 }
 
 async fn expect_peer_advertising(
@@ -293,9 +293,12 @@ async fn passthrough_advertisement_is_discovered() {
         .connect_to_protocol::<bredr::ProfileMarker>(&test_topology)
         .expect("Profile should be available");
     let a2dp = a2dp_service_definition();
-    let _client =
-        ProfileClient::advertise(profile.clone(), vec![a2dp], bredr::ChannelParameters::default())
-            .unwrap();
+    let _client = ProfileClient::advertise(
+        profile.clone(),
+        vec![a2dp],
+        fidl_bt::ChannelParameters::default(),
+    )
+    .unwrap();
 
     // Test driven peer searches for A2DP Sink.
     let mut search_results = test_driven_peer
@@ -344,7 +347,7 @@ async fn passthrough_search_discovers_advertisement() {
     let _client_channel = profile
         .connect(
             &test_driven_peer.peer_id().into(),
-            &l2cap_connect_parameters(Psm::AVDTP, bredr::ChannelMode::Basic),
+            &l2cap_connect_parameters(Psm::AVDTP, fidl_bt::ChannelMode::Basic),
         )
         .await;
 

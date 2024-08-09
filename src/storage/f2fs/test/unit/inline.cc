@@ -568,5 +568,118 @@ TEST(InlineDataTest, DataExistFlag) {
   EXPECT_EQ(Fsck(std::move(bc), FsckOptions{.repair = false}, &bc), ZX_OK);
 }
 
+TEST(InlineXattrTest, InlineXattr) {
+  std::unique_ptr<BcacheMapper> bc;
+  FileTester::MkfsOnFakeDev(&bc);
+
+  std::unique_ptr<F2fs> fs;
+  MountOptions options{};
+  // Enable inline xattr option
+  ASSERT_EQ(options.SetValue(MountOption::kInlineXattr, 1), ZX_OK);
+  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+  FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
+
+  fbl::RefPtr<VnodeF2fs> root;
+  FileTester::CreateRoot(fs.get(), &root);
+
+  fbl::RefPtr<Dir> root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
+
+  // Inline xattr file creation
+  std::string test_filename("inline");
+  zx::result test_child = root_dir->Create(test_filename, fs::CreationType::kFile);
+  ASSERT_TRUE(test_child.is_ok()) << test_child.status_string();
+
+  fbl::RefPtr<VnodeF2fs> test_file = fbl::RefPtr<VnodeF2fs>::Downcast(*std::move(test_child));
+
+  File *test_file_ptr = static_cast<File *>(test_file.get());
+
+  FileTester::CheckInlineXattr(test_file_ptr);
+
+  // Set xattr
+  constexpr uint8_t kNameLen = 4;
+  constexpr uint16_t kValueSize = 32;
+  std::vector<std::pair<std::string, std::array<uint8_t, kValueSize>>> xattrs;
+
+  XattrEntryInfo sample_info{.name_index = 0, .name_len = kNameLen, .value_size = kValueSize};
+
+  // Set xattr within inline xattr area, until just before xattr block is allocated
+  uint8_t inline_xattr_count = (kInlineXattrAddrs - kXattrHeaderSlots) / sample_info.Slots();
+  for (uint8_t i = 0; i < inline_xattr_count; ++i) {
+    std::string name;
+    for (uint8_t j = 0; j < kNameLen; ++j) {
+      name.push_back(static_cast<std::string::value_type>('a' + i));
+    }
+
+    std::array<uint8_t, kValueSize> value;
+    value.fill(i + 1);
+
+    ASSERT_EQ(
+        test_file_ptr->SetExtendedAttribute(XattrIndex::kUser, name, value, XattrOption::kNone),
+        ZX_OK);
+
+    xattrs.emplace_back(name, value);
+  }
+
+  // Check if xattr block is not yet allocated
+  ASSERT_EQ(test_file_ptr->XattrNid(), 0U);
+
+  // Add one more xattr, then xattr block is allocated
+  std::string name = "last";
+  std::array<uint8_t, kValueSize> value;
+  value.fill(1);
+  ASSERT_EQ(test_file_ptr->SetExtendedAttribute(XattrIndex::kUser, name, value, XattrOption::kNone),
+            ZX_OK);
+
+  xattrs.emplace_back(name, value);
+  ASSERT_NE(test_file_ptr->XattrNid(), 0U);
+
+  // Get and verify
+  std::array<uint8_t, kMaxXattrValueLength> buf;
+  for (auto &xattr : xattrs) {
+    buf.fill(0);
+    zx::result<size_t> result =
+        test_file_ptr->GetExtendedAttribute(XattrIndex::kUser, xattr.first, buf);
+    ASSERT_TRUE(result.is_ok());
+    ASSERT_EQ(*result, xattr.second.size());
+    ASSERT_EQ(std::memcmp(buf.data(), xattr.second.data(), *result), 0);
+  }
+
+  // Remount
+  ASSERT_EQ(test_file->Close(), ZX_OK);
+  test_file = nullptr;
+  ASSERT_EQ(root_dir->Close(), ZX_OK);
+  root_dir = nullptr;
+
+  FileTester::Unmount(std::move(fs), &bc);
+  FileTester::MountWithOptions(loop.dispatcher(), options, &bc, &fs);
+
+  FileTester::CreateRoot(fs.get(), &root);
+  root_dir = fbl::RefPtr<Dir>::Downcast(std::move(root));
+  fbl::RefPtr<fs::Vnode> test_vn;
+  FileTester::Lookup(root_dir.get(), test_filename, &test_vn);
+  test_file = fbl::RefPtr<VnodeF2fs>::Downcast(std::move(test_vn));
+  test_file_ptr = static_cast<File *>(test_file.get());
+
+  FileTester::CheckInlineXattr(test_file_ptr);
+
+  // Get and verify
+  for (auto &xattr : xattrs) {
+    buf.fill(0);
+    zx::result<size_t> result =
+        test_file_ptr->GetExtendedAttribute(XattrIndex::kUser, xattr.first, buf);
+    ASSERT_TRUE(result.is_ok());
+    ASSERT_EQ(*result, xattr.second.size());
+    ASSERT_EQ(std::memcmp(buf.data(), xattr.second.data(), *result), 0);
+  }
+
+  ASSERT_EQ(test_file->Close(), ZX_OK);
+  test_file = nullptr;
+  ASSERT_EQ(root_dir->Close(), ZX_OK);
+  root_dir = nullptr;
+
+  FileTester::Unmount(std::move(fs), &bc);
+  EXPECT_EQ(Fsck(std::move(bc), FsckOptions{.repair = false}, &bc), ZX_OK);
+}
+
 }  // namespace
 }  // namespace f2fs

@@ -9,5 +9,8 @@ import("//build/rust/rustc_test.gni")
 
 group("tests") {
   testonly = true
-  public_deps = [ "container:tests" ]
+  public_deps = [
+    "client:tests",
+    "container:tests",
+  ]
 }

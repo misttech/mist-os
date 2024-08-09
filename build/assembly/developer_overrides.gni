@@ -25,6 +25,10 @@ import("//build/python/python_action.gni")
 #     [scope] This is a set of values to override / overlay onto the platform
 #     configuration.
 #
+#   product
+#     [scope] This is a set of value to override / overlay onto the product's
+#     provided configuration.
+#
 #   kernel
 #     [scope] This is a set of flags and settings specifically for the kernel.
 #     It's a scope with the following fields (all optional):
@@ -130,12 +134,18 @@ template("assembly_developer_overrides") {
     # platform config with the deps that are passed to this template.
     assembly_overrides_intermediate_inputs =
         "${assembly_overrides_intermediate}.inputs"
+
+    # This is a third target created by the product_assembly_config_file()
+    # template that lists all the files that were found in the intermediate
+    assembly_overrides_intermediate_input_paths =
+        "${assembly_overrides_intermediate}.input_file_paths"
   }
 
   files = {
     outdir = "${target_out_dir}/${target_name}"
     assembly_config_file = "$outdir/product_assembly_overrides.json"
     assembly_config_file_intermediate = "${target_out_dir}/${target_name}.product_assembly_overrides.intermediate.json"
+    assembly_config_file_intermediate_input_paths = "${target_out_dir}/${target_name}.product_assembly_overrides.intermediate.json.input_file_paths.json"
   }
 
   creation_inputs = []
@@ -249,6 +259,7 @@ template("assembly_developer_overrides") {
                            [
                              "developer_only_options",
                              "platform",
+                             "product",
                              "kernel",
                            ])
     packages = _packages
@@ -283,10 +294,15 @@ template("assembly_developer_overrides") {
                            ])
     binary_label = "//build/assembly/scripts:developer_overrides"
 
+    inputs = [
+      files.assembly_config_file_intermediate,
+      files.assembly_config_file_intermediate_input_paths,
+    ]
     public_deps = [
       ":${labels.assembly_overrides_intermediate_inputs}",
       ":${labels.assembly_overrides_intermediate}",
     ]
+    deps = [ ":${labels.assembly_overrides_intermediate_input_paths}" ]
 
     # The contents of these folders is dynamic, and managed entirely by this
     # action.  Further, this action will need to delete items from these
@@ -300,16 +316,20 @@ template("assembly_developer_overrides") {
       "${files.outdir}/compiled_packages",
       "${files.outdir}/packages",
       "${files.outdir}/subpackages",
+      "${files.outdir}/resources",
     ]
 
-    inputs = creation_inputs + [ files.assembly_config_file_intermediate ]
-    deps = creation_deps
+    inputs += creation_inputs
+    deps += creation_deps
     outputs = [ files.assembly_config_file ]
     depfile = "${files.assembly_config_file}.d"
 
     args = [
       "--input",
       rebase_path(files.assembly_config_file_intermediate, root_build_dir),
+      "--input-file-paths",
+      rebase_path(files.assembly_config_file_intermediate_input_paths,
+                  root_build_dir),
       "--outdir",
       rebase_path(files.outdir, root_build_dir),
       "--depfile",

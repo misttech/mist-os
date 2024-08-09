@@ -82,7 +82,7 @@ class DisplayPowerManagerMockTest : public gtest::RealLoopFixture {
 };
 
 TEST_F(DisplayPowerManagerMockTest, Ok) {
-  constexpr fuchsia::hardware::display::types::DisplayId kDisplayId = {.value = 1};
+  const fuchsia_hardware_display_types::DisplayId kDisplayId = {{.value = 1}};
   const uint32_t kDisplayWidth = 1024;
   const uint32_t kDisplayHeight = 768;
 
@@ -176,7 +176,7 @@ TEST_F(DisplayPowerManagerMockTest, NoDisplay) {
 }
 
 TEST_F(DisplayPowerManagerMockTest, NotSupported) {
-  constexpr fuchsia::hardware::display::types::DisplayId kDisplayId = {.value = 1};
+  const fuchsia_hardware_display_types::DisplayId kDisplayId = {{.value = 1}};
   const uint32_t kDisplayWidth = 1024;
   const uint32_t kDisplayHeight = 768;
 

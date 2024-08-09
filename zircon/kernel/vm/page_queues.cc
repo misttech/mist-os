@@ -1577,26 +1577,32 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::GetCowWithReplaceablePage(
       Guard<SpinLock, IrqSave> guard{&lock_};
       // While holding lock_, we can safely add an event to be notified, if needed.  While a page
       // state transition from ALLOC to OBJECT, and from OBJECT with no VmCowPages to OBJECT with a
-      // VmCowPages, are both guarded by lock_, a transition to FREE is not.  So we must check
-      // again, in an ordered fashion (using PmmNode lock not just "relaxed" atomic) for the page
-      // being in FREE state after we add an event, to ensure the transition to FREE doesn't miss
-      // the added event.  If a page transitions back out of FREE due to actions by other threads,
-      // the lock_ protects the page's object field from being overwritten by an event being added.
+      // VmCowPages, are both guarded by lock_, a transition to FREE_LOANED is not.  So we must
+      // check again, in an ordered fashion (using PmmNode lock not just "relaxed" atomic) for the
+      // page being in FREE_LOANED state after we add an event, to ensure the transition to
+      // FREE_LOANED doesn't miss the added event.  If a page transitions back out of FREE_LOANED
+      // due to actions by other threads, the lock_ protects the page's object field from being
+      // overwritten by an event being added.
       vm_page_state state = page->state();
       // If owning_cow, we know the owning_cow destructor can't run, so the only valid page
-      // states while FREE or borrowed by a VmCowPages and not pinned are FREE, ALLOC, OBJECT.
+      // states while FREE_LOANED or borrowed by a VmCowPages and not pinned are FREE_LOANED, ALLOC,
+      // OBJECT.
       //
       // If !owning_cow, the set of possible states isn't constrained, and we don't try to wait for
       // the page.
       switch (state) {
         case vm_page_state::FREE:
+          panic("Loaned page should never be FREE");
+          break;
+        case vm_page_state::FREE_LOANED:
           // No cow, but still success.  The fact that we were holding lock_ while reading page
-          // state isn't relevant to the transition to FREE; we just care that we'll notice FREE
-          // somewhere in the loop.
+          // state isn't relevant to the transition to FREE_LOANED; we just care that we'll notice
+          // FREE_LOANED somewhere in the loop.
           //
-          // We care that we will notice transition _to_ FREE that stays FREE indefinitely via this
-          // check.  Other threads doing commit/decommit on owning_cow can cause this check to miss
-          // a transient FREE state, but we avoid getting stuck waiting indefinitely.
+          // We care that we will notice transition _to_ FREE_LOANED that stays FREE_LOANED
+          // indefinitely via this check.  Other threads doing commit/decommit on owning_cow can
+          // cause this check to miss a transient FREE_LOANED state, but we avoid getting stuck
+          // waiting indefinitely.
           return ktl::nullopt;
         case vm_page_state::OBJECT: {
           // Sub-cases:
@@ -1614,9 +1620,10 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::GetCowWithReplaceablePage(
               // there wasn't.
               return ktl::nullopt;
             }
-            // Page is moving from cow to cow, and/or is on the way to FREE, so wait below for
-            // page to get a new VmCowPages or become FREE.  We still have to synchronize further
-            // below using thread_lock, since OBJECT to FREE doesn't hold PageQueues lock_.
+            // Page is moving from cow to cow, and/or is on the way to FREE_LOANED, so wait below
+            // for page to get a new VmCowPages or become FREE_LOANED.  We still have to synchronize
+            // further below using thread_lock, since OBJECT to FREE_LOANED doesn't hold PageQueues
+            // lock_.
             wait_on_stack_ownership = true;
             break;
           } else if (cow == owning_cow) {
@@ -1640,7 +1647,7 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::GetCowWithReplaceablePage(
             // We're under PageQueues lock, so this value is stable at the moment, but by the time
             // the caller acquires the cow lock this page could potentially be elsewhere, depending
             // on whether the page is allowed to move to a different VmCowPages or to a different
-            // location in this VmCowPages, without going through FREE.
+            // location in this VmCowPages, without going through FREE_LOANED.
             //
             // The cow->RemovePageForEviction() does a re-check that this page is still at this
             // offset.  The caller's loop takes care of chasing down the page if it moves between
@@ -1664,12 +1671,13 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::GetCowWithReplaceablePage(
             // is ok with a successful "none" here since the page isn't immediately replaceable.
             return ktl::nullopt;
           }
-          // Wait for ALLOC to become OBJECT or FREE.
+          // Wait for ALLOC to become OBJECT or FREE_LOANED.
           wait_on_stack_ownership = true;
           break;
         default:
           // If owning_cow, we know the owning_cow destructor can't run, so the only valid page
-          // states while FREE or borrowed by a VmCowPages and not pinned are FREE, ALLOC, OBJECT.
+          // states while FREE_LOANED or borrowed by a VmCowPages and not pinned are FREE_LOANED,
+          // ALLOC, OBJECT.
           DEBUG_ASSERT(!owning_cow);
           // When !owning_cow, the possible page states include all page states.  The caller is only
           // interested in pages that are both used by a VmCowPages (not transiently stack owned)

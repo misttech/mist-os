@@ -179,6 +179,10 @@ type WatchMask = strict bits : uint32 {
     IDLE = 0x00000010;
 };
 
+// TODO(https://fxbug.dev/324932108): This should be marked as discoverable for both platform and
+// external servers. Annotating this correctly breaks our binary compatibility checks, since
+// fuchsia.io/Node and Directory are closed protocols. This should be fixed when we make them open.
+@discoverable(server="platform")
 closed protocol Directory {
     compose Directory1;
     compose Directory2;

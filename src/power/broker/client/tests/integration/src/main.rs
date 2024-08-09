@@ -53,7 +53,7 @@ mod tests {
 
         let (provider_level_sender, provider_level_receiver) = mpsc::unbounded();
         let current_level_proxy = provider.current_level.clone();
-        let dep_token = provider.assertive_dependency_token();
+        let dep_token = provider.assertive_dependency_token().unwrap();
 
         let runner_task = fasync::Task::local(async move {
             run_power_element(
@@ -180,7 +180,7 @@ mod tests {
         let provider_lock_local = Arc::new(futures::lock::Mutex::new(()));
         let provider_lock = provider_lock_local.clone();
         let current_level_proxy = provider.current_level.clone();
-        let dep_token = provider.assertive_dependency_token();
+        let dep_token = provider.assertive_dependency_token().unwrap();
 
         fasync::Task::local(async move {
             run_power_element(

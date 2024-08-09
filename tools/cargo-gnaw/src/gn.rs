@@ -634,7 +634,8 @@ uses_fuchsia_license = true
 mod tests {
     use super::*;
     use camino::Utf8Path;
-    use cargo_metadata::Version;
+    use cargo_metadata::Edition;
+    use semver::Version;
     use std::collections::HashMap;
 
     // WARNING: the expected output tests below have non-printable artifacts
@@ -654,7 +655,7 @@ mod tests {
             &pkg_id,
             "test_target",
             "test_package",
-            "2018",
+            Edition::E2018,
             Utf8Path::from_path(project_root.as_path()).unwrap(),
             &version,
             GnRustType::Library,
@@ -708,7 +709,7 @@ mod tests {
             &pkg_id,
             "test_target",
             "test_package",
-            "2018",
+            Edition::E2018,
             Utf8Path::from_path(project_root.as_path()).unwrap(),
             &version,
             GnRustType::Library,
@@ -770,7 +771,7 @@ mod tests {
             &pkg_id,
             "test_target",
             "test_package",
-            "2018",
+            Edition::E2018,
             Utf8Path::from_path(project_root.as_path()).unwrap(),
             &version,
             GnRustType::Binary,
@@ -834,7 +835,7 @@ mod tests {
             &pkg_id,
             "test_target",
             "test_package",
-            "2018",
+            Edition::E2018,
             Utf8Path::from_path(project_root.as_path()).unwrap(),
             &version,
             GnRustType::Binary,

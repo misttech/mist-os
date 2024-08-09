@@ -71,6 +71,10 @@ const FILE_PROTOCOL_NAME string = "fuchsia.io/File";
 ///
 /// NOTE: cloned connections do not share their seek offset with their source
 /// connection.
+// TODO(https://fxbug.dev/324932108): This should be marked as discoverable for both platform and
+// external servers. Annotating this correctly breaks our binary compatibility checks, since
+// fuchsia.io/Node and File are closed protocols. This should be fixed when we make them open.
+@discoverable(server="platform")
 closed protocol File {
     compose AdvisoryLocking;
     @available(added=18)

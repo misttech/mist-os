@@ -62,6 +62,7 @@ class ContiguousPooledSystem : public ::testing::Test {
                    sysmem::MakeHeap("HEAP_TYPE.TEST_HEAP", 0), kVmoSize * kVmoCount,
                    true,       // is_always_cpu_accessible
                    true,       // is_ever_cpu_accessible
+                   true,       // is_ever_zircon_accessible
                    false,      // is_ready
                    true,       // can_be_torn_down
                    nullptr) {  // dispatcher

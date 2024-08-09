@@ -21,7 +21,7 @@
         type: "TemperatureHandler",
         name: "temperature_soc_pll",
         config: {
-            driver_path: "/dev/sys/platform/05:04:a/aml_thermal_pll/thermal",
+            sensor_name: "CPU thermal",
             cache_duration_ms: 50,
         },
     },

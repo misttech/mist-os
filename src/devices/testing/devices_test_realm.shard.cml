@@ -20,7 +20,6 @@
                 // Tests can write to debug logs
                 "fuchsia.boot.WriteOnlyLog",
                 "fuchsia.inspect.InspectSink",
-                "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
                 "fuchsia.vulkan.loader.Loader",
             ],

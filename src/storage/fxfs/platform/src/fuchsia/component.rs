@@ -214,8 +214,8 @@ impl Component {
         if let Some(channel) = lifecycle_channel {
             let me = self.clone();
             self.scope.spawn(async move {
-                if let Err(e) = me.handle_lifecycle_requests(channel).await {
-                    warn!(error = ?e, "handle_lifecycle_requests");
+                if let Err(error) = me.handle_lifecycle_requests(channel).await {
+                    warn!(?error, "handle_lifecycle_requests");
                 }
             });
         }
@@ -280,11 +280,11 @@ impl Component {
             Arc::new(FsInspectTree::new(weak_fs, fuchsia_inspect::component::inspector().root()));
         let mem_monitor = match MemoryPressureMonitor::start().await {
             Ok(v) => Some(v),
-            Err(e) => {
+            Err(error) => {
                 warn!(
-                    error = ?e,
+                    ?error,
                     "Failed to connect to memory pressure monitor. Running \
-                without pressure awareness."
+                     without pressure awareness."
                 );
                 None
             }
@@ -372,7 +372,7 @@ impl Component {
             let _ = fs_container.close().await;
         }
         // TODO(b/311550633): Stash ok res in inspect.
-        tracing::info!("handle_check for fs: {:?}", res?);
+        info!("handle_check for fs: {:?}", res?);
         Ok(())
     }
 
@@ -393,7 +393,7 @@ impl Component {
                 self.shutdown().await;
                 responder
                     .send()
-                    .unwrap_or_else(|e| warn!("Failed to send shutdown response: {}", e));
+                    .unwrap_or_else(|error| warn!(?error, "Failed to send shutdown response"));
                 return Ok(true);
             }
         }
@@ -450,17 +450,17 @@ impl Component {
                                 .await
                                 .map_err(map_to_raw_status),
                         )
-                        .unwrap_or_else(
-                            |e| warn!(error = ?e, "Failed to send volume creation response"),
-                        );
+                        .unwrap_or_else(|error| {
+                            warn!(?error, "Failed to send volume creation response")
+                        });
                 }
                 VolumesRequest::Remove { name, responder } => {
                     info!(name = name.as_str(), "Remove volume");
                     responder
                         .send(volumes.remove_volume(&name).await.map_err(map_to_raw_status))
-                        .unwrap_or_else(
-                            |e| warn!(error = ?e, "Failed to send volume removal response"),
-                        );
+                        .unwrap_or_else(|error| {
+                            warn!(?error, "Failed to send volume removal response")
+                        });
                 }
             }
         }

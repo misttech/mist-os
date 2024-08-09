@@ -22,7 +22,6 @@
             protocol: [
                 // Tests can write to debug logs
                 "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.logger.LogSink",
                 "fuchsia.process.Launcher",
             ],
             from: "parent",

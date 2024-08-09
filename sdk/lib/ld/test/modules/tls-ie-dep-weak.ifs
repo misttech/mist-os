@@ -1,9 +1,0 @@
---- !ifs-v1
-IfsVersion:      3.0
-SoName:          libtls-ie.so
-Symbols:
-  - { Name: tls_ie_data, Type: Func }
-  - { Name: tls_ie_bss, Type: Func }
-  # This is not actually defined in the runtime DSO.
-  - { Name: tls_ie_weak, Type: TLS, Size: 4 }
-...

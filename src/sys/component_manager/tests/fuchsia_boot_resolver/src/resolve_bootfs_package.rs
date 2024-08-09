@@ -47,7 +47,7 @@ async fn package_resolution() {
     };
     let _cm_controller = instance.start_with_args(args).await.unwrap();
 
-    // Confirm root component (hello_world.cm) can start and exit.
+    // Confirm root component (trigger.cm) can be started.
     let lifecycle_controller =
         instance.connect_to_protocol_at_exposed_dir::<fsys::LifecycleControllerMarker>().unwrap();
     let (_binder, server_end) = endpoints::create_proxy::<fcomponent::BinderMarker>().unwrap();
@@ -82,9 +82,7 @@ async fn package_resolution() {
     assert_read_dirents!(dir_proxy, 1000, expected.into_vec());
 
     let mut expected_bin = DirentsSameInodeBuilder::new(fio::INO_UNKNOWN);
-    expected_bin
-        .add(fio::DirentType::Directory, b".")
-        .add(fio::DirentType::File, b"hello_world_v1");
+    expected_bin.add(fio::DirentType::Directory, b".").add(fio::DirentType::File, b"trigger");
     assert_read_dirents!(
         fuchsia_fs::directory::open_directory_no_describe(
             &dir_proxy,
@@ -101,8 +99,8 @@ async fn package_resolution() {
         .add(fio::DirentType::Directory, b".")
         .add(fio::DirentType::File, b"contents")
         .add(fio::DirentType::Directory, b"fuchsia.abi")
-        .add(fio::DirentType::File, b"hello_world.cm")
-        .add(fio::DirentType::File, b"package");
+        .add(fio::DirentType::File, b"package")
+        .add(fio::DirentType::File, b"trigger.cm");
 
     assert_read_dirents!(
         fuchsia_fs::directory::open_directory_no_describe(

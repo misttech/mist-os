@@ -3875,6 +3875,10 @@ fpromise::result<zx::vmo> LogicalBufferCollection::AllocateVmo(
   // will be sync rather than async. This is mainly relevant if LogicalBufferCollection::Allocate()
   // fails to allocate a later buffer in the same collection.
   auto buffer_result = LogicalBuffer::Create(fbl::RefPtr(this), index, std::move(raw_parent_vmo));
+  if (buffer_result.is_error()) {
+    LogError(FROM_HERE, "LogicalBuffer::Create() failed - status: %d", buffer_result.error_value());
+    return fpromise::error();
+  }
   if (!buffer_result->is_ok()) {
     LogError(FROM_HERE, "LogicalBuffer::error(): %d", buffer_result->error());
     return fpromise::error();

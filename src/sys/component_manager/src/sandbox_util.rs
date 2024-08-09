@@ -396,6 +396,7 @@ pub mod tests {
 
         let cap = dict
             .get_with_request(
+                Moniker::root(),
                 &RelativePath::new("foo/bar/data").unwrap(),
                 Request {
                     availability: Availability::Required,
@@ -414,10 +415,12 @@ pub mod tests {
     #[fuchsia::test]
     async fn get_with_request_error() {
         let dict = Dict::new();
-        let foo = Router::new_error(RoutingError::SourceCapabilityIsVoid);
+        let foo =
+            Router::new_error(RoutingError::SourceCapabilityIsVoid { moniker: Moniker::root() });
         assert!(dict.insert_capability(&RelativePath::new("foo").unwrap(), foo.into()).is_ok());
         let cap = dict
             .get_with_request(
+                Moniker::root(),
                 &RelativePath::new("foo/bar").unwrap(),
                 Request {
                     availability: Availability::Required,
@@ -432,7 +435,7 @@ pub mod tests {
             Err(RouterError::NotFound(err))
             if matches!(
                 err.downcast_for_test::<RoutingError>(),
-                RoutingError::SourceCapabilityIsVoid
+                RoutingError::SourceCapabilityIsVoid { .. }
             )
         );
     }
@@ -442,6 +445,7 @@ pub mod tests {
         let dict = Dict::new();
         let cap = dict
             .get_with_request(
+                Moniker::root(),
                 &RelativePath::new("foo/bar").unwrap(),
                 Request {
                     availability: Availability::Required,
@@ -464,6 +468,7 @@ pub mod tests {
 
         let cap = dict
             .get_with_request(
+                Moniker::root(),
                 &RelativePath::new("foo").unwrap(),
                 Request {
                     availability: Availability::Required,
@@ -477,6 +482,7 @@ pub mod tests {
 
         let cap = dict
             .get_with_request(
+                Moniker::root(),
                 &RelativePath::new("foo/bar").unwrap(),
                 Request {
                     availability: Availability::Required,
@@ -675,7 +681,7 @@ pub mod tests {
         let base_router = Router::new_ok(dict1);
         let downscoped_router = base_router.lazy_get(
             RelativePath::new("source").unwrap(),
-            RoutingError::BedrockMemberAccessUnsupported,
+            RoutingError::BedrockMemberAccessUnsupported { moniker: Moniker::root().into() },
         );
 
         let capability = downscoped_router
@@ -715,7 +721,7 @@ pub mod tests {
         let base_router = Router::new_ok(dict4);
         let downscoped_router = base_router.lazy_get(
             RelativePath::new("dict3/dict2/dict1/source").unwrap(),
-            RoutingError::BedrockMemberAccessUnsupported,
+            RoutingError::BedrockMemberAccessUnsupported { moniker: Moniker::root().into() },
         );
 
         let capability = downscoped_router

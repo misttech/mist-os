@@ -40,7 +40,6 @@
         },
         {
             protocol: [
-                "fuchsia.logger.LogSink",
                 "fuchsia.scheduler.RoleManager",
                 "fuchsia.thermal.ClientStateConnector",
             ],

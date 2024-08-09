@@ -33,7 +33,8 @@ namespace {
 
 constexpr uint64_t kMiB = 1024ull * 1024;
 
-fuchsia_hardware_sysmem::HeapProperties BuildHeapProperties(bool is_cpu_accessible) {
+fuchsia_hardware_sysmem::HeapProperties BuildHeapProperties(bool is_cpu_accessible,
+                                                            bool is_ever_zircon_accessible) {
   using fuchsia_hardware_sysmem::CoherencyDomainSupport;
   using fuchsia_hardware_sysmem::HeapProperties;
 
@@ -46,13 +47,14 @@ fuchsia_hardware_sysmem::HeapProperties BuildHeapProperties(bool is_cpu_accessib
   heap_properties.coherency_domain_support() = std::move(coherency_domain_support);
   // New buffers do need to be zeroed (regardless of is_ever_cpu_accessible_ and
   // is_always_cpu_accessible_), and we want to do the zeroing in ContiguousPooledMemoryAllocator,
-  // either via Zircon's zeroing of reclaimed pages, our own zeroing of just-checked pattern pages,
-  // or via the TEE as necessary.  So we set need_clear true and return true from
-  // is_already_cleared_on_allocate().  For secure buffers, these are always cleared via the TEE
-  // even if some of the pages may have also been cleared by Zircon page reclaim, since any
-  // "scramble" HW setting feature would potentially make zeroes look like non-zero to a device
-  // reading the buffer.
-  heap_properties.need_clear() = true;
+  // either via Zircon's zeroing of reclaimed pages, our own zeroing of just-checked pattern pages.
+  // So we set need_clear true and return true from is_already_cleared_on_allocate().  For secure
+  // buffers, these are always cleared via the TEE even if some of the pages may have also been
+  // cleared by Zircon page reclaim, since any "scramble" HW setting feature would potentially make
+  // zeroes look like non-zero to a device reading the buffer.
+  // The exception is if zircon can never access the buffer, such as with any physical VMOs created
+  // for the VDEC range, then there is no risk of stray zeroes from the kernel.
+  heap_properties.need_clear() = is_ever_zircon_accessible;
 
   // is_cpu_accessible true: We don't do (all the) flushing in this class, so caller will help with
   // that.
@@ -91,9 +93,9 @@ std::atomic<trace_counter_id_t> next_counter_id;
 ContiguousPooledMemoryAllocator::ContiguousPooledMemoryAllocator(
     Owner* parent_device, const char* allocation_name, inspect::Node* parent_node,
     fuchsia_sysmem2::Heap heap, uint64_t size, bool is_always_cpu_accessible,
-    bool is_ever_cpu_accessible, bool is_ready, bool can_be_torn_down,
-    async_dispatcher_t* dispatcher)
-    : MemoryAllocator(BuildHeapProperties(is_always_cpu_accessible)),
+    bool is_ever_cpu_accessible, bool is_ever_zircon_accessible, bool is_ready,
+    bool can_be_torn_down, async_dispatcher_t* dispatcher)
+    : MemoryAllocator(BuildHeapProperties(is_always_cpu_accessible, is_ever_zircon_accessible)),
       parent_device_(parent_device),
       dispatcher_(dispatcher),
       allocation_name_(allocation_name),

@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use std::str::{CharIndices, Chars};
-
 use nom::error::{ErrorKind, ParseError};
 use nom::{
     AsBytes, Compare, CompareResult, Err, IResult, InputIter, InputLength, InputTake,
     InputTakeAtPosition, Needed, Offset, ParseTo, Slice,
 };
+use std::num::NonZero;
+use std::str::{CharIndices, Chars};
 
 /// Parsing context used to store additional information.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -62,7 +62,7 @@ impl<'a> InputIter for ParsingContext<'a> {
     {
         self.input.position(predicate)
     }
-    fn slice_index(&self, count: usize) -> Option<usize> {
+    fn slice_index(&self, count: usize) -> Result<usize, Needed> {
         self.input.slice_index(count)
     }
 }
@@ -102,7 +102,7 @@ impl<'a> InputTakeAtPosition for ParsingContext<'a> {
         self.input
             .position(predicate)
             .map(|idx| Self::take_split(&self, idx))
-            .ok_or(Err::Incomplete(Needed::Size(1)))
+            .ok_or(Err::Incomplete(Needed::Size(NonZero::new(1).unwrap())))
     }
 
     fn split_at_position1<P, E: ParseError<Self>>(
@@ -116,7 +116,7 @@ impl<'a> InputTakeAtPosition for ParsingContext<'a> {
         match self.input.position(predicate) {
             Some(0) => Err(Err::Error(E::from_error_kind(self.clone(), e))),
             Some(idx) => Ok(Self::take_split(&self, idx)),
-            None => Err(Err::Incomplete(Needed::Size(1))),
+            None => Err(Err::Incomplete(Needed::Size(NonZero::new(1).unwrap()))),
         }
     }
 

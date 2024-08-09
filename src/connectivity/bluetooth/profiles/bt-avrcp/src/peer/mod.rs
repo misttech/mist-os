@@ -18,7 +18,10 @@ use std::mem::{discriminant, Discriminant};
 use std::num::NonZeroU16;
 use std::sync::Arc;
 use tracing::{info, trace, warn};
-use {fidl_fuchsia_bluetooth_bredr as bredr, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {
+    fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
+};
 
 mod controller;
 mod handlers;
@@ -147,12 +150,12 @@ impl AVCTPConnectionType {
 
     /// Get the the correct L2cap ChannelParameters for this connection type.
     /// (basic for control, enhanced retransmission for browsing)
-    pub fn parameters(&self) -> bredr::ChannelParameters {
+    pub fn parameters(&self) -> fidl_bt::ChannelParameters {
         // TODO(https://fxbug.dev/42052066): set minimum MTU to 335.
         match self {
-            AVCTPConnectionType::Control => bredr::ChannelParameters::default(),
-            AVCTPConnectionType::Browse => bredr::ChannelParameters {
-                channel_mode: Some(bredr::ChannelMode::EnhancedRetransmission),
+            AVCTPConnectionType::Control => fidl_bt::ChannelParameters::default(),
+            AVCTPConnectionType::Browse => fidl_bt::ChannelParameters {
+                channel_mode: Some(fidl_bt::ChannelMode::EnhancedRetransmission),
                 ..Default::default()
             },
         }
@@ -1109,7 +1112,7 @@ pub(crate) mod tests {
                         assert_eq!(v, u16::from(Psm::new(27))); // AVCTP_BROWSE
                         assert_eq!(
                             params.channel_mode.expect("channel mode should not be None"),
-                            bredr::ChannelMode::EnhancedRetransmission
+                            fidl_bt::ChannelMode::EnhancedRetransmission
                         );
                     }
                     x => panic!("Expected L2CAP parameters but got: {:?}", x),
@@ -1360,7 +1363,7 @@ pub(crate) mod tests {
                         assert_eq!(v, u16::from(Psm::new(27))); // AVCTP_BROWSE
                         assert_eq!(
                             params.channel_mode.expect("channel mode should not be None"),
-                            bredr::ChannelMode::EnhancedRetransmission
+                            fidl_bt::ChannelMode::EnhancedRetransmission
                         );
                     }
                     x => panic!("Expected L2CAP parameters but got: {:?}", x),

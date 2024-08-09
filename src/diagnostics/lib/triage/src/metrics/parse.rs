@@ -12,7 +12,7 @@ use nom::character::complete::{char, none_of, one_of};
 use nom::character::{is_alphabetic, is_alphanumeric};
 use nom::combinator::{all_consuming, map, opt, peek, recognize};
 use nom::error::{convert_error, VerboseError};
-use nom::multi::{fold_many0, many0, separated_list};
+use nom::multi::{fold_many0, many0, separated_list0};
 use nom::sequence::{delimited, pair, preceded, separated_pair, terminated, tuple};
 use nom::Err::{self, Incomplete};
 use nom::{IResult, InputLength, Slice};
@@ -71,9 +71,9 @@ fn whitespace<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ParsingContext<'a>
 fn spewing<'a, F, O>(
     note: &'static str,
     parser: F,
-) -> impl Fn(&'a str) -> IResult<&'a str, O, VerboseError<&'a str>>
+) -> impl FnMut(&'a str) -> IResult<&'a str, O, VerboseError<&'a str>>
 where
-    F: Fn(&'a str) -> IResult<&'a str, O, VerboseError<&'a str>>,
+    F: FnMut(&'a str) -> IResult<&'a str, O, VerboseError<&'a str>>,
 {
     let dumper = move |i: ParsingContext<'a>| {
         println!("{}:'{}'", note, &i[..min(20, i.len())]);
@@ -83,9 +83,9 @@ where
 }*/
 
 // A bit of syntactic sugar - just adds optional whitespace in front of any parser.
-fn spaced<'a, F, O>(parser: F) -> impl Fn(ParsingContext<'a>) -> ParsingResult<'a, O>
+fn spaced<'a, F, O>(parser: F) -> impl FnMut(ParsingContext<'a>) -> ParsingResult<'a, O>
 where
-    F: Fn(ParsingContext<'a>) -> ParsingResult<'a, O>,
+    F: FnMut(ParsingContext<'a>) -> ParsingResult<'a, O>,
 {
     preceded(whitespace, parser)
 }
@@ -304,7 +304,7 @@ fn function_name_parser<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, Function
 
 fn function_expression<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionTree> {
     let open_paren = spaced(char('('));
-    let expressions = separated_list(spaced(char(',')), expression_top);
+    let expressions = separated_list0(spaced(char(',')), expression_top);
     let close_paren = spaced(char(')'));
     let function_sequence = tuple((function_name_parser, open_paren, expressions, close_paren));
     map(function_sequence, move |(function, _, operands, _)| {
@@ -314,7 +314,7 @@ fn function_expression<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, Expressio
 
 fn vector_expression<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionTree> {
     let open_bracket = spaced(char('['));
-    let expressions = separated_list(spaced(char(',')), expression_top);
+    let expressions = separated_list0(spaced(char(',')), expression_top);
     let close_bracket = spaced(char(']'));
     let vector_sequence = tuple((open_bracket, expressions, close_bracket));
     map(vector_sequence, move |(_, items, _)| ExpressionTree::Vector(items))(i)
@@ -333,6 +333,7 @@ fn expression_primitive<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, Expressi
 // Scans for primitive expressions separated by * and /.
 fn expression_muldiv<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionTree> {
     let (i, init) = expression_primitive(i)?;
+    let mut init = Some(init);
     fold_many0(
         pair(
             alt((
@@ -344,7 +345,7 @@ fn expression_muldiv<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionT
             )),
             expression_primitive,
         ),
-        init,
+        move || init.take().unwrap(),
         |acc, (op, expr)| ExpressionTree::Function(op, vec![acc, expr]),
     )(i)
 }
@@ -353,9 +354,10 @@ fn expression_muldiv<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionT
 // separated by + and -. Remember unary + and - will be recognized by number().
 fn expression_addsub<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionTree> {
     let (i, init) = expression_muldiv(i)?;
+    let mut init = Some(init);
     fold_many0(
         pair(alt((math!("+", Add), math!("-", Sub))), expression_muldiv),
-        init,
+        move || init.take().unwrap(),
         |acc, (op, expr)| ExpressionTree::Function(op, vec![acc, expr]),
     )(i)
 }
@@ -385,7 +387,7 @@ fn expression_top<'a>(i: ParsingContext<'a>) -> ParsingResult<'a, ExpressionTree
 // to be evaluated.
 pub(crate) fn parse_expression(i: &str, namespace: &str) -> Result<ExpressionTree, Error> {
     let ctx = ParsingContext::new(i, namespace);
-    let match_whole = all_consuming(terminated(expression_top, whitespace));
+    let mut match_whole = all_consuming(terminated(expression_top, whitespace));
     match match_whole(ctx) {
         Err(Err::Error(e)) | Err(Err::Failure(e)) => {
             return Err(format_err!(

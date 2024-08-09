@@ -4,58 +4,84 @@
 
 use crate::error::AvailabilityRoutingError;
 use cm_rust::{Availability, ExposeDeclCommon, ExposeSource, OfferDeclCommon, OfferSource};
+use moniker::ExtendedMoniker;
 
 pub fn advance_with_offer(
+    moniker: &ExtendedMoniker,
     current: Availability,
     offer: &impl OfferDeclCommon,
 ) -> Result<Availability, AvailabilityRoutingError> {
-    let result = advance(current, *offer.availability());
+    let result = advance(moniker, current, *offer.availability());
     if offer.source() == &OfferSource::Void
-        && result == Err(AvailabilityRoutingError::TargetHasStrongerAvailability)
+        && result
+            == Err(AvailabilityRoutingError::TargetHasStrongerAvailability {
+                moniker: moniker.clone(),
+            })
     {
-        return Err(AvailabilityRoutingError::OfferFromVoidToRequiredTarget);
+        return Err(AvailabilityRoutingError::OfferFromVoidToRequiredTarget {
+            moniker: moniker.clone(),
+        });
     }
     result
 }
 
 pub fn advance_with_expose(
+    moniker: &ExtendedMoniker,
     current: Availability,
     expose: &impl ExposeDeclCommon,
 ) -> Result<Availability, AvailabilityRoutingError> {
-    let result = advance(current, *expose.availability());
+    let result = advance(moniker, current, *expose.availability());
     if expose.source() == &ExposeSource::Void
-        && result == Err(AvailabilityRoutingError::TargetHasStrongerAvailability)
+        && result
+            == Err(AvailabilityRoutingError::TargetHasStrongerAvailability {
+                moniker: moniker.clone(),
+            })
     {
-        return Err(AvailabilityRoutingError::ExposeFromVoidToRequiredTarget);
+        return Err(AvailabilityRoutingError::ExposeFromVoidToRequiredTarget {
+            moniker: moniker.clone(),
+        });
     }
     result
 }
 
 impl crate::legacy_router::OfferVisitor for Availability {
-    fn visit(&mut self, offer: &cm_rust::OfferDecl) -> Result<(), crate::RoutingError> {
-        *self = advance_with_offer(*self, offer)?;
+    fn visit(
+        &mut self,
+        moniker: &ExtendedMoniker,
+        offer: &cm_rust::OfferDecl,
+    ) -> Result<(), crate::RoutingError> {
+        *self = advance_with_offer(moniker, *self, offer)?;
         Ok(())
     }
 }
 
 impl crate::legacy_router::ExposeVisitor for Availability {
-    fn visit(&mut self, expose: &cm_rust::ExposeDecl) -> Result<(), crate::RoutingError> {
-        *self = advance_with_expose(*self, expose)?;
+    fn visit(
+        &mut self,
+        moniker: &ExtendedMoniker,
+        expose: &cm_rust::ExposeDecl,
+    ) -> Result<(), crate::RoutingError> {
+        *self = advance_with_expose(moniker, *self, expose)?;
         Ok(())
     }
 }
 
 impl crate::legacy_router::CapabilityVisitor for Availability {
-    fn visit(&mut self, _: &cm_rust::CapabilityDecl) -> Result<(), crate::RoutingError> {
+    fn visit(
+        &mut self,
+        _: &ExtendedMoniker,
+        _: &cm_rust::CapabilityDecl,
+    ) -> Result<(), crate::RoutingError> {
         Ok(())
     }
 }
 
 pub fn advance(
+    moniker: &ExtendedMoniker,
     current: Availability,
     next_availability: Availability,
 ) -> Result<Availability, AvailabilityRoutingError> {
-    let next = availability::advance(current, next_availability)?;
+    let next = availability::advance(moniker, current, next_availability)?;
     Ok(next)
 }
 
@@ -98,25 +124,25 @@ mod tests {
     #[test_case(
         Availability::Optional,
         new_offer(Availability::Transitional),
-        Err(AvailabilityRoutingError::TargetHasStrongerAvailability)
+        Err(AvailabilityRoutingError::TargetHasStrongerAvailability { moniker: ExtendedMoniker::ComponentManager })
     )]
     #[test_case(Availability::Optional, new_void_offer(), Ok(()))]
     #[test_case(
         Availability::Required,
         new_offer(Availability::Optional),
-        Err(AvailabilityRoutingError::TargetHasStrongerAvailability)
+        Err(AvailabilityRoutingError::TargetHasStrongerAvailability { moniker: ExtendedMoniker::ComponentManager })
     )]
     #[test_case(Availability::Required, new_offer(Availability::Required), Ok(()))]
     #[test_case(Availability::Required, new_offer(Availability::SameAsTarget), Ok(()))]
     #[test_case(
         Availability::Required,
         new_offer(Availability::Transitional),
-        Err(AvailabilityRoutingError::TargetHasStrongerAvailability)
+        Err(AvailabilityRoutingError::TargetHasStrongerAvailability { moniker: ExtendedMoniker::ComponentManager })
     )]
     #[test_case(
         Availability::Required,
         new_void_offer(),
-        Err(AvailabilityRoutingError::OfferFromVoidToRequiredTarget)
+        Err(AvailabilityRoutingError::OfferFromVoidToRequiredTarget { moniker: ExtendedMoniker::ComponentManager })
     )]
     #[test_case(Availability::Transitional, new_offer(Availability::Optional), Ok(()))]
     #[test_case(Availability::Transitional, new_offer(Availability::Required), Ok(()))]
@@ -128,7 +154,8 @@ mod tests {
         offer: OfferDecl,
         expected: Result<(), AvailabilityRoutingError>,
     ) {
-        let actual = advance_with_offer(availability, &offer).map(|_| ());
+        let actual = advance_with_offer(&ExtendedMoniker::ComponentManager, availability, &offer)
+            .map(|_| ());
         assert_eq!(actual, expected);
     }
 
@@ -160,7 +187,7 @@ mod tests {
     #[test_case(
         Availability::Optional,
         new_expose(Availability::Transitional),
-        Err(AvailabilityRoutingError::TargetHasStrongerAvailability)
+        Err(AvailabilityRoutingError::TargetHasStrongerAvailability { moniker: ExtendedMoniker::ComponentManager })
     )]
     #[test_case(
         Availability::Optional,
@@ -170,19 +197,19 @@ mod tests {
     #[test_case(
         Availability::Required,
         new_expose(Availability::Optional),
-        Err(AvailabilityRoutingError::TargetHasStrongerAvailability)
+        Err(AvailabilityRoutingError::TargetHasStrongerAvailability { moniker: ExtendedMoniker::ComponentManager })
     )]
     #[test_case(Availability::Required, new_expose(Availability::Required), Ok(()))]
     #[test_case(Availability::Required, new_expose(Availability::SameAsTarget), Ok(()))]
     #[test_case(
         Availability::Required,
         new_expose(Availability::Transitional),
-        Err(AvailabilityRoutingError::TargetHasStrongerAvailability)
+        Err(AvailabilityRoutingError::TargetHasStrongerAvailability { moniker: ExtendedMoniker::ComponentManager })
     )]
     #[test_case(
         Availability::Required,
         new_void_expose(),
-        Err(AvailabilityRoutingError::ExposeFromVoidToRequiredTarget)
+        Err(AvailabilityRoutingError::ExposeFromVoidToRequiredTarget { moniker: ExtendedMoniker::ComponentManager })
     )]
     #[test_case(Availability::Transitional, new_expose(Availability::Optional), Ok(()))]
     #[test_case(Availability::Transitional, new_expose(Availability::Required), Ok(()))]
@@ -198,7 +225,8 @@ mod tests {
         expose: ExposeDecl,
         expected: Result<(), AvailabilityRoutingError>,
     ) {
-        let actual = advance_with_expose(availability, &expose).map(|_| ());
+        let actual = advance_with_expose(&ExtendedMoniker::ComponentManager, availability, &expose)
+            .map(|_| ());
         assert_eq!(actual, expected);
     }
 }

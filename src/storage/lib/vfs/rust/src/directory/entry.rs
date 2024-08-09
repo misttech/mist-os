@@ -88,39 +88,32 @@ pub trait DirectoryEntryAsync: DirectoryEntry {
 #[derive(Debug)]
 pub struct OpenRequest<'a> {
     scope: ExecutionScope,
-    flags_or_protocols: FlagsOrProtocols<'a>,
+    request_flags: RequestFlags,
     path: Path,
     object_request: ObjectRequestRef<'a>,
 }
 
-/// Wraps flags (io1) or protocols (io2).
+/// Wraps flags used for open requests based on which fuchsia.io/Directory.Open method was used.
+/// Used to delegate [`OpenRequest`] to the corresponding method when the entry is opened.
 #[derive(Debug)]
-pub enum FlagsOrProtocols<'a> {
-    /// io1
-    Flags(fio::OpenFlags),
-    /// io2
-    Protocols(&'a fio::ConnectionProtocols),
+pub enum RequestFlags {
+    /// fuchsia.io/Directory.Open1 (io1)
+    Open1(fio::OpenFlags),
+    /// fuchsia.io/Directory.Open3 (io2)
     #[cfg(fuchsia_api_level_at_least = "HEAD")]
-    /// io3
-    Flags3(fio::Flags),
+    Open3(fio::Flags),
 }
 
-impl From<fio::OpenFlags> for FlagsOrProtocols<'_> {
+impl From<fio::OpenFlags> for RequestFlags {
     fn from(value: fio::OpenFlags) -> Self {
-        FlagsOrProtocols::Flags(value)
-    }
-}
-
-impl<'a> From<&'a fio::ConnectionProtocols> for FlagsOrProtocols<'a> {
-    fn from(value: &'a fio::ConnectionProtocols) -> Self {
-        FlagsOrProtocols::Protocols(value)
+        RequestFlags::Open1(value)
     }
 }
 
 #[cfg(fuchsia_api_level_at_least = "HEAD")]
-impl From<fio::Flags> for FlagsOrProtocols<'_> {
+impl From<fio::Flags> for RequestFlags {
     fn from(value: fio::Flags) -> Self {
-        FlagsOrProtocols::Flags3(value)
+        RequestFlags::Open3(value)
     }
 }
 
@@ -128,11 +121,11 @@ impl<'a> OpenRequest<'a> {
     /// Creates a new open request.
     pub fn new(
         scope: ExecutionScope,
-        flags_or_protocols: impl Into<FlagsOrProtocols<'a>>,
+        request_flags: impl Into<RequestFlags>,
         path: Path,
         object_request: ObjectRequestRef<'a>,
     ) -> Self {
-        Self { scope, flags_or_protocols: flags_or_protocols.into(), path, object_request }
+        Self { scope, request_flags: request_flags.into(), path, object_request }
     }
 
     /// Returns the path for this request.
@@ -171,7 +164,7 @@ impl<'a> OpenRequest<'a> {
         match self {
             OpenRequest {
                 scope,
-                flags_or_protocols: FlagsOrProtocols::Flags(flags),
+                request_flags: RequestFlags::Open1(flags),
                 path,
                 object_request,
             } => {
@@ -180,19 +173,10 @@ impl<'a> OpenRequest<'a> {
                 // tail recursion optimization, but that shouldn't occur in practice.
                 Ok(())
             }
-            OpenRequest {
-                scope,
-                flags_or_protocols: FlagsOrProtocols::Protocols(protocols),
-                path,
-                object_request,
-            } => {
-                // We should fix the copy of protocols here.
-                dir.open2(scope, path, protocols.clone(), object_request)
-            }
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             OpenRequest {
                 scope,
-                flags_or_protocols: FlagsOrProtocols::Flags3(flags),
+                request_flags: RequestFlags::Open3(flags),
                 path,
                 object_request,
             } => dir.open3(scope, path, flags, object_request),
@@ -204,7 +188,7 @@ impl<'a> OpenRequest<'a> {
         match self {
             OpenRequest {
                 scope,
-                flags_or_protocols: FlagsOrProtocols::Flags(flags),
+                request_flags: RequestFlags::Open1(flags),
                 path,
                 object_request,
             } => {
@@ -213,21 +197,10 @@ impl<'a> OpenRequest<'a> {
                 }
                 file::serve(file, scope, &flags, object_request)
             }
-            OpenRequest {
-                scope,
-                flags_or_protocols: FlagsOrProtocols::Protocols(protocols),
-                path,
-                object_request,
-            } => {
-                if !path.is_empty() {
-                    return Err(Status::NOT_DIR);
-                }
-                file::serve(file, scope, protocols, object_request)
-            }
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             OpenRequest {
                 scope,
-                flags_or_protocols: FlagsOrProtocols::Flags3(flags),
+                request_flags: RequestFlags::Open3(flags),
                 path,
                 object_request,
             } => {
@@ -244,7 +217,7 @@ impl<'a> OpenRequest<'a> {
         match self {
             OpenRequest {
                 scope,
-                flags_or_protocols: FlagsOrProtocols::Flags(flags),
+                request_flags: RequestFlags::Open1(flags),
                 path,
                 object_request,
             } => {
@@ -253,21 +226,10 @@ impl<'a> OpenRequest<'a> {
                 }
                 symlink::serve(service, scope, &flags, object_request)
             }
-            OpenRequest {
-                scope,
-                flags_or_protocols: FlagsOrProtocols::Protocols(protocols),
-                path,
-                object_request,
-            } => {
-                if !path.is_empty() {
-                    return Err(Status::NOT_DIR);
-                }
-                symlink::serve(service, scope, protocols, object_request)
-            }
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             OpenRequest {
                 scope,
-                flags_or_protocols: FlagsOrProtocols::Flags3(flags),
+                request_flags: RequestFlags::Open3(flags),
                 path,
                 object_request,
             } => {
@@ -284,7 +246,7 @@ impl<'a> OpenRequest<'a> {
         match self {
             OpenRequest {
                 scope,
-                flags_or_protocols: FlagsOrProtocols::Flags(flags),
+                request_flags: RequestFlags::Open1(flags),
                 path,
                 object_request,
             } => {
@@ -293,21 +255,10 @@ impl<'a> OpenRequest<'a> {
                 }
                 service::serve(service, scope, &flags, object_request)
             }
-            OpenRequest {
-                scope,
-                flags_or_protocols: FlagsOrProtocols::Protocols(protocols),
-                path,
-                object_request,
-            } => {
-                if !path.is_empty() {
-                    return Err(Status::NOT_DIR);
-                }
-                service::serve(service, scope, protocols, object_request)
-            }
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             OpenRequest {
                 scope,
-                flags_or_protocols: FlagsOrProtocols::Flags3(flags),
+                request_flags: RequestFlags::Open3(flags),
                 path,
                 object_request,
             } => {
@@ -327,7 +278,7 @@ impl<'a> OpenRequest<'a> {
         match self {
             OpenRequest {
                 scope,
-                flags_or_protocols: FlagsOrProtocols::Flags(flags),
+                request_flags: RequestFlags::Open1(flags),
                 path,
                 object_request,
             } => {
@@ -344,32 +295,10 @@ impl<'a> OpenRequest<'a> {
                 }
                 Ok(())
             }
-            OpenRequest {
-                scope,
-                flags_or_protocols: FlagsOrProtocols::Protocols(protocols),
-                path,
-                object_request,
-            } => {
-                let protocols = protocols.clone();
-                if object_request.what_to_send() == ObjectRequestSend::Nothing && remote.lazy(&path)
-                {
-                    let object_request = object_request.take();
-                    scope.clone().spawn(async move {
-                        if object_request.wait_till_ready().await {
-                            object_request.handle(|object_request| {
-                                remote.open2(scope, path, protocols, object_request)
-                            });
-                        }
-                    });
-                    Ok(())
-                } else {
-                    remote.open2(scope, path, protocols, object_request)
-                }
-            }
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
             OpenRequest {
                 scope,
-                flags_or_protocols: FlagsOrProtocols::Flags3(flags),
+                request_flags: RequestFlags::Open3(flags),
                 path,
                 object_request,
             } => {
@@ -391,14 +320,14 @@ impl<'a> OpenRequest<'a> {
 
     /// Spawns a task to handle the request.  `entry` must implement DirectoryEntryAsync.
     pub fn spawn(self, entry: Arc<impl DirectoryEntryAsync>) {
-        let OpenRequest { scope, flags_or_protocols, path, object_request } = self;
+        let OpenRequest { scope, request_flags, path, object_request } = self;
         let mut object_request = object_request.take();
-        match flags_or_protocols {
-            FlagsOrProtocols::Flags(flags) => scope.clone().spawn(async move {
+        match request_flags {
+            RequestFlags::Open1(flags) => scope.clone().spawn(async move {
                 match entry
                     .open_entry_async(OpenRequest::new(
                         scope,
-                        FlagsOrProtocols::Flags(flags),
+                        RequestFlags::Open1(flags),
                         path,
                         &mut object_request,
                     ))
@@ -408,30 +337,13 @@ impl<'a> OpenRequest<'a> {
                     Err(s) => object_request.shutdown(s),
                 }
             }),
-            FlagsOrProtocols::Protocols(protocols) => {
-                let protocols = protocols.clone();
-                scope.clone().spawn(async move {
-                    match entry
-                        .open_entry_async(OpenRequest::new(
-                            scope,
-                            FlagsOrProtocols::Protocols(&protocols),
-                            path,
-                            &mut object_request,
-                        ))
-                        .await
-                    {
-                        Ok(()) => {}
-                        Err(s) => object_request.shutdown(s),
-                    }
-                });
-            }
             #[cfg(fuchsia_api_level_at_least = "HEAD")]
-            FlagsOrProtocols::Flags3(flags) => {
+            RequestFlags::Open3(flags) => {
                 scope.clone().spawn(async move {
                     match entry
                         .open_entry_async(OpenRequest::new(
                             scope,
-                            FlagsOrProtocols::Flags3(flags),
+                            RequestFlags::Open3(flags),
                             path,
                             &mut object_request,
                         ))
@@ -508,14 +420,14 @@ pub fn serve_directory(
 #[cfg(test)]
 mod tests {
     use super::{
-        DirectoryEntry, DirectoryEntryAsync, EntryInfo, FlagsOrProtocols, OpenRequest, SubNode,
+        DirectoryEntry, DirectoryEntryAsync, EntryInfo, OpenRequest, RequestFlags, SubNode,
     };
     use crate::directory::entry::GetEntryInfo;
     use crate::directory::entry_container::Directory;
     use crate::execution_scope::ExecutionScope;
     use crate::file::read_only;
     use crate::path::Path;
-    use crate::{assert_read, pseudo_directory, ToObjectRequest};
+    use crate::{assert_read, pseudo_directory, ObjectRequest, ToObjectRequest};
     use assert_matches::assert_matches;
     use fidl::endpoints::{create_endpoints, create_proxy, ClientEnd};
     use fidl_fuchsia_io as fio;
@@ -606,7 +518,7 @@ mod tests {
                 assert_matches!(
                     request,
                     OpenRequest {
-                        flags_or_protocols: FlagsOrProtocols::Flags(f),
+                        request_flags: RequestFlags::Open1(f),
                         path,
                         ..
                     } if f == flags_copy && path.as_ref() == "a/b/c"
@@ -629,32 +541,26 @@ mod tests {
         );
 
         let (proxy, server) = create_proxy::<fio::NodeMarker>().unwrap();
-        let protocols = fio::ConnectionProtocols::Node(fio::NodeOptions {
-            protocols: Some(fio::NodeProtocols {
-                file: Some(fio::FileProtocolFlags::APPEND),
-                ..Default::default()
-            }),
-            ..Default::default()
-        });
-        let mut object_request = protocols.to_object_request(server);
+        let flags = fio::Flags::PROTOCOL_FILE | fio::Flags::FILE_APPEND;
+        let mut object_request =
+            ObjectRequest::new3(flags, &Default::default(), server.into_channel());
 
-        let protocols_copy = protocols.clone();
         Arc::new(MockNode {
             callback: move |request| {
                 assert_matches!(
                     request,
                     OpenRequest {
-                        flags_or_protocols: FlagsOrProtocols::Protocols(p),
+                        request_flags: RequestFlags::Open3(f),
                         path,
                         ..
-                    } if p == &protocols_copy && path.as_ref() == "a/b/c"
+                    } if f == flags && path.as_ref() == "a/b/c"
                 );
                 Status::BAD_STATE
             },
         })
         .open_entry(OpenRequest::new(
             scope.clone(),
-            &protocols,
+            flags,
             "a/b/c".try_into().unwrap(),
             &mut object_request,
         ))

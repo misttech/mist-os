@@ -95,7 +95,7 @@ impl<R> SessionParser<R> {
                     // Fall back to asking for the max trace record size if we don't know
                     // how much we want.
                     nom::Needed::Unknown => 32768,
-                    nom::Needed::Size(n) => n,
+                    nom::Needed::Size(n) => n.into(),
                 })
             }
         }

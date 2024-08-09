@@ -174,6 +174,9 @@ type ComponentStartInfo = resource table {
 /// state in the framework, to receive those state again the next time it is
 /// started.
 ///
+/// Before stopping, a component can optionally use `OnStopInfo` to publish
+/// information such as the exit code.
+///
 /// EPITAPH
 ///
 /// This protocol sends a FIDL epitaph to indicate that the component instance
@@ -261,5 +264,26 @@ closed protocol ComponentController {
         /// dictionary, put the event pair inside with an appropriate key
         /// (e.g. `"my_event_pair"`), then check for that entry on startup.
         2: escrowed_dictionary fuchsia.component.sandbox.DictionaryRef;
+    });
+
+    /// Publish information about the execution, before closing the channel.
+    ///
+    /// The component lifecycle does not transition to `Stopped` until the
+    /// channel is closed.
+    ///
+    /// Repeated calls will replace the old value. This is discouraged.
+    ///
+    /// This event is optional.
+    @available(added=HEAD)
+    strict -> OnStopInfo(@generated_name("ComponentStopInfo") resource table {
+        /// The exit code of the component instance.
+        ///
+        /// Runner implementors may map their runtime specific exit code concept
+        /// (such as libc exit status) to this field.
+        ///
+        /// The framework interprets a value of 0 as success, and other values
+        /// as errors. The framework does not make more assumptions about the
+        /// meaning of specific values.
+        1: exit_code int64;
     });
 };

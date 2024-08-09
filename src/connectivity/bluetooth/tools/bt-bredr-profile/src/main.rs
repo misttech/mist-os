@@ -7,6 +7,7 @@
 use anyhow::{anyhow, Context, Error};
 use bt_rfcomm::ServerChannel;
 use fidl::endpoints::create_request_stream;
+use fidl_fuchsia_bluetooth::{ChannelMode, ChannelParameters, SecurityRequirements};
 use fidl_fuchsia_bluetooth_bredr::*;
 use fidl_fuchsia_bluetooth_rfcomm_test::RfcommTestMarker;
 use fuchsia_async as fasync;
@@ -132,7 +133,7 @@ async fn advertise(
         .map_err(|_| anyhow!("max-rx-sdu-size must be an integer i the range 0 - 65535"))?;
     let params = ChannelParameters {
         channel_mode: Some(channel_mode),
-        max_rx_sdu_size: Some(max_rx_sdu_size),
+        max_rx_packet_size: Some(max_rx_sdu_size),
         security_requirements: None,
         ..Default::default()
     };
@@ -166,7 +167,7 @@ async fn advertise(
         advertisement_stopper: end_ad_sender,
         params: ChannelParameters {
             channel_mode: Some(channel_mode),
-            max_rx_sdu_size: Some(max_rx_sdu_size),
+            max_rx_packet_size: Some(max_rx_sdu_size),
             security_requirements: None,
             ..Default::default()
         },
@@ -204,7 +205,7 @@ async fn services(state: Arc<Mutex<ProfileState>>) {
             "Service:\n  Id: {}\n  Mode: {:?}, Max Rx Sdu Size: {}",
             id,
             service.params.channel_mode.unwrap(),
-            service.params.max_rx_sdu_size.unwrap()
+            service.params.max_rx_packet_size.unwrap()
         );
     }
 }
@@ -225,7 +226,7 @@ async fn connect_l2cap(
     let security_requirements = security_requirements_from_str(args[4].as_ref())?;
     let params = ChannelParameters {
         channel_mode: Some(channel_mode),
-        max_rx_sdu_size: Some(max_rx_sdu_size),
+        max_rx_packet_size: Some(max_rx_sdu_size),
         security_requirements,
         ..Default::default()
     };

@@ -44,7 +44,7 @@ pub async fn get_open_status(node_proxy: &fio::NodeProxy) -> zx::Status {
         match result.expect("FIDL error") {
             fio::NodeEvent::OnOpen_ { s, info: _ } => zx::Status::from_raw(s),
             fio::NodeEvent::OnRepresentation { .. } => panic!(
-                "This function should only be used with fuchsia.io/Directory.Open, *not* Open2!"
+                "This function should only be used with fuchsia.io/Directory.Open, *not* Open3!"
             ),
         }
     } else {

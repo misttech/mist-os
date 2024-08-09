@@ -47,6 +47,7 @@ ffx("ffx") {
     "//src/developer/ffx/daemon/proxy:lib",
     "//src/developer/ffx/lib/errors:lib",
     "//src/developer/ffx/lib/fho/search:lib",
+    "//src/lib/async-utils",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:async-trait",

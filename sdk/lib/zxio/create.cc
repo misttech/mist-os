@@ -113,17 +113,16 @@ class ZxioCreateOnRepresentationEventHandler final : public fidl::WireSyncEventH
   zx_status_t& status_;
 };
 
-// Helper for `ProtocolToObjectType` to reduce verbosity when getting protocol identifier strings
-// and to provide protocol names for non-discoverable protocols.
+// Same as `fidl::DiscoverableProtocolName` except using a `std::string_view`.
 template <typename Protocol>
 constexpr std::string_view kProtocolName = fidl::DiscoverableProtocolName<Protocol>;
 
 // TODO(https://fxbug.dev/42056856): We can't mark certain fuchsia.io protocols as @discoverable
 // so we need to hard-code these constants until they are updated.
 template <>
-constexpr std::string_view kProtocolName<fuchsia_io::Directory> = "fuchsia.io.Directory";
+constexpr std::string_view kProtocolName<fio::Directory> = "fuchsia.io.Directory";
 template <>
-constexpr std::string_view kProtocolName<fuchsia_io::File> = "fuchsia.io.File";
+constexpr std::string_view kProtocolName<fio::File> = "fuchsia.io.File";
 
 // Maps a given discoverable FIDL protocol to an equivalent ZXIO type. If the protocol is unknown,
 // it will be mapped to `ZXIO_OBJECT_TYPE_NONE`.

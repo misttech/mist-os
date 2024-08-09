@@ -28,6 +28,7 @@ fn source_to_value(
     default: &Option<cm_rust::ConfigValue>,
     source: CapabilitySource,
 ) -> Result<Option<cm_rust::ConfigValue>, RoutingError> {
+    let moniker = source.source_moniker();
     let cap = match source {
         CapabilitySource::Void(_) => {
             return Ok(default.clone());
@@ -37,18 +38,14 @@ fn source_to_value(
         }) => source_capability,
         CapabilitySource::Component(ComponentSource { capability, .. }) => capability,
         o => {
-            return Err(RoutingError::UnsupportedRouteSource {
-                source_type: o.type_name().to_string(),
-            });
+            return Err(RoutingError::unsupported_route_source(moniker, o.type_name().to_string()));
         }
     };
 
     let cap = match cap {
         ComponentCapability::Config(c) => c,
         c => {
-            return Err(RoutingError::UnsupportedCapabilityType {
-                type_name: c.type_name().into(),
-            });
+            return Err(RoutingError::unsupported_capability_type(moniker, c.type_name()));
         }
     };
     Ok(Some(cap.value))
@@ -69,6 +66,7 @@ where
             None => {
                 return Err(RoutingError::BedrockNotPresentInDictionary {
                     name: use_config.target_name.to_string(),
+                    moniker: component.moniker().clone(),
                 }
                 .into());
             }
@@ -77,6 +75,7 @@ where
         return Err(RoutingError::BedrockWrongCapabilityType {
             actual: format!("{:?}", capability),
             expected: "Router".to_string(),
+            moniker: component.moniker().clone().into(),
         }
         .into());
     };
@@ -93,6 +92,7 @@ where
             return Err(RoutingError::BedrockWrongCapabilityType {
                 actual: format!("{:?}", other),
                 expected: "Data or Unit".to_string(),
+                moniker: component.moniker().clone().into(),
             }
             .into());
         }
@@ -101,6 +101,7 @@ where
         return Err(RoutingError::BedrockWrongCapabilityType {
             actual: format!("{:?}", data),
             expected: "Data::bytes".to_string(),
+            moniker: component.moniker().clone().into(),
         }
         .into());
     };
@@ -110,6 +111,7 @@ where
             return Err(RoutingError::BedrockWrongCapabilityType {
                 actual: "{unknown}".into(),
                 expected: "fuchsia.component.decl.ConfigValue".into(),
+                moniker: component.moniker().clone().into(),
             }
             .into())
         }

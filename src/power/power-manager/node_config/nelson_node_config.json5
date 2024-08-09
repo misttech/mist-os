@@ -17,7 +17,7 @@
         type: "TemperatureHandler",
         name: "soc_pll_thermal",
         config: {
-            driver_path: "/dev/sys/platform/05:05:a/aml_thermal_pll/thermal",
+            sensor_name: "CPU thermal",
             cache_duration_ms: 50,
         },
     },
@@ -25,7 +25,7 @@
         type: "TemperatureHandler",
         name: "thermistor_thread",
         config: {
-            driver_path: "/dev/sys/platform/03:0a:27/thermistor/thermistor-device/therm-thread",
+            sensor_name: "therm-thread",
             cache_duration_ms: 50,
         },
     },
@@ -33,7 +33,7 @@
         type: "TemperatureHandler",
         name: "thermistor_audio",
         config: {
-            driver_path: "/dev/sys/platform/03:0a:27/thermistor/thermistor-device/therm-audio",
+            sensor_name: "therm-audio",
             cache_duration_ms: 50,
         },
     },

@@ -44,9 +44,11 @@ class BtTransportUart;
 class ScoConnectionServer : public fidl::Server<fuchsia_hardware_bluetooth::ScoConnection> {
   using SendHandler = fit::function<void(std::vector<uint8_t>&, fit::function<void(void)>)>;
   using StopHandler = fit::function<void(void)>;
+  using AckReceiveHandler = fit::function<void(void)>;
 
  public:
-  explicit ScoConnectionServer(SendHandler send_handler, StopHandler stop_handler);
+  explicit ScoConnectionServer(SendHandler send_handler, StopHandler stop_handler,
+                               AckReceiveHandler ack_receive_handler);
 
   // fuchsia_hardware_bluetooth::ScoConnection overrides.
   void Send(SendRequest& request, SendCompleter::Sync& completer) override;
@@ -59,6 +61,7 @@ class ScoConnectionServer : public fidl::Server<fuchsia_hardware_bluetooth::ScoC
  private:
   SendHandler send_handler_;
   StopHandler stop_handler_;
+  AckReceiveHandler ack_receive_handler_;
   std::vector<uint8_t> write_buffer_;
 };
 
@@ -136,6 +139,7 @@ class BtTransportUart
 
   // Used by tests only.
   fit::function<void(void)> WaitforSnoopCallback();
+  fit::function<void(void)> WaitforHciTransportCallback();
   uint64_t GetAckedSnoopSeq();
 
  private:
@@ -191,6 +195,10 @@ class BtTransportUart
   // Queues a read callback for async serial on the dispatcher.
   void QueueUartRead();
   void HciHandleUartReadEvents(const uint8_t* buf, size_t length) __TA_EXCLUDES(mutex_);
+
+  // Handle the acknowledgements of received packets from the host. Called by |AckReceive| handler
+  // of both ScoConnection and HciTransport protocol.
+  void OnAckReceive();
 
   // Reads the next packet chunk from |uart_src| into |buffer| and increments |buffer_offset| and
   // |uart_src| by the number of bytes read. If a complete packet is read, it will be written to
@@ -285,6 +293,15 @@ class BtTransportUart
   // Must only be used in the UART read callback (HciHandleUartReadEvents).
   size_t sco_buffer_offset_ = 0;
 
+  static constexpr size_t kUnackedReceivePacketLimit = 20;
+  // Mark the read state of the driver, when the value is set to true, it means that the driver has
+  // stopped reading data from the bus.
+  bool read_stopped_ = false;
+
+  // This number is to keep track of the number of packets that were sent through
+  // |OnReceive| event but haven't received their ack from |AckReceive|s yet.
+  size_t unacked_receive_packet_number_ = 0;
+
   // for sending outbound packets to the UART
   // fuchsia_hardware_bluetooth::kAclPacketMax is the largest frame size sent.
   // This buffer is used for packets received from different data channels.
@@ -343,11 +360,13 @@ class BtTransportUart
   uint64_t acked_snoop_seq_ = 0;
   // Used for test only, to synchronize the snoop protocol setup.
   libsync::Completion snoop_setup_;
+  libsync::Completion hci_transport_setup_;
 
   ScoConnectionServer sco_connection_server_;
   fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::ScoConnection> sco_connection_binding_;
   fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::Hci> hci_binding_;
-  fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::HciTransport> hci_transport_binding_;
+  std::optional<fidl::ServerBinding<fuchsia_hardware_bluetooth::HciTransport>>
+      hci_transport_binding_;
 
   // The task which runs to queue a uart read.
   async::TaskClosureMethod<BtTransportUart, &BtTransportUart::QueueUartRead> queue_read_task_{this};

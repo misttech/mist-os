@@ -26,6 +26,7 @@ objdump="$clang_dir_local"/bin/llvm-objdump
 readelf="$clang_dir_local"/bin/llvm-readelf
 dwarfdump="$clang_dir_local"/bin/llvm-dwarfdump
 nm="$clang_dir_local"/bin/llvm-nm
+jq="$project_root_rel/prebuilt/third_party/jq/$HOST_PLATFORM/bin/jq"
 
 # Diff two files, run through a command: diff -u <(command $1) <(command $2)
 # Usage: diff_with command [options] -- input1 input2
@@ -66,6 +67,11 @@ function diff_with() {
   diff -u "$1.$suffix.local" "$1.$suffix.remote"
 }
 
+function json_diff() {
+  local diff_status=0
+  diff_with "$jq" . -- "$1" "$2"
+}
+
 function binary_diff() {
   # Intended for binaries (rlibs, executables).
   # needs -o pipefail to propagate exit statuses
@@ -98,6 +104,9 @@ case "$1" in
   *.d | *.map | *.ll)
     echo "text diff (first $diff_limit lines):"
     diff -u "$1" "$2" | head -n "$diff_limit"
+    ;;
+  *.json)
+    json_diff "$1" "$2" | head -n  "$diff_limit"
     ;;
   # TODO: .bc LLVM bitcode
   *.a | *.o | *.so | *.rlib)

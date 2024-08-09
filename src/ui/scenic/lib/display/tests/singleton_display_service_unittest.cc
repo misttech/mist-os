@@ -4,6 +4,7 @@
 
 #include "src/ui/scenic/lib/display/singleton_display_service.h"
 
+#include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 
 #include <cstdint>
@@ -23,7 +24,7 @@ TEST(SingletonDisplayService, GetMetrics) {
   static constexpr uint32_t kHeightInMm = 55;
   static constexpr uint32_t kRefreshRate = 44000;
   auto display = std::make_shared<Display>(
-      fuchsia::hardware::display::types::DisplayId{.value = 1}, kWidthInPx, kHeightInPx, kWidthInMm,
+      fuchsia_hardware_display_types::DisplayId{{.value = 1}}, kWidthInPx, kHeightInPx, kWidthInMm,
       kHeightInMm, std::vector{fuchsia_images2::PixelFormat::kB8G8R8A8}, kRefreshRate);
   auto singleton = std::make_unique<SingletonDisplayService>(display);
 
@@ -59,7 +60,7 @@ TEST(SingletonDisplayService, GetMetrics) {
 }
 
 TEST(SingletonDisplayService, DevicePixelRatioChange) {
-  auto display = std::make_shared<Display>(fuchsia::hardware::display::types::DisplayId{.value = 1},
+  auto display = std::make_shared<Display>(fuchsia_hardware_display_types::DisplayId{{.value = 1}},
                                            /*width_in_px=*/777, /*height_in_px=*/555,
                                            /*width_in_mm=*/77, /*height_in_mm=*/55,
                                            std::vector{fuchsia_images2::PixelFormat::kB8G8R8A8},
@@ -82,7 +83,7 @@ TEST(SingletonDisplayService, DevicePixelRatioChange) {
 }
 
 TEST(SingletonDisplayService, GetOwnershipEvent) {
-  auto display = std::make_shared<Display>(fuchsia::hardware::display::types::DisplayId{.value = 1},
+  auto display = std::make_shared<Display>(fuchsia_hardware_display_types::DisplayId{{.value = 1}},
                                            /*width_in_px=*/777, /*height_in_px=*/555);
   auto singleton = std::make_unique<SingletonDisplayService>(display);
 

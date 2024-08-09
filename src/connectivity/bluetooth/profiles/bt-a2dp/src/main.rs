@@ -29,7 +29,7 @@ use std::collections::HashSet;
 use std::sync::Arc;
 use tracing::{debug, error, info, trace, warn};
 use {
-    bt_avdtp as avdtp, fidl_fuchsia_bluetooth_bredr as bredr,
+    bt_avdtp as avdtp, fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr,
     fidl_fuchsia_media_sessions2 as sessions2, fuchsia_inspect as inspect, fuchsia_zircon as zx,
 };
 
@@ -142,7 +142,7 @@ async fn streams_builder(
 async fn connect_after_timeout(
     peer_id: PeerId,
     peers: Arc<ConnectedPeers>,
-    channel_parameters: bredr::ChannelParameters,
+    channel_parameters: fidl_bt::ChannelParameters,
     initiator_delay: zx::Duration,
 ) {
     trace!("waiting {}ms before connecting to peer {}.", initiator_delay.into_millis(), peer_id);
@@ -186,7 +186,7 @@ fn handle_services_found(
     peer_id: &PeerId,
     attributes: &[bredr::Attribute],
     peers: Arc<ConnectedPeers>,
-    channel_parameters: bredr::ChannelParameters,
+    channel_parameters: fidl_bt::ChannelParameters,
     initiator_delay: Option<zx::Duration>,
 ) {
     let service_classes = find_service_classes(attributes);
@@ -404,7 +404,7 @@ async fn main() -> Result<(), Error> {
 async fn handle_profile_events(
     mut profile: impl Stream<Item = profile_client::Result<ProfileEvent>> + Unpin,
     peers: Arc<ConnectedPeers>,
-    channel_parameters: bredr::ChannelParameters,
+    channel_parameters: fidl_bt::ChannelParameters,
     initiator_delay: Option<zx::Duration>,
 ) -> Result<(), Error> {
     while let Some(item) = profile.next().await {
@@ -558,9 +558,9 @@ mod tests {
             &peer_id,
             &attributes,
             peers.clone(),
-            bredr::ChannelParameters {
-                channel_mode: Some(bredr::ChannelMode::Basic),
-                max_rx_sdu_size: Some(crate::config::MAX_RX_SDU_SIZE),
+            fidl_bt::ChannelParameters {
+                channel_mode: Some(fidl_bt::ChannelMode::Basic),
+                max_rx_packet_size: Some(crate::config::MAX_RX_SDU_SIZE),
                 ..Default::default()
             },
             Some(DEFAULT_INITIATOR_DELAY),
@@ -591,7 +591,7 @@ mod tests {
                 match connection {
                     bredr::ConnectParameters::L2cap(params) => assert_eq!(
                         Some(crate::config::MAX_RX_SDU_SIZE),
-                        params.parameters.unwrap().max_rx_sdu_size
+                        params.parameters.unwrap().max_rx_packet_size
                     ),
                     x => panic!("Expected L2cap connection, got {:?}", x),
                 };
@@ -634,7 +634,7 @@ mod tests {
             &peer_id,
             &attributes,
             peers.clone(),
-            bredr::ChannelParameters::default(),
+            fidl_bt::ChannelParameters::default(),
             Some(DEFAULT_INITIATOR_DELAY),
         );
 

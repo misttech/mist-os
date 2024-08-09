@@ -69,6 +69,8 @@ fuchsia_test_component("web_runner_integration_tests") {
 fuchsia_test_package("web_runner_tests") {
   test_components = [ ":web_runner_integration_tests" ]
 
+  subpackages = [ "//src/ui/testing/test_ui_stack:test-ui-stack" ]
+
   deps = [
     # TODO(https://fxbug.dev/42070261): These should be provided by the Product
     # configurations on which these tests run rather than as deps.
@@ -82,7 +84,6 @@ fuchsia_test_package("web_runner_tests") {
     # just declares that the binary needs to be compiled, but doesn't actually
     # add the package.  That happens below in the "tests" group.
     "//src/testing/fidl/intl_property_manager",
-    "//src/ui/testing/test_ui_stack:test-ui-stack",
   ]
 
   test_specs = {

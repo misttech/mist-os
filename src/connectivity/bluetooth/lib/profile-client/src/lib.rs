@@ -30,13 +30,13 @@
 
 use fidl::client::QueryResponseFut;
 use fidl::endpoints::create_request_stream;
-use fidl_fuchsia_bluetooth_bredr as bredr;
 use fuchsia_bluetooth::types::{Channel, PeerId};
 use futures::stream::{FusedStream, Stream, StreamExt};
 use futures::task::{Context, Poll, Waker};
 use futures::FutureExt;
 use std::pin::Pin;
 use tracing::trace;
+use {fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr};
 
 /// Error type used by this library.
 mod error;
@@ -140,7 +140,7 @@ impl ProfileClient {
     pub fn advertise(
         proxy: bredr::ProfileProxy,
         services: Vec<bredr::ServiceDefinition>,
-        channel_params: bredr::ChannelParameters,
+        channel_params: fidl_bt::ChannelParameters,
     ) -> Result<Self> {
         if services.is_empty() {
             return Ok(Self::new(proxy));
@@ -287,8 +287,8 @@ mod tests {
         let source_uuid =
             Uuid::new16(bredr::ServiceClassProfileIdentifier::AudioSource.into_primitive());
         let defs = vec![make_profile_service_definition(source_uuid)];
-        let channel_params = bredr::ChannelParameters {
-            channel_mode: Some(bredr::ChannelMode::Basic),
+        let channel_params = fidl_bt::ChannelParameters {
+            channel_mode: Some(fidl_bt::ChannelMode::Basic),
             ..Default::default()
         };
 
@@ -331,8 +331,8 @@ mod tests {
         let source_uuid =
             Uuid::new16(bredr::ServiceClassProfileIdentifier::AudioSource.into_primitive());
         let defs = vec![make_profile_service_definition(source_uuid)];
-        let channel_params = bredr::ChannelParameters {
-            channel_mode: Some(bredr::ChannelMode::Basic),
+        let channel_params = fidl_bt::ChannelParameters {
+            channel_mode: Some(fidl_bt::ChannelMode::Basic),
             ..Default::default()
         };
 
@@ -381,7 +381,7 @@ mod tests {
         exec: &mut fasync::TestExecutor,
         profile_stream: &mut bredr::ProfileRequestStream,
         expected_defs: Vec<bredr::ServiceDefinition>,
-        expected_params: Option<bredr::ChannelParameters>,
+        expected_params: Option<fidl_bt::ChannelParameters>,
     ) -> (bredr::ConnectionReceiverProxy, bredr::ProfileAdvertiseResponder) {
         match exec.run_until_stalled(&mut profile_stream.next()) {
             Poll::Ready(Some(Ok(bredr::ProfileRequest::Advertise { payload, responder }))) => {

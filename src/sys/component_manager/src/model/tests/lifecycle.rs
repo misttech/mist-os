@@ -33,10 +33,11 @@ use futures::future::pending;
 use futures::join;
 use futures::lock::Mutex;
 use futures::prelude::*;
-use hooks::{Event, EventType, Hook, HooksRegistration};
+use hooks::{Event, EventPayload, EventType, Hook, HooksRegistration};
 use moniker::{ChildName, Moniker};
 use std::collections::HashSet;
 use std::sync::{Arc, Weak};
+use test_case::test_case;
 use vfs::directory::entry::OpenRequest;
 use vfs::execution_scope::ExecutionScope;
 use vfs::ToObjectRequest;
@@ -809,5 +810,58 @@ async fn open_then_stop_with_escrow() {
     assert_eq!(
         client_end.basic_info().unwrap().related_koid,
         server_end.basic_info().unwrap().koid
+    );
+}
+
+#[test_case(0)]
+#[test_case(-1000)]
+#[test_case(123456)]
+#[fuchsia::test]
+async fn stop_with_exit_code(expected_code: i64) {
+    // Build test realm.
+    let (model, builtin_environment, mock_runner) =
+        new_model(vec![("root", component_decl_with_test_runner())]).await;
+    let events = vec![EventType::Started.into(), EventType::Stopped.into()];
+    let mut event_source =
+        builtin_environment.lock().await.event_source_factory.create_for_above_root();
+    let mut event_stream = event_source
+        .subscribe(
+            events
+                .into_iter()
+                .map(|event: Name| EventSubscription {
+                    event_name: UseEventStreamDecl {
+                        source_name: event,
+                        source: UseSource::Parent,
+                        scope: None,
+                        target_path: "/svc/fuchsia.component.EventStream".parse().unwrap(),
+                        filter: None,
+                        availability: Availability::Required,
+                    },
+                })
+                .collect(),
+        )
+        .await
+        .expect("subscribe to event stream");
+
+    model.start().await;
+    event_stream.wait_until(EventType::Started, Moniker::root()).await.unwrap();
+    let url = "test:///root_resolved";
+    mock_runner.wait_for_url(url).await;
+
+    // Stop the root component with an exit code.
+    let root = model.root();
+    let info = ComponentInfo::new(root.clone()).await;
+    mock_runner.send_on_stop_info(
+        &info.channel_id,
+        fcrunner::ComponentStopInfo { exit_code: Some(expected_code), ..Default::default() },
+    );
+    root.stop().await.unwrap();
+
+    // Assert that the event stream contains the exit code.
+    let stopped_event = event_stream.wait_until(EventType::Stopped, Moniker::root()).await.unwrap();
+    assert_matches!(
+        stopped_event.event.payload,
+        EventPayload::Stopped { status, exit_code: Some(exit_code), .. }
+        if status == zx::Status::OK && exit_code == expected_code
     );
 }

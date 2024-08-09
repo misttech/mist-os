@@ -109,7 +109,7 @@ mod method {
                 vec![("closed", "strict"), ("open", "strict"), ("open", "flexible")]
             {
                 assert!(compare_fidl_library(
-                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    ["1", "1,2,NEXT,HEAD"],
                     protocol("server=\"platform\"", change, openness, flexibility)
                 )
                 .is_compatible());
@@ -125,18 +125,19 @@ mod method {
         for change in &changes {
             for (openness, flexibility) in vec![("closed", "strict"), ("open", "strict")] {
                 assert!(compare_fidl_library(
-                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    ["1", "1,2,NEXT,HEAD"],
                     protocol(discoverable, change, openness, flexibility)
                 )
-                .has_problems(vec![ProblemPattern::protocol("1,2,NEXT,HEAD", "1")
-                    .message(Contains("missing method"))]));
+                .has_problems(vec![
+                    ProblemPattern::error().message(Begins("Server(@1) missing method"))
+                ]));
             }
         }
         // For flexible methods this should succeed.
         for change in changes {
             for (openness, flexibility) in vec![("open", "flexible")] {
                 assert!(compare_fidl_library(
-                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    ["1", "1,2,NEXT,HEAD"],
                     protocol(discoverable, change, openness, flexibility)
                 )
                 .is_compatible());
@@ -157,7 +158,7 @@ mod method {
                     vec![("closed", "strict"), ("open", "strict"), ("open", "flexible")]
                 {
                     assert!(compare_fidl_library(
-                        Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                        ["1", "1,2,NEXT,HEAD"],
                         protocol(discoverable, change, openness, flexibility)
                     )
                     .is_compatible());
@@ -175,18 +176,19 @@ mod method {
         for change in &changes {
             for (openness, flexibility) in vec![("closed", "strict"), ("open", "strict")] {
                 assert!(compare_fidl_library(
-                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    ["1", "1,2,NEXT,HEAD"],
                     protocol(discoverable, change, openness, flexibility)
                 )
-                .has_problems(vec![ProblemPattern::protocol("1,2,NEXT,HEAD", "1")
-                    .message(Contains("missing method"))]));
+                .has_problems(vec![
+                    ProblemPattern::error().message(Begins("Server(@1) missing method"))
+                ]));
             }
         }
         // For flexible methods this should succeed.
         for change in changes {
             for (openness, flexibility) in vec![("open", "flexible")] {
                 assert!(compare_fidl_library(
-                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    ["1", "1,2,NEXT,HEAD"],
                     protocol(discoverable, change, openness, flexibility)
                 )
                 .is_compatible());
@@ -229,7 +231,7 @@ mod event {
                 vec![("closed", "strict"), ("open", "strict"), ("open", "flexible")]
             {
                 assert!(compare_fidl_library(
-                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    ["1", "1,2,NEXT,HEAD"],
                     protocol("server=\"external\"", change, openness, flexibility)
                 )
                 .is_compatible());
@@ -245,18 +247,19 @@ mod event {
         for change in &changes {
             for (openness, flexibility) in vec![("closed", "strict"), ("open", "strict")] {
                 assert!(compare_fidl_library(
-                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    ["1", "1,2,NEXT,HEAD"],
                     protocol(discoverable, change, openness, flexibility)
                 )
-                .has_problems(vec![ProblemPattern::protocol("1", "1,2,NEXT,HEAD")
-                    .message(Contains("missing event"))]));
+                .has_problems(vec![
+                    ProblemPattern::error().message(Begins("Client(@1) missing event"))
+                ]));
             }
         }
         // For flexible events this should succeed.
         for change in changes {
             for (openness, flexibility) in vec![("open", "flexible")] {
                 assert!(compare_fidl_library(
-                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    ["1", "1,2,NEXT,HEAD"],
                     protocol(discoverable, change, openness, flexibility)
                 )
                 .is_compatible());
@@ -277,7 +280,7 @@ mod event {
                     vec![("closed", "strict"), ("open", "strict"), ("open", "flexible")]
                 {
                     assert!(compare_fidl_library(
-                        Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                        ["1", "1,2,NEXT,HEAD"],
                         protocol(discoverable, change, openness, flexibility)
                     )
                     .is_compatible());
@@ -295,18 +298,19 @@ mod event {
         for change in &changes {
             for (openness, flexibility) in vec![("closed", "strict"), ("open", "strict")] {
                 assert!(compare_fidl_library(
-                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    ["1", "1,2,NEXT,HEAD"],
                     protocol(discoverable, change, openness, flexibility)
                 )
-                .has_problems(vec![ProblemPattern::protocol("1", "1,2,NEXT,HEAD")
-                    .message(Contains("missing event"))]));
+                .has_problems(vec![
+                    ProblemPattern::error().message(Begins("Client(@1) missing event"))
+                ]));
             }
         }
         // For flexible clients this should succeed.
         for change in changes {
             for (openness, flexibility) in vec![("open", "flexible")] {
                 assert!(compare_fidl_library(
-                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    ["1", "1,2,NEXT,HEAD"],
                     protocol(discoverable, change, openness, flexibility)
                 )
                 .is_compatible());
@@ -321,7 +325,7 @@ mod protocol {
     #[test]
     fn add_protocol() {
         assert!(compare_fidl_library(
-            Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+            ["1", "1,2,NEXT,HEAD"],
             r#"
             @discoverable
             @available(added=2)
@@ -335,10 +339,8 @@ mod protocol {
 #[test]
 fn tear_off() {
     let error_message = "Server(@1) missing method fuchsia.compat.test/TearOff.Added";
-    let platform_version = "1,2,NEXT,HEAD";
-    let external_version = "1";
     assert!(compare_fidl_library(
-        Versions { external: external_version, platform: platform_version },
+        ["1", "1,2,NEXT,HEAD"],
         r#"
             // Server @1 will be incompatible with clients @PLATFORM
             closed protocol TearOff {
@@ -373,32 +375,71 @@ fn tear_off() {
     )
     .has_problems(vec![
         // ServerExternal.ClientEndInResponse
-        ProblemPattern::protocol(platform_version, external_version)
+        ProblemPattern::error()
             .path(Contains("ServerExternal.ClientEndInResponse"))
-            .message(Equals(error_message)),
-        ProblemPattern::protocol(platform_version, external_version)
+            .message(error_message),
+        ProblemPattern::error()
             .path(Contains("ServerExternal.ClientEndInResponse"))
             .message(Contains("Incompatible response")),
         // ServerExternal.ServerEndInRequest
-        ProblemPattern::protocol(platform_version, external_version)
+        ProblemPattern::error()
             .path(Contains("ServerExternal.ServerEndInRequest"))
-            .message(Equals(error_message)),
-        ProblemPattern::protocol(platform_version, external_version)
+            .message(error_message),
+        ProblemPattern::error()
             .path(Contains("ServerExternal.ServerEndInRequest"))
             .message(Contains("Incompatible request")),
         // ServerPlatform.ClientEndInRequest
-        ProblemPattern::protocol(platform_version, external_version)
+        ProblemPattern::error()
             .path(Contains("ServerPlatform.ClientEndInRequest"))
-            .message(Equals(error_message)),
-        ProblemPattern::protocol(external_version, platform_version)
+            .message(error_message),
+        ProblemPattern::error()
             .path(Contains("ServerPlatform.ClientEndInRequest"))
             .message(Contains("Incompatible request")),
         // ServerPlatform.ServerEndInResponse
-        ProblemPattern::protocol(platform_version, external_version)
+        ProblemPattern::error()
             .path(Contains("ServerPlatform.ServerEndInResponse"))
-            .message(Equals(error_message)),
-        ProblemPattern::protocol(external_version, platform_version)
+            .message(error_message),
+        ProblemPattern::error()
             .path(Contains("ServerPlatform.ServerEndInResponse"))
             .message(Contains("Incompatible response")),
+    ]));
+}
+
+#[test]
+fn discoverable_contradiction() {
+    assert!(compare_fidl_library(
+        ["1", "1,2,NEXT,HEAD"],
+        r#"
+        @discoverable(client="external", server="platform")
+        protocol ExternalClient {};
+
+        @discoverable(client="platform", server="external")
+        protocol ExternalServer {
+            TakeServerEnd(resource struct{endpoint server_end:ExternalClient;}); // Bad
+            TakeClientEnd(resource struct{endpoint client_end:ExternalClient;});
+            ReturnServerEnd() -> (resource struct{endpoint server_end:ExternalClient;});
+            ReturnClientEnd() -> (resource struct{endpoint client_end:ExternalClient;}); // Bad
+        };
+        "#
+    )
+    .has_problems(vec![
+        ProblemPattern::error()
+            .path(Contains("ExternalServer.TakeServerEnd"))
+            .message(Contains("ExternalClient(@1) used as a external server")),
+        ProblemPattern::error()
+            .path(Contains("ExternalServer.ReturnClientEnd"))
+            .message(Contains("ExternalClient(@1) used as a external server")),
+        ProblemPattern::error()
+            .path(Contains("ExternalServer.TakeServerEnd"))
+            .message(Contains("ExternalClient(@1,2,NEXT,HEAD) used as a platform client")),
+        ProblemPattern::error()
+            .path(Contains("ExternalServer.ReturnClientEnd"))
+            .message(Contains("ExternalClient(@1,2,NEXT,HEAD) used as a platform client")),
+        ProblemPattern::error()
+            .path(Contains("ExternalServer.TakeServerEnd"))
+            .message(Begins("Incompatible request types")),
+        ProblemPattern::error()
+            .path(Contains("ExternalServer.ReturnClientEnd"))
+            .message(Begins("Incompatible response types"))
     ]));
 }

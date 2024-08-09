@@ -216,7 +216,7 @@ impl<T: EngineOperations> EmuStartTool<T> {
         let mut engine =
             self.get_engine(writer, &emulator_configuration, engine_type, existing).await?;
 
-        if self.cmd.config.is_none() && !self.cmd.reuse && !self.cmd.dry_run {
+        if self.cmd.config.is_none() && !self.cmd.reuse {
             // We don't stage files for custom configurations, because the EmulatorConfiguration
             // doesn't hold valid paths to the system images.
             engine.stage().await?;
@@ -995,7 +995,7 @@ mod tests {
         Ok(())
     }
 
-    // Ensure dry-run stops after building command, doesn't stage/run
+    // Ensure dry-run stops after building command, doesn't run
     #[fuchsia::test]
     async fn test_dry_run() -> Result<()> {
         let env = ffx_config::test_init().await.unwrap();
@@ -1014,7 +1014,7 @@ mod tests {
             .expect_new_engine()
             .returning(|_, _| {
                 Ok(Box::new(TestEngine {
-                    do_stage: false,
+                    do_stage: true,
                     do_start: false,
                     config: EmulatorConfiguration::default(),
                     ..Default::default()

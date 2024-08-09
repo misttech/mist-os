@@ -7,12 +7,12 @@ use bt_map::{Error as MapError, *};
 use bt_obex::profile::{
     goep_l2cap_psm_attribute, parse_obex_search_result, GOEP_L2CAP_PSM_ATTRIBUTE,
 };
-use fidl_fuchsia_bluetooth_bredr as bredr;
 use fuchsia_bluetooth::profile::*;
 use fuchsia_bluetooth::types::Uuid;
 use profile_client::ProfileClient;
 use std::collections::HashSet;
 use tracing::info;
+use {fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr};
 
 const PROFILE_MAJOR_VERSION: u8 = 1;
 const PROFILE_MINOR_VERSION: u8 = 4;
@@ -232,8 +232,8 @@ pub fn connect_and_advertise(profile_svc: bredr::ProfileProxy) -> Result<Profile
     ];
 
     let service_defs = vec![(&build_mns_service_definition()).try_into()?];
-    let channel_parameters = bredr::ChannelParameters {
-        channel_mode: Some(bredr::ChannelMode::EnhancedRetransmission),
+    let channel_parameters = fidl_bt::ChannelParameters {
+        channel_mode: Some(fidl_bt::ChannelMode::EnhancedRetransmission),
         ..Default::default()
     };
 

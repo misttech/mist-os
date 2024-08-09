@@ -167,7 +167,9 @@ to large-scale changes, Global Approvers are not expected to have
 comprehensive knowledge of the entire Fuchsia codebase. It is expected
 that global approval will be used primarily in cases where the changes
 systematic, largely mechanical, and impacts a large fraction of the
-codebase.
+codebase. Global approval may also be appropriate in cases where an
+urgent change is needed to stabilize the tree, such a CL to  disable a
+test or a complex revert that cannot be approved automatically.
 
 Currently, members of [Fuchsia Engineering Council][fec] are global
 approvers, as well as a small number of reviewers to cover timezones

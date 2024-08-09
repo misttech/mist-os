@@ -22,6 +22,7 @@
 #define DW_OP_mul 0x1e
 #define DW_OP_plus 0x22
 #define DW_OP_plus_uconst 0x23
+#define DW_OP_minus 0x1c
 #define DW_OP_lit0 0x30
 #define DW_OP_lit(n) (DW_OP_lit0 + (n))  // n <= 31
 

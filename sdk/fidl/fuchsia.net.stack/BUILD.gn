@@ -12,4 +12,22 @@ fidl("fuchsia.net.stack") {
     "//sdk/fidl/fuchsia.net.interfaces.admin",
   ]
   enable_hlcpp = true
+
+  # Visibility is locked down to facilitate driving down usages of deprecated APIs.
+  # See https://fxbug.dev/42081105.
+  visibility = [
+    "//src/connectivity/lib/fidl_fuchsia_net_stack_ext/*",
+    "//src/connectivity/lowpan/*",
+    "//src/connectivity/network/net-cli/*",
+    "//src/connectivity/network/netstack/*",
+    "//src/connectivity/network/netstack3/*",
+    "//src/connectivity/network/testing/netemul/*",
+    "//src/connectivity/network/tests/*",
+    "//src/connectivity/policy/netcfg/*",
+    "//src/connectivity/weave/adaptation/*",
+    "//src/lib/network/fidl_fuchsia_net_routes_ext/*",
+    "//src/virtualization/lib/guest_interaction/*",
+    "//third_party/openweave-core/src/inet/*",
+    "//third_party/tcpdump/tests/*",
+  ]
 }

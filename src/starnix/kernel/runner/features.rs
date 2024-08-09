@@ -21,7 +21,7 @@ use input_device::uinput::register_uinput_device;
 use input_device::InputDevice;
 #[cfg(not(feature = "starnix_lite"))]
 use magma_device::magma_device_init;
-use selinux::security_server;
+use selinux_core::security_server;
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_core::device::android::bootloader_message_store::android_bootloader_message_store_init;
 #[cfg(not(feature = "starnix_lite"))]

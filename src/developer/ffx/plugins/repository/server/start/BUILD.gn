@@ -10,26 +10,13 @@ ffx_plugin("ffx_repository_server_start") {
   with_unit_tests = true
 
   args_sources = [ "src/args.rs" ]
-  args_deps = [
-    "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
-    "//src/developer/ffx/plugins/repository/serve:ffx_repository_serve_args",
-    "//third_party/rust_crates:camino",
-  ]
-  sources = [
-    "src/lib.rs",
-    "src/server.rs",
-  ]
+  sources = [ "src/lib.rs" ]
 
   deps = [
-    "//sdk/fidl/fuchsia.developer.remotecontrol:fuchsia.developer.remotecontrol_rust",
-    "//src/developer/ffx/config:lib",
     "//src/developer/ffx/fidl:fuchsia.developer.ffx_rust",
     "//src/developer/ffx/lib/fho:lib",
     "//src/developer/ffx/lib/fidl-fuchsia-developer-ffx-ext",
     "//src/developer/ffx/lib/pkg",
-    "//src/developer/ffx/lib/target:lib",
-    "//src/developer/ffx/plugins/repository/serve:ffx_repository_serve",
-    "//src/developer/ffx/plugins/repository/serve:ffx_repository_serve_args",
     "//src/lib/network/fidl_fuchsia_net_ext",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:schemars",

@@ -62,14 +62,14 @@ async fn main() {
                 IncomingRequest::Router(mut stream) => {
                     while let Ok(Some(request)) = stream.try_next().await {
                         match request {
+                            // [START request]
                             fsandbox::RouterRequest::Route { payload: _, responder } => {
-                                // [START export]
                                 let dup_dict_id = id_gen.next();
                                 store.duplicate(dict_id, dup_dict_id).await.unwrap().unwrap();
                                 let capability = store.export(dup_dict_id).await.unwrap().unwrap();
-                                // [END export]
                                 let _ = responder.send(Ok(capability));
                             }
+                            // [END request]
                             fsandbox::RouterRequest::_UnknownMethod { ordinal, .. } => {
                                 warn!(%ordinal, "Unknown Router request");
                             }

@@ -52,6 +52,7 @@ use camino::{Utf8Path, Utf8PathBuf};
 use pathdiff::diff_utf8_paths;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::collections::{BTreeMap, HashMap};
 
 /// A Utf8PathBuf which can be either file-relative, or has been resolved with
 /// the path to the containing file.
@@ -492,6 +493,58 @@ impl<T: SupportsFileRelativePaths> SupportsFileRelativePaths for Option<T> {
         path_to_containing_dir: impl AsRef<Utf8Path>,
     ) -> Result<Self> {
         self.map(|s| s.make_paths_relative_to_dir(path_to_containing_dir)).transpose()
+    }
+}
+
+impl<K: std::cmp::Ord, V: SupportsFileRelativePaths> SupportsFileRelativePaths for BTreeMap<K, V> {
+    fn resolve_paths_from_dir(self, dir_path: impl AsRef<Utf8Path>) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        self.into_iter()
+            .map(|(k, v)| v.resolve_paths_from_dir(&dir_path).map(|resolved| (k, resolved)))
+            .collect()
+    }
+
+    fn make_paths_relative_to_dir(
+        self,
+        path_to_containing_dir: impl AsRef<Utf8Path>,
+    ) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        self.into_iter()
+            .map(|(k, v)| {
+                v.make_paths_relative_to_dir(&path_to_containing_dir).map(|relative| (k, relative))
+            })
+            .collect()
+    }
+}
+
+impl<K: std::cmp::Eq + std::hash::Hash, V: SupportsFileRelativePaths> SupportsFileRelativePaths
+    for HashMap<K, V>
+{
+    fn resolve_paths_from_dir(self, dir_path: impl AsRef<Utf8Path>) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        self.into_iter()
+            .map(|(k, v)| v.resolve_paths_from_dir(&dir_path).map(|resolved| (k, resolved)))
+            .collect()
+    }
+
+    fn make_paths_relative_to_dir(
+        self,
+        path_to_containing_dir: impl AsRef<Utf8Path>,
+    ) -> Result<Self>
+    where
+        Self: Sized,
+    {
+        self.into_iter()
+            .map(|(k, v)| {
+                v.make_paths_relative_to_dir(&path_to_containing_dir).map(|relative| (k, relative))
+            })
+            .collect()
     }
 }
 

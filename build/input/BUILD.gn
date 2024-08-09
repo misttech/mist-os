@@ -11,28 +11,19 @@ declare_args() {
 
 group("bootfs") {
   testonly = fuchsia_zbi_testonly
-  deps = [
-    "board:bootfs_labels",
-    "dev:bootfs_labels",
-  ]
+  deps = [ "board:bootfs_labels" ]
 }
 
 group("build_only") {
   testonly = true
-  deps = build_only_labels + [ "dev:build_only_deps" ]
+  deps = build_only_labels
 }
 
 group("recovery_bootfs") {
-  deps = [
-    "board:recovery_bootfs_labels",
-    "dev:recovery_bootfs_labels",
-  ]
+  deps = [ "board:recovery_bootfs_labels" ]
 }
 
 group("zedboot_bootfs") {
   testonly = true
-  deps = [
-    "board:zedboot_bootfs_labels",
-    "dev:zedboot_bootfs_labels",
-  ]
+  deps = [ "board:zedboot_bootfs_labels" ]
 }

@@ -33,7 +33,7 @@ use crate::legacy_router::{
     OfferVisitor, RouteBundle, Sources,
 };
 use crate::mapper::DebugRouteMapper;
-use crate::rights::Rights;
+use crate::rights::RightsWalker;
 use crate::walk_state::WalkState;
 use cm_rust::{
     Availability, CapabilityTypeName, ExposeConfigurationDecl, ExposeDecl, ExposeDeclCommon,
@@ -47,7 +47,7 @@ use cm_rust::{
 };
 use cm_types::{Name, RelativePath};
 use from_enum::FromEnum;
-use moniker::{ChildName, Moniker};
+use moniker::{ChildName, ExtendedMoniker, Moniker};
 use router_error::Explain;
 use std::sync::Arc;
 use tracing::warn;
@@ -111,10 +111,11 @@ impl From<UseDecl> for RouteRequest {
     }
 }
 
-impl TryFrom<Vec<&ExposeDecl>> for RouteRequest {
-    type Error = RoutingError;
-
-    fn try_from(exposes: Vec<&ExposeDecl>) -> Result<Self, Self::Error> {
+impl RouteRequest {
+    pub fn from_expose_decls(
+        moniker: &Moniker,
+        exposes: Vec<&ExposeDecl>,
+    ) -> Result<Self, RoutingError> {
         let first_expose = exposes.first().expect("invalid empty expose list");
         let first_type_name = CapabilityTypeName::from(*first_expose);
         assert!(
@@ -161,13 +162,14 @@ impl TryFrom<Vec<&ExposeDecl>> for RouteRequest {
             ExposeDecl::Dictionary(_) => {
                 // TODO(https://fxbug.dev/301674053) implement dictionary routing and make this
                 // method From instead of TryFrom.
-                Err(RoutingError::unsupported_capability_type(CapabilityTypeName::Dictionary))
+                Err(RoutingError::unsupported_capability_type(
+                    moniker.clone(),
+                    CapabilityTypeName::Dictionary,
+                ))
             }
         }
     }
-}
 
-impl RouteRequest {
     /// Returns the availability of the RouteRequest if supported.
     pub fn availability(&self) -> Option<Availability> {
         use crate::RouteRequest::*;
@@ -839,37 +841,47 @@ where
 /// The accumulated state of routing a Directory capability.
 #[derive(Clone, Debug)]
 pub struct DirectoryState {
-    rights: WalkState<Rights>,
+    rights: WalkState<RightsWalker>,
     pub subdir: RelativePath,
     availability_state: Availability,
 }
 
 impl DirectoryState {
-    fn new(operations: fio::Operations, subdir: RelativePath, availability: &Availability) -> Self {
+    fn new(rights: RightsWalker, subdir: RelativePath, availability: &Availability) -> Self {
         DirectoryState {
-            rights: WalkState::at(operations.into()),
+            rights: WalkState::at(rights),
             subdir,
             availability_state: availability.clone(),
         }
     }
 
-    fn advance_with_offer(&mut self, offer: &OfferDirectoryDecl) -> Result<(), RoutingError> {
-        self.availability_state = availability::advance_with_offer(self.availability_state, offer)?;
-        self.advance(offer.rights.clone(), offer.subdir.clone())
+    fn advance_with_offer(
+        &mut self,
+        moniker: &ExtendedMoniker,
+        offer: &OfferDirectoryDecl,
+    ) -> Result<(), RoutingError> {
+        self.availability_state =
+            availability::advance_with_offer(moniker, self.availability_state, offer)?;
+        self.advance(moniker, offer.rights.clone(), offer.subdir.clone())
     }
 
-    fn advance_with_expose(&mut self, expose: &ExposeDirectoryDecl) -> Result<(), RoutingError> {
+    fn advance_with_expose(
+        &mut self,
+        moniker: &ExtendedMoniker,
+        expose: &ExposeDirectoryDecl,
+    ) -> Result<(), RoutingError> {
         self.availability_state =
-            availability::advance_with_expose(self.availability_state, expose)?;
-        self.advance(expose.rights.clone(), expose.subdir.clone())
+            availability::advance_with_expose(moniker, self.availability_state, expose)?;
+        self.advance(moniker, expose.rights.clone(), expose.subdir.clone())
     }
 
     fn advance(
         &mut self,
+        moniker: &ExtendedMoniker,
         rights: Option<fio::Operations>,
         mut subdir: RelativePath,
     ) -> Result<(), RoutingError> {
-        self.rights = self.rights.advance(rights.map(Rights::from))?;
+        self.rights = self.rights.advance(rights.map(|r| RightsWalker::new(r, moniker.clone())))?;
         subdir.extend(self.subdir.clone());
         self.subdir = subdir;
         Ok(())
@@ -877,10 +889,10 @@ impl DirectoryState {
 
     fn finalize(
         &mut self,
-        rights: fio::Operations,
+        rights: RightsWalker,
         mut subdir: RelativePath,
     ) -> Result<(), RoutingError> {
-        self.rights = self.rights.finalize(Some(rights.into()))?;
+        self.rights = self.rights.finalize(Some(rights))?;
         subdir.extend(self.subdir.clone());
         self.subdir = subdir;
         Ok(())
@@ -888,11 +900,18 @@ impl DirectoryState {
 }
 
 impl OfferVisitor for DirectoryState {
-    fn visit(&mut self, offer: &cm_rust::OfferDecl) -> Result<(), RoutingError> {
+    fn visit(
+        &mut self,
+        moniker: &ExtendedMoniker,
+        offer: &cm_rust::OfferDecl,
+    ) -> Result<(), RoutingError> {
         match offer {
             cm_rust::OfferDecl::Directory(dir) => match dir.source {
-                OfferSource::Framework => self.finalize(fio::RW_STAR_DIR, dir.subdir.clone()),
-                _ => self.advance_with_offer(dir),
+                OfferSource::Framework => self.finalize(
+                    RightsWalker::new(fio::RW_STAR_DIR, moniker.clone()),
+                    dir.subdir.clone(),
+                ),
+                _ => self.advance_with_offer(moniker, dir),
             },
             _ => Ok(()),
         }
@@ -900,11 +919,18 @@ impl OfferVisitor for DirectoryState {
 }
 
 impl ExposeVisitor for DirectoryState {
-    fn visit(&mut self, expose: &cm_rust::ExposeDecl) -> Result<(), RoutingError> {
+    fn visit(
+        &mut self,
+        moniker: &ExtendedMoniker,
+        expose: &cm_rust::ExposeDecl,
+    ) -> Result<(), RoutingError> {
         match expose {
             cm_rust::ExposeDecl::Directory(dir) => match dir.source {
-                ExposeSource::Framework => self.finalize(fio::RW_STAR_DIR, dir.subdir.clone()),
-                _ => self.advance_with_expose(dir),
+                ExposeSource::Framework => self.finalize(
+                    RightsWalker::new(fio::RW_STAR_DIR, moniker.clone()),
+                    dir.subdir.clone(),
+                ),
+                _ => self.advance_with_expose(moniker, dir),
             },
             _ => Ok(()),
         }
@@ -912,10 +938,14 @@ impl ExposeVisitor for DirectoryState {
 }
 
 impl CapabilityVisitor for DirectoryState {
-    fn visit(&mut self, capability: &cm_rust::CapabilityDecl) -> Result<(), RoutingError> {
+    fn visit(
+        &mut self,
+        moniker: &ExtendedMoniker,
+        capability: &cm_rust::CapabilityDecl,
+    ) -> Result<(), RoutingError> {
         match capability {
             cm_rust::CapabilityDecl::Directory(dir) => {
-                self.finalize(dir.rights.clone(), Default::default())
+                self.finalize(RightsWalker::new(dir.rights, moniker.clone()), Default::default())
             }
             _ => Ok(()),
         }
@@ -949,12 +979,15 @@ where
         }
         _ => {
             let mut state = DirectoryState::new(
-                use_decl.rights.clone(),
+                RightsWalker::new(use_decl.rights, target.moniker().clone()),
                 use_decl.subdir.clone(),
                 &use_decl.availability,
             );
             if let UseSource::Framework = &use_decl.source {
-                state.finalize(fio::RW_STAR_DIR, Default::default())?;
+                state.finalize(
+                    RightsWalker::new(fio::RW_STAR_DIR, target.moniker().clone()),
+                    Default::default(),
+                )?;
             }
             let allowed_sources =
                 Sources::new(CapabilityTypeName::Directory).framework().namespace().component();
@@ -1084,8 +1117,11 @@ where
     C: ComponentInstanceInterface + 'static,
 {
     // Storage rights are always READ+WRITE.
-    let mut state =
-        DirectoryState::new(fio::RW_STAR_DIR, Default::default(), &Availability::Required);
+    let mut state = DirectoryState::new(
+        RightsWalker::new(fio::RW_STAR_DIR, target.moniker().clone()),
+        Default::default(),
+        &Availability::Required,
+    );
     let allowed_sources = Sources::new(CapabilityTypeName::Directory).component().namespace();
     let source = legacy_router::route_from_registration(
         StorageDeclAsRegistration::from(storage_decl.clone()),
@@ -1128,6 +1164,7 @@ where
         Some((ExtendedInstanceInterface::AboveRoot(top_instance), reg)) => {
             let internal_capability = allowed_sources
                 .find_builtin_source(
+                    ExtendedMoniker::ComponentManager,
                     reg.source_name(),
                     top_instance.builtin_capabilities(),
                     &mut NoopVisitor::new(),

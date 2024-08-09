@@ -1743,7 +1743,7 @@ pub(crate) mod test {
                     .err()
                     .unwrap()
             ),
-            "Expression Error: \n0: at line 0, in Eof:\nINSPECT:foo:bar:baz\n       ^\n\n"
+            "Expression Error: \n0: at line 1, in Eof:\nINSPECT:foo:bar:baz\n       ^\n\n"
         );
 
         // Check correct error behavior when building expression from invalid expression string
@@ -1755,7 +1755,7 @@ pub(crate) mod test {
                     .err()
                     .unwrap()
             ),
-            concat!("Expression Error: \n0: at line 0, in Eof:\n1 *\n  ^\n\n")
+            concat!("Expression Error: \n0: at line 1, in Eof:\n1 *\n  ^\n\n")
         );
 
         // Check expression correctly built from valid expression

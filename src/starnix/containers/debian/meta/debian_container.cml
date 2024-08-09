@@ -3,14 +3,4 @@
 // found in the LICENSE file.
 {
     include: [ "//src/starnix/containers/debian/meta/debian_container.base.cml" ],
-    program: {
-        features: [
-            "ashmem",
-            "container",
-            "custom_artifacts",
-            "framebuffer2",
-            "magma",
-            "test_data",
-        ],
-    },
 }

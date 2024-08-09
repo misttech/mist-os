@@ -1938,7 +1938,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                 &mut NoopRouteMapper
             )
             .await,
-            Err(RoutingError::UnsupportedRouteSource { source_type: _ })
+            Err(RoutingError::UnsupportedRouteSource { source_type: _, moniker: _ })
         );
     }
 
@@ -4379,7 +4379,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         assert_matches!(
             route_result,
-            Err(RoutingError::DictionariesNotSupported { cap_type: CapabilityTypeName::Protocol })
+            Err(RoutingError::DictionariesNotSupported {
+                cap_type: CapabilityTypeName::Protocol,
+                ..
+            })
         );
     }
 
@@ -4448,7 +4451,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         assert_matches!(
             route_result,
-            Err(RoutingError::DictionariesNotSupported { cap_type: CapabilityTypeName::Protocol })
+            Err(RoutingError::DictionariesNotSupported {
+                cap_type: CapabilityTypeName::Protocol,
+                ..
+            })
         );
     }
 
@@ -4512,7 +4518,10 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         assert_matches!(
             route_result,
-            Err(RoutingError::DictionariesNotSupported { cap_type: CapabilityTypeName::Protocol })
+            Err(RoutingError::DictionariesNotSupported {
+                cap_type: CapabilityTypeName::Protocol,
+                ..
+            })
         );
     }
 }

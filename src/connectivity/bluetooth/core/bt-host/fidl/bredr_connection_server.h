@@ -15,7 +15,7 @@ namespace bthost {
 
 // BrEdrConnectionServer relays packets and disconnections between the Connection FIDL protocol and
 // a corresponding L2CAP channel.
-class BrEdrConnectionServer : public ServerBase<fuchsia::bluetooth::bredr::Connection> {
+class BrEdrConnectionServer : public ServerBase<fuchsia::bluetooth::Channel> {
  public:
   // Limit unacknowledged OnReceive() events to 10, which should be small enough to avoid filling
   // FIDL channel.
@@ -29,7 +29,7 @@ class BrEdrConnectionServer : public ServerBase<fuchsia::bluetooth::bredr::Conne
   // the Connection protocol or the L2CAP channel closes. Returns nullptr on failure (failure to
   // activate the Channel).
   static std::unique_ptr<BrEdrConnectionServer> Create(
-      fidl::InterfaceRequest<fuchsia::bluetooth::bredr::Connection> request,
+      fidl::InterfaceRequest<fuchsia::bluetooth::Channel> request,
       bt::l2cap::Channel::WeakPtr channel, fit::callback<void()> closed_callback);
 
   ~BrEdrConnectionServer() override;
@@ -42,12 +42,13 @@ class BrEdrConnectionServer : public ServerBase<fuchsia::bluetooth::bredr::Conne
     kDeactivated,
   };
 
-  BrEdrConnectionServer(fidl::InterfaceRequest<fuchsia::bluetooth::bredr::Connection> request,
+  BrEdrConnectionServer(fidl::InterfaceRequest<fuchsia::bluetooth::Channel> request,
                         bt::l2cap::Channel::WeakPtr channel, fit::callback<void()> closed_callback);
 
-  // fuchsia::bluetooth::bredr::Connection overrides:
+  // fuchsia::bluetooth::Channel overrides:
   void Send(std::vector<uint8_t> packet, SendCallback callback) override;
   void AckReceive() override;
+  void WatchChannelParameters(WatchChannelParametersCallback callback) override;
   void handle_unknown_method(uint64_t ordinal, bool method_has_response) override;
 
   bool Activate();
@@ -74,6 +75,9 @@ class BrEdrConnectionServer : public ServerBase<fuchsia::bluetooth::bredr::Conne
 
   // The maximum number of unacknowledged packets to send to the FIDL client at a time.
   uint8_t receive_credits_ = kDefaultReceiveCredits;
+
+  // Pending callback for a WatchChannelParameters call.
+  std::optional<WatchChannelParametersCallback> pending_watch_channel_parameters_;
 
   State state_ = State::kActivating;
 

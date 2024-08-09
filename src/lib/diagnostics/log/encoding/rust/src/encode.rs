@@ -1084,9 +1084,8 @@ mod tests {
     #[derive(Debug)]
     struct PrintMe(u32);
 
-    #[allow(clippy::type_complexity)]
-    static LAST_RECORD: LazyLock<Mutex<Option<Encoder<Cursor<[u8; 1024]>>>>> =
-        LazyLock::new(|| Mutex::new(None));
+    type ByteEncoder = Encoder<Cursor<[u8; 1024]>>;
+    static LAST_RECORD: LazyLock<Mutex<Option<ByteEncoder>>> = LazyLock::new(|| Mutex::new(None));
 
     struct EncoderLayer;
     impl<S> Layer<S> for EncoderLayer

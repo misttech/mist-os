@@ -4,11 +4,15 @@
 
 #include "src/ui/scenic/lib/display/display_power_manager.h"
 
+#include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.display.types/cpp/hlcpp_conversion.h>
+#include <fuchsia/hardware/display/types/cpp/fidl.h>
 #include <fuchsia/ui/display/internal/cpp/fidl.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
 
 #include "src/ui/scenic/lib/display/display_manager.h"
+#include "src/ui/scenic/lib/display/util.h"
 
 namespace scenic_impl::display {
 
@@ -40,20 +44,30 @@ void DisplayPowerManager::SetDisplayPower(bool power_on, SetDisplayPowerCallback
   // the DisplayPowerManager will only control power of the default display.
   // Once Scenic and DisplayManager supports multiple displays, this needs to
   // be updated to control power of all available displays.
-  FX_DCHECK(display_manager_.default_display_coordinator());
-  auto id = display_manager_.default_display()->display_id();
+  std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> hlcpp_coordinator =
+      display_manager_.default_display_coordinator();
+  FX_DCHECK(hlcpp_coordinator);
+  fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator> coordinator =
+      scenic_impl::GetUnowned(*hlcpp_coordinator);
+  fuchsia_hardware_display_types::DisplayId id = display_manager_.default_display()->display_id();
 
-  fuchsia::hardware::display::Coordinator_SetDisplayPower_Result set_display_power_result;
-  auto status = (*display_manager_.default_display_coordinator())
-                    ->SetDisplayPower(id, power_on, &set_display_power_result);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to call FIDL SetDisplayPower(): " << zx_status_get_string(status);
-    callback(SetDisplayPowerResult::WithErr(ZX_ERR_INTERNAL));
-    return;
-  }
-  if (set_display_power_result.is_err()) {
+  fit::result set_display_power_result = fidl::Call(coordinator)
+                                             ->SetDisplayPower({{
+                                                 .display_id = id,
+                                                 .power_on = power_on,
+                                             }});
+  if (set_display_power_result.is_error()) {
+    const auto& error_value = set_display_power_result.error_value();
+    if (error_value.is_framework_error()) {
+      FX_LOGS(ERROR) << "Failed to call FIDL SetDisplayPower(): "
+                     << set_display_power_result.error_value();
+      callback(SetDisplayPowerResult::WithErr(ZX_ERR_INTERNAL));
+      return;
+    }
+
+    // error_value.is_domain_error()
     FX_LOGS(WARNING) << "DisplayCoordinator SetDisplayPower() is not supported; error status: "
-                     << zx_status_get_string(set_display_power_result.err());
+                     << set_display_power_result.error_value();
     callback(SetDisplayPowerResult::WithErr(ZX_ERR_NOT_SUPPORTED));
     return;
   }

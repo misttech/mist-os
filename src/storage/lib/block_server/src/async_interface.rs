@@ -32,7 +32,7 @@ pub trait Interface: Send + Sync + Unpin + 'static {
     fn write(
         &self,
         device_block_offset: u64,
-        length: u32,
+        block_count: u32,
         vmo: &Arc<zx::Vmo>,
         vmo_offset: u64, // *bytes* not blocks
     ) -> impl Future<Output = Result<(), zx::Status>> + Send;

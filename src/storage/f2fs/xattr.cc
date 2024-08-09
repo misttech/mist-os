@@ -6,26 +6,37 @@
 
 namespace f2fs {
 
-XattrOperator::XattrOperator(LockedPage &page) {
+XattrOperator::XattrOperator(LockedPage &ipage, LockedPage &xattr_page)
+    : available_slots_(ipage ? kMaxXattrSlots : XattrSlots(kValidXattrBlockSize)) {
   buffer_ = std::make_unique<std::array<xattr_slot_t, kMaxXattrSlots>>();
   buffer_->fill(0);
 
-  if (!page) {
+  if (ipage) {
+    Inode &inode = ipage->GetAddress<Node>()->i;
+    std::memcpy(buffer_->data(), &(inode.i_addr[kAddrsPerInode - kInlineXattrAddrs]),
+                safemath::checked_cast<size_t>(kXattrAlign * kInlineXattrAddrs));
+  }
+
+  if (xattr_page) {
+    ZX_DEBUG_ASSERT(xattr_page->Size() >= kValidXattrBlockSize);
+    std::memcpy(buffer_->data() + (ipage ? kInlineXattrAddrs : 0),
+                xattr_page->GetAddress<uint8_t>(), kValidXattrBlockSize);
+  }
+
+  if (buffer_->at(0) != kXattrMagic) {
     XattrHeader header{
         .magic = kXattrMagic,
         .refcount = 1,
     };
-    std::memcpy(buffer_->data(), &header, sizeof(XattrHeader));
-    return;
-  }
 
-  std::memcpy(buffer_->data(), page->GetAddress<uint8_t>(), kValidXattrBlockSize);
+    std::memcpy(buffer_->data(), &header, sizeof(XattrHeader));
+  }
 }
 
 zx::result<uint32_t> XattrOperator::FindSlotOffset(XattrIndex index, std::string_view name) {
   uint32_t slot_offset = kXattrHeaderSlots;
 
-  while (slot_offset < buffer_->size()) {
+  while (slot_offset < available_slots_) {
     XattrEntryInfo entry_info;
     std::memcpy(&entry_info, &buffer_->at(slot_offset), sizeof(XattrEntryInfo));
     if (entry_info.IsLast()) {
@@ -50,8 +61,8 @@ zx::result<uint32_t> XattrOperator::FindSlotOffset(XattrIndex index, std::string
 
 zx_status_t XattrOperator::Add(XattrIndex index, std::string_view name,
                                cpp20::span<const uint8_t> value) {
-  uint32_t slot_offset = GetEndOffset(kXattrHeaderSlots);
-  if (slot_offset >= buffer_->size()) {
+  uint32_t slot_offset = GetEndOffset();
+  if (slot_offset >= available_slots_) {
     return ZX_ERR_NO_SPACE;
   }
 
@@ -59,7 +70,7 @@ zx_status_t XattrOperator::Add(XattrIndex index, std::string_view name,
                              .name_len = safemath::checked_cast<uint8_t>(name.length()),
                              .value_size = safemath::checked_cast<uint16_t>(value.size())};
 
-  if (slot_offset + new_info.Slots() > buffer_->size()) {
+  if (slot_offset + new_info.Slots() > available_slots_) {
     return ZX_ERR_NO_SPACE;
   }
 
@@ -79,8 +90,8 @@ void XattrOperator::Remove(uint32_t offset) {
   uint32_t entry_slots = entry_info.Slots();
   uint32_t next_entry_offset = offset + entry_slots;
 
-  if (next_entry_offset >= buffer_->size()) {
-    ZX_ASSERT(offset + entry_slots <= buffer_->size());
+  if (next_entry_offset >= available_slots_) {
+    ZX_ASSERT(offset + entry_slots <= available_slots_);
     std::fill(buffer_->begin() + offset, buffer_->begin() + offset + entry_slots, 0);
     return;
   }
@@ -112,16 +123,26 @@ zx::result<size_t> XattrOperator::Lookup(XattrIndex index, std::string_view name
   return zx::ok(entry_info.value_size);
 }
 
-zx_status_t XattrOperator::WriteTo(LockedPage &page) {
-  if (page) {
-    std::memcpy(page->GetAddress<uint8_t>(), buffer_->data(), kValidXattrBlockSize);
-    page->SetDirty();
+void XattrOperator::WriteTo(LockedPage &ipage, LockedPage &xattr_page) {
+  if (ipage) {
+    Inode &inode = ipage->GetAddress<Node>()->i;
+    std::memcpy(&(inode.i_addr[kAddrsPerInode - kInlineXattrAddrs]), buffer_->data(),
+                safemath::checked_cast<size_t>(kXattrAlign * kInlineXattrAddrs));
+    ipage->SetDirty();
   }
-  return ZX_OK;
+
+  if (xattr_page) {
+    ZX_DEBUG_ASSERT(xattr_page->Size() >= kValidXattrBlockSize);
+    std::memcpy(xattr_page->GetAddress<uint8_t>(),
+                buffer_->data() + (ipage ? kInlineXattrAddrs : 0), kValidXattrBlockSize);
+    xattr_page.SetDirty();
+  }
 }
 
 uint32_t XattrOperator::GetEndOffset(uint32_t from) {
-  while (from < buffer_->size()) {
+  from = std::max(from, safemath::checked_cast<uint32_t>(kXattrHeaderSlots));
+
+  while (from < available_slots_) {
     XattrEntryInfo entry_info;
     std::memcpy(&entry_info, &buffer_->at(from), sizeof(XattrEntryInfo));
     if (entry_info.IsLast()) {

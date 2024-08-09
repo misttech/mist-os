@@ -67,9 +67,15 @@ impl<T: ComponentSelector> ValidateComponentSelectorExt for T {
         }
         let last_idx = segments.len() - 1;
         for segment in &segments[..last_idx] {
-            segment.validate(StringSelectorValidationOpts::default())?;
+            segment.validate(StringSelectorValidationOpts {
+                allow_empty: false,
+                ..Default::default()
+            })?;
         }
-        segments[last_idx].validate(StringSelectorValidationOpts { allow_recursive_glob: true })?;
+        segments[last_idx].validate(StringSelectorValidationOpts {
+            allow_recursive_glob: true,
+            ..Default::default()
+        })?;
         Ok(())
     }
 }
@@ -93,6 +99,7 @@ impl<T: TreeSelector> ValidateTreeSelectorExt for T {
 #[derive(Default)]
 struct StringSelectorValidationOpts {
     allow_recursive_glob: bool,
+    allow_empty: bool,
 }
 
 trait ValidateStringSelectorExt {
@@ -105,8 +112,10 @@ impl<T: StringSelector> ValidateStringSelectorExt for T {
             (None, None) | (Some(_), Some(_)) => {
                 return Err(ValidationError::InvalidStringSelector)
             }
-            (Some(_), None) => {
-                // A exact match is always valid.
+            (Some(exact_match), None) => {
+                if !opts.allow_empty && exact_match.is_empty() {
+                    return Err(ValidationError::InvalidStringSelector);
+                }
                 return Ok(());
             }
             (None, Some(pattern)) => {

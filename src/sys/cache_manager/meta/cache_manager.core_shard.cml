@@ -15,10 +15,5 @@
             from: "#cache",
             to: "#storage_cache_manager",
         },
-        {
-            protocol: "fuchsia.logger.LogSink",
-            from: "parent",
-            to: "#storage_cache_manager",
-        },
     ],
 }

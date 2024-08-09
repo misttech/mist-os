@@ -16,7 +16,7 @@ use fuchsia_zircon as zx;
 use starnix_logging::{impossible_error, track_stub};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::errors::Errno;
-use starnix_uapi::file_mode::mode;
+use starnix_uapi::file_mode::{mode, AccessCheck};
 use starnix_uapi::math::round_up_to_system_page_size;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
@@ -419,7 +419,8 @@ where
     );
     node.write_guard_state.lock().enable_sealing(seals);
 
-    let ops = node.open(locked, current_task, &MountInfo::detached(), flags, false)?;
+    let ops =
+        node.open(locked, current_task, &MountInfo::detached(), flags, AccessCheck::skip())?;
 
     // In /proc/[pid]/fd, the target of this memfd's symbolic link is "/memfd:[name]".
     let mut local_name = FsString::from("/memfd:");

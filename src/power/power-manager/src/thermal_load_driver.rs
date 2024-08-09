@@ -45,7 +45,7 @@ use {fuchsia_async as fasync, serde_json as json};
 /// Sends Messages:
 ///   - SystemShutdown
 ///   - UpdateThermalLoad
-///   - GetDriverPath
+///   - GetSensorName
 ///   - LogPlatformMetric
 ///
 /// FIDL dependencies: N/A
@@ -178,12 +178,12 @@ impl ThermalLoadDriver {
     fn create_polling_task(self: &Rc<Self>, config: TemperatureInputConfig) {
         let this = self.clone();
         let polling_future = async move {
-            // Query the TemperatureHandler to find out the driver's topological path. This path is
+            // Query the TemperatureHandler to find out the driver's name. This sensor name is
             // used to identify the source of thermal load changes in the system.
-            let sensor_path = this.query_driver_path(&config.temperature_handler_node).await?;
+            let sensor_name = this.query_sensor_name(&config.temperature_handler_node).await?;
 
             // Each polling task gets its own Inspect node
-            let inspect = TemperatureInputInspect::new(&this.inspect, &sensor_path, &config);
+            let inspect = TemperatureInputInspect::new(&this.inspect, &sensor_name, &config);
 
             let mut periodic_timer = fasync::Interval::new(config.poll_interval.into());
             let temperature_input = TemperatureInput::new(config);
@@ -197,7 +197,7 @@ impl ThermalLoadDriver {
                     Err(e) => {
                         error!(
                             "Failed to get updated thermal load for {} (err = {})",
-                            &sensor_path, e
+                            &sensor_name, e
                         );
                         continue;
                     }
@@ -214,7 +214,7 @@ impl ThermalLoadDriver {
                     log_if_err!(
                         this.send_message_to_many(
                             &this.thermal_load_notify_nodes,
-                            &Message::UpdateThermalLoad(new_thermal_load, sensor_path.clone())
+                            &Message::UpdateThermalLoad(new_thermal_load, sensor_name.clone())
                         )
                         .await
                         .into_iter()
@@ -231,11 +231,11 @@ impl ThermalLoadDriver {
         self.polling_tasks.borrow_mut().push(fasync::Task::local(polling_future));
     }
 
-    /// Queries the provided TemperatureHandler node for its associated driver path.
-    async fn query_driver_path(&self, temperature_handler: &Rc<dyn Node>) -> Result<String> {
-        match self.send_message(temperature_handler, &Message::GetDriverPath).await {
-            Ok(MessageReturn::GetDriverPath(path)) => Ok(path),
-            _ => Err(format_err!("Failed to get driver path for {}", temperature_handler.name())),
+    /// Queries the provided TemperatureHandler node for its associated sensor name.
+    async fn query_sensor_name(&self, temperature_handler: &Rc<dyn Node>) -> Result<String> {
+        match self.send_message(temperature_handler, &Message::GetSensorName).await {
+            Ok(MessageReturn::GetSensorName(name)) => Ok(name),
+            _ => Err(format_err!("Failed to get sensor name for {}", temperature_handler.name())),
         }
     }
 
@@ -363,8 +363,8 @@ struct TemperatureInputInspect {
 }
 
 impl TemperatureInputInspect {
-    fn new(parent: &inspect::Node, sensor_path: &str, config: &TemperatureInputConfig) -> Self {
-        let root = parent.create_child(sensor_path);
+    fn new(parent: &inspect::Node, sensor_name: &str, config: &TemperatureInputConfig) -> Self {
+        let root = parent.create_child(sensor_name);
         let thermal_load_property = root.create_uint("thermal_load", 0);
         root.record_double("onset_temperature_c", config.onset_temperature.0);
         root.record_double("reboot_temperature_c", config.reboot_temperature.0);
@@ -480,9 +480,9 @@ mod tests {
     }
 
     // Convenience function to add an UpdateThermalLoad message to a mock node's expected messages.
-    fn expect_thermal_load(node: &Rc<MockNode>, thermal_load: u32, sensor_path: &str) {
+    fn expect_thermal_load(node: &Rc<MockNode>, thermal_load: u32, sensor_name: &str) {
         node.add_msg_response_pair((
-            msg_eq!(UpdateThermalLoad(ThermalLoad(thermal_load), sensor_path.to_string())),
+            msg_eq!(UpdateThermalLoad(ThermalLoad(thermal_load), sensor_name.to_string())),
             msg_ok_return!(UpdateThermalLoad),
         ));
     }
@@ -569,15 +569,15 @@ mod tests {
         let mock_temperature_handler_1 = mock_maker.make("temperature_handler_1", vec![]);
         let mock_temperature_handler_2 = mock_maker.make("temperature_handler_2", vec![]);
 
-        // The ThermalLoadDriver asks for the driver path of all TemperatureHandler nodes during
+        // The ThermalLoadDriver asks for the driver name of all TemperatureHandler nodes during
         // initialization
         mock_temperature_handler_1.add_msg_response_pair((
-            msg_eq!(GetDriverPath),
-            msg_ok_return!(GetDriverPath("fake_driver_path_1".to_string())),
+            msg_eq!(GetSensorName),
+            msg_ok_return!(GetSensorName("fake_driver_1".to_string())),
         ));
         mock_temperature_handler_2.add_msg_response_pair((
-            msg_eq!(GetDriverPath),
-            msg_ok_return!(GetDriverPath("fake_driver_path_2".to_string())),
+            msg_eq!(GetSensorName),
+            msg_ok_return!(GetSensorName("fake_driver_2".to_string())),
         ));
 
         // Create the ThermalLoadDriver node. The node has two temperature input sources that are
@@ -616,23 +616,23 @@ mod tests {
         );
 
         // Increase mock_1 temperature, expect a corresponding thermal load update
-        expect_thermal_load(&mock_thermal_load_receiver, 20, "fake_driver_path_1");
-        expect_thermal_load(&mock_thermal_load_receiver, 0, "fake_driver_path_2");
+        expect_thermal_load(&mock_thermal_load_receiver, 20, "fake_driver_1");
+        expect_thermal_load(&mock_thermal_load_receiver, 0, "fake_driver_2");
         node_runner.iterate_with_temperature_inputs(&[10.0, 0.0]);
 
         // Increase mock_2 temperature, expect a corresponding thermal load update
-        expect_thermal_load(&mock_thermal_load_receiver, 20, "fake_driver_path_1");
-        expect_thermal_load(&mock_thermal_load_receiver, 40, "fake_driver_path_2");
+        expect_thermal_load(&mock_thermal_load_receiver, 20, "fake_driver_1");
+        expect_thermal_load(&mock_thermal_load_receiver, 40, "fake_driver_2");
         node_runner.iterate_with_temperature_inputs(&[10.0, 40.0]);
 
         // Both temperatures remain constant, thermal load should still be sent
-        expect_thermal_load(&mock_thermal_load_receiver, 20, "fake_driver_path_1");
-        expect_thermal_load(&mock_thermal_load_receiver, 40, "fake_driver_path_2");
+        expect_thermal_load(&mock_thermal_load_receiver, 20, "fake_driver_1");
+        expect_thermal_load(&mock_thermal_load_receiver, 40, "fake_driver_2");
         node_runner.iterate_with_temperature_inputs(&[10.0, 40.0]);
 
         // Decrease temperature for both mocks, expect two corresponding thermal load updates
-        expect_thermal_load(&mock_thermal_load_receiver, 10, "fake_driver_path_1");
-        expect_thermal_load(&mock_thermal_load_receiver, 20, "fake_driver_path_2");
+        expect_thermal_load(&mock_thermal_load_receiver, 10, "fake_driver_1");
+        expect_thermal_load(&mock_thermal_load_receiver, 20, "fake_driver_2");
         node_runner.iterate_with_temperature_inputs(&[5.0, 20.0]);
     }
 
@@ -655,11 +655,11 @@ mod tests {
             )],
         );
 
-        // The ThermalLoadDriver asks for the driver path of all TemperatureHandler nodes during
+        // The ThermalLoadDriver asks for the driver name of all TemperatureHandler nodes during
         // initialization
         mock_temperature_handler.add_msg_response_pair((
-            msg_eq!(GetDriverPath),
-            msg_ok_return!(GetDriverPath("fake_driver_path".to_string())),
+            msg_eq!(GetSensorName),
+            msg_ok_return!(GetSensorName("fake_driver".to_string())),
         ));
 
         let node = ThermalLoadDriverBuilder {
@@ -702,15 +702,15 @@ mod tests {
         let mock_thermal_load_receiver = mock_maker.make("mock_thermal_load_receiver", vec![]);
         let system_shutdown_node = mock_maker.make("mock_system_shutdown_node", vec![]);
 
-        // The ThermalLoadDriver asks for the driver path of all TemperatureHandler nodes during
+        // The ThermalLoadDriver asks for the driver name of all TemperatureHandler nodes during
         // initialization
         mock_temperature_handler_1.add_msg_response_pair((
-            msg_eq!(GetDriverPath),
-            msg_ok_return!(GetDriverPath("fake_driver_path_1".to_string())),
+            msg_eq!(GetSensorName),
+            msg_ok_return!(GetSensorName("fake_driver_1".to_string())),
         ));
         mock_temperature_handler_2.add_msg_response_pair((
-            msg_eq!(GetDriverPath),
-            msg_ok_return!(GetDriverPath("fake_driver_path_2".to_string())),
+            msg_eq!(GetSensorName),
+            msg_ok_return!(GetSensorName("fake_driver_2".to_string())),
         ));
 
         let node = ThermalLoadDriverBuilder {
@@ -746,8 +746,8 @@ mod tests {
         );
 
         // Provide some fake temperature values that cause a thermal load change for both inputs
-        expect_thermal_load(&mock_thermal_load_receiver, 20, "fake_driver_path_1");
-        expect_thermal_load(&mock_thermal_load_receiver, 50, "fake_driver_path_2");
+        expect_thermal_load(&mock_thermal_load_receiver, 20, "fake_driver_1");
+        expect_thermal_load(&mock_thermal_load_receiver, 50, "fake_driver_2");
         node_runner.iterate_with_temperature_inputs(&[10.0, 50.0]);
 
         // Verify the expected thermal load values are present for both temperature inputs
@@ -755,14 +755,14 @@ mod tests {
             inspector,
             root: {
                 "ThermalLoadDriver": {
-                    fake_driver_path_1: {
+                    fake_driver_1: {
                         onset_temperature_c: 0.0,
                         reboot_temperature_c: 50.0,
                         poll_interval_s: 1.99,
                         filter_time_constant_s: 10.0,
                         thermal_load: 20u64
                     },
-                    fake_driver_path_2: {
+                    fake_driver_2: {
                         onset_temperature_c: 0.0,
                         reboot_temperature_c: 100.0,
                         poll_interval_s: 2.0,
@@ -786,11 +786,11 @@ mod tests {
         let mock_thermal_load_receiver = mock_maker.make("mock_thermal_load_receiver", vec![]);
         let mock_system_shutdown_node = mock_maker.make("mock_system_shutdown_node", vec![]);
 
-        // The ThermalLoadDriver asks for the driver path of all TemperatureHandler nodes during
+        // The ThermalLoadDriver asks for the driver name of all TemperatureHandler nodes during
         // initialization
         mock_temperature_handler.add_msg_response_pair((
-            msg_eq!(GetDriverPath),
-            msg_ok_return!(GetDriverPath("fake_driver_path".to_string())),
+            msg_eq!(GetSensorName),
+            msg_ok_return!(GetSensorName("fake_driver".to_string())),
         ));
 
         let node = ThermalLoadDriverBuilder {

@@ -1,0 +1,86 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/rust/rustc_library.gni")
+
+# A template for end-to-end testing of ffx tools using `e2e_emu` library.
+#
+# Parameters
+#
+#   product_bundle (optional)
+#     Product bundle containing emulator image..
+#     Default: "//build/images/fuchsia:product_bundle($default_toolchain)"
+#
+#   any other arguments are forwarded to rustc_test.
+template("ffx_e2e_test") {
+  _host_test_data_label = "${invoker.target_name}_emulator_data"
+  _host_test_config = "${invoker.target_name}_path_config"
+
+  # Exported SDK with ffx binary.
+  _sdk_label = "//sdk:core($default_toolchain)"
+  _sdk_outdir = get_label_info(_sdk_label, "root_out_dir")
+  _sdk_path = _sdk_outdir + "/sdk/exported/core"
+
+  _amber_files_label = "//build/images/updates:publish($default_toolchain)"
+  _amber_files_path = "$root_build_dir/amber-files"
+
+  # Default product bundle containing emulator image.
+  _pb_label = "//build/images/fuchsia:product_bundle($default_toolchain)"
+  if (defined(invoker.product_bundle)) {
+    _pb_label = invoker.product_bundle
+  }
+  _pb_outdir = get_label_info(_pb_label, "target_out_dir")
+  _product_bundle = "$_pb_outdir/product_bundle"
+
+  rustc_test(target_name) {
+    deps = [ "//src/developer/ffx/lib/e2e_emu:e2e_emu" ]
+    if (defined(invoker.deps)) {
+      deps += invoker.deps
+    }
+
+    data_deps = [
+      ":$_host_test_data_label",
+      "//src/developer/ffx:suite_test_data",
+    ]
+    if (defined(invoker.data_deps)) {
+      data_deps += invoker.data_deps
+    }
+
+    configs += [ ":$_host_test_config" ]
+
+    args = [
+      "env PRODUCT_BUNDLE_PATH=" + rebase_path(_product_bundle, root_build_dir),
+      "env PACKAGE_REPOSITORY_PATH=" +
+          rebase_path(_amber_files_path, root_build_dir),
+    ]
+
+    if (defined(invoker.args)) {
+      args += invoker.args
+    }
+
+    forward_variables_from(invoker,
+                           "*",
+                           [
+                             "product_bundle",
+                             "deps",
+                             "args",
+                             "data_deps",
+                           ])
+  }
+  host_test_data(_host_test_data_label) {
+    sources = [
+      _amber_files_path,
+      _product_bundle,
+      _sdk_path,
+    ]
+    deps = [
+      _amber_files_label,
+      _pb_label,
+      _sdk_label,
+    ]
+  }
+  config(_host_test_config) {
+    rustenv = [ "SDK_ROOT_DIR=" + rebase_path(_sdk_path, root_build_dir) ]
+  }
+}

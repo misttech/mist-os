@@ -9,7 +9,7 @@ use crate::parser::common::{
 use nom::branch::alt;
 use nom::bytes::complete::{tag, take_until};
 use nom::combinator::{map, opt, value};
-use nom::multi::separated_nonempty_list;
+use nom::multi::separated_list1;
 use nom::sequence::{delimited, separated_pair, terminated, tuple};
 use nom::IResult;
 
@@ -91,14 +91,14 @@ fn keyword_enum(input: NomSpan) -> IResult<NomSpan, ValueType, BindParserError> 
 }
 
 fn value_list<'a, O, F>(
-    f: F,
-) -> impl Fn(NomSpan<'a>) -> IResult<NomSpan<'a>, Vec<O>, BindParserError>
+    mut f: F,
+) -> impl FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, Vec<O>, BindParserError>
 where
-    F: Fn(NomSpan<'a>) -> IResult<NomSpan<'a>, O, BindParserError>,
+    F: FnMut(NomSpan<'a>) -> IResult<NomSpan<'a>, O, BindParserError>,
 {
     move |input: NomSpan<'a>| {
         let separator = || ws(map_err(tag(","), BindParserError::ListSeparator));
-        let values = separated_nonempty_list(separator(), |s| f(s));
+        let values = separated_list1(separator(), |s| f(s));
 
         // Lists may optionally be terminated by an additional trailing separator.
         let values = terminated(values, opt(separator()));

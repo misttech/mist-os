@@ -145,12 +145,11 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> Table<I, BC, E> {
             if let Some((original_tuple, reply_tuple)) = guard
                 .table
                 .iter()
-                .filter_map(|(_, conn)| {
-                    if conn.state.lock().is_established() {
-                        None
-                    } else {
+                .filter_map(|(_, conn)| match conn.state.lock().establishment_lifecycle {
+                    EstablishmentLifecycle::SeenOriginal => {
                         Some((conn.inner.original_tuple.clone(), conn.inner.reply_tuple.clone()))
                     }
+                    EstablishmentLifecycle::SeenReply | EstablishmentLifecycle::Established => None,
                 })
                 .next()
             {
@@ -425,7 +424,7 @@ impl<I: IpExt> Inspectable for Tuple<I> {
 }
 
 /// The direction of a packet when compared to the given connection.
-#[derive(Debug, Clone)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
 pub(crate) enum ConnectionDirection {
     /// The packet is traveling in the same direction as the first packet seen
     /// for the [`Connection`].
@@ -645,6 +644,39 @@ impl ProtocolState {
     }
 }
 
+/// The lifecycle of the connection getting to being established.
+///
+/// To mimic Linux behavior, we require seeing three packets in order to mark a
+/// connection established.
+/// 1. Original
+/// 2. Reply
+/// 3. Original
+///
+/// The first packet is implicit in the creation of the connection when the
+/// first packet is seen.
+#[derive(Debug, Copy, Clone, PartialEq, Eq)]
+enum EstablishmentLifecycle {
+    SeenOriginal,
+    SeenReply,
+    Established,
+}
+
+impl EstablishmentLifecycle {
+    fn update(self, dir: ConnectionDirection) -> Self {
+        match self {
+            EstablishmentLifecycle::SeenOriginal => match dir {
+                ConnectionDirection::Original => self,
+                ConnectionDirection::Reply => EstablishmentLifecycle::SeenReply,
+            },
+            EstablishmentLifecycle::SeenReply => match dir {
+                ConnectionDirection::Original => EstablishmentLifecycle::Established,
+                ConnectionDirection::Reply => self,
+            },
+            EstablishmentLifecycle::Established => self,
+        }
+    }
+}
+
 /// Dynamic per-connection state.
 #[derive(Derivative)]
 #[derivative(Clone(bound = ""), Debug(bound = ""))]
@@ -652,6 +684,9 @@ pub(crate) struct ConnectionState<BT: FilterBindingsTypes> {
     /// The time the last packet was seen for this connection (in either of the
     /// original or reply directions).
     last_packet_time: BT::Instant,
+
+    /// Where in the generic establishment lifecycle the current connection is.
+    establishment_lifecycle: EstablishmentLifecycle,
 
     /// State that is specific to a given protocol (e.g. TCP or UDP).
     protocol_state: ProtocolState,
@@ -668,22 +703,21 @@ impl<BT: FilterBindingsTypes> ConnectionState<BT> {
             self.last_packet_time = now;
         }
 
-        self.protocol_state.update(dir, transport_data)
-    }
+        self.establishment_lifecycle = self.establishment_lifecycle.update(dir);
 
-    fn is_established(&self) -> bool {
-        match &self.protocol_state {
-            ProtocolState::Tcp(tcp_state) => tcp_state.is_established(),
-            ProtocolState::Udp { established } | ProtocolState::Other { established } => {
-                *established
-            }
-        }
+        self.protocol_state.update(dir, transport_data)
     }
 }
 
 impl<BT: FilterBindingsTypes> Inspectable for ConnectionState<BT> {
     fn record<Inspector: netstack3_base::Inspector>(&self, inspector: &mut Inspector) {
-        inspector.record_bool("established", self.is_established());
+        inspector.record_bool(
+            "established",
+            match self.establishment_lifecycle {
+                EstablishmentLifecycle::SeenOriginal | EstablishmentLifecycle::SeenReply => false,
+                EstablishmentLifecycle::Established => true,
+            },
+        );
         inspector.record_inspectable_value("last_packet_time", &self.last_packet_time);
     }
 }
@@ -736,6 +770,7 @@ impl<I: IpExt, BC: FilterBindingsContext, E: Default> ConnectionExclusive<I, BC,
             },
             state: ConnectionState {
                 last_packet_time: bindings_ctx.now(),
+                establishment_lifecycle: EstablishmentLifecycle::SeenOriginal,
                 protocol_state: match tuple.protocol {
                     TransportProtocol::Tcp => {
                         let (segment, payload_len) = transport_data
@@ -842,7 +877,7 @@ impl<I: IpExt, BT: FilterBindingsTypes, E> ConnectionShared<I, BT, E> {
         let duration = now.saturating_duration_since(state.last_packet_time);
 
         let expiry_duration = match state.protocol_state {
-            ProtocolState::Tcp(tcp_conn) => tcp_conn.expiry_duration(),
+            ProtocolState::Tcp(tcp_conn) => tcp_conn.expiry_duration(state.establishment_lifecycle),
             ProtocolState::Udp { .. } => CONNECTION_EXPIRY_TIME_UDP,
             // ICMP ends up here. The ICMP messages we track are simple
             // request/response protocols, so we always expect to get a response
@@ -950,6 +985,43 @@ mod tests {
         fn transport_packet_mut(&mut self) -> Option<Self::TransportPacketMut<'_>> {
             None
         }
+    }
+
+    #[test_case(
+        EstablishmentLifecycle::SeenOriginal,
+        ConnectionDirection::Original
+          => EstablishmentLifecycle::SeenOriginal
+    )]
+    #[test_case(
+        EstablishmentLifecycle::SeenOriginal,
+        ConnectionDirection::Reply
+          => EstablishmentLifecycle::SeenReply
+    )]
+    #[test_case(
+        EstablishmentLifecycle::SeenReply,
+        ConnectionDirection::Original
+          => EstablishmentLifecycle::Established
+    )]
+    #[test_case(
+        EstablishmentLifecycle::SeenReply,
+        ConnectionDirection::Reply
+          => EstablishmentLifecycle::SeenReply
+    )]
+    #[test_case(
+        EstablishmentLifecycle::Established,
+        ConnectionDirection::Original
+          => EstablishmentLifecycle::Established
+    )]
+    #[test_case(
+        EstablishmentLifecycle::Established,
+        ConnectionDirection::Reply
+          => EstablishmentLifecycle::Established
+    )]
+    fn establishment_lifecycle_test(
+        lifecycle: EstablishmentLifecycle,
+        dir: ConnectionDirection,
+    ) -> EstablishmentLifecycle {
+        lifecycle.update(dir)
     }
 
     #[ip_test(I)]
@@ -1163,7 +1235,7 @@ mod tests {
             Ok(ConnectionUpdateAction::NoAction)
         );
         let state = connection.state();
-        assert!(!state.is_established());
+        assert_matches!(state.establishment_lifecycle, EstablishmentLifecycle::SeenOriginal);
         assert_eq!(state.last_packet_time.offset, Duration::from_secs(1));
 
         // Tuple in reply direction should set established to true and obviously
@@ -1174,7 +1246,7 @@ mod tests {
             Ok(ConnectionUpdateAction::NoAction)
         );
         let state = connection.state();
-        assert!(state.is_established());
+        assert_matches!(state.establishment_lifecycle, EstablishmentLifecycle::SeenReply);
         assert_eq!(state.last_packet_time.offset, Duration::from_secs(2));
 
         // Unrelated connection should return an error and otherwise not touch
@@ -1184,7 +1256,7 @@ mod tests {
             connection.update(&bindings_ctx, &other_packet),
             Err(ConnectionUpdateError::NonMatchingTuple)
         );
-        assert!(state.is_established());
+        assert_matches!(state.establishment_lifecycle, EstablishmentLifecycle::SeenReply);
         assert_eq!(state.last_packet_time.offset, Duration::from_secs(2));
     }
 
@@ -1214,7 +1286,7 @@ mod tests {
             .expect("packet should be valid")
             .expect("connection should be present");
         let state = conn.state();
-        assert!(!state.is_established());
+        assert_matches!(state.establishment_lifecycle, EstablishmentLifecycle::SeenOriginal);
         assert_eq!(state.last_packet_time.offset, Duration::from_secs(1));
 
         // Since the connection isn't present in the map, we should get a
@@ -1237,7 +1309,7 @@ mod tests {
             .expect("packet should be valid");
         let conn = assert_matches!(conn, Some(conn) => conn);
         let state = conn.state();
-        assert!(!state.is_established());
+        assert_matches!(state.establishment_lifecycle, EstablishmentLifecycle::SeenOriginal);
         assert_eq!(state.last_packet_time.offset, Duration::from_secs(2));
         let conn = assert_matches!(conn, Connection::Shared(conn) => conn);
 
@@ -1247,7 +1319,7 @@ mod tests {
             .expect("packet should be valid");
         let reply_conn = assert_matches!(reply_conn, Some(conn) => conn);
         let state = reply_conn.state();
-        assert!(state.is_established());
+        assert_matches!(state.establishment_lifecycle, EstablishmentLifecycle::SeenReply);
         assert_eq!(state.last_packet_time.offset, Duration::from_secs(3));
         let reply_conn = assert_matches!(reply_conn, Connection::Shared(conn) => conn);
 
@@ -1418,7 +1490,7 @@ mod tests {
             .get_connection_for_packet_and_update(&bindings_ctx, &second_packet_reply)
             .expect("packet should be valid")
             .expect("packet should be trackable");
-        assert!(conn.state().is_established());
+        assert_matches!(conn.state().establishment_lifecycle, EstablishmentLifecycle::SeenReply);
         assert!(!core_ctx
             .conntrack()
             .finalize_connection(&mut bindings_ctx, conn)
@@ -1593,7 +1665,7 @@ mod tests {
             .get_connection_for_packet_and_update(&bindings_ctx, &packet)
             .expect("packet should be valid")
             .expect("packet should be trackable");
-        assert!(!conn.state().is_established());
+        assert_matches!(conn.state().establishment_lifecycle, EstablishmentLifecycle::SeenOriginal);
         assert!(table
             .finalize_connection(&mut bindings_ctx, conn)
             .expect("connection finalize should succeed"));
@@ -1719,7 +1791,7 @@ mod tests {
         let state = conn.state();
         // Since we can't differentiate between the original and reply tuple,
         // the connection ends up being marked established immediately.
-        assert!(state.is_established());
+        assert_matches!(state.establishment_lifecycle, EstablishmentLifecycle::SeenReply);
 
         assert_matches!(conn, Connection::Exclusive(_));
         assert!(!table.contains_tuple(&tuple));

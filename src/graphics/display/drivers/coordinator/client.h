@@ -316,7 +316,7 @@ class ClientProxy {
  public:
   // `client_id` is assigned by the Controller to distinguish clients.
   ClientProxy(Controller* controller, ClientPriority client_priority, ClientId client_id,
-              fit::function<void()> on_client_dead);
+              fit::function<void()> on_client_disconnected);
 
   ~ClientProxy();
 
@@ -425,7 +425,7 @@ class ClientProxy {
   VsyncAckCookie last_cookie_sent_ = kInvalidVsyncAckCookie;
   bool acknowledge_request_sent_ = false;
 
-  fit::function<void()> on_client_dead_;
+  fit::function<void()> on_client_disconnected_;
 
   // Mapping from controller_stamp to client_stamp for all configurations that
   // are already applied and pending to be presented on the display.

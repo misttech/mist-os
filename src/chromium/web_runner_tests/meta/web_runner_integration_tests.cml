@@ -29,7 +29,7 @@
         },
         {
             name: "ui",
-            url: "fuchsia-pkg://fuchsia.com/test-ui-stack#meta/test-ui-stack.cm",
+            url: "test-ui-stack#meta/test-ui-stack.cm",
         },
     ],
     use: [
@@ -150,7 +150,6 @@
         "fuchsia.test": {
             "deprecated-allowed-packages": [
                 "intl_property_manager",
-                "test-ui-stack",
                 "web_engine",
             ],
         },

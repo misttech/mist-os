@@ -9,12 +9,12 @@ use super::{FsNodeSecurityXattr, FsNodeState, ProcAttr, ResolvedElfState};
 use crate::task::{CurrentTask, Task};
 use crate::vfs::{FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp};
 use linux_uapi::XATTR_NAME_SELINUX;
-use selinux::permission_check::PermissionCheck;
-use selinux::security_server::SecurityServer;
-use selinux::{InitialSid, SecurityId};
-use selinux_common::{
+use selinux::{
     ClassPermission, FilePermission, NullessByteStr, ObjectClass, Permission, ProcessPermission,
 };
+use selinux_core::permission_check::PermissionCheck;
+use selinux_core::security_server::SecurityServer;
+use selinux_core::{InitialSid, SecurityId};
 use starnix_logging::{log_debug, track_stub};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
@@ -58,8 +58,6 @@ pub(super) fn check_exec_access(
         security_server
             .compute_new_sid(current_sid, executable_sid, ObjectClass::Process)
             .map_err(|_| errno!(EACCES))?
-        // TODO(http://b/319232900): validate that the new context is valid, and return EACCESS if
-        // it's not.
     };
     if current_sid == new_sid {
         // To `exec()` a binary in the caller's domain, the caller must be granted
@@ -329,7 +327,6 @@ pub fn get_procattr(
     attr: ProcAttr,
 ) -> Result<Vec<u8>, Errno> {
     let task_attrs = &task.read().security_state.attrs;
-    // TODO(b/322849067): Validate that the `source` has the required access.
 
     let sid = match attr {
         ProcAttr::Current => Some(task_attrs.current_sid),
@@ -428,22 +425,12 @@ pub fn set_procattr(
 
 /// Determines the effective Security Context to use in access control checks on the supplied `fs_node`.
 ///
-/// This logic is a work-in-progress but will involve (at least) the following:
-///
-/// 1. If the filesystem has a "context=" mount option, then cache that SID in the node.
-// TODO(b/334091674): Implement the "context=" override.
-/// 2. If the filesystem has "fs_use_xattr" then:
-///    a. If the file has a "security.selinux" valid with the current policy then obtain the SID
-///       and cache it.
-///    b. If the file has a "security.selinux" invalid with the current policy then return the
-///       "unlabeled" SID without caching.
-///    c. If the file lacks a "security.selinux" attribute then check the filesystem's
-///       "defcontext=" mount option; if set then return that SID, without caching.
-// TODO(b/334091674): Implement the "defcontext=" override.
-/// 3. If the policy defines security context(s) for the filesystem type on which `fs_node` resides
-///    then use those to determine a SID, and cache it.
-// TODO(b/334091674): Implement use of policy-defined contexts (e.g. via `genfscon`).
-/// 4. Return the policy's "file" initial context.
+/// This implementation is in active development, but in principle involves:
+/// 1. If there is a cached SID, use it.
+/// 2. Determine how to produce the SID, depending on the file system labeling scheme.
+///    e.g. for "fs_use_xattr" try reading the security extended attribute.
+///    e.g. for "mountpoint" labelling, use the file system's label.
+/// 3. If all else fails, use the policy-defined "unlabeled" SID.
 fn compute_fs_node_security_id(
     security_server: &SecurityServer,
     current_task: &CurrentTask,
@@ -475,9 +462,12 @@ fn compute_fs_node_security_id(
             }
         }
         _ => {
-            // TODO(b/334091674): Complete the fallback implementation (e.g. using the file system's "defcontext",
-            // if specified).
-            SecurityId::initial(InitialSid::File)
+            // If the filesystem defines a "default" context then use that.
+            let fs_contexts = &fs_node.fs().security_state.state;
+            let def_context = fs_contexts.def_context.as_ref();
+            def_context
+                .and_then(|ctx| security_server.security_context_to_sid(ctx.into()).ok())
+                .unwrap_or(SecurityId::initial(InitialSid::File))
         }
     }
 }
@@ -537,8 +527,11 @@ pub fn fs_node_security_xattr(
     _parent: Option<&FsNodeHandle>,
 ) -> Result<Option<FsNodeSecurityXattr>, Errno> {
     // TODO(b/334091674): If there is no `parent` then this is the "root" node; apply `root_context`, if set.
-    // TODO(b/334091674): Determine whether "context" (and "defcontext") should be returned here, or only set in
-    // the node's cached SID.
+    // TODO(b/334091674): If a filesystem is not configured to store security
+    // contexts in xattrs then nothing should be returned here.
+    // TODO(b/334091674): If "context" is set on the filesystem then regardless
+    // of the policy-defined scheme for the filesystem type, this instance uses
+    // "mountpoint labelling" instead (and no labels are written to the FS).
     let fs = new_node.fs();
     Ok(fs
         .security_state
@@ -661,7 +654,7 @@ mod tests {
         AutoReleasableTask,
     };
     use crate::vfs::{NamespaceNode, XattrOp};
-    use selinux::security_server::Mode;
+    use selinux_core::security_server::Mode;
     use starnix_sync::{Locked, Unlocked};
     use starnix_uapi::device_type::DeviceType;
     use starnix_uapi::file_mode::FileMode;

@@ -11,11 +11,6 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
-            from: "parent",
-            to: [ "#bt-snoop" ],
-        },
-        {
             directory: "dev-class",
             from: "parent",
             as: "dev-bt-hci",

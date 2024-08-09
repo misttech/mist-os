@@ -92,6 +92,9 @@ if (toolchain_environment == "user.basic") {
       distribution_entries_barrier = []
       distribution_entries = []
     }
+
+    # workaround for b/349448459 to remote-link successfully
+    configs += [ "//build/config:remote_link_scandeps_workaround" ]
   }
 
   source_set("syscall-asm") {

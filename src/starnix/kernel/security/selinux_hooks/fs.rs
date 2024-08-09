@@ -17,9 +17,9 @@ use crate::vfs::{
 use bstr::ByteSlice;
 use fuchsia_zircon as zx;
 use fuchsia_zircon::HandleBased;
-use selinux::security_server::SecurityServer;
-use selinux::{InitialSid, SecurityId};
-use selinux_policy::SUPPORTED_POLICY_VERSION;
+use selinux::policy::SUPPORTED_POLICY_VERSION;
+use selinux_core::security_server::SecurityServer;
+use selinux_core::{InitialSid, SecurityId};
 use starnix_logging::{impossible_error, log_error, log_info, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_uapi::device_type::DeviceType;

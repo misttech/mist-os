@@ -91,6 +91,12 @@ struct PhysVmo {
 };
 static_assert(std::is_default_constructible_v<PhysVmo>);
 
+// A physical address range.
+struct PhysAddressRange {
+  uintptr_t addr = 0;
+  size_t size = 0;
+};
+
 // This holds (or points to) everything that is handed off from physboot to the
 // kernel proper at boot time.
 struct PhysHandoff {
@@ -113,8 +119,8 @@ struct PhysHandoff {
   // kernel proper.
   PhysHandoffTemporarySpan<const PhysVmo> vmos;
 
-  // Physical address of the data ZBI.
-  uint64_t zbi = 0;
+  // Physical address range of the data ZBI.
+  PhysAddressRange zbi;
 
   // Entropy gleaned from ZBI Items such as 'ZBI_TYPE_SECURE_ENTROPY' and/or command line.
   std::optional<crypto::EntropyPool> entropy_pool;
@@ -127,12 +133,6 @@ struct PhysHandoff {
   // Architecture-specific content.
   ArchPhysHandoff arch_handoff;
   static_assert(std::is_default_constructible_v<ArchPhysHandoff>);
-
-  // ZBI_TYPE_MEM_CONFIG payload.
-  //
-  // TODO(https://fxbug.dev/347766366): Replace this with a span of normalized
-  // memalloc::Range.
-  PhysHandoffTemporarySpan<const zbi_mem_range_t> mem_config;
 
   // A normalized accounting of RAM (and peripheral ranges). It consists of
   // ranges that are maximally contiguous and in sorted order, and features
@@ -198,11 +198,8 @@ void HandoffFromPhys(paddr_t handoff_paddr);
 // The remaining hand-off data to be consumed at the end of the hand-off phase
 // (see EndHandoff()).
 struct HandoffEnd {
-  // The data ZBI within the physmap.
-  //
-  // TODO(https://fxbug.dev/357155617): Use PhysVmo machinery to create the VMO
-  // and instead pass a Handle* here.
-  cpp20::span<std::byte> zbi;
+  // The data ZBI.
+  Handle* zbi;
 
   // The VMOs deriving from the phys environment. As returned by EndHandoff(),
   // the entirety of the array will be populated by real handles (if only by

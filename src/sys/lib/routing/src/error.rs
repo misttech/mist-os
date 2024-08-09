@@ -7,7 +7,7 @@ use crate::rights::Rights;
 use clonable_error::ClonableError;
 use cm_rust::CapabilityTypeName;
 use cm_types::Name;
-use moniker::{ChildName, Moniker, MonikerError};
+use moniker::{ChildName, ExtendedMoniker, Moniker};
 use router_error::{Explain, RouterError};
 use std::sync::Arc;
 use thiserror::Error;
@@ -65,6 +65,23 @@ impl ComponentInstanceError {
 
     pub fn resolve_failed(moniker: Moniker, err: impl Into<anyhow::Error>) -> Self {
         Self::ResolveFailed { moniker, err: err.into().into() }
+    }
+}
+
+impl From<ComponentInstanceError> for ExtendedMoniker {
+    fn from(err: ComponentInstanceError) -> ExtendedMoniker {
+        match err {
+            ComponentInstanceError::InstanceNotFound { moniker }
+            | ComponentInstanceError::MalformedUrl { moniker, .. }
+            | ComponentInstanceError::NoAbsoluteUrl { moniker, .. }
+            | ComponentInstanceError::ResolveFailed { moniker, .. } => {
+                ExtendedMoniker::ComponentInstance(moniker.clone())
+            }
+            ComponentInstanceError::ComponentManagerInstanceUnavailable {}
+            | ComponentInstanceError::ComponentManagerInstanceUnexpected {} => {
+                ExtendedMoniker::ComponentManager
+            }
+        }
     }
 }
 
@@ -195,7 +212,7 @@ pub enum RoutingError {
     },
 
     // TODO: Could this be distinguished by use/offer/expose?
-    #[error("`{capability_id}` is not a framework capability")]
+    #[error("`{capability_id}` is not a framework capability (at component `{moniker}`)")]
     CapabilityFromFrameworkNotFound { moniker: Moniker, capability_id: String },
 
     #[error(
@@ -237,38 +254,40 @@ pub enum RoutingError {
     #[error("`{capability_id}` was not exposed to `{moniker}` from `#{child_moniker}`")]
     UseFromChildExposeNotFound { child_moniker: ChildName, moniker: Moniker, capability_id: String },
 
-    #[error("routing a capability from an unsupported source type: {source_type}")]
-    UnsupportedRouteSource { source_type: String },
+    #[error("routing a capability from an unsupported source type `{source_type}` at `{moniker}`")]
+    UnsupportedRouteSource { source_type: String, moniker: ExtendedMoniker },
 
-    #[error("routing a capability of an unsupported type: {type_name}")]
-    UnsupportedCapabilityType { type_name: CapabilityTypeName },
+    #[error("routing a capability of an unsupported type `{type_name}` at `{moniker}`")]
+    UnsupportedCapabilityType { type_name: CapabilityTypeName, moniker: ExtendedMoniker },
 
-    #[error("dictionaries are not yet supported for {cap_type} capabilities")]
-    DictionariesNotSupported { cap_type: CapabilityTypeName },
+    #[error(
+        "dictionaries are not yet supported for {cap_type} capabilities at component `{moniker}`"
+    )]
+    DictionariesNotSupported { moniker: Moniker, cap_type: CapabilityTypeName },
 
-    #[error("the capability does not support member access")]
-    BedrockMemberAccessUnsupported,
+    #[error("the capability does not support member access at `{moniker}`")]
+    BedrockMemberAccessUnsupported { moniker: ExtendedMoniker },
 
-    #[error("item `{name}` is not present in dictionary")]
-    BedrockNotPresentInDictionary { name: String },
+    #[error("item `{name}` is not present in dictionary at component `{moniker}`")]
+    BedrockNotPresentInDictionary { name: String, moniker: Moniker },
 
-    #[error("routed capability was the wrong type. Was: {actual}, expected: {expected}")]
-    BedrockWrongCapabilityType { actual: String, expected: String },
+    #[error("routed capability was the wrong type at component `{moniker}`. Was: {actual}, expected: {expected}")]
+    BedrockWrongCapabilityType { actual: String, expected: String, moniker: ExtendedMoniker },
 
-    #[error("there was an error remoting a capability")]
-    BedrockRemoteCapability,
+    #[error("there was an error remoting a capability at component `{moniker}`")]
+    BedrockRemoteCapability { moniker: Moniker },
 
-    #[error("source dictionary was not found in child's exposes")]
-    BedrockSourceDictionaryExposeNotFound,
+    #[error("source dictionary was not found in child's exposes at component `{moniker}`")]
+    BedrockSourceDictionaryExposeNotFound { moniker: Moniker },
 
-    #[error("Some capability in the routing chain could not be cloned.")]
-    BedrockNotCloneable,
+    #[error("Some capability in the routing chain could not be cloned at `{moniker}`.")]
+    BedrockNotCloneable { moniker: ExtendedMoniker },
 
     #[error(
         "a capability in a dictionary extended from a source dictionary collides with \
-        a capability in the source dictionary that has the same key"
+        a capability in the source dictionary that has the same key at `{moniker}`"
     )]
-    BedrockSourceDictionaryCollision,
+    BedrockSourceDictionaryCollision { moniker: ExtendedMoniker },
 
     #[error(transparent)]
     ComponentInstanceError(#[from] ComponentInstanceError),
@@ -285,20 +304,17 @@ pub enum RoutingError {
     #[error(transparent)]
     PolicyError(#[from] PolicyError),
 
-    #[error(transparent)]
-    MonikerError(#[from] MonikerError),
-
     #[error(
-        "source capability is void. \
+        "source capability at component {moniker} is void. \
         If the offer/expose declaration has `source_availability` set to `unknown`, \
         the source component instance likely isn't defined in the component declaration"
     )]
-    SourceCapabilityIsVoid,
+    SourceCapabilityIsVoid { moniker: Moniker },
 
     #[error(
-        "routes that do not set the `debug` flag are unsupported in the current configuration."
+        "routes that do not set the `debug` flag are unsupported in the current configuration (at `{moniker}`)."
     )]
-    NonDebugRoutesUnsupported,
+    NonDebugRoutesUnsupported { moniker: ExtendedMoniker },
 }
 
 impl Explain for RoutingError {
@@ -344,13 +360,69 @@ impl Explain for RoutingError {
             | RoutingError::BedrockNotCloneable { .. }
             | RoutingError::AvailabilityRoutingError(_) => zx::Status::NOT_FOUND,
             RoutingError::BedrockMemberAccessUnsupported { .. }
-            | RoutingError::NonDebugRoutesUnsupported
+            | RoutingError::NonDebugRoutesUnsupported { .. }
             | RoutingError::DictionariesNotSupported { .. } => zx::Status::NOT_SUPPORTED,
-            RoutingError::MonikerError(_) => zx::Status::INTERNAL,
             RoutingError::ComponentInstanceError(err) => err.as_zx_status(),
             RoutingError::RightsRoutingError(err) => err.as_zx_status(),
             RoutingError::PolicyError(err) => err.as_zx_status(),
-            RoutingError::SourceCapabilityIsVoid => zx::Status::NOT_FOUND,
+            RoutingError::SourceCapabilityIsVoid { .. } => zx::Status::NOT_FOUND,
+        }
+    }
+}
+
+impl From<RoutingError> for ExtendedMoniker {
+    fn from(err: RoutingError) -> ExtendedMoniker {
+        match err {
+            RoutingError::BedrockNotPresentInDictionary { moniker, .. }
+            | RoutingError::BedrockRemoteCapability { moniker, .. }
+            | RoutingError::BedrockSourceDictionaryExposeNotFound { moniker, .. }
+            | RoutingError::CapabilityFromCapabilityNotFound { moniker, .. }
+            | RoutingError::CapabilityFromFrameworkNotFound { moniker, .. }
+            | RoutingError::ComponentNotInIdIndex { source_moniker: moniker, .. }
+            | RoutingError::DictionariesNotSupported { moniker, .. }
+            | RoutingError::EnvironmentFromChildExposeNotFound { moniker, .. }
+            | RoutingError::EnvironmentFromChildInstanceNotFound { moniker, .. }
+            | RoutingError::EnvironmentFromParentNotFound { moniker, .. }
+            | RoutingError::ExposeFromChildExposeNotFound { moniker, .. }
+            | RoutingError::ExposeFromChildInstanceNotFound { moniker, .. }
+            | RoutingError::ExposeFromCollectionNotFound { moniker, .. }
+            | RoutingError::ExposeFromFrameworkNotFound { moniker, .. }
+            | RoutingError::ExposeFromSelfNotFound { moniker, .. }
+            | RoutingError::OfferFromChildExposeNotFound { moniker, .. }
+            | RoutingError::OfferFromChildInstanceNotFound { moniker, .. }
+            | RoutingError::OfferFromCollectionNotFound { moniker, .. }
+            | RoutingError::OfferFromParentNotFound { moniker, .. }
+            | RoutingError::OfferFromSelfNotFound { moniker, .. }
+            | RoutingError::SourceCapabilityIsVoid { moniker, .. }
+            | RoutingError::StorageFromChildExposeNotFound { moniker, .. }
+            | RoutingError::StorageFromParentNotFound { moniker, .. }
+            | RoutingError::UseFromChildExposeNotFound { moniker, .. }
+            | RoutingError::UseFromChildInstanceNotFound { moniker, .. }
+            | RoutingError::UseFromEnvironmentNotFound { moniker, .. }
+            | RoutingError::UseFromParentNotFound { moniker, .. }
+            | RoutingError::UseFromRootEnvironmentNotAllowed { moniker, .. }
+            | RoutingError::UseFromSelfNotFound { moniker, .. } => moniker.into(),
+
+            RoutingError::BedrockMemberAccessUnsupported { moniker }
+            | RoutingError::BedrockNotCloneable { moniker }
+            | RoutingError::BedrockSourceDictionaryCollision { moniker }
+            | RoutingError::BedrockWrongCapabilityType { moniker, .. }
+            | RoutingError::NonDebugRoutesUnsupported { moniker }
+            | RoutingError::UnsupportedCapabilityType { moniker, .. }
+            | RoutingError::UnsupportedRouteSource { moniker, .. } => moniker,
+
+            RoutingError::AvailabilityRoutingError(err) => err.into(),
+            RoutingError::ComponentInstanceError(err) => err.into(),
+            RoutingError::EventsRoutingError(err) => err.into(),
+            RoutingError::PolicyError(err) => err.into(),
+            RoutingError::RightsRoutingError(err) => err.into(),
+
+            RoutingError::CapabilityFromComponentManagerNotFound { .. }
+            | RoutingError::OfferFromComponentManagerNotFound { .. }
+            | RoutingError::RegisterFromComponentManagerNotFound { .. }
+            | RoutingError::UseFromComponentManagerNotFound { .. } => {
+                ExtendedMoniker::ComponentManager
+            }
         }
     }
 }
@@ -554,12 +626,18 @@ impl RoutingError {
         }
     }
 
-    pub fn unsupported_route_source(source: impl Into<String>) -> Self {
-        Self::UnsupportedRouteSource { source_type: source.into() }
+    pub fn unsupported_route_source(
+        moniker: impl Into<ExtendedMoniker>,
+        source: impl Into<String>,
+    ) -> Self {
+        Self::UnsupportedRouteSource { source_type: source.into(), moniker: moniker.into() }
     }
 
-    pub fn unsupported_capability_type(type_name: impl Into<CapabilityTypeName>) -> Self {
-        Self::UnsupportedCapabilityType { type_name: type_name.into() }
+    pub fn unsupported_capability_type(
+        moniker: impl Into<ExtendedMoniker>,
+        type_name: impl Into<CapabilityTypeName>,
+    ) -> Self {
+        Self::UnsupportedCapabilityType { type_name: type_name.into(), moniker: moniker.into() }
     }
 }
 
@@ -567,21 +645,32 @@ impl RoutingError {
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
 #[derive(Error, Debug, Clone, PartialEq)]
 pub enum EventsRoutingError {
-    #[error("filter is not a subset")]
-    InvalidFilter,
+    #[error("filter is not a subset at `{moniker}`")]
+    InvalidFilter { moniker: ExtendedMoniker },
 
-    #[error("event routes must end at source with a filter declaration")]
-    MissingFilter,
+    #[error("event routes must end at source with a filter declaration at `{moniker}`")]
+    MissingFilter { moniker: ExtendedMoniker },
+}
+
+impl From<EventsRoutingError> for ExtendedMoniker {
+    fn from(err: EventsRoutingError) -> ExtendedMoniker {
+        match err {
+            EventsRoutingError::InvalidFilter { moniker }
+            | EventsRoutingError::MissingFilter { moniker } => moniker,
+        }
+    }
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
 #[derive(Debug, Error, Clone, PartialEq)]
 pub enum RightsRoutingError {
-    #[error("requested rights ({requested}) greater than provided rights ({provided})")]
-    Invalid { requested: Rights, provided: Rights },
+    #[error(
+        "requested rights ({requested}) greater than provided rights ({provided}) at \"{moniker}\""
+    )]
+    Invalid { moniker: ExtendedMoniker, requested: Rights, provided: Rights },
 
-    #[error("directory routes must end at source with a rights declaration")]
-    MissingRightsSource,
+    #[error("directory routes must end at source with a rights declaration, it's missing at \"{moniker}\"")]
+    MissingRightsSource { moniker: ExtendedMoniker },
 }
 
 impl RightsRoutingError {
@@ -589,7 +678,16 @@ impl RightsRoutingError {
     pub fn as_zx_status(&self) -> zx::Status {
         match self {
             RightsRoutingError::Invalid { .. } => zx::Status::ACCESS_DENIED,
-            RightsRoutingError::MissingRightsSource => zx::Status::NOT_FOUND,
+            RightsRoutingError::MissingRightsSource { .. } => zx::Status::NOT_FOUND,
+        }
+    }
+}
+
+impl From<RightsRoutingError> for ExtendedMoniker {
+    fn from(err: RightsRoutingError) -> ExtendedMoniker {
+        match err {
+            RightsRoutingError::Invalid { moniker, .. }
+            | RightsRoutingError::MissingRightsSource { moniker } => moniker,
         }
     }
 }
@@ -599,20 +697,30 @@ impl RightsRoutingError {
 pub enum AvailabilityRoutingError {
     #[error(
         "availability requested by the target has stronger guarantees than what \
-    is being provided at the source"
+    is being provided at the source at `{moniker}`"
     )]
-    TargetHasStrongerAvailability,
+    TargetHasStrongerAvailability { moniker: ExtendedMoniker },
 
-    #[error("offer uses void source, but target requires the capability")]
-    OfferFromVoidToRequiredTarget,
+    #[error("offer uses void source, but target requires the capability at `{moniker}`")]
+    OfferFromVoidToRequiredTarget { moniker: ExtendedMoniker },
 
-    #[error("expose uses void source, but target requires the capability")]
-    ExposeFromVoidToRequiredTarget,
+    #[error("expose uses void source, but target requires the capability at `{moniker}`")]
+    ExposeFromVoidToRequiredTarget { moniker: ExtendedMoniker },
 }
 
 impl From<availability::TargetHasStrongerAvailability> for AvailabilityRoutingError {
     fn from(value: availability::TargetHasStrongerAvailability) -> Self {
-        let availability::TargetHasStrongerAvailability = value;
-        AvailabilityRoutingError::TargetHasStrongerAvailability
+        let availability::TargetHasStrongerAvailability { moniker } = value;
+        AvailabilityRoutingError::TargetHasStrongerAvailability { moniker }
+    }
+}
+
+impl From<AvailabilityRoutingError> for ExtendedMoniker {
+    fn from(err: AvailabilityRoutingError) -> ExtendedMoniker {
+        match err {
+            AvailabilityRoutingError::ExposeFromVoidToRequiredTarget { moniker }
+            | AvailabilityRoutingError::OfferFromVoidToRequiredTarget { moniker }
+            | AvailabilityRoutingError::TargetHasStrongerAvailability { moniker } => moniker,
+        }
     }
 }

@@ -304,6 +304,13 @@ impl MockRunner {
         handle.send_on_escrow(request).unwrap();
     }
 
+    /// Sends a `OnStopInfo` event on the controller channel identified by `koid`.
+    pub fn send_on_stop_info(&self, koid: &Koid, info: fcrunner::ComponentStopInfo) {
+        let state = self.inner.lock().unwrap();
+        let handle = state.controller_control_handles.get(koid).expect("koid was not available");
+        handle.send_on_stop_info(info).unwrap();
+    }
+
     async fn start(
         &self,
         start_info: fcrunner::ComponentStartInfo,

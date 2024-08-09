@@ -39,10 +39,10 @@ pub struct AssemblyConfig {
 #[derive(Debug, Deserialize, Serialize, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
 pub struct AssemblyConfigWrapperForOverrides {
-    // The platform config is deserialized as a Value before it is parsed into
+    // The platform and products configs are deserialized as a Value before it is parsed into
     // a 'PlatformConfig``
     pub platform: serde_json::Value,
-    pub product: ProductConfig,
+    pub product: serde_json::Value,
     #[serde(default)]
     pub file_relative_paths: bool,
 }
@@ -389,7 +389,7 @@ mod tests {
         let mut cursor = std::io::Cursor::new(json5);
         let config: AssemblyConfig = util::from_reader(&mut cursor).unwrap();
         let config = config.resolve_paths_from_file("path/to/assembly_config.json").unwrap();
-        assert_eq!(config.file_relative_paths, true);
+        assert!(config.file_relative_paths);
         assert_eq!(
             config.product.packages.base,
             vec![ProductPackageDetails {

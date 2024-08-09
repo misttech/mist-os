@@ -4,12 +4,10 @@
 
 // Structs used in parsing packages
 
-use cm_fidl_analyzer::{match_absolute_pkg_urls, PkgUrlMatch};
 use fuchsia_merkle::Hash;
 use fuchsia_url::AbsolutePackageUrl;
 use std::collections::HashMap;
 use std::path::PathBuf;
-use tracing::warn;
 
 /// Package- and component-related data extracted from a package identified by a
 /// fully-qualified fuchsia package URL.
@@ -37,18 +35,6 @@ impl PackageDefinition {
             cms: partial.cms,
             cvfs: partial.cvfs,
         }
-    }
-
-    pub fn matches_url(&self, url: &AbsolutePackageUrl) -> bool {
-        let url_match = match_absolute_pkg_urls(&self.url, url);
-        if url_match == PkgUrlMatch::WeakMatch {
-            warn!(
-                PkgDefinition.url = %self.url,
-                other_url = %url,
-                "Lossy match of absolute package URLs",
-            );
-        }
-        url_match != PkgUrlMatch::NoMatch
     }
 }
 

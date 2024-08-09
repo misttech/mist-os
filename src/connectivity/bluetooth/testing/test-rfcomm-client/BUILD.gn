@@ -10,6 +10,7 @@ rustc_library("test-rfcomm-client") {
   with_unit_tests = true
 
   deps = [
+    "//sdk/fidl/fuchsia.bluetooth:fuchsia.bluetooth_rust",
     "//sdk/fidl/fuchsia.bluetooth.bredr:fuchsia.bluetooth.bredr_rust",
     "//sdk/fidl/fuchsia.bluetooth.rfcomm.test:fuchsia.bluetooth.rfcomm.test_rust",
     "//src/connectivity/bluetooth/lib/bt-rfcomm",

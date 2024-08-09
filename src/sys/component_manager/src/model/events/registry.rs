@@ -316,7 +316,10 @@ impl EventRegistry {
                             Self::route_single_event(event_decl.clone(), &component).await?;
                         let mut scope = EventDispatcherScope::new(scope_moniker);
                         if let Some(filter) = event_decl.filter {
-                            scope = scope.with_filter(EventFilter::new(Some(filter)));
+                            scope = scope.with_filter(EventFilter::new(
+                                target_moniker.clone(),
+                                Some(filter),
+                            ));
                         }
                         result.insert(source_name, scope, route);
                     }

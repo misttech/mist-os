@@ -5,8 +5,9 @@
 #include "temperature_server.h"
 
 namespace fake_driver {
-TemperatureDeviceProtocolServer::TemperatureDeviceProtocolServer(float* temperature)
-    : temperature_(temperature) {}
+TemperatureDeviceProtocolServer::TemperatureDeviceProtocolServer(std::string sensor_name,
+                                                                 float* temperature)
+    : temperature_(temperature), sensor_name_(sensor_name) {}
 
 void TemperatureDeviceProtocolServer::GetTemperatureCelsius(
     GetTemperatureCelsiusCompleter::Sync& completer) {
@@ -14,7 +15,7 @@ void TemperatureDeviceProtocolServer::GetTemperatureCelsius(
 }
 
 void TemperatureDeviceProtocolServer::GetSensorName(GetSensorNameCompleter::Sync& completer) {
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
+  completer.Reply(fidl::StringView::FromExternal(sensor_name_));
 }
 
 void TemperatureDeviceProtocolServer::Serve(

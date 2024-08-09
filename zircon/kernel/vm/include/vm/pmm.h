@@ -8,7 +8,6 @@
 #ifndef ZIRCON_KERNEL_VM_INCLUDE_VM_PMM_H_
 #define ZIRCON_KERNEL_VM_INCLUDE_VM_PMM_H_
 
-#include <lib/zbi-format/memory.h>
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
@@ -39,14 +38,9 @@ class LoanSweeper;
   (0x1)  // this arena is contained within architecturally-defined 'low memory'
 
 // Initializes the PMM with the provided, unnormalized and normalized memory
-// ranges. This in particular initializes its arenas, and populates the
-// bootreserve with ranges it should avoid in that selection and marks them as
-// wired.
-//
-// TODO(https://fxbug.dev/347766366): Make this a function of only the
-// normalized ranges.
-zx_status_t pmm_init(ktl::span<const zbi_mem_range_t> unnormalized,
-                     ktl::span<const memalloc::Range> normalized);
+// ranges. This in particular initializes its arenas and wires any previously
+// allocated special subranges or holes.
+zx_status_t pmm_init(ktl::span<const memalloc::Range> ranges);
 
 // Returns the number of arenas.
 size_t pmm_num_arenas();
@@ -100,9 +94,13 @@ zx_status_t pmm_alloc_range(paddr_t address, size_t count, list_node* list) __NO
 zx_status_t pmm_alloc_contiguous(size_t count, uint alloc_flags, uint8_t align_log2, paddr_t* pa,
                                  list_node* list) __NONNULL((4, 5));
 
-// Mark contiguous pages as "loaned", and free the pages so they can be borrowed by page allocations
-// that specify PMM_ALLOC_FLAG_CAN_BORROW.  The caller must eventually call pmm_cancel_loan() +
-// pmm_end_loan(), or pmm_delete_lender(), on ranges that cover exactly all the loaned pages.
+// Unwires a page and sets it in the ALLOC state.
+void pmm_unwire_page(vm_page_t* page);
+
+// Mark contiguous pages as "loaned", and free the pages so they can be borrowed by page
+// allocations that specify PMM_ALLOC_FLAG_CAN_BORROW.  The caller must eventually call
+// pmm_cancel_loan() + pmm_end_loan(), or pmm_delete_lender(), on ranges that cover exactly all
+// the loaned pages.
 void pmm_begin_loan(list_node* page_list);
 
 // All pages in the range must be currently loaned.  This call must be made before pmm_end_loan().

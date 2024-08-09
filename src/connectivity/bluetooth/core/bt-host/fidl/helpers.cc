@@ -1940,7 +1940,7 @@ ServiceRecordToServiceDefinition(const bt::sdp::ServiceRecord& record) {
 }
 
 bt::gap::BrEdrSecurityRequirements FidlToBrEdrSecurityRequirements(
-    const fbredr::ChannelParameters& fidl) {
+    const fbt::ChannelParameters& fidl) {
   bt::gap::BrEdrSecurityRequirements requirements{.authentication = false,
                                                   .secure_connections = false};
   if (fidl.has_security_requirements()) {

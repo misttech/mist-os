@@ -16,9 +16,10 @@ use crate::model::testing::test_hook::TestHook;
 use camino::Utf8PathBuf;
 use cm_config::RuntimeConfig;
 use cm_rust::{
-    Availability, CapabilityDecl, ChildDecl, ComponentDecl, ConfigValuesData, EventStreamDecl,
-    NativeIntoFidl, RunnerDecl, UseEventStreamDecl, UseSource,
+    Availability, CapabilityDecl, ComponentDecl, ConfigValuesData, EventStreamDecl, NativeIntoFidl,
+    RunnerDecl, UseEventStreamDecl, UseSource,
 };
+use cm_rust_testing::*;
 use cm_types::{Name, Url};
 use fidl::endpoints;
 use fuchsia_zircon::{self as zx, Koid};
@@ -443,15 +444,7 @@ impl ActionsTest {
         args: fcomponent::CreateChildArgs,
     ) -> Result<(), fcomponent::Error> {
         let collection_ref = fdecl::CollectionRef { name: coll.to_string() };
-        let child_decl = ChildDecl {
-            name: name.parse().unwrap(),
-            url: format!("test:///{}", name).parse().unwrap(),
-            startup: fdecl::StartupMode::Lazy,
-            environment: None,
-            on_terminate: None,
-            config_overrides: None,
-        }
-        .native_into_fidl();
+        let child_decl = ChildBuilder::new().name(name).build().native_into_fidl();
         let res = self
             .realm_proxy
             .as_ref()

@@ -423,6 +423,8 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             {
                 (
                     "fx",
+                    "--dir",
+                    os.path.join(self.fuchsia_dir.name, "out/default"),
                     "build",
                     "--default",
                     "//src/sys:foo_test_package",
@@ -464,6 +466,8 @@ class TestMainIntegration(unittest.IsolatedAsyncioTestCase):
             {
                 (
                     "fx",
+                    "--dir",
+                    os.path.join(self.fuchsia_dir.name, "out/default"),
                     "build",
                     "--toolchain=//build/toolchain/host:x64",
                     "//src/tests/end_to_end:example_e2e_test",

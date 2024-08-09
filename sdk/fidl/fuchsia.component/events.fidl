@@ -146,6 +146,15 @@ type StoppedPayload = table {
     /// possible status values and their meaning are described in the definition
     /// of the ComponentController protocol.
     1: status zx.Status;
+
+    /// The exit code of the component instance. Note that not all components
+    /// will stop with an exit code.
+    ///
+    /// Many program runtimes have the concept of an exit code. Runners may map
+    /// that value to this field when applicable. For example, the ELF runner
+    /// will publish the Zircon process return code here.
+    @available(added=HEAD)
+    2: exit_code int64;
 };
 
 /// Payload for DebugStarted events.

@@ -429,7 +429,7 @@ fn create_trip_point_states_from_client_config(client_config: ClientConfig) -> V
         .map(|state_config| {
             let state = ThermalState(state_config.state);
             state_config.trip_points.into_iter().map(move |trip_point| TripPointState {
-                sensor: trip_point.sensor,
+                sensor: trip_point.sensor_name,
                 activate_at: ThermalLoad(trip_point.activate_at),
                 deactivate_below: ThermalLoad(trip_point.deactivate_below),
                 is_active: false,
@@ -671,27 +671,24 @@ impl MetricsTracker {
     /// this function is called, the provided thermal load value is passed on to the PlatformMetrics
     /// node. If the new thermal load value results in a change in throttling state ("active" or
     /// "mitigated") then this metric is reported to the PlatformMetrics node as well.
-    async fn log_thermal_load(&mut self, sensor_path: &str, thermal_load: ThermalLoad) -> bool {
+    async fn log_thermal_load(&mut self, sensor: &str, thermal_load: ThermalLoad) -> bool {
         // Always send the received thermal load value to PlatformMetrics
-        self.log_platform_metric(PlatformMetric::ThermalLoad(
-            thermal_load,
-            sensor_path.to_string(),
-        ))
-        .await;
+        self.log_platform_metric(PlatformMetric::ThermalLoad(thermal_load, sensor.to_string()))
+            .await;
 
         let per_sensor_metrics = {
-            if let Some(m) = self.per_sensor_metrics.get_mut(sensor_path) {
+            if let Some(m) = self.per_sensor_metrics.get_mut(sensor) {
                 m
             } else {
                 self.per_sensor_metrics.insert(
-                    sensor_path.to_string(),
+                    sensor.to_string(),
                     PerSensorMetrics {
                         thermal_load: ThermalLoad(0),
-                        thermal_load_property: self.root_node.create_uint(sensor_path, 0),
+                        thermal_load_property: self.root_node.create_uint(sensor, 0),
                         throttled: false,
                     },
                 );
-                self.per_sensor_metrics.get_mut(sensor_path).unwrap()
+                self.per_sensor_metrics.get_mut(sensor).unwrap()
             }
         };
 

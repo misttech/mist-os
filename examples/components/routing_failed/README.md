@@ -51,7 +51,7 @@ The `Echo2` protocol request fails due to an issue starting the component:
 ```
 [component_manager] WARN: Failed to start component `echo_server_bad#meta/default.cm`:
 unable to load component with url "echo_server_bad#meta/default.cm":
-error loading executable: "reading object at \"bin/routing_failed_echo_server_oops\" failed: A FIDL client's channel to the service (anonymous) File was closed: NOT_FOUND
+error loading executable: "reading object at \"bin/routing_failed_echo_server_oops\" failed: A FIDL client's channel to the service fuchsia.io.File was closed: NOT_FOUND
 ```
 
 After running the example, you can remove the example realm using

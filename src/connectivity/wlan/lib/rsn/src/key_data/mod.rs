@@ -5,7 +5,12 @@
 pub mod kde;
 
 use crate::Error;
-use nom::{call, complete, many0, named, take, try_parse, IResult, Needed};
+use nom::bytes::streaming::take;
+use nom::combinator::complete;
+use nom::error::Error as NomError;
+use nom::multi::many0;
+use nom::{IResult, Needed};
+use std::num::NonZero;
 use wlan_common::ie::rsn::rsne;
 use wlan_common::ie::{wpa, Id};
 
@@ -20,21 +25,23 @@ pub enum Element {
     UnsupportedIe(u8, u8),
 }
 
-fn peek_u8_at(input: &[u8], index: usize) -> IResult<&[u8], u8> {
-    if input.len() <= index {
-        Err(nom::Err::Incomplete(Needed::Size(index + 1)))
-    } else {
-        Ok((input, input[index]))
+fn peek_u8_at(index: usize) -> impl FnMut(&[u8]) -> IResult<&[u8], u8> {
+    move |input: &[u8]| {
+        if input.len() <= index {
+            Err(nom::Err::Incomplete(Needed::Size(NonZero::new(index + 1).unwrap())))
+        } else {
+            Ok((input, input[index]))
+        }
     }
 }
 
 fn parse_ie(i0: &[u8]) -> IResult<&[u8], Element> {
-    let (i1, id) = try_parse!(i0, call!(peek_u8_at, 0));
-    let (i2, len) = try_parse!(i1, call!(peek_u8_at, 1));
-    let (out, bytes) = try_parse!(i2, take!(2 + (len as usize)));
+    let (i1, id) = peek_u8_at(0)(i0)?;
+    let (i2, len) = peek_u8_at(1)(i1)?;
+    let (out, bytes) = take(2 + (len as usize))(i2)?;
     match Id(id) {
         Id::RSNE => {
-            let (_, rsne) = try_parse!(bytes, rsne::from_bytes);
+            let (_, rsne) = rsne::from_bytes(bytes)?;
             Ok((out, Element::Rsne(rsne)))
         }
         _ => Ok((out, Element::UnsupportedIe(id, len))),
@@ -42,20 +49,22 @@ fn parse_ie(i0: &[u8]) -> IResult<&[u8], Element> {
 }
 
 fn parse_element(input: &[u8]) -> IResult<&[u8], Element> {
-    let (_, type_) = try_parse!(input, call!(peek_u8_at, 0));
+    let (_, type_) = peek_u8_at(0)(input)?;
     match type_ {
         kde::TYPE => kde::parse(input),
         _ => parse_ie(input),
     }
 }
 
-named!(parse_elements<&[u8], Vec<Element>>, many0!(complete!(parse_element)));
+fn parse_elements(input: &[u8]) -> IResult<&[u8], Vec<Element>> {
+    many0(complete(parse_element))(input)
+}
 
 pub fn extract_elements(key_data: &[u8]) -> Result<Vec<Element>, Error> {
     match parse_elements(&key_data[..]) {
         Ok((_, elements)) => Ok(elements),
-        Err(nom::Err::Error((_, kind))) => Err(Error::InvalidKeyData(kind).into()),
-        Err(nom::Err::Failure((_, kind))) => Err(Error::InvalidKeyData(kind).into()),
+        Err(nom::Err::Error(NomError { code, .. })) => Err(Error::InvalidKeyData(code).into()),
+        Err(nom::Err::Failure(NomError { code, .. })) => Err(Error::InvalidKeyData(code).into()),
         Err(nom::Err::Incomplete(_)) => Ok(vec![]),
     }
 }
