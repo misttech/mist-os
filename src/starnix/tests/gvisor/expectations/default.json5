@@ -1194,6 +1194,9 @@
 
                 // TODO(https://fxbug.dev/358452019) deflake
                 "SigstopTest.Correctness",
+
+                // TODO(https://fxbug.dev/358626000) deflake
+                "AllInetTests/SimpleTcpSocketTest.ListenConnectParallel/*",
             ],
         },
     ],
