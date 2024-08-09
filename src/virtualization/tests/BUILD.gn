@@ -60,7 +60,6 @@ group("tests") {
     deps += [
       # TODO(https://fxbug.dev/42142945): These tests needs to be reworked so that they
       # interact correctly with Scenic.
-      ":virtualization_magma_tests_pkg",
       ":virtualization_sound_tests_pkg",
     ]
   }
@@ -533,16 +532,7 @@ fuchsia_shell_package("virtualization_test_utils_pkg") {
 romfs_image("extras") {
   testonly = true
 
-  deps = [
-    "//src/graphics/magma/tests/integration:virtmagma_conformance_tests(${linux_exe_toolchain})",
-    "//src/graphics/magma/tests_linux/unit_tests:virtmagma_vulkan_unit_tests(${linux_exe_toolchain})",
-  ]
-
-  inputs = [
-    "${linux_exe_path}/virtmagma_vulkan_unit_tests",
-    "${linux_exe_path}/virtmagma_conformance_tests",
-    "//src/virtualization/tests/testdata/stereo_ramp_48khz_16bit.wav",
-  ]
+  inputs = [ "//src/virtualization/tests/testdata/stereo_ramp_48khz_16bit.wav" ]
 
   # We don't run the container tests on arm64, so don't provide any container images to reduce the
   # size of the tests.
@@ -558,50 +548,11 @@ romfs_image("extras") {
   output = "$target_out_dir/linux/extras.img"
 }
 
-executable("virtualization_magma_tests") {
-  visibility = [ ":*" ]
-  testonly = true
-
-  sources = [ "virtio_magma_tests.cc" ]
-
-  deps = [
-    "lib",
-    "lib:test_main",
-    "//sdk/lib/sys/component/cpp/testing:cpp",
-    "//third_party/googletest:gtest",
-  ]
-}
-
 resource("linux_extras_img") {
   testonly = true
   sources = [ "$target_out_dir/linux/extras.img" ]
   outputs = [ "data/extras.img" ]
   deps = [ ":extras" ]
-}
-
-fuchsia_test_component("virtualization_magma_tests_cmp") {
-  component_name = "virtualization_magma_tests"
-  deps = [
-    ":test_images",
-    ":virtualization_magma_tests",
-  ]
-  manifest = "meta/virtualization_magma_tests.cml"
-  test_type = "system"
-}
-
-fuchsia_test_package("virtualization_magma_tests_pkg") {
-  package_name = "virtualization_magama_tests"
-  test_components = [ ":virtualization_magma_tests_cmp" ]
-  subpackages = guest_packages
-  test_specs = {
-    environments = [
-      nuc7_env,
-      nuc11_env,
-    ]
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
 }
 
 executable("termina_container_tests") {
