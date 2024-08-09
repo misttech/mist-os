@@ -109,7 +109,7 @@ mod method {
                 vec![("closed", "strict"), ("open", "strict"), ("open", "flexible")]
             {
                 assert!(compare_fidl_library(
-                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    ["1", "1,2,NEXT,HEAD"],
                     protocol("server=\"platform\"", change, openness, flexibility)
                 )
                 .is_compatible());
@@ -125,7 +125,7 @@ mod method {
         for change in &changes {
             for (openness, flexibility) in vec![("closed", "strict"), ("open", "strict")] {
                 assert!(compare_fidl_library(
-                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    ["1", "1,2,NEXT,HEAD"],
                     protocol(discoverable, change, openness, flexibility)
                 )
                 .has_problems(vec![
@@ -137,7 +137,7 @@ mod method {
         for change in changes {
             for (openness, flexibility) in vec![("open", "flexible")] {
                 assert!(compare_fidl_library(
-                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    ["1", "1,2,NEXT,HEAD"],
                     protocol(discoverable, change, openness, flexibility)
                 )
                 .is_compatible());
@@ -158,7 +158,7 @@ mod method {
                     vec![("closed", "strict"), ("open", "strict"), ("open", "flexible")]
                 {
                     assert!(compare_fidl_library(
-                        Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                        ["1", "1,2,NEXT,HEAD"],
                         protocol(discoverable, change, openness, flexibility)
                     )
                     .is_compatible());
@@ -176,7 +176,7 @@ mod method {
         for change in &changes {
             for (openness, flexibility) in vec![("closed", "strict"), ("open", "strict")] {
                 assert!(compare_fidl_library(
-                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    ["1", "1,2,NEXT,HEAD"],
                     protocol(discoverable, change, openness, flexibility)
                 )
                 .has_problems(vec![
@@ -188,7 +188,7 @@ mod method {
         for change in changes {
             for (openness, flexibility) in vec![("open", "flexible")] {
                 assert!(compare_fidl_library(
-                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    ["1", "1,2,NEXT,HEAD"],
                     protocol(discoverable, change, openness, flexibility)
                 )
                 .is_compatible());
@@ -231,7 +231,7 @@ mod event {
                 vec![("closed", "strict"), ("open", "strict"), ("open", "flexible")]
             {
                 assert!(compare_fidl_library(
-                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    ["1", "1,2,NEXT,HEAD"],
                     protocol("server=\"external\"", change, openness, flexibility)
                 )
                 .is_compatible());
@@ -247,7 +247,7 @@ mod event {
         for change in &changes {
             for (openness, flexibility) in vec![("closed", "strict"), ("open", "strict")] {
                 assert!(compare_fidl_library(
-                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    ["1", "1,2,NEXT,HEAD"],
                     protocol(discoverable, change, openness, flexibility)
                 )
                 .has_problems(vec![
@@ -259,7 +259,7 @@ mod event {
         for change in changes {
             for (openness, flexibility) in vec![("open", "flexible")] {
                 assert!(compare_fidl_library(
-                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    ["1", "1,2,NEXT,HEAD"],
                     protocol(discoverable, change, openness, flexibility)
                 )
                 .is_compatible());
@@ -280,7 +280,7 @@ mod event {
                     vec![("closed", "strict"), ("open", "strict"), ("open", "flexible")]
                 {
                     assert!(compare_fidl_library(
-                        Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                        ["1", "1,2,NEXT,HEAD"],
                         protocol(discoverable, change, openness, flexibility)
                     )
                     .is_compatible());
@@ -298,7 +298,7 @@ mod event {
         for change in &changes {
             for (openness, flexibility) in vec![("closed", "strict"), ("open", "strict")] {
                 assert!(compare_fidl_library(
-                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    ["1", "1,2,NEXT,HEAD"],
                     protocol(discoverable, change, openness, flexibility)
                 )
                 .has_problems(vec![
@@ -310,7 +310,7 @@ mod event {
         for change in changes {
             for (openness, flexibility) in vec![("open", "flexible")] {
                 assert!(compare_fidl_library(
-                    Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+                    ["1", "1,2,NEXT,HEAD"],
                     protocol(discoverable, change, openness, flexibility)
                 )
                 .is_compatible());
@@ -325,7 +325,7 @@ mod protocol {
     #[test]
     fn add_protocol() {
         assert!(compare_fidl_library(
-            Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+            ["1", "1,2,NEXT,HEAD"],
             r#"
             @discoverable
             @available(added=2)
@@ -340,7 +340,7 @@ mod protocol {
 fn tear_off() {
     let error_message = "Server(@1) missing method fuchsia.compat.test/TearOff.Added";
     assert!(compare_fidl_library(
-        Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+        ["1", "1,2,NEXT,HEAD"],
         r#"
             // Server @1 will be incompatible with clients @PLATFORM
             closed protocol TearOff {
@@ -408,7 +408,7 @@ fn tear_off() {
 #[test]
 fn discoverable_contradiction() {
     assert!(compare_fidl_library(
-        Versions { external: "1", platform: "1,2,NEXT,HEAD" },
+        ["1", "1,2,NEXT,HEAD"],
         r#"
         @discoverable(client="external", server="platform")
         protocol ExternalClient {};

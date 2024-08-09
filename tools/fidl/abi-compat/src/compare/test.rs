@@ -8,7 +8,7 @@ use crate::compare::problems::CompatibilityProblems;
 use crate::compare::{AbiSurface, Protocol, Type};
 use crate::convert::{Context, ConvertType};
 use crate::ir::IR;
-use crate::{Scope, Version};
+use crate::Version;
 use std::collections::HashMap;
 use std::rc::Rc;
 
@@ -66,10 +66,6 @@ impl CompiledTestLibrary<'_> {
         self.version.api_level()
     }
 
-    fn scope(&self) -> Scope {
-        self.version.scope()
-    }
-
     fn get_decl(&self, name: &str) -> &Declaration {
         self.ir.get(name).unwrap_or_else(|_| {
             panic!(
@@ -118,29 +114,17 @@ impl CompiledTestLibrary<'_> {
     }
 }
 
-#[derive(Clone, Copy)]
-pub struct Versions {
-    pub external: &'static str,
-    pub platform: &'static str,
-}
-
 #[allow(unused)]
 pub(super) fn compare_fidl_library(
-    versions: Versions,
+    versions: [&'static str; 2],
     source_fragment: impl AsRef<str>,
 ) -> CompatibilityProblems {
     let lib = TestLibrary::new(source_fragment.as_ref());
 
-    let external = lib.compile(&Version::new(versions.external));
-    let platform = lib.compile(&Version::new(versions.platform));
-    assert_eq!(external.scope(), Scope::External);
-    assert_eq!(platform.scope(), Scope::Platform);
-    super::compatible(
-        [&external.get_abi_surface(), &platform.get_abi_surface()],
-        &Default::default(),
-    )
-    .unwrap_or_else(|_| {
-        panic!("Comparing {:?} and {:?}:\n{}", versions.external, versions.platform, lib.source)
+    let compiled = versions.map(|v| lib.compile(&Version::new(v)));
+    let surfaces = compiled.map(|c| c.get_abi_surface());
+    super::compatible(surfaces.each_ref(), &Default::default()).unwrap_or_else(|_| {
+        panic!("Comparing {:?} and {:?}:\n{}", versions[0], versions[1], lib.source)
     })
 }
 
