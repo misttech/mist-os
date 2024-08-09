@@ -439,6 +439,15 @@ impl FinState {
             FinState::Acked => FinState::Acked,
         }
     }
+
+    /// Has this FIN been acked?
+    fn acked(&self) -> bool {
+        match self {
+            FinState::NotSent => false,
+            FinState::Sent(_) => false,
+            FinState::Acked => true,
+        }
+    }
 }
 
 /// The return value from [`do_established_update`] indicating further action.
@@ -858,6 +867,15 @@ impl Established {
 }
 
 /// State for the Closing state.
+///
+/// State transitions for in-range segments regardless of direction:
+/// - SYN: Invalid
+/// - RST: Delete connection
+/// - FIN: Closing
+/// - ACK: Closing
+///
+/// The Closing state deletes the connection once FINs from both peers have been
+/// ACKed.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Closing {
     original: Peer,
@@ -868,11 +886,57 @@ state_from_state_struct!(Closing);
 impl Closing {
     fn update(
         self,
-        _segment: &SegmentHeader,
-        _payload_len: usize,
-        _dir: ConnectionDirection,
+        segment: &SegmentHeader,
+        payload_len: usize,
+        dir: ConnectionDirection,
     ) -> (State, bool) {
-        (self.into(), true)
+        let Self { original, reply } = self;
+
+        // NOTE: Segments after a FIN are somewhat invalid, but we do not
+        // attempt to handle them specially. Per RFC 9293 3.10.7.4:
+        //
+        //   Seventh, process the segment text. [After FIN,] this should not
+        //   occur since a FIN has been received from the remote side. Ignore
+        //   the segment text.
+        //
+        // Because these segments aren't completely invalid, handling them
+        // properly (and consistently with the endpoints) is difficult. It is
+        // not needed for correctness, since the connection will be torn down as
+        // soon as there's an ACK for both FINs anyway. This extra invalid data
+        // does not change that.
+        //
+        // Neither Linux nor gVisor do anything special for these segments.
+
+        let (original, reply) = match do_established_update(
+            UpdatePeers { original, reply },
+            segment,
+            payload_len,
+            dir.clone(),
+        ) {
+            EstablishedUpdateResult::Success { new_original, new_reply, fin_seen: _ } => {
+                (new_original, new_reply)
+            }
+            EstablishedUpdateResult::Invalid { original, reply } => {
+                return (Self { original, reply }.into(), false)
+            }
+            EstablishedUpdateResult::Reset => return (Closed {}.into(), true),
+        };
+
+        if original.fin_state.acked() && reply.fin_state.acked() {
+            // Removing the entry immediately is not expected to break any
+            // use-cases. The endpoints are ultimately responsible for
+            // respecting the TIME_WAIT state.
+            //
+            // The NAT entry will be removed as a consequence, but this is only
+            // a problem if a server wanted to reopen the connection with the
+            // client (but only during TIME_WAIT).
+            //
+            // TODO(https://fxbug.dev/355200767): Add TimeWait and reopening
+            // connections once simultaneous open is supported.
+            (Closed {}.into(), true)
+        } else {
+            (Closing { original, reply }.into(), true)
+        }
     }
 }
 
@@ -1809,5 +1873,128 @@ mod tests {
         };
 
         assert_eq!(state.update(&args.segment, args.payload_len, args.dir), (new_state, valid));
+    }
+
+    #[test_case(
+        StateUpdateTestArgs {
+            segment: SegmentHeader {
+                seq: SeqNum::new(1400),
+                ack: Some(SeqNum::new(66_001)),
+                wnd: UnscaledWindowSize::from(10),
+                control: None,
+                options: Options::default(),
+            },
+            payload_len: 24,
+            dir: ConnectionDirection::Original,
+            expected: Some(Closing {
+                original: Peer {
+                    window_scale: WindowScale::new(2).unwrap(),
+                    max_wnd: WindowSize::new(40).unwrap(),
+                    max_wnd_seq: SeqNum::new(70_000),
+                    max_next_seq: SeqNum::new(1424),
+                    unacked_data: true,
+                    fin_state: FinState::NotSent,
+                },
+                reply: Peer {
+                    window_scale: WindowScale::new(0).unwrap(),
+                    max_wnd: WindowSize::new(400).unwrap(),
+                    max_wnd_seq: SeqNum::new(1424),
+                    max_next_seq: SeqNum::new(66_001),
+                    unacked_data: false,
+                    fin_state: FinState::Acked,
+                },
+            }.into()),
+        }; "update original"
+    )]
+    #[test_case(
+        StateUpdateTestArgs {
+            segment: SegmentHeader {
+                seq: SeqNum::new(1400),
+                // Fails equation III.
+                ack: Some(SeqNum::new(100_000)),
+                wnd: UnscaledWindowSize::from(10),
+                control: None,
+                options: Options::default(),
+            },
+            payload_len: 24,
+            dir: ConnectionDirection::Original,
+            expected: None,
+        }; "invalid"
+    )]
+    #[test_case(
+        StateUpdateTestArgs {
+            segment: SegmentHeader {
+                seq: SeqNum::new(1400),
+                ack: Some(SeqNum::new(66_001)),
+                wnd: UnscaledWindowSize::from(10),
+                control: Some(Control::RST),
+                options: Options::default(),
+            },
+            payload_len: 0,
+            dir: ConnectionDirection::Original,
+            expected: Some (Closed {}.into())
+        }; "rst"
+    )]
+    fn closing_test(args: StateUpdateTestArgs) {
+        let state = Closing {
+            original: Peer {
+                window_scale: WindowScale::new(2).unwrap(),
+                max_wnd: WindowSize::new(0).unwrap(),
+                max_wnd_seq: SeqNum::new(70_000),
+                max_next_seq: SeqNum::new(1024),
+                unacked_data: true,
+                fin_state: FinState::NotSent,
+            },
+            reply: Peer {
+                window_scale: WindowScale::new(0).unwrap(),
+                max_wnd: WindowSize::new(400).unwrap(),
+                max_wnd_seq: SeqNum::new(1424),
+                max_next_seq: SeqNum::new(66_001),
+                unacked_data: false,
+                fin_state: FinState::Acked,
+            },
+        };
+
+        let (new_state, valid) = match args.expected {
+            Some(new_state) => (new_state, true),
+            None => (state.clone().into(), false),
+        };
+
+        assert_eq!(state.update(&args.segment, args.payload_len, args.dir), (new_state, valid));
+    }
+
+    #[test]
+    fn closing_complete_test() {
+        let state = Closing {
+            original: Peer {
+                window_scale: WindowScale::new(2).unwrap(),
+                max_wnd: WindowSize::new(0).unwrap(),
+                max_wnd_seq: SeqNum::new(70_000),
+                max_next_seq: SeqNum::new(1024),
+                unacked_data: true,
+                fin_state: FinState::Sent(SeqNum::new(1023)),
+            },
+            reply: Peer {
+                window_scale: WindowScale::new(0).unwrap(),
+                max_wnd: WindowSize::new(400).unwrap(),
+                max_wnd_seq: SeqNum::new(1424),
+                max_next_seq: SeqNum::new(66_001),
+                unacked_data: false,
+                fin_state: FinState::Acked,
+            },
+        };
+
+        let segment = SegmentHeader {
+            seq: SeqNum::new(66_100),
+            ack: Some(SeqNum::new(1024)),
+            wnd: UnscaledWindowSize::from(10),
+            control: None,
+            options: Options::default(),
+        };
+
+        assert_matches!(
+            state.update(&segment, /* payload_len */ 0, ConnectionDirection::Reply),
+            (State::Closed(_), true)
+        );
     }
 }
