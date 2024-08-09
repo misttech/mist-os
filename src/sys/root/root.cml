@@ -185,7 +185,6 @@
                 "capability_requested",
                 "debug_started",
                 "destroyed",
-                "discovered",
                 "started",
                 "stopped",
             ],
