@@ -183,7 +183,7 @@ impl State {
                 if original.unacked_data || reply.unacked_data {
                     MSL
                 } else {
-                    Duration::from_secs(6 * 60 * 60)
+                    Duration::from_secs(5 * 60 * 60 * 24)
                 }
             }
             State::Closing(_) => MSL,
