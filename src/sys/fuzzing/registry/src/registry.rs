@@ -14,10 +14,9 @@ use tracing::{error, warn};
 use url::Url;
 use {fidl_fuchsia_fuzzer as fuzz, fuchsia_async as fasync, fuchsia_zircon as zx};
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 enum ProviderStatus {
     Stopped,
-    Launching(oneshot::Sender<()>),
+    Launching { _sender: oneshot::Sender<()> },
     Running(fuzz::ControllerProviderProxy),
     Connecting,
     Interrupted,
@@ -166,10 +165,10 @@ impl FuzzRegistry {
                 ProviderStatus::Stopped | ProviderStatus::Interrupted => {
                     // The provider hasn't registered yet.
                     let (sender, receiver) = oneshot::channel::<()>();
-                    *entry = ProviderStatus::Launching(sender);
+                    *entry = ProviderStatus::Launching { _sender: sender };
                     Some(receiver)
                 }
-                ProviderStatus::Launching(_) | ProviderStatus::Connecting => {
+                ProviderStatus::Launching { _sender: _ } | ProviderStatus::Connecting => {
                     // Another call to `connect` is in progress.
                     return Err(zx::Status::SHOULD_WAIT);
                 }
@@ -200,7 +199,7 @@ impl FuzzRegistry {
     pub async fn disconnect(&self, url: Url) -> Result<(), zx::Status> {
         let mut providers = self.providers.borrow_mut();
         match providers.remove(&url) {
-            Some(ProviderStatus::Launching(_)) => {
+            Some(ProviderStatus::Launching { _sender: _ }) => {
                 // There may be an outstanding `register` request that needs to be dropped. See
                 // also the note in `register`. The re-insertion is expensive, but this case is
                 // uncommon.
