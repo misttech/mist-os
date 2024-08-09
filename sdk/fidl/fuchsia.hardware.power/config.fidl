@@ -104,12 +104,16 @@ type SagElement = strict enum {
 /// an element that the other element depends upon.
 type ParentElement = strict union {
     /// The parent element's access token should be available from a
-    /// `PowerTokenProvider` capability in the incoming namespace and should
+    /// `fuchsia.hardware.power/PowerTokenProvider` capability in the incoming namespace and should
     /// provide this same string in the `GetToken` response.
     1: name string:MAX_NAME_LENGTH;
     /// The parent element is one of SAG's elements and the access token should
     /// be obtained from the appropriate SAG-related protocol.
     2: sag SagElement;
+
+    /// The parent element's access token should be available from
+    /// `/svc/fuchsia.hardware.power.PowerTokenProvider/{instance_name}`.
+    3: instance_name string:MAX_NAME_LENGTH;
 };
 
 @discoverable
