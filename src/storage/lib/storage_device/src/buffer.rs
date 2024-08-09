@@ -216,6 +216,15 @@ impl<'a> MutableBufferRef<'a> {
         self.subslice(..)
     }
 
+    pub fn into_ref(self) -> BufferRef<'a> {
+        BufferRef {
+            slice: self.slice,
+            start: self.range.start,
+            end: self.range.end,
+            allocator: self.allocator,
+        }
+    }
+
     /// Returns a slice of the buffer's contents.
     pub fn as_slice(&self) -> &[u8] {
         self.slice

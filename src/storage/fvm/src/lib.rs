@@ -18,8 +18,11 @@ use remote_block_device::RemoteBlockClient;
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::collections::HashMap;
+use std::fmt::Formatter;
+use std::future::Future;
 use std::sync::{Arc, Mutex};
 use storage_device::block_device::BlockDevice;
+use storage_device::buffer::MutableBufferRef;
 use storage_device::{Device, DeviceHolder};
 use tracing::{error, warn};
 use uuid::Uuid;
@@ -57,6 +60,18 @@ struct PartitionEntry {
     slices: u32,
     flags: u32,
     name: [u8; 24],
+}
+
+impl std::fmt::Debug for PartitionEntry {
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.debug_struct("PartitionEntry")
+            .field("type_guid", &Uuid::from_slice(&self.type_guid).unwrap())
+            .field("guid", &Uuid::from_slice(&self.guid).unwrap())
+            .field("slices", &self.slices)
+            .field("flags", &self.flags)
+            .field("name", &self.name())
+            .finish()
+    }
 }
 
 impl PartitionEntry {
@@ -275,6 +290,55 @@ impl Fvm {
         device_block_offset: u64,
         block_count: u32,
         vmo: &Arc<zx::Vmo>,
+        vmo_offset: u64,
+    ) -> Result<(), Error> {
+        struct Read;
+        impl IoTrait for Read {
+            fn get_op<'a>(
+                device: &'a dyn Device,
+                offset: u64,
+                buf: MutableBufferRef<'a>,
+            ) -> impl Future<Output = Result<(), Error>> + 'a {
+                device.read(offset, buf)
+            }
+
+            fn post(buf: &[u8], vmo: &zx::Vmo, vmo_offset: u64) -> Result<(), zx::Status> {
+                vmo.write(buf, vmo_offset)
+            }
+        }
+        self.do_io::<Read>(partition, device_block_offset, block_count, vmo, vmo_offset).await
+    }
+
+    async fn write(
+        &self,
+        partition: usize,
+        device_block_offset: u64,
+        block_count: u32,
+        vmo: &Arc<zx::Vmo>,
+        vmo_offset: u64,
+    ) -> Result<(), Error> {
+        struct Write;
+        impl IoTrait for Write {
+            fn pre(buf: &mut [u8], vmo: &zx::Vmo, vmo_offset: u64) -> Result<(), zx::Status> {
+                vmo.read(buf, vmo_offset)
+            }
+            fn get_op<'a>(
+                device: &'a dyn Device,
+                offset: u64,
+                buf: MutableBufferRef<'a>,
+            ) -> impl Future<Output = Result<(), Error>> + 'a {
+                device.write(offset, buf.into_ref())
+            }
+        }
+        self.do_io::<Write>(partition, device_block_offset, block_count, vmo, vmo_offset).await
+    }
+
+    async fn do_io<Io: IoTrait>(
+        &self,
+        partition: usize,
+        device_block_offset: u64,
+        block_count: u32,
+        vmo: &Arc<zx::Vmo>,
         mut vmo_offset: u64,
     ) -> Result<(), Error> {
         let Some(mappings) = self.mappings.get(&partition) else {
@@ -298,9 +362,10 @@ impl Fvm {
             * 2;
 
         while total_len > 0 {
+            let amount = std::cmp::min(buffer.len() as u64, total_len) as usize;
+            Io::pre(&mut buffer.as_mut_slice()[..amount], &vmo, vmo_offset)?;
             let mut buffer_left = buffer.as_mut();
-            let mut done = 0;
-            let mut reads = Vec::new();
+            let mut ops = Vec::new();
             while total_len > 0 {
                 let slice = offset / slice_size;
                 let index = match mappings.binary_search_by(|m| m.logical_slice.cmp(&slice)) {
@@ -320,31 +385,39 @@ impl Fvm {
                 let (buf, remaining) = buffer_left.split_at_mut(len);
                 let physical_offset = data_start
                     + (mapping.physical_slice + (slice - mapping.logical_slice)) * slice_size;
-                reads.push(self.device.read(physical_offset, buf));
+                ops.push(Io::get_op(self.device.as_ref(), physical_offset, buf));
                 offset += len as u64;
                 total_len -= len as u64;
-                done += len;
                 if remaining.is_empty() {
                     break;
                 }
                 buffer_left = remaining;
             }
-            try_join_all(reads).await?;
-            vmo.write(&buffer.as_slice()[..done], vmo_offset)?;
-            vmo_offset += done as u64;
+            try_join_all(ops).await?;
+            Io::post(&buffer.as_slice()[..amount], &vmo, vmo_offset)?;
+            vmo_offset += amount as u64;
         }
         Ok(())
     }
+}
 
-    async fn write(
-        &self,
-        _partition: usize,
-        _device_block_offset: u64,
-        _block_count: u32,
-        _vmo: &Arc<zx::Vmo>,
-        _vmo_offset: u64,
-    ) -> Result<(), Error> {
-        todo!();
+// Trait to abstract over the difference between reads and writes.
+trait IoTrait {
+    // Called prior to performing the operation (used for writes).
+    fn pre(_buf: &mut [u8], _vmo: &zx::Vmo, _vmo_offset: u64) -> Result<(), zx::Status> {
+        Ok(())
+    }
+
+    // Called to get the future that performs the read or write.
+    fn get_op<'a>(
+        device: &'a dyn Device,
+        offset: u64,
+        buf: MutableBufferRef<'a>,
+    ) -> impl Future<Output = Result<(), Error>> + 'a;
+
+    // Called after performing the operation (used for reads).
+    fn post(_buf: &[u8], _vmo: &zx::Vmo, _vmo_offset: u64) -> Result<(), zx::Status> {
+        Ok(())
     }
 }
 
@@ -626,7 +699,7 @@ fn map_to_status(error: anyhow::Error) -> zx::Status {
 
 #[cfg(test)]
 mod tests {
-    use super::Component;
+    use super::{map_to_status, Component};
     use fake_block_server::FakeServer;
     use fidl::endpoints::RequestStream;
     use fidl_fuchsia_fs_startup::{
@@ -636,11 +709,11 @@ mod tests {
     use fuchsia_component::client::{
         connect_to_named_protocol_at_dir_root, connect_to_protocol_at_dir_svc,
     };
-    use remote_block_device::{BlockClient, MutableBufferSlice, RemoteBlockClient};
+    use remote_block_device::{BlockClient, BufferSlice, MutableBufferSlice, RemoteBlockClient};
     use std::sync::Arc;
     use {
         fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_hardware_block_volume as fvolume,
-        fidl_fuchsia_io as fio, fuchsia_async as fasync,
+        fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
     };
 
     #[fuchsia::test]
@@ -692,9 +765,9 @@ mod tests {
             .expect("mount failed");
 
         // Look for blobfs's magic:
-        let volume_proxy =
+        let block_proxy =
             connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap();
-        let client = RemoteBlockClient::new(volume_proxy).await.unwrap();
+        let client = RemoteBlockClient::new(block_proxy).await.unwrap();
         let mut buf = vec![0; 8192];
         client.read_at(MutableBufferSlice::Memory(&mut buf), 0).await.unwrap();
 
@@ -709,5 +782,49 @@ mod tests {
         let mut buf = vec![0; 8192];
         client.read_at(MutableBufferSlice::Memory(&mut buf), 8192).await.unwrap();
         assert_eq!(&buf[..16], BLOBFS_MAGIC);
+
+        // And check the journal magic, which is in a different slice:
+        let mut buf = vec![0; 8192];
+        client.read_at(MutableBufferSlice::Memory(&mut buf), 0x30000 * 8192).await.unwrap();
+        assert_eq!(&buf[..8], &[0x6c, 0x6e, 0x72, 0x6a, 0x62, 0x6f, 0x6c, 0x62]);
+
+        // Reading from a slice that's not allocated should fail.
+        assert_eq!(
+            map_to_status(
+                client
+                    .read_at(MutableBufferSlice::Memory(&mut buf), 32768)
+                    .await
+                    .expect_err("Read from slice #2 should fail")
+            ),
+            zx::Status::OUT_OF_RANGE
+        );
+
+        // Mount the minfs partition.
+        let volume_proxy = connect_to_named_protocol_at_dir_root::<ffxfs::VolumeMarker>(
+            &outgoing_dir,
+            "volumes/data",
+        )
+        .unwrap();
+
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+            .expect("Create proxy to succeed");
+        volume_proxy
+            .mount(dir_server_end, ffxfs::MountOptions { crypt: None, as_blob: false })
+            .await
+            .expect("mount failed (FIDL)")
+            .expect("mount failed");
+
+        let block_proxy =
+            connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap();
+        let client = RemoteBlockClient::new(block_proxy).await.unwrap();
+
+        // Check some writes.
+        for offset in [0, 10 * 8192, 20 * 8192] {
+            let buf = vec![0xaf; 16384];
+            client.write_at(BufferSlice::Memory(&buf), offset).await.unwrap();
+            let mut read_buf = vec![0; 16384];
+            client.read_at(MutableBufferSlice::Memory(&mut read_buf), offset).await.unwrap();
+            assert_eq!(&buf, &read_buf);
+        }
     }
 }
