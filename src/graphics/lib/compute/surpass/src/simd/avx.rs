@@ -75,13 +75,14 @@ impl Default for m32x8 {
     }
 }
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 #[derive(Clone, Copy, Debug)]
-pub struct u8x32(__m256i);
+pub struct u8x32 {
+    _inner: __m256i,
+}
 
 impl u8x32 {
     pub fn splat(val: u8) -> Self {
-        Self(unsafe { _mm256_set1_epi8(i8::from_ne_bytes(val.to_ne_bytes())) })
+        Self { _inner: unsafe { _mm256_set1_epi8(i8::from_ne_bytes(val.to_ne_bytes())) } }
     }
 
     pub fn from_u32_interleaved(vals: [u32x8; 4]) -> Self {
@@ -104,14 +105,14 @@ impl u8x32 {
                 13, 9, 5, 1, 12, 8, 4, 0,
             );
 
-            Self(_mm256_shuffle_epi8(bytes, shuffle))
+            Self { _inner: _mm256_shuffle_epi8(bytes, shuffle) }
         }
     }
 }
 
 impl Default for u8x32 {
     fn default() -> Self {
-        Self(unsafe { _mm256_setzero_si256() })
+        Self { _inner: unsafe { _mm256_setzero_si256() } }
     }
 }
 
