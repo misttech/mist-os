@@ -3,13 +3,17 @@
 // found in the LICENSE file.
 
 #include <errno.h>
+#include <fcntl.h>
 
 #include <algorithm>
+#include <cstring>
 #include <iostream>
 
 #include <fbl/algorithm.h>
+#include <gtest/gtest.h>
 
 #include "src/storage/host_fs_test/fixture.h"
+#include "src/storage/minfs/host.h"
 
 namespace fs_test {
 namespace {

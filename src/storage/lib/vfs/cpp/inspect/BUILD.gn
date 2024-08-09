@@ -10,7 +10,10 @@ static_library("inspect") {
     "node_operations.h",
     "operation_tracker.h",
   ]
-  sources = [ "operation_tracker/operation_tracker_shared.cc" ]
+  sources = [
+    "operation_tracker/operation_tracker_base.h",
+    "operation_tracker/operation_tracker_shared.cc",
+  ]
   public_deps = [ "//zircon/system/ulib/zx" ]
   deps = [ "//sdk/lib/syslog/cpp" ]
 
@@ -23,6 +26,7 @@ static_library("inspect") {
       "inspect_data.cc",
       "inspect_tree.cc",
       "operation_tracker/operation_tracker_fuchsia.cc",
+      "operation_tracker/operation_tracker_fuchsia.h",
     ]
     public_deps += [
       "//src/storage/lib/block_client/cpp",
@@ -30,6 +34,8 @@ static_library("inspect") {
     ]
 
     deps += [ "//sdk/lib/fit" ]
+  } else {
+    sources += [ "operation_tracker/operation_tracker_stub.h" ]
   }
 }
 

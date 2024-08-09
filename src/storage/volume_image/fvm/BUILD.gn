@@ -50,7 +50,10 @@ source_set("fvm-sparse-image") {
     "fvm_sparse_image.cc",
     "fvm_sparse_image_reader.cc",
   ]
-  public = [ "fvm_sparse_image.h" ]
+  public = [
+    "fvm_sparse_image.h",
+    "fvm_sparse_image_reader.h",
+  ]
   public_deps = [
     ":fvm-descriptor",
     "//sdk/lib/fit-promise",

@@ -18,6 +18,14 @@ group("tests") {
 }
 
 static_library("fvm") {
+  public = [
+    "format.h",
+    "fvm.h",
+    "fvm_sparse.h",
+    "metadata.h",
+    "metadata_buffer.h",
+    "sparse_reader.h",
+  ]
   sources = [
     "format.cc",
     "fvm.cc",
@@ -47,6 +55,11 @@ static_library("fvm") {
       "client.cc",
       "fvm_check.cc",
       "vmo_metadata_buffer.cc",
+    ]
+    public += [
+      "client.h",
+      "fvm_check.h",
+      "vmo_metadata_buffer.h",
     ]
 
     deps += [

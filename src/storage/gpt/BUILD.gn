@@ -27,6 +27,7 @@ zx_library("gpt") {
     sources = [
       "cros.cc",
       "gpt.cc",
+      "gpt.h",
       "guid.cc",
     ]
     deps = [
@@ -39,6 +40,7 @@ zx_library("gpt") {
       "//zircon/third_party/ulib/safemath",
     ]
     public_deps += [ "//src/storage/lib/block_client/cpp:interface" ]
+    friend = [ "test:*" ]
   }
 }
 

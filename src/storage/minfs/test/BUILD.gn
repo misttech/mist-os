@@ -18,6 +18,7 @@ test("minfs_unit") {
     "unit/fsck_test.cc",
     "unit/inspector_test.cc",
     "unit/journal_integration_fixture.cc",
+    "unit/journal_integration_fixture.h",
     "unit/journal_test.cc",
     "unit/lazy_buffer_test.cc",
     "unit/lazy_reader_test.cc",

@@ -8,18 +8,19 @@ import("//build/components.gni")
 static_library("lib") {
   public = [
     "memfs.h",
-    "vnode.h",
     "vnode_dir.h",
     "vnode_file.h",
-    "vnode_vmo.h",
   ]
   sources = [
     "dnode.cc",
+    "dnode.h",
     "memfs.cc",
     "vnode.cc",
+    "vnode.h",
     "vnode_dir.cc",
     "vnode_file.cc",
     "vnode_vmo.cc",
+    "vnode_vmo.h",
   ]
 
   public_deps = [

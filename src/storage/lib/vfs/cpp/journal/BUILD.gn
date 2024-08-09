@@ -130,6 +130,7 @@ test("journal-unit") {
 }
 
 source_set("fuzz-utils") {
+  public = [ "fuzzer_utils.h" ]
   sources = [ "fuzzer_utils.cc" ]
   public_deps = [
     ":journal",

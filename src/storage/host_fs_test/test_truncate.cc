@@ -2,12 +2,24 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fcntl.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <time.h>
 
+#include <cstdint>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 #include <iostream>
+#include <sstream>
+#include <string>
 #include <vector>
 
+#include <gtest/gtest.h>
+
 #include "src/storage/host_fs_test/fixture.h"
+#include "src/storage/minfs/host.h"
 
 namespace fs_test {
 namespace {

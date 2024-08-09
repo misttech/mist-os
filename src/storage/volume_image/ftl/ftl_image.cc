@@ -21,7 +21,6 @@
 #include "src/storage/volume_image/address_descriptor.h"
 #include "src/storage/volume_image/ftl/ftl_image_internal.h"
 #include "src/storage/volume_image/ftl/options.h"
-#include "src/storage/volume_image/ftl/raw_nand_image.h"
 #include "src/storage/volume_image/ftl/raw_nand_image_utils.h"
 #include "src/storage/volume_image/options.h"
 #include "src/storage/volume_image/utils/block_utils.h"

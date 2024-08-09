@@ -5,6 +5,14 @@
 import("//build/test.gni")
 
 if (is_host) {
+  source_set("fixture") {
+    public = [ "fixture.h" ]
+    sources = [ "fixture.cc" ]
+    deps = [ "//src/storage/minfs" ]
+    public_deps = [ "//third_party/googletest:gtest" ]
+    testonly = true
+  }
+
   test("host_fs_test") {
     if (is_debug) {
       configs -= [ "//build/config:default_optimize" ]
@@ -12,7 +20,6 @@ if (is_host) {
     }
 
     sources = [
-      "fixture.cc",
       "test_basic.cc",
       "test_directory.cc",
       "test_sparse.cc",
@@ -20,6 +27,7 @@ if (is_host) {
     ]
 
     deps = [
+      ":fixture",
       "//src/lib/fxl/test:gtest_main",
       "//src/storage/minfs",
       "//third_party/googletest:gtest",
@@ -33,12 +41,10 @@ if (is_host) {
       configs += [ "//build/config:optimize_sanitizer" ]
     }
 
-    sources = [
-      "fixture.cc",
-      "test_maxfile.cc",
-    ]
+    sources = [ "test_maxfile.cc" ]
 
     deps = [
+      ":fixture",
       "//src/lib/fxl/test:gtest_main",
       "//src/storage/minfs",
       "//third_party/googletest:gtest",
@@ -52,12 +58,10 @@ if (is_host) {
       configs += [ "//build/config:optimize_sanitizer" ]
     }
 
-    sources = [
-      "fixture.cc",
-      "test_rw_workers.cc",
-    ]
+    sources = [ "test_rw_workers.cc" ]
 
     deps = [
+      ":fixture",
       "//src/lib/fxl/test:gtest_main",
       "//src/storage/minfs",
       "//third_party/googletest:gtest",
