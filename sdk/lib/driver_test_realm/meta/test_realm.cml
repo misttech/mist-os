@@ -128,11 +128,6 @@
             to: [ "#driver_manager" ],
         },
         {
-            protocol: "fuchsia.process.Launcher",
-            from: "parent",
-            to: "#driver_manager",
-        },
-        {
             protocol: [
                 "fuchsia.boot.Items",
                 "fuchsia.kernel.RootJob",
