@@ -9,6 +9,7 @@
 #include <lib/driver/devfs/cpp/connector.h>
 
 #include "src/ui/input/drivers/buttons/buttons-device.h"
+#include "src/ui/input/drivers/buttons/buttons_config.h"
 
 namespace buttons {
 
@@ -18,7 +19,8 @@ class Buttons : public fdf::DriverBase {
  public:
   Buttons(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
       : fdf::DriverBase(kDeviceName, std::move(start_args), std::move(driver_dispatcher)),
-        devfs_connector_(fit::bind_member<&Buttons::Serve>(this)) {}
+        devfs_connector_(fit::bind_member<&Buttons::Serve>(this)),
+        config_(take_config<buttons_config::Config>()) {}
 
   zx::result<> Start() override;
   void PrepareStop(fdf::PrepareStopCompleter completer) override;
@@ -35,6 +37,7 @@ class Buttons : public fdf::DriverBase {
   fidl::WireSyncClient<fuchsia_driver_framework::Node> node_;
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
   driver_devfs::Connector<fuchsia_input_report::InputDevice> devfs_connector_;
+  buttons_config::Config config_;
 };
 
 }  // namespace buttons

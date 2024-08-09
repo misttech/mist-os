@@ -11,6 +11,21 @@
 
 namespace buttons {
 
+void InputIntegration::ReportInterrupt() {
+  if (!aggregator_client_.has_value()) {
+    return;
+  }
+
+  fidl::WireResult result = aggregator_client_.value()->HandoffWake();
+  if (result->is_error()) {
+    FDF_LOG(
+        ERROR,
+        "Failed to handoff wake, system may incorrectly enter suspend: %s. Will not attempt again.",
+        result.status_string());
+    aggregator_client_.reset();
+  }
+}
+
 void ButtonsDevice::ButtonsInputReport::ToFidlInputReport(
     fidl::WireTableBuilder<::fuchsia_input_report::wire::InputReport>& input_report,
     fidl::AnyArena& allocator) {
@@ -139,6 +154,12 @@ int ButtonsDevice::Thread() {
         packet.key < (kPortKeyInterruptStart + buttons_.size())) {
       uint32_t type = static_cast<uint32_t>(packet.key - kPortKeyInterruptStart);
       if (gpios_[type].config.type == BUTTONS_GPIO_TYPE_INTERRUPT) {
+        // Before we ack the irq we must report the interrupt to the input
+        // stack. In systems where power framework is available, this prompts
+        // the input stack to create its own wake lease so that the system does
+        //  not suspend before the event can be processed.
+        input_integration_.ReportInterrupt();
+
         // We need to reconfigure the GPIO to catch the opposite polarity.
         auto reconfig_result = ReconfigurePolarity(type, packet.key);
         if (!reconfig_result.is_ok()) {
@@ -465,8 +486,12 @@ zx_status_t ButtonsDevice::ConfigureInterrupt(uint32_t idx, uint64_t int_port) {
 }
 
 ButtonsDevice::ButtonsDevice(async_dispatcher_t* dispatcher,
-                             fbl::Array<buttons_button_config_t> buttons, fbl::Array<Gpio> gpios)
-    : dispatcher_(dispatcher), buttons_(std::move(buttons)), gpios_(std::move(gpios)) {
+                             fbl::Array<buttons_button_config_t> buttons, fbl::Array<Gpio> gpios,
+                             InputIntegration input_integration)
+    : dispatcher_(dispatcher),
+      buttons_(std::move(buttons)),
+      gpios_(std::move(gpios)),
+      input_integration_(std::move(input_integration)) {
   ZX_ASSERT(Init() == ZX_OK);
 }
 
