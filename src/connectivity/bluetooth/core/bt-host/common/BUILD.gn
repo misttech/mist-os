@@ -10,10 +10,6 @@ import("$dir_pw_unit_test/test.gni")
 
 dir_public_common = "../public/pw_bluetooth_sapphire/internal/host/common"
 
-config("warnings") {
-  cflags_cc = [ "-Wswitch-enum" ]
-}
-
 pw_source_set("common") {
   public = [
     "$dir_public_common/advertising_data.h",
@@ -93,7 +89,8 @@ pw_source_set("common") {
   }
 
   deps = [ "$dir_pw_preprocessor" ]
-  configs = [ ":warnings" ]
+
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
 }
 
 pw_source_set("uuid_string_util") {

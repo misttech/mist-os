@@ -10,10 +10,6 @@ import("$dir_pw_unit_test/test.gni")
 
 dir_public_l2cap = "../public/pw_bluetooth_sapphire/internal/host/l2cap"
 
-config("warnings") {
-  cflags_cc = [ "-Wswitch-enum" ]
-}
-
 # Basic target with protocol definitions and no logic, suitable for test
 # emulation.
 pw_source_set("definitions") {
@@ -100,7 +96,7 @@ pw_source_set("l2cap") {
     "//src/connectivity/bluetooth/core/bt-host/transport",
   ]
 
-  configs = [ ":warnings" ]
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
 
   deps = [
     "$dir_pw_bluetooth:emboss_l2cap_frames",

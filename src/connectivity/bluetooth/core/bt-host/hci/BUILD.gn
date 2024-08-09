@@ -8,10 +8,6 @@ import("$dir_pw_unit_test/test.gni")
 
 dir_public_hci = "../public/pw_bluetooth_sapphire/internal/host/hci"
 
-config("warnings") {
-  cflags_cc = [ "-Wswitch-enum" ]
-}
-
 pw_source_set("hci") {
   public = [
     "$dir_public_hci/acl_connection.h",
@@ -58,7 +54,8 @@ pw_source_set("hci") {
     "//src/connectivity/bluetooth/core/bt-host/transport",
   ]
 
-  configs = [ ":warnings" ]
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
+
   deps = [ "$dir_pw_preprocessor" ]
 }
 

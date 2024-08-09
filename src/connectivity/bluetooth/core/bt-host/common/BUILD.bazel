@@ -8,6 +8,7 @@ load(
     "fuchsia_select",
     "fuchsia_unittest_package",
 )
+load("//src/connectivity/bluetooth/core/bt-host:variables.bzl", "COPTS")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -30,7 +31,7 @@ cc_library(
         "supplement_data.cc",
         "uuid.cc",
     ],
-    copts = ["-Wswitch-enum"],
+    copts = COPTS,
     deps = [
         "//src/connectivity/bluetooth/core/bt-host:config",
         "//src/connectivity/bluetooth/core/bt-host:public",
