@@ -9,7 +9,9 @@ use core::time::Duration;
 use netstack3_base::{Control, SegmentHeader, SeqNum, UnscaledWindowSize, WindowScale, WindowSize};
 use replace_with::replace_with_and;
 
-use super::{ConnectionDirection, ConnectionUpdateAction, ConnectionUpdateError};
+use super::{
+    ConnectionDirection, ConnectionUpdateAction, ConnectionUpdateError, EstablishmentLifecycle,
+};
 
 /// A struct that completely encapsulates tracking a bidirectional TCP
 /// connection.
@@ -25,19 +27,15 @@ impl Connection {
             // TODO(https://fxbug.dev/355699182): Properly support self-connected
             // connections.
             state: if self_connected {
-                Untracked { established: false }.into()
+                Untracked {}.into()
             } else {
                 State::new(segment, payload_len)?
             },
         })
     }
 
-    pub fn expiry_duration(&self) -> Duration {
-        self.state.expiry_duration()
-    }
-
-    pub fn is_established(&self) -> bool {
-        self.state.is_established()
+    pub fn expiry_duration(&self, establishment_lifecycle: EstablishmentLifecycle) -> Duration {
+        self.state.expiry_duration(establishment_lifecycle)
     }
 
     pub fn update(
@@ -147,46 +145,38 @@ impl State {
         )
     }
 
-    fn is_established(&self) -> bool {
-        match self {
-            State::Untracked(s) => s.established,
-            State::Closed(_) => false,
-            State::SynSent(_) => false,
-            State::WaitingOnOpeningAck(_) => false,
-            State::Established(_) => true,
-            State::Closing(_) => true,
-        }
-    }
-
-    fn expiry_duration(&self) -> Duration {
-        const MSL: Duration = Duration::from_secs(120);
+    fn expiry_duration(&self, establishment_lifecycle: EstablishmentLifecycle) -> Duration {
+        const MAXIMUM_SEGMENT_LIFETIME: Duration = Duration::from_secs(120);
 
         // These are all picked to optimize purging connections from the table
         // as soon as is reasonable. Unlike Linux, we are choosing to be more
         // conservative with our timeouts and setting the most aggressive one to
         // the standard MSL of 120 seconds.
         match self {
-            State::Untracked(s) => {
-                if s.established {
-                    Duration::from_secs(6 * 60 * 60)
-                } else {
-                    MSL
+            State::Untracked(_) => {
+                match establishment_lifecycle {
+                    // This is small because it's just meant to be the time for
+                    // the initial handshake.
+                    EstablishmentLifecycle::SeenOriginal | EstablishmentLifecycle::SeenReply => {
+                        MAXIMUM_SEGMENT_LIFETIME
+                    }
+                    EstablishmentLifecycle::Established => Duration::from_secs(6 * 60 * 60),
                 }
             }
             State::Closed(_) => Duration::ZERO,
-            State::SynSent(_) => MSL,
-            State::WaitingOnOpeningAck(_) => MSL,
+            State::SynSent(_) => MAXIMUM_SEGMENT_LIFETIME,
+            State::WaitingOnOpeningAck(_) => MAXIMUM_SEGMENT_LIFETIME,
             State::Established(Established { original, reply }) => {
                 // If there is no data outstanding, make the timeout large, and
                 // otherwise small so we can purge the connection quickly if one
                 // of the endpoints disappears.
                 if original.unacked_data || reply.unacked_data {
-                    MSL
+                    MAXIMUM_SEGMENT_LIFETIME
                 } else {
                     Duration::from_secs(5 * 60 * 60 * 24)
                 }
             }
-            State::Closing(_) => MSL,
+            State::Closing(_) => MAXIMUM_SEGMENT_LIFETIME,
         }
     }
 
@@ -535,11 +525,7 @@ fn do_established_update(
 ///
 /// This state never transitions to another state.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Untracked {
-    // TODO(https://fxbug.dev/355699112): Delete this once connection
-    // establishment tracking is protocol-generic.
-    established: bool,
-}
+pub(crate) struct Untracked {}
 state_from_state_struct!(Untracked);
 
 impl Untracked {
@@ -547,12 +533,9 @@ impl Untracked {
         self,
         _segment: &SegmentHeader,
         _payload_len: usize,
-        dir: ConnectionDirection,
+        _dir: ConnectionDirection,
     ) -> (State, bool) {
-        match dir {
-            ConnectionDirection::Original => (self.into(), true),
-            ConnectionDirection::Reply => (Untracked { established: true }.into(), true),
-        }
+        (Self {}.into(), true)
     }
 }
 
@@ -693,7 +676,7 @@ impl SynSent {
                                 "Unsupported TCP simultaneous open. Giving up on detailed tracking"
                             );
 
-                            return (Untracked { established: false }.into(), true);
+                            return (Untracked {}.into(), true);
                         };
 
                         let reply_window_scale = segment.options.window_scale;
@@ -1176,7 +1159,7 @@ mod tests {
 
         assert_eq!(
             state.update(&segment, /*payload_len*/ 0, ConnectionDirection::Reply),
-            (Untracked { established: false }.into(), true)
+            (Untracked {}.into(), true)
         );
     }
 
