@@ -56,6 +56,10 @@ type NodeAttributes = struct {
 
 const MAX_FS_NAME_BUFFER uint64 = 32;
 
+// TODO(https://fxbug.dev/324932108): This should be marked as discoverable for both platform and
+// external servers. Annotating this correctly breaks our binary compatibility checks, since
+// fuchsia.io/Node is a closed protocol. This should be fixed when we make it open.
+@discoverable(server="platform")
 closed protocol Node {
     compose Node1;
     compose Node2;

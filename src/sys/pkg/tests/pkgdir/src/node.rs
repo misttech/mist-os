@@ -218,26 +218,26 @@ async fn describe() {
 
 async fn describe_per_package_source(source: PackageSource) {
     let root_dir = source.dir;
-    assert_describe_directory(&root_dir, ".").await;
+    assert_query_directory(&root_dir, ".").await;
 
-    assert_describe_directory(&root_dir, "meta").await;
+    assert_query_directory(&root_dir, "meta").await;
     assert_describe_meta_file(&root_dir, "meta").await;
 
-    assert_describe_directory(&root_dir, "meta/dir").await;
-    assert_describe_directory(&root_dir, "dir").await;
+    assert_query_directory(&root_dir, "meta/dir").await;
+    assert_query_directory(&root_dir, "dir").await;
 
     assert_describe_file(&root_dir, "file").await;
     assert_describe_meta_file(&root_dir, "meta/file").await;
 }
 
-async fn assert_describe_directory(package_root: &fio::DirectoryProxy, path: &str) {
+async fn assert_query_directory(package_root: &fio::DirectoryProxy, path: &str) {
     for flag in [fio::OpenFlags::empty(), fio::OpenFlags::NODE_REFERENCE] {
         let node =
             fuchsia_fs::directory::open_node(package_root, path, flag | fio::OpenFlags::DIRECTORY)
                 .await
                 .unwrap();
 
-        if let Err(e) = verify_describe_directory_success(node, flag).await {
+        if let Err(e) = verify_query_directory(node, flag).await {
             panic!(
                 "failed to verify describe. path: {path:?}, flag: {flag:?}, \
                     error: {e:#}",
@@ -246,20 +246,17 @@ async fn assert_describe_directory(package_root: &fio::DirectoryProxy, path: &st
     }
 }
 
-async fn verify_describe_directory_success(
-    node: fio::NodeProxy,
-    flag: fio::OpenFlags,
-) -> Result<(), Error> {
-    let protocol = node.query().await.context("failed to call query")?;
+async fn verify_query_directory(node: fio::NodeProxy, flag: fio::OpenFlags) -> Result<(), Error> {
+    let protocol = String::from_utf8(node.query().await.context("failed to call query")?).unwrap();
     let expected = if flag.intersects(fio::OpenFlags::NODE_REFERENCE) {
-        fio::NODE_PROTOCOL_NAME
+        crate::NODE_PROTOCOL_NAMES
     } else {
-        fio::DIRECTORY_PROTOCOL_NAME
+        crate::DIRECTORY_PROTOCOL_NAMES
     };
-    if protocol == expected.as_bytes() {
+    if expected.contains(&protocol.as_str()) {
         Ok(())
     } else {
-        Err(anyhow!("wrong protocol returned: {:?}", std::str::from_utf8(&protocol)))
+        Err(anyhow!("wrong protocol returned: {:?}", protocol))
     }
 }
 
@@ -276,14 +273,14 @@ async fn assert_describe_file(package_root: &fio::DirectoryProxy, path: &str) {
 }
 
 async fn verify_describe_file(node: fio::NodeProxy, flag: fio::OpenFlags) -> Result<(), Error> {
-    let protocol = node.query().await.context("failed to call query")?;
+    let protocol = String::from_utf8(node.query().await.context("failed to call query")?).unwrap();
     if flag.intersects(fio::OpenFlags::NODE_REFERENCE) {
-        if protocol == fio::NODE_PROTOCOL_NAME.as_bytes() {
+        if crate::NODE_PROTOCOL_NAMES.contains(&protocol.as_str()) {
             Ok(())
         } else {
-            Err(anyhow!("wrong protocol returned: {:?}", std::str::from_utf8(&protocol)))
+            Err(anyhow!("wrong protocol returned: {:?}", protocol))
         }
-    } else if protocol == fio::FILE_PROTOCOL_NAME.as_bytes() {
+    } else if crate::FILE_PROTOCOL_NAMES.contains(&protocol.as_str()) {
         let fio::FileInfo { observer, .. } = fio::FileProxy::new(node.into_channel().unwrap())
             .describe()
             .await
@@ -298,7 +295,7 @@ async fn verify_describe_file(node: fio::NodeProxy, flag: fio::OpenFlags) -> Res
         // TODO(https://fxbug.dev/327633753): Check for stream support.
         Ok(())
     } else {
-        Err(anyhow!("wrong protocol returned: {:?}", std::str::from_utf8(&protocol)))
+        Err(anyhow!("wrong protocol returned: {:?}", protocol))
     }
 }
 

@@ -766,7 +766,7 @@ depends on the [component runner][doc-runners]:
     `fuchsia-pkg://fuchsia.com/components-routing-failed-example#meta/echo_server_bad.cm`:
     unable to load component with url "fuchsia-pkg://fuchsia.com/components-routing-failed-example#meta/echo_server_bad.cm":
     error loading executable: "reading object at \"bin/routing_failed_echo_server_oops\" failed:
-    A FIDL client's channel to the service (anonymous) File was closed: PEER_CLOSED"
+    A FIDL client's channel to the service fuchsia.io.File was closed: PEER_CLOSED"
     ```
 
 *   For other runners, check the [logs][doc-logs] of the runner component. You

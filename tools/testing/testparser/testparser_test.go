@@ -96,12 +96,12 @@ ERROR: label length should be less than 16.
 [PASSED]	FormatFilesystemTest.MkfsOptionsLabel
 [RUNNING]	NodeManagerTest.TruncateExceptionCase
 [stderr - NodeManagerTest.TruncateExceptionCase]
-Error reading test result:File(read call failed: A FIDL client's channel to the service (anonymous) File was closed: PEER_CLOSED
+Error reading test result:File(read call failed: A FIDL client's channel to the service fuchsia.io.File was closed: PEER_CLOSED
 [stderr - NodeManagerTest.TruncateExceptionCase]
 [stderr - NodeManagerTest.TruncateExceptionCase]
 Caused by:
 [stderr - NodeManagerTest.TruncateExceptionCase]
-    0: A FIDL client's channel to the service (anonymous) File was closed: PEER_CLOSED
+    0: A FIDL client's channel to the service fuchsia.io.File was closed: PEER_CLOSED
 [stderr - NodeManagerTest.TruncateExceptionCase]
     1: PEER_CLOSED)
 [FAILED]	NodeManagerTest.TruncateExceptionCase
@@ -142,9 +142,9 @@ One or more test runs failed.
 			CaseName:    "NodeManagerTest.TruncateExceptionCase",
 			Status:      runtests.TestFailure,
 			Format:      "FTF",
-			FailReason: "Error reading test result:File(read call failed: A FIDL client's channel to the service (anonymous) File was closed: PEER_CLOSED\n" +
+			FailReason: "Error reading test result:File(read call failed: A FIDL client's channel to the service fuchsia.io.File was closed: PEER_CLOSED\n" +
 				"Caused by:\n" +
-				"    0: A FIDL client's channel to the service (anonymous) File was closed: PEER_CLOSED",
+				"    0: A FIDL client's channel to the service fuchsia.io.File was closed: PEER_CLOSED",
 		}, {
 			DisplayName: "VnodeTest.TruncateExceptionCase",
 			CaseName:    "VnodeTest.TruncateExceptionCase",

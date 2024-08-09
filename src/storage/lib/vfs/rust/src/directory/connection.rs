@@ -509,7 +509,7 @@ mod tests {
             node_proxy.query().await,
             Err(fidl::Error::ClientChannelClosed {
                 status: Status::NOT_FOUND,
-                protocol_name: "(anonymous) Node",
+                protocol_name: "fuchsia.io.Node",
                 ..
             })
         );
@@ -548,7 +548,7 @@ mod tests {
             event_stream.try_next().await,
             Err(fidl::Error::ClientChannelClosed {
                 status: Status::NOT_FOUND,
-                protocol_name: "(anonymous) Node",
+                protocol_name: "fuchsia.io.Node",
                 ..
             })
         );
@@ -589,7 +589,7 @@ mod tests {
             node_proxy.query().await,
             Err(fidl::Error::ClientChannelClosed {
                 status: Status::NOT_FOUND,
-                protocol_name: "(anonymous) Node",
+                protocol_name: "fuchsia.io.Node",
                 ..
             })
         );
@@ -638,7 +638,7 @@ mod tests {
             event_stream.try_next().await,
             Err(fidl::Error::ClientChannelClosed {
                 status: Status::NOT_FOUND,
-                protocol_name: "(anonymous) Node",
+                protocol_name: "fuchsia.io.Node",
                 ..
             })
         );
