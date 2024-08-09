@@ -481,11 +481,9 @@ fn configure_subsystems(
     )
     .context("Configuring the 'usb' subsystem")?;
 
-    let mut tee_clients = product.tee_clients.clone();
-    tee_clients.extend(product.trusted_apps.clone());
     tee_clients::TeeClientsConfig::define_configuration(
         &context_base.for_subsystem("tee_clients"),
-        &tee_clients,
+        &product.tee_clients,
         builder,
     )
     .context("configuring the 'tee_clients' subsystem")?;

@@ -45,11 +45,6 @@ pub struct ProductConfig {
     pub component_policy: ComponentPolicyConfig,
 
     /// Components which depend on trusted applications running in the TEE.
-    /// Deprecated: Please use `tee_clients` instead.
-    #[serde(default)]
-    pub trusted_apps: Vec<TeeClient>,
-
-    /// Components which depend on trusted applications running in the TEE.
     #[serde(default)]
     pub tee_clients: Vec<TeeClient>,
 }
