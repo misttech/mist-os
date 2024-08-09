@@ -7,6 +7,7 @@ use crate::walk_state::WalkStateUnit;
 use cm_rust::DictionaryValue;
 use cm_types::Name;
 use maplit::btreemap;
+use moniker::ExtendedMoniker;
 use std::collections::BTreeMap;
 
 #[derive(Debug, Clone)]
@@ -27,17 +28,21 @@ type OptionFilterMap = Option<BTreeMap<String, DictionaryValue>>;
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct EventFilter {
+    moniker: ExtendedMoniker,
     filter: Option<BTreeMap<String, DictionaryValue>>,
     is_debug: bool,
 }
 
 impl EventFilter {
-    pub fn new(filter: Option<BTreeMap<String, DictionaryValue>>) -> Self {
-        Self { filter, is_debug: false }
+    pub fn new(
+        moniker: impl Into<ExtendedMoniker>,
+        filter: Option<BTreeMap<String, DictionaryValue>>,
+    ) -> Self {
+        Self { moniker: moniker.into(), filter, is_debug: false }
     }
 
-    pub fn debug() -> Self {
-        Self { filter: None, is_debug: true }
+    pub fn debug(moniker: ExtendedMoniker) -> Self {
+        Self { moniker, filter: None, is_debug: true }
     }
 
     /// Verifies that for all fields given, they are present in the current filter. If no fields
@@ -46,7 +51,7 @@ impl EventFilter {
         if self.is_debug {
             return true;
         }
-        Self::validate_subset(&fields, &self.filter).is_ok()
+        Self::validate_subset(&self.moniker, &fields, &self.filter).is_ok()
     }
 
     pub fn contains(&self, key: impl Into<String>, values: Vec<String>) -> bool {
@@ -54,6 +59,7 @@ impl EventFilter {
     }
 
     fn validate_subset(
+        moniker: &ExtendedMoniker,
         self_filter: &OptionFilterMap,
         next_filter: &OptionFilterMap,
     ) -> Result<(), EventsRoutingError> {
@@ -65,12 +71,12 @@ impl EventFilter {
                     if !(next_filter.contains_key(key)
                         && is_subset(value, next_filter.get(key).as_ref().unwrap()))
                     {
-                        return Err(EventsRoutingError::InvalidFilter);
+                        return Err(EventsRoutingError::InvalidFilter { moniker: moniker.clone() });
                     }
                 }
             }
             (Some(_), None) => {
-                return Err(EventsRoutingError::InvalidFilter);
+                return Err(EventsRoutingError::InvalidFilter { moniker: moniker.clone() });
             }
         }
         Ok(())
@@ -88,11 +94,11 @@ impl WalkStateUnit for EventFilter {
     /// For all properties of B, those properties are in A and they are subsets of the property in
     /// B.
     fn validate_next(&self, next_state: &EventFilter) -> Result<(), Self::Error> {
-        Self::validate_subset(&self.filter, &next_state.filter)
+        Self::validate_subset(&self.moniker, &self.filter, &next_state.filter)
     }
 
-    fn finalize_error() -> Self::Error {
-        EventsRoutingError::MissingFilter
+    fn finalize_error(&self) -> Self::Error {
+        EventsRoutingError::MissingFilter { moniker: self.moniker.clone() }
     }
 }
 
@@ -124,79 +130,98 @@ mod tests {
     use super::*;
     use assert_matches::assert_matches;
     use maplit::btreemap;
+    use moniker::Moniker;
 
     #[test]
     fn test_filter_walk_state() {
-        let none_filter = EventFilter::new(None);
-        let empty_filter = EventFilter::new(Some(btreemap! {}));
-        let single_field_filter = EventFilter::new(Some(btreemap! {
-            "field".to_string() => DictionaryValue::Str("/foo".to_string()),
-        }));
-        let single_field_filter_2 = EventFilter::new(Some(btreemap! {
-            "field".to_string() => DictionaryValue::Str("/bar".to_string()),
-        }));
-        let multi_field_filter = EventFilter::new(Some(btreemap! {
-            "field".to_string() => DictionaryValue::StrVec(vec![
-                                    "/bar".to_string(), "/baz".to_string()])
-        }));
-        let multi_field_filter_2 = EventFilter::new(Some(btreemap! {
-            "field".to_string() => DictionaryValue::StrVec(vec![
-                                    "/bar".to_string(), "/baz".to_string(), "/foo".to_string()])
-        }));
-        let multi_field_single = EventFilter::new(Some(btreemap! {
-            "field".to_string() => DictionaryValue::StrVec(vec!["/foo".to_string()])
-        }));
-        let multi_field_empty = EventFilter::new(Some(btreemap! {
-            "field".to_string() => DictionaryValue::StrVec(vec![])
-        }));
+        let none_filter = EventFilter::new(Moniker::root(), None);
+        let empty_filter = EventFilter::new(Moniker::root(), Some(btreemap! {}));
+        let single_field_filter = EventFilter::new(
+            Moniker::root(),
+            Some(btreemap! {
+                "field".to_string() => DictionaryValue::Str("/foo".to_string()),
+            }),
+        );
+        let single_field_filter_2 = EventFilter::new(
+            Moniker::root(),
+            Some(btreemap! {
+                "field".to_string() => DictionaryValue::Str("/bar".to_string()),
+            }),
+        );
+        let multi_field_filter = EventFilter::new(
+            Moniker::root(),
+            Some(btreemap! {
+                "field".to_string() => DictionaryValue::StrVec(vec![
+                                        "/bar".to_string(), "/baz".to_string()])
+            }),
+        );
+        let multi_field_filter_2 = EventFilter::new(
+            Moniker::root(),
+            Some(btreemap! {
+                "field".to_string() => DictionaryValue::StrVec(vec![
+                                        "/bar".to_string(), "/baz".to_string(), "/foo".to_string()])
+            }),
+        );
+        let multi_field_single = EventFilter::new(
+            Moniker::root(),
+            Some(btreemap! {
+                "field".to_string() => DictionaryValue::StrVec(vec!["/foo".to_string()])
+            }),
+        );
+        let multi_field_empty = EventFilter::new(
+            Moniker::root(),
+            Some(btreemap! {
+                "field".to_string() => DictionaryValue::StrVec(vec![])
+            }),
+        );
 
         assert_matches!(none_filter.validate_next(&none_filter), Ok(()));
 
         assert_matches!(
             single_field_filter.validate_next(&none_filter),
-            Err(EventsRoutingError::InvalidFilter)
+            Err(EventsRoutingError::InvalidFilter { .. })
         );
         assert_matches!(
             single_field_filter.validate_next(&empty_filter),
-            Err(EventsRoutingError::InvalidFilter)
+            Err(EventsRoutingError::InvalidFilter { .. })
         );
         assert_matches!(single_field_filter.validate_next(&single_field_filter), Ok(()));
         assert_matches!(
             single_field_filter.validate_next(&single_field_filter_2),
-            Err(EventsRoutingError::InvalidFilter)
+            Err(EventsRoutingError::InvalidFilter { .. })
         );
         assert_matches!(
             single_field_filter.validate_next(&multi_field_filter),
-            Err(EventsRoutingError::InvalidFilter)
+            Err(EventsRoutingError::InvalidFilter { .. })
         );
         assert_matches!(single_field_filter.validate_next(&multi_field_filter_2), Ok(()));
 
         assert_matches!(
             multi_field_filter.validate_next(&none_filter),
-            Err(EventsRoutingError::InvalidFilter)
+            Err(EventsRoutingError::InvalidFilter { .. })
         );
         assert_matches!(
             multi_field_filter_2.validate_next(&multi_field_filter),
-            Err(EventsRoutingError::InvalidFilter)
+            Err(EventsRoutingError::InvalidFilter { .. })
         );
         assert_matches!(
             multi_field_filter.validate_next(&single_field_filter),
-            Err(EventsRoutingError::InvalidFilter)
+            Err(EventsRoutingError::InvalidFilter { .. })
         );
         assert_matches!(
             multi_field_filter.validate_next(&single_field_filter_2),
-            Err(EventsRoutingError::InvalidFilter)
+            Err(EventsRoutingError::InvalidFilter { .. })
         );
         assert_matches!(multi_field_filter.validate_next(&multi_field_filter), Ok(()));
         assert_matches!(multi_field_filter.validate_next(&multi_field_filter_2), Ok(()));
         assert_matches!(
             multi_field_filter.validate_next(&empty_filter),
-            Err(EventsRoutingError::InvalidFilter)
+            Err(EventsRoutingError::InvalidFilter { .. })
         );
 
         assert_matches!(
             empty_filter.validate_next(&none_filter),
-            Err(EventsRoutingError::InvalidFilter)
+            Err(EventsRoutingError::InvalidFilter { .. })
         );
         assert_matches!(empty_filter.validate_next(&empty_filter), Ok(()));
         assert_matches!(empty_filter.validate_next(&single_field_filter), Ok(()));
@@ -208,9 +233,12 @@ mod tests {
 
     #[test]
     fn contains_filter() {
-        let filter = EventFilter::new(Some(btreemap! {
-            "field".to_string() => DictionaryValue::StrVec(vec!["/foo".to_string(), "/bar".to_string()]),
-        }));
+        let filter = EventFilter::new(
+            Moniker::root(),
+            Some(btreemap! {
+                "field".to_string() => DictionaryValue::StrVec(vec!["/foo".to_string(), "/bar".to_string()]),
+            }),
+        );
 
         assert!(filter.contains("field", vec!["/foo".to_string()]));
         assert!(filter.contains("field", vec!["/foo".to_string(), "/bar".to_string()]));

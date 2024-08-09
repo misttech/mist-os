@@ -6,6 +6,7 @@ use crate::error::RoutingError;
 use async_trait::async_trait;
 use cm_types::IterablePath;
 use fidl_fuchsia_component_sandbox as fsandbox;
+use moniker::ExtendedMoniker;
 use router_error::RouterError;
 use sandbox::{Capability, Dict, Request, Routable};
 
@@ -29,6 +30,7 @@ pub trait DictExt {
     /// `None`.
     async fn get_with_request<'a>(
         &self,
+        moniker: impl Into<ExtendedMoniker> + Send,
         path: &'a impl IterablePath,
         request: Request,
     ) -> Result<Option<Capability>, RouterError>;
@@ -125,17 +127,20 @@ impl DictExt for Dict {
 
     async fn get_with_request<'a>(
         &self,
+        moniker: impl Into<ExtendedMoniker> + Send,
         path: &'a impl IterablePath,
         request: Request,
     ) -> Result<Option<Capability>, RouterError> {
         let mut current_capability: Capability = self.clone().into();
+        let moniker = moniker.into();
         for next_name in path.iter_segments() {
             // We have another name but no subdictionary, so exit.
             let Capability::Dictionary(current_dict) = &current_capability else { return Ok(None) };
 
             // Get the capability.
-            let capability =
-                current_dict.get(next_name).map_err(|_| RoutingError::BedrockNotCloneable)?;
+            let capability = current_dict
+                .get(next_name)
+                .map_err(|_| RoutingError::BedrockNotCloneable { moniker: moniker.clone() })?;
 
             // The capability doesn't exist.
             let Some(capability) = capability else { return Ok(None) };

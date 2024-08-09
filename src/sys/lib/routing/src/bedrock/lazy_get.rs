@@ -14,13 +14,13 @@ pub trait LazyGet: Routable {
     /// Returns a router that requests capabilities from the specified `path` relative to
     /// the base routable or fails the request with `not_found_error` if the member is not
     /// found. The base routable should resolve with a dictionary capability.
-    fn lazy_get<P>(self, path: P, not_found_error: impl Into<RouterError>) -> Router
+    fn lazy_get<P>(self, path: P, not_found_error: RoutingError) -> Router
     where
         P: IterablePath + Debug + 'static;
 }
 
 impl<T: Routable + 'static> LazyGet for T {
-    fn lazy_get<P>(self, path: P, not_found_error: impl Into<RouterError>) -> Router
+    fn lazy_get<P>(self, path: P, not_found_error: RoutingError) -> Router
     where
         P: IterablePath + Debug + 'static,
     {
@@ -28,7 +28,7 @@ impl<T: Routable + 'static> LazyGet for T {
         struct ScopedDictRouter<P: IterablePath + Debug + 'static> {
             router: Router,
             path: P,
-            not_found_error: RouterError,
+            not_found_error: RoutingError,
         }
 
         #[async_trait]
@@ -36,11 +36,19 @@ impl<T: Routable + 'static> LazyGet for T {
             async fn route(&self, request: Request) -> Result<Capability, RouterError> {
                 match self.router.route(request.clone()).await? {
                     Capability::Dictionary(dict) => {
-                        let maybe_capability =
-                            dict.get_with_request(&self.path, request.clone()).await?;
-                        maybe_capability.ok_or_else(|| self.not_found_error.clone())
+                        let maybe_capability = dict
+                            .get_with_request(
+                                self.not_found_error.clone(),
+                                &self.path,
+                                request.clone(),
+                            )
+                            .await?;
+                        maybe_capability.ok_or_else(|| self.not_found_error.clone().into())
                     }
-                    _ => Err(RoutingError::BedrockMemberAccessUnsupported.into()),
+                    _ => Err(RoutingError::BedrockMemberAccessUnsupported {
+                        moniker: self.not_found_error.clone().into(),
+                    }
+                    .into()),
                 }
             }
         }

@@ -31,8 +31,8 @@ pub enum PolicyError {
     #[error("security policy disallows \"{policy}\" child policy for \"{moniker}\"")]
     ChildPolicyDisallowed { policy: String, moniker: Moniker },
 
-    #[error("security policy was unable to extract the source from the routed capability")]
-    InvalidCapabilitySource,
+    #[error("security policy was unable to extract the source from the routed capability at component \"{moniker}\"")]
+    InvalidCapabilitySource { moniker: ExtendedMoniker },
 
     #[error("security policy disallows \"{cap}\" from \"{source_moniker}\" being used at \"{target_moniker}\"")]
     CapabilityUseDisallowed {
@@ -52,6 +52,19 @@ impl PolicyError {
     /// Convert this error into its approximate `zx::Status` equivalent.
     pub fn as_zx_status(&self) -> zx::Status {
         zx::Status::ACCESS_DENIED
+    }
+}
+
+impl From<PolicyError> for ExtendedMoniker {
+    fn from(err: PolicyError) -> ExtendedMoniker {
+        match err {
+            PolicyError::ChildPolicyDisallowed { moniker, .. }
+            | PolicyError::DebugCapabilityUseDisallowed { env_moniker: moniker, .. }
+            | PolicyError::JobPolicyDisallowed { moniker, .. } => moniker.into(),
+
+            PolicyError::CapabilityUseDisallowed { source_moniker: moniker, .. }
+            | PolicyError::InvalidCapabilitySource { moniker } => moniker,
+        }
     }
 }
 
@@ -80,7 +93,9 @@ impl GlobalPolicyChecker {
                     source_moniker: ExtendedMoniker::ComponentManager,
                     source_name: capability
                         .source_name()
-                        .ok_or(PolicyError::InvalidCapabilitySource)?
+                        .ok_or(PolicyError::InvalidCapabilitySource {
+                            moniker: capability_source.source_moniker(),
+                        })?
                         .clone(),
                     source: CapabilityAllowlistSource::Self_,
                     capability: capability.type_name(),
@@ -91,7 +106,9 @@ impl GlobalPolicyChecker {
                     source_moniker: ExtendedMoniker::ComponentInstance(moniker.clone()),
                     source_name: capability
                         .source_name()
-                        .ok_or(PolicyError::InvalidCapabilitySource)?
+                        .ok_or(PolicyError::InvalidCapabilitySource {
+                            moniker: capability_source.source_moniker(),
+                        })?
                         .clone(),
                     source: CapabilityAllowlistSource::Self_,
                     capability: capability.type_name(),
@@ -124,7 +141,9 @@ impl GlobalPolicyChecker {
                 source_moniker: ExtendedMoniker::ComponentInstance(moniker.clone()),
                 source_name: source_capability
                     .source_name()
-                    .ok_or(PolicyError::InvalidCapabilitySource)?
+                    .ok_or(PolicyError::InvalidCapabilitySource {
+                        moniker: capability_source.source_moniker(),
+                    })?
                     .clone(),
                 source: CapabilityAllowlistSource::Capability,
                 capability: source_capability.type_name(),
@@ -154,7 +173,9 @@ impl GlobalPolicyChecker {
                     source_moniker: ExtendedMoniker::ComponentManager,
                     source_name: capability
                         .source_name()
-                        .ok_or(PolicyError::InvalidCapabilitySource)?
+                        .ok_or(PolicyError::InvalidCapabilitySource {
+                            moniker: capability_source.source_moniker(),
+                        })?
                         .clone(),
                     source: CapabilityAllowlistSource::Environment,
                     capability: capability.type_name(),

@@ -37,7 +37,7 @@ use cm_rust::{
 use cm_rust_derive::FidlDecl;
 use cm_types::{LongName, Name};
 use fidl_fuchsia_component_internal as finternal;
-use moniker::{ChildName, Moniker};
+use moniker::{ChildName, ExtendedMoniker, Moniker};
 use std::collections::HashSet;
 use std::marker::PhantomData;
 use std::sync::Arc;
@@ -65,7 +65,10 @@ where
 {
     let cap_type = CapabilityTypeName::from(&use_decl);
     if !use_decl.source_path().dirname.is_dot() {
-        return Err(RoutingError::DictionariesNotSupported { cap_type });
+        return Err(RoutingError::DictionariesNotSupported {
+            cap_type,
+            moniker: use_target.moniker().clone(),
+        });
     }
     match Use::route(use_decl, use_target.clone(), &sources, visitor, mapper).await? {
         UseResult::Source(source) => return Ok(source),
@@ -152,7 +155,10 @@ where
     let cap_type = CapabilityTypeName::from(offer.iter().next().unwrap());
     for offer in offer.iter() {
         if !offer.source_path().dirname.is_dot() {
-            return Err(RoutingError::DictionariesNotSupported { cap_type });
+            return Err(RoutingError::DictionariesNotSupported {
+                cap_type,
+                moniker: offer_target.moniker().clone(),
+            });
         }
     }
     match Offer::route(offer, offer_target.clone(), &sources, visitor, mapper).await? {
@@ -223,6 +229,7 @@ where
                     match offer_service_decl.source_instance_filter {
                         None => {
                             return Err(RoutingError::unsupported_route_source(
+                                aggregation_component.moniker().clone(),
                                 "Aggregate offers must be of service capabilities \
                             with source_instance_filter set",
                             ));
@@ -230,17 +237,21 @@ where
                         Some(allowed_instances) => {
                             for instance in allowed_instances.iter() {
                                 if !seen_instances.insert(instance.clone()) {
-                                    return Err(RoutingError::unsupported_route_source(format!(
-                                        "Instance {} found in multiple offers \
+                                    return Err(RoutingError::unsupported_route_source(
+                                        aggregation_component.moniker().clone(),
+                                        format!(
+                                            "Instance {} found in multiple offers \
                                                 of the same service.",
-                                        instance
-                                    )));
+                                            instance
+                                        ),
+                                    ));
                                 }
                             }
                         }
                     }
                 } else {
                     return Err(RoutingError::unsupported_route_source(
+                        aggregation_component.moniker().clone(),
                         "Aggregate source must consist of only service capabilities",
                     ));
                 }
@@ -291,7 +302,10 @@ where
     let cap_type = CapabilityTypeName::from(expose.iter().next().unwrap());
     for expose in expose.iter() {
         if !expose.source_path().dirname.is_dot() {
-            return Err(RoutingError::DictionariesNotSupported { cap_type });
+            return Err(RoutingError::DictionariesNotSupported {
+                cap_type,
+                moniker: expose_target.moniker().clone(),
+            });
         }
     }
     match Expose::route(expose, expose_target, &sources, visitor, mapper).await? {
@@ -345,7 +359,10 @@ where
 {
     let cap_type = CapabilityTypeName::from(&use_decl);
     if !use_decl.source_path().dirname.is_dot() {
-        return Err(RoutingError::DictionariesNotSupported { cap_type });
+        return Err(RoutingError::DictionariesNotSupported {
+            cap_type,
+            moniker: target.moniker().clone(),
+        });
     }
     mapper.add_use(target.moniker().clone(), &use_decl.clone().into());
     route_from_self_by_name(use_decl.source_name(), target, sources, visitor, mapper).await
@@ -447,6 +464,7 @@ impl Sources {
     /// [`RoutingError::UnsupportedRouteSource`] if unsupported.
     pub fn framework_source(
         &self,
+        moniker: &Moniker,
         name: Name,
         mapper: &mut dyn DebugRouteMapper,
     ) -> Result<InternalCapability, RoutingError> {
@@ -455,18 +473,18 @@ impl Sources {
             mapper.add_framework_capability(name);
             Ok(capability)
         } else {
-            Err(RoutingError::unsupported_route_source("framework"))
+            Err(RoutingError::unsupported_route_source(moniker.clone(), "framework"))
         }
     }
 
     /// Checks whether capability sources are supported, returning [`RoutingError::UnsupportedRouteSource`]
     /// if they are not.
     // TODO(https://fxbug.dev/42140194): Add route mapping for capability sources.
-    pub fn capability_source(&self) -> Result<(), RoutingError> {
+    pub fn capability_source(&self, moniker: &Moniker) -> Result<(), RoutingError> {
         if self.capability {
             Ok(())
         } else {
-            Err(RoutingError::unsupported_route_source("capability"))
+            Err(RoutingError::unsupported_route_source(moniker.clone(), "capability"))
         }
     }
 
@@ -481,6 +499,7 @@ impl Sources {
     /// Returns [`RoutingError::UnsupportedRouteSource`] if namespace capabilities are unsupported.
     pub fn find_namespace_source<V>(
         &self,
+        moniker: impl Into<ExtendedMoniker>,
         name: &Name,
         capabilities: &[CapabilityDecl],
         visitor: &mut V,
@@ -497,14 +516,15 @@ impl Sources {
                 })
                 .cloned()
             {
-                visitor.visit(&decl)?;
+                let moniker = moniker.into();
+                visitor.visit(&moniker.into(), &decl)?;
                 mapper.add_namespace_capability(&decl);
                 Ok(Some(decl.into()))
             } else {
                 Ok(None)
             }
         } else {
-            Err(RoutingError::unsupported_route_source("namespace"))
+            Err(RoutingError::unsupported_route_source(moniker, "namespace"))
         }
     }
 
@@ -513,6 +533,7 @@ impl Sources {
     /// Returns [`RoutingError::UnsupportedRouteSource`] if built-in capabilities are unsupported.
     pub fn find_builtin_source<V>(
         &self,
+        moniker: impl Into<ExtendedMoniker>,
         name: &Name,
         capabilities: &[CapabilityDecl],
         visitor: &mut V,
@@ -529,14 +550,14 @@ impl Sources {
                 })
                 .cloned()
             {
-                visitor.visit(&decl)?;
+                visitor.visit(&moniker.into(), &decl)?;
                 mapper.add_builtin_capability(&decl);
                 Ok(Some(decl.into()))
             } else {
                 Ok(None)
             }
         } else {
-            Err(RoutingError::unsupported_route_source("built-in"))
+            Err(RoutingError::unsupported_route_source(moniker, "built-in"))
         }
     }
 
@@ -564,11 +585,11 @@ impl Sources {
                 })
                 .cloned()
                 .expect("CapabilityDecl missing, FIDL validation should catch this");
-            visitor.visit(&decl)?;
+            visitor.visit(&moniker.clone().into(), &decl)?;
             mapper.add_component_capability(moniker.clone(), &decl);
             Ok(decl.into())
         } else {
-            Err(RoutingError::unsupported_route_source("component"))
+            Err(RoutingError::unsupported_route_source(moniker.clone(), "component"))
         }
     }
 }
@@ -606,12 +627,16 @@ impl Use {
         match use_.source() {
             UseSource::Framework => {
                 Ok(UseResult::Source(CapabilitySource::Framework(FrameworkSource {
-                    capability: sources.framework_source(use_.source_name().clone(), mapper)?,
+                    capability: sources.framework_source(
+                        target.moniker(),
+                        use_.source_name().clone(),
+                        mapper,
+                    )?,
                     moniker: target.moniker().clone(),
                 })))
             }
             UseSource::Capability(_) => {
-                sources.capability_source()?;
+                sources.capability_source(target.moniker())?;
                 Ok(UseResult::Source(CapabilitySource::Capability(CapabilityToCapabilitySource {
                     moniker: target.moniker().clone(),
                     source_capability: ComponentCapability::Use_(use_.into()),
@@ -621,6 +646,7 @@ impl Use {
                 ExtendedInstanceInterface::<C>::AboveRoot(top_instance) => {
                     if sources.is_namespace_supported() {
                         if let Some(capability) = sources.find_namespace_source(
+                            ExtendedMoniker::ComponentManager,
                             use_.source_name(),
                             top_instance.namespace_capabilities(),
                             visitor,
@@ -632,6 +658,7 @@ impl Use {
                         }
                     }
                     if let Some(capability) = sources.find_builtin_source(
+                        ExtendedMoniker::ComponentManager,
                         use_.source_name(),
                         top_instance.builtin_capabilities(),
                         visitor,
@@ -682,12 +709,15 @@ impl Use {
             UseSource::Debug => {
                 // This is not supported today. It might be worthwhile to support this if
                 // more than just protocol has a debug capability.
-                return Err(RoutingError::unsupported_route_source("debug capability"));
+                return Err(RoutingError::unsupported_route_source(
+                    target.moniker().clone(),
+                    "debug capability",
+                ));
             }
             UseSource::Self_ => {
                 let use_: UseDecl = use_.into();
                 if let UseDecl::Config(config) = use_ {
-                    sources.capability_source()?;
+                    sources.capability_source(target.moniker())?;
                     let target_capabilities = target.lock_resolved_state().await?.capabilities();
                     return Ok(UseResult::Source(CapabilitySource::Component(ComponentSource {
                         capability: sources.find_component_source(
@@ -700,12 +730,18 @@ impl Use {
                         moniker: target.moniker().clone(),
                     })));
                 }
-                return Err(RoutingError::unsupported_route_source("self"));
+                return Err(RoutingError::unsupported_route_source(
+                    target.moniker().clone(),
+                    "self",
+                ));
             }
             UseSource::Environment => {
                 // This is not supported today. It might be worthwhile to support this if
                 // capabilities other than runner can be used from environment.
-                return Err(RoutingError::unsupported_route_source("environment"));
+                return Err(RoutingError::unsupported_route_source(
+                    target.moniker().clone(),
+                    "environment",
+                ));
             }
         }
     }
@@ -766,6 +802,7 @@ where
                 ExtendedInstanceInterface::<C>::AboveRoot(top_instance) => {
                     if sources.is_namespace_supported() {
                         if let Some(capability) = sources.find_namespace_source(
+                            ExtendedMoniker::ComponentManager,
                             registration.source_name(),
                             top_instance.namespace_capabilities(),
                             visitor,
@@ -777,6 +814,7 @@ where
                         }
                     }
                     if let Some(capability) = sources.find_builtin_source(
+                        ExtendedMoniker::ComponentManager,
                         registration.source_name(),
                         top_instance.builtin_capabilities(),
                         visitor,
@@ -810,7 +848,9 @@ where
             },
             RegistrationSource::Child(child) => {
                 let child_component = {
-                    let child_moniker = ChildName::try_new(child, None)?;
+                    let child_moniker = ChildName::try_new(child, None).expect(
+                        "discovered invalid child name, manifest validation should prevent this",
+                    );
                     target.lock_resolved_state().await?.get_child(&child_moniker).ok_or_else(
                         || RoutingError::EnvironmentFromChildInstanceNotFound {
                             child_moniker,
@@ -893,7 +933,7 @@ impl Offer {
             };
             if let Some(visit_offer) = visit_offer {
                 mapper.add_offer(target.moniker().clone(), &visit_offer);
-                OfferVisitor::visit(visitor, &visit_offer)?;
+                OfferVisitor::visit(visitor, &target.moniker().clone().into(), &visit_offer)?;
             }
 
             fn is_filtered_offer(o: &OfferDecl) -> bool {
@@ -916,6 +956,7 @@ impl Offer {
             for o in offer_bundle.iter() {
                 if !o.source_path().dirname.is_dot() {
                     return Err(RoutingError::DictionariesNotSupported {
+                        moniker: target.moniker().clone(),
                         cap_type: CapabilityTypeName::from(o),
                     });
                 }
@@ -1006,12 +1047,16 @@ impl Offer {
             }
             OfferSource::Framework => OfferSegment::Done(OfferResult::Source(
                 CapabilitySource::Framework(FrameworkSource {
-                    capability: sources.framework_source(offer.source_name().clone(), mapper)?,
+                    capability: sources.framework_source(
+                        target.moniker(),
+                        offer.source_name().clone(),
+                        mapper,
+                    )?,
                     moniker: target.moniker().clone(),
                 }),
             )),
             OfferSource::Capability(_) => {
-                sources.capability_source()?;
+                sources.capability_source(target.moniker())?;
                 OfferSegment::Done(OfferResult::Source(CapabilitySource::Capability(
                     CapabilityToCapabilitySource {
                         source_capability: ComponentCapability::Offer(offer.into()),
@@ -1024,6 +1069,7 @@ impl Offer {
                     ExtendedInstanceInterface::<C>::AboveRoot(top_instance) => {
                         if sources.is_namespace_supported() {
                             if let Some(capability) = sources.find_namespace_source(
+                                ExtendedMoniker::ComponentManager,
                                 offer.source_name(),
                                 top_instance.namespace_capabilities(),
                                 visitor,
@@ -1035,6 +1081,7 @@ impl Offer {
                             }
                         }
                         if let Some(capability) = sources.find_builtin_source(
+                            ExtendedMoniker::ComponentManager,
                             offer.source_name(),
                             top_instance.builtin_capabilities(),
                             visitor,
@@ -1090,7 +1137,8 @@ where
                 let child_moniker = ChildName::try_new(
                     child.name.as_str(),
                     child.collection.as_ref().map(|s| s.as_str()),
-                )?;
+                )
+                .expect("discovered invalid child name, manifest validation should prevent this");
                 component.lock_resolved_state().await?.get_child(&child_moniker).ok_or_else(
                     || RoutingError::OfferFromChildInstanceNotFound {
                         child_moniker,
@@ -1323,13 +1371,14 @@ impl Expose {
             };
             if let Some(visit_expose) = visit_expose {
                 mapper.add_expose(target.moniker().clone(), visit_expose.clone().into());
-                ExposeVisitor::visit(visitor, &visit_expose)?;
+                ExposeVisitor::visit(visitor, &target.moniker().clone().into(), &visit_expose)?;
             }
 
             // Make sure this isn't coming from a dictionary
             for e in expose_bundle.iter() {
                 if !e.source_path().dirname.is_dot() {
                     return Err(RoutingError::DictionariesNotSupported {
+                        moniker: target.moniker().clone(),
                         cap_type: CapabilityTypeName::from(e),
                     });
                 }
@@ -1391,12 +1440,16 @@ impl Expose {
             }
             ExposeSource::Framework => ExposeSegment::Done(ExposeResult::Source(
                 CapabilitySource::Framework(FrameworkSource {
-                    capability: sources.framework_source(expose.source_name().clone(), mapper)?,
+                    capability: sources.framework_source(
+                        target.moniker(),
+                        expose.source_name().clone(),
+                        mapper,
+                    )?,
                     moniker: target.moniker().clone(),
                 }),
             )),
             ExposeSource::Capability(_) => {
-                sources.capability_source()?;
+                sources.capability_source(target.moniker())?;
                 ExposeSegment::Done(ExposeResult::Source(CapabilitySource::Capability(
                     CapabilityToCapabilitySource {
                         source_capability: ComponentCapability::Expose(expose.into()),
@@ -1461,21 +1514,26 @@ fn target_matches_moniker(target: &OfferTarget, child_moniker: &ChildName) -> bo
 
 /// Visitor pattern trait for visiting all [`OfferDecl`] during a route.
 pub trait OfferVisitor {
-    fn visit(&mut self, offer: &OfferDecl) -> Result<(), RoutingError>;
+    fn visit(&mut self, moniker: &ExtendedMoniker, offer: &OfferDecl) -> Result<(), RoutingError>;
 }
 
 /// Visitor pattern trait for visiting all [`ExposeDecl`] during a route.
 pub trait ExposeVisitor {
     /// Visit each [`ExposeDecl`] on the route.
     /// Returning an `Err` cancels visitation.
-    fn visit(&mut self, expose: &ExposeDecl) -> Result<(), RoutingError>;
+    fn visit(&mut self, moniker: &ExtendedMoniker, expose: &ExposeDecl)
+        -> Result<(), RoutingError>;
 }
 
 /// Visitor pattern trait for visiting all [`CapabilityDecl`] during a route.
 pub trait CapabilityVisitor {
     /// Visit each [`CapabilityDecl`] on the route.
     /// Returning an `Err` cancels visitation.
-    fn visit(&mut self, capability: &CapabilityDecl) -> Result<(), RoutingError>;
+    fn visit(
+        &mut self,
+        moniker: &ExtendedMoniker,
+        capability: &CapabilityDecl,
+    ) -> Result<(), RoutingError>;
 }
 
 pub fn find_matching_offers(
@@ -1546,19 +1604,19 @@ impl NoopVisitor {
 }
 
 impl OfferVisitor for NoopVisitor {
-    fn visit(&mut self, _: &OfferDecl) -> Result<(), RoutingError> {
+    fn visit(&mut self, _: &ExtendedMoniker, _: &OfferDecl) -> Result<(), RoutingError> {
         Ok(())
     }
 }
 
 impl ExposeVisitor for NoopVisitor {
-    fn visit(&mut self, _: &ExposeDecl) -> Result<(), RoutingError> {
+    fn visit(&mut self, _: &ExtendedMoniker, _: &ExposeDecl) -> Result<(), RoutingError> {
         Ok(())
     }
 }
 
 impl CapabilityVisitor for NoopVisitor {
-    fn visit(&mut self, _: &CapabilityDecl) -> Result<(), RoutingError> {
+    fn visit(&mut self, _: &ExtendedMoniker, _: &CapabilityDecl) -> Result<(), RoutingError> {
         Ok(())
     }
 }

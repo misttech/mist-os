@@ -1063,9 +1063,10 @@ mod tests {
         assert_matches!(
             &result.error,
             Some(AnalyzerModelError::MissingResolverForScheme(
-                    resolver
+                    moniker,
+                    resolver,
                 ))
-                if resolver == "base"
+                if resolver == "base" && moniker == c_component.moniker()
         );
     }
 

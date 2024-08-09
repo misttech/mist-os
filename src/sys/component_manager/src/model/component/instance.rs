@@ -638,10 +638,12 @@ impl ResolvedInstanceState {
         let exposes = decl.exposes.iter().filter(|e| !sandbox_construction::is_supported_expose(e));
         let exposes_by_target_name = routing::aggregate_exposes(exposes);
         for (target_name, exposes) in exposes_by_target_name {
-            let request = match routing::request_for_namespace_capability_expose(exposes) {
-                Some(r) => r,
-                None => continue,
-            };
+            let request =
+                match routing::request_for_namespace_capability_expose(&component.moniker, exposes)
+                {
+                    Some(r) => r,
+                    None => continue,
+                };
             let capability = request.into_capability(component);
             match target_dict.insert_capability(target_name, capability) {
                 Ok(()) => (),
@@ -1033,6 +1035,10 @@ impl ResolvedInstanceState {
     fn get_child_component_output_dictionary_routers(&self) -> HashMap<ChildName, Router> {
         self.children.iter().map(|(name, child)| (name.clone(), child.component_output())).collect()
     }
+
+    pub fn moniker(&self) -> &Moniker {
+        &self.weak_component.moniker
+    }
 }
 
 impl ResolvedInstanceInterface for ResolvedInstanceState {
@@ -1290,7 +1296,9 @@ impl Routable for CapabilityRequestedHook {
         } else if receiver.is_taken() {
             sender.into()
         } else {
-            self.capability.try_clone().map_err(|_| RoutingError::BedrockNotCloneable)?
+            self.capability.try_clone().map_err(|_| RoutingError::BedrockNotCloneable {
+                moniker: self.source.moniker.clone().into(),
+            })?
         };
         Ok(capability)
     }
@@ -1338,10 +1346,12 @@ impl Routable for ProgramRouter {
             .await
             .map_err(|e| open_error(OpenOutgoingDirError::Fidl(e)))?
             .map_err(RouterError::from)?;
-        let capability =
-            Capability::try_from(cap).map_err(|_| RoutingError::BedrockRemoteCapability)?;
+        let capability = Capability::try_from(cap).map_err(|_| {
+            RoutingError::BedrockRemoteCapability { moniker: self.component.moniker.clone() }
+        })?;
         if !matches!(capability, Capability::Dictionary(_)) {
             Err(RoutingError::BedrockWrongCapabilityType {
+                moniker: self.component.moniker.clone().into(),
                 actual: capability.debug_typename().into(),
                 expected: "Dictionary".into(),
             })?;

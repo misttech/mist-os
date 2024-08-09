@@ -74,6 +74,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
             .get_program_output_dict()
             .await?
             .get_with_request(
+                source.moniker.clone(),
                 &self.name,
                 // Routers in `program_output_dict` do not check availability but we need a
                 // request to run hooks.
@@ -86,6 +87,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
             )
             .await?
             .ok_or_else(|| RoutingError::BedrockNotPresentInDictionary {
+                moniker: self.target.moniker.clone(),
                 name: self.name.to_string(),
             })
             .map_err(RouterError::from)?;

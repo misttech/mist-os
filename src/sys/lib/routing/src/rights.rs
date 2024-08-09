@@ -5,6 +5,7 @@
 use crate::error::RightsRoutingError;
 use crate::walk_state::WalkStateUnit;
 use fidl_fuchsia_io as fio;
+use moniker::ExtendedMoniker;
 #[cfg(feature = "serde")]
 use serde::{de::Deserializer, ser::Serializer, Deserialize, Serialize};
 use std::fmt;
@@ -22,9 +23,22 @@ const LEGACY_WRITABLE_RIGHTS: fio::Operations = fio::Operations::empty()
     .union(fio::Operations::UPDATE_ATTRIBUTES)
     .union(fio::Operations::MODIFY_DIRECTORY);
 
+/// Performs rights validation for a routing step
+#[derive(Debug, PartialEq, Eq, Clone)]
+pub(super) struct RightsWalker {
+    rights: Rights,
+    moniker: ExtendedMoniker,
+}
+
 /// Opaque rights type to define new traits like PartialOrd on.
 #[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub struct Rights(fio::Operations);
+
+impl RightsWalker {
+    pub fn new(rights: fio::Operations, moniker: impl Into<ExtendedMoniker>) -> Self {
+        Self { rights: rights.into(), moniker: moniker.into() }
+    }
+}
 
 impl Rights {
     /// Converts new fuchsia.io directory rights to legacy fuchsia.io compatible rights. This will
@@ -49,14 +63,14 @@ impl Rights {
 
 /// Allows creating rights from fio::Operations.
 impl From<fio::Operations> for Rights {
-    fn from(operations: fio::Operations) -> Self {
-        Rights(operations)
+    fn from(rights: fio::Operations) -> Self {
+        Rights(rights)
     }
 }
 
 impl fmt::Display for Rights {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self(rights) = self;
+        let Self(rights) = &self;
         match *rights {
             fio::R_STAR_DIR => write!(f, "r*"),
             fio::W_STAR_DIR => write!(f, "w*"),
@@ -92,22 +106,26 @@ impl<'de> Deserialize<'de> for Rights {
     }
 }
 
-impl WalkStateUnit for Rights {
+impl WalkStateUnit for RightsWalker {
     type Error = RightsRoutingError;
 
     /// Ensures the next walk state of rights satisfies a monotonic increasing sequence. Used to
     /// verify the expectation that no right requested from a use, offer, or expose is missing as
     /// capability routing walks from the capability's consumer to its provider.
-    fn validate_next(&self, next_rights: &Rights) -> Result<(), Self::Error> {
-        if next_rights.0.contains(self.0) {
+    fn validate_next(&self, next_rights: &RightsWalker) -> Result<(), Self::Error> {
+        if next_rights.rights.0.contains(self.rights.0) {
             Ok(())
         } else {
-            Err(RightsRoutingError::Invalid { requested: *self, provided: *next_rights })
+            Err(RightsRoutingError::Invalid {
+                moniker: self.moniker.clone(),
+                requested: self.rights,
+                provided: next_rights.rights,
+            })
         }
     }
 
-    fn finalize_error() -> Self::Error {
-        RightsRoutingError::MissingRightsSource
+    fn finalize_error(&self) -> Self::Error {
+        RightsRoutingError::MissingRightsSource { moniker: self.moniker.clone() }
     }
 }
 
@@ -122,27 +140,40 @@ mod tests {
     #[test]
     fn validate_next() {
         assert_matches!(
-            Rights::from(fio::Operations::empty())
-                .validate_next(&Rights::from(LEGACY_READABLE_RIGHTS)),
+            RightsWalker::new(fio::Operations::empty(), ExtendedMoniker::ComponentManager)
+                .validate_next(&RightsWalker::new(
+                    LEGACY_READABLE_RIGHTS,
+                    ExtendedMoniker::ComponentManager
+                )),
             Ok(())
         );
         assert_matches!(
-            Rights::from(fio::Operations::READ_BYTES | fio::Operations::GET_ATTRIBUTES)
-                .validate_next(&Rights::from(LEGACY_READABLE_RIGHTS)),
+            RightsWalker::new(
+                fio::Operations::READ_BYTES | fio::Operations::GET_ATTRIBUTES,
+                ExtendedMoniker::ComponentManager
+            )
+            .validate_next(&RightsWalker::new(
+                LEGACY_READABLE_RIGHTS,
+                ExtendedMoniker::ComponentManager
+            )),
             Ok(())
         );
         let provided = fio::Operations::READ_BYTES | fio::Operations::GET_ATTRIBUTES;
         assert_eq!(
-            Rights::from(LEGACY_READABLE_RIGHTS).validate_next(&Rights::from(provided)),
+            RightsWalker::new(LEGACY_READABLE_RIGHTS, ExtendedMoniker::ComponentManager)
+                .validate_next(&RightsWalker::new(provided, ExtendedMoniker::ComponentManager)),
             Err(RightsRoutingError::Invalid {
+                moniker: ExtendedMoniker::ComponentManager,
                 requested: Rights::from(LEGACY_READABLE_RIGHTS),
                 provided: Rights::from(provided),
             })
         );
         let provided = fio::Operations::READ_BYTES | fio::Operations::GET_ATTRIBUTES;
         assert_eq!(
-            Rights::from(fio::Operations::WRITE_BYTES).validate_next(&Rights::from(provided)),
+            RightsWalker::new(fio::Operations::WRITE_BYTES, ExtendedMoniker::ComponentManager)
+                .validate_next(&RightsWalker::new(provided, ExtendedMoniker::ComponentManager)),
             Err(RightsRoutingError::Invalid {
+                moniker: ExtendedMoniker::ComponentManager,
                 requested: Rights::from(fio::Operations::WRITE_BYTES),
                 provided: Rights::from(provided),
             })

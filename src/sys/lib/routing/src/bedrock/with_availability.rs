@@ -5,11 +5,13 @@
 use crate::error::RoutingError;
 use async_trait::async_trait;
 use cm_types::Availability;
+use moniker::ExtendedMoniker;
 use sandbox::{Capability, Request, Router};
 
 struct AvailabilityRouter {
     router: Router,
     availability: Availability,
+    moniker: ExtendedMoniker,
 }
 
 #[async_trait]
@@ -17,7 +19,7 @@ impl sandbox::Routable for AvailabilityRouter {
     async fn route(&self, mut request: Request) -> Result<Capability, router_error::RouterError> {
         // The availability of the request must be compatible with the
         // availability of this step of the route.
-        match crate::availability::advance(request.availability, self.availability) {
+        match crate::availability::advance(&self.moniker, request.availability, self.availability) {
             Ok(updated) => {
                 request.availability = updated;
                 // Everything checks out, forward the request.
@@ -31,12 +33,20 @@ impl sandbox::Routable for AvailabilityRouter {
 pub trait WithAvailability {
     /// Returns a router that ensures the capability request has an availability
     /// strength that is at least the provided `availability`.
-    fn with_availability(self, availability: Availability) -> Router;
+    fn with_availability(
+        self,
+        moniker: impl Into<ExtendedMoniker>,
+        availability: Availability,
+    ) -> Router;
 }
 
 impl WithAvailability for Router {
-    fn with_availability(self, availability: Availability) -> Router {
-        Router::new(AvailabilityRouter { availability, router: self })
+    fn with_availability(
+        self,
+        moniker: impl Into<ExtendedMoniker>,
+        availability: Availability,
+    ) -> Router {
+        Router::new(AvailabilityRouter { availability, router: self, moniker: moniker.into() })
     }
 }
 
@@ -67,7 +77,8 @@ mod tests {
     async fn availability_good() {
         let source: Capability = Data::String("hello".to_string()).into();
         let base = Router::new(source);
-        let proxy = base.with_availability(Availability::Optional);
+        let proxy =
+            base.with_availability(ExtendedMoniker::ComponentManager, Availability::Optional);
         let capability = proxy
             .route(Request {
                 availability: Availability::Optional,
@@ -88,7 +99,8 @@ mod tests {
     async fn availability_bad() {
         let source: Capability = Data::String("hello".to_string()).into();
         let base = Router::new(source);
-        let proxy = base.with_availability(Availability::Optional);
+        let proxy =
+            base.with_availability(ExtendedMoniker::ComponentManager, Availability::Optional);
         let error = proxy
             .route(Request {
                 availability: Availability::Required,
@@ -104,7 +116,7 @@ mod tests {
             if matches!(
                 err.downcast_for_test::<RoutingError>(),
                 RoutingError::AvailabilityRoutingError(
-                    crate::error::AvailabilityRoutingError::TargetHasStrongerAvailability
+                    crate::error::AvailabilityRoutingError::TargetHasStrongerAvailability { moniker: ExtendedMoniker::ComponentManager}
                 )
             )
         );

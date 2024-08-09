@@ -6,6 +6,7 @@ use crate::bedrock::request_metadata::METADATA_KEY_TYPE;
 use crate::error::RoutingError;
 use async_trait::async_trait;
 use cm_rust::CapabilityTypeName;
+use moniker::Moniker;
 use router_error::RouterError;
 use sandbox::{Capability, Data, Request, Routable, Router};
 
@@ -17,11 +18,11 @@ pub trait WithPorcelainType {
     /// Returns a router that ensures the capability request has a porcelain
     /// type that is the same as the type of the capability returned by the
     /// router.
-    fn with_porcelain_type(self, porcelain_type: CapabilityTypeName) -> Router;
+    fn with_porcelain_type(self, porcelain_type: CapabilityTypeName, moniker: Moniker) -> Router;
 }
 
 impl WithPorcelainType for Router {
-    fn with_porcelain_type(self, porcelain_type: CapabilityTypeName) -> Router {
+    fn with_porcelain_type(self, porcelain_type: CapabilityTypeName, moniker: Moniker) -> Router {
         if !is_supported(&porcelain_type) {
             return self;
         }
@@ -30,21 +31,25 @@ impl WithPorcelainType for Router {
         struct RouterWithPorcelainType {
             router: Router,
             porcelain_type: CapabilityTypeName,
+            moniker: Moniker,
         }
 
         #[async_trait]
         impl Routable for RouterWithPorcelainType {
             async fn route(&self, request: Request) -> Result<Capability, RouterError> {
-                let RouterWithPorcelainType { router, porcelain_type } = self;
+                let RouterWithPorcelainType { router, porcelain_type, moniker } = self;
                 let Capability::Data(Data::String(capability_type)) = request
                     .metadata
                     .get(&cm_types::Name::new(METADATA_KEY_TYPE).unwrap())
-                    .map_err(|()| RoutingError::BedrockNotCloneable)?
+                    .map_err(|()| RoutingError::BedrockNotCloneable {
+                        moniker: moniker.clone().into(),
+                    })?
                     .unwrap_or_else(|| {
                         panic!("missing capability type {porcelain_type} for request: {request:?}")
                     })
                 else {
                     return Err(RoutingError::BedrockNotPresentInDictionary {
+                        moniker: moniker.clone(),
                         name: String::from("type"),
                     }
                     .into());
@@ -54,6 +59,7 @@ impl WithPorcelainType for Router {
                     router.route(request).await
                 } else {
                     Err(RoutingError::BedrockWrongCapabilityType {
+                        moniker: moniker.clone().into(),
                         actual: capability_type,
                         expected: porcelain_type,
                     }
@@ -62,7 +68,7 @@ impl WithPorcelainType for Router {
             }
         }
 
-        Router::new(RouterWithPorcelainType { router: self, porcelain_type })
+        Router::new(RouterWithPorcelainType { router: self, porcelain_type, moniker })
     }
 }
 
@@ -96,7 +102,7 @@ mod tests {
     async fn porcelain_type_good() {
         let source: Capability = Data::String("hello".to_string()).into();
         let base = Router::new(source);
-        let proxy = base.with_porcelain_type(CapabilityTypeName::Protocol);
+        let proxy = base.with_porcelain_type(CapabilityTypeName::Protocol, Moniker::root());
         let capability = proxy
             .route(Request {
                 availability: Availability::Optional,
@@ -117,7 +123,7 @@ mod tests {
     async fn porcelain_type_bad() {
         let source: Capability = Data::String("hello".to_string()).into();
         let base = Router::new(source);
-        let proxy = base.with_porcelain_type(CapabilityTypeName::Protocol);
+        let proxy = base.with_porcelain_type(CapabilityTypeName::Protocol, Moniker::root());
         let metadata = Dict::new();
         metadata
             .insert(
@@ -139,7 +145,7 @@ mod tests {
             RouterError::NotFound(err)
             if matches!(
                 err.downcast_for_test::<RoutingError>(),
-                RoutingError::BedrockWrongCapabilityType { actual: _, expected: _},
+                RoutingError::BedrockWrongCapabilityType { actual: _, expected: _, moniker: _},
             )
         );
     }

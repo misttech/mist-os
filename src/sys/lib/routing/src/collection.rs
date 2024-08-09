@@ -22,7 +22,7 @@ use cm_rust::{ExposeDecl, NameMapping, OfferDecl, OfferServiceDecl};
 use cm_types::Name;
 use derivative::Derivative;
 use futures::future::BoxFuture;
-use moniker::ChildName;
+use moniker::{ChildName, ExtendedMoniker};
 use std::collections::HashSet;
 use std::sync::Arc;
 
@@ -245,7 +245,10 @@ where
             }
         })? {
             ExtendedInstanceInterface::AboveRoot(_) => {
-                return Err(RoutingError::unsupported_route_source("service above parent"));
+                return Err(RoutingError::unsupported_route_source(
+                    ExtendedMoniker::ComponentManager,
+                    "service above parent",
+                ));
             }
             ExtendedInstanceInterface::Component(p) => p,
         };
@@ -480,10 +483,10 @@ where
             let offer_decl = OfferDecl::Service(offer_decl);
             let fut = async {
                 let component = self.component.upgrade().map_err(|e| {
-                    RoutingError::unsupported_route_source(format!(
-                        "error upgrading aggregation point component {}",
-                        e
-                    ))
+                    RoutingError::unsupported_route_source(
+                        self.component.moniker.clone(),
+                        format!("error upgrading aggregation point component {}", e),
+                    )
                 })?;
                 let capability_source = legacy_router::route_from_offer(
                     RouteBundle::from_offer(offer_decl),

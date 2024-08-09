@@ -30,12 +30,13 @@ use {
 };
 
 fn new_debug_only_router(source: CapabilitySource) -> Router {
+    let moniker = source.source_moniker();
     let cap: Capability =
         source.try_into().expect("failed to convert capability source to dictionary");
     Router::new(move |request: Request| {
         if !request.debug {
             future::ready(Err(RouterError::NotFound(Arc::new(
-                RoutingError::NonDebugRoutesUnsupported,
+                RoutingError::NonDebugRoutesUnsupported { moniker: moniker.clone() },
             ))))
             .boxed()
         } else {
@@ -208,6 +209,7 @@ pub(crate) fn static_children_component_output_dictionary_routers(
                 .cloned()
                 .ok_or(RouterError::NotFound(Arc::new(
                     RoutingError::BedrockNotPresentInDictionary {
+                        moniker: self.weak_component.moniker.clone(),
                         name: format!("{}", &self.child_name),
                     },
                 )))?;

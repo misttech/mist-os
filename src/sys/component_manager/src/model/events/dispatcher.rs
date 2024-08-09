@@ -106,7 +106,7 @@ pub struct EventDispatcherScope {
 
 impl EventDispatcherScope {
     pub fn new(moniker: ExtendedMoniker) -> Self {
-        Self { moniker, filter: EventFilter::new(None) }
+        Self { moniker: moniker.clone(), filter: EventFilter::new(moniker, None) }
     }
 
     pub fn with_filter(mut self, filter: EventFilter) -> Self {
@@ -117,7 +117,7 @@ impl EventDispatcherScope {
     /// For the top-level EventStreams and event strems used in unit tests in the c_m codebase we
     /// don't take filters into account.
     pub fn for_debug(mut self) -> Self {
-        self.filter = EventFilter::debug();
+        self.filter = EventFilter::debug(self.moniker.clone());
         self
     }
 

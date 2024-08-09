@@ -138,7 +138,7 @@ impl RouteValidatorCapabilityProvider {
                     name: use_.source_name().as_str().into(),
                     decl_type: fsys::DeclType::Use,
                 };
-                let request = RouteRequest::from(use_.clone());
+                let request = RouteRequest::try_from(use_.clone()).unwrap();
                 (target, request)
             });
 
@@ -148,7 +148,7 @@ impl RouteValidatorCapabilityProvider {
                     name: target_name.to_string(),
                     decl_type: fsys::DeclType::Expose,
                 };
-                let request = RouteRequest::try_from(e).unwrap();
+                let request = RouteRequest::from_expose_decls(resolved.moniker(), e).unwrap();
                 (target, request)
             });
             Ok(use_requests.chain(expose_requests).collect())
@@ -183,7 +183,7 @@ impl RouteValidatorCapabilityProvider {
                                     name: u.source_name().to_string(),
                                     decl_type: target.decl_type,
                                 };
-                                let request = RouteRequest::from(u.clone());
+                                let request = RouteRequest::try_from(u.clone()).unwrap();
                                 Some(Ok((target, request)))
                             })
                             .collect();
@@ -202,7 +202,8 @@ impl RouteValidatorCapabilityProvider {
                                     name: target_name.to_string(),
                                     decl_type: target.decl_type,
                                 };
-                                let request = RouteRequest::try_from(e).unwrap();
+                                let request =
+                                    RouteRequest::from_expose_decls(resolved.moniker(), e).unwrap();
                                 Some(Ok((target, request)))
                             })
                             .collect();
@@ -393,6 +394,16 @@ impl RouteRequest {
             }
         })
     }
+
+    pub fn from_expose_decls(
+        moniker: &Moniker,
+        exposes: Vec<&ExposeDecl>,
+    ) -> Result<Self, RoutingError> {
+        match BedrockRouteRequest::try_from(&exposes) {
+            Ok(r) => Ok(Self::Bedrock(r)),
+            Err(()) => Ok(Self::Legacy(LegacyRouteRequest::from_expose_decls(moniker, exposes)?)),
+        }
+    }
 }
 
 impl From<UseDecl> for RouteRequest {
@@ -400,17 +411,6 @@ impl From<UseDecl> for RouteRequest {
         match BedrockRouteRequest::try_from(u) {
             Ok(r) => Self::Bedrock(r),
             Err(r) => Self::Legacy(r.into()),
-        }
-    }
-}
-
-impl TryFrom<Vec<&ExposeDecl>> for RouteRequest {
-    type Error = RoutingError;
-
-    fn try_from(e: Vec<&ExposeDecl>) -> Result<Self, Self::Error> {
-        match BedrockRouteRequest::try_from(&e) {
-            Ok(r) => Ok(Self::Bedrock(r)),
-            Err(()) => Ok(Self::Legacy(e.try_into()?)),
         }
     }
 }
@@ -492,7 +492,7 @@ async fn validate_exposes(
     for (target_name, e) in exposes {
         let capability = Some(target_name.to_string());
         let decl_type = Some(fsys::DeclType::Expose);
-        let (availability, error) = match RouteRequest::try_from(e) {
+        let (availability, error) = match RouteRequest::from_expose_decls(&instance.moniker, e) {
             Err(e) => (
                 None,
                 Some(fsys::RouteError { summary: Some(e.to_string()), ..Default::default() }),

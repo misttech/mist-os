@@ -4,11 +4,13 @@
 
 use cm_types::Availability;
 use fuchsia_zircon_status as zx;
+use moniker::ExtendedMoniker;
 use router_error::Explain;
 use thiserror::Error;
 
 /// Ensure that availability cannot decrease from target to source.
 pub fn advance(
+    moniker: &ExtendedMoniker,
     current: Availability,
     next: Availability,
 ) -> Result<Availability, TargetHasStrongerAvailability> {
@@ -42,7 +44,7 @@ pub fn advance(
         (Availability::Optional, Availability::Transitional)
         | (Availability::Required, Availability::Transitional)
         | (Availability::Required, Availability::Optional) =>
-            Err(TargetHasStrongerAvailability),
+            Err(TargetHasStrongerAvailability { moniker: moniker.clone() }),
     }
 }
 
@@ -53,7 +55,9 @@ pub fn advance(
     "Availability requested by the target has stronger guarantees than what \
     is being provided at the source."
 )]
-pub struct TargetHasStrongerAvailability;
+pub struct TargetHasStrongerAvailability {
+    pub moniker: ExtendedMoniker,
+}
 
 impl Explain for TargetHasStrongerAvailability {
     fn as_zx_status(&self) -> zx::Status {
@@ -72,15 +76,15 @@ mod tests {
     #[test_case(
         Availability::Optional,
         Availability::Transitional,
-        Err(TargetHasStrongerAvailability)
+        Err(TargetHasStrongerAvailability { moniker: ExtendedMoniker::ComponentManager })
     )]
-    #[test_case(Availability::Required, Availability::Optional, Err(TargetHasStrongerAvailability))]
+    #[test_case(Availability::Required, Availability::Optional, Err(TargetHasStrongerAvailability { moniker: ExtendedMoniker::ComponentManager }))]
     #[test_case(Availability::Required, Availability::Required, Ok(Availability::Required))]
     #[test_case(Availability::Required, Availability::SameAsTarget, Ok(Availability::Required))]
     #[test_case(
         Availability::Required,
         Availability::Transitional,
-        Err(TargetHasStrongerAvailability)
+        Err(TargetHasStrongerAvailability { moniker: ExtendedMoniker::ComponentManager })
     )]
     #[test_case(Availability::Transitional, Availability::Optional, Ok(Availability::Optional))]
     #[test_case(Availability::Transitional, Availability::Required, Ok(Availability::Required))]
@@ -99,7 +103,7 @@ mod tests {
         next: Availability,
         expected: Result<Availability, TargetHasStrongerAvailability>,
     ) {
-        let actual = advance(current, next);
+        let actual = advance(&ExtendedMoniker::ComponentManager, current, next);
         assert_eq!(actual, expected);
     }
 }
