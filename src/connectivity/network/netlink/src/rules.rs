@@ -111,6 +111,60 @@ struct RuleTableInner {
 }
 
 impl RuleTableInner {
+    fn new_with_defaults<I: Ip>() -> RuleTableInner {
+        fn build_lookup_rule<I: Ip>(priority: RulePriority, table: u8) -> RuleMessage {
+            let mut rule = RuleMessage::default();
+            rule.header.family = match I::VERSION {
+                IpVersion::V4 => AddressFamily::Inet,
+                IpVersion::V6 => AddressFamily::Inet6,
+            };
+            rule.header.table = table;
+            rule.header.action = RuleAction::ToTable;
+            rule.attributes.push(RuleAttribute::Priority(priority));
+            rule
+        }
+
+        let mut table = RuleTableInner::default();
+        let rules_to_add = match I::VERSION {
+            IpVersion::V4 => itertools::Either::Left(
+                [
+                    build_lookup_rule::<Ipv4>(
+                        LINUX_DEFAULT_LOOKUP_LOCAL_PRIORITY,
+                        rt_class_t_RT_TABLE_LOCAL as u8,
+                    ),
+                    build_lookup_rule::<Ipv4>(
+                        LINUX_DEFAULT_LOOKUP_MAIN_PRIORITY,
+                        rt_class_t_RT_TABLE_MAIN as u8,
+                    ),
+                    build_lookup_rule::<Ipv4>(
+                        LINUX_DEFAULT_LOOKUP_DEFAULT_PRIORITY,
+                        rt_class_t_RT_TABLE_DEFAULT as u8,
+                    ),
+                ]
+                .into_iter(),
+            ),
+            IpVersion::V6 => itertools::Either::Right(
+                [
+                    build_lookup_rule::<Ipv6>(
+                        LINUX_DEFAULT_LOOKUP_LOCAL_PRIORITY,
+                        rt_class_t_RT_TABLE_LOCAL as u8,
+                    ),
+                    build_lookup_rule::<Ipv6>(
+                        LINUX_DEFAULT_LOOKUP_MAIN_PRIORITY,
+                        rt_class_t_RT_TABLE_MAIN as u8,
+                    ),
+                ]
+                .into_iter(),
+            ),
+        };
+
+        for rule in rules_to_add {
+            table.add_rule(rule).expect("should not fail to add a default rule");
+        }
+
+        table
+    }
+
     /// Adds the given rule to the table.
     fn add_rule(&mut self, mut rule: RuleMessage) -> Result<(), AddRuleError> {
         // Get the rule's priority, setting it to a default if unset.
@@ -248,6 +302,7 @@ pub(crate) struct RuleTable {
 }
 
 impl RuleTable {
+    #[cfg(test)]
     /// Constructs an empty RuleTable.
     pub(crate) fn new() -> RuleTable {
         RuleTable {
@@ -264,61 +319,10 @@ impl RuleTable {
     /// * [V6] 0:        from all lookup local
     /// * [V6] 32766:    from all lookup main
     pub(crate) fn new_with_defaults() -> RuleTable {
-        fn build_lookup_rule<I: Ip>(priority: RulePriority, table: u8) -> RuleMessage {
-            let mut rule = RuleMessage::default();
-            rule.header.family = match I::VERSION {
-                IpVersion::V4 => AddressFamily::Inet,
-                IpVersion::V6 => AddressFamily::Inet6,
-            };
-            rule.header.table = table;
-            rule.header.action = RuleAction::ToTable;
-            rule.attributes.push(RuleAttribute::Priority(priority));
-            rule
+        RuleTable {
+            v4_rules: Arc::new(Mutex::new(RuleTableInner::new_with_defaults::<Ipv4>())),
+            v6_rules: Arc::new(Mutex::new(RuleTableInner::new_with_defaults::<Ipv6>())),
         }
-
-        let table = RuleTable::new();
-        // Conversions to u8 is safe as these constants fit into a u8.
-        for rule in [
-            build_lookup_rule::<Ipv4>(
-                LINUX_DEFAULT_LOOKUP_LOCAL_PRIORITY,
-                rt_class_t_RT_TABLE_LOCAL as u8,
-            ),
-            build_lookup_rule::<Ipv4>(
-                LINUX_DEFAULT_LOOKUP_MAIN_PRIORITY,
-                rt_class_t_RT_TABLE_MAIN as u8,
-            ),
-            build_lookup_rule::<Ipv4>(
-                LINUX_DEFAULT_LOOKUP_DEFAULT_PRIORITY,
-                rt_class_t_RT_TABLE_DEFAULT as u8,
-            ),
-        ] {
-            table
-                .v4_rules
-                .lock()
-                .unwrap()
-                .add_rule(rule)
-                .expect("should not fail to add a default ipv4 rule");
-        }
-
-        for rule in [
-            build_lookup_rule::<Ipv6>(
-                LINUX_DEFAULT_LOOKUP_LOCAL_PRIORITY,
-                rt_class_t_RT_TABLE_LOCAL as u8,
-            ),
-            build_lookup_rule::<Ipv6>(
-                LINUX_DEFAULT_LOOKUP_MAIN_PRIORITY,
-                rt_class_t_RT_TABLE_MAIN as u8,
-            ),
-        ] {
-            table
-                .v6_rules
-                .lock()
-                .unwrap()
-                .add_rule(rule)
-                .expect("should not fail to add a default ipv6 rule");
-        }
-
-        table
     }
 }
 
