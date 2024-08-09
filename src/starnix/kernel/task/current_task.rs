@@ -455,6 +455,7 @@ impl CurrentTask {
             flags,
             FileMode::default(),
             ResolveFlags::empty(),
+            AccessCheck::default(),
         )
     }
 
@@ -596,6 +597,7 @@ impl CurrentTask {
         flags: OpenFlags,
         mode: FileMode,
         resolve_flags: ResolveFlags,
+        access_check: AccessCheck,
     ) -> Result<FileHandle, Errno>
     where
         L: LockBefore<BeforeFsNodeAppend>,
@@ -607,7 +609,7 @@ impl CurrentTask {
         }
 
         let (dir, path) = self.resolve_dir_fd(dir_fd, path, resolve_flags)?;
-        self.open_namespace_node_at(locked, dir, path, flags, mode, resolve_flags)
+        self.open_namespace_node_at(locked, dir, path, flags, mode, resolve_flags, access_check)
     }
 
     pub fn open_namespace_node_at<L>(
@@ -618,6 +620,7 @@ impl CurrentTask {
         flags: OpenFlags,
         mode: FileMode,
         mut resolve_flags: ResolveFlags,
+        access_check: AccessCheck,
     ) -> Result<FileHandle, Errno>
     where
         L: LockBefore<FileOpsCore>,
@@ -737,7 +740,7 @@ impl CurrentTask {
         // > open() call that creates a read-only file may well return a  read/write  file
         // > descriptor.
 
-        let access_check = if created { AccessCheck::skip() } else { AccessCheck::default() };
+        let access_check = if created { AccessCheck::skip() } else { access_check };
         name.open(locked, self, flags, access_check)
     }
 

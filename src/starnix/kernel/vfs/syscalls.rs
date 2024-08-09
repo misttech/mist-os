@@ -38,7 +38,7 @@ use starnix_uapi::auth::{
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, ErrnoResultExt, EFAULT, EINTR, ENAMETOOLONG, ETIMEDOUT};
 use starnix_uapi::file_lease::FileLeaseType;
-use starnix_uapi::file_mode::{Access, FileMode};
+use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
 use starnix_uapi::inotify_mask::InotifyMask;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
@@ -566,6 +566,7 @@ fn open_file_at(
         OpenFlags::from_bits_truncate(flags),
         mode,
         resolve_flags,
+        AccessCheck::default(),
     )
 }
 

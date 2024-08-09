@@ -349,6 +349,7 @@ mod test {
     use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
     use crate::vfs::{FdNumber, UnlinkKind};
     use starnix_uapi::errno;
+    use starnix_uapi::file_mode::AccessCheck;
     use starnix_uapi::mount_flags::MountFlags;
     use starnix_uapi::vfs::ResolveFlags;
     use zerocopy::AsBytes;
@@ -441,6 +442,7 @@ mod test {
                 OpenFlags::CREAT | OpenFlags::RDONLY,
                 FileMode::from_bits(0o777),
                 ResolveFlags::empty(),
+                AccessCheck::default(),
             )
             .expect("failed to create file");
         assert_eq!(
@@ -459,6 +461,7 @@ mod test {
                 OpenFlags::WRONLY,
                 FileMode::EMPTY,
                 ResolveFlags::empty(),
+                AccessCheck::default(),
             )
             .expect("failed to open file WRONLY");
 
@@ -478,6 +481,7 @@ mod test {
                 OpenFlags::RDWR,
                 FileMode::EMPTY,
                 ResolveFlags::empty(),
+                AccessCheck::default(),
             )
             .expect("failed to open file RDWR");
 
@@ -528,6 +532,7 @@ mod test {
                 OpenFlags::RDWR | OpenFlags::CREAT,
                 FileMode::from_bits(0o777),
                 ResolveFlags::empty(),
+                AccessCheck::default(),
             )
             .expect("failed to create test.txt");
         let txt = current_task

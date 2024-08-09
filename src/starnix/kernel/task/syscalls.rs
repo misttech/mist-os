@@ -266,6 +266,7 @@ pub fn sys_execveat(
             open_flags,
             FileMode::default(),
             ResolveFlags::empty(),
+            AccessCheck::default(),
         )?
     };
 

@@ -277,6 +277,7 @@ impl StarnixNodeConnection {
                 flags.into(),
                 FileMode::ALLOW_ALL,
                 ResolveFlags::empty(),
+                AccessCheck::default(),
             ) {
                 Err(e) if e == errno!(EISDIR) && must_create_directory => {
                     let mode =
