@@ -8,12 +8,14 @@ import os
 import typing
 
 import args
+from dataparse import dataparse
 
 
 class EnvironmentError(Exception):
     """There was an error loading the execution environment."""
 
 
+@dataparse
 @dataclass
 class ExecutionEnvironment:
     """Contains the parsed environment for this invocation of fx test.
@@ -28,11 +30,11 @@ class ExecutionEnvironment:
     # The output build directory for compiled Fuchsia code.
     out_dir: str
 
-    # Path to the log file to write to. If unset, do not log.
-    log_file: str | None
-
     # Path to the input tests.json file.
     test_json_file: str
+
+    # Path to the log file to write to. If unset, do not log.
+    log_file: str | None = None
 
     # Path to the input test-list.json file.
     test_list_file: str | None = None
@@ -120,8 +122,8 @@ class ExecutionEnvironment:
         return cls(
             fuchsia_dir,
             out_dir,
-            log_file,
             tests_json_file,
+            log_file=log_file,
             package_repositories_file=(
                 package_repositories_file
                 if os.path.isfile(package_repositories_file)

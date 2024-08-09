@@ -103,7 +103,7 @@ class TestExecutionEnvironment(unittest.TestCase):
                 )
 
     def test_no_fuchsia_dir(self) -> None:
-        with mock.patch.dict(os.environ, {"FUCHSIA_DIR": ""}):
+        with mock.patch.dict(os.environ, {"FUCHSIA_DIR": ""}, clear=True):
             default_flags = args.parse_args([])
             self.assertRaisesRegex(
                 environment.EnvironmentError,
@@ -118,7 +118,7 @@ class TestExecutionEnvironment(unittest.TestCase):
             self._make_test_files(tmp)
             os.remove(os.path.join(tmp, ".fx-build-dir"))
 
-            with mock.patch.dict(os.environ, {"FUCHSIA_DIR": tmp}):
+            with mock.patch.dict(os.environ, {"FUCHSIA_DIR": tmp}, clear=True):
                 default_flags = args.parse_args([])
                 self.assertRaisesRegex(
                     environment.EnvironmentError,
@@ -133,7 +133,7 @@ class TestExecutionEnvironment(unittest.TestCase):
             self._make_test_files(tmp)
             shutil.rmtree(os.path.join(tmp, "out", "foo"))
 
-            with mock.patch.dict(os.environ, {"FUCHSIA_DIR": tmp}):
+            with mock.patch.dict(os.environ, {"FUCHSIA_DIR": tmp}, clear=True):
                 default_flags = args.parse_args([])
                 self.assertRaisesRegex(
                     environment.EnvironmentError,
@@ -148,7 +148,7 @@ class TestExecutionEnvironment(unittest.TestCase):
             self._make_test_files(tmp)
             os.remove(os.path.join(tmp, "out", "foo", "tests.json"))
 
-            with mock.patch.dict(os.environ, {"FUCHSIA_DIR": tmp}):
+            with mock.patch.dict(os.environ, {"FUCHSIA_DIR": tmp}, clear=True):
                 default_flags = args.parse_args([])
                 self.assertRaisesRegex(
                     environment.EnvironmentError,

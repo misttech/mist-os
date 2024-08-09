@@ -20,6 +20,7 @@ import time
 import typing
 
 from dataparse import dataparse
+import environment
 import selection_types
 import tests_json_file
 
@@ -332,7 +333,7 @@ class EventPayloadUnion:
     # This event denotes processing the execution environment.
     #
     # The parsed environment is included in the value.
-    process_env: dict[str, typing.Any] | None = None
+    process_env: environment.ExecutionEnvironment | None = None
 
     # This event denotes a message to be shown to the user.
     #
@@ -723,11 +724,11 @@ class EventRecorder:
             )
         )
 
-    def emit_process_env(self, env: dict[str, typing.Any]) -> None:
+    def emit_process_env(self, env: environment.ExecutionEnvironment) -> None:
         """Emit a process_env event with details of the environment.
 
         Args:
-            env (dict[str, typing.Any]): The environment parsed by this invocation.
+            env (ExecutionEnvironment): The environment parsed by this invocation.
         """
         self._emit(
             Event(

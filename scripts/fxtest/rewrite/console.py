@@ -15,6 +15,7 @@ import statusinfo
 import termout
 
 import args
+import environment
 import event
 
 
@@ -48,8 +49,6 @@ class ConsoleState:
     """Holder for all console output state.
 
     Attributes:
-        root_path: The root Fuchsia directory. Starts empty until an
-            event containing it is processed.
         active_durations: Map from Id to DurationInfo for durations
             that have not yet ended.
         complete_durations: Map from Id to DurationInfo for durations
@@ -59,16 +58,17 @@ class ConsoleState:
             Only set after the global run has ended.
         test_results: Map from status to a set of tests with that
             status. This is the canonical result list for all tests.
+        exec_env: Parsed environment for this run.
     """
 
     def __init__(self) -> None:
-        self.root_path: str | None = None
         self.active_durations: dict[event.Id, DurationInfo] = dict()
         self.complete_durations: dict[event.Id, DurationInfo] = dict()
         self.end_duration: float | None = None
         self.test_results: dict[
             event.TestSuiteStatus, typing.Set[str]
         ] = defaultdict(set)
+        self.exec_env: environment.ExecutionEnvironment | None = None
 
 
 async def console_printer(
@@ -599,7 +599,7 @@ async def _console_event_loop(
 
             if next_event.payload.process_env is not None:
                 # Extract the path from the parsed environment.
-                root_path = next_event.payload.process_env["fuchsia_dir"]
+                state.exec_env = next_event.payload.process_env
             elif next_event.payload.user_message is not None:
                 # Style and display user messages.
                 quietable = False
@@ -650,8 +650,11 @@ async def _console_event_loop(
                 # Print a result to the user when the tests file is parsed.
                 test_info = next_event.payload.test_file_loaded
                 path = (
-                    "//" + os.path.relpath(test_info.file_path, root_path)
-                    if root_path
+                    "//"
+                    + os.path.relpath(
+                        test_info.file_path, state.exec_env.fuchsia_dir
+                    )
+                    if state.exec_env
                     else test_info.file_path
                 )
                 lines_to_print.append(
@@ -683,10 +686,13 @@ async def _console_event_loop(
                 )
                 # Also output the command line used for fx build up to a limit,
                 # to avoid scrolling multiple pages.
+                out_dir_string = (
+                    f"--dir {state.exec_env.out_dir} " if state.exec_env else ""
+                )
                 lines_to_print.append(
                     statusinfo.ellipsize(
                         statusinfo.green_highlight(
-                            f"> fx build {' '.join(next_event.payload.build_targets)}",
+                            f"> fx build {out_dir_string}{' '.join(next_event.payload.build_targets)}",
                             style=flags.style,
                         ),
                         width=80 * 5,  # Approximately 5 lines
