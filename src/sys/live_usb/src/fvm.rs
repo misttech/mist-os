@@ -150,9 +150,9 @@ impl FvmRamdisk {
             .await
             .context("building ramdisk")?;
         let channel = ramdisk.open().await.context("Opening ramdisk")?;
-        let block_client = remote_block_device::RemoteBlockClientSync::new(channel)
+        let block_client = block_client::RemoteBlockClientSync::new(channel)
             .context("creating remote block client")?;
-        let cache = remote_block_device::cache::Cache::new(block_client)
+        let cache = block_client::cache::Cache::new(block_client)
             .context("creating remote block client cache")?;
         gpt::write_ramdisk(Box::new(cache)).context("writing GPT")?;
 

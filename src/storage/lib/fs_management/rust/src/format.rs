@@ -5,8 +5,8 @@
 pub mod constants;
 
 use anyhow::{anyhow, ensure, Context as _, Error};
+use block_client::{AsBlockProxy, BlockClient, MutableBufferSlice, RemoteBlockClient};
 use fuchsia_zircon as zx;
-use remote_block_device::{AsBlockProxy, BlockClient, MutableBufferSlice, RemoteBlockClient};
 
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub enum DiskFormat {

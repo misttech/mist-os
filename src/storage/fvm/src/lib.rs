@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error};
+use block_client::RemoteBlockClient;
 use block_server::async_interface::{Interface, SessionManager};
 use block_server::{BlockServer, PartitionInfo};
 use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd};
@@ -14,7 +15,6 @@ use fidl_fuchsia_fxfs::{
 use fidl_fuchsia_hardware_block::BlockMarker;
 use futures::future::try_join_all;
 use futures::stream::TryStreamExt;
-use remote_block_device::RemoteBlockClient;
 use sha2::{Digest, Sha256};
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -700,6 +700,7 @@ fn map_to_status(error: anyhow::Error) -> zx::Status {
 #[cfg(test)]
 mod tests {
     use super::{map_to_status, Component};
+    use block_client::{BlockClient, BufferSlice, MutableBufferSlice, RemoteBlockClient};
     use fake_block_server::FakeServer;
     use fidl::endpoints::RequestStream;
     use fidl_fuchsia_fs_startup::{
@@ -709,7 +710,6 @@ mod tests {
     use fuchsia_component::client::{
         connect_to_named_protocol_at_dir_root, connect_to_protocol_at_dir_svc,
     };
-    use remote_block_device::{BlockClient, BufferSlice, MutableBufferSlice, RemoteBlockClient};
     use std::sync::Arc;
     use {
         fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_hardware_block_volume as fvolume,

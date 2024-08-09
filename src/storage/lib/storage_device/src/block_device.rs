@@ -7,8 +7,8 @@ use crate::buffer_allocator::{BufferAllocator, BufferSource};
 use crate::Device;
 use anyhow::{bail, ensure, Error};
 use async_trait::async_trait;
+use block_client::{BlockClient, BlockFlags, BufferSlice, MutableBufferSlice, VmoId};
 use fuchsia_zircon::Status;
-use remote_block_device::{BlockClient, BlockFlags, BufferSlice, MutableBufferSlice, VmoId};
 use std::ops::Range;
 
 /// BlockDevice is an implementation of Device backed by a real block device behind a FIFO.
@@ -128,8 +128,8 @@ impl Drop for BlockDevice {
 mod tests {
     use crate::block_device::BlockDevice;
     use crate::Device;
+    use block_client::testing::FakeBlockClient;
     use fuchsia_zircon::Status;
-    use remote_block_device::testing::FakeBlockClient;
 
     #[fuchsia::test]
     async fn test_lifecycle() {
