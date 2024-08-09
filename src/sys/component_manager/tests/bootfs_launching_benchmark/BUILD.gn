@@ -151,6 +151,12 @@ if (current_toolchain == default_toolchain) {
     foreach(i, number_of_components_list) {
       deps += [ ":component-manager-cmp-${i}" ]
     }
+
+    # We don't want to include the product bundle in build outputs.
+    metadata = {
+      product_bundles_barrier = []
+      images_barrier = []
+    }
   }
 
   component_config("config") {
