@@ -1,5 +1,16 @@
 [
     {
+        tag: 'wlanstack-last-pulse',
+        service_name: 'wlan',
+        max_bytes: 500,
+        min_seconds_between_fetch: 60,
+        selectors: [
+            'INSPECT:bootstrap/driver_manager:root/usme/last_pulse/status:status_str',
+            'INSPECT:bootstrap/driver_manager:root/usme/last_pulse:last_link_up',
+            'INSPECT:bootstrap/driver_manager:root/usme/last_pulse:last_updated',
+        ],
+    },
+    {
         tag: 'wlancfg-client-stats-counters',
         service_name: 'wlan',
         max_bytes: 1200,
