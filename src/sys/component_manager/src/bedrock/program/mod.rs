@@ -40,6 +40,51 @@ pub struct Program {
     namespace_scope: ExecutionScope,
 }
 
+/// Everything about a stopped execution.
+#[derive(Debug)]
+pub struct StopConclusion {
+    /// How the execution was stopped.
+    pub disposition: StopDisposition,
+
+    /// Optional escrow request sent by the component.
+    pub escrow_request: Option<EscrowRequest>,
+
+    /// Other optional information such as exit code.
+    pub stop_info: Option<StopInfo>,
+}
+
+/// [`StopDisposition`] describes how the execution was stopped, e.g. did it timeout.
+#[derive(Debug, PartialEq, Copy, Clone)]
+pub enum StopDisposition {
+    /// The component did not stop in time, but was killed before the kill
+    /// timeout. Additionally contains a status from the runner.
+    Killed(zx::Status),
+
+    /// The component did not stop in time and was killed after the kill
+    /// timeout was reached.
+    KilledAfterTimeout,
+
+    /// The component had no Controller, no request was sent, and therefore no
+    /// error occurred in the stop process.
+    NoController,
+
+    /// The component stopped within the timeout. Note that in this case a
+    /// component may also have stopped on its own without the framework asking.
+    /// Additionally contains a status from the runner.
+    Stopped(zx::Status),
+}
+
+impl StopDisposition {
+    pub fn status(&self) -> zx::Status {
+        match self {
+            StopDisposition::Killed(status) => *status,
+            StopDisposition::KilledAfterTimeout => zx::Status::TIMED_OUT,
+            StopDisposition::NoController => zx::Status::OK,
+            StopDisposition::Stopped(status) => *status,
+        }
+    }
+}
+
 impl Program {
     /// Starts running a program using the `runner`.
     ///
@@ -104,12 +149,14 @@ impl Program {
     /// before the program stops, then the program is killed.
     ///
     /// Returns an error if the program could not be killed within the `kill_timer` timeout.
+    ///
+    /// Reaps any escrow request and stop information sent by the component.
     pub async fn stop_or_kill_with_timeout<'a, 'b>(
-        &self,
+        self,
         stop_timer: BoxFuture<'a, ()>,
         kill_timer: BoxFuture<'b, ()>,
-    ) -> Result<ComponentStopOutcome, StopError> {
-        let outcome = match self.stop_with_timeout(stop_timer).await {
+    ) -> Result<StopConclusion, StopError> {
+        let disposition = match self.stop_with_timeout(stop_timer).await {
             Some(r) => r,
             None => {
                 // We must have hit the stop timeout because calling stop didn't return
@@ -119,16 +166,17 @@ impl Program {
         }?;
         self.namespace_scope.shutdown();
         self.namespace_scope.wait().await;
-        Ok(outcome)
+        let FinalizedProgram { escrow_request, stop_info } = self.finalize();
+        Ok(StopConclusion { disposition, escrow_request, stop_info })
     }
 
     /// Stops the program or returns early if the operation times out.
     ///
     /// Returns None on timeout, when `stop_timer` returns a value before the program terminates.
-    pub async fn stop_with_timeout<'a>(
+    async fn stop_with_timeout<'a>(
         &self,
         stop_timer: BoxFuture<'a, ()>,
-    ) -> Option<Result<ComponentStopOutcome, StopError>> {
+    ) -> Option<Result<StopDisposition, StopError>> {
         // Ask the controller to stop the component
         if let Err(err) = self.stop() {
             return Some(Err(err));
@@ -140,20 +188,19 @@ impl Program {
         // Wait for either the timer to fire or the channel to close
         match futures::future::select(stop_timer, channel_close).await {
             Either::Left(((), _channel_close)) => None,
-            Either::Right((_timer, _close_result)) => Some(Ok(ComponentStopOutcome {
-                request: StopRequestSuccess::Stopped,
-                component_exit_status: self.on_terminate().await,
-            })),
+            Either::Right((_timer, _close_result)) => {
+                Some(Ok(StopDisposition::Stopped(self.on_terminate().await)))
+            }
         }
     }
 
     /// Kills the program or returns early if the operation times out.
     ///
     /// Returns None on timeout, when `kill_timer` returns a value before the program terminates.
-    pub async fn kill_with_timeout<'a>(
+    async fn kill_with_timeout<'a>(
         &self,
         kill_timer: BoxFuture<'a, ()>,
-    ) -> Result<ComponentStopOutcome, StopError> {
+    ) -> Result<StopDisposition, StopError> {
         self.kill()?;
 
         // Wait for the controller to close the channel
@@ -161,20 +208,17 @@ impl Program {
 
         // If the control channel closes first, report the component to be
         // kill "normally", otherwise report it as killed after timeout.
-        match futures::future::select(kill_timer, channel_close).await {
-            Either::Left(((), _channel_close)) => Ok(ComponentStopOutcome {
-                request: StopRequestSuccess::KilledAfterTimeout,
-                component_exit_status: zx::Status::TIMED_OUT,
-            }),
-            Either::Right((_timer, _close_result)) => Ok(ComponentStopOutcome {
-                request: StopRequestSuccess::Killed,
-                component_exit_status: self.on_terminate().await,
-            }),
-        }
+        let disposition = match futures::future::select(kill_timer, channel_close).await {
+            Either::Left(((), _channel_close)) => StopDisposition::KilledAfterTimeout,
+            Either::Right((_timer, _close_result)) => {
+                StopDisposition::Killed(self.on_terminate().await)
+            }
+        };
+        Ok(disposition)
     }
 
     /// Drops the program and returns state that the program has escrowed, if any.
-    pub fn finalize(self) -> FinalizedProgram {
+    fn finalize(self) -> FinalizedProgram {
         let Program { controller, .. } = self;
         let (escrow_request, stop_info) = controller.finalize();
         FinalizedProgram { escrow_request, stop_info }
@@ -196,39 +240,6 @@ impl Program {
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
         Program { controller, runtime_dir, namespace_scope: ExecutionScope::new() }
     }
-}
-
-#[derive(Debug, PartialEq)]
-/// Represents the result of a request to stop a component, which has two
-/// pieces. There is what happened to sending the request over the FIDL
-/// channel to the controller and then what the exit status of the component
-/// is. For example, the component might have exited with error before the
-/// request was sent, in which case we encountered no error processing the stop
-/// request and the component is considered to have terminated abnormally.
-pub struct ComponentStopOutcome {
-    /// The result of the request to stop the component.
-    pub request: StopRequestSuccess,
-    /// The final status of the component.
-    pub component_exit_status: zx::Status,
-}
-
-#[derive(Debug, PartialEq)]
-/// Outcomes of the stop request that are considered success. A request success
-/// indicates that the request was sent without error over the
-/// ComponentController channel or that sending the request was not necessary
-/// because the component stopped previously.
-pub enum StopRequestSuccess {
-    /// The component did not stop in time, but was killed before the kill
-    /// timeout.
-    Killed,
-    /// The component did not stop in time and was killed after the kill
-    /// timeout was reached.
-    KilledAfterTimeout,
-    /// The component had no Controller, no request was sent, and therefore no
-    /// error occurred in the send process.
-    NoController,
-    /// The component stopped within the timeout.
-    Stopped,
 }
 
 /// Information and capabilities used to start a program.
@@ -366,7 +377,7 @@ impl From<fcrunner::ComponentStopInfo> for StopInfo {
 }
 
 #[derive(Debug, Default)]
-pub struct FinalizedProgram {
+struct FinalizedProgram {
     pub escrow_request: Option<EscrowRequest>,
     pub stop_info: Option<StopInfo>,
 }
@@ -412,10 +423,10 @@ pub mod tests {
             let timer = fasync::Timer::new(fasync::Time::after(kill_timeout));
             timer.await;
         });
+        let program_koid = program.koid();
         match program.stop_or_kill_with_timeout(stop_timer, kill_timer).await {
-            Ok(ComponentStopOutcome {
-                request: StopRequestSuccess::Stopped,
-                component_exit_status: zx::Status::OK,
+            Ok(StopConclusion {
+                disposition: StopDisposition::Stopped(zx::Status::OK), ..
             }) => {}
             Ok(result) => {
                 panic!("unexpected successful stop result {:?}", result);
@@ -426,7 +437,7 @@ pub mod tests {
         }
 
         let msg_map = requests.lock().await;
-        let msg_list = msg_map.get(&program.koid()).expect("No messages received on the channel");
+        let msg_list = msg_map.get(&program_koid).expect("No messages received on the channel");
 
         // The controller should have only seen a STOP message since it stops
         // the component immediately.
@@ -453,9 +464,9 @@ pub mod tests {
         // Drop the server end so it closes
         drop(server);
         match program.stop_or_kill_with_timeout(stop_timer, kill_timer).await {
-            Ok(ComponentStopOutcome {
-                request: StopRequestSuccess::Stopped,
-                component_exit_status: zx::Status::PEER_CLOSED,
+            Ok(StopConclusion {
+                disposition: StopDisposition::Stopped(zx::Status::PEER_CLOSED),
+                ..
             }) => {}
             Ok(result) => {
                 panic!("unexpected successful stop result {:?}", result);
@@ -503,6 +514,7 @@ pub mod tests {
             let timer = fasync::Timer::new(fasync::Time::after(kill_timeout));
             timer.await;
         });
+        let program_koid = program.koid();
         let mut stop_future = Box::pin(program.stop_or_kill_with_timeout(stop_timer, kill_timer));
 
         // Poll the stop component future to where it has asked the controller
@@ -520,9 +532,9 @@ pub mod tests {
         // The controller channel should be closed so we can drive the stop
         // future to completion.
         match exec.run_until_stalled(&mut stop_future) {
-            Poll::Ready(Ok(ComponentStopOutcome {
-                request: StopRequestSuccess::Stopped,
-                component_exit_status: zx::Status::OK,
+            Poll::Ready(Ok(StopConclusion {
+                disposition: StopDisposition::Stopped(zx::Status::OK),
+                ..
             })) => {}
             Poll::Ready(Ok(result)) => {
                 panic!("unexpected successful stop result {:?}", result);
@@ -538,8 +550,7 @@ pub mod tests {
         // Check that what we expect to be in the message map is there.
         let mut test_fut = Box::pin(async {
             let msg_map = requests.lock().await;
-            let msg_list =
-                msg_map.get(&program.koid()).expect("No messages received on the channel");
+            let msg_list = msg_map.get(&program_koid).expect("No messages received on the channel");
 
             // The controller should have only seen a STOP message since it stops
             // the component before the timeout is hit.
@@ -589,6 +600,7 @@ pub mod tests {
             let timer = fasync::Timer::new(fasync::Time::after(kill_timeout));
             timer.await;
         });
+        let program_koid = program.koid();
         let mut stop_fut = Box::pin(program.stop_or_kill_with_timeout(stop_timer, kill_timer));
 
         // The stop fn has sent the stop message and is now waiting for a response
@@ -598,8 +610,7 @@ pub mod tests {
         let mut check_msgs = Box::pin(async {
             // Check if the mock controller got all the messages we expected it to get.
             let msg_map = requests.lock().await;
-            let msg_list =
-                msg_map.get(&program.koid()).expect("No messages received on the channel");
+            let msg_list = msg_map.get(&program_koid).expect("No messages received on the channel");
             assert_eq!(msg_list, &vec![ControlMessage::Stop]);
         });
         assert!(exec.run_until_stalled(&mut check_msgs).is_ready());
@@ -626,8 +637,7 @@ pub mod tests {
         let mut check_msgs = Box::pin(async {
             // Check if the mock controller got all the messages we expected it to get.
             let msg_map = requests.lock().await;
-            let msg_list =
-                msg_map.get(&program.koid()).expect("No messages received on the channel");
+            let msg_list = msg_map.get(&program_koid).expect("No messages received on the channel");
             assert_eq!(msg_list, &vec![ControlMessage::Stop, ControlMessage::Kill]);
         });
         assert!(exec.run_until_stalled(&mut check_msgs).is_ready());
@@ -641,16 +651,11 @@ pub mod tests {
         // The stop fn should have given up and returned a result
         assert_matches!(
             exec.run_until_stalled(&mut stop_fut),
-            Poll::Ready(Ok(ComponentStopOutcome {
-                request: StopRequestSuccess::KilledAfterTimeout,
-                component_exit_status: zx::Status::TIMED_OUT,
+            Poll::Ready(Ok(StopConclusion {
+                disposition: StopDisposition::KilledAfterTimeout,
+                escrow_request: None,
+                stop_info: None,
             }))
-        );
-
-        drop(stop_fut);
-        assert_matches!(
-            program.finalize(),
-            FinalizedProgram { escrow_request: None, stop_info: None }
         );
     }
 
@@ -715,16 +720,11 @@ pub mod tests {
         // controller's future was not polled to completion.
         assert_matches!(
             exec.run_until_stalled(&mut stop_fut),
-            Poll::Ready(Ok(ComponentStopOutcome {
-                request: StopRequestSuccess::Killed,
-                component_exit_status: zx::Status::OK
+            Poll::Ready(Ok(StopConclusion {
+                disposition: StopDisposition::Killed(zx::Status::OK),
+                escrow_request: None,
+                stop_info: None,
             }))
-        );
-
-        drop(stop_fut);
-        assert_matches!(
-            program.finalize(),
-            FinalizedProgram { escrow_request: None, stop_info: None }
         );
     }
 
@@ -771,6 +771,7 @@ pub mod tests {
             timer.await;
         });
         let epitaph_fut = program.on_terminate();
+        let program_koid = program.koid();
         let mut stop_fut = Box::pin(program.stop_or_kill_with_timeout(stop_timer, kill_timer));
 
         // it should be the case we stall waiting for a response from the
@@ -790,8 +791,7 @@ pub mod tests {
             epitaph_fut.await;
 
             let msg_map = requests.lock().await;
-            let msg_list =
-                msg_map.get(&program.koid()).expect("No messages received on the channel");
+            let msg_list = msg_map.get(&program_koid).expect("No messages received on the channel");
 
             assert_eq!(msg_list, &vec![ControlMessage::Stop]);
         });
@@ -806,16 +806,11 @@ pub mod tests {
         // happening after its timeout expired.
         assert_matches!(
             exec.run_until_stalled(&mut stop_fut),
-            Poll::Ready(Ok(ComponentStopOutcome {
-                request: StopRequestSuccess::Killed,
-                component_exit_status: zx::Status::OK
+            Poll::Ready(Ok(StopConclusion {
+                disposition: StopDisposition::Killed(zx::Status::OK),
+                escrow_request: None,
+                stop_info: None,
             }))
-        );
-
-        drop(stop_fut);
-        assert_matches!(
-            program.finalize(),
-            FinalizedProgram { escrow_request: None, stop_info: None }
         );
     }
 

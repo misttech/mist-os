@@ -5,7 +5,7 @@
 pub mod instance;
 pub mod manager;
 
-use crate::bedrock::program::StopRequestSuccess;
+use crate::bedrock::program::{StopConclusion, StopDisposition};
 use crate::framework::controller;
 use crate::model::actions::{
     start, ActionsManager, DestroyAction, ResolveAction, ShutdownAction, ShutdownType, StartAction,
@@ -41,7 +41,7 @@ use futures::lock::{MappedMutexGuard, Mutex, MutexGuard};
 use hooks::{Event, EventPayload, Hooks};
 use instance::{
     InstanceState, ResolvedInstanceState, ShutdownInstanceState, StartedInstanceState,
-    StopConclusion, UnresolvedInstanceState,
+    UnresolvedInstanceState,
 };
 use manager::ComponentManagerInstance;
 use moniker::{ChildName, Moniker};
@@ -662,8 +662,8 @@ impl ComponentInstance {
                     .stop(stop_timer, kill_timer)
                     .await
                     .map_err(StopActionError::ProgramStopError)?;
-                if ret.outcome.request == StopRequestSuccess::KilledAfterTimeout
-                    || ret.outcome.request == StopRequestSuccess::Killed
+                if matches!(ret.disposition, StopDisposition::KilledAfterTimeout)
+                    || matches!(ret.disposition, StopDisposition::Killed(_))
                 {
                     warn!(
                         "component {} did not stop in {:?}. Killed it.",
@@ -702,7 +702,7 @@ impl ComponentInstance {
             .await
             .map_err(|err| StopActionError::DestroyDynamicChildrenFailed { err: Box::new(err) })?;
 
-        if let Some((StopConclusion { outcome, escrow_request, stop_info }, start_time)) =
+        if let Some((StopConclusion { disposition, escrow_request, stop_info }, start_time)) =
             stop_result
         {
             let requested_escrow = escrow_request.is_some();
@@ -719,7 +719,7 @@ impl ComponentInstance {
 
             let stop_time = zx::Time::get_monotonic();
             let event = self.new_event(EventPayload::Stopped {
-                status: outcome.component_exit_status,
+                status: disposition.status(),
                 exit_code: stop_info.map(|info| info.exit_code).flatten(),
                 stop_time,
                 execution_duration: stop_time - start_time,

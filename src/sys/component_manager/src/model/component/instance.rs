@@ -2,9 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::bedrock::program::{
-    self as program, ComponentStopOutcome, FinalizedProgram, Program, StopRequestSuccess,
-};
+use crate::bedrock::program::{Program, StopConclusion, StopDisposition};
 use crate::framework::{build_framework_dictionary, controller};
 use crate::model::actions::{shutdown, StopAction};
 use crate::model::component::{
@@ -1106,12 +1104,6 @@ struct ProgramRuntime {
     exit_listener: fasync::Task<()>,
 }
 
-pub struct StopConclusion {
-    pub outcome: ComponentStopOutcome,
-    pub escrow_request: Option<program::EscrowRequest>,
-    pub stop_info: Option<program::StopInfo>,
-}
-
 impl ProgramRuntime {
     pub fn new(program: Program, component: WeakComponentInstance) -> Self {
         let terminated_fut = program.on_terminate();
@@ -1134,7 +1126,6 @@ impl ProgramRuntime {
         stop_timer: BoxFuture<'a, ()>,
         kill_timer: BoxFuture<'b, ()>,
     ) -> Result<StopConclusion, StopError> {
-        let outcome = self.program.stop_or_kill_with_timeout(stop_timer, kill_timer).await;
         // Drop the program and join on the exit listener. Dropping the program
         // should cause the exit listener to stop waiting for the channel epitaph and
         // exit.
@@ -1143,10 +1134,9 @@ impl ProgramRuntime {
         // even after cancellation future may still run for a short period of time
         // before getting dropped. If that happens there is a chance of scheduling a
         // duplicate Stop action.
-        let FinalizedProgram { escrow_request, stop_info } = self.program.finalize();
+        let res = self.program.stop_or_kill_with_timeout(stop_timer, kill_timer).await;
         self.exit_listener.await;
-        let outcome = outcome?;
-        Ok(StopConclusion { outcome, escrow_request, stop_info })
+        res
     }
 }
 
@@ -1220,17 +1210,13 @@ impl StartedInstanceState {
             program.stop(stop_timer, kill_timer).await
         } else {
             Ok(StopConclusion {
-                outcome: ComponentStopOutcome {
-                    request: StopRequestSuccess::NoController,
-                    component_exit_status: zx::Status::OK,
-                },
+                disposition: StopDisposition::NoController,
                 escrow_request: None,
                 stop_info: None,
             })
         }?;
         if let Some(execution_controller_task) = self.execution_controller_task.as_mut() {
-            execution_controller_task
-                .set_stop_payload(ret.outcome.component_exit_status, ret.stop_info);
+            execution_controller_task.set_stop_payload(ret.disposition.status(), ret.stop_info);
         }
         Ok(ret)
     }
