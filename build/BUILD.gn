@@ -130,6 +130,11 @@ group("non_hermetic_deps") {
   # Unit tests for the ffx e2e library make their own amber-files to test universe package resolve.
   visibility += [ "//src/developer/ffx/lib/e2e_emu:*" ]
 
+  # e2e test using e2e_emu for ffx power system-activity application-activity.
+  visibility += [
+    "//src/developer/ffx/tools/power/system-activity/application-activity:*",
+  ]
+
   # This tests accesses `out/<build_dir_name>.json` at runtime.
   # See https://fxbug.dev/352511300
   visibility += [ "//src/developer/ffx/tests/mw-goldens:gen_schema_files" ]

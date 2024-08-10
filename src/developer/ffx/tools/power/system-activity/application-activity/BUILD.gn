@@ -3,6 +3,13 @@
 # found in the LICENSE file.
 
 import("//src/developer/ffx/build/ffx_plugin.gni")
+import("//src/developer/ffx/lib/e2e_emu/ffx_e2e_test.gni")
+
+import("//build/assembly/assembled_system.gni")
+import("//build/assembly/board_configuration.gni")
+import("//build/assembly/generated_partitions_config.gni")
+import("//build/assembly/product_assembly_configuration.gni")
+import("//build/sdk/product_bundle.gni")
 
 ffx_plugin("ffx_power_system_activity_application_activity") {
   version = "0.1.0"
@@ -18,4 +25,81 @@ ffx_plugin("ffx_power_system_activity_application_activity") {
 
   args_sources = [ "src/args.rs" ]
   args_with_unit_tests = true
+}
+
+if (is_host) {
+  group("host_tests") {
+    testonly = true
+    if (has_board) {
+      deps = [ ":ffx_power_system_activity_application_activity_e2e_tests" ]
+    }
+  }
+
+  if (has_board) {
+    ffx_e2e_test("ffx_power_system_activity_application_activity_e2e_tests") {
+      edition = "2021"
+      source_root = "tests/e2e.rs"
+      sources = [ source_root ]
+
+      product_bundle = ":product_bundle($default_toolchain)"
+
+      deps = [
+        "//src/developer/ffx/tools/power:ffx_power_test_data",
+        "//src/lib/diagnostics/data",
+        "//src/lib/fuchsia",
+        "//third_party/rust_crates:serde_json",
+      ]
+    }
+  }
+}
+
+if (is_fuchsia && has_board) {
+  files = {
+    partitions_config = "$target_out_dir/partitions/partitions_config.json"
+    outdir = target_out_dir + "/fuchsia"
+    images_json = "${outdir}/images.json"
+  }
+
+  product_bundle("product_bundle") {
+    testonly = true
+    name = "application-activity-test"
+
+    partitions = files.partitions_config
+    system_a = files.images_json
+
+    # Add the virtual device.
+    virtual_devices = [ "$root_build_dir/virtual_device_recommended.json" ]
+
+    deps = [
+      ":assembly",
+      ":partitions_config",
+      "//build/virtual-devices:virtual_device_specification_recommended",
+    ]
+  }
+
+  assembled_system("assembly") {
+    testonly = true
+    image_name = "fuchsia"
+
+    generate_fxfs = true
+    generate_vbmeta = true
+    board_config_label = board_configuration_label
+    product_assembly_config_label = ":product_assembly_config"
+  }
+
+  generated_partitions_config("partitions_config") {
+    testonly = true
+    output_path = get_path_info(files.partitions_config, "dir")
+    hw_revision = board_name
+  }
+
+  product_assembly_configuration("product_assembly_config") {
+    testonly = true
+    platform = {
+      build_type = "eng"
+      power = {
+        suspend_enabled = true
+      }
+    }
+  }
 }
