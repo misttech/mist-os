@@ -70,29 +70,8 @@ const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& FakeDisplayStack
 }
 
 fidl::ClientEnd<fuchsia_sysmem2::Allocator> FakeDisplayStack::ConnectToSysmemAllocatorV2() {
-  // The directory exposed by `sysmem_` is its root directory. First we need to
-  // open the `/svc` directory where the services are located.
-  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> sysmem_root_dir_result =
-      sysmem_service_provider_->GetOutgoingDirectory();
-  if (sysmem_root_dir_result.is_error()) {
-    ZX_PANIC("GetOutgoingDirectory failed: %s", sysmem_root_dir_result.status_string());
-  }
-  fidl::ClientEnd<fuchsia_io::Directory> sysmem_root_dir_client =
-      std::move(sysmem_root_dir_result).value();
-
-  auto [sysmem_svc_dir_client, sysmem_svc_dir_server] =
-      fidl::Endpoints<fuchsia_io::Directory>::Create();
-  zx_status_t status = fdio_open_at(sysmem_root_dir_client.handle()->get(), "/svc",
-                                    static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                                    std::move(sysmem_svc_dir_server).TakeChannel().release());
-  if (status != ZX_OK) {
-    ZX_PANIC("Failed to open /svc directory of sysmem's outgoing directory: %s",
-             zx_status_get_string(status));
-  }
-
   zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> connect_allocator_result =
-      component::ConnectAtMember<fuchsia_hardware_sysmem::Service::AllocatorV2>(
-          sysmem_svc_dir_client);
+      sysmem_service_provider_->ConnectAllocator2();
   if (connect_allocator_result.is_error()) {
     ZX_PANIC("Failed to connect to sysmem Allocator service: %s",
              connect_allocator_result.status_string());

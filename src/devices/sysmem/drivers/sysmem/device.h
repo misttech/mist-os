@@ -291,6 +291,7 @@ class Device final : public fdf::DriverBase,
   // public for tests
   mutable std::optional<async::synchronization_checker> driver_checker_;
   mutable std::optional<async::synchronization_checker> loop_checker_;
+  fidl::ServerBindingGroup<fuchsia_hardware_sysmem::Sysmem>& BindingsForTest() { return bindings_; }
 
  private:
   class SecureMemConnection {
@@ -459,9 +460,6 @@ class Device final : public fdf::DriverBase,
 
   // std::optional<> so we can init on the loop_ thread
   std::optional<component::OutgoingDirectory> outgoing_ __TA_GUARDED(*loop_checker_);
-
-  // This is for tests, at least until MockDdk supports a driver's outgoing dir directly.
-  fidl::ClientEnd<fuchsia_io::Directory> outgoing_dir_client_for_tests_;
 
   fidl::ServerBindingGroup<fuchsia_device_fs::Connector> devfs_connector_;
   fidl::ServerBindingGroup<fuchsia_hardware_sysmem::DriverConnector> driver_connectors_;

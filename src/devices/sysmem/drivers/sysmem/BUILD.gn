@@ -122,12 +122,12 @@ source_set("sysmem_common_srcs") {
     "//zircon/system/ulib/sysmem-version",
     "//zircon/system/ulib/trace",
     "//zircon/system/ulib/zx",
+    "//zircon/third_party/ulib/safemath",
   ]
 
   deps = [
     "//zircon/system/ulib/image-format",
     "//zircon/system/ulib/region-alloc",
-    "//zircon/third_party/ulib/safemath",
   ]
 }
 

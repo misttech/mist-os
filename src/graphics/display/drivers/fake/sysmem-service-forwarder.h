@@ -6,18 +6,17 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_SYSMEM_SERVICE_FORWARDER_H_
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
-#include <fidl/fuchsia.io/cpp/fidl.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/zx/result.h>
 
 #include "src/graphics/display/drivers/fake/sysmem-service-provider.h"
 
 namespace display {
 
-// Forwards the sysmem protocol from the component's incoming service
-// directory to the [`fuchsia.hardware.sysmem/Service`] service served on the
-// forwarder's outgoing service directory.
+// Forwards the following sysmem protocols from the component's incoming service
+// directory to the forwarder's outgoing service directory:
+// - [`fuchsia.sysmem/Allocator`]
+// - [`fuchsia.sysmem2/Allocator`]
+// - [`fucshia.hardware.sysmem/Sysmem`]
 class SysmemServiceForwarder : public SysmemServiceProvider {
  public:
   // Factory method for production use.
@@ -36,21 +35,12 @@ class SysmemServiceForwarder : public SysmemServiceProvider {
   zx::result<> Initialize();
 
   // SysmemServiceProvider:
-  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> GetOutgoingDirectory() override;
+  zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> ConnectAllocator() override;
+  zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> ConnectAllocator2() override;
+  zx::result<fidl::ClientEnd<fuchsia_hardware_sysmem::Sysmem>> ConnectHardwareSysmem() override;
 
  private:
-  // The reteurned instance handler must be used only when the
-  // `SysmemServiceForwarder` instance is alive.
-  fuchsia_hardware_sysmem::Service::InstanceHandler CreateSysmemServiceInstanceHandler() const;
-
-  // Serves the outgoing services. Must outlive `outgoing_`.
-  async::Loop loop_;
-
-  // Must be created, called and destroyed on `loop_`.
-  std::optional<component::OutgoingDirectory> outgoing_;
-
   fidl::ClientEnd<fuchsia_io::Directory> component_incoming_root_;
-  fidl::ClientEnd<fuchsia_io::Directory> forwarder_outgoing_root_;
 };
 
 }  // namespace display
