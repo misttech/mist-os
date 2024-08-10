@@ -5599,7 +5599,19 @@ Example:
    }
  ]
 
-**Current value (from the default):** `[]`
+**Current value for `target_cpu = "arm64"`:** `[]`
+
+From //out/not-default/args.gn:30
+
+**Overridden from the default:** `[]`
+
+From //build/assembly/developer_overrides.gni:372
+
+**Current value for `target_cpu = "x64"`:** `[]`
+
+From //out/not-default/args.gn:30
+
+**Overridden from the default:** `[]`
 
 From //build/assembly/developer_overrides.gni:372
 
@@ -7089,16 +7101,18 @@ The overall mode for RBE to be operating in.  The valid values are:
                        remote services.
  * 'cloudtop' => An RBE configuration that's optimized for running on a
                  cloudtop. Suitable for high-bandwidth connections to
-                 remote services.
- * 'infra' => The RBE configuration used by CI/CQ bots. Also high-bandwidth.
+                 remote services and downloading remote outputs.
+ * 'infra' => The RBE configuration recommended for CI/CQ bots.
+              Also uses high-bandwidth.
  * 'remote_cache_only' => Use RBE only as a remote-cache: on cache-miss,
                           execute locally instead of remotely.
- * 'low_bandwidth' => An RBE configuration for developers that have a
-                      powerful workstations, but low bandwidth.
+ * 'low_bandwidth_remote' => An RBE configuration for low network bandwidth.
+                             Saves bandwidth by avoiding downloading some
+                             intermediate results.
 
 **Current value (from the default):** `"off"`
 
-From //build/toolchain/rbe_modes.gni:34
+From //build/toolchain/rbe_modes.gni:36
 
 ### rbe_settings_overrides
 
@@ -7107,7 +7121,7 @@ variables whose default values are set by the chosen RBE mode (above).
 
 **Current value (from the default):** `{ }`
 
-From //build/toolchain/rbe_modes.gni:38
+From //build/toolchain/rbe_modes.gni:40
 
 ### recovery_board_configuration_label
 
