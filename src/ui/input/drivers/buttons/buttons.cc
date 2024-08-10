@@ -168,31 +168,8 @@ zx::result<> Buttons::Start() {
     gpios[i].config = metadata_config->gpios[i];
   }
 
-  std::optional<fidl::WireSyncClient<fuchsia_input_interaction_observation::Aggregator>>
-      aggregator_client;
-  if (config_.suspend_enabled()) {
-    auto aggregator_result =
-        incoming()->Connect<fuchsia_input_interaction_observation::Aggregator>();
-    if (aggregator_result.is_ok() && aggregator_result->is_valid()) {
-      auto client = fidl::WireSyncClient(std::move(aggregator_result.value()));
-      if (client.is_valid()) {
-        aggregator_client.emplace(std::move(client));
-      } else {
-        FDF_LOG(
-            ERROR,
-            "Failed to create FIDL client for fuchsia.input.interaction.observation; system may incorrectly enter suspend.");
-      }
-    } else {
-      FDF_LOG(
-          ERROR,
-          "Failed to connect to fuchsia.input.interaction.observation.Aggregator: %s; system may incorrectly enter suspend.",
-          aggregator_result.status_string());
-    }
-  }
-
   device_ = std::make_unique<buttons::ButtonsDevice>(
-      dispatcher(), std::move(metadata_config->buttons), std::move(gpios),
-      InputIntegration(std::move(aggregator_client)));
+      dispatcher(), std::move(metadata_config->buttons), std::move(gpios));
 
   auto result = outgoing()->component().AddUnmanagedProtocol<fuchsia_input_report::InputDevice>(
       input_report_bindings_.CreateHandler(device_.get(), dispatcher(),

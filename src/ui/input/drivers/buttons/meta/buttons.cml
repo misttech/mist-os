@@ -18,16 +18,5 @@
                 "fuchsia.hardware.gpio.Service",
             ],
         },
-        {
-            from: "parent",
-            default: false,
-            config: "fuchsia.power.SuspendEnabled",
-            key: "suspend_enabled",
-            type: "bool",
-            availability: "transitional",
-        },
-        {
-            protocol: [ "fuchsia.input.interaction.observation.Aggregator" ],
-        },
     ],
 }
