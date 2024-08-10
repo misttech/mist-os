@@ -41,6 +41,9 @@ const (
 	// We'll fall back to using this build dir if neither `fx --dir` nor `fx set
 	// --auto-dir` is specified.
 	defaultBuildDir = "out/default"
+
+	// When unspecified, this is used for --rbe-mode.
+	defaultRbeMode = "auto"
 )
 
 type subprocessRunner interface {
@@ -169,6 +172,10 @@ type setArgs struct {
 	noCcache  bool
 	ccacheDir string
 
+	// rbeMode selects a preset of RBE configurations.
+	// see build/toolchain/rbe_modes.gni.
+	rbeMode string
+
 	enableRustRbe bool
 
 	enableLinkRbe  bool
@@ -228,6 +235,7 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 	flagSet.BoolVar(&cmd.noCcache, "no-ccache", false, "")
 	flagSet.BoolVar(&cmd.includeClippy, "include-clippy", true, "")
 
+	flagSet.StringVar(&cmd.rbeMode, "rbe-mode", defaultRbeMode, "")
 	flagSet.BoolVar(&cmd.enableRustRbe, "rust-rbe", false, "")
 	flagSet.BoolVar(&cmd.enableCxxRbe, "cxx-rbe", false, "")
 	flagSet.BoolVar(&cmd.disableCxxRbe, "no-cxx-rbe", false, "")
@@ -323,6 +331,7 @@ func parseArgsAndEnv(args []string, env map[string]string) (*setArgs, error) {
 	return cmd, nil
 }
 
+// rbeIsSupported returns true if the RBE is supported on the current platform.
 func rbeIsSupported() bool {
 	return (runtime.GOOS == "linux") && (runtime.GOARCH == "amd64")
 }
@@ -350,9 +359,18 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 		variants = append(variants, fuzzerVariants(sanitizer)...)
 	}
 
-	// Check for RBE eligibility.
 	rbeSupported := rbeIsSupported()
-	requestedAnyRbe := args.enableCxxRbe || args.enableRustRbe || args.enableLinkRbe || args.enableBazelRbe
+	rbeMode := args.rbeMode
+	if rbeMode == "auto" {
+		if rbeSupported && canUseRbe {
+			rbeMode = "legacy_default" // subject to change
+		} else {
+			rbeMode = "off"
+		}
+	}
+
+	// Check for RBE eligibility.
+	requestedAnyRbe := rbeMode != "off" || args.enableCxxRbe || args.enableRustRbe || args.enableLinkRbe || args.enableBazelRbe
 	if requestedAnyRbe {
 		if !rbeSupported {
 			return nil, fmt.Errorf("Sorry, RBE is only supported on linux-x64 at this time.")
@@ -404,6 +422,10 @@ func constructStaticSpec(ctx context.Context, fx fxRunner, checkoutDir string, a
 	if useCcacheFinal {
 		gnArgs = append(gnArgs, "use_ccache=true")
 	}
+
+	// Always write out rbe_mode, even if it is the default "off".
+	// This makes it easier for users to `fx args` and edit.
+	gnArgs = append(gnArgs, fmt.Sprintf("rbe_mode=\"%s\"", rbeMode))
 
 	// fint already translates the *_rbe_enable variables into GN args.
 
@@ -488,10 +510,14 @@ func allEnvVars() map[string]string {
 	return env
 }
 
+// canAccessRbe returns true if there is evidence from the user's environment
+// and source checkout that suggests they have RBE access privileges.
+// Note: This is not perfect because it does not actually check against ACL
+// but it avoids the problem of external developers accidentally
+// configuring use of RBE.
+// TODO(b/356896318): distinguish between cache-reading and remote execution
+// privileges.
 func canAccessRbe(checkoutDir string) (bool, error) {
-	// Note: This is not perfect because it does not actually check against ACL
-	// but it avoids the problem of external developers accidentally
-	// configuring use of RBE.
 	cmd := exec.Command("git", "remote", "-v")
 	cmd.Dir = checkoutDir + "/integration"
 	out, err := cmd.Output()
