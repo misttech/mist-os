@@ -23,12 +23,14 @@ int main() {
   fuchsia_driver_test::wire::RealmArgs args(arena);
   args.set_root_driver(arena,
                        fidl::StringView("fuchsia-boot:///platform-bus#meta/platform-bus.cm"));
-  fuchsia_driver_test::wire::Expose expose{
-      .service_name = fidl::StringView("fuchsia.hardware.ramdisk.Service"),
-      .collection = fuchsia_driver_test::wire::Collection::kBootDrivers,
-  };
-  args.set_exposes(fidl::ObjectView(
-      arena, fidl::VectorView<fuchsia_driver_test::wire::Expose>::FromExternal(&expose, 1)));
+
+  auto expose = fuchsia_component_test::wire::Capability::WithService(
+      arena, fuchsia_component_test::wire::Service::Builder(arena)
+                 .name("fuchsia.hardware.ramdisk.Service")
+                 .Build());
+  args.set_dtr_exposes(
+      arena, fidl::VectorView<fuchsia_component_test::wire::Capability>::FromExternal(&expose, 1));
+
   auto wire_result = client->Start(std::move(args));
   if (wire_result.status() != ZX_OK) {
     FX_SLOG(ERROR, "Failed to call to Realm:Start", FX_KV("status", wire_result.status()));
