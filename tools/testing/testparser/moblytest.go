@@ -106,7 +106,7 @@ func parseMoblyTest(lines [][]byte) []runtests.TestCaseResult {
 		case "SKIP":
 			status = runtests.TestSkipped
 		case "ERROR":
-			status = runtests.TestCrashed
+			status = runtests.TestFailure
 		}
 
 		failureReason := tc.Details

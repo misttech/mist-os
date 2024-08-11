@@ -42,11 +42,6 @@ const (
 	// TestSkipped represents a skipped test.
 	TestSkipped TestResult = "SKIP"
 
-	// TestCrashed means the test exited unexpectedly in a way that may not be
-	// the test's fault, e.g. an infrastructure failure.
-	// TODO(betramlalusha): remove this test status; it is overlaps with INFRA_FAIL.
-	TestCrashed TestResult = "CRASH"
-
 	// TestInfraFailure means that the test failed because of infra related issue.
 	TestInfraFailure TestResult = "INFRA_FAIL"
 )

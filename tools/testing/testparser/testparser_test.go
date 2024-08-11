@@ -1431,7 +1431,7 @@ Type: Summary
 			FailReason:  "[FuchsiaDeviceError] Some multi-line error: line-1, line-2",
 			SuiteName:   "GreetingsTest",
 			CaseName:    "test_error",
-			Status:      runtests.TestCrashed,
+			Status:      runtests.TestFailure,
 			Duration:    6 * time.Millisecond,
 			Format:      "Mobly",
 		},
