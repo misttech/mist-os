@@ -273,10 +273,20 @@ func genArgs(
 		vars["rustc_prefix"] = filepath.Join(contextSpec.RustToolchainDir)
 	}
 
-	vars["rust_rbe_enable"] = staticSpec.RustRbeEnable
-	vars["cxx_rbe_enable"] = staticSpec.CxxRbeEnable
-	vars["link_rbe_enable"] = staticSpec.LinkRbeEnable
-	vars["enable_bazel_remote_rbe"] = staticSpec.BazelRbeEnable
+	// Only set these GN variables if they are != the default value
+	// (which is false).
+	if staticSpec.RustRbeEnable {
+		vars["rust_rbe_enable"] = staticSpec.RustRbeEnable
+	}
+	if staticSpec.CxxRbeEnable {
+		vars["cxx_rbe_enable"] = staticSpec.CxxRbeEnable
+	}
+	if staticSpec.LinkRbeEnable {
+		vars["link_rbe_enable"] = staticSpec.LinkRbeEnable
+	}
+	if staticSpec.BazelRbeEnable {
+		vars["enable_bazel_remote_rbe"] = staticSpec.BazelRbeEnable
+	}
 
 	if staticSpec.Product != "" {
 		basename := filepath.Base(staticSpec.Product)
