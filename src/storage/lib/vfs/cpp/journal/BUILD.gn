@@ -16,8 +16,6 @@ static_library("journal") {
     "format.h",
     "header_view.h",
     "initializer.h",
-    "inspector_journal.h",
-    "inspector_parser.h",
     "journal.h",
     "journal_writer.h",
     "replay.h",
@@ -31,7 +29,6 @@ static_library("journal") {
 
   public_deps = [
     "//sdk/lib/fit-promise",
-    "//src/storage/lib/disk_inspector",
     "//src/storage/lib/vfs/cpp",
     "//src/storage/lib/vfs/cpp/transaction",
   ]
@@ -44,6 +41,10 @@ static_library("journal") {
   configs += [ "//build/config:all_source" ]
 
   if (is_fuchsia) {
+    public += [
+      "inspector_journal.h",
+      "inspector_parser.h",
+    ]
     sources += [
       "background_executor.cc",
       "data_streamer.cc",
@@ -63,6 +64,7 @@ static_library("journal") {
       "superblock.cc",
     ]
     public_deps += [
+      "//src/storage/lib/disk_inspector",
       "//zircon/system/ulib/range",
       "//zircon/system/ulib/storage/buffer",
       "//zircon/system/ulib/storage/operation",

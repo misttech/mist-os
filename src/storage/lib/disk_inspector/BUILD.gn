@@ -37,65 +37,44 @@ group("tests") {
   deps = [ ":disk-inspector-unit" ]
 }
 
-if (is_fuchsia) {
-  source_set("disk_inspector") {
-    public = [
-      "buffer_factory.h",
-      "command.h",
-      "command_handler.h",
-      "common_types.h",
-      "disk_inspector.h",
-      "disk_obj.h",
-      "disk_struct.h",
-      "inspector_transaction_handler.h",
-      "loader.h",
-      "supported_types.h",
-      "type_utils.h",
-      "vmo_buffer_factory.h",
-    ]
-    sources = [
-      "command.cc",
-      "disk_inspector.cc",
-      "disk_primitive.h",
-      "disk_struct.cc",
-      "inspector_transaction_handler.cc",
-      "loader.cc",
-      "vmo_buffer_factory.cc",
-    ]
-    public_deps = [
-      "//src/storage/lib/block_client/cpp",
-      "//src/storage/lib/vfs/cpp",
-      "//src/storage/lib/vfs/cpp/transaction",
-      "//zircon/system/ulib/fbl",
-      "//zircon/system/ulib/storage/buffer",
-    ]
-    deps = [
-      "//sdk/lib/fdio",
-      "//sdk/lib/syslog/cpp",
-      "//third_party/re2",
-      "//zircon/system/ulib/fbl",
-      "//zircon/system/ulib/storage/operation",
-      "//zircon/third_party/ulib/safemath",
-    ]
-    friend = [ ":*" ]
-  }
-} else {
-  source_set("disk_inspector") {
-    public = [
-      "buffer_factory.h",
-      "command.h",
-      "command_handler.h",
-      "common_types.h",
-      "disk_inspector.h",
-      "disk_obj.h",
-      "disk_struct.h",
-      "inspector_transaction_handler.h",
-      "loader.h",
-      "supported_types.h",
-      "type_utils.h",
-      "vmo_buffer_factory.h",
-    ]
-
-    public_deps = [ "//src/storage/lib/vfs/cpp/transaction" ]
-  }
+source_set("disk_inspector") {
+  public = [
+    "buffer_factory.h",
+    "command.h",
+    "command_handler.h",
+    "common_types.h",
+    "disk_inspector.h",
+    "disk_obj.h",
+    "disk_struct.h",
+    "inspector_transaction_handler.h",
+    "loader.h",
+    "supported_types.h",
+    "type_utils.h",
+    "vmo_buffer_factory.h",
+  ]
+  sources = [
+    "command.cc",
+    "disk_inspector.cc",
+    "disk_primitive.h",
+    "disk_struct.cc",
+    "inspector_transaction_handler.cc",
+    "loader.cc",
+    "vmo_buffer_factory.cc",
+  ]
+  public_deps = [
+    "//src/storage/lib/block_client/cpp",
+    "//src/storage/lib/vfs/cpp",
+    "//src/storage/lib/vfs/cpp/transaction",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/storage/buffer",
+  ]
+  deps = [
+    "//sdk/lib/fdio",
+    "//sdk/lib/syslog/cpp",
+    "//third_party/re2",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/storage/operation",
+    "//zircon/third_party/ulib/safemath",
+  ]
+  friend = [ ":*" ]
 }

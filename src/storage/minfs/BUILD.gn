@@ -6,12 +6,10 @@ static_library("minfs") {
   friend = [
     "test:*",
     "allocator/test:*",
+    "inspector:*",
     "//src/storage/conformance/conformance_harness/minfs:bin",
   ]
-  visibility = [
-    "//src/devices/block/bin/disk-inspect",
-    "//src/storage/*",
-  ]
+  visibility = [ "//src/storage/*" ]
   public = [
     "bcache.h",
     "format.h",
@@ -74,7 +72,6 @@ static_library("minfs") {
     "//sdk/lib/fit",
     "//sdk/lib/syslog/cpp",
     "//src/storage/fvm",
-    "//src/storage/lib/disk_inspector",
     "//src/storage/lib/trace:cpp",
     "//src/storage/lib/vfs/cpp",
     "//zircon/system/ulib/async:async-cpp",
@@ -88,10 +85,6 @@ static_library("minfs") {
   # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-vla-cxx-extension" ]
   if (is_fuchsia) {
-    public += [
-      "inspector/command_handler.h",
-      "inspector/minfs_inspector.h",
-    ]
     sources += [
       "allocator/allocator.cc",
       "allocator/inode_manager.cc",
@@ -100,23 +93,6 @@ static_library("minfs") {
       "component_runner.cc",
       "component_runner.h",
       "file_target.cc",
-      "inspector/command_handler.cc",
-      "inspector/disk_struct.cc",
-      "inspector/disk_struct.h",
-      "inspector/inspector.cc",
-      "inspector/inspector.h",
-      "inspector/inspector_inode.cc",
-      "inspector/inspector_inode.h",
-      "inspector/inspector_inode_table.cc",
-      "inspector/inspector_inode_table.h",
-      "inspector/inspector_private.h",
-      "inspector/inspector_superblock.cc",
-      "inspector/inspector_superblock.h",
-      "inspector/loader.cc",
-      "inspector/loader.h",
-      "inspector/minfs_inspector.cc",
-      "inspector/parser.cc",
-      "inspector/parser.h",
       "minfs_inspect_tree.cc",
       "minfs_inspect_tree.h",
       "minfs_target.cc",

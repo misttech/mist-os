@@ -5,6 +5,14 @@
 #include "src/storage/minfs/inspector/loader.h"
 
 #include <zircon/assert.h>
+#include <zircon/types.h>
+
+#include <cstdint>
+
+#include <storage/buffer/block_buffer.h>
+#include <storage/operation/operation.h>
+
+#include "src/storage/minfs/format.h"
 
 namespace minfs {
 

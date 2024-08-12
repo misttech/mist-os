@@ -6,7 +6,13 @@
 
 #include <zircon/assert.h>
 
+#include <climits>
+#include <cstdint>
+
 #include <bitmap/raw-bitmap.h>
+#include <storage/buffer/block_buffer.h>
+
+#include "src/storage/minfs/format.h"
 
 namespace minfs {
 

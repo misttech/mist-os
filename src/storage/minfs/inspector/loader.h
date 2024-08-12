@@ -5,6 +5,10 @@
 #ifndef SRC_STORAGE_MINFS_INSPECTOR_LOADER_H_
 #define SRC_STORAGE_MINFS_INSPECTOR_LOADER_H_
 
+#include <zircon/types.h>
+
+#include <cstdint>
+
 #include <storage/buffer/block_buffer.h>
 
 #include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
@@ -12,7 +16,7 @@
 
 namespace minfs {
 
-// Wrapper arround fs::TransactionHandler to load on-disk structures from a block-device
+// Wrapper around fs::TransactionHandler to load on-disk structures from a block-device
 // into a passed-in BlockBuffer. Loading functions return an error status if the passed
 // in buffer to load into is not large enough to fit the loaded data.
 class Loader {
@@ -37,7 +41,7 @@ class Loader {
   zx_status_t RunReadOperation(storage::BlockBuffer* buffer, uint64_t vmo_offset,
                                uint64_t dev_offset, uint64_t length) const;
 
-  // Wrapper to send a write operation from |buffer| at the specified loations to the underlying
+  // Wrapper to send a write operation from |buffer| at the specified locations to the underlying
   // TransactionHandler.
   zx_status_t RunWriteOperation(storage::BlockBuffer* buffer, uint64_t vmo_offset,
                                 uint64_t dev_offset, uint64_t length) const;
