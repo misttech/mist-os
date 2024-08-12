@@ -274,12 +274,14 @@ where
         Some(src) if !src.is_empty() => src,
         _ => ".",
     };
-    let params = iter.next().unwrap_or("");
+
+    let mut params = MountParams::parse(iter.next().unwrap_or("").into())?;
+    let flags = params.remove_mount_flags();
 
     let options = FileSystemOptions {
         source: fs_src.into(),
-        flags: MountFlags::empty(),
-        params: MountParams::parse(params.into())?,
+        flags: flags & MountFlags::STORED_ON_FILESYSTEM,
+        params,
     };
 
     // Default rights for remotefs.
@@ -293,7 +295,7 @@ where
         "remotefs" => create_remotefs_filesystem(kernel, pkg, options, rights)?,
         _ => creator.create_filesystem(locked, fs_type.into(), options)?,
     };
-    Ok(MountAction { path: mount_point.into(), fs, flags: MountFlags::empty() })
+    Ok(MountAction { path: mount_point.into(), fs, flags })
 }
 
 fn parse_block_size(block_size_str: &str) -> Result<u64, Error> {

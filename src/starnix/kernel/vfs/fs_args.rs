@@ -5,6 +5,7 @@
 use crate::vfs::{FsStr, FsString};
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
+use starnix_uapi::mount_flags::MountFlags;
 use std::collections::HashMap;
 use std::fmt::Display;
 
@@ -43,6 +44,35 @@ impl MountParams {
 
     pub fn is_empty(&self) -> bool {
         self.options.is_empty()
+    }
+
+    pub fn remove_mount_flags(&mut self) -> MountFlags {
+        let mut flags = MountFlags::empty();
+        if self.remove(b"ro").is_some() {
+            flags |= MountFlags::RDONLY;
+        }
+        if self.remove(b"nosuid").is_some() {
+            flags |= MountFlags::NOSUID;
+        }
+        if self.remove(b"nodev").is_some() {
+            flags |= MountFlags::NODEV;
+        }
+        if self.remove(b"noexec").is_some() {
+            flags |= MountFlags::NOEXEC;
+        }
+        if self.remove(b"noatime").is_some() {
+            flags |= MountFlags::NOATIME;
+        }
+        if self.remove(b"nodiratime").is_some() {
+            flags |= MountFlags::NODIRATIME;
+        }
+        if self.remove(b"relatime").is_some() {
+            flags |= MountFlags::RELATIME;
+        }
+        if self.remove(b"strictatime").is_some() {
+            flags |= MountFlags::STRICTATIME;
+        }
+        flags
     }
 }
 
