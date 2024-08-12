@@ -494,8 +494,8 @@ func genArgs(
 	finalArgs = append(finalArgs, varArgs...)
 	finalArgs = append(finalArgs, targetListArgs...)
 	finalArgs = append(finalArgs, testArgs...)
-	finalArgs = append(finalArgs, localArgs...)
 	finalArgs = append(finalArgs, overridesArgs...)
+	finalArgs = append(finalArgs, localArgs...)
 	finalArgs = append(finalArgs, "\n")
 	return finalArgs, nil
 }
