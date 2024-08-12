@@ -132,7 +132,7 @@ type Properties = table {
     ///
     /// Replaced by `port_class`. Scheduled for removal in 2025.
     // TODO(https://fxbug.dev/42157740): Remove this type.
-    @available(deprecated=22)
+    @available(deprecated=22, removed=NEXT)
     4: device_class strict union {
         /// The interface is loopback.
         1: loopback Empty;

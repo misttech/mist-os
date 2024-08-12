@@ -35,7 +35,7 @@ type PortId = struct {
 ///
 /// Replaced by `PortClass`. Scheduled for removal in 2025.
 // TODO(https://fxbug.dev/42157740): Remove this type.
-@available(deprecated=22)
+@available(deprecated=22, removed=NEXT)
 type DeviceClass = strict enum : uint16 {
     VIRTUAL = 0;
     ETHERNET = 1;
