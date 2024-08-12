@@ -31,6 +31,7 @@ from honeydew.affordances.fuchsia_controller.bluetooth.profiles import (
 from honeydew.affordances.fuchsia_controller.ui import (
     user_input as user_input_fc,
 )
+from honeydew.affordances.fuchsia_controller.wlan import wlan as wlan_fc
 from honeydew.affordances.starnix import (
     system_power_state_controller as system_power_state_controller_starnix,
 )
@@ -431,7 +432,11 @@ class FuchsiaDevice(
         Returns:
             wlan.Wlan object
         """
-        raise NotImplementedError
+        return wlan_fc.Wlan(
+            device_name=self.device_name,
+            fuchsia_controller=self.fuchsia_controller,
+            reboot_affordance=self,
+        )
 
     @properties.Affordance
     def inspect(self) -> inspect_interface.Inspect:
