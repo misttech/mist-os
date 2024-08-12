@@ -5,6 +5,10 @@
 
 import abc
 
+from honeydew.interfaces.auxiliary_devices import (
+    power_switch as power_switch_interface,
+)
+from honeydew.interfaces.transports import serial as serial_interface
 from honeydew.utils import properties
 
 
@@ -21,8 +25,23 @@ class Fastboot(abc.ABC):
         """
 
     @abc.abstractmethod
-    def boot_to_fastboot_mode(self) -> None:
+    def boot_to_fastboot_mode(
+        self,
+        use_serial: bool = False,
+        serial_transport: serial_interface.Serial | None = None,
+        power_switch: power_switch_interface.PowerSwitch | None = None,
+        outlet: int | None = None,
+    ) -> None:
         """Boot the device to fastboot mode from fuchsia mode.
+
+        Args:
+            use_serial: Use serial port on the device to boot into Fastboot mode.
+                If set to True, user need to also pass serial_transport, power_switch and outlet
+                args so that device can be power cycled.
+            serial_transport: Implementation of Serial interface.
+            power_switch: Implementation of PowerSwitch interface.
+            outlet (int): If required by power switch hardware, outlet on
+                power switch hardware where this fuchsia device is connected.
 
         Raises:
             errors.FuchsiaStateError: Invalid state to perform this operation.
@@ -46,6 +65,9 @@ class Fastboot(abc.ABC):
 
         Returns:
             True if in fastboot mode, False otherwise.
+
+        Raises:
+            errors.FastbootCommandError: Failed to check if device is in fastboot mode or not.
         """
 
     @abc.abstractmethod

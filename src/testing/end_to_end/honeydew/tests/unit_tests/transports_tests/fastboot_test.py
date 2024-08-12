@@ -14,7 +14,11 @@ from unittest import mock
 from parameterized import param, parameterized
 
 from honeydew import errors
+from honeydew.interfaces.auxiliary_devices import (
+    power_switch as power_switch_interface,
+)
 from honeydew.interfaces.device_classes import affordances_capable
+from honeydew.interfaces.transports import serial as serial_interface
 from honeydew.transports import fastboot, ffx
 from honeydew.utils import common, host_shell
 
@@ -84,9 +88,13 @@ _INPUT_ARGS: dict[str, Any] = {
     "run_cmd": ["getvar", "hw-revision"],
 }
 
+_FASTBOOT_DEVICES: str = f"{_USB_BASED_FASTBOOT_NODE_ID}\t Android Fastboot"
+
 _MOCK_ARGS: dict[str, Any] = {
     "ffx_target_info_when_in_fuchsia_mode": _USB_BASED_TARGET_WHEN_IN_FUCHSIA_MODE,
     "ffx_target_info_when_in_fastboot_mode": _USB_BASED_TARGET_WHEN_IN_FASTBOOT_MODE,
+    "fastboot_devices_when_in_fuchsia_mode": "",
+    "fastboot_devices_when_in_fastboot_mode": _FASTBOOT_DEVICES,
     "fastboot_getvar_hw_revision": "hw-revision: core.x64-b4\nFinished. Total time: 0.000s",
 }
 
@@ -196,53 +204,76 @@ class FastbootTests(unittest.TestCase):
         """Test case for Fastboot.boot_to_fastboot_mode() when device is not in
         fuchsia mode"""
         with self.assertRaises(errors.FuchsiaStateError):
-            self.fastboot_obj.boot_to_fastboot_mode()
+            self.fastboot_obj.boot_to_fastboot_mode(use_serial=False)
 
         mock_wait_for_fuchsia_mode.assert_called()
 
     @mock.patch.object(
-        fastboot.Fastboot, "wait_for_fastboot_mode", autospec=True
+        fastboot.Fastboot,
+        "wait_for_fastboot_mode",
+        autospec=True,
+    )
+    @mock.patch.object(
+        fastboot.Fastboot,
+        "_boot_to_fastboot_mode_using_ffx",
+        autospec=True,
     )
     @mock.patch.object(
         fastboot.Fastboot,
         "wait_for_fuchsia_mode",
         autospec=True,
     )
-    def test_boot_to_fastboot_mode_when_in_fuchsia_mode(
+    def test_boot_to_fastboot_mode_when_in_fuchsia_mode_with_out_serial(
         self,
         mock_wait_for_fuchsia_mode: mock.Mock,
+        mock_boot_to_fastboot_mode_using_ffx: mock.Mock,
         mock_wait_for_fastboot_mode: mock.Mock,
     ) -> None:
-        """Test case for Fastboot.boot_to_fastboot_mode() when device is not in
-        fuchsia mode"""
-        self.fastboot_obj.boot_to_fastboot_mode()
+        """Test case for Fastboot.boot_to_fastboot_mode() when device is in fuchsia mode with
+        use_serial=False"""
+        self.fastboot_obj.boot_to_fastboot_mode(use_serial=False)
 
         mock_wait_for_fuchsia_mode.assert_called()
+        mock_boot_to_fastboot_mode_using_ffx.assert_called()
         mock_wait_for_fastboot_mode.assert_called()
 
     @mock.patch.object(
         fastboot.Fastboot,
         "wait_for_fastboot_mode",
-        side_effect=errors.FuchsiaDeviceError("error"),
         autospec=True,
     )
     @mock.patch.object(
         fastboot.Fastboot,
-        "wait_for_fuchsia_mode",
+        "_boot_to_fastboot_mode_using_serial",
         autospec=True,
     )
-    def test_boot_to_fastboot_mode_failed(
+    def test_boot_to_fastboot_mode_with_serial(
         self,
-        mock_wait_for_fuchsia_mode: mock.Mock,
+        mock_boot_to_fastboot_mode_using_serial: mock.Mock,
         mock_wait_for_fastboot_mode: mock.Mock,
+    ) -> None:
+        """Test case for Fastboot.boot_to_fastboot_mode() with use_serial set to True"""
+        self.fastboot_obj.boot_to_fastboot_mode(use_serial=True)
+
+        mock_boot_to_fastboot_mode_using_serial.assert_called()
+        mock_wait_for_fastboot_mode.assert_called()
+
+    @mock.patch.object(
+        fastboot.Fastboot,
+        "_boot_to_fastboot_mode_using_serial",
+        side_effect=errors.SerialError("error"),
+        autospec=True,
+    )
+    def test_boot_to_fastboot_mode_exception(
+        self,
+        mock_boot_to_fastboot_mode_using_serial: mock.Mock,
     ) -> None:
         """Test case for Fastboot.boot_to_fastboot_mode() raising an
         exception"""
         with self.assertRaises(errors.FuchsiaDeviceError):
-            self.fastboot_obj.boot_to_fastboot_mode()
+            self.fastboot_obj.boot_to_fastboot_mode(use_serial=True)
 
-        mock_wait_for_fuchsia_mode.assert_called()
-        mock_wait_for_fastboot_mode.assert_called()
+        mock_boot_to_fastboot_mode_using_serial.assert_called()
 
     @mock.patch.object(
         fastboot.Fastboot,
@@ -311,17 +342,17 @@ class FastbootTests(unittest.TestCase):
             (
                 {
                     "label": "when_device_is_in_fuchsia_mode",
-                    "ffx_target_info": _MOCK_ARGS[
-                        "ffx_target_info_when_in_fuchsia_mode"
+                    "fastboot_devices": _MOCK_ARGS[
+                        "fastboot_devices_when_in_fuchsia_mode"
                     ],
                     "expected": False,
                 },
             ),
             (
                 {
-                    "label": "when_device_is_in_fastboot_mode_mode",
-                    "ffx_target_info": _MOCK_ARGS[
-                        "ffx_target_info_when_in_fastboot_mode"
+                    "label": "when_device_is_in_fastboot_mode",
+                    "fastboot_devices": _MOCK_ARGS[
+                        "fastboot_devices_when_in_fastboot_mode"
                     ],
                     "expected": True,
                 },
@@ -329,18 +360,45 @@ class FastbootTests(unittest.TestCase):
         ],
         name_func=_custom_test_name_func,
     )
+    @mock.patch.object(
+        host_shell,
+        "run",
+        autospec=True,
+    )
     def test_is_in_fastboot_mode(
         self,
         parameterized_dict: dict[str, Any],
+        mock_host_shell_run: mock.Mock,
     ) -> None:
         """Test case for Fastboot.is_in_fastboot_mode()"""
-        self.ffx_obj.get_target_info_from_target_list.return_value = (
-            parameterized_dict["ffx_target_info"]
-        )
+        mock_host_shell_run.return_value = parameterized_dict[
+            "fastboot_devices"
+        ]
+
         self.assertEqual(
             self.fastboot_obj.is_in_fastboot_mode(),
             parameterized_dict["expected"],
         )
+
+        mock_host_shell_run.assert_called()
+
+    @mock.patch.object(
+        host_shell,
+        "run",
+        side_effect=errors.HostCmdError("error"),
+        autospec=True,
+    )
+    def test_is_in_fastboot_mode_fail(
+        self,
+        mock_host_shell_run: mock.Mock,
+    ) -> None:
+        """Test case for Fastboot.is_in_fastboot_mode() raising exception."""
+        with self.assertRaisesRegex(
+            errors.FastbootCommandError, "Failed to check"
+        ):
+            self.fastboot_obj.is_in_fastboot_mode()
+
+        mock_host_shell_run.assert_called()
 
     @mock.patch.object(
         fastboot.Fastboot,
@@ -525,3 +583,48 @@ class FastbootTests(unittest.TestCase):
         """Test case for Fastboot._wait_for_valid_tcp_address() success case."""
         self.fastboot_obj._wait_for_valid_tcp_address()
         mock_wait_for_state.assert_called()
+
+    @mock.patch("time.sleep", autospec=True)
+    @mock.patch(
+        "time.time",
+        side_effect=[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10],
+        autospec=True,
+    )
+    def test_boot_to_fastboot_mode_using_serial(
+        self, mock_time: mock.Mock, mock_sleep: mock.Mock
+    ) -> None:
+        """Test case for Fastboot._boot_to_fastboot_mode_using_serial()"""
+        serial_transport = mock.MagicMock(spec=serial_interface.Serial)
+        power_switch = mock.MagicMock(spec=power_switch_interface.PowerSwitch)
+
+        self.fastboot_obj._boot_to_fastboot_mode_using_serial(
+            serial_transport=serial_transport, power_switch=power_switch
+        )
+
+        mock_time.assert_called()
+        mock_sleep.assert_called()
+
+    def test_boot_to_fastboot_mode_using_serial_error(self) -> None:
+        """Test case for Fastboot._boot_to_fastboot_mode_using_serial() raising exceptions"""
+        with self.assertRaisesRegex(
+            ValueError,
+            "'power_switch' and 'serial_transport' args need to be provided",
+        ):
+            self.fastboot_obj._boot_to_fastboot_mode_using_serial(
+                serial_transport=None,
+                power_switch=mock.MagicMock(
+                    spec=power_switch_interface.PowerSwitch
+                ),
+            )
+
+            self.fastboot_obj._boot_to_fastboot_mode_using_serial(
+                serial_transport=mock.MagicMock(spec=serial_interface.Serial),
+                power_switch=None,
+            )
+
+    def test_boot_to_fastboot_mode_using_ffx(self) -> None:
+        """Test case for Fastboot.boot_to_fastboot_mode_using_ffx() when device is not in
+        fuchsia mode"""
+        self.ffx_obj.run.side_effect = errors.FfxCommandError("error")
+
+        self.fastboot_obj._boot_to_fastboot_mode_using_ffx()

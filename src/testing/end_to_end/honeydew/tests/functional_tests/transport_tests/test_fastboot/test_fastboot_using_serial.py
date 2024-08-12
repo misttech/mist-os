@@ -8,13 +8,21 @@ import logging
 from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts, test_runner
 
+from honeydew import errors
+from honeydew.auxiliary_devices import power_switch_dmc
 from honeydew.interfaces.device_classes import fuchsia_device
+from honeydew.interfaces.transports import serial as serial_transport
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
 
 
-class FastbootTransportTests(fuchsia_base_test.FuchsiaBaseTest):
-    """Fastboot transport tests"""
+class FastbootUsingSerialTests(fuchsia_base_test.FuchsiaBaseTest):
+    """Test class to test rebooting the device into Fastboot mode using serial transport.
+
+    Note: This test case can only be run in infra as it uses below which are available only in infra:
+    * PowerSwitch auxiliary device implementation using DMC
+    * Serial transport implementation using unix socket
+    """
 
     def setup_class(self) -> None:
         """setup_class is called once before running tests.
@@ -53,46 +61,39 @@ class FastbootTransportTests(fuchsia_base_test.FuchsiaBaseTest):
             )
             self.device.fastboot.boot_to_fuchsia_mode()
 
-    def test_fastboot_node_id(self) -> None:
-        """Test case for Fastboot.node_id."""
-        # Note - If "node_id" is specified in "expected_values" in
-        # params.yml then compare with it.
-        if self.user_params["expected_values"] and self.user_params[
-            "expected_values"
-        ].get("node_id"):
-            asserts.assert_equal(
-                self._fastboot_node_id,
-                self.user_params["expected_values"]["node_id"],
+    def test_fastboot_using_serial(self) -> None:
+        """Test case that puts the device in fastboot mode using serial, runs
+        a command in fastboot mode and reboots the device back to fuchsia mode.
+        """
+        power_switch: power_switch_dmc.PowerSwitchDmc
+        serial: serial_transport.Serial
+
+        try:
+            power_switch = power_switch_dmc.PowerSwitchDmc(
+                device_name=self.device.device_name
             )
-        else:
-            asserts.assert_is_not_none(self._fastboot_node_id)
-            asserts.assert_is_instance(self._fastboot_node_id, str)
+        except power_switch_dmc.PowerSwitchDmcError:
+            asserts.fail(
+                "PowerSwitchDmc is not available. This test can't be run."
+            )
 
-    def test_fastboot_methods(self) -> None:
-        """Test case that puts the device in fastboot mode, runs a command in
-        fastboot mode and reboots the device back to fuchsia mode."""
-        self.device.fastboot.boot_to_fastboot_mode()
+        try:
+            serial = self.device.serial
+        except errors.FuchsiaDeviceError:
+            asserts.fail(
+                "Access to device serial port via unix socket is not available. "
+                "This test can't be run."
+            )
 
-        self.device.fastboot.wait_for_fastboot_mode()
-
-        asserts.assert_true(
-            self.device.fastboot.is_in_fastboot_mode(),
-            msg=f"{self.device.device_name} is not in fastboot mode which "
-            f"is not expected",
+        self.device.fastboot.boot_to_fastboot_mode(
+            use_serial=True,
+            serial_transport=serial,
+            power_switch=power_switch,
         )
 
-        cmd: list[str] = ["getvar", "hw-revision"]
-        self.device.fastboot.run(cmd)
+        self.device.fastboot.run(cmd=["getvar", "hw-revision"])
 
         self.device.fastboot.boot_to_fuchsia_mode()
-
-        self.device.fastboot.wait_for_fuchsia_mode()
-
-        asserts.assert_false(
-            self.device.fastboot.is_in_fastboot_mode(),
-            msg=f"{self.device.device_name} is in fastboot mode when not "
-            f"expected",
-        )
 
 
 if __name__ == "__main__":
