@@ -54,6 +54,14 @@ closed protocol ConfigurableNetstack {
         ///
         /// If not set, interpreted as false.
         7: enable_ipv6_forwarding bool;
+        /// The maximum number of IPv4 multicast neighbor solicitations.
+        ///
+        /// If not set, uses the system default.
+        8: ipv4_multicast_neighbor_solicitations uint16;
+        /// The maximum number of IPv6 multicast neighbor solicitations.
+        ///
+        /// If not set, uses the system default.
+        9: ipv6_multicast_neighbor_solicitations uint16;
     }) -> () error @generated_name("ConfigurationError") strict enum {
         INVALID_ARGUMENTS = 1;
         REJECTED_BY_NETSTACK = 2;

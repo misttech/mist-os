@@ -35,6 +35,7 @@ rustc_test("client") {
     "//src/lib/fuchsia-component",
     "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
     "//src/lib/network/fidl_fuchsia_net_routes_ext",
+    "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:futures-util",
     "//third_party/rust_crates:test-case",
   ]
