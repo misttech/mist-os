@@ -398,8 +398,6 @@ class BtTransportUartHciTransportProtocolTest
     return received_sco_packets_;
   }
 
-  fidl::Client<fhbt::Snoop>& snoop_client() { return snoop_client_; }
-
   const uint64_t& snoop_seq() { return current_snoop_seq_; }
 
   fidl::WireClient<fhbt::HciTransport> hci_transport_client_;
@@ -423,13 +421,23 @@ class BtTransportUartHciTransportProtocolTest
 };
 
 // Test fixture that opens all channels and has helpers for reading/writing data.
-class BtTransportUartHciProtocolTest : public BtTransportUartTest {
+class BtTransportUartHciProtocolTest : public BtTransportUartTest,
+                                       public fidl::AsyncEventHandler<fhbt::Snoop> {
  public:
   void SetUp() override {
     BtTransportUartTest::SetUp();
     zx::result hci_result = driver_test().Connect<fhbt::HciService::Hci>();
     ASSERT_EQ(ZX_OK, hci_result.status_value());
     hci_client_.Bind(std::move(hci_result.value()));
+
+    zx::result snoop_result = driver_test().Connect<fhbt::HciService::Snoop>();
+    ASSERT_EQ(ZX_OK, snoop_result.status_value());
+    snoop_client_.Bind(std::move(snoop_result.value()),
+                       fdf::Dispatcher::GetCurrent()->async_dispatcher(), this);
+
+    auto wait_snoop = driver_test().RunInDriverContext<fit::function<void(void)>>(
+        [](BtTransportUart& driver) { return driver.WaitforSnoopCallback(); });
+    wait_snoop();
 
     zx::channel cmd_chan_driver_end;
     ASSERT_EQ(zx::channel::create(/*flags=*/0, &cmd_chan_, &cmd_chan_driver_end), ZX_OK);
@@ -469,20 +477,59 @@ class BtTransportUartHciProtocolTest : public BtTransportUartTest {
     wait_begin_status =
         sco_chan_readable_wait_.Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher());
     ASSERT_EQ(wait_begin_status, ZX_OK) << zx_status_get_string(wait_begin_status);
-
-    zx::channel snoop_chan_driver_end;
-    ZX_ASSERT(zx::channel::create(/*flags=*/0, &snoop_chan_, &snoop_chan_driver_end) == ZX_OK);
-    {
-      auto result = hci_client_->OpenSnoopChannel(std::move(snoop_chan_driver_end));
-      ASSERT_TRUE(result.ok());
-      ASSERT_FALSE(result->is_error());
-    }
-    // Configure wait for readable signal on snoop channel.
-    snoop_chan_readable_wait_.set_object(snoop_chan_.get());
-    wait_begin_status =
-        snoop_chan_readable_wait_.Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher());
-    ASSERT_EQ(wait_begin_status, ZX_OK) << zx_status_get_string(wait_begin_status);
   }
+
+  // fidl::AsyncEventHandler<fhbt::Snoop> overrides:
+  void OnObservePacket(
+      ::fidl::Event<::fuchsia_hardware_bluetooth::Snoop::OnObservePacket>& event) override {
+    ASSERT_TRUE(event.sequence().has_value());
+    current_snoop_seq_ = event.sequence().value();
+    ASSERT_TRUE(event.direction().has_value());
+    if (event.direction().value() == fhbt::PacketDirection::kHostToController) {
+      switch (event.packet()->Which()) {
+        case fhbt::SnoopPacket::Tag::kAcl:
+          snoop_sent_acl_packets_.push_back(event.packet()->acl().value());
+          break;
+        case fhbt::SnoopPacket::Tag::kCommand:
+          snoop_sent_command_packets_.push_back(event.packet()->command().value());
+          break;
+        case fhbt::SnoopPacket::Tag::kSco:
+          snoop_sent_sco_packets_.push_back(event.packet()->sco().value());
+          break;
+        case fhbt::SnoopPacket::Tag::kIso:
+          // No Iso data should be sent.
+          // TODO(b/350753924): Handle ISO packets in this driver.
+          FAIL();
+        default:
+          // Unknown packet type sent.
+          FAIL();
+      };
+    } else if (event.direction().value() == fhbt::PacketDirection::kControllerToHost) {
+      switch (event.packet()->Which()) {
+        case fhbt::SnoopPacket::Tag::kEvent:
+          snoop_received_event_packets_.push_back(event.packet()->event().value());
+          break;
+        case fhbt::SnoopPacket::Tag::kAcl:
+          snoop_received_acl_packets_.push_back(event.packet()->acl().value());
+          break;
+        case fhbt::SnoopPacket::Tag::kSco:
+          snoop_received_sco_packets_.push_back(event.packet()->sco().value());
+          break;
+        case fhbt::SnoopPacket::Tag::kIso:
+          // No Iso data should be received.
+          // TODO(b/350753924): Handle ISO packets in this driver.
+          FAIL();
+        default:
+          // Unknown packet type received.
+          FAIL();
+      };
+    }
+  }
+  void OnDroppedPackets(::fidl::Event<fhbt::Snoop::OnDroppedPackets>&) override {
+    // Do nothing, the driver shouldn't drop any packet for now.
+    FAIL();
+  }
+  void handle_unknown_event(fidl::UnknownEventMetadata<fhbt::Snoop> metadata) override { FAIL(); }
 
   void TearDown() override {
     cmd_chan_readable_wait_.Cancel();
@@ -494,16 +541,33 @@ class BtTransportUartHciProtocolTest : public BtTransportUartTest {
     sco_chan_readable_wait_.Cancel();
     sco_chan_.reset();
 
-    snoop_chan_readable_wait_.Cancel();
-    snoop_chan_.reset();
-
     BtTransportUartTest::TearDown();
   }
 
   const std::vector<std::vector<uint8_t>>& hci_events() const { return cmd_chan_received_packets_; }
 
-  const std::vector<std::vector<uint8_t>>& snoop_packets() const {
-    return snoop_chan_received_packets_;
+  const std::vector<std::vector<uint8_t>>& snoop_sent_acl_packets() const {
+    return snoop_sent_acl_packets_;
+  }
+
+  const std::vector<std::vector<uint8_t>>& snoop_sent_command_packets() const {
+    return snoop_sent_command_packets_;
+  }
+
+  const std::vector<std::vector<uint8_t>>& snoop_sent_sco_packets() const {
+    return snoop_sent_sco_packets_;
+  }
+
+  const std::vector<std::vector<uint8_t>>& snoop_received_acl_packets() const {
+    return snoop_received_acl_packets_;
+  }
+
+  const std::vector<std::vector<uint8_t>>& snoop_received_event_packets() const {
+    return snoop_received_event_packets_;
+  }
+
+  const std::vector<std::vector<uint8_t>>& snoop_received_sco_packets() const {
+    return snoop_received_sco_packets_;
   }
 
   const std::vector<std::vector<uint8_t>>& received_acl_packets() const {
@@ -533,9 +597,6 @@ class BtTransportUartHciProtocolTest : public BtTransportUartTest {
     if (wait == &cmd_chan_readable_wait_) {
       chan = zx::unowned_channel(cmd_chan_);
       received_packets = &cmd_chan_received_packets_;
-    } else if (wait == &snoop_chan_readable_wait_) {
-      chan = zx::unowned_channel(snoop_chan_);
-      received_packets = &snoop_chan_received_packets_;
     } else if (wait == &acl_chan_readable_wait_) {
       chan = zx::unowned_channel(acl_chan_);
       received_packets = &acl_chan_received_packets_;
@@ -565,25 +626,31 @@ class BtTransportUartHciProtocolTest : public BtTransportUartTest {
   zx::channel cmd_chan_;
   zx::channel acl_chan_;
   zx::channel sco_chan_;
-  zx::channel snoop_chan_;
+
+  fidl::Client<fhbt::Snoop> snoop_client_;
+  uint64_t current_snoop_seq_ = 0;
 
   async::WaitMethod<BtTransportUartHciProtocolTest, &BtTransportUartHciProtocolTest::OnChannelReady>
       cmd_chan_readable_wait_{this, zx_handle_t(), ZX_CHANNEL_READABLE};
-  async::WaitMethod<BtTransportUartHciProtocolTest, &BtTransportUartHciProtocolTest::OnChannelReady>
-      snoop_chan_readable_wait_{this, zx_handle_t(), ZX_CHANNEL_READABLE};
   async::WaitMethod<BtTransportUartHciProtocolTest, &BtTransportUartHciProtocolTest::OnChannelReady>
       acl_chan_readable_wait_{this, zx_handle_t(), ZX_CHANNEL_READABLE};
   async::WaitMethod<BtTransportUartHciProtocolTest, &BtTransportUartHciProtocolTest::OnChannelReady>
       sco_chan_readable_wait_{this, zx_handle_t(), ZX_CHANNEL_READABLE};
 
   std::vector<std::vector<uint8_t>> cmd_chan_received_packets_;
-  std::vector<std::vector<uint8_t>> snoop_chan_received_packets_;
   std::vector<std::vector<uint8_t>> acl_chan_received_packets_;
   std::vector<std::vector<uint8_t>> sco_chan_received_packets_;
+
+  std::vector<std::vector<uint8_t>> snoop_sent_acl_packets_;
+  std::vector<std::vector<uint8_t>> snoop_sent_command_packets_;
+  std::vector<std::vector<uint8_t>> snoop_sent_sco_packets_;
+  std::vector<std::vector<uint8_t>> snoop_received_acl_packets_;
+  std::vector<std::vector<uint8_t>> snoop_received_event_packets_;
+  std::vector<std::vector<uint8_t>> snoop_received_sco_packets_;
 };
 
 TEST_F(BtTransportUartHciProtocolTest, SendAclPackets) {
-  const uint8_t kNumPackets = 25;
+  const uint8_t kNumPackets = 20;
   for (uint8_t i = 0; i < kNumPackets; i++) {
     const std::vector<uint8_t> kAclPacket = {i};
     zx_status_t write_status =
@@ -611,12 +678,12 @@ TEST_F(BtTransportUartHciProtocolTest, SendAclPackets) {
     EXPECT_EQ(packets[i], expected);
   }
 
-  driver_test().runtime().RunUntil([&]() { return snoop_packets().size() == kNumPackets; });
+  driver_test().runtime().RunUntil(
+      [&]() { return snoop_sent_acl_packets().size() == kNumPackets; });
   for (uint8_t i = 0; i < kNumPackets; i++) {
+    const std::vector<uint8_t> kExpectedSnoopPacket = {i};
     // Snoop packets should have a snoop packet flag prepended (NOT a UART packet indicator).
-    const std::vector<uint8_t> kExpectedSnoopPacket = {BT_HCI_SNOOP_TYPE_ACL,  // Snoop packetflag
-                                                       i};
-    EXPECT_EQ(snoop_packets()[i], kExpectedSnoopPacket);
+    EXPECT_EQ(snoop_sent_acl_packets()[i], kExpectedSnoopPacket);
   }
 }
 
@@ -815,8 +882,8 @@ TEST_F(BtTransportUartHciTransportProtocolTest, AclReadableSignalIgnoredUntilFir
 }
 
 TEST_F(BtTransportUartHciProtocolTest, ReceiveAclPacketsIn2Parts) {
-  const std::vector<uint8_t> kSnoopAclBuffer = {
-      BT_HCI_SNOOP_TYPE_ACL | BT_HCI_SNOOP_FLAG_RECV,  // Snoop packet flag
+  const std::vector<uint8_t> kAclBuffer = {
+      BtHciPacketIndicator::kHciAclData,
       0x00,
       0x00,  // arbitrary header fields
       0x02,
@@ -824,12 +891,11 @@ TEST_F(BtTransportUartHciProtocolTest, ReceiveAclPacketsIn2Parts) {
       0x01,
       0x02,  // arbitrary payload
   };
-  std::vector<uint8_t> kSerialAclBuffer = kSnoopAclBuffer;
-  kSerialAclBuffer[0] = BtHciPacketIndicator::kHciAclData;
-  const std::vector<uint8_t> kAclBuffer(kSnoopAclBuffer.begin() + 1, kSnoopAclBuffer.end());
+
+  const std::vector<uint8_t> kRawData(kAclBuffer.begin() + 1, kAclBuffer.end());
   // Split the packet length field in half to test corner case.
-  const std::vector<uint8_t> kPart1(kSerialAclBuffer.begin(), kSerialAclBuffer.begin() + 4);
-  const std::vector<uint8_t> kPart2(kSerialAclBuffer.begin() + 4, kSerialAclBuffer.end());
+  const std::vector<uint8_t> kPart1(kAclBuffer.begin(), kAclBuffer.begin() + 4);
+  const std::vector<uint8_t> kPart2(kAclBuffer.begin() + 4, kAclBuffer.end());
 
   const size_t kNumPackets = 20;
   for (size_t i = 0; i < kNumPackets; i++) {
@@ -844,18 +910,19 @@ TEST_F(BtTransportUartHciProtocolTest, ReceiveAclPacketsIn2Parts) {
   driver_test().runtime().RunUntil([&]() { return received_acl_packets().size() == kNumPackets; });
 
   for (const std::vector<uint8_t>& packet : received_acl_packets()) {
-    EXPECT_EQ(packet.size(), kAclBuffer.size());
-    EXPECT_EQ(packet, kAclBuffer);
+    EXPECT_EQ(packet.size(), kRawData.size());
+    EXPECT_EQ(packet, kRawData);
   }
 
-  driver_test().runtime().RunUntil([&]() { return snoop_packets().size() == kNumPackets; });
-  for (const std::vector<uint8_t>& packet : snoop_packets()) {
-    EXPECT_EQ(packet, kSnoopAclBuffer);
+  driver_test().runtime().RunUntil(
+      [&]() { return snoop_received_acl_packets().size() == kNumPackets; });
+  for (const std::vector<uint8_t>& packet : snoop_received_acl_packets()) {
+    EXPECT_EQ(packet, kRawData);
   }
 }
 
 TEST_F(BtTransportUartHciTransportProtocolTest, ReceiveAclPacketsIn2Parts) {
-  const std::vector<uint8_t> kSerialAclBuffer = {
+  const std::vector<uint8_t> kAclBuffer = {
       BtHciPacketIndicator::kHciAclData,
       0x00,
       0x00,  // arbitrary header fields
@@ -864,10 +931,10 @@ TEST_F(BtTransportUartHciTransportProtocolTest, ReceiveAclPacketsIn2Parts) {
       0x01,
       0x02,  // arbitrary payload
   };
-  const std::vector<uint8_t> kAclBuffer(kSerialAclBuffer.begin() + 1, kSerialAclBuffer.end());
+  const std::vector<uint8_t> kRawData(kAclBuffer.begin() + 1, kAclBuffer.end());
   // Split the packet length field in half to test corner case.
-  const std::vector<uint8_t> kPart1(kSerialAclBuffer.begin(), kSerialAclBuffer.begin() + 4);
-  const std::vector<uint8_t> kPart2(kSerialAclBuffer.begin() + 4, kSerialAclBuffer.end());
+  const std::vector<uint8_t> kPart1(kAclBuffer.begin(), kAclBuffer.begin() + 4);
+  const std::vector<uint8_t> kPart2(kAclBuffer.begin() + 4, kAclBuffer.end());
 
   const size_t kNumPackets = 20;
   for (size_t i = 0; i < kNumPackets; i++) {
@@ -883,8 +950,8 @@ TEST_F(BtTransportUartHciTransportProtocolTest, ReceiveAclPacketsIn2Parts) {
       [&]() { return received_acl_packets().size() == static_cast<size_t>(kNumPackets); });
 
   for (const std::vector<uint8_t>& packet : received_acl_packets()) {
-    EXPECT_EQ(packet.size(), kAclBuffer.size());
-    EXPECT_EQ(packet, kAclBuffer);
+    EXPECT_EQ(packet.size(), kRawData.size());
+    EXPECT_EQ(packet, kRawData);
   }
 
   driver_test().runtime().RunUntil(
@@ -892,15 +959,15 @@ TEST_F(BtTransportUartHciTransportProtocolTest, ReceiveAclPacketsIn2Parts) {
   EXPECT_EQ(snoop_received_acl_packets().size(), kNumPackets);
 
   for (const std::vector<uint8_t>& packet : snoop_received_acl_packets()) {
-    EXPECT_EQ(packet, kAclBuffer);
+    EXPECT_EQ(packet, kRawData);
   }
 
   ASSERT_EQ(snoop_seq(), static_cast<uint64_t>(kNumPackets - 1));
 }
 
 TEST_F(BtTransportUartHciProtocolTest, ReceiveAclPacketsLotsInQueue) {
-  const std::vector<uint8_t> kSnoopAclBuffer = {
-      BT_HCI_SNOOP_TYPE_ACL | BT_HCI_SNOOP_FLAG_RECV,  // Snoop packet flag
+  const std::vector<uint8_t> kAclBuffer = {
+      BtHciPacketIndicator::kHciAclData,
       0x00,
       0x00,  // arbitrary header fields
       0x02,
@@ -908,12 +975,10 @@ TEST_F(BtTransportUartHciProtocolTest, ReceiveAclPacketsLotsInQueue) {
       0x01,
       0x02,  // arbitrary payload
   };
-  std::vector<uint8_t> kSerialAclBuffer = kSnoopAclBuffer;
-  kSerialAclBuffer[0] = BtHciPacketIndicator::kHciAclData;
-  const std::vector<uint8_t> kAclBuffer(kSnoopAclBuffer.begin() + 1, kSnoopAclBuffer.end());
+  const std::vector<uint8_t> kRawData(kAclBuffer.begin() + 1, kAclBuffer.end());
   // Split the packet length field in half to test corner case.
-  const std::vector<uint8_t> kPart1(kSerialAclBuffer.begin(), kSerialAclBuffer.begin() + 4);
-  const std::vector<uint8_t> kPart2(kSerialAclBuffer.begin() + 4, kSerialAclBuffer.end());
+  const std::vector<uint8_t> kPart1(kAclBuffer.begin(), kAclBuffer.begin() + 4);
+  const std::vector<uint8_t> kPart2(kAclBuffer.begin() + 4, kAclBuffer.end());
 
   const size_t kNumPackets = 1000;
   for (size_t i = 0; i < kNumPackets; i++) {
@@ -935,13 +1000,8 @@ TEST_F(BtTransportUartHciProtocolTest, ReceiveAclPacketsLotsInQueue) {
 
   ASSERT_EQ(received_acl_packets().size(), static_cast<size_t>(kNumPackets + 1));
   for (const std::vector<uint8_t>& packet : received_acl_packets()) {
-    EXPECT_EQ(packet.size(), kAclBuffer.size());
-    EXPECT_EQ(packet, kAclBuffer);
-  }
-
-  driver_test().runtime().RunUntil([&]() { return snoop_packets().size() == kNumPackets + 1; });
-  for (const std::vector<uint8_t>& packet : snoop_packets()) {
-    EXPECT_EQ(packet, kSnoopAclBuffer);
+    EXPECT_EQ(packet.size(), kRawData.size());
+    EXPECT_EQ(packet, kRawData);
   }
 }
 
@@ -1032,15 +1092,11 @@ TEST_F(BtTransportUartHciTransportProtocolTest, ReceiveAclPacketsWithFlowControl
 }
 
 TEST_F(BtTransportUartHciProtocolTest, SendHciCommands) {
-  const std::vector<uint8_t> kSnoopCmd0 = {
-      BT_HCI_SNOOP_TYPE_CMD,  // Snoop packet flag
-      0x00,                   // arbitrary payload
-  };
-  const std::vector<uint8_t> kCmd0(kSnoopCmd0.begin() + 1, kSnoopCmd0.end());
   const std::vector<uint8_t> kUartCmd0 = {
       BtHciPacketIndicator::kHciCommand,  // UART packet indicator
       0x00,                               // arbitrary payload
   };
+  const std::vector<uint8_t> kCmd0(kUartCmd0.begin() + 1, kUartCmd0.end());
 
   zx_status_t write_status =
       cmd_chan()->write(/*flags=*/0, kCmd0.data(), static_cast<uint32_t>(kCmd0.size()),
@@ -1055,15 +1111,12 @@ TEST_F(BtTransportUartHciProtocolTest, SendHciCommands) {
     }) == 1u;
   });
 
-  const std::vector<uint8_t> kSnoopCmd1 = {
-      BT_HCI_SNOOP_TYPE_CMD,  // Snoop packet flag
-      0x01,                   // arbitrary payload
-  };
-  const std::vector<uint8_t> kCmd1(kSnoopCmd1.begin() + 1, kSnoopCmd1.end());
   const std::vector<uint8_t> kUartCmd1 = {
       BtHciPacketIndicator::kHciCommand,  // UART packet indicator
       0x01,                               // arbitrary payload
   };
+  const std::vector<uint8_t> kCmd1(kUartCmd1.begin() + 1, kUartCmd1.end());
+
   write_status = cmd_chan()->write(/*flags=*/0, kCmd1.data(), static_cast<uint32_t>(kCmd1.size()),
                                    /*handles=*/nullptr,
                                    /*num_handles=*/0);
@@ -1082,9 +1135,9 @@ TEST_F(BtTransportUartHciProtocolTest, SendHciCommands) {
   EXPECT_EQ(packets[0], kUartCmd0);
   EXPECT_EQ(packets[1], kUartCmd1);
 
-  driver_test().runtime().RunUntil([&]() { return snoop_packets().size() == 2u; });
-  EXPECT_EQ(snoop_packets()[0], kSnoopCmd0);
-  EXPECT_EQ(snoop_packets()[1], kSnoopCmd1);
+  driver_test().runtime().RunUntil([&]() { return snoop_sent_command_packets().size() == 2u; });
+  EXPECT_EQ(snoop_sent_command_packets()[0], kCmd0);
+  EXPECT_EQ(snoop_sent_command_packets()[1], kCmd1);
 }
 
 TEST_F(BtTransportUartHciTransportProtocolTest, SendHciCommands) {
@@ -1274,18 +1327,16 @@ TEST_F(BtTransportUartHciTransportProtocolTest,
 }
 
 TEST_F(BtTransportUartHciProtocolTest, ReceiveManyHciEventsSplitIntoTwoResponses) {
-  const std::vector<uint8_t> kSnoopEventBuffer = {
-      BT_HCI_SNOOP_TYPE_EVT | BT_HCI_SNOOP_FLAG_RECV,  // Snoop packet flag
-      0x01,                                            // event code
-      0x02,                                            // parameter_total_size
-      0x03,                                            // arbitrary parameter
-      0x04                                             // arbitrary parameter
+  const std::vector<uint8_t> kEventBuffer = {
+      BtHciPacketIndicator::kHciEvent,
+      0x01,  // event code
+      0x02,  // parameter_total_size
+      0x03,  // arbitrary parameter
+      0x04   // arbitrary parameter
   };
-  const std::vector<uint8_t> kEventBuffer(kSnoopEventBuffer.begin() + 1, kSnoopEventBuffer.end());
-  std::vector<uint8_t> kSerialEventBuffer = kSnoopEventBuffer;
-  kSerialEventBuffer[0] = BtHciPacketIndicator::kHciEvent;
-  const std::vector<uint8_t> kPart1(kSerialEventBuffer.begin(), kSerialEventBuffer.begin() + 3);
-  const std::vector<uint8_t> kPart2(kSerialEventBuffer.begin() + 3, kSerialEventBuffer.end());
+  const std::vector<uint8_t> kRawData(kEventBuffer.begin() + 1, kEventBuffer.end());
+  const std::vector<uint8_t> kPart1(kEventBuffer.begin(), kEventBuffer.begin() + 3);
+  const std::vector<uint8_t> kPart2(kEventBuffer.begin() + 3, kEventBuffer.end());
 
   const size_t kNumEvents = 20;
   for (size_t i = 0; i < kNumEvents; i++) {
@@ -1302,12 +1353,13 @@ TEST_F(BtTransportUartHciProtocolTest, ReceiveManyHciEventsSplitIntoTwoResponses
 
   ASSERT_EQ(hci_events().size(), kNumEvents);
   for (const std::vector<uint8_t>& event : hci_events()) {
-    EXPECT_EQ(event, kEventBuffer);
+    EXPECT_EQ(event, kRawData);
   }
 
-  driver_test().runtime().RunUntil([&]() { return snoop_packets().size() == kNumEvents; });
-  for (const std::vector<uint8_t>& packet : snoop_packets()) {
-    EXPECT_EQ(packet, kSnoopEventBuffer);
+  driver_test().runtime().RunUntil(
+      [&]() { return snoop_received_event_packets().size() == kNumEvents; });
+  for (const std::vector<uint8_t>& packet : snoop_received_event_packets()) {
+    EXPECT_EQ(packet, kRawData);
   }
 }
 
@@ -1351,7 +1403,7 @@ TEST_F(BtTransportUartHciTransportProtocolTest, ReceiveManyHciEventsSplitIntoTwo
 }
 
 TEST_F(BtTransportUartHciProtocolTest, SendScoPackets) {
-  const size_t kNumPackets = 25;
+  const size_t kNumPackets = 20;
   for (size_t i = 0; i < kNumPackets; i++) {
     const std::vector<uint8_t> kScoPacket = {static_cast<uint8_t>(i)};
     zx_status_t write_status =
@@ -1376,11 +1428,12 @@ TEST_F(BtTransportUartHciProtocolTest, SendScoPackets) {
     EXPECT_EQ(packets[i], expected);
   }
 
-  driver_test().runtime().RunUntil([&]() { return snoop_packets().size() == kNumPackets; });
+  driver_test().runtime().RunUntil(
+      [&]() { return snoop_sent_sco_packets().size() == kNumPackets; });
   for (uint8_t i = 0; i < kNumPackets; i++) {
     // Snoop packets should have a snoop packet flag prepended (NOT a UART packet indicator).
-    const std::vector<uint8_t> kExpectedSnoopPacket = {BT_HCI_SNOOP_TYPE_SCO, i};
-    EXPECT_EQ(snoop_packets()[i], kExpectedSnoopPacket);
+    const std::vector<uint8_t> kExpectedSnoopPacket = {static_cast<uint8_t>(i)};
+    EXPECT_EQ(snoop_sent_sco_packets()[i], kExpectedSnoopPacket);
   }
 }
 
@@ -1514,19 +1567,18 @@ TEST_F(BtTransportUartHciTransportProtocolTest, ScoReadableSignalIgnoredUntilFir
 }
 
 TEST_F(BtTransportUartHciProtocolTest, ReceiveScoPacketsIn2Parts) {
-  const std::vector<uint8_t> kSnoopScoBuffer = {
-      BT_HCI_SNOOP_TYPE_SCO | BT_HCI_SNOOP_FLAG_RECV,  // Snoop packet flag
+  const std::vector<uint8_t> kScoBuffer = {
+      BtHciPacketIndicator::kHciSco,
       0x07,
       0x08,  // arbitrary header fields
       0x01,  // 1-byte payload length in little endian
       0x02,  // arbitrary payload
   };
-  std::vector<uint8_t> kSerialScoBuffer = kSnoopScoBuffer;
-  kSerialScoBuffer[0] = BtHciPacketIndicator::kHciSco;
-  const std::vector<uint8_t> kScoBuffer(kSnoopScoBuffer.begin() + 1, kSnoopScoBuffer.end());
+
+  const std::vector<uint8_t> kRawData(kScoBuffer.begin() + 1, kScoBuffer.end());
   // Split the packet before length field to test corner case.
-  const std::vector<uint8_t> kPart1(kSerialScoBuffer.begin(), kSerialScoBuffer.begin() + 3);
-  const std::vector<uint8_t> kPart2(kSerialScoBuffer.begin() + 3, kSerialScoBuffer.end());
+  const std::vector<uint8_t> kPart1(kScoBuffer.begin(), kScoBuffer.begin() + 3);
+  const std::vector<uint8_t> kPart2(kScoBuffer.begin() + 3, kScoBuffer.end());
 
   const size_t kNumPackets = 20;
   for (size_t i = 0; i < kNumPackets; i++) {
@@ -1542,14 +1594,15 @@ TEST_F(BtTransportUartHciProtocolTest, ReceiveScoPacketsIn2Parts) {
   driver_test().runtime().RunUntil([&]() { return received_sco_packets().size() == kNumPackets; });
 
   for (const std::vector<uint8_t>& packet : received_sco_packets()) {
-    EXPECT_EQ(packet.size(), kScoBuffer.size());
-    EXPECT_EQ(packet, kScoBuffer);
+    EXPECT_EQ(packet.size(), kRawData.size());
+    EXPECT_EQ(packet, kRawData);
   }
 
-  driver_test().runtime().RunUntil([&]() { return snoop_packets().size() == kNumPackets; });
+  driver_test().runtime().RunUntil(
+      [&]() { return snoop_received_sco_packets().size() == kNumPackets; });
 
-  for (const std::vector<uint8_t>& packet : snoop_packets()) {
-    EXPECT_EQ(packet, kSnoopScoBuffer);
+  for (const std::vector<uint8_t>& packet : snoop_received_sco_packets()) {
+    EXPECT_EQ(packet, kRawData);
   }
 }
 

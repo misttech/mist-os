@@ -532,7 +532,21 @@ void BtTransportUart::HciHandleClientChannel(zx::channel* chan, zx_signals_t pen
       write_buffer_[0] = packet_type;
       length++;
 
-      SnoopChannelWriteLocked(bt_hci_snoop_flags(snoop_type, false), write_buffer_ + 1, length - 1);
+      auto snoop_vec = std::vector<uint8_t>(write_buffer_ + 1, write_buffer_ + length);
+
+      fhbt::SnoopPacket::Tag type = fhbt::SnoopPacket::Tag::kIso;
+      if (snoop_type == BT_HCI_SNOOP_TYPE_ACL) {
+        type = fhbt::SnoopPacket::Tag::kAcl;
+      } else if (snoop_type == BT_HCI_SNOOP_TYPE_CMD) {
+        type = fhbt::SnoopPacket::Tag::kCommand;
+      } else if (snoop_type == BT_HCI_SNOOP_TYPE_SCO) {
+        type = fhbt::SnoopPacket::Tag::kSco;
+      } else {
+        // TODO(b/350753924): Handle ISO packets in this driver.
+        FDF_LOG(ERROR, "Unsupported packet type for snoop.");
+      }
+
+      SendSnoop(std::move(snoop_vec), type, fhbt::PacketDirection::kHostToController);
     }
 
     SerialWrite(write_buffer_, length);
@@ -640,6 +654,7 @@ void BtTransportUart::ProcessNextUartPacketFromReadBuffer(
     return;
   }
   std::lock_guard guard(mutex_);
+  auto fidl_vec = std::vector<uint8_t>(&buffer[1], &buffer[1] + packet_length - 1);
   // Attempt to send this packet to the channel. We are working on the callback thread from the
   // UART, so we need to do this inside of the lock to make sure that nothing closes the channel
   // out from under us while we try to write. If something goes wrong here, close the channel.
@@ -649,11 +664,8 @@ void BtTransportUart::ProcessNextUartPacketFromReadBuffer(
       FDF_LOG(ERROR, "failed to write packet: %s", zx_status_get_string(status));
       ChannelCleanupLocked(&acl_channel_);
     }
-    // If the snoop channel is open then try to write the packet even if |channel| was closed.
-    SnoopChannelWriteLocked(bt_hci_snoop_flags(snoop_type, true), &buffer[1], packet_length - 1);
 
   } else {
-    auto fidl_vec = std::vector<uint8_t>(&buffer[1], &buffer[1] + packet_length - 1);
     if (snoop_type == BT_HCI_SNOOP_TYPE_SCO) {
       if (sco_connection_binding_.size() == 0) {
         FDF_LOG(DEBUG, "No SCO connection available for sending SCO packets up.");
@@ -693,21 +705,21 @@ void BtTransportUart::ProcessNextUartPacketFromReadBuffer(
     }
 
     unacked_receive_packet_number_++;
-
-    fhbt::SnoopPacket::Tag type = fhbt::SnoopPacket::Tag::kIso;
-    if (snoop_type == BT_HCI_SNOOP_TYPE_ACL) {
-      type = fhbt::SnoopPacket::Tag::kAcl;
-    } else if (snoop_type == BT_HCI_SNOOP_TYPE_EVT) {
-      type = fhbt::SnoopPacket::Tag::kEvent;
-    } else if (snoop_type == BT_HCI_SNOOP_TYPE_SCO) {
-      type = fhbt::SnoopPacket::Tag::kSco;
-    } else {
-      // TODO(b/350753924): Handle ISO packets in this driver.
-      FDF_LOG(ERROR, "Unsupported packet type for snoop.");
-    }
-
-    SendSnoop(std::move(fidl_vec), type, fhbt::PacketDirection::kControllerToHost);
   }
+
+  fhbt::SnoopPacket::Tag type = fhbt::SnoopPacket::Tag::kIso;
+  if (snoop_type == BT_HCI_SNOOP_TYPE_ACL) {
+    type = fhbt::SnoopPacket::Tag::kAcl;
+  } else if (snoop_type == BT_HCI_SNOOP_TYPE_EVT) {
+    type = fhbt::SnoopPacket::Tag::kEvent;
+  } else if (snoop_type == BT_HCI_SNOOP_TYPE_SCO) {
+    type = fhbt::SnoopPacket::Tag::kSco;
+  } else {
+    // TODO(b/350753924): Handle ISO packets in this driver.
+    FDF_LOG(ERROR, "Unsupported packet type for snoop.");
+  }
+
+  SendSnoop(std::move(fidl_vec), type, fhbt::PacketDirection::kControllerToHost);
 
   // reset buffer
   cur_uart_packet_type_ = kHciNone;
