@@ -107,9 +107,6 @@ zx_status_t zxio_default_xattr_set(zxio_t* io, const uint8_t* name, size_t name_
                                    const uint8_t* value, size_t value_len,
                                    zxio_xattr_set_mode_t mode);
 zx_status_t zxio_default_xattr_remove(zxio_t* io, const uint8_t* name, size_t name_len);
-zx_status_t zxio_default_open2(zxio_t* directory, const char* path, size_t path_len,
-                               const zxio_open2_options_t* options,
-                               zxio_node_attributes_t* inout_attr, zxio_storage_t* storage);
 zx_status_t zxio_default_allocate(zxio_t* io, uint64_t offset, uint64_t len,
                                   zxio_allocate_mode_t mode);
 zx_status_t zxio_default_enable_verity(zxio_t* io, const zxio_fsverity_descriptor_t* descriptor);
@@ -177,7 +174,6 @@ static __CONSTEXPR const zxio_ops_t zxio_default_ops = {
     .xattr_get = zxio_default_xattr_get,
     .xattr_set = zxio_default_xattr_set,
     .xattr_remove = zxio_default_xattr_remove,
-    .open2 = zxio_default_open2,
     .open3 = zxio_default_open3,
     .allocate = zxio_default_allocate,
     .enable_verity = zxio_default_enable_verity,

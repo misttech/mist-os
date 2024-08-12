@@ -368,22 +368,6 @@ pub struct RecvMessageInfo {
     pub flags: i32,
 }
 
-pub enum CreationMode {
-    Never,
-    AllowExisting,
-    Always,
-}
-
-impl From<CreationMode> for zxio::zxio_creation_mode_t {
-    fn from(value: CreationMode) -> Self {
-        match value {
-            CreationMode::Never => zxio::ZXIO_CREATION_MODE_NEVER,
-            CreationMode::AllowExisting => zxio::ZXIO_CREATION_MODE_ALLOW_EXISTING,
-            CreationMode::Always => zxio::ZXIO_CREATION_MODE_ALWAYS,
-        }
-    }
-}
-
 /// Options for Open3.
 #[derive(Default)]
 pub struct ZxioOpenOptions<'a> {

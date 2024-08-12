@@ -146,10 +146,6 @@ pub const EOWNERDEAD: u32 = 130;
 pub const ENOTRECOVERABLE: u32 = 131;
 pub const ERFKILL: u32 = 132;
 pub const EHWPOISON: u32 = 133;
-pub const ZXIO_CREATION_MODE_NEVER: u32 = 0;
-pub const ZXIO_CREATION_MODE_NEVER_DEPRECATED: u32 = 1;
-pub const ZXIO_CREATION_MODE_ALLOW_EXISTING: u32 = 2;
-pub const ZXIO_CREATION_MODE_ALWAYS: u32 = 3;
 pub const SOCK_STREAM: u32 = 1;
 pub const SOCK_DGRAM: u32 = 2;
 pub const SOCK_RAW: u32 = 3;
@@ -659,29 +655,6 @@ impl Default for zxio_dirent {
 }
 pub type zxio_dirent_t = zxio_dirent;
 pub type zxio_shutdown_options_t = u32;
-pub type zxio_creation_mode_t = u32;
-#[repr(C)]
-#[derive(Debug, Copy, Clone)]
-pub struct zxio_open2_options {
-    pub protocols: zxio_node_protocols_t,
-    pub optional_rights: u64,
-    pub file_flags: u64,
-    pub node_flags: u64,
-    pub mode: zxio_creation_mode_t,
-    pub __bindgen_padding_0: [u8; 4usize],
-    pub rights: u64,
-    pub create_attr: *const zxio_node_attributes_t,
-}
-impl Default for zxio_open2_options {
-    fn default() -> Self {
-        let mut s = ::std::mem::MaybeUninit::<Self>::uninit();
-        unsafe {
-            ::std::ptr::write_bytes(s.as_mut_ptr(), 0, 1);
-            s.assume_init()
-        }
-    }
-}
-pub type zxio_open2_options_t = zxio_open2_options;
 pub type zxio_xattr_set_mode_t = u32;
 #[repr(C)]
 #[derive(Debug, Copy, Clone)]
@@ -942,16 +915,6 @@ extern "C" {
         flags: u32,
         path: *const ::std::os::raw::c_char,
         path_len: usize,
-        storage: *mut zxio_storage_t,
-    ) -> zx_status_t;
-}
-extern "C" {
-    pub fn zxio_open2(
-        directory: *mut zxio_t,
-        path: *const ::std::os::raw::c_char,
-        path_len: usize,
-        options: *const zxio_open2_options_t,
-        inout_attr: *mut zxio_node_attributes_t,
         storage: *mut zxio_storage_t,
     ) -> zx_status_t;
 }
