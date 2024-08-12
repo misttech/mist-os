@@ -270,7 +270,7 @@ Base) for a product. These packages are never evicted by the system.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:16
+From //out/not-default/args.gn:12
 
 **Overridden from the default:** `[]`
 
@@ -278,7 +278,7 @@ From //BUILD.gn:39
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:16
+From //out/not-default/args.gn:12
 
 **Overridden from the default:** `[]`
 
@@ -402,6 +402,18 @@ to stdout/stderr during the Ninja build.
 
 From //build/bazel/bazel_action.gni:18
 
+### bazel_rbe_download_outputs
+
+Control what bazel remote-built outputs are downloaded.
+See https://bazel.build/reference/command-line-reference#flag--remote_download_outputs
+Valid options: all, minimal, toplevel (default since Bazel 7.1)
+- 'toplevel' and 'minimal' can save significant download bandwidth
+- 'all' is useful for debugging remote build issues
+
+**Current value (from the default):** `"toplevel"`
+
+From //build/bazel/remote_services.gni:31
+
 ### bazel_rbe_exec_strategy
 
 When bazel is configured to use RBE, this controls the execution strategy
@@ -434,7 +446,7 @@ Valid options:
 
 **Current value (from the default):** `""`
 
-From //build/bazel/remote_services.gni:40
+From //build/bazel/remote_services.gni:47
 
 ### blobfs_capacity
 
@@ -803,7 +815,7 @@ dependency of anything else, and so are "build only".
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:19
+From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
@@ -811,7 +823,7 @@ From //build/input/BUILD.gn:9
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:19
+From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
@@ -877,7 +889,7 @@ pressure arises or other policies indicate.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:17
+From //out/not-default/args.gn:13
 
 **Overridden from the default:** `[]`
 
@@ -885,7 +897,7 @@ From //BUILD.gn:48
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:17
+From //out/not-default/args.gn:13
 
 **Overridden from the default:** `[]`
 
@@ -1353,19 +1365,7 @@ From //build/toolchain/rbe.gni:218
 Set to true to enable distributed compilation of C++ using RBE.
 Remote execution offers increased build parallelism and caching.
 
-**Current value for `target_cpu = "arm64"`:** `false`
-
-From //out/not-default/args.gn:7
-
-**Overridden from the default:** `false`
-
-From //build/toolchain/rbe.gni:159
-
-**Current value for `target_cpu = "x64"`:** `false`
-
-From //out/not-default/args.gn:7
-
-**Overridden from the default:** `false`
+**Current value (from the default):** `false`
 
 From //build/toolchain/rbe.gni:159
 
@@ -1472,7 +1472,7 @@ These are always a dependency of the main product assembly.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:28
+From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
@@ -1480,7 +1480,7 @@ From //BUILD.gn:109
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:28
+From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
@@ -2794,7 +2794,7 @@ hardware or emulated).
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:24
+From //out/not-default/args.gn:20
 
 **Overridden from the default:** `[]`
 
@@ -2802,7 +2802,7 @@ From //BUILD.gn:98
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:24
+From //out/not-default/args.gn:20
 
 **Overridden from the default:** `[]`
 
@@ -2833,19 +2833,7 @@ The Remote Execution API can be found at:
 https://github.com/bazelbuild/remote-apis
 For an overview of remote execution for Bazel, see https://bazel.build/remote/rbe
 
-**Current value for `target_cpu = "arm64"`:** `false`
-
-From //out/not-default/args.gn:8
-
-**Overridden from the default:** `false`
-
-From //build/bazel/remote_services.gni:16
-
-**Current value for `target_cpu = "x64"`:** `false`
-
-From //out/not-default/args.gn:8
-
-**Overridden from the default:** `false`
+**Current value (from the default):** `false`
 
 From //build/bazel/remote_services.gni:16
 
@@ -3714,7 +3702,7 @@ Fully hermetic tests (both by packaging and at runtime)
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:22
+From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
@@ -3722,7 +3710,7 @@ From //BUILD.gn:90
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:22
+From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
@@ -3748,7 +3736,7 @@ These will be added to the build using the host toolchain.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:9
+From //out/not-default/args.gn:7
 
 **Overridden from the default:** `[]`
 
@@ -3756,7 +3744,7 @@ From //BUILD.gn:116
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:9
+From //out/not-default/args.gn:7
 
 **Overridden from the default:** `[]`
 
@@ -3775,7 +3763,7 @@ These will be added to the build using the host toolchain.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:25
+From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
@@ -3783,7 +3771,7 @@ From //BUILD.gn:104
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:25
+From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
@@ -4100,7 +4088,7 @@ Debug build.
 
 **Current value for `target_cpu = "arm64"`:** `false`
 
-From //out/not-default/args.gn:10
+From //out/not-default/args.gn:8
 
 **Overridden from the default:** `""`
 
@@ -4108,7 +4096,7 @@ From //build/config/compilation_modes.gni:54
 
 **Current value for `target_cpu = "x64"`:** `false`
 
-From //out/not-default/args.gn:10
+From //out/not-default/args.gn:8
 
 **Overridden from the default:** `""`
 
@@ -4476,19 +4464,7 @@ Set to true to enable remote linking using RBE.
 This covers actions that use `ar`, or use `clang` to drive
 linkers like `lld`.
 
-**Current value for `target_cpu = "arm64"`:** `false`
-
-From //out/not-default/args.gn:11
-
-**Overridden from the default:** `false`
-
-From //build/toolchain/rbe.gni:227
-
-**Current value for `target_cpu = "x64"`:** `false`
-
-From //out/not-default/args.gn:11
-
-**Overridden from the default:** `false`
+**Current value (from the default):** `false`
 
 From //build/toolchain/rbe.gni:227
 
@@ -5601,7 +5577,7 @@ Example:
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:30
+From //out/not-default/args.gn:26
 
 **Overridden from the default:** `[]`
 
@@ -5609,7 +5585,7 @@ From //build/assembly/developer_overrides.gni:372
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:30
+From //out/not-default/args.gn:26
 
 **Overridden from the default:** `[]`
 
@@ -7361,19 +7337,7 @@ From //build/toolchain/rbe.gni:141
 
 Set to true to enable distributed compilation of Rust using RBE.
 
-**Current value for `target_cpu = "arm64"`:** `false`
-
-From //out/not-default/args.gn:12
-
-**Overridden from the default:** `false`
-
-From //build/toolchain/rbe.gni:89
-
-**Current value for `target_cpu = "x64"`:** `false`
-
-From //out/not-default/args.gn:12
-
-**Overridden from the default:** `false`
+**Current value (from the default):** `false`
 
 From //build/toolchain/rbe.gni:89
 
@@ -8019,13 +7983,13 @@ From //src/storage/lib/trace/BUILD.gn:11
 
 **Current value for `target_cpu = "arm64"`:** `"arm64"`
 
-From //out/not-default/args.gn:13
+From //out/not-default/args.gn:9
 
 **Overridden from the default:** `""`
 
 **Current value for `target_cpu = "x64"`:** `"x64"`
 
-From //out/not-default/args.gn:13
+From //out/not-default/args.gn:9
 
 **Overridden from the default:** `""`
 
@@ -8163,7 +8127,7 @@ be flagged as an error by the build.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:23
+From //out/not-default/args.gn:19
 
 **Overridden from the default:** `[]`
 
@@ -8171,7 +8135,7 @@ From //BUILD.gn:94
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:23
+From //out/not-default/args.gn:19
 
 **Overridden from the default:** `[]`
 
@@ -8311,7 +8275,7 @@ include those labels in this variable.
 
 **Current value for `target_cpu = "arm64"`:** `["//bundles/kitchen_sink"]`
 
-From //out/not-default/args.gn:18
+From //out/not-default/args.gn:14
 
 **Overridden from the default:** `[]`
 
@@ -8319,7 +8283,7 @@ From //BUILD.gn:57
 
 **Current value for `target_cpu = "x64"`:** `["//bundles/kitchen_sink"]`
 
-From //out/not-default/args.gn:18
+From //out/not-default/args.gn:14
 
 **Overridden from the default:** `[]`
 
