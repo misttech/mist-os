@@ -216,8 +216,8 @@ pub use internal::base::{
     receive_ipv6_packet_action, resolve_route_to_destination, AddressStatus,
     BaseTransportIpContext, DropReason, FilterHandlerProvider, HopLimits, IpCounters,
     IpDeviceContext, IpDeviceStateContext, IpLayerBindingsContext, IpLayerContext, IpLayerEvent,
-    IpLayerHandler, IpLayerIpExt, IpLayerTimerId, IpPacketDestination, IpSendFrameError,
-    IpSendFrameErrorReason, IpStateContext, IpStateInner, IpTransportContext,
+    IpLayerHandler, IpLayerIpExt, IpLayerTimerId, IpPacketDestination, IpRouteTablesContext,
+    IpSendFrameError, IpSendFrameErrorReason, IpStateContext, IpStateInner, IpTransportContext,
     IpTransportDispatchContext, Ipv4PresentAddressStatus, Ipv4State, Ipv4StateBuilder,
     Ipv6PresentAddressStatus, Ipv6State, Ipv6StateBuilder, MulticastMembershipHandler,
     ReceiveIpPacketMeta, ReceivePacketAction, ResolveRouteError, RoutingTableId, SendIpPacketMeta,
@@ -228,7 +228,7 @@ pub use internal::path_mtu::{PmtuCache, PmtuContext};
 pub use internal::reassembly::{FragmentContext, FragmentTimerId, IpPacketFragmentCache};
 pub use internal::routing::{
     request_context_add_route, request_context_del_routes, AddRouteError, IpRoutingDeviceContext,
-    RoutingTable,
+    RoutingTable, RulesTable,
 };
 pub use internal::types::{
     AddableEntry, AddableEntryEither, AddableMetric, Destination, Entry, EntryEither, Generation,

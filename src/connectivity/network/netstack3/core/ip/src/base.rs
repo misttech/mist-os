@@ -8,6 +8,9 @@ use core::fmt::Debug;
 use core::hash::Hash;
 use core::marker::PhantomData;
 use core::num::{NonZeroU16, NonZeroU8};
+use core::ops::ControlFlow;
+#[cfg(test)]
+use core::ops::DerefMut;
 use core::sync::atomic::{self, AtomicU16};
 
 use const_unwrap::const_unwrap_option;
@@ -69,7 +72,9 @@ use crate::internal::reassembly::{
     FragmentBindingsTypes, FragmentHandler, FragmentProcessingState, FragmentTimerId,
     FragmentablePacket, IpPacketFragmentCache,
 };
-use crate::internal::routing::{IpRoutingDeviceContext, RoutingTable};
+use crate::internal::routing::{
+    IpRoutingDeviceContext, RoutingTable, Rule, RuleAction, RulesTable,
+};
 use crate::internal::socket::{IpSocketBindingsContext, IpSocketContext, IpSocketHandler};
 use crate::internal::types::{self, Destination, NextHop, ResolvedRoute, RoutableIpAddr};
 use crate::internal::{ipv6, multicast_forwarding};
@@ -666,7 +671,31 @@ impl IpLayerIpExt for Ipv6 {
 }
 
 /// The state context provided to the IP layer.
-pub trait IpStateContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice> {
+pub trait IpStateContext<I: IpLayerIpExt, BC>: IpRouteTablesContext<I, BC> {
+    /// The context that provides access to the IP routing tables.
+    type IpRouteTablesCtx<'a>: IpRouteTablesContext<I, BC, DeviceId = Self::DeviceId>;
+
+    /// Gets an immutable reference to the rules table.
+    fn with_rules_table<
+        O,
+        F: FnOnce(&mut Self::IpRouteTablesCtx<'_>, &RulesTable<I, Self::DeviceId>) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O;
+
+    /// Gets a mutable reference to the rules table.
+    fn with_rules_table_mut<
+        O,
+        F: FnOnce(&mut Self::IpRouteTablesCtx<'_>, &mut RulesTable<I, Self::DeviceId>) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O;
+}
+
+/// The state context that gives access to routing tables provided to the IP layer.
+pub trait IpRouteTablesContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice> {
     /// The inner device id context.
     type IpDeviceIdCtx<'a>: DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         + IpRoutingDeviceContext<I>
@@ -971,6 +1000,49 @@ pub enum ResolveRouteError {
     Unreachable,
 }
 
+/// A helper function that traverses through the rules table.
+///
+/// To walk through the rules, you need to provide it with an initial value for the loop and a
+/// callback function that yieds a [`ControlFlow`] result to indicate whether the traversal should
+/// stop.
+///
+/// # Returns
+///
+/// - `ControlFlow::Break(RuleAction::Lookup(_))` if we hit a lookup rule and an output is yielded
+///   from the route table.
+/// - `ControlFlow::Break(RuleAction::Unreachable)` if we hit an unreachable rule.
+/// - `ControlFlow::Continue(_)` if we finished walking the rules table without yielding any result.
+fn walk_rules<
+    I: IpLayerIpExt,
+    BC,
+    CC: IpStateContext<I, BC>,
+    O,
+    State,
+    F: FnMut(
+        State,
+        &mut <CC::IpRouteTablesCtx<'_> as IpRouteTablesContext<I, BC>>::IpDeviceIdCtx<'_>,
+        &RoutingTable<I, CC::DeviceId>,
+    ) -> ControlFlow<O, State>,
+>(
+    core_ctx: &mut CC,
+    init: State,
+    mut lookup_table: F,
+) -> ControlFlow<RuleAction<O>, State> {
+    core_ctx.with_rules_table(|core_ctx, rules| {
+        rules.iter().try_fold(init, |state, Rule { action }| match action {
+            RuleAction::Unreachable => return ControlFlow::Break(RuleAction::Unreachable),
+            RuleAction::Lookup(table_id) => {
+                core_ctx.with_ip_routing_table(table_id, |core_ctx, table| {
+                    match lookup_table(state, core_ctx, table) {
+                        ControlFlow::Break(out) => ControlFlow::Break(RuleAction::Lookup(out)),
+                        ControlFlow::Continue(state) => ControlFlow::Continue(state),
+                    }
+                })
+            }
+        })
+    })
+}
+
 /// Returns the forwarding instructions for reaching the given destination.
 ///
 /// If a `device` is specified, the resolved route is limited to those that
@@ -1063,9 +1135,10 @@ pub fn resolve_route_to_destination<
             next_hop: NextHop::RemoteAsNeighbor,
         });
     }
-
-    core_ctx
-        .with_main_ip_routing_table(|core_ctx, table| {
+    let result = walk_rules(
+        core_ctx,
+        None, /* first error encountered */
+        |first_error, core_ctx, table| {
             let mut matching_with_addr = table.lookup_filter_map(
                 core_ctx,
                 device,
@@ -1075,12 +1148,18 @@ pub fn resolve_route_to_destination<
                 },
             );
 
-            let first_error = match matching_with_addr.next() {
+            let first_error_in_this_table = match matching_with_addr.next() {
                 Some((Destination { device, next_hop }, Ok(local_addr))) => {
-                    return Ok((Destination { device: device.clone(), next_hop }, local_addr))
+                    return ControlFlow::Break(Ok((
+                        Destination { device: device.clone(), next_hop },
+                        local_addr,
+                    )));
                 }
                 Some((_, Err(e))) => e,
-                None => return Err(ResolveRouteError::Unreachable),
+                // Note: rule evaluation will continue on to the next rule, if the
+                // previous rule was `Lookup` but the table didn't have the route
+                // inside of it.
+                None => return ControlFlow::Continue(first_error),
             };
 
             matching_with_addr
@@ -1092,16 +1171,31 @@ pub fn resolve_route_to_destination<
                         .map(|local_addr| (destination, local_addr))
                 })
                 .next()
-                .map_or(Err(first_error), |(Destination { device, next_hop }, local_addr)| {
-                    Ok((Destination { device: device.clone(), next_hop }, local_addr))
-                })
-        })
-        .map(|(Destination { device, next_hop }, local_addr)| ResolvedRoute {
-            src_addr: local_addr,
-            device,
-            local_delivery_device: None,
-            next_hop,
-        })
+                .map_or(
+                    ControlFlow::Continue(first_error.or(Some(first_error_in_this_table))),
+                    |(Destination { device, next_hop }, local_addr)| {
+                        ControlFlow::Break(Ok((
+                            Destination { device: device.clone(), next_hop },
+                            local_addr,
+                        )))
+                    },
+                )
+        },
+    );
+    match result {
+        ControlFlow::Break(RuleAction::Lookup(result)) => {
+            result.map(|(Destination { device, next_hop }, src_addr)| ResolvedRoute {
+                src_addr,
+                device,
+                local_delivery_device: None,
+                next_hop,
+            })
+        }
+        ControlFlow::Break(RuleAction::Unreachable) => Err(ResolveRouteError::Unreachable),
+        ControlFlow::Continue(first_error) => {
+            Err(first_error.unwrap_or(ResolveRouteError::Unreachable))
+        }
+    }
 }
 
 /// Enables a blanket implementation of [`IpSocketContext`].
@@ -1350,6 +1444,15 @@ impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
 }
 
 impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
+    OrderedLockAccess<RulesTable<I, D>> for IpStateInner<I, D, BT>
+{
+    type Lock = RwLock<RulesTable<I, D>>;
+    fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
+        OrderedLockRef::new(&self.rules_table)
+    }
+}
+
+impl<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
     OrderedLockAccess<HashMap<RoutingTableId<I, D>, PrimaryRc<RwLock<RoutingTable<I, D>>>>>
     for IpStateInner<I, D, BT>
 {
@@ -1538,6 +1641,12 @@ impl<I: Ip, D> RoutingTableId<I, D> {
         let Self(rc) = self;
         WeakRoutingTableId(StrongRc::downgrade(rc))
     }
+
+    #[cfg(test)]
+    fn get_mut(&self) -> impl DerefMut<Target = RoutingTable<I, D>> + '_ {
+        let Self(rc) = self;
+        rc.write()
+    }
 }
 
 /// Weak Identifier to a routing table.
@@ -1555,6 +1664,7 @@ impl<I: Ip, D> Debug for WeakRoutingTableId<I, D> {
 #[derive(GenericOverIp)]
 #[generic_over_ip(I, Ip)]
 pub struct IpStateInner<I: IpLayerIpExt, D: StrongDeviceIdentifier, BT: IpStateBindingsTypes> {
+    rules_table: RwLock<RulesTable<I, D>>,
     // TODO(https://fxbug.dev/355059838): Explore the option to let Bindings create the main table.
     main_table_id: RoutingTableId<I, D>,
     multicast_forwarding: RwLock<MulticastForwardingState<I, D>>,
@@ -1606,6 +1716,7 @@ impl<
         let main_table: PrimaryRc<RwLock<RoutingTable<I, D>>> = PrimaryRc::new(Default::default());
         let main_table_id = RoutingTableId(PrimaryRc::clone_strong(&main_table));
         Self {
+            rules_table: RwLock::new(RulesTable::new(main_table_id.clone())),
             tables: Mutex::new(HashMap::from_iter(core::iter::once((
                 main_table_id.clone(),
                 main_table,
@@ -3199,7 +3310,16 @@ fn lookup_route_table<I: IpLayerIpExt, BC, CC: IpStateContext<I, BC>>(
     device: Option<&CC::DeviceId>,
     dst_ip: I::Addr,
 ) -> Option<Destination<I::Addr, CC::DeviceId>> {
-    core_ctx.with_main_ip_routing_table(|core_ctx, table| table.lookup(core_ctx, device, dst_ip))
+    match walk_rules(core_ctx, (), |(), core_ctx, table| {
+        match table.lookup(core_ctx, device, dst_ip) {
+            Some(dst) => ControlFlow::Break(Some(dst)),
+            None => ControlFlow::Continue(()),
+        }
+    }) {
+        ControlFlow::Break(RuleAction::Lookup(dst)) => dst,
+        ControlFlow::Break(RuleAction::Unreachable) => None,
+        ControlFlow::Continue(()) => None,
+    }
 }
 
 /// Packed destination passed to [`IpDeviceSendContext::send_ip_frame`].

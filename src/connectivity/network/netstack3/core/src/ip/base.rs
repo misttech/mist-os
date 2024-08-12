@@ -32,10 +32,10 @@ use netstack3_ip::multicast_forwarding::MulticastForwardingState;
 use netstack3_ip::raw::RawIpSocketMap;
 use netstack3_ip::{
     self as ip, FragmentContext, IpCounters, IpLayerBindingsContext, IpLayerContext, IpLayerIpExt,
-    IpPacketFragmentCache, IpStateContext, IpStateInner, IpTransportContext,
+    IpPacketFragmentCache, IpRouteTablesContext, IpStateContext, IpStateInner, IpTransportContext,
     IpTransportDispatchContext, MulticastMembershipHandler, PmtuCache, PmtuContext,
     ReceiveIpPacketMeta, ResolveRouteError, ResolvedRoute, RoutingTable, RoutingTableId,
-    TransportReceiveError,
+    RulesTable, TransportReceiveError,
 };
 use netstack3_sync::rc::Primary;
 use netstack3_sync::RwLock;
@@ -226,6 +226,41 @@ impl<BT: BindingsTypes, I: IpLayerIpExt> UnlockedAccess<crate::lock_ordering::Ip
 
 #[netstack3_macros::instantiate_ip_impl_block(I)]
 impl<I, BC, L> IpStateContext<I, BC> for CoreCtx<'_, BC, L>
+where
+    I: IpLayerIpExt,
+    BC: BindingsContext,
+    L: LockBefore<crate::lock_ordering::IpStateRulesTable<I>>,
+{
+    type IpRouteTablesCtx<'a> =
+        CoreCtx<'a, BC, WrapLockLevel<crate::lock_ordering::IpStateRulesTable<I>>>;
+
+    fn with_rules_table<
+        O,
+        F: FnOnce(&mut Self::IpRouteTablesCtx<'_>, &RulesTable<I, Self::DeviceId>) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let (rules_table, mut restricted) =
+            self.read_lock_and::<crate::lock_ordering::IpStateRulesTable<I>>();
+        cb(&mut restricted, &rules_table)
+    }
+
+    fn with_rules_table_mut<
+        O,
+        F: FnOnce(&mut Self::IpRouteTablesCtx<'_>, &mut RulesTable<I, Self::DeviceId>) -> O,
+    >(
+        &mut self,
+        cb: F,
+    ) -> O {
+        let (mut rules_table, mut restricted) =
+            self.write_lock_and::<crate::lock_ordering::IpStateRulesTable<I>>();
+        cb(&mut restricted, &mut rules_table)
+    }
+}
+
+#[netstack3_macros::instantiate_ip_impl_block(I)]
+impl<I, BC, L> IpRouteTablesContext<I, BC> for CoreCtx<'_, BC, L>
 where
     I: IpLayerIpExt,
     BC: BindingsContext,
@@ -685,6 +720,21 @@ impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
 }
 
 impl<I: IpLayerIpExt, BT: BindingsTypes> DelegatedOrderedLockAccess<PmtuCache<I, BT>>
+    for StackState<BT>
+{
+    type Inner = IpStateInner<I, DeviceId<BT>, BT>;
+    fn delegate_ordered_lock_access(&self) -> &Self::Inner {
+        self.inner_ip_state()
+    }
+}
+
+impl<I: IpLayerIpExt, BT: BindingsTypes> LockLevelFor<StackState<BT>>
+    for crate::lock_ordering::IpStateRulesTable<I>
+{
+    type Data = RulesTable<I, DeviceId<BT>>;
+}
+
+impl<I: IpLayerIpExt, BT: BindingsTypes> DelegatedOrderedLockAccess<RulesTable<I, DeviceId<BT>>>
     for StackState<BT>
 {
     type Inner = IpStateInner<I, DeviceId<BT>, BT>;

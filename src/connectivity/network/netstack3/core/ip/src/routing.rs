@@ -13,7 +13,7 @@ use net_types::{SpecifiedAddr, Witness as _};
 use netstack3_base::{AnyDevice, BroadcastIpExt, DeviceIdContext, ExistsError};
 use thiserror::Error;
 
-use crate::internal::base::{IpLayerBindingsContext, IpLayerEvent, IpLayerIpExt};
+use crate::internal::base::{IpLayerBindingsContext, IpLayerEvent, IpLayerIpExt, RoutingTableId};
 use crate::internal::types::{
     AddableEntry, Destination, Entry, EntryAndGeneration, NextHop, OrderedEntry, RawMetric,
 };
@@ -283,6 +283,45 @@ impl<I: BroadcastIpExt, D: Clone + Debug + PartialEq> RoutingTable<I, D> {
     }
 }
 
+/// Table that contains routing rules.
+pub struct RulesTable<I: Ip, D> {
+    rules: Vec<Rule<I, D>>,
+}
+
+impl<I: Ip, D> RulesTable<I, D> {
+    pub(crate) fn new(main_table_id: RoutingTableId<I, D>) -> Self {
+        // TODO(https://fxbug.dev/355059790): If bindings is installing the main table, we should
+        // also let the bindings install this default rule.
+        Self { rules: alloc::vec![Rule { action: RuleAction::Lookup(main_table_id) }] }
+    }
+
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &'_ Rule<I, D>> {
+        self.rules.iter()
+    }
+
+    #[cfg(test)]
+    pub(crate) fn rules_mut(&mut self) -> &mut Vec<Rule<I, D>> {
+        &mut self.rules
+    }
+}
+
+/// The action part of the routing rules.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum RuleAction<Lookup> {
+    /// Will resolve to unreachable.
+    // TODO(https://fxbug.dev/357858471): Install Bindings rules in Core.
+    #[allow(unused)]
+    Unreachable,
+    /// Lookup in a routing table.
+    Lookup(Lookup),
+}
+
+/// A routing rule.
+pub(crate) struct Rule<I: Ip, D> {
+    // TODO(https://fxbug.dev/354724171): Rules need selectors.
+    pub(crate) action: RuleAction<RoutingTableId<I, D>>,
+}
+
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
     use alloc::collections::HashSet;
@@ -292,7 +331,7 @@ pub(crate) mod testutil {
     use netstack3_base::testutil::FakeCoreCtx;
     use netstack3_base::{NotFoundError, StrongDeviceIdentifier};
 
-    use crate::internal::base::IpStateContext;
+    use crate::internal::base::IpRouteTablesContext;
     use crate::internal::types::{AddableMetric, Generation, Metric};
 
     use super::*;
@@ -317,7 +356,7 @@ pub(crate) mod testutil {
     pub fn add_route<
         I: IpLayerIpExt,
         BC: IpLayerBindingsContext<I, CC::DeviceId>,
-        CC: IpStateContext<I, BC>,
+        CC: IpRouteTablesContext<I, BC>,
     >(
         core_ctx: &mut CC,
         _bindings_ctx: &mut BC,
@@ -348,7 +387,7 @@ pub(crate) mod testutil {
     pub fn del_routes_to_subnet<
         I: IpLayerIpExt,
         BC: IpLayerBindingsContext<I, CC::DeviceId>,
-        CC: IpStateContext<I, BC>,
+        CC: IpRouteTablesContext<I, BC>,
     >(
         core_ctx: &mut CC,
         _bindings_ctx: &mut BC,
@@ -370,7 +409,7 @@ pub(crate) mod testutil {
     /// Deletes all routes referencing `del_device` from the routing table.
     pub fn del_device_routes<
         I: IpLayerIpExt,
-        CC: IpStateContext<I, BC>,
+        CC: IpRouteTablesContext<I, BC>,
         BC: IpLayerBindingsContext<I, CC::DeviceId>,
     >(
         core_ctx: &mut CC,

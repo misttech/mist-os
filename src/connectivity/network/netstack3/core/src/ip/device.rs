@@ -50,7 +50,7 @@ use netstack3_ip::nud::{self, ConfirmationFlags, NudCounters, NudIpHandler};
 use netstack3_ip::socket::SasCandidate;
 use netstack3_ip::{
     self as ip, AddableMetric, AddressStatus, FilterHandlerProvider, IpLayerIpExt,
-    IpSendFrameError, IpStateContext, Ipv4PresentAddressStatus, RawMetric, DEFAULT_TTL,
+    IpRouteTablesContext, IpSendFrameError, Ipv4PresentAddressStatus, RawMetric, DEFAULT_TTL,
 };
 use packet::{EmptyBuf, InnerPacketBuilder, Serializer};
 use packet_formats::icmp::ndp::options::{NdpNonce, NdpOptionBuilder};
@@ -943,6 +943,8 @@ impl<BC: BindingsContext> Ipv6DiscoveredRoutesContext<BC>
         // TODO(https://fxbug.dev/42079625): Rather than perform a synchronous
         // check for whether the route already exists, use a routes-admin
         // RouteSet to track the NDP-added route.
+        // TODO(https://fxbug.dev/358254288): Should check the route table where
+        // the route lives instead of the main table.
         let already_exists =
             self.with_main_ip_routing_table(|_core_ctx, table: &ip::RoutingTable<Ipv6, _>| {
                 table.iter_table().any(|table_entry: &ip::Entry<Ipv6Addr, _>| {
