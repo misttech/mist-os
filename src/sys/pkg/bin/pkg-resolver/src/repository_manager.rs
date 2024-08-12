@@ -45,16 +45,13 @@ pub struct RepositoryManager {
 
 #[derive(Debug)]
 struct RepositoryManagerInspectState {
-    // TODO(https://fxbug.dev/42165549)
-    #[allow(unused)]
+    #[expect(dead_code)]
     node: inspect::Node,
     dynamic_configs_node: inspect::Node,
     static_configs_node: inspect::Node,
-    // TODO(https://fxbug.dev/42165549)
-    #[allow(unused)]
+    #[expect(dead_code)]
     dynamic_configs_path_property: inspect::StringProperty,
-    // TODO(https://fxbug.dev/42165549)
-    #[allow(unused)]
+    #[expect(dead_code)]
     persisted_repos_dir_property: inspect::StringProperty,
     stats: Arc<Mutex<Stats>>,
     repos_node: Arc<inspect::Node>,
@@ -62,8 +59,7 @@ struct RepositoryManagerInspectState {
 
 #[derive(Debug)]
 pub struct Stats {
-    // TODO(https://fxbug.dev/42165549)
-    #[allow(unused)]
+    #[expect(dead_code)]
     node: inspect::Node,
 
     mirrors_node: inspect::Node,
@@ -88,8 +84,7 @@ impl Stats {
 
 #[derive(Debug)]
 pub struct MirrorStats {
-    // TODO(https://fxbug.dev/42165549)
-    #[allow(unused)]
+    #[expect(dead_code)]
     node: inspect::Node,
     /// web requests that failed with a network error and then succeeded when retried
     network_blips: inspect_util::Counter,
@@ -1017,10 +1012,9 @@ mod tests {
         }
     }
 
-    #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
     #[derive(Debug)]
     pub(crate) enum TestError {
-        Constructor(LoadError),
+        Constructor(#[expect(dead_code)] LoadError),
         LoadStaticConfigs(Vec<LoadError>),
     }
 

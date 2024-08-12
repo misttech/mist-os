@@ -51,8 +51,7 @@ use std::collections::VecDeque;
 /// ```
 #[derive(Debug)]
 pub struct BoundedNode<V> {
-    // TODO(https://fxbug.dev/42165549)
-    #[allow(unused)]
+    #[expect(dead_code)]
     node: Node,
     children_node: Node,
     capacity: usize,

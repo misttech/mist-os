@@ -852,7 +852,6 @@ mod stub {
             self
         }
 
-        #[allow(dead_code)]
         pub fn time_source(mut self, time_source: MockTimeSource) -> Self {
             self.time_source = Some(time_source);
             self

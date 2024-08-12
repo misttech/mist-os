@@ -104,13 +104,13 @@ pub enum UpdateResult {
 
 #[derive(Debug)]
 pub struct RepoVersions {
-    #[allow(dead_code)] // fields present so they're included in the Debug output
+    #[expect(dead_code)] // fields present so they're included in the Debug output
     root: u32,
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     timestamp: Option<u32>,
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     snapshot: Option<u32>,
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     targets: Option<u32>,
 }
 

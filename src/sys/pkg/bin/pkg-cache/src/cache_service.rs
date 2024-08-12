@@ -930,8 +930,6 @@ mod serve_needed_blobs_tests {
     struct FakeOpenBlobResponse(Option<OpenBlobResponse>);
 
     struct FakeOpenBlobResponder<'a> {
-        // Response is written to through send(). It is never intended to read.
-        #[allow(dead_code)]
         response: &'a mut FakeOpenBlobResponse,
     }
 
