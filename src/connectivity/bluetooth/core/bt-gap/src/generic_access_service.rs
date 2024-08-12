@@ -208,6 +208,7 @@ mod tests {
         );
         let dispatcher = HostDispatcher::new(
             TEST_DEVICE_APPEARANCE,
+            Default::default(),
             stash,
             system_inspect,
             gas_task_channel,

@@ -53,4 +53,45 @@
             from: "self",
         },
     ],
+    config: {
+        // Whether Low Energy privacy should be enabled on Hosts.
+        // When enabled, the LE Address used for advertising, connecting and
+        // active scanning will be random.
+        // Strongly encouraged to be set.
+        le_privacy: { type: "bool" },
+
+        // Whether to enable background scanning of Low Energy devices.
+        // When enabled, scanning will occur without an active scan request on the
+        // fuchsia.bluetooth.le.Central API and peers set to autoconnect will be
+        // connected.  Scan requests will complete immediately.
+        le_background_scanning: { type: "bool" },
+
+        // Low Energy Security Mode
+        // See Core Spec v5.4, Vol 3, Part C, Section 10.2
+        // Supported Options:
+        //  - "Mode1": allows for variance for unencrypted to secure connections
+        //    based on service requirements.
+        //  - "SecureConnectionsOnly": All connections will be authenticated and
+        //    encrypted with a strong key.
+        le_security_mode: {
+            type: "string",
+            max_size: 21,
+        },
+
+        // BR/EDR Connectability
+        // The device is connectable over BR/EDR if this is true.
+        bredr_connectable: { type: "bool" },
+
+        // BR/EDR Security Mode
+        // See Core Spec v5.4, Vol 3, Part C, Section 5.2
+        // Supported Options:
+        //  - "Mode4": Requires pairing for all non-trivial services based on
+        //     requirements and pairs to the highest supported security.
+        //  - "SecureConnectionsOnly": All non-trivial services require encryption
+        //    and authentication using Level 4.
+        bredr_security_mode: {
+            type: "string",
+            max_size: 21,
+        },
+    },
 }

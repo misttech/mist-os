@@ -61,6 +61,7 @@ async fn on_device_changed_inspect_state() {
     );
     let dispatcher = HostDispatcher::new(
         Appearance::Display,
+        Default::default(),
         stash,
         system_inspect,
         gas_channel_sender,

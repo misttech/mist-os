@@ -7,7 +7,6 @@
 ?bt-a2dp
 ?bt-avrcp
 ?bt-avrcp-target
-?bt-gap
 ?bt-hfp-audio-gateway-default
 ?bt-host
 ?bt-init

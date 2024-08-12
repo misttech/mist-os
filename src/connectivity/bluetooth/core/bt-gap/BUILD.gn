@@ -11,6 +11,7 @@ rustc_binary("bin") {
   with_unit_tests = true
 
   deps = [
+    ":bt_gap_config",
     "//sdk/fidl/fuchsia.bluetooth:fuchsia.bluetooth_rust",
     "//sdk/fidl/fuchsia.bluetooth.bredr:fuchsia.bluetooth.bredr_rust",
     "//sdk/fidl/fuchsia.bluetooth.gatt:fuchsia.bluetooth.gatt_rust",
@@ -77,28 +78,41 @@ rustc_binary("bin") {
     "//src/lib/test_util",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:proptest",
-    "//third_party/rust_crates:tempfile",
   ]
 
   configs -= [ "//build/config/rust/lints:allow_unused_results" ]
 }
 
-resource("default-config") {
-  sources = [ "config/default.json" ]
-  outputs = [ "data/bt-gap-default.json" ]
+fuchsia_component_manifest("manifest") {
+  component_name = "bt-gap"
+  manifest = "meta/bt-gap.cml"
+}
+
+fuchsia_structured_config_rust_lib("bt_gap_config") {
+  cm_label = ":manifest"
+}
+
+fuchsia_structured_config_values("default_config_values") {
+  cm_label = ":manifest"
+  values = {
+    le_privacy = true
+    le_background_scanning = true
+    le_security_mode = "Mode1"
+    bredr_connectable = true
+    bredr_security_mode = "Mode4"
+  }
 }
 
 fuchsia_component("component") {
-  component_name = "bt-gap"
-  manifest = "meta/bt-gap.cml"
-  deps = [
-    ":bin",
-    ":default-config",
-  ]
+  cm_label = ":manifest"
+  deps = [ ":bin" ]
 }
 
-fuchsia_package("bt-gap") {
-  deps = [ ":component" ]
+fuchsia_package("bt-gap-default") {
+  deps = [
+    ":component",
+    ":default_config_values",
+  ]
 }
 
 fuchsia_test_component("test-stash-secure") {
@@ -122,7 +136,7 @@ fuchsia_test_package("bt-gap-unittests") {
   }
   test_components = [ ":test-component" ]
   deps = [
-    ":default-config",
+    ":default_config_values",
     ":test-stash-secure",
   ]
 }

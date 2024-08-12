@@ -118,6 +118,7 @@ impl BtGap {
     async fn init() -> Result<Self, Error> {
         info!("Initializing bt-gap...");
         let inspect = fuchsia_inspect::Inspector::default();
+        let config = build_config::load_default()?;
         let stash_inspect = inspect.root().create_child("persistent");
         info!("Initializing data store from Stash...");
         let stash = store::stash::init_stash(BT_GAP_COMPONENT_ID, stash_inspect)
@@ -158,6 +159,7 @@ impl BtGap {
 
         let hd = HostDispatcher::new(
             Appearance::Display,
+            config,
             stash,
             inspect.root().create_child("system"),
             gas_channel_sender,
