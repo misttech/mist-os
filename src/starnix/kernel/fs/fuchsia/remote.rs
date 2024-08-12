@@ -54,13 +54,11 @@ use vfs::{ProtocolsExt, ToFlags};
 use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
 pub struct RemoteFs {
-    supports_open3: bool,
-
     // If true, trust the remote file system's IDs (which requires that the remote file system does
     // not span mounts).  This must be true to properly support hard links.  If this is false, the
     // same node can end up having different IDs as it leaves and reenters the node cache.
-    // TODO(https://fxbug.dev/42081972): At the time of writing, package directories do not have unique IDs so
-    // this *must* be false in that case.
+    // TODO(https://fxbug.dev/42081972): At the time of writing, package directories do not have
+    // unique IDs so this *must* be false in that case.
     use_remote_ids: bool,
 
     root_proxy: fio::DirectorySynchronousProxy,
@@ -205,35 +203,10 @@ impl RemoteFs {
             has: zxio_node_attr_has_t { id: true, ..Default::default() },
             ..Default::default()
         };
-        let (remote_node, node_id, supports_open3) =
+        let (remote_node, node_id) =
             match Zxio::create_with_on_representation(client_end.into(), Some(&mut attrs)) {
-                Err(zx::Status::NOT_SUPPORTED) => {
-                    // Fall back to open.
-                    let (client_end, server_end) = zx::Channel::create();
-                    root_proxy
-                        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server_end.into())
-                        .map_err(|_| errno!(EIO))?;
-                    let remote_node = RemoteNode {
-                        zxio: Arc::new(
-                            Zxio::create(client_end.into())
-                                .map_err(|status| from_status_like_fdio!(status))?,
-                        ),
-                        rights,
-                    };
-                    let attrs = remote_node
-                        .zxio
-                        .attr_get(zxio_node_attr_has_t { id: true, ..Default::default() })
-                        .map_err(|_| errno!(EIO))?;
-                    (remote_node, attrs.id, false)
-                }
                 Err(status) => return Err(from_status_like_fdio!(status)),
-                Ok(zxio) => (
-                    RemoteNode { zxio: Arc::new(zxio), rights },
-                    attrs.id,
-                    // Only use Open3 if the filesystem supports POSIX attributes. All unit tests
-                    // currently use fxfs, which does support POSIX attributes.
-                    cfg!(any(feature = "posix_attributes", test)),
-                ),
+                Ok(zxio) => (RemoteNode { zxio: Arc::new(zxio), rights }, attrs.id),
             };
 
         if !rights.contains(fio::OpenFlags::RIGHT_WRITABLE) {
@@ -245,7 +218,7 @@ impl RemoteFs {
         let fs = FileSystem::new(
             kernel,
             CacheMode::Cached(CacheConfig::default()),
-            RemoteFs { supports_open3, use_remote_ids, root_proxy },
+            RemoteFs { use_remote_ids, root_proxy },
             options,
         )?;
         let mut root_node = FsNode::new_root(remote_node);
@@ -455,7 +428,7 @@ impl FsNodeOps for RemoteNode {
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
-        mut mode: FileMode,
+        mode: FileMode,
         dev: DeviceType,
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
@@ -466,79 +439,45 @@ impl FsNodeOps for RemoteNode {
 
         let zxio;
         let mut node_id;
-        if fs_ops.supports_open3 {
-            if !(mode.is_reg()
-                || mode.is_chr()
-                || mode.is_blk()
-                || mode.is_fifo()
-                || mode.is_sock())
-            {
-                return error!(EINVAL, name);
-            }
-            let mut attrs = zxio_node_attributes_t {
-                has: zxio_node_attr_has_t { id: true, ..Default::default() },
-                ..Default::default()
-            };
-            zxio = Arc::new(
-                self.zxio
-                    .open3(
-                        name,
-                        fio::Flags::FLAG_MUST_CREATE
-                            | fio::Flags::PROTOCOL_FILE
-                            | fio::Flags::PERM_READ
-                            | fio::Flags::PERM_WRITE
-                            | fio::Flags::PERM_GET_ATTRIBUTES
-                            | fio::Flags::PERM_SET_ATTRIBUTES
-                            | fio::Flags::PERM_MODIFY,
-                        ZxioOpenOptions {
-                            attributes: Some(&mut attrs),
-                            create_attributes: Some(zxio_node_attributes_t {
-                                mode: mode.bits(),
-                                uid: owner.uid,
-                                gid: owner.gid,
-                                rdev: dev.bits(),
-                                has: zxio_node_attr_has_t {
-                                    mode: true,
-                                    uid: true,
-                                    gid: true,
-                                    rdev: true,
-                                    ..Default::default()
-                                },
-                                ..Default::default()
-                            }),
-                        },
-                    )
-                    .map_err(|status| from_status_like_fdio!(status, name))?,
-            );
-            node_id = attrs.id;
-        } else {
-            if !mode.is_reg() || dev.bits() != 0 {
-                return error!(EINVAL, name);
-            }
-            zxio = Arc::new(
-                self.zxio
-                    .open(
-                        fio::OpenFlags::CREATE
-                            | fio::OpenFlags::CREATE_IF_ABSENT
-                            | fio::OpenFlags::RIGHT_WRITABLE
-                            | fio::OpenFlags::RIGHT_READABLE,
-                        name,
-                    )
-                    .map_err(|status| from_status_like_fdio!(status, name))?,
-            );
-            // Unfortunately, remote filesystems that don't support open3 require another
-            // round-trip.
-            let attrs = zxio
-                .attr_get(zxio_node_attr_has_t {
-                    protocols: true,
-                    abilities: true,
-                    id: true,
-                    ..Default::default()
-                })
-                .map_err(|status| from_status_like_fdio!(status, name))?;
-            mode = get_mode(&attrs);
-            node_id = attrs.id;
+        if !(mode.is_reg() || mode.is_chr() || mode.is_blk() || mode.is_fifo() || mode.is_sock()) {
+            return error!(EINVAL, name);
         }
+        let mut attrs = zxio_node_attributes_t {
+            has: zxio_node_attr_has_t { id: true, ..Default::default() },
+            ..Default::default()
+        };
+        zxio = Arc::new(
+            self.zxio
+                .open3(
+                    name,
+                    fio::Flags::FLAG_MUST_CREATE
+                        | fio::Flags::PROTOCOL_FILE
+                        | fio::Flags::PERM_READ
+                        | fio::Flags::PERM_WRITE
+                        | fio::Flags::PERM_GET_ATTRIBUTES
+                        | fio::Flags::PERM_SET_ATTRIBUTES
+                        | fio::Flags::PERM_MODIFY,
+                    ZxioOpenOptions {
+                        attributes: Some(&mut attrs),
+                        create_attributes: Some(zxio_node_attributes_t {
+                            mode: mode.bits(),
+                            uid: owner.uid,
+                            gid: owner.gid,
+                            rdev: dev.bits(),
+                            has: zxio_node_attr_has_t {
+                                mode: true,
+                                uid: true,
+                                gid: true,
+                                rdev: true,
+                                ..Default::default()
+                            },
+                            ..Default::default()
+                        }),
+                    },
+                )
+                .map_err(|status| from_status_like_fdio!(status, name))?,
+        );
+        node_id = attrs.id;
 
         let ops = if mode.is_reg() {
             Box::new(RemoteNode { zxio, rights: self.rights }) as Box<dyn FsNodeOps>
@@ -574,58 +513,36 @@ impl FsNodeOps for RemoteNode {
 
         let zxio;
         let mut node_id;
-        if fs_ops.supports_open3 {
-            let mut attrs = zxio_node_attributes_t {
-                has: zxio_node_attr_has_t { id: true, ..Default::default() },
-                ..Default::default()
-            };
-            zxio = Arc::new(
-                self.zxio
-                    .open3(
-                        name,
-                        fio::Flags::FLAG_MUST_CREATE
-                            | fio::Flags::PROTOCOL_DIRECTORY
-                            | fio::RW_STAR_DIR.to_flags(),
-                        ZxioOpenOptions {
-                            attributes: Some(&mut attrs),
-                            create_attributes: Some(zxio_node_attributes_t {
-                                mode: mode.bits(),
-                                uid: owner.uid,
-                                gid: owner.gid,
-                                has: zxio_node_attr_has_t {
-                                    mode: true,
-                                    uid: true,
-                                    gid: true,
-                                    ..Default::default()
-                                },
+        let mut attrs = zxio_node_attributes_t {
+            has: zxio_node_attr_has_t { id: true, ..Default::default() },
+            ..Default::default()
+        };
+        zxio = Arc::new(
+            self.zxio
+                .open3(
+                    name,
+                    fio::Flags::FLAG_MUST_CREATE
+                        | fio::Flags::PROTOCOL_DIRECTORY
+                        | fio::RW_STAR_DIR.to_flags(),
+                    ZxioOpenOptions {
+                        attributes: Some(&mut attrs),
+                        create_attributes: Some(zxio_node_attributes_t {
+                            mode: mode.bits(),
+                            uid: owner.uid,
+                            gid: owner.gid,
+                            has: zxio_node_attr_has_t {
+                                mode: true,
+                                uid: true,
+                                gid: true,
                                 ..Default::default()
-                            }),
-                        },
-                    )
-                    .map_err(|status| from_status_like_fdio!(status, name))?,
-            );
-            node_id = attrs.id;
-        } else {
-            zxio = Arc::new(
-                self.zxio
-                    .open(
-                        fio::OpenFlags::CREATE
-                            | fio::OpenFlags::CREATE_IF_ABSENT
-                            | fio::OpenFlags::RIGHT_WRITABLE
-                            | fio::OpenFlags::RIGHT_READABLE
-                            | fio::OpenFlags::DIRECTORY,
-                        name,
-                    )
-                    .map_err(|status| from_status_like_fdio!(status, name))?,
-            );
-
-            // Unfortunately, remote filesystems that don't support open3 require another
-            // round-trip.
-            node_id = zxio
-                .attr_get(zxio_node_attr_has_t { id: true, ..Default::default() })
-                .map_err(|status| from_status_like_fdio!(status, name))?
-                .id;
-        }
+                            },
+                            ..Default::default()
+                        }),
+                    },
+                )
+                .map_err(|status| from_status_like_fdio!(status, name))?,
+        );
+        node_id = attrs.id;
 
         let ops = RemoteNode { zxio, rights: self.rights };
         if !fs_ops.use_remote_ids {
@@ -657,65 +574,38 @@ impl FsNodeOps for RemoteNode {
         let owner;
         let rdev;
         let fsverity_enabled;
-        if fs_ops.supports_open3 {
-            let mut attrs = zxio_node_attributes_t {
-                has: zxio_node_attr_has_t {
-                    protocols: true,
-                    abilities: true,
-                    mode: true,
-                    uid: true,
-                    gid: true,
-                    rdev: true,
-                    id: true,
-                    fsverity_enabled: true,
-                    ..Default::default()
-                },
+        let mut attrs = zxio_node_attributes_t {
+            has: zxio_node_attr_has_t {
+                protocols: true,
+                abilities: true,
+                mode: true,
+                uid: true,
+                gid: true,
+                rdev: true,
+                id: true,
+                fsverity_enabled: true,
                 ..Default::default()
-            };
-            let open_operations = self.rights.rights().unwrap_or(fio::Operations::empty());
-            zxio = Arc::new(
-                self.zxio
-                    .open3(
-                        name,
-                        open_operations.to_flags(),
-                        ZxioOpenOptions { attributes: Some(&mut attrs), create_attributes: None },
-                    )
-                    .map_err(|status| from_status_like_fdio!(status, name))?,
-            );
-            mode = get_mode(&attrs);
-            node_id = attrs.id;
-            rdev = DeviceType::from_bits(attrs.rdev);
-            owner = FsCred { uid: attrs.uid, gid: attrs.gid };
-            fsverity_enabled = attrs.fsverity_enabled;
-            // fsverity should not be enabled for non-file nodes.
-            if fsverity_enabled && (attrs.protocols & ZXIO_NODE_PROTOCOL_FILE == 0) {
-                return error!(EINVAL);
-            }
-        } else {
-            zxio = Arc::new(self.zxio.open(self.rights, name).map_err(|status| match status {
-                // TODO: When the file is not found `PEER_CLOSED` is returned. In this case the peer
-                // closed should be translated into ENOENT, so that the file may be created. This
-                // logic creates a race when creating files in remote filesystems, between us and
-                // any other client creating a file between here and `mknod`.
-                zx::Status::PEER_CLOSED => errno!(ENOENT, name),
-                status => from_status_like_fdio!(status, name),
-            })?);
-
-            // Unfortunately, remote filesystems that don't support open3 require another
-            // round-trip.
-            let attrs = zxio
-                .attr_get(zxio_node_attr_has_t {
-                    protocols: true,
-                    abilities: true,
-                    id: true,
-                    ..Default::default()
-                })
-                .map_err(|status| from_status_like_fdio!(status))?;
-            mode = get_mode(&attrs);
-            node_id = attrs.id;
-            rdev = DeviceType::from_bits(0);
-            fsverity_enabled = false;
-            owner = FsCred::root();
+            },
+            ..Default::default()
+        };
+        let open_operations = self.rights.rights().unwrap_or(fio::Operations::empty());
+        zxio = Arc::new(
+            self.zxio
+                .open3(
+                    name,
+                    open_operations.to_flags(),
+                    ZxioOpenOptions { attributes: Some(&mut attrs), create_attributes: None },
+                )
+                .map_err(|status| from_status_like_fdio!(status, name))?,
+        );
+        mode = get_mode(&attrs);
+        node_id = attrs.id;
+        rdev = DeviceType::from_bits(attrs.rdev);
+        owner = FsCred { uid: attrs.uid, gid: attrs.gid };
+        fsverity_enabled = attrs.fsverity_enabled;
+        // fsverity should not be enabled for non-file nodes.
+        if fsverity_enabled && (attrs.protocols & ZXIO_NODE_PROTOCOL_FILE == 0) {
+            return error!(EINVAL);
         }
 
         fs.get_or_create_node(
@@ -787,22 +677,20 @@ impl FsNodeOps for RemoteNode {
 
     fn fetch_and_refresh_info<'a>(
         &self,
-        node: &FsNode,
+        _node: &FsNode,
         _current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
-        let update_timestamps = self.filesystem_manages_timestamps(&node);
-        // TODO(https://fxbug.dev/294318193): when Fxfs supports tracking atime, we should refresh with the
-        // corresponding value.
+        // TODO(https://fxbug.dev/294318193): when Fxfs and Memfs support tracking atime, we should
+        // refresh with the corresponding value.
         let attrs = self
             .zxio
             .attr_get(zxio_node_attr_has_t {
                 content_size: true,
                 storage_size: true,
                 link_count: true,
-                // If the filesystem can manage timestamps, update `info` with those timestamps.
-                modification_time: update_timestamps,
-                change_time: update_timestamps,
+                modification_time: true,
+                change_time: true,
                 ..Default::default()
             })
             .map_err(|status| from_status_like_fdio!(status))?;
@@ -811,14 +699,8 @@ impl FsNodeOps for RemoteNode {
         Ok(RwLockWriteGuard::downgrade(info))
     }
 
-    // Indicates if the filesystem can manage the timestamps (i.e. atime, ctime, and mtime).
-    // The filesystem should also support getting and setting these timestamps, which for atime and
-    // ctime is only true when the filesystem supports open3 (and thus supports GetAttributes (io2)
-    // and UpdateAttributes (io2))
-    fn filesystem_manages_timestamps(&self, node: &FsNode) -> bool {
-        let fs = node.fs();
-        let fs_ops = RemoteFs::from_fs(&fs);
-        fs_ops.supports_open3
+    fn filesystem_manages_timestamps(&self, _node: &FsNode) -> bool {
+        true
     }
 
     fn update_attributes(
