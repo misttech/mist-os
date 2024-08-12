@@ -52,6 +52,10 @@ const (
 	// The directory is unspecified.
 	buildstatsJSONName = "buildstats.json"
 
+	// subbuildsJSONName names the JSON file listing potential ninja sub-build directories.
+	// It is expected to be located in the top build directory.
+	subbuildsJSONName = "ninja_subbuilds.json"
+
 	// Name of the directory within the build directory that will contain clang
 	// crash reports. This name is configured by the `crash_diagnostics_dir` GN
 	// arg in //build/config/clang/crash_diagnostics.gni.
@@ -112,9 +116,43 @@ type ninjaDebugFileSet struct {
 	statsPath string
 }
 
+// subbuildEntry follows from the metadata written by GN to 'ninja_subbuilds.json'
+type subbuildEntry struct {
+	BuildDir string `json:"build_dir"`
+}
+
 func checkFileExists(filePath string) bool {
 	_, error := os.Stat(filePath)
 	return !errors.Is(error, os.ErrNotExist)
+}
+
+func getSubbuildSubdirs(ctx context.Context, subbuildsJSON string) ([]string, error) {
+	subbuildSubdirs := []string{}
+	if checkFileExists(subbuildsJSON) {
+		var subbuildEntries []subbuildEntry
+		subbuildsData, err := os.ReadFile(subbuildsJSON)
+		if err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(subbuildsData, &subbuildEntries); err != nil {
+			return nil, err
+		}
+		for _, e := range subbuildEntries {
+			subbuildSubdirs = append(subbuildSubdirs, e.BuildDir)
+		}
+	}
+	return subbuildSubdirs, nil
+}
+
+// subninjaLogIsRecent returns true if the mtime of the `log` is
+// newer than time `t`.  This is passed a function to facilitate
+// unit-testing.
+func subninjaLogIsRecent(log string, t time.Time) (bool, error) {
+	info, err := os.Stat(log)
+	if err != nil {
+		return false, err
+	}
+	return t.Before(info.ModTime()), nil
 }
 
 // Build runs `ninja` given a static and context spec. It's intended to be
@@ -130,7 +168,7 @@ func Build(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb.C
 		return nil, err
 	}
 
-	artifacts, err := buildImpl(ctx, &subprocess.Runner{}, checkFileExists, staticSpec, contextSpec, modules, platform)
+	artifacts, err := buildImpl(ctx, &subprocess.Runner{}, subninjaLogIsRecent, checkFileExists, staticSpec, contextSpec, modules, platform)
 	if err != nil && artifacts != nil && artifacts.FailureSummary == "" {
 		// Fall back to using the error text as the failure summary if the
 		// failure summary is unset. It's better than failing without emitting
@@ -145,6 +183,7 @@ func Build(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb.C
 func buildImpl(
 	ctx context.Context,
 	runner subprocessRunner,
+	subninjaLogIsRecent func(string, time.Time) (bool, error),
 	fileExists func(string) bool,
 	staticSpec *fintpb.Static,
 	contextSpec *fintpb.Context,
@@ -234,15 +273,32 @@ func buildImpl(
 
 	// Each ninja invocation produces a log file located in its build dir.
 	// Depending on the status of the build, not all sub-build logs are guaranteed to exist.
-	// TODO(b/349155983): Support ninja logs from multiple sub-builds
 	topNinjaLog := filepath.Join(buildDir, ninjaLogPath)
+	subbuildsJSON := filepath.Join(buildDir, subbuildsJSONName)
+	subbuildSubdirs, err := getSubbuildSubdirs(ctx, subbuildsJSON)
+	if err != nil {
+		return nil, err
+	}
 	ninjaLogCandidates := []string{topNinjaLog}
+	for _, subdir := range subbuildSubdirs {
+		subninjaLog := filepath.Join(buildDir, subdir, ninjaLogPath)
+		if !fileExists(subninjaLog) {
+			continue
+		}
+		// A ninja log could exist from a previous build,
+		// so only take logs that were touched since the start time.
+		recent, err := subninjaLogIsRecent(subninjaLog, ninjaStartTime)
+		if err != nil {
+			return nil, err
+		}
+		if !recent {
+			continue
+		}
+		ninjaLogCandidates = append(ninjaLogCandidates, subninjaLog)
+	}
 
 	ninjaDebugFileSets := []*ninjaDebugFileSet{}
 	for _, ninjaLog := range ninjaLogCandidates {
-		if !fileExists(ninjaLog) {
-			continue
-		}
 		ninjaDebugFiles, traceErr := getNinjaDebugFiles(ctx, r, buildDir, targets, ninjaLog, ninjatraceToolPath, buildstatsToolPath)
 		if traceErr != nil {
 			logger.Warningf(ctx, "(ignored) Failed to analyze ninja log %s, with error: %v", ninjaLog, traceErr)
@@ -369,6 +425,7 @@ func buildImpl(
 func getNinjaDebugFiles(ctx context.Context, r ninjaRunner, buildDir string, targets []string, ninjaLog string, ninjatraceToolPath string, buildstatsToolPath string) (*ninjaDebugFileSet, error) {
 	// Write auxiliary files and the final ninja trace to the same dir where the ninja log resides.
 	// This this assumes that the build dir is writeable.
+	logger.Debugf(ctx, "analyzing ninja log: %s", ninjaLog)
 	subBuildDirAbs := filepath.Dir(ninjaLog)
 
 	ninjaDepsFile := filepath.Join(subBuildDirAbs, ninjaDepsPath)
