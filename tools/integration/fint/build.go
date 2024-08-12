@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -115,6 +116,13 @@ type ninjaDebugFileSet struct {
 	// An empty value means this output was not generated.
 	statsPath string
 }
+
+type byLogPath []*ninjaDebugFileSet
+
+// functions for sorting
+func (n byLogPath) Len() int           { return len(n) }
+func (n byLogPath) Swap(i, j int)      { n[i], n[j] = n[j], n[i] }
+func (n byLogPath) Less(i, j int) bool { return n[i].logPath < n[j].logPath }
 
 // subbuildEntry follows from the metadata written by GN to 'ninja_subbuilds.json'
 type subbuildEntry struct {
@@ -297,15 +305,33 @@ func buildImpl(
 		ninjaLogCandidates = append(ninjaLogCandidates, subninjaLog)
 	}
 
-	ninjaDebugFileSets := []*ninjaDebugFileSet{}
+	// Process ninja logs, in parallel.
+	ninjaFileSetChan := make(chan *ninjaDebugFileSet, len(ninjaLogCandidates))
+	eg, egCtx := errgroup.WithContext(ctx)
 	for _, ninjaLog := range ninjaLogCandidates {
-		ninjaDebugFiles, traceErr := getNinjaDebugFiles(ctx, r, buildDir, targets, ninjaLog, ninjatraceToolPath, buildstatsToolPath)
-		if traceErr != nil {
-			logger.Warningf(ctx, "(ignored) Failed to analyze ninja log %s, with error: %v", ninjaLog, traceErr)
-		}
-
-		ninjaDebugFileSets = append(ninjaDebugFileSets, ninjaDebugFiles)
+		ninjaLog := ninjaLog
+		eg.Go(func() error {
+			// `egCtx` allows errgroup to cancel other goroutines as soon as one of them errors.
+			fs, err := getNinjaDebugFiles(egCtx, r, buildDir, targets, ninjaLog, ninjatraceToolPath, buildstatsToolPath)
+			if err != nil {
+				logger.Warningf(ctx, "(ignored) Failed to analyze ninja log %s, with error: %v", ninjaLog, err)
+				return nil
+			}
+			ninjaFileSetChan <- fs
+			return nil
+		})
 	}
+	if err := eg.Wait(); err != nil {
+		return artifacts, err
+	}
+	// Pull file sets from channel into array.
+	close(ninjaFileSetChan)
+	var ninjaDebugFileSets []*ninjaDebugFileSet
+	for fs := range ninjaFileSetChan {
+		ninjaDebugFileSets = append(ninjaDebugFileSets, fs)
+	}
+	// Make ordering deterministic for the sake of testing.
+	sort.Sort(byLogPath(ninjaDebugFileSets))
 
 	if contextSpec.ArtifactDir != "" {
 		for _, debugFileSet := range ninjaDebugFileSets {
