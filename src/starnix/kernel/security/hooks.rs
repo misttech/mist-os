@@ -10,7 +10,6 @@ use crate::vfs::{
     FileSystemHandle, FileSystemOptions, FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode,
     ValueOrSize, XattrOp,
 };
-
 use selinux_core::security_server::{Mode, SecurityServer};
 use selinux_core::SecurityId;
 use starnix_uapi::error;
@@ -133,7 +132,7 @@ pub fn task_alloc(task: &Task, clone_flags: u64) -> TaskState {
     TaskState {
         attrs: run_if_selinux_else(
             task,
-            |_| selinux_hooks::task_alloc(&task.read().security_state.attrs, clone_flags),
+            |_| selinux_hooks::task::task_alloc(&task.read().security_state.attrs, clone_flags),
             || selinux_hooks::TaskAttrs::for_selinux_disabled(),
         ),
     }
@@ -161,7 +160,7 @@ pub fn get_task_context(current_task: &CurrentTask, target: &Task) -> Result<Vec
 pub fn check_task_create_access(current_task: &CurrentTask) -> Result<(), Errno> {
     check_if_selinux(current_task, |security_server| {
         let sid = get_current_sid(&current_task);
-        selinux_hooks::check_task_create_access(&security_server.as_permission_check(), sid)
+        selinux_hooks::task::check_task_create_access(&security_server.as_permission_check(), sid)
     })
 }
 
@@ -173,7 +172,7 @@ pub fn check_exec_access(
     check_if_selinux_else(
         current_task,
         |security_server| {
-            selinux_hooks::check_exec_access(&security_server, current_task, executable_node)
+            selinux_hooks::task::check_exec_access(&security_server, current_task, executable_node)
         },
         || Ok(ResolvedElfState { sid: None }),
     )
@@ -191,7 +190,7 @@ pub fn check_getsched_access(source: &CurrentTask, target: &Task) -> Result<(), 
     check_if_selinux(source, |security_server| {
         let source_sid = get_current_sid(&source);
         let target_sid = get_current_sid(&target);
-        selinux_hooks::check_getsched_access(
+        selinux_hooks::task::check_getsched_access(
             &security_server.as_permission_check(),
             source_sid,
             target_sid,
@@ -204,7 +203,7 @@ pub fn check_setsched_access(source: &CurrentTask, target: &Task) -> Result<(), 
     check_if_selinux(source, |security_server| {
         let source_sid = get_current_sid(&source);
         let target_sid = get_current_sid(&target);
-        selinux_hooks::check_setsched_access(
+        selinux_hooks::task::check_setsched_access(
             &security_server.as_permission_check(),
             source_sid,
             target_sid,
@@ -217,7 +216,7 @@ pub fn check_getpgid_access(source: &CurrentTask, target: &Task) -> Result<(), E
     check_if_selinux(source, |security_server| {
         let source_sid = get_current_sid(&source);
         let target_sid = get_current_sid(&target);
-        selinux_hooks::check_getpgid_access(
+        selinux_hooks::task::check_getpgid_access(
             &security_server.as_permission_check(),
             source_sid,
             target_sid,
@@ -230,7 +229,7 @@ pub fn check_setpgid_access(source: &CurrentTask, target: &Task) -> Result<(), E
     check_if_selinux(source, |security_server| {
         let source_sid = get_current_sid(&source);
         let target_sid = get_current_sid(&target);
-        selinux_hooks::check_setpgid_access(
+        selinux_hooks::task::check_setpgid_access(
             &security_server.as_permission_check(),
             source_sid,
             target_sid,
@@ -244,7 +243,7 @@ pub fn check_task_getsid(source: &CurrentTask, target: &Task) -> Result<(), Errn
     check_if_selinux(source, |security_server| {
         let source_sid = get_current_sid(&source);
         let target_sid = get_current_sid(&target);
-        selinux_hooks::check_task_getsid(
+        selinux_hooks::task::check_task_getsid(
             &security_server.as_permission_check(),
             source_sid,
             target_sid,
@@ -261,7 +260,7 @@ pub fn check_signal_access(
     check_if_selinux(source, |security_server| {
         let source_sid = get_current_sid(&source);
         let target_sid = get_current_sid(&target);
-        selinux_hooks::check_signal_access(
+        selinux_hooks::task::check_signal_access(
             &security_server.as_permission_check(),
             source_sid,
             target_sid,
@@ -279,7 +278,7 @@ pub fn check_signal_access_tg(
     check_if_selinux(source, |security_server| {
         let source_sid = get_current_sid(&source);
         let target_sid = get_current_sid(target);
-        selinux_hooks::check_signal_access(
+        selinux_hooks::task::check_signal_access(
             &security_server.as_permission_check(),
             source_sid,
             target_sid,
@@ -291,7 +290,7 @@ pub fn check_signal_access_tg(
 // Checks whether the `parent_tracer_task` is allowed to trace the current `tracee_task`.
 pub fn ptrace_traceme(tracee_task: &CurrentTask, parent_tracer_task: &Task) -> Result<(), Errno> {
     check_if_selinux(tracee_task, |security_server| {
-        selinux_hooks::ptrace_access_check(
+        selinux_hooks::task::ptrace_access_check(
             &security_server.as_permission_check(),
             get_current_sid(&parent_tracer_task),
             &mut tracee_task.write().security_state.attrs,
@@ -305,7 +304,7 @@ pub fn ptrace_access_check(tracer_task: &CurrentTask, tracee_task: &Task) -> Res
     check_if_selinux(tracer_task, |security_server| {
         let tracer_sid = get_current_sid(&tracer_task);
         let mut task_state = tracee_task.write();
-        selinux_hooks::ptrace_access_check(
+        selinux_hooks::task::ptrace_access_check(
             &security_server.as_permission_check(),
             tracer_sid,
             &mut task_state.security_state.attrs,
@@ -324,7 +323,7 @@ pub fn task_prlimit(
     check_if_selinux(source, |security_server| {
         let source_sid = get_current_sid(&source);
         let target_sid = get_current_sid(&target);
-        selinux_hooks::task_prlimit(
+        selinux_hooks::task::task_prlimit(
             &security_server.as_permission_check(),
             source_sid,
             target_sid,
@@ -445,7 +444,9 @@ pub fn get_procattr(
 ) -> Result<Vec<u8>, Errno> {
     check_if_selinux_else(
         current_task,
-        |security_server| selinux_hooks::get_procattr(security_server, current_task, target, attr),
+        |security_server| {
+            selinux_hooks::task::get_procattr(security_server, current_task, target, attr)
+        },
         // If SELinux is disabled then there are no values to return.
         || error!(EINVAL),
     )
@@ -459,7 +460,9 @@ pub fn set_procattr(
 ) -> Result<(), Errno> {
     check_if_selinux_else(
         current_task,
-        |security_server| selinux_hooks::set_procattr(security_server, current_task, attr, context),
+        |security_server| {
+            selinux_hooks::task::set_procattr(security_server, current_task, attr, context)
+        },
         // If SELinux is disabled then no writes are accepted.
         || error!(EINVAL),
     )

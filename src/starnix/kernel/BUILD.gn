@@ -196,6 +196,7 @@ rustc_library("starnix_core") {
     "security/mod.rs",
     "security/selinux_hooks/fs.rs",
     "security/selinux_hooks/mod.rs",
+    "security/selinux_hooks/task.rs",
     "security/selinux_hooks/testing.rs",
     "signals/mod.rs",
     "signals/signal_handling.rs",
