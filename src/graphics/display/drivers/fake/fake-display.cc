@@ -655,11 +655,6 @@ zx_status_t FakeDisplay::DisplayEngineReleaseCapture(uint64_t capture_handle) {
   return ZX_OK;
 }
 
-bool FakeDisplay::DisplayEngineIsCaptureCompleted() {
-  fbl::AutoLock lock(&capture_mutex_);
-  return current_capture_target_image_id_ == display::kInvalidDriverCaptureImageId;
-}
-
 zx_status_t FakeDisplay::InitializeCapture() {
   {
     fbl::AutoLock image_lock(&image_mutex_);

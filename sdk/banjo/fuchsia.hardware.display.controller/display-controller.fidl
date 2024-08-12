@@ -621,12 +621,6 @@ closed protocol DisplayEngine {
         s zx.Status;
     });
 
-    /// Returns true if display capture is supported and the previous capture is
-    /// completed. False otherwise.
-    strict IsCaptureCompleted() -> (struct {
-        is_capture_completed bool;
-    });
-
     /// Set the minimum value of RGB channels.
     ///
     /// Returns ZX_ERR_NOT_SUPPORTED if RGB clamping is not supported.

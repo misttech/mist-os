@@ -163,10 +163,6 @@ zx_status_t DisplayControllerBanjo::DisplayEngineReleaseCapture(uint64_t banjo_c
   return result.status_value();
 }
 
-bool DisplayControllerBanjo::DisplayEngineIsCaptureCompleted() {
-  return engine_.IsCaptureCompleted();
-}
-
 zx_status_t DisplayControllerBanjo::DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) {
   zx::result<> result = engine_.SetMinimumRgb(minimum_rgb);
   return result.status_value();

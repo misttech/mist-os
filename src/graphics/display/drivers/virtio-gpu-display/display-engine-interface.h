@@ -72,7 +72,6 @@ class DisplayEngineInterface {
   virtual bool IsCaptureSupported() = 0;
   virtual zx::result<> StartCapture(display::DriverCaptureImageId capture_image_id) = 0;
   virtual zx::result<> ReleaseCapture(display::DriverCaptureImageId capture_image_id) = 0;
-  virtual bool IsCaptureCompleted() = 0;
 
   virtual zx::result<> SetMinimumRgb(uint8_t minimum_rgb) = 0;
 

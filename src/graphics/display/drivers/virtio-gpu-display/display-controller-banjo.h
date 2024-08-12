@@ -60,7 +60,6 @@ class DisplayControllerBanjo : public ddk::DisplayEngineProtocol<DisplayControll
   bool DisplayEngineIsCaptureSupported();
   zx_status_t DisplayEngineStartCapture(uint64_t capture_handle);
   zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle);
-  bool DisplayEngineIsCaptureCompleted();
   zx_status_t DisplayEngineSetMinimumRgb(uint8_t minimum_rgb);
 
   display_engine_protocol_t GetProtocol();

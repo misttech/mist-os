@@ -96,7 +96,6 @@ class DisplayEngine final : public DisplayEngineInterface {
   bool IsCaptureSupported() override;
   zx::result<> StartCapture(display::DriverCaptureImageId capture_image_id) override;
   zx::result<> ReleaseCapture(display::DriverCaptureImageId capture_image_id) override;
-  bool IsCaptureCompleted() override;
   zx::result<> SetMinimumRgb(uint8_t minimum_rgb) override;
 
   // Finds the first display usable by this driver, in the `display_infos` list.

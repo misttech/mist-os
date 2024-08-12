@@ -330,12 +330,6 @@ open protocol Engine {
         capture_image_id ImageId;
     }) -> () error zx.Status;
 
-    /// Returns true if display capture is supported and the previous capture is
-    /// completed. False otherwise.
-    flexible IsCaptureCompleted() -> (struct {
-        is_capture_completed bool;
-    });
-
     /// Triggered when a previous display capture triggered by [`StartCapture`]
     /// is completed.
     ///
