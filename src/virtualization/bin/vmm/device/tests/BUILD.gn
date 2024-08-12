@@ -12,7 +12,6 @@ group("tests") {
     ":virtio_console_device_tests",
     ":virtio_gpu_device_tests",
     ":virtio_input_device_tests",
-    ":virtio_magma_device_tests",
     ":virtio_mem_device_tests",
     ":virtio_net_device_tests",
     ":virtio_rng_device_tests",
@@ -226,42 +225,6 @@ device_test("virtio_input_device_tests") {
       max_severity = "ERROR"
     }
   }
-}
-
-device_test("virtio_magma_device_tests") {
-  sources = [ "virtio_magma_test.cc" ]
-  manifest = "meta/virtio_magma_device_tests.cml"
-  device_components = [
-    "//src/virtualization/bin/vmm/device/virtio_magma:virtio_magma_component",
-  ]
-
-  deps = [
-    ":test_with_device",
-    ":virtio_queue_fake",
-    "//sdk/fidl/fuchsia.logger:fuchsia.logger_hlcpp",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
-    "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_hlcpp",
-    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
-    "//sdk/fidl/fuchsia.virtualization:fuchsia.virtualization_hlcpp",
-    "//sdk/fidl/fuchsia.virtualization.hardware:fuchsia.virtualization.hardware_hlcpp",
-    "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_hlcpp",
-    "//sdk/lib/magma_client:magma_headers",
-    "//sdk/lib/sys/component/cpp/testing:cpp",
-    "//sdk/lib/sys/cpp",
-    "//src/graphics/drivers/msd-intel-gen/include:include",
-    "//src/graphics/lib/magma/include/virtio:headers",
-    "//src/lib/fsl",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/zx",
-  ]
-
-  test_specs = {
-    environments = guest_vulkan_envs
-    log_settings = {
-      max_severity = "ERROR"
-    }
-  }
-  test_type = "system"
 }
 
 device_test("virtio_net_device_tests") {
