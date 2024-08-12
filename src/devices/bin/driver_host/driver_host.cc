@@ -51,9 +51,9 @@ zx::result<> DriverHost::PublishDriverHost(component::OutgoingDirectory& outgoin
   };
   auto status = outgoing_directory.AddUnmanagedProtocol<fdh::DriverHost>(std::move(service));
   if (status.is_error()) {
-    FX_SLOG(ERROR, "Failed to add directory entry",
-            FX_KV("name", fidl::DiscoverableProtocolName<fdh::DriverHost>),
-            FX_KV("status_str", status.status_string()));
+    FX_LOG_KV(ERROR, "Failed to add directory entry",
+              FX_KV("name", fidl::DiscoverableProtocolName<fdh::DriverHost>),
+              FX_KV("status_str", status.status_string()));
   }
 
   return status;
@@ -87,8 +87,8 @@ void DriverHost::GetProcessInfo(GetProcessInfoCompleter::Sync& completer) {
   zx_status_t status =
       zx::process::self()->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
   if (status != ZX_OK) {
-    FX_SLOG(ERROR, "Failed to get info about process handle",
-            FX_KV("status_str", zx_status_get_string(status)));
+    FX_LOG_KV(ERROR, "Failed to get info about process handle",
+              FX_KV("status_str", zx_status_get_string(status)));
     completer.Reply(zx::error(status));
     return;
   }
@@ -97,8 +97,8 @@ void DriverHost::GetProcessInfo(GetProcessInfoCompleter::Sync& completer) {
   status =
       zx::job::default_job()->get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
   if (status != ZX_OK) {
-    FX_SLOG(ERROR, "Failed to get info about job handle",
-            FX_KV("status_str", zx_status_get_string(status)));
+    FX_LOG_KV(ERROR, "Failed to get info about job handle",
+              FX_KV("status_str", zx_status_get_string(status)));
     completer.Reply(zx::error(status));
     return;
   }
@@ -130,8 +130,8 @@ void DriverHost::StartDriver(fbl::RefPtr<Driver> driver,
   auto start_callback = [this, driver, cb = std::move(cb),
                          request = std::move(request)](zx::result<> status) mutable {
     if (status.is_error()) {
-      FX_SLOG(ERROR, "Failed to start driver", FX_KV("url", driver->url().data()),
-              FX_KV("status_str", status.status_string()));
+      FX_LOG_KV(ERROR, "Failed to start driver", FX_KV("url", driver->url().data()),
+                FX_KV("status_str", status.status_string()));
       // If we fail to start the driver, we need to initiate shutting down the driver and
       // dispatchers.
       ShutdownDriver(driver.get(), {});
@@ -139,12 +139,12 @@ void DriverHost::StartDriver(fbl::RefPtr<Driver> driver,
       return;
     }
 
-    FX_SLOG(INFO, "Started driver", FX_KV("url", driver->url().data()));
+    FX_LOG_KV(INFO, "Started driver", FX_KV("url", driver->url().data()));
     auto unbind_callback = [this](Driver* driver, fidl::UnbindInfo info,
                                   fidl::ServerEnd<fdh::Driver> server) {
       if (!info.is_user_initiated()) {
-        FX_SLOG(WARNING, "Unexpected stop of driver", FX_KV("url", driver->url().data()),
-                FX_KV("status_str", info.FormatDescription().data()));
+        FX_LOG_KV(WARNING, "Unexpected stop of driver", FX_KV("url", driver->url().data()),
+                  FX_KV("status_str", info.FormatDescription().data()));
       }
       ShutdownDriver(driver, std::move(server));
     };

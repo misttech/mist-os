@@ -38,8 +38,8 @@ class FakeRoleManager : public fidl::WireServer<fuchsia_scheduler::RoleManager> 
 zx::result<std::unique_ptr<FakeRoleManager>> FakeRoleManager::Create() {
   auto config_result = zircon_profile::LoadConfigs(kConfigPath);
   if (config_result.is_error()) {
-    FX_SLOG(ERROR, "Failed to load configs", FX_KV("error", config_result.error_value()),
-            FX_KV("tag", "FakeRoleManager"));
+    FX_LOG_KV(ERROR, "Failed to load configs", FX_KV("error", config_result.error_value()),
+              FX_KV("tag", "FakeRoleManager"));
     return zx::error(ZX_ERR_INTERNAL);
   }
   return zx::ok(
@@ -58,8 +58,8 @@ void FakeRoleManager::SetRole(SetRoleRequestView request, SetRoleCompleter::Sync
     std::optional<std::vector<fuchsia_scheduler::Parameter>> maybe_input_params =
         fidl::ToNatural(request->input_parameters());
     if (!maybe_input_params.has_value()) {
-      FX_SLOG(WARNING, "Unable to take ownership of input parameters.", FX_KV("role", role_name),
-              FX_KV("tag", "FakeRoleManager"));
+      FX_LOG_KV(WARNING, "Unable to take ownership of input parameters.", FX_KV("role", role_name),
+                FX_KV("tag", "FakeRoleManager"));
       completer.ReplyError(ZX_ERR_INVALID_ARGS);
       return;
     }
@@ -83,15 +83,15 @@ void FakeRoleManager::SetRole(SetRoleRequestView request, SetRoleCompleter::Sync
     return;
   }
 
-  FX_SLOG(DEBUG, "Requested role not found", FX_KV("role", role->name()),
-          FX_KV("tag", "FakeRoleManager"));
+  FX_LOG_KV(DEBUG, "Requested role not found", FX_KV("role", role->name()),
+            FX_KV("tag", "FakeRoleManager"));
   completer.ReplyError(ZX_ERR_NOT_FOUND);
 }
 
 void FakeRoleManager::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_scheduler::RoleManager> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  FX_SLOG(ERROR, "Got request to handle unknown method", FX_KV("tag", "FakeRoleManager"));
+  FX_LOG_KV(ERROR, "Got request to handle unknown method", FX_KV("tag", "FakeRoleManager"));
 }
 
 }  // namespace

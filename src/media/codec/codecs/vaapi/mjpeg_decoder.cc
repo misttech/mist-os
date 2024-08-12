@@ -44,7 +44,7 @@ MJPEGDecoder::DecodeResult MJPEGDecoder::Decode() {
   if (!pending_parse_result_.has_value()) {
     JpegParseResult parse_result;
     if (!ParseJpegPicture(stream_data_, stream_bytes_left_, &parse_result)) {
-      FX_SLOG(WARNING, "ParseJpegPicture failed");
+      FX_LOG_KV(WARNING, "ParseJpegPicture failed");
       return kDecodeError;
     }
 
@@ -97,9 +97,9 @@ MJPEGDecoder::DecodeResult MJPEGDecoder::Decode() {
     return kDecodeError;
   }
 
-  // TODO(https://fxbug.dev/42073235): Right now we limit the caller of stream processor to only submit one
-  // JPEG encoded frame at a time. We could update this implementation to allow the client to submit
-  // fractional or multiple frames per buffer.
+  // TODO(https://fxbug.dev/42073235): Right now we limit the caller of stream processor to only
+  // submit one JPEG encoded frame at a time. We could update this implementation to allow the
+  // client to submit fractional or multiple frames per buffer.
   return kRanOutOfStreamData;
 }
 

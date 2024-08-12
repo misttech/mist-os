@@ -14,7 +14,7 @@ int main() {
 
   auto client_end = component::Connect<fuchsia_driver_test::Realm>();
   if (!client_end.is_ok()) {
-    FX_SLOG(ERROR, "Failed to connect to Realm FIDL", FX_KV("error", client_end.error_value()));
+    FX_LOG_KV(ERROR, "Failed to connect to Realm FIDL", FX_KV("error", client_end.error_value()));
     return 1;
   }
   fidl::WireSyncClient client{std::move(*client_end)};
@@ -46,11 +46,11 @@ int main() {
   // log checker in tests.
   zx::result ramctl = device_watcher::RecursiveWaitForFile("/dev/sys/platform/ram-disk/ramctl");
   if (ramctl.is_error()) {
-    FX_SLOG(ERROR, "Failed to wait for ramctl", FX_KV("status", ramctl.status_value()));
+    FX_LOG_KV(ERROR, "Failed to wait for ramctl", FX_KV("status", ramctl.status_value()));
   }
   zx::result nand_ctl = device_watcher::RecursiveWaitForFile("/dev/sys/platform/00:00:2e/nand-ctl");
   if (nand_ctl.is_error()) {
-    FX_SLOG(ERROR, "Failed to wait for nand-ctl", FX_KV("status", nand_ctl.status_value()));
+    FX_LOG_KV(ERROR, "Failed to wait for nand-ctl", FX_KV("status", nand_ctl.status_value()));
   }
   return 0;
 }

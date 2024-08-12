@@ -53,7 +53,7 @@ MJPEGAccelerator::Status MJPEGAccelerator::SubmitDecode(
   status = vaCreateBuffer(display, adapter_->context_id(), VAPictureParameterBufferType,
                           sizeof(pic_param), 1, &pic_param, &pic_params_buffer_id);
   if (status != VA_STATUS_SUCCESS) {
-    FX_SLOG(ERROR, "vaCreateBuffer for pic_param failed", FX_KV("error_str", vaErrorStr(status)));
+    FX_LOG_KV(ERROR, "vaCreateBuffer for pic_param failed", FX_KV("error_str", vaErrorStr(status)));
     return Status::kFail;
   }
   ScopedBufferID pic_params_buffer(pic_params_buffer_id);
@@ -62,8 +62,8 @@ MJPEGAccelerator::Status MJPEGAccelerator::SubmitDecode(
   status = vaCreateBuffer(display, adapter_->context_id(), VAIQMatrixBufferType,
                           sizeof(matrix_buffer), 1, &matrix_buffer, &iq_matrix_buffer_id);
   if (status != VA_STATUS_SUCCESS) {
-    FX_SLOG(ERROR, "vaCreateBuffer for matrix_buffer failed",
-            FX_KV("error_str", vaErrorStr(status)));
+    FX_LOG_KV(ERROR, "vaCreateBuffer for matrix_buffer failed",
+              FX_KV("error_str", vaErrorStr(status)));
     return Status::kFail;
   }
   ScopedBufferID iq_matrix_buffer(iq_matrix_buffer_id);
@@ -72,8 +72,8 @@ MJPEGAccelerator::Status MJPEGAccelerator::SubmitDecode(
   status = vaCreateBuffer(display, adapter_->context_id(), VAHuffmanTableBufferType,
                           sizeof(huffman_table), 1, &huffman_table, &huffman_table_buffer_id);
   if (status != VA_STATUS_SUCCESS) {
-    FX_SLOG(ERROR, "vaCreateBuffer for huffman_table failed",
-            FX_KV("error_str", vaErrorStr(status)));
+    FX_LOG_KV(ERROR, "vaCreateBuffer for huffman_table failed",
+              FX_KV("error_str", vaErrorStr(status)));
     return Status::kFail;
   }
   ScopedBufferID huffman_table_buffer(huffman_table_buffer_id);
@@ -82,7 +82,8 @@ MJPEGAccelerator::Status MJPEGAccelerator::SubmitDecode(
   status = vaCreateBuffer(display, adapter_->context_id(), VASliceParameterBufferType,
                           sizeof(slice_param), 1, &slice_param, &slice_param_buffer_id);
   if (status != VA_STATUS_SUCCESS) {
-    FX_SLOG(ERROR, "vaCreateBuffer for slice_param failed", FX_KV("error_str", vaErrorStr(status)));
+    FX_LOG_KV(ERROR, "vaCreateBuffer for slice_param failed",
+              FX_KV("error_str", vaErrorStr(status)));
     return Status::kFail;
   }
   ScopedBufferID slice_param_buffer(slice_param_buffer_id);
@@ -94,8 +95,8 @@ MJPEGAccelerator::Status MJPEGAccelerator::SubmitDecode(
                           &jpeg_data_buffer_id);
 
   if (status != VA_STATUS_SUCCESS) {
-    FX_SLOG(ERROR, "vaCreateBuffer for jpeg_data_buffer_id failed",
-            FX_KV("error_str", vaErrorStr(status)));
+    FX_LOG_KV(ERROR, "vaCreateBuffer for jpeg_data_buffer_id failed",
+              FX_KV("error_str", vaErrorStr(status)));
     return Status::kFail;
   }
   ScopedBufferID jpeg_data_buffer(jpeg_data_buffer_id);
@@ -103,7 +104,7 @@ MJPEGAccelerator::Status MJPEGAccelerator::SubmitDecode(
   auto va_surface_id = static_cast<VaapiJpegPicture*>(picture.get())->GetVASurfaceID();
   status = vaBeginPicture(display, adapter_->context_id(), va_surface_id);
   if (status != VA_STATUS_SUCCESS) {
-    FX_SLOG(ERROR, "BeginPicture failed", FX_KV("error_str", vaErrorStr(status)));
+    FX_LOG_KV(ERROR, "BeginPicture failed", FX_KV("error_str", vaErrorStr(status)));
     return Status::kFail;
   }
 
@@ -113,13 +114,13 @@ MJPEGAccelerator::Status MJPEGAccelerator::SubmitDecode(
   status = vaRenderPicture(display, adapter_->context_id(), buffers.data(),
                            static_cast<int>(buffers.size()));
   if (status != VA_STATUS_SUCCESS) {
-    FX_SLOG(ERROR, "RenderPicture failed", FX_KV("error_str", vaErrorStr(status)));
+    FX_LOG_KV(ERROR, "RenderPicture failed", FX_KV("error_str", vaErrorStr(status)));
     return Status::kFail;
   }
 
   status = vaEndPicture(display, adapter_->context_id());
   if (status != VA_STATUS_SUCCESS) {
-    FX_SLOG(ERROR, "EndPicture failed", FX_KV("error_str", vaErrorStr(status)));
+    FX_LOG_KV(ERROR, "EndPicture failed", FX_KV("error_str", vaErrorStr(status)));
     return Status::kFail;
   }
 

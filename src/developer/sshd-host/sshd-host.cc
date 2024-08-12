@@ -32,7 +32,7 @@ int main(int argc, const char** argv) {
     zx::handle((zx_take_startup_handle(PA_DIRECTORY_REQUEST)));
   }
 
-  FX_SLOG(INFO, "sshd-host starting up");
+  FX_LOG_KV(INFO, "sshd-host starting up");
 
   zx::result client_end = component::Connect<fuchsia_boot::Items>();
   if (!client_end.is_ok()) {
@@ -44,35 +44,37 @@ int main(int argc, const char** argv) {
 
   if (zx_status_t status = sshd_host::provision_authorized_keys_from_bootloader_file(boot_items);
       status != ZX_OK) {
-    FX_SLOG(WARNING, "Failed to provision authorized_keys",
-            FX_KV("status", zx_status_get_string(status)));
+    FX_LOG_KV(WARNING, "Failed to provision authorized_keys",
+              FX_KV("status", zx_status_get_string(status)));
   }
 
   zx::process process;
   if (zx_status_t status = fdio_spawn(0, FDIO_SPAWN_CLONE_ALL, kKeyGenArgs[0], kKeyGenArgs,
                                       process.reset_and_get_address());
       status != ZX_OK) {
-    FX_SLOG(FATAL, "Failed to spawn hostkeygen", FX_KV("status", zx_status_get_string(status)));
+    FX_LOG_KV(FATAL, "Failed to spawn hostkeygen", FX_KV("status", zx_status_get_string(status)));
   }
   if (zx_status_t status = process.wait_one(ZX_PROCESS_TERMINATED, zx::time::infinite(), nullptr);
       status != ZX_OK) {
-    FX_SLOG(FATAL, "Failed to wait for hostkeygen", FX_KV("status", zx_status_get_string(status)));
+    FX_LOG_KV(FATAL, "Failed to wait for hostkeygen",
+              FX_KV("status", zx_status_get_string(status)));
   }
   zx_info_process_t info;
   if (zx_status_t status = process.get_info(ZX_INFO_PROCESS, &info, sizeof(info), nullptr, nullptr);
       status != ZX_OK) {
-    FX_SLOG(FATAL, "Failed to get hostkeygen info", FX_KV("status", zx_status_get_string(status)));
+    FX_LOG_KV(FATAL, "Failed to get hostkeygen info",
+              FX_KV("status", zx_status_get_string(status)));
   }
 
   if (info.return_code != 0) {
-    FX_SLOG(FATAL, "Failed to generate host keys", FX_KV("return_code", info.return_code));
+    FX_LOG_KV(FATAL, "Failed to generate host keys", FX_KV("return_code", info.return_code));
   }
 
   uint16_t port = kPort;
   if (argc > 1) {
     int arg = atoi(argv[1]);
     if (arg <= 0) {
-      FX_SLOG(ERROR, "Invalid port", FX_KV("argv[1]", argv[1]));
+      FX_LOG_KV(ERROR, "Invalid port", FX_KV("argv[1]", argv[1]));
       return -1;
     }
     port = static_cast<uint16_t>(arg);
@@ -80,7 +82,7 @@ int main(int argc, const char** argv) {
   sshd_host::Service service(loop.dispatcher(), port);
 
   if (zx_status_t status = loop.Run(); status != ZX_OK) {
-    FX_SLOG(FATAL, "Failed to run loop", FX_KV("status", zx_status_get_string(status)));
+    FX_LOG_KV(FATAL, "Failed to run loop", FX_KV("status", zx_status_get_string(status)));
   }
 
   return 0;

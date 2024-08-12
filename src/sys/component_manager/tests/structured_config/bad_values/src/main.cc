@@ -5,6 +5,6 @@
 #include <lib/syslog/cpp/macros.h>
 
 int main(int argc, const char** argv) {
-  FX_SLOG(ERROR, "This component was started when it wasn't supposed to.");
+  FX_LOG_KV(ERROR, "This component was started when it wasn't supposed to.");
   return 1;
 }

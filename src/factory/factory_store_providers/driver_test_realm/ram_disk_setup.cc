@@ -21,7 +21,7 @@ constexpr char kExt4FilePath[] = "/pkg/data/factory_ext4.img";
 zx::result<storage::RamDisk> MakeRamdisk() {
   fsl::SizedVmo result;
   if (!fsl::VmoFromFilename(kExt4FilePath, &result)) {
-    FX_SLOG(ERROR, "Failed to read file", FX_KV("path", kExt4FilePath));
+    FX_LOG_KV(ERROR, "Failed to read file", FX_KV("path", kExt4FilePath));
     return zx::make_result(ZX_ERR_INTERNAL).take_error();
   }
 
@@ -31,9 +31,9 @@ zx::result<storage::RamDisk> MakeRamdisk() {
 
   auto ram_disk_or = storage::RamDisk::CreateWithVmo(std::move(vmo), kRamdiskBlockSize);
   if (!ram_disk_or.is_ok()) {
-    FX_SLOG(ERROR, "Ramdisk failed to be created");
+    FX_LOG_KV(ERROR, "Ramdisk failed to be created");
   } else {
-    FX_SLOG(INFO, "Ramdisk created", FX_KV("path", ram_disk_or.value().path().c_str()));
+    FX_LOG_KV(INFO, "Ramdisk created", FX_KV("path", ram_disk_or.value().path().c_str()));
   }
 
   return ram_disk_or;
@@ -44,7 +44,7 @@ int main() {
 
   auto client_end = component::Connect<fuchsia_driver_test::Realm>();
   if (!client_end.is_ok()) {
-    FX_SLOG(ERROR, "Failed to connect to Realm FIDL", FX_KV("error", client_end.error_value()));
+    FX_LOG_KV(ERROR, "Failed to connect to Realm FIDL", FX_KV("error", client_end.error_value()));
     return 1;
   }
   fidl::WireSyncClient client{std::move(*client_end)};
@@ -55,17 +55,17 @@ int main() {
                         .root_driver("fuchsia-boot:///platform-bus#meta/platform-bus.cm")
                         .Build());
   if (wire_result.status() != ZX_OK) {
-    FX_SLOG(ERROR, "Failed to call to Realm:Start", FX_KV("status", wire_result.status()));
+    FX_LOG_KV(ERROR, "Failed to call to Realm:Start", FX_KV("status", wire_result.status()));
     return 1;
   }
   if (wire_result->is_error()) {
-    FX_SLOG(ERROR, "Realm:Start failed", FX_KV("error", wire_result->error_value()));
+    FX_LOG_KV(ERROR, "Realm:Start failed", FX_KV("error", wire_result->error_value()));
     return 1;
   }
 
   zx::result channel = device_watcher::RecursiveWaitForFile("/dev/sys/platform/ram-disk/ramctl");
   if (channel.is_error()) {
-    FX_SLOG(ERROR, "Failed to wait for ramctl", FX_KV("status", channel.status_value()));
+    FX_LOG_KV(ERROR, "Failed to wait for ramctl", FX_KV("status", channel.status_value()));
   }
 
   auto result = MakeRamdisk();

@@ -51,13 +51,13 @@ class OpenAccount : public fidl::Server<fuchsia_examples_services::ReadWriteAcco
     } else {
       completer.Reply({false});
     }
-    FX_SLOG(INFO, "Account balance updated: ", FX_KV("balance", account_.balance));
+    FX_LOG_KV(INFO, "Account balance updated: ", FX_KV("balance", account_.balance));
   }
 
   void Credit(CreditRequest& request, CreditCompleter::Sync& completer) override {
     account_.balance += request.amount();
     completer.Reply();
-    FX_SLOG(INFO, "Account balance updated: ", FX_KV("balance", account_.balance));
+    FX_LOG_KV(INFO, "Account balance updated: ", FX_KV("balance", account_.balance));
   }
 
  private:
@@ -69,22 +69,22 @@ int main(int argc, const char* argv[], char* envp[]) {
 
   // Read program arguments and construct the account
   if (argc < 3) {
-    FX_SLOG(ERROR, "Invalid number of arguments.");
+    FX_LOG_KV(ERROR, "Invalid number of arguments.");
     return -1;
   }
 
   component::OutgoingDirectory outgoing(loop.dispatcher());
   auto result = outgoing.ServeFromStartupInfo();
   if (result.is_error()) {
-    FX_SLOG(ERROR, "Failed to serve outgoing directory.");
+    FX_LOG_KV(ERROR, "Failed to serve outgoing directory.");
     return -1;
   }
 
   auto name = argv[1];
   auto balance = atoi(argv[2]);
   Account user_account = {.name = name, .balance = balance};
-  FX_SLOG(INFO, "Starting bank account provider", FX_KV("name", user_account.name.c_str()),
-          FX_KV("balance", user_account.balance));
+  FX_LOG_KV(INFO, "Starting bank account provider", FX_KV("name", user_account.name.c_str()),
+            FX_KV("balance", user_account.balance));
 
   fidl::ServerBindingGroup<fuchsia_examples_services::ReadOnlyAccount> read_only_bindings;
   fidl::ServerBindingGroup<fuchsia_examples_services::ReadWriteAccount> read_write_bindings;
@@ -101,7 +101,7 @@ int main(int argc, const char* argv[], char* envp[]) {
 
   result = outgoing.AddService<fuchsia_examples_services::BankAccount>(std::move(handler));
   if (result.is_error()) {
-    FX_SLOG(ERROR, "Failed to add service to outgoing.");
+    FX_LOG_KV(ERROR, "Failed to add service to outgoing.");
     return -1;
   }
 

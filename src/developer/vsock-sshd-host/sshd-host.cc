@@ -55,7 +55,7 @@ class DevNullVnode : public fs::Vnode {
 int main(int argc, const char** argv) {
   fuchsia_logging::SetTags({"sshd-host"});
 
-  FX_SLOG(INFO, "sshd-host starting up");
+  FX_LOG_KV(INFO, "sshd-host starting up");
 
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
 
@@ -90,7 +90,7 @@ int main(int argc, const char** argv) {
   if (argc > 1) {
     int arg = atoi(argv[1]);
     if (arg <= 0) {
-      FX_SLOG(ERROR, "Invalid port", FX_KV("argv[1]", argv[1]));
+      FX_LOG_KV(ERROR, "Invalid port", FX_KV("argv[1]", argv[1]));
       return -1;
     }
     port = static_cast<uint16_t>(arg);
@@ -98,7 +98,7 @@ int main(int argc, const char** argv) {
   sshd_host::Service service(loop.dispatcher(), port);
 
   if (zx_status_t status = loop.Run(); status != ZX_OK) {
-    FX_SLOG(FATAL, "Failed to run loop", FX_KV("status", zx_status_get_string(status)));
+    FX_LOG_KV(FATAL, "Failed to run loop", FX_KV("status", zx_status_get_string(status)));
   }
 
   return 0;

@@ -62,7 +62,7 @@ TEST_F(LogTest, LegacyFormat) {
   constexpr const char tag1[] = "test1";
   constexpr const char tag2[] = "test2";
   constexpr size_t line = __LINE__ + 1;
-  FX_SLOG(INFO, payload, FX_KV("tag", tag1), FX_KV("tag", tag2));
+  FX_LOG_KV(INFO, payload, FX_KV("tag", tag1), FX_KV("tag", tag2));
   fuchsia::logger::LogPtr accessor;
   std::unique_ptr context = sys::ComponentContext::Create();
   ASSERT_OK(context->svc()->Connect(accessor.NewRequest()));

@@ -16,7 +16,7 @@ int main() {
 
   auto client_end = component::Connect<fuchsia_driver_test::Realm>();
   if (!client_end.is_ok()) {
-    FX_SLOG(ERROR, "Failed to connect to Realm FIDL", FX_KV("error", client_end.error_value()));
+    FX_LOG_KV(ERROR, "Failed to connect to Realm FIDL", FX_KV("error", client_end.error_value()));
     return 1;
   }
   fidl::WireSyncClient client{std::move(*client_end)};
@@ -24,11 +24,11 @@ int main() {
   fidl::Arena arena;
   auto wire_result = client->Start(fuchsia_driver_test::wire::RealmArgs(arena));
   if (wire_result.status() != ZX_OK) {
-    FX_SLOG(ERROR, "Failed to connect to Realm:Start", FX_KV("error", wire_result.status()));
+    FX_LOG_KV(ERROR, "Failed to connect to Realm:Start", FX_KV("error", wire_result.status()));
     return 1;
   }
   if (wire_result.value().is_error()) {
-    FX_SLOG(ERROR, "Realm:Start failed", FX_KV("error", wire_result.value().error_value()));
+    FX_LOG_KV(ERROR, "Realm:Start failed", FX_KV("error", wire_result.value().error_value()));
     return 1;
   }
 
@@ -37,13 +37,13 @@ int main() {
   // that occur during setup (see b/316579125).
   fbl::unique_fd dev(open("/dev", O_RDONLY));
   if (!dev) {
-    FX_SLOG(ERROR, "Failed to open /dev");
+    FX_LOG_KV(ERROR, "Failed to open /dev");
     return 1;
   }
   if (zx_status_t status =
           device_watcher::RecursiveWaitForFile(dev.get(), "sys/test").status_value();
       status != ZX_OK) {
-    FX_SLOG(ERROR, "Failed to open /dev/sys/test");
+    FX_LOG_KV(ERROR, "Failed to open /dev/sys/test");
     return 1;
   }
   return 0;
