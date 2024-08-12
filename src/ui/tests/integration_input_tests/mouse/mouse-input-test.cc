@@ -516,8 +516,6 @@ class ChromiumInputTest : public MouseInputBase {
 };
 
 TEST_F(ChromiumInputTest, ChromiumMouseMove) {
-  LaunchClient();
-
   auto initial_position = EnsureMouseIsReadyAndGetPosition();
 
   double initial_x = initial_position.x;
