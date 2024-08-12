@@ -202,23 +202,25 @@ struct ValueBlock {
     value: String,
 }
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 #[derive(Debug)]
+// Note: The inner members are used as part of the `Debug` impl to provide
+// additional context about the error. Prefix them with `_` to avoid dead code
+// warnings as they're unused elsewhere.
 enum ValueConvertError {
-    FloatError(std::num::ParseFloatError),
-    IntError(std::num::ParseIntError),
-    BadPrimitive(String),
+    FloatError { _error: std::num::ParseFloatError },
+    IntError { _error: std::num::ParseIntError },
+    BadPrimitive { _error: String },
 }
 
 impl From<std::num::ParseFloatError> for ValueConvertError {
     fn from(item: std::num::ParseFloatError) -> ValueConvertError {
-        ValueConvertError::FloatError(item)
+        ValueConvertError::FloatError { _error: item }
     }
 }
 
 impl From<std::num::ParseIntError> for ValueConvertError {
     fn from(item: std::num::ParseIntError) -> ValueConvertError {
-        ValueConvertError::IntError(item)
+        ValueConvertError::IntError { _error: item }
     }
 }
 
@@ -246,7 +248,7 @@ fn convert_expanded_value_member(
         Type::I64 => (&|x: String| Ok(Value::I64(x.parse::<i64>()?))) as &ConverterType,
         Type::F32 => (&|x: String| Ok(Value::F32(x.parse::<f32>()?))) as &ConverterType,
         Type::F64 => (&|x: String| Ok(Value::F64(x.parse::<f64>()?))) as &ConverterType,
-        _ => return Err(ValueConvertError::BadPrimitive(container.to_owned())),
+        _ => return Err(ValueConvertError::BadPrimitive { _error: container.to_owned() }),
     };
 
     let mut result = Vec::new();
