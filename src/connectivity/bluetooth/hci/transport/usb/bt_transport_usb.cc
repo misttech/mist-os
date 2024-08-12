@@ -5,7 +5,6 @@
 #include "bt_transport_usb.h"
 
 #include <assert.h>
-#include <fuchsia/hardware/bt/hci/c/banjo.h>
 #include <fuchsia/hardware/usb/c/banjo.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
@@ -36,9 +35,6 @@
 
 // The maximum HCI ACL frame size used for data transactions
 #define ACL_MAX_FRAME_SIZE 1028  // (1024 + 4 bytes for the ACL header)
-
-#define CMD_BUF_SIZE 258    // 3 byte header + 255 byte payload
-#define EVENT_BUF_SIZE 257  // 2 byte header + 255 byte payload
 
 // TODO(https://fxbug.dev/42171484): move these to hw/usb.h (or hw/bluetooth.h if that exists)
 #define USB_SUBCLASS_BLUETOOTH 1
@@ -381,14 +377,11 @@ void Device::ConnectSnoop(fidl::ServerEnd<fuchsia_hardware_bluetooth::Snoop> ser
 }
 
 zx_status_t Device::DdkGetProtocol(uint32_t proto_id, void* out) {
-  if (proto_id != ZX_PROTOCOL_BT_HCI) {
+  if (proto_id == ZX_PROTOCOL_USB) {
     // Pass this on for drivers to load firmware / initialize
     return device_get_protocol(parent(), proto_id, out);
   }
 
-  bt_hci_protocol_t* hci_proto = static_cast<bt_hci_protocol_t*>(out);
-  hci_proto->ops = &bt_hci_protocol_ops_;
-  hci_proto->ctx = this;
   return ZX_OK;
 }
 
@@ -406,15 +399,8 @@ void Device::DdkUnbind(ddk::UnbindTxn txn) {
     mtx_lock(&pending_request_lock_);
 
     unbound_ = true;
-    isoc_alt_setting_being_changed_ = true;
 
     mtx_unlock(&pending_request_lock_);
-
-    // Close the transport channels so that the host stack is notified of device removal.
-    cmd_channel_.CleanUp();
-    acl_channel_.CleanUp();
-    sco_channel_.CleanUp();
-    snoop_channel_.CleanUp();
 
     const uint8_t isoc_alt_setting = isoc_alt_setting_;
 
@@ -536,36 +522,6 @@ void Device::DdkRelease() {
   // Driver manager is given a raw pointer to this dynamically allocated object in Bind(), so when
   // DdkRelease() is called we need to free the allocated memory.
   delete this;
-}
-
-void Device::ChannelWrapper::CleanUp() {
-  if (!channel_.is_valid()) {
-    return;
-  }
-
-  if (wait_.pending) {
-    async_cancel_wait(device_->dispatcher_, &wait_);
-    wait_.pending = false;
-  }
-
-  channel_.reset();
-}
-
-bool Device::ChannelWrapper::BeginWait() {
-  if (wait_.pending) {
-    zxlogf(ERROR, "Failed to wait on %s channel: already pending", name_);
-    CleanUp();
-    return false;
-  }
-
-  zx_status_t wait_status = async_begin_wait(device_->dispatcher_, &wait_);
-  if (wait_status != ZX_OK) {
-    zxlogf(ERROR, "Failed to wait on %s channel %s", name_, zx_status_get_string(wait_status));
-    CleanUp();
-    return false;
-  }
-  wait_.pending = true;
-  return true;
 }
 
 void Device::ReadIsocInterfaces(usb_desc_iter_t* config_desc_iter) {
@@ -721,19 +677,7 @@ void Device::QueueInterruptRequestsLocked() {
 
 void Device::SnoopChannelWriteLocked(bt_hci_snoop_type_t type, bool is_received,
                                      const uint8_t* bytes, size_t length) {
-  if (snoop_channel_.IsOpen()) {
-    // We tack on a flags byte to the beginning of the payload.
-    uint8_t flags = bt_hci_snoop_flags(type, is_received);
-    zx_status_t status =
-        snoop_channel_.WriteMulti(&flags, sizeof(flags), bytes, static_cast<uint32_t>(length));
-    if (status < 0) {
-      if (status != ZX_ERR_PEER_CLOSED) {
-        zxlogf(ERROR, "bt-transport-usb: failed to write to snoop channel: %s",
-               zx_status_get_string(status));
-      }
-      snoop_channel_.CleanUp();
-    }
-  } else if (snoop_server_.has_value()) {
+  if (snoop_server_.has_value()) {
     if ((snoop_seq_ - acked_snoop_seq_) > kSeqNumMaxDiff) {
       if (!snoop_warning_emitted_) {
         zxlogf(
@@ -808,12 +752,12 @@ void Device::HciEventComplete(usb_request_t* req) {
     return;
   }
 
-  // Handle the interrupt as long as either the command channel or the snoop channel is open.
-  if (!cmd_channel_.IsOpen() && !snoop_channel_.IsOpen() && hci_transport_binding_.size() == 0 &&
-      !snoop_server_.has_value()) {
-    zxlogf(DEBUG,
-           "bt-transport-usb: received hci event while command channel and snoop channel are "
-           "closed");
+  // Handle the interrupt as long as either HciTransport protocol or Snoop protocol is open.
+  if (!snoop_server_.has_value() && hci_transport_binding_.size() == 0) {
+    zxlogf(
+        DEBUG,
+        "bt-transport-usb: received hci event while HciTransport connection and Snoop client are "
+        "closed");
     // Re-queue the HCI event USB request.
     zx_status_t status = usb_req_list_add_head(&free_event_reqs_, req, parent_req_size_);
     ZX_ASSERT(status == ZX_OK);
@@ -837,14 +781,7 @@ void Device::HciEventComplete(usb_request_t* req) {
   // simple case - packet fits in received data
   if (event_buffer_offset_ == 0 && length >= sizeof(HciEventHeader)) {
     if (packet_size == length) {
-      if (cmd_channel_.IsOpen()) {
-        zx_status_t status = cmd_channel_.Write(buffer, static_cast<uint32_t>(length));
-        if (status < 0) {
-          zxlogf(ERROR,
-                 "bt-transport-usb: hci_event_complete failed to write to command channel: %s",
-                 zx_status_get_string(status));
-        }
-      } else if (hci_transport_binding_.size()) {
+      if (hci_transport_binding_.size()) {
         // When channel is not open, send event through HciTransport protocol events if the
         // protocol is open.
         auto fidl_vec_view = fidl::VectorView<uint8_t>::FromExternal(byte_buffer, length);
@@ -893,13 +830,7 @@ void Device::HciEventComplete(usb_request_t* req) {
     zxlogf(TRACE,
            "bt-transport-usb: Accumulated full HCI event packet, sending on command & snoop "
            "channels.");
-    if (cmd_channel_.IsOpen()) {
-      zx_status_t status = cmd_channel_.Write(event_buffer_, static_cast<uint32_t>(packet_size));
-      if (status < 0) {
-        zxlogf(ERROR, "bt-transport-usb: failed to write to command channel: %s",
-               zx_status_get_string(status));
-      }
-    } else if (hci_transport_binding_.size()) {
+    if (hci_transport_binding_.size()) {
       // When channel is not open, send event through HciTransport protocol events if the protocol
       // is open.
       auto fidl_vec_view = fidl::VectorView<uint8_t>::FromExternal(event_buffer_, packet_size);
@@ -963,13 +894,7 @@ void Device::HciAclReadComplete(usb_request_t* req) {
     return;
   }
 
-  if (acl_channel_.IsOpen()) {
-    status = acl_channel_.Write(buffer, static_cast<uint32_t>(req->response.actual));
-    if (status < 0) {
-      zxlogf(ERROR, "bt-transport-usb: hci_acl_read_complete failed to write: %s",
-             zx_status_get_string(status));
-    }
-  } else if (hci_transport_binding_.size()) {
+  if (hci_transport_binding_.size()) {
     // When channel is not open, send event through HciTransport protocol events if the protocol
     // is open.
     const uint8_t* byte_buffer = static_cast<uint8_t*>(buffer);
@@ -988,10 +913,11 @@ void Device::HciAclReadComplete(usb_request_t* req) {
           }
         });
   } else {
-    zxlogf(ERROR, "bt-transport-usb: ACL data received while channel is closed");
+    zxlogf(ERROR, "bt-transport-usb: ACL data received while HciTransport connection is closed");
   }
 
-  // If the snoop channel is open then try to write the packet even if acl_channel was closed.
+  // If the snoop client is available then try to write the packet even if HciTransport connection
+  // was closed.
   SnoopChannelWriteLocked(BT_HCI_SNOOP_TYPE_ACL, /*is_received=*/true,
                           static_cast<uint8_t*>(buffer), req->response.actual);
 
@@ -1020,7 +946,7 @@ void Device::HciAclWriteComplete(usb_request_t* req) {
     acl_completer_queue_.pop();
   }
 
-  if (snoop_channel_.IsOpen() || snoop_server_.has_value()) {
+  if (snoop_server_.has_value()) {
     void* buffer;
     zx_status_t status = usb_request_mmap(req, &buffer);
     if (status != ZX_OK) {
@@ -1052,9 +978,7 @@ void Device::HciScoReadComplete(usb_request_t* req) {
     zxlogf(TRACE, "SCO request stalled, ignoring.");
     zx_status_t status = usb_req_list_add_head(&free_sco_read_reqs_, req, parent_req_size_);
     ZX_DEBUG_ASSERT(status == ZX_OK);
-    if (!isoc_alt_setting_being_changed_) {
-      QueueScoReadRequestsLocked();
-    }
+    QueueScoReadRequestsLocked();
     mtx_unlock(&mutex_);
     return;
   }
@@ -1073,21 +997,13 @@ void Device::HciScoReadComplete(usb_request_t* req) {
 
   status = usb_req_list_add_head(&free_sco_read_reqs_, req, parent_req_size_);
   ZX_ASSERT(status == ZX_OK);
-  if (!isoc_alt_setting_being_changed_) {
-    QueueScoReadRequestsLocked();
-  }
+  QueueScoReadRequestsLocked();
 
   mtx_unlock(&mutex_);
 }
 
 void Device::OnScoReassemblerPacketLocked(cpp20::span<const uint8_t> packet) {
-  if (sco_channel_.IsOpen()) {
-    zx_status_t status = sco_channel_.Write(packet.data(), static_cast<uint32_t>(packet.size()));
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "%s: failed to write SCO packet: %s", __FUNCTION__,
-             zx_status_get_string(status));
-    }
-  } else if (sco_connection_binding_.has_value()) {
+  if (sco_connection_binding_.has_value()) {
     // When channel is not open, send event through HciTransport protocol events if the protocol
     // is open.
     auto fidl_vec =
@@ -1100,10 +1016,10 @@ void Device::OnScoReassemblerPacketLocked(cpp20::span<const uint8_t> packet) {
       zxlogf(ERROR, "Failed to send SCO packet to host: %s", result.error_value().status_string());
     }
   } else {
-    zxlogf(ERROR, "SCO data received while channel is closed");
+    zxlogf(ERROR, "SCO data received while no connection is available.");
   }
 
-  // If the snoop channel is open then try to write the packet even if sco_channel_ was closed.
+  // If the snoop client available then try to write the packet even if sco connection was closed.
   SnoopChannelWriteLocked(BT_HCI_SNOOP_TYPE_SCO, /*is_received=*/true, packet.data(),
                           packet.size());
 }
@@ -1127,7 +1043,7 @@ void Device::HciScoWriteComplete(usb_request_t* req) {
     sco_callback_queue_.pop();
   }
 
-  if (snoop_channel_.IsOpen() || snoop_server_.has_value()) {
+  if (snoop_server_.has_value()) {
     void* buffer;
     zx_status_t status = usb_request_mmap(req, &buffer);
     if (status != ZX_OK) {
@@ -1141,225 +1057,6 @@ void Device::HciScoWriteComplete(usb_request_t* req) {
   }
 
   mtx_unlock(&mutex_);
-}
-
-void Device::HciHandleCmdReadEvents(zx_signals_t signals) {
-  mtx_lock(&mutex_);
-
-  if (signals & ZX_CHANNEL_PEER_CLOSED) {
-    cmd_channel_.CleanUp();
-    mtx_unlock(&mutex_);
-    return;
-  }
-
-  if (!cmd_channel_.BeginWait()) {
-    mtx_unlock(&mutex_);
-    return;
-  }
-
-  uint8_t buf[CMD_BUF_SIZE];
-  uint32_t length = sizeof(buf);
-
-  // Read messages until the channel is empty or an error occurs.
-  while (true) {
-    length = sizeof(buf);
-    zx_status_t read_status = cmd_channel_.Read(buf, length, &length);
-    if (read_status == ZX_ERR_SHOULD_WAIT) {
-      // The channel is empty.
-      break;
-    };
-    if (read_status == ZX_ERR_BUFFER_TOO_SMALL) {
-      zxlogf(WARNING, "hci_read_thread: command channel too large message (%d), dropping", length);
-      continue;
-    }
-    if (read_status != ZX_OK) {
-      zxlogf(ERROR, "hci_read_thread: failed to read from command channel %s",
-             zx_status_get_string(read_status));
-      cmd_channel_.CleanUp();
-      break;
-    }
-
-    zx_status_t control_status =
-        usb_control_out(&usb_, USB_DIR_OUT | USB_TYPE_CLASS | USB_RECIP_DEVICE, 0, 0, 0,
-                        ZX_TIME_INFINITE, buf, length);
-    if (control_status != ZX_OK) {
-      zxlogf(ERROR, "hci_read_thread: usb_control_out failed: %s",
-             zx_status_get_string(control_status));
-      cmd_channel_.CleanUp();
-      break;
-    }
-
-    SnoopChannelWriteLocked(BT_HCI_SNOOP_TYPE_CMD, /*is_received=*/false, buf, length);
-  }
-
-  mtx_unlock(&mutex_);
-}
-
-void Device::HciHandleAclReadEvents(zx_signals_t signals) {
-  {
-    fbl::AutoLock<mtx_t> lock(&mutex_);
-
-    if (signals & ZX_CHANNEL_PEER_CLOSED) {
-      acl_channel_.CleanUp();
-      return;
-    }
-
-    if (!acl_channel_.BeginWait()) {
-      return;
-    }
-  }
-
-  // Read until the channel is empty.
-  while (true) {
-    list_node_t* node;
-    uint8_t buf[ACL_MAX_FRAME_SIZE];
-    uint32_t length = sizeof(buf);
-
-    {
-      fbl::AutoLock<mtx_t> lock(&mutex_);
-      if (!acl_channel_.IsOpen()) {
-        break;
-      }
-      node = list_peek_head(&free_acl_write_reqs_);
-
-      // We don't have enough reqs. Simply punt the channel read until later.
-      if (!node) {
-        break;
-      }
-
-      zx_status_t read_status = acl_channel_.Read(buf, length, &length);
-      if (read_status == ZX_ERR_SHOULD_WAIT) {
-        // There's nothing to read for now, so wait for future signals.
-        break;
-      }
-      if (read_status != ZX_OK) {
-        zxlogf(ERROR, "hci_read_thread: failed to read from ACL channel %s",
-               zx_status_get_string(read_status));
-        acl_channel_.CleanUp();
-        break;
-      }
-
-      node = list_remove_head(&free_acl_write_reqs_);
-
-      // Unlock so that the write callback doesn't try to recursively lock the mutex if called
-      // synchronously.
-    }
-
-    // At this point if we don't get a free node from |free_acl_write_reqs| that means that
-    // they were cleaned up in hci_release(). Just drop the packet.
-    if (!node) {
-      return;
-    }
-
-    usb_req_internal_t* req_int = containerof(node, usb_req_internal_t, node);
-    usb_request_t* req = REQ_INTERNAL_TO_USB_REQ(req_int, parent_req_size_);
-    size_t result = usb_request_copy_to(req, buf, length, 0);
-    ZX_ASSERT(result == length);
-    req->header.length = length;
-    UsbRequestSend(&usb_, req, [](void* ctx, usb_request_t* req) {
-      static_cast<Device*>(ctx)->HciAclWriteComplete(req);
-    });
-  }
-}
-
-void Device::HciHandleScoReadEvents(zx_signals_t signals) {
-  fbl::AutoLock<mtx_t> lock(&mutex_);
-  if (signals & ZX_CHANNEL_PEER_CLOSED) {
-    sco_channel_.CleanUp();
-    return;
-  }
-
-  // SCO packets can't just be dropped if the alt setting is not configured because then the
-  // controller would not acknowledge the packets.
-  if (isoc_alt_setting_being_changed_) {
-    zxlogf(DEBUG, "outbound SCO packets queued while alt setting is being changed");
-    return;
-  }
-
-  // If the alt setting is kIsocAltSettingInactive, packets may remain queued in the SCO
-  // channel until the next connection. The packets can't just be dropped because then the host
-  // wouldn't receive a HCI_Number_Of_Completed_Packets event.
-  // TODO(https://fxbug.dev/42172341): Maybe default to alt setting 1 to mitigate this (ensures
-  // packets drain).
-  if (isoc_alt_setting_ == kIsocAltSettingInactive) {
-    zxlogf(DEBUG, "outbound SCO packets queued because not alt setting is selected");
-    return;
-  }
-
-  // A wait might be pending if the wait was restarted when the alt setting changed.
-  if (!sco_channel_.WaitPending() && !sco_channel_.BeginWait()) {
-    return;
-  }
-
-  // Read until the channel is empty.
-  while (true) {
-    list_node_t* node = list_peek_head(&free_sco_write_reqs_);
-
-    // We don't have enough reqs. Simply punt the channel read until later.
-    if (!node) {
-      break;
-    }
-
-    uint8_t buf[kScoMaxFrameSize];
-    uint32_t actual_length = 0;
-    zx_status_t status = sco_channel_.Read(buf, sizeof(buf), &actual_length);
-    if (status == ZX_ERR_SHOULD_WAIT) {
-      break;
-    }
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "hci_read_thread: failed to read from SCO channel %s",
-             zx_status_get_string(status));
-      sco_channel_.CleanUp();
-      break;
-    }
-
-    node = list_remove_head(&free_sco_write_reqs_);
-
-    // The mutex was held between the peek and the remove, so if we got this far the list must
-    // have a node.
-    ZX_ASSERT(node);
-
-    usb_req_internal_t* req_int = containerof(node, usb_req_internal_t, node);
-    usb_request_t* req = REQ_INTERNAL_TO_USB_REQ(req_int, parent_req_size_);
-    size_t result = usb_request_copy_to(req, buf, actual_length, 0);
-    ZX_ASSERT(result == actual_length);
-    req->header.length = actual_length;
-    // The completion callback will not be called synchronously, so it is safe to hold mutex_
-    // across UsbRequestSend.
-    UsbRequestSend(&usb_, req, [](void* ctx, usb_request_t* req) {
-      static_cast<Device*>(ctx)->HciScoWriteComplete(req);
-    });
-  }
-}
-
-void Device::HciHandleSnoopSignals(zx_signals_t) {
-  fbl::AutoLock<mtx_t> lock(&mutex_);
-  snoop_channel_.CleanUp();
-}
-
-zx_status_t Device::HciOpenChannel(ChannelWrapper* out, zx::channel in) {
-  mtx_lock(&mutex_);
-  mtx_lock(&pending_request_lock_);
-  if (unbound_) {
-    mtx_unlock(&pending_request_lock_);
-    mtx_unlock(&mutex_);
-    return ZX_ERR_CANCELED;
-  }
-  mtx_unlock(&pending_request_lock_);
-
-  if (out->IsOpen()) {
-    zxlogf(ERROR, "channel already bound, failing");
-    mtx_unlock(&mutex_);
-    return ZX_ERR_ALREADY_BOUND;
-  }
-
-  zxlogf(DEBUG, "opening %s channel", out->name());
-
-  out->set_channel(std::move(in));
-  ZX_ASSERT(out->BeginWait());
-
-  mtx_unlock(&mutex_);
-  return ZX_OK;
 }
 
 void Device::OnScoData(std::vector<uint8_t>& packet, fit::function<void(void)> callback) {
@@ -1453,85 +1150,6 @@ void Device::OnScoStop() {
   }
 }
 
-zx_status_t Device::BtHciOpenCommandChannel(zx::channel channel) {
-  zxlogf(TRACE, "%s", __FUNCTION__);
-  return HciOpenChannel(&cmd_channel_, std::move(channel));
-}
-
-zx_status_t Device::BtHciOpenAclDataChannel(zx::channel channel) {
-  zxlogf(TRACE, "%s", __FUNCTION__);
-  return HciOpenChannel(&acl_channel_, std::move(channel));
-}
-
-zx_status_t Device::BtHciOpenScoChannel(zx::channel channel) {
-  zxlogf(TRACE, "%s", __FUNCTION__);
-  if (isoc_endp_descriptors_.empty()) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  return HciOpenChannel(&sco_channel_, std::move(channel));
-}
-
-// TODO(https://fxbug.dev/42169728): Dispatch to a different thread to avoid blocking the caller.
-void Device::BtHciConfigureSco(sco_coding_format_t coding_format, sco_encoding_t encoding,
-                               sco_sample_rate_t sample_rate,
-                               bt_hci_configure_sco_callback callback, void* cookie) {
-  uint8_t new_alt_setting = 0;
-
-  // Only the settings for 1 voice channel are supported.
-  // MSBC uses alt setting 1 because few controllers support alt setting 6.
-  // See Core Spec v5.3, Vol 4, Part B, Sec 2.1.1 for settings table.
-  if (coding_format == SCO_CODING_FORMAT_MSBC ||
-      (sample_rate == SCO_SAMPLE_RATE_KHZ_8 && encoding == SCO_ENCODING_BITS_8)) {
-    new_alt_setting = 1;
-  } else if (sample_rate == SCO_SAMPLE_RATE_KHZ_8 && encoding == SCO_ENCODING_BITS_16) {
-    new_alt_setting = 2;
-  } else if (sample_rate == SCO_SAMPLE_RATE_KHZ_16 && encoding == SCO_ENCODING_BITS_16) {
-    new_alt_setting = 4;
-  } else {
-    callback(cookie, ZX_ERR_NOT_SUPPORTED);
-    return;
-  }
-
-  if (new_alt_setting >= isoc_endp_descriptors_.size()) {
-    zxlogf(ERROR, "isoc alt setting %hhu not supported, cannot configure SCO", new_alt_setting);
-    callback(cookie, ZX_ERR_NOT_SUPPORTED);
-    return;
-  }
-
-  IsocAltSettingRequest request{
-      .alt_setting = new_alt_setting, .callback = callback, .cookie = cookie};
-  mtx_lock(&mutex_);
-  isoc_alt_setting_requests_.push(request);
-  mtx_unlock(&mutex_);
-  ProcessNextIsocAltSettingRequest();
-}
-
-void Device::BtHciResetSco(bt_hci_reset_sco_callback callback, void* cookie) {
-  IsocAltSettingRequest request{
-      .alt_setting = kIsocAltSettingInactive, .callback = callback, .cookie = cookie};
-  mtx_lock(&mutex_);
-  isoc_alt_setting_requests_.push(request);
-  mtx_unlock(&mutex_);
-  ProcessNextIsocAltSettingRequest();
-}
-
-zx_status_t Device::BtHciOpenIsoDataChannel(zx::channel channel) { return ZX_ERR_NOT_SUPPORTED; }
-
-zx_status_t Device::BtHciOpenSnoopChannel(zx::channel channel) {
-  zxlogf(TRACE, "%s", __FUNCTION__);
-  return HciOpenChannel(&snoop_channel_, std::move(channel));
-}
-
-Device::Wait::Wait(Device* device, ChannelWrapper* channel) {
-  this->state = ASYNC_STATE_INIT;
-  this->handler = Handler;
-  this->object = ZX_HANDLE_INVALID;
-  this->trigger = ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED;
-  this->options = 0;
-  this->device = device;
-  this->channel = channel;
-}
-
 void Device::Send(SendRequest& request, SendCompleter::Sync& completer) {
   switch (request.Which()) {
     case fhbt::SentPacket::Tag::kIso:
@@ -1589,7 +1207,7 @@ void Device::Send(SendRequest& request, SendCompleter::Sync& completer) {
                                 request.command().value().data(), request.command().value().size());
       }
 
-      if (request.command().value().size() > CMD_BUF_SIZE) {
+      if (request.command().value().size() > fhbt::kCommandMax) {
         zxlogf(WARNING, "Command packet too large (%zu), dropping",
                request.command().value().size());
         break;
@@ -1707,18 +1325,6 @@ void Device::handle_unknown_method(
   zxlogf(ERROR, "Unknown method in fidl::Server<fuchsia_hardware_bluetooth::Snoop>");
 }
 
-void Device::Wait::Handler(async_dispatcher_t* dispatcher, async_wait_t* async_wait,
-                           zx_status_t status, const zx_packet_signal_t* signal) {
-  ZX_ASSERT(signal->observed & (ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED));
-
-  auto wait = static_cast<Wait*>(async_wait);
-  {
-    fbl::AutoLock<mtx_t> lock(&wait->device->mutex_);
-    wait->pending = false;
-  }
-  (wait->device->*(wait->channel->signal_handler_))(signal->observed);
-}
-
 zx_status_t Device::AllocBtUsbPackets(int limit, uint64_t data_size, uint8_t ep_address,
                                       size_t req_size, list_node_t* list) {
   zx_status_t status;
@@ -1747,152 +1353,6 @@ void Device::HandleUsbResponseError(usb_request_t* req, const char* req_descript
   zxlogf(ERROR, "%s request completed with error status (%s). Removing device", req_description,
          zx_status_get_string(status));
   RemoveDeviceLocked();
-}
-
-// NOLINTNEXTLINE(misc-no-recursion)
-void Device::ProcessNextIsocAltSettingRequest() {
-  IsocAltSettingRequest request;
-  uint8_t prev_alt_setting = 0;
-  {
-    fbl::AutoLock<mtx_t> lock(&mutex_);
-    {
-      fbl::AutoLock<mtx_t> req_lock(&pending_request_lock_);
-      if (unbound_) {
-        return;
-      }
-    }
-
-    if (isoc_alt_setting_being_changed_ || isoc_alt_setting_requests_.empty()) {
-      return;
-    }
-
-    request = isoc_alt_setting_requests_.front();
-    isoc_alt_setting_requests_.pop();
-
-    if (isoc_endp_descriptors_.empty()) {
-      zxlogf(INFO, "%s: failed (SCO not supported)", __FUNCTION__);
-      lock.release();
-      request.callback(request.cookie, ZX_ERR_NOT_SUPPORTED);
-      ProcessNextIsocAltSettingRequest();
-      return;
-    }
-
-    prev_alt_setting = isoc_alt_setting_;
-
-    if (request.alt_setting == prev_alt_setting) {
-      lock.release();
-      request.callback(request.cookie, ZX_OK);
-      ProcessNextIsocAltSettingRequest();
-      return;
-    }
-
-    ZX_ASSERT(!isoc_alt_setting_being_changed_);
-    isoc_alt_setting_being_changed_ = true;
-  }
-
-  if (prev_alt_setting != kIsocAltSettingInactive) {
-    // Pending read requests will be completed by the USB driver with status ZX_ERR_CANCELED.
-    // Canceled read requests won't be requeued because the handler doesn't requeue packets with a
-    // ZX_ERR_CANCELED status. They must be requeued manually at the end of this method.
-    // mutex_ must not be held in order to prevent request completion callbacks from blocking.
-    zx_status_t status =
-        usb_cancel_all(&usb_, isoc_endp_descriptors_[prev_alt_setting].in.b_endpoint_address);
-    if (status != ZX_OK) {
-      zxlogf(ERROR, "usb_cancel_all failed with status: %s", zx_status_get_string(status));
-      request.callback(request.cookie, status);
-      return;
-    }
-
-    // New write requests are blocked at this point because isoc_alt_setting_being_changed_ is true.
-    // Pending write requests cannot be canceled because that would invalidate the host's free
-    // controller buffer slot count (no HCI_Number_Of_Completed_Packets event would be received for
-    // canceled packets). Instead, we must wait for them to complete normally.
-    {
-      fbl::AutoLock<mtx_t> req_lock(&pending_request_lock_);
-      while (pending_sco_write_request_count_) {
-        cnd_wait(&pending_sco_write_request_count_0_cnd_, &pending_request_lock_);
-      }
-    }
-  }
-
-  {
-    fbl::AutoLock<mtx_t> lock(&mutex_);
-    {
-      fbl::AutoLock<mtx_t> req_lock(&pending_request_lock_);
-      if (unbound_) {
-        return;
-      }
-    }
-
-    if (prev_alt_setting != kIsocAltSettingInactive) {
-      // Disable previous endpoints before changing the alt setting.
-      zx_status_t status = usb_enable_endpoint(&usb_, &isoc_endp_descriptors_[prev_alt_setting].in,
-                                               /*ss_com_desc=*/nullptr, /*enable=*/false);
-      if (status != ZX_OK) {
-        lock.release();
-        zxlogf(ERROR, "usb_enable_endpoint (disable) failed with status: %s",
-               zx_status_get_string(status));
-        request.callback(request.cookie, status);
-        return;
-      }
-      status = usb_enable_endpoint(&usb_, &isoc_endp_descriptors_[prev_alt_setting].out,
-                                   /*ss_com_desc=*/nullptr, /*enable=*/false);
-      if (status != ZX_OK) {
-        lock.release();
-        zxlogf(ERROR, "usb_enable_endpoint (disable) failed with status: %s",
-               zx_status_get_string(status));
-        request.callback(request.cookie, status);
-        return;
-      }
-    }
-
-    zx_status_t status = usb_set_interface(&usb_, kIsocInterfaceNum, request.alt_setting);
-    if (status != ZX_OK) {
-      lock.release();
-      zxlogf(ERROR, "usb_set_interface failed with status: %s", zx_status_get_string(status));
-      request.callback(request.cookie, status);
-      return;
-    }
-
-    if (request.alt_setting != kIsocAltSettingInactive) {
-      // Enable new endpoints.
-      status = usb_enable_endpoint(&usb_, &isoc_endp_descriptors_[request.alt_setting].in,
-                                   /*ss_com_desc=*/nullptr, /*enable=*/true);
-      if (status != ZX_OK) {
-        lock.release();
-        zxlogf(ERROR, "usb_enable_endpoint failed with status: %s", zx_status_get_string(status));
-        request.callback(request.cookie, status);
-        return;
-      }
-      status = usb_enable_endpoint(&usb_, &isoc_endp_descriptors_[request.alt_setting].out,
-                                   /*ss_com_desc=*/nullptr, /*enable=*/true);
-      if (status != ZX_OK) {
-        lock.release();
-        zxlogf(ERROR, "usb_enable_endpoint failed with status: %s", zx_status_get_string(status));
-        request.callback(request.cookie, status);
-        return;
-      }
-    }
-
-    isoc_alt_setting_ = request.alt_setting;
-    // Clear any partial SCO packets in the reassembler.
-    sco_reassembler_.clear();
-    if (isoc_alt_setting_ != kIsocAltSettingInactive) {
-      QueueScoReadRequestsLocked();
-    }
-
-    ZX_ASSERT(isoc_alt_setting_being_changed_);
-    isoc_alt_setting_being_changed_ = false;
-
-    // Restart wait now that the SCO channel can be read from again (readable signals will have
-    // been ignored up until now).
-    if (sco_channel_.IsOpen() && !sco_channel_.WaitPending()) {
-      ZX_ASSERT(sco_channel_.BeginWait());
-    }
-  }
-
-  request.callback(request.cookie, ZX_OK);
-  ProcessNextIsocAltSettingRequest();
 }
 
 // A lambda is used to create an empty instance of zx_driver_ops_t.

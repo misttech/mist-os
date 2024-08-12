@@ -7,8 +7,6 @@
 
 #include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.bluetooth/cpp/wire.h>
-#include <fuchsia/hardware/bt/hci/c/banjo.h>
-#include <fuchsia/hardware/bt/hci/cpp/banjo.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/devfs/cpp/connector.h>
@@ -26,8 +24,7 @@ namespace bt_hci_intel {
 class Device : public fdf::DriverBase,
                public fidl::WireAsyncEventHandler<fuchsia_driver_framework::NodeController>,
                public fidl::WireAsyncEventHandler<fuchsia_driver_framework::Node>,
-               public fidl::WireServer<fuchsia_hardware_bluetooth::Vendor>,
-               public fidl::WireServer<fuchsia_hardware_bluetooth::Hci> {
+               public fidl::WireServer<fuchsia_hardware_bluetooth::Vendor> {
  public:
   Device(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher);
 
@@ -46,34 +43,7 @@ class Device : public fdf::DriverBase,
   void handle_unknown_event(
       fidl::UnknownEventMetadata<fuchsia_driver_framework::Node> metadata) override {}
 
-  zx_status_t BtHciOpenCommandChannel(zx::channel in);
-  zx_status_t BtHciOpenAclDataChannel(zx::channel in);
-  zx_status_t BtHciOpenScoChannel(zx::channel in);
-  void BtHciConfigureSco(sco_coding_format_t coding_format, sco_encoding_t encoding,
-                         sco_sample_rate_t sample_rate, bt_hci_configure_sco_callback callback,
-                         void* cookie);
-  void BtHciResetSco(bt_hci_reset_sco_callback callback, void* cookie);
-  zx_status_t BtHciOpenIsoDataChannel(zx::channel in);
-  zx_status_t BtHciOpenSnoopChannel(zx::channel in);
-
  private:
-  // fuchsia_hardware_bluetooth::Hci protocol interface implementations
-  void OpenCommandChannel(OpenCommandChannelRequestView request,
-                          OpenCommandChannelCompleter::Sync& completer) override;
-  void OpenAclDataChannel(OpenAclDataChannelRequestView request,
-                          OpenAclDataChannelCompleter::Sync& completer) override;
-  void OpenScoDataChannel(OpenScoDataChannelRequestView request,
-                          OpenScoDataChannelCompleter::Sync& completer) override;
-  void ConfigureSco(ConfigureScoRequestView request,
-                    ConfigureScoCompleter::Sync& completer) override;
-  void ResetSco(ResetScoCompleter::Sync& completer) override;
-  void OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
-                          OpenIsoDataChannelCompleter::Sync& completer) override;
-  void OpenSnoopChannel(OpenSnoopChannelRequestView request,
-                        OpenSnoopChannelCompleter::Sync& completer) override;
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
-                             fidl::UnknownMethodCompleter::Sync& completer) override;
-
   // fuchsia_hardware_bluetooth::Vendor protocol interface implementations
   void EncodeCommand(EncodeCommandRequestView request,
                      EncodeCommandCompleter::Sync& completer) override;
@@ -105,7 +75,6 @@ class Device : public fdf::DriverBase,
 
   driver_devfs::Connector<fuchsia_hardware_bluetooth::Vendor> devfs_connector_;
 
-  fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::Hci> hci_binding_group_;
   fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::Vendor> vendor_binding_group_;
 
   fidl::WireClient<fuchsia_driver_framework::Node> node_;
@@ -116,7 +85,6 @@ class Device : public fdf::DriverBase,
   HciEventHandler hci_event_handler_;
   fidl::SharedClient<fuchsia_hardware_bluetooth::HciTransport> hci_transport_client_;
 
-  ddk::BtHciProtocolClient hci_;
   bool secure_{false};
   bool firmware_loaded_{false};
   bool legacy_firmware_loading_{false};  // true to use legacy way to load firmware

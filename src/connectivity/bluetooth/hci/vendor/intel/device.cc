@@ -4,7 +4,6 @@
 
 #include "device.h"
 
-#include <fuchsia/hardware/bt/hci/c/banjo.h>
 #include <fuchsia/hardware/usb/cpp/banjo.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_export.h>
@@ -75,16 +74,6 @@ void Device::Start(fdf::StartCompleter completer) {
       break;
     }
   }
-
-  zx::result<ddk::BtHciProtocolClient> hci_client =
-      compat::ConnectBanjo<ddk::BtHciProtocolClient>(incoming());
-
-  if (hci_client.is_error()) {
-    errorf("Failed to connect hci client: %s", hci_client.status_string());
-    completer(zx::error(hci_client.status_value()));
-    return;
-  }
-  hci_ = *hci_client;
 
   auto dispatcher =
       fdf::SynchronizedDispatcher::Create({}, "", [](fdf_dispatcher_t* dispatcher) {});
@@ -245,54 +234,6 @@ zx_handle_t Device::MapFirmware(const char* name, uintptr_t* fw_addr, size_t* fw
   return vmo;
 }
 
-void Device::OpenCommandChannel(OpenCommandChannelRequestView request,
-                                OpenCommandChannelCompleter::Sync& completer) {
-  if (zx_status_t status = BtHciOpenCommandChannel(std::move(request->channel)); status != ZX_OK) {
-    completer.ReplyError(status);
-    return;
-  }
-  completer.ReplySuccess();
-}
-void Device::OpenAclDataChannel(OpenAclDataChannelRequestView request,
-                                OpenAclDataChannelCompleter::Sync& completer) {
-  if (zx_status_t status = BtHciOpenAclDataChannel(std::move(request->channel)); status != ZX_OK) {
-    completer.ReplyError(status);
-    return;
-  }
-  completer.ReplySuccess();
-}
-void Device::OpenScoDataChannel(OpenScoDataChannelRequestView request,
-                                OpenScoDataChannelCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-void Device::ConfigureSco(ConfigureScoRequestView request, ConfigureScoCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-void Device::ResetSco(ResetScoCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-void Device::OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
-                                OpenIsoDataChannelCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-void Device::OpenSnoopChannel(OpenSnoopChannelRequestView request,
-                              OpenSnoopChannelCompleter::Sync& completer) {
-  if (zx_status_t status = BtHciOpenSnoopChannel(std::move(request->channel)); status != ZX_OK) {
-    completer.ReplyError(status);
-    return;
-  }
-  completer.ReplySuccess();
-}
-void Device::handle_unknown_method(fidl::UnknownMethodMetadata<fhbt::Hci> metadata,
-                                   fidl::UnknownMethodCompleter::Sync& completer) {
-  errorf("Unknown method in Hci request, closing with ZX_ERR_NOT_SUPPORTED");
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-
 void Device::EncodeCommand(EncodeCommandRequestView request,
                            EncodeCommandCompleter::Sync& completer) {
   completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
@@ -304,8 +245,6 @@ void Device::OpenHci(OpenHciCompleter::Sync& completer) {
     completer.ReplyError(endpoints.error_value());
     return;
   }
-  hci_binding_group_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
-                                std::move(endpoints->server), this, fidl::kIgnoreBindingClosure);
 
   completer.ReplySuccess(std::move(endpoints->client));
 }
@@ -520,34 +459,6 @@ zx_status_t Device::LoadLegacyFirmware() {
 
   infof("controller patched using %s", fw_filename.c_str());
   return ZX_OK;
-}
-
-zx_status_t Device::BtHciOpenCommandChannel(zx::channel in) {
-  return hci_.OpenCommandChannel(std::move(in));
-}
-
-zx_status_t Device::BtHciOpenAclDataChannel(zx::channel in) {
-  return hci_.OpenAclDataChannel(std::move(in));
-}
-
-zx_status_t Device::BtHciOpenScoChannel(zx::channel in) {
-  return hci_.OpenScoChannel(std::move(in));
-}
-
-void Device::BtHciConfigureSco(sco_coding_format_t coding_format, sco_encoding_t encoding,
-                               sco_sample_rate_t sample_rate,
-                               bt_hci_configure_sco_callback callback, void* cookie) {
-  hci_.ConfigureSco(coding_format, encoding, sample_rate, callback, cookie);
-}
-
-void Device::BtHciResetSco(bt_hci_reset_sco_callback callback, void* cookie) {
-  hci_.ResetSco(callback, cookie);
-}
-
-zx_status_t Device::BtHciOpenIsoDataChannel(zx::channel in) { return ZX_ERR_NOT_SUPPORTED; }
-
-zx_status_t Device::BtHciOpenSnoopChannel(zx::channel in) {
-  return hci_.OpenSnoopChannel(std::move(in));
 }
 
 }  // namespace bt_hci_intel
