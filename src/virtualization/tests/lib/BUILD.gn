@@ -190,6 +190,7 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_hlcpp",
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_hlcpp",
     "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_hlcpp",
+    "//sdk/fidl/fuchsia.vulkan.loader:fuchsia.vulkan.loader_hlcpp",
     "//sdk/lib/fit-promise",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//src/lib/testing/loop_fixture",

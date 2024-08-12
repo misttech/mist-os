@@ -5,10 +5,9 @@
 #ifndef SRC_UI_TESTING_UTIL_PORTABLE_UI_TEST_H_
 #define SRC_UI_TESTING_UTIL_PORTABLE_UI_TEST_H_
 
+#include <fidl/fuchsia.ui.composition/cpp/fidl.h>
 #include <fidl/fuchsia.ui.test.input/cpp/fidl.h>
-#include <fuchsia/sysmem/cpp/fidl.h>
-#include <fuchsia/ui/composition/cpp/fidl.h>
-#include <fuchsia/ui/test/scene/cpp/fidl.h>
+#include <fidl/fuchsia.ui.test.scene/cpp/fidl.h>
 #include <lib/fidl/cpp/channel.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <zircon/status.h>
@@ -23,7 +22,7 @@
 
 namespace ui_testing {
 
-using fuchsia::ui::composition::ScreenshotFormat;
+using fuchsia_ui_composition::ScreenshotFormat;
 
 class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
  public:
@@ -52,16 +51,16 @@ class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
   bool HasViewConnected(zx_koid_t view_ref_koid);
 
   // Helper method to take a screenshot.
-  Screenshot TakeScreenshot(ScreenshotFormat format = ScreenshotFormat::BGRA_RAW);
+  Screenshot TakeScreenshot(ScreenshotFormat format = ScreenshotFormat::kBgraRaw);
 
   // Helper method to take a screenshot until predicate is true. Returns false if
   // |predicate_timeout| is reached.
   bool TakeScreenshotUntil(fit::function<bool(const ui_testing::Screenshot&)> predicate,
                            zx::duration predicate_timeout, zx::duration step = zx::msec(10),
-                           ScreenshotFormat format = ScreenshotFormat::BGRA_RAW);
+                           ScreenshotFormat format = ScreenshotFormat::kBgraRaw);
 
   // Return display size by connecting to |fuchsia::ui::display::singleton::Info| protocol.
-  fuchsia::math::SizeU display_size();
+  fuchsia_math::SizeU display_size();
 
   // Return display height by connecting to |fuchsia::ui::display::singleton::Info| protocol.
   uint32_t display_height();
@@ -146,11 +145,14 @@ class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
   // Helper method to set up the scene provider.
   void SetUpSceneProvider();
 
+  // Helper method to register ViewTreeWatcher to scene_provider.
+  void RegisterViewTreeWatcher();
+
   // Helper method to watch watch for view geometry updates.
   void WatchViewGeometry();
 
   // Helper method to process a view geometry update.
-  void ProcessViewGeometryResponse(fuchsia::ui::observation::geometry::WatchResponse response);
+  void ProcessViewGeometryResponse(fuchsia_ui_observation_geometry::WatchResponse response);
 
   // Helper to connect input registry.
   void ConnectInputRegistry();
@@ -159,9 +161,9 @@ class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
   fidl::SyncClient<fuchsia_ui_test_input::TouchScreen> fake_touchscreen_;
   fidl::SyncClient<fuchsia_ui_test_input::Mouse> fake_mouse_;
   fidl::SyncClient<fuchsia_ui_test_input::Keyboard> fake_keyboard_;
-  fuchsia::ui::test::scene::ControllerPtr scene_provider_;
-  fuchsia::ui::observation::geometry::ViewTreeWatcherPtr view_tree_watcher_;
-  std::optional<fuchsia::ui::composition::ScreenshotPtr> screenshotter_;
+  fidl::SyncClient<fuchsia_ui_test_scene::Controller> scene_provider_;
+  fidl::Client<fuchsia_ui_observation_geometry::ViewTreeWatcher> view_tree_watcher_;
+  fidl::SyncClient<fuchsia_ui_composition::Screenshot> screenshotter_;
 
   component_testing::RealmBuilder realm_builder_;
   std::optional<component_testing::RealmRoot> realm_;
@@ -174,14 +176,14 @@ class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
   std::optional<zx_koid_t> client_root_view_ref_koid_;
 
   // Holds the display size.
-  std::optional<fuchsia::math::SizeU> display_size_;
+  std::optional<fuchsia_math::SizeU> display_size_;
 
   // Holds the most recent view tree snapshot received from the view tree
   // watcher.
   //
   // From this snapshot, we can retrieve relevant view tree state on demand,
   // e.g. if the client view is rendering content.
-  std::optional<fuchsia::ui::observation::geometry::ViewTreeSnapshot> last_view_tree_snapshot_;
+  std::optional<fuchsia_ui_observation_geometry::ViewTreeSnapshot> last_view_tree_snapshot_;
 
   // The typical latency on devices we've tested is ~60 msec. The retry interval is chosen to be
   // a) Long enough that it's unlikely that we send a new tap while a previous tap is still being
@@ -192,6 +194,10 @@ class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
   // The first property is important to avoid skewing the latency metrics that we collect.
   // For an explanation of why a tap might be lost, see the documentation for TryInject().
   static constexpr auto kTapRetryInterval = zx::sec(1);
+
+  // PortableUITest should stop view_tree_watcher_ and ignore errors from the watcher when test tear
+  // down begins.
+  bool begin_tear_down_ = false;
 };
 
 }  // namespace ui_testing

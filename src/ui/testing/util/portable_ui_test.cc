@@ -5,13 +5,14 @@
 
 #include "src/ui/testing/util/portable_ui_test.h"
 
+#include <fidl/fuchsia.logger/cpp/fidl.h>
+#include <fidl/fuchsia.scheduler/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem/cpp/fidl.h>
+#include <fidl/fuchsia.tracing.provider/cpp/fidl.h>
+#include <fidl/fuchsia.ui.app/cpp/fidl.h>
+#include <fidl/fuchsia.ui.display.singleton/cpp/fidl.h>
 #include <fidl/fuchsia.ui.focus/cpp/fidl.h>
-#include <fuchsia/logger/cpp/fidl.h>
-#include <fuchsia/scheduler/cpp/fidl.h>
-#include <fuchsia/tracing/provider/cpp/fidl.h>
-#include <fuchsia/ui/app/cpp/fidl.h>
-#include <fuchsia/ui/display/singleton/cpp/fidl.h>
-#include <fuchsia/vulkan/loader/cpp/fidl.h>
+#include <fidl/fuchsia.vulkan.loader/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fidl/cpp/channel.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
@@ -30,21 +31,18 @@ using component_testing::Protocol;
 using component_testing::RealmRoot;
 using component_testing::Route;
 
-bool CheckViewExistsInSnapshot(const fuchsia::ui::observation::geometry::ViewTreeSnapshot& snapshot,
+bool CheckViewExistsInSnapshot(const fuchsia_ui_observation_geometry::ViewTreeSnapshot& snapshot,
                                zx_koid_t view_ref_koid) {
-  if (!snapshot.has_views()) {
+  if (!snapshot.views().has_value()) {
     return false;
   }
 
   auto snapshot_count = std::count_if(
-      snapshot.views().begin(), snapshot.views().end(),
+      snapshot.views()->begin(), snapshot.views()->end(),
       [view_ref_koid](const auto& view) { return view.view_ref_koid() == view_ref_koid; });
 
   return snapshot_count > 0;
 }
-
-// Timeout for taking a screenshot.
-constexpr zx::duration kScreenshotTimeout = zx::sec(10);
 
 }  // namespace
 
@@ -55,24 +53,25 @@ void PortableUITest::SetUpRealmBase() {
   realm_builder_.AddChild(kTestUIStack, GetTestUIStackUrl());
 
   // Route base system services to flutter and the test UI stack.
-  realm_builder_.AddRoute(
-      Route{.capabilities = {Protocol{fuchsia::logger::LogSink::Name_},
-                             Protocol{fuchsia::scheduler::RoleManager::Name_},
-                             Protocol{fuchsia::sysmem::Allocator::Name_},
-                             Protocol{fuchsia::sysmem2::Allocator::Name_},
-                             Protocol{fuchsia::vulkan::loader::Loader::Name_},
-                             Protocol{fuchsia::tracing::provider::Registry::Name_}},
-            .source = ParentRef{},
-            .targets = {kTestUIStackRef}});
+  realm_builder_.AddRoute(Route{
+      .capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_logger::LogSink>},
+                       Protocol{fidl::DiscoverableProtocolName<fuchsia_scheduler::RoleManager>},
+                       Protocol{fidl::DiscoverableProtocolName<fuchsia_sysmem::Allocator>},
+                       Protocol{fidl::DiscoverableProtocolName<fuchsia_sysmem2::Allocator>},
+                       Protocol{fidl::DiscoverableProtocolName<fuchsia_vulkan_loader::Loader>},
+                       Protocol{
+                           fidl::DiscoverableProtocolName<fuchsia_tracing_provider::Registry>}},
+      .source = ParentRef{},
+      .targets = {kTestUIStackRef}});
 
   // Route UI capabilities from test-ui-stack to test driver.
   realm_builder_.AddRoute(Route{
       .capabilities =
-          {Protocol{fuchsia::ui::composition::Screenshot::Name_},
-           Protocol{fuchsia::ui::display::singleton::Info::Name_},
+          {Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Screenshot>},
+           Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_display_singleton::Info>},
            Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_focus::FocusChainListenerRegistry>},
            Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_test_input::Registry>},
-           Protocol{fuchsia::ui::test::scene::Controller::Name_}},
+           Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_test_scene::Controller>}},
       .source = kTestUIStackRef,
       .targets = {ParentRef{}}});
 
@@ -99,29 +98,28 @@ void PortableUITest::SetUp() {
 }
 
 void PortableUITest::TearDown() {
+  begin_tear_down_ = true;
   bool complete = false;
   realm_->Teardown([&](fit::result<fuchsia::component::Error> result) { complete = true; });
   RunLoopUntil([&]() { return complete; });
 }
 
 void PortableUITest::ProcessViewGeometryResponse(
-    fuchsia::ui::observation::geometry::WatchResponse response) {
+    fuchsia_ui_observation_geometry::WatchResponse response) {
   // Process update if no error.
-  if (!response.has_error()) {
-    std::vector<fuchsia::ui::observation::geometry::ViewTreeSnapshot>* updates =
-        response.mutable_updates();
-    if (updates && !updates->empty()) {
-      last_view_tree_snapshot_ = std::move(updates->back());
+  if (!response.error().has_value()) {
+    if (response.updates().has_value() && !response.updates()->empty()) {
+      last_view_tree_snapshot_ = std::move(response.updates()->back());
     }
   } else {
     // Otherwise, process error.
-    const auto& error = response.error();
+    const auto& error = response.error().value();
 
-    if (error | fuchsia::ui::observation::geometry::Error::CHANNEL_OVERFLOW) {
+    if (error & fuchsia_ui_observation_geometry::Error::kChannelOverflow) {
       FX_LOGS(DEBUG) << "View Tree watcher channel overflowed";
-    } else if (error | fuchsia::ui::observation::geometry::Error::BUFFER_OVERFLOW) {
+    } else if (error & fuchsia_ui_observation_geometry::Error::kBufferOverflow) {
       FX_LOGS(DEBUG) << "View Tree watcher buffer overflowed";
-    } else if (error | fuchsia::ui::observation::geometry::Error::VIEWS_OVERFLOW) {
+    } else if (error & fuchsia_ui_observation_geometry::Error::kViewsOverflow) {
       // This one indicates some possible data loss, so we log with a high severity.
       FX_LOGS(WARNING) << "View Tree watcher attempted to report too many views";
     }
@@ -130,26 +128,29 @@ void PortableUITest::ProcessViewGeometryResponse(
 
 void PortableUITest::SetUpSceneProvider() {
   ASSERT_TRUE(realm_.has_value());
-  scene_provider_ = realm_->component().Connect<fuchsia::ui::test::scene::Controller>();
-  scene_provider_.set_error_handler([](zx_status_t status) {
-    FX_LOGS(ERROR) << "Error from test scene provider: " << zx_status_get_string(status);
-  });
+  auto scene_provider_connect = realm_->component().Connect<fuchsia_ui_test_scene::Controller>();
+  ZX_ASSERT_OK(scene_provider_connect);
+  scene_provider_ = fidl::SyncClient(std::move(scene_provider_connect.value()));
 }
 
 void PortableUITest::WatchViewGeometry() {
-  FX_CHECK(view_tree_watcher_) << "View Tree watcher must be registered before calling Watch()";
+  FX_CHECK(view_tree_watcher_.is_valid())
+      << "View Tree watcher must be registered before calling Watch()";
 
-  view_tree_watcher_->Watch([this](auto response) {
-    ProcessViewGeometryResponse(std::move(response));
-    WatchViewGeometry();
+  view_tree_watcher_->Watch().Then([this](auto response) {
+    if (!begin_tear_down_) {
+      ZX_ASSERT_OK(response);
+      ProcessViewGeometryResponse(std::move(response.value()));
+      WatchViewGeometry();
+    }
   });
 }
 
 void PortableUITest::WaitForViewPresentation() {
   SetUpSceneProvider();
-  bool view_presented = false;
-  scene_provider_->WatchViewPresentation([&]() { view_presented = true; });
-  RunLoopUntil([&]() { return view_presented; });
+
+  // WatchViewPresentation() will hang until a ClientView has `Present()`
+  ZX_ASSERT_OK(scene_provider_->WatchViewPresentation());
 }
 
 bool PortableUITest::HasViewConnected(zx_koid_t view_ref_koid) {
@@ -157,14 +158,27 @@ bool PortableUITest::HasViewConnected(zx_koid_t view_ref_koid) {
          CheckViewExistsInSnapshot(*last_view_tree_snapshot_, view_ref_koid);
 }
 
+void PortableUITest::RegisterViewTreeWatcher() {
+  auto [watcher_client, watcher_server] =
+      fidl::Endpoints<fuchsia_ui_observation_geometry::ViewTreeWatcher>::Create();
+  view_tree_watcher_ = fidl::Client(std::move(watcher_client), dispatcher());
+  ZX_ASSERT_OK(scene_provider_->RegisterViewTreeWatcher({std::move(watcher_server)}));
+}
+
 void PortableUITest::LaunchClient() {
   SetUpSceneProvider();
-  fuchsia::ui::test::scene::ControllerAttachClientViewRequest request;
-  request.set_view_provider(realm_->component().Connect<fuchsia::ui::app::ViewProvider>());
-  scene_provider_->RegisterViewTreeWatcher(view_tree_watcher_.NewRequest(), []() {});
-  scene_provider_->AttachClientView(std::move(request), [this](auto client_view_ref_koid) {
-    client_root_view_ref_koid_ = client_view_ref_koid;
-  });
+  RegisterViewTreeWatcher();
+
+  auto view_provider_connect = realm_->component().Connect<fuchsia_ui_app::ViewProvider>();
+  ZX_ASSERT_OK(view_provider_connect);
+
+  fuchsia_ui_test_scene::ControllerAttachClientViewRequest request;
+  request.view_provider() = std::move(view_provider_connect.value());
+
+  auto attach_client_view_res = scene_provider_->AttachClientView(std::move(request));
+  ZX_ASSERT_OK(attach_client_view_res);
+
+  client_root_view_ref_koid_ = attach_client_view_res->view_ref_koid();
 
   FX_LOGS(INFO) << "Waiting for client view ref koid";
   RunLoopUntil([this] { return client_root_view_ref_koid_.has_value(); });
@@ -182,7 +196,7 @@ void PortableUITest::LaunchClientWithEmbeddedView() {
   // At this point, the parent view must have rendered, so we just need to wait
   // for the embedded view.
   RunLoopUntil([this] {
-    if (!last_view_tree_snapshot_.has_value() || !last_view_tree_snapshot_->has_views()) {
+    if (!last_view_tree_snapshot_.has_value() || !last_view_tree_snapshot_->views().has_value()) {
       return false;
     }
 
@@ -190,23 +204,24 @@ void PortableUITest::LaunchClientWithEmbeddedView() {
       return false;
     }
 
-    for (const auto& view : last_view_tree_snapshot_->views()) {
-      if (!view.has_view_ref_koid() || view.view_ref_koid() != *client_root_view_ref_koid_) {
+    for (const auto& view : last_view_tree_snapshot_->views().value()) {
+      if (!view.view_ref_koid().has_value() ||
+          view.view_ref_koid().value() != *client_root_view_ref_koid_) {
         continue;
       }
 
-      if (view.children().empty()) {
+      if (view.children()->empty()) {
         return false;
       }
 
       // NOTE: We can't rely on the presence of the child view in
       // `view.children()` to guarantee that it has rendered. The child view
       // also needs to be present in `last_view_tree_snapshot_->views`.
-      return std::count_if(last_view_tree_snapshot_->views().begin(),
-                           last_view_tree_snapshot_->views().end(),
-                           [view_to_find = view.children().back()](const auto& view_to_check) {
-                             return view_to_check.has_view_ref_koid() &&
-                                    view_to_check.view_ref_koid() == view_to_find;
+      return std::count_if(last_view_tree_snapshot_->views()->begin(),
+                           last_view_tree_snapshot_->views()->end(),
+                           [view_to_find = view.children()->back()](const auto& view_to_check) {
+                             return view_to_check.view_ref_koid().has_value() &&
+                                    view_to_check.view_ref_koid().value() == view_to_find;
                            }) > 0;
     }
 
@@ -217,28 +232,22 @@ void PortableUITest::LaunchClientWithEmbeddedView() {
 }
 
 Screenshot PortableUITest::TakeScreenshot(ScreenshotFormat format) {
-  if (!screenshotter_.has_value()) {
-    screenshotter_ = realm_root()->component().Connect<fuchsia::ui::composition::Screenshot>();
+  if (!screenshotter_.is_valid()) {
+    auto connect = realm_root()->component().Connect<fuchsia_ui_composition::Screenshot>();
+    ZX_ASSERT_OK(connect);
+    screenshotter_ = fidl::SyncClient(std::move(connect.value()));
   }
   FX_LOGS(INFO) << "Taking screenshot... ";
 
-  fuchsia::ui::composition::ScreenshotTakeRequest request;
-  request.set_format(format);
-
-  std::optional<fuchsia::ui::composition::ScreenshotTakeResponse> response;
-  screenshotter_.value()->Take(std::move(request), [this, &response](auto screenshot) {
-    response = std::move(screenshot);
-    QuitLoop();
-  });
-
-  EXPECT_FALSE(RunLoopWithTimeout(kScreenshotTimeout)) << "Timed out waiting for screenshot.";
+  auto res = screenshotter_->Take({{.format = format}});
+  ZX_ASSERT_OK(res);
 
   FX_LOGS(INFO) << "Screenshot captured.";
 
-  if (format == ScreenshotFormat::PNG) {
-    return Screenshot(response->vmo());
+  if (format == ScreenshotFormat::kPng) {
+    return Screenshot(res->vmo().value());
   }
-  return Screenshot(response->vmo(), display_size().width, display_size().height,
+  return Screenshot(res->vmo().value(), display_size().width(), display_size().height(),
                     display_rotation());
 }
 
@@ -252,22 +261,25 @@ bool PortableUITest::TakeScreenshotUntil(
       predicate_timeout, step);
 }
 
-fuchsia::math::SizeU PortableUITest::display_size() {
+fuchsia_math::SizeU PortableUITest::display_size() {
   if (display_size_)
     return display_size_.value();
 
-  fuchsia::ui::display::singleton::InfoPtr display_info =
-      realm_root()->component().Connect<fuchsia::ui::display::singleton::Info>();
-  fuchsia::math::SizeU size;
-  display_info->GetMetrics([&size](auto info) { size = info.extent_in_px(); });
-  RunLoopUntil([&size] { return size.width > 0 && size.height > 0; });
-  display_size_ = size;
-  return size;
+  auto display_info_connect =
+      realm_root()->component().Connect<fuchsia_ui_display_singleton::Info>();
+  ZX_ASSERT_OK(display_info_connect);
+  fidl::SyncClient<fuchsia_ui_display_singleton::Info> display_info(
+      std::move(display_info_connect.value()));
+  auto get_metrics_res = display_info->GetMetrics();
+  ZX_ASSERT_OK(get_metrics_res);
+
+  display_size_ = get_metrics_res->info().extent_in_px();
+  return display_size_.value();
 }
 
-uint32_t PortableUITest::display_width() { return display_size().width; }
+uint32_t PortableUITest::display_width() { return display_size().width(); }
 
-uint32_t PortableUITest::display_height() { return display_size().height; }
+uint32_t PortableUITest::display_height() { return display_size().height(); }
 
 void PortableUITest::RegisterTouchScreen() {
   FX_LOGS(INFO) << "Registering fake touch screen";
