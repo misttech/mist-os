@@ -4,7 +4,6 @@
 
 group("core") {
   deps = [
-    "bt-gap",
     "bt-host",
     "bt-init",
   ]
