@@ -139,6 +139,9 @@ Handle* CreatePhysVmo(const PhysVmo& phys_vmo) {
     status = vmo->set_name(name.data(), name.size());
     DEBUG_ASSERT(status == ZX_OK);
 
+    status = vmo->Write(contents.data(), 0, contents.size_bytes());
+    DEBUG_ASSERT(status == ZX_OK);
+
     zx_paddr_t paddr = physmap_to_paddr(contents.data());
     LogVmo(name, paddr, contents.size());
   }
