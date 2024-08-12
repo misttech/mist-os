@@ -7,7 +7,6 @@
 //! RTM_DELRULE.
 
 use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex};
 
 use derivative::Derivative;
 use either::Either;
@@ -295,20 +294,16 @@ impl DelRuleError {
 ///
 /// The inner rule tables are wrapped with `Arc<Mutex>` to support concurrent
 /// access from multiple NETLINK_ROUTE clients.
-#[derive(Clone)]
 pub(crate) struct RuleTable {
-    v4_rules: Arc<Mutex<RuleTableInner>>,
-    v6_rules: Arc<Mutex<RuleTableInner>>,
+    v4_rules: RuleTableInner,
+    v6_rules: RuleTableInner,
 }
 
 impl RuleTable {
     #[cfg(test)]
     /// Constructs an empty RuleTable.
     pub(crate) fn new() -> RuleTable {
-        RuleTable {
-            v4_rules: Arc::new(Mutex::new(RuleTableInner::default())),
-            v6_rules: Arc::new(Mutex::new(RuleTableInner::default())),
-        }
+        RuleTable { v4_rules: RuleTableInner::default(), v6_rules: RuleTableInner::default() }
     }
 
     /// Constructs a RuleTable prepopulated with the default rules present on
@@ -320,8 +315,8 @@ impl RuleTable {
     /// * [V6] 32766:    from all lookup main
     pub(crate) fn new_with_defaults() -> RuleTable {
         RuleTable {
-            v4_rules: Arc::new(Mutex::new(RuleTableInner::new_with_defaults::<Ipv4>())),
-            v6_rules: Arc::new(Mutex::new(RuleTableInner::new_with_defaults::<Ipv6>())),
+            v4_rules: RuleTableInner::new_with_defaults::<Ipv4>(),
+            v6_rules: RuleTableInner::new_with_defaults::<Ipv6>(),
         }
     }
 }
@@ -355,7 +350,7 @@ pub(crate) struct RuleRequest<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerM
 
 /// Handler trait for NETLINK_ROUTE requests related to PBR rules.
 pub(crate) trait RuleRequestHandler<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>:
-    Clone + Send + 'static
+    Send + 'static
 {
     fn handle_request(&mut self, req: RuleRequest<S>) -> Result<(), Errno>;
 }
@@ -366,25 +361,25 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> RuleRequestHandl
     fn handle_request(&mut self, req: RuleRequest<S>) -> Result<(), Errno> {
         let RuleTable { v4_rules, v6_rules } = self;
         let RuleRequest { args, ip_version, sequence_number, mut client } = req;
-        let mut locked_rule_table = match ip_version {
-            IpVersion::V4 => v4_rules.lock().unwrap(),
-            IpVersion::V6 => v6_rules.lock().unwrap(),
+        let rule_table = match ip_version {
+            IpVersion::V4 => v4_rules,
+            IpVersion::V6 => v6_rules,
         };
 
         match args {
             RuleRequestArgs::DumpRules => {
-                for rule in locked_rule_table.iter_rules() {
+                for rule in rule_table.iter_rules() {
                     client.send_unicast(to_nlm_new_rule(rule.clone(), sequence_number, true));
                 }
                 Ok(())
             }
             RuleRequestArgs::New(rule) => {
-                locked_rule_table.add_rule(rule).map_err(|e| e.errno())
+                rule_table.add_rule(rule).map_err(|e| e.errno())
                 // TODO(https://issues.fuchsia.dev/292587350): Notify
                 // multicast groups of `RTM_NEWRULE`.
             }
             RuleRequestArgs::Del(del_pattern) => {
-                locked_rule_table.del_rule(&del_pattern).map_err(|e| e.errno())
+                rule_table.del_rule(&del_pattern).map_err(|e| e.errno())
                 // TODO(https://issues.fuchsia.dev/292587350): Notify
                 // multicast groups of `RTM_DELRULE`.
             }
