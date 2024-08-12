@@ -516,7 +516,8 @@ pub fn sys_fstatfs(
     //
     // See https://man7.org/linux/man-pages/man2/open.2.html
     let file = current_task.files.get_allowing_opath(fd)?;
-    let stat = file.fs.statfs(current_task)?;
+    let mut stat = file.fs.statfs(current_task)?;
+    stat.f_flags |= file.name.mount.flags().bits() as i64;
     current_task.write_object(user_buf, &stat)?;
     Ok(())
 }
@@ -527,9 +528,10 @@ pub fn sys_statfs(
     user_path: UserCString,
     user_buf: UserRef<statfs>,
 ) -> Result<(), Errno> {
-    let node = lookup_at(current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
-    let file_system = node.entry.node.fs();
-    let stat = file_system.statfs(current_task)?;
+    let name = lookup_at(current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
+    let fs = name.entry.node.fs();
+    let mut stat = fs.statfs(current_task)?;
+    stat.f_flags |= name.mount.flags().bits() as i64;
     current_task.write_object(user_buf, &stat)?;
 
     Ok(())
