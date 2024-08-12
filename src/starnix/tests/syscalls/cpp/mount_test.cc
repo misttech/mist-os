@@ -10,6 +10,7 @@
 #include <sys/mount.h>
 #include <unistd.h>
 
+#include <cerrno>
 #include <fstream>
 #include <iostream>
 
@@ -335,6 +336,16 @@ TEST_F(MountTest, BusyWithMmap) {
   foo.reset();
   ASSERT_THAT(umount(dir.c_str()), SyscallFailsWithErrno(EBUSY));
   SAFE_SYSCALL(munmap(mmap_addr, page_size));
+  ASSERT_THAT(umount(dir.c_str()), SyscallSucceeds());
+}
+
+TEST_F(MountTest, NoDev) {
+  ASSERT_SUCCESS(MakeDir("a"));
+  auto dir = TestPath("a");
+  ASSERT_THAT(mount(nullptr, dir.c_str(), "tmpfs", MS_NODEV, nullptr), SyscallSucceeds());
+  auto path = TestPath("a/foo");
+  ASSERT_THAT(mknod(path.c_str(), S_IFBLK | 0777, 0), SyscallSucceeds());
+  ASSERT_THAT(open(path.c_str(), O_RDONLY), SyscallFailsWithErrno(EACCES));
   ASSERT_THAT(umount(dir.c_str()), SyscallSucceeds());
 }
 

@@ -37,6 +37,7 @@ use starnix_uapi::auth::{
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, EACCES};
 use starnix_uapi::file_mode::{mode, Access, AccessCheck, FileMode};
+use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::ownership::Releasable;
 use starnix_uapi::resource_limits::Resource;
@@ -1297,22 +1298,32 @@ impl FsNode {
         };
 
         match mode & FileMode::IFMT {
-            FileMode::IFCHR => current_task.kernel().open_device(
-                locked,
-                current_task,
-                self,
-                flags,
-                rdev,
-                DeviceMode::Char,
-            ),
-            FileMode::IFBLK => current_task.kernel().open_device(
-                locked,
-                current_task,
-                self,
-                flags,
-                rdev,
-                DeviceMode::Block,
-            ),
+            FileMode::IFCHR => {
+                if mount.flags().contains(MountFlags::NODEV) {
+                    return error!(EACCES);
+                }
+                current_task.kernel().open_device(
+                    locked,
+                    current_task,
+                    self,
+                    flags,
+                    rdev,
+                    DeviceMode::Char,
+                )
+            }
+            FileMode::IFBLK => {
+                if mount.flags().contains(MountFlags::NODEV) {
+                    return error!(EACCES);
+                }
+                current_task.kernel().open_device(
+                    locked,
+                    current_task,
+                    self,
+                    flags,
+                    rdev,
+                    DeviceMode::Block,
+                )
+            }
             FileMode::IFIFO => Pipe::open(current_task, self.fifo.as_ref().unwrap(), flags),
             // UNIX domain sockets can't be opened.
             FileMode::IFSOCK => error!(ENXIO),
