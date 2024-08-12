@@ -49,11 +49,11 @@ def _fuchsia_board_configuration_impl(ctx):
 
     filesystems = json.decode(ctx.attr.filesystems)
     replace_labels_with_files(filesystems, ctx.attr.filesystems_labels)
-
     for label, _ in ctx.attr.filesystems_labels.items():
         src = label.files.to_list()[0]
         dest = ctx.actions.declare_file(src.path)
         ctx.actions.symlink(output = dest, target_file = src)
+        board_files.append(src)
         board_files.append(dest)
 
     board_config = {}
@@ -94,12 +94,27 @@ def _fuchsia_board_configuration_impl(ctx):
     content = json.encode_indent(board_config, indent = "  ")
     ctx.actions.write(board_config_file, content)
 
+    board_config_dir = ctx.actions.declare_directory(ctx.label.name + "_board_configuration")
+    ctx.actions.run(
+        outputs = [board_config_dir],
+        inputs = board_files,
+        executable = ctx.executable._establish_board_config_dir,
+        arguments = [
+            "--config-file",
+            board_config_file.path,
+            "--output-dir",
+            board_config_dir.path,
+        ],
+        **LOCAL_ONLY_ACTION_KWARGS
+    )
+    board_files.append(board_config_dir)
+
     return [
         DefaultInfo(
             files = depset(board_files),
         ),
         FuchsiaBoardConfigInfo(
-            config = board_config_file,
+            config = board_config_dir.path + "/board_configuration.json",
             files = board_files,
         ),
     ]
@@ -140,6 +155,11 @@ _fuchsia_board_configuration = rule(
             doc = "Devicetree binary (.dtb) file",
             allow_single_file = True,
         ),
+        "_establish_board_config_dir": attr.label(
+            default = "//fuchsia/tools:establish_board_config_dir",
+            executable = True,
+            cfg = "exec",
+        ),
     },
 )
 
@@ -176,7 +196,7 @@ def _fuchsia_prebuilt_board_configuration_impl(ctx):
     return [
         FuchsiaBoardConfigInfo(
             files = ctx.files.files,
-            config = board_configuration,
+            config = board_configuration.path,
         ),
     ]
 

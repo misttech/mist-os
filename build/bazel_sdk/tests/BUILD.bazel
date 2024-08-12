@@ -30,7 +30,6 @@ test_suite(
         "//fuchsia/assembly:board_configuration_golden_test",
         "//fuchsia/assembly:board_input_bundle_golden_test",
         "//fuchsia/assembly:partitions_config_golden_test",
-        "//fuchsia/assembly:prebuilt_inputs_board_configuration_golden_test",
         "//fuchsia/assembly:prebuilt_product_config_golden_test",
         "//fuchsia/assembly:product_config_golden_test",
         "//fuchsia/assembly:product_config_with_labels_golden_test",

@@ -81,7 +81,7 @@ def _fuchsia_product_assembly_impl(ctx):
 
     # The path to the json file itself will be in the provider's board_config
     # field, this needs to be in the arguments to assembly.
-    board_config_file_path = board_config.config.path
+    board_config_file_path = board_config.config
 
     # Invoke Product Assembly
     product_config_file = ctx.attr.product_config[FuchsiaProductConfigInfo].product_config

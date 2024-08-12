@@ -1,0 +1,9 @@
+{
+    "devicetree": "devicetree/test.dtb",
+    "input_bundles": [
+        "input_bundles/testing_board_input_bundle_out",
+        "input_bundles/empty_bib"
+    ],
+    "name": "x64",
+    "provided_features": []
+}
