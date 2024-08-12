@@ -2,6 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+// Note: For the clarity of this example, allow code to be unused.
+#![allow(dead_code)]
+
 use {
     anyhow::{Context as _, Error},
     // [START diff_1]
@@ -27,7 +30,6 @@ lazy_static! {
 // [START diff_2]
 // A representation of a key-value store that can contain an arbitrarily deep nesting of other
 // key-value stores.
-#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 enum StoreNode {
     Leaf(Option<Vec<u8>>),
     Branch(Box<HashMap<String, StoreNode>>),
