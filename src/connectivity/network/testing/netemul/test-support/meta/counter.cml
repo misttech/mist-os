@@ -35,6 +35,13 @@
             rights: [ "r*" ],
             path: "/dev",
         },
+        {
+            config: "fuchsia.netemul.test.Config",
+            key: "config",
+            availability: "optional",
+            type: "bool",
+            default: false,
+        },
     ],
     expose: [
         {
