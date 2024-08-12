@@ -117,10 +117,6 @@ class StarnixTouchTest : public ui_testing::PortableUITest {
   }
 
   // For use by test cases.
-  uint32_t display_width() { return display_size().width; }
-  uint32_t display_height() { return display_size().height; }
-
-  // For use by test cases.
   void InjectInput(TapLocation tap_location) {
     auto touch = std::make_unique<fuchsia_ui_input::TouchscreenReport>();
     switch (tap_location) {

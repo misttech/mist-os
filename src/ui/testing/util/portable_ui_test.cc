@@ -5,6 +5,7 @@
 
 #include "src/ui/testing/util/portable_ui_test.h"
 
+#include <fidl/fuchsia.ui.focus/cpp/fidl.h>
 #include <fuchsia/logger/cpp/fidl.h>
 #include <fuchsia/scheduler/cpp/fidl.h>
 #include <fuchsia/tracing/provider/cpp/fidl.h>
@@ -65,13 +66,15 @@ void PortableUITest::SetUpRealmBase() {
             .targets = {kTestUIStackRef}});
 
   // Route UI capabilities from test-ui-stack to test driver.
-  realm_builder_.AddRoute(
-      Route{.capabilities = {Protocol{fuchsia::ui::composition::Screenshot::Name_},
-                             Protocol{fuchsia::ui::display::singleton::Info::Name_},
-                             Protocol{fuchsia::ui::test::input::Registry::Name_},
-                             Protocol{fuchsia::ui::test::scene::Controller::Name_}},
-            .source = kTestUIStackRef,
-            .targets = {ParentRef{}}});
+  realm_builder_.AddRoute(Route{
+      .capabilities =
+          {Protocol{fuchsia::ui::composition::Screenshot::Name_},
+           Protocol{fuchsia::ui::display::singleton::Info::Name_},
+           Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_focus::FocusChainListenerRegistry>},
+           Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_test_input::Registry>},
+           Protocol{fuchsia::ui::test::scene::Controller::Name_}},
+      .source = kTestUIStackRef,
+      .targets = {ParentRef{}}});
 
   // Configure test-ui-stack.
   realm_builder_.InitMutableConfigToEmpty(kTestUIStack);
@@ -89,6 +92,10 @@ void PortableUITest::SetUp() {
   ExtendRealm();
 
   realm_ = realm_builder_.Build();
+
+  // Get the display dimensions. This is not only a log output, it ensures display info is ready.
+  FX_LOGS(INFO) << "Got display_width = " << display_width()
+                << " and display_height = " << display_height();
 }
 
 void PortableUITest::TearDown() {
@@ -258,36 +265,33 @@ fuchsia::math::SizeU PortableUITest::display_size() {
   return size;
 }
 
+uint32_t PortableUITest::display_width() { return display_size().width; }
+
+uint32_t PortableUITest::display_height() { return display_size().height; }
+
 void PortableUITest::RegisterTouchScreen() {
   FX_LOGS(INFO) << "Registering fake touch screen";
-  input_registry_ = realm_->component().Connect<fuchsia::ui::test::input::Registry>();
-  input_registry_.set_error_handler([](zx_status_t status) {
-    FX_LOGS(ERROR) << "Error connecting to f.ui.test.input.Registry: "
-                   << zx_status_get_string(status);
-  });
+  ConnectInputRegistry();
 
-  bool touchscreen_registered = false;
-  fuchsia::ui::test::input::RegistryRegisterTouchScreenRequest request;
-  request.set_device(fake_touchscreen_.NewRequest());
-  request.set_coordinate_unit(fuchsia::ui::test::input::CoordinateUnit::PHYSICAL_PIXELS);
-  input_registry_->RegisterTouchScreen(
-      std::move(request), [&touchscreen_registered]() { touchscreen_registered = true; });
+  auto [register_touch_client, register_touch_server] =
+      fidl::Endpoints<fuchsia_ui_test_input::TouchScreen>::Create();
+  fake_touchscreen_ = fidl::SyncClient(std::move(register_touch_client));
 
-  RunLoopUntil([&touchscreen_registered] { return touchscreen_registered; });
+  ZX_ASSERT_OK(input_registry_->RegisterTouchScreen(
+      {{.device = std::move(register_touch_server),
+        .coordinate_unit = fuchsia_ui_test_input::CoordinateUnit::kPhysicalPixels}}));
   FX_LOGS(INFO) << "Touchscreen registered";
 }
 
 void PortableUITest::InjectTap(int32_t x, int32_t y) {
-  fuchsia::ui::test::input::TouchScreenSimulateTapRequest tap_request;
-  tap_request.mutable_tap_location()->x = x;
-  tap_request.mutable_tap_location()->y = y;
+  fuchsia_ui_test_input::TouchScreenSimulateTapRequest tap_request;
+  tap_request.tap_location() = fuchsia_math::Vec{{.x = x, .y = y}};
 
-  FX_LOGS(INFO) << "Injecting tap at (" << tap_request.tap_location().x << ", "
-                << tap_request.tap_location().y << ")";
-  fake_touchscreen_->SimulateTap(std::move(tap_request), [this]() {
-    ++touch_injection_request_count_;
-    FX_LOGS(INFO) << "*** Tap injected, count: " << touch_injection_request_count_;
-  });
+  FX_LOGS(INFO) << "Injecting tap at (" << tap_request.tap_location()->x() << ", "
+                << tap_request.tap_location()->y() << ")";
+  fake_touchscreen_->SimulateTap(tap_request);
+  ++touch_injection_request_count_;
+  FX_LOGS(INFO) << "*** Tap injected, count: " << touch_injection_request_count_;
 }
 
 void PortableUITest::InjectTapWithRetry(int32_t x, int32_t y) {
@@ -298,36 +302,30 @@ void PortableUITest::InjectTapWithRetry(int32_t x, int32_t y) {
 
 void PortableUITest::InjectSwipe(int start_x, int start_y, int end_x, int end_y,
                                  int move_event_count) {
-  fuchsia::ui::test::input::TouchScreenSimulateSwipeRequest swipe_request;
-  swipe_request.mutable_start_location()->x = start_x;
-  swipe_request.mutable_start_location()->y = start_y;
-  swipe_request.mutable_end_location()->x = end_x;
-  swipe_request.mutable_end_location()->y = end_y;
-  swipe_request.set_move_event_count(move_event_count);
+  fuchsia_ui_test_input::TouchScreenSimulateSwipeRequest swipe_request;
+  swipe_request.start_location() = {{.x = start_x, .y = start_y}};
+  swipe_request.end_location() = {{.x = end_x, .y = end_y}};
+  swipe_request.move_event_count() = move_event_count;
 
-  FX_LOGS(INFO) << "Injecting swipe from (" << swipe_request.start_location().x << ", "
-                << swipe_request.start_location().y << ") to (" << swipe_request.end_location().x
-                << ", " << swipe_request.end_location().y
-                << ") with move_event_count = " << swipe_request.move_event_count();
+  FX_LOGS(INFO) << "Injecting swipe from (" << swipe_request.start_location()->x() << ", "
+                << swipe_request.start_location()->y() << ") to ("
+                << swipe_request.end_location()->x() << ", " << swipe_request.end_location()->y()
+                << ") with move_event_count = " << swipe_request.move_event_count().value();
 
-  fake_touchscreen_->SimulateSwipe(std::move(swipe_request), [this]() {
-    touch_injection_request_count_++;
-    FX_LOGS(INFO) << "*** Swipe injected";
-  });
+  fake_touchscreen_->SimulateSwipe(swipe_request);
+  touch_injection_request_count_++;
+  FX_LOGS(INFO) << "*** Swipe injected";
 }
 
 void PortableUITest::RegisterMouse() {
   FX_LOGS(INFO) << "Registering fake mouse";
-  auto res = realm_->component().Connect<fuchsia_ui_test_input::Registry>();
-  ZX_ASSERT_OK(res);
-  mouse_input_registry_ = fidl::SyncClient(std::move(res.value()));
+  ConnectInputRegistry();
 
   auto [register_mouse_client, register_mouse_server] =
       fidl::Endpoints<fuchsia_ui_test_input::Mouse>::Create();
   fake_mouse_ = fidl::SyncClient(std::move(register_mouse_client));
 
-  ZX_ASSERT_OK(
-      mouse_input_registry_->RegisterMouse({{.device = std::move(register_mouse_server)}}));
+  ZX_ASSERT_OK(input_registry_->RegisterMouse({{.device = std::move(register_mouse_server)}}));
   FX_LOGS(INFO) << "Mouse registered";
 }
 
@@ -358,6 +356,32 @@ void PortableUITest::SimulateMouseScroll(
   }
 
   ZX_ASSERT_OK(fake_mouse_->SimulateMouseEvent(request));
+}
+
+void PortableUITest::RegisterKeyboard() {
+  FX_LOGS(INFO) << "Registering fake keyboard";
+  ConnectInputRegistry();
+
+  auto [register_kb_client, register_kb_server] =
+      fidl::Endpoints<fuchsia_ui_test_input::Keyboard>::Create();
+  fake_keyboard_ = fidl::SyncClient(std::move(register_kb_client));
+
+  ZX_ASSERT_OK(input_registry_->RegisterKeyboard({{.device = std::move(register_kb_server)}}));
+  FX_LOGS(INFO) << "Keyboard registered";
+}
+
+void PortableUITest::SimulateUsAsciiTextEntry(const std::string& str) {
+  FX_LOGS(INFO) << "Requesting key event";
+
+  ZX_ASSERT_OK(fake_keyboard_->SimulateUsAsciiTextEntry({{.text = str}}));
+}
+
+void PortableUITest::ConnectInputRegistry() {
+  if (!input_registry_.is_valid()) {
+    auto res = realm_->component().Connect<fuchsia_ui_test_input::Registry>();
+    ZX_ASSERT_OK(res);
+    input_registry_ = fidl::SyncClient(std::move(res.value()));
+  }
 }
 
 }  // namespace ui_testing

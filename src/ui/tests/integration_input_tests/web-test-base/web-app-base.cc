@@ -24,14 +24,14 @@ fuchsia_mem::Buffer BufferFromString(const std::string& script) {
   return fuchsia_mem::Buffer(std::move(vmo), num_bytes);
 }
 
+}  // namespace
+
 std::string StringFromBuffer(const fuchsia_mem::Buffer& buffer) {
   size_t num_bytes = buffer.size();
   std::string str(num_bytes, 'x');
   buffer.vmo().read(str.data(), 0, num_bytes);
   return str;
 }
-
-}  // namespace
 
 rapidjson::Document JsonFromBuffer(const fuchsia_mem::Buffer& buffer) {
   rapidjson::Document doc =
@@ -72,10 +72,10 @@ void NavListener::OnNavigationStateChanged(OnNavigationStateChangedRequest& req,
 WebAppBase::WebAppBase()
     : loop_(&kAsyncLoopConfigAttachToCurrentThread), outgoing_directory_(loop_.dispatcher()) {}
 
-void WebAppBase::Setup(const std::string& js_code,
+void WebAppBase::Setup(const std::string& web_app_name, const std::string& js_code,
                        fuchsia_web::ContextFeatureFlags context_feature_flags) {
   ZX_ASSERT_OK(outgoing_directory_.ServeFromStartupInfo());
-  SetupWebEngine(context_feature_flags);
+  SetupWebEngine(web_app_name, context_feature_flags);
   SetupViewProvider();
 
   FX_LOGS(INFO) << "Wait for CreateView2 called.";
@@ -83,7 +83,8 @@ void WebAppBase::Setup(const std::string& js_code,
   SetupWebPage(js_code);
 }
 
-void WebAppBase::SetupWebEngine(fuchsia_web::ContextFeatureFlags context_feature_flags) {
+void WebAppBase::SetupWebEngine(const std::string& web_app_name,
+                                fuchsia_web::ContextFeatureFlags context_feature_flags) {
   auto web_context_provider_connect = component::Connect<fuchsia_web::ContextProvider>();
   ZX_ASSERT_OK(web_context_provider_connect);
   web_context_provider_ = fidl::SyncClient(std::move(web_context_provider_connect.value()));
@@ -103,7 +104,12 @@ void WebAppBase::SetupWebEngine(fuchsia_web::ContextFeatureFlags context_feature
   web_context_ = fidl::SyncClient(std::move(web_context_client_end));
 
   auto [web_frame_client_end, web_frame_server_end] = fidl::Endpoints<fuchsia_web::Frame>::Create();
-  ZX_ASSERT_OK(web_context_->CreateFrame({std::move(web_frame_server_end)}));
+  fuchsia_web::CreateFrameParams web_frame_params;
+  web_frame_params.debug_name(web_app_name);
+  ZX_ASSERT_OK(web_context_->CreateFrameWithParams({{
+      std::move(web_frame_params),
+      std::move(web_frame_server_end),
+  }}));
 
   web_frame_ = fidl::SyncClient(std::move(web_frame_client_end));
 

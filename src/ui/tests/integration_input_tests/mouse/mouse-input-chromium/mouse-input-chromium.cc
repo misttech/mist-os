@@ -58,7 +58,7 @@ fuchsia_ui_test_input::MouseEventPhase GetPhase(const std::string& type) {
 // Implements a simple web app, which responds to mouse events.
 class WebApp : public integration_tests::WebAppBase {
  public:
-  WebApp() { Setup(kAppCode); }
+  WebApp() { Setup("mouse-input-chromium", kAppCode); }
 
   void RunLoopForMouseReponse() {
     auto test_app_status_listener_connect =

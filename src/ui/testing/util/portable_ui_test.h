@@ -8,13 +8,13 @@
 #include <fidl/fuchsia.ui.test.input/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <fuchsia/ui/composition/cpp/fidl.h>
-#include <fuchsia/ui/test/input/cpp/fidl.h>
 #include <fuchsia/ui/test/scene/cpp/fidl.h>
 #include <lib/fidl/cpp/channel.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <zircon/status.h>
 
 #include <optional>
+#include <string>
 #include <utility>
 #include <vector>
 
@@ -63,6 +63,12 @@ class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
   // Return display size by connecting to |fuchsia::ui::display::singleton::Info| protocol.
   fuchsia::math::SizeU display_size();
 
+  // Return display height by connecting to |fuchsia::ui::display::singleton::Info| protocol.
+  uint32_t display_height();
+
+  // Return display width by connecting to |fuchsia::ui::display::singleton::Info| protocol.
+  uint32_t display_width();
+
   // Registers a fake touch screen device with an injection coordinate space
   // spanning [-1000, 1000] on both axes.
   void RegisterTouchScreen();
@@ -109,6 +115,12 @@ class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
   void SimulateMouseScroll(const std::vector<fuchsia_ui_test_input::MouseButton>& pressed_buttons,
                            int scroll_x, int scroll_y, bool use_physical_units = false);
 
+  // Register a fake keyboard.
+  void RegisterKeyboard();
+
+  // Helper method to simulate a string in us ascii to the fake keyboard.
+  void SimulateUsAsciiTextEntry(const std::string& str);
+
  protected:
   component_testing::RealmBuilder& realm_builder() { return realm_builder_; }
   std::optional<component_testing::RealmRoot>& realm_root() { return realm_; }
@@ -140,10 +152,13 @@ class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
   // Helper method to process a view geometry update.
   void ProcessViewGeometryResponse(fuchsia::ui::observation::geometry::WatchResponse response);
 
-  fuchsia::ui::test::input::RegistryPtr input_registry_;
-  fidl::SyncClient<fuchsia_ui_test_input::Registry> mouse_input_registry_;
-  fuchsia::ui::test::input::TouchScreenPtr fake_touchscreen_;
+  // Helper to connect input registry.
+  void ConnectInputRegistry();
+
+  fidl::SyncClient<fuchsia_ui_test_input::Registry> input_registry_;
+  fidl::SyncClient<fuchsia_ui_test_input::TouchScreen> fake_touchscreen_;
   fidl::SyncClient<fuchsia_ui_test_input::Mouse> fake_mouse_;
+  fidl::SyncClient<fuchsia_ui_test_input::Keyboard> fake_keyboard_;
   fuchsia::ui::test::scene::ControllerPtr scene_provider_;
   fuchsia::ui::observation::geometry::ViewTreeWatcherPtr view_tree_watcher_;
   std::optional<fuchsia::ui::composition::ScreenshotPtr> screenshotter_;
