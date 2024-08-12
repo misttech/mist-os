@@ -3,9 +3,7 @@
 // found in the LICENSE file.
 
 use crate::task::CurrentTask;
-use crate::vfs::{
-    ActiveNamespaceNode, CheckAccessReason, FileSystemHandle, Namespace, NamespaceNode,
-};
+use crate::vfs::{ActiveNamespaceNode, CheckAccessReason, Namespace, NamespaceNode};
 use starnix_logging::log_trace;
 use starnix_sync::RwLock;
 use starnix_uapi::auth::CAP_SYS_CHROOT;
@@ -69,8 +67,7 @@ impl FsContext {
     ///
     /// The root and cwd of the FsContext are initialized to the root of the
     /// namespace.
-    pub fn new(root: FileSystemHandle) -> Arc<FsContext> {
-        let namespace = Namespace::new(root);
+    pub fn new(namespace: Arc<Namespace>) -> Arc<FsContext> {
         let root = namespace.root();
         Arc::new(FsContext {
             state: RwLock::new(FsContextState {
@@ -171,14 +168,14 @@ impl FsContext {
 mod test {
     use crate::fs::tmpfs::TmpFs;
     use crate::testing::{create_kernel_and_task, create_kernel_task_and_unlocked_with_pkgfs};
-    use crate::vfs::FsContext;
+    use crate::vfs::{FsContext, Namespace};
     use starnix_uapi::file_mode::FileMode;
     use starnix_uapi::open_flags::OpenFlags;
 
     #[::fuchsia::test]
     async fn test_umask() {
         let (kernel, _task) = create_kernel_and_task();
-        let fs = FsContext::new(TmpFs::new_fs(&kernel));
+        let fs = FsContext::new(Namespace::new(TmpFs::new_fs(&kernel)));
 
         assert_eq!(FileMode::from_bits(0o22), fs.set_umask(FileMode::from_bits(0o3020)));
         assert_eq!(FileMode::from_bits(0o646), fs.apply_umask(FileMode::from_bits(0o666)));

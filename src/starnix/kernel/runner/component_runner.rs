@@ -191,17 +191,17 @@ pub async fn start_component(
                     })?;
                 if let Some(local_mounts) = local_mounts {
                     for mount in local_mounts.iter() {
-                        let (mount_point, child_fs) =
-                            create_filesystem_from_spec(locked, current_task, &pkg, mount)
-                                .map_err(|e| {
-                                    log_error!("Error while mounting the filesystems: {e:?}");
-                                    errno!(EINVAL)
-                                })?;
-                        let mount_point = current_task.lookup_path_from_root(mount_point)?;
+                        let action = create_filesystem_from_spec(locked, current_task, &pkg, mount)
+                            .map_err(|e| {
+                                log_error!("Error while mounting the filesystems: {e:?}");
+                                errno!(EINVAL)
+                            })?;
+                        let mount_point =
+                            current_task.lookup_path_from_root(action.path.as_ref())?;
                         mount_record.lock().mount(
                             mount_point,
-                            WhatToMount::Fs(child_fs),
-                            MountFlags::empty(),
+                            WhatToMount::Fs(action.fs),
+                            action.flags,
                         )?;
                     }
                 }

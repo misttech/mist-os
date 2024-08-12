@@ -15,7 +15,6 @@ use crate::vfs::{
     FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
     FsNodeOps, FsStr, FsString, SpecialNode, VecDirectory, VecDirectoryEntry,
 };
-use bstr::B;
 use starnix_logging::{log_error, track_stub};
 use starnix_sync::{
     BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked, ProcessGroupState, Unlocked,
@@ -111,15 +110,10 @@ fn init_devpts(
     // Register tty and ptmx device types.
     kernel.device_registry.register_major(TTY_ALT_MAJOR, device, DeviceMode::Char)?;
 
-    let parsed_options = fs_args::generic_parse_mount_options(options.params.as_ref())?;
-    let uid = parsed_options
-        .get(B("uid"))
-        .map(|uid| fs_args::parse::<uid_t>(uid.as_ref()))
-        .transpose()?;
-    let gid = parsed_options
-        .get(B("gid"))
-        .map(|gid| fs_args::parse::<gid_t>(gid.as_ref()))
-        .transpose()?;
+    let uid =
+        options.params.get(b"uid").map(|uid| fs_args::parse::<uid_t>(uid.as_ref())).transpose()?;
+    let gid =
+        options.params.get(b"gid").map(|gid| fs_args::parse::<gid_t>(gid.as_ref())).transpose()?;
 
     let fs = FileSystem::new(kernel, CacheMode::Uncached, DevPtsFs { uid, gid }, options)
         .expect("devpts filesystem constructed with valid options");

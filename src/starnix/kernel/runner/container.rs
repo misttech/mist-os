@@ -34,14 +34,13 @@ use starnix_core::fs::tmpfs::TmpFs;
 use starnix_core::security;
 use starnix_core::task::{set_thread_role, CurrentTask, ExitStatus, Kernel, Task};
 use starnix_core::time::utc::update_utc_clock;
-use starnix_core::vfs::{FileSystemOptions, FsContext, LookupContext, WhatToMount};
+use starnix_core::vfs::{FileSystemOptions, FsContext, LookupContext, Namespace, WhatToMount};
 use starnix_kernel_config::Config;
 use starnix_logging::{
     log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
 };
 use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::errors::{SourceContext, ENOENT};
-use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::{errno, rlimit};
@@ -515,13 +514,13 @@ where
     // point doesn't exist in a previous mount. The root must be first so other mounts can be
     // applied on top of it.
     let mut mounts_iter = config.mounts.iter();
-    let (root_point, mut root_fs) = create_filesystem_from_spec(
+    let mut root = create_filesystem_from_spec(
         locked,
         kernel,
         pkg_dir_proxy,
         mounts_iter.next().ok_or_else(|| anyhow!("Mounts list is empty"))?,
     )?;
-    if root_point != "/" {
+    if root.path != "/" {
         anyhow::bail!("First mount in mounts list is not the root");
     }
 
@@ -537,8 +536,8 @@ where
             create_remotefs_filesystem(
                 kernel,
                 pkg_dir_proxy,
-                rights,
                 FileSystemOptions { source: "data".into(), ..Default::default() },
+                rights,
             )?,
             BTreeMap::from([("component".into(), TmpFs::new_fs(kernel))]),
         );
@@ -554,12 +553,12 @@ where
     if !mappings.is_empty() {
         // If this container has enabled any features that mount directories that might not exist
         // in the root file system, we add a LayeredFs to hold these mappings.
-        root_fs = LayeredFs::new_fs(kernel, root_fs, mappings.into_iter().collect());
+        root.fs = LayeredFs::new_fs(kernel, root.fs, mappings.into_iter().collect());
     }
     if features.rootfs_rw {
-        root_fs = OverlayFs::wrap_fs_in_writable_layer(kernel, root_fs)?;
+        root.fs = OverlayFs::wrap_fs_in_writable_layer(kernel, root.fs)?;
     }
-    Ok(FsContext::new(root_fs))
+    Ok(FsContext::new(Namespace::new_with_flags(root.fs, root.flags)))
 }
 
 pub fn set_rlimits(task: &Task, rlimits: &[String]) -> Result<(), Error> {
@@ -613,15 +612,12 @@ where
     // Skip the first mount, that was used to create the root filesystem.
     let _ = mounts_iter.next();
     for mount_spec in mounts_iter {
-        let (mount_point, child_fs) =
-            create_filesystem_from_spec(locked, system_task, pkg_dir_proxy, mount_spec)
-                .with_source_context(|| {
-                    format!("creating filesystem from spec: {}", &mount_spec)
-                })?;
+        let action = create_filesystem_from_spec(locked, system_task, pkg_dir_proxy, mount_spec)
+            .with_source_context(|| format!("creating filesystem from spec: {}", &mount_spec))?;
         let mount_point = system_task
-            .lookup_path_from_root(mount_point)
-            .with_source_context(|| format!("lookup path from root: {mount_point}"))?;
-        mount_point.mount(WhatToMount::Fs(child_fs), MountFlags::empty())?;
+            .lookup_path_from_root(action.path.as_ref())
+            .with_source_context(|| format!("lookup path from root: {}", action.path))?;
+        mount_point.mount(WhatToMount::Fs(action.fs), action.flags)?;
     }
     Ok(())
 }

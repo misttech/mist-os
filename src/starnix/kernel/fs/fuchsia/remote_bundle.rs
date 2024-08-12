@@ -50,10 +50,12 @@ impl RemoteBundle {
     pub fn new_fs(
         kernel: &Arc<Kernel>,
         base: &fio::DirectorySynchronousProxy,
+        mut options: FileSystemOptions,
         rights: fio::OpenFlags,
-        path: &str,
     ) -> Result<FileSystemHandle, Error> {
         let (root, server_end) = fidl::endpoints::create_endpoints::<fio::NodeMarker>();
+        let path =
+            std::str::from_utf8(&options.source).map_err(|_| anyhow!("Source path is not utf8"))?;
         base.open(rights, fio::ModeType::empty(), path, server_end)
             .map_err(|e| anyhow!("Failed to open root: {}", e))?;
         let root = fio::DirectorySynchronousProxy::new(root.into_channel());
@@ -81,19 +83,15 @@ impl RemoteBundle {
             "Root node does not exist in remote bundle"
         );
 
+        if !rights.contains(fio::OpenFlags::RIGHT_WRITABLE) {
+            options.flags |= MountFlags::RDONLY;
+        }
+
         let fs = FileSystem::new(
             kernel,
             CacheMode::Cached(CacheConfig { capacity: REMOTE_BUNDLE_NODE_LRU_CAPACITY }),
             RemoteBundle { metadata, root, rights },
-            FileSystemOptions {
-                source: path.into(),
-                flags: if rights.contains(fio::OpenFlags::RIGHT_WRITABLE) {
-                    MountFlags::empty()
-                } else {
-                    MountFlags::RDONLY
-                },
-                params: Default::default(),
-            },
+            options,
         )?;
         let mut root_node = FsNode::new_root(DirectoryObject);
         root_node.node_id = ext4_metadata::ROOT_INODE_NUM;
@@ -516,7 +514,8 @@ mod test {
     use crate::testing::create_kernel_task_and_unlocked;
     use crate::vfs::buffers::VecOutputBuffer;
     use crate::vfs::{
-        DirectoryEntryType, DirentSink, FsStr, LookupContext, Namespace, SymlinkMode, SymlinkTarget,
+        DirectoryEntryType, DirentSink, FileSystemOptions, FsStr, LookupContext, Namespace,
+        SymlinkMode, SymlinkTarget,
     };
     use starnix_uapi::errors::Errno;
     use starnix_uapi::file_mode::{AccessCheck, FileMode};
@@ -534,8 +533,8 @@ mod test {
         let fs = RemoteBundle::new_fs(
             &kernel,
             &fio::DirectorySynchronousProxy::new(client),
+            FileSystemOptions { source: "data/test-image".into(), ..Default::default() },
             rights,
-            "data/test-image",
         )
         .expect("new_fs failed");
         let ns = Namespace::new(fs);

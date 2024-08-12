@@ -6,6 +6,7 @@ use super::selinux_hooks::fs::selinux_fs;
 use super::{selinux_hooks, FileSystemState, ResolvedElfState, TaskState};
 use crate::security::KernelState;
 use crate::task::{CurrentTask, Task};
+use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
     FileSystemHandle, FileSystemOptions, FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode,
     ValueOrSize, XattrOp,
@@ -17,7 +18,6 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::signals::Signal;
 use starnix_uapi::unmount_flags::UnmountFlags;
-use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Executes the `hook` closure, dependent on the state of SELinux.
@@ -97,9 +97,9 @@ pub fn new_selinux_fs(
 /// This sits somewhere between `fs_context_parse_param()` and `sb_set_mnt_opts()` in function.
 pub fn file_system_init_security(
     fs_type: &FsStr,
-    mount_options: &HashMap<FsString, FsString>,
+    mount_params: &MountParams,
 ) -> Result<FileSystemState, Errno> {
-    Ok(FileSystemState { state: selinux_hooks::file_system_init_security(fs_type, mount_options)? })
+    Ok(FileSystemState { state: selinux_hooks::file_system_init_security(fs_type, mount_params)? })
 }
 
 /// Used to return an extended attribute name and value to apply to a [`crate::vfs::FsNode`].

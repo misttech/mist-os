@@ -68,11 +68,13 @@ pub struct Namespace {
 
 impl Namespace {
     pub fn new(fs: FileSystemHandle) -> Arc<Namespace> {
+        Self::new_with_flags(fs, MountFlags::empty())
+    }
+
+    pub fn new_with_flags(fs: FileSystemHandle, flags: MountFlags) -> Arc<Namespace> {
         let kernel = fs.kernel.upgrade().expect("can't create namespace without a kernel");
-        Arc::new(Self {
-            root_mount: Mount::new(WhatToMount::Fs(fs), MountFlags::empty()),
-            id: kernel.get_next_namespace_id(),
-        })
+        let root_mount = Mount::new(WhatToMount::Fs(fs), flags);
+        Arc::new(Self { root_mount, id: kernel.get_next_namespace_id() })
     }
 
     pub fn root(&self) -> NamespaceNode {
@@ -285,7 +287,7 @@ pub enum WhatToMount {
 }
 
 impl Mount {
-    fn new(what: WhatToMount, flags: MountFlags) -> MountHandle {
+    pub fn new(what: WhatToMount, flags: MountFlags) -> MountHandle {
         match what {
             WhatToMount::Fs(fs) => Self::new_with_root(fs.root().clone(), flags),
             WhatToMount::Bind(node) => {
@@ -738,8 +740,8 @@ impl FileSystemCreator for Arc<Kernel> {
                 self.container_data_dir
                     .as_ref()
                     .ok_or_else(|| errno!(EPERM, "Missing container data directory"))?,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
                 options,
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
             )?,
             b"tmpfs" => TmpFs::new_fs_with_options(self, options)?,
             _ => {

@@ -11,6 +11,7 @@ use crate::task::{
 use crate::timer::{Timeline, TimerWakeup};
 use crate::vfs::buffers::{UserBuffersInputBuffer, UserBuffersOutputBuffer};
 use crate::vfs::eventfd::{new_eventfd, EventFdFileObject, EventFdType};
+use crate::vfs::fs_args::MountParams;
 use crate::vfs::inotify::InotifyFileObject;
 use crate::vfs::namespace::FileSystemCreator;
 use crate::vfs::pidfd::new_pidfd;
@@ -1783,7 +1784,7 @@ where
     let options = FileSystemOptions {
         source: source.into(),
         flags: flags & MountFlags::STORED_ON_FILESYSTEM,
-        params: data.into(),
+        params: MountParams::parse(&data)?,
     };
 
     let fs = current_task.create_filesystem(locked, fs_type, options)?;

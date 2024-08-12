@@ -8,6 +8,7 @@ pub(super) mod testing;
 
 use super::{FsNodeSecurityXattr, FsNodeState, ResolvedElfState};
 use crate::task::CurrentTask;
+use crate::vfs::fs_args::MountParams;
 use crate::vfs::{FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp};
 use linux_uapi::XATTR_NAME_SELINUX;
 use selinux::{ClassPermission, InitialSid, Permission, ProcessPermission};
@@ -19,7 +20,6 @@ use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::unmount_flags::UnmountFlags;
-use std::collections::HashMap;
 
 /// Maximum supported size for the extended attribute value used to store SELinux security
 /// contexts in a filesystem node extended attributes.
@@ -227,12 +227,12 @@ fn check_self_permissions(
 /// Return security state to associate with a filesystem based on the supplied mount options.
 pub fn file_system_init_security(
     _fs_type: &FsStr,
-    options: &HashMap<FsString, FsString>,
+    mount_params: &MountParams,
 ) -> Result<FileSystemState, Errno> {
-    let context = options.get(FsStr::new(b"context")).cloned();
-    let def_context = options.get(FsStr::new(b"defcontext")).cloned();
-    let fs_context = options.get(FsStr::new(b"fscontext")).cloned();
-    let root_context = options.get(FsStr::new(b"rootcontext")).cloned();
+    let context = mount_params.get(FsStr::new(b"context")).cloned();
+    let def_context = mount_params.get(FsStr::new(b"defcontext")).cloned();
+    let fs_context = mount_params.get(FsStr::new(b"fscontext")).cloned();
+    let root_context = mount_params.get(FsStr::new(b"rootcontext")).cloned();
 
     #[cfg(not(test))]
     // TODO: https://fxbug.dev/355628002 - Remove this as soon as `fs_use_*` Contexts are being determine from policy.

@@ -11,8 +11,9 @@ use crate::task::{
     ptrace_syscall_enter, ptrace_syscall_exit, CurrentTask, ExitStatus, Kernel, SeccompStateValue,
     TaskFlags, ThreadGroup,
 };
+use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
-    FdNumber, FdTable, FileSystemCreator, FileSystemHandle, FileSystemOptions, FsStr,
+    FdNumber, FdTable, FileSystemCreator, FileSystemHandle, FileSystemOptions, FsString,
 };
 use anyhow::{anyhow, Error};
 #[cfg(feature = "syscall_stats")]
@@ -233,8 +234,8 @@ pub fn parse_numbered_handles(
 pub fn create_remotefs_filesystem(
     kernel: &Arc<Kernel>,
     root: &fio::DirectorySynchronousProxy,
-    rights: fio::OpenFlags,
     options: FileSystemOptions,
+    rights: fio::OpenFlags,
 ) -> Result<FileSystemHandle, Errno> {
     let root = syncio::directory_open_directory_async(
         root,
@@ -246,12 +247,18 @@ pub fn create_remotefs_filesystem(
     RemoteFs::new_fs(kernel, root.into_channel(), options, rights)
 }
 
-pub fn create_filesystem_from_spec<'a, L>(
+pub struct MountAction {
+    pub path: FsString,
+    pub fs: FileSystemHandle,
+    pub flags: MountFlags,
+}
+
+pub fn create_filesystem_from_spec<L>(
     locked: &mut Locked<'_, L>,
     creator: &impl FileSystemCreator,
     pkg: &fio::DirectorySynchronousProxy,
-    spec: &'a str,
-) -> Result<(&'a FsStr, FileSystemHandle), Error>
+    spec: &str,
+) -> Result<MountAction, Error>
 where
     L: LockBefore<FileOpsCore>,
     L: LockBefore<DeviceOpen>,
@@ -272,7 +279,7 @@ where
     let options = FileSystemOptions {
         source: fs_src.into(),
         flags: MountFlags::empty(),
-        params: params.into(),
+        params: MountParams::parse(params.into())?,
     };
 
     // Default rights for remotefs.
@@ -282,11 +289,11 @@ where
     // manifest file, for whatever reason. Anything else is passed to create_filesystem, which is
     // common code that also handles the mount() system call.
     let fs = match fs_type {
-        "remote_bundle" => RemoteBundle::new_fs(kernel, pkg, rights, fs_src)?,
-        "remotefs" => create_remotefs_filesystem(kernel, pkg, rights, options)?,
+        "remote_bundle" => RemoteBundle::new_fs(kernel, pkg, options, rights)?,
+        "remotefs" => create_remotefs_filesystem(kernel, pkg, options, rights)?,
         _ => creator.create_filesystem(locked, fs_type.into(), options)?,
     };
-    Ok((mount_point.into(), fs))
+    Ok(MountAction { path: mount_point.into(), fs, flags: MountFlags::empty() })
 }
 
 fn parse_block_size(block_size_str: &str) -> Result<u64, Error> {

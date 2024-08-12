@@ -17,7 +17,6 @@ use crate::vfs::{
     FsNodeInfo, FsNodeOps, FsStr, FsString, PeekBufferSegmentsCallback, SeekTarget, SimpleFileNode,
     StaticDirectoryBuilder, SymlinkTarget, ValueOrSize, VecDirectory, VecDirectoryEntry, XattrOp,
 };
-use bstr::B;
 use fuchsia_zircon as zx;
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_error, log_trace, log_warn, track_stub};
@@ -128,11 +127,10 @@ pub fn new_fuse_fs(
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
-    let mut mount_options = fs_args::generic_parse_mount_options(options.params.as_ref())?;
     let fd = fs_args::parse::<FdNumber>(
-        mount_options.remove(B("fd")).ok_or_else(|| errno!(EINVAL))?.as_ref(),
+        options.params.get(b"fd").ok_or_else(|| errno!(EINVAL))?.as_ref(),
     )?;
-    let default_permissions = mount_options.remove(B("default_permissions")).is_some().into();
+    let default_permissions = options.params.get(b"default_permissions").is_some().into();
     let connection = current_task
         .files
         .get(fd)?
