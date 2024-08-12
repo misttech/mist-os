@@ -4,7 +4,9 @@
 
 library fuchsia.fs.startup;
 
+using fuchsia.fxfs;
 using fuchsia.hardware.block;
+using fuchsia.io;
 using zx;
 
 /// Compression algorithm specifier.
@@ -73,7 +75,10 @@ type FormatOptions = table {
 };
 
 /// Options for running consistency checks on filesystems.
-type CheckOptions = resource struct {};
+type CheckOptions = resource table {
+    /// An optional connection to a crypt client (for encrypted volumes).
+    1: crypt client_end:<fuchsia.fxfs.Crypt>;
+};
 
 // TODO(https://fxbug.dev/42172184): Figure out a more flexible configuration option strategy.
 @discoverable
@@ -97,5 +102,76 @@ closed protocol Startup {
     strict Check(resource struct {
         device client_end:fuchsia.hardware.block.Block;
         options CheckOptions;
+    }) -> () error zx.Status;
+};
+
+type MountOptions = resource table {
+    /// An optional connection to a crypt client (for encrypted volumes).
+    1: crypt client_end:<fuchsia.fxfs.Crypt>;
+
+    /// If true, mount as a blob filesystem.
+    2: as_blob bool;
+};
+
+closed protocol Volume {
+    /// Mounts the volume.  If the volume is encrypted, `options.crypt` should provide all key
+    /// access for the given volume.  `outgoing_directory` will contain the root and other services
+    /// exposed by the volume.  To lock the volume, call fuchsia.fs.Admin.Shutdown on the returned
+    /// handle.
+    // TODO(https://fxbug.dev/42181598): Try to share options with fuchsia.fs_startup StartOptions.
+    strict Mount(resource struct {
+        outgoing_directory server_end:fuchsia.io.Directory;
+        options MountOptions;
+    }) -> () error zx.Status;
+
+    /// Check the volume for consistency.  If the volume is encrypted, `options.crypt` should
+    /// provide all key access for the given volume.
+    strict Check(resource struct {
+        options CheckOptions;
+    }) -> () error zx.Status;
+
+    /// Set the limit in bytes on the volume. Setting it lower than current usage is accepted but
+    /// will prevent further increases.
+    strict SetLimit(struct {
+        bytes uint64;
+    }) -> () error zx.Status;
+
+    /// Get the allocation limit for the volume. A return value of 0 indicates that there
+    /// is no limit and the volume can be extended as long as there is available space on the
+    /// device.
+    ///
+    /// The volume may be larger than this limit if a smaller limit was applied after the
+    /// volume had already grown to the current size.
+    ///
+    /// The volume limit persists across reboots.
+    strict GetLimit() -> (struct {
+        bytes uint64;
+    }) error zx.Status;
+};
+
+/// fuchsia.fs.startup.Volumes is only used for creating volumes.  Other operations
+/// (e.g. enumeration and deletion) are serviced by the `volumes` directory offered by filesystems in their
+/// export root.  Volumes appear as files within this directory, and these files should also speak
+/// the `fuchsia.fs.startup.Volume` protocol.
+///
+/// `mount_options` affects how the resulting volume is mounted. For encrypted volumes, the crypt
+/// setting in the `mount_options` is also used when creating the volume. `outgoing_directory` will
+/// be connected to the root directory of the volume.
+@discoverable
+closed protocol Volumes {
+    /// Creates and mounts a new volume identified by `name`. `mount_options` affects how the
+    /// resulting volume is mounted. For encrypted volumes, `mount_options.crypt` is also used when
+    /// creating the volume. `outgoing_directory` will be connected to the root directory of the
+    /// volume.
+    strict Create(resource struct {
+        name string:fuchsia.io.MAX_FILENAME;
+        outgoing_directory server_end:fuchsia.io.Directory;
+        mount_options MountOptions;
+    }) -> () error zx.Status;
+
+    /// Permanently deletes a volume identified by `name`.  If the volume is mounted, this call will
+    /// fail.
+    strict Remove(struct {
+        name string:fuchsia.io.MAX_FILENAME;
     }) -> () error zx.Status;
 };

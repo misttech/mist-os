@@ -45,6 +45,7 @@ rustc_test("blob-writer-test") {
   deps = [
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
+    "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/storage/lib/blob_writer:blob-writer",
     "//src/storage/lib/delivery_blob",

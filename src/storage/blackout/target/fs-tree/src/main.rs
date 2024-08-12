@@ -8,7 +8,8 @@ use blackout_target::static_tree::{DirectoryEntry, EntryDistribution};
 use blackout_target::{Test, TestServer};
 use fidl::endpoints::{create_proxy, Proxy as _};
 use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
-use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose, MountOptions};
+use fidl_fuchsia_fs_startup::MountOptions;
+use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose};
 use fidl_fuchsia_hardware_block_volume::VolumeManagerMarker;
 use fs_management::filesystem::{ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem};
 use fs_management::format::DiskFormat;
@@ -95,7 +96,11 @@ impl FsTree {
         let crypt_service = Some(
             connect_to_protocol::<CryptMarker>()?.into_channel().unwrap().into_zx_channel().into(),
         );
-        fs.create_volume("default", MountOptions { crypt: crypt_service, as_blob: false }).await?;
+        fs.create_volume(
+            "default",
+            MountOptions { crypt: crypt_service, ..MountOptions::default() },
+        )
+        .await?;
         Ok(())
     }
 
@@ -113,7 +118,10 @@ impl FsTree {
             connect_to_protocol::<CryptMarker>()?.into_channel().unwrap().into_zx_channel().into(),
         );
         let _ = fs
-            .open_volume("default", MountOptions { crypt: crypt_service, as_blob: false })
+            .open_volume(
+                "default",
+                MountOptions { crypt: crypt_service, ..MountOptions::default() },
+            )
             .await?;
         Ok(FsInstance::Fxfs(fs))
     }

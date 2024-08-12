@@ -213,7 +213,6 @@ rustc_library("fvm_rust") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
-    "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/storage/lib/block_client/rust",
     "//src/storage/lib/block_server",
     "//src/storage/lib/storage_device",

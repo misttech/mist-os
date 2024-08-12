@@ -106,7 +106,7 @@ class __EXPORT StartedSingleVolumeFilesystem : public SingleVolumeFilesystemInte
 };
 
 /// Manages a started volume within a filesystem instance (i.e. one opened or created by
-/// [`fuchsia.fxfs.Volumes`]).
+/// [`fuchsia.fs.startup.Volumes`]).
 class MountedVolume {
  public:
   MountedVolume() = default;
@@ -175,7 +175,7 @@ class __EXPORT StartedMultiVolumeFilesystem {
   // Returns a pointer to the volume if it was opened.  The lifetime of the pointer is less than
   // this object.
   zx::result<MountedVolume*> OpenVolume(std::string_view name,
-                                        fuchsia_fxfs::wire::MountOptions options);
+                                        fuchsia_fs_startup::wire::MountOptions options);
 
   // Creates and mounts a volume.  |options.crypt| is an optional connection to a crypt service used
   // to unlock the volume; if unset, the volume is assumed to be unencrypted.
@@ -183,7 +183,7 @@ class __EXPORT StartedMultiVolumeFilesystem {
   // Returns a pointer to the volume if it was created.  The lifetime of the pointer is less than
   // this object.
   zx::result<MountedVolume*> CreateVolume(std::string_view name,
-                                          fuchsia_fxfs::wire::MountOptions options);
+                                          fuchsia_fs_startup::wire::MountOptions options);
 
   // Verifies the integrity of a volume.  |crypt_client| is an optional connection to a crypt
   // service used to unlock the volume; if unset, the volume is assumed to be unencrypted.

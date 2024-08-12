@@ -7,10 +7,9 @@ use block_client::RemoteBlockClient;
 use block_server::async_interface::{Interface, SessionManager};
 use block_server::{BlockServer, PartitionInfo};
 use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, ServerEnd};
-use fidl_fuchsia_fs_startup::{StartOptions, StartupMarker, StartupRequest, StartupRequestStream};
-use fidl_fuchsia_fxfs::{
-    MountOptions, VolumeRequest, VolumeRequestStream, VolumesMarker, VolumesRequest,
-    VolumesRequestStream,
+use fidl_fuchsia_fs_startup::{
+    MountOptions, StartOptions, StartupMarker, StartupRequest, StartupRequestStream, VolumeRequest,
+    VolumeRequestStream, VolumesMarker, VolumesRequest, VolumesRequestStream,
 };
 use fidl_fuchsia_hardware_block::BlockMarker;
 use futures::future::try_join_all;
@@ -704,7 +703,8 @@ mod tests {
     use fake_block_server::FakeServer;
     use fidl::endpoints::RequestStream;
     use fidl_fuchsia_fs_startup::{
-        CompressionAlgorithm, EvictionPolicyOverride, StartOptions, StartupMarker,
+        CompressionAlgorithm, EvictionPolicyOverride, MountOptions, StartOptions, StartupMarker,
+        VolumeMarker,
     };
     use fidl_fuchsia_hardware_block::BlockMarker;
     use fuchsia_component::client::{
@@ -712,8 +712,8 @@ mod tests {
     };
     use std::sync::Arc;
     use {
-        fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_hardware_block_volume as fvolume,
-        fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx,
+        fidl_fuchsia_hardware_block_volume as fvolume, fidl_fuchsia_io as fio,
+        fuchsia_async as fasync, fuchsia_zircon as zx,
     };
 
     #[fuchsia::test]
@@ -750,16 +750,14 @@ mod tests {
             .expect("start failed");
 
         // Mount the blobfs partition.
-        let volume_proxy = connect_to_named_protocol_at_dir_root::<ffxfs::VolumeMarker>(
-            &outgoing_dir,
-            "volumes/blobfs",
-        )
-        .unwrap();
+        let volume_proxy =
+            connect_to_named_protocol_at_dir_root::<VolumeMarker>(&outgoing_dir, "volumes/blobfs")
+                .unwrap();
 
         let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("Create proxy to succeed");
         volume_proxy
-            .mount(dir_server_end, ffxfs::MountOptions { crypt: None, as_blob: false })
+            .mount(dir_server_end, MountOptions::default())
             .await
             .expect("mount failed (FIDL)")
             .expect("mount failed");
@@ -800,16 +798,14 @@ mod tests {
         );
 
         // Mount the minfs partition.
-        let volume_proxy = connect_to_named_protocol_at_dir_root::<ffxfs::VolumeMarker>(
-            &outgoing_dir,
-            "volumes/data",
-        )
-        .unwrap();
+        let volume_proxy =
+            connect_to_named_protocol_at_dir_root::<VolumeMarker>(&outgoing_dir, "volumes/data")
+                .unwrap();
 
         let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
             .expect("Create proxy to succeed");
         volume_proxy
-            .mount(dir_server_end, ffxfs::MountOptions { crypt: None, as_blob: false })
+            .mount(dir_server_end, MountOptions::default())
             .await
             .expect("mount failed (FIDL)")
             .expect("mount failed");

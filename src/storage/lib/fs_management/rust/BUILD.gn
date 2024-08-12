@@ -87,7 +87,7 @@ rustc_test("static-child-test") {
   deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fuchsia",
-    "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
+    "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
     "//src/storage/lib/fs_management/rust:fs_management",
     "//src/storage/lib/ramdevice_client/rust:ramdevice_client",
   ]

@@ -843,7 +843,8 @@ mod tests {
     use crate::fuchsia::volumes_directory::VolumesDirectory;
     use delivery_blob::CompressionMode;
     use fidl::endpoints::ServerEnd;
-    use fidl_fuchsia_fxfs::{BytesAndNodes, ProjectIdMarker, VolumeMarker};
+    use fidl_fuchsia_fs_startup::VolumeMarker;
+    use fidl_fuchsia_fxfs::{BytesAndNodes, ProjectIdMarker};
     use fuchsia_component::client::connect_to_protocol_at_dir_svc;
     use fuchsia_fs::file;
     use fuchsia_zircon::Status;

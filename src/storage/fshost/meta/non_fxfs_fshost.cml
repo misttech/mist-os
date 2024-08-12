@@ -18,7 +18,7 @@
             path: "/volumes",
         },
         {
-            protocol: [ "fuchsia.fxfs.Volumes" ],
+            protocol: [ "fuchsia.fs.startup.Volumes" ],
         },
     ],
     expose: [
@@ -27,7 +27,7 @@
             from: "self",
         },
         {
-            protocol: "fuchsia.fxfs.Volumes",
+            protocol: "fuchsia.fs.startup.Volumes",
             from: "self",
         },
         {

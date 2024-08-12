@@ -38,7 +38,7 @@ use {fidl_fuchsia_fshost as fshost, fuchsia_async as fasync};
 
 pub enum FshostShutdownResponder {
     Lifecycle(
-        // TODO(fxbug.dev/333319162): Implement me.
+        // TODO(https://fxbug.dev/333319162): Implement me.
         #[allow(dead_code)] LifecycleRequestStream,
     ),
 }
@@ -190,7 +190,10 @@ async fn wipe_storage_fxblob(
 
     let mut serving_fxfs = fxfs.serve_multi_volume().await.context("serving fxfs")?;
     let blob_volume = serving_fxfs
-        .create_volume("blob", fidl_fuchsia_fxfs::MountOptions { crypt: None, as_blob: true })
+        .create_volume(
+            "blob",
+            fidl_fuchsia_fs_startup::MountOptions { as_blob: Some(true), ..Default::default() },
+        )
         .await
         .context("making blob volume")?;
     clone_onto_no_describe(blob_volume.root(), None, blobfs_root)?;
