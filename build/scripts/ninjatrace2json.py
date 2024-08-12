@@ -28,7 +28,7 @@ def _subbuild_ninja_target(build_dir: Path) -> str:
     subbuild directory."""
     # LINT.IfChange
     return str(build_dir.name) + ".stamp"
-    # LINT.ThenChange(//build/sdk/idk_subbuilds.gni)
+    # LINT.ThenChange(//build/subbuild.gni)
 
 
 @dataclasses.dataclass

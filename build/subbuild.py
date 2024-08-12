@@ -2,7 +2,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Build an sdk_collection target for a particular target_cpu and api_level."""
+"""Build a target for a particular target_cpu and api_level."""
 
 import argparse
 import logging
@@ -148,9 +148,9 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--sdk-id", help="The version name value for this IDK.")
     parser.add_argument(
-        "--sdk-collection-label",
+        "--target-label",
         required=True,
-        help="List of GN sdk_collection() GN targets to build.",
+        help="GN target to build.",
     )
     parser.add_argument(
         "--prebuilt-host-tools-dir",
@@ -159,13 +159,13 @@ def main():
     parser.add_argument(
         "--target-cpu",
         required=True,
-        help="Target CPU for which to build the sdk_collection.",
+        help="Target CPU for which to build the target.",
     )
     parser.add_argument(
         "--api-level",
         type=str,
         required=True,
-        help="API level at which to build the sdk_collection.",
+        help="API level at which to build the target.",
     )
     parser.add_argument("--stamp-file", help="Optional output stamp file.")
     parser.add_argument(
@@ -221,6 +221,12 @@ def main():
         action="store_true",
         help="Only setup the output directory. Do not build.",
     )
+    parser.add_argument(
+        "--api-level-path",
+        type=str,
+        default=None,
+        help="If set, write the API level to this file in the output directory.",
+    )
 
     args = parser.parse_args()
 
@@ -252,24 +258,19 @@ def main():
     if not args.verbose:
         ninja_cmd_prefix.append("--quiet")
 
-    def sdk_label_partition(target_label: str) -> Tuple[str, str]:
-        """Split an SDK GN label into a (dir, name) pair."""
+    def label_partition(target_label: str) -> Tuple[str, str]:
+        """Split an GN label into a (dir, name) pair."""
         # Expected format is //<dir>:<name>
         path, colon, name = target_label.partition(":")
         assert colon == ":" and path.startswith(
             "//"
-        ), f"Invalid SDK target label: {target_label}"
+        ), f"Invalid target label: {target_label}"
         return (path[2:], name)
 
-    def sdk_label_to_ninja_target(target_label: str) -> str:
-        """Convert SDK GN label to Ninja target path."""
-        target_dir, target_name = sdk_label_partition(target_label)
+    def label_to_ninja_target(target_label: str) -> str:
+        """Convert GN label to Ninja target path."""
+        target_dir, target_name = label_partition(target_label)
         return f"{target_dir}:{target_name}"
-
-    def sdk_label_to_exported_dir(target_label: str, build_dir: Path) -> Path:
-        """Convert SDK GN label to exported directory in build_dir."""
-        target_dir, target_name = sdk_label_partition(target_label)
-        return build_dir / "sdk" / "exported" / target_name
 
     target_cpu = args.target_cpu
     api_level = args.api_level
@@ -289,7 +290,7 @@ def main():
         cxx_rbe_enable="true" if args.cxx_rbe_enable else "false",
         link_rbe_enable="true" if args.link_rbe_enable else "false",
         rust_rbe_enable="true" if args.rust_rbe_enable else "false",
-        sdk_labels_list=f'"{args.sdk_collection_label}"',
+        sdk_labels_list=f'"{args.target_label}"',
     )
     if args.sdk_id:
         args_gn_content += f'sdk_id = "{args.sdk_id}"\n'
@@ -351,18 +352,16 @@ def main():
                 args.parallelism,
                 "-l",
                 args.max_load_average,
-                sdk_label_to_ninja_target(args.sdk_collection_label),
+                label_to_ninja_target(args.target_label),
             ],
             capture_output=not args.verbose,
             env=os.environ | ninja_env,
         ):
             return 1
 
-        base_exported_dir = sdk_label_to_exported_dir(
-            args.sdk_collection_label, build_dir
-        )
-        api_level_path = base_exported_dir / "api_level"
-        api_level_path.write_text(str(api_level))
+        if args.api_level_path:
+            api_level_path = Path(args.api_level_path)
+            api_level_path.write_text(str(api_level))
 
     # Write stamp file if needed.
     if args.stamp_file:
