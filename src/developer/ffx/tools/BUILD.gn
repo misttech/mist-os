@@ -79,8 +79,5 @@ group("tests") {
 
 group("host_tests") {
   testonly = true
-  deps = [
-    "power:host_tests",
-    "target-package:host_tests",
-  ]
+  deps = [ "target-package:host_tests" ]
 }
