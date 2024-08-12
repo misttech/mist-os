@@ -17,6 +17,8 @@ build:_remote_common --google_default_credentials=true
 # Only accept outputs from remote execution on the back-end (remote workers).
 build:_remote_common --noremote_upload_local_results
 # --remote_proxy may be passed at run time, with a pointer to a temporary socket.
+# Tell bazel to download (all,minimal,toplevel) remote build artifacts.
+build:_remote_common --remote_download_outputs={remote_download_outputs}
 
 # remote: will request remote execution on cache-misses
 build:remote --config=_remote_common

@@ -551,6 +551,12 @@ def main() -> int:
         help="Use BzlMod to generate external repositories.",
     )
     parser.add_argument(
+        "--remote_download_outputs",
+        help="Option to forward to bazel --remote_download_outputs",
+        type=str,
+        default="toplevel",
+    )
+    parser.add_argument(
         "--verbose", action="count", default=1, help="Increase verbosity"
     )
     parser.add_argument(
@@ -809,6 +815,7 @@ block *
         "template.remote_services.bazelrc",
         remote_instance_name=build_config["rbe_instance_name"],
         rbe_project=build_config["rbe_project"],
+        remote_download_outputs=args.remote_download_outputs,
     )
     if args.use_bzlmod:
         bazelrc_content += """

@@ -23,6 +23,13 @@ declare_args() {
   #   "local": on cache-miss, build locally
   bazel_rbe_exec_strategy = rbe_settings.bazel_exec_strategy
 
+  # Control what bazel remote-built outputs are downloaded.
+  # See https://bazel.build/reference/command-line-reference#flag--remote_download_outputs
+  # Valid options: all, minimal, toplevel (default since Bazel 7.1)
+  # - 'toplevel' and 'minimal' can save significant download bandwidth
+  # - 'all' is useful for debugging remote build issues
+  bazel_rbe_download_outputs = rbe_settings.bazel_download_outputs
+
   # Configure bazel to stream build events and results to a service.
   # This is useful for sharing build results and invocation details
   # for reproducing and triaging issues.

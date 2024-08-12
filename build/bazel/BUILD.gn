@@ -8,6 +8,7 @@ import("//build/bazel/bazel_inputs.gni")
 import("//build/bazel/bazel_workspace.gni")
 import("//build/bazel/generate_prebuilt_dir_content_hash.gni")
 import("//build/bazel/legacy_ninja_build_outputs.gni")
+import("//build/bazel/remote_services.gni")
 import("//build/config/clang/clang.gni")
 import("//build/images/vbmeta.gni")
 import("//build/info/info.gni")
@@ -112,6 +113,8 @@ action("generate_main_workspace") {
     target_cpu,
     "--depfile",
     rebase_path(depfile, root_build_dir),
+    "--remote_download_outputs",
+    bazel_rbe_download_outputs,
   ]
 
   # The generated wrapper includes the absolute path of the Ninja output
@@ -194,6 +197,8 @@ action("remote_services_bazelrc") {
            rebase_path(_template, root_build_dir),
            "--output",
            rebase_path(_output, root_build_dir),
+           "--remote_download_outputs",
+           bazel_rbe_download_outputs,
            "--cfgs",
          ] + rebase_path(_configs, root_build_dir)
 }
