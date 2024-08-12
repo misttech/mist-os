@@ -54,10 +54,9 @@ class VDso : public RoDso {
   // for entering the kernel with <syscall-name>'s syscall number.
   struct ValidSyscallPC;
 
-  // Adds the additional ticks value to the monotonic ticks offset in all of the vDSO variants'
-  // TimeValues structure. This will be called on system resume to update the amount of time the
-  // system spent in a suspended state.
-  static void AddMonotonicTicksOffset(zx_ticks_t additional);
+  // Sets the monotonic ticks offset in all of the vDSO variants' TimeValues structure. This will
+  // be called on system resume to update the amount of time the system spent in a suspended state.
+  static void SetMonotonicTicksOffset(zx_ticks_t new_offset);
 
  private:
   using Variant = userboot::VdsoVariant;
