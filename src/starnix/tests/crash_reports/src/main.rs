@@ -81,6 +81,7 @@ async fn main() {
     assert_eq!(report.program_name.unwrap(), "generate_linux_crash_report");
     assert!(report.program_uptime.is_some());
     assert!(report.is_fatal.unwrap());
+    assert_eq!(report.crash_signature.unwrap(), "generate_linux_crash_report SIGABRT(6)");
 
     let native_report = match report.specific_report.unwrap() {
         SpecificCrashReport::Native(n) => n,

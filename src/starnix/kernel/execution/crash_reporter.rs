@@ -5,7 +5,7 @@
 use crate::task::{CurrentTask, ExitStatus};
 use fidl_fuchsia_feedback::{
     Annotation, CrashReport, CrashReporterProxy, NativeCrashReport, SpecificCrashReport,
-    MAX_ANNOTATION_VALUE_LENGTH,
+    MAX_ANNOTATION_VALUE_LENGTH, MAX_CRASH_SIGNATURE_LENGTH,
 };
 use fuchsia_inspect::Node;
 use fuchsia_inspect_contrib::profile_duration;
@@ -90,7 +90,7 @@ impl CrashReporter {
         let argv0 = argv0.rsplit_once("/").unwrap_or(("", &argv0)).1.to_string();
 
         let mut argv_joined = argv.join(" ");
-        truncate_annotation(&mut argv_joined);
+        truncate_with_ellipsis(&mut argv_joined, MAX_ANNOTATION_VALUE_LENGTH as usize);
 
         let mut env_joined = current_task
             .read_env(MAX_ANNOTATION_VALUE_LENGTH as usize)
@@ -99,9 +99,19 @@ impl CrashReporter {
             .map(|a| a.to_string())
             .collect::<Vec<_>>()
             .join(" ");
-        truncate_annotation(&mut env_joined);
+        truncate_with_ellipsis(&mut env_joined, MAX_ANNOTATION_VALUE_LENGTH as usize);
+
+        let signal_str = signal.to_string();
+
+        // Truncate program name to fit in crash signature with a space and signal string added.
+        let max_signature_prefix_len = MAX_CRASH_SIGNATURE_LENGTH as usize - (signal_str.len() + 1);
+        let mut crash_signature = argv0.clone();
+        truncate_with_ellipsis(&mut crash_signature, max_signature_prefix_len);
+        crash_signature.push(' ');
+        crash_signature.push_str(&signal_str);
 
         let crash_report = CrashReport {
+            crash_signature: Some(crash_signature),
             program_name: Some(argv0.clone()),
             program_uptime: Some(uptime.into_nanos()),
             specific_report: Some(SpecificCrashReport::Native(NativeCrashReport {
@@ -118,7 +128,7 @@ impl CrashReporter {
                 Annotation { key: "linux.pid".to_string(), value: linux_pid.to_string() },
                 Annotation { key: "linux.argv".to_string(), value: argv_joined },
                 Annotation { key: "linux.env".to_string(), value: env_joined },
-                Annotation { key: "linux.signal".to_string(), value: signal.to_string() },
+                Annotation { key: "linux.signal".to_string(), value: signal_str },
             ]),
             is_fatal: Some(true),
             ..Default::default()
@@ -174,14 +184,57 @@ impl Drop for ReportGuard {
     }
 }
 
-fn truncate_annotation(s: &mut String) {
-    let original_len = s.len();
-    let max_len = MAX_ANNOTATION_VALUE_LENGTH as usize;
-    if original_len <= max_len {
+fn truncate_with_ellipsis(s: &mut String, max_len: usize) {
+    if s.len() <= max_len {
         return;
     }
-    s.truncate(max_len - 3);
-    if s.len() < original_len {
-        s.push_str("...");
+
+    // 3 bytes for ellipsis.
+    let max_content_len = max_len - 3;
+
+    // String::truncate panics if the new max length is in the middle of a character, so we need to
+    // find an appropriate byte boundary.
+    let mut new_len = 0;
+    let mut iter = s.char_indices();
+    while let Some((offset, _)) = iter.next() {
+        if offset > max_content_len {
+            break;
+        }
+        new_len = offset;
+    }
+
+    s.truncate(new_len);
+    s.push_str("...");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn truncate_noop_on_max_length_string() {
+        let mut s = String::from("1234567890");
+        let before = s.clone();
+        truncate_with_ellipsis(&mut s, 10);
+        assert_eq!(s, before);
+    }
+
+    #[test]
+    fn truncate_adds_ellipsis() {
+        let mut s = String::from("1234567890");
+        truncate_with_ellipsis(&mut s, 9);
+        assert_eq!(s.len(), 9);
+        assert_eq!(s, "123456...", "truncate must add ellipsis and still fit under max len");
+    }
+
+    #[test]
+    fn truncate_is_sensible_in_middle_of_multibyte_chars() {
+        let mut s = String::from("æææææææææ");
+        // æ is 2 bytes, so any odd byte length should be in the middle of a character. Truncate
+        // adds 3 bytes for the ellipsis so we actually need an even max length to hit the middle
+        // of a character.
+        truncate_with_ellipsis(&mut s, 8);
+        assert_eq!(s.len(), 7, "may end up shorter than provided max length w/ multi-byte chars");
+        assert_eq!(s, "ææ...", "truncate must remove whole characters and add ellipsis");
     }
 }
