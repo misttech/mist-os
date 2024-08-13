@@ -9375,7 +9375,7 @@ pub struct bpf_sysctl {
     pub file_pos: __u32,
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub struct bpf_sockopt {
     pub __bindgen_anon_1: bpf_sockopt__bindgen_ty_1,
     pub __bindgen_anon_2: bpf_sockopt__bindgen_ty_2,
@@ -9386,7 +9386,7 @@ pub struct bpf_sockopt {
     pub retval: __s32,
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub union bpf_sockopt__bindgen_ty_1 {
     pub sk: uref<bpf_sock>,
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
@@ -9408,7 +9408,7 @@ impl bpf_sockopt__bindgen_ty_1 {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub union bpf_sockopt__bindgen_ty_2 {
     pub optval: uaddr,
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,
@@ -9430,7 +9430,7 @@ impl bpf_sockopt__bindgen_ty_2 {
     }
 }
 #[repr(C)]
-#[derive(Copy, Clone)]
+#[derive(Copy, Clone, AsBytes, FromBytes, NoCell, FromZeros)]
 pub union bpf_sockopt__bindgen_ty_3 {
     pub optval_end: uaddr,
     pub _bitfield_1: __BindgenBitfieldUnit<[u8; 8usize]>,

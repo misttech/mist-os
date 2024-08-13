@@ -21,8 +21,8 @@ use linux_uapi::{
     bpf_func_id_BPF_FUNC_ringbuf_submit, bpf_func_id_BPF_FUNC_skb_adjust_room,
     bpf_func_id_BPF_FUNC_skb_change_head, bpf_func_id_BPF_FUNC_skb_change_proto,
     bpf_func_id_BPF_FUNC_skb_load_bytes_relative, bpf_func_id_BPF_FUNC_skb_pull_data,
-    bpf_func_id_BPF_FUNC_skb_store_bytes, bpf_sock, bpf_sock_addr, bpf_user_pt_regs_t, uref,
-    xdp_md,
+    bpf_func_id_BPF_FUNC_skb_store_bytes, bpf_sock, bpf_sock_addr, bpf_sockopt, bpf_user_pt_regs_t,
+    uref, xdp_md,
 };
 use once_cell::sync::Lazy;
 use starnix_logging::track_stub;
@@ -837,6 +837,8 @@ static BPF_USER_PT_REGS_T_ARGS: Lazy<Vec<Type>> =
 
 static BPF_SOCK_ARGS: Lazy<Vec<Type>> = Lazy::new(|| build_bpf_args::<bpf_sock>());
 
+static BPF_SOCKOPT: Lazy<Vec<Type>> = Lazy::new(|| build_bpf_args::<bpf_sockopt>());
+
 static BPF_SOCK_ADDR_ARGS: Lazy<Vec<Type>> = Lazy::new(|| build_bpf_args::<bpf_sock_addr>());
 
 #[repr(C)]
@@ -871,6 +873,7 @@ pub fn get_bpf_args(program_type: &ProgramType) -> &'static [Type] {
         ProgramType::KProbe => &BPF_USER_PT_REGS_T_ARGS,
         ProgramType::TracePoint => &BPF_TRACEPOINT_ARGS,
         ProgramType::CgroupSock => &BPF_SOCK_ARGS,
+        ProgramType::CgroupSockopt => &BPF_SOCKOPT,
         ProgramType::CgroupSockAddr => &BPF_SOCK_ADDR_ARGS,
         ProgramType::Unknown(_) => &[],
     }
