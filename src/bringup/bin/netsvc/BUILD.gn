@@ -110,11 +110,13 @@ test("netsvc-test") {
     "test/args-test.cc",
     "test/debuglog-test.cc",
     "test/file-api-test.cc",
+    "test/match-test.cc",
     "test/paver-test.cc",
     "test/payload-streamer-test.cc",
   ]
   deps = [
     ":args",
+    ":netifc-discover",
     ":netsvc",
     ":netsvc_common",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
@@ -243,6 +245,8 @@ source_set("inet6") {
 source_set("netifc-discover") {
   sources = [
     "inet6.h",
+    "match.cc",
+    "match.h",
     "netifc-discover.cc",
     "netifc-discover.h",
   ]
