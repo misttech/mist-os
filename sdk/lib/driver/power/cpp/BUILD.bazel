@@ -11,10 +11,12 @@ cc_library(
     srcs = [
         "element-description-builder.cc",
         "power-support.cc",
+        "types.cc",
     ],
     hdrs = [
         "element-description-builder.h",
         "power-support.h",
+        "types.h",
     ],
     target_compatible_with = ["@platforms//os:fuchsia"],
     deps = [

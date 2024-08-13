@@ -17,6 +17,8 @@ source_set("cpp") {
     "element-description-builder.h",
     "power-support.cc",
     "power-support.h",
+    "types.cc",
+    "types.h",
   ]
 
   public_deps = [
