@@ -306,7 +306,7 @@ MAGMA_EXPORT magma_status_t magma_collection_info_get_format_index(
     magma_collection_info_t collection_info, magma_sysmem_buffer_constraints_t constraints,
     magma_bool_t* format_valid_out, uint32_t format_valid_count);
 
-// LINT.ThenChange(magma_common_defs.h:version)
+// LINT.ThenChange(/sdk/lib/magma_common/include/lib/magma/magma_common_defs.h:version)
 
 // NOLINTEND(modernize-use-using)
 
