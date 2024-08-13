@@ -7,7 +7,6 @@ composite framebuffer_intel_display;
 using fuchsia.acpi;
 using fuchsia.hardware.pci;
 using fuchsia.pci;
-using fuchsia.hardware.sysmem;
 
 primary node "pci" {
   fuchsia.hardware.pci.Service == fuchsia.hardware.pci.Service.ZirconTransport;
@@ -50,10 +49,6 @@ primary node "pci" {
   fuchsia.BIND_PCI_DID != 0x9a60;
   fuchsia.BIND_PCI_DID != 0x9a68;
   fuchsia.BIND_PCI_DID != 0x9a70;
-}
-
-optional node "sysmem" {
-  fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }
 
 optional node "acpi" {

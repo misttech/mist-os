@@ -8,16 +8,11 @@ using fuchsia.acpi;
 using fuchsia.hardware.pci;
 using fuchsia.intel.platform.pci;
 using fuchsia.pci;
-using fuchsia.hardware.sysmem;
 
 primary node "pci" {
   fuchsia.hardware.pci.Service == fuchsia.hardware.pci.Service.ZirconTransport;
   fuchsia.BIND_PCI_VID == fuchsia.pci.BIND_PCI_VID.INTEL;
   fuchsia.BIND_PCI_DID == fuchsia.intel.platform.pci.BIND_PCI_DID.SUNRISE_POINT_SERIALIO_SPIFLASH;
-}
-
-node "sysmem" {
-  fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }
 
 optional node "acpi" {

@@ -7,17 +7,12 @@ composite virtio_input;
 
 using fuchsia.acpi;
 using fuchsia.hardware.pci;
-using fuchsia.hardware.sysmem;
 using fuchsia.pci;
 
 primary node "pci" {
     fuchsia.hardware.pci.Service == fuchsia.hardware.pci.Service.ZirconTransport;
     fuchsia.BIND_PCI_VID == fuchsia.pci.BIND_PCI_VID.VIRTIO;
     fuchsia.BIND_PCI_DID == fuchsia.pci.BIND_PCI_DID.VIRTIO_DEV_TYPE_INPUT;
-}
-
-optional node "sysmem" {
-    fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }
 
 optional node "acpi" {

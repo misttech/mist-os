@@ -34,18 +34,6 @@
         ]
     },
     {
-        "node": "sysmem",
-        "tests": [
-            {
-                "name": "Match",
-                "expected": "match",
-                "device": {
-                    "fuchsia.hardware.sysmem.Service": "fuchsia.hardware.sysmem.Service.ZirconTransport"
-                }
-            }
-        ]
-    },
-    {
         "node": "acpi",
         "tests": [
             {

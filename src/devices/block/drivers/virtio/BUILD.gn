@@ -12,7 +12,6 @@ driver_bind_rules("virtio_block_bind") {
   tests = "meta/block_bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
-    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
     "//src/devices/bind/fuchsia.acpi",
     "//src/devices/bind/fuchsia.pci",
   ]
@@ -80,7 +79,6 @@ driver_bind_rules("virtio_scsi_bind") {
   tests = "meta/scsi_bind_tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
-    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
     "//src/devices/bind/fuchsia.acpi",
     "//src/devices/bind/fuchsia.pci",
   ]

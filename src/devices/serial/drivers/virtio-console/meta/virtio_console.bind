@@ -6,7 +6,6 @@ composite virtio_console;
 
 using fuchsia.acpi;
 using fuchsia.hardware.pci;
-using fuchsia.hardware.sysmem;
 using fuchsia.pci;
 
 primary node "pci" {
@@ -16,10 +15,6 @@ primary node "pci" {
     fuchsia.pci.BIND_PCI_DID.VIRTIO_DEV_TYPE_CONSOLE,
     fuchsia.pci.BIND_PCI_DID.VIRTIO_DEV_TYPE_T_CONSOLE,
   }
-}
-
-optional node "sysmem" {
-  fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }
 
 optional node "acpi" {

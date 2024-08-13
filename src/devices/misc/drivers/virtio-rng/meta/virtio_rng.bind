@@ -7,7 +7,6 @@ composite virtio_rng;
 using fuchsia.acpi;
 using fuchsia.hardware.pci;
 using fuchsia.pci;
-using fuchsia.hardware.sysmem;
 
 primary node "pci" {
   fuchsia.hardware.pci.Service == fuchsia.hardware.pci.Service.ZirconTransport;
@@ -16,10 +15,6 @@ primary node "pci" {
     fuchsia.pci.BIND_PCI_DID.VIRTIO_DEV_TYPE_ENTROPY,
     fuchsia.pci.BIND_PCI_DID.VIRTIO_DEV_TYPE_T_ENTROPY,
   }
-}
-
-optional node "sysmem" {
-  fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }
 
 optional node "acpi" {
