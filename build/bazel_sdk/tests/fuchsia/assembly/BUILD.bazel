@@ -78,6 +78,21 @@ fuchsia_board_configuration(
     ],
     board_name = "x64",
     devicetree = "test_data/test.dtb",
+    post_processing_script_args = [
+        "-t",
+        "mkbootimg",
+        "-k",
+        "linux-kola-boot-shim.bin",
+        "-d",
+        "kola.dtb",
+        "-p",
+        "fuchsia-vendored-python",
+    ],
+    post_processing_script_inputs = {
+        "test_data/fake_dep": "fake_dep",
+        "test_data/test.dtb": "test.dtb",
+    },
+    post_processing_script_path = "zbi_signing_script",
 )
 
 fuchsia_board_configuration_test(

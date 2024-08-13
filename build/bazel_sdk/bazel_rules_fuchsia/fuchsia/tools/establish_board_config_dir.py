@@ -25,6 +25,12 @@ def parse_args():
         help="The directory of output board configuration",
         required=True,
     )
+    parser.add_argument(
+        "--script-inputs",
+        type=str,
+        help="string formed script inputs dictionary which map from source to destination inside board configuration.",
+        default="{}",
+    )
 
     return parser.parse_args()
 
@@ -77,6 +83,16 @@ def main():
             input_bundles.append(relative_dest)
 
         config["input_bundles"] = input_bundles
+
+    # Copy the post processing script inputs
+    script_maps = json.loads(args.script_inputs)
+    for source, relative_dest in script_maps.items():
+        dest = os.path.join(output_dir, "scripts", relative_dest)
+        dest_dir = os.path.dirname(dest)
+
+        if not os.path.exists(dest_dir):
+            os.makedirs(dest_dir)
+        shutil.copyfile(source, dest)
 
     # Write the board configuration json
     board_config_path = os.path.join(output_dir, "board_configuration.json")

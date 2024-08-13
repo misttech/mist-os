@@ -1,5 +1,22 @@
 {
     "devicetree": "devicetree/test.dtb",
+    "filesystems": {
+        "zbi": {
+            "postprocessing_script": {
+                "args": [
+                    "-t",
+                    "mkbootimg",
+                    "-k",
+                    "linux-kola-boot-shim.bin",
+                    "-d",
+                    "kola.dtb",
+                    "-p",
+                    "fuchsia-vendored-python"
+                ],
+                "board_script_path": "scripts/zbi_signing_script"
+            }
+        }
+    },
     "input_bundles": [
         "input_bundles/testing_board_input_bundle_out",
         "input_bundles/empty_bib"

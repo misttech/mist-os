@@ -91,20 +91,44 @@ def _fuchsia_board_configuration_impl(ctx):
         else:
             board_config["devicetree"] = board_config_relative_to_root + ctx.file.devicetree.path
 
+    if ctx.attr.post_processing_script_path:
+        filesystems = board_config.get("filesystems", {})
+        board_config["filesystems"] = filesystems
+
+        zbi = filesystems.get("zbi", {})
+        zbi["postprocessing_script"] = {
+            "board_script_path": "scripts/" + ctx.attr.post_processing_script_path,
+            "args": ctx.attr.post_processing_script_args,
+        }
+        board_config["filesystems"]["zbi"] = zbi
+
     content = json.encode_indent(board_config, indent = "  ")
     ctx.actions.write(board_config_file, content)
 
     board_config_dir = ctx.actions.declare_directory(ctx.label.name + "_board_configuration")
+    args = [
+        "--config-file",
+        board_config_file.path,
+        "--output-dir",
+        board_config_dir.path,
+    ]
+
+    if ctx.attr.post_processing_script_inputs:
+        paths_map = {}
+        for source, dest in ctx.attr.post_processing_script_inputs.items():
+            source_path = source.files.to_list()[0].path
+            board_files.extend(source.files.to_list())
+            paths_map[source_path] = dest
+        args += [
+            "--script-inputs",
+            str(paths_map),
+        ]
+
     ctx.actions.run(
         outputs = [board_config_dir],
         inputs = board_files,
         executable = ctx.executable._establish_board_config_dir,
-        arguments = [
-            "--config-file",
-            board_config_file.path,
-            "--output-dir",
-            board_config_dir.path,
-        ],
+        arguments = args,
         **LOCAL_ONLY_ACTION_KWARGS
     )
     board_files.append(board_config_dir)
@@ -155,6 +179,19 @@ _fuchsia_board_configuration = rule(
             doc = "Devicetree binary (.dtb) file",
             allow_single_file = True,
         ),
+        "post_processing_script_path": attr.string(
+            doc = """Path to post processing script. Note: resultant zbi probably can't
+            be used with tools like scrutiny, because we won't know how to unpack the zbi
+            out of whatever the post-processing script has done to it.""",
+        ),
+        "post_processing_script_args": attr.string_list(
+            doc = "Post processing script arguments",
+        ),
+        "post_processing_script_inputs": attr.label_keyed_string_dict(
+            doc = """Dictionary for artifacts used by post processing script.
+            It will be a source -> destination map""",
+            allow_files = True,
+        ),
         "_establish_board_config_dir": attr.label(
             default = "//fuchsia/tools:establish_board_config_dir",
             executable = True,
@@ -165,26 +202,16 @@ _fuchsia_board_configuration = rule(
 
 def fuchsia_board_configuration(
         name,
-        board_name,
-        board_bundles_dir = None,
-        input_bundles = [],
-        board_input_bundles = [],
-        provided_features = [],
         filesystems = {},
-        devicetree = None):
+        **kwargs):
     """A board configuration that takes a dict for the filesystems config."""
     filesystem_labels = extract_labels(filesystems)
 
     _fuchsia_board_configuration(
         name = name,
-        board_name = board_name,
-        input_bundles = input_bundles,
-        board_bundles_dir = board_bundles_dir,
-        board_input_bundles = board_input_bundles,
-        provided_features = provided_features,
         filesystems = json.encode_indent(filesystems, indent = "    "),
         filesystems_labels = filesystem_labels,
-        devicetree = devicetree,
+        **kwargs
     )
 
 def _fuchsia_prebuilt_board_configuration_impl(ctx):
