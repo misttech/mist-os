@@ -13,7 +13,7 @@
 #include <lib/fidl/cpp/binding_set.h>
 #include <lib/sys/cpp/component_context.h>
 
-#include "src/lib/ui/flatland-frame-scheduling/src/simple_present.h"
+#include "src/lib/ui/flatland-frame-scheduling/src/simple_present_hlcpp.h"
 
 namespace screen_recording_example {
 

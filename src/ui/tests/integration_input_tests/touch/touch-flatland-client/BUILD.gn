@@ -30,7 +30,7 @@ executable("touch-flatland-client-binary") {
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//sdk/lib/ui/scenic/cpp",
-    "//src/lib/ui/flatland-frame-scheduling:simple_present",
+    "//src/lib/ui/flatland-frame-scheduling:simple_present_hlcpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/zx",

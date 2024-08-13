@@ -21,7 +21,7 @@
 #include <memory>
 #include <vector>
 
-#include "src/lib/ui/flatland-frame-scheduling/src/simple_present.h"
+#include "src/lib/ui/flatland-frame-scheduling/src/simple_present_hlcpp.h"
 
 namespace touch_flatland_client {
 
