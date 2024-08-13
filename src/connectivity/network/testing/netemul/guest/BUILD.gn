@@ -96,3 +96,14 @@ group("tests") {
   testonly = true
   deps = [ "test:netemul-guest-self-tests" ]
 }
+
+# This target depends on the netemul-guest component. This allows us to get
+# build coverage in blocking CI that this component builds without running the
+# tests.
+#
+# We do this as the guest tests can place additional load on CI/CQ so we run the
+# tests non-blocking, but we do still want to catch build regressions in CI/CQ.
+group("build-only") {
+  testonly = true
+  deps = [ ":netemul-guest" ]
+}
