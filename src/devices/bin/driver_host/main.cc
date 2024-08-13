@@ -27,7 +27,9 @@ using namespace fuchsia_driver_framework;
 int main(int argc, char** argv) {
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   fuchsia_logging::LogSettingsBuilder builder;
-  builder.WithDispatcher(loop.dispatcher()).BuildAndInitializeWithTags({"driver_host", "driver"});
+  builder.WithDispatcher(loop.dispatcher())
+      .WithTags({"driver_host", "driver"})
+      .BuildAndInitialize();
   driver_logger::GetLogger().AddTag("driver_host").AddTag("driver");
   // TODO(https://fxbug.dev/42108351): Lock down job.
   zx_status_t status = StdoutToDebuglog::Init();
