@@ -119,7 +119,7 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn test_file_stream() {
         for size in [0, CHUNK_SIZE - 1, CHUNK_SIZE, CHUNK_SIZE + 1, CHUNK_SIZE * 2 + 1] {
-            let expected = (0..std::u8::MAX).cycle().take(size).collect::<Vec<_>>();
+            let expected = (0..u8::MAX).cycle().take(size).collect::<Vec<_>>();
             let stream = file_stream(size as u64, &*expected, None);
 
             let mut actual = vec![];
@@ -132,7 +132,7 @@ mod tests {
     async fn test_file_stream_chunks() {
         let size = CHUNK_SIZE * 3 + 10;
 
-        let expected = (0..std::u8::MAX).cycle().take(size).collect::<Vec<_>>();
+        let expected = (0..u8::MAX).cycle().take(size).collect::<Vec<_>>();
         let mut stream = file_stream(size as u64, &*expected, None);
 
         let mut expected_chunks = expected.chunks(CHUNK_SIZE).map(Bytes::copy_from_slice);
@@ -165,7 +165,7 @@ mod tests {
         let len = CHUNK_SIZE * 3;
         let short_len = CHUNK_SIZE * 2;
 
-        let buf = (0..std::u8::MAX).cycle().take(len).collect::<Vec<_>>();
+        let buf = (0..u8::MAX).cycle().take(len).collect::<Vec<_>>();
         let stream = file_stream(short_len as u64, buf.as_slice(), None);
 
         let mut actual = vec![];
@@ -178,7 +178,7 @@ mod tests {
         fn test_file_stream_proptest(len in 0usize..CHUNK_SIZE * 100) {
             let mut executor = fuchsia_async::TestExecutor::new();
             let () = executor.run_singlethreaded(async move {
-                let expected = (0..std::u8::MAX).cycle().take(len).collect::<Vec<_>>();
+                let expected = (0..u8::MAX).cycle().take(len).collect::<Vec<_>>();
                 let stream = file_stream(expected.len() as u64, expected.as_slice(), None);
 
                 let mut actual = vec![];

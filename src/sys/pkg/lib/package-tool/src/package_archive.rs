@@ -279,7 +279,7 @@ async fn extract_far_to_dir(
             .with_context(|| format!("failed to create directory: {}", parent.display()))?;
 
         // We can link the blobs from the /blobs dir which was populated during archive extract
-        if let Err(_) = std::fs::hard_link(blobs_dir.join(src_path.as_str()), &dst_path) {
+        if std::fs::hard_link(blobs_dir.join(src_path.as_str()), &dst_path).is_err() {
             // The files that do not exist in /blobs (e.g. meta.far and its content) will return
             // an error when trying to link. We then extract them directly from the far file.
             let bytes = reader
@@ -294,8 +294,9 @@ async fn extract_far_to_dir(
 
 async fn extract_mapping_from_contents(path: &PathBuf) -> Result<HashMap<String, String>> {
     let mut map = HashMap::new();
-    let contents_file = File::open(path).with_context(|| "failed to open meta/contents")?;
-    for line in BufReader::new(contents_file).lines().flatten() {
+    let contents_file = File::open(path).context("failed to open meta/contents")?;
+    for res in BufReader::new(contents_file).lines() {
+        let line = res.context("failed to read line from meta/contents")?;
         let m: Vec<_> = line.split("=").collect();
         if m.len() != 2 {
             return Err(anyhow!("meta/contents contains invalid entry: {line}"));

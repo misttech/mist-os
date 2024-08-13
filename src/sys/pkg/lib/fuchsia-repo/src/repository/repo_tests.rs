@@ -176,7 +176,7 @@ macro_rules! repo_test_suite {
                 for size in [20, $chunk_size - 1, $chunk_size, $chunk_size + 1, $chunk_size * 2 + 1]
                 {
                     let path = format!("{}", size);
-                    let body = (0..std::u8::MAX).cycle().take(size).collect::<Vec<_>>();
+                    let body = (0..u8::MAX).cycle().take(size).collect::<Vec<_>>();
 
                     env.write_metadata(&path, &body);
                     env.write_blob(&path, &body);
@@ -202,7 +202,7 @@ macro_rules! repo_test_suite {
                 for size in [20, $chunk_size - 1, $chunk_size, $chunk_size + 1, $chunk_size * 2 + 1]
                 {
                     let path = format!("{}", size);
-                    let body = (0..std::u8::MAX).cycle().take(size).collect::<Vec<_>>();
+                    let body = (0..u8::MAX).cycle().take(size).collect::<Vec<_>>();
 
                     env.write_metadata(&path, &body);
                     env.write_blob(&path, &body);
@@ -285,7 +285,7 @@ macro_rules! repo_test_suite {
                 for size in [20, $chunk_size - 1, $chunk_size, $chunk_size + 1, $chunk_size * 2 + 1]
                 {
                     let path = format!("{}", size);
-                    let body = (0..std::u8::MAX).cycle().take(size).collect::<Vec<_>>();
+                    let body = (0..u8::MAX).cycle().take(size).collect::<Vec<_>>();
 
                     env.write_metadata(&path, &body);
                     env.write_blob(&path, &body);
