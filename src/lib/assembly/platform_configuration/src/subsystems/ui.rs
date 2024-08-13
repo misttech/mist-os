@@ -62,32 +62,18 @@ impl DefineSubsystemConfiguration<PlatformUiConfig> for UiSubsystem {
             "UI is only supported in the default feature set level"
         );
 
-        fn get_px_range(
-            new: &UnsignedIntegerRangeInclusive,
-            old: &UnsignedIntegerRangeInclusive,
-        ) -> (i32, i32) {
-            let new_start = new.start.map(|i| i as i32);
-            let new_end = new.end.map(|i| i as i32);
-            let old_start = old.start.map(|i| i as i32);
-            let old_end = old.end.map(|i| i as i32);
-
-            let start = new_start.unwrap_or(old_start.unwrap_or(-1));
-            let end = new_end.unwrap_or(old_end.unwrap_or(-1));
+        fn get_px_range(new: &UnsignedIntegerRangeInclusive) -> (i32, i32) {
+            let start = new.start.map(|i| i as i32).unwrap_or(-1);
+            let end = new.end.map(|i| i as i32).unwrap_or(-1);
             (start, end)
         }
 
-        let (horizontal_res_min, horizontal_res_max) = get_px_range(
-            &ui_config.display_mode.horizontal_resolution_px_range,
-            &ui_config.display_mode_horizontal_resolution_px_range,
-        );
-        let (vertical_res_min, vertical_res_max) = get_px_range(
-            &ui_config.display_mode.vertical_resolution_px_range,
-            &ui_config.display_mode_vertical_resolution_px_range,
-        );
-        let (refresh_rate_min, refresh_rate_max) = get_px_range(
-            &ui_config.display_mode.refresh_rate_millihertz_range,
-            &ui_config.display_mode_refresh_rate_millihertz_range,
-        );
+        let (horizontal_res_min, horizontal_res_max) =
+            get_px_range(&ui_config.display_mode.horizontal_resolution_px_range);
+        let (vertical_res_min, vertical_res_max) =
+            get_px_range(&ui_config.display_mode.vertical_resolution_px_range);
+        let (refresh_rate_min, refresh_rate_max) =
+            get_px_range(&ui_config.display_mode.refresh_rate_millihertz_range);
 
         // We should only configure scenic here when it has been added to assembly.
         builder.set_config_capability(
