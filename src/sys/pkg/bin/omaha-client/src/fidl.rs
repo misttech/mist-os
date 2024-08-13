@@ -446,14 +446,13 @@ where
         Ok(())
     }
 
-    #[allow(clippy::await_holding_refcell_ref)]
     async fn handle_on_update_check_completion_request(
         server: Rc<RefCell<Self>>,
         request: ListenerRequest,
     ) -> Result<(), Error> {
         match request {
             ListenerRequest::WaitForFirstUpdateCheckToComplete { responder } => {
-                server.borrow_mut().completion_responder.respond_when_appropriate(responder).await;
+                server.borrow_mut().completion_responder.respond_when_appropriate(responder);
             }
             ListenerRequest::_UnknownMethod { .. } => {}
         }
@@ -588,7 +587,6 @@ where
     }
 
     /// The state change callback from StateMachine.
-    #[allow(clippy::await_holding_refcell_ref)]
     pub async fn on_state_change(server: Rc<RefCell<Self>>, state: state_machine::State) {
         server.borrow_mut().state.manager_state = state;
 
@@ -604,7 +602,7 @@ where
             _ => {}
         }
 
-        server.borrow_mut().completion_responder.react_to(&state).await;
+        server.borrow_mut().completion_responder.react_to(&state);
 
         Self::send_state_to_queue(Rc::clone(&server)).await;
 
@@ -695,7 +693,7 @@ impl CompletionResponder {
         CompletionResponder::Waiting(Vec::new())
     }
 
-    async fn respond_when_appropriate(
+    fn respond_when_appropriate(
         &mut self,
         responder: ListenerWaitForFirstUpdateCheckToCompleteResponder,
     ) {
@@ -708,7 +706,7 @@ impl CompletionResponder {
         }
     }
 
-    async fn react_to(&mut self, state: &state_machine::State) {
+    fn react_to(&mut self, state: &state_machine::State) {
         // If a software update has completed, with or without error, and no reboot is needed,
         // then send any waiting notifications and change state to Satisfied. Otherwise return.
         match state {
