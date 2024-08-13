@@ -312,7 +312,12 @@ func buildImpl(
 		ninjaLog := ninjaLog
 		eg.Go(func() error {
 			// `egCtx` allows errgroup to cancel other goroutines as soon as one of them errors.
-			fs, err := getNinjaDebugFiles(egCtx, r, buildDir, targets, ninjaLog, ninjatraceToolPath, buildstatsToolPath)
+			subninjaRunner := ninjaRunner{
+				runner:    runner,
+				ninjaPath: ninjaPath,
+				buildDir:  filepath.Dir(ninjaLog),
+			}
+			fs, err := getNinjaDebugFiles(egCtx, subninjaRunner, buildDir, targets, ninjaLog, ninjatraceToolPath, buildstatsToolPath)
 			if err != nil {
 				logger.Warningf(ctx, "(ignored) Failed to analyze ninja log %s, with error: %v", ninjaLog, err)
 				return nil
