@@ -47,36 +47,37 @@ async fn redirect_ingress_no_assigned_address<I: TestIpExt, M: Matcher>(name: &s
     // This has the side effect of completing neighbor resolution on the client
     // for the server, so that we can remove the address assigned to the server
     // and still expect traffic from the client to reach it.
-    net.run_test::<I, M::SocketType>(ExpectedConnectivity::TwoWay).await;
+    let _handles = net.run_test::<I, M::SocketType>(ExpectedConnectivity::TwoWay).await;
 
     // Remove the server's assigned address. Even though we have a Redirect NAT
     // rule installed, the traffic from the client should not reach the server
     // because Redirect drops the packet when there is no address assigned to
     // the incoming interface.
-    net.run_test_with::<I, M::SocketType, _>(
-        ExpectedConnectivity::None,
-        |TestNet { client: _, server }, addrs, ()| {
-            Box::pin(async move {
-                let removed = server
-                    .interface
-                    .del_address_and_subnet_route(I::SERVER_ADDR_WITH_PREFIX)
-                    .await
-                    .expect("remove address");
-                assert!(removed);
+    let _handles = net
+        .run_test_with::<I, M::SocketType, _>(
+            ExpectedConnectivity::None,
+            |TestNet { client: _, server }, addrs, ()| {
+                Box::pin(async move {
+                    let removed = server
+                        .interface
+                        .del_address_and_subnet_route(I::SERVER_ADDR_WITH_PREFIX)
+                        .await
+                        .expect("remove address");
+                    assert!(removed);
 
-                server
-                    .install_nat_rule_for_incoming_traffic::<I, _>(
-                        LOW_RULE_PRIORITY,
-                        &matcher,
-                        server.incoming_subnets::<I>(),
-                        addrs.client_ports(),
-                        Action::Redirect { dst_port: None },
-                    )
-                    .await;
-            })
-        },
-    )
-    .await;
+                    server
+                        .install_nat_rule_for_incoming_traffic::<I, _>(
+                            LOW_RULE_PRIORITY,
+                            &matcher,
+                            server.incoming_subnets::<I>(),
+                            addrs.client_ports(),
+                            Action::Redirect { dst_port: None },
+                        )
+                        .await;
+                })
+            },
+        )
+        .await;
 }
 
 fn different_ephemeral_port(port: u16) -> u16 {
@@ -114,23 +115,24 @@ async fn redirect_ingress<I: TestIpExt, M: Matcher>(name: &str, matcher: M, chan
     // Install a rule to redirect incoming traffic to the primary address of the
     // incoming interface. This should have no effect on connectivity because
     // the incoming traffic is already destined to this address.
-    net.run_test_with::<I, M::SocketType, _>(
-        ExpectedConnectivity::TwoWay,
-        |TestNet { client: _, server }, addrs, ()| {
-            Box::pin(async move {
-                server
-                    .install_nat_rule_for_incoming_traffic::<I, _>(
-                        LOW_RULE_PRIORITY,
-                        &matcher,
-                        server.incoming_subnets::<I>(),
-                        addrs.client_ports(),
-                        Action::Redirect { dst_port: None },
-                    )
-                    .await;
-            })
-        },
-    )
-    .await;
+    let _handles = net
+        .run_test_with::<I, M::SocketType, _>(
+            ExpectedConnectivity::TwoWay,
+            |TestNet { client: _, server }, addrs, ()| {
+                Box::pin(async move {
+                    server
+                        .install_nat_rule_for_incoming_traffic::<I, _>(
+                            LOW_RULE_PRIORITY,
+                            &matcher,
+                            server.incoming_subnets::<I>(),
+                            addrs.client_ports(),
+                            Action::Redirect { dst_port: None },
+                        )
+                        .await;
+                })
+            },
+        )
+        .await;
 
     // Now run a similar test, but instead of sending from the client socket to
     // the address the server socket is bound to, send to some other address
@@ -180,7 +182,7 @@ async fn redirect_ingress<I: TestIpExt, M: Matcher>(name: &str, matcher: M, chan
         )
         .await;
 
-    M::SocketType::run_test::<I>(
+    let _handles = M::SocketType::run_test::<I>(
         net.realms(),
         sockets,
         SockAddrs { client: sock_addrs.client, server: original_dst },
@@ -262,7 +264,7 @@ async fn redirect_local_egress<I: TestIpExt, M: Matcher>(
         )
         .await;
 
-    M::SocketType::run_test::<I>(
+    let _handles = M::SocketType::run_test::<I>(
         Realms { client: &netstack.realm, server: &netstack.realm },
         sockets,
         SockAddrs { client: sock_addrs.client, server: original_dst },
