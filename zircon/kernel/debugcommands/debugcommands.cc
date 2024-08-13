@@ -589,11 +589,11 @@ static int cmd_crash_stack_guard(int argc, const cmd_args* argv, uint32_t flags)
 static int cmd_crash_illegal_instruction(int argc, const cmd_args* argv, uint32_t flags) {
   printf("attempting to crash with an illegal instruction\n");
 #if defined(__riscv)
-  asm("unimp");
+  asm volatile("unimp");
 #elif defined(__x86_64__)
-  asm("ud2");
+  asm volatile("ud2");
 #elif defined(__aarch64__)
-  asm("udf #0");
+  asm volatile("udf #0");
 #else
   printf("not implemented for this architecture\n");
 #endif
@@ -604,11 +604,11 @@ static int cmd_crash_illegal_instruction(int argc, const cmd_args* argv, uint32_
 static int cmd_crash_break_instruction(int argc, const cmd_args* argv, uint32_t flags) {
   printf("attempting to crash with a break instruction\n");
 #if defined(__riscv)
-  asm("ebreak");
+  asm volatile("ebreak");
 #elif defined(__x86_64__)
-  asm("int3");
+  asm volatile("int3");
 #elif defined(__aarch64__)
-  asm("brk #0");
+  asm volatile("brk #0");
 #else
   printf("not implemented for this architecture\n");
 #endif
@@ -622,9 +622,9 @@ static int cmd_crash_syscall_instruction(int argc, const cmd_args* argv, uint32_
   // Actually not a good idea, this will probably call into firmware with undefined args.
   printf("not implemented for RISC-V, ecall instruction would probably be trapped by firmware\n");
 #elif defined(__x86_64__)
-  asm("syscall");
+  asm volatile("syscall");
 #elif defined(__aarch64__)
-  asm("svc #0");
+  asm volatile("svc #0");
 #else
   printf("not implemented for this architecture\n");
 #endif
