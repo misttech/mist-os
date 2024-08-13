@@ -482,13 +482,15 @@ impl Fvm {
                         format!("No mapping #2 ({device_block_offset}, {block_count})")
                     });
                 }
-                let len = std::cmp::min(
-                    (end_slice - slice) * slice_size,
-                    std::cmp::min(total_len, buffer_left.len() as u64),
-                ) as usize;
+                let end = end_slice * slice_size;
+                let len =
+                    std::cmp::min(end - offset, std::cmp::min(total_len, buffer_left.len() as u64))
+                        as usize;
                 let (buf, remaining) = buffer_left.split_at_mut(len);
                 let physical_offset = data_start
-                    + (mapping.physical_slice + (slice - mapping.logical_slice)) * slice_size;
+                    + mapping.physical_slice * slice_size
+                    + (offset - mapping.logical_slice * slice_size);
+
                 ops.push(Io::get_op(self.device.as_ref(), physical_offset, buf));
                 offset += len as u64;
                 total_len -= len as u64;
@@ -1108,12 +1110,17 @@ mod tests {
         let client = RemoteBlockClient::new(block_proxy).await.unwrap();
 
         // Check some writes.
-        for offset in [0, 10 * 8192, 20 * 8192] {
-            let buf = vec![0xaf; 16384];
+        let offsets = [0, 16384, 10 * 8192, 20 * 8192];
+        for (index, &offset) in offsets.iter().enumerate() {
+            let buf = vec![index as u8; 16384];
             client.write_at(BufferSlice::Memory(&buf), offset).await.unwrap();
-            let mut read_buf = vec![0; 16384];
+        }
+
+        // Read back in reverse.
+        for (index, &offset) in offsets.iter().enumerate().rev() {
+            let mut read_buf = vec![index as u8; 16384];
             client.read_at(MutableBufferSlice::Memory(&mut read_buf), offset).await.unwrap();
-            assert_eq!(&buf, &read_buf);
+            assert_eq!(&read_buf, &[index as u8; 16384]);
         }
     }
 
