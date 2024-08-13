@@ -73,7 +73,8 @@ int main(const std::string& process_name, const std::string& suspend_enabled_fla
   fuchsia_logging::LogSettingsBuilder()
       // Prevents blocking on initialization in case logging subsystem is stuck.
       .DisableWaitForInitialInterest()
-      .BuildAndInitializeWithTags({"forensics", "exception", handler_index});
+      .WithTags({"forensics", "exception", handler_index})
+      .BuildAndInitialize();
 
   // We receive a channel that we interpret as a fuchsia.exception.internal.CrashReporter
   // connection.
