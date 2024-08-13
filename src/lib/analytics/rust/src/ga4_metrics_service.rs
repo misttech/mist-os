@@ -50,7 +50,7 @@ impl GA4MetricsService {
                             None
                         }
                     } else {
-                        None
+                        Some(GOOGLER_ENHANCED_NOTICE.to_string())
                     }
                 }
                 _ => None,
