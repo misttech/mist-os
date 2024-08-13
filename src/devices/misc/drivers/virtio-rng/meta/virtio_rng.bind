@@ -18,7 +18,7 @@ primary node "pci" {
   }
 }
 
-node "sysmem" {
+optional node "sysmem" {
   fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }
 

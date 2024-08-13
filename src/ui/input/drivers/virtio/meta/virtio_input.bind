@@ -16,7 +16,7 @@ primary node "pci" {
     fuchsia.BIND_PCI_DID == fuchsia.pci.BIND_PCI_DID.VIRTIO_DEV_TYPE_INPUT;
 }
 
-node "sysmem" {
+optional node "sysmem" {
     fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }
 

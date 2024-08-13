@@ -9,23 +9,12 @@
 #include <bind/fuchsia/acpi/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/hardware/pci/cpp/bind.h>
-#include <bind/fuchsia/hardware/sysmem/cpp/bind.h>
 
 namespace pci {
 
 ddk::CompositeNodeSpec CreateCompositeNodeSpec(const CompositeInfo& info) {
   auto kPciBindTopo =
       static_cast<uint32_t>(BIND_PCI_TOPO_PACK(info.bus_id, info.dev_id, info.func_id));
-
-  const ddk::BindRule kSysmemRules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia_hardware_sysmem::SERVICE,
-                              bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
-  };
-
-  const device_bind_prop_t kSysmemProperties[] = {
-      ddk::MakeProperty(bind_fuchsia_hardware_sysmem::SERVICE,
-                        bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
-  };
 
   const ddk::BindRule kAcpiRules[] = {
       ddk::MakeAcceptBindRule(bind_fuchsia::PROTOCOL, bind_fuchsia_acpi::BIND_PROTOCOL_DEVICE),
@@ -65,8 +54,7 @@ ddk::CompositeNodeSpec CreateCompositeNodeSpec(const CompositeInfo& info) {
       ddk::MakeProperty(bind_fuchsia::PCI_TOPO, kPciBindTopo),
   };
 
-  auto composite_node_spec = ddk::CompositeNodeSpec(kSysmemRules, kSysmemProperties)
-                                 .AddParentSpec(kPciRules, kPciProperties);
+  auto composite_node_spec = ddk::CompositeNodeSpec(kPciRules, kPciProperties);
   if (info.has_acpi) {
     composite_node_spec.AddParentSpec(kAcpiRules, kAcpiProperties);
   }
