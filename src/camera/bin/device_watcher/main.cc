@@ -68,7 +68,8 @@ class DeviceWatcherTesterImpl : public fidl::Server<fuchsia_camera_test::DeviceW
 int main(int argc, char* argv[]) {
   fuchsia_logging::LogSettingsBuilder builder;
   builder.WithMinLogSeverity(CAMERA_MIN_LOG_LEVEL)
-      .BuildAndInitializeWithTags({"camera", "camera_device_watcher"});
+      .WithTags({"camera", "camera_device_watcher"})
+      .BuildAndInitialize();
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   async_dispatcher_t* dispatcher = loop.dispatcher();
