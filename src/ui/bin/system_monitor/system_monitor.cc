@@ -22,13 +22,7 @@ namespace system_monitor {
 constexpr char kTarget[] = "platform_metrics";
 constexpr zx::duration kPrintFrequency = zx::sec(10);
 
-SystemMonitor::SystemMonitor(bool use_real_archive_accessor) {
-  auto services = sys::ServiceDirectory::CreateFromNamespace();
-  if (use_real_archive_accessor) {
-    services->Connect(accessor_.NewRequest(), "fuchsia.diagnostics.RealArchiveAccessor");
-  } else {
-    services->Connect(accessor_.NewRequest());
-  }
+SystemMonitor::SystemMonitor() {
   params_ = fuchsia::diagnostics::StreamParameters();
   params_.set_stream_mode(fuchsia::diagnostics::StreamMode::SNAPSHOT);
   params_.set_data_type(fuchsia::diagnostics::DataType::INSPECT);
@@ -36,6 +30,17 @@ SystemMonitor::SystemMonitor(bool use_real_archive_accessor) {
   params_.set_client_selector_configuration(
       fuchsia::diagnostics::ClientSelectorConfiguration::WithSelectAll(true));
 }
+
+void SystemMonitor::ConnectToArchiveAccessor(bool use_real_archive_accessor) {
+  auto services = sys::ServiceDirectory::CreateFromNamespace();
+  if (use_real_archive_accessor) {
+    services->Connect(accessor_.NewRequest(), "fuchsia.diagnostics.RealArchiveAccessor");
+  } else {
+    services->Connect(accessor_.NewRequest());
+  }
+}
+
+void SystemMonitor::InitializeRenderer() { renderer_.Initialize(); }
 
 void SystemMonitor::UpdateRecentDiagnostic() {
   accessor_->StreamDiagnostics(std::move(params_), iterator_.NewRequest());

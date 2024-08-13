@@ -8,18 +8,21 @@
 #include <fuchsia/diagnostics/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 
+#include "src/ui/bin/system_monitor/system_monitor_renderer.h"
+
 namespace system_monitor {
 
 // This class uses archiveAccessor and batchIterator to get diagnostic
 // information like platform metrics which include CPU usage.
 class SystemMonitor {
  public:
-  // Class constructor initializes the batchIterator pointer to be used
-  //  by the function to get all the inspect diagnostic.
-  SystemMonitor(bool use_real_archive_accessor = false);
+  // Class constructor initializes the parameters of INSPECT data
+  SystemMonitor();
   // These functions uses the iterator to access inspect diagnostic and turn
   // all the json format content into std::string and
   // returns a vector of strings.
+  void ConnectToArchiveAccessor(bool use_real_archive_accessor = false);
+  void InitializeRenderer();
   void UpdateRecentDiagnostic();
   void PrintRecentDiagnostic();
   std::vector<std::string> ParseBatch(
@@ -37,6 +40,7 @@ class SystemMonitor {
   fuchsia::diagnostics::ArchiveAccessorSyncPtr accessor_;
   // streamParameters initialized in the class constructor.
   fuchsia::diagnostics::StreamParameters params_;
+  SystemMonitorRenderer renderer_;
 };
 }  // namespace system_monitor
 

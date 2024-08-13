@@ -18,8 +18,9 @@
 int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   system_monitor::SystemMonitor systemMonitor;
+  systemMonitor.ConnectToArchiveAccessor();
+  systemMonitor.InitializeRenderer();
   systemMonitor.PrintRecentDiagnostic();
   loop.Run();
-
   return 0;
 }
