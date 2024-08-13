@@ -46,6 +46,6 @@ int StartComponent() {
 
 int main(int argc, char** argv) {
   fuchsia_logging::LogSettingsBuilder builder;
-  builder.BuildAndInitializeWithTags({"f2fs"});
+  builder.WithTags({"f2fs"}).BuildAndInitialize();
   return StartComponent();
 }
