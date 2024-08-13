@@ -25,7 +25,9 @@ rustc_library("fdf_rust_lib") {
     "src/arena.rs",
     "src/dispatcher.rs",
     "src/fdf_sys.rs",
+    "src/handle.rs",
     "src/lib.rs",
+    "src/message.rs",
   ]
 }
 

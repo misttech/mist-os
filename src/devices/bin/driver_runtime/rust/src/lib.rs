@@ -8,6 +8,10 @@
 mod arena;
 mod dispatcher;
 mod fdf_sys;
+mod handle;
+mod message;
 
 pub use arena::*;
 pub use dispatcher::*;
+pub use handle::*;
+pub use message::*;
