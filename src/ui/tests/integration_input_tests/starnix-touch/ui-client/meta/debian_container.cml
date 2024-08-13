@@ -14,8 +14,8 @@
         ],
         init: [],
         mounts: [
-            "/:remote_bundle:data/system",
-            "/dev:devtmpfs",
+            "/:remote_bundle:data/system:nosuid,nodev,relatime",
+            "/dev:devtmpfs::nosuid,relatime",
         ],
         rlimits: [ "RLIMIT_NOFILE=131072" ],
         name: "debian",
