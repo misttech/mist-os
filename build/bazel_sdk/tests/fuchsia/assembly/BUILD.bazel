@@ -78,6 +78,28 @@ fuchsia_board_configuration(
     ],
     board_name = "x64",
     devicetree = "test_data/test.dtb",
+    kernel = {
+        "contiguous_physical_pages": True,
+    },
+    platform = {
+        "connectivity": {
+            "network": {
+                "netsvc_interface": "/dwmac-ff3f0000_group/dwmac/Designware-MAC/netdevice-migration/network-device",
+            },
+        },
+        "development_support": {
+            "enable_debug_access_port_for_soc": "amlogic-a311d",
+        },
+        "sysmem_defaults": {
+            "contiguous_guard_pages_unused": False,
+            "contiguous_memory_size": {
+                "fixed": 209715200,
+            },
+            "protected_memory_size": {
+                "fixed": 0,
+            },
+        },
+    },
     post_processing_script_args = [
         "-t",
         "mkbootimg",

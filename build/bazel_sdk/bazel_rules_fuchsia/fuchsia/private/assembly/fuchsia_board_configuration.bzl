@@ -17,6 +17,10 @@ load(
     "replace_labels_with_files",
     "select_single_file",
 )
+load(
+    "//fuchsia/private/licenses:common.bzl",
+    "check_type",
+)
 
 def _copy_bash(ctx, src, dst):
     cmd = """\
@@ -48,6 +52,7 @@ def _fuchsia_board_configuration_impl(ctx):
     board_files = [board_config_file]
 
     filesystems = json.decode(ctx.attr.filesystems)
+    check_type(filesystems, "dict")
     replace_labels_with_files(filesystems, ctx.attr.filesystems_labels)
     for label, _ in ctx.attr.filesystems_labels.items():
         src = label.files.to_list()[0]
@@ -61,6 +66,16 @@ def _fuchsia_board_configuration_impl(ctx):
     board_config["provided_features"] = ctx.attr.provided_features
     if filesystems != {}:
         board_config["filesystems"] = filesystems
+
+    kernel = json.decode(ctx.attr.kernel)
+    check_type(kernel, "dict")
+    if kernel != {}:
+        board_config["kernel"] = kernel
+
+    platform = json.decode(ctx.attr.platform)
+    check_type(platform, "dict")
+    if platform != {}:
+        board_config["platform"] = platform
 
     if ctx.attr.board_bundles_dir:
         board_dir_name = ctx.file.board_bundles_dir.basename
@@ -192,6 +207,14 @@ _fuchsia_board_configuration = rule(
             It will be a source -> destination map""",
             allow_files = True,
         ),
+        "platform": attr.string(
+            doc = "The platform related configuration provided by the board.",
+            default = "{}",
+        ),
+        "kernel": attr.string(
+            doc = "The kernel related configuration provided by the board.",
+            default = "{}",
+        ),
         "_establish_board_config_dir": attr.label(
             default = "//fuchsia/tools:establish_board_config_dir",
             executable = True,
@@ -203,6 +226,8 @@ _fuchsia_board_configuration = rule(
 def fuchsia_board_configuration(
         name,
         filesystems = {},
+        platform = {},
+        kernel = {},
         **kwargs):
     """A board configuration that takes a dict for the filesystems config."""
     filesystem_labels = extract_labels(filesystems)
@@ -210,6 +235,8 @@ def fuchsia_board_configuration(
     _fuchsia_board_configuration(
         name = name,
         filesystems = json.encode_indent(filesystems, indent = "    "),
+        platform = json.encode_indent(platform, indent = "    "),
+        kernel = json.encode_indent(kernel, indent = "    "),
         filesystems_labels = filesystem_labels,
         **kwargs
     )

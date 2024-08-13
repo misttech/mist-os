@@ -21,6 +21,28 @@
         "input_bundles/testing_board_input_bundle_out",
         "input_bundles/empty_bib"
     ],
+    "kernel": {
+        "contiguous_physical_pages": true
+    },
     "name": "x64",
+    "platform": {
+        "connectivity": {
+            "network": {
+                "netsvc_interface": "/dwmac-ff3f0000_group/dwmac/Designware-MAC/netdevice-migration/network-device"
+            }
+        },
+        "development_support": {
+            "enable_debug_access_port_for_soc": "amlogic-a311d"
+        },
+        "sysmem_defaults": {
+            "contiguous_guard_pages_unused": false,
+            "contiguous_memory_size": {
+                "fixed": 209715200
+            },
+            "protected_memory_size": {
+                "fixed": 0
+            }
+        }
+    },
     "provided_features": []
 }
