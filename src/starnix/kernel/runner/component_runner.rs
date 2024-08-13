@@ -419,7 +419,10 @@ impl MountRecord {
             FileSystemOptions { source: path.into(), ..Default::default() },
             rights,
         )?;
-        current_node.mount(WhatToMount::Fs(fs), MountFlags::empty())?;
+        // Fuchsia doesn't specify mount flags in the incoming namespace, so we need to make
+        // up some flags.
+        let flags = MountFlags::NOSUID | MountFlags::NODEV | MountFlags::RELATIME;
+        current_node.mount(WhatToMount::Fs(fs), flags)?;
         self.mounts.push(current_node);
 
         Ok(())

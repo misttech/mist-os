@@ -154,7 +154,9 @@ mod parse_mount_options {
 #[cfg(test)]
 mod tests {
     use super::{parse, MountParams};
+    use crate::vfs::FsString;
     use maplit::hashmap;
+    use starnix_uapi::mount_flags::MountFlags;
 
     #[::fuchsia::test]
     fn empty_data() {
@@ -222,6 +224,34 @@ mod tests {
         assert!(
             parse_result.is_err(),
             "expected parse failure:  key0=\"quoted\",key1=\"mis\"quoted"
+        );
+    }
+
+    #[::fuchsia::test]
+    fn parse_normal_mount_flags() {
+        let data = b"nosuid,nodev,noexec,relatime";
+        let parsed_data = MountParams::parse(data.into())
+            .expect("mount options parse:  nosuid,nodev,noexec,relatime");
+        assert_eq!(
+            parsed_data.options,
+            hashmap! {
+                b"nosuid".into() => FsString::default(),
+                b"nodev".into() => FsString::default(),
+                b"noexec".into() => FsString::default(),
+                b"relatime".into() => FsString::default(),
+            }
+        );
+    }
+
+    #[::fuchsia::test]
+    fn parse_and_remove_normal_mount_flags() {
+        let data = b"nosuid,nodev,noexec,relatime";
+        let mut parsed_data = MountParams::parse(data.into())
+            .expect("mount options parse:  nosuid,nodev,noexec,relatime");
+        let flags = parsed_data.remove_mount_flags();
+        assert_eq!(
+            flags,
+            MountFlags::NOSUID | MountFlags::NODEV | MountFlags::NOEXEC | MountFlags::RELATIME
         );
     }
 
