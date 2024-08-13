@@ -66,8 +66,13 @@ if (is_host) {
     ]
     transport = "fuchsia-controller"
 
-    # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
-    environments = [ aemu_env ]
+    environments = [
+      # Only enable for AEMU-x64 as host-tests aren't supported on QEMU-arm64.
+      aemu_env,
+      nuc11_env,
+      vim3_env,
+      nelson_env,
+    ]
   }
 }
 
