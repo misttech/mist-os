@@ -232,8 +232,8 @@ class VmCowPages final : public VmHierarchyBase,
   // May return ZX_ERR_SHOULD_WAIT if the |page_request| is filled out and needs waiting on. In this
   // case |supplied_len| might be populated with a value less than |len|.
   //
-  // |supplied_len| is always filled with the amount of |len| that has been processed to allow for
-  // gradual progress of calls. Will always be equal to |len| if ZX_OK is returned.
+  // If ZX_OK is returned then |supplied_len| will always be equal to |len|. For any other error
+  // code the value of |supplied_len| is undefined.
   zx_status_t SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageSpliceList* pages,
                                 SupplyOptions options, uint64_t* supplied_len,
                                 MultiPageRequest* page_request) TA_REQ(lock());

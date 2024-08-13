@@ -5499,6 +5499,9 @@ zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageS
         new_pages_start = offset + PAGE_SIZE;
         new_pages_len = 0;
       } else {
+        // Only cause for this should be an out of memory from the kernel heap when attempting to
+        // allocate a page list node.
+        ASSERT(status == ZX_ERR_NO_MEMORY);
         break;
       }
     }
@@ -5525,8 +5528,10 @@ zx_status_t VmCowPages::SupplyPagesLocked(uint64_t offset, uint64_t len, VmPageS
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
 
   *supplied_len = offset - start;
-  // Assert we have only popped as many pages from the splice list as we have supplied.
-  DEBUG_ASSERT((pages->Position() - initial_list_position) == *supplied_len);
+  // In the case of ZX_OK or ZX_ERR_SHOULD_WAIT we should have supplied exactly as many pages as we
+  // processed. In any other case the value is undefined.
+  DEBUG_ASSERT(((pages->Position() - initial_list_position) == *supplied_len) ||
+               (status != ZX_OK && status != ZX_ERR_SHOULD_WAIT));
   return status;
 }
 
