@@ -132,7 +132,7 @@ HotPlugDetectionState HotPlugDetection::CurrentState() {
 zx::result<> HotPlugDetection::Init() {
   fidl::WireResult<fuchsia_hardware_gpio::Gpio::ConfigIn> config_in_result =
       pin_gpio_->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kPullDown);
-  if (config_in_result->is_error()) {
+  if (!config_in_result.ok()) {
     FDF_LOG(ERROR, "Failed to send ConfigIn request to hpd gpio: %s",
             config_in_result.status_string());
     return zx::error(config_in_result.status());
@@ -248,7 +248,7 @@ zx::result<> HotPlugDetection::SetPinInterruptMode(fuchsia_hardware_gpio::Interr
   if (!result.ok()) {
     FDF_LOG(ERROR, "Failed to send ConfigureInterrupt request to hpd gpio: %s",
             result.status_string());
-    return result->take_error();
+    return zx::error(result.status());
   }
 
   fidl::WireResultUnwrapType<fuchsia_hardware_gpio::Gpio::ConfigureInterrupt>& response =
