@@ -393,8 +393,4 @@ void fx_slog_internal(fuchsia_logging::LogSeverity severity, const char* file, i
 
 #define FX_LOG_KV(severity, msg...) FX_LOG_KV_ETC(::fuchsia_logging::LOG_##severity, msg)
 
-// TODO(b/299996898): Delete this once everyone
-// is moved to FX_LOG_KV.
-#define FX_SLOG FX_LOG_KV
-
 #endif  // LIB_SYSLOG_CPP_MACROS_H_

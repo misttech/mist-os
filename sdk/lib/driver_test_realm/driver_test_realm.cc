@@ -166,12 +166,12 @@ class FakeBootItems final : public fidl::WireServer<fuchsia_boot::Items> {
     zx_status_t status =
         GetBootItem(entries, request->type, board_name_, request->extra, &vmo, &length);
     if (status != ZX_OK) {
-      FX_SLOG(ERROR, "Failed to get boot items", FX_KV("status", status));
+      FX_LOG_KV(ERROR, "Failed to get boot items", FX_KV("status", status));
     }
     completer.Reply(std::move(vmo), length);
   }
   void Get2(Get2RequestView request, Get2Completer::Sync& completer) override {
-    FX_SLOG(ERROR, "Unsupported Get2 called.");
+    FX_LOG_KV(ERROR, "Unsupported Get2 called.");
     completer.Close(ZX_OK);
   }
 
@@ -198,7 +198,7 @@ class FakeRootJob final : public fidl::WireServer<fuchsia_kernel::RootJob> {
     zx::job job;
     zx_status_t status = zx::job::default_job()->duplicate(ZX_RIGHT_SAME_RIGHTS, &job);
     if (status != ZX_OK) {
-      FX_SLOG(ERROR, "Failed to duplicate job", FX_KV("status", status));
+      FX_LOG_KV(ERROR, "Failed to duplicate job", FX_KV("status", status));
     }
     completer.Reply(std::move(job));
   }
@@ -242,8 +242,8 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
       zx::result result =
           outgoing_->AddDirectory(std::move(client_end.value()), kRealmBuilderExposedDir);
       if (result.is_error()) {
-        FX_SLOG(ERROR, "Failed to add directory to outgoing directory",
-                FX_KV("directory", kRealmBuilderExposedDir));
+        FX_LOG_KV(ERROR, "Failed to add directory to outgoing directory",
+                  FX_KV("directory", kRealmBuilderExposedDir));
         return result.take_error();
       }
     }
@@ -253,8 +253,8 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
     zx::result result = outgoing_->AddUnmanagedProtocol<fuchsia_driver_test::Realm>(
         bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
     if (result.is_error()) {
-      FX_SLOG(ERROR, "Failed to add protocol to outgoing directory",
-              FX_KV("protocol", "fuchsia.driver.test/Realm"));
+      FX_LOG_KV(ERROR, "Failed to add protocol to outgoing directory",
+                FX_KV("protocol", "fuchsia.driver.test/Realm"));
       return result.take_error();
     }
 
@@ -415,8 +415,8 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
           case fuchsia_component_test::Capability::Tag::kConfig:
           case fuchsia_component_test::Capability::Tag::kDictionary:
           default:
-            FX_SLOG(WARNING, "Skipping unsupported offer capability.",
-                    FX_KV("type", static_cast<uint64_t>(offer_cap.Which())));
+            FX_LOG_KV(WARNING, "Skipping unsupported offer capability.",
+                      FX_KV("type", static_cast<uint64_t>(offer_cap.Which())));
             break;
         }
 
@@ -468,8 +468,8 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
           case fuchsia_component_test::Capability::Tag::kConfig:
           case fuchsia_component_test::Capability::Tag::kDictionary:
           default:
-            FX_SLOG(WARNING, "Skipping unsupported expose capability.",
-                    FX_KV("type", static_cast<uint64_t>(expose_cap.Which())));
+            FX_LOG_KV(WARNING, "Skipping unsupported expose capability.",
+                      FX_KV("type", static_cast<uint64_t>(expose_cap.Which())));
             break;
         }
 
@@ -605,8 +605,8 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
         break;
     };
 
-    FX_SLOG(WARNING, "DriverDevelopmentService received unknown method.",
-            FX_KV("Direction", method_type.c_str()), FX_KV("Ordinal", metadata.method_ordinal));
+    FX_LOG_KV(WARNING, "DriverDevelopmentService received unknown method.",
+              FX_KV("Direction", method_type.c_str()), FX_KV("Ordinal", metadata.method_ordinal));
   }
 
  private:
@@ -632,20 +632,20 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
       // Check each manifest to see if it uses the driver runner.
       zx::result cloned_dir = component::Clone(dir);
       if (cloned_dir.is_error()) {
-        FX_SLOG(ERROR, "Unable to clone dir");
+        FX_LOG_KV(ERROR, "Unable to clone dir");
         return zx::error(ZX_ERR_IO);
       }
       fbl::unique_fd dir_fd;
       zx_status_t status =
           fdio_fd_create(cloned_dir->TakeHandle().release(), dir_fd.reset_and_get_address());
       if (status != ZX_OK) {
-        FX_SLOG(ERROR, "Failed to turn dir into fd");
+        FX_LOG_KV(ERROR, "Failed to turn dir into fd");
         return zx::error(ZX_ERR_IO);
       }
       std::vector<std::string> manifests;
       if (!files::ReadDirContentsAt(dir_fd.get(), "meta", &manifests)) {
-        FX_SLOG(WARNING, "Unable to dir contents for ",
-                FX_KV("dir", fxl::Concatenate({"/", type, "/meta"})));
+        FX_LOG_KV(WARNING, "Unable to dir contents for ",
+                  FX_KV("dir", fxl::Concatenate({"/", type, "/meta"})));
       }
       std::vector<std::string> driver_components;
       for (const auto& manifest : manifests) {
@@ -656,13 +656,13 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
         }
         std::vector<uint8_t> manifest_bytes;
         if (!files::ReadFileToVectorAt(dir_fd.get(), manifest_path, &manifest_bytes)) {
-          FX_SLOG(ERROR, "Unable to read file contents for", FX_KV("manifest", manifest_path));
+          FX_LOG_KV(ERROR, "Unable to read file contents for", FX_KV("manifest", manifest_path));
           return zx::error(ZX_ERR_IO);
         }
         fit::result component = fidl::Unpersist<fuchsia_component_decl::Component>(manifest_bytes);
         if (component.is_error()) {
-          FX_SLOG(ERROR, "Unable to unpersist component manifest",
-                  FX_KV("manifest", manifest_path));
+          FX_LOG_KV(ERROR, "Unable to unpersist component manifest",
+                    FX_KV("manifest", manifest_path));
           return zx::error(ZX_ERR_IO);
         }
         if (!component->program() || !component->program()->runner() ||

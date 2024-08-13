@@ -33,11 +33,11 @@ int main() {
 
   auto wire_result = client->Start(std::move(args));
   if (wire_result.status() != ZX_OK) {
-    FX_SLOG(ERROR, "Failed to call to Realm:Start", FX_KV("status", wire_result.status()));
+    FX_LOG_KV(ERROR, "Failed to call to Realm:Start", FX_KV("status", wire_result.status()));
     return 1;
   }
   if (wire_result->is_error()) {
-    FX_SLOG(ERROR, "Realm:Start failed", FX_KV("error", wire_result->error_value()));
+    FX_LOG_KV(ERROR, "Realm:Start failed", FX_KV("error", wire_result->error_value()));
     return 1;
   }
 
