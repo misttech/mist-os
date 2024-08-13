@@ -6,7 +6,10 @@ use futures::future::{Future, FutureExt, FutureObj};
 use futures::ready;
 use futures::task::{Context, Poll};
 use std::convert::Infallible;
+use std::fmt::Debug;
+use std::marker::Sync;
 use std::pin::Pin;
+use std::sync::{Arc, RwLock};
 
 #[derive(Debug)]
 pub struct ExitReason(pub Result<(), anyhow::Error>);
@@ -50,6 +53,38 @@ pub trait IntoStateExt<E>: Future<Output = Result<State<E>, E>> {
 
 impl<F, E> IntoStateExt<E> for F where F: Future<Output = Result<State<E>, E>> {}
 
+// Some helpers to allow state machines to publish state and other futures to check in on the most
+// recent state updates.
+#[derive(Clone)]
+pub struct StateMachineStatusPublisher<S>(Arc<RwLock<S>>);
+
+impl<S: Clone + Debug + Send + Sync> StateMachineStatusPublisher<S> {
+    pub fn publish_status(&self, status: S) {
+        match self.0.write() {
+            Ok(mut writer) => *writer = status,
+            Err(e) => tracing::warn!("Failed to write current status {:?}: {}", status, e),
+        }
+    }
+}
+
+#[derive(Clone)]
+pub struct StateMachineStatusReader<S>(Arc<RwLock<S>>);
+
+impl<S: Clone + Debug + Send + Sync> StateMachineStatusReader<S> {
+    pub fn read_status(&self) -> Result<S, anyhow::Error> {
+        match self.0.read() {
+            Ok(reader) => Ok(reader.clone()),
+            Err(e) => Err(anyhow::format_err!("Failed to read current status: {}", e)),
+        }
+    }
+}
+
+pub fn status_publisher_and_reader<S: Clone + Default>(
+) -> (StateMachineStatusPublisher<S>, StateMachineStatusReader<S>) {
+    let status = Arc::new(RwLock::new(S::default()));
+    (StateMachineStatusPublisher(status.clone()), StateMachineStatusReader(status))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -87,5 +122,26 @@ mod tests {
     // A workaround for the "recursive impl Trait" problem in the compiler
     fn make_sum_state(current: u32, stream: mpsc::UnboundedReceiver<u32>) -> State<u32> {
         sum_state(current, stream).into_state()
+    }
+
+    #[derive(Clone, Debug, Default, PartialEq)]
+    enum FakeState {
+        #[default]
+        Beginning,
+        Middle,
+        End,
+    }
+
+    #[fuchsia::test]
+    fn state_publish_and_read() {
+        let _exec = fasync::TestExecutor::new();
+        let (publisher, reader) = status_publisher_and_reader::<FakeState>();
+        assert_eq!(reader.read_status().expect("failed to read status"), FakeState::Beginning);
+
+        publisher.publish_status(FakeState::Middle);
+        assert_eq!(reader.read_status().expect("failed to read status"), FakeState::Middle);
+
+        publisher.publish_status(FakeState::End);
+        assert_eq!(reader.read_status().expect("failed to read status"), FakeState::End);
     }
 }

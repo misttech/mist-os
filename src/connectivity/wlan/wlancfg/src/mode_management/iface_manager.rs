@@ -13,6 +13,7 @@ use crate::mode_management::iface_manager_types::*;
 use crate::mode_management::phy_manager::{CreateClientIfacesReason, PhyManagerApi};
 use crate::mode_management::{recovery, Defect};
 use crate::telemetry::{TelemetryEvent, TelemetrySender};
+use crate::util::state_machine::status_publisher_and_reader;
 use crate::util::{atomic_oneshot_stream, future_with_metadata, listener};
 use anyhow::{format_err, Error};
 use fidl::endpoints::create_proxy;
@@ -101,6 +102,9 @@ async fn create_client_state_machine(
     dev_monitor_proxy.get_client_sme(iface_id, remote).await?.map_err(zx::Status::from_raw)?;
     let event_stream = sme_proxy.take_event_stream();
 
+    // State machine status information
+    let (publisher, _reader) = status_publisher_and_reader::<client_fsm::Status>();
+
     let fut = client_fsm::serve(
         iface_id,
         sme_proxy,
@@ -112,6 +116,7 @@ async fn create_client_state_machine(
         telemetry_sender,
         defect_sender,
         roam_manager,
+        publisher,
     );
 
     let metadata =
