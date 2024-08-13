@@ -19,11 +19,8 @@
 ## This command supports:
 ##  - incremental package publishing. If enabled, it will auto-publish packages as they
 ##    are created or modified.
-##  - foreground repository serving. If enabled, the repository server and device registration
-##    flows will be ran as a foreground process.
 ##
 ## To enable incremental package serving, run "fx --enable=incremental serve ..."
-## To enable foreground repository serving, run "fx --enable=foreground_repo_server serve ..."
 
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/vars.sh || exit $?
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" >/dev/null 2>&1 && pwd)"/lib/updates.sh || exit $?
@@ -80,12 +77,17 @@ if fx-is-bringup; then
   exit 1
 fi
 
+# Determine which server is configured.
+server_mode="$(package-server-mode)"
+err=$?
+if [[ "${err}" -ne 0 ]]; then
+  exit 1
+fi
+
 sunset_resolutions() {
-  fx-error "Please consider switching to foreground serving via ffx, and report"
-  fx-error "any blocking issues at your earliest convenience."
-  fx-error "To serve repositories, please pick between the following two options:"
-  fx-error ""
-  fx-error "1. Disable pm and switch to ffx foreground server (aka supported):"
+  fx-error "Only ffx foreground repo serving is supported via \`fx serve\`."
+  fx-error "To serve repositories, please make sure pm and ffx daemon based"
+  fx-error "serving are disabled:"
   fx-error ""
   fx-error "   Ensure your shell does *not* export the environment variable"
   fx-error "   FUCHSIA_DISABLED_foreground_repo_server"
@@ -96,21 +98,8 @@ sunset_resolutions() {
   fx-error ""
   fx-error "   Then restart \"fx serve\""
   fx-error ""
-  fx-error "2. Strongly discouraged, this option is going away at the end"
-  fx-error "   of 2024Q2: Ensure your shell *does* export the following"
-  fx-error "   environment variable wherever you use fx and ffx."
-  fx-error ""
-  fx-error "   $ export FUCHSIA_DISABLED_foreground_repo_server=1"
-  fx-error ""
-  fx-error "   Enable the ffx background server:"
-  fx-error ""
-  fx-error "   $ ffx config remove repository.server.mode"
-  fx-error "   $ ffx config set repository.server.enabled true"
-  fx-error "   $ ffx doctor --restart-daemon"
-  fx-error ""
-  fx-error "In both cases, please note that an already running foreground server is"
-  fx-error "not always detected correctly. Consider running the following commands"
-  fx-error "in case of problems:"
+  fx-error "Consider running the following commands in case you run into"
+  fx-error "unexpected problems:"
   fx-error ""
   fx-error "$ ffx config remove repository.server.listen"
   fx-error "$ ffx doctor --restart-daemon"
@@ -122,17 +111,13 @@ sunset_resolutions() {
   exit 1
 }
 
-# Determine which server is configured.
-server_mode="$(package-server-mode)"
-err=$?
-if [[ "${err}" -ne 0 ]]; then
-  exit 1
+if [[ "${server_mode}" = "pm" ]]; then
+  fx-error "Starting a **pm** repository server was requested."
+  sunset_resolutions
 fi
 
-# pm is no longer supported
-if [[ "${server_mode}" = "pm" ]] ; then
-  fx-error "Invoking pm via fx serve is no longer supported. Additionally,"
-  fx-error "the pm is slated for removal, targeted for 2024 Q2."
+if [[ "$(ffx-repository-server-enabled)" == "true" ]]; then
+  fx-error "Starting an ffx **background** server was requested."
   sunset_resolutions
 fi
 
@@ -247,16 +232,8 @@ else
 fi
 
 # Default the port to 8083 if it is unset.
-if is_feature_enabled "foreground_repo_server"; then
-  if [[ -z "${port}" ]]; then
-    port="8083"
-  fi
-fi
-
-if [[ "$(ffx-repository-server-enabled)" == "true" ]]; then
-  fx-error "Starting an ffx background server from \"fx serve\" is no longer supported,"
-  fx-error "preceding the upcoming removal of background serving at the end of 2024Q2."
-  sunset_resolutions
+if [[ -z "${port}" ]]; then
+  port="8083"
 fi
 
 # Error out if we can't start a package server.
@@ -372,51 +349,28 @@ while true; do
   fi
 
   if [[ "${state}" == "config" ]]; then
-    log "Registering devhost as update source"
+    log "Starting repository server"
 
-    if is_feature_enabled "foreground_repo_server"; then
-      ffx_flags=( --config repository.foreground.enabled=true )
-      if [[ "${verbose}" == true ]]; then
-        ffx_flags+=( -v )
-      fi
-
-      if [[ -z "${source_name}" ]]; then
-        source_name="$(ffx-default-repository-name)"
-      fi
-
-      # Start repository server in foreground, wait until it
-      # voluntarily exits
-      fx-command-run ffx ${ffx_flags[@]} repository serve \
-        ${no_device} \
-        --address [::]:${port} \
-        --repository "${source_name}" \
-        --repo-path "${repo_dir}" \
-        --trusted-root "${repo_dir}/repository/9.root.json" \
-        --alias "fuchsia.com" \
-        --alias "chromium.org"
-
-      exit 0
-    else
-      add_update_source_args=( "${persist}" --port "${port}" --server-mode "${server_mode}" )
-      if [[ ! -z "${source_name}" ]]; then
-        add_update_source_args+=( --name "${source_name}" )
-      fi
-
-      if with-pinned-target fx-command-run add-update-source "${add_update_source_args[@]}"; then
-        log "Ready to push packages!"
-        # Log the uptime so that it is clear(er) from fx serve if the device rebooted.
-        # The tr is present as the output sometimes contains spurious control characters.
-        clock=$(with-pinned-target fx-command-run shell clock --monotonic)
-        if [[ -n ${clock} ]]; then
-          uptime=$(echo $clock | tr '[[:cntrl:]]' ' ' )
-          log "Target uptime: $(( $uptime / 1000000000 ))"
-        fi
-        state="ready"
-      else
-        log "Device lost while configuring update source"
-        state="discover"
-      fi
+    if [[ "${verbose}" == true ]]; then
+      ffx_flags+=( -v )
     fi
+
+    if [[ -z "${source_name}" ]]; then
+      source_name="$(ffx-default-repository-name)"
+    fi
+
+    # Start repository server in foreground, wait until it
+    # voluntarily exits
+    fx-command-run ffx ${ffx_flags[@]} repository serve \
+      ${no_device} \
+      --address [::]:${port} \
+      --repository "${source_name}" \
+      --repo-path "${repo_dir}" \
+      --trusted-root "${repo_dir}/repository/9.root.json" \
+      --alias "fuchsia.com" \
+      --alias "chromium.org"
+
+    exit 0
   fi
 
   if [[ "${state}" == "ready" ]]; then
