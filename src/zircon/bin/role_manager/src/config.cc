@@ -13,6 +13,7 @@
 #include <zircon/syscalls/profile.h>
 
 #include <algorithm>
+#include <cmath>
 #include <limits>
 #include <sstream>
 #include <string>
