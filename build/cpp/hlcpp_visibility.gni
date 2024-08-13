@@ -349,7 +349,7 @@ hlcpp_visibility = [
   "//src/virtualization/lib/guest_config:*",
   "//src/virtualization/lib/guest_interaction:*",
   "//src/virtualization/lib/vsh:*",
-  "//src/virtualization/tests/lib:*",
+  "//src/virtualization/tests/*",
   "//src/zircon/bin/hwstress:*",
   "//src/zircon/bin/ktrace:*",
   "//src/zircon/testing/mutex_pi_exerciser:*",
