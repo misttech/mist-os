@@ -1565,11 +1565,12 @@ impl NamespaceNode {
         ArcKey::ref_cast(&self.entry)
     }
 
-    pub fn suid_and_sgid(&self) -> UserAndOrGroupId {
+    pub fn suid_and_sgid(&self, current_task: &CurrentTask) -> Result<UserAndOrGroupId, Errno> {
         if self.mount.flags().contains(MountFlags::NOSUID) {
-            UserAndOrGroupId::default()
+            Ok(UserAndOrGroupId::default())
         } else {
-            self.entry.node.info().suid_and_sgid()
+            let creds = current_task.creds();
+            self.entry.node.info().suid_and_sgid(&creds)
         }
     }
 

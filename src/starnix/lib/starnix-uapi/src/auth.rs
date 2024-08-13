@@ -5,6 +5,7 @@
 #![allow(dead_code)]
 
 use crate::errors::{error, Errno};
+use crate::file_mode::{Access, FileMode};
 use crate::{gid_t, uapi, uid_t};
 use bitflags::bitflags;
 use std::ops;
@@ -399,6 +400,34 @@ impl Credentials {
         self.cap_effective.contains(capability)
     }
 
+    pub fn check_access(
+        &self,
+        access: Access,
+        node_uid: uid_t,
+        node_gid: gid_t,
+        mode: FileMode,
+    ) -> Result<(), Errno> {
+        let mode_bits = mode.bits();
+        let mode_rwx_bits = if self.has_capability(CAP_DAC_OVERRIDE) {
+            if mode.is_dir() {
+                0o7
+            } else {
+                // At least one of the EXEC bits must be set to execute files.
+                0o6 | (mode_bits & 0o100) >> 6 | (mode_bits & 0o010) >> 3 | mode_bits & 0o001
+            }
+        } else if self.fsuid == node_uid {
+            (mode_bits & 0o700) >> 6
+        } else if self.is_in_group(node_gid) {
+            (mode_bits & 0o070) >> 3
+        } else {
+            mode_bits & 0o007
+        };
+        if (mode_rwx_bits & access.rwx_bits()) != access.rwx_bits() {
+            return error!(EACCES);
+        }
+        Ok(())
+    }
+
     fn apply_suid_and_sgid(&mut self, maybe_set: UserAndOrGroupId) {
         if maybe_set.is_none() {
             return;
@@ -579,6 +608,10 @@ pub struct UserAndOrGroupId {
 impl UserAndOrGroupId {
     pub fn is_none(&self) -> bool {
         self.uid.is_none() && self.gid.is_none()
+    }
+
+    pub fn is_some(&self) -> bool {
+        !self.is_none()
     }
 
     pub fn clear(&mut self) {

@@ -31,8 +31,8 @@ use starnix_sync::{
 };
 use starnix_uapi::as_any::AsAny;
 use starnix_uapi::auth::{
-    Credentials, FsCred, UserAndOrGroupId, CAP_CHOWN, CAP_DAC_OVERRIDE, CAP_FOWNER, CAP_FSETID,
-    CAP_MKNOD, CAP_SYS_ADMIN, CAP_SYS_RESOURCE,
+    Credentials, FsCred, UserAndOrGroupId, CAP_CHOWN, CAP_FOWNER, CAP_FSETID, CAP_MKNOD,
+    CAP_SYS_ADMIN, CAP_SYS_RESOURCE,
 };
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::{Errno, EACCES};
@@ -274,7 +274,7 @@ impl FsNodeInfo {
         FsCred { uid: self.uid, gid: self.gid }
     }
 
-    pub fn suid_and_sgid(&self) -> UserAndOrGroupId {
+    pub fn suid_and_sgid(&self, creds: &Credentials) -> Result<UserAndOrGroupId, Errno> {
         let uid = self.mode.contains(FileMode::ISUID).then_some(self.uid);
 
         // See <https://man7.org/linux/man-pages/man7/inode.7.html>:
@@ -285,7 +285,14 @@ impl FsNodeInfo {
         //   group execution bit (S_IXGRP) set, the set-group-ID bit indicates
         //   mandatory file/record locking.
         let gid = self.mode.contains(FileMode::ISGID | FileMode::IXGRP).then_some(self.gid);
-        UserAndOrGroupId { uid, gid }
+
+        let maybe_set_id = UserAndOrGroupId { uid, gid };
+        if maybe_set_id.is_some() {
+            // Check that uid and gid actually have execute access before
+            // returning them as the SUID or SGID.
+            creds.check_access(Access::EXEC, self.uid, self.gid, self.mode)?;
+        }
+        Ok(maybe_set_id)
     }
 }
 
@@ -1766,29 +1773,9 @@ impl FsNode {
         access: Access,
         info: RwLockReadGuard<'_, FsNodeInfo>,
     ) -> Result<(), Errno> {
-        let (node_uid, node_gid, mode) = (info.uid, info.gid, info.mode.bits());
+        let (node_uid, node_gid, mode) = (info.uid, info.gid, info.mode);
         std::mem::drop(info);
-        let creds = current_task.creds();
-
-        let mode_flags = if creds.has_capability(CAP_DAC_OVERRIDE) {
-            if self.is_dir() {
-                0o7
-            } else {
-                // At least one of the EXEC bits must be set to execute files.
-                0o6 | (mode & 0o100) >> 6 | (mode & 0o010) >> 3 | mode & 0o001
-            }
-        } else if creds.fsuid == node_uid {
-            (mode & 0o700) >> 6
-        } else if creds.is_in_group(node_gid) {
-            (mode & 0o070) >> 3
-        } else {
-            mode & 0o007
-        };
-        if (mode_flags & access.rwx_bits()) != access.rwx_bits() {
-            return error!(EACCES);
-        }
-
-        Ok(())
+        current_task.creds().check_access(access, node_uid, node_gid, mode)
     }
 
     /// Check whether the node can be accessed in the current context with the specified access
