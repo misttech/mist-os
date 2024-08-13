@@ -2,94 +2,108 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/ui/app/cpp/fidl.h>
-#include <fuchsia/ui/composition/cpp/fidl.h>
-#include <fuchsia/ui/test/input/cpp/fidl.h>
-#include <fuchsia/ui/views/cpp/fidl.h>
+#include <fidl/fuchsia.ui.app/cpp/fidl.h>
+#include <fidl/fuchsia.ui.composition/cpp/fidl.h>
+#include <fidl/fuchsia.ui.scenic/cpp/hlcpp_conversion.h>
+#include <fidl/fuchsia.ui.test.input/cpp/fidl.h>
+#include <fidl/fuchsia.ui.views/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/fidl/cpp/binding.h>
-#include <lib/fidl/cpp/interface_handle.h>
-#include <lib/fidl/cpp/interface_request.h>
+#include <lib/component/incoming/cpp/protocol.h>
+#include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/fidl/cpp/channel.h>
 #include <lib/fit/function.h>
-#include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
 #include <zircon/status.h>
 
 #include <array>
 #include <memory>
+#include <utility>
 #include <vector>
 
-#include "src/lib/ui/flatland-frame-scheduling/src/simple_present_hlcpp.h"
+#include <src/lib/ui/flatland-frame-scheduling/src/simple_present.h>
+#include <src/ui/testing/util/fidl_cpp_helpers.h>
 
 namespace touch_flatland_client {
 
 // Implementation of a simple scenic client using the Flatland API.
-class TouchFlatlandClient final : public fuchsia::ui::app::ViewProvider {
+class TouchFlatlandClient final : public fidl::Server<fuchsia_ui_app::ViewProvider> {
  public:
-  TouchFlatlandClient(async::Loop* loop) : loop_(loop), view_provider_binding_(this) {
+  explicit TouchFlatlandClient(async::Loop* loop)
+      : loop_(loop), outgoing_directory_(loop_->dispatcher()) {
     FX_CHECK(loop_);
 
-    context_ = sys::ComponentContext::CreateAndServeOutgoingDirectory();
-    context_->outgoing()->AddPublicService<fuchsia::ui::app::ViewProvider>(
-        [this](fidl::InterfaceRequest<fuchsia::ui::app::ViewProvider> request) {
-          view_provider_binding_.Bind(std::move(request));
-        });
+    ZX_ASSERT_OK(outgoing_directory_.AddUnmanagedProtocol<fuchsia_ui_app::ViewProvider>(
+        [&](fidl::ServerEnd<fuchsia_ui_app::ViewProvider> server_end) {
+          FX_LOGS(INFO) << "fuchsia_ui_app::ViewProvider connect";
+          view_provider_binding_.AddBinding(loop_->dispatcher(), std::move(server_end), this,
+                                            fidl::kIgnoreBindingClosure);
+        }));
 
+    ZX_ASSERT_OK(outgoing_directory_.ServeFromStartupInfo());
+
+    auto touch_input_listener_connect =
+        component::Connect<fuchsia_ui_test_input::TouchInputListener>();
+    ZX_ASSERT_OK(touch_input_listener_connect);
     touch_input_listener_ =
-        context_->svc()->Connect<fuchsia::ui::test::input::TouchInputListener>();
-    touch_input_listener_.set_error_handler([](zx_status_t status) {
-      FX_LOGS(WARNING) << "Test response listener disconnected, status: "
-                       << zx_status_get_string(status);
-      // Don't quit, because we should be able to run this client outside of a test.
-    });
+        fidl::Client(std::move(touch_input_listener_connect.value()), loop_->dispatcher());
 
-    flatland_connection_ =
-        simple_present::FlatlandConnection::Create(context_.get(), "TouchFlatlandClient");
-    flatland_ = flatland_connection_->flatland();
-
-    // Set up the touch source to listen to the pointer events.
-    touch_source_.set_error_handler([](zx_status_t status) {
-      FX_LOGS(ERROR) << "Touch source closed with status: " << zx_status_get_string(status);
-    });
-
-    // Set up parent watcher to retrieve layout info.
-    parent_viewport_watcher_.set_error_handler([](zx_status_t status) {
-      FX_LOGS(ERROR) << "Error from fuchsia::ui::composition::ParentViewportWatcher: "
-                     << zx_status_get_string(status);
-    });
+    flatland_connection_ = simple_present::FlatlandConnection::Create(loop, "TouchFlatlandClient");
   }
 
-  // |fuchsia::ui::app::ViewProvider|
-  void CreateView2(fuchsia::ui::app::CreateView2Args args) override {
-    auto& view_creation_token = *args.mutable_view_creation_token();
-    auto identity = scenic::NewViewIdentityOnCreation();
-    fuchsia::ui::composition::ViewBoundProtocols protocols;
-    protocols.set_touch_source(touch_source_.NewRequest());
-    flatland_->CreateView2(std::move(view_creation_token), std::move(identity),
-                           std::move(protocols), parent_viewport_watcher_.NewRequest());
+  // |fuchsia_ui_app::ViewProvider|
+  void CreateView2(CreateView2Request& req, CreateView2Completer::Sync& completer) override {
+    FX_LOGS(INFO) << "Call CreateView2";
+
+    auto [touch_source_client, touch_source_server] =
+        fidl::Endpoints<fuchsia_ui_pointer::TouchSource>::Create();
+    touch_source_ = fidl::Client(std::move(touch_source_client), loop_->dispatcher());
+
+    auto [parent_viewport_watcher_client, parent_viewport_watcher_server] =
+        fidl::Endpoints<fuchsia_ui_composition::ParentViewportWatcher>::Create();
+    parent_viewport_watcher_ = fidl::SyncClient(std::move(parent_viewport_watcher_client));
+
+    auto identity = fidl::HLCPPToNatural(scenic::NewViewIdentityOnCreation());
+    fuchsia_ui_composition::ViewBoundProtocols protocols;
+    protocols.touch_source(std::move(touch_source_server));
+    fuchsia_ui_composition::FlatlandCreateView2Request create_view2_req;
+    create_view2_req.token(std::move(req.args().view_creation_token()->value()));
+    create_view2_req.view_identity(std::move(identity));
+    create_view2_req.protocols(std::move(protocols));
+    create_view2_req.parent_viewport_watcher(std::move(parent_viewport_watcher_server));
+
+    ZX_ASSERT_OK(flatland_connection_->FlatlandClient()->CreateView2(std::move(create_view2_req)));
 
     // Create a minimal scene after receiving the layout information.
-    parent_viewport_watcher_->GetLayout([this](auto layout_info) {
-      FX_CHECK(layout_info.has_logical_size());
-      FX_CHECK(layout_info.has_device_pixel_ratio());
+    auto layout = parent_viewport_watcher_->GetLayout();
 
-      width_ = layout_info.logical_size().width;
-      height_ = layout_info.logical_size().height;
-      device_pixel_ratio_ = layout_info.device_pixel_ratio();
-      FX_LOGS(INFO) << "Flatland cpp client received layout info: w=" << width_ << ", h=" << height_
-                    << ", dpr=(" << device_pixel_ratio_.x << "," << device_pixel_ratio_.y << ")";
-      CreateScene();
-    });
+    ZX_ASSERT_OK(layout);
+    auto layout_info = layout.value().info();
+
+    FX_CHECK(layout_info.logical_size().has_value());
+    FX_CHECK(layout_info.device_pixel_ratio().has_value());
+
+    width_ = layout_info.logical_size()->width();
+    height_ = layout_info.logical_size()->height();
+    device_pixel_ratio_ = layout_info.device_pixel_ratio().value();
+    FX_LOGS(INFO) << "Flatland cpp client received layout info: w=" << width_ << ", h=" << height_
+                  << ", dpr=(" << device_pixel_ratio_.x() << "," << device_pixel_ratio_.y() << ")";
+    CreateScene();
 
     // Listen for pointer events.
-    touch_source_->Watch({}, fit::bind_member(this, &TouchFlatlandClient::Watch));
+    touch_source_->Watch({}).Then([&](auto res) {
+      ZX_ASSERT_OK(res);
+      Watch(res.value().events());
+    });
+
+    // TODO(chaopeng): add TestAppReady to notify test class.
   }
 
-  void CreateViewWithViewRef(zx::eventpair token,
-                             fuchsia::ui::views::ViewRefControl view_ref_control,
-                             fuchsia::ui::views::ViewRef view_ref) override {
+  // |fuchsia_ui_app::ViewProvider|
+  void CreateViewWithViewRef(CreateViewWithViewRefRequest& request,
+                             CreateViewWithViewRefCompleter::Sync& completer) override {
+    // Flatland only use |CreateView2|.
     ZX_PANIC("Not Implemented");
   }
 
@@ -102,32 +116,40 @@ class TouchFlatlandClient final : public fuchsia::ui::app::ViewProvider {
        {0.f, 0.f, 255.f, 255.f},      // blue
        {128.f, 0.f, 255.f, 255.f}}};  // purple
 
-  static constexpr fuchsia::ui::composition::TransformId kRootTransformId = {1};
-  static constexpr fuchsia::ui::composition::ContentId kRectId = {1};
-  static constexpr fuchsia::ui::composition::TransformId kRectTransformId = {2};
+  static const uint64_t kRootTransformId = 1;
+  static const uint64_t kRectId = 1;
+  static const uint64_t kRectTransformId = 2;
 
   // Creates a minimal scene containing a solid filled rectangle of size |width_| * |height_|.
   // Called after receiving layout info from
   // |fuchsia.ui.composition.ParentViewportWatcher.GetLayout|.
   void CreateScene() {
+    fuchsia_ui_composition::TransformId rootTransformId(kRootTransformId);
+    fuchsia_ui_composition::ContentId rectId(kRectId);
+    fuchsia_ui_composition::TransformId rectTransformId = {kRectTransformId};
+
     // Create the root transform
-    flatland_->CreateTransform(kRootTransformId);
-    flatland_->SetRootTransform(kRootTransformId);
+    ZX_ASSERT_OK(flatland_connection_->FlatlandClient()->CreateTransform({rootTransformId}));
+    ZX_ASSERT_OK(flatland_connection_->FlatlandClient()->SetRootTransform({rootTransformId}));
 
     // Create the transform for the rectangle.
-    flatland_->CreateTransform(kRectTransformId);
-    flatland_->SetTranslation(kRectTransformId, {0, 0});
+    ZX_ASSERT_OK(flatland_connection_->FlatlandClient()->CreateTransform({rectTransformId}));
+    ZX_ASSERT_OK(
+        flatland_connection_->FlatlandClient()->SetTranslation({{rectTransformId, {0, 0}}}));
 
     // Connect the transform to the scene graph.
-    flatland_->AddChild(kRootTransformId, kRectTransformId);
+    ZX_ASSERT_OK(
+        flatland_connection_->FlatlandClient()->AddChild({rootTransformId, rectTransformId}));
 
     // Create the content and attach it to the transform.
     auto color = kColorsRgba[color_index_];
-    flatland_->CreateFilledRect(kRectId);
-    flatland_->SetSolidFill(
-        kRectId, {color[0] / 255.f, color[1] / 255.f, color[2] / 255.f, color[3] / 255.f},
-        {width_, height_});
-    flatland_->SetContent(kRectTransformId, kRectId);
+    ZX_ASSERT_OK(flatland_connection_->FlatlandClient()->CreateFilledRect({rectId}));
+    ZX_ASSERT_OK(flatland_connection_->FlatlandClient()->SetSolidFill(
+        {kRectId,
+         {color[0] / 255.f, color[1] / 255.f, color[2] / 255.f, color[3] / 255.f},
+         {width_, height_}}));
+    ZX_ASSERT_OK(flatland_connection_->FlatlandClient()->SetContent({kRectTransformId, kRectId}));
+
     Present();
   }
 
@@ -138,23 +160,23 @@ class TouchFlatlandClient final : public fuchsia::ui::app::ViewProvider {
   // Creates a watch loop to continuously watch for pointer events using the
   // |fuchsia.ui.pointer.TouchSource.Watch|. Changes the color of the rectangle in the scene when a
   // tap event is received.
-  void Watch(std::vector<fuchsia::ui::pointer::TouchEvent> events) {
+  void Watch(std::vector<fuchsia_ui_pointer::TouchEvent> events) {
     // Stores the response for touch events in |events|.
-    std::vector<fuchsia::ui::pointer::TouchResponse> responses;
-    for (fuchsia::ui::pointer::TouchEvent& event : events) {
-      if (event.has_interaction_result() &&
-          event.interaction_result().status ==
-              fuchsia::ui::pointer::TouchInteractionStatus::GRANTED) {
+    std::vector<fuchsia_ui_pointer::TouchResponse> responses;
+    for (fuchsia_ui_pointer::TouchEvent& event : events) {
+      if (event.interaction_result().has_value() &&
+          event.interaction_result()->status() ==
+              fuchsia_ui_pointer::TouchInteractionStatus::kGranted) {
         interaction_granted_ = true;
 
         // Report any queued events now that the interaction has been granted.
-        for (fuchsia::ui::pointer::TouchEvent& pending_event : pending_events_before_granted_) {
+        for (fuchsia_ui_pointer::TouchEvent& pending_event : pending_events_before_granted_) {
           ReportEvent(pending_event);
         }
         pending_events_before_granted_.clear();
       }
 
-      fuchsia::ui::pointer::TouchResponse response;
+      fuchsia_ui_pointer::TouchResponse response;
       if (!HasValidatedTouchSample(event)) {
         responses.push_back(std::move(response));
         continue;
@@ -168,71 +190,74 @@ class TouchFlatlandClient final : public fuchsia::ui::app::ViewProvider {
         pending_events_before_granted_.push_back(std::move(event));
       }
 
-      response.set_response_type(fuchsia::ui::pointer::TouchResponseType::YES);
+      response.response_type(fuchsia_ui_pointer::TouchResponseType::kYes);
       responses.push_back(std::move(response));
     }
 
-    touch_source_->Watch(std::move(responses), fit::bind_member(this, &TouchFlatlandClient::Watch));
+    // Start next touch event watch.
+    touch_source_->Watch({std::move(responses)}).Then([&](auto res) {
+      ZX_ASSERT_OK(res);
+      Watch(res.value().events());
+    });
   }
 
-  void ReportEvent(fuchsia::ui::pointer::TouchEvent& event) {
+  void ReportEvent(fuchsia_ui_pointer::TouchEvent& event) {
     FX_CHECK(interaction_granted_) << "only report events with interaction status of granted";
     const auto& pointer_sample = event.pointer_sample();
 
     // Store the view parameters received from a TouchEvent when either a new connection was
     // formed or the view parameters were modified.
-    if (event.has_view_parameters()) {
+    if (event.view_parameters().has_value()) {
       view_params_ = std::move(event.view_parameters());
     }
 
-    if (pointer_sample.phase() == fuchsia::ui::pointer::EventPhase::ADD) {
+    if (pointer_sample->phase() == fuchsia_ui_pointer::EventPhase::kAdd) {
       // Change the color of the rectangle on a tap event.
       color_index_ = (color_index_ + 1) % kColorsRgba.size();
       auto color = kColorsRgba[color_index_];
-      flatland_->SetSolidFill(
-          kRectId, {color[0] / 255.f, color[1] / 255.f, color[2] / 255.f, color[3] / 255.f},
-          {width_, height_});
+      ZX_ASSERT_OK(flatland_connection_->FlatlandClient()->SetSolidFill(
+          {kRectId,
+           {color[0] / 255.f, color[1] / 255.f, color[2] / 255.f, color[3] / 255.f},
+           {width_, height_}}));
       Present();
     }
-    if (touch_input_listener_) {
-      fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest request;
-      // Only report ADD/CHANGE/REMOVE events for minimality; add more if necessary.
-      if (pointer_sample.phase() == fuchsia::ui::pointer::EventPhase::ADD ||
-          pointer_sample.phase() == fuchsia::ui::pointer::EventPhase::CHANGE ||
-          pointer_sample.phase() == fuchsia::ui::pointer::EventPhase::REMOVE) {
-        auto logical = ViewportToViewCoordinates(pointer_sample.position_in_viewport(),
-                                                 view_params_->viewport_to_view_transform);
+    fuchsia_ui_test_input::TouchInputListenerReportTouchInputRequest request;
+    // Only report ADD/CHANGE/REMOVE events for minimality; add more if necessary.
+    if (pointer_sample->phase() == fuchsia_ui_pointer::EventPhase::kAdd ||
+        pointer_sample->phase() == fuchsia_ui_pointer::EventPhase::kChange ||
+        pointer_sample->phase() == fuchsia_ui_pointer::EventPhase::kRemove) {
+      auto logical = ViewportToViewCoordinates(pointer_sample->position_in_viewport().value(),
+                                               view_params_->viewport_to_view_transform());
 
-        // The raw pointer event's coordinates are in pips (logical pixels). The test
-        // expects coordinates in physical pixels. The former is transformed into the
-        // latter with the DPR values received from |GetLayout|.
-        request.set_local_x(logical[0] * device_pixel_ratio_.x)
-            .set_local_y(logical[1] * device_pixel_ratio_.y)
-            .set_phase(pointer_sample.phase())
-            .set_time_received(zx_clock_get_monotonic())
-            .set_component_name("touch-flatland-client");
-        touch_input_listener_->ReportTouchInput(std::move(request));
-      }
+      // The raw pointer event's coordinates are in pips (logical pixels). The test
+      // expects coordinates in physical pixels. The former is transformed into the
+      // latter with the DPR values received from |GetLayout|.
+      request.local_x(logical[0] * device_pixel_ratio_.x());
+      request.local_y(logical[1] * device_pixel_ratio_.y());
+      request.phase(pointer_sample->phase());
+      request.time_received(zx_clock_get_monotonic());
+      request.component_name("touch-flatland-client");
+      ZX_ASSERT_OK(touch_input_listener_->ReportTouchInput(request));
     }
 
     // Reset |interaction_granted_| as the current interaction has ended.
-    if (pointer_sample.phase() == fuchsia::ui::pointer::EventPhase::REMOVE) {
+    if (pointer_sample->phase() == fuchsia_ui_pointer::EventPhase::kRemove) {
       interaction_granted_ = false;
       pending_events_before_granted_.clear();
     }
   }
 
-  bool HasValidatedTouchSample(const fuchsia::ui::pointer::TouchEvent& event) {
-    if (!event.has_pointer_sample()) {
+  static bool HasValidatedTouchSample(const fuchsia_ui_pointer::TouchEvent& event) {
+    if (!event.pointer_sample().has_value()) {
       return false;
     }
-    FX_CHECK(event.pointer_sample().has_interaction()) << "API guarantee";
-    FX_CHECK(event.pointer_sample().has_phase()) << "API guarantee";
-    FX_CHECK(event.pointer_sample().has_position_in_viewport()) << "API guarantee";
+    FX_CHECK(event.pointer_sample()->interaction().has_value()) << "API guarantee";
+    FX_CHECK(event.pointer_sample()->phase().has_value()) << "API guarantee";
+    FX_CHECK(event.pointer_sample()->position_in_viewport().has_value()) << "API guarantee";
     return true;
   }
 
-  std::array<float, 2> ViewportToViewCoordinates(
+  static std::array<float, 2> ViewportToViewCoordinates(
       std::array<float, 2> viewport_coordinates,
       const std::array<float, 9>& viewport_to_view_transform) {
     // The transform matrix is a FIDL array with matrix data in column-major
@@ -248,42 +273,39 @@ class TouchFlatlandClient final : public fuchsia::ui::app::ViewProvider {
     const auto& M = viewport_to_view_transform;
     const float x = viewport_coordinates[0];
     const float y = viewport_coordinates[1];
-    const float xp = M[0] * x + M[3] * y + M[6];
-    const float yp = M[1] * x + M[4] * y + M[7];
-    const float wp = M[2] * x + M[5] * y + M[8];
+    const float xp = (M[0] * x) + (M[3] * y) + M[6];
+    const float yp = (M[1] * x) + (M[4] * y) + M[7];
+    const float wp = (M[2] * x) + (M[5] * y) + M[8];
     if (wp != 0) {
       return {xp / wp, yp / wp};
-    } else {
-      return {xp, yp};
     }
+    return {xp, yp};
   }
 
   // The main thread's message loop.
   async::Loop* loop_ = nullptr;
 
-  // This component's global context.
-  std::unique_ptr<sys::ComponentContext> context_;
+  // This holds exposed protocols.
+  component::OutgoingDirectory outgoing_directory_;
 
   // Protocols used by this component.
-  fuchsia::ui::test::input::TouchInputListenerPtr touch_input_listener_;
+  fidl::Client<fuchsia_ui_test_input::TouchInputListener> touch_input_listener_;
 
   // Protocols vended by this component.
-  fidl::Binding<fuchsia::ui::app::ViewProvider> view_provider_binding_;
-
-  fuchsia::ui::composition::Flatland* flatland_;
+  fidl::ServerBindingGroup<fuchsia_ui_app::ViewProvider> view_provider_binding_;
 
   std::unique_ptr<simple_present::FlatlandConnection> flatland_connection_;
 
-  fuchsia::ui::pointer::TouchSourcePtr touch_source_;
+  fidl::Client<fuchsia_ui_pointer::TouchSource> touch_source_;
 
-  fuchsia::ui::composition::ParentViewportWatcherPtr parent_viewport_watcher_;
+  fidl::SyncClient<fuchsia_ui_composition::ParentViewportWatcher> parent_viewport_watcher_;
 
   // The fuchsia.ui.pointer.TouchSource protocol issues channel-global view
   // parameters on connection and on change. Events must apply these view
   // parameters to correctly map to logical view coordinates. The "nullopt"
   // state represents the absence of view parameters, early in the protocol
   // lifecycle.
-  std::optional<fuchsia::ui::pointer::ViewParameters> view_params_;
+  std::optional<fuchsia_ui_pointer::ViewParameters> view_params_;
 
   uint32_t color_index_ = 0;
 
@@ -293,14 +315,14 @@ class TouchFlatlandClient final : public fuchsia::ui::app::ViewProvider {
   uint32_t height_ = 0;
 
   // DPR received from |fuchsia.ui.composition.ParentViewportWatcher.GetLayout|.
-  fuchsia::math::VecF device_pixel_ratio_ = {.x = 1.f, .y = 1.f};
+  fuchsia_math::VecF device_pixel_ratio_ = fuchsia_math::VecF(1.f, 1.f);
 
   // Indicates whether the latest touch interaction has been granted to the client.
   bool interaction_granted_ = false;
 
   // Any events that have been received before the touch has been granted;
   // these will be processed once the gesture has been granted to the client.
-  std::vector<fuchsia::ui::pointer::TouchEvent> pending_events_before_granted_ = {};
+  std::vector<fuchsia_ui_pointer::TouchEvent> pending_events_before_granted_;
 };
 }  // namespace touch_flatland_client
 

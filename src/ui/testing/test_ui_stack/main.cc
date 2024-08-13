@@ -15,6 +15,7 @@
 #include <fidl/fuchsia.ui.policy/cpp/fidl.h>
 #include <fidl/fuchsia.ui.test.input/cpp/fidl.h>
 #include <fidl/fuchsia.ui.test.scene/cpp/fidl.h>
+#include <fidl/test.accessibility/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/sys/cpp/component_context.h>
@@ -22,7 +23,8 @@
 
 #include <cstring>
 
-#include "src/ui/testing/test_ui_stack/test_ui_stack_config_lib.h"
+#include <src/ui/testing/test_ui_stack/test_ui_stack_config_lib.h>
+
 #include "src/ui/testing/ui_test_realm/ui_test_realm.h"
 
 namespace {
@@ -90,6 +92,10 @@ int run_test_ui_stack(int argc, const char** argv) {
   // Helper services.
   AddPublicService<fuchsia_ui_test_input::Registry>(context.get(), realm_exposed_services.get());
   AddPublicService<fuchsia_ui_test_scene::Controller>(context.get(), realm_exposed_services.get());
+
+  if (config.accessibility_owner == ui_testing::UITestRealm::AccessibilityOwnerType::FAKE) {
+    AddPublicService<test_accessibility::Magnifier>(context.get(), realm_exposed_services.get());
+  }
 
   context->outgoing()->ServeFromStartupInfo();
 

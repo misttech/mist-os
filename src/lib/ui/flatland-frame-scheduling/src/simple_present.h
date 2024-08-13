@@ -5,8 +5,9 @@
 #ifndef SRC_LIB_UI_FLATLAND_FRAME_SCHEDULING_SRC_SIMPLE_PRESENT_H_
 #define SRC_LIB_UI_FLATLAND_FRAME_SCHEDULING_SRC_SIMPLE_PRESENT_H_
 
-#include <fuchsia/ui/composition/cpp/fidl.h>
-#include <lib/sys/cpp/component_context.h>
+#include <fidl/fuchsia.ui.composition/cpp/fidl.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/fidl/cpp/channel.h>
 
 #include <memory>
 #include <queue>
@@ -16,22 +17,28 @@ using OnFramePresentedCallback = fit::function<void(zx_time_t actual_presentatio
 using OnErrorCallback = fit::function<void()>;
 
 // This class is meant to help clients use the Flatland Present API correctly.
-class FlatlandConnection final {
+class FlatlandConnection final : public fidl::AsyncEventHandler<fuchsia_ui_composition::Flatland> {
  public:
   ~FlatlandConnection();
   FlatlandConnection(const FlatlandConnection&) = delete;
   FlatlandConnection& operator=(const FlatlandConnection&) = delete;
 
-  // Creates a flatland connection using the given |context|.
-  static std::unique_ptr<FlatlandConnection> Create(sys::ComponentContext* context,
-                                                    const std::string& debug_name);
-  // Creates a flatland connection using fdio_service_connect.
-  static std::unique_ptr<FlatlandConnection> Create(const std::string& debug_name);
-  // Creates a flatland connection by binding the given channel.
-  static std::unique_ptr<FlatlandConnection> Create(zx::channel flatland_endpoint,
+  // Creates a flatland connection using component::Connect.
+  static std::unique_ptr<FlatlandConnection> Create(async::Loop* loop,
                                                     const std::string& debug_name);
 
-  fuchsia::ui::composition::Flatland* flatland() { return flatland_.get(); }
+  fidl::Client<fuchsia_ui_composition::Flatland>& FlatlandClient();
+
+  // fidl::AsyncEventHandler
+  void on_fidl_error(fidl::UnbindInfo error) override;
+  // fidl::AsyncEventHandler
+  void OnError(fidl::Event<fuchsia_ui_composition::Flatland::OnError>& error) override;
+  // fidl::AsyncEventHandler
+  void OnNextFrameBegin(
+      fidl::Event<fuchsia_ui_composition::Flatland::OnNextFrameBegin>& e) override;
+  // fidl::AsyncEventHandler
+  void OnFramePresented(
+      fidl::Event<fuchsia_ui_composition::Flatland::OnFramePresented>& e) override;
 
   void SetErrorCallback(OnErrorCallback callback);
 
@@ -42,28 +49,24 @@ class FlatlandConnection final {
   // This version of Present can be readily used for steady-state rendering. Inside |callback|
   // clients may process any input, submit Flatland commands, and finally re-Present(), perpetuating
   // the loop.
-  void Present(fuchsia::ui::composition::PresentArgs present_args,
-               OnFramePresentedCallback callback);
+  void Present(fuchsia_ui_composition::PresentArgs present_args, OnFramePresentedCallback callback);
 
  private:
-  FlatlandConnection(fuchsia::ui::composition::FlatlandPtr flatland, const std::string& debug_name);
+  FlatlandConnection(async::Loop* loop, fidl::ClientEnd<fuchsia_ui_composition::Flatland> flatland,
+                     const std::string& debug_name);
 
-  void OnError(fuchsia::ui::composition::FlatlandError error);
-  void OnNextFrameBegin(fuchsia::ui::composition::OnNextFrameBeginValues values);
-  void OnFramePresented(fuchsia::scenic::scheduling::FramePresentedInfo info);
-
-  fuchsia::ui::composition::FlatlandPtr flatland_;
+  fidl::Client<fuchsia_ui_composition::Flatland> flatland_;
   uint32_t present_credits_ = 1;
 
   struct PendingPresent {
-    PendingPresent(fuchsia::ui::composition::PresentArgs present_args,
+    PendingPresent(fuchsia_ui_composition::PresentArgs present_args,
                    OnFramePresentedCallback callback);
     ~PendingPresent();
 
     PendingPresent(PendingPresent&& other);
     PendingPresent& operator=(PendingPresent&& other);
 
-    fuchsia::ui::composition::PresentArgs present_args;
+    fuchsia_ui_composition::PresentArgs present_args;
     OnFramePresentedCallback callback;
   };
   std::queue<PendingPresent> pending_presents_;

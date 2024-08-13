@@ -13,6 +13,7 @@
 #include <fidl/fuchsia.ui.display.singleton/cpp/fidl.h>
 #include <fidl/fuchsia.ui.focus/cpp/fidl.h>
 #include <fidl/fuchsia.vulkan.loader/cpp/fidl.h>
+#include <fidl/test.accessibility/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fidl/cpp/channel.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
@@ -67,11 +68,15 @@ void PortableUITest::SetUpRealmBase() {
   // Route UI capabilities from test-ui-stack to test driver.
   realm_builder_.AddRoute(Route{
       .capabilities =
-          {Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Screenshot>},
-           Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_display_singleton::Info>},
-           Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_focus::FocusChainListenerRegistry>},
-           Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_test_input::Registry>},
-           Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_test_scene::Controller>}},
+          {
+              Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Screenshot>},
+              Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_display_singleton::Info>},
+              Protocol{
+                  fidl::DiscoverableProtocolName<fuchsia_ui_focus::FocusChainListenerRegistry>},
+              Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_test_input::Registry>},
+              Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_test_scene::Controller>},
+              Protocol{fidl::DiscoverableProtocolName<test_accessibility::Magnifier>},
+          },
       .source = kTestUIStackRef,
       .targets = {ParentRef{}}});
 

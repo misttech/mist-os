@@ -48,8 +48,6 @@ void FakeA11yManager::RegisterViewForSemantics(
 
 FakeMagnifier::FakeMagnifier(std::unique_ptr<a11y::FlatlandAccessibilityView> a11y_view)
     : a11y_view_(std::move(a11y_view)) {
-  FX_LOGS(INFO) << "Starting fake magnifier";
-
   a11y_view_->add_scene_ready_callback([this]() {
     // Listen for pointer events.
     touch_source_ = a11y_view_->TakeTouchSource();

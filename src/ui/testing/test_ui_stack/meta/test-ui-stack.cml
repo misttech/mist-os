@@ -30,6 +30,9 @@
                 "fuchsia.ui.policy.DeviceListenerRegistry",
                 "fuchsia.ui.test.input.Registry",
                 "fuchsia.ui.test.scene.Controller",
+
+                // Only available when is a11y is fake.
+                "test.accessibility.Magnifier",
             ],
         },
     ],
@@ -79,6 +82,9 @@
                 "fuchsia.ui.policy.DeviceListenerRegistry",
                 "fuchsia.ui.test.input.Registry",
                 "fuchsia.ui.test.scene.Controller",
+
+                // Only available when is a11y is fake.
+                "test.accessibility.Magnifier",
             ],
             from: "self",
         },
