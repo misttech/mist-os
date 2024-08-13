@@ -629,6 +629,7 @@ impl<
                     let cx = cx.clone();
                     let inner = Arc::clone(&self.inner);
                     let registrar = Arc::clone(&self.registrar);
+                    load_repositories_from_config(&inner, true).await;
                     fasync::Task::local(async move {
                         load_registrations_from_config(&cx, &inner, None, registrar).await;
                     })
@@ -854,8 +855,6 @@ impl<
             inner.server = ServerState::Stopped;
         }
 
-        // Only write the instance data if the daemon repository server is enabled and starting.
-        let mut write_instance_data = false;
         // Start the server if it is enabled, but always load the configured repositories.
         if pkg_config::get_repository_server_enabled().await? {
             match fetch_repo_address().await {
@@ -871,12 +870,11 @@ impl<
                     tracing::error!("failed to read last address used from config: {:#}", err);
                 }
             }
-            write_instance_data = true;
         } else {
             tracing::debug!("repository server not enabled.");
         }
 
-        load_repositories_from_config(&self.inner, write_instance_data).await;
+        load_repositories_from_config(&self.inner, false).await;
 
         self.event_handler_provider
             .setup_event_handlers(cx.clone(), Arc::clone(&self.inner), Arc::clone(&self.registrar))
@@ -914,10 +912,6 @@ async fn load_repositories_from_config(inner: &Arc<RwLock<RepoInner>>, write_ins
         }
     };
     for (name, repo_spec) in pkg::config::get_repositories().await {
-        if inner.read().await.manager.get(&name).is_some() {
-            continue;
-        }
-
         let (repo_path, aliases) = match repo_spec {
             RepositorySpec::FileSystem { ref metadata_repo_path, ref aliases, .. } => {
                 (metadata_repo_path.as_std_path().into(), aliases)
@@ -930,27 +924,33 @@ async fn load_repositories_from_config(inner: &Arc<RwLock<RepoInner>>, write_ins
                 (PathType::Url(metadata_repo_url.clone()), aliases)
             }
         };
-        // Add the repository.
-        if let Err(err) = add_repository(&name, &repo_spec, Arc::clone(inner)).await {
+        let valid = if inner.read().await.manager.get(&name).is_some() {
+            tracing::debug!("repo {name} not added because it is already added");
+            true
+        } else if let Err(err) = add_repository(&name, &repo_spec, Arc::clone(inner)).await {
             tracing::warn!("failed to add the repository {:?}: {:?}", name, err);
+            false
         } else {
-            if write_instance_data {
-                if let Err(e) = write_instance_info(
-                    None,
-                    ServerMode::Daemon,
-                    &name,
-                    &addr,
-                    repo_path.into(),
-                    aliases.into_iter().map(ToString::to_string).collect(),
-                    ffx::RepositoryStorageType::Ephemeral.into(),
-                    ffx::RepositoryRegistrationAliasConflictMode::Replace.into(),
-                )
-                .await
-                {
-                    tracing::error!(
-                        "failed to write repo server instance information for {name}: {e:?}"
-                    );
-                }
+            // added OK.
+            true
+        };
+
+        if valid && write_instance_data {
+            if let Err(e) = write_instance_info(
+                None,
+                ServerMode::Daemon,
+                &name,
+                &addr,
+                repo_path.into(),
+                aliases.into_iter().map(ToString::to_string).collect(),
+                ffx::RepositoryStorageType::Ephemeral.into(),
+                ffx::RepositoryRegistrationAliasConflictMode::Replace.into(),
+            )
+            .await
+            {
+                tracing::error!(
+                    "failed to write repo server instance information for {name}: {e:?}"
+                );
             }
         }
     }
