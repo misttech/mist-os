@@ -136,9 +136,13 @@ pub fn create_task(
     kernel: &Arc<Kernel>,
     task_name: &str,
 ) -> AutoReleasableTask {
-    let task =
-        CurrentTask::create_init_child_process(locked, kernel, &CString::new(task_name).unwrap())
-            .expect("failed to create second task");
+    let task = CurrentTask::create_init_child_process(
+        locked,
+        kernel,
+        &CString::new(task_name).unwrap(),
+        None,
+    )
+    .expect("failed to create second task");
 
     // Take the lock on thread group and task in the correct order to ensure any wrong ordering
     // will trigger the tracing-mutex at the right call site.

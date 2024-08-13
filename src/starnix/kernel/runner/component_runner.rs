@@ -161,11 +161,19 @@ pub async fn start_component(
         },
     );
 
+    let security_context = {
+        let s = get_program_string(&start_info, "seclabel");
+        match s {
+            Some(s) => Some(CString::new(s.to_owned())?),
+            None => None,
+        }
+    };
     let (task_complete_sender, task_complete) = oneshot::channel::<TaskResult>();
     let current_task = CurrentTask::create_init_child_process(
         system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
         system_task.kernel(),
         &binary_path,
+        security_context.as_ref(),
     )?;
 
     let weak_task = execute_task_with_prerun_result(

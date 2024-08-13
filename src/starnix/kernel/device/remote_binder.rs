@@ -1126,6 +1126,7 @@ mod tests {
                     locked,
                     &kernel,
                     &CString::new("remote_binder".to_string()).expect("CString"),
+                    None,
                 )
                 .expect("Task")
                 .into();

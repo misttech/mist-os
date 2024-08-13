@@ -1224,6 +1224,7 @@ impl CurrentTask {
         locked: &mut Locked<'_, L>,
         kernel: &Arc<Kernel>,
         initial_name: &CString,
+        seclabel: Option<&CString>,
     ) -> Result<TaskBuilder, Errno>
     where
         L: LockBefore<TaskRelease>,
@@ -1232,6 +1233,11 @@ impl CurrentTask {
         let weak_init = kernel.pids.read().get_task(1);
         let init_task = weak_init.upgrade().ok_or_else(|| errno!(EINVAL))?;
         let initial_name_bytes = initial_name.as_bytes().to_owned();
+        let security_context = match seclabel {
+            Some(s) => security::task_for_context(&init_task, s.as_bytes().into())?,
+            None => security::task_alloc(&init_task, 0),
+        };
+
         let task = Self::create_task(
             locked,
             kernel,
@@ -1248,7 +1254,7 @@ impl CurrentTask {
                     &initial_name_bytes,
                 )
             },
-            security::task_alloc(&init_task, 0),
+            security_context,
         )?;
         {
             let mut init_writer = init_task.thread_group.write();

@@ -253,6 +253,11 @@ pub fn file_system_init_security(
     Ok(FileSystemState { context, def_context, fs_context, root_context })
 }
 
+/// Returns `TaskAttrs` for a new `Task`, based on that of the provided `sid`.
+pub(super) fn taskattrs_for_sid(sid: SecurityId) -> TaskAttrs {
+    TaskAttrs::for_sid(sid)
+}
+
 /// The SELinux security structure for `ThreadGroup`.
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct TaskAttrs {
@@ -284,6 +289,17 @@ impl TaskAttrs {
     /// Returns placeholder state for use when SELinux is not enabled.
     pub(super) fn for_selinux_disabled() -> Self {
         Self::for_initial_sid(InitialSid::Unlabeled)
+    }
+
+    fn for_sid(sid: SecurityId) -> Self {
+        Self {
+            current_sid: sid,
+            previous_sid: sid,
+            exec_sid: None,
+            fscreate_sid: None,
+            keycreate_sid: None,
+            sockcreate_sid: None,
+        }
     }
 
     fn for_initial_sid(initial_sid: InitialSid) -> Self {

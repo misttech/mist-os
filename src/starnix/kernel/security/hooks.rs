@@ -13,11 +13,11 @@ use crate::vfs::{
 };
 use selinux_core::security_server::{Mode, SecurityServer};
 use selinux_core::SecurityId;
-use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::signals::Signal;
 use starnix_uapi::unmount_flags::UnmountFlags;
+use starnix_uapi::{errno, error};
 use std::sync::Arc;
 
 /// Executes the `hook` closure, dependent on the state of SELinux.
@@ -136,6 +136,23 @@ pub fn task_alloc(task: &Task, clone_flags: u64) -> TaskState {
             || selinux_hooks::TaskAttrs::for_selinux_disabled(),
         ),
     }
+}
+
+/// Returns `TaskState` for a new `Task`, based on that of the provided `context`.
+pub fn task_for_context(task: &Task, context: &FsStr) -> Result<TaskState, Errno> {
+    Ok(TaskState {
+        attrs: run_if_selinux_else(
+            task,
+            |security_server| {
+                Ok(selinux_hooks::taskattrs_for_sid(
+                    security_server
+                        .security_context_to_sid(context.into())
+                        .map_err(|_| errno!(EINVAL))?,
+                ))
+            },
+            || Ok(selinux_hooks::TaskAttrs::for_selinux_disabled()),
+        )?,
+    })
 }
 
 fn get_current_sid(task: &Task) -> SecurityId {
