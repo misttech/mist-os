@@ -46,23 +46,28 @@ bool change_ids(uid_t user, gid_t group) {
   return (setresgid(group, group, group) == 0) && (setresuid(user, user, user) == 0);
 }
 
-std::optional<std::string> MountTmpFs(const std::string &temp_dir) {
-  std::string temp = temp_dir + "/tmp";
-  EXPECT_THAT(mkdir(temp.c_str(), S_IRWXU), SyscallSucceeds());
-
-  int res = mount(nullptr, temp.c_str(), "tmpfs", 0, "");
-  EXPECT_EQ(res, 0) << "mount: " << std::strerror(errno);
-
-  if (res != 0) {
-    return std::nullopt;
-  }
-
-  return temp;
-}
-
 }  // namespace
 
-TEST(SuidTest, SuidBinaryBecomesRoot) {
+class SuidTest : public ::testing::Test, public ::testing::WithParamInterface<uint64_t> {
+ public:
+  static uint64_t mount_flags() { return GetParam(); }
+
+  std::optional<std::string> MountTmpFs(const std::string &temp_dir) {
+    std::string temp = temp_dir + "/tmp";
+    EXPECT_THAT(mkdir(temp.c_str(), S_IRWXU), SyscallSucceeds());
+
+    int res = mount(nullptr, temp.c_str(), "tmpfs", mount_flags(), "");
+    EXPECT_EQ(res, 0) << "mount: " << std::strerror(errno);
+
+    if (res != 0) {
+      return std::nullopt;
+    }
+
+    return temp;
+  }
+};
+
+TEST_P(SuidTest, SuidBinaryBecomesRoot) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping.";
   }
@@ -114,8 +119,13 @@ TEST(SuidTest, SuidBinaryBecomesRoot) {
     uid_t ruid, euid, suid;
     EXPECT_EQ(fscanf(fp, "ruid: %u euid: %u suid: %u\n", &ruid, &euid, &suid), 3);
     EXPECT_EQ(ruid, kUser1Uid);
-    EXPECT_EQ(euid, kRootUid);
-    EXPECT_EQ(suid, kRootUid);
+    if (mount_flags() & MS_NOSUID) {
+      EXPECT_EQ(euid, kUser1Uid);
+      EXPECT_EQ(suid, kUser1Uid);
+    } else {
+      EXPECT_EQ(euid, kRootUid);
+      EXPECT_EQ(suid, kRootUid);
+    }
   }
 
   {
@@ -129,7 +139,7 @@ TEST(SuidTest, SuidBinaryBecomesRoot) {
   fclose(fp);
 }
 
-TEST(SuidTest, FileModificationsRemoveSuid) {
+TEST_P(SuidTest, FileModificationsRemoveSuid) {
   if (!test_helper::HasSysAdmin() || !test_helper::HasCapability(CAP_FSETID)) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping.";
   }
@@ -180,7 +190,7 @@ TEST(SuidTest, FileModificationsRemoveSuid) {
   });
 }
 
-TEST(SuidTest, OwnershipChangesRemoveSuid) {
+TEST_P(SuidTest, OwnershipChangesRemoveSuid) {
   if (!test_helper::HasSysAdmin()) {
     GTEST_SKIP() << "Not running with sysadmin capabilities, skipping.";
   }
@@ -203,3 +213,5 @@ TEST(SuidTest, OwnershipChangesRemoveSuid) {
   close(fd);
   SAFE_SYSCALL(unlink(test_suid_file.c_str()));
 }
+
+INSTANTIATE_TEST_SUITE_P(SuidTest, SuidTest, ::testing::Values(0, MS_NOSUID));
