@@ -275,6 +275,12 @@
             to: "#session-manager",
         },
         {
+            protocol: "fuchsia.power.broker.Topology",
+            from: "parent",
+            to: "#session-manager",
+            availability: "same_as_target",
+        },
+        {
             service: "fuchsia.power.broker.ElementInfoProviderService",
             from: "parent",
             to: "#session-manager",
@@ -298,12 +304,9 @@
             ],
         },
         {
-            protocol: [
-                "fuchsia.power.broker.Topology",
-                "fuchsia.power.system.ActivityGovernor",
-            ],
+            protocol: "fuchsia.power.system.ActivityGovernor",
             from: "parent",
-            to: [ "#session-manager" ],
+            to: "#session-manager",
             availability: "optional",
         },
         {

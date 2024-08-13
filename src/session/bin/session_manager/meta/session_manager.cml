@@ -147,6 +147,7 @@
                 "fuchsia.net.stackmigrationdeprecated.State",
                 "fuchsia.paver.Paver",
                 "fuchsia.power.battery.BatteryManager",
+                "fuchsia.power.broker.Topology",
                 "fuchsia.power.button.Monitor",
                 "fuchsia.power.profile.Watcher",
                 "fuchsia.power.system.ActivityGovernor",
