@@ -3348,3 +3348,16 @@
   reviewers: ['abarth@google.com', 'chaselatta@google.com', 'hjfreyer@google.com', 'keir@google.com', 'tmandry@google.com',]
   submitted: '2024-05-22'
   reviewed: '2024-08-08'
+
+- name: 'RFC-0257'
+  title: 'storage-host: Componentizing upper-layer storage drivers'
+  short_description: 'Move upper-layer storage drivers (GPT, FVM, etc) to a new storage-host component.'
+  authors: ['jfsulliv@google.com']
+  file: '0257_storage-host.md'
+  area: ['Storage']
+  issue: ['339491886']
+  gerrit_change_id: ['1077832']
+  status: 'Accepted'
+  reviewers: ['csuter@google.com', 'garratt@google.comm', 'surajmalhotra@google.com, curtisgalloway@google.com']
+  submitted: '2024-07-08'
+  reviewed: '2024-08-13'
