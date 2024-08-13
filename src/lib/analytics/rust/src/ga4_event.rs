@@ -192,8 +192,6 @@ pub struct Post {
     pub(crate) client_id: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) user_id: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub(crate) user_first_touch_timestamp: Option<String>,
     pub(crate) non_personalized_ads: bool,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) user_properties: Option<HashMap<String, ValueObject>>,
@@ -204,23 +202,10 @@ impl Post {
     pub(crate) fn new(
         client_id: String,
         user_id: Option<String>,
-        first_touch_string: String,
         user_properties: Option<HashMap<String, ValueObject>>,
         events: Vec<Event>,
     ) -> Self {
-        let user_first_touch_timestamp = if first_touch_string == "" || first_touch_string == "0" {
-            None
-        } else {
-            Some(first_touch_string)
-        };
-        Post {
-            client_id,
-            user_id,
-            user_first_touch_timestamp,
-            non_personalized_ads: true,
-            user_properties,
-            events,
-        }
+        Post { client_id, user_id, non_personalized_ads: true, user_properties, events }
     }
 
     pub(crate) fn add_event(&mut self, event: Event) {
@@ -265,7 +250,6 @@ impl Default for Post {
         Post {
             client_id: "Unknown client id".to_string(),
             user_id: None,
-            user_first_touch_timestamp: None,
             non_personalized_ads: true,
             user_properties: None,
             events: vec![],
@@ -433,7 +417,6 @@ fn get_systime() -> u128 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::json;
     use std::collections::BTreeMap;
 
     #[test]
@@ -585,26 +568,11 @@ mod tests {
     #[test]
     fn make_post_event() {
         let args = "config analytics enable";
-        let want_event = json!({
-             "client_id" : "1",
-             "events" : [
-                 {
-                     "name": "invoke",
-                     "params": {
-                         "label": "config analytics enable"
-                     },
-                     "timestamp_micros" : "1",
-                 }
-             ],
-             "non_personalized_ads": true,
-             "user_first_touch_timestamp": "1234567"
-        });
-
-        let expected = want_event.to_string();
+        let expected = String::from("{\"client_id\":\"1\",\"events\":[{\"name\":\"invoke\",\"params\":{\"label\":\"config analytics enable\"},\"timestamp_micros\":\"1\"}],\"non_personalized_ads\":true}");
         let mut event =
             make_ga4_event(None, None, Some(args), BTreeMap::new(), None, Some("invoke"));
         event.timestamp_micros = 1.to_string(); // timestamps need to be set to the same time for strings to match
-        let post = &mut Post::new("1".to_string(), None, "1234567".into(), None, vec![event]);
+        let post = &mut Post::new("1".to_string(), None, None, vec![event]);
 
         assert_eq!(expected, post.to_json());
     }
