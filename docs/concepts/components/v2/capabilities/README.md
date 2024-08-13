@@ -60,26 +60,35 @@ Routing terminology divides into the following categories:
 
 The component framework enforces that capababilities offered between components
 do not form a cycle. The simplest example of a cycle would be a component that
-offers a capability from child `A` to child `B`, and offers a capability from
-child `B` to child `A`, without the weak option.
+offers a capability from child `A` to child `B`, and from `B` to `A`, without
+the weak option.
 
-Cycles are detected between child components and between the current component
-and its children.  The current component is allowed to `use` capabilities from
-its children, unless it is offering capabilities to those children.
+Note: For more information on the weak option, see the `dependency` field documentation
+in the [CML reference](https://fuchsia.dev/reference/cml).
 
-The current component is allowed to `use` a capability from its parent and
-`expose` a capability to its parent. We can be sure that this is not cyclical
-because the parent component is also checked for cycles when it loaded.
+Cycles are detected between:
+
+- Child components and their parents.
+- The current component and its children.
+
+The current component is allowed to:
+
+- `use` capabilities from its children, unless it is offering capabilities to
+  those children.
+- `use` a capability from its parent.
+- `expose` a capability to its parent.
 
 If there is a cycle, there are several strategies to address this.
 
-- Split one of the components into two smaller components that do not have a cycle.
-- Invert the order of one of the dependencies. For example, instead of `B` using a capability
-  from `A`, `A` could use a second capability from `B`.
 - Mark one of the links as `dependency: "weak"`. Weak capabilities do not count
   as a dependency with respect to cycle detection or shutdown ordering. A
   component using a capability weakly should be programmed to operate correctly if
   the weak capability does not exist or goes away.
+- Split one of the components into two smaller components that do not have a cycle.
+- Invert the order of one of the dependencies. For example, instead of `B` using a capability
+  from `A`, `A` could use a second capability from `B`. This can be done by
+  adding a new capability to `A` and `B`'s manifest, and then adding a new `use`
+  to `A`'s manifest.
 
 ## Capability types {#capability-types}
 
