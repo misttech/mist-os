@@ -7371,7 +7371,7 @@ pub mod tests {
 
         // The FD should have the same flags.
         assert_eq!(
-            receiver.task.files.get_fd_flags(receiver_fd).expect("get flags"),
+            receiver.task.files.get_fd_flags_allowing_opath(receiver_fd).expect("get flags"),
             FdFlags::CLOEXEC
         );
 

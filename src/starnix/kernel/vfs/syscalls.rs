@@ -242,7 +242,7 @@ pub fn sys_fcntl(
             file.set_async_owner(owner);
             Ok(SUCCESS)
         }
-        F_GETFD => Ok(current_task.files.get_fd_flags(fd)?.into()),
+        F_GETFD => Ok(current_task.files.get_fd_flags_allowing_opath(fd)?.into()),
         F_SETFD => {
             current_task
                 .files
@@ -3135,8 +3135,8 @@ mod tests {
         assert_ne!(oldfd, newfd);
         let files = &current_task.files;
         assert!(Arc::ptr_eq(&files.get(oldfd).unwrap(), &files.get(newfd).unwrap()));
-        assert_eq!(files.get_fd_flags(oldfd).unwrap(), FdFlags::empty());
-        assert_eq!(files.get_fd_flags(newfd).unwrap(), FdFlags::CLOEXEC);
+        assert_eq!(files.get_fd_flags_allowing_opath(oldfd).unwrap(), FdFlags::empty());
+        assert_eq!(files.get_fd_flags_allowing_opath(newfd).unwrap(), FdFlags::CLOEXEC);
 
         assert_eq!(sys_dup3(&mut locked, &current_task, oldfd, oldfd, O_CLOEXEC), error!(EINVAL));
 
@@ -3173,7 +3173,7 @@ mod tests {
             O_RDONLY | O_CLOEXEC,
             FileMode::default(),
         )?;
-        assert!(current_task.files.get_fd_flags(fd)?.contains(FdFlags::CLOEXEC));
+        assert!(current_task.files.get_fd_flags_allowing_opath(fd)?.contains(FdFlags::CLOEXEC));
         Ok(())
     }
 

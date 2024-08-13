@@ -505,7 +505,7 @@ mod tests {
             FileMode::default(),
         )?;
         let _file_handle = current_task.open_file(&mut locked, path.into(), OpenFlags::RDONLY)?;
-        assert!(!current_task.files.get_fd_flags(fd)?.contains(FdFlags::CLOEXEC));
+        assert!(!current_task.files.get_fd_flags_allowing_opath(fd)?.contains(FdFlags::CLOEXEC));
         Ok(())
     }
 

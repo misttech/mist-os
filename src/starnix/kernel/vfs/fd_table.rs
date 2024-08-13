@@ -347,7 +347,7 @@ impl FdTable {
         }
     }
 
-    pub fn get_fd_flags(&self, fd: FdNumber) -> Result<FdFlags, Errno> {
+    pub fn get_fd_flags_allowing_opath(&self, fd: FdNumber) -> Result<FdFlags, Errno> {
         self.get_allowing_opath_with_flags(fd).map(|(_file, flags)| flags)
     }
 
@@ -466,8 +466,8 @@ mod test {
         assert!(forked.get(fd2).is_err());
 
         files.set_fd_flags_allowing_opath(fd0, FdFlags::CLOEXEC).unwrap();
-        assert_eq!(FdFlags::CLOEXEC, files.get_fd_flags(fd0).unwrap());
-        assert_ne!(FdFlags::CLOEXEC, forked.get_fd_flags(fd0).unwrap());
+        assert_eq!(FdFlags::CLOEXEC, files.get_fd_flags_allowing_opath(fd0).unwrap());
+        assert_ne!(FdFlags::CLOEXEC, forked.get_fd_flags_allowing_opath(fd0).unwrap());
 
         forked.release(());
         files.release(());
