@@ -15,19 +15,30 @@
 
 set -e
 
-function preserve_owner_files {
-  local owners_tmp=$1
-  find . -name "OWNERS" -print0 | while read -d $'\0' owner_file
+function preserve_files {
+  local tmp=$1
+  local filename=$2
+  # Some crates can vendor dependnecies in them, so limit max depth to avoid
+  # picking up files from nested dependencies.
+  find . -maxdepth 2 -type f -name "$filename" -print0 | while read -d $'\0' file_to_preserve
   do
-    local owner_dir=$(dirname "$owner_file")
-    local version=$(sed -n "s/^version = \"\(.*\)\"$/\\1/p" "$owner_dir/Cargo.toml" | head -n 1)
-    if [[ $owner_dir != *-"$version" ]]; then
-      owner_dir="$owner_dir-$version"
+    local dir=$(dirname "$file_to_preserve")
+    local version=$(sed -n "s/^version = \"\(.*\)\"$/\\1/p" "$dir/Cargo.toml" | head -n 1)
+    if [[ $dir != *-"$version" ]]; then
+      dir="$dir-$version"
     fi
-    local temp_owner_dir="$owners_tmp/$owner_dir"
-    mkdir -p "$temp_owner_dir"
-    cp "$owner_file" "$temp_owner_dir"
+    local temp_dir="$tmp/$dir"
+    mkdir -p "$temp_dir"
+    cp "$file_to_preserve" "$temp_dir"
   done
+}
+
+function latest_version_dir {
+  local crate=$1
+  local crate_name=$(echo "$crate" | sed -rn "s/^([a-zA-Z][a-zA-Z0-9_\\-]*)-[0-9]+\\.[0-9]+\\.[0-9]+.*$/\\1/p")
+  local semver_regex="s/^$crate_name-([0-9]+)\\.([0-9]+)\\.([0-9]+)(.*$)/\\1 \\2 \\3 \\4/p"
+  local latest_version=$(echo "$crate" "$crate_name"-* | tr ' ' '\n' | sed -rn "$semver_regex" | sort -rn -k 1,1 -k 2,2 -k 3,3 -k 4,4 | sed -rn "s/^(.+) (.+) (.+) (.*$)/$crate_name-\\1.\\2.\\3\\4/p" | grep -A1 -F "$crate" | tail -n1)
+  echo "$latest_version"
 }
 
 # This function looks for any vendored crates that are missing OWNERS files and
@@ -40,11 +51,33 @@ function propagate_owner_files {
   do
     if [[ ! -f "$vendor_dir/$crate/OWNERS" ]]; then
       cd "$owners_tmp"
-      local crate_name=$(echo "$crate" | sed -rn "s/^([a-zA-Z][a-zA-Z0-9_\\-]*)-[0-9]+\\.[0-9]+\\.[0-9]+.*$/\\1/p")
-      local semver_regex="s/^$crate_name-([0-9]+)\\.([0-9]+)\\.([0-9]+)(.*$)/\\1 \\2 \\3 \\4/p"
-      local latest_version=$(echo "$crate" "$crate_name"-* | tr ' ' '\n' | sed -rn "$semver_regex" | sort -rn -k 1,1 -k 2,2 -k 3,3 -k 4,4 | sed -rn "s/^(.+) (.+) (.+) (.*$)/$crate_name-\\1.\\2.\\3\\4/p" | grep -A1 -F "$crate" | tail -n1)
+      local latest_version="$(latest_version_dir $crate)"
       if [[ "$latest_version" != "$crate" ]]; then
         cp "$owners_tmp/$latest_version/OWNERS" "$vendor_dir/$crate"
+      fi
+    fi
+  done
+}
+
+# This function looks for any vendored crates that are missing LICENSE files and
+# attempts to source one from the previous latest version of that crate.
+#
+# NOTE: This function is only intended for LICENSE files created by us, which
+# are always named LICENSE, so it skips copying if one does exist. This is OK
+# because we later rely on check_rust_licenses.py to check other possible
+# license file included by upstream.
+function propagate_license_files {
+  local license_tmp=$1
+  local vendor_dir=$2
+  cd "$vendor_dir"
+  for crate in *
+  do
+    if [[ ! -f "$vendor_dir/$crate/LICENSE" ]]; then
+      cd "$license_tmp"
+      local latest_version="$(latest_version_dir $crate)"
+      local src="$license_tmp/$latest_version/LICENSE"
+      if [[ "$latest_version" != "$crate" && -f "$src" ]]; then
+        cp "$src" "$vendor_dir/$crate"
       fi
     fi
   done
@@ -91,21 +124,22 @@ else
 fi
 
 export VENDOR_DIR=$FUCHSIA_DIR/third_party/rust_crates/vendor
-export OWNERS_TMP=$(mktemp -d)
+export TMP=$(mktemp -d)
 
-# preserve OWNERS files
-(cd $VENDOR_DIR; $(preserve_owner_files $OWNERS_TMP))
+# Preserve both OWNERS and LICENSE files.
+(cd $VENDOR_DIR; $(preserve_files $TMP 'OWNERS'))
+(cd $VENDOR_DIR; $(preserve_files $TMP 'LICENSE'))
 
-# this deletes OWNERS files
+rm -rf $VENDOR_DIR
 (cd $FUCHSIA_DIR; $PREBUILT_RUST_DIR/bin/cargo vendor \
   --manifest-path $FUCHSIA_DIR/third_party/rust_crates/Cargo.toml \
   --versioned-dirs \
   $FUCHSIA_DIR/third_party/rust_crates/vendor \
   -q)
 
-# restore OWNERS files for unchanged directories
+# Restore files for unchanged directories.
 shopt -s nullglob
-for f in $OWNERS_TMP/*
+for f in $TMP/*
 do
   crate_dir=$(basename "$f")
   # if the exact same version of the crate still exists
@@ -115,9 +149,10 @@ do
   fi
 done
 
-# copy the OWNERS from the previous latest version for the new latest version
-# for newly-vendored versions
-$(propagate_owner_files $OWNERS_TMP $VENDOR_DIR)
+# Copy the OWNERS and LICENSE from the previous latest version for the new
+# latest version for newly-vendored versions
+$(propagate_owner_files $TMP $VENDOR_DIR)
+$(propagate_license_files $TMP $VENDOR_DIR)
 
 # ensure LICENSE* files exist
 $FUCHSIA_DIR/scripts/rust/check_rust_licenses.py \
