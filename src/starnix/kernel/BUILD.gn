@@ -316,6 +316,7 @@ rustc_library("starnix_core") {
     "//sdk/fidl/fuchsia.net.filter:fuchsia.net.filter_rust",
     "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
     "//sdk/fidl/fuchsia.net.tun:fuchsia.net.tun_rust",
+    "//sdk/fidl/fuchsia.netpol.socketproxy:fuchsia.netpol.socketproxy_rust",
     "//sdk/fidl/fuchsia.posix:fuchsia.posix_rust",
     "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
     "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_rust",

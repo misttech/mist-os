@@ -24,6 +24,8 @@ use starnix_uapi::{errno, error, statfs};
 use std::borrow::Cow;
 use std::net::{Ipv4Addr, Ipv6Addr};
 
+use {fidl_fuchsia_net as fnet, fidl_fuchsia_netpol_socketproxy as fnp_socketproxy};
+
 const DEFAULT_NETWORK_FILE_NAME: &str = "default";
 
 #[derive(Clone, Debug, Default, Deserialize, PartialEq, Serialize)]
@@ -260,6 +262,41 @@ impl BytesFileOps for DefaultNetworkIdFile {
         }
 
         Ok(network_manager.get_default_id_as_bytes().to_vec().into())
+    }
+}
+
+impl From<&NetworkMessage> for fnp_socketproxy::Network {
+    fn from(message: &NetworkMessage) -> Self {
+        Self {
+            network_id: Some(message.netid),
+            info: Some(fnp_socketproxy::NetworkInfo::Starnix(
+                fnp_socketproxy::StarnixNetworkInfo {
+                    mark: Some(message.mark),
+                    handle: Some(message.handle),
+                    ..Default::default()
+                },
+            )),
+            dns_servers: Some(fnp_socketproxy::NetworkDnsServers {
+                v4: Some(
+                    message
+                        .dnsv4
+                        .clone()
+                        .into_iter()
+                        .map(|a| fnet::Ipv4Address { addr: a.octets() })
+                        .collect::<Vec<_>>(),
+                ),
+                v6: Some(
+                    message
+                        .dnsv6
+                        .clone()
+                        .into_iter()
+                        .map(|a| fnet::Ipv6Address { addr: a.octets() })
+                        .collect::<Vec<_>>(),
+                ),
+                ..Default::default()
+            }),
+            ..Default::default()
+        }
     }
 }
 
