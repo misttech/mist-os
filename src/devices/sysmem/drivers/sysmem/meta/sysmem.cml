@@ -14,9 +14,6 @@
         colocate: "false",
         default_dispatcher_scheduler_role: "fuchsia.devices.sysmem.drivers.sysmem.device",
     },
-    capabilities: [
-        { service: 'fuchsia.hardware.sysmem.Service' },
-    ],
     use: [
         {
             protocol: [
@@ -56,12 +53,6 @@
             key: "contiguous_guard_pages_unused",
             type: "bool",
             availability: "optional",
-        },
-    ],
-    expose: [
-        {
-            service: 'fuchsia.hardware.sysmem.Service',
-            from: 'self',
         },
     ],
     config: {

@@ -28,6 +28,7 @@
 #include <string>
 #include <thread>
 
+#include <bind/fuchsia/hardware/sysmem/cpp/bind.h>
 #include <bind/fuchsia/sysmem/heap/cpp/bind.h>
 
 // TODO(b/42113093): Remove this include of AmLogic-specific heap names in sysmem code. The include
@@ -271,13 +272,6 @@ zx_status_t Device::GetContiguousGuardParameters(const std::optional<sysmem_conf
 
 void Device::DdkUnbindInternal() {
   ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent()->async_dispatcher() == driver_dispatcher());
-
-  // stop other drivers from connecting
-  zx::result<> remove_result = outgoing()->RemoveService<fuchsia_hardware_sysmem::Service>();
-  if (!remove_result.is_ok()) {
-    LOG(WARNING, "RemoveService failed: %s", remove_result.status_string());
-    // keep going
-  }
 
   // disconnect existing connections from drivers
   bindings_.RemoveAll();
@@ -672,12 +666,6 @@ zx_status_t Device::Initialize() {
     });
   }
 
-  auto service_dir_result = SetupOutgoingServiceDir();
-  if (service_dir_result.is_error()) {
-    LOG(ERROR, "SetupOutgoingServiceDir failed: %s", service_dir_result.status_string());
-    return service_dir_result.status_value();
-  }
-
   auto [devfs_connector_client, devfs_connector_server] =
       fidl::Endpoints<fuchsia_device_fs::Connector>::Create();
 
@@ -694,11 +682,13 @@ zx_status_t Device::Initialize() {
   devfs_owned_child_node_ = std::move(add_owned_child_result).value();
 
   // compat node
-  const fuchsia_driver_framework::NodePropertyVector empty_node_propery_vector;
+  const fuchsia_driver_framework::NodePropertyVector properties = {
+      fdf::MakeProperty(bind_fuchsia_hardware_sysmem::SERVICE,
+                        bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
+  };
   std::vector<fuchsia_driver_framework::Offer> offers = compat_server_.CreateOffers2();
-  offers.push_back(fdf::MakeOffer2<fuchsia_hardware_sysmem::Service>());
   zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> add_child_result =
-      AddChild("sysmem", empty_node_propery_vector, offers);
+      AddChild("sysmem", properties, offers);
   if (!add_child_result.is_ok()) {
     LOG(ERROR, "Failed to call FIDL AddChild: %s", add_child_result.status_string());
     return ZX_ERR_INTERNAL;
@@ -719,35 +709,6 @@ zx_status_t Device::Initialize() {
   LOG(INFO, "sysmem finished initialization");
 
   return ZX_OK;
-}
-
-zx::result<> Device::SetupOutgoingServiceDir() {
-  ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent()->async_dispatcher() == driver_dispatcher());
-  // outgoing() runs on the fdf dispatcher without being configurable; we post to loop_ on a
-  // per-message basis
-  auto add_result = outgoing()->AddService<fuchsia_hardware_sysmem::Service>(
-      fuchsia_hardware_sysmem::Service::InstanceHandler({
-          .sysmem = bindings_.CreateHandler(this, driver_dispatcher(), fidl::kIgnoreBindingClosure),
-          .allocator_v1 =
-              [this](fidl::ServerEnd<fuchsia_sysmem::Allocator> request) {
-                PostTask([this, request = std::move(request)]() mutable {
-                  std::lock_guard thread_checker(*loop_checker_);
-                  Allocator::CreateOwnedV1(std::move(request), this, v1_allocators());
-                });
-              },
-          .allocator_v2 =
-              [this](fidl::ServerEnd<fuchsia_sysmem2::Allocator> request) {
-                PostTask([this, request = std::move(request)]() mutable {
-                  std::lock_guard thread_checker(*loop_checker_);
-                  Allocator::CreateOwnedV2(std::move(request), this, v2_allocators());
-                });
-              },
-      }));
-  if (!add_result.is_ok()) {
-    LOG(ERROR, "AddService failed: %s", add_result.status_string());
-    return add_result.take_error();
-  }
-  return zx::ok();
 }
 
 void Device::Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) {
