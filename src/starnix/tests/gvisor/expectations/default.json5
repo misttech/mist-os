@@ -367,8 +367,6 @@
                 // ioctl_test
                 "IoctlTest/IoctlTestSIOCGIFCONF.ValidateNoArrayGetsLength/*",
                 "IoctlTest.FIONBIOFails",
-                "IoctlTest.FIOCLEXSucceeds",
-                "IoctlTest.FIONCLEXSucceeds",
                 "IoctlTest.FIOASYNCFails",
                 "IoctlTest.FIOASYNCSucceeds",
                 "IoctlTest.FIOASYNCNoTarget",
