@@ -955,6 +955,11 @@ fn map_to_status(error: anyhow::Error) -> zx::Status {
     }
 }
 
+#[fuchsia::main]
+fn main() -> Result<(), Error> {
+    todo!();
+}
+
 #[cfg(test)]
 mod tests {
     use super::{map_to_status, Component};
