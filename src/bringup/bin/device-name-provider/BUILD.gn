@@ -13,16 +13,27 @@ group("tests") {
 source_set("args") {
   sources = [ "args.cc" ]
   deps = [
+    ":device_name_provider_config",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//zircon/system/ulib/zx",
   ]
 }
 
+fuchsia_component_manifest("manifest") {
+  component_name = "device-name-provider"
+  manifest = "meta/device-name-provider.cml"
+}
+
+fuchsia_structured_config_cpp_elf_lib("device_name_provider_config") {
+  cm_label = ":manifest"
+}
+
 executable("device-name-provider") {
   sources = [ "device-name-provider.cc" ]
   deps = [
     ":args",
+    ":device_name_provider_config",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fdio",
@@ -34,8 +45,7 @@ executable("device-name-provider") {
 }
 
 fuchsia_component("component") {
-  component_name = "device-name-provider"
-  manifest = "meta/device-name-provider.cml"
+  cm_label = ":manifest"
   deps = [ ":device-name-provider" ]
 }
 

@@ -85,6 +85,7 @@
             from: "#config",
             to: "#bootstrap",
             config: [
+                "fuchsia.network.PrimaryInterface",
                 "fuchsia.sysmem.ContiguousGuardPagesUnused",
                 "fuchsia.sysmem.FixedContiguousMemorySize",
                 "fuchsia.sysmem.FixedProtectedMemorySize",

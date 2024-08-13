@@ -9,6 +9,8 @@
 
 #include <string>
 
+#include "src/bringup/bin/netsvc/netsvc_structured_config.h"
+
 struct NetsvcArgs {
   // This is true if `netsvc.disable` is on the kernel commandline.
   bool disable = false;
@@ -32,7 +34,8 @@ struct NetsvcArgs {
 
 // Parses NetsvcArgs via the kernel commandline and the binary commandline (argv).
 // If ParseArgs returns < 0, an error string will be returned in |error|.
-int ParseArgs(int argc, char** argv, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir,
-              const char** error, NetsvcArgs* out);
+int ParseArgs(int argc, char** argv, const netsvc_structured_config::Config& config,
+              fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir, const char** error,
+              NetsvcArgs* out);
 
 #endif  // SRC_BRINGUP_BIN_NETSVC_ARGS_H_

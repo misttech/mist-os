@@ -20,24 +20,10 @@
 #include <mock-boot-arguments/server.h>
 #include <zxtest/zxtest.h>
 
+#include "src/bringup/bin/netsvc/netsvc_structured_config.h"
+
 namespace {
 constexpr char kInterface[] = "/dev/whatever/whatever";
-
-TEST(ArgsTest, NetsvcNodenamePrintsAndExits) {
-  const std::string path = "/pkg/bin/netsvc";
-  const char* argv[] = {path.c_str(), "--nodename", nullptr};
-  zx::process process;
-  char err_msg[FDIO_SPAWN_ERR_MSG_MAX_LENGTH];
-
-  ASSERT_OK(fdio_spawn_etc(ZX_HANDLE_INVALID, FDIO_SPAWN_CLONE_ALL, argv[0], argv, nullptr, 0,
-                           nullptr, process.reset_and_get_address(), err_msg),
-            "%s", err_msg);
-
-  ASSERT_OK(process.wait_one(ZX_TASK_TERMINATED, zx::time::infinite(), nullptr));
-  zx_info_process_t proc_info;
-  ASSERT_OK(process.get_info(ZX_INFO_PROCESS, &proc_info, sizeof(proc_info), nullptr, nullptr));
-  ASSERT_EQ(proc_info.return_code, 0);
-}
 
 class FakeSvc {
  public:
@@ -89,14 +75,15 @@ TEST_F(ArgsTest, NetsvcNoneProvided) {
   int argc = 1;
   const char* argv[] = {"netsvc"};
   const char* error = nullptr;
+  auto config = netsvc_structured_config::Config();
   NetsvcArgs args;
   zx::result svc = svc_root();
   ASSERT_OK(svc);
   {
     ASSERT_OK(loop().StartThread());
     auto cleanup = fit::defer(fit::bind_member<&async::Loop::Shutdown>(&loop()));
-    ASSERT_EQ(ParseArgs(argc, const_cast<char**>(argv), svc.value(), &error, &args), 0, "%s",
-              error);
+    ASSERT_EQ(ParseArgs(argc, const_cast<char**>(argv), config, svc.value(), &error, &args), 0,
+              "%s", error);
   }
   ASSERT_FALSE(args.netboot);
   ASSERT_FALSE(args.print_nodename_and_exit);
@@ -106,12 +93,36 @@ TEST_F(ArgsTest, NetsvcNoneProvided) {
   ASSERT_EQ(error, nullptr);
 }
 
+TEST_F(ArgsTest, NetsvcStructuredConfigProvided) {
+  int argc = 1;
+  const char* argv[] = {"netsvc"};
+  const char* error = nullptr;
+  auto config = netsvc_structured_config::Config();
+  config.primary_interface() = kInterface;
+  NetsvcArgs args;
+  zx::result svc = svc_root();
+  ASSERT_OK(svc);
+  {
+    ASSERT_OK(loop().StartThread());
+    auto cleanup = fit::defer(fit::bind_member<&async::Loop::Shutdown>(&loop()));
+    ASSERT_EQ(ParseArgs(argc, const_cast<char**>(argv), config, svc.value(), &error, &args), 0,
+              "%s", error);
+  }
+  ASSERT_FALSE(args.netboot);
+  ASSERT_FALSE(args.print_nodename_and_exit);
+  ASSERT_TRUE(args.advertise);
+  ASSERT_FALSE(args.all_features);
+  ASSERT_EQ(args.interface, kInterface);
+  ASSERT_EQ(error, nullptr);
+}
+
 TEST_F(ArgsTest, NetsvcAllProvided) {
   int argc = 7;
   const char* argv[] = {
       "netsvc",         "--netboot",   "--nodename", "--advertise",
       "--all-features", "--interface", kInterface,
   };
+  auto config = netsvc_structured_config::Config();
   const char* error = nullptr;
   NetsvcArgs args;
   zx::result svc = svc_root();
@@ -119,8 +130,8 @@ TEST_F(ArgsTest, NetsvcAllProvided) {
   {
     ASSERT_OK(loop().StartThread());
     auto cleanup = fit::defer(fit::bind_member<&async::Loop::Shutdown>(&loop()));
-    ASSERT_EQ(ParseArgs(argc, const_cast<char**>(argv), svc.value(), &error, &args), 0, "%s",
-              error);
+    ASSERT_EQ(ParseArgs(argc, const_cast<char**>(argv), config, svc.value(), &error, &args), 0,
+              "%s", error);
   }
   ASSERT_TRUE(args.netboot);
   ASSERT_TRUE(args.print_nodename_and_exit);
@@ -136,6 +147,7 @@ TEST_F(ArgsTest, NetsvcValidation) {
       "netsvc",
       "--interface",
   };
+  auto config = netsvc_structured_config::Config();
   const char* error = nullptr;
   NetsvcArgs args;
   zx::result svc = svc_root();
@@ -143,7 +155,7 @@ TEST_F(ArgsTest, NetsvcValidation) {
   {
     ASSERT_OK(loop().StartThread());
     auto cleanup = fit::defer(fit::bind_member<&async::Loop::Shutdown>(&loop()));
-    ASSERT_LT(ParseArgs(argc, const_cast<char**>(argv), svc.value(), &error, &args), 0);
+    ASSERT_LT(ParseArgs(argc, const_cast<char**>(argv), config, svc.value(), &error, &args), 0);
   }
   ASSERT_TRUE(args.interface.empty());
   ASSERT_TRUE(strstr(error, "interface"));
@@ -155,6 +167,7 @@ TEST_F(ArgsTest, LogPackets) {
       "netsvc",
       "--log-packets",
   };
+  auto config = netsvc_structured_config::Config();
   NetsvcArgs args;
   EXPECT_FALSE(args.log_packets);
   const char* error = nullptr;
@@ -163,8 +176,8 @@ TEST_F(ArgsTest, LogPackets) {
   {
     ASSERT_OK(loop().StartThread());
     auto cleanup = fit::defer(fit::bind_member<&async::Loop::Shutdown>(&loop()));
-    ASSERT_EQ(ParseArgs(argc, const_cast<char**>(argv), svc.value(), &error, &args), 0, "%s",
-              error);
+    ASSERT_EQ(ParseArgs(argc, const_cast<char**>(argv), config, svc.value(), &error, &args), 0,
+              "%s", error);
   }
   EXPECT_TRUE(args.log_packets);
 }

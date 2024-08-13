@@ -13,9 +13,17 @@ config("netsvc_config") {
   defines = netsvc_extra_defines
 }
 
-fuchsia_component("component") {
+fuchsia_component_manifest("manifest") {
   component_name = "netsvc"
   manifest = "meta/netsvc.cml"
+}
+
+fuchsia_structured_config_cpp_elf_lib("netsvc_structured_config") {
+  cm_label = ":manifest"
+}
+
+fuchsia_component("component") {
+  cm_label = ":manifest"
   deps = [ ":netsvc" ]
 }
 
@@ -33,6 +41,7 @@ executable("netsvc") {
     ":args",
     ":inet6",
     ":netsvc_common",
+    ":netsvc_structured_config",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/lib/component/outgoing/cpp",
@@ -54,6 +63,7 @@ executable("netsvc") {
 source_set("args") {
   sources = [ "args.cc" ]
   deps = [
+    ":netsvc_structured_config",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/component/incoming/cpp",
@@ -119,6 +129,7 @@ test("netsvc-test") {
     ":netifc-discover",
     ":netsvc",
     ":netsvc_common",
+    ":netsvc_structured_config",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
     "//sdk/fidl/fuchsia.device:fuchsia.device_cpp",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_cpp",
