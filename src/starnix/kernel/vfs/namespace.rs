@@ -735,7 +735,7 @@ impl FileSystemCreator for Arc<Kernel> {
         Ok(match &**fs_type {
             b"binder" => BinderFs::new_fs(self, options)?,
             b"bpf" => BpfFs::new_fs(self, options)?,
-            b"remotefs" => crate::execution::create_remotefs_filesystem(
+            b"remotefs" => crate::fs::fuchsia::create_remotefs_filesystem(
                 self,
                 self.container_data_dir
                     .as_ref()

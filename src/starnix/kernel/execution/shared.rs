@@ -3,33 +3,24 @@
 // found in the LICENSE file.
 
 use crate::arch::execution::new_syscall;
-use crate::fs::fuchsia::{create_file_from_handle, RemoteBundle, RemoteFs, SyslogFile};
 use crate::mm::MemoryManager;
 use crate::signals::{dequeue_signal, prepare_to_restart_syscall};
 use crate::syscalls::table::dispatch_syscall;
 use crate::task::{
-    ptrace_syscall_enter, ptrace_syscall_exit, CurrentTask, ExitStatus, Kernel, SeccompStateValue,
+    ptrace_syscall_enter, ptrace_syscall_exit, CurrentTask, ExitStatus, SeccompStateValue,
     TaskFlags, ThreadGroup,
 };
-use crate::vfs::fs_args::MountParams;
-use crate::vfs::{
-    FdNumber, FdTable, FileSystemCreator, FileSystemHandle, FileSystemOptions, FsString,
-};
-use anyhow::{anyhow, Error};
+use crate::vfs::FileSystemCreator;
 #[cfg(feature = "syscall_stats")]
 use fuchsia_inspect::NumericProperty;
-use fuchsia_runtime::{HandleInfo, HandleType};
 use fuchsia_zircon::{self as zx};
 use starnix_logging::log_trace;
-use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked, Unlocked};
+use starnix_sync::{Locked, Unlocked};
 use starnix_syscalls::decls::{Syscall, SyscallDecl};
 use starnix_syscalls::SyscallResult;
-use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::ownership::{OwnedRef, Releasable};
 use std::sync::Arc;
-use {fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess};
 
 /// Contains context to track the most recently failing system call.
 ///
@@ -191,154 +182,6 @@ pub fn process_completed_restricted_exit(
         }
     }
     return Ok(result);
-}
-
-/// Creates a `StartupHandles` from the provided handles.
-///
-/// The `numbered_handles` of type `HandleType::FileDescriptor` are used to
-/// create files, and the handles are required to be of type `zx::Socket`.
-///
-/// If there is a `numbered_handles` of type `HandleType::User0`, that is
-/// interpreted as the server end of the ShellController protocol.
-pub fn parse_numbered_handles(
-    current_task: &CurrentTask,
-    numbered_handles: Option<Vec<fprocess::HandleInfo>>,
-    files: &FdTable,
-) -> Result<(), Error> {
-    if let Some(numbered_handles) = numbered_handles {
-        for numbered_handle in numbered_handles {
-            let info = HandleInfo::try_from(numbered_handle.id)?;
-            if info.handle_type() == HandleType::FileDescriptor {
-                files.insert(
-                    current_task,
-                    FdNumber::from_raw(info.arg().into()),
-                    create_file_from_handle(current_task, numbered_handle.handle)?,
-                )?;
-            }
-        }
-    }
-
-    let stdio = SyslogFile::new_file(current_task);
-    // If no numbered handle is provided for each stdio handle, default to syslog.
-    for i in [0, 1, 2] {
-        if files.get(FdNumber::from_raw(i)).is_err() {
-            files.insert(current_task, FdNumber::from_raw(i), stdio.clone())?;
-        }
-    }
-
-    Ok(())
-}
-
-/// Create a filesystem to access the content of the fuchsia directory available at `fs_src` inside
-/// `pkg`.
-pub fn create_remotefs_filesystem(
-    kernel: &Arc<Kernel>,
-    root: &fio::DirectorySynchronousProxy,
-    options: FileSystemOptions,
-    rights: fio::OpenFlags,
-) -> Result<FileSystemHandle, Errno> {
-    let root = syncio::directory_open_directory_async(
-        root,
-        std::str::from_utf8(&options.source)
-            .map_err(|_| errno!(EINVAL, "source path is not utf8"))?,
-        rights,
-    )
-    .map_err(|e| errno!(EIO, format!("Failed to open root: {e}")))?;
-    RemoteFs::new_fs(kernel, root.into_channel(), options, rights)
-}
-
-pub struct MountAction {
-    pub path: FsString,
-    pub fs: FileSystemHandle,
-    pub flags: MountFlags,
-}
-
-pub fn create_filesystem_from_spec<L>(
-    locked: &mut Locked<'_, L>,
-    creator: &impl FileSystemCreator,
-    pkg: &fio::DirectorySynchronousProxy,
-    spec: &str,
-) -> Result<MountAction, Error>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-    L: LockBefore<BeforeFsNodeAppend>,
-{
-    let kernel = creator.kernel();
-
-    let mut iter = spec.splitn(4, ':');
-    let mount_point =
-        iter.next().ok_or_else(|| anyhow!("mount point is missing from {:?}", spec))?;
-    let fs_type = iter.next().ok_or_else(|| anyhow!("fs type is missing from {:?}", spec))?;
-    let fs_src = match iter.next() {
-        Some(src) if !src.is_empty() => src,
-        _ => ".",
-    };
-
-    let mut params = MountParams::parse(iter.next().unwrap_or("").into())?;
-    let flags = params.remove_mount_flags();
-
-    let options = FileSystemOptions {
-        source: fs_src.into(),
-        flags: flags & MountFlags::STORED_ON_FILESYSTEM,
-        params,
-    };
-
-    // Default rights for remotefs.
-    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
-
-    // The filesystem types handled in this match are the ones that can only be specified in a
-    // manifest file, for whatever reason. Anything else is passed to create_filesystem, which is
-    // common code that also handles the mount() system call.
-    let fs = match fs_type {
-        "remote_bundle" => RemoteBundle::new_fs(kernel, pkg, options, rights)?,
-        "remotefs" => create_remotefs_filesystem(kernel, pkg, options, rights)?,
-        _ => creator.create_filesystem(locked, fs_type.into(), options)?,
-    };
-    Ok(MountAction { path: mount_point.into(), fs, flags })
-}
-
-fn parse_block_size(block_size_str: &str) -> Result<u64, Error> {
-    if block_size_str.is_empty() {
-        return Err(anyhow!("Invalid empty block size"));
-    }
-    let (mut string, suffix) = block_size_str.split_at(block_size_str.len() - 1);
-    let multiplier: u64 = match suffix {
-        "K" => 1024,
-        "M" => 1024 * 1024,
-        "G" => 1024 * 1024 * 1024,
-        _ => {
-            string = block_size_str;
-            1
-        }
-    };
-    u64::from_str_radix(string, 10)
-        .map_err(|_| anyhow!("Invalid block size {string}"))
-        .and_then(|val| multiplier.checked_mul(val).ok_or(anyhow!("Block size overflow")))
-}
-
-pub fn create_remote_block_device_from_spec<'a, L>(
-    locked: &mut Locked<'_, L>,
-    current_task: &CurrentTask,
-    spec: &'a str,
-) -> Result<(), Error>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-{
-    let mut iter = spec.splitn(2, ':');
-    let device_name =
-        iter.next().ok_or_else(|| anyhow!("remoteblk name is missing from {:?}", spec))?;
-    let device_size =
-        iter.next().ok_or_else(|| anyhow!("remoteblk size is missing from {:?}", spec))?;
-    let device_size = parse_block_size(device_size)?;
-
-    current_task.kernel().remote_block_device_registry.create_remote_block_device_if_absent(
-        locked,
-        current_task,
-        device_name,
-        device_size,
-    )
 }
 
 #[cfg(test)]
