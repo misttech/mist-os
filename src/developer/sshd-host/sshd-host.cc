@@ -21,7 +21,7 @@ const char* kKeyGenArgs[] = {"/pkg/bin/hostkeygen", nullptr};
 int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   fuchsia_logging::LogSettingsBuilder builder;
-  builder.WithDispatcher(loop.dispatcher()).BuildAndInitializeWithTags({"sshd-host"});
+  builder.WithDispatcher(loop.dispatcher()).WithTags({"sshd-host"}).BuildAndInitialize();
   // We need to close PA_DIRECTORY_REQUEST otherwise clients that expect us to
   // offer services won't know that we've started and are not going to offer
   // any services.
