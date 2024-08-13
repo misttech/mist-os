@@ -40,8 +40,21 @@ rustc_library("block-client") {
   sources = [
     "src/cache.rs",
     "src/lib.rs",
-    "src/testing.rs",
   ]
+}
+
+rustc_library("fake-block-client") {
+  with_unit_tests = false
+  edition = "2021"
+  deps = [
+    ":block-client",
+    "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
+    "//src/lib/zircon/rust:fuchsia-zircon",
+    "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-trait",
+  ]
+  sources = [ "src/fake_block_client.rs" ]
+  source_root = "src/fake_block_client.rs"
 }
 
 storage_driver_test_realm_v2_component("block-client-tests-component") {

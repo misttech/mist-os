@@ -128,7 +128,7 @@ impl Drop for BlockDevice {
 mod tests {
     use crate::block_device::BlockDevice;
     use crate::Device;
-    use block_client::testing::FakeBlockClient;
+    use fake_block_client::FakeBlockClient;
     use fuchsia_zircon::Status;
 
     #[fuchsia::test]

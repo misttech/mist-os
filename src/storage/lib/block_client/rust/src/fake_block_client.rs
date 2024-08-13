@@ -2,9 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{BlockClient, BufferSlice, MutableBufferSlice, VmoId};
 use anyhow::{anyhow, ensure, Error};
 use async_trait::async_trait;
+use block_client::{BlockClient, BufferSlice, MutableBufferSlice, VmoId};
 use std::collections::BTreeMap;
 use std::ops::Range;
 use std::sync::atomic::{self, AtomicU32};

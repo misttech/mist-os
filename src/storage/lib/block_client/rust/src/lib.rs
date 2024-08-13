@@ -33,8 +33,6 @@ pub use block_protocol::*;
 
 pub mod cache;
 
-pub mod testing;
-
 const TEMP_VMO_SIZE: usize = 65536;
 
 pub use block_driver::{BlockIoFlag, BlockOpcode};

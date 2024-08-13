@@ -39,6 +39,7 @@ rustc_library("storage_device") {
   test_deps = [
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
+    "//src/storage/lib/block_client/rust:fake-block-client",
     "//third_party/rust_crates:rand",
   ]
   sources = lib_srcs
