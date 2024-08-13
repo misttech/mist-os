@@ -149,6 +149,21 @@ closed protocol Volume {
     }) error zx.Status;
 };
 
+/// Not all options are recognized by all implementations.  For example, at time of writing, Fxfs
+/// ignores all options.
+type CreateOptions = resource table {
+    /// Byte count for the initial size of the volume.  Some implementations might ignore this
+    /// setting.
+    1: initial_size uint64;
+
+    /// Unique GUID for the volume.  If unspecified, a GUID will be generated.
+    2: guid array<uint8, 16>;
+
+    /// Type GUID for the volume.  If unspecified, an implementation default is chosen.  Some
+    /// implementations might not support arbitrary volume types.
+    3: type_guid array<uint8, 16>;
+};
+
 /// fuchsia.fs.startup.Volumes is only used for creating volumes.  Other operations
 /// (e.g. enumeration and deletion) are serviced by the `volumes` directory offered by filesystems in their
 /// export root.  Volumes appear as files within this directory, and these files should also speak
@@ -166,6 +181,7 @@ closed protocol Volumes {
     strict Create(resource struct {
         name string:fuchsia.io.MAX_FILENAME;
         outgoing_directory server_end:fuchsia.io.Directory;
+        create_options CreateOptions;
         mount_options MountOptions;
     }) -> () error zx.Status;
 

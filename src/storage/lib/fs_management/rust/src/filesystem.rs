@@ -10,7 +10,7 @@ use anyhow::{anyhow, bail, ensure, Context, Error};
 use fidl::endpoints::{create_endpoints, create_proxy, ClientEnd, Proxy as _, ServerEnd};
 use fidl_fuchsia_component::{self as fcomponent, RealmMarker};
 use fidl_fuchsia_fs::AdminMarker;
-use fidl_fuchsia_fs_startup::{CheckOptions, MountOptions, StartupMarker};
+use fidl_fuchsia_fs_startup::{CheckOptions, CreateOptions, MountOptions, StartupMarker};
 use fuchsia_component::client::{
     connect_to_named_protocol_at_dir_root, connect_to_protocol, connect_to_protocol_at_dir_root,
     connect_to_protocol_at_dir_svc, open_childs_exposed_directory,
@@ -602,7 +602,7 @@ impl ServingMultiVolumeFilesystem {
         connect_to_protocol_at_dir_root::<fidl_fuchsia_fs_startup::VolumesMarker>(
             self.exposed_dir.as_ref().unwrap(),
         )?
-        .create(volume, server, options)
+        .create(volume, server, CreateOptions::default(), options)
         .await?
         .map_err(|e| anyhow!(zx::Status::from_raw(e)))?;
         self.insert_volume(volume.to_string(), exposed_dir).await

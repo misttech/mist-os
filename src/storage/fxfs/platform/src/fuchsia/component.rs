@@ -432,7 +432,13 @@ impl Component {
             };
         while let Ok(Some(request)) = stream.try_next().await {
             match request {
-                VolumesRequest::Create { name, outgoing_directory, mount_options, responder } => {
+                VolumesRequest::Create {
+                    name,
+                    outgoing_directory,
+                    create_options: _,
+                    mount_options,
+                    responder,
+                } => {
                     info!(
                         name = name.as_str(),
                         "Create {}volume",
@@ -485,8 +491,8 @@ mod tests {
     use fidl::endpoints::{Proxy, ServerEnd};
     use fidl_fuchsia_fs::AdminMarker;
     use fidl_fuchsia_fs_startup::{
-        CompressionAlgorithm, EvictionPolicyOverride, MountOptions, StartOptions, StartupMarker,
-        VolumesMarker,
+        CompressionAlgorithm, CreateOptions, EvictionPolicyOverride, MountOptions, StartOptions,
+        StartupMarker, VolumesMarker,
     };
     use fidl_fuchsia_process_lifecycle::{LifecycleMarker, LifecycleProxy};
     use fuchsia_component::client::connect_to_protocol_at_dir_svc;
@@ -629,7 +635,7 @@ mod tests {
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                         .expect("create_proxy failed");
                 volumes_proxy
-                    .create("test", server_end, MountOptions::default())
+                    .create("test", server_end, CreateOptions::default(), MountOptions::default())
                     .await
                     .expect("fidl failed")
                     .expect("create failed");
@@ -650,7 +656,7 @@ mod tests {
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                         .expect("create_proxy failed");
                 volumes_proxy
-                    .create("test", server_end, MountOptions::default())
+                    .create("test", server_end, CreateOptions::default(), MountOptions::default())
                     .await
                     .expect("fidl failed")
                     .expect_err("create succeeded");
@@ -669,7 +675,7 @@ mod tests {
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                         .expect("create_proxy failed");
                 volumes_proxy
-                    .create("test", server_end, MountOptions::default())
+                    .create("test", server_end, CreateOptions::default(), MountOptions::default())
                     .await
                     .expect("fidl failed")
                     .expect("create failed");
@@ -708,7 +714,7 @@ mod tests {
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                         .expect("create_proxy failed");
                 volumes_proxy
-                    .create("test", server_end, MountOptions::default())
+                    .create("test", server_end, CreateOptions::default(), MountOptions::default())
                     .await
                     .expect("fidl failed")
                     .expect("create failed");
