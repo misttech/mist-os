@@ -49,6 +49,15 @@ FuchsiaBoardConfigInfo = provider(
     },
 )
 
+FuchsiaPostProcessingScriptInfo = provider(
+    doc = "A post processing script info used to containing the post processing script related artifacts",
+    fields = {
+        "post_processing_script_path": "Path to post processing script",
+        "post_processing_script_args": "Post processing script arguments",
+        "post_processing_script_inputs": "Dictionary for artifacts used by post processing script.",
+    },
+)
+
 FuchsiaSizeCheckerInfo = provider(
     doc = """Size reports created by size checker tool.""",
     fields = {

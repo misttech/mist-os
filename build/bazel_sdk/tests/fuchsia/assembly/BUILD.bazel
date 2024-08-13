@@ -13,6 +13,7 @@ load(
     "fuchsia_bootstrap_partition",
     "fuchsia_partition",
     "fuchsia_partitions_configuration",
+    "fuchsia_post_processing_script",
     "fuchsia_prebuilt_board_input_bundle",
     "fuchsia_prebuilt_package",
     "fuchsia_prebuilt_product_configuration",
@@ -100,6 +101,11 @@ fuchsia_board_configuration(
             },
         },
     },
+    post_processing_script = ":post_processing_script",
+)
+
+fuchsia_post_processing_script(
+    name = "post_processing_script",
     post_processing_script_args = [
         "-t",
         "mkbootimg",
