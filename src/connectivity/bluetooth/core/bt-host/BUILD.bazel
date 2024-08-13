@@ -119,10 +119,13 @@ fuchsia_package(
 cc_library(
     name = "config",
     srcs = [],
-    defines = [
-        "PW_BLUETOOTH_SAPPHIRE_INSPECT_ENABLED",
-        "PW_BLUETOOTH_SAPPHIRE_TRACE_ENABLED",
-    ],
+    defines = select({
+        "@platforms//os:fuchsia": [
+            "PW_BLUETOOTH_SAPPHIRE_INSPECT_ENABLED",
+            "PW_BLUETOOTH_SAPPHIRE_TRACE_ENABLED",
+        ],
+        "//conditions:default": [],
+    }),
 )
 
 cc_library(

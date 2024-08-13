@@ -5,7 +5,6 @@
 load(
     "@fuchsia_sdk//fuchsia:defs.bzl",
     "fuchsia_cc_test",
-    "fuchsia_select",
     "fuchsia_unittest_package",
 )
 load("//src/connectivity/bluetooth/core/bt-host:variables.bzl", "COPTS")
@@ -48,7 +47,7 @@ cc_library(
         "@pigweed//pw_string",
         "@pigweed//pw_string:utf_codecs",
         "@pigweed//third_party/fuchsia:fit",
-    ] + fuchsia_select({
+    ] + select({
         "@platforms//os:fuchsia": [
             "@fuchsia_sdk//pkg/inspect_component_cpp",
             "@fuchsia_sdk//pkg/trace",
