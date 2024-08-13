@@ -299,10 +299,15 @@ zx_status_t Device::Bind() {
   zxlogf(DEBUG, "bt-transport-usb: vendor id = %hu, product id = %hu", dev_desc.id_vendor,
          dev_desc.id_product);
 
+  // Use default driver dispatcher in production. In tests, use the test dispatcher provided in the
+  // constructor.
+  if (!dispatcher_) {
+    dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
+  }
+
   // Serve HciTransport protocol in the outgoing directory and add the directory to the child
   // device.
-  auto* dispatcher = fdf::Dispatcher::GetCurrent()->async_dispatcher();
-  outgoing_ = component::OutgoingDirectory(dispatcher);
+  outgoing_ = component::OutgoingDirectory(dispatcher_);
 
   auto snoop_handler = [this](fidl::ServerEnd<fhbt::Snoop> server_end) mutable {
     if (snoop_server_.has_value()) {
@@ -317,7 +322,7 @@ zx_status_t Device::Bind() {
 
   fuchsia_hardware_bluetooth::HciService::InstanceHandler handler({
       .hci_transport =
-          hci_transport_binding_.CreateHandler(this, dispatcher, fidl::kIgnoreBindingClosure),
+          hci_transport_binding_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
       .snoop = std::move(snoop_handler),
   });
   auto result = outgoing_->AddService<fuchsia_hardware_bluetooth::HciService>(std::move(handler));
@@ -349,18 +354,6 @@ zx_status_t Device::Bind() {
   if (status != ZX_OK) {
     OnBindFailure(status, "DdkAdd");
     return status;
-  }
-
-  // Spawn a new thread in production. In tests, use the test dispatcher provided in the
-  // constructor.
-  if (!dispatcher_) {
-    loop_.emplace(&kAsyncLoopConfigNoAttachToCurrentThread);
-    status = loop_->StartThread("bt-transport-usb");
-    if (status != ZX_OK) {
-      OnBindFailure(status, "starting async loop failed");
-      return status;
-    }
-    dispatcher_ = loop_->dispatcher();
   }
 
   return ZX_OK;
