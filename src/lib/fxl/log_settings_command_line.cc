@@ -130,7 +130,7 @@ bool SetLogSettingsFromCommandLine(const fxl::CommandLine& command_line,
   if (!ParseLogSettings(command_line, &settings))
     return false;
   fuchsia_logging::LogSettingsBuilder builder;
-  builder.WithMinLogSeverity(settings.min_log_level);
+  builder.WithMinLogSeverity(settings.min_log_level).WithTags(tags);
 #ifndef __Fuchsia__
   builder.WithLogFile(settings.log_file);
 #else
@@ -150,7 +150,7 @@ bool SetLogSettingsFromCommandLine(const fxl::CommandLine& command_line,
     builder.DisableWaitForInitialInterest();
   }
 #endif
-  builder.BuildAndInitializeWithTags(tags);
+  builder.BuildAndInitialize();
   return true;
 }
 

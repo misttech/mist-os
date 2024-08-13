@@ -8,6 +8,7 @@
 #include <lib/syslog/cpp/log_level.h>
 
 #include <type_traits>
+#include <vector>
 #ifdef __Fuchsia__
 #include <lib/async/dispatcher.h>
 #include <lib/zx/channel.h>
@@ -40,6 +41,7 @@ struct LogSettings {
   // Log messages for FX_VLOGS(x) (from macros.h) log verbosities in
   // the range between INFO and DEBUG
   fuchsia_logging::LogSeverity min_log_level = fuchsia_logging::DefaultLogLevel;
+  std::vector<std::string> tags;
 #ifndef __Fuchsia__
   // The name of a file to which the log should be written.
   // When non-empty, the previous log output is closed and logging is
@@ -73,6 +75,9 @@ class LogSettingsBuilder {
   // this defaults to INFO, or to the value specified by Archivist.
   LogSettingsBuilder& WithMinLogSeverity(LogSeverity min_log_level);
 
+  // Sets the tags that are implicitly logged with every message.
+  LogSettingsBuilder& WithTags(const std::initializer_list<std::string>& tags);
+
 #ifndef __Fuchsia__
   // Sets the log file.
   LogSettingsBuilder& WithLogFile(const std::string_view& log_file);
@@ -97,14 +102,14 @@ class LogSettingsBuilder {
   LogSettingsBuilder& WithSeverityChangedListener(
       void (*callback)(fuchsia_logging::LogSeverity severity));
 #endif
-
-  // Configures the log settings with the specified tags
-  // and initializes (or re-initializes) the LogSink connection.
-  void BuildAndInitializeWithTags(const std::initializer_list<std::string>& tags);
-
   // Configures the log settings
   // and initializes (or re-initializes) the LogSink connection.
   void BuildAndInitialize();
+
+  // TODO(b/299996898): Remove once everyone has migrated to WithTags.
+  void BuildAndInitializeWithTags(const std::initializer_list<std::string>& tags) {
+    WithTags(tags).BuildAndInitialize();
+  }
 
  private:
   LogSettings settings_;
