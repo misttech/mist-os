@@ -26,6 +26,7 @@
 #include <gtest/gtest.h>
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
+#include "src/devices/sysmem/drivers/sysmem/allocator.h"
 #include "src/devices/sysmem/drivers/sysmem/buffer_collection.h"
 #include "src/devices/sysmem/drivers/sysmem/device.h"
 #include "src/devices/sysmem/drivers/sysmem/logical_buffer_collection.h"
@@ -79,17 +80,6 @@ class FakeDdkSysmem : public ::testing::Test {
     node_server_.reset();
   }
 
-  fidl::ClientEnd<fuchsia_io::Directory> CreateDriverOutgoingDirClient() {
-    // Open the svc directory in the driver's outgoing, and return a client end.
-    auto svc_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
-
-    zx_status_t status = fdio_open_at(driver_outgoing_.handle()->get(), "/svc",
-                                      static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                                      svc_endpoints.server.TakeChannel().release());
-    EXPECT_EQ(status, ZX_OK);
-    return std::move(svc_endpoints.client);
-  }
-
   void StartDriver() {
     zx::result start_result = runtime_.RunToCompletion(wrapped_device_.SyncCall(
         &fdf_testing::DriverUnderTest<sysmem_driver::Device>::Start, std::move(start_args_)));
@@ -106,11 +96,20 @@ class FakeDdkSysmem : public ::testing::Test {
   }
 
   fidl::ClientEnd<fuchsia_sysmem2::Allocator> Connect() {
-    zx::result allocator_v2_result =
-        component::ConnectAtMember<fuchsia_hardware_sysmem::Service::AllocatorV2>(
-            CreateDriverOutgoingDirClient());
-    EXPECT_TRUE(allocator_v2_result.is_ok());
-    return std::move(allocator_v2_result).value();
+    fpromise::bridge<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> bridge;
+    wrapped_device_.SyncCall(
+        [completer = bridge.completer.bind()](
+            fdf_testing::DriverUnderTest<sysmem_driver::Device>* device) mutable {
+          auto [client, server] = fidl::Endpoints<fuchsia_sysmem2::Allocator>::Create();
+          (*device)->PostTask([device = **device, request = std::move(server)]() mutable {
+            sysmem_driver::Allocator::CreateOwnedV2(std::move(request), device,
+                                                    device->v2_allocators());
+          });
+          completer(std::move(client));
+        });
+    return runtime_.RunToCompletion(
+        fdf_testing::DriverRuntime::AsyncTask<fidl::ClientEnd<fuchsia_sysmem2::Allocator>>(
+            bridge.consumer.promise()));
   }
 
   fidl::ClientEnd<fuchsia_sysmem2::BufferCollection> AllocateNonSharedCollection() {
@@ -292,8 +291,8 @@ TEST_F(FakeDdkSysmem, NamedAllocatorToken) {
     EXPECT_TRUE(allocator->SetDebugClientInfo(std::move(set_debug_request)).is_ok());
   }
   // Despite this message being sent after the above message, this message is not the "final word"
-  // on the debug info, because the allocator will fence all token messages before transferring the
-  // allocator's debug info to the BufferColllection.
+  // on the debug info, because the allocator will fence all token messages before transferring
+  // the allocator's debug info to the BufferColllection.
   {
     fuchsia_sysmem2::NodeSetDebugClientInfoRequest set_debug_request;
     set_debug_request.name() = "bad";
@@ -309,9 +308,9 @@ TEST_F(FakeDdkSysmem, NamedAllocatorToken) {
   bind_shared_request.buffer_collection_request() = std::move(collection_server_end);
   EXPECT_TRUE(allocator->BindSharedCollection(std::move(bind_shared_request)).is_ok());
 
-  // Poll until a matching buffer collection is found. If this gets stuck, sysmem may be failing to
-  // ensure that the allocator's debug info is the "last word" - may be failing to fence the token
-  // messages before applyign the allocator's debug info to the token.
+  // Poll until a matching buffer collection is found. If this gets stuck, sysmem may be failing
+  // to ensure that the allocator's debug info is the "last word" - may be failing to fence the
+  // token messages before applyign the allocator's debug info to the token.
   while (true) {
     bool found_collection = device_->SyncCall([&]() {
       ZX_ASSERT(fdf::Dispatcher::GetCurrent()->async_dispatcher() == device_->loop_dispatcher());

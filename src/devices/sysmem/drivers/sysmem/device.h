@@ -12,7 +12,6 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/closure-queue/closure_queue.h>
-#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/fit/thread_checker.h>
@@ -327,8 +326,6 @@ class Device final : public fdf::DriverBase,
 
   void DdkUnbindInternal() __TA_REQUIRES(*driver_checker_);
 
-  zx::result<> SetupOutgoingServiceDir();
-
   inspect::Inspector inspector_;
 
   // Other than DDK call-ins, everything runs on the loop_ thread.
@@ -457,9 +454,6 @@ class Device final : public fdf::DriverBase,
   async::TaskMethod<Device, &Device::LogCollectionsTimer> log_all_collections_{this};
 
   fidl::ServerBindingGroup<fuchsia_hardware_sysmem::Sysmem> bindings_;
-
-  // std::optional<> so we can init on the loop_ thread
-  std::optional<component::OutgoingDirectory> outgoing_ __TA_GUARDED(*loop_checker_);
 
   fidl::ServerBindingGroup<fuchsia_device_fs::Connector> devfs_connector_;
   fidl::ServerBindingGroup<fuchsia_hardware_sysmem::DriverConnector> driver_connectors_;
