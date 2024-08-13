@@ -364,6 +364,7 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
         wlan_fc_init.assert_called_once_with(
             self.fd_obj.wlan,
             device_name=self.fd_obj._device_info.name,
+            ffx=self.fd_obj.ffx,
             fuchsia_controller=self.fd_obj.fuchsia_controller,
             reboot_affordance=self.fd_obj,
         )

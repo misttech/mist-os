@@ -3,9 +3,13 @@
 # found in the LICENSE file.
 """WLAN affordance implementation using Fuchsia Controller."""
 
+import logging
+
+from honeydew import errors
 from honeydew.interfaces.affordances.wlan import wlan
 from honeydew.interfaces.device_classes import affordances_capable
-from honeydew.transports import fuchsia_controller as fc_transport
+from honeydew.interfaces.transports import ffx as ffx_transport
+from honeydew.interfaces.transports import fuchsia_controller as fc_transport
 from honeydew.typing.wlan import (
     BssDescription,
     ClientStatusResponse,
@@ -14,6 +18,15 @@ from honeydew.typing.wlan import (
     WlanMacRole,
 )
 
+# List of required FIDLs for the WLAN Fuchsia Controller affordance.
+_REQUIRED_CAPABILITIES = [
+    "fuchsia.location.namedplace",
+    "fuchsia.wlan.device.service",
+    "fuchsia.wlan.phyimpl",
+]
+
+_LOGGER: logging.Logger = logging.getLogger(__name__)
+
 
 class Wlan(wlan.Wlan):
     """WLAN affordance implemented with Fuchsia Controller."""
@@ -21,6 +34,7 @@ class Wlan(wlan.Wlan):
     def __init__(
         self,
         device_name: str,
+        ffx: ffx_transport.FFX,
         fuchsia_controller: fc_transport.FuchsiaController,
         reboot_affordance: affordances_capable.RebootCapableDevice,
     ) -> None:
@@ -28,18 +42,40 @@ class Wlan(wlan.Wlan):
 
         Args:
             device_name: Device name returned by `ffx target list`.
+            ffx: FFX transport.
             fuchsia_controller: Fuchsia Controller transport.
             reboot_affordance: Object that implements RebootCapableDevice.
         """
-        self._verify_supported()
+        self._verify_supported(device_name, ffx)
 
-        self._name = device_name
         self._fc_transport = fuchsia_controller
         self._reboot_affordance = reboot_affordance
 
-    def _verify_supported(self) -> None:
-        """Check if WLAN is supported on the DUT."""
-        # TODO(http://b/358690794): Implement this method
+    def _verify_supported(self, device: str, ffx: ffx_transport.FFX) -> None:
+        """Check if WLAN is supported on the DUT.
+
+        Args:
+            device: Device name returned by `ffx target list`.
+            ffx: FFX transport
+
+        Raises:
+            NotSupportedError: A required component capability is not available.
+        """
+        for capability in _REQUIRED_CAPABILITIES:
+            # TODO(http://b/359342196): This is a maintenance burden; find a
+            # better way to detect FIDL component capabilities.
+            if capability not in ffx.run(
+                ["component", "capability", capability]
+            ):
+                _LOGGER.warning(
+                    "All available WLAN component capabilities:\n%s",
+                    ffx.run(["component", "capability", "fuchsia.wlan"]),
+                )
+                raise errors.NotSupportedError(
+                    f'Component capability "{capability}" not exposed by device '
+                    f"{device}; this build of Fuchsia does not support the "
+                    "WLAN FC affordance."
+                )
 
     def connect(
         self,

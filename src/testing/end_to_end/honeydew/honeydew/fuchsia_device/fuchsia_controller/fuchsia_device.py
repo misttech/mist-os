@@ -434,6 +434,7 @@ class FuchsiaDevice(
         """
         return wlan_fc.Wlan(
             device_name=self.device_name,
+            ffx=self.ffx,
             fuchsia_controller=self.fuchsia_controller,
             reboot_affordance=self,
         )

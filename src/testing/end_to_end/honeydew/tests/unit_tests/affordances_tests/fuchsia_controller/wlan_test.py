@@ -7,7 +7,9 @@ import unittest
 from unittest import mock
 
 from honeydew.affordances.fuchsia_controller.wlan import wlan
+from honeydew.errors import NotSupportedError
 from honeydew.interfaces.device_classes import affordances_capable
+from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import fuchsia_controller as fc_transport
 from honeydew.typing.wlan import (
     BssDescription,
@@ -48,12 +50,32 @@ class WlanSL4FTests(unittest.TestCase):
             spec=fc_transport.FuchsiaController,
             autospec=True,
         )
+        self.ffx_transport_obj = mock.MagicMock(
+            spec=ffx_transport.FFX,
+            autospec=True,
+        )
+
+        self.ffx_transport_obj.run.return_value = "".join(
+            wlan._REQUIRED_CAPABILITIES
+        )
 
         self.wlan_obj = wlan.Wlan(
             device_name="fuchsia-emulator",
+            ffx=self.ffx_transport_obj,
             fuchsia_controller=self.fc_transport_obj,
             reboot_affordance=self.reboot_affordance_obj,
         )
+
+    def test_verify_supported(self) -> None:
+        """Test if _verify_supported works."""
+        self.ffx_transport_obj.run.return_value = ""
+        with self.assertRaises(NotSupportedError):
+            self.wlan_obj = wlan.Wlan(
+                device_name="fuchsia-emulator",
+                ffx=self.ffx_transport_obj,
+                fuchsia_controller=self.fc_transport_obj,
+                reboot_affordance=self.reboot_affordance_obj,
+            )
 
     def test_connect(self) -> None:
         """Test if connect works."""
