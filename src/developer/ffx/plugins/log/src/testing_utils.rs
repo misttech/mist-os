@@ -18,6 +18,7 @@ use fidl_fuchsia_diagnostics_host::{
 };
 use futures::channel::{mpsc, oneshot};
 use futures::{Stream, StreamExt, TryStreamExt};
+use log_command::parse_time;
 use moniker::Moniker;
 use std::cell::RefCell;
 use std::collections::HashMap;
@@ -34,12 +35,12 @@ pub struct TestEnvironmentConfig {
     pub send_connected_event: bool,
 }
 
-pub fn test_log_with_severity(timestamp: Timestamp, severity: Severity) -> LogsData {
+pub fn test_log_with_severity(timestamp: impl Into<Timestamp>, severity: Severity) -> LogsData {
     LogsDataBuilder::new(BuilderArgs {
         component_url: Some("ffx".into()),
         moniker: "host/ffx".try_into().unwrap(),
         severity,
-        timestamp_nanos: timestamp,
+        timestamp_nanos: timestamp.into(),
     })
     .set_pid(1)
     .set_tid(2)
@@ -47,12 +48,12 @@ pub fn test_log_with_severity(timestamp: Timestamp, severity: Severity) -> LogsD
     .build()
 }
 
-pub fn test_log(timestamp: Timestamp) -> LogsData {
+pub fn test_log(timestamp: impl Into<Timestamp>) -> LogsData {
     LogsDataBuilder::new(BuilderArgs {
         component_url: Some("ffx".into()),
         moniker: "host/ffx".try_into().unwrap(),
         severity: Severity::Info,
-        timestamp_nanos: timestamp,
+        timestamp_nanos: timestamp.into(),
     })
     .set_pid(1)
     .set_tid(2)
@@ -60,12 +61,12 @@ pub fn test_log(timestamp: Timestamp) -> LogsData {
     .build()
 }
 
-pub fn test_log_with_file(timestamp: Timestamp) -> LogsData {
+pub fn test_log_with_file(timestamp: impl Into<Timestamp>) -> LogsData {
     LogsDataBuilder::new(BuilderArgs {
         component_url: Some("ffx".into()),
         moniker: "host/ffx".try_into().unwrap(),
         severity: Severity::Info,
-        timestamp_nanos: timestamp,
+        timestamp_nanos: timestamp.into(),
     })
     .set_file("test_filename.cc")
     .set_line(42)
@@ -76,18 +77,22 @@ pub fn test_log_with_file(timestamp: Timestamp) -> LogsData {
     .build()
 }
 
-pub fn test_log_with_tag(timestamp: Timestamp) -> LogsData {
+pub fn test_log_with_tag(timestamp: impl Into<Timestamp>) -> LogsData {
     LogsDataBuilder::new(BuilderArgs {
         component_url: Some("ffx".into()),
         moniker: "host/ffx".try_into().unwrap(),
         severity: Severity::Info,
-        timestamp_nanos: timestamp,
+        timestamp_nanos: timestamp.into(),
     })
     .add_tag("test tag")
     .set_pid(1)
     .set_tid(2)
     .set_message("Hello world!")
     .build()
+}
+
+pub fn naive_utc_nanos(utc_time: &str) -> Timestamp {
+    Timestamp::from(parse_time(utc_time).unwrap().time.naive_utc().timestamp_nanos_opt().unwrap())
 }
 
 impl Default for TestEnvironmentConfig {

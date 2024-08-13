@@ -381,6 +381,29 @@ ffx log --force-select.
         assert_eq!(error, EXPECTED_INTEREST_ERROR);
     }
 
+    async fn logger_dump_test(
+        config: TestEnvironmentConfig,
+        cmd: LogCommand,
+        expected_output: &str,
+    ) {
+        let mut environment = TestEnvironment::new(config);
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
+            symbolize: SymbolizeMode::Off,
+            ..cmd
+        };
+
+        let rcs_connector = environment.rcs_connector().await;
+        let tool = LogTool { cmd, rcs_connector };
+        let buffers = TestBuffers::default();
+        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let mut event_stream = environment.take_event_stream().unwrap();
+
+        assert_matches!(tool.main(writer).await, Ok(()));
+        assert_eq!(buffers.into_stdout_str(), expected_output);
+        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
+    }
+
     #[fuchsia::test]
     async fn logger_sets_interest_if_one_match() {
         let selectors = vec![parse_log_interest_selector("core/foo#INFO").unwrap()];
@@ -446,111 +469,60 @@ ffx log --force-select.
 
     #[fuchsia::test]
     async fn logger_does_not_color_logs_if_disabled() {
-        let environment = TestEnvironment::new(TestEnvironmentConfig::default());
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            symbolize: SymbolizeMode::Off,
-            no_color: true,
-            ..LogCommand::default()
-        };
-
-        let rcs_connector = environment.rcs_connector().await;
-        let tool = LogTool { cmd, rcs_connector };
-        let buffers = TestBuffers::default();
-        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
-
-        assert_matches!(tool.main(writer).await, Ok(()));
-        assert_eq!(buffers.into_stdout_str(), "[00000.000000][ffx] INFO: Hello world!\n",);
+        logger_dump_test(
+            TestEnvironmentConfig::default(),
+            LogCommand { no_color: true, ..LogCommand::default() },
+            "[00000.000000][ffx] INFO: Hello world!\n",
+        )
+        .await;
     }
 
     #[fuchsia::test]
     async fn logger_shows_metadata_if_enabled() {
-        let environment = TestEnvironment::new(TestEnvironmentConfig::default());
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            symbolize: SymbolizeMode::Off,
-            no_color: true,
-            show_metadata: true,
-            ..LogCommand::default()
-        };
-
-        let rcs_connector = environment.rcs_connector().await;
-        let tool = LogTool { cmd, rcs_connector };
-        let buffers = TestBuffers::default();
-        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
-
-        assert_matches!(tool.main(writer).await, Ok(()));
-        assert_eq!(buffers.into_stdout_str(), "[00000.000000][1][2][ffx] INFO: Hello world!\n",);
+        logger_dump_test(
+            TestEnvironmentConfig::default(),
+            LogCommand { no_color: true, show_metadata: true, ..LogCommand::default() },
+            "[00000.000000][1][2][ffx] INFO: Hello world!\n",
+        )
+        .await;
     }
 
     #[fuchsia::test]
     async fn logger_shows_utc_time_if_enabled() {
-        let environment = TestEnvironment::new(TestEnvironmentConfig::default());
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            symbolize: SymbolizeMode::Off,
-            clock: TimeFormat::Utc,
-            ..LogCommand::default()
-        };
-
-        let rcs_connector = environment.rcs_connector().await;
-        let tool = LogTool { cmd, rcs_connector };
-        let buffers = TestBuffers::default();
-        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
-
-        assert_matches!(tool.main(writer).await, Ok(()));
-        assert_eq!(
-            buffers.into_stdout_str(),
+        logger_dump_test(
+            TestEnvironmentConfig::default(),
+            LogCommand { clock: TimeFormat::Utc, ..LogCommand::default() },
             "[1970-01-01 00:00:00.000][ffx] INFO: Hello world!\u{1b}[m\n",
-        );
+        )
+        .await;
     }
 
     #[fuchsia::test]
     async fn logger_shows_logs_filtered_by_severity() {
-        let environment = TestEnvironment::new(TestEnvironmentConfig {
-            messages: vec![
-                testing_utils::test_log_with_severity(Timestamp::from(0), Severity::Info),
-                testing_utils::test_log_with_severity(
-                    Timestamp::from(3000000000i64),
-                    Severity::Error,
-                ),
-                testing_utils::test_log_with_severity(
-                    Timestamp::from(6000000000i64),
-                    Severity::Info,
-                ),
-            ],
-            ..Default::default()
-        });
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            symbolize: SymbolizeMode::Off,
-            clock: TimeFormat::Utc,
-            severity: Severity::Error,
-            ..LogCommand::default()
-        };
-
-        let rcs_connector = environment.rcs_connector().await;
-        let tool = LogTool { cmd, rcs_connector };
-        let buffers = TestBuffers::default();
-        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
-
-        assert_matches!(tool.main(writer).await, Ok(()));
-        assert_eq!(
-            buffers.into_stdout_str(),
+        logger_dump_test(
+            TestEnvironmentConfig {
+                messages: vec![
+                    testing_utils::test_log_with_severity(0, Severity::Info),
+                    testing_utils::test_log_with_severity(3000000000i64, Severity::Error),
+                    testing_utils::test_log_with_severity(6000000000i64, Severity::Info),
+                ],
+                ..Default::default()
+            },
+            LogCommand {
+                clock: TimeFormat::Utc,
+                severity: Severity::Error,
+                ..LogCommand::default()
+            },
             "\u{1b}[38;5;1m[1970-01-01 00:00:03.000][ffx] ERROR: Hello world!\u{1b}[m\n",
-        );
+        )
+        .await;
     }
 
     #[fuchsia::test]
     async fn logger_shows_logs_since_specific_timestamp_across_reboots() {
         let mut environment = TestEnvironment::new(TestEnvironmentConfig {
-            messages: vec![testing_utils::test_log(Timestamp::from(
-                parse_time("1980-01-01T00:00:03")
-                    .unwrap()
-                    .time
-                    .naive_utc()
-                    .timestamp_nanos_opt()
-                    .unwrap(),
+            messages: vec![testing_utils::test_log(testing_utils::naive_utc_nanos(
+                "1980-01-01T00:00:03",
             ))],
             send_connected_event: true,
             ..Default::default()
@@ -608,13 +580,8 @@ ffx log --force-select.
     #[fuchsia::test]
     async fn logger_shows_logs_since_specific_timestamp_across_reboots_heuristic() {
         let mut environment = TestEnvironment::new(TestEnvironmentConfig {
-            messages: vec![testing_utils::test_log(Timestamp::from(
-                parse_time("1980-01-01T00:00:03")
-                    .unwrap()
-                    .time
-                    .naive_utc()
-                    .timestamp_nanos_opt()
-                    .unwrap(),
+            messages: vec![testing_utils::test_log(testing_utils::naive_utc_nanos(
+                "1980-01-01T00:00:03",
             ))],
             send_connected_event: true,
             ..Default::default()
@@ -682,228 +649,117 @@ ffx log --force-select.
 
     #[fuchsia::test]
     async fn logger_shows_logs_since_specific_timestamp() {
-        let mut environment = TestEnvironment::new(TestEnvironmentConfig {
-            messages: vec![
-                testing_utils::test_log(Timestamp::from(
-                    parse_time("1980-01-01T00:00:00")
-                        .unwrap()
-                        .time
-                        .naive_utc()
-                        .timestamp_nanos_opt()
-                        .unwrap(),
-                )),
-                testing_utils::test_log(Timestamp::from(
-                    parse_time("1980-01-01T00:00:03")
-                        .unwrap()
-                        .time
-                        .naive_utc()
-                        .timestamp_nanos_opt()
-                        .unwrap(),
-                )),
-                testing_utils::test_log(Timestamp::from(
-                    parse_time("1980-01-01T00:00:06")
-                        .unwrap()
-                        .time
-                        .naive_utc()
-                        .timestamp_nanos_opt()
-                        .unwrap(),
-                )),
-            ],
-            ..Default::default()
-        });
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            symbolize: SymbolizeMode::Off,
-            since: Some(parse_time("1980-01-01T00:00:01").unwrap()),
-            until: Some(parse_time("1980-01-01T00:00:05").unwrap()),
-            clock: TimeFormat::Utc,
-            ..LogCommand::default()
-        };
-
-        let rcs_connector = environment.rcs_connector().await;
-        let tool = LogTool { cmd, rcs_connector };
-        let buffers = TestBuffers::default();
-        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
-        let mut event_stream = environment.take_event_stream().unwrap();
-
-        assert_matches!(tool.main(writer).await, Ok(()));
-        assert_eq!(
-            buffers.into_stdout_str(),
+        logger_dump_test(
+            TestEnvironmentConfig {
+                messages: vec![
+                    testing_utils::test_log(testing_utils::naive_utc_nanos("1980-01-01T00:00:00")),
+                    testing_utils::test_log(testing_utils::naive_utc_nanos("1980-01-01T00:00:03")),
+                    testing_utils::test_log(testing_utils::naive_utc_nanos("1980-01-01T00:00:06")),
+                ],
+                ..Default::default()
+            },
+            LogCommand {
+                since: Some(parse_time("1980-01-01T00:00:01").unwrap()),
+                until: Some(parse_time("1980-01-01T00:00:05").unwrap()),
+                clock: TimeFormat::Utc,
+                ..LogCommand::default()
+            },
             "[1980-01-01 00:00:03.000][ffx] INFO: Hello world!\u{1b}[m\n",
-        );
-
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
+        )
+        .await;
     }
 
     #[fuchsia::test]
     async fn logger_shows_logs_since_specific_timestamp_monotonic() {
-        let mut environment = TestEnvironment::new(TestEnvironmentConfig {
-            messages: vec![
-                testing_utils::test_log(Timestamp::from(0)),
-                testing_utils::test_log(Timestamp::from(3000000000i64)),
-                testing_utils::test_log(Timestamp::from(6000000000i64)),
-            ],
-            ..Default::default()
-        });
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            symbolize: SymbolizeMode::Off,
-            clock: TimeFormat::Utc,
-            since_monotonic: Some(parse_seconds_string_as_duration("1").unwrap()),
-            until_monotonic: Some(parse_seconds_string_as_duration("5").unwrap()),
-            ..LogCommand::default()
-        };
-        let mut event_stream = environment.take_event_stream().unwrap();
-
-        let rcs_connector = environment.rcs_connector().await;
-        let tool = LogTool { cmd, rcs_connector };
-        let buffers = TestBuffers::default();
-        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
-
-        assert_matches!(tool.main(writer).await, Ok(()));
-        assert_eq!(
-            buffers.into_stdout_str(),
+        logger_dump_test(
+            TestEnvironmentConfig {
+                messages: vec![
+                    testing_utils::test_log(0),
+                    testing_utils::test_log(3000000000i64),
+                    testing_utils::test_log(6000000000i64),
+                ],
+                ..Default::default()
+            },
+            LogCommand {
+                clock: TimeFormat::Utc,
+                since_monotonic: Some(parse_seconds_string_as_duration("1").unwrap()),
+                until_monotonic: Some(parse_seconds_string_as_duration("5").unwrap()),
+                ..LogCommand::default()
+            },
             "[1970-01-01 00:00:03.000][ffx] INFO: Hello world!\u{1b}[m\n",
-        );
-
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
+        )
+        .await;
     }
 
     #[fuchsia::test]
     async fn logger_shows_local_time_if_enabled() {
-        let mut environment = TestEnvironment::new(TestEnvironmentConfig::default());
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            symbolize: SymbolizeMode::Off,
-            clock: TimeFormat::Local,
-            ..LogCommand::default()
-        };
-        let mut event_stream = environment.take_event_stream().unwrap();
-
-        let rcs_connector = environment.rcs_connector().await;
-        let tool = LogTool { cmd, rcs_connector };
-        let buffers = TestBuffers::default();
-        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
-
-        assert_matches!(tool.main(writer).await, Ok(()));
-        assert_eq!(
-            buffers.into_stdout_str(),
-            format!(
+        logger_dump_test(
+            TestEnvironmentConfig::default(),
+            LogCommand { clock: TimeFormat::Local, ..LogCommand::default() },
+            &format!(
                 "[{}][ffx] INFO: Hello world!\u{1b}[m\n",
                 Local.timestamp_opt(0, 1).unwrap().format(TIMESTAMP_FORMAT)
-            )
-        );
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
+            ),
+        )
+        .await;
     }
 
     #[fuchsia::test]
     async fn logger_shows_tags_by_default() {
-        let mut environment = TestEnvironment::new(TestEnvironmentConfig {
-            messages: vec![testing_utils::test_log_with_tag(Timestamp::from(0))],
-            ..Default::default()
-        });
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            symbolize: SymbolizeMode::Off,
-            ..LogCommand::default()
-        };
-        let mut event_stream = environment.take_event_stream().unwrap();
-
-        let rcs_connector = environment.rcs_connector().await;
-        let tool = LogTool { cmd, rcs_connector };
-        let buffers = TestBuffers::default();
-        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
-
-        assert_matches!(tool.main(writer).await, Ok(()));
-
-        assert_eq!(
-            buffers.into_stdout_str(),
+        logger_dump_test(
+            TestEnvironmentConfig {
+                messages: vec![testing_utils::test_log_with_tag(0)],
+                ..Default::default()
+            },
+            LogCommand::default(),
             "[00000.000000][ffx][test tag] INFO: Hello world!\u{1b}[m\n",
-        );
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
+        )
+        .await;
     }
 
     #[fuchsia::test]
     async fn logger_hides_full_moniker_by_default() {
-        let mut environment = TestEnvironment::new(TestEnvironmentConfig {
-            messages: vec![testing_utils::test_log_with_tag(Timestamp::from(0))],
-            ..Default::default()
-        });
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            symbolize: SymbolizeMode::Off,
-            ..LogCommand::default()
-        };
-        let mut event_stream = environment.take_event_stream().unwrap();
-
-        let rcs_connector = environment.rcs_connector().await;
-        let tool = LogTool { cmd, rcs_connector };
-        let buffers = TestBuffers::default();
-        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
-
-        assert_matches!(tool.main(writer).await, Ok(()));
-        assert_eq!(
-            buffers.into_stdout_str(),
-            "[00000.000000][ffx][test tag] INFO: Hello world!\u{1b}[m\n"
-        );
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
+        logger_dump_test(
+            TestEnvironmentConfig {
+                messages: vec![testing_utils::test_log_with_tag(0)],
+                ..Default::default()
+            },
+            LogCommand::default(),
+            "[00000.000000][ffx][test tag] INFO: Hello world!\u{1b}[m\n",
+        )
+        .await;
     }
 
     #[fuchsia::test]
     async fn logger_shows_full_moniker_when_enabled() {
-        let mut environment = TestEnvironment::new(TestEnvironmentConfig {
-            messages: vec![testing_utils::test_log_with_tag(Timestamp::from(0))],
-            ..Default::default()
-        });
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            symbolize: SymbolizeMode::Off,
-            show_full_moniker: true,
-            ..LogCommand::default()
-        };
-        let mut event_stream = environment.take_event_stream().unwrap();
-
-        let rcs_connector = environment.rcs_connector().await;
-        let tool = LogTool { cmd, rcs_connector };
-        let buffers = TestBuffers::default();
-        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
-
-        assert_matches!(tool.main(writer).await, Ok(()));
-        assert_eq!(
-            buffers.into_stdout_str(),
-            "[00000.000000][host/ffx][test tag] INFO: Hello world!\u{1b}[m\n"
-        );
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
+        logger_dump_test(
+            TestEnvironmentConfig {
+                messages: vec![testing_utils::test_log_with_tag(0)],
+                ..Default::default()
+            },
+            LogCommand { show_full_moniker: true, ..LogCommand::default() },
+            "[00000.000000][host/ffx][test tag] INFO: Hello world!\u{1b}[m\n",
+        )
+        .await;
     }
 
     #[fuchsia::test]
     async fn logger_hides_tag_when_instructed() {
-        let mut environment = TestEnvironment::new(TestEnvironmentConfig {
-            messages: vec![testing_utils::test_log_with_tag(Timestamp::from(0))],
-            ..Default::default()
-        });
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            symbolize: SymbolizeMode::Off,
-            hide_tags: true,
-            ..LogCommand::default()
-        };
-        let mut event_stream = environment.take_event_stream().unwrap();
-
-        let rcs_connector = environment.rcs_connector().await;
-        let tool = LogTool { cmd, rcs_connector };
-        let buffers = TestBuffers::default();
-        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
-
-        assert_matches!(tool.main(writer).await, Ok(()));
-        assert_eq!(buffers.into_stdout_str(), "[00000.000000][ffx] INFO: Hello world!\u{1b}[m\n",);
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
+        logger_dump_test(
+            TestEnvironmentConfig {
+                messages: vec![testing_utils::test_log_with_tag(0)],
+                ..Default::default()
+            },
+            LogCommand { hide_tags: true, ..LogCommand::default() },
+            "[00000.000000][ffx] INFO: Hello world!\u{1b}[m\n",
+        )
+        .await;
     }
 
     #[fuchsia::test]
     async fn logger_sets_severity_appropriately_then_exits() {
         let mut environment = TestEnvironment::new(TestEnvironmentConfig {
-            messages: vec![testing_utils::test_log(Timestamp::from(0))],
+            messages: vec![testing_utils::test_log(0)],
             ..Default::default()
         });
         let selector = vec![parse_log_interest_selector("archivist.cm#TRACE").unwrap()];
@@ -931,55 +787,28 @@ ffx log --force-select.
 
     #[fuchsia::test]
     async fn logger_shows_file_names_by_default() {
-        let mut environment = TestEnvironment::new(TestEnvironmentConfig {
-            messages: vec![testing_utils::test_log_with_file(Timestamp::from(0))],
-            ..Default::default()
-        });
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            symbolize: SymbolizeMode::Off,
-            ..LogCommand::default()
-        };
-        let mut event_stream = environment.take_event_stream().unwrap();
-
-        let rcs_connector = environment.rcs_connector().await;
-        let tool = LogTool { cmd, rcs_connector };
-        let buffers = TestBuffers::default();
-        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
-
-        assert_matches!(tool.main(writer).await, Ok(()));
-        assert_eq!(
-            buffers.into_stdout_str(),
+        logger_dump_test(
+            TestEnvironmentConfig {
+                messages: vec![testing_utils::test_log_with_file(0)],
+                ..Default::default()
+            },
+            LogCommand::default(),
             "[00000.000000][ffx][test tag] INFO: [test_filename.cc(42)] Hello world!\u{1b}[m\n",
-        );
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
+        )
+        .await;
     }
 
     #[fuchsia::test]
     async fn logger_hides_filename_if_disabled() {
-        let mut environment = TestEnvironment::new(TestEnvironmentConfig {
-            messages: vec![testing_utils::test_log_with_file(Timestamp::from(0))],
-            ..Default::default()
-        });
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            symbolize: SymbolizeMode::Off,
-            hide_file: true,
-            ..LogCommand::default()
-        };
-        let mut event_stream = environment.take_event_stream().unwrap();
-
-        let rcs_connector = environment.rcs_connector().await;
-        let tool = LogTool { cmd, rcs_connector };
-        let buffers = TestBuffers::default();
-        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
-
-        assert_matches!(tool.main(writer).await, Ok(()));
-        assert_eq!(
-            buffers.into_stdout_str(),
+        logger_dump_test(
+            TestEnvironmentConfig {
+                messages: vec![testing_utils::test_log_with_file(0)],
+                ..Default::default()
+            },
+            LogCommand { hide_file: true, ..LogCommand::default() },
             "[00000.000000][ffx][test tag] INFO: Hello world!\u{1b}[m\n",
-        );
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
+        )
+        .await;
     }
 
     #[fuchsia::test]
