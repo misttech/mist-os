@@ -63,7 +63,6 @@ source_set("cpp_disable_synchronization_check") {
   #
   # TODO(https://fxbug.dev/42065251): Fix all deps in this allowlist and remove it.
   visibility = [
-    "//src/developer/adb/bin/adb-file-sync:adb-file-sync",
     "//src/devices/light-sensor/drivers/ams-light:ams-light-test-bin",
     "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
     "//src/ui/input/drivers/gt6853:gt6853-test",

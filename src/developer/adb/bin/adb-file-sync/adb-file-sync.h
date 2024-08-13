@@ -19,12 +19,11 @@ namespace adb_file_sync {
 class AdbFileSync : public AdbFileSyncBase,
                     public fidl::WireServer<fuchsia_hardware_adb::Provider> {
  public:
-  explicit AdbFileSync(adb_file_sync_config::Config config)
-      : context_(std::make_unique<sys::ComponentContext>(
-            sys::ServiceDirectory::CreateFromNamespace(), loop_.dispatcher())),
-        config_(std::move(config)) {
-    loop_.StartThread("adb-file-sync-thread");
-  }
+  explicit AdbFileSync(adb_file_sync_config::Config config, async_dispatcher_t* dispatcher)
+      : dispatcher_(dispatcher),
+        context_(std::make_unique<sys::ComponentContext>(
+            sys::ServiceDirectory::CreateFromNamespace(), dispatcher)),
+        config_(std::move(config)) {}
 
   static zx_status_t StartService(adb_file_sync_config::Config config);
   void OnUnbound(fidl::UnbindInfo info, fidl::ServerEnd<fuchsia_hardware_adb::Provider> server_end);
@@ -35,14 +34,14 @@ class AdbFileSync : public AdbFileSyncBase,
   zx::result<zx::channel> ConnectToComponent(std::string name,
                                              std::vector<std::string>* out_path) override;
 
-  async_dispatcher_t* dispatcher() { return loop_.dispatcher(); }
+  async_dispatcher_t* dispatcher() { return dispatcher_; }
 
  private:
   friend class AdbFileSyncTest;
 
   zx_status_t ConnectToAdbDevice(zx::channel chan);
 
-  async::Loop loop_ = async::Loop(&kAsyncLoopConfigNeverAttachToThread);
+  async_dispatcher_t* dispatcher_;
   std::unique_ptr<sys::ComponentContext> context_;
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_adb::Provider>> binding_ref_;
   adb_file_sync_config::Config config_;
