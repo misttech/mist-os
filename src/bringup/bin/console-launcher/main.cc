@@ -286,7 +286,7 @@ std::vector<std::thread> LaunchAutorun(const console_launcher::ConsoleLauncher& 
 int main(int argv, char** argc) {
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   fuchsia_logging::LogSettingsBuilder builder;
-  builder.WithDispatcher(loop.dispatcher()).BuildAndInitializeWithTags({"console-launcher"});
+  builder.WithTags({"console-launcher"}).WithDispatcher(loop.dispatcher()).BuildAndInitialize();
 
   if (zx_status_t status = StdoutToDebuglog::Init(); status != ZX_OK) {
     FX_PLOGS(ERROR, status)
