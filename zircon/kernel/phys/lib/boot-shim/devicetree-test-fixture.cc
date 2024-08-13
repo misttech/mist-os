@@ -26,6 +26,7 @@ std::optional<LoadedDtb> ArmDevicetreeTest::khadas_vim3_ = std::nullopt;
 std::optional<LoadedDtb> RiscvDevicetreeTest::qemu_riscv_ = std::nullopt;
 std::optional<LoadedDtb> RiscvDevicetreeTest::sifive_hifive_unmatched_ = std::nullopt;
 std::optional<LoadedDtb> RiscvDevicetreeTest::vision_five_2_ = std::nullopt;
+std::optional<LoadedDtb> RiscvDevicetreeTest::banana_pi_f3_ = std::nullopt;
 
 void CheckCpuTopology(cpp20::span<const zbi_topology_node_t> actual_nodes,
                       cpp20::span<const zbi_topology_node_t> expected_nodes) {

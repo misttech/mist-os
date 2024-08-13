@@ -150,4 +150,28 @@ TEST_F(RiscvDevicetreeTimerItemTest, SifiveHifiveUnmatched) {
   ASSERT_TRUE(present);
 }
 
+TEST_F(RiscvDevicetreeTimerItemTest, BananaPiF3) {
+  std::array<std::byte, 512> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = banana_pi_f3();
+  boot_shim::DevicetreeBootShim<boot_shim::RiscvDevicetreeTimerItem> shim("test", fdt);
+  ASSERT_TRUE(shim.Init());
+  ASSERT_TRUE(shim.AppendItems(image).is_ok());
+
+  bool present = false;
+  auto clear_err = fit::defer([&]() { image.ignore_error(); });
+  for (auto [header, payload] : image) {
+    if (header->type == ZBI_TYPE_KERNEL_DRIVER &&
+        header->extra == ZBI_KERNEL_DRIVER_RISCV_GENERIC_TIMER) {
+      EXPECT_GE(payload.size(), sizeof(zbi_dcfg_riscv_generic_timer_driver_t));
+      auto* dcfg = reinterpret_cast<zbi_dcfg_riscv_generic_timer_driver_t*>(payload.data());
+      EXPECT_EQ(dcfg->freq_hz, 0x16E3600);
+      present = true;
+    }
+  }
+  ASSERT_TRUE(present);
+}
+
 }  // namespace

@@ -413,4 +413,67 @@ TEST_F(MemoryMatcherTest, KhadasVim3) {
   EXPECT_EQ(ranges[3].type, memalloc::Type::kReserved);
 }
 
+TEST_F(MemoryMatcherTest, BananaPiF3) {
+  std::vector<memalloc::Range> storage(13);
+
+  auto fdt = banana_pi_f3();
+  boot_shim::DevicetreeMemoryMatcher memory_matcher("test", stdout, storage);
+
+  ASSERT_TRUE(devicetree::Match(fdt, memory_matcher));
+  auto ranges = memory_matcher.ranges();
+  ASSERT_EQ(ranges.size(), 13);
+
+  EXPECT_EQ(ranges[0].addr, 0x00);
+  EXPECT_EQ(ranges[0].size, 0x80000000);
+  EXPECT_EQ(ranges[0].type, memalloc::Type::kFreeRam);
+
+  EXPECT_EQ(ranges[1].addr, 0x100000000);
+  EXPECT_EQ(ranges[1].size, 0x80000000);
+  EXPECT_EQ(ranges[1].type, memalloc::Type::kFreeRam);
+
+  EXPECT_EQ(ranges[2].addr, 0x0);
+  EXPECT_EQ(ranges[2].size, 0x80000);
+  EXPECT_EQ(ranges[2].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[3].addr, 0x80000000);
+  EXPECT_EQ(ranges[3].size, 0x40800000);
+  EXPECT_EQ(ranges[3].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[4].addr, 0xc0800000);
+  EXPECT_EQ(ranges[4].size, 0x40000);
+  EXPECT_EQ(ranges[4].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[5].addr, 0xc0840000);
+  EXPECT_EQ(ranges[5].size, 0x3f7c0000);
+  EXPECT_EQ(ranges[5].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[6].addr, 0x30000000);
+  EXPECT_EQ(ranges[6].size, 0x200000);
+  EXPECT_EQ(ranges[6].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[7].addr, 0x30200000);
+  EXPECT_EQ(ranges[7].size, 0x3000);
+  EXPECT_EQ(ranges[7].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[8].addr, 0x30203000);
+  EXPECT_EQ(ranges[8].size, 0x3000);
+  EXPECT_EQ(ranges[8].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[9].addr, 0x30206000);
+  EXPECT_EQ(ranges[9].size, 0xf6000);
+  EXPECT_EQ(ranges[9].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[10].addr, 0x302fc000);
+  EXPECT_EQ(ranges[10].size, 0x4000);
+  EXPECT_EQ(ranges[10].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[11].addr, 0x30300000);
+  EXPECT_EQ(ranges[11].size, 0x40000);
+  EXPECT_EQ(ranges[11].type, memalloc::Type::kReserved);
+
+  EXPECT_EQ(ranges[12].addr, 0x2ff40000);
+  EXPECT_EQ(ranges[12].size, 0xc0000);
+  EXPECT_EQ(ranges[12].type, memalloc::Type::kReserved);
+}
+
 }  // namespace

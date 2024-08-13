@@ -19,7 +19,6 @@
 #include <vector>
 
 #include <zxtest/zxtest.h>
-
 namespace {
 using boot_shim::testing::LoadDtb;
 using boot_shim::testing::LoadedDtb;
@@ -1095,6 +1094,259 @@ TEST_F(RiscvDevicetreeCpuTopologyItemTest, HifiveSifiveUnmatched) {
     } else if (header->type == ZBI_TYPE_RISCV64_ISA_STRTAB) {
       string_table_present = true;
       ASSERT_NO_FATAL_FAILURE(ExpectStringTable({kHart0IsaString, kCommonHartIsaString}, payload));
+    }
+  }
+  EXPECT_TRUE(topology_present);
+  EXPECT_TRUE(string_table_present);
+}
+
+TEST_F(RiscvDevicetreeCpuTopologyItemTest, BananaPiF3) {
+  constexpr std::string_view kHart0IsaString =
+      "rv64imafdcv_zicsr_zifencei_zicbom_zicboz_zicbop_zihintpause_zicond_zba_zbb_zbc_zbs_svpbmt_sstc_sscofpmf";  // strtab index 1
+  constexpr std::array
+      kExpectedTopology =
+          {
+              // cluster0
+              zbi_topology_node_t{
+                  .entity =
+                      {
+                          .discriminant = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+                          .cluster =
+                              {
+                                  .performance_class = 0xFF,
+                              },
+                      },
+                  .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+              },
+
+              // cpu@2
+              zbi_topology_node_t{
+                  .entity =
+                      {
+                          .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                          .processor =
+                              {
+                                  .architecture_info =
+                                      {
+                                          .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                          .riscv64 =
+                                              {
+                                                  .hart_id = 0,
+                                                  .isa_strtab_index = 1,
+                                              },
+                                      },
+                                  .flags = 0,
+                                  .logical_ids = {2, 0, 0, 0},
+                                  .logical_id_count = 1,
+                              },
+                      },
+                  .parent_index = 0,
+              },
+
+              // cpu@1
+              zbi_topology_node_t{
+                  .entity =
+                      {
+                          .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                          .processor =
+                              {
+                                  .architecture_info =
+                                      {
+                                          .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                          .riscv64 =
+                                              {
+                                                  .hart_id = 1,
+                                                  .isa_strtab_index = 1,
+                                              },
+                                      },
+                                  .flags = 0,
+                                  .logical_ids = {1, 0, 0, 0},
+                                  .logical_id_count = 1,
+                              },
+                      },
+                  .parent_index = 0,
+              },
+
+              // cpu@0
+              zbi_topology_node_t{
+                  .entity =
+                      {
+                          .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                          .processor =
+                              {
+                                  .architecture_info =
+                                      {
+                                          .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                          .riscv64 =
+                                              {
+                                                  .hart_id = 2,
+                                                  .isa_strtab_index = 1,
+                                              },
+                                      },
+                                  .flags = ZBI_TOPOLOGY_PROCESSOR_FLAGS_PRIMARY,
+                                  .logical_ids = {0, 0, 0, 0},
+                                  .logical_id_count = 1,
+                              },
+                      },
+                  .parent_index = 0,
+              },
+
+              // cpu@3
+              zbi_topology_node_t{
+                  .entity =
+                      {
+                          .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                          .processor =
+                              {
+                                  .architecture_info =
+                                      {
+                                          .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                          .riscv64 =
+                                              {
+                                                  .hart_id = 3,
+                                                  .isa_strtab_index = 1,
+                                              },
+                                      },
+                                  .flags = 0,
+                                  .logical_ids = {3, 0, 0, 0},
+                                  .logical_id_count = 1,
+                              },
+                      },
+                  .parent_index = 0,
+              },
+
+              // cluster1
+              zbi_topology_node_t{
+                  .entity =
+                      {
+                          .discriminant = ZBI_TOPOLOGY_ENTITY_CLUSTER,
+                          .cluster =
+                              {
+                                  .performance_class = 0xFF,
+                              },
+                      },
+                  .parent_index = ZBI_TOPOLOGY_NO_PARENT,
+              },
+
+              // cpu@4
+              zbi_topology_node_t{
+                  .entity =
+                      {
+                          .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                          .processor =
+                              {
+                                  .architecture_info =
+                                      {
+                                          .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                          .riscv64 =
+                                              {
+                                                  .hart_id = 4,
+                                                  .isa_strtab_index = 1,
+                                              },
+                                      },
+                                  .flags = 0,
+                                  .logical_ids = {4, 0, 0, 0},
+                                  .logical_id_count = 1,
+                              },
+                      },
+                  .parent_index = 5,
+              },
+
+              // cpu@5
+              zbi_topology_node_t{
+                  .entity =
+                      {
+                          .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                          .processor =
+                              {
+                                  .architecture_info =
+                                      {
+                                          .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                          .riscv64 =
+                                              {
+                                                  .hart_id = 5,
+                                                  .isa_strtab_index = 1,
+                                              },
+                                      },
+                                  .flags = 0,
+                                  .logical_ids = {5, 0, 0, 0},
+                                  .logical_id_count = 1,
+                              },
+                      },
+                  .parent_index = 5,
+              },
+
+              // cpu@6
+              zbi_topology_node_t{
+                  .entity =
+                      {
+                          .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                          .processor =
+                              {
+                                  .architecture_info =
+                                      {
+                                          .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                          .riscv64 =
+                                              {
+                                                  .hart_id = 6,
+                                                  .isa_strtab_index = 1,
+                                              },
+                                      },
+                                  .flags = 0,
+                                  .logical_ids = {6, 0, 0, 0},
+                                  .logical_id_count = 1,
+                              },
+                      },
+                  .parent_index = 5,
+              },
+
+              // cpu@7
+              zbi_topology_node_t{
+                  .entity =
+                      {
+                          .discriminant = ZBI_TOPOLOGY_ENTITY_PROCESSOR,
+                          .processor =
+                              {
+                                  .architecture_info =
+                                      {
+                                          .discriminant = ZBI_TOPOLOGY_ARCHITECTURE_INFO_RISCV64,
+                                          .riscv64 =
+                                              {
+                                                  .hart_id = 7,
+                                                  .isa_strtab_index = 1,
+                                              },
+                                      },
+                                  .flags = 0,
+                                  .logical_ids = {7, 0, 0, 0},
+                                  .logical_id_count = 1,
+                              },
+                      },
+                  .parent_index = 5,
+              },
+          };
+
+  std::array<std::byte, 1024> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = banana_pi_f3();
+  boot_shim::DevicetreeBootShim<RiscvDevicetreeCpuTopologyItem<2>> shim("test", fdt);
+  shim.set_allocator(TestAllocator());
+
+  ASSERT_TRUE(shim.Init());
+  auto clear_errors = fit::defer([&]() { image.ignore_error(); });
+  ASSERT_TRUE(shim.AppendItems(image).is_ok());
+  bool topology_present = false;
+  bool string_table_present = false;
+  for (auto [header, payload] : image) {
+    if (header->type == ZBI_TYPE_CPU_TOPOLOGY) {
+      topology_present = true;
+      cpp20::span<zbi_topology_node_t> nodes(reinterpret_cast<zbi_topology_node_t*>(payload.data()),
+                                             payload.size() / sizeof(zbi_topology_node_t));
+      boot_shim::testing::CheckCpuTopology(nodes, kExpectedTopology);
+    } else if (header->type == ZBI_TYPE_RISCV64_ISA_STRTAB) {
+      string_table_present = true;
+      ASSERT_NO_FATAL_FAILURE(ExpectStringTable({kHart0IsaString}, payload));
     }
   }
   EXPECT_TRUE(topology_present);

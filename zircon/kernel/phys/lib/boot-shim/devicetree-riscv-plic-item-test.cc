@@ -139,6 +139,31 @@ TEST_F(RiscvDevicetreePlicItemTest, HifiveSifiveUnmatched) {
   ASSERT_TRUE(present);
 }
 
+TEST_F(RiscvDevicetreePlicItemTest, BananaPiF3) {
+  std::array<std::byte, 512> image_buffer;
+  zbitl::Image<cpp20::span<std::byte>> image(image_buffer);
+  ASSERT_TRUE(image.clear().is_ok());
+
+  auto fdt = banana_pi_f3();
+  boot_shim::DevicetreeBootShim<boot_shim::RiscvDevicetreePlicItem> shim("test", fdt);
+
+  ASSERT_TRUE(shim.Init());
+  ASSERT_TRUE(shim.AppendItems(image).is_ok());
+  auto clear_err = fit::defer([&]() { image.ignore_error(); });
+
+  bool present = false;
+  for (auto [header, payload] : image) {
+    if (header->type == ZBI_TYPE_KERNEL_DRIVER && header->extra == ZBI_KERNEL_DRIVER_RISCV_PLIC) {
+      ASSERT_GE(payload.size(), sizeof(zbi_dcfg_riscv_plic_driver_t));
+      auto* plic_dcfg = reinterpret_cast<zbi_dcfg_riscv_plic_driver_t*>(payload.data());
+      EXPECT_EQ(plic_dcfg->mmio_phys, 0xe0000000);
+      EXPECT_EQ(plic_dcfg->num_irqs, 0x9f);
+      present = true;
+    }
+  }
+  ASSERT_TRUE(present);
+}
+
 TEST_F(RiscvDevicetreePlicItemTest, MissingNode) {
   std::array<std::byte, 512> image_buffer;
   zbitl::Image<cpp20::span<std::byte>> image(image_buffer);

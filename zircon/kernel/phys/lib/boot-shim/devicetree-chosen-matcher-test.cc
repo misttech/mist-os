@@ -9,6 +9,7 @@
 #include <lib/boot-shim/testing/devicetree-test-fixture.h>
 #include <lib/fit/defer.h>
 #include <lib/uart/amlogic.h>
+#include <lib/uart/ns8250.h>
 #include <lib/zbi-format/driver-config.h>
 #include <lib/zbitl/image.h>
 
@@ -75,7 +76,8 @@ struct ExpectedChosen {
 
 using AllUartDrivers =
     std::variant<uart::null::Driver, uart::ns8250::Dw8250Driver, uart::pl011::Driver,
-                 uart::ns8250::Mmio8Driver, uart::ns8250::Mmio32Driver, uart::amlogic::Driver>;
+                 uart::ns8250::Mmio8Driver, uart::ns8250::Mmio32Driver, uart::amlogic::Driver,
+                 uart::ns8250::PxaDriver>;
 
 template <typename ChosenItemType>
 void CheckChosenMatcher(const ChosenItemType& matcher, const ExpectedChosen& expected) {
@@ -361,6 +363,31 @@ TEST_F(ChosenNodeMatcherTest, KhadasVim3) {
                              },
                          .uart_absolute_path = "/soc/bus@ff800000/serial@3000",
                      });
+}
+
+TEST_F(ChosenNodeMatcherTest, BananaPiF3) {
+  constexpr std::string_view kCmdline =
+      "earlycon=sbi earlyprintk console=tty1 console=ttyS0,115200 loglevel=8 clk_ignore_unused swiotlb=65536 "
+      "rdinit=/init root=/dev/mmcblk2p6 rootwait rootfstype=ext4";
+
+  auto fdt = banana_pi_f3();
+  boot_shim::DevicetreeChosenNodeMatcher<AllUartDrivers> chosen_matcher("test", stdout);
+
+  ASSERT_TRUE(devicetree::Match(fdt, chosen_matcher));
+
+  CheckChosenMatcher(chosen_matcher, {
+                                         .ramdisk_start = 0x7685c000,
+                                         .ramdisk_end = 0x76ebf76b,
+                                         .cmdline = kCmdline,
+                                         .uart_config_name = uart::ns8250::PxaDriver::config_name(),
+                                         .uart_config =
+                                             {
+                                                 .mmio_phys = 0xd4017000,
+                                                 .irq = 0x2a,
+                                                 .flags = 0,
+                                             },
+                                         .uart_absolute_path = "/soc/serial@d4017000",
+                                     });
 }
 
 }  // namespace

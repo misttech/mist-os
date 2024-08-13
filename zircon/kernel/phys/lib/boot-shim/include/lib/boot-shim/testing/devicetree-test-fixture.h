@@ -123,22 +123,29 @@ class RiscvDevicetreeTest {
     loaded_dtb = LoadDtb("vision-five-2.dtb");
     ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
     vision_five_2_ = std::move(loaded_dtb).value();
+
+    loaded_dtb = LoadDtb("banana-pi-f3.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    banana_pi_f3_ = std::move(loaded_dtb).value();
   }
 
   static void TearDownTestSuite() {
     qemu_riscv_ = std::nullopt;
     vision_five_2_ = std::nullopt;
     sifive_hifive_unmatched_ = std::nullopt;
+    banana_pi_f3_ = std::nullopt;
   }
 
   devicetree::Devicetree qemu_riscv() { return qemu_riscv_->fdt(); }
   devicetree::Devicetree sifive_hifive_unmatched() { return sifive_hifive_unmatched_->fdt(); }
   devicetree::Devicetree vision_five_2() { return vision_five_2_->fdt(); }
+  devicetree::Devicetree banana_pi_f3() { return banana_pi_f3_->fdt(); }
 
  private:
   static std::optional<LoadedDtb> qemu_riscv_;
   static std::optional<LoadedDtb> sifive_hifive_unmatched_;
   static std::optional<LoadedDtb> vision_five_2_;
+  static std::optional<LoadedDtb> banana_pi_f3_;
 };
 
 // Template that combines architecture fixtures into a single Test fixture.
