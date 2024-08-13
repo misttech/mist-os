@@ -376,8 +376,8 @@ TEST_F(ProcMountsTest, Basic) {
     GTEST_SKIP() << "ProcMountsTest::Basic can not be run on Linux, skipping.";
   }
   EXPECT_THAT(read_mounts(), IsSupersetOf({
-                                 "data/system / remote_bundle rw 0 0",
-                                 "none /dev tmpfs rw 0 0",
+                                 "data/system / remote_bundle rw,nosuid,nodev 0 0",
+                                 "none /dev tmpfs rw,nosuid 0 0",
                                  ". /tmp tmpfs rw 0 0",
                              }));
 }

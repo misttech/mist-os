@@ -8,7 +8,7 @@
         features: [ "container" ],
         init: [],
         kernel_cmdline: "",
-        mounts: [ "/:remotefs" ],
+        mounts: [ "/:remotefs::nosuid,nodev,relatime" ],
         name: "empty_container",
         startup_file_path: "",
     },
