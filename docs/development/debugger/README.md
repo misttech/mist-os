@@ -134,6 +134,10 @@ Once you have successfully connected to the `zxdb` debugger, you may want to:
 * [Work with exceptions][zxdb-exceptions]
 * [See advanced zxdb topics][zxdb-advanced]
 
+Additionally, you can also follow the zxdb tutorials:
+
+* [Tutorial: Debug tests using zxdb][zxdb-testing-tutorial]
+
 
 [zxdb-troubleshooting]: /docs/development/debugger/troubleshooting.md
 [zxdb-commands]: /docs/development/debugger/commands.md
@@ -147,6 +151,7 @@ Once you have successfully connected to the `zxdb` debugger, you may want to:
 [zxdb-symbols]: /docs/development/debugger/symbols.md
 [zxdb-exceptions]: /docs/development/debugger/exceptions.md
 [zxdb-tests]: /docs/development/debugger/tests.md
+[zxdb-testing-tutorial]: /docs/development/debugger/tutorial-tests.md
 [component-urls]: /docs/reference/components/url.md
 [component-identifiers]: /docs/concepts/components/v2/identifiers.md
 [component-monikers]: /docs/concepts/components/v2/identifiers.md#monikers
