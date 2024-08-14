@@ -37,10 +37,6 @@
             durability: "single_run",
         },
         {
-            name: "virtio_magma_devices",
-            durability: "single_run",
-        },
-        {
             name: "virtio_gpu_devices",
             durability: "single_run",
         },
@@ -142,26 +138,6 @@
             ],
             from: "parent",
             to: "#virtio_sound_devices",
-        },
-        {
-            directory: "dev-gpu",
-            from: "parent",
-            to: "#virtio_magma_devices",
-        },
-        {
-            protocol: [
-                "fuchsia.sysmem.Allocator",
-                "fuchsia.sysmem2.Allocator",
-                "fuchsia.vulkan.loader.Loader",
-            ],
-            from: "parent",
-            to: "#virtio_magma_devices",
-        },
-        {
-            protocol: [ "fuchsia.ui.composition.Allocator" ],
-            from: "parent",
-            to: "#virtio_magma_devices",
-            availability: "optional",
         },
     ],
     expose: [

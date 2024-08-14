@@ -111,7 +111,6 @@ fit::result<GuestManagerError, GuestConfig> TerminaGuestManager::GetDefaultGuest
   fuchsia::virtualization::GuestConfig termina_config;
   termina_config.set_virtio_gpu(false);
   termina_config.set_block_devices(std::move(block_devices_result.value()));
-  termina_config.set_magma_device(fuchsia::virtualization::MagmaDevice());
 
   // Include a wayland device.
   fuchsia::wayland::ServerPtr server_proxy;

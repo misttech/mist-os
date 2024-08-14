@@ -372,46 +372,6 @@ fit::result<GuestError> Vmm::Initialize(GuestConfig cfg, ::sys::ComponentContext
     }
   }
 
-  // Setup magma device.
-  if (cfg.has_magma_device()) {
-    magma_ = std::make_unique<VirtioMagma>(guest_->phys_mem());
-    // TODO(https://fxbug.dev/42076944): simplify vmm launch configs
-    const size_t magma_dev_mem_size = cfg.magma_device().memory;
-    const zx_gpaddr_t magma_dev_mem_offset = AllocDeviceAddr(magma_dev_mem_size);
-    if (!dev_mem.AddRange(magma_dev_mem_offset, magma_dev_mem_size)) {
-      FX_PLOGS(INFO, status) << "Could not reserve device memory range for magma device";
-      return fit::error(GuestError::INTERNAL_ERROR);
-    }
-    zx::vmar magma_vmar;
-    status = guest_->CreateSubVmar(magma_dev_mem_offset, magma_dev_mem_size, &magma_vmar);
-    if (status != ZX_OK) {
-      FX_PLOGS(INFO, status) << "Could not create VMAR for magma device";
-      return fit::error(GuestError::DEVICE_INITIALIZATION_FAILURE);
-    }
-    status = pci_bus_->Connect(magma_->pci_device(), dispatcher);
-    if (status != ZX_OK) {
-      FX_PLOGS(INFO, status) << "Could not connect magma device";
-      return fit::error(GuestError::DEVICE_INITIALIZATION_FAILURE);
-    }
-    fidl::InterfaceHandle<fuchsia::virtualization::hardware::VirtioWaylandImporter>
-        wayland_importer_handle = nullptr;
-    if (cfg.has_wayland_device()) {
-      status = wl_->GetImporter(wayland_importer_handle.NewRequest());
-      if (status != ZX_OK) {
-        FX_PLOGS(INFO, status) << "Could not get wayland importer";
-        return fit::error(GuestError::DEVICE_INITIALIZATION_FAILURE);
-      }
-    }
-    status = magma_->Start(guest_->object(), std::move(magma_vmar),
-                           std::move(wayland_importer_handle), context, dispatcher);
-    if (status == ZX_ERR_NOT_FOUND) {
-      FX_LOGS(INFO) << "Magma device not supported by host";
-    } else if (status != ZX_OK) {
-      FX_PLOGS(INFO, status) << "Could not start magma device";
-      return fit::error(GuestError::DEVICE_START_FAILURE);
-    }
-  }
-
   // Setup sound device.
   if (cfg.has_virtio_sound() && cfg.virtio_sound()) {
     sound_ = std::make_unique<VirtioSound>(guest_->phys_mem());

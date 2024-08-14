@@ -423,7 +423,6 @@ void GuestManager::SnapshotConfig(const fuchsia::virtualization::GuestConfig& co
   guest_descriptor_.set_guest_memory(config.guest_memory());
 
   guest_descriptor_.set_wayland(config.has_wayland_device());
-  guest_descriptor_.set_magma(config.has_magma_device());
 
   guest_descriptor_.set_balloon(config.has_virtio_balloon() && config.virtio_balloon());
   guest_descriptor_.set_console(config.has_virtio_console() && config.virtio_console());
@@ -435,8 +434,8 @@ void GuestManager::SnapshotConfig(const fuchsia::virtualization::GuestConfig& co
   if (config.has_net_devices()) {
     *guest_descriptor_.mutable_networks() = config.net_devices();
   }
-  // TODO(https://fxbug.dev/42051237): After updating FIDL, this should also return the full MemoryDevice
-  // structure.
+  // TODO(https://fxbug.dev/42051237): After updating FIDL, this should also return the full
+  // MemoryDevice structure.
   guest_descriptor_.set_mem(config.has_virtio_mem() && config.virtio_mem());
 }
 

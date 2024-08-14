@@ -166,7 +166,6 @@ async fn get_detailed_information(
                 };
 
             add_to_table("wayland", config.wayland, &mut details.device_counts);
-            add_to_table("magma", config.magma, &mut details.device_counts);
             add_to_table("balloon", config.balloon, &mut details.device_counts);
             add_to_table("console", config.console, &mut details.device_counts);
             add_to_table("gpu", config.gpu, &mut details.device_counts);
@@ -412,7 +411,6 @@ mod test {
                 num_cpus: Some(4),
                 guest_memory: Some(1073741824),
                 wayland: Some(false),
-                magma: Some(false),
                 networks: Some(vec![
                     NetSpec {
                         mac_address: MacAddress { octets: [0u8; 6] },
@@ -454,7 +452,6 @@ mod test {
             "                     network (2 devices)  \n",
             "                     \n",
             " Inactive devices:   wayland  \n",
-            "                     magma  \n",
             "                     gpu  \n",
             "                     sound  \n",
             "                                                        \n",
