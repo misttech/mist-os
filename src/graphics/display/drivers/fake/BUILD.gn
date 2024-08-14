@@ -34,8 +34,6 @@ source_set("fake-lib") {
     "//sdk/lib/driver/logging/cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/graphics/display/lib/api-types-cpp",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
     "//src/lib/fsl",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
@@ -169,6 +167,7 @@ source_set("fake-sysmem-device-hierarchy") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/syslog/cpp",
     "//zircon/system/ulib/async:async-cpp",
+    "//zircon/system/ulib/ddk-platform-defs",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/sync:sync-cpp",
   ]

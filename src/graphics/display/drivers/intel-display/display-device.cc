@@ -5,8 +5,6 @@
 #include "src/graphics/display/drivers/intel-display/display-device.h"
 
 #include <fuchsia/hardware/display/controller/c/banjo.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/driver.h>
 #include <lib/fit/function.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
@@ -16,8 +14,6 @@
 #include <cfloat>
 #include <cinttypes>
 #include <cmath>
-
-#include <ddktl/fidl.h>
 
 #include "src/graphics/display/drivers/intel-display/intel-display.h"
 #include "src/graphics/display/drivers/intel-display/registers-dpll.h"

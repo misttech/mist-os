@@ -15,8 +15,6 @@
 
 #include <memory>
 
-#include <ddktl/device.h>
-
 #include "src/graphics/display/drivers/intel-display/intel-display.h"
 
 namespace intel_display {

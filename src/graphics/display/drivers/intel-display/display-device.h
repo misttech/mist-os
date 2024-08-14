@@ -13,7 +13,6 @@
 #include <lib/zx/vmo.h>
 #include <zircon/types.h>
 
-#include <ddktl/device.h>
 #include <region-alloc/region-alloc.h>
 
 #include "src/graphics/display/drivers/intel-display/ddi-physical-layer-manager.h"

@@ -12,8 +12,6 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/platform-defs.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/sync/cpp/completion.h>

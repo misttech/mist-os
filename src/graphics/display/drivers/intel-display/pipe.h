@@ -16,7 +16,6 @@
 #include <list>
 #include <unordered_map>
 
-#include <ddktl/device.h>
 #include <region-alloc/region-alloc.h>
 
 #include "src/graphics/display/drivers/intel-display/gtt.h"

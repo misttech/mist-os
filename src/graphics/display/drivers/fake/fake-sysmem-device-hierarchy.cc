@@ -8,8 +8,6 @@
 #include <fidl/fuchsia.io/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
-#include <lib/ddk/debug.h>
-#include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/syslog/cpp/macros.h>

@@ -5,7 +5,6 @@
 #include "src/graphics/display/drivers/intel-display/dp-display.h"
 
 #include <endian.h>
-#include <lib/ddk/driver.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/fit/defer.h>
 #include <lib/mmio/mmio.h>

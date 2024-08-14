@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/async/cpp/irq.h>
-#include <lib/ddk/device.h>
 #include <lib/fit/function.h>
 #include <lib/zx/interrupt.h>
 #include <lib/zx/result.h>

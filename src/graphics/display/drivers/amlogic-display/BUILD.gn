@@ -113,6 +113,7 @@ source_set("common_srcs") {
     "//src/graphics/display/lib/device-protocol-display",
     "//src/graphics/display/lib/driver-framework-migration-utils/dispatcher",
     "//src/graphics/display/lib/mipi-dsi",
+    "//src/lib/ddk:ddk_metadata_only",
     "//src/lib/fxl",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/fbl",

@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/intel-display/hdmi-display.h"
 
-#include <lib/ddk/driver.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/mmio/mmio-buffer.h>
 #include <lib/stdcompat/span.h>

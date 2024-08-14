@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
-#include <lib/ddk/device.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/fit/function.h>
 #include <lib/mmio/mmio-buffer.h>
