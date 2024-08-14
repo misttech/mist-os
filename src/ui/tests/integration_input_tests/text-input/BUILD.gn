@@ -47,7 +47,6 @@ executable("text-input-test-bin") {
     "//sdk/fidl/fuchsia.tracing.provider:fuchsia.tracing.provider_cpp",
     "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_cpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_cpp",
-    "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_cpp",
     "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_cpp",
     "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_cpp",
     "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_cpp",

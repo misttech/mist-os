@@ -24,7 +24,6 @@
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fidl/fuchsia.tracing.provider/cpp/fidl.h>
 #include <fidl/fuchsia.ui.app/cpp/fidl.h>
-#include <fidl/fuchsia.ui.focus/cpp/fidl.h>
 #include <fidl/fuchsia.ui.input/cpp/fidl.h>
 #include <fidl/fuchsia.ui.input3/cpp/fidl.h>
 #include <fidl/fuchsia.ui.test.input/cpp/fidl.h>
@@ -83,41 +82,6 @@ std::vector<T> merge(std::initializer_list<std::vector<T>> vecs) {
   }
   return result;
 }
-
-class FocusListener : public fidl::Server<fuchsia_ui_focus::FocusChainListener> {
- public:
-  // |fuchsia_ui_focus::FocusChainListener|
-  void OnFocusChange(OnFocusChangeRequest& req, OnFocusChangeCompleter::Sync& completer) override {
-    FX_LOGS(INFO) << "OnFocusChange";
-    last_focus_chain_ = std::move(req.focus_chain());
-    for (auto& view : last_focus_chain_.value().focus_chain().value()) {
-      FX_LOGS(INFO) << "focus: " << fsl::GetKoid(view.reference().get());
-    }
-    completer.Reply();
-  }
-
-  bool IsViewFocused(const zx_koid_t koid) const {
-    FX_LOGS(INFO) << "check if focus on: " << koid;
-    if (!last_focus_chain_) {
-      return false;
-    }
-
-    if (!last_focus_chain_->focus_chain()) {
-      return false;
-    }
-
-    if (last_focus_chain_->focus_chain()->empty()) {
-      return false;
-    }
-
-    // the new focus view store at the last slot.
-    return fsl::GetKoid(last_focus_chain_->focus_chain()->back().reference().get()) == koid;
-  }
-
- private:
-  // Holds the most recent focus chain update received.
-  std::optional<fuchsia_ui_focus::FocusChain> last_focus_chain_;
-};
 
 // Externalized test specific keyboard input state.
 //
@@ -250,11 +214,6 @@ class ChromiumInputBase : public ui_testing::PortableUITest {
     RegisterKeyboard();
   }
 
-  void TearDown() override {
-    focus_listener_bindings_.RemoveAll();
-    ui_testing::PortableUITest::TearDown();
-  }
-
   // Subclass should implement this method to add v2 components to the test realm
   // next to the base ones added.
   virtual std::vector<std::pair<ChildName, std::string>> GetTestComponents() { return {}; }
@@ -285,8 +244,6 @@ class ChromiumInputBase : public ui_testing::PortableUITest {
   std::shared_ptr<KeyboardInputState> keyboard_input_state_;
 
   std::optional<async::Task> inject_retry_task_;
-
-  fidl::ServerBindingGroup<fuchsia_ui_focus::FocusChainListener> focus_listener_bindings_;
 };
 
 class ChromiumInputTest : public ChromiumInputBase {
@@ -485,26 +442,6 @@ class ChromiumInputTest : public ChromiumInputBase {
     // Not quite exactly the location of the text area under test, but since the
     // text area occupies all the screen, it's very likely within the text area.
     InjectTap(display_width() / 2, display_height() / 2);
-
-    // Register focus chain listener.
-    auto [focus_listener_client, focus_listener_server] =
-        fidl::Endpoints<fuchsia_ui_focus::FocusChainListener>::Create();
-
-    auto focus_listener_registry_connect =
-        realm_root()->component().Connect<fuchsia_ui_focus::FocusChainListenerRegistry>();
-    ZX_ASSERT_OK(focus_listener_registry_connect);
-    fidl::SyncClient focus_chain_listener_registry(
-        std::move(focus_listener_registry_connect.value()));
-
-    ZX_ASSERT_OK(focus_chain_listener_registry->Register({std::move(focus_listener_client)}));
-
-    FocusListener focus_listener;
-    focus_listener_bindings_.AddBinding(dispatcher(), std::move(focus_listener_server),
-                                        &focus_listener, fidl::kIgnoreBindingClosure);
-
-    FX_LOGS(INFO) << "Waiting on Fuchsia focused on Chromium";
-    RunLoopUntil(
-        [&]() { return focus_listener.IsViewFocused(client_root_view_ref_koid().value()); });
 
     FX_LOGS(INFO) << "Waiting on app focused on textarea: ready for key events";
     RunLoopUntil([this]() { return keyboard_input_state_->IsReadyForKey(); });
