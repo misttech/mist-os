@@ -11,6 +11,7 @@
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/driver/incoming/cpp/namespace.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
@@ -52,6 +53,9 @@ fit::result<Error, std::vector<fuchsia_power_broker::LevelDependency>> ConvertPo
   }
 
   // See if this is an assertive or opportunistic dependency
+  // If we don't know the type, default to assertive. This possibly results in
+  // unintentionally high power consumption, but is more likely to preserve
+  // programmatic correctness.
   fuchsia_power_broker::DependencyType dep_type;
   switch (driver_config_deps->strength()) {
     case fuchsia_hardware_power::wire::RequirementType::kAssertive:
@@ -60,6 +64,12 @@ fit::result<Error, std::vector<fuchsia_power_broker::LevelDependency>> ConvertPo
     case fuchsia_hardware_power::wire::RequirementType::kOpportunistic:
       dep_type = fuchsia_power_broker::DependencyType::kOpportunistic;
       break;
+    default:
+      if (fdf::Logger::HasGlobalInstance()) {
+        FDF_LOGL(WARNING, *fdf::Logger::GlobalInstance(),
+                 "Dependency level not recognized, using assertive");
+      }
+      dep_type = fuchsia_power_broker::DependencyType::kAssertive;
   }
 
   // Go through each of the level dependencies and translate them
@@ -414,6 +424,8 @@ fit::result<Error, TokenMap> GetDependencyTokens(
       case fuchsia_hardware_power::ParentElement::Tag::kInstanceName:
         have_driver_dep = true;
         break;
+      default:
+        return fit::error(Error::INVALID_ARGS);
     }
     if (have_driver_dep && have_sag_dep) {
       break;
@@ -444,9 +456,8 @@ fit::result<Error, TokenMap> GetDependencyTokens(
   if (!elements.ok()) {
     if (elements.is_peer_closed()) {
       return fit::error(Error::ACTIVITY_GOVERNOR_UNAVAILABLE);
-    } else {
-      return fit::error(Error::ACTIVITY_GOVERNOR_REQUEST);
     }
+    return fit::error(Error::ACTIVITY_GOVERNOR_REQUEST);
   }
 
   // Track the parents we find so we can remove them from dependencies after
@@ -454,7 +465,7 @@ fit::result<Error, TokenMap> GetDependencyTokens(
   std::vector<fuchsia_hardware_power::ParentElement> found_parents = {};
 
   for (const auto& [parent, deps] : dependencies) {
-    if (parent.Which() == fuchsia_hardware_power::ParentElement::Tag::kName) {
+    if (parent.Which() != fuchsia_hardware_power::ParentElement::Tag::kSag) {
       continue;
     }
 
@@ -463,7 +474,7 @@ fit::result<Error, TokenMap> GetDependencyTokens(
     // be for all clients, but very soon we should modify the return types and
     // return the right tokens.
     switch (parent.sag().value()) {
-      case fuchsia_hardware_power::SagElement::kExecutionState: {
+      case fuchsia_hardware_power::SagElement::kExecutionState:
         if (elements->has_execution_state() &&
             elements->execution_state().has_opportunistic_dependency_token()) {
           zx::event copy;
@@ -473,8 +484,8 @@ fit::result<Error, TokenMap> GetDependencyTokens(
         } else {
           return fit::error(Error::DEPENDENCY_NOT_FOUND);
         }
-      } break;
-      case fuchsia_hardware_power::SagElement::kExecutionResumeLatency: {
+        break;
+      case fuchsia_hardware_power::SagElement::kExecutionResumeLatency:
         if (elements->has_execution_resume_latency() &&
             elements->execution_resume_latency().has_assertive_dependency_token()) {
           zx::event copy;
@@ -484,8 +495,8 @@ fit::result<Error, TokenMap> GetDependencyTokens(
         } else {
           return fit::error(Error::DEPENDENCY_NOT_FOUND);
         }
-      } break;
-      case fuchsia_hardware_power::SagElement::kWakeHandling: {
+        break;
+      case fuchsia_hardware_power::SagElement::kWakeHandling:
         if (elements->has_wake_handling() &&
             elements->wake_handling().has_assertive_dependency_token()) {
           zx::event copy;
@@ -495,8 +506,8 @@ fit::result<Error, TokenMap> GetDependencyTokens(
         } else {
           return fit::error(Error::DEPENDENCY_NOT_FOUND);
         }
-      } break;
-      case fuchsia_hardware_power::SagElement::kApplicationActivity: {
+        break;
+      case fuchsia_hardware_power::SagElement::kApplicationActivity:
         if (elements->has_application_activity() &&
             elements->application_activity().has_assertive_dependency_token()) {
           zx::event copy;
@@ -506,7 +517,9 @@ fit::result<Error, TokenMap> GetDependencyTokens(
         } else {
           return fit::error(Error::DEPENDENCY_NOT_FOUND);
         }
-      } break;
+        break;
+      default:
+        return fit::error(Error::INVALID_ARGS);
     }
 
     // Record that we found this parent
