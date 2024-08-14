@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from pathlib import Path
 
+import build_dir
 from async_utils.command import (
     AsyncCommand,
     CommandEvent,
@@ -15,7 +16,6 @@ from async_utils.command import (
     StderrEvent,
     StdoutEvent,
 )
-from build_dir import get_build_directory
 
 
 class ExecutableCommand(ABC):
@@ -98,7 +98,7 @@ class FxCmd(ExecutableCommand):
         """The formatted command line this command will execute for the given args."""
         build_directory = self._build_directory
         if build_directory is None:
-            build_directory = str(get_build_directory())
+            build_directory = str(build_dir.get_build_directory())
 
         return ["fx", "--dir", build_directory] + list(args)
 
