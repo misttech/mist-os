@@ -50,7 +50,7 @@ pub(super) fn update_state_on_exec(
 /// `_dev_name` of type `_fs_type`, with the mounting flags `_flags` and filesystem data `_data`.
 pub(super) fn sb_mount(
     _permission_check: &impl PermissionCheck,
-    _source_sid: SecurityId,
+    _current_task: &CurrentTask,
     _dev_name: &bstr::BStr,
     _path: &NamespaceNode,
     _fs_type: &bstr::BStr,
@@ -65,7 +65,7 @@ pub(super) fn sb_mount(
 /// `_node` using the unmount flags `_flags`.
 pub(super) fn sb_umount(
     _permission_check: &impl PermissionCheck,
-    _source_sid: SecurityId,
+    _current_task: &CurrentTask,
     _node: &NamespaceNode,
     _flags: UnmountFlags,
 ) -> Result<(), Errno> {
@@ -253,11 +253,6 @@ pub fn file_system_init_security(
     Ok(FileSystemState { context, def_context, fs_context, root_context })
 }
 
-/// Returns `TaskAttrs` for a new `Task`, based on that of the provided `sid`.
-pub(super) fn taskattrs_for_sid(sid: SecurityId) -> TaskAttrs {
-    TaskAttrs::for_sid(sid)
-}
-
 /// The SELinux security structure for `ThreadGroup`.
 #[derive(Clone, Debug, PartialEq)]
 pub(super) struct TaskAttrs {
@@ -283,29 +278,19 @@ pub(super) struct TaskAttrs {
 impl TaskAttrs {
     /// Returns initial state for kernel tasks.
     pub(super) fn for_kernel() -> Self {
-        Self::for_initial_sid(InitialSid::Kernel)
+        Self::for_sid(SecurityId::initial(InitialSid::Kernel))
     }
 
     /// Returns placeholder state for use when SELinux is not enabled.
     pub(super) fn for_selinux_disabled() -> Self {
-        Self::for_initial_sid(InitialSid::Unlabeled)
+        Self::for_sid(SecurityId::initial(InitialSid::Unlabeled))
     }
 
-    fn for_sid(sid: SecurityId) -> Self {
+    /// Used to create initial state for tasks with a specified SID.
+    pub(super) fn for_sid(sid: SecurityId) -> Self {
         Self {
             current_sid: sid,
             previous_sid: sid,
-            exec_sid: None,
-            fscreate_sid: None,
-            keycreate_sid: None,
-            sockcreate_sid: None,
-        }
-    }
-
-    fn for_initial_sid(initial_sid: InitialSid) -> Self {
-        Self {
-            current_sid: SecurityId::initial(initial_sid),
-            previous_sid: SecurityId::initial(initial_sid),
             exec_sid: None,
             fscreate_sid: None,
             keycreate_sid: None,

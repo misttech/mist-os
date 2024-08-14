@@ -3510,7 +3510,7 @@ impl BinderDriver {
                 let security_context: Option<FsString> =
                     if object.flags.contains(BinderObjectFlags::TXN_SECURITY_CTX) {
                         let mut security_context = FsString::from(
-                            security::get_task_context(&current_task, &target_task)
+                            security::task_get_context(&current_task, &target_task)
                                 .unwrap_or_default(),
                         );
                         security_context.push(b'\0');

@@ -12,7 +12,6 @@ use crate::vfs::{
     ValueOrSize, XattrOp,
 };
 use selinux_core::security_server::{Mode, SecurityServer};
-use selinux_core::SecurityId;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::signals::Signal;
@@ -132,7 +131,7 @@ pub fn task_alloc(task: &Task, clone_flags: u64) -> TaskState {
     TaskState {
         attrs: run_if_selinux_else(
             task,
-            |_| selinux_hooks::task::task_alloc(&task.read().security_state.attrs, clone_flags),
+            |_| selinux_hooks::task::task_alloc(&task, clone_flags),
             || selinux_hooks::TaskAttrs::for_selinux_disabled(),
         ),
     }
@@ -144,7 +143,7 @@ pub fn task_for_context(task: &Task, context: &FsStr) -> Result<TaskState, Errno
         attrs: run_if_selinux_else(
             task,
             |security_server| {
-                Ok(selinux_hooks::taskattrs_for_sid(
+                Ok(selinux_hooks::TaskAttrs::for_sid(
                     security_server
                         .security_context_to_sid(context.into())
                         .map_err(|_| errno!(EINVAL))?,
@@ -155,19 +154,14 @@ pub fn task_for_context(task: &Task, context: &FsStr) -> Result<TaskState, Errno
     })
 }
 
-fn get_current_sid(task: &Task) -> SecurityId {
-    task.read().security_state.attrs.current_sid
-}
-
 /// Returns the serialized Security Context associated with the specified task.
 /// If the task's current SID cannot be resolved then an empty string is returned.
 /// This combines the `task_getsecid()` and `secid_to_secctx()` hooks, in effect.
-pub fn get_task_context(current_task: &CurrentTask, target: &Task) -> Result<Vec<u8>, Errno> {
+pub fn task_get_context(current_task: &CurrentTask, target: &Task) -> Result<Vec<u8>, Errno> {
     run_if_selinux_else(
         current_task,
         |security_server| {
-            let sid = get_current_sid(&target);
-            Ok(security_server.sid_to_security_context(sid).unwrap_or_default())
+            selinux_hooks::task::task_get_context(&security_server, &current_task, &target)
         },
         || error!(ENOTSUP),
     )
@@ -176,8 +170,10 @@ pub fn get_task_context(current_task: &CurrentTask, target: &Task) -> Result<Vec
 /// Check if creating a task is allowed.
 pub fn check_task_create_access(current_task: &CurrentTask) -> Result<(), Errno> {
     check_if_selinux(current_task, |security_server| {
-        let sid = get_current_sid(&current_task);
-        selinux_hooks::task::check_task_create_access(&security_server.as_permission_check(), sid)
+        selinux_hooks::task::check_task_create_access(
+            &security_server.as_permission_check(),
+            current_task,
+        )
     })
 }
 
@@ -205,12 +201,10 @@ pub fn update_state_on_exec(current_task: &CurrentTask, elf_security_state: &Res
 /// Checks if `source` may exercise the "getsched" permission on `target`.
 pub fn check_getsched_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
     check_if_selinux(source, |security_server| {
-        let source_sid = get_current_sid(&source);
-        let target_sid = get_current_sid(&target);
         selinux_hooks::task::check_getsched_access(
             &security_server.as_permission_check(),
-            source_sid,
-            target_sid,
+            &source,
+            &target,
         )
     })
 }
@@ -218,12 +212,10 @@ pub fn check_getsched_access(source: &CurrentTask, target: &Task) -> Result<(), 
 /// Checks if setsched is allowed.
 pub fn check_setsched_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
     check_if_selinux(source, |security_server| {
-        let source_sid = get_current_sid(&source);
-        let target_sid = get_current_sid(&target);
         selinux_hooks::task::check_setsched_access(
             &security_server.as_permission_check(),
-            source_sid,
-            target_sid,
+            &source,
+            &target,
         )
     })
 }
@@ -231,12 +223,10 @@ pub fn check_setsched_access(source: &CurrentTask, target: &Task) -> Result<(), 
 /// Checks if getpgid is allowed.
 pub fn check_getpgid_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
     check_if_selinux(source, |security_server| {
-        let source_sid = get_current_sid(&source);
-        let target_sid = get_current_sid(&target);
         selinux_hooks::task::check_getpgid_access(
             &security_server.as_permission_check(),
-            source_sid,
-            target_sid,
+            &source,
+            &target,
         )
     })
 }
@@ -244,12 +234,10 @@ pub fn check_getpgid_access(source: &CurrentTask, target: &Task) -> Result<(), E
 /// Checks if setpgid is allowed.
 pub fn check_setpgid_access(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
     check_if_selinux(source, |security_server| {
-        let source_sid = get_current_sid(&source);
-        let target_sid = get_current_sid(&target);
         selinux_hooks::task::check_setpgid_access(
             &security_server.as_permission_check(),
-            source_sid,
-            target_sid,
+            &source,
+            &target,
         )
     })
 }
@@ -258,12 +246,10 @@ pub fn check_setpgid_access(source: &CurrentTask, target: &Task) -> Result<(), E
 /// Corresponds to the `task_getsid` LSM hook.
 pub fn check_task_getsid(source: &CurrentTask, target: &Task) -> Result<(), Errno> {
     check_if_selinux(source, |security_server| {
-        let source_sid = get_current_sid(&source);
-        let target_sid = get_current_sid(&target);
         selinux_hooks::task::check_task_getsid(
             &security_server.as_permission_check(),
-            source_sid,
-            target_sid,
+            &source,
+            &target,
         )
     })
 }
@@ -275,12 +261,10 @@ pub fn check_signal_access(
     signal: Signal,
 ) -> Result<(), Errno> {
     check_if_selinux(source, |security_server| {
-        let source_sid = get_current_sid(&source);
-        let target_sid = get_current_sid(&target);
         selinux_hooks::task::check_signal_access(
             &security_server.as_permission_check(),
-            source_sid,
-            target_sid,
+            &source,
+            &target,
             signal,
         )
     })
@@ -293,38 +277,34 @@ pub fn check_signal_access_tg(
     signal: Signal,
 ) -> Result<(), Errno> {
     check_if_selinux(source, |security_server| {
-        let source_sid = get_current_sid(&source);
-        let target_sid = get_current_sid(target);
         selinux_hooks::task::check_signal_access(
             &security_server.as_permission_check(),
-            source_sid,
-            target_sid,
+            &source,
+            &target,
             signal,
         )
     })
 }
 
-// Checks whether the `parent_tracer_task` is allowed to trace the current `tracee_task`.
-pub fn ptrace_traceme(tracee_task: &CurrentTask, parent_tracer_task: &Task) -> Result<(), Errno> {
-    check_if_selinux(tracee_task, |security_server| {
+// Checks whether the `parent_tracer_task` is allowed to trace the `current_task`.
+pub fn ptrace_traceme(current_task: &CurrentTask, parent_tracer_task: &Task) -> Result<(), Errno> {
+    check_if_selinux(current_task, |security_server| {
         selinux_hooks::task::ptrace_access_check(
             &security_server.as_permission_check(),
-            get_current_sid(&parent_tracer_task),
-            &mut tracee_task.write().security_state.attrs,
+            &current_task,
+            &parent_tracer_task,
         )
     })
 }
 
-/// Checks whether the current `tracer_task` is allowed to trace `tracee_task`.
+/// Checks whether the current `current_task` is allowed to trace `tracee_task`.
 /// This fills the role of both of the LSM `ptrace_traceme` and `ptrace_access_check` hooks.
-pub fn ptrace_access_check(tracer_task: &CurrentTask, tracee_task: &Task) -> Result<(), Errno> {
-    check_if_selinux(tracer_task, |security_server| {
-        let tracer_sid = get_current_sid(&tracer_task);
-        let mut task_state = tracee_task.write();
+pub fn ptrace_access_check(current_task: &CurrentTask, tracee_task: &Task) -> Result<(), Errno> {
+    check_if_selinux(current_task, |security_server| {
         selinux_hooks::task::ptrace_access_check(
             &security_server.as_permission_check(),
-            tracer_sid,
-            &mut task_state.security_state.attrs,
+            current_task,
+            &tracee_task,
         )
     })
 }
@@ -338,12 +318,10 @@ pub fn task_prlimit(
     check_set_rlimit: bool,
 ) -> Result<(), Errno> {
     check_if_selinux(source, |security_server| {
-        let source_sid = get_current_sid(&source);
-        let target_sid = get_current_sid(&target);
         selinux_hooks::task::task_prlimit(
             &security_server.as_permission_check(),
-            source_sid,
-            target_sid,
+            &source,
+            &target,
             check_get_rlimit,
             check_set_rlimit,
         )
@@ -354,18 +332,17 @@ pub fn task_prlimit(
 /// `type` contains the filesystem type. `flags` contains the mount flags. `data` contains the filesystem-specific data.
 /// Corresponds to the `security_sb_mount` hook.
 pub fn sb_mount(
-    source: &CurrentTask,
+    current_task: &CurrentTask,
     dev_name: &bstr::BStr,
     path: &NamespaceNode,
     fs_type: &bstr::BStr,
     flags: MountFlags,
     data: &bstr::BStr,
 ) -> Result<(), Errno> {
-    check_if_selinux(source, |security_server| {
-        let source_sid = get_current_sid(&source);
+    check_if_selinux(current_task, |security_server| {
         selinux_hooks::sb_mount(
             &security_server.as_permission_check(),
-            source_sid,
+            current_task,
             dev_name,
             path,
             fs_type,
@@ -375,17 +352,16 @@ pub fn sb_mount(
     })
 }
 
-/// Checks if `source` has the permission to unmount the filesystem mounted on
+/// Checks if `current_task` has the permission to unmount the filesystem mounted on
 /// `node` using the unmount flags `flags`.
 /// Corresponds to the `security_sb_umount` hook.
 pub fn sb_umount(
-    source: &CurrentTask,
+    current_task: &CurrentTask,
     node: &NamespaceNode,
     flags: UnmountFlags,
 ) -> Result<(), Errno> {
-    check_if_selinux(source, |security_server| {
-        let source_sid = get_current_sid(&source);
-        selinux_hooks::sb_umount(&security_server.as_permission_check(), source_sid, node, flags)
+    check_if_selinux(current_task, |security_server| {
+        selinux_hooks::sb_umount(&security_server.as_permission_check(), current_task, node, flags)
     })
 }
 
@@ -507,7 +483,7 @@ mod tests {
     use crate::vfs::NamespaceNode;
     use linux_uapi::XATTR_NAME_SELINUX;
     use selinux_core::security_server::Mode;
-    use selinux_core::InitialSid;
+    use selinux_core::{InitialSid, SecurityId};
     use starnix_sync::{Locked, Unlocked};
     use starnix_uapi::device_type::DeviceType;
     use starnix_uapi::error;
