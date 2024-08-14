@@ -6,7 +6,7 @@ use crate::bpf::map::{Map, RingBufferWakeupPolicy};
 use crate::bpf::program::ProgramType;
 use crate::task::CurrentTask;
 use ebpf::{
-    new_bpf_type_identifier, BpfValue, EbpfHelper, EpbfRunContext, FieldMapping, FieldType,
+    new_bpf_type_identifier, BpfValue, EbpfHelper, EbpfRunContext, FieldMapping, FieldType,
     FunctionSignature, MemoryId, MemoryParameterSize, Type,
 };
 use linux_uapi::{
@@ -37,7 +37,7 @@ pub struct HelperFunctionContext<'a> {
 }
 
 pub enum HelperFunctionContextMarker {}
-impl EpbfRunContext for HelperFunctionContextMarker {
+impl EbpfRunContext for HelperFunctionContextMarker {
     type Context<'a> = HelperFunctionContext<'a>;
 }
 
