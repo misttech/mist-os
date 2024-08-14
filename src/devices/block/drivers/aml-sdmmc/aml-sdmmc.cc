@@ -419,8 +419,8 @@ void AmlSdmmc::GetToken(GetTokenCompleter::Sync& completer) {
   if (hardware_power_lease_control_client_end_.is_valid()) {
     hardware_power_lease_control_client_end_.channel().reset();
   }
-  completer.Reply(fit::success(fuchsia_hardware_power::PowerTokenProviderGetTokenResponse{
-      std::move(dupe), kHardwarePowerElementName}));
+  completer.Reply(
+      fit::success(fuchsia_hardware_power::PowerTokenProviderGetTokenResponse{std::move(dupe)}));
 }
 
 void AmlSdmmc::WatchHardwareRequiredLevel() {

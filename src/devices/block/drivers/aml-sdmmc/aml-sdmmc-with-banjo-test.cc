@@ -2528,7 +2528,6 @@ TEST_F(AmlSdmmcWithBanjoTest, PowerTokenProvider) {
     ASSERT_OK(get_token);
     ASSERT_TRUE(get_token->is_ok());
     EXPECT_TRUE(get_token.value()->handle.is_valid());
-    EXPECT_EQ(get_token.value()->name.get(), AmlSdmmc::kHardwarePowerElementName);
   });
 }
 

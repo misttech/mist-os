@@ -29,7 +29,7 @@
             {
                 child: "pe-fake-child",
                 parent: {
-                    name: "pe-fake-parent",
+                    instance_name: "pe-fake-parent",
                 },
                 level_deps: [
                     {

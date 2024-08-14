@@ -155,7 +155,7 @@ void FakeParentServer::GetToken(GetTokenCompleter::Sync& completer) {
   zx_event_create(0, &mine);
   zx_handle_t yours;
   zx_handle_duplicate(mine, ZX_RIGHT_SAME_RIGHTS, &yours);
-  completer.ReplySuccess(zx::event(yours), fidl::StringView::FromExternal(element_name_));
+  completer.ReplySuccess(zx::event(yours));
 }
 void FakeParentServer::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_power::PowerTokenProvider> md,

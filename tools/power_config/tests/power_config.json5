@@ -32,7 +32,7 @@
             {
                 child: "my-awesome-element",
                 parent: {
-                    name: "my-rad-parent",
+                    instance_name: "my-rad-parent",
                 },
                 level_deps: [
                     {

@@ -43,12 +43,11 @@ class PowerLibTest : public gtest::RealLoopFixture {};
 
 class FakeTokenServer : public fidl::WireServer<fuchsia_hardware_power::PowerTokenProvider> {
  public:
-  explicit FakeTokenServer(std::string element_name, zx::event event)
-      : element_name_(std::move(element_name)), event_(std::move(event)) {}
+  explicit FakeTokenServer(zx::event event) : event_(std::move(event)) {}
   void GetToken(GetTokenCompleter::Sync& completer) override {
     zx::event dupe;
     ASSERT_EQ(event_.duplicate(ZX_RIGHT_SAME_RIGHTS, &dupe), ZX_OK);
-    completer.ReplySuccess(std::move(dupe), fidl::StringView::FromExternal(element_name_));
+    completer.ReplySuccess(std::move(dupe));
   }
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_power::PowerTokenProvider> md,
@@ -58,7 +57,6 @@ class FakeTokenServer : public fidl::WireServer<fuchsia_hardware_power::PowerTok
   ~FakeTokenServer() override = default;
 
  private:
-  std::string element_name_;
   zx::event event_;
 };
 
@@ -193,7 +191,7 @@ class CurrentLevelServer : public fidl::Server<fuchsia_power_broker::CurrentLeve
 };
 
 AddInstanceResult AddServiceInstance(
-    std::string parent_name, async_dispatcher_t* dispatcher,
+    async_dispatcher_t* dispatcher,
     fidl::ServerBindingGroup<fuchsia_hardware_power::PowerTokenProvider>* bindings) {
   zx::event raw_event;
   zx::event::create(0, &raw_event);
@@ -202,7 +200,7 @@ AddInstanceResult AddServiceInstance(
   zx::event event_copy;
   event->duplicate(ZX_RIGHT_SAME_RIGHTS, &event_copy);
   std::shared_ptr<FakeTokenServer> token_handler =
-      std::make_shared<FakeTokenServer>(parent_name, std::move(event_copy));
+      std::make_shared<FakeTokenServer>(std::move(event_copy));
   fbl::RefPtr<fs::PseudoDir> service_instance = fbl::MakeRefCounted<fs::PseudoDir>();
   fbl::RefPtr<fs::Service> token_server = fbl::MakeRefCounted<fs::Service>(
       [token_handler, dispatcher,
@@ -520,7 +518,6 @@ TEST_F(PowerLibTest, TestElementRunnerManualSet) {
 TEST_F(PowerLibTest, AddElementNoDep) {
   // Create the dependency configuration and create a
   // map<parent_name, vec<level_deps> used for call validation later.
-  std::string parent_name = "element_first_parent";
   fuchsia_hardware_power::PowerLevel one = {{.level = 0, .name = "one", .transitions = {}}};
   fuchsia_hardware_power::PowerLevel two = {{.level = 1, .name = "two", .transitions = {}}};
   fuchsia_hardware_power::PowerLevel three = {{.level = 2, .name = "three", .transitions = {}}};
@@ -589,7 +586,7 @@ TEST_F(PowerLibTest, AddElementSingleDep) {
 
   fuchsia_hardware_power::PowerDependency power_dep = {{
       .child = "n/a",
-      .parent = fuchsia_hardware_power::ParentElement::WithName(parent_name),
+      .parent = fuchsia_hardware_power::ParentElement::WithInstanceName(parent_name),
       .level_deps = {{one_to_one, three_to_two}},
       .strength = fuchsia_hardware_power::RequirementType::kAssertive,
   }};
@@ -612,7 +609,7 @@ TEST_F(PowerLibTest, AddElementSingleDep) {
   std::unordered_map<fuchsia_hardware_power::ParentElement, zx::event,
                      fdf_power::ParentElementHasher>
       tokens;
-  tokens.insert(std::make_pair(fuchsia_hardware_power::ParentElement::WithName(parent_name),
+  tokens.insert(std::make_pair(fuchsia_hardware_power::ParentElement::WithInstanceName(parent_name),
                                std::move(token_copy)));
 
   // Make the fake power broker
@@ -667,9 +664,9 @@ TEST_F(PowerLibTest, AddElementDoubleDep) {
   // Create the dependency configuration and create a
   // map<parent_name, vec<level_deps> used for call validation later.
   fuchsia_hardware_power::ParentElement parent_name_first =
-      fuchsia_hardware_power::ParentElement::WithName("element_first_parent");
+      fuchsia_hardware_power::ParentElement::WithInstanceName("element_first_parent");
   fuchsia_hardware_power::ParentElement parent_name_second =
-      fuchsia_hardware_power::ParentElement::WithName("element_second_parent");
+      fuchsia_hardware_power::ParentElement::WithInstanceName("element_second_parent");
   fuchsia_hardware_power::PowerLevel one = {{.level = 0, .name = "one", .transitions = {}}};
   fuchsia_hardware_power::PowerLevel two = {{.level = 1, .name = "two", .transitions = {}}};
   fuchsia_hardware_power::PowerLevel three = {{.level = 2, .name = "three", .transitions = {}}};
@@ -796,7 +793,7 @@ TEST_F(PowerLibTest, AddElementDoubleDep) {
 /// format used by Power Framework.
 TEST_F(PowerLibTest, LevelDependencyWithSingleParent) {
   fuchsia_hardware_power::ParentElement parent =
-      fuchsia_hardware_power::ParentElement::WithName("element_first_parent");
+      fuchsia_hardware_power::ParentElement::WithInstanceName("element_first_parent");
   fuchsia_hardware_power::PowerLevel one = {{.level = 0, .name = "one", .transitions = {}}};
   fuchsia_hardware_power::PowerLevel two = {{.level = 1, .name = "two", .transitions = {}}};
   fuchsia_hardware_power::PowerLevel three = {{.level = 2, .name = "three", .transitions = {}}};
@@ -851,7 +848,7 @@ TEST_F(PowerLibTest, LevelDependencyWithSingleParent) {
 /// Check that power levels are take out of the driver config format correctly.
 TEST_F(PowerLibTest, ExtractPowerLevelsFromConfig) {
   fuchsia_hardware_power::ParentElement parent =
-      fuchsia_hardware_power::ParentElement::WithName("element_first_parent");
+      fuchsia_hardware_power::ParentElement::WithInstanceName("element_first_parent");
   fuchsia_hardware_power::PowerLevel one = {{.level = 0, .name = "one", .transitions = {}}};
   fuchsia_hardware_power::PowerLevel two = {{.level = 0, .name = "two", .transitions = {}}};
   fuchsia_hardware_power::PowerLevel three = {{.level = 0, .name = "three", .transitions = {}}};
@@ -921,17 +918,17 @@ TEST_F(PowerLibTest, GetTokensNoTokens) {
 TEST_F(PowerLibTest, GetTokensOneDepOneLevel) {
   std::string parent_name = "parentOne";
   fuchsia_hardware_power::ParentElement parent =
-      fuchsia_hardware_power::ParentElement::WithName(parent_name);
+      fuchsia_hardware_power::ParentElement::WithInstanceName(parent_name);
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   loop.StartThread();
   fidl::ServerBindingGroup<fuchsia_hardware_power::PowerTokenProvider> bindings;
 
   fbl::RefPtr<fs::PseudoDir> power_token_service = fbl::MakeRefCounted<fs::PseudoDir>();
 
-  AddInstanceResult instance_data = AddServiceInstance(parent_name, loop.dispatcher(), &bindings);
+  AddInstanceResult instance_data = AddServiceInstance(loop.dispatcher(), &bindings);
 
   fbl::RefPtr<fs::PseudoDir> svc_instances_dir = fbl::MakeRefCounted<fs::PseudoDir>();
-  ASSERT_EQ(svc_instances_dir->AddEntry("instance_one", instance_data.service_instance), ZX_OK);
+  ASSERT_EQ(svc_instances_dir->AddEntry(parent_name, instance_data.service_instance), ZX_OK);
   ASSERT_EQ(power_token_service->AddEntry(fuchsia_hardware_power::PowerTokenService::Name,
                                           svc_instances_dir),
             ZX_OK);
@@ -997,7 +994,7 @@ TEST_F(PowerLibTest, GetTokensOneDepOneLevel) {
 TEST_F(PowerLibTest, GetTokensOneDepTwoLevels) {
   std::string parent_name = "parentOne";
   fuchsia_hardware_power::ParentElement parent =
-      fuchsia_hardware_power::ParentElement::WithName(parent_name);
+      fuchsia_hardware_power::ParentElement::WithInstanceName(parent_name);
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   loop.StartThread();
   fidl::ServerBindingGroup<fuchsia_hardware_power::PowerTokenProvider> bindings;
@@ -1005,8 +1002,8 @@ TEST_F(PowerLibTest, GetTokensOneDepTwoLevels) {
   fbl::RefPtr<fs::PseudoDir> namespace_svc_dir = fbl::MakeRefCounted<fs::PseudoDir>();
 
   fbl::RefPtr<fs::PseudoDir> svc_instances_dir = fbl::MakeRefCounted<fs::PseudoDir>();
-  AddInstanceResult instance_data = AddServiceInstance(parent_name, loop.dispatcher(), &bindings);
-  ASSERT_EQ(svc_instances_dir->AddEntry("instance_one", instance_data.service_instance), ZX_OK);
+  AddInstanceResult instance_data = AddServiceInstance(loop.dispatcher(), &bindings);
+  ASSERT_EQ(svc_instances_dir->AddEntry(parent_name, instance_data.service_instance), ZX_OK);
 
   ASSERT_EQ(namespace_svc_dir->AddEntry(fuchsia_hardware_power::PowerTokenService::Name,
                                         svc_instances_dir),
@@ -1077,25 +1074,23 @@ TEST_F(PowerLibTest, GetTokensOneDepTwoLevels) {
 TEST_F(PowerLibTest, GetTokensTwoDepTwoLevels) {
   std::string parent_name1 = "parentOne";
   fuchsia_hardware_power::ParentElement parent_element1 =
-      fuchsia_hardware_power::ParentElement::WithName(parent_name1);
+      fuchsia_hardware_power::ParentElement::WithInstanceName(parent_name1);
   std::string parent_name2 = "parentTwo";
   fuchsia_hardware_power::ParentElement parent_element2 =
-      fuchsia_hardware_power::ParentElement::WithName(parent_name2);
+      fuchsia_hardware_power::ParentElement::WithInstanceName(parent_name2);
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   loop.StartThread();
   fidl::ServerBindingGroup<fuchsia_hardware_power::PowerTokenProvider> bindings;
 
   fbl::RefPtr<fs::PseudoDir> power_token_service = fbl::MakeRefCounted<fs::PseudoDir>();
 
-  AddInstanceResult instance_one_data =
-      AddServiceInstance(parent_name1, loop.dispatcher(), &bindings);
-  AddInstanceResult instance_two_data =
-      AddServiceInstance(parent_name2, loop.dispatcher(), &bindings);
+  AddInstanceResult instance_one_data = AddServiceInstance(loop.dispatcher(), &bindings);
+  AddInstanceResult instance_two_data = AddServiceInstance(loop.dispatcher(), &bindings);
 
   // Create the directory holding the service instances
   fbl::RefPtr<fs::PseudoDir> svc_instances_dir = fbl::MakeRefCounted<fs::PseudoDir>();
-  ASSERT_EQ(svc_instances_dir->AddEntry("instance_two", instance_one_data.service_instance), ZX_OK);
-  ASSERT_EQ(svc_instances_dir->AddEntry("instance_one", instance_two_data.service_instance), ZX_OK);
+  ASSERT_EQ(svc_instances_dir->AddEntry(parent_name1, instance_one_data.service_instance), ZX_OK);
+  ASSERT_EQ(svc_instances_dir->AddEntry(parent_name2, instance_two_data.service_instance), ZX_OK);
   ASSERT_EQ(power_token_service->AddEntry(fuchsia_hardware_power::PowerTokenService::Name,
                                           svc_instances_dir),
             ZX_OK);
@@ -1181,25 +1176,23 @@ TEST_F(PowerLibTest, GetTokensTwoDepTwoLevels) {
 TEST_F(PowerLibTest, GetTokensOneLevelTwoDeps) {
   std::string parent_name1 = "parentOne";
   fuchsia_hardware_power::ParentElement parent_element1 =
-      fuchsia_hardware_power::ParentElement::WithName(parent_name1);
+      fuchsia_hardware_power::ParentElement::WithInstanceName(parent_name1);
   std::string parent_name2 = "parenttwo";
   fuchsia_hardware_power::ParentElement parent_element2 =
-      fuchsia_hardware_power::ParentElement::WithName(parent_name2);
+      fuchsia_hardware_power::ParentElement::WithInstanceName(parent_name2);
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   loop.StartThread();
   fidl::ServerBindingGroup<fuchsia_hardware_power::PowerTokenProvider> bindings;
 
   fbl::RefPtr<fs::PseudoDir> power_token_service = fbl::MakeRefCounted<fs::PseudoDir>();
 
-  AddInstanceResult instance_one_data =
-      AddServiceInstance(parent_name1, loop.dispatcher(), &bindings);
-  AddInstanceResult instance_two_data =
-      AddServiceInstance(parent_name2, loop.dispatcher(), &bindings);
+  AddInstanceResult instance_one_data = AddServiceInstance(loop.dispatcher(), &bindings);
+  AddInstanceResult instance_two_data = AddServiceInstance(loop.dispatcher(), &bindings);
 
   // Create the directory holding the service instances
   fbl::RefPtr<fs::PseudoDir> svc_instances_dir = fbl::MakeRefCounted<fs::PseudoDir>();
-  ASSERT_EQ(svc_instances_dir->AddEntry("instance_two", instance_two_data.service_instance), ZX_OK);
-  ASSERT_EQ(svc_instances_dir->AddEntry("instance_one", instance_one_data.service_instance), ZX_OK);
+  ASSERT_EQ(svc_instances_dir->AddEntry(parent_name1, instance_one_data.service_instance), ZX_OK);
+  ASSERT_EQ(svc_instances_dir->AddEntry(parent_name2, instance_two_data.service_instance), ZX_OK);
   ASSERT_EQ(power_token_service->AddEntry(fuchsia_hardware_power::PowerTokenService::Name,
                                           svc_instances_dir),
             ZX_OK);
@@ -1432,14 +1425,14 @@ TEST_F(PowerLibTest, TestDriverAndSagElements) {
   // Now let's add dependencies on non-SAG elements
   std::string driver_parent_name = "driver_parent";
   fuchsia_hardware_power::ParentElement driver_parent =
-      fuchsia_hardware_power::ParentElement::WithName(driver_parent_name);
+      fuchsia_hardware_power::ParentElement::WithInstanceName(driver_parent_name);
 
   fidl::ServerBindingGroup<fuchsia_hardware_power::PowerTokenProvider> token_service_bindings;
   // Service dir which contains the service instances
   fbl::RefPtr<fs::PseudoDir> power_token_service = fbl::MakeRefCounted<fs::PseudoDir>();
-  AddInstanceResult instance_data =
-      AddServiceInstance(driver_parent_name, loop.dispatcher(), &token_service_bindings);
-  ASSERT_EQ(ZX_OK, power_token_service->AddEntry("one", instance_data.service_instance));
+  AddInstanceResult instance_data = AddServiceInstance(loop.dispatcher(), &token_service_bindings);
+  ASSERT_EQ(ZX_OK,
+            power_token_service->AddEntry(driver_parent_name, instance_data.service_instance));
   svcs_dir->AddEntry(fuchsia_hardware_power::PowerTokenService::Name, power_token_service);
 
   fidl::Endpoints<fuchsia_io::Directory> dir_endpoints =
@@ -1522,7 +1515,6 @@ TEST_F(PowerLibTest, TestDriverInstanceDep) {
   fbl::RefPtr<fs::PseudoDir> svcs_dir = fbl::MakeRefCounted<fs::PseudoDir>();
 
   // Now let's add dependencies on non-SAG elements
-  std::string driver_parent_name = "element_name";
   std::string driver_instance_name = "instance_name";
   fuchsia_hardware_power::ParentElement driver_parent =
       fuchsia_hardware_power::ParentElement::WithInstanceName(driver_instance_name);
@@ -1530,8 +1522,7 @@ TEST_F(PowerLibTest, TestDriverInstanceDep) {
   fidl::ServerBindingGroup<fuchsia_hardware_power::PowerTokenProvider> token_service_bindings;
   // Service dir which contains the service instances
   fbl::RefPtr<fs::PseudoDir> power_token_service = fbl::MakeRefCounted<fs::PseudoDir>();
-  AddInstanceResult instance_data =
-      AddServiceInstance(driver_parent_name, loop.dispatcher(), &token_service_bindings);
+  AddInstanceResult instance_data = AddServiceInstance(loop.dispatcher(), &token_service_bindings);
   ASSERT_EQ(ZX_OK,
             power_token_service->AddEntry(driver_instance_name, instance_data.service_instance));
   svcs_dir->AddEntry(fuchsia_hardware_power::PowerTokenService::Name, power_token_service);
