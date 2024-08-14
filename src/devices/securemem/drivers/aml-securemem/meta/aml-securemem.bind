@@ -15,7 +15,7 @@ primary node "pdev" {
   fuchsia.BIND_PLATFORM_DEV_DID == fuchsia.amlogic.platform.BIND_PLATFORM_DEV_DID.SECURE_MEM;
 }
 
-node "sysmem" {
+optional node "sysmem" {
   fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }
 

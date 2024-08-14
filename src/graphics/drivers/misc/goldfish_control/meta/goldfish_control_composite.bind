@@ -24,6 +24,6 @@ node "goldfish-sync" {
     fuchsia.hardware.goldfish.SyncService == fuchsia.hardware.goldfish.SyncService.ZirconTransport;
 }
 
-node "sysmem" {
+optional node "sysmem" {
     fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }

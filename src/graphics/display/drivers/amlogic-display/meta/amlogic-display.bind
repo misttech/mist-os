@@ -39,7 +39,7 @@ optional node "gpio-hdmi-hotplug-detect" {
   fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.HDMI_HOTPLUG_DETECT;
 }
 
-node "sysmem" {
+optional node "sysmem" {
   fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }
 

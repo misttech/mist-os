@@ -33,7 +33,7 @@ primary node "pdev" {
   }
 }
 
-node "sysmem" {
+optional node "sysmem" {
   fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }
 

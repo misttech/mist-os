@@ -21,6 +21,6 @@ node "ge2d" {
   fuchsia.BIND_PROTOCOL == fuchsia.camera.BIND_PROTOCOL.GE2D;
 }
 
-node "sysmem" {
+optional node "sysmem" {
   fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }
