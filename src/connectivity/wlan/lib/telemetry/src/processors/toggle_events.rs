@@ -21,7 +21,7 @@ pub struct ToggleLogger {
 impl ToggleLogger {
     pub fn new(inspect_node: &InspectNode) -> Self {
         // Initialize inspect children
-        let toggle_events = inspect_node.create_child("client-connections-toggle-events");
+        let toggle_events = inspect_node.create_child("client_connections_toggle_events");
         let toggle_inspect_node = BoundedListNode::new(toggle_events, INSPECT_TOGGLE_EVENTS_LIMIT);
 
         Self { toggle_inspect_node }
@@ -54,7 +54,7 @@ mod tests {
 
         assert_data_tree!(inspector, root: {
             wlan_mock_node: {
-                "client-connections-toggle-events": {
+                client_connections_toggle_events: {
                     "0": {
                         "event_type": "Enabled",
                         "@time": AnyNumericProperty
