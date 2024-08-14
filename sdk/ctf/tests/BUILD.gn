@@ -23,6 +23,28 @@ group("tests") {
   ]
 }
 
+group("ctf-tests") {
+  testonly = true
+
+  # TODO(https://fxbug.dev/42070336): Iteratively fix these builds for frozen CTF.
+  # These targets will be removed from :tests when we depend on the subbuild for
+  # the current CTF release bundle, but for now this list serves as a TODO for
+  # further changes.
+  deps = [
+    # "examples:ctf-tests",
+    # "fidl:ctf-tests",
+    # "pkg:ctf-tests",
+    # # Tests defined outside of //sdk/ctf
+    # "//src/connectivity/wlan/testing/hw-sim/test:ctf-tests",
+    # "//src/devices/tests/ctf:ctf-tests",
+    # "//src/sys/component_manager/tests/realm:ctf-tests",
+    # "//src/sys/pkg/tests/pkgdir:ctf-tests",
+    # "//src/sys/time/timekeeper_integration:ctf-tests",
+    # "//src/ui/scenic/tests:ctf-tests",
+    # "//src/ui/tests/conformance_input_tests:ctf-tests",
+  ]
+}
+
 group("e2e_tests") {
   testonly = true
   deps = [ "examples:e2e_tests" ]
