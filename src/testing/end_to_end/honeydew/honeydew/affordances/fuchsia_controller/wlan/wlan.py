@@ -3,13 +3,21 @@
 # found in the LICENSE file.
 """WLAN affordance implementation using Fuchsia Controller."""
 
+import asyncio
 import logging
+from dataclasses import dataclass
+
+import fidl.fuchsia_location_namedplace as f_location_namedplace
+import fidl.fuchsia_wlan_device_service as f_wlan_device_service
+import fidl.fuchsia_wlan_sme as f_wlan_sme
+from fuchsia_controller_py import Channel, ZxStatus
 
 from honeydew import errors
 from honeydew.interfaces.affordances.wlan import wlan
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.transports import ffx as ffx_transport
 from honeydew.interfaces.transports import fuchsia_controller as fc_transport
+from honeydew.typing.custom_types import FidlEndpoint
 from honeydew.typing.wlan import (
     BssDescription,
     ClientStatusResponse,
@@ -26,6 +34,15 @@ _REQUIRED_CAPABILITIES = [
 ]
 
 _LOGGER: logging.Logger = logging.getLogger(__name__)
+
+# Fuchsia Controller proxies
+_DEVICE_MONITOR_PROXY = FidlEndpoint(
+    "core/wlandevicemonitor", "fuchsia.wlan.device.service.DeviceMonitor"
+)
+_REGULATORY_REGION_CONFIGURATOR_PROXY = FidlEndpoint(
+    "core/regulatory_region",
+    "fuchsia.location.namedplace.RegulatoryRegionConfigurator",
+)
 
 
 class Wlan(wlan.Wlan):
@@ -50,6 +67,9 @@ class Wlan(wlan.Wlan):
 
         self._fc_transport = fuchsia_controller
         self._reboot_affordance = reboot_affordance
+
+        self._connect_proxy()
+        self._reboot_affordance.register_for_on_device_boot(self._connect_proxy)
 
     def _verify_supported(self, device: str, ffx: ffx_transport.FFX) -> None:
         """Check if WLAN is supported on the DUT.
@@ -77,6 +97,19 @@ class Wlan(wlan.Wlan):
                     "WLAN FC affordance."
                 )
 
+    def _connect_proxy(self) -> None:
+        """Re-initializes connection to the WLAN stack."""
+        self._device_monitor_proxy = f_wlan_device_service.DeviceMonitor.Client(
+            self._fc_transport.connect_device_proxy(_DEVICE_MONITOR_PROXY)
+        )
+        self._regulatory_region_configurator = (
+            f_location_namedplace.RegulatoryRegionConfigurator.Client(
+                self._fc_transport.connect_device_proxy(
+                    _REGULATORY_REGION_CONFIGURATOR_PROXY
+                )
+            )
+        )
+
     def connect(
         self,
         ssid: str,
@@ -99,8 +132,12 @@ class Wlan(wlan.Wlan):
 
         Raises:
             HoneydewWlanError: Error from WLAN stack
-            InterfaceNotFoundError: No client WLAN interface found.
+            NetworkInterfaceNotFoundError: No client WLAN interface found.
         """
+        # TODO(http://b/324949922): Uncomment once the WLAN affordance API is
+        # changed to include the desired authentication in every call to
+        # connect().
+        # TODO(http://b/324949815): Implement server to ConnectTransaction
         raise NotImplementedError()
 
     def create_iface(
@@ -120,7 +157,29 @@ class Wlan(wlan.Wlan):
             HoneydewWlanError: Error from WLAN stack
             ValueError: Invalid MAC address
         """
-        raise NotImplementedError()
+        if sta_addr is None:
+            sta_addr = "00:00:00:00:00:00"
+            _LOGGER.warning(
+                "No MAC provided in args of create_iface, using %s", sta_addr
+            )
+
+        req = f_wlan_device_service.CreateIfaceRequest(
+            phy_id=phy_id,
+            role=role.to_fidl(),
+            sta_addr=MacAddress(sta_addr).bytes(),
+        )
+        try:
+            create_iface = asyncio.run(
+                self._device_monitor_proxy.create_iface(req=req)
+            )
+            if create_iface.status != ZxStatus.ZX_OK:
+                raise ZxStatus(create_iface.status)
+        except ZxStatus as status:
+            raise errors.HoneydewWlanError(
+                f"DeviceMonitor.CreateIface() error {status}"
+            ) from status
+
+        return create_iface.resp.iface_id
 
     def destroy_iface(self, iface_id: int) -> None:
         """Destroy WLAN interface by ID.
@@ -131,7 +190,17 @@ class Wlan(wlan.Wlan):
         Raises:
             HoneydewWlanError: Error from WLAN stack
         """
-        raise NotImplementedError()
+        req = f_wlan_device_service.DestroyIfaceRequest(iface_id=iface_id)
+        try:
+            destroy_iface = asyncio.run(
+                self._device_monitor_proxy.destroy_iface(req=req)
+            )
+            if destroy_iface.status != ZxStatus.ZX_OK:
+                raise ZxStatus(destroy_iface.status)
+        except ZxStatus as status:
+            raise errors.HoneydewWlanError(
+                f"DeviceMonitor.DestroyIface() error {status}"
+            ) from status
 
     def disconnect(self) -> None:
         """Disconnect all client WLAN connections.
@@ -139,7 +208,22 @@ class Wlan(wlan.Wlan):
         Raises:
             HoneydewWlanError: Error from WLAN stack
         """
-        raise NotImplementedError()
+        iface_ids = self.get_iface_id_list()
+
+        for iface_id in iface_ids:
+            info = self.query_iface(iface_id)
+            if info.role == WlanMacRole.CLIENT:
+                sme = self._get_client_sme(iface_id)
+                try:
+                    asyncio.run(
+                        sme.disconnect(
+                            reason=f_wlan_sme.UserDisconnectReason.WLAN_SERVICE_UTIL_TESTING,
+                        )
+                    )
+                except ZxStatus as status:
+                    raise errors.HoneydewWlanError(
+                        f"SmeClient.Disconnect() error {status}"
+                    ) from status
 
     def get_country(self, phy_id: int) -> CountryCode:
         """Queries the currently configured country code from phy `phy_id`.
@@ -153,7 +237,20 @@ class Wlan(wlan.Wlan):
         Raises:
             HoneydewWlanError: Error from WLAN stack
         """
-        raise NotImplementedError()
+        try:
+            get_country = asyncio.run(
+                self._device_monitor_proxy.get_country(phy_id=phy_id)
+            )
+            if get_country.err is not None:
+                raise ZxStatus(get_country.err)
+        except ZxStatus as status:
+            raise errors.HoneydewWlanError(
+                f"DeviceMonitor.GetCountry() error {status}"
+            ) from status
+
+        return CountryCode(
+            bytes(get_country.response.resp.alpha2).decode("utf-8")
+        )
 
     def get_iface_id_list(self) -> list[int]:
         """Get list of wlan iface IDs on device.
@@ -164,7 +261,13 @@ class Wlan(wlan.Wlan):
         Raises:
             HoneydewWlanError: Error from WLAN stack
         """
-        raise NotImplementedError()
+        try:
+            resp = asyncio.run(self._device_monitor_proxy.list_ifaces())
+        except ZxStatus as status:
+            raise errors.HoneydewWlanError(
+                f"DeviceMonitor.ListIfaces() error {status}"
+            ) from status
+        return resp.iface_list
 
     def get_phy_id_list(self) -> list[int]:
         """Get list of phy ids on device.
@@ -175,7 +278,13 @@ class Wlan(wlan.Wlan):
         Raises:
             HoneydewWlanError: Error from WLAN stack
         """
-        raise NotImplementedError()
+        try:
+            resp = asyncio.run(self._device_monitor_proxy.list_phys())
+        except ZxStatus as status:
+            raise errors.HoneydewWlanError(
+                f"DeviceMonitor.ListPhys() error {status}"
+            ) from status
+        return resp.phy_list
 
     def query_iface(self, iface_id: int) -> QueryIfaceResponse:
         """Retrieves interface info for given wlan iface id.
@@ -189,7 +298,17 @@ class Wlan(wlan.Wlan):
         Raises:
             HoneydewWlanError: DeviceMonitor.QueryIface error
         """
-        raise NotImplementedError()
+        try:
+            query = asyncio.run(
+                self._device_monitor_proxy.query_iface(iface_id=iface_id)
+            )
+            if query.err is not None:
+                raise query.err
+        except ZxStatus as status:
+            raise errors.HoneydewWlanError(
+                f"DeviceMonitor.QueryIface() error {status}"
+            ) from status
+        return QueryIfaceResponse.from_fidl(query.response.resp)
 
     def scan_for_bss_info(self) -> dict[str, list[BssDescription]]:
         """Scans and returns BSS info.
@@ -200,9 +319,101 @@ class Wlan(wlan.Wlan):
 
         Raises:
             HoneydewWlanError: Error from WLAN stack
-            InterfaceNotFoundError: No client WLAN interface found.
+            NetworkInterfaceNotFoundError: No client WLAN interface found.
         """
-        raise NotImplementedError()
+        iface_id = self._get_first_sme(WlanMacRole.CLIENT)
+        client_sme = self._get_client_sme(iface_id)
+
+        # Perform a passive scan
+        req = f_wlan_sme.ScanRequest()
+        req.passive = f_wlan_sme.PassiveScanRequest()
+
+        try:
+            scan = asyncio.run(client_sme.scan_for_controller(req=req))
+        except ZxStatus as status:
+            raise errors.HoneydewWlanError(
+                f"ClientSme.ScanForController() error {status}"
+            ) from status
+
+        if scan.err is not None:
+            raise errors.HoneydewWlanError(
+                f"ClientSme.ScanForController() ScanErrorCode {scan.err}"
+            )
+
+        results: dict[str, list[BssDescription]] = {}
+
+        for scan_result in scan.response.scan_results:
+            desc = BssDescription.from_fidl(scan_result.bss_description)
+            ssid = desc.ssid()
+            if ssid:
+                if ssid in results:
+                    results[ssid].append(desc)
+                else:
+                    results[ssid] = [desc]
+            else:
+                _LOGGER.warning(
+                    "Scan result does not contain SSID: %s", scan_result
+                )
+
+        return results
+
+    def _get_first_sme(self, role: WlanMacRole) -> int:
+        """Find a WLAN interface running with the specified role.
+
+        Args:
+            role: Desired mode of the WLAN interface.
+
+        Raises:
+            NetworkInterfaceNotFoundError: No WLAN interface found running with the
+                specified role.
+
+        Returns:
+            ID of the first WLAN interface found running with the specified
+            role. The others are discarded.
+        """
+        iface_ids = self.get_iface_id_list()
+        if len(iface_ids) == 0:
+            raise errors.NetworkInterfaceNotFoundError(
+                "No WLAN interface found"
+            )
+
+        for iface_id in iface_ids:
+            info = self.query_iface(iface_id)
+            if info.role == role:
+                return iface_id
+
+        raise errors.NetworkInterfaceNotFoundError(
+            f"WLAN interface with role {role} not found"
+        )
+
+    def _get_client_sme(self, iface_id: int) -> f_wlan_sme.ClientSme.Client:
+        """Get a handle to ClientSme for performing SME actions.
+
+        Args:
+            iface_id: The wlan interface id to connect with
+
+        Raises:
+            HoneydewWlanError: DeviceMonitor.QueryIface error
+
+        Returns:
+            Client-side handle to the fuchsia.wlan.sme.ClientSme protocol, used
+            for performing driver-layer actions on the underlying WLAN hardware.
+        """
+        client, server = Channel.create()
+        sme_client = f_wlan_sme.ClientSme.Client(client)
+
+        try:
+            asyncio.run(
+                self._device_monitor_proxy.get_client_sme(
+                    iface_id=iface_id, sme_server=server.take()
+                )
+            )
+        except ZxStatus as status:
+            raise errors.HoneydewWlanError(
+                f"DeviceMonitor.GetClientSme() error {status}"
+            ) from status
+
+        return sme_client
 
     def set_region(self, region_code: str) -> None:
         """Set regulatory region.
@@ -214,7 +425,17 @@ class Wlan(wlan.Wlan):
             HoneydewWlanError: Error from WLAN stack
             TypeError: Invalid region_code format
         """
-        raise NotImplementedError()
+        if len(region_code) != 2:
+            raise TypeError(
+                f'Expected region_code to be length 2, got "{region_code}"'
+            )
+
+        try:
+            self._regulatory_region_configurator.set_region(region=region_code)
+        except ZxStatus as status:
+            raise errors.HoneydewWlanError(
+                f"RegulatoryRegionConfigurator.SetRegion() error {status}"
+            ) from status
 
     def status(self) -> ClientStatusResponse:
         """Request connection status
@@ -225,7 +446,51 @@ class Wlan(wlan.Wlan):
 
         Raises:
             HoneydewWlanError: Error from WLAN stack
-            InterfaceNotFoundError: No client WLAN interface found.
+            NetworkInterfaceNotFoundError: No client WLAN interface found.
             TypeError: If any of the return values are not of the expected type.
         """
-        raise NotImplementedError()
+        iface_id = self._get_first_sme(WlanMacRole.CLIENT)
+        sme = self._get_client_sme(iface_id)
+
+        try:
+            resp = asyncio.run(sme.status())
+        except ZxStatus as status:
+            raise errors.HoneydewWlanError(
+                f"ClientSme.Status() error {status}"
+            ) from status
+
+        return ClientStatusResponse.from_fidl(resp.resp)
+
+
+@dataclass(frozen=True)
+class MacAddress:
+    """MAC address following the EUI-48 identifier format.
+
+    Used by IEEE 802 networks as unique identifiers assigned to network
+    interface controllers.
+    """
+
+    mac: str
+    """MAC address in the form "xx:xx:xx:xx:xx:xx"."""
+
+    def bytes(self) -> bytes:
+        """Convert MAC into a byte array.
+
+        Returns:
+            Byte array of the MAC address.
+
+        Raises:
+            ValueError: Invalid MAC address
+        """
+        try:
+            mac = bytes([int(a, 16) for a in self.mac.split(":", 5)])
+            for i, octet in enumerate(mac):
+                if octet > 255:
+                    raise ValueError(
+                        f"Invalid octet at index {i}: larger than 8 bits"
+                    )
+            if len(mac) != 6:
+                raise ValueError(f"Expected 6 bytes, got {len(mac)}")
+            return mac
+        except ValueError as e:
+            raise ValueError("Invalid MAC address") from e

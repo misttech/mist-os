@@ -98,6 +98,14 @@ class HoneydewDataResourceError(HoneydewError):
     """Raised when Honeydew fails to fetch its data resources."""
 
 
+class HoneydewWlanError(HoneydewError):
+    """Raised by wlan.Wlan class."""
+
+
+class NetworkInterfaceNotFoundError(HoneydewError):
+    """Raised when a matching network interface is not found."""
+
+
 class FuchsiaStateError(HoneydewError):
     """Exception for state errors."""
 

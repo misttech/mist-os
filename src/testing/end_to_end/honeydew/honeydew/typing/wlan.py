@@ -9,9 +9,14 @@ import enum
 from dataclasses import dataclass
 from typing import Protocol
 
+import fidl.fuchsia_wlan_common as f_wlan_common
+import fidl.fuchsia_wlan_device_service as f_wlan_device_service
+import fidl.fuchsia_wlan_internal as f_wlan_internal
+import fidl.fuchsia_wlan_sme as f_wlan_sme
+
 
 # pylint: disable=line-too-long
-# TODO(b/299995309): Add lint if change presubmit checks to keep enums and fidl
+# TODO(http://b/299995309): Add lint if change presubmit checks to keep enums and fidl
 # definitions consistent.
 class SecurityType(enum.StrEnum):
     """Fuchsia supported security types.
@@ -73,6 +78,9 @@ class RequestStatus(enum.StrEnum):
     REJECTED_DUPLICATE_REQUEST = "RejectedDuplicateRequest"
 
 
+# TODO(http://b/346424966): Only necessary because Python does not have static
+# typing for FIDL. Once these static types are available and the SL4F affordance
+# is removed, replace with the statically generated FIDL equivalent.
 class WlanMacRole(enum.StrEnum):
     """Role of the WLAN MAC interface.
 
@@ -85,20 +93,78 @@ class WlanMacRole(enum.StrEnum):
     MESH = "Mesh"
     UNKNOWN = "Unknown"
 
+    @staticmethod
+    def from_fidl(fidl: f_wlan_common.WlanMacRole) -> "WlanMacRole":
+        match int(fidl):
+            case 1:
+                return WlanMacRole.CLIENT
+            case 2:
+                return WlanMacRole.AP
+            case 3:
+                return WlanMacRole.MESH
+            case _:
+                raise TypeError(f"Unknown WlanMacRole: {fidl.role}")
 
+    def to_fidl(self) -> f_wlan_common.WlanMacRole:
+        match self:
+            case WlanMacRole.CLIENT:
+                return f_wlan_common.WlanMacRole.CLIENT
+            case WlanMacRole.AP:
+                return f_wlan_common.WlanMacRole.AP
+            case WlanMacRole.MESH:
+                return f_wlan_common.WlanMacRole.MESH
+            case WlanMacRole.UNKNOWN:
+                raise TypeError("No corresponding WlanMacRole for UNKNOWN")
+
+
+# TODO(http://b/346424966): Only necessary because Python does not have static
+# typing for FIDL. Once these static types are available and the SL4F affordance
+# is removed, replace with the statically generated FIDL equivalent.
 class BssType(enum.StrEnum):
     """BssType
 
     Defined by https://cs.opensource.google/fuchsia/fuchsia/+/main:src/testing/sl4f/src/wlan/types.rs
     """
 
+    UNKNOWN = "Unknown"
     INFRASTRUCTURE = "Infrastructure"
-    PERSONAL = "Personal"
     INDEPENDENT = "Independent"
     MESH = "Mesh"
-    UNKNOWN = "Unknown"
+    PERSONAL = "Personal"
+
+    @staticmethod
+    def from_fidl(fidl: f_wlan_common.BssType) -> "BssType":
+        match fidl:
+            case f_wlan_common.BssType.UNKNOWN:
+                return BssType.UNKNOWN
+            case f_wlan_common.BssType.INFRASTRUCTURE:
+                return BssType.INFRASTRUCTURE
+            case f_wlan_common.BssType.INDEPENDENT:
+                return BssType.INDEPENDENT
+            case f_wlan_common.BssType.MESH:
+                return BssType.MESH
+            case f_wlan_common.BssType.PERSONAL:
+                return BssType.PERSONAL
+            case _:
+                raise TypeError(f"Unknown BssType FIDL value: {fidl}")
+
+    def to_fidl(self) -> f_wlan_common.BssType:
+        match self:
+            case BssType.UNKNOWN:
+                return f_wlan_common.BssType.UNKNOWN
+            case BssType.INFRASTRUCTURE:
+                return f_wlan_common.BssType.INFRASTRUCTURE
+            case BssType.INDEPENDENT:
+                return f_wlan_common.BssType.INDEPENDENT
+            case BssType.MESH:
+                return f_wlan_common.BssType.MESH
+            case BssType.PERSONAL:
+                return f_wlan_common.BssType.PERSONAL
 
 
+# TODO(http://b/346424966): Only necessary because Python does not have static
+# typing for FIDL. Once these static types are available and the SL4F affordance
+# is removed, replace with the statically generated FIDL equivalent.
 class ChannelBandwidth(enum.StrEnum):
     """Channel Bandwidth
 
@@ -113,7 +179,43 @@ class ChannelBandwidth(enum.StrEnum):
     CBW80P80 = "Cbw80P80"
     UNKNOWN = "Unknown"
 
+    @staticmethod
+    def from_fidl(fidl: f_wlan_common.ChannelBandwidth) -> "ChannelBandwidth":
+        match fidl:
+            case f_wlan_common.ChannelBandwidth.CBW20:
+                return ChannelBandwidth.CBW20
+            case f_wlan_common.ChannelBandwidth.CBW40:
+                return ChannelBandwidth.CBW40
+            case f_wlan_common.ChannelBandwidth.CBW40BELOW:
+                return ChannelBandwidth.CBW40BELOW
+            case f_wlan_common.ChannelBandwidth.CBW80:
+                return ChannelBandwidth.CBW80
+            case f_wlan_common.ChannelBandwidth.CBW80P80:
+                return ChannelBandwidth.CBW80P80
+            case _:
+                raise TypeError(f"Unknown ChannelBandwidth FIDL value: {fidl}")
 
+    def to_fidl(self) -> f_wlan_common.ChannelBandwidth:
+        match self:
+            case ChannelBandwidth.CBW20:
+                return f_wlan_common.ChannelBandwidth.CBW20
+            case ChannelBandwidth.CBW40:
+                return f_wlan_common.ChannelBandwidth.CBW40
+            case ChannelBandwidth.CBW40BELOW:
+                return f_wlan_common.ChannelBandwidth.CBW40BELOW
+            case ChannelBandwidth.CBW80:
+                return f_wlan_common.ChannelBandwidth.CBW80
+            case ChannelBandwidth.CBW80P80:
+                return f_wlan_common.ChannelBandwidth.CBW80P80
+            case ChannelBandwidth.UNKNOWN:
+                raise TypeError(
+                    "ChannelBandwidth.UNKNOWN doesn't have FIDL equivalent"
+                )
+
+
+# TODO(http://b/346424966): Only necessary because Python does not have static
+# typing for FIDL. Once these static types are available and the SL4F affordance
+# is removed, replace with the statically generated FIDL equivalent.
 class Protection(enum.IntEnum):
     """Protection
 
@@ -132,6 +234,16 @@ class Protection(enum.IntEnum):
     WPA3_PERSONAL = 9
     WPA2_ENTERPRISE = 10
     WPA3_ENTERPRISE = 11
+
+    @staticmethod
+    def from_fidl(fidl: f_wlan_sme.Protection) -> "Protection":
+        match fidl:
+            case p if isinstance(p, f_wlan_sme.Protection) and (
+                int(p) >= 0 and int(p) <= 11
+            ):
+                return Protection(int(p))
+            case _:
+                raise TypeError(f"Unknown Protection FIDL value: {fidl}")
 
 
 @dataclass(frozen=True)
@@ -212,6 +324,21 @@ class WlanChannel:
     cbw: ChannelBandwidth
     secondary80: int
 
+    @staticmethod
+    def from_fidl(fidl: f_wlan_common.WlanChannel) -> "WlanChannel":
+        return WlanChannel(
+            primary=fidl.primary,
+            cbw=ChannelBandwidth.from_fidl(fidl.cbw),
+            secondary80=fidl.secondary80,
+        )
+
+    def to_fidl(self) -> f_wlan_common.WlanChannel:
+        return WlanChannel(
+            primary=self.primary,
+            cbw=self.cbw.to_fidl(),
+            secondary80=self.secondary80,
+        )
+
 
 @dataclass(frozen=True)
 class QueryIfaceResponse:
@@ -225,6 +352,19 @@ class QueryIfaceResponse:
     phy_id: int
     phy_assigned_id: int
     sta_addr: list[int]
+
+    @staticmethod
+    def from_fidl(
+        fidl: f_wlan_device_service.QueryIfaceResponse,
+    ) -> "QueryIfaceResponse":
+        """Create a QueryIFaceResponse from the FIDL equivalent."""
+        return QueryIfaceResponse(
+            role=WlanMacRole.from_fidl(fidl.role),
+            id=fidl.id,
+            phy_id=fidl.phy_id,
+            phy_assigned_id=fidl.phy_assigned_id,
+            sta_addr=list(fidl.sta_addr),
+        )
 
 
 class InformationElementType(enum.IntEnum):
@@ -240,6 +380,9 @@ class InformationElementType(enum.IntEnum):
     # Types 1-255 are not implemented. Only implement a new type if it is being used.
 
 
+# TODO(http://b/346424966): Only necessary because Python does not have static
+# typing for FIDL. Once these static types are available and the SL4F affordance
+# is removed, replace with the statically generated FIDL equivalent.
 @dataclass(frozen=True)
 class BssDescription:
     """BssDescription
@@ -256,11 +399,101 @@ class BssDescription:
     rssi_dbm: int
     snr_db: int
 
+    @staticmethod
+    def from_fidl(fidl: f_wlan_internal.BssDescription) -> "BssDescription":
+        return BssDescription(
+            bssid=list(fidl.bssid),
+            bss_type=BssType.from_fidl(fidl.bss_type),
+            beacon_period=fidl.beacon_period,
+            capability_info=fidl.capability_info,
+            ies=list(fidl.ies),
+            channel=WlanChannel.from_fidl(fidl.channel),
+            rssi_dbm=fidl.rssi_dbm,
+            snr_db=fidl.snr_db,
+        )
 
+    def to_fidl(self) -> f_wlan_internal.BssDescription:
+        return f_wlan_internal.BssDescription(
+            bssid=self.bssid,
+            bss_type=self.bss_type.to_fidl(),
+            beacon_period=self.beacon_period,
+            capability_info=self.capability_info,
+            ies=self.ies,
+            channel=self.channel.to_fidl(),
+            rssi_dbm=self.rssi_dbm,
+            snr_db=self.snr_db,
+        )
+
+    def ssid(self) -> str | None:
+        """Parse information elements for SSID."""
+        ies = bytes(self.ies)
+        i = 0
+        while i < len(ies):
+            if not len(ies) > i + 1:
+                raise TypeError(
+                    "Invalid information element; requires at least 2 bytes for "
+                    f"Element ID and Length, got {len(ies)-i}"
+                )
+
+            element = int(ies[i])
+            length = int(ies[i + 1])
+            i += 2
+
+            try:
+                ie_type = InformationElementType(int(element))
+            except ValueError:
+                # Type not implemented. It's okay to skip
+                i += length
+                continue
+
+            match ie_type:
+                case InformationElementType.SSID:
+                    try:
+                        return ies[i : i + length].decode("utf-8")
+                    except UnicodeDecodeError:
+                        # ssid is not valid UTF-8; fallback to counting bytes
+                        return f"<ssid-{length}>"
+                case _:
+                    raise TypeError(
+                        f"Unsupported InformationElementType: {ie_type}"
+                    )
+
+        return None
+
+
+# TODO(http://b/346424966): Only necessary because Python does not have static
+# typing for FIDL. Once these static types are available and the SL4F affordance
+# is removed, replace with the statically generated FIDL equivalent.
 @dataclass(frozen=True)
 class ClientStatusResponse(Protocol):
+    """WLAN client interface status."""
+
     def status(self) -> str:
-        ...
+        """Description of the client's status."""
+
+    @staticmethod
+    def from_fidl(
+        fidl: f_wlan_sme.ClientStatusResponse,
+    ) -> "ClientStatusResponse":
+        """Convert a ClientStatusResponse FIDL to the corresponding type."""
+        if fidl.connected:
+            ap: f_wlan_sme.ServingApInfo = fidl.connected
+            return ClientStatusConnected(
+                bssid=list(ap.bssid),
+                ssid=list(ap.ssid),
+                rssi_dbm=ap.rssi_dbm,
+                snr_db=ap.snr_db,
+                channel=WlanChannel.from_fidl(ap.channel),
+                protection=Protection.from_fidl(ap.protection),
+            )
+
+        if fidl.connecting:
+            return ClientStatusConnecting(ssid=fidl.connecting)
+
+        if fidl.idle:
+            return ClientStatusIdle()
+
+        raise TypeError(f"Unknown ClientStatusResponse FIDL value: {fidl}")
 
 
 @dataclass(frozen=True)

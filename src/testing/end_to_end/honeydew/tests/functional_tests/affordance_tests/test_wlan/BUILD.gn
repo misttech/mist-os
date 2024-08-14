@@ -101,5 +101,6 @@ group("tests") {
     ":test_wlan_fc",
     ":test_wlan_policy_sl4f",
     ":test_wlan_sl4f",
+    ":wlan_test_fc($host_toolchain)",
   ]
 }
