@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/coordinator/vsync-monitor.h"
 
-#include <lib/async-loop/loop.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/clock.h>
@@ -26,19 +25,21 @@ constexpr zx::duration kVsyncMonitorInterval = kVsyncStallThreshold / 2;
 
 }  // namespace
 
-VsyncMonitor::VsyncMonitor(inspect::Node inspect_root)
+VsyncMonitor::VsyncMonitor(inspect::Node inspect_root, async_dispatcher_t* dispatcher)
     : inspect_root_(std::move(inspect_root)),
       last_vsync_ns_property_(inspect_root_.CreateUint("last_vsync_timestamp_ns", 0)),
       last_vsync_interval_ns_property_(inspect_root_.CreateUint("last_vsync_interval_ns", 0)),
       last_vsync_config_stamp_property_(
           inspect_root_.CreateUint("last_vsync_config_stamp", kInvalidConfigStamp.value())),
       vsync_stalls_detected_(inspect_root_.CreateUint("vsync_stalls", 0)),
-      updater_loop_(&kAsyncLoopConfigNeverAttachToThread) {}
+      dispatcher_(*dispatcher) {
+  ZX_DEBUG_ASSERT(dispatcher != nullptr);
+}
 
 VsyncMonitor::~VsyncMonitor() { Deinitialize(); }
 
 zx::result<> VsyncMonitor::Initialize() {
-  zx_status_t post_status = updater_.PostDelayed(updater_loop_.dispatcher(), kVsyncMonitorInterval);
+  zx_status_t post_status = updater_.PostDelayed(&dispatcher_, kVsyncMonitorInterval);
   if (post_status != ZX_OK) {
     FDF_LOG(ERROR, "Failed to schedule vsync monitor: %s", zx_status_get_string(post_status));
     return zx::error(post_status);
@@ -62,7 +63,7 @@ void VsyncMonitor::UpdateStatistics() {
     vsync_stalls_detected_.Add(1);
   }
 
-  zx_status_t status = updater_.PostDelayed(updater_loop_.dispatcher(), kVsyncMonitorInterval);
+  zx_status_t status = updater_.PostDelayed(&dispatcher_, kVsyncMonitorInterval);
   if (status != ZX_OK) {
     FDF_LOG(ERROR, "Failed to schedule vsync monitor: %s", zx_status_get_string(status));
   }

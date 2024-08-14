@@ -8,8 +8,6 @@
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fuchsia/hardware/audiotypes/c/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/function.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -200,6 +198,8 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   // Currently located at bootstrap/driver_manager:root/display.
   inspect::Node root_;
 
+  fdf::UnownedSynchronizedDispatcher client_dispatcher_;
+
   VsyncMonitor vsync_monitor_;
 
   // mtx_ is a global lock on state shared among clients.
@@ -230,8 +230,6 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
 
   fuchsia_hardware_display::wire::VirtconMode virtcon_mode_ __TA_GUARDED(mtx()) =
       fuchsia_hardware_display::wire::VirtconMode::kInactive;
-
-  fdf::UnownedSynchronizedDispatcher client_dispatcher_;
 
   std::unique_ptr<EngineDriverClient> engine_driver_client_;
 

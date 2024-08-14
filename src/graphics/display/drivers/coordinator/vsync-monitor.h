@@ -5,7 +5,6 @@
 #ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_VSYNC_MONITOR_H_
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_COORDINATOR_VSYNC_MONITOR_H_
 
-#include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/task.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/result.h>
@@ -20,7 +19,9 @@ namespace display {
 // Maintains statistics about Vsync stalls.
 class VsyncMonitor {
  public:
-  explicit VsyncMonitor(inspect::Node inspect_root);
+  // `dispatcher` must be non-null and must outlive the `VsyncMonitor`
+  // instance.
+  explicit VsyncMonitor(inspect::Node inspect_root, async_dispatcher_t* dispatcher);
 
   VsyncMonitor(const VsyncMonitor&) = delete;
   VsyncMonitor(VsyncMonitor&&) = delete;
@@ -53,7 +54,8 @@ class VsyncMonitor {
   // Fields that track how often vsync was detected to have been stalled.
   std::atomic_bool vsync_stalled_ = false;
   inspect::UintProperty vsync_stalls_detected_;
-  async::Loop updater_loop_;
+
+  async_dispatcher_t& dispatcher_;
   async::TaskClosureMethod<VsyncMonitor, &VsyncMonitor::UpdateStatistics> updater_{this};
 };
 

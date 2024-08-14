@@ -6,7 +6,6 @@
 
 #include <fuchsia/hardware/audiotypes/c/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
-#include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/fdf/cpp/dispatcher.h>
@@ -930,8 +929,8 @@ Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
                        inspect::Inspector inspector)
     : inspector_(std::move(inspector)),
       root_(inspector_.GetRoot().CreateChild("display")),
-      vsync_monitor_(root_.CreateChild("vsync_monitor")),
       client_dispatcher_(std::move(client_dispatcher)),
+      vsync_monitor_(root_.CreateChild("vsync_monitor"), client_dispatcher_->async_dispatcher()),
       engine_driver_client_(std::move(engine_driver_client)) {
   ZX_DEBUG_ASSERT(engine_driver_client_ != nullptr);
 

@@ -94,8 +94,6 @@ source_set("shared") {
     "//src/graphics/display/lib/driver-framework-migration-utils/logging:zxlogf",
     "//src/graphics/display/lib/edid",
     "//zircon/system/ulib/async:async-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-cpp",
-    "//zircon/system/ulib/async-loop:async-loop-default",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/image-format",
