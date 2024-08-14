@@ -163,6 +163,7 @@ def run_mypy_on_library_target(
 def run_mypy_checks(
     app_dir: str,
     src_map: dict[str, str],
+    with_incremental_cache: bool = True,
 ) -> int:
     """
     Runs `mypy` type checking on the app_dir, refactors the output to reflect
@@ -171,6 +172,10 @@ def run_mypy_checks(
     Args:
         app_dir: The path of the directory to run type checking on
         src_map: Mapping from the original source file paths to app dir paths
+        with_incremental_cache: If True, use the incremental cache.
+            This is known to cause issues in infra due to
+            https://fxbug.dev/345717802, so if this option is set
+            the operation will be re-run with the cache disabled.
 
     Returns:
         int: returncode if type checking was successful, else error returncode
@@ -180,18 +185,28 @@ def run_mypy_checks(
     pylibs_dir = fuchsia_dir / "third_party" / "pylibs"
     try:
         return subprocess.run(
-            [
-                sys.executable,
-                "-S",
-                "-m",
-                "mypy",
-                # TODO(https://fxbug.dev/345717802): Disabling cache to temporarily resolve this flake.
-                # see https://github.com/python/mypy/issues/7276 for details on similar issue.
-                "--no-incremental",
-                "--config-file",
-                str(config_path),
-                app_dir,
-            ],
+            (
+                [
+                    sys.executable,
+                    "-S",
+                    "-m",
+                    "mypy",
+                ]
+                + (
+                    [
+                        # TODO(https://fxbug.dev/345717802): Disabling cache to temporarily resolve this flake.
+                        # see https://github.com/python/mypy/issues/7276 for details on similar issue.
+                        "--no-incremental",
+                    ]
+                    if not with_incremental_cache
+                    else []
+                )
+                + [
+                    "--config-file",
+                    str(config_path),
+                    app_dir,
+                ]
+            ),
             env={
                 "PYTHONPATH": os.pathsep.join(
                     [
@@ -207,6 +222,11 @@ def run_mypy_checks(
         ).returncode
     except subprocess.CalledProcessError as e:
         if e.returncode != 0:
+            if with_incremental_cache:
+                # Try again without the incremental cache.
+                return run_mypy_checks(
+                    app_dir, src_map, with_incremental_cache=False
+                )
             if e.stdout:
                 refactored_out = convert_mypy_output(e.stdout, src_map)
                 print(
