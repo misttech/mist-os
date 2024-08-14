@@ -199,14 +199,6 @@ class MouseInputBase : public ui_testing::PortableUITest {
     ASSERT_EQ(mouse_state_->SizeOfEvents(), 0u);
   }
 
-  // Subclass should implement this method to add v2 components to the test realm
-  // next to the base ones added.
-  virtual std::vector<std::pair<ChildName, std::string>> GetTestComponents() { return {}; }
-
-  // Subclass should implement this method to add capability routes to the test
-  // realm next to the base ones added.
-  virtual std::vector<Route> GetTestRoutes() { return {}; }
-
   // Helper method for checking the test.mouse.MouseInputListener response from the client app.
   static void VerifyEvent(
       fuchsia_ui_test_input::MouseInputListenerReportMouseInputRequest& pointer_data,
@@ -258,15 +250,6 @@ class MouseInputBase : public ui_testing::PortableUITest {
         kMouseInputListener, [d, mouse_state = mouse_state_, ready_to_inject = ready_to_inject_]() {
           return std::make_unique<MouseInputListenerServer>(d, mouse_state, ready_to_inject);
         });
-
-    for (const auto& [name, component] : GetTestComponents()) {
-      realm_builder().AddChild(name, component);
-    }
-
-    // Add the necessary routing for each of the extra components added above.
-    for (const auto& route : GetTestRoutes()) {
-      realm_builder().AddRoute(route);
-    }
   }
 
   std::shared_ptr<MouseInputState> mouse_state_;

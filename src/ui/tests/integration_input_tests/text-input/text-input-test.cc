@@ -214,14 +214,6 @@ class ChromiumInputBase : public ui_testing::PortableUITest {
     RegisterKeyboard();
   }
 
-  // Subclass should implement this method to add v2 components to the test realm
-  // next to the base ones added.
-  virtual std::vector<std::pair<ChildName, std::string>> GetTestComponents() { return {}; }
-
-  // Subclass should implement this method to add capability routes to the test
-  // realm next to the base ones added.
-  virtual std::vector<Route> GetTestRoutes() { return {}; }
-
   void ExtendRealm() override {
     // Key part of service setup: have this test component vend the
     // |ResponseListener| service in the constructed realm.
@@ -229,15 +221,6 @@ class ChromiumInputBase : public ui_testing::PortableUITest {
                                   [d = dispatcher(), s = keyboard_input_state_]() {
                                     return std::make_unique<KeyboardInputListenerServer>(d, s);
                                   });
-
-    for (const auto& [name, component] : GetTestComponents()) {
-      realm_builder().AddChild(name, component);
-    }
-
-    // Add the necessary routing for each of the extra components added above.
-    for (const auto& route : GetTestRoutes()) {
-      realm_builder().AddRoute(route);
-    }
   }
 
   // Needs to outlive realm_ below.

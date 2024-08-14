@@ -430,14 +430,6 @@ class TouchInputBase : public ui_testing::PortableUITest,
     FX_LOGS(INFO) << "test app status: kHandlersRegistered";
   }
 
-  // Subclass should implement this method to add capability routes to the test
-  // realm next to the base ones added.
-  virtual std::vector<Route> GetTestRoutes() { return {}; }
-
-  // Subclass should implement this method to add components to the test realm
-  // next to the base ones added.
-  virtual std::vector<std::pair<ChildName, std::string>> GetTestComponents() { return {}; }
-
   bool LastEventReceivedMatchesPhase(fuchsia_ui_pointer::EventPhase phase,
                                      const std::string& component_name) {
     const auto& events_received = response_state_->events_received();
@@ -528,16 +520,6 @@ class TouchInputBase : public ui_testing::PortableUITest,
     realm_builder().AddLocalChild(kMockResponseListener, [d = dispatcher(), s = response_state_]() {
       return std::make_unique<ResponseListenerServer>(d, s);
     });
-
-    // Add components specific for this test case to the realm.
-    for (const auto& [name, component] : GetTestComponents()) {
-      realm_builder().AddChild(name, component);
-    }
-
-    // Add the necessary routing for each of the extra components added above.
-    for (const auto& route : GetTestRoutes()) {
-      realm_builder().AddRoute(route);
-    }
   }
 
   std::shared_ptr<ResponseState> response_state_ = std::make_shared<ResponseState>();

@@ -232,7 +232,7 @@ class WebEngineTest : public ui_testing::PortableUITest,
     RegisterTouchScreen();
   }
 
-  std::vector<Route> GetTestRoutes() {
+  std::vector<Route> GetTestRoutes() override {
     return merge({GetWebEngineRoutes(ChildRef{kOneChromiumClient}),
                   {
                       {.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
@@ -241,7 +241,7 @@ class WebEngineTest : public ui_testing::PortableUITest,
                   }});
   }
 
-  std::vector<std::pair<ChildName, std::string>> GetTestComponents() {
+  std::vector<std::pair<ChildName, std::string>> GetTestComponents() override {
     return {
         std::make_pair(kBuildInfoProvider, kBuildInfoProviderUrl),
         std::make_pair(kFontsProvider, kFontsProviderUrl),
@@ -476,16 +476,6 @@ class WebEngineTest : public ui_testing::PortableUITest,
     realm_builder().AddLocalChild(kMockResponseListener, [d = dispatcher(), s = response_state_]() {
       return std::make_unique<ResponseListenerServer>(d, s);
     });
-
-    // Add components specific for this test case to the realm.
-    for (const auto& [name, component] : GetTestComponents()) {
-      realm_builder().AddChild(name, component);
-    }
-
-    // Add the necessary routing for each of the extra components added above.
-    for (const auto& route : GetTestRoutes()) {
-      realm_builder().AddRoute(route);
-    }
   }
 
   std::shared_ptr<ResponseState> response_state_ = std::make_shared<ResponseState>();
