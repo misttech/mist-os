@@ -287,7 +287,7 @@ func buildImpl(
 	if err != nil {
 		return nil, err
 	}
-	ninjaLogCandidates := []string{topNinjaLog}
+	subNinjaLogCandidates := []string{}
 	for _, subdir := range subbuildSubdirs {
 		subninjaLog := filepath.Join(buildDir, subdir, ninjaLogPath)
 		if !fileExists(subninjaLog) {
@@ -302,13 +302,28 @@ func buildImpl(
 		if !recent {
 			continue
 		}
-		ninjaLogCandidates = append(ninjaLogCandidates, subninjaLog)
+		subNinjaLogCandidates = append(subNinjaLogCandidates, subninjaLog)
 	}
 
-	// Process ninja logs, in parallel.
-	ninjaFileSetChan := make(chan *ninjaDebugFileSet, len(ninjaLogCandidates))
+	// Process ninja logs (top and sub-builds), in parallel.
+	ninjaFileSetChan := make(chan *ninjaDebugFileSet, len(subNinjaLogCandidates)+1)
 	eg, egCtx := errgroup.WithContext(ctx)
-	for _, ninjaLog := range ninjaLogCandidates {
+	// Handle top-level build differently, pass targets
+	eg.Go(func() error {
+		subninjaRunner := ninjaRunner{
+			runner:    runner,
+			ninjaPath: ninjaPath,
+			buildDir:  buildDir,
+		}
+		fs, err := getNinjaDebugFiles(egCtx, subninjaRunner, targets, topNinjaLog, ninjatraceToolPath, buildstatsToolPath)
+		if err != nil {
+			logger.Warningf(ctx, "(ignored) Failed to analyze top ninja log %s, with error: %v", topNinjaLog, err)
+			return nil
+		}
+		ninjaFileSetChan <- fs
+		return nil
+	})
+	for _, ninjaLog := range subNinjaLogCandidates { // sub-builds
 		ninjaLog := ninjaLog
 		eg.Go(func() error {
 			// `egCtx` allows errgroup to cancel other goroutines as soon as one of them errors.
@@ -317,9 +332,9 @@ func buildImpl(
 				ninjaPath: ninjaPath,
 				buildDir:  filepath.Dir(ninjaLog),
 			}
-			fs, err := getNinjaDebugFiles(egCtx, subninjaRunner, buildDir, targets, ninjaLog, ninjatraceToolPath, buildstatsToolPath)
+			fs, err := getNinjaDebugFiles(egCtx, subninjaRunner, []string{}, ninjaLog, ninjatraceToolPath, buildstatsToolPath)
 			if err != nil {
-				logger.Warningf(ctx, "(ignored) Failed to analyze ninja log %s, with error: %v", ninjaLog, err)
+				logger.Warningf(ctx, "(ignored) Failed to analyze sub ninja log %s, with error: %v", ninjaLog, err)
 				return nil
 			}
 			ninjaFileSetChan <- fs
@@ -453,7 +468,7 @@ func buildImpl(
 }
 
 // getNinjaDebugFiles creates a ninja trace file that will be exposed for debugging.
-func getNinjaDebugFiles(ctx context.Context, r ninjaRunner, buildDir string, targets []string, ninjaLog string, ninjatraceToolPath string, buildstatsToolPath string) (*ninjaDebugFileSet, error) {
+func getNinjaDebugFiles(ctx context.Context, r ninjaRunner, targets []string, ninjaLog string, ninjatraceToolPath string, buildstatsToolPath string) (*ninjaDebugFileSet, error) {
 	// Write auxiliary files and the final ninja trace to the same dir where the ninja log resides.
 	// This this assumes that the build dir is writeable.
 	logger.Debugf(ctx, "analyzing ninja log: %s", ninjaLog)
