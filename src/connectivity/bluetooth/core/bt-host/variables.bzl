@@ -4,6 +4,8 @@
 
 """Build information used in the bt-host builds."""
 
+# Note, this file is not copybara'd to downstream Pigweed.
+
 # LINT.IfChange(copts)
 # Common C++ flags used in bt-host to ensure it builds in downstream (e.g. Pigweed).
 # Note Pigweed downstream has its own version of COPTS since this file is not

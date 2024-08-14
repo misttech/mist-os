@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# Note, this file is not copybara'd to downstream Pigweed.
+
 load(
     "@fuchsia_sdk//fuchsia:defs.bzl",
     "fuchsia_cc_binary",
