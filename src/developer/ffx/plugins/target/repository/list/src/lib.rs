@@ -7,6 +7,7 @@ use async_trait::async_trait;
 use ffx_target_repository_list_args::ListCommand;
 use fho::{daemon_protocol, FfxMain, FfxTool, ToolIO, VerifiedMachineWriter};
 use fidl_fuchsia_developer_ffx::{RepositoryRegistryProxy, RepositoryStorageType};
+use prettytable::format::FormatBuilder;
 use prettytable::{cell, row, Table};
 use std::collections::HashMap;
 
@@ -85,6 +86,13 @@ async fn list_impl(
     }
 
     let mut table = Table::new();
+
+    // display_lengths requires right padding
+    let padl = 0;
+    let padr = 1;
+    let table_format = FormatBuilder::new().padding(padl, padr).build();
+    table.set_format(table_format);
+
     table.set_titles(row!("REPO", "TARGET"));
 
     for (repo, targets) in items {
@@ -187,19 +195,17 @@ mod test {
         let writer = Writer::new_test(None, &test_buffers);
         list_impl(ListCommand {}, repos, writer).await.unwrap();
 
-        static EXPECT: &str = "\
-             +-------+-------------------------+\n\
-             | REPO  | TARGET                  |\n\
-             +=======+=========================+\n\
-             | bob   | target1                 |\n\
-             |       |   alias: target1_alias1 |\n\
-             |       |   alias: target1_alias2 |\n\
-             |       | target3                 |\n\
-             +-------+-------------------------+\n\
-             | smith | target2 (EPHEMERAL)     |\n\
-             +-------+-------------------------+\n";
+        let expected = concat!(
+            "REPO  TARGET \n",
+            "bob   target1 \n",
+            "        alias: target1_alias1 \n",
+            "        alias: target1_alias2 \n",
+            "      target3 \n",
+            "smith target2 (EPHEMERAL) \n"
+        )
+        .to_owned();
 
-        assert_eq!(EXPECT, test_buffers.into_stdout_str());
+        assert_eq!(expected, test_buffers.into_stdout_str());
     }
 
     #[fasync::run_singlethreaded(test)]
