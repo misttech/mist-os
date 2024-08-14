@@ -369,7 +369,7 @@ void Scheduler::ThreadBaseProfileChanged(Thread& thread) {
   ss.effective_profile_.AssertDirtyState(SchedulerState::ProfileDirtyFlag::BaseDirty);
 
   PiNodeAdapter<Thread> target{thread};
-  auto f = [&ss, has_ever_run](const SchedulerState::EffectiveProfile&, SchedTime virt_now) {
+  auto f = [&ss, has_ever_run, now](const SchedulerState::EffectiveProfile&, SchedTime virt_now) {
     // When the base profile of a thread was changed by a user, we treat it like
     // a yield in order to avoid any attempts by a user to game the system to
     // get more bandwidth by constantly changing the base profile of their
@@ -387,7 +387,7 @@ void Scheduler::ThreadBaseProfileChanged(Thread& thread) {
       ss.finish_time_ = virt_now;
     } else {
       DEBUG_ASSERT(new_ep.IsDeadline());
-      ss.start_time_ = CurrentTime() + new_ep.deadline.deadline_ns;
+      ss.start_time_ = now + new_ep.deadline.deadline_ns;
       ss.finish_time_ = ss.start_time_ + new_ep.deadline.deadline_ns;
     }
     ss.time_slice_ns_ = SchedDuration{0};
@@ -417,7 +417,7 @@ void Scheduler::UpstreamThreadBaseProfileChanged(Thread& _upstream, TargetType& 
   target.AssertEpDirtyState(SchedulerState::ProfileDirtyFlag::InheritedDirty);
   upstream.AssertEpDirtyState(SchedulerState::ProfileDirtyFlag::Clean);
 
-  auto f = [&target](const SchedulerState::EffectiveProfile&, SchedTime virt_now) {
+  auto f = [&target, now](const SchedulerState::EffectiveProfile&, SchedTime virt_now) {
     // TODO(johngro): What is the proper fair policy here?  Typically, we
     // penalize threads which are changing profiles to make sure there is no way
     // for them to game the system and gain any bandwidth via artificial
@@ -437,7 +437,7 @@ void Scheduler::UpstreamThreadBaseProfileChanged(Thread& _upstream, TargetType& 
       target.time_slice_ns() = SchedDuration{0};
     } else {
       DEBUG_ASSERT(target.effective_profile().IsDeadline());
-      target.start_time() = CurrentTime() + ep.deadline.deadline_ns;
+      target.start_time() = now + ep.deadline.deadline_ns;
       target.finish_time() = target.start_time() + ep.deadline.deadline_ns;
       target.time_slice_ns() = SchedDuration{0};
     }
