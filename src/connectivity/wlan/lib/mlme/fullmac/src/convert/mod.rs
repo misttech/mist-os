@@ -3,5 +3,5 @@
 // found in the LICENSE file.
 
 pub(crate) mod banjo_to_fidl;
-pub(crate) mod fidl_to_banjo;
+pub(crate) mod fullmac_to_mlme;
 pub(crate) mod mlme_to_fullmac;

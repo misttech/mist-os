@@ -15,7 +15,7 @@ struct wlan_fullmac_mlme_handle_t {};
 namespace bindings_stubs {
 
 using StartFullmacType =
-    std::function<wlan_fullmac_mlme_handle_t*(rust_fullmac_device_interface_t)>;
+    std::function<wlan_fullmac_mlme_handle_t*(rust_fullmac_device_ffi_t, zx_handle_t)>;
 using StopFullmacType = std::function<void(wlan_fullmac_mlme_handle_t*)>;
 using DeleteFullmacType = std::function<void(wlan_fullmac_mlme_handle_t*)>;
 

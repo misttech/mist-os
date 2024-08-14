@@ -6,21 +6,22 @@ mod convert;
 pub mod device;
 mod logger;
 
-use crate::convert::banjo_to_fidl;
+use crate::convert::fullmac_to_mlme;
 use crate::device::DeviceOps;
 use anyhow::bail;
 use fuchsia_inspect::Inspector;
 use fuchsia_inspect_contrib::auto_persist;
 use futures::channel::{mpsc, oneshot};
 use futures::{select, StreamExt};
+use std::future::Future;
+use std::pin::Pin;
 use tracing::{error, info, warn};
 use wlan_common::sink::UnboundedSink;
 use wlan_sme::serve::create_sme;
 use {
-    banjo_fuchsia_wlan_common as banjo_wlan_common, fidl_fuchsia_wlan_common as fidl_common,
-    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
-    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_sme as fidl_sme,
-    fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
+    fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_mlme as fidl_mlme,
+    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -41,12 +42,12 @@ pub enum FullmacMlmeError {
     FailedToRespondToUsmeBootstrapRequest(fidl::Error),
     #[error("Failed to get generic SME stream: {0}")]
     FailedToGetGenericSmeStream(fidl::Error),
-    #[error("Failed to convert DeviceInfo: {0}")]
-    FailedToConvertDeviceInfo(anyhow::Error),
     #[error("Invalid MAC implementation type: {0:?}")]
     InvalidMacImplementationType(fidl_common::MacImplementationType),
-    #[error("Failed to convert MAC sublayer support: {0}")]
-    FailedToConvertMacSublayerSupport(anyhow::Error),
+    #[error("Invalid data plane type: {0:?}")]
+    InvalidDataPlaneType(fidl_common::DataPlaneType),
+    #[error("Failed to query vendor driver: {0:?}")]
+    FailedToQueryVendorDriver(anyhow::Error),
     #[error("Failed to create persistence proxy: {0}")]
     FailedToCreatePersistenceProxy(fidl::Error),
     #[error("Failed to create sme: {0}")]
@@ -166,78 +167,53 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
         }
     }
 
-    async fn main_loop_thread(
+    /// Initializes the MLME.
+    ///
+    /// This:
+    /// - Handles the channel exchange over WlanFullmacImpl::Start().
+    /// - Retrieves the generic SME channel over the USME bootstrap channel.
+    /// - Creates the SME future.
+    ///
+    /// On success, returns an instance of FullmacMlme and the SME future.
+    async fn initialize(
         mut device: D,
-        driver_event_sink: mpsc::UnboundedSender<FullmacDriverEvent>,
+        ifc: &device::WlanFullmacIfcProtocol,
         driver_event_stream: mpsc::UnboundedReceiver<FullmacDriverEvent>,
         inspector: Inspector,
         inspect_usme_node: fuchsia_inspect::Node,
-        startup_sender: oneshot::Sender<Result<(), FullmacMlmeError>>,
-    ) {
-        let driver_event_sink =
-            Box::new(FullmacDriverEventSink(UnboundedSink::new(driver_event_sink)));
-        let ifc = device::WlanFullmacIfcProtocol::new(driver_event_sink);
-        let usme_bootstrap_protocol_handle = match device.start(&ifc) {
-            Ok(handle) => handle,
-            Err(e) => {
-                // Failure to unwrap indicates a critical failure in the driver init thread.
-                startup_sender.send(Err(FullmacMlmeError::DeviceStartFailed(e))).unwrap();
-                return;
-            }
-        };
-        let channel = zx::Channel::from(usme_bootstrap_protocol_handle);
-        let server = fidl::endpoints::ServerEnd::<fidl_sme::UsmeBootstrapMarker>::new(channel);
-        let (mut usme_bootstrap_stream, _usme_bootstrap_control_handle) =
-            match server.into_stream_and_control_handle() {
-                Ok(res) => res,
-                Err(e) => {
-                    // Failure to unwrap indicates a critical failure in the driver init thread.
-                    startup_sender
-                        .send(Err(FullmacMlmeError::FailedToGetUsmeBootstrapStream(e)))
-                        .unwrap();
-                    return;
-                }
-            };
+    ) -> Result<(Self, Pin<Box<impl Future<Output = Result<(), anyhow::Error>>>>), FullmacMlmeError>
+    {
+        let usme_bootstrap_protocol_channel =
+            device.start(ifc).map_err(FullmacMlmeError::DeviceStartFailed)?;
 
-        let (generic_sme_server, legacy_privacy_support, responder) = match usme_bootstrap_stream
+        let server = fidl::endpoints::ServerEnd::<fidl_sme::UsmeBootstrapMarker>::new(
+            usme_bootstrap_protocol_channel,
+        );
+
+        let mut usme_bootstrap_stream =
+            server.into_stream().map_err(FullmacMlmeError::FailedToGetUsmeBootstrapStream)?;
+
+        let fidl_sme::UsmeBootstrapRequest::Start {
+            generic_sme_server,
+            legacy_privacy_support,
+            responder,
+            ..
+        } = usme_bootstrap_stream
             .next()
             .await
-        {
-            Some(Ok(fidl_sme::UsmeBootstrapRequest::Start {
-                generic_sme_server,
-                legacy_privacy_support,
-                responder,
-                ..
-            })) => (generic_sme_server, legacy_privacy_support, responder),
-            Some(Err(e)) => {
-                startup_sender.send(Err(FullmacMlmeError::UsmeBootstrapStreamFailed(e))).unwrap();
-                return;
-            }
-            None => {
-                startup_sender.send(Err(FullmacMlmeError::UsmeBootstrapStreamTerminated)).unwrap();
-                return;
-            }
-        };
-        let inspect_vmo = match inspector.duplicate_vmo() {
-            Some(vmo) => vmo,
-            None => {
-                startup_sender.send(Err(FullmacMlmeError::FailedToDuplicateInspectVmo)).unwrap();
-                return;
-            }
-        };
-        if let Err(e) = responder.send(inspect_vmo).into() {
-            startup_sender
-                .send(Err(FullmacMlmeError::FailedToRespondToUsmeBootstrapRequest(e)))
-                .unwrap();
-            return;
-        }
-        let generic_sme_stream = match generic_sme_server.into_stream() {
-            Ok(stream) => stream,
-            Err(e) => {
-                startup_sender.send(Err(FullmacMlmeError::FailedToGetGenericSmeStream(e))).unwrap();
-                return;
-            }
-        };
+            .ok_or(FullmacMlmeError::UsmeBootstrapStreamTerminated)?
+            .map_err(FullmacMlmeError::UsmeBootstrapStreamFailed)?;
+
+        let inspect_vmo =
+            inspector.duplicate_vmo().ok_or(FullmacMlmeError::FailedToDuplicateInspectVmo)?;
+
+        responder
+            .send(inspect_vmo)
+            .map_err(FullmacMlmeError::FailedToRespondToUsmeBootstrapRequest)?;
+
+        let generic_sme_stream = generic_sme_server
+            .into_stream()
+            .map_err(FullmacMlmeError::FailedToGetGenericSmeStream)?;
 
         // Create SME
         let cfg = wlan_sme::Config {
@@ -248,60 +224,48 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
         let (mlme_event_sender, mlme_event_receiver) = mpsc::unbounded();
         let mlme_event_sink = UnboundedSink::new(mlme_event_sender);
 
-        let info = device.query_device_info();
-        let device_info = match banjo_to_fidl::convert_device_info(info) {
-            Ok(info) => info,
-            Err(e) => {
-                startup_sender.send(Err(FullmacMlmeError::FailedToConvertDeviceInfo(e))).unwrap();
-                return;
-            }
-        };
+        let device_info = fullmac_to_mlme::convert_device_info(
+            device.query_device_info().map_err(FullmacMlmeError::FailedToQueryVendorDriver)?,
+        );
 
-        let support = device.query_mac_sublayer_support();
-        let mac_sublayer_support = match banjo_to_fidl::convert_mac_sublayer_support(support) {
-            Ok(s) => {
-                if s.device.mac_implementation_type != fidl_common::MacImplementationType::Fullmac {
-                    startup_sender
-                        .send(Err(FullmacMlmeError::InvalidMacImplementationType(
-                            s.device.mac_implementation_type,
-                        )))
-                        .unwrap();
-                    return;
-                }
-                s
-            }
-            Err(e) => {
-                startup_sender
-                    .send(Err(FullmacMlmeError::FailedToConvertMacSublayerSupport(e)))
-                    .unwrap();
-                return;
-            }
-        };
+        let mac_sublayer_support = device
+            .query_mac_sublayer_support()
+            .map_err(FullmacMlmeError::FailedToQueryVendorDriver)?;
 
-        let support = device.query_security_support();
-        let security_support = banjo_to_fidl::convert_security_support(support);
+        if mac_sublayer_support.device.mac_implementation_type
+            != fidl_common::MacImplementationType::Fullmac
+        {
+            return Err(FullmacMlmeError::InvalidMacImplementationType(
+                mac_sublayer_support.device.mac_implementation_type,
+            ));
+        }
 
-        let support = device.query_spectrum_management_support();
-        let spectrum_management_support =
-            banjo_to_fidl::convert_spectrum_management_support(support);
+        if mac_sublayer_support.data_plane.data_plane_type
+            != fidl_common::DataPlaneType::GenericNetworkDevice
+        {
+            return Err(FullmacMlmeError::InvalidDataPlaneType(
+                mac_sublayer_support.data_plane.data_plane_type,
+            ));
+        }
+
+        let security_support =
+            device.query_security_support().map_err(FullmacMlmeError::FailedToQueryVendorDriver)?;
+
+        let spectrum_management_support = device
+            .query_spectrum_management_support()
+            .map_err(FullmacMlmeError::FailedToQueryVendorDriver)?;
 
         // TODO(https://fxbug.dev/42064968): Get persistence working by adding the appropriate configs
         //                         in *.cml files
-        let (persistence_proxy, _persistence_server_end) = match fidl::endpoints::create_proxy::<
+        let (persistence_proxy, _persistence_server_end) = fidl::endpoints::create_proxy::<
             fidl_fuchsia_diagnostics_persist::DataPersistenceMarker,
-        >() {
-            Ok(r) => r,
-            Err(e) => {
-                startup_sender
-                    .send(Err(FullmacMlmeError::FailedToCreatePersistenceProxy(e)))
-                    .unwrap();
-                return;
-            }
-        };
+        >()
+        .map_err(FullmacMlmeError::FailedToCreatePersistenceProxy)?;
+
         let (persistence_req_sender, _persistence_req_forwarder_fut) =
             auto_persist::create_persistence_req_sender(persistence_proxy);
 
-        let (mlme_request_stream, sme_fut) = match create_sme(
+        let (mlme_request_stream, sme_fut) = create_sme(
             cfg.into(),
             mlme_event_receiver,
             &device_info,
@@ -311,13 +275,8 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
             inspect_usme_node,
             persistence_req_sender,
             generic_sme_stream,
-        ) {
-            Ok((mlme_request_stream, sme_fut)) => (mlme_request_stream, sme_fut),
-            Err(e) => {
-                startup_sender.send(Err(FullmacMlmeError::FailedToCreateSme(e))).unwrap();
-                return;
-            }
-        };
+        )
+        .map_err(FullmacMlmeError::FailedToCreateSme)?;
 
         let mlme = Self {
             device,
@@ -328,9 +287,47 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
             device_link_state: fidl_mlme::ControlledPortState::Closed,
         };
 
-        // Startup is complete. Signal the main thread to proceed.
-        // Failure to unwrap indicates a critical failure in the driver init thread.
-        startup_sender.send(Ok(())).unwrap();
+        Ok((mlme, sme_fut))
+    }
+
+    /// The main MLME thread.
+    ///
+    /// This initializes the MLME, then on successful initialization runs the MLME main loop future
+    /// and SME futures concurrently until completion.
+    ///
+    /// Notifies the thread that calls |Self::start| when startup is complete through |startup_sender|.
+    ///
+    /// If initialization fails, then this exits immediately.
+    ///
+    /// # Panics
+    ///
+    /// This panics if sending over |startup_sender| returns an error. This probably means the
+    /// thread that called |Self::start| already exited due to an error/panic.
+    async fn main_loop_thread(
+        device: D,
+        driver_event_sink: mpsc::UnboundedSender<FullmacDriverEvent>,
+        driver_event_stream: mpsc::UnboundedReceiver<FullmacDriverEvent>,
+        inspector: Inspector,
+        inspect_usme_node: fuchsia_inspect::Node,
+        startup_sender: oneshot::Sender<Result<(), FullmacMlmeError>>,
+    ) {
+        let driver_event_sink =
+            Box::new(FullmacDriverEventSink(UnboundedSink::new(driver_event_sink)));
+        let ifc = device::WlanFullmacIfcProtocol::new(driver_event_sink);
+
+        let (mlme, sme_fut) =
+            match Self::initialize(device, &ifc, driver_event_stream, inspector, inspect_usme_node)
+                .await
+            {
+                Ok((mlme, sme_fut)) => {
+                    startup_sender.send(Ok(())).unwrap();
+                    (mlme, sme_fut)
+                }
+                Err(e) => {
+                    startup_sender.send(Err(e)).unwrap();
+                    return;
+                }
+            };
 
         let mlme_main_loop_fut = mlme.run_main_loop();
         match futures::try_join!(mlme_main_loop_fut, sme_fut) {
@@ -339,18 +336,24 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
         }
     }
 
-    pub async fn run_main_loop(mut self) -> Result<(), anyhow::Error> {
-        let mac_role = self.device.query_device_info().role;
+    pub async fn run_main_loop(mut self) -> anyhow::Result<()> {
+        let mac_role = self.device.query_device_info()?.role;
         loop {
             select! {
                 mlme_request = self.mlme_request_stream.next() => match mlme_request {
-                    Some(req) => self.handle_mlme_request(req),
+                    Some(req) => {
+                        if let Err(e) = self.handle_mlme_request(req) {
+                            error!("Failed to handle MLME req: {}", e);
+                        }
+                    },
                     None => bail!("MLME request stream terminated unexpectedly."),
                 },
                 driver_event = self.driver_event_stream.next() => match driver_event {
                     Some(event) => {
-                        if let DriverState::Stopping = self.handle_driver_event(event, &mac_role) {
-                            return Ok(())
+                        match self.handle_driver_event(event, &mac_role) {
+                            Ok(DriverState::Running) => {},
+                            Ok(DriverState::Stopping) => return Ok(()),
+                            Err(e) => error!("Failed to handle driver event: {}", e),
                         }
                     },
                     None => bail!("Driver event stream terminated unexpectedly."),
@@ -359,79 +362,84 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
         }
     }
 
-    fn handle_mlme_request(&mut self, req: wlan_sme::MlmeRequest) {
-        use convert::fidl_to_banjo::*;
+    fn handle_mlme_request(&mut self, req: wlan_sme::MlmeRequest) -> anyhow::Result<()> {
+        use convert::mlme_to_fullmac;
         use wlan_sme::MlmeRequest::*;
         match req {
-            Scan(req) => self.handle_mlme_scan_request(req),
+            Scan(req) => self.handle_mlme_scan_request(req)?,
             Connect(req) => {
-                self.set_link_state(fidl_mlme::ControlledPortState::Closed);
+                self.set_link_state(fidl_mlme::ControlledPortState::Closed)?;
                 self.is_bss_protected = !req.security_ie.is_empty();
-                self.device.connect(*convert_connect_request(&req))
+                self.device.connect(mlme_to_fullmac::convert_connect_request(req))?;
             }
-            Reconnect(req) => self.device.reconnect(convert_reconnect_request(&req)),
-            AuthResponse(resp) => self.device.auth_resp(convert_authenticate_response(&resp)),
+            Reconnect(req) => {
+                self.device.reconnect(mlme_to_fullmac::convert_reconnect_request(req))?;
+            }
+            AuthResponse(resp) => {
+                self.device.auth_resp(mlme_to_fullmac::convert_authenticate_response(resp))?;
+            }
             Deauthenticate(req) => {
-                self.set_link_state(fidl_mlme::ControlledPortState::Closed);
-                self.device.deauth(convert_deauthenticate_request(&req))
+                self.set_link_state(fidl_mlme::ControlledPortState::Closed)?;
+                self.device.deauth(mlme_to_fullmac::convert_deauthenticate_request(req))?;
             }
-            AssocResponse(resp) => self.device.assoc_resp(convert_associate_response(&resp)),
+            AssocResponse(resp) => {
+                self.device.assoc_resp(mlme_to_fullmac::convert_associate_response(resp))?;
+            }
             Disassociate(req) => {
-                self.set_link_state(fidl_mlme::ControlledPortState::Closed);
-                self.device.disassoc(convert_disassociate_request(&req));
+                self.set_link_state(fidl_mlme::ControlledPortState::Closed)?;
+                self.device.disassoc(mlme_to_fullmac::convert_disassociate_request(req))?;
             }
             Reset(req) => {
-                self.set_link_state(fidl_mlme::ControlledPortState::Closed);
-                self.device.reset(convert_reset_request(&req));
+                self.set_link_state(fidl_mlme::ControlledPortState::Closed)?;
+                self.device.reset(mlme_to_fullmac::convert_reset_request(req))?;
             }
-            Start(req) => self.device.start_bss(convert_start_bss_request(&req)),
-            Stop(req) => self.device.stop_bss(convert_stop_bss_request(&req)),
-            SetKeys(req) => self.handle_mlme_set_keys_request(req),
-            DeleteKeys(req) => self.device.del_keys_req(convert_delete_keys_request(&req)),
-            Eapol(req) => self.device.eapol_tx(*convert_eapol_request(&req)),
-            SetCtrlPort(req) => self.set_link_state(req.state),
+            Start(req) => {
+                self.device.start_bss(mlme_to_fullmac::convert_start_bss_request(req)?)?
+            }
+            Stop(req) => self.device.stop_bss(mlme_to_fullmac::convert_stop_bss_request(req)?)?,
+            SetKeys(req) => self.handle_mlme_set_keys_request(req)?,
+            DeleteKeys(req) => {
+                self.device.del_keys_req(mlme_to_fullmac::convert_delete_keys_request(req)?)?
+            }
+            Eapol(req) => self.device.eapol_tx(mlme_to_fullmac::convert_eapol_request(req))?,
+            SetCtrlPort(req) => self.set_link_state(req.state)?,
             QueryDeviceInfo(responder) => {
-                let info = self.device.query_device_info();
-                match banjo_to_fidl::convert_device_info(info) {
-                    Ok(info) => responder.respond(info),
-                    Err(e) => warn!("Failed to convert DeviceInfo: {}", e),
-                }
+                let device_info =
+                    fullmac_to_mlme::convert_device_info(self.device.query_device_info()?);
+                responder.respond(device_info);
             }
             QueryDiscoverySupport(..) => info!("QueryDiscoverySupport is unsupported"),
             QueryMacSublayerSupport(responder) => {
-                let support = self.device.query_mac_sublayer_support();
-                match banjo_to_fidl::convert_mac_sublayer_support(support) {
-                    Ok(s) => responder.respond(s),
-                    Err(e) => warn!("Failed to convert MAC sublayer support: {}", e),
-                }
+                responder.respond(self.device.query_mac_sublayer_support()?)
             }
             QuerySecuritySupport(responder) => {
-                let support = self.device.query_security_support();
-                responder.respond(banjo_to_fidl::convert_security_support(support));
+                responder.respond(self.device.query_security_support()?)
             }
             QuerySpectrumManagementSupport(responder) => {
-                let support = self.device.query_spectrum_management_support();
-                responder.respond(banjo_to_fidl::convert_spectrum_management_support(support));
+                responder.respond(self.device.query_spectrum_management_support()?)
             }
             GetIfaceCounterStats(responder) => {
-                responder.respond(self.device.get_iface_counter_stats())
+                responder.respond(self.device.get_iface_counter_stats()?)
             }
             GetIfaceHistogramStats(responder) => {
-                responder.respond(self.device.get_iface_histogram_stats())
+                responder.respond(self.device.get_iface_histogram_stats()?)
             }
             GetMinstrelStats(_, _) => info!("GetMinstrelStats is unsupported"),
             ListMinstrelPeers(_) => info!("ListMinstrelPeers is unsupported"),
-            SaeHandshakeResp(resp) => {
-                self.device.sae_handshake_resp(convert_sae_handshake_response(&resp))
+            SaeHandshakeResp(resp) => self
+                .device
+                .sae_handshake_resp(mlme_to_fullmac::convert_sae_handshake_response(resp))?,
+            SaeFrameTx(frame) => {
+                self.device.sae_frame_tx(mlme_to_fullmac::convert_sae_frame(frame))?
             }
-            SaeFrameTx(frame) => self.device.sae_frame_tx(*convert_sae_frame(&frame)),
-            WmmStatusReq => self.device.wmm_status_req(),
+            WmmStatusReq => self.device.wmm_status_req()?,
             FinalizeAssociation(..) => info!("FinalizeAssociation is unsupported"),
-        }
+        };
+        Ok(())
     }
 
-    fn handle_mlme_scan_request(&mut self, req: fidl_mlme::ScanRequest) {
-        use convert::fidl_to_banjo::*;
+    fn handle_mlme_scan_request(&mut self, req: fidl_mlme::ScanRequest) -> anyhow::Result<()> {
+        use convert::mlme_to_fullmac::convert_scan_request;
 
         if req.channel_list.is_empty() {
             let end = fidl_mlme::ScanEnd {
@@ -439,37 +447,32 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
                 code: fidl_mlme::ScanResultCode::InvalidArgs,
             };
             self.mlme_event_sink.send(fidl_mlme::MlmeEvent::OnScanEnd { end });
-            return;
+        } else {
+            self.device.start_scan(convert_scan_request(req)?)?;
         }
-        let ssid_list_copy: Vec<_> =
-            req.ssid_list.iter().map(|ssid_bytes| convert_ssid(&ssid_bytes[..])).collect();
-        self.device.start_scan(*convert_scan_request(&req, &ssid_list_copy[..]))
+        Ok(())
     }
 
-    fn handle_mlme_set_keys_request(&mut self, req: fidl_mlme::SetKeysRequest) {
-        use convert::fidl_to_banjo::*;
+    fn handle_mlme_set_keys_request(
+        &mut self,
+        req: fidl_mlme::SetKeysRequest,
+    ) -> anyhow::Result<()> {
+        use convert::mlme_to_fullmac::*;
 
-        let result = convert_set_keys_request(&req).and_then(|banjo_req| {
-            let set_keys_resp = self.device.set_keys_req(*banjo_req);
-            banjo_to_fidl::convert_set_keys_resp(set_keys_resp, &req)
-        });
-        match result {
-            Ok(resp) => {
-                self.mlme_event_sink.send(fidl_mlme::MlmeEvent::SetKeysConf { conf: resp });
-            }
-            Err(e) => {
-                warn!("Failed to convert SetKeysResp: {}", e);
-            }
-        }
+        let fullmac_req = convert_set_keys_request(&req)?;
+        let fullmac_resp = self.device.set_keys_req(fullmac_req)?;
+        let mlme_resp = fullmac_to_mlme::convert_set_keys_resp(fullmac_resp, &req)?;
+        self.mlme_event_sink.send(fidl_mlme::MlmeEvent::SetKeysConf { conf: mlme_resp });
+        Ok(())
     }
 
     fn handle_driver_event(
         &mut self,
         event: FullmacDriverEvent,
-        mac_role: &banjo_wlan_common::WlanMacRole,
-    ) -> DriverState {
+        mac_role: &fidl_common::WlanMacRole,
+    ) -> anyhow::Result<DriverState> {
         match event {
-            FullmacDriverEvent::Stop => return DriverState::Stopping,
+            FullmacDriverEvent::Stop => return Ok(DriverState::Stopping),
             FullmacDriverEvent::OnScanResult { result } => {
                 self.mlme_event_sink.send(fidl_mlme::MlmeEvent::OnScanResult { result });
             }
@@ -483,7 +486,7 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
                 // point we would receive a request to open the controlled port from SME.
                 if !self.is_bss_protected && resp.result_code == fidl_ieee80211::StatusCode::Success
                 {
-                    self.set_link_state(fidl_mlme::ControlledPortState::Open);
+                    self.set_link_state(fidl_mlme::ControlledPortState::Open)?;
                 }
                 self.mlme_event_sink.send(fidl_mlme::MlmeEvent::ConnectConf { resp });
             }
@@ -495,14 +498,14 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
                 self.mlme_event_sink.send(fidl_mlme::MlmeEvent::AuthenticateInd { ind });
             }
             FullmacDriverEvent::DeauthConf { resp } => {
-                if *mac_role == banjo_wlan_common::WlanMacRole::CLIENT {
-                    self.set_link_state(fidl_mlme::ControlledPortState::Closed);
+                if *mac_role == fidl_common::WlanMacRole::Client {
+                    self.set_link_state(fidl_mlme::ControlledPortState::Closed)?;
                 }
                 self.mlme_event_sink.send(fidl_mlme::MlmeEvent::DeauthenticateConf { resp });
             }
             FullmacDriverEvent::DeauthInd { ind } => {
-                if *mac_role == banjo_wlan_common::WlanMacRole::CLIENT {
-                    self.set_link_state(fidl_mlme::ControlledPortState::Closed);
+                if *mac_role == fidl_common::WlanMacRole::Client {
+                    self.set_link_state(fidl_mlme::ControlledPortState::Closed)?;
                 }
                 self.mlme_event_sink.send(fidl_mlme::MlmeEvent::DeauthenticateInd { ind });
             }
@@ -510,26 +513,26 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
                 self.mlme_event_sink.send(fidl_mlme::MlmeEvent::AssociateInd { ind });
             }
             FullmacDriverEvent::DisassocConf { resp } => {
-                if *mac_role == banjo_wlan_common::WlanMacRole::CLIENT {
-                    self.set_link_state(fidl_mlme::ControlledPortState::Closed);
+                if *mac_role == fidl_common::WlanMacRole::Client {
+                    self.set_link_state(fidl_mlme::ControlledPortState::Closed)?;
                 }
                 self.mlme_event_sink.send(fidl_mlme::MlmeEvent::DisassociateConf { resp });
             }
             FullmacDriverEvent::DisassocInd { ind } => {
-                if *mac_role == banjo_wlan_common::WlanMacRole::CLIENT {
-                    self.set_link_state(fidl_mlme::ControlledPortState::Closed);
+                if *mac_role == fidl_common::WlanMacRole::Client {
+                    self.set_link_state(fidl_mlme::ControlledPortState::Closed)?;
                 }
                 self.mlme_event_sink.send(fidl_mlme::MlmeEvent::DisassociateInd { ind });
             }
             FullmacDriverEvent::StartConf { resp } => {
                 if resp.result_code == fidl_mlme::StartResultCode::Success {
-                    self.set_link_state(fidl_mlme::ControlledPortState::Open);
+                    self.set_link_state(fidl_mlme::ControlledPortState::Open)?;
                 }
                 self.mlme_event_sink.send(fidl_mlme::MlmeEvent::StartConf { resp });
             }
             FullmacDriverEvent::StopConf { resp } => {
                 if resp.result_code == fidl_mlme::StopResultCode::Success {
-                    self.set_link_state(fidl_mlme::ControlledPortState::Closed);
+                    self.set_link_state(fidl_mlme::ControlledPortState::Closed)?;
                 }
                 self.mlme_event_sink.send(fidl_mlme::MlmeEvent::StopConf { resp });
             }
@@ -558,18 +561,22 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
                 self.mlme_event_sink.send(fidl_mlme::MlmeEvent::OnWmmStatusResp { status, resp });
             }
         }
-        DriverState::Running
+        Ok(DriverState::Running)
     }
 
-    fn set_link_state(&mut self, new_link_state: fidl_mlme::ControlledPortState) {
+    fn set_link_state(
+        &mut self,
+        new_link_state: fidl_mlme::ControlledPortState,
+    ) -> anyhow::Result<()> {
         // TODO(https://fxbug.dev/42128153): Let SME handle these changes.
         if new_link_state == self.device_link_state {
-            return;
+            return Ok(());
         }
 
         let online = new_link_state == fidl_mlme::ControlledPortState::Open;
-        self.device.on_link_state_changed(online);
+        self.device.on_link_state_changed(online)?;
         self.device_link_state = new_link_state;
+        Ok(())
     }
 }
 
@@ -655,27 +662,16 @@ mod tests {
     }
 
     #[test]
-    fn test_main_loop_thread_fails_due_to_convert_device_info() {
-        let (mut h, mut test_fut) = TestHelper::set_up();
-        h.fake_device.lock().unwrap().query_device_info_mock.band_cap_count = 1;
-        h.fake_device.lock().unwrap().query_device_info_mock.band_cap_list[0].band =
-            banjo_wlan_common::WlanBand(255);
-        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
-
-        let startup_result =
-            assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
-        assert_variant!(startup_result, Err(FullmacMlmeError::FailedToConvertDeviceInfo(_)));
-    }
-
-    #[test]
     fn test_main_loop_thread_fails_due_to_wrong_mac_implementation_type() {
         let (mut h, mut test_fut) = TestHelper::set_up();
         h.fake_device
             .lock()
             .unwrap()
             .query_mac_sublayer_support_mock
+            .as_mut()
+            .unwrap()
             .device
-            .mac_implementation_type = banjo_wlan_common::MacImplementationType::SOFTMAC;
+            .mac_implementation_type = fidl_common::MacImplementationType::Softmac;
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
 
         let startup_result =
@@ -684,24 +680,65 @@ mod tests {
     }
 
     #[test]
-    fn test_main_loop_thread_fails_due_to_convert_mac_sublayer_support() {
+    fn test_main_loop_thread_fails_due_to_wrong_data_plane_type() {
         let (mut h, mut test_fut) = TestHelper::set_up();
         h.fake_device
             .lock()
             .unwrap()
             .query_mac_sublayer_support_mock
-            .device
-            .mac_implementation_type = banjo_wlan_common::MacImplementationType::FULLMAC;
-        h.fake_device.lock().unwrap().query_mac_sublayer_support_mock.data_plane.data_plane_type =
-            banjo_wlan_common::DataPlaneType(99);
+            .as_mut()
+            .unwrap()
+            .data_plane
+            .data_plane_type = fidl_common::DataPlaneType::EthernetDevice;
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
 
         let startup_result =
             assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
-        assert_variant!(
-            startup_result,
-            Err(FullmacMlmeError::FailedToConvertMacSublayerSupport(_))
-        );
+        assert_variant!(startup_result, Err(FullmacMlmeError::InvalidDataPlaneType(_)));
+    }
+
+    #[test]
+    fn test_main_loop_thread_fails_due_to_query_device_info_error() {
+        let (mut h, mut test_fut) = TestHelper::set_up();
+        h.fake_device.lock().unwrap().query_device_info_mock = None;
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
+
+        let startup_result =
+            assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
+        assert_variant!(startup_result, Err(FullmacMlmeError::FailedToQueryVendorDriver(_)));
+    }
+
+    #[test]
+    fn test_main_loop_thread_fails_due_to_query_mac_sublayer_support_error() {
+        let (mut h, mut test_fut) = TestHelper::set_up();
+        h.fake_device.lock().unwrap().query_mac_sublayer_support_mock = None;
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
+
+        let startup_result =
+            assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
+        assert_variant!(startup_result, Err(FullmacMlmeError::FailedToQueryVendorDriver(_)));
+    }
+
+    #[test]
+    fn test_main_loop_thread_fails_due_to_query_security_support_error() {
+        let (mut h, mut test_fut) = TestHelper::set_up();
+        h.fake_device.lock().unwrap().query_security_support_mock = None;
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
+
+        let startup_result =
+            assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
+        assert_variant!(startup_result, Err(FullmacMlmeError::FailedToQueryVendorDriver(_)));
+    }
+
+    #[test]
+    fn test_main_loop_thread_fails_due_to_query_spectrum_management_support_error() {
+        let (mut h, mut test_fut) = TestHelper::set_up();
+        h.fake_device.lock().unwrap().query_spectrum_management_support_mock = None;
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
+
+        let startup_result =
+            assert_variant!(h.startup_receiver.try_recv(), Ok(Some(result)) => result);
+        assert_variant!(startup_result, Err(FullmacMlmeError::FailedToQueryVendorDriver(_)));
     }
 
     struct TestHelper {
@@ -783,8 +820,7 @@ mod handle_mlme_request_tests {
     use test_case::test_case;
     use wlan_common::assert_variant;
     use {
-        banjo_fuchsia_wlan_fullmac as banjo_wlan_fullmac,
-        banjo_fuchsia_wlan_ieee80211 as banjo_wlan_ieee80211,
+        fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_internal as fidl_internal,
         fidl_fuchsia_wlan_stats as fidl_stats,
     };
 
@@ -801,18 +837,21 @@ mod handle_mlme_request_tests {
             max_channel_time: 7,
         });
 
-        h.mlme.handle_mlme_request(fidl_req);
+        h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
-        let (driver_req, driver_req_channels, driver_req_ssids) = assert_variant!(driver_calls.next(), Some(DriverCall::StartScan { req, channels, ssids }) => (req, channels, ssids));
-        assert_eq!(driver_req.txn_id, 1);
-        assert_eq!(driver_req.scan_type, banjo_wlan_fullmac::WlanScanType::PASSIVE);
-        assert_eq!(&driver_req_channels[..], &[2]);
-        assert_eq!(driver_req.min_channel_time, 6);
-        assert_eq!(driver_req.max_channel_time, 7);
-        assert_eq!(driver_req_ssids.len(), 1);
-        assert_eq!(driver_req_ssids[0].data[..driver_req_ssids[0].len as usize], [3u8; 4][..]);
+        let driver_req =
+            assert_variant!(driver_calls.next(), Some(DriverCall::StartScan { req }) => req);
+        assert_eq!(driver_req.txn_id, Some(1));
+        assert_eq!(driver_req.scan_type, Some(fidl_fullmac::WlanScanType::Passive));
+        assert_eq!(driver_req.channels, Some(vec![2]));
+        assert_eq!(driver_req.min_channel_time, Some(6));
+        assert_eq!(driver_req.max_channel_time, Some(7));
+
+        let driver_cssids = driver_req.ssids.as_ref().unwrap();
+        assert_eq!(driver_cssids.len(), 1);
+        assert_eq!(driver_cssids[0].data[..driver_cssids[0].len as usize], [3u8; 4][..]);
     }
 
     #[test]
@@ -828,13 +867,14 @@ mod handle_mlme_request_tests {
             max_channel_time: 7,
         });
 
-        h.mlme.handle_mlme_request(fidl_req);
+        h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
-        let (driver_req, driver_req_ssids) = assert_variant!(driver_calls.next(), Some(DriverCall::StartScan { req, ssids, .. }) => (req, ssids));
-        assert_eq!(driver_req.scan_type, banjo_wlan_fullmac::WlanScanType::ACTIVE);
-        assert!(driver_req_ssids.is_empty());
+        let driver_req =
+            assert_variant!(driver_calls.next(), Some(DriverCall::StartScan { req }) => req);
+        assert_eq!(driver_req.scan_type, Some(fidl_fullmac::WlanScanType::Active));
+        assert!(driver_req.ssids.as_ref().unwrap().is_empty());
     }
 
     #[test]
@@ -850,7 +890,7 @@ mod handle_mlme_request_tests {
             max_channel_time: 7,
         });
 
-        h.mlme.handle_mlme_request(fidl_req);
+        h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
@@ -897,7 +937,7 @@ mod handle_mlme_request_tests {
             security_ie: vec![12u8, 13],
         });
 
-        h.mlme.handle_mlme_request(fidl_req);
+        h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         assert!(h.mlme.is_bss_protected);
         let binding = h.fake_device.lock().unwrap();
@@ -906,37 +946,38 @@ mod handle_mlme_request_tests {
             driver_calls.next(),
             Some(DriverCall::OnLinkStateChanged { online: false })
         );
-        assert_variant!(driver_calls.next(), Some(DriverCall::ConnectReq { req, selected_bss_ies, sae_password, wep_key, security_ie }) => {
-            assert_eq!(req.selected_bss.bssid, [100u8; 6]);
-            assert_eq!(req.selected_bss.bss_type, banjo_wlan_common::BssType::INFRASTRUCTURE);
-            assert_eq!(req.selected_bss.beacon_period, 101);
-            assert_eq!(req.selected_bss.capability_info, 102);
-            assert_eq!(*selected_bss_ies, vec![103u8, 104, 105]);
-            assert_eq!(req.selected_bss.bss_type, banjo_wlan_common::BssType::INFRASTRUCTURE);
+        assert_variant!(driver_calls.next(), Some(DriverCall::ConnectReq { req }) => {
+            let selected_bss = req.selected_bss.clone().unwrap();
+            assert_eq!(selected_bss.bssid, [100u8; 6]);
+            assert_eq!(selected_bss.bss_type, fidl_common::BssType::Infrastructure);
+            assert_eq!(selected_bss.beacon_period, 101);
+            assert_eq!(selected_bss.capability_info, 102);
+            assert_eq!(selected_bss.ies, vec![103u8, 104, 105]);
             assert_eq!(
-                req.selected_bss.channel,
-                banjo_wlan_common::WlanChannel {
+                selected_bss.channel,
+                fidl_common::WlanChannel {
                     primary: 106,
-                    cbw: banjo_wlan_common::ChannelBandwidth::CBW40,
+                    cbw: fidl_common::ChannelBandwidth::Cbw40,
                     secondary80: 0,
                 }
             );
-            assert_eq!(req.selected_bss.rssi_dbm, 107);
-            assert_eq!(req.selected_bss.snr_db, 108);
+            assert_eq!(selected_bss.rssi_dbm, 107);
+            assert_eq!(selected_bss.snr_db, 108);
 
-            assert_eq!(req.connect_failure_timeout, 1u32);
-            assert_eq!(req.auth_type, banjo_wlan_fullmac::WlanAuthType::OPEN_SYSTEM);
-            assert_eq!(*sae_password, vec![2u8, 3, 4]);
+            assert_eq!(req.connect_failure_timeout, Some(1u32));
+            assert_eq!(req.auth_type, Some(fidl_fullmac::WlanAuthType::OpenSystem));
+            assert_eq!(req.sae_password, Some(vec![2u8, 3, 4]));
 
-            assert_eq!(*wep_key, vec![5u8, 6]);
-            assert_eq!(req.wep_key.key_idx, 7);
-            assert_eq!(req.wep_key.key_type, banjo_wlan_common::WlanKeyType::GROUP);
-            assert_eq!(req.wep_key.peer_addr, [8u8; 6]);
-            assert_eq!(req.wep_key.rsc, 9);
-            assert_eq!(req.wep_key.cipher_oui, [10u8; 3]);
-            assert_eq!(req.wep_key.cipher_type, banjo_wlan_ieee80211::CipherSuiteType(11));
+            let wep_key = req.wep_key.clone().unwrap();
+            assert_eq!(wep_key.key, Some(vec![5u8, 6]));
+            assert_eq!(wep_key.key_idx, Some(7));
+            assert_eq!(wep_key.key_type, Some(fidl_common::WlanKeyType::Group));
+            assert_eq!(wep_key.peer_addr, Some([8u8; 6]));
+            assert_eq!(wep_key.rsc, Some(9));
+            assert_eq!(wep_key.cipher_oui, Some([10u8; 3]));
+            assert_eq!(wep_key.cipher_type, fidl_ieee80211::CipherSuiteType::from_primitive(11));
 
-            assert_eq!(*security_ie, vec![12u8, 13]);
+            assert_eq!(req.security_ie, Some(vec![12u8, 13]));
         });
     }
 
@@ -947,7 +988,7 @@ mod handle_mlme_request_tests {
             peer_sta_address: [1u8; 6],
         });
 
-        h.mlme.handle_mlme_request(fidl_req);
+        h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
@@ -955,7 +996,10 @@ mod handle_mlme_request_tests {
             assert_variant!(driver_calls.next(), Some(DriverCall::ReconnectReq { req }) => req);
         assert_eq!(
             *driver_req,
-            banjo_wlan_fullmac::WlanFullmacImplReconnectRequest { peer_sta_address: [1u8; 6] }
+            fidl_fullmac::WlanFullmacImplReconnectRequest {
+                peer_sta_address: Some([1u8; 6]),
+                ..Default::default()
+            }
         );
     }
 
@@ -967,7 +1011,7 @@ mod handle_mlme_request_tests {
             result_code: fidl_mlme::AuthenticateResultCode::Success,
         });
 
-        h.mlme.handle_mlme_request(fidl_req);
+        h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
@@ -975,9 +1019,10 @@ mod handle_mlme_request_tests {
             assert_variant!(driver_calls.next(), Some(DriverCall::AuthResp { resp }) => resp);
         assert_eq!(
             *driver_req,
-            banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest {
-                peer_sta_address: [1u8; 6],
-                result_code: banjo_wlan_fullmac::WlanAuthResult::SUCCESS,
+            fidl_fullmac::WlanFullmacImplAuthRespRequest {
+                peer_sta_address: Some([1u8; 6]),
+                result_code: Some(fidl_fullmac::WlanAuthResult::Success),
+                ..Default::default()
             }
         );
     }
@@ -990,7 +1035,7 @@ mod handle_mlme_request_tests {
             reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDeauth,
         });
 
-        h.mlme.handle_mlme_request(fidl_req);
+        h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
@@ -1000,11 +1045,8 @@ mod handle_mlme_request_tests {
         );
         let driver_req =
             assert_variant!(driver_calls.next(), Some(DriverCall::DeauthReq { req }) => req);
-        assert_eq!(driver_req.peer_sta_address, [1u8; 6]);
-        assert_eq!(
-            driver_req.reason_code,
-            banjo_wlan_ieee80211::ReasonCode::LEAVING_NETWORK_DEAUTH
-        );
+        assert_eq!(driver_req.peer_sta_address, Some([1u8; 6]));
+        assert_eq!(driver_req.reason_code, Some(fidl_ieee80211::ReasonCode::LeavingNetworkDeauth));
     }
 
     #[test]
@@ -1018,15 +1060,15 @@ mod handle_mlme_request_tests {
             rates: vec![4, 5],
         });
 
-        h.mlme.handle_mlme_request(fidl_req);
+        h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
         let driver_req =
             assert_variant!(driver_calls.next(), Some(DriverCall::AssocResp { resp }) => resp);
-        assert_eq!(driver_req.peer_sta_address, [1u8; 6]);
-        assert_eq!(driver_req.result_code, banjo_wlan_fullmac::WlanAssocResult::SUCCESS);
-        assert_eq!(driver_req.association_id, 2);
+        assert_eq!(driver_req.peer_sta_address, Some([1u8; 6]));
+        assert_eq!(driver_req.result_code, Some(fidl_fullmac::WlanAssocResult::Success));
+        assert_eq!(driver_req.association_id, Some(2));
     }
 
     #[test]
@@ -1037,11 +1079,10 @@ mod handle_mlme_request_tests {
             reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDisassoc,
         });
 
-        h.mlme.handle_mlme_request(fidl_req);
+        h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
-
         assert_variant!(
             driver_calls.next(),
             Some(DriverCall::OnLinkStateChanged { online: false })
@@ -1049,10 +1090,10 @@ mod handle_mlme_request_tests {
 
         let driver_req =
             assert_variant!(driver_calls.next(), Some(DriverCall::Disassoc{ req }) => req);
-        assert_eq!(driver_req.peer_sta_address, [1u8; 6]);
+        assert_eq!(driver_req.peer_sta_address, Some([1u8; 6]));
         assert_eq!(
             driver_req.reason_code,
-            banjo_wlan_ieee80211::ReasonCode::LEAVING_NETWORK_DISASSOC
+            Some(fidl_ieee80211::ReasonCode::LeavingNetworkDisassoc)
         );
     }
 
@@ -1064,11 +1105,10 @@ mod handle_mlme_request_tests {
             set_default_mib: true,
         });
 
-        h.mlme.handle_mlme_request(fidl_req);
+        h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
-
         assert_variant!(
             driver_calls.next(),
             Some(DriverCall::OnLinkStateChanged { online: false })
@@ -1078,9 +1118,10 @@ mod handle_mlme_request_tests {
             assert_variant!(driver_calls.next(), Some(DriverCall::Reset { req }) => req);
         assert_eq!(
             *driver_req,
-            banjo_wlan_fullmac::WlanFullmacImplResetRequest {
-                sta_address: [1u8; 6],
-                set_default_mib: true,
+            fidl_fullmac::WlanFullmacImplResetRequest {
+                sta_address: Some([1u8; 6]),
+                set_default_mib: Some(true),
+                ..Default::default()
             }
         );
     }
@@ -1105,23 +1146,22 @@ mod handle_mlme_request_tests {
             channel_bandwidth: fidl_common::ChannelBandwidth::Cbw80,
         });
 
-        h.mlme.handle_mlme_request(fidl_req);
+        h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
 
         let driver_req =
             assert_variant!(driver_calls.next(), Some(DriverCall::StartBss { req }) => req);
-        assert_eq!(driver_req.ssid.len as usize, SSID_LEN);
-        assert_eq!(driver_req.ssid.data[..SSID_LEN], [1u8; SSID_LEN][..]);
-        assert_eq!(driver_req.bss_type, banjo_wlan_common::BssType::INFRASTRUCTURE);
-        assert_eq!(driver_req.beacon_period, 3);
-        assert_eq!(driver_req.dtim_period, 4);
-        assert_eq!(driver_req.channel, 5);
-        assert_eq!(driver_req.rsne_count as usize, RSNE_LEN);
-        assert_ne!(driver_req.rsne_list, std::ptr::null());
-        assert_eq!(driver_req.vendor_ie_list, std::ptr::null());
-        assert_eq!(driver_req.vendor_ie_count as usize, 0);
+
+        assert_eq!(driver_req.ssid.as_ref().unwrap().len as usize, SSID_LEN);
+        assert_eq!(driver_req.ssid.as_ref().unwrap().data[..SSID_LEN], [1u8; SSID_LEN][..]);
+        assert_eq!(driver_req.bss_type, Some(fidl_common::BssType::Infrastructure));
+        assert_eq!(driver_req.beacon_period, Some(3));
+        assert_eq!(driver_req.dtim_period, Some(4));
+        assert_eq!(driver_req.channel, Some(5));
+        assert_ne!(driver_req.rsne, Some(vec![14 as u8, RSNE_LEN as u8]));
+        assert_eq!(driver_req.vendor_ie, Some(vec![]));
     }
 
     #[test]
@@ -1131,15 +1171,15 @@ mod handle_mlme_request_tests {
         let fidl_req =
             wlan_sme::MlmeRequest::Stop(fidl_mlme::StopRequest { ssid: vec![1u8; SSID_LEN] });
 
-        h.mlme.handle_mlme_request(fidl_req);
+        h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
 
         let driver_req =
             assert_variant!(driver_calls.next(), Some(DriverCall::StopBss { req }) => req);
-        assert_eq!(driver_req.ssid.len as usize, SSID_LEN);
-        assert_eq!(driver_req.ssid.data[..SSID_LEN], [1u8; SSID_LEN][..]);
+        assert_eq!(driver_req.ssid.as_ref().unwrap().len as usize, SSID_LEN);
+        assert_eq!(driver_req.ssid.as_ref().unwrap().data[..SSID_LEN], [1u8; SSID_LEN][..]);
     }
 
     #[test]
@@ -1159,20 +1199,24 @@ mod handle_mlme_request_tests {
             }],
         });
 
-        h.mlme.handle_mlme_request(fidl_req);
+        h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
 
-        let (driver_req, driver_req_keys) = assert_variant!(driver_calls.next(), Some(DriverCall::SetKeysReq { req, keys }) => (req, keys));
+        let driver_req =
+            assert_variant!(driver_calls.next(), Some(DriverCall::SetKeysReq { req }) => req);
         assert_eq!(driver_req.num_keys, 1);
-        assert_eq!(driver_req_keys[0], vec![5u8, 6]);
-        assert_eq!(driver_req.keylist[0].key_idx, 7);
-        assert_eq!(driver_req.keylist[0].key_type, banjo_wlan_common::WlanKeyType::GROUP);
-        assert_eq!(driver_req.keylist[0].peer_addr, [8u8; 6]);
-        assert_eq!(driver_req.keylist[0].rsc, 9);
-        assert_eq!(driver_req.keylist[0].cipher_oui, [10u8; 3]);
-        assert_eq!(driver_req.keylist[0].cipher_type, banjo_wlan_ieee80211::CipherSuiteType(11));
+        // assert_eq!(driver_req_keys[0], vec![5u8, 6]);
+        assert_eq!(driver_req.keylist[0].key_idx, Some(7));
+        assert_eq!(driver_req.keylist[0].key_type, Some(fidl_common::WlanKeyType::Group));
+        assert_eq!(driver_req.keylist[0].peer_addr, Some([8u8; 6]));
+        assert_eq!(driver_req.keylist[0].rsc, Some(9));
+        assert_eq!(driver_req.keylist[0].cipher_oui, Some([10u8; 3]));
+        assert_eq!(
+            driver_req.keylist[0].cipher_type,
+            Some(fidl_ieee80211::CipherSuiteType::from_primitive_allow_unknown(11))
+        );
 
         let conf = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(fidl_mlme::MlmeEvent::SetKeysConf { conf })) => conf);
         assert_eq!(
@@ -1188,7 +1232,7 @@ mod handle_mlme_request_tests {
         let mut h = TestHelper::set_up();
         const NUM_KEYS: usize = 3;
         h.fake_device.lock().unwrap().set_keys_resp_mock =
-            Some(banjo_wlan_fullmac::WlanFullmacSetKeysResp {
+            Some(fidl_fullmac::WlanFullmacSetKeysResp {
                 num_keys: NUM_KEYS as u64,
                 statuslist: [0i32, 1, 0, 0],
             });
@@ -1207,15 +1251,16 @@ mod handle_mlme_request_tests {
         }
         let fidl_req = wlan_sme::MlmeRequest::SetKeys(fidl_mlme::SetKeysRequest { keylist });
 
-        h.mlme.handle_mlme_request(fidl_req);
+        h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
 
-        let (driver_req, _driver_req_keys) = assert_variant!(driver_calls.next(), Some(DriverCall::SetKeysReq { req, keys }) => (req, keys));
+        let driver_req =
+            assert_variant!(driver_calls.next(), Some(DriverCall::SetKeysReq { req }) => req);
         assert_eq!(driver_req.num_keys, NUM_KEYS as u64);
         for i in 0..NUM_KEYS {
-            assert_eq!(driver_req.keylist[i].key_idx, i as u8);
+            assert_eq!(driver_req.keylist[i].key_idx, Some(i as u8));
         }
 
         let conf = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(fidl_mlme::MlmeEvent::SetKeysConf { conf })) => conf);
@@ -1247,7 +1292,7 @@ mod handle_mlme_request_tests {
             keylist: vec![key.clone(); 5],
         });
 
-        h.mlme.handle_mlme_request(fidl_req);
+        assert!(h.mlme.handle_mlme_request(fidl_req).is_err());
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
@@ -1261,7 +1306,7 @@ mod handle_mlme_request_tests {
     fn test_set_keys_request_when_resp_has_different_num_keys() {
         let mut h = TestHelper::set_up();
         h.fake_device.lock().unwrap().set_keys_resp_mock =
-            Some(banjo_wlan_fullmac::WlanFullmacSetKeysResp { num_keys: 2, statuslist: [0i32; 4] });
+            Some(fidl_fullmac::WlanFullmacSetKeysResp { num_keys: 2, statuslist: [0i32; 4] });
         let fidl_req = wlan_sme::MlmeRequest::SetKeys(fidl_mlme::SetKeysRequest {
             keylist: vec![fidl_mlme::SetKeyDescriptor {
                 key: vec![5u8, 6],
@@ -1276,7 +1321,8 @@ mod handle_mlme_request_tests {
             }],
         });
 
-        h.mlme.handle_mlme_request(fidl_req);
+        // An error is expected when converting the response
+        assert!(h.mlme.handle_mlme_request(fidl_req).is_err());
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
@@ -1298,7 +1344,7 @@ mod handle_mlme_request_tests {
             }],
         });
 
-        h.mlme.handle_mlme_request(fidl_req);
+        h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
@@ -1307,7 +1353,7 @@ mod handle_mlme_request_tests {
             assert_variant!(driver_calls.next(), Some(DriverCall::DelKeysReq { req }) => req);
         assert_eq!(driver_req.num_keys, 1);
         assert_eq!(driver_req.keylist[0].key_id, 1);
-        assert_eq!(driver_req.keylist[0].key_type, banjo_wlan_common::WlanKeyType::PEER);
+        assert_eq!(driver_req.keylist[0].key_type, fidl_common::WlanKeyType::Peer);
         assert_eq!(driver_req.keylist[0].address, [2u8; 6]);
     }
 
@@ -1320,15 +1366,16 @@ mod handle_mlme_request_tests {
             data: vec![3u8; 4],
         });
 
-        h.mlme.handle_mlme_request(fidl_req);
+        h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
 
-        let (driver_req, driver_req_data) = assert_variant!(driver_calls.next(), Some(DriverCall::EapolTx { req, data }) => (req, data));
-        assert_eq!(driver_req.src_addr, [1u8; 6]);
-        assert_eq!(driver_req.dst_addr, [2u8; 6]);
-        assert_eq!(*driver_req_data, vec![3u8; 4]);
+        let driver_req =
+            assert_variant!(driver_calls.next(), Some(DriverCall::EapolTx { req }) => req);
+        assert_eq!(driver_req.src_addr, Some([1u8; 6]));
+        assert_eq!(driver_req.dst_addr, Some([2u8; 6]));
+        assert_eq!(driver_req.data, Some(vec![3u8; 4]));
     }
 
     #[test_case(fidl_mlme::ControlledPortState::Open, true; "online")]
@@ -1349,7 +1396,7 @@ mod handle_mlme_request_tests {
             state: controlled_port_state,
         });
 
-        h.mlme.handle_mlme_request(fidl_req);
+        h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
@@ -1362,7 +1409,7 @@ mod handle_mlme_request_tests {
     #[test]
     fn test_get_iface_counter_stats() {
         let mut h = TestHelper::set_up();
-        let mocked_stats = banjo_wlan_fullmac::WlanFullmacIfaceCounterStats {
+        let mocked_stats = fidl_fullmac::WlanFullmacIfaceCounterStats {
             rx_unicast_drop: 11,
             rx_unicast_total: 22,
             rx_multicast: 33,
@@ -1371,13 +1418,13 @@ mod handle_mlme_request_tests {
         };
         h.fake_device.lock().unwrap().get_iface_counter_stats_mock.replace(
             fidl_mlme::GetIfaceCounterStatsResponse::Stats(
-                banjo_to_fidl::convert_iface_counter_stats(mocked_stats),
+                fullmac_to_mlme::convert_iface_counter_stats(mocked_stats),
             ),
         );
         let (stats_responder, mut stats_receiver) = wlan_sme::responder::Responder::new();
         let fidl_req = wlan_sme::MlmeRequest::GetIfaceCounterStats(stats_responder);
 
-        h.mlme.handle_mlme_request(fidl_req);
+        h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
@@ -1403,77 +1450,70 @@ mod handle_mlme_request_tests {
         let mut h = TestHelper::set_up();
 
         let noise_floor_samples =
-            vec![banjo_wlan_fullmac::WlanFullmacHistBucket { bucket_index: 2, num_samples: 3 }];
-        let noise_floor_histograms = vec![banjo_wlan_fullmac::WlanFullmacNoiseFloorHistogram {
-            hist_scope: banjo_wlan_fullmac::WlanFullmacHistScope::STATION,
-            antenna_id: banjo_wlan_fullmac::WlanFullmacAntennaId {
-                freq: banjo_wlan_fullmac::WlanFullmacAntennaFreq::ANTENNA_2_G,
+            vec![fidl_fullmac::WlanFullmacHistBucket { bucket_index: 2, num_samples: 3 }];
+        let noise_floor_histograms = vec![fidl_fullmac::WlanFullmacNoiseFloorHistogram {
+            hist_scope: fidl_fullmac::WlanFullmacHistScope::Station,
+            antenna_id: fidl_fullmac::WlanFullmacAntennaId {
+                freq: fidl_fullmac::WlanFullmacAntennaFreq::Antenna2G,
                 index: 1,
             },
-            noise_floor_samples_list: noise_floor_samples.as_ptr(),
-            noise_floor_samples_count: noise_floor_samples.len(),
+            noise_floor_samples,
             invalid_samples: 4,
         }];
 
         let rssi_samples =
-            vec![banjo_wlan_fullmac::WlanFullmacHistBucket { bucket_index: 6, num_samples: 7 }];
-        let rssi_histograms = vec![banjo_wlan_fullmac::WlanFullmacRssiHistogram {
-            hist_scope: banjo_wlan_fullmac::WlanFullmacHistScope::PER_ANTENNA,
-            antenna_id: banjo_wlan_fullmac::WlanFullmacAntennaId {
-                freq: banjo_wlan_fullmac::WlanFullmacAntennaFreq::ANTENNA_5_G,
+            vec![fidl_fullmac::WlanFullmacHistBucket { bucket_index: 6, num_samples: 7 }];
+        let rssi_histograms = vec![fidl_fullmac::WlanFullmacRssiHistogram {
+            hist_scope: fidl_fullmac::WlanFullmacHistScope::PerAntenna,
+            antenna_id: fidl_fullmac::WlanFullmacAntennaId {
+                freq: fidl_fullmac::WlanFullmacAntennaFreq::Antenna5G,
                 index: 5,
             },
-            rssi_samples_list: rssi_samples.as_ptr(),
-            rssi_samples_count: rssi_samples.len(),
+            rssi_samples,
             invalid_samples: 8,
         }];
 
         let rx_rate_index_samples =
-            vec![banjo_wlan_fullmac::WlanFullmacHistBucket { bucket_index: 10, num_samples: 11 }];
-        let rx_rate_index_histograms = vec![banjo_wlan_fullmac::WlanFullmacRxRateIndexHistogram {
-            hist_scope: banjo_wlan_fullmac::WlanFullmacHistScope::STATION,
-            antenna_id: banjo_wlan_fullmac::WlanFullmacAntennaId {
-                freq: banjo_wlan_fullmac::WlanFullmacAntennaFreq::ANTENNA_5_G,
+            vec![fidl_fullmac::WlanFullmacHistBucket { bucket_index: 10, num_samples: 11 }];
+        let rx_rate_index_histograms = vec![fidl_fullmac::WlanFullmacRxRateIndexHistogram {
+            hist_scope: fidl_fullmac::WlanFullmacHistScope::Station,
+            antenna_id: fidl_fullmac::WlanFullmacAntennaId {
+                freq: fidl_fullmac::WlanFullmacAntennaFreq::Antenna5G,
                 index: 9,
             },
-            rx_rate_index_samples_list: rx_rate_index_samples.as_ptr(),
-            rx_rate_index_samples_count: rx_rate_index_samples.len(),
+            rx_rate_index_samples,
             invalid_samples: 12,
         }];
 
         let snr_samples =
-            vec![banjo_wlan_fullmac::WlanFullmacHistBucket { bucket_index: 14, num_samples: 15 }];
-        let snr_histograms = vec![banjo_wlan_fullmac::WlanFullmacSnrHistogram {
-            hist_scope: banjo_wlan_fullmac::WlanFullmacHistScope::PER_ANTENNA,
-            antenna_id: banjo_wlan_fullmac::WlanFullmacAntennaId {
-                freq: banjo_wlan_fullmac::WlanFullmacAntennaFreq::ANTENNA_2_G,
+            vec![fidl_fullmac::WlanFullmacHistBucket { bucket_index: 14, num_samples: 15 }];
+        let snr_histograms = vec![fidl_fullmac::WlanFullmacSnrHistogram {
+            hist_scope: fidl_fullmac::WlanFullmacHistScope::PerAntenna,
+            antenna_id: fidl_fullmac::WlanFullmacAntennaId {
+                freq: fidl_fullmac::WlanFullmacAntennaFreq::Antenna2G,
                 index: 13,
             },
-            snr_samples_list: snr_samples.as_ptr(),
-            snr_samples_count: snr_samples.len(),
+            snr_samples,
             invalid_samples: 16,
         }];
 
-        let mocked_stats = banjo_wlan_fullmac::WlanFullmacIfaceHistogramStats {
-            noise_floor_histograms_list: noise_floor_histograms.as_ptr(),
-            noise_floor_histograms_count: noise_floor_histograms.len(),
-            rssi_histograms_list: rssi_histograms.as_ptr(),
-            rssi_histograms_count: rssi_histograms.len(),
-            rx_rate_index_histograms_list: rx_rate_index_histograms.as_ptr(),
-            rx_rate_index_histograms_count: rx_rate_index_histograms.len(),
-            snr_histograms_list: snr_histograms.as_ptr(),
-            snr_histograms_count: snr_histograms.len(),
+        let mocked_stats = fidl_fullmac::WlanFullmacIfaceHistogramStats {
+            noise_floor_histograms: Some(noise_floor_histograms),
+            rssi_histograms: Some(rssi_histograms),
+            rx_rate_index_histograms: Some(rx_rate_index_histograms),
+            snr_histograms: Some(snr_histograms),
+            ..Default::default()
         };
 
         h.fake_device.lock().unwrap().get_iface_histogram_stats_mock.replace(
             fidl_mlme::GetIfaceHistogramStatsResponse::Stats(
-                banjo_to_fidl::convert_iface_histogram_stats(mocked_stats),
+                fullmac_to_mlme::convert_iface_histogram_stats(mocked_stats),
             ),
         );
         let (stats_responder, mut stats_receiver) = wlan_sme::responder::Responder::new();
         let fidl_req = wlan_sme::MlmeRequest::GetIfaceHistogramStats(stats_responder);
 
-        h.mlme.handle_mlme_request(fidl_req);
+        h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
@@ -1532,17 +1572,14 @@ mod handle_mlme_request_tests {
             status_code: fidl_ieee80211::StatusCode::AntiCloggingTokenRequired,
         });
 
-        h.mlme.handle_mlme_request(fidl_req);
+        h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
 
         let driver_req = assert_variant!(driver_calls.next(), Some(DriverCall::SaeHandshakeResp { resp }) => resp);
         assert_eq!(driver_req.peer_sta_address, [1u8; 6]);
-        assert_eq!(
-            driver_req.status_code,
-            banjo_wlan_ieee80211::StatusCode::ANTI_CLOGGING_TOKEN_REQUIRED
-        );
+        assert_eq!(driver_req.status_code, fidl_ieee80211::StatusCode::AntiCloggingTokenRequired);
     }
 
     #[test]
@@ -1555,16 +1592,17 @@ mod handle_mlme_request_tests {
             sae_fields: vec![3u8; 4],
         });
 
-        h.mlme.handle_mlme_request(fidl_req);
+        h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
 
-        let (driver_frame, driver_frame_sae_fields) = assert_variant!(driver_calls.next(), Some(DriverCall::SaeFrameTx { frame, sae_fields }) => (frame, sae_fields));
+        let driver_frame =
+            assert_variant!(driver_calls.next(), Some(DriverCall::SaeFrameTx { frame }) => frame);
         assert_eq!(driver_frame.peer_sta_address, [1u8; 6]);
-        assert_eq!(driver_frame.status_code, banjo_wlan_ieee80211::StatusCode::SUCCESS);
+        assert_eq!(driver_frame.status_code, fidl_ieee80211::StatusCode::Success);
         assert_eq!(driver_frame.seq_num, 2);
-        assert_eq!(*driver_frame_sae_fields, vec![3u8; 4]);
+        assert_eq!(driver_frame.sae_fields, vec![3u8; 4]);
     }
 
     #[test]
@@ -1572,7 +1610,7 @@ mod handle_mlme_request_tests {
         let mut h = TestHelper::set_up();
         let fidl_req = wlan_sme::MlmeRequest::WmmStatusReq;
 
-        h.mlme.handle_mlme_request(fidl_req);
+        h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
@@ -1635,6 +1673,7 @@ mod handle_driver_event_tests {
     use test_case::test_case;
     use wlan_common::{assert_variant, fake_fidl_bss_description};
     use {
+        banjo_fuchsia_wlan_common as banjo_wlan_common,
         banjo_fuchsia_wlan_fullmac as banjo_wlan_fullmac,
         banjo_fuchsia_wlan_ieee80211 as banjo_wlan_ieee80211,
         banjo_fuchsia_wlan_internal as banjo_wlan_internal, fidl_fuchsia_wlan_mlme as fidl_mlme,
@@ -1860,13 +1899,13 @@ mod handle_driver_event_tests {
         );
     }
 
-    #[test_case(banjo_wlan_common::WlanMacRole::CLIENT; "client")]
-    #[test_case(banjo_wlan_common::WlanMacRole::AP; "ap")]
+    #[test_case(fidl_common::WlanMacRole::Client; "client")]
+    #[test_case(fidl_common::WlanMacRole::Ap; "ap")]
     #[fuchsia::test(add_test_attr = false)]
-    fn test_deauth_conf(mac_role: banjo_wlan_common::WlanMacRole) {
+    fn test_deauth_conf(mac_role: fidl_common::WlanMacRole) {
         let (mut h, mut test_fut) =
             TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
-        h.fake_device.lock().unwrap().query_device_info_mock.role = mac_role;
+        h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role = mac_role;
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let peer_sta_address = [1u8; 6];
@@ -1881,7 +1920,7 @@ mod handle_driver_event_tests {
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
 
-        if mac_role == banjo_wlan_common::WlanMacRole::CLIENT {
+        if mac_role == fidl_common::WlanMacRole::Client {
             assert_variant!(
                 driver_calls.next(),
                 Some(DriverCall::OnLinkStateChanged { online: false })
@@ -1896,13 +1935,13 @@ mod handle_driver_event_tests {
         assert_eq!(conf, fidl_mlme::DeauthenticateConfirm { peer_sta_address: [1u8; 6] });
     }
 
-    #[test_case(banjo_wlan_common::WlanMacRole::CLIENT; "client")]
-    #[test_case(banjo_wlan_common::WlanMacRole::AP; "ap")]
+    #[test_case(fidl_common::WlanMacRole::Client; "client")]
+    #[test_case(fidl_common::WlanMacRole::Ap; "ap")]
     #[fuchsia::test(add_test_attr = false)]
-    fn test_deauth_ind(mac_role: banjo_wlan_common::WlanMacRole) {
+    fn test_deauth_ind(mac_role: fidl_common::WlanMacRole) {
         let (mut h, mut test_fut) =
             TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
-        h.fake_device.lock().unwrap().query_device_info_mock.role = mac_role;
+        h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role = mac_role;
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let deauth_ind = banjo_wlan_fullmac::WlanFullmacDeauthIndication {
@@ -1921,7 +1960,7 @@ mod handle_driver_event_tests {
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
 
-        if mac_role == banjo_wlan_common::WlanMacRole::CLIENT {
+        if mac_role == fidl_common::WlanMacRole::Client {
             assert_variant!(
                 driver_calls.next(),
                 Some(DriverCall::OnLinkStateChanged { online: false })
@@ -1979,13 +2018,13 @@ mod handle_driver_event_tests {
         );
     }
 
-    #[test_case(banjo_wlan_common::WlanMacRole::CLIENT; "client")]
-    #[test_case(banjo_wlan_common::WlanMacRole::AP; "ap")]
+    #[test_case(fidl_common::WlanMacRole::Client; "client")]
+    #[test_case(fidl_common::WlanMacRole::Ap; "ap")]
     #[fuchsia::test(add_test_attr = false)]
-    fn test_disassoc_conf(mac_role: banjo_wlan_common::WlanMacRole) {
+    fn test_disassoc_conf(mac_role: fidl_common::WlanMacRole) {
         let (mut h, mut test_fut) =
             TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
-        h.fake_device.lock().unwrap().query_device_info_mock.role = mac_role;
+        h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role = mac_role;
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let disassoc_conf = banjo_wlan_fullmac::WlanFullmacDisassocConfirm { status: 1 };
@@ -2000,7 +2039,7 @@ mod handle_driver_event_tests {
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
 
-        if mac_role == banjo_wlan_common::WlanMacRole::CLIENT {
+        if mac_role == fidl_common::WlanMacRole::Client {
             assert_variant!(
                 driver_calls.next(),
                 Some(DriverCall::OnLinkStateChanged { online: false })
@@ -2014,13 +2053,13 @@ mod handle_driver_event_tests {
         assert_eq!(conf, fidl_mlme::DisassociateConfirm { status: 1 });
     }
 
-    #[test_case(banjo_wlan_common::WlanMacRole::CLIENT; "client")]
-    #[test_case(banjo_wlan_common::WlanMacRole::AP; "ap")]
+    #[test_case(fidl_common::WlanMacRole::Client; "client")]
+    #[test_case(fidl_common::WlanMacRole::Ap; "ap")]
     #[fuchsia::test(add_test_attr = false)]
-    fn test_disassoc_ind(mac_role: banjo_wlan_common::WlanMacRole) {
+    fn test_disassoc_ind(mac_role: fidl_common::WlanMacRole) {
         let (mut h, mut test_fut) =
             TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
-        h.fake_device.lock().unwrap().query_device_info_mock.role = mac_role;
+        h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role = mac_role;
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let disassoc_ind = banjo_wlan_fullmac::WlanFullmacDisassocIndication {
@@ -2039,7 +2078,7 @@ mod handle_driver_event_tests {
         let binding = h.fake_device.lock().unwrap();
         let mut driver_calls = binding.captured_driver_calls.iter();
 
-        if mac_role == banjo_wlan_common::WlanMacRole::CLIENT {
+        if mac_role == fidl_common::WlanMacRole::Client {
             assert_variant!(
                 driver_calls.next(),
                 Some(DriverCall::OnLinkStateChanged { online: false })

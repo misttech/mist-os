@@ -2,12 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::convert::banjo_to_fidl;
+use super::convert::{banjo_to_fidl, fullmac_to_mlme};
 use super::{FullmacDriverEvent, FullmacDriverEventSink};
+use anyhow::{format_err, Context};
+use fidl::HandleBased;
 use std::ffi::c_void;
 use {
     banjo_fuchsia_wlan_common as banjo_wlan_common,
-    banjo_fuchsia_wlan_fullmac as banjo_wlan_fullmac, fidl_fuchsia_wlan_mlme as fidl_mlme,
+    banjo_fuchsia_wlan_fullmac as banjo_wlan_fullmac, fidl_fuchsia_wlan_common as fidl_common,
+    fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fuchsia_zircon as zx,
 };
 
@@ -305,300 +308,277 @@ impl WlanFullmacIfcProtocol {
 /// can then implement trait methods instead of mocking an underlying DeviceInterface
 /// and FIDL proxy.
 pub trait DeviceOps {
-    fn start(&mut self, ifc: *const WlanFullmacIfcProtocol) -> Result<zx::Handle, zx::Status>;
-    fn query_device_info(&mut self) -> banjo_wlan_fullmac::WlanFullmacQueryInfo;
-    fn query_mac_sublayer_support(&mut self) -> banjo_wlan_common::MacSublayerSupport;
-    fn query_security_support(&mut self) -> banjo_wlan_common::SecuritySupport;
-    fn query_spectrum_management_support(&mut self)
-        -> banjo_wlan_common::SpectrumManagementSupport;
-    fn start_scan(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplStartScanRequest);
-    fn connect(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplConnectRequest);
-    fn reconnect(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplReconnectRequest);
-    fn auth_resp(&mut self, resp: banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest);
-    fn deauth(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplDeauthRequest);
-    fn assoc_resp(&mut self, resp: banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest);
-    fn disassoc(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplDisassocRequest);
-    fn reset(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplResetRequest);
-    fn start_bss(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplStartBssRequest);
-    fn stop_bss(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplStopBssRequest);
+    fn start(&mut self, ifc: *const WlanFullmacIfcProtocol) -> Result<fidl::Channel, zx::Status>;
+    fn query_device_info(&mut self) -> anyhow::Result<fidl_fullmac::WlanFullmacQueryInfo>;
+    fn query_mac_sublayer_support(&mut self) -> anyhow::Result<fidl_common::MacSublayerSupport>;
+    fn query_security_support(&mut self) -> anyhow::Result<fidl_common::SecuritySupport>;
+    fn query_spectrum_management_support(
+        &mut self,
+    ) -> anyhow::Result<fidl_common::SpectrumManagementSupport>;
+    fn start_scan(
+        &mut self,
+        req: fidl_fullmac::WlanFullmacImplStartScanRequest,
+    ) -> anyhow::Result<()>;
+    fn connect(&mut self, req: fidl_fullmac::WlanFullmacImplConnectRequest) -> anyhow::Result<()>;
+    fn reconnect(
+        &mut self,
+        req: fidl_fullmac::WlanFullmacImplReconnectRequest,
+    ) -> anyhow::Result<()>;
+    fn auth_resp(
+        &mut self,
+        resp: fidl_fullmac::WlanFullmacImplAuthRespRequest,
+    ) -> anyhow::Result<()>;
+    fn deauth(&mut self, req: fidl_fullmac::WlanFullmacImplDeauthRequest) -> anyhow::Result<()>;
+    fn assoc_resp(
+        &mut self,
+        resp: fidl_fullmac::WlanFullmacImplAssocRespRequest,
+    ) -> anyhow::Result<()>;
+    fn disassoc(&mut self, req: fidl_fullmac::WlanFullmacImplDisassocRequest)
+        -> anyhow::Result<()>;
+    fn reset(&mut self, req: fidl_fullmac::WlanFullmacImplResetRequest) -> anyhow::Result<()>;
+    fn start_bss(
+        &mut self,
+        req: fidl_fullmac::WlanFullmacImplStartBssRequest,
+    ) -> anyhow::Result<()>;
+    fn stop_bss(&mut self, req: fidl_fullmac::WlanFullmacImplStopBssRequest) -> anyhow::Result<()>;
     fn set_keys_req(
         &mut self,
-        req: banjo_wlan_fullmac::WlanFullmacSetKeysReq,
-    ) -> banjo_wlan_fullmac::WlanFullmacSetKeysResp;
-    fn del_keys_req(&mut self, req: banjo_wlan_fullmac::WlanFullmacDelKeysReq);
-    fn eapol_tx(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplEapolTxRequest);
-    fn get_iface_counter_stats(&mut self) -> fidl_mlme::GetIfaceCounterStatsResponse;
-    fn get_iface_histogram_stats(&mut self) -> fidl_mlme::GetIfaceHistogramStatsResponse;
-    fn sae_handshake_resp(&mut self, resp: banjo_wlan_fullmac::WlanFullmacSaeHandshakeResp);
-    fn sae_frame_tx(&mut self, frame: banjo_wlan_fullmac::WlanFullmacSaeFrame);
-    fn wmm_status_req(&mut self);
-    fn on_link_state_changed(&mut self, online: bool);
+        req: fidl_fullmac::WlanFullmacSetKeysReq,
+    ) -> anyhow::Result<fidl_fullmac::WlanFullmacSetKeysResp>;
+    fn del_keys_req(&mut self, req: fidl_fullmac::WlanFullmacDelKeysReq) -> anyhow::Result<()>;
+    fn eapol_tx(&mut self, req: fidl_fullmac::WlanFullmacImplEapolTxRequest) -> anyhow::Result<()>;
+    fn get_iface_counter_stats(
+        &mut self,
+    ) -> anyhow::Result<fidl_mlme::GetIfaceCounterStatsResponse>;
+    fn get_iface_histogram_stats(
+        &mut self,
+    ) -> anyhow::Result<fidl_mlme::GetIfaceHistogramStatsResponse>;
+    fn sae_handshake_resp(
+        &mut self,
+        resp: fidl_fullmac::WlanFullmacSaeHandshakeResp,
+    ) -> anyhow::Result<()>;
+    fn sae_frame_tx(&mut self, frame: fidl_fullmac::WlanFullmacSaeFrame) -> anyhow::Result<()>;
+    fn wmm_status_req(&mut self) -> anyhow::Result<()>;
+    fn on_link_state_changed(&mut self, online: bool) -> anyhow::Result<()>;
 }
 
-/// A `FullmacDeviceInterface` allows transmitting frames and MLME messages.
+/// A `RawFullmacDeviceFfi` allows transmitting MLME messages.
 #[repr(C)]
-pub struct RawFullmacDeviceInterface {
+pub struct RawFullmacDeviceFfi {
     device: *mut c_void,
     /// Start operations on the underlying device and return the SME channel.
-    start: extern "C" fn(
+    start_fullmac_ifc_server: extern "C" fn(
         device: *mut c_void,
         ifc: *const WlanFullmacIfcProtocol,
-        out_sme_channel: *mut zx::sys::zx_handle_t,
+        fullmac_ifc_server_end_handle: zx::sys::zx_handle_t,
     ) -> zx::sys::zx_status_t,
-
-    query_device_info:
-        extern "C" fn(device: *mut c_void) -> banjo_wlan_fullmac::WlanFullmacQueryInfo,
-    query_mac_sublayer_support:
-        extern "C" fn(device: *mut c_void) -> banjo_wlan_common::MacSublayerSupport,
-    query_security_support:
-        extern "C" fn(device: *mut c_void) -> banjo_wlan_common::SecuritySupport,
-    query_spectrum_management_support:
-        extern "C" fn(device: *mut c_void) -> banjo_wlan_common::SpectrumManagementSupport,
-
-    start_scan: extern "C" fn(
-        device: *mut c_void,
-        req: *mut banjo_wlan_fullmac::WlanFullmacImplStartScanRequest,
-    ),
-    connect: extern "C" fn(
-        device: *mut c_void,
-        req: *mut banjo_wlan_fullmac::WlanFullmacImplConnectRequest,
-    ),
-    reconnect: extern "C" fn(
-        device: *mut c_void,
-        req: *mut banjo_wlan_fullmac::WlanFullmacImplReconnectRequest,
-    ),
-    auth_resp: extern "C" fn(
-        device: *mut c_void,
-        resp: *mut banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest,
-    ),
-    deauth: extern "C" fn(
-        device: *mut c_void,
-        req: *mut banjo_wlan_fullmac::WlanFullmacImplDeauthRequest,
-    ),
-    assoc_resp: extern "C" fn(
-        device: *mut c_void,
-        resp: *mut banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest,
-    ),
-    disassoc: extern "C" fn(
-        device: *mut c_void,
-        req: *mut banjo_wlan_fullmac::WlanFullmacImplDisassocRequest,
-    ),
-    reset: extern "C" fn(
-        device: *mut c_void,
-        req: *mut banjo_wlan_fullmac::WlanFullmacImplResetRequest,
-    ),
-    start_bss: extern "C" fn(
-        device: *mut c_void,
-        req: *mut banjo_wlan_fullmac::WlanFullmacImplStartBssRequest,
-    ),
-    stop_bss: extern "C" fn(
-        device: *mut c_void,
-        req: *mut banjo_wlan_fullmac::WlanFullmacImplStopBssRequest,
-    ),
-    set_keys_req: extern "C" fn(
-        device: *mut c_void,
-        req: *mut banjo_wlan_fullmac::WlanFullmacSetKeysReq,
-    ) -> banjo_wlan_fullmac::WlanFullmacSetKeysResp,
-    del_keys_req:
-        extern "C" fn(device: *mut c_void, req: *mut banjo_wlan_fullmac::WlanFullmacDelKeysReq),
-    eapol_tx: extern "C" fn(
-        device: *mut c_void,
-        req: *mut banjo_wlan_fullmac::WlanFullmacImplEapolTxRequest,
-    ),
-    get_iface_counter_stats: extern "C" fn(
-        device: *mut c_void,
-        out_status: *mut i32,
-    ) -> banjo_wlan_fullmac::WlanFullmacIfaceCounterStats,
-    get_iface_histogram_stats: extern "C" fn(
-        device: *mut c_void,
-        out_status: *mut i32,
-    )
-        -> banjo_wlan_fullmac::WlanFullmacIfaceHistogramStats,
-    sae_handshake_resp: extern "C" fn(
-        device: *mut c_void,
-        resp: *mut banjo_wlan_fullmac::WlanFullmacSaeHandshakeResp,
-    ),
-    sae_frame_tx:
-        extern "C" fn(device: *mut c_void, frame: *mut banjo_wlan_fullmac::WlanFullmacSaeFrame),
-    wmm_status_req: extern "C" fn(device: *mut c_void),
-
-    on_link_state_changed: extern "C" fn(device: *mut c_void, online: bool),
 }
 
 // Our device is used inside a separate worker thread, so we force Rust to allow this.
 unsafe impl Send for FullmacDevice {}
 
 pub struct FullmacDevice {
-    raw_device: RawFullmacDeviceInterface,
+    raw_device: RawFullmacDeviceFfi,
+    fullmac_impl_sync_proxy: fidl_fullmac::WlanFullmacImpl_SynchronousProxy,
 }
 
 impl FullmacDevice {
-    pub fn new(raw_device: RawFullmacDeviceInterface) -> FullmacDevice {
-        FullmacDevice { raw_device }
+    pub fn new(
+        raw_device: RawFullmacDeviceFfi,
+        fullmac_impl_sync_proxy: fidl_fullmac::WlanFullmacImpl_SynchronousProxy,
+    ) -> FullmacDevice {
+        FullmacDevice { raw_device, fullmac_impl_sync_proxy }
     }
 }
 
 impl DeviceOps for FullmacDevice {
-    fn start(&mut self, ifc: *const WlanFullmacIfcProtocol) -> Result<zx::Handle, zx::Status> {
-        let mut out_channel = 0;
-        let status =
-            (self.raw_device.start)(self.raw_device.device, ifc, &mut out_channel as *mut u32);
-        // Unsafe block required because we cannot pass a Rust handle over FFI. An invalid
-        // handle violates the banjo API, and may be detected by the caller of this fn.
-        zx::ok(status).and_then(|_| {
-            let handle = unsafe { zx::Handle::from_raw(out_channel) };
-            if handle.is_invalid() {
-                Err(zx::Status::BAD_HANDLE)
-            } else {
-                Ok(handle)
-            }
-        })
+    fn start(&mut self, ifc: *const WlanFullmacIfcProtocol) -> Result<fidl::Channel, zx::Status> {
+        let (fullmac_ifc_client_end, fullmac_ifc_server_end) = fidl::endpoints::create_endpoints();
+
+        // Start the WlanFullmacImplIfc server in wlanif before calling WlanFullmacImpl::Start.
+        // Note: wlanif takes ownership of the server end through this call.
+        let status = (self.raw_device.start_fullmac_ifc_server)(
+            self.raw_device.device,
+            ifc,
+            fullmac_ifc_server_end.into_channel().into_raw(),
+        );
+        zx::Status::ok(status)?;
+
+        self.fullmac_impl_sync_proxy
+            .start(fullmac_ifc_client_end, zx::Time::INFINITE)
+            .map_err(|e| {
+                tracing::error!("FIDL error on Start: {}", e);
+                zx::Status::INTERNAL
+            })?
+            .map_err(|e| zx::Status::from_raw(e))
     }
 
-    fn query_device_info(&mut self) -> banjo_wlan_fullmac::WlanFullmacQueryInfo {
-        (self.raw_device.query_device_info)(self.raw_device.device)
+    fn query_device_info(&mut self) -> anyhow::Result<fidl_fullmac::WlanFullmacQueryInfo> {
+        self.fullmac_impl_sync_proxy
+            .query(zx::Time::INFINITE)
+            .context("FIDL error on QueryDeviceInfo")?
+            .map_err(|e| format_err!("Driver returned error on QueryDeviceInfo: {}", e))
     }
 
-    fn query_mac_sublayer_support(&mut self) -> banjo_wlan_common::MacSublayerSupport {
-        (self.raw_device.query_mac_sublayer_support)(self.raw_device.device)
+    fn query_mac_sublayer_support(&mut self) -> anyhow::Result<fidl_common::MacSublayerSupport> {
+        self.fullmac_impl_sync_proxy
+            .query_mac_sublayer_support(zx::Time::INFINITE)
+            .context("FIDL error on QueryMacSublayerSupport")?
+            .map_err(|e| format_err!("Driver returned error on QueryMacSublayerSupport: {}", e))
     }
 
-    fn query_security_support(&mut self) -> banjo_wlan_common::SecuritySupport {
-        (self.raw_device.query_security_support)(self.raw_device.device)
+    fn query_security_support(&mut self) -> anyhow::Result<fidl_common::SecuritySupport> {
+        self.fullmac_impl_sync_proxy
+            .query_security_support(zx::Time::INFINITE)
+            .context("FIDL error on QuerySecuritySupport")?
+            .map_err(|e| format_err!("Driver returned error on QuerySecuritySupport: {}", e))
     }
 
     fn query_spectrum_management_support(
         &mut self,
-    ) -> banjo_wlan_common::SpectrumManagementSupport {
-        (self.raw_device.query_spectrum_management_support)(self.raw_device.device)
+    ) -> anyhow::Result<fidl_common::SpectrumManagementSupport> {
+        self.fullmac_impl_sync_proxy
+            .query_spectrum_management_support(zx::Time::INFINITE)
+            .context("FIDL error on QuerySpectrumManagementSupport")?
+            .map_err(|e| {
+                format_err!("Driver returned error on QuerySpectrumManagementSupport: {}", e)
+            })
     }
 
-    fn start_scan(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplStartScanRequest) {
-        (self.raw_device.start_scan)(
-            self.raw_device.device,
-            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplStartScanRequest,
-        )
+    fn start_scan(
+        &mut self,
+        req: fidl_fullmac::WlanFullmacImplStartScanRequest,
+    ) -> anyhow::Result<()> {
+        self.fullmac_impl_sync_proxy
+            .start_scan(&req, zx::Time::INFINITE)
+            .context("FIDL error on StartScan")
     }
-    fn connect(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplConnectRequest) {
-        (self.raw_device.connect)(
-            self.raw_device.device,
-            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplConnectRequest,
-        )
+    fn connect(&mut self, req: fidl_fullmac::WlanFullmacImplConnectRequest) -> anyhow::Result<()> {
+        self.fullmac_impl_sync_proxy
+            .connect(&req, zx::Time::INFINITE)
+            .context("FIDL error on Connect")
     }
-    fn reconnect(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplReconnectRequest) {
-        (self.raw_device.reconnect)(
-            self.raw_device.device,
-            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplReconnectRequest,
-        )
+    fn reconnect(
+        &mut self,
+        req: fidl_fullmac::WlanFullmacImplReconnectRequest,
+    ) -> anyhow::Result<()> {
+        self.fullmac_impl_sync_proxy
+            .reconnect(&req, zx::Time::INFINITE)
+            .context("FIDL error on Reconnect")
     }
-    fn auth_resp(&mut self, mut resp: banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest) {
-        (self.raw_device.auth_resp)(
-            self.raw_device.device,
-            &mut resp as *mut banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest,
-        )
+    fn auth_resp(
+        &mut self,
+        resp: fidl_fullmac::WlanFullmacImplAuthRespRequest,
+    ) -> anyhow::Result<()> {
+        self.fullmac_impl_sync_proxy
+            .auth_resp(&resp, zx::Time::INFINITE)
+            .context("FIDL error on AuthResp")
     }
-    fn deauth(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplDeauthRequest) {
-        (self.raw_device.deauth)(
-            self.raw_device.device,
-            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplDeauthRequest,
-        )
+    fn deauth(&mut self, req: fidl_fullmac::WlanFullmacImplDeauthRequest) -> anyhow::Result<()> {
+        self.fullmac_impl_sync_proxy
+            .deauth(&req, zx::Time::INFINITE)
+            .context("FIDL error on Deauth")
     }
-    fn assoc_resp(&mut self, mut resp: banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest) {
-        (self.raw_device.assoc_resp)(
-            self.raw_device.device,
-            &mut resp as *mut banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest,
-        )
+    fn assoc_resp(
+        &mut self,
+        resp: fidl_fullmac::WlanFullmacImplAssocRespRequest,
+    ) -> anyhow::Result<()> {
+        self.fullmac_impl_sync_proxy
+            .assoc_resp(&resp, zx::Time::INFINITE)
+            .context("FIDL error on AssocResp")
     }
-    fn disassoc(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplDisassocRequest) {
-        (self.raw_device.disassoc)(
-            self.raw_device.device,
-            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplDisassocRequest,
-        )
+    fn disassoc(
+        &mut self,
+        req: fidl_fullmac::WlanFullmacImplDisassocRequest,
+    ) -> anyhow::Result<()> {
+        self.fullmac_impl_sync_proxy
+            .disassoc(&req, zx::Time::INFINITE)
+            .context("FIDL error on Disassoc")
     }
-    fn reset(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplResetRequest) {
-        (self.raw_device.reset)(
-            self.raw_device.device,
-            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplResetRequest,
-        )
+    fn reset(&mut self, req: fidl_fullmac::WlanFullmacImplResetRequest) -> anyhow::Result<()> {
+        self.fullmac_impl_sync_proxy.reset(&req, zx::Time::INFINITE).context("FIDL error on Reset")
     }
-    fn start_bss(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplStartBssRequest) {
-        (self.raw_device.start_bss)(
-            self.raw_device.device,
-            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplStartBssRequest,
-        )
+    fn start_bss(
+        &mut self,
+        req: fidl_fullmac::WlanFullmacImplStartBssRequest,
+    ) -> anyhow::Result<()> {
+        self.fullmac_impl_sync_proxy
+            .start_bss(&req, zx::Time::INFINITE)
+            .context("FIDL error on StartBss")
     }
-    fn stop_bss(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplStopBssRequest) {
-        (self.raw_device.stop_bss)(
-            self.raw_device.device,
-            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplStopBssRequest,
-        )
+    fn stop_bss(&mut self, req: fidl_fullmac::WlanFullmacImplStopBssRequest) -> anyhow::Result<()> {
+        self.fullmac_impl_sync_proxy
+            .stop_bss(&req, zx::Time::INFINITE)
+            .context("FIDL error on StopBss")
     }
     fn set_keys_req(
         &mut self,
-        mut req: banjo_wlan_fullmac::WlanFullmacSetKeysReq,
-    ) -> banjo_wlan_fullmac::WlanFullmacSetKeysResp {
-        (self.raw_device.set_keys_req)(
-            self.raw_device.device,
-            &mut req as *mut banjo_wlan_fullmac::WlanFullmacSetKeysReq,
-        )
+        req: fidl_fullmac::WlanFullmacSetKeysReq,
+    ) -> anyhow::Result<fidl_fullmac::WlanFullmacSetKeysResp> {
+        self.fullmac_impl_sync_proxy
+            .set_keys_req(&req, zx::Time::INFINITE)
+            .context("FIDL error on SetKeysReq")
     }
-    fn del_keys_req(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacDelKeysReq) {
-        (self.raw_device.del_keys_req)(
-            self.raw_device.device,
-            &mut req as *mut banjo_wlan_fullmac::WlanFullmacDelKeysReq,
-        )
+    fn del_keys_req(&mut self, req: fidl_fullmac::WlanFullmacDelKeysReq) -> anyhow::Result<()> {
+        self.fullmac_impl_sync_proxy
+            .del_keys_req(&req, zx::Time::INFINITE)
+            .context("FIDL Error on DelKeysReq")
     }
-    fn eapol_tx(&mut self, mut req: banjo_wlan_fullmac::WlanFullmacImplEapolTxRequest) {
-        (self.raw_device.eapol_tx)(
-            self.raw_device.device,
-            &mut req as *mut banjo_wlan_fullmac::WlanFullmacImplEapolTxRequest,
-        )
+    fn eapol_tx(&mut self, req: fidl_fullmac::WlanFullmacImplEapolTxRequest) -> anyhow::Result<()> {
+        self.fullmac_impl_sync_proxy
+            .eapol_tx(&req, zx::Time::INFINITE)
+            .context("FIDL error on EapolTx")
     }
-    fn get_iface_counter_stats(&mut self) -> fidl_mlme::GetIfaceCounterStatsResponse {
-        let mut out_status: i32 = 0;
-        let stats = (self.raw_device.get_iface_counter_stats)(
-            self.raw_device.device,
-            &mut out_status as *mut i32,
-        );
-        if out_status == zx::sys::ZX_OK {
-            fidl_mlme::GetIfaceCounterStatsResponse::Stats(
-                banjo_to_fidl::convert_iface_counter_stats(stats),
-            )
-        } else {
-            fidl_mlme::GetIfaceCounterStatsResponse::ErrorStatus(out_status)
+    fn get_iface_counter_stats(
+        &mut self,
+    ) -> anyhow::Result<fidl_mlme::GetIfaceCounterStatsResponse> {
+        match self
+            .fullmac_impl_sync_proxy
+            .get_iface_counter_stats(zx::Time::INFINITE)
+            .context("FIDL error on GetIfaceCounterStats")?
+        {
+            Ok(stats) => Ok(fidl_mlme::GetIfaceCounterStatsResponse::Stats(
+                fullmac_to_mlme::convert_iface_counter_stats(stats),
+            )),
+            Err(e) => Ok(fidl_mlme::GetIfaceCounterStatsResponse::ErrorStatus(e)),
         }
     }
-    fn get_iface_histogram_stats(&mut self) -> fidl_mlme::GetIfaceHistogramStatsResponse {
-        let mut out_status: i32 = 0;
-        let stats = (self.raw_device.get_iface_histogram_stats)(
-            self.raw_device.device,
-            &mut out_status as *mut i32,
-        );
-        if out_status == zx::sys::ZX_OK {
-            fidl_mlme::GetIfaceHistogramStatsResponse::Stats(
-                banjo_to_fidl::convert_iface_histogram_stats(stats),
-            )
-        } else {
-            fidl_mlme::GetIfaceHistogramStatsResponse::ErrorStatus(out_status)
+    fn get_iface_histogram_stats(
+        &mut self,
+    ) -> anyhow::Result<fidl_mlme::GetIfaceHistogramStatsResponse> {
+        match self
+            .fullmac_impl_sync_proxy
+            .get_iface_histogram_stats(zx::Time::INFINITE)
+            .context("FIDL error on GetIfaceHistogramStats")?
+        {
+            Ok(stats) => Ok(fidl_mlme::GetIfaceHistogramStatsResponse::Stats(
+                fullmac_to_mlme::convert_iface_histogram_stats(stats),
+            )),
+            Err(e) => Ok(fidl_mlme::GetIfaceHistogramStatsResponse::ErrorStatus(e)),
         }
     }
-    fn sae_handshake_resp(&mut self, mut resp: banjo_wlan_fullmac::WlanFullmacSaeHandshakeResp) {
-        (self.raw_device.sae_handshake_resp)(
-            self.raw_device.device,
-            &mut resp as *mut banjo_wlan_fullmac::WlanFullmacSaeHandshakeResp,
-        )
+    fn sae_handshake_resp(
+        &mut self,
+        resp: fidl_fullmac::WlanFullmacSaeHandshakeResp,
+    ) -> anyhow::Result<()> {
+        self.fullmac_impl_sync_proxy
+            .sae_handshake_resp(&resp, zx::Time::INFINITE)
+            .context("FIDL error on SaeHandshakeResp")
     }
-    fn sae_frame_tx(&mut self, mut frame: banjo_wlan_fullmac::WlanFullmacSaeFrame) {
-        (self.raw_device.sae_frame_tx)(
-            self.raw_device.device,
-            &mut frame as *mut banjo_wlan_fullmac::WlanFullmacSaeFrame,
-        )
+    fn sae_frame_tx(&mut self, frame: fidl_fullmac::WlanFullmacSaeFrame) -> anyhow::Result<()> {
+        self.fullmac_impl_sync_proxy
+            .sae_frame_tx(&frame, zx::Time::INFINITE)
+            .context("FIDL error on SaeFrameTx")
     }
-    fn wmm_status_req(&mut self) {
-        (self.raw_device.wmm_status_req)(self.raw_device.device)
+    fn wmm_status_req(&mut self) -> anyhow::Result<()> {
+        self.fullmac_impl_sync_proxy
+            .wmm_status_req(zx::Time::INFINITE)
+            .context("FIDL error on WmmStatusReq")
     }
-    fn on_link_state_changed(&mut self, online: bool) {
-        (self.raw_device.on_link_state_changed)(self.raw_device.device, online)
+    fn on_link_state_changed(&mut self, online: bool) -> anyhow::Result<()> {
+        self.fullmac_impl_sync_proxy
+            .on_link_state_changed(online, zx::Time::INFINITE)
+            .context("FIDL error on OnLinkStateChanged")
     }
 }
 
@@ -606,78 +586,46 @@ impl DeviceOps for FullmacDevice {
 pub mod test_utils {
     use super::*;
     use std::sync::{Arc, Mutex};
-    use {banjo_fuchsia_wlan_ieee80211 as banjo_wlan_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme};
+    use {fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_sme as fidl_sme};
 
     #[derive(Debug)]
     pub enum DriverCall {
-        StartScan {
-            req: banjo_wlan_fullmac::WlanFullmacImplStartScanRequest,
-            channels: Vec<u8>,
-            ssids: Vec<banjo_wlan_ieee80211::CSsid>,
-        },
-        ConnectReq {
-            req: banjo_wlan_fullmac::WlanFullmacImplConnectRequest,
-            selected_bss_ies: Vec<u8>,
-            sae_password: Vec<u8>,
-            wep_key: Vec<u8>,
-            security_ie: Vec<u8>,
-        },
-        ReconnectReq {
-            req: banjo_wlan_fullmac::WlanFullmacImplReconnectRequest,
-        },
-        AuthResp {
-            resp: banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest,
-        },
-        DeauthReq {
-            req: banjo_wlan_fullmac::WlanFullmacImplDeauthRequest,
-        },
-        AssocResp {
-            resp: banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest,
-        },
-        Disassoc {
-            req: banjo_wlan_fullmac::WlanFullmacImplDisassocRequest,
-        },
-        Reset {
-            req: banjo_wlan_fullmac::WlanFullmacImplResetRequest,
-        },
-        StartBss {
-            req: banjo_wlan_fullmac::WlanFullmacImplStartBssRequest,
-        },
-        StopBss {
-            req: banjo_wlan_fullmac::WlanFullmacImplStopBssRequest,
-        },
-        SetKeysReq {
-            req: banjo_wlan_fullmac::WlanFullmacSetKeysReq,
-            keys: Vec<Vec<u8>>,
-        },
-        DelKeysReq {
-            req: banjo_wlan_fullmac::WlanFullmacDelKeysReq,
-        },
-        EapolTx {
-            req: banjo_wlan_fullmac::WlanFullmacImplEapolTxRequest,
-            data: Vec<u8>,
-        },
+        StartScan { req: fidl_fullmac::WlanFullmacImplStartScanRequest },
+        ConnectReq { req: fidl_fullmac::WlanFullmacImplConnectRequest },
+        ReconnectReq { req: fidl_fullmac::WlanFullmacImplReconnectRequest },
+        AuthResp { resp: fidl_fullmac::WlanFullmacImplAuthRespRequest },
+        DeauthReq { req: fidl_fullmac::WlanFullmacImplDeauthRequest },
+        AssocResp { resp: fidl_fullmac::WlanFullmacImplAssocRespRequest },
+        Disassoc { req: fidl_fullmac::WlanFullmacImplDisassocRequest },
+        Reset { req: fidl_fullmac::WlanFullmacImplResetRequest },
+        StartBss { req: fidl_fullmac::WlanFullmacImplStartBssRequest },
+        StopBss { req: fidl_fullmac::WlanFullmacImplStopBssRequest },
+        SetKeysReq { req: fidl_fullmac::WlanFullmacSetKeysReq },
+        DelKeysReq { req: fidl_fullmac::WlanFullmacDelKeysReq },
+        EapolTx { req: fidl_fullmac::WlanFullmacImplEapolTxRequest },
         GetIfaceCounterStats,
         GetIfaceHistogramStats,
-        SaeHandshakeResp {
-            resp: banjo_wlan_fullmac::WlanFullmacSaeHandshakeResp,
-        },
-        SaeFrameTx {
-            frame: banjo_wlan_fullmac::WlanFullmacSaeFrame,
-            sae_fields: Vec<u8>,
-        },
+        SaeHandshakeResp { resp: fidl_fullmac::WlanFullmacSaeHandshakeResp },
+        SaeFrameTx { frame: fidl_fullmac::WlanFullmacSaeFrame },
         WmmStatusReq,
-        OnLinkStateChanged {
-            online: bool,
-        },
+        OnLinkStateChanged { online: bool },
     }
 
     pub struct FakeFullmacDeviceMocks {
         pub captured_driver_calls: Vec<DriverCall>,
         pub start_fn_status_mock: Option<zx::sys::zx_status_t>,
-        pub query_device_info_mock: banjo_wlan_fullmac::WlanFullmacQueryInfo,
-        pub query_mac_sublayer_support_mock: banjo_wlan_common::MacSublayerSupport,
-        pub set_keys_resp_mock: Option<banjo_wlan_fullmac::WlanFullmacSetKeysResp>,
+
+        // Note: anyhow::Error isn't cloneable, so the query mocks are all optionals to make this
+        // easier to work with.
+        //
+        // If any of the query mocks are None, then an Err is returned from DeviceOps with an empty
+        // error message.
+        pub query_device_info_mock: Option<fidl_fullmac::WlanFullmacQueryInfo>,
+        pub query_mac_sublayer_support_mock: Option<fidl_common::MacSublayerSupport>,
+        pub query_security_support_mock: Option<fidl_common::SecuritySupport>,
+        pub query_spectrum_management_support_mock: Option<fidl_common::SpectrumManagementSupport>,
+
+        pub set_keys_resp_mock: Option<fidl_fullmac::WlanFullmacSetKeysResp>,
         pub get_iface_counter_stats_mock: Option<fidl_mlme::GetIfaceCounterStatsResponse>,
         pub get_iface_histogram_stats_mock: Option<fidl_mlme::GetIfaceHistogramStatsResponse>,
     }
@@ -695,15 +643,15 @@ pub mod test_utils {
         pub mocks: Arc<Mutex<FakeFullmacDeviceMocks>>,
     }
 
-    const fn dummy_band_cap() -> banjo_wlan_fullmac::WlanFullmacBandCapability {
-        banjo_wlan_fullmac::WlanFullmacBandCapability {
-            band: banjo_wlan_common::WlanBand::TWO_GHZ,
+    const fn dummy_band_cap() -> fidl_fullmac::WlanFullmacBandCapability {
+        fidl_fullmac::WlanFullmacBandCapability {
+            band: fidl_common::WlanBand::TwoGhz,
             basic_rate_count: 0,
             basic_rate_list: [0u8; 12],
             ht_supported: false,
-            ht_caps: banjo_wlan_ieee80211::HtCapabilities { bytes: [0u8; 26] },
+            ht_caps: fidl_ieee80211::HtCapabilities { bytes: [0u8; 26] },
             vht_supported: false,
-            vht_caps: banjo_wlan_ieee80211::VhtCapabilities { bytes: [0u8; 12] },
+            vht_caps: fidl_ieee80211::VhtCapabilities { bytes: [0u8; 12] },
             operating_channel_count: 0,
             operating_channel_list: [0u8; 256],
         }
@@ -714,33 +662,44 @@ pub mod test_utils {
             // Create a channel for SME requests, to be surfaced by start().
             let (usme_bootstrap_client_end, usme_bootstrap_server_end) =
                 fidl::endpoints::create_endpoints::<fidl_sme::UsmeBootstrapMarker>();
+
             Self {
                 usme_bootstrap_client_end: Some(usme_bootstrap_client_end),
                 usme_bootstrap_server_end: Some(usme_bootstrap_server_end),
                 mocks: Arc::new(Mutex::new(FakeFullmacDeviceMocks {
                     captured_driver_calls: vec![],
                     start_fn_status_mock: None,
-                    query_device_info_mock: banjo_wlan_fullmac::WlanFullmacQueryInfo {
+                    query_device_info_mock: Some(fidl_fullmac::WlanFullmacQueryInfo {
                         sta_addr: [0u8; 6],
-                        role: banjo_wlan_common::WlanMacRole::CLIENT,
-                        band_cap_list: [dummy_band_cap(); 16],
+                        role: fidl_common::WlanMacRole::Client,
+                        band_cap_list: std::array::from_fn(|_| dummy_band_cap()),
                         band_cap_count: 0,
-                    },
-                    query_mac_sublayer_support_mock: banjo_wlan_common::MacSublayerSupport {
-                        rate_selection_offload: banjo_wlan_common::RateSelectionOffloadExtension {
+                    }),
+                    query_mac_sublayer_support_mock: Some(fidl_common::MacSublayerSupport {
+                        rate_selection_offload: fidl_common::RateSelectionOffloadExtension {
                             supported: false,
                         },
-                        data_plane: banjo_wlan_common::DataPlaneExtension {
-                            data_plane_type:
-                                banjo_wlan_common::DataPlaneType::GENERIC_NETWORK_DEVICE,
+                        data_plane: fidl_common::DataPlaneExtension {
+                            data_plane_type: fidl_common::DataPlaneType::GenericNetworkDevice,
                         },
-                        device: banjo_wlan_common::DeviceExtension {
+                        device: fidl_common::DeviceExtension {
                             is_synthetic: true,
-                            mac_implementation_type:
-                                banjo_wlan_common::MacImplementationType::FULLMAC,
+                            mac_implementation_type: fidl_common::MacImplementationType::Fullmac,
                             tx_status_report_supported: false,
                         },
-                    },
+                    }),
+                    query_security_support_mock: Some(fidl_common::SecuritySupport {
+                        sae: fidl_common::SaeFeature {
+                            driver_handler_supported: false,
+                            sme_handler_supported: true,
+                        },
+                        mfp: fidl_common::MfpFeature { supported: false },
+                    }),
+                    query_spectrum_management_support_mock: Some(
+                        fidl_common::SpectrumManagementSupport {
+                            dfs: fidl_common::DfsFeature { supported: false },
+                        },
+                    ),
                     set_keys_resp_mock: None,
                     get_iface_counter_stats_mock: None,
                     get_iface_histogram_stats_mock: None,
@@ -750,174 +709,189 @@ pub mod test_utils {
     }
 
     impl DeviceOps for FakeFullmacDevice {
-        fn start(&mut self, _ifc: *const WlanFullmacIfcProtocol) -> Result<zx::Handle, zx::Status> {
+        fn start(
+            &mut self,
+            _ifc: *const WlanFullmacIfcProtocol,
+        ) -> Result<fidl::Channel, zx::Status> {
             match self.mocks.lock().unwrap().start_fn_status_mock {
                 Some(status) => Err(zx::Status::from_raw(status)),
 
                 // Start can only be called once since this moves usme_bootstrap_server_end.
-                None => Ok(self.usme_bootstrap_server_end.take().unwrap().into_channel().into()),
+                None => Ok(self.usme_bootstrap_server_end.take().unwrap().into_channel()),
             }
         }
 
-        fn query_device_info(&mut self) -> banjo_wlan_fullmac::WlanFullmacQueryInfo {
-            self.mocks.lock().unwrap().query_device_info_mock
+        fn query_device_info(&mut self) -> anyhow::Result<fidl_fullmac::WlanFullmacQueryInfo> {
+            self.mocks.lock().unwrap().query_device_info_mock.clone().ok_or(format_err!(""))
         }
 
-        fn query_mac_sublayer_support(&mut self) -> banjo_wlan_common::MacSublayerSupport {
-            self.mocks.lock().unwrap().query_mac_sublayer_support_mock
+        fn query_mac_sublayer_support(
+            &mut self,
+        ) -> anyhow::Result<fidl_common::MacSublayerSupport> {
+            self.mocks
+                .lock()
+                .unwrap()
+                .query_mac_sublayer_support_mock
+                .clone()
+                .ok_or(format_err!(""))
         }
 
-        fn query_security_support(&mut self) -> banjo_wlan_common::SecuritySupport {
-            banjo_wlan_common::SecuritySupport {
-                sae: banjo_wlan_common::SaeFeature {
-                    driver_handler_supported: false,
-                    sme_handler_supported: true,
-                },
-                mfp: banjo_wlan_common::MfpFeature { supported: false },
-            }
+        fn query_security_support(&mut self) -> anyhow::Result<fidl_common::SecuritySupport> {
+            self.mocks.lock().unwrap().query_security_support_mock.clone().ok_or(format_err!(""))
         }
 
         fn query_spectrum_management_support(
             &mut self,
-        ) -> banjo_wlan_common::SpectrumManagementSupport {
-            banjo_wlan_common::SpectrumManagementSupport {
-                dfs: banjo_wlan_common::DfsFeature { supported: false },
-            }
+        ) -> anyhow::Result<fidl_common::SpectrumManagementSupport> {
+            self.mocks
+                .lock()
+                .unwrap()
+                .query_spectrum_management_support_mock
+                .clone()
+                .ok_or(format_err!(""))
         }
 
         // Cannot mark fn unsafe because it has to match fn signature in FullDeviceInterface
-        fn start_scan(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplStartScanRequest) {
-            let channels =
-                banjo_to_fidl::unsafe_slice_to_vec(req.channels_list, req.channels_count);
-            let ssids = banjo_to_fidl::unsafe_slice_to_vec(req.ssids_list, req.ssids_count);
-            self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::StartScan {
-                req,
-                channels,
-                ssids,
-            });
+        fn start_scan(
+            &mut self,
+            req: fidl_fullmac::WlanFullmacImplStartScanRequest,
+        ) -> anyhow::Result<()> {
+            self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::StartScan { req });
+            Ok(())
         }
 
-        fn connect(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplConnectRequest) {
-            let selected_bss_ies = banjo_to_fidl::unsafe_slice_to_vec(
-                req.selected_bss.ies_list,
-                req.selected_bss.ies_count,
-            );
-            let sae_password =
-                banjo_to_fidl::unsafe_slice_to_vec(req.sae_password_list, req.sae_password_count);
-            let wep_key =
-                banjo_to_fidl::unsafe_slice_to_vec(req.wep_key.key_list, req.wep_key.key_count);
-            let security_ie =
-                banjo_to_fidl::unsafe_slice_to_vec(req.security_ie_list, req.security_ie_count);
-            self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::ConnectReq {
-                req,
-                selected_bss_ies,
-                sae_password,
-                wep_key,
-                security_ie,
-            });
+        fn connect(
+            &mut self,
+            req: fidl_fullmac::WlanFullmacImplConnectRequest,
+        ) -> anyhow::Result<()> {
+            self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::ConnectReq { req });
+            Ok(())
         }
-        fn reconnect(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplReconnectRequest) {
+        fn reconnect(
+            &mut self,
+            req: fidl_fullmac::WlanFullmacImplReconnectRequest,
+        ) -> anyhow::Result<()> {
             self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::ReconnectReq { req });
+            Ok(())
         }
-        fn auth_resp(&mut self, resp: banjo_wlan_fullmac::WlanFullmacImplAuthRespRequest) {
+        fn auth_resp(
+            &mut self,
+            resp: fidl_fullmac::WlanFullmacImplAuthRespRequest,
+        ) -> anyhow::Result<()> {
             self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::AuthResp { resp });
+            Ok(())
         }
-        fn deauth(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplDeauthRequest) {
+        fn deauth(
+            &mut self,
+            req: fidl_fullmac::WlanFullmacImplDeauthRequest,
+        ) -> anyhow::Result<()> {
             self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::DeauthReq { req });
+            Ok(())
         }
-        fn assoc_resp(&mut self, resp: banjo_wlan_fullmac::WlanFullmacImplAssocRespRequest) {
+        fn assoc_resp(
+            &mut self,
+            resp: fidl_fullmac::WlanFullmacImplAssocRespRequest,
+        ) -> anyhow::Result<()> {
             self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::AssocResp { resp });
+            Ok(())
         }
-        fn disassoc(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplDisassocRequest) {
+        fn disassoc(
+            &mut self,
+            req: fidl_fullmac::WlanFullmacImplDisassocRequest,
+        ) -> anyhow::Result<()> {
             self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::Disassoc { req });
+            Ok(())
         }
-        fn reset(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplResetRequest) {
+        fn reset(&mut self, req: fidl_fullmac::WlanFullmacImplResetRequest) -> anyhow::Result<()> {
             self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::Reset { req });
+            Ok(())
         }
-        fn start_bss(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplStartBssRequest) {
+        fn start_bss(
+            &mut self,
+            req: fidl_fullmac::WlanFullmacImplStartBssRequest,
+        ) -> anyhow::Result<()> {
             self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::StartBss { req });
+            Ok(())
         }
-        fn stop_bss(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplStopBssRequest) {
+        fn stop_bss(
+            &mut self,
+            req: fidl_fullmac::WlanFullmacImplStopBssRequest,
+        ) -> anyhow::Result<()> {
             self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::StopBss { req });
+            Ok(())
         }
         fn set_keys_req(
             &mut self,
-            req: banjo_wlan_fullmac::WlanFullmacSetKeysReq,
-        ) -> banjo_wlan_fullmac::WlanFullmacSetKeysResp {
+            req: fidl_fullmac::WlanFullmacSetKeysReq,
+        ) -> anyhow::Result<fidl_fullmac::WlanFullmacSetKeysResp> {
             let num_keys = req.num_keys;
-            let mut keys = vec![];
-            for i in 0..req.num_keys as usize {
-                keys.push(banjo_to_fidl::unsafe_slice_to_vec(
-                    req.keylist[i].key_list,
-                    req.keylist[i].key_count,
-                ));
-            }
-            self.mocks
-                .lock()
-                .unwrap()
-                .captured_driver_calls
-                .push(DriverCall::SetKeysReq { req, keys });
+            self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::SetKeysReq { req });
             match self.mocks.lock().unwrap().set_keys_resp_mock {
-                Some(resp) => resp,
+                Some(resp) => Ok(resp),
                 None => {
-                    banjo_wlan_fullmac::WlanFullmacSetKeysResp { num_keys, statuslist: [0i32; 4] }
+                    Ok(fidl_fullmac::WlanFullmacSetKeysResp { num_keys, statuslist: [0i32; 4] })
                 }
             }
         }
-        fn del_keys_req(&mut self, req: banjo_wlan_fullmac::WlanFullmacDelKeysReq) {
+        fn del_keys_req(&mut self, req: fidl_fullmac::WlanFullmacDelKeysReq) -> anyhow::Result<()> {
             self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::DelKeysReq { req });
+            Ok(())
         }
-        fn eapol_tx(&mut self, req: banjo_wlan_fullmac::WlanFullmacImplEapolTxRequest) {
-            let data = banjo_to_fidl::unsafe_slice_to_vec(req.data_list, req.data_count);
-            self.mocks
-                .lock()
-                .unwrap()
-                .captured_driver_calls
-                .push(DriverCall::EapolTx { req, data });
+        fn eapol_tx(
+            &mut self,
+            req: fidl_fullmac::WlanFullmacImplEapolTxRequest,
+        ) -> anyhow::Result<()> {
+            self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::EapolTx { req });
+            Ok(())
         }
-        fn get_iface_counter_stats(&mut self) -> fidl_mlme::GetIfaceCounterStatsResponse {
+        fn get_iface_counter_stats(
+            &mut self,
+        ) -> anyhow::Result<fidl_mlme::GetIfaceCounterStatsResponse> {
             self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::GetIfaceCounterStats);
-            self.mocks.lock().unwrap().get_iface_counter_stats_mock.clone().unwrap_or(
+            Ok(self.mocks.lock().unwrap().get_iface_counter_stats_mock.clone().unwrap_or(
                 fidl_mlme::GetIfaceCounterStatsResponse::ErrorStatus(zx::sys::ZX_ERR_NOT_SUPPORTED),
-            )
+            ))
         }
-        fn get_iface_histogram_stats(&mut self) -> fidl_mlme::GetIfaceHistogramStatsResponse {
+        fn get_iface_histogram_stats(
+            &mut self,
+        ) -> anyhow::Result<fidl_mlme::GetIfaceHistogramStatsResponse> {
             self.mocks
                 .lock()
                 .unwrap()
                 .captured_driver_calls
                 .push(DriverCall::GetIfaceHistogramStats);
-            self.mocks.lock().unwrap().get_iface_histogram_stats_mock.clone().unwrap_or(
+            Ok(self.mocks.lock().unwrap().get_iface_histogram_stats_mock.clone().unwrap_or(
                 fidl_mlme::GetIfaceHistogramStatsResponse::ErrorStatus(
                     zx::sys::ZX_ERR_NOT_SUPPORTED,
                 ),
-            )
+            ))
         }
-        fn sae_handshake_resp(&mut self, resp: banjo_wlan_fullmac::WlanFullmacSaeHandshakeResp) {
-            self.mocks
+        fn sae_handshake_resp(
+            &mut self,
+            resp: fidl_fullmac::WlanFullmacSaeHandshakeResp,
+        ) -> anyhow::Result<()> {
+            Ok(self
+                .mocks
                 .lock()
                 .unwrap()
                 .captured_driver_calls
-                .push(DriverCall::SaeHandshakeResp { resp });
+                .push(DriverCall::SaeHandshakeResp { resp }))
         }
-        fn sae_frame_tx(&mut self, frame: banjo_wlan_fullmac::WlanFullmacSaeFrame) {
-            let sae_fields =
-                banjo_to_fidl::unsafe_slice_to_vec(frame.sae_fields_list, frame.sae_fields_count);
-            self.mocks
-                .lock()
-                .unwrap()
-                .captured_driver_calls
-                .push(DriverCall::SaeFrameTx { frame, sae_fields });
+        fn sae_frame_tx(&mut self, frame: fidl_fullmac::WlanFullmacSaeFrame) -> anyhow::Result<()> {
+            self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::SaeFrameTx { frame });
+            Ok(())
         }
-        fn wmm_status_req(&mut self) {
+        fn wmm_status_req(&mut self) -> anyhow::Result<()> {
             self.mocks.lock().unwrap().captured_driver_calls.push(DriverCall::WmmStatusReq);
+            Ok(())
         }
-        fn on_link_state_changed(&mut self, online: bool) {
+        fn on_link_state_changed(&mut self, online: bool) -> anyhow::Result<()> {
             self.mocks
                 .lock()
                 .unwrap()
                 .captured_driver_calls
                 .push(DriverCall::OnLinkStateChanged { online });
+            Ok(())
         }
     }
 }

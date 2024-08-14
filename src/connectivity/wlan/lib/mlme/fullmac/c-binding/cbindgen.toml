@@ -17,6 +17,12 @@ sys_includes = [
     "fuchsia/wlan/fullmac/c/banjo.h",   # wlan_fullmac_scan_result_t, etc.
 ]
 
+# Dictates how C structs are generated. "type" means that codegen is of the form:
+# typedef struct {
+# ...
+# } typename;
+style = "type"
+
 [parse]
 parse_deps = true
 include = ["wlan_fullmac_mlme"]
@@ -35,7 +41,7 @@ exclude = [
 # Unfortunately cbindgen's rename machinery is rather simple
 # and doesn't accommodate our needs. As a result we have to
 # explicitly declare the items which should get renamed
-"RawFullmacDeviceInterface" = "rust_fullmac_device_interface_t"
+"RawFullmacDeviceFfi" = "rust_fullmac_device_ffi_t"
 "FullmacMlmeHandle" = "wlan_fullmac_mlme_handle_t"
 
 # These structs are used for void* context fields in protocol ops.

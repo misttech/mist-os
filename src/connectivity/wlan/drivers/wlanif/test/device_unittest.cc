@@ -387,15 +387,19 @@ class WlanifDeviceTestNoStopOnTeardown : public ::testing::Test {
     EXPECT_EQ(ZX_OK, prepare_stop_result.status_value());
   }
 
-  zx_status_t StartWlanifDevice(const rust_wlan_fullmac_ifc_protocol_ops_copy_t* ops, void* ctx) {
-    const rust_wlan_fullmac_ifc_protocol_copy_t proto{
-        .ops = ops,
-        .ctx = ctx,
-    };
+  zx_status_t StartWlanifDevice(const rust_wlan_fullmac_ifc_protocol_copy_t proto) {
+    auto endpoints = fidl::CreateEndpoints<fuchsia_wlan_fullmac::WlanFullmacImplIfc>();
+    ZX_ASSERT(endpoints.is_ok());
 
-    zx::channel out_sme_channel;
-    zx_status_t status = driver_->StartFullmac(&proto, &out_sme_channel);
+    zx_handle_t handle = endpoints->server.TakeHandle().release();
+    zx_status_t status = driver_->StartFullmacIfcServer(&proto, handle);
     EXPECT_EQ(status, ZX_OK);
+
+    fake_wlanfullmac_parent_.SyncCall([&](FakeFullmacParent* fake_wlanfullmac_parent) {
+      fake_wlanfullmac_parent->client_ =
+          fidl::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImplIfc>(
+              std::move(endpoints->client));
+    });
     return status;
   }
 
@@ -466,7 +470,7 @@ TEST_F(WlanifDeviceTestNoStopOnTeardown, CheckRustProtoOpsCannotBeCalledAfterMlm
   ops.on_wmm_status_resp = [](void* ctx, zx_status_t status,
                               const wlan_wmm_parameters_t* wmm_params) { ADD_FAILURE(); };
 
-  EXPECT_EQ(ZX_OK, StartWlanifDevice(&ops, nullptr));
+  EXPECT_EQ(ZX_OK, StartWlanifDevice({&ops, nullptr}));
 
   [[maybe_unused]] auto f = std::async(std::launch::async, [&]() {
     stop_fullmac_mlme_called.Wait();
@@ -507,154 +511,6 @@ class WlanifDeviceTest : public WlanifDeviceTestNoStopOnTeardown {
     WlanifDeviceTestNoStopOnTeardown::TearDown();
   }
 };
-
-TEST_F(WlanifDeviceTest, Basic) {
-  auto ops = EmptyRustProtoOps();
-  EXPECT_EQ(ZX_OK, StartWlanifDevice(&ops, nullptr));
-}
-
-TEST_F(WlanifDeviceTest, EthDataPlaneNotSupported) {
-  fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SetDataPlaneType,
-                                    fuchsia_wlan_common::wire::DataPlaneType::kEthernetDevice);
-  ASSERT_EQ(driver()->Bind(), ZX_ERR_NOT_SUPPORTED);
-}
-
-TEST_F(WlanifDeviceTest, StartScan) {
-  const uint8_t chan_list[1] = {0x9};
-  const wlan_fullmac_impl_start_scan_request_t req = {.scan_type = WLAN_SCAN_TYPE_ACTIVE,
-                                                      .channels_list = chan_list,
-                                                      .channels_count = 1,
-                                                      .ssids_count = 0,
-                                                      .min_channel_time = 10,
-                                                      .max_channel_time = 100};
-  driver()->StartScan(&req);
-}
-
-TEST_F(WlanifDeviceTest, Connect) {
-  const wlan_fullmac_impl_connect_request_t req = wlan_fullmac_test::CreateConnectReq();
-  driver()->Connect(&req);
-}
-
-TEST_F(WlanifDeviceTest, CheckReconnReq) {
-  wlan_fullmac_impl_reconnect_request_t req;
-  memcpy(req.peer_sta_address, kPeerStaAddress, sizeof(kPeerStaAddress));
-  driver()->Reconnect(&req);
-}
-
-TEST_F(WlanifDeviceTest, CheckDeauthReq) {
-  wlan_fullmac_impl_deauth_request_t req = {.reason_code = REASON_CODE_AP_INITIATED};
-  memcpy(req.peer_sta_address, kPeerStaAddress, sizeof(kPeerStaAddress));
-  driver()->Deauthenticate(&req);
-}
-
-TEST_F(WlanifDeviceTest, CheckAuthResp) {
-  wlan_fullmac_impl_auth_resp_request_t resp = {.result_code = WLAN_AUTH_RESULT_SUCCESS};
-  memcpy(resp.peer_sta_address, kPeerStaAddress, sizeof(kPeerStaAddress));
-  driver()->AuthenticateResp(&resp);
-}
-
-TEST_F(WlanifDeviceTest, CheckAssocResp) {
-  wlan_fullmac_impl_assoc_resp_request resp = {.result_code = WLAN_ASSOC_RESULT_SUCCESS,
-                                               .association_id = 42};
-  memcpy(resp.peer_sta_address, kPeerStaAddress, sizeof(kPeerStaAddress));
-  driver()->AssociateResp(&resp);
-}
-
-TEST_F(WlanifDeviceTest, CheckDisassoc) {
-  wlan_fullmac_impl_disassoc_request_t req = {.reason_code = REASON_CODE_LEAVING_NETWORK_DISASSOC};
-  memcpy(req.peer_sta_address, kPeerStaAddress, sizeof(kPeerStaAddress));
-  driver()->Disassociate(&req);
-}
-
-TEST_F(WlanifDeviceTest, CheckStartBss) {
-  wlan_fullmac_impl_start_bss_request_t req = {
-      .bss_type = BSS_TYPE_INFRASTRUCTURE, .beacon_period = 100, .dtim_period = 100, .channel = 1};
-  memcpy(req.ssid.data, kPeerStaAddress, sizeof(kPeerStaAddress));
-  req.ssid.len = sizeof(kPeerStaAddress);
-  driver()->StartBss(&req);
-}
-
-TEST_F(WlanifDeviceTest, CheckStopBss) {
-  wlan_fullmac_impl_stop_bss_request_t req;
-  memcpy(req.ssid.data, kPeerStaAddress, sizeof(kPeerStaAddress));
-  req.ssid.len = sizeof(kPeerStaAddress);
-  driver()->StopBss(&req);
-}
-
-TEST_F(WlanifDeviceTest, CheckReset) {
-  wlan_fullmac_impl_reset_request_t req = {.set_default_mib = true};
-  memcpy(req.sta_address, kPeerStaAddress, sizeof(kPeerStaAddress));
-  driver()->Reset(&req);
-}
-
-TEST_F(WlanifDeviceTest, CheckDeauthConf) {
-  libsync::Completion signal;
-  auto ops = EmptyRustProtoOps();
-
-  ops.deauth_conf = [](void* ctx, const uint8_t peer_sta_address[ETH_ALEN]) {
-    for (size_t i = 0; i < ETH_ALEN; i++) {
-      EXPECT_EQ(kPeerStaAddress[i], peer_sta_address[i]);
-    }
-
-    EXPECT_NE(ctx, nullptr);
-    libsync::Completion* signal = static_cast<libsync::Completion*>(ctx);
-    signal->Signal();
-  };
-
-  EXPECT_EQ(ZX_OK, StartWlanifDevice(&ops, &signal));
-  wlan_fullmac_impl_deauth_request_t req;
-  memcpy(req.peer_sta_address, kPeerStaAddress, ETH_ALEN);
-  req.reason_code = 0;
-  driver()->Deauthenticate(&req);
-  EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendDeauthConf).ok());
-  zx_status_t status = signal.Wait(kWaitForCallbackDuration);
-  EXPECT_EQ(status, ZX_OK);
-  driver()->Stop();
-}
-
-TEST_F(WlanifDeviceTest, SetDelKey) {
-  wlan_fullmac_set_keys_req_t req = {};
-  req.num_keys = 1;
-  req.keylist[0].protection = WLAN_PROTECTION_RX_TX;
-  req.keylist[0].cipher_type = CIPHER_SUITE_TYPE_USE_GROUP;
-  req.keylist[0].key_type = WLAN_KEY_TYPE_PAIRWISE;
-  req.keylist[0].key_idx = 0;
-  wlan_fullmac_set_keys_resp_t resp = {};
-  driver()->SetKeysReq(&req, &resp);
-  EXPECT_EQ(resp.num_keys, 1u);
-
-  wlan_fullmac_del_keys_req_t del_req = {};
-  del_req.num_keys = 1;
-  del_req.keylist[0].key_id = 0;
-  del_req.keylist[0].key_type = WLAN_KEY_TYPE_PAIRWISE;
-  driver()->DeleteKeysReq(&del_req);
-  EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::GetDelKeyRequestReceived));
-}
-
-TEST_F(WlanifDeviceTest, CheckEapolTx) {
-  wlan_fullmac_impl_eapol_tx_request_t req = {};
-  uint8_t data[256];
-  req.data_count = 100;
-  req.data_list = data;
-  driver()->EapolTx(&req);
-  EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::GetEapolTxRequestReceived));
-}
-
-TEST_F(WlanifDeviceTest, CheckQueryInfo) {
-  wlan_fullmac_query_info_t resp;
-  driver()->QueryDeviceInfo(&resp);
-  EXPECT_EQ(resp.role, WLAN_MAC_ROLE_CLIENT);
-}
-
-TEST_F(WlanifDeviceTest, CheckMacLayerSupport) {
-  fake_wlanfullmac_parent_.SyncCall(
-      &FakeFullmacParent::SetDataPlaneType,
-      fuchsia_wlan_common::wire::DataPlaneType::kGenericNetworkDevice);
-  mac_sublayer_support_t resp;
-  driver()->QueryMacSublayerSupport(&resp);
-  EXPECT_EQ(resp.data_plane.data_plane_type, DATA_PLANE_TYPE_GENERIC_NETWORK_DEVICE);
-  EXPECT_EQ(resp.device.mac_implementation_type, MAC_IMPLEMENTATION_TYPE_FULLMAC);
-}
 
 TEST_F(WlanifDeviceTest, CheckCallbacks) {
   libsync::Completion signal;
@@ -706,8 +562,9 @@ TEST_F(WlanifDeviceTest, CheckCallbacks) {
     signal->Signal();
   };
 
-  EXPECT_EQ(ZX_OK, StartWlanifDevice(&ops, &signal));
+  EXPECT_EQ(ZX_OK, StartWlanifDevice({&ops, &signal}));
   EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendDeauthConf).ok());
+
   zx_status_t status = signal.Wait(kWaitForCallbackDuration);
   EXPECT_EQ(status, ZX_OK);
   signal.Reset();

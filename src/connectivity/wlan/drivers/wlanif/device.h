@@ -19,12 +19,10 @@
 #include <zircon/types.h>
 
 #include <memory>
-#include <mutex>
 
 #include <sdk/lib/driver/logging/cpp/logger.h>
 
-#include "fuchsia/wlan/common/c/banjo.h"
-#include "fullmac_mlme.h"
+#include "src/connectivity/wlan/lib/mlme/fullmac/c-binding/bindings.h"
 
 namespace fdf {
 using namespace fuchsia_driver_framework;
@@ -40,46 +38,18 @@ class Device final : public fdf::DriverBase,
                   fdf::UnownedSynchronizedDispatcher driver_dispatcher);
   ~Device();
 
-  zx_status_t Bind();
-  zx_status_t ConnectToWlanFullmacImpl();
-
   static constexpr const char* Name() { return "wlanif"; }
   zx::result<> Start() override;
   void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
-  zx_status_t InitMlme();
   fdf::Logger* Logger() { return logger_.get(); }
 
-  zx_status_t StartFullmac(const rust_wlan_fullmac_ifc_protocol_copy_t* ifc,
-                           zx::channel* out_sme_channel);
+  zx_status_t StartFullmacIfcServer(const rust_wlan_fullmac_ifc_protocol_copy_t* ifc,
+                                    zx_handle_t ifc_server_end_handle);
 
   void OnUnbound(fidl::UnbindInfo info, fidl::ServerEnd<fuchsia_wlan_fullmac::WlanFullmacImplIfc>);
   void handle_unknown_event(
       fidl::UnknownEventMetadata<fuchsia_driver_framework::NodeController> metadata) override;
-  void StartScan(const wlan_fullmac_impl_start_scan_request_t* req);
-  void Connect(const wlan_fullmac_impl_connect_request_t* req);
-  void Reconnect(const wlan_fullmac_impl_reconnect_request_t* req);
-  void AuthenticateResp(const wlan_fullmac_impl_auth_resp_request_t* resp);
-  void Deauthenticate(const wlan_fullmac_impl_deauth_request_t* req);
-  void AssociateResp(const wlan_fullmac_impl_assoc_resp_request_t* resp);
-  void Disassociate(const wlan_fullmac_impl_disassoc_request_t* req);
-  void Reset(const wlan_fullmac_impl_reset_request_t* req);
-  void StartBss(const wlan_fullmac_impl_start_bss_request_t* req);
-  void StopBss(const wlan_fullmac_impl_stop_bss_request_t* req);
-  void SetKeysReq(const wlan_fullmac_set_keys_req_t* req, wlan_fullmac_set_keys_resp_t* out_resp);
-  void DeleteKeysReq(const wlan_fullmac_del_keys_req_t* req);
-  void EapolTx(const wlan_fullmac_impl_eapol_tx_request_t* req);
-  void QueryDeviceInfo(wlan_fullmac_query_info_t* out_resp);
-  void QueryMacSublayerSupport(mac_sublayer_support_t* out_resp);
-  void QuerySecuritySupport(security_support_t* out_resp);
-  void QuerySpectrumManagementSupport(spectrum_management_support_t* out_resp);
-  zx_status_t GetIfaceCounterStats(wlan_fullmac_iface_counter_stats_t* out_stats);
-  zx_status_t GetIfaceHistogramStats(wlan_fullmac_iface_histogram_stats_t* out_stats);
-  void SaeHandshakeResp(const wlan_fullmac_sae_handshake_resp_t* resp);
-  void SaeFrameTx(const wlan_fullmac_sae_frame_t* frame);
-  void WmmStatusReq();
-
-  void OnLinkStateChanged(bool online);
 
   // Implementation of fuchsia_wlan_fullmac::WlanFullmacImplIfc.
   void OnScanResult(OnScanResultRequestView request,
@@ -114,20 +84,8 @@ class Device final : public fdf::DriverBase,
   void Shutdown();
 
  private:
-  // Storage of histogram data.
-  wlan_fullmac_hist_bucket_t
-      noise_floor_buckets_[fuchsia_wlan_fullmac::wire::kWlanFullmacMaxNoiseFloorSamples];
-  wlan_fullmac_hist_bucket_t rssi_buckets_[fuchsia_wlan_fullmac::wire::kWlanFullmacMaxRssiSamples];
-  wlan_fullmac_hist_bucket_t
-      rx_rate_index_buckets_[fuchsia_wlan_fullmac::wire::kWlanFullmacMaxRxRateIndexSamples];
-  wlan_fullmac_hist_bucket_t snr_buckets_[fuchsia_wlan_fullmac::wire::kWlanFullmacMaxSnrSamples];
-  wlan_fullmac_noise_floor_histogram_t noise_floor_histograms_;
-  wlan_fullmac_rssi_histogram_t rssi_histograms_;
-  wlan_fullmac_rx_rate_index_histogram_t rx_rate_index_histograms_;
-  wlan_fullmac_snr_histogram_t snr_histograms_;
-
-  std::mutex lock_;
-  std::mutex get_iface_histogram_stats_lock_;
+  using RustFullmacMlme =
+      std::unique_ptr<wlan_fullmac_mlme_handle_t, void (*)(wlan_fullmac_mlme_handle_t*)>;
 
   // Manages the lifetime of the protocol struct we pass down to the vendor driver. Actual
   // calls to this protocol should only be performed by the vendor driver.
@@ -136,14 +94,8 @@ class Device final : public fdf::DriverBase,
   std::mutex wlan_fullmac_impl_ifc_banjo_protocol_lock_;
   std::unique_ptr<wlan_fullmac_impl_ifc_banjo_protocol_t> wlan_fullmac_impl_ifc_banjo_protocol_
       __TA_GUARDED(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
-  std::unique_ptr<FullmacMlme> mlme_;
-
-  bool device_online_ = false;
-  // The FIDL Client to communicate with WlanIf device
-  fidl::WireSharedClient<fuchsia_wlan_fullmac::WlanFullmacImpl> client_;
-
-  // Dispatcher for making requests to the vendor driver over WlanFullmacImpl.
-  fdf::Dispatcher client_dispatcher_;
+  std::mutex rust_mlme_lock_;
+  RustFullmacMlme rust_mlme_ __TA_GUARDED(rust_mlme_lock_);
 
   // Dispatcher for being a FIDL server firing replies to WlanIf device
   fdf::Dispatcher server_dispatcher_;

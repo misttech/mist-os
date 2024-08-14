@@ -71,6 +71,7 @@ impl Device {
         }
     }
 
+    // TODO(https://fxbug.dev/356119431): Share this with fullmac.
     fn flatten_and_log_error<T>(
         method_name: impl Display,
         result: Result<Result<T, zx::sys::zx_status_t>, fidl::Error>,
