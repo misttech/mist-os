@@ -126,7 +126,6 @@
 		gpios = <&gpio_expander 0 0>,
 			<&gpio A311D_GPIOH(2) 0>;
 		gpio-names = "LCD_RESET", "HDMI_HOTPLUG_DETECT";
-		fuchsia,sysmem = <&sysmem>;
 		amlogic,canvas = <&canvas>;
 		display-detect = <&display_detect>;
 		display-detect-names = "HDMI";

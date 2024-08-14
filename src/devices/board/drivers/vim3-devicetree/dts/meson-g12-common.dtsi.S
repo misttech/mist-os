@@ -38,7 +38,6 @@
 				<GIC_SPI 43 GIC_IRQ_MODE_EDGE_RISING>,
 				<GIC_SPI 44 GIC_IRQ_MODE_EDGE_RISING>;
 
-			fuchsia,sysmem = <&sysmem>;
 			amlogic,canvas = <&canvas>;
 
 			clocks = <&clock 0x10005>,
