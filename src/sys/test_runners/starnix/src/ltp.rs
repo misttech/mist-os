@@ -3,42 +3,13 @@
 // found in the LICENSE file.
 
 use crate::helpers::*;
-use anyhow::{anyhow, Context as _, Error};
-use fidl::endpoints::{create_proxy, Proxy};
+use anyhow::{anyhow, Error};
+use fidl::endpoints::create_proxy;
 use std::collections::HashMap;
 use {
-    fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata, fidl_fuchsia_io as fio,
+    fidl_fuchsia_component_runner as frunner, fidl_fuchsia_data as fdata,
     fidl_fuchsia_test as ftest, fuchsia_zircon as zx,
 };
-
-struct LtpTestDefinition {
-    name: String,
-    command: String,
-}
-
-fn parse_test_definition(test_def: &str) -> LtpTestDefinition {
-    let test_def = test_def.trim();
-    match test_def.split_once(' ') {
-        Some((name, command)) => {
-            LtpTestDefinition { name: name.to_string(), command: command.trim().to_string() }
-        }
-        None => LtpTestDefinition { name: test_def.to_string(), command: test_def.to_string() },
-    }
-}
-
-async fn read_tests_list(
-    start_info: &mut frunner::ComponentStartInfo,
-) -> Result<Vec<LtpTestDefinition>, Error> {
-    let program = start_info.program.as_ref().unwrap();
-    let tests_list_file = get_str_value_from_dict(program, "tests_list")?;
-    Ok(read_file_from_component_ns(start_info, &tests_list_file)
-        .await
-        .with_context(|| format!("Failed to read {}", tests_list_file))?
-        .split('\n')
-        .filter(|s| !s.is_empty())
-        .map(parse_test_definition)
-        .collect())
-}
 
 pub async fn get_cases_list_for_ltp(
     mut start_info: frunner::ComponentStartInfo,
@@ -93,38 +64,6 @@ pub async fn run_ltp_cases(
     }
 
     Ok(())
-}
-
-async fn read_file_from_dir(dir: &fio::DirectoryProxy, path: &str) -> Result<String, Error> {
-    let file_proxy = fuchsia_fs::directory::open_file_no_describe(
-        &dir,
-        path,
-        fuchsia_fs::OpenFlags::RIGHT_READABLE,
-    )?;
-    fuchsia_fs::file::read_to_string(&file_proxy).await.map_err(Into::into)
-}
-
-async fn read_file_from_component_ns(
-    start_info: &mut frunner::ComponentStartInfo,
-    path: &str,
-) -> Result<String, Error> {
-    for entry in start_info.ns.as_mut().ok_or(anyhow!("Component NS is not set"))?.iter_mut() {
-        if entry.path == Some("/pkg".to_string()) {
-            let dir = entry.directory.take().ok_or(anyhow!("NS entry directory is not set"))?;
-            let dir_proxy = dir.into_proxy()?;
-
-            let result = read_file_from_dir(&dir_proxy, path).await;
-
-            // Return the directory back to the `start_info`.
-            entry.directory = Some(fidl::endpoints::ClientEnd::new(
-                dir_proxy.into_channel().unwrap().into_zx_channel(),
-            ));
-
-            return result;
-        }
-    }
-
-    Err(anyhow!("/pkg is not in the namespace"))
 }
 
 // Starts a component that runs the specified `binary` with the specified `args`.

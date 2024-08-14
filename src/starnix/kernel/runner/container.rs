@@ -4,8 +4,8 @@
 
 use crate::{
     create_filesystem_from_spec, expose_root, get_serial_number, parse_features,
-    run_container_features, serve_component_runner, serve_container_controller,
-    serve_graphical_presenter, Features,
+    parse_numbered_handles, run_container_features, serve_component_runner,
+    serve_container_controller, serve_graphical_presenter, Features,
 };
 use anyhow::{anyhow, bail, Error};
 use bstr::BString;
@@ -481,6 +481,7 @@ async fn create_container(
         kernel.kthreads.unlocked_for_async().deref_mut(),
         init_task,
         move |locked, init_task| {
+            parse_numbered_handles(init_task, None, &init_task.files).expect("");
             init_task.exec(locked, executable, argv[0].clone(), argv.clone(), vec![])
         },
         move |result| {

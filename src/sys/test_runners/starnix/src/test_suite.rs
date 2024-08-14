@@ -7,6 +7,7 @@ use crate::gbenchmark::*;
 use crate::gtest::*;
 use crate::helpers::*;
 use crate::ltp::*;
+use crate::selinux::*;
 use anyhow::{anyhow, Context, Error};
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_test::{self as ftest};
@@ -28,6 +29,7 @@ fn get_test_type(program: &fdata::Dictionary) -> Result<TestType, Error> {
         Some("gtest_xml_output") => Ok(TestType::GtestXmlOutput),
         Some("gunit") => Ok(TestType::Gunit),
         Some("ltp") => Ok(TestType::Ltp),
+        Some("selinux") => Ok(TestType::SeLinux),
         Some(value) => Err(anyhow!("Unrecognized test_type: {}", value)),
 
         // If test_type is not specified, then just run the component as a single test case.
@@ -91,6 +93,7 @@ pub async fn handle_suite_requests(
                             ..Default::default()
                         }]
                     }
+                    TestType::SeLinux => get_cases_list_for_ltp(test_start_info).await?,
                 };
 
                 handle_case_iterator(test_cases, stream).await?
@@ -155,6 +158,15 @@ pub async fn handle_suite_requests(
                     }
                     TestType::Ltp => {
                         run_ltp_cases(
+                            tests,
+                            test_start_info,
+                            &run_listener_proxy,
+                            &component_runner,
+                        )
+                        .await?
+                    }
+                    TestType::SeLinux => {
+                        run_selinux_cases(
                             tests,
                             test_start_info,
                             &run_listener_proxy,
