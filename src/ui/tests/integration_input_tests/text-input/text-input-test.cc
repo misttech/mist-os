@@ -39,13 +39,11 @@
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/clock.h>
-#include <lib/zx/time.h>
 #include <zircon/status.h>
 #include <zircon/types.h>
 #include <zircon/utc.h>
 
 #include <cstddef>
-#include <cstdint>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -235,8 +233,6 @@ constexpr auto kResponseListener = "test_text_response_listener";
 // devtools, which is super-useful for debugging.
 class ChromiumInputBase : public ui_testing::PortableUITest {
  protected:
-  static constexpr auto kTapRetryInterval = zx::sec(1);
-
   ChromiumInputBase() : keyboard_input_state_(std::make_shared<KeyboardInputState>()) {}
 
   std::string GetTestUIStackUrl() override { return "#meta/test-ui-stack.cm"; }
@@ -266,20 +262,6 @@ class ChromiumInputBase : public ui_testing::PortableUITest {
   // Subclass should implement this method to add capability routes to the test
   // realm next to the base ones added.
   virtual std::vector<Route> GetTestRoutes() { return {}; }
-
-  // Periodically taps the (x,y) coordinate on the screen.
-  // Call CancelTap() to cancel the periodic tap task.
-  void TryTapUntilCanceled(int32_t x, int32_t y) {
-    InjectTap(x, y);
-    inject_retry_task_.emplace(
-        [this, x, y](auto dispatcher, auto task, auto status) { TryTapUntilCanceled(x, y); });
-    FX_CHECK(inject_retry_task_->PostDelayed(dispatcher(), kTapRetryInterval) == ZX_OK);
-  }
-
-  void CancelTaps() {
-    inject_retry_task_.reset();
-    FX_LOGS(INFO) << "Taps canceled as our window is in focus";
-  }
 
   void ExtendRealm() override {
     // Key part of service setup: have this test component vend the
@@ -502,7 +484,7 @@ class ChromiumInputTest : public ChromiumInputBase {
 
     // Not quite exactly the location of the text area under test, but since the
     // text area occupies all the screen, it's very likely within the text area.
-    TryTapUntilCanceled(display_width() / 2, display_height() / 2);
+    InjectTap(display_width() / 2, display_height() / 2);
 
     // Register focus chain listener.
     auto [focus_listener_client, focus_listener_server] =
@@ -526,7 +508,6 @@ class ChromiumInputTest : public ChromiumInputBase {
 
     FX_LOGS(INFO) << "Waiting on app focused on textarea: ready for key events";
     RunLoopUntil([this]() { return keyboard_input_state_->IsReadyForKey(); });
-    CancelTaps();
   }
 };
 
