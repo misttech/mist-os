@@ -99,29 +99,22 @@ class FlagAcquireGuard {
   FlagAcquireGuard &operator=(const FlagAcquireGuard &) = delete;
   FlagAcquireGuard(FlagAcquireGuard &&flag) = delete;
   FlagAcquireGuard &operator=(FlagAcquireGuard &&flag) = delete;
-  explicit FlagAcquireGuard(std::atomic_flag *flag, bool wake_waiters = false)
-      : flag_(flag), wake_waiters_(wake_waiters) {
+  explicit FlagAcquireGuard(std::atomic_flag *flag, bool wake_waiters = false) : flag_(flag) {
     // Release-acquire ordering between the writeback (loader) and others such as checkpoint and gc.
     acquired_ = !flag_->test_and_set(std::memory_order_acquire);
   }
   ~FlagAcquireGuard() {
     if (acquired_) {
-      ZX_ASSERT(IsSet());
       // Release-acquire ordering between the writeback (loader) and others such as checkpoint and
       // gc.
       flag_->clear(std::memory_order_release);
-      if (wake_waiters_) {
-        flag_->notify_all();
-      }
     }
   }
-  bool IsSet() { return flag_->test(std::memory_order_acquire); }
   bool IsAcquired() const { return acquired_; }
 
  private:
   std::atomic_flag *flag_ = nullptr;
   bool acquired_ = false;
-  bool wake_waiters_ = false;
 };
 
 class SuperblockInfo {

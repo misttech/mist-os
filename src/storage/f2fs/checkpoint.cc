@@ -513,14 +513,15 @@ bool F2fs::IsTearDown() const { return teardown_flag_.test(std::memory_order_rel
 void F2fs::SetTearDown() { teardown_flag_.test_and_set(std::memory_order_relaxed); }
 
 // We guarantee that this checkpoint procedure should not fail.
-zx_status_t F2fs::WriteCheckpoint(bool blocked, bool is_umount) {
+zx_status_t F2fs::WriteCheckpoint(bool stop_writeback, bool is_umount) {
   if (superblock_info_->TestCpFlags(CpFlag::kCpErrorFlag)) {
     return ZX_ERR_BAD_STATE;
   }
 
   // Stop writeback during checkpoint.
   FlagAcquireGuard flag(&stop_reclaim_flag_);
-  if (flag.IsAcquired()) {
+  if (stop_writeback) {
+    ZX_ASSERT(flag.IsAcquired());
     ZX_ASSERT(WaitForWriteback().is_ok());
   }
   ZX_DEBUG_ASSERT(segment_manager_->FreeSections() > GetFreeSectionsForDirtyPages());

@@ -162,7 +162,8 @@ class F2fs final {
   void Sync(SyncCallback closure = nullptr) __TA_EXCLUDES(f2fs::GetGlobalLock());
   zx_status_t SyncFs(bool bShutdown = false) __TA_EXCLUDES(f2fs::GetGlobalLock());
   zx_status_t DoCheckpoint(bool is_umount) __TA_REQUIRES(f2fs::GetGlobalLock());
-  zx_status_t WriteCheckpoint(bool blocked, bool is_umount) __TA_REQUIRES(f2fs::GetGlobalLock());
+  zx_status_t WriteCheckpoint(bool stop_writeback, bool is_umount)
+      __TA_REQUIRES(f2fs::GetGlobalLock()) __TA_EXCLUDES(writeback_mutex_);
 
   // recovery.cc
   // For the list of fsync inodes, used only during recovery
@@ -232,34 +233,27 @@ class F2fs final {
   void ScheduleWriter(fpromise::promise<> task) { writer_->ScheduleTask(std::move(task)); }
 
   void ScheduleWritebackAndReclaimPages(size_t num_pages = kDefaultBlocksPerSegment);
-  zx::result<> WaitForWriteback() {
-    if (!writeback_flag_.try_acquire_for(std::chrono::seconds(kWriteTimeOut))) {
+
+  zx::result<> WaitForWriteback() __TA_EXCLUDES(writeback_mutex_) {
+    if (!writeback_mutex_.try_lock_shared_for(std::chrono::seconds(kWriteTimeOut))) {
       return zx::error(ZX_ERR_TIMED_OUT);
     }
-    writeback_flag_.release();
+    writeback_mutex_.unlock_shared();
     return zx::ok();
   }
+
   std::atomic_flag &GetStopReclaimFlag() { return stop_reclaim_flag_; }
 
-  bool StopWriteback() {
-    // release-acquire ordering with MemoryPressureWatcher::OnLevelChanged().
-    auto level = current_memory_pressure_level_.load(std::memory_order_acquire);
-    return level == MemoryPressure::kLow ||
-           !superblock_info_->GetPageCount(CountType::kDirtyData) ||
-           (level == MemoryPressure::kUnknown &&
-            superblock_info_->GetPageCount(CountType::kDirtyData) < kMaxDirtyDataPages / 4);
-  }
-
-  bool HasNotEnoughMemory() {
+  bool HasNotEnoughMemory(size_t factor = 1) {
     // release-acquire ordering with MemoryPressureWatcher::OnLevelChanged().
     auto level = current_memory_pressure_level_.load(std::memory_order_acquire);
     return (level > MemoryPressure::kLow &&
             superblock_info_->GetPageCount(CountType::kDirtyData)) ||
            (level == MemoryPressure::kUnknown &&
-            superblock_info_->GetPageCount(CountType::kDirtyData) >= kMaxDirtyDataPages);
+            superblock_info_->GetPageCount(CountType::kDirtyData) * factor >= kMaxDirtyDataPages);
   }
 
-  void WaitForAvailableMemory() {
+  void WaitForAvailableMemory() __TA_EXCLUDES(writeback_mutex_) {
     while (HasNotEnoughMemory()) {
       ScheduleWritebackAndReclaimPages();
       ZX_ASSERT(WaitForWriteback().is_ok());
@@ -290,7 +284,7 @@ class F2fs final {
 
   std::atomic_flag teardown_flag_ = ATOMIC_FLAG_INIT;
   std::atomic_flag stop_reclaim_flag_ = ATOMIC_FLAG_INIT;
-  std::binary_semaphore writeback_flag_{1};
+  std::shared_timed_mutex writeback_mutex_;
 
   FuchsiaDispatcher dispatcher_;
   PlatformVfs *const vfs_ = nullptr;

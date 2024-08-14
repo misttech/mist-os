@@ -217,9 +217,10 @@ void F2fs::ScheduleWritebackAndReclaimPages(size_t num_pages) {
   // dirty Pages is less than kMaxDirtyDataPages / 4. |writeback_flag_| ensures that neither
   // checkpoint nor gc runs during this writeback. If there is not enough space, stop writeback as
   // flushing N of dirty Pages can produce N of additional dirty node Pages in the worst case.
-  if (HasNotEnoughMemory() && writeback_flag_.try_acquire()) {
-    auto promise = fpromise::make_promise([this]() mutable {
-      while (!segment_manager_->HasNotEnoughFreeSecs() && CanReclaim() && !StopWriteback()) {
+  if (HasNotEnoughMemory()) {
+    auto promise = fpromise::make_promise([this]() __TA_EXCLUDES(writeback_mutex_) {
+      std::lock_guard<std::shared_timed_mutex> lock(writeback_mutex_);
+      while (!segment_manager_->HasNotEnoughFreeSecs() && CanReclaim() && HasNotEnoughMemory(4)) {
         GetVCache().ForDirtyVnodesIf(
             [&](fbl::RefPtr<VnodeF2fs>& vnode) {
               WritebackOperation op = {.bReclaim = true};
@@ -235,8 +236,6 @@ void F2fs::ScheduleWritebackAndReclaimPages(size_t num_pages) {
       }
       node_vnode_->CleanupPages();
       GetVCache().EvictInactiveVnodes();
-      // Wake waiters of WaitForWriteback().
-      writeback_flag_.release();
       return fpromise::ok();
     });
     writer_->ScheduleWriteback(std::move(promise));
@@ -264,7 +263,7 @@ zx_status_t F2fs::SyncFs(bool bShutdown) {
       }
       // If necessary, do gc.
       if (segment_manager_->HasNotEnoughFreeSecs()) {
-        if (auto ret = gc_manager_->Run(); ret.is_error()) {
+        if (auto ret = gc_manager_->Run(false); ret.is_error()) {
           if (superblock_info_->TestCpFlags(CpFlag::kCpErrorFlag)) {
             return ZX_ERR_INTERNAL;
           }
@@ -287,7 +286,7 @@ zx_status_t F2fs::SyncFs(bool bShutdown) {
     } while (superblock_info_->GetPageCount(CountType::kDirtyData) && target_vnodes);
   }
   std::lock_guard lock(f2fs::GetGlobalLock());
-  return WriteCheckpoint(false, bShutdown);
+  return WriteCheckpoint(true, bShutdown);
 }
 
 #if 0  // porting needed

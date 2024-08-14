@@ -201,7 +201,7 @@ GcManager::GcManager(F2fs *fs)
       superblock_info_(fs->GetSuperblockInfo()),
       segment_manager_(fs->GetSegmentManager()) {}
 
-zx::result<uint32_t> GcManager::Run() {
+zx::result<uint32_t> GcManager::Run(bool stop_writeback) {
   // For testing
   if (disable_gc_for_test_) {
     return zx::ok(0);
@@ -211,26 +211,21 @@ zx::result<uint32_t> GcManager::Run() {
     return zx::error(ZX_ERR_BAD_STATE);
   }
 
-  if (!run_.try_acquire_for(std::chrono::seconds(kWriteTimeOut))) {
-    return zx::error(ZX_ERR_TIMED_OUT);
-  }
-  auto release = fit::defer([&] { run_.release(); });
   std::lock_guard gc_lock(f2fs::GetGlobalLock());
-
   GcType gc_type = GcType::kBgGc;
   uint32_t sec_freed = 0;
 
   // FG_GC must run when there is no space (e.g., HasNotEnoughFreeSecs() == true).
   // If not, gc can compete with others (e.g., writeback) for victim Pages and space.
   while (segment_manager_.HasNotEnoughFreeSecs()) {
-    // Stop writeback before gc. The writeback won't be invoked until gc acquires enough sections.
-    FlagAcquireGuard flag(&fs_->GetStopReclaimFlag());
-    if (flag.IsAcquired()) {
-      ZX_ASSERT(fs_->WaitForWriteback().is_ok());
-    }
-
     if (superblock_info_.TestCpFlags(CpFlag::kCpErrorFlag)) {
       return zx::error(ZX_ERR_BAD_STATE);
+    }
+    // Stop writeback before gc. The writeback won't be invoked until gc acquires enough sections.
+    FlagAcquireGuard flag(&fs_->GetStopReclaimFlag());
+    if (stop_writeback) {
+      ZX_ASSERT(flag.IsAcquired());
+      ZX_ASSERT(fs_->WaitForWriteback().is_ok());
     }
     // For example, if there are many prefree_segments below given threshold, we can make them
     // free by checkpoint. Then, we secure free segments which doesn't need fggc any more.
