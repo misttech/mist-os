@@ -16,10 +16,10 @@
 # groups are created:
 #
 # <PRODUCT>.<BOARD>
-#     Stable (Tests that passed for at least 200+ consecutive runs)
+#     Stable (Tests that passed for at least 1000+ consecutive runs)
 #         Tests that require SL4F transport, if any
 #         Tests that does not require SL4F transport
-#     Unstable (Tests that are yet to pass 200 consecutive runs)
+#     Unstable (Tests that are yet to pass 1000 consecutive runs)
 #         Tests that require SL4F transport, if any
 #         Tests that does not require SL4F transport
 #
