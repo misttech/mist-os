@@ -56,6 +56,8 @@ pub struct Controller<C: Controllable> {
     /// manipulate the component
     request_stream: fcrunner::ComponentControllerRequestStream,
 
+    control: fcrunner::ComponentControllerControlHandle,
+
     /// Controllable object which controls the underlying component.
     /// This would be None once the object is killed.
     controllable: Option<C>,
@@ -64,37 +66,50 @@ pub struct Controller<C: Controllable> {
     on_escrow_monitor: fasync::Task<()>,
 }
 
-pub struct ChannelEpitaph(u32);
+/// Information about a component's termination (fuchsia.component.runner/ComponentStopInfo)
+#[derive(Debug, Clone, PartialEq)]
+pub struct StopInfo {
+    pub termination_status: zx::Status,
+    pub exit_code: Option<i64>,
+}
 
-impl ChannelEpitaph {
-    pub fn ok() -> Self {
-        static_assertions::const_assert_eq!(fuchsia_zircon_types::ZX_OK, 0);
-        Self(0)
+impl StopInfo {
+    pub fn from_status(s: zx::Status, c: Option<i64>) -> Self {
+        Self { termination_status: s, exit_code: c }
+    }
+
+    pub fn from_u32(s: u32, c: Option<i64>) -> Self {
+        Self {
+            termination_status: Status::from_raw(i32::try_from(s).unwrap_or_else(|_| i32::MAX)),
+            exit_code: c,
+        }
+    }
+
+    pub fn from_error(s: fcomp::Error, c: Option<i64>) -> Self {
+        Self::from_u32(s.into_primitive().into(), c)
+    }
+
+    pub fn from_ok(c: Option<i64>) -> Self {
+        Self { termination_status: Status::OK, exit_code: c }
     }
 }
 
-impl From<ChannelEpitaph> for Status {
-    fn from(value: ChannelEpitaph) -> Self {
-        Status::from_raw(i32::try_from(value.0).unwrap_or_else(|_| i32::MAX))
+impl From<StopInfo> for fcrunner::ComponentStopInfo {
+    fn from(info: StopInfo) -> Self {
+        Self {
+            termination_status: Some(info.termination_status.into_raw()),
+            exit_code: info.exit_code,
+            ..Default::default()
+        }
     }
 }
 
-impl From<u32> for ChannelEpitaph {
-    fn from(v: u32) -> Self {
-        Self(v)
-    }
-}
-
-impl TryFrom<Status> for ChannelEpitaph {
-    type Error = std::num::TryFromIntError;
-    fn try_from(value: Status) -> Result<Self, std::num::TryFromIntError> {
-        Ok(Self(u32::try_from(value.into_raw())?))
-    }
-}
-
-impl From<fcomp::Error> for ChannelEpitaph {
-    fn from(value: fcomp::Error) -> Self {
-        Self(u32::from(value.into_primitive()))
+impl From<fcrunner::ComponentStopInfo> for StopInfo {
+    fn from(value: fcrunner::ComponentStopInfo) -> Self {
+        Self {
+            termination_status: zx::Status::from_raw(value.termination_status.unwrap_or(0)),
+            exit_code: value.exit_code,
+        }
     }
 }
 
@@ -103,11 +118,17 @@ impl<C: Controllable + 'static> Controller<C> {
     pub fn new(
         controllable: C,
         requests: fcrunner::ComponentControllerRequestStream,
+        control: fcrunner::ComponentControllerControlHandle,
     ) -> Controller<C> {
         let on_escrow = controllable.on_escrow();
         let on_escrow_monitor =
             fasync::Task::spawn(Self::monitor_events(on_escrow, requests.control_handle()));
-        Controller { controllable: Some(controllable), request_stream: requests, on_escrow_monitor }
+        Controller {
+            controllable: Some(controllable),
+            request_stream: requests,
+            control,
+            on_escrow_monitor,
+        }
     }
 
     async fn serve_controller(&mut self) -> Result<(), ()> {
@@ -149,8 +170,8 @@ impl<C: Controllable + 'static> Controller<C> {
     /// or the request stream closes. In either case the request stream is
     /// closed once this function returns since the stream itself, which owns
     /// the channel, is dropped.
-    pub async fn serve(mut self, exit_fut: impl Future<Output = ChannelEpitaph> + Unpin) {
-        let result_code: ChannelEpitaph = {
+    pub async fn serve(mut self, exit_fut: impl Future<Output = StopInfo> + Unpin) {
+        let stop_info = {
             // Pin the server_controller future so we can use it with select
             let request_server = self.serve_controller();
             futures::pin_mut!(request_server);
@@ -181,7 +202,8 @@ impl<C: Controllable + 'static> Controller<C> {
         // TODO(https://fxbug.dev/326626515): Drain the escrow requests until no long readable
         // instead of waiting for an unbounded amount of time if `on_escrow` never completes.
         self.on_escrow_monitor.await;
-        self.request_stream.control_handle().shutdown_with_epitaph(result_code.into());
+        _ = self.control.send_on_stop(stop_info.clone().into());
+        self.request_stream.control_handle().shutdown();
     }
 
     /// Kill the job and shutdown control handle supplied to this function.
@@ -425,10 +447,7 @@ pub fn report_start_error(
 
 #[cfg(test)]
 mod tests {
-    use super::{
-        configure_launcher, truncate_str, ChannelEpitaph, Controllable, Controller, LaunchError,
-        LauncherConfigArgs,
-    };
+    use super::*;
     use anyhow::{Context, Error};
     use assert_matches::assert_matches;
     use async_trait::async_trait;
@@ -438,7 +457,6 @@ mod tests {
     use fuchsia_zircon::{self as zx, HandleBased};
     use futures::future::BoxFuture;
     use futures::poll;
-    use futures::prelude::*;
     use namespace::{Namespace, NamespaceError};
     use std::pin::Pin;
     use std::task::Poll;
@@ -494,14 +512,14 @@ mod tests {
     #[fuchsia::test]
     async fn test_kill_component() -> Result<(), Error> {
         let (sender, recv) = futures::channel::oneshot::channel::<()>();
-        let (epitaph_tx, epitaph_rx) = futures::channel::oneshot::channel::<ChannelEpitaph>();
-        const CHANNEL_EPITAPH: zx::Status = zx::Status::OK;
+        let (term_tx, term_rx) = futures::channel::oneshot::channel::<StopInfo>();
+        let stop_info = StopInfo::from_ok(Some(42));
         let fake_component = FakeComponent {
             onkill: Some(move || {
                 sender.send(()).unwrap();
-                // After acknowledging that we received kill, send the epitaph
+                // After acknowledging that we received kill, send the status
                 // value so `serve` completes.
-                let _ = epitaph_tx.send(CHANNEL_EPITAPH.try_into().unwrap());
+                let _ = term_tx.send(stop_info.clone());
             }),
             onstop: Some(|| {}),
             onteardown: Some(async {}.boxed()),
@@ -511,19 +529,27 @@ mod tests {
 
         client_proxy.kill().expect("FIDL error returned from kill request to controller");
 
-        let epitaph_receiver = Box::pin(async move { epitaph_rx.await.unwrap() });
+        let term_receiver = Box::pin(async move { term_rx.await.unwrap() });
         // this should return after kill call
-        controller.serve(epitaph_receiver).await;
+        controller.serve(term_receiver).await;
 
         // this means kill was called
         recv.await?;
 
-        // Check the epitaph on the controller channel, this should match what
-        // is sent by `epitaph_tx`
+        // Check the event on the controller channel, this should match what
+        // is sent by `term_tx`
+        let mut event_stream = client_proxy.take_event_stream();
         assert_matches!(
-            client_proxy.take_event_stream().try_next().await,
-            Err(fidl::Error::ClientChannelClosed { status, .. }) if status == CHANNEL_EPITAPH
+            event_stream.try_next().await,
+            Ok(Some(fcrunner::ComponentControllerEvent::OnStop {
+                payload: fcrunner::ComponentStopInfo {
+                    termination_status: Some(0),
+                    exit_code: Some(42),
+                    ..
+                }
+            }))
         );
+        assert_matches!(event_stream.try_next().await, Ok(None));
 
         Ok(())
     }
@@ -533,13 +559,13 @@ mod tests {
         let (sender, recv) = futures::channel::oneshot::channel::<()>();
         let (teardown_signal_tx, teardown_signal_rx) = futures::channel::oneshot::channel::<()>();
         let (teardown_fence_tx, teardown_fence_rx) = futures::channel::oneshot::channel::<()>();
-        let (epitaph_tx, epitaph_rx) = futures::channel::oneshot::channel::<ChannelEpitaph>();
-        const CHANNEL_EPITAPH: zx::Status = zx::Status::OK;
+        let (term_tx, term_rx) = futures::channel::oneshot::channel::<StopInfo>();
+        let stop_info = StopInfo::from_ok(Some(42));
 
         let fake_component = FakeComponent {
             onstop: Some(move || {
                 sender.send(()).unwrap();
-                let _ = epitaph_tx.send(CHANNEL_EPITAPH.try_into().unwrap());
+                let _ = term_tx.send(stop_info.clone());
             }),
             onkill: Some(move || {}),
             onteardown: Some(
@@ -555,10 +581,10 @@ mod tests {
 
         client_proxy.stop().expect("FIDL error returned from kill request to controller");
 
-        let epitaph_receiver = Box::pin(async move { epitaph_rx.await.unwrap() });
+        let term_receiver = Box::pin(async move { term_rx.await.unwrap() });
 
         // This should return once the channel is closed, that is after stop and teardown
-        let controller_serve = fasync::Task::spawn(controller.serve(epitaph_receiver));
+        let controller_serve = fasync::Task::spawn(controller.serve(term_receiver));
 
         // This means stop was called
         recv.await?;
@@ -566,19 +592,26 @@ mod tests {
         // Teardown should be called
         teardown_signal_rx.await?;
 
-        // Teardown is blocked. Verify there's no epitaph on the channel yet, then unblock it.
+        // Teardown is blocked. Verify there's no event on the channel yet, then unblock it.
         let mut client_stream = client_proxy.take_event_stream();
         let mut client_stream_fut = client_stream.try_next();
         assert_matches!(poll!(Pin::new(&mut client_stream_fut)), Poll::Pending);
         teardown_fence_tx.send(()).unwrap();
         controller_serve.await;
 
-        // Check the epitaph on the controller channel, this should match what
-        // is sent by `epitaph_tx`
+        // Check the event on the controller channel, this should match what
+        // is sent by `term_tx`
         assert_matches!(
             client_stream_fut.await,
-            Err(fidl::Error::ClientChannelClosed { status, .. }) if status == CHANNEL_EPITAPH
+            Ok(Some(fcrunner::ComponentControllerEvent::OnStop {
+                payload: fcrunner::ComponentStopInfo {
+                    termination_status: Some(0),
+                    exit_code: Some(42),
+                    ..
+                }
+            }))
         );
+        assert_matches!(client_stream.try_next().await, Ok(None));
 
         Ok(())
     }
@@ -587,8 +620,8 @@ mod tests {
     fn test_stop_then_kill() -> Result<(), Error> {
         let mut exec = fasync::TestExecutor::new();
         let (sender, mut recv) = futures::channel::oneshot::channel::<()>();
-        let (epitaph_tx, epitaph_rx) = futures::channel::oneshot::channel::<ChannelEpitaph>();
-        const CHANNEL_EPITAPH: zx::Status = zx::Status::OK;
+        let (term_tx, term_rx) = futures::channel::oneshot::channel::<StopInfo>();
+        let stop_info = StopInfo::from_ok(Some(42));
 
         // This component will only 'exit' after kill is called.
         let fake_component = FakeComponent {
@@ -596,7 +629,7 @@ mod tests {
                 sender.send(()).unwrap();
             }),
             onkill: Some(move || {
-                let _ = epitaph_tx.send(CHANNEL_EPITAPH.try_into().unwrap());
+                let _ = term_tx.send(stop_info.clone());
             }),
             onteardown: Some(async {}.boxed()),
         };
@@ -607,8 +640,8 @@ mod tests {
         client_proxy.stop().expect("FIDL error returned from stop request to controller");
 
         // Set up the controller to run.
-        let epitaph_receiver = Box::pin(async move { epitaph_rx.await.unwrap() });
-        let mut controller_fut = Box::pin(controller.serve(epitaph_receiver));
+        let term_receiver = Box::pin(async move { term_rx.await.unwrap() });
+        let mut controller_fut = Box::pin(controller.serve(term_receiver));
 
         // Run the serve loop until it is stalled, it shouldn't return because
         // stop doesn't automatically call exit.
@@ -621,7 +654,7 @@ mod tests {
         assert_eq!(exec.run_until_stalled(&mut recv), Poll::Ready(Ok(())));
 
         // Kill the component which should call the `onkill` we passed in.
-        // This should cause the epitaph future to complete, which should then
+        // This should cause the termination future to complete, which should then
         // cause the controller future to complete.
         client_proxy.kill().expect("FIDL error returned from kill request to controller");
         match exec.run_until_stalled(&mut controller_fut) {
@@ -629,15 +662,23 @@ mod tests {
             x => panic!("Unexpected controller poll state {:?}", x),
         }
 
-        // Check the controller channel closed with an epitaph that matches
+        // Check the controller channel closed with an event that matches
         // what was sent in the `onkill` closure.
         let mut event_stream = client_proxy.take_event_stream();
         let mut next_fut = event_stream.try_next();
         assert_matches!(
             exec.run_until_stalled(&mut next_fut),
-            Poll::Ready(Err(fidl::Error::ClientChannelClosed { status, .. })) if status == CHANNEL_EPITAPH
+            Poll::Ready(Ok(Some(fcrunner::ComponentControllerEvent::OnStop {
+                payload: fcrunner::ComponentStopInfo {
+                    termination_status: Some(0),
+                    exit_code: Some(42),
+                    ..
+                }
+            })))
         );
 
+        let mut next_fut = event_stream.try_next();
+        assert_matches!(exec.run_until_stalled(&mut next_fut), Poll::Ready(Ok(None)));
         Ok(())
     }
 
@@ -652,10 +693,11 @@ mod tests {
             create_endpoints::<fcrunner::ComponentControllerMarker>();
 
         // Get a proxy to the ComponentController channel.
-        let controller_stream =
-            server_endpoint.into_stream().context("failed to convert server end to controller")?;
+        let (controller_stream, control) = server_endpoint
+            .into_stream_and_control_handle()
+            .context("failed to convert server end to controller")?;
         Ok((
-            Controller::new(fake_component, controller_stream),
+            Controller::new(fake_component, controller_stream, control),
             client_endpoint.into_proxy().expect("conversion to proxy failed."),
         ))
     }

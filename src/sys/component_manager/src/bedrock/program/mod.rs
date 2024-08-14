@@ -5,6 +5,7 @@
 use crate::model::escrow::EscrowedState;
 use crate::model::token::InstanceToken;
 use crate::runner::RemoteRunner;
+use ::runner::component::StopInfo;
 use errors::{StartError, StopError};
 use fidl::endpoints;
 use fidl::endpoints::ServerEnd;
@@ -48,17 +49,14 @@ pub struct StopConclusion {
 
     /// Optional escrow request sent by the component.
     pub escrow_request: Option<EscrowRequest>,
-
-    /// Other optional information such as exit code.
-    pub stop_info: Option<StopInfo>,
 }
 
 /// [`StopDisposition`] describes how the execution was stopped, e.g. did it timeout.
-#[derive(Debug, PartialEq, Copy, Clone)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum StopDisposition {
     /// The component did not stop in time, but was killed before the kill
     /// timeout. Additionally contains a status from the runner.
-    Killed(zx::Status),
+    Killed(StopInfo),
 
     /// The component did not stop in time and was killed after the kill
     /// timeout was reached.
@@ -71,16 +69,18 @@ pub enum StopDisposition {
     /// The component stopped within the timeout. Note that in this case a
     /// component may also have stopped on its own without the framework asking.
     /// Additionally contains a status from the runner.
-    Stopped(zx::Status),
+    Stopped(StopInfo),
 }
 
 impl StopDisposition {
-    pub fn status(&self) -> zx::Status {
+    pub fn stop_info(&self) -> StopInfo {
         match self {
-            StopDisposition::Killed(status) => *status,
-            StopDisposition::KilledAfterTimeout => zx::Status::TIMED_OUT,
-            StopDisposition::NoController => zx::Status::OK,
-            StopDisposition::Stopped(status) => *status,
+            StopDisposition::Killed(status) => status.clone(),
+            StopDisposition::KilledAfterTimeout => {
+                StopInfo::from_status(zx::Status::TIMED_OUT, None)
+            }
+            StopDisposition::NoController => StopInfo::from_ok(None),
+            StopDisposition::Stopped(status) => status.clone(),
         }
     }
 }
@@ -139,8 +139,8 @@ impl Program {
 
     /// Wait for the program to terminate, with an epitaph specified in the
     /// `fuchsia.component.runner/ComponentController` FIDL protocol documentation.
-    pub fn on_terminate(&self) -> BoxFuture<'static, zx::Status> {
-        self.controller.wait_for_epitaph()
+    pub fn on_terminate(&self) -> BoxFuture<'static, StopInfo> {
+        self.controller.wait_for_termination()
     }
 
     /// Stops or kills the program or returns early if either operation times out.
@@ -166,8 +166,8 @@ impl Program {
         }?;
         self.namespace_scope.shutdown();
         self.namespace_scope.wait().await;
-        let FinalizedProgram { escrow_request, stop_info } = self.finalize();
-        Ok(StopConclusion { disposition, escrow_request, stop_info })
+        let FinalizedProgram { escrow_request } = self.finalize();
+        Ok(StopConclusion { disposition, escrow_request })
     }
 
     /// Stops the program or returns early if the operation times out.
@@ -220,8 +220,8 @@ impl Program {
     /// Drops the program and returns state that the program has escrowed, if any.
     fn finalize(self) -> FinalizedProgram {
         let Program { controller, .. } = self;
-        let (escrow_request, stop_info) = controller.finalize();
-        FinalizedProgram { escrow_request, stop_info }
+        let escrow_request = controller.finalize();
+        FinalizedProgram { escrow_request }
     }
 
     /// Gets a [`Koid`] that will uniquely identify this program.
@@ -363,30 +363,16 @@ impl From<fcrunner::ComponentControllerOnEscrowRequest> for EscrowRequest {
     }
 }
 
-/// Information about a stopped execution.
-#[derive(Debug, Default, Clone, Copy)]
-pub struct StopInfo {
-    /// Exit code of the program.
-    pub exit_code: Option<i64>,
-}
-
-impl From<fcrunner::ComponentStopInfo> for StopInfo {
-    fn from(value: fcrunner::ComponentStopInfo) -> Self {
-        Self { exit_code: value.exit_code }
-    }
-}
-
 #[derive(Debug, Default)]
 struct FinalizedProgram {
     pub escrow_request: Option<EscrowRequest>,
-    pub stop_info: Option<StopInfo>,
 }
 
 #[cfg(test)]
 pub mod tests {
     use super::*;
     use crate::model::testing::mocks::{
-        self, ControlMessage, ControllerActionResponse, MockController,
+        self, ControlMessage, ControllerActionResponse, MockController, MOCK_EXIT_CODE,
     };
     use assert_matches::assert_matches;
     use fidl::endpoints::ControlHandle;
@@ -426,7 +412,12 @@ pub mod tests {
         let program_koid = program.koid();
         match program.stop_or_kill_with_timeout(stop_timer, kill_timer).await {
             Ok(StopConclusion {
-                disposition: StopDisposition::Stopped(zx::Status::OK), ..
+                disposition:
+                    StopDisposition::Stopped(StopInfo {
+                        termination_status: zx::Status::OK,
+                        exit_code: Some(MOCK_EXIT_CODE),
+                    }),
+                ..
             }) => {}
             Ok(result) => {
                 panic!("unexpected successful stop result {:?}", result);
@@ -465,7 +456,11 @@ pub mod tests {
         drop(server);
         match program.stop_or_kill_with_timeout(stop_timer, kill_timer).await {
             Ok(StopConclusion {
-                disposition: StopDisposition::Stopped(zx::Status::PEER_CLOSED),
+                disposition:
+                    StopDisposition::Stopped(StopInfo {
+                        termination_status: zx::Status::PEER_CLOSED,
+                        exit_code: None,
+                    }),
                 ..
             }) => {}
             Ok(result) => {
@@ -533,7 +528,11 @@ pub mod tests {
         // future to completion.
         match exec.run_until_stalled(&mut stop_future) {
             Poll::Ready(Ok(StopConclusion {
-                disposition: StopDisposition::Stopped(zx::Status::OK),
+                disposition:
+                    StopDisposition::Stopped(StopInfo {
+                        termination_status: zx::Status::OK,
+                        exit_code: Some(MOCK_EXIT_CODE),
+                    }),
                 ..
             })) => {}
             Poll::Ready(Ok(result)) => {
@@ -654,7 +653,6 @@ pub mod tests {
             Poll::Ready(Ok(StopConclusion {
                 disposition: StopDisposition::KilledAfterTimeout,
                 escrow_request: None,
-                stop_info: None,
             }))
         );
     }
@@ -721,9 +719,11 @@ pub mod tests {
         assert_matches!(
             exec.run_until_stalled(&mut stop_fut),
             Poll::Ready(Ok(StopConclusion {
-                disposition: StopDisposition::Killed(zx::Status::OK),
+                disposition: StopDisposition::Killed(StopInfo {
+                    termination_status: zx::Status::OK,
+                    exit_code: Some(MOCK_EXIT_CODE)
+                }),
                 escrow_request: None,
-                stop_info: None,
             }))
         );
     }
@@ -807,9 +807,11 @@ pub mod tests {
         assert_matches!(
             exec.run_until_stalled(&mut stop_fut),
             Poll::Ready(Ok(StopConclusion {
-                disposition: StopDisposition::Killed(zx::Status::OK),
+                disposition: StopDisposition::Killed(StopInfo {
+                    termination_status: zx::Status::OK,
+                    exit_code: Some(MOCK_EXIT_CODE)
+                }),
                 escrow_request: None,
-                stop_info: None,
             }))
         );
     }

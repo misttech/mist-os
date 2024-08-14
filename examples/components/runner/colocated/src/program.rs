@@ -9,7 +9,7 @@ use fidl_fuchsia_process::HandleInfo;
 use fuchsia_runtime::HandleType;
 use futures::future::{BoxFuture, FutureExt};
 use futures::TryStreamExt;
-use runner::component::{ChannelEpitaph, Controllable};
+use runner::component::{Controllable, StopInfo};
 use std::sync::Arc;
 use tracing::warn;
 use zx::{AsHandleRef, Koid};
@@ -76,11 +76,11 @@ impl ColocatedProgram {
     }
 
     /// Returns a future that will resolve when the program is terminated.
-    pub fn wait_for_termination<'a>(&self) -> BoxFuture<'a, ChannelEpitaph> {
+    pub fn wait_for_termination<'a>(&self) -> BoxFuture<'a, StopInfo> {
         let terminated = self.terminated.clone();
         async move {
             terminated.wait().await;
-            ChannelEpitaph::ok()
+            StopInfo::from_ok(None)
         }
         .boxed()
     }

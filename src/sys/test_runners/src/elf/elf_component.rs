@@ -19,6 +19,7 @@ use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::future::{abortable, BoxFuture};
 use futures::prelude::*;
 use namespace::Namespace;
+use runner::component::StopInfo;
 use std::mem;
 use std::ops::Deref;
 use std::path::Path;
@@ -572,21 +573,23 @@ where
     .detach();
 
     let server_end = take_server_end(server_end);
-    let controller_stream = server_end.into_stream().map_err(|e| {
-        ComponentError::Fidl("failed to convert server end to controller".to_owned(), e)
-    })?;
-    let controller = runner::component::Controller::new(component_runtime, controller_stream);
+    let (controller_stream, control) =
+        server_end.into_stream_and_control_handle().map_err(|e| {
+            ComponentError::Fidl("failed to convert server end to controller".to_owned(), e)
+        })?;
+    let controller =
+        runner::component::Controller::new(component_runtime, controller_stream, control);
 
-    let epitaph_fut = Box::pin(async move {
+    let termination_fut = Box::pin(async move {
         // Just return 'OK' here. Any actual errors will be handled through
         // the test protocol.
         let _ =
             fasync::OnSignals::new(&job_watch_dup.as_handle_ref(), zx::Signals::TASK_TERMINATED)
                 .await;
-        zx::Status::OK.try_into().unwrap()
+        StopInfo::from_ok(None)
     });
 
-    fasync::Task::spawn(controller.serve(epitaph_fut)).detach();
+    fasync::Task::spawn(controller.serve(termination_fut)).detach();
 
     Ok(())
 }

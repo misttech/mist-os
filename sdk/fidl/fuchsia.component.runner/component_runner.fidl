@@ -147,7 +147,7 @@ type ComponentStartInfo = resource table {
 /// When the controlled component instance terminates or becomes inaccessible
 /// for any reason, the server closes the connection with an epitaph.
 ///
-/// LIFECYCLE
+/// # Lifecycle
 ///
 /// A component may exist in one of two states: `Started`, or `Stopped`. The
 /// component is `Started` from the time `ComponentRunner.Start()` is called
@@ -156,15 +156,14 @@ type ComponentStartInfo = resource table {
 ///
 /// Component manager uses ComponentController to terminate a component in two
 /// steps:
-///  1) Component manager calls `Stop()` to indicate that the ComponentRunner
-///     should stop a component's execution and close this connection with an
-///     epitaph.
-///  2) If after some time the ComponentController is not closed, component
+///
+/// 1.  Component manager calls `Stop()` to indicate that the ComponentRunner
+///     should stop a component's execution and send the `OnStop` event.
+/// 2.  If after some time the ComponentController is not closed, component
 ///     manager calls `Kill()` to indicate that the ComponentRunner must halt a
-///     component's execution immediately, and then close this connection with
-///     an epitaph. The component manager may wait some period of time after
-///     calling `Kill()` before closing the ComponentController channel, but
-///     makes no guarantees it will wait or for how long.
+///     component's execution immediately, and then send the `OnStop` event.
+///     The component manager may wait some period of time after calling `Kill()`
+///     before sending `OnStop`, but makes no guarantees it will wait or for how long.
 ///
 /// Component manager first waits for the ComponentController to close, and
 /// then tears down the namespace it hosts for the stopped component. Component
@@ -174,16 +173,33 @@ type ComponentStartInfo = resource table {
 /// state in the framework, to receive those state again the next time it is
 /// started.
 ///
-/// Before stopping, a component can optionally use `OnStopInfo` to publish
-/// information such as the exit code.
+/// When the component stops, the runner should send an `OnStop` event
+/// instead of just closing the channel, to report the component's termination status
+/// (see below) and (optionally) an exit code. Once the runner has sent `OnStop`
+/// it is free to close [ComponentRunner]; the component framework will close
+/// its end of the channel when it receives this event.
 ///
-/// EPITAPH
+/// ## Legacy
 ///
-/// This protocol sends a FIDL epitaph to indicate that the component instance
-/// has been terminated. The component runner is expected to clean up all
-/// resources attributed to the component before closing the connection.
+/// Instead of sending `OnStop`, it is also legal for a runner to close the channel
+/// with with an epitaph equal to the termination status, but this is a legacy method
+/// for backward compatibility that's no longer recommended.
 ///
-/// The following epitaphs may be sent by the server on error:
+/// # Termination status
+///
+/// The termination status indicates the component's final disposition in the eyes of
+/// the runner.
+///
+/// Note that termination status is _not_ synonymous with a component's exit code.
+/// A component's exit code, which is optional for a runner to report, is an
+/// integer that represents the program's own return code. For example, for ELF
+/// components, it is the value returned by main(). The termination status is
+/// the _runner_'s status code for the component's termination, which may capture
+/// failure modes that occur in the context of the runner itself rather than the
+/// program.
+///
+/// The following termination statuses may be sent by the server on error:
+///
 /// - `ZX_OK`: The component exited successfully, typically because the
 ///   component was asked to stop or it decided independently to exit.
 /// - `INVALID_ARGUMENTS`:
@@ -266,24 +282,27 @@ closed protocol ComponentController {
         2: escrowed_dictionary fuchsia.component.sandbox.DictionaryRef;
     });
 
-    /// Publish information about the execution, before closing the channel.
+    /// Report that the component has stopped, with data about its termination. This will
+    /// cause the component to make a lifecycle transition to `Stopped`.
     ///
-    /// The component lifecycle does not transition to `Stopped` until the
-    /// channel is closed.
+    /// Once the runner has sent `OnStop` it is free to close this [ComponentRunner]; the
+    /// component framework will close its end of the channel when it receives this event.
     ///
-    /// Repeated calls will replace the old value. This is discouraged.
-    ///
-    /// This event is optional.
+    /// Alternatively, a runner may close the controller channel without this event to signal
+    /// component stop, but this method is legacy and no longer recommended.
     @available(added=HEAD)
-    strict -> OnStopInfo(@generated_name("ComponentStopInfo") resource table {
-        /// The exit code of the component instance.
+    strict -> OnStop(@generated_name("ComponentStopInfo") resource table {
+        /// The component's termination status, as documented on [ComponentRunner] above.
+        ///
+        /// The caller should set this field. If it is absent, the framework will assume
+        /// a value of ZX_OK.
+        1: termination_status zx.Status;
+
+        /// (Optional) The exit code of the component instance.
         ///
         /// Runner implementors may map their runtime specific exit code concept
-        /// (such as libc exit status) to this field.
-        ///
-        /// The framework interprets a value of 0 as success, and other values
-        /// as errors. The framework does not make more assumptions about the
-        /// meaning of specific values.
-        1: exit_code int64;
+        /// (such as libc exit status) to this field. Or they may choose to
+        /// leave this blank.
+        2: exit_code int64;
     });
 };

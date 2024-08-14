@@ -16,7 +16,7 @@ use futures::{Future, FutureExt, TryStreamExt};
 use namespace::{Namespace, NamespaceError};
 use routing::capability_source::{BuiltinSource, CapabilitySource};
 use routing::policy::ScopedPolicyChecker;
-use runner::component::{ChannelEpitaph, Controllable, Controller};
+use runner::component::{Controllable, Controller, StopInfo};
 use sandbox::{Capability, Dict, DirEntry, RemotableCapability};
 use std::sync::Arc;
 use thiserror::Error;
@@ -116,7 +116,7 @@ impl BuiltinRunner {
     fn start(
         self: Arc<BuiltinRunner>,
         mut start_info: fcrunner::ComponentStartInfo,
-    ) -> Result<(impl Controllable, impl Future<Output = ChannelEpitaph> + Unpin), BuiltinRunnerError>
+    ) -> Result<(impl Controllable, impl Future<Output = StopInfo> + Unpin), BuiltinRunnerError>
     {
         let outgoing_dir =
             start_info.outgoing_dir.take().ok_or(BuiltinRunnerError::MissingOutgoingDir)?;
@@ -147,26 +147,26 @@ impl BuiltinRunner {
 ///
 /// Normally, the job will terminate when the builtin runner requests to stop the ELF runner.
 /// We'll observe the asynchronous termination here and consider the ELF runner stopped.
-async fn wait_for_job_termination(job: zx::Job) -> ChannelEpitaph {
+async fn wait_for_job_termination(job: zx::Job) -> StopInfo {
     fasync::OnSignals::new(&job.as_handle_ref(), zx::Signals::JOB_TERMINATED)
         .await
         .map(|_: fidl::Signals| ())
         .unwrap_or_else(|error| warn!(%error, "error waiting for job termination"));
 
     use fidl_fuchsia_component::Error;
-    let exit_status: ChannelEpitaph = match job.info() {
+    let exit_status = match job.info() {
         Ok(zx::JobInfo { return_code: zx::sys::ZX_TASK_RETCODE_SYSCALL_KILL, .. }) => {
             // Stopping the ELF runner will destroy the job, so this is the only
             // normal exit code path.
-            ChannelEpitaph::ok()
+            StopInfo::from_ok(None)
         }
         Ok(zx::JobInfo { return_code, .. }) => {
             warn!(%return_code, "job terminated with abnormal return code");
-            Error::InstanceDied.into()
+            StopInfo::from_error(Error::InstanceDied, None)
         }
         Err(error) => {
             warn!(%error, "Unable to query job info");
-            Error::Internal.into()
+            StopInfo::from_error(Error::Internal, None)
         }
     };
     exit_status
@@ -187,8 +187,9 @@ impl BuiltinRunnerFactory for BuiltinRunner {
                         request;
                     match runner.clone().start(start_info) {
                         Ok((program, on_exit)) => {
-                            let controller =
-                                Controller::new(program, controller.into_stream().unwrap());
+                            let (stream, control) =
+                                controller.into_stream_and_control_handle().unwrap();
+                            let controller = Controller::new(program, stream, control);
                             runner.task_group.spawn(controller.serve(on_exit));
                         }
                         Err(err) => {
@@ -545,15 +546,20 @@ mod tests {
         let event = elf_runner_controller.take_event_stream().try_next().await;
         assert_matches!(
             event,
-            Err(fidl::Error::ClientChannelClosed { status, .. })
-            if status == zx::Status::OK
+            Ok(Some(fcrunner::ComponentControllerEvent::OnStop {
+                payload: fcrunner::ComponentStopInfo {
+                    termination_status: Some(0),
+                    exit_code: None,
+                    ..
+                }
+            }))
         );
 
         // The ELF component controller channel should close (abnormally, because its runner died).
         let result = program.on_terminate().await;
         let instance_died =
             zx::Status::from_raw(fcomponent::Error::InstanceDied.into_primitive() as i32);
-        assert_eq!(result, instance_died);
+        assert_eq!(result.termination_status, instance_died);
     }
 
     /// Test that the builtin runner reports errors when starting unknown types.

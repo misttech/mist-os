@@ -36,7 +36,7 @@ use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use futures::channel::oneshot;
 use futures::TryStreamExt;
 use moniker::Moniker;
-use runner::component::ChannelEpitaph;
+use runner::component::StopInfo;
 use runner::StartInfo;
 use std::path::Path;
 use std::sync::Arc;
@@ -551,15 +551,15 @@ async fn start(
         }
     };
 
-    let (epitaph_tx, epitaph_rx) = oneshot::channel::<ChannelEpitaph>();
+    let (termination_tx, termination_rx) = oneshot::channel::<StopInfo>();
     // This function waits for something from the channel and
     // returns it or Error::Internal if the channel is closed
-    let epitaph_fn = Box::pin(async move {
-        epitaph_rx
+    let termination_fn = Box::pin(async move {
+        termination_rx
             .await
             .unwrap_or_else(|_| {
                 warn!("epitaph oneshot channel closed unexpectedly");
-                fcomp::Error::Internal.into()
+                StopInfo::from_error(fcomp::Error::Internal, None)
             })
             .into()
     });
@@ -597,7 +597,6 @@ async fn start(
     // Spawn a future that watches for the process to exit
     fasync::Task::spawn({
         let resolved_url = resolved_url.clone();
-        let control = control.clone();
         async move {
             fasync::OnSignals::new(&proc_copy.as_handle_ref(), zx::Signals::PROCESS_TERMINATED)
                 .await
@@ -607,33 +606,30 @@ async fn start(
             // TODO(https://fxbug.dev/42134825) If we create an epitaph that indicates
             // intentional, non-zero exit, use that for all non-0 exit
             // codes.
-            let exit_status: ChannelEpitaph = match proc_copy.info() {
+            let stop_info = match proc_copy.info() {
                 Ok(zx::ProcessInfo { return_code, .. }) => {
-                    // Notify framework of exit code.
-                    _ = control.send_on_stop_info(fcrunner::ComponentStopInfo {
-                        exit_code: Some(return_code),
-                        ..Default::default()
-                    });
-                    // Determine the epitaph.
                     match return_code {
-                        0 => ChannelEpitaph::ok(),
+                        0 => StopInfo::from_ok(Some(return_code)),
                         // Don't log SYSCALL_KILL codes because they are expected in the course
                         // of normal operation. When elf_runner process a `Kill` method call for
                         // a component it makes a zx_task_kill syscall which sets this return code.
-                        zx::sys::ZX_TASK_RETCODE_SYSCALL_KILL => fcomp::Error::InstanceDied.into(),
+                        zx::sys::ZX_TASK_RETCODE_SYSCALL_KILL => StopInfo::from_error(
+                            fcomp::Error::InstanceDied.into(),
+                            Some(return_code),
+                        ),
                         _ => {
                             warn!(url=%resolved_url, %return_code,
                                 "process terminated with abnormal return code");
-                            fcomp::Error::InstanceDied.into()
+                            StopInfo::from_error(fcomp::Error::InstanceDied, Some(return_code))
                         }
                     }
                 }
                 Err(error) => {
                     warn!(%error, "Unable to query process info");
-                    fcomp::Error::Internal.into()
+                    StopInfo::from_error(fcomp::Error::Internal, None)
                 }
             };
-            epitaph_tx.send(exit_status).unwrap_or_else(|_| warn!("error sending epitaph"));
+            termination_tx.send(stop_info).unwrap_or_else(|_| warn!("error sending done signal"));
         }
     })
     .detach();
@@ -652,7 +648,9 @@ async fn start(
                 |error| warn!(url=%resolved_url, %error, "sending diagnostics failed"),
             );
         }
-        runner::component::Controller::new(elf_component, server_stream).serve(epitaph_fn).await;
+        runner::component::Controller::new(elf_component, server_stream, control)
+            .serve(termination_fn)
+            .await;
     })
     .detach();
 }
@@ -1217,14 +1215,12 @@ mod tests {
         // process that was killed.
         let mut event_stream = controller.take_event_stream();
         expect_diagnostics_event(&mut event_stream).await;
-        expect_exit_code(&mut event_stream, zx::sys::ZX_TASK_RETCODE_SYSCALL_KILL).await;
-        expect_channel_closed(
-            &mut event_stream,
-            zx::Status::from_raw(
-                i32::try_from(fcomp::Error::InstanceDied.into_primitive()).unwrap(),
-            ),
-        )
-        .await;
+
+        let s = zx::Status::from_raw(
+            i32::try_from(fcomp::Error::InstanceDied.into_primitive()).unwrap(),
+        );
+        expect_on_stop(&mut event_stream, s, Some(zx::sys::ZX_TASK_RETCODE_SYSCALL_KILL)).await;
+        expect_channel_closed(&mut event_stream).await;
         Ok(())
     }
 
@@ -1347,8 +1343,8 @@ mod tests {
             runner.start(start_info, server_controller).await;
             let mut event_stream = client_controller.take_event_stream();
             expect_diagnostics_event(&mut event_stream).await;
-            expect_exit_code(&mut event_stream, 0).await;
-            expect_channel_closed(&mut event_stream, zx::Status::OK).await;
+            expect_on_stop(&mut event_stream, zx::Status::OK, Some(0)).await;
+            expect_channel_closed(&mut event_stream).await;
         };
 
         // Just check for connection count, other integration tests cover decoding the actual logs.
@@ -1445,29 +1441,26 @@ mod tests {
         );
     }
 
-    async fn expect_exit_code(
+    async fn expect_on_stop(
         event_stream: &mut fcrunner::ComponentControllerEventStream,
-        expected_exit_code: i64,
+        expected_status: zx::Status,
+        expected_exit_code: Option<i64>,
     ) {
         let event = event_stream.try_next().await;
         assert_matches!(
             event,
-            Ok(Some(fcrunner::ComponentControllerEvent::OnStopInfo {
-                payload: fcrunner::ComponentStopInfo { exit_code: Some(code), .. },
+            Ok(Some(fcrunner::ComponentControllerEvent::OnStop {
+                payload: fcrunner::ComponentStopInfo { termination_status: Some(s), exit_code, .. },
             }))
-            if code == expected_exit_code
+            if s == expected_status.into_raw() &&
+                exit_code == expected_exit_code
         );
     }
 
-    async fn expect_channel_closed(
-        event_stream: &mut fcrunner::ComponentControllerEventStream,
-        expected_status: zx::Status,
-    ) {
+    async fn expect_channel_closed(event_stream: &mut fcrunner::ComponentControllerEventStream) {
         let event = event_stream.try_next().await;
         match event {
-            Err(fidl::Error::ClientChannelClosed { status, .. }) => {
-                assert_eq!(status, expected_status);
-            }
+            Ok(None) => {}
             other => panic!("Expected channel closed error, got {:?}", other),
         }
     }
@@ -1727,12 +1720,8 @@ mod tests {
             other => panic!("unexpected event result: {:?}", other),
         }
 
-        expect_exit_code(&mut event_stream, 0).await;
-
-        match event_stream.try_next().await {
-            Err(fidl::Error::ClientChannelClosed { .. }) => {}
-            other => panic!("unexpected event result: {:?}", other),
-        }
+        expect_on_stop(&mut event_stream, zx::Status::OK, Some(0)).await;
+        expect_channel_closed(&mut event_stream).await;
     }
 
     fn exit_with_code_startinfo(exit_code: i64) -> fcrunner::ComponentStartInfo {
@@ -1784,8 +1773,8 @@ mod tests {
 
         let mut event_stream = controller.take_event_stream();
         expect_diagnostics_event(&mut event_stream).await;
-        expect_exit_code(&mut event_stream, 0).await;
-        expect_channel_closed(&mut event_stream, zx::Status::OK).await;
+        expect_on_stop(&mut event_stream, zx::Status::OK, Some(0)).await;
+        expect_channel_closed(&mut event_stream).await;
     }
 
     #[fuchsia::test]
@@ -1803,13 +1792,10 @@ mod tests {
 
         let mut event_stream = controller.take_event_stream();
         expect_diagnostics_event(&mut event_stream).await;
-        expect_exit_code(&mut event_stream, 123).await;
-        expect_channel_closed(
-            &mut event_stream,
-            zx::Status::from_raw(
-                i32::try_from(fcomp::Error::InstanceDied.into_primitive()).unwrap(),
-            ),
-        )
-        .await;
+        let s = zx::Status::from_raw(
+            i32::try_from(fcomp::Error::InstanceDied.into_primitive()).unwrap(),
+        );
+        expect_on_stop(&mut event_stream, s, Some(123)).await;
+        expect_channel_closed(&mut event_stream).await;
     }
 }

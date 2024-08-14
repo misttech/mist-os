@@ -675,9 +675,7 @@ impl ComponentInstance {
             .await
             .map_err(|err| StopActionError::DestroyDynamicChildrenFailed { err: Box::new(err) })?;
 
-        if let Some((StopConclusion { disposition, escrow_request, stop_info }, start_time)) =
-            stop_result
-        {
+        if let Some((StopConclusion { disposition, escrow_request }, start_time)) = stop_result {
             let requested_escrow = escrow_request.is_some();
 
             // Store any escrowed state.
@@ -692,8 +690,8 @@ impl ComponentInstance {
 
             let stop_time = zx::Time::get_monotonic();
             let event = self.new_event(EventPayload::Stopped {
-                status: disposition.status(),
-                exit_code: stop_info.map(|info| info.exit_code).flatten(),
+                status: disposition.stop_info().termination_status,
+                exit_code: disposition.stop_info().exit_code,
                 stop_time,
                 execution_duration: stop_time - start_time,
                 requested_escrow,

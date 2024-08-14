@@ -1152,14 +1152,10 @@ impl StartedInstanceState {
         let ret = if let Some(program) = program {
             program.stop(stop_timer, kill_timer).await
         } else {
-            Ok(StopConclusion {
-                disposition: StopDisposition::NoController,
-                escrow_request: None,
-                stop_info: None,
-            })
+            Ok(StopConclusion { disposition: StopDisposition::NoController, escrow_request: None })
         }?;
         if let Some(execution_controller_task) = self.execution_controller_task.as_mut() {
-            execution_controller_task.set_stop_payload(ret.disposition.status(), ret.stop_info);
+            execution_controller_task.set_stop_payload(ret.disposition.stop_info());
         }
         Ok(ret)
     }

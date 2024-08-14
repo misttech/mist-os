@@ -8,7 +8,7 @@ use fidl::endpoints::{ControlHandle, RequestStream};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_sync::Mutex;
 use futures::{StreamExt, TryStreamExt};
-use runner::component::{ChannelEpitaph, Controllable, Controller};
+use runner::component::{Controllable, Controller, StopInfo};
 use std::collections::HashMap;
 use std::future::Future;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -86,16 +86,19 @@ async fn handle_runner_request(
         let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } = request;
         let url = start_info.resolved_url.clone().unwrap_or_else(|| "unknown url".to_string());
         info!("Colocated runner is going to start component {url}");
+        let (stream, control) = controller.into_stream_and_control_handle().unwrap();
         match start(start_info, resource_tracker.clone(), memory_server_handle.new_publisher()) {
             Ok((program, on_exit)) => {
-                let controller = Controller::new(program, controller.into_stream().unwrap());
+                let controller = Controller::new(program, stream, control);
                 fasync::Task::spawn(controller.serve(on_exit)).detach();
             }
             Err(err) => {
                 warn!("Colocated runner failed to start component {url}: {err}");
-                let _ = controller.close_with_epitaph(zx::Status::from_raw(
-                    fcomponent::Error::Internal.into_primitive() as i32,
-                ));
+                let _ = control.send_on_stop(fcrunner::ComponentStopInfo {
+                    termination_status: Some(fcomponent::Error::Internal.into_primitive() as i32),
+                    ..Default::default()
+                });
+                control.shutdown();
             }
         }
     }
@@ -161,7 +164,7 @@ fn start(
     start_info: fcrunner::ComponentStartInfo,
     resource_tracker: Arc<ResourceTracker>,
     publisher: Publisher,
-) -> Result<(impl Controllable, impl Future<Output = ChannelEpitaph> + Unpin)> {
+) -> Result<(impl Controllable, impl Future<Output = StopInfo> + Unpin)> {
     let numbered_handles = start_info.numbered_handles.unwrap_or(vec![]);
     let program = ColocatedProgram::new(numbered_handles)?;
     let id = NEXT_ID.fetch_add(1, Ordering::SeqCst);

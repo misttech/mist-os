@@ -19,8 +19,8 @@ pub struct ComponentController {
     /// The wrapped `ComponentController` connection.
     inner: fcrunner::ComponentControllerProxy,
 
-    /// Receiver for epitaphs coming from the connection.
-    epitaph_value_recv: Shared<oneshot::Receiver<zx::Status>>,
+    /// Receiver for termination events coming from the connection.
+    termination_value_recv: Shared<oneshot::Receiver<StopInfo>>,
 
     /// State stored by the `ComponentController` server.
     state: Arc<Mutex<State>>,
@@ -32,9 +32,6 @@ pub struct ComponentController {
 struct State {
     /// The last value seen in an `ComponentController.OnEscrow` event.
     escrow: Option<EscrowRequest>,
-
-    /// The last value seen in an `ComponentController.OnStopInfo` event.
-    stop_info: Option<StopInfo>,
 }
 
 impl Deref for ComponentController {
@@ -53,9 +50,9 @@ impl<'a> ComponentController {
         proxy: fcrunner::ComponentControllerProxy,
         diagnostics_sender: Option<oneshot::Sender<fdiagnostics::ComponentDiagnostics>>,
     ) -> Self {
-        let (epitaph_sender, epitaph_value_recv) = oneshot::channel();
+        let (epitaph_sender, termination_value_recv) = oneshot::channel();
 
-        let state = Arc::new(Mutex::new(State { escrow: None, stop_info: None }));
+        let state = Arc::new(Mutex::new(State { escrow: None }));
         let event_stream = proxy.take_event_stream();
         let events_fut = Self::listen_for_events(
             event_stream,
@@ -67,46 +64,59 @@ impl<'a> ComponentController {
 
         Self {
             inner: proxy,
-            epitaph_value_recv: epitaph_value_recv.shared(),
+            termination_value_recv: termination_value_recv.shared(),
             state,
             _event_listener_task: event_listener_task,
         }
     }
 
     /// Returns state that the program has escrowed, if any.
-    pub fn finalize(self) -> (Option<EscrowRequest>, Option<StopInfo>) {
+    pub fn finalize(self) -> Option<EscrowRequest> {
         let mut state = self.state.lock();
-        (state.escrow.take(), state.stop_info.take())
+        state.escrow.take()
     }
 
-    /// Obtain a future for the epitaph value.
+    /// Obtain a future for the termination value.
     ///
     /// If the async task handling the `ComponentControllerProxy` unexpectedly exits, the future
     /// will resolve to `PEER_CLOSED`. Otherwise, it will resolve to the `zx::Status` representing
-    /// the epitaph sent on the channel.
+    /// the termination status sent on the channel.
     ///
     /// This method may be called multiple times from multiple threads.
-    pub fn wait_for_epitaph(&self) -> BoxFuture<'static, zx::Status> {
-        let val = self.epitaph_value_recv.clone();
-        async move { val.await.unwrap_or(zx::Status::PEER_CLOSED) }.boxed()
+    pub fn wait_for_termination(&self) -> BoxFuture<'static, StopInfo> {
+        let val = self.termination_value_recv.clone();
+        async move {
+            val.await.unwrap_or(StopInfo {
+                termination_status: zx::Status::PEER_CLOSED,
+                exit_code: None,
+            })
+        }
+        .boxed()
     }
 
     async fn listen_for_events(
         mut event_stream: fcrunner::ComponentControllerEventStream,
-        epitaph_sender: oneshot::Sender<zx::Status>,
+        termination_sender: oneshot::Sender<StopInfo>,
         state: Arc<Mutex<State>>,
         mut diagnostics_sender: Option<oneshot::Sender<fdiagnostics::ComponentDiagnostics>>,
     ) {
-        let mut epitaph_sender = Some(epitaph_sender);
+        let mut termination_sender = Some(termination_sender);
         while let Some(value) = event_stream.next().await {
             match value {
                 Err(fidl::Error::ClientChannelClosed { status, .. }) => {
-                    epitaph_sender.take().and_then(|sender| sender.send(status).ok());
+                    termination_sender.take().and_then(|sender| {
+                        sender.send(StopInfo { termination_status: status, exit_code: None }).ok()
+                    });
                 }
                 Err(_) => {
-                    epitaph_sender
-                        .take()
-                        .and_then(|sender| sender.send(zx::Status::PEER_CLOSED).ok());
+                    termination_sender.take().and_then(|sender| {
+                        sender
+                            .send(StopInfo {
+                                termination_status: zx::Status::PEER_CLOSED,
+                                exit_code: None,
+                            })
+                            .ok()
+                    });
                 }
                 Ok(event) => match event {
                     fcrunner::ComponentControllerEvent::OnPublishDiagnostics {
@@ -117,13 +127,18 @@ impl<'a> ComponentController {
                     fcrunner::ComponentControllerEvent::OnEscrow { payload } => {
                         state.lock().escrow = Some(payload.into());
                     }
-                    fcrunner::ComponentControllerEvent::OnStopInfo { payload } => {
-                        state.lock().stop_info = Some(payload.into());
+                    fcrunner::ComponentControllerEvent::OnStop { payload } => {
+                        termination_sender.take().map(|sender| sender.send(payload.into()));
+                        break;
                     }
                 },
             }
         }
-        epitaph_sender.take().map(|sender| sender.send(zx::Status::PEER_CLOSED).unwrap_or(()));
+        termination_sender.take().map(|sender| {
+            sender
+                .send(StopInfo { termination_status: zx::Status::PEER_CLOSED, exit_code: None })
+                .unwrap_or(())
+        });
     }
 
     /// Get the KOID of the `ComponentController` FIDL server endpoint.
@@ -173,9 +188,9 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fcrunner::ComponentControllerMarker>()
                 .unwrap();
         let controller = ComponentController::new(proxy, None);
-        let epitaph_fut = controller.wait_for_epitaph();
+        let epitaph_fut = controller.wait_for_termination();
         stream.control_handle().shutdown_with_epitaph(zx::Status::UNAVAILABLE);
-        assert_eq!(epitaph_fut.await, zx::Status::UNAVAILABLE);
+        assert_eq!(epitaph_fut.await.termination_status, zx::Status::UNAVAILABLE);
     }
 
     #[fuchsia::test]
@@ -184,9 +199,9 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fcrunner::ComponentControllerMarker>()
                 .unwrap();
         let controller = ComponentController::new(proxy, None);
-        let epitaph_fut = controller.wait_for_epitaph();
+        let epitaph_fut = controller.wait_for_termination();
         drop(stream);
-        assert_eq!(epitaph_fut.await, zx::Status::PEER_CLOSED);
+        assert_eq!(epitaph_fut.await.termination_status, zx::Status::PEER_CLOSED);
     }
 
     #[fuchsia::test]
@@ -194,8 +209,8 @@ mod tests {
         let (proxy, _) =
             fidl::endpoints::create_proxy::<fcrunner::ComponentControllerMarker>().unwrap();
         let controller = ComponentController::new(proxy, None);
-        let epitaph_fut = controller.wait_for_epitaph();
+        let epitaph_fut = controller.wait_for_termination();
         drop(controller);
-        assert_eq!(epitaph_fut.await, zx::Status::PEER_CLOSED);
+        assert_eq!(epitaph_fut.await.termination_status, zx::Status::PEER_CLOSED);
     }
 }
