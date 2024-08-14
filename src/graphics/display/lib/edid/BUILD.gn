@@ -18,15 +18,11 @@ source_set("edid") {
     "timings.cc",
     "timings.h",
   ]
-  deps = [
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-    "//zircon/system/ulib/zx",
-  ]
+  deps = [ "//zircon/system/ulib/zx" ]
   public_deps = [
+    "//sdk/lib/driver/logging/cpp",
     "//sdk/lib/stdcompat",
     "//src/graphics/display/lib/api-types-cpp",
-    "//src/graphics/display/lib/driver-framework-migration-utils/logging:zxlogf",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/hwreg",
   ]
@@ -36,8 +32,7 @@ fuchsia_library_fuzzer("edid-fuzzer") {
   sources = [ "edid-fuzzer.cc" ]
   deps = [
     ":edid",
-    "//src/devices/testing/mock-ddk",
-    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
+    "//sdk/lib/driver/testing/cpp:scoped_global_logger",
   ]
   include_dirs = [ ".." ]
 }
@@ -50,8 +45,7 @@ test("edid-test") {
   ]
   deps = [
     ":edid",
-    "//src/devices/testing/mock-ddk",
-    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
+    "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//src/graphics/display/lib/edid-values",
     "//src/lib/fxl",
     "//src/lib/fxl/test:gtest_main",
