@@ -345,6 +345,7 @@ board_input_bundle("rtc_driver") {
 # Adding this to your build graph will greatly reduce your build speed.
 group("vim3-release") {
   deps = [
+    "//src/connectivity/ethernet/drivers/aml-ethernet:package-archive",
     "//src/connectivity/ethernet/drivers/dwmac:package-archive",
     "//src/connectivity/ethernet/drivers/realtek-8211f:package-archive",
     "//src/devices/adc/drivers/aml-saradc:package-archive",
