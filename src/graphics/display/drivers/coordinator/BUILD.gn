@@ -94,6 +94,7 @@ source_set("shared") {
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/lib/mmio",
     "//src/graphics/display/lib/api-types-cpp",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:zxlogf",
     "//src/graphics/display/lib/edid",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",

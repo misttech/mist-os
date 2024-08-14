@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
-#include <lib/ddk/debug.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/sysmem-version/sysmem-version.h>
@@ -46,6 +45,7 @@
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
+#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 

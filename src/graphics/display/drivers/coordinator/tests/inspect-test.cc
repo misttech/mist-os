@@ -4,6 +4,7 @@
 
 #include <lib/async/default.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/inspect/cpp/hierarchy.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/inspect/cpp/reader.h>
@@ -52,6 +53,9 @@ class InspectTest : public ::testing::Test {
   }
 
  protected:
+  // `logger_` must outlive `driver_runtime_` to allow for any
+  // logging in driver de-initialization code.
+  fdf_testing::ScopedGlobalLogger logger_;
   fdf_testing::DriverRuntime driver_runtime_;
 
   EngineDriverClientAndServer engine_driver_client_and_server_;

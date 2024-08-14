@@ -33,6 +33,7 @@ source_set("fake-lib") {
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/graphics/display/lib/api-types-cpp",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:zxlogf",
     "//src/lib/ddk",
     "//src/lib/ddktl",
     "//src/lib/fsl",
@@ -67,7 +68,6 @@ static_library("fake-display-stack") {
     "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
     "//src/devices/testing/mock-ddk",
     "//src/graphics/display/drivers/coordinator:shared",
-    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv1",
     "//zircon/system/ulib/sync:sync-cpp",
   ]
 }
@@ -80,6 +80,7 @@ test("fake-display-unittests-bin") {
     ":fake-display-stack",
     ":fake-sysmem-device-hierarchy",
     "//src/devices/testing/mock-ddk",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv2",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/predicates",
     "//third_party/googletest:gmock",

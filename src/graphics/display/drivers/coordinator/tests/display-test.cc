@@ -6,6 +6,7 @@
 #include <fidl/fuchsia.hardware.display/cpp/wire_test_base.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fdf/dispatcher.h>
 #include <lib/fidl/cpp/wire/client_base.h>
@@ -46,9 +47,12 @@ DispatcherAndShutdownCompletion CreateDispatcherAndShutdownCompletionForTesting(
           .dispatcher_shutdown_completion = std::move(shutdown_completion)};
 }
 
-}  // namespace
+class DisplayTest : public ::testing::Test {
+ private:
+  fdf_testing::ScopedGlobalLogger logger_;
+};
 
-TEST(DisplayTest, ClientVSyncOk) {
+TEST_F(DisplayTest, ClientVSyncOk) {
   fdf_testing::DriverRuntime driver_runtime;
 
   constexpr ConfigStamp kControllerStampValue(1);
@@ -107,7 +111,7 @@ TEST(DisplayTest, ClientVSyncOk) {
   shutdown_completion->Wait();
 }
 
-TEST(DisplayTest, ClientVSynPeerClosed) {
+TEST_F(DisplayTest, ClientVSynPeerClosed) {
   fdf_testing::DriverRuntime driver_runtime;
 
   auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
@@ -133,7 +137,7 @@ TEST(DisplayTest, ClientVSynPeerClosed) {
   shutdown_completion->Wait();
 }
 
-TEST(DisplayTest, ClientVSyncNotSupported) {
+TEST_F(DisplayTest, ClientVSyncNotSupported) {
   fdf_testing::DriverRuntime driver_runtime;
 
   auto [client_end, server_end] = fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
@@ -158,7 +162,7 @@ TEST(DisplayTest, ClientVSyncNotSupported) {
   shutdown_completion->Wait();
 }
 
-TEST(DisplayTest, ClientMustDrainPendingStamps) {
+TEST_F(DisplayTest, ClientMustDrainPendingStamps) {
   fdf_testing::DriverRuntime driver_runtime;
 
   constexpr size_t kNumPendingStamps = 5;
@@ -202,5 +206,7 @@ TEST(DisplayTest, ClientMustDrainPendingStamps) {
   dispatcher.ShutdownAsync();
   shutdown_completion->Wait();
 }
+
+}  // namespace
 
 }  // namespace display

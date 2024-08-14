@@ -7,7 +7,6 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/dispatcher.h>
-#include <lib/ddk/debug.h>
 #include <lib/fit/function.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
@@ -18,6 +17,7 @@
 #include <zircon/status.h>
 
 #include <atomic>
+#include <cstdio>
 #include <memory>
 #include <thread>
 
@@ -163,8 +163,8 @@ class PostTaskTest : public testing::TestWithParam<bool> {
     if (is_loop_on_main_thread_) {
       zx_status_t loop_run_status = loop_.Run();
       if (loop_run_status != ZX_ERR_CANCELED) {
-        zxlogf(ERROR, "async::Loop::Run() returned unexpected status: %s",
-               zx_status_get_string(loop_run_status));
+        fprintf(stderr, "async::Loop::Run() returned unexpected status: %s\n",
+                zx_status_get_string(loop_run_status));
       }
     }
 
