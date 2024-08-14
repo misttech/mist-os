@@ -33,7 +33,6 @@
 #include "src/graphics/display/drivers/intel-display/pch-engine.h"
 #include "src/graphics/display/drivers/intel-display/pci-ids.h"
 #include "src/graphics/display/drivers/intel-display/pipe.h"
-#include "src/graphics/display/drivers/intel-display/poll-until.h"
 #include "src/graphics/display/drivers/intel-display/power-controller.h"
 #include "src/graphics/display/drivers/intel-display/registers-ddi-phy-tiger-lake.h"
 #include "src/graphics/display/drivers/intel-display/registers-ddi.h"
@@ -42,6 +41,7 @@
 #include "src/graphics/display/drivers/intel-display/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-display/registers-typec.h"
 #include "src/graphics/display/drivers/intel-display/registers.h"
+#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace intel_display {

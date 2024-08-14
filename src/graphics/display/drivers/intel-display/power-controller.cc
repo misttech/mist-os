@@ -16,9 +16,9 @@
 
 #include <hwreg/bitfields.h>
 
-#include "src/graphics/display/drivers/intel-display/poll-until.h"
 #include "src/graphics/display/drivers/intel-display/registers-gt-mailbox.h"
-#include "src/graphics/display/drivers/intel-display/scoped-value-change.h"
+#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
+#include "src/graphics/display/drivers/intel-display/util/scoped-value-change.h"
 
 namespace intel_display {
 

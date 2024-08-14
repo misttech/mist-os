@@ -72,7 +72,6 @@ source_set("common_srcs") {
     "pipe-manager.h",
     "pipe.cc",
     "pipe.h",
-    "poll-until.h",
     "power-controller.cc",
     "power-controller.h",
     "power.cc",
@@ -88,9 +87,10 @@ source_set("common_srcs") {
     "registers-transcoder.h",
     "registers-typec.h",
     "registers.h",
-    "scoped-value-change.cc",
-    "scoped-value-change.h",
     "tiling.h",
+    "util/poll-until.h",
+    "util/scoped-value-change.cc",
+    "util/scoped-value-change.h",
   ]
   public_deps = [
     ":intel-display-bind",
@@ -175,7 +175,6 @@ test("intel-display-tests") {
     "pch-engine-unittest.cc",
     "pipe-manager-unittest.cc",
     "pipe-unittest.cc",
-    "poll-until-unittest.cc",
     "power-controller-unittest.cc",
     "power-unittest.cc",
     "registers-arbiter-unittest.cc",
@@ -191,7 +190,8 @@ test("intel-display-tests") {
     "registers-transcoder-unittest.cc",
     "registers-typec-unittest.cc",
     "registers-unittest.cc",
-    "scoped-value-change-unittest.cc",
+    "util/poll-until-unittest.cc",
+    "util/scoped-value-change-unittest.cc",
   ]
   deps = [
     ":common_srcs",

@@ -26,13 +26,13 @@
 #include "src/graphics/display/drivers/intel-display/i2c/gmbus-gpio.h"
 #include "src/graphics/display/drivers/intel-display/intel-display.h"
 #include "src/graphics/display/drivers/intel-display/pci-ids.h"
-#include "src/graphics/display/drivers/intel-display/poll-until.h"
 #include "src/graphics/display/drivers/intel-display/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-display/registers-dpll.h"
 #include "src/graphics/display/drivers/intel-display/registers-gmbus.h"
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-display/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-display/registers.h"
+#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 
 namespace intel_display {

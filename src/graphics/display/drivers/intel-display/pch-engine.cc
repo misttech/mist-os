@@ -18,9 +18,9 @@
 #include <tuple>
 
 #include "src/graphics/display/drivers/intel-display/pci-ids.h"
-#include "src/graphics/display/drivers/intel-display/poll-until.h"
 #include "src/graphics/display/drivers/intel-display/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-display/registers-pch.h"
+#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
 
 namespace intel_display {
 

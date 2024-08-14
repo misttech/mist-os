@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_SCOPED_VALUE_CHANGE_H_
-#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_SCOPED_VALUE_CHANGE_H_
+#ifndef SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_UTIL_SCOPED_VALUE_CHANGE_H_
+#define SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_UTIL_SCOPED_VALUE_CHANGE_H_
 
 #include <type_traits>
 #include <utility>
@@ -151,4 +151,4 @@ inline void ScopedValueChange<T>::RemovedChangeTo(T* variable) {
 
 }  // namespace intel_display
 
-#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_SCOPED_VALUE_CHANGE_H_
+#endif  // SRC_GRAPHICS_DISPLAY_DRIVERS_INTEL_DISPLAY_UTIL_SCOPED_VALUE_CHANGE_H_

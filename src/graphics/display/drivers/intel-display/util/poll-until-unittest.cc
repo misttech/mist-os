@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/graphics/display/drivers/intel-display/poll-until.h"
+#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
 
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 

@@ -10,7 +10,7 @@
 
 #include <cstdint>
 
-#include "src/graphics/display/drivers/intel-display/scoped-value-change.h"
+#include "src/graphics/display/drivers/intel-display/util/scoped-value-change.h"
 
 namespace intel_display {
 

@@ -14,7 +14,7 @@
 #include <variant>
 
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
-#include "src/graphics/display/drivers/intel-display/scoped-value-change.h"
+#include "src/graphics/display/drivers/intel-display/util/scoped-value-change.h"
 
 namespace intel_display {
 
