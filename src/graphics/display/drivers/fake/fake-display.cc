@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/inspect/cpp/inspector.h>
 #include <lib/sysmem-version/sysmem-version.h>
@@ -45,7 +46,6 @@
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/fxl/strings/string_printf.h"
 
@@ -138,8 +138,8 @@ zx_status_t FakeDisplay::InitSysmemAllocatorClient() {
   request.id() = fsl::GetCurrentProcessKoid();
   auto set_debug_result = sysmem_->SetDebugClientInfo(std::move(request));
   if (!set_debug_result.is_ok()) {
-    zxlogf(ERROR, "Cannot set sysmem allocator debug info: %s",
-           set_debug_result.error_value().status_string());
+    FDF_LOG(ERROR, "Cannot set sysmem allocator debug info: %s",
+            set_debug_result.error_value().status_string());
     return set_debug_result.error_value().status();
   }
   return ZX_OK;
@@ -197,7 +197,8 @@ zx_status_t FakeDisplay::DisplayEngineImportBufferCollection(
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   if (buffer_collections_.find(driver_buffer_collection_id) != buffer_collections_.end()) {
-    zxlogf(ERROR, "Buffer Collection (id=%lu) already exists", driver_buffer_collection_id.value());
+    FDF_LOG(ERROR, "Buffer Collection (id=%lu) already exists",
+            driver_buffer_collection_id.value());
     return ZX_ERR_ALREADY_EXISTS;
   }
 
@@ -210,8 +211,8 @@ zx_status_t FakeDisplay::DisplayEngineImportBufferCollection(
   bind_request.buffer_collection_request() = std::move(collection_server_endpoint);
   auto bind_result = sysmem_->BindSharedCollection(std::move(bind_request));
   if (bind_result.is_error()) {
-    zxlogf(ERROR, "Cannot complete FIDL call BindSharedCollection: %s",
-           bind_result.error_value().status_string());
+    FDF_LOG(ERROR, "Cannot complete FIDL call BindSharedCollection: %s",
+            bind_result.error_value().status_string());
     return ZX_ERR_INTERNAL;
   }
 
@@ -225,8 +226,8 @@ zx_status_t FakeDisplay::DisplayEngineReleaseBufferCollection(
   const display::DriverBufferCollectionId driver_buffer_collection_id =
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   if (buffer_collections_.find(driver_buffer_collection_id) == buffer_collections_.end()) {
-    zxlogf(ERROR, "Cannot release buffer collection %lu: buffer collection doesn't exist",
-           driver_buffer_collection_id.value());
+    FDF_LOG(ERROR, "Cannot release buffer collection %lu: buffer collection doesn't exist",
+            driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
   buffer_collections_.erase(driver_buffer_collection_id);
@@ -240,16 +241,16 @@ zx_status_t FakeDisplay::DisplayEngineImportImage(const image_metadata_t* image_
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
-    zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)",
-           driver_buffer_collection_id.value());
+    FDF_LOG(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)",
+            driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
   const fidl::SyncClient<fuchsia_sysmem2::BufferCollection>& collection = it->second;
 
   fbl::AutoLock lock(&image_mutex_);
   if (!IsAcceptableImageTilingType(image_metadata->tiling_type)) {
-    zxlogf(INFO, "ImportImage() will fail due to invalid Image tiling type %" PRIu32,
-           image_metadata->tiling_type);
+    FDF_LOG(INFO, "ImportImage() will fail due to invalid Image tiling type %" PRIu32,
+            image_metadata->tiling_type);
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -320,7 +321,7 @@ void FakeDisplay::DisplayEngineReleaseImage(uint64_t image_handle) {
   fbl::AutoLock lock(&image_mutex_);
   display::DriverImageId driver_image_id = display::ToDriverImageId(image_handle);
   if (imported_images_.erase(driver_image_id) == nullptr) {
-    zxlogf(ERROR, "Failed to release display Image (handle %" PRIu64 ")", driver_image_id.value());
+    FDF_LOG(ERROR, "Failed to release display Image (handle %" PRIu64 ")", driver_image_id.value());
   }
 }
 
@@ -508,8 +509,8 @@ zx_status_t FakeDisplay::DisplayEngineSetBufferCollectionConstraints(
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
-    zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)",
-           driver_buffer_collection_id.value());
+    FDF_LOG(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)",
+            driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
   const fidl::SyncClient<fuchsia_sysmem2::BufferCollection>& collection = it->second;
@@ -522,8 +523,8 @@ zx_status_t FakeDisplay::DisplayEngineSetBufferCollectionConstraints(
   request.constraints() = CreateBufferCollectionConstraints(buffer_collection_usage);
   auto set_result = collection->SetConstraints(std::move(request));
   if (set_result.is_error()) {
-    zxlogf(ERROR, "Failed to set constraints on a sysmem BufferCollection: %s",
-           set_result.error_value().status_string());
+    FDF_LOG(ERROR, "Failed to set constraints on a sysmem BufferCollection: %s",
+            set_result.error_value().status_string());
     return set_result.error_value().status();
   }
 
@@ -544,8 +545,8 @@ zx_status_t FakeDisplay::DisplayEngineImportImageForCapture(
       display::ToDriverBufferCollectionId(banjo_driver_buffer_collection_id);
   const auto it = buffer_collections_.find(driver_buffer_collection_id);
   if (it == buffer_collections_.end()) {
-    zxlogf(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)",
-           driver_buffer_collection_id.value());
+    FDF_LOG(ERROR, "ImportImage: Cannot find imported buffer collection (id=%lu)",
+            driver_buffer_collection_id.value());
     return ZX_ERR_NOT_FOUND;
   }
   const fidl::SyncClient<fuchsia_sysmem2::BufferCollection>& collection = it->second;
@@ -714,37 +715,37 @@ int FakeDisplay::CaptureThread() {
             ZX_ASSERT(src.IsValid());
 
             if (src->metadata().pixel_format != dst->metadata().pixel_format) {
-              zxlogf(ERROR, "Trying to capture format=%u as format=%u\n",
-                     static_cast<uint32_t>(src->metadata().pixel_format),
-                     static_cast<uint32_t>(dst->metadata().pixel_format));
+              FDF_LOG(ERROR, "Trying to capture format=%u as format=%u\n",
+                      static_cast<uint32_t>(src->metadata().pixel_format),
+                      static_cast<uint32_t>(dst->metadata().pixel_format));
               continue;
             }
             size_t src_vmo_size;
             auto status = src->vmo().get_size(&src_vmo_size);
             if (status != ZX_OK) {
-              zxlogf(ERROR, "Failed to get the size of the displayed image VMO: %s",
-                     zx_status_get_string(status));
+              FDF_LOG(ERROR, "Failed to get the size of the displayed image VMO: %s",
+                      zx_status_get_string(status));
               continue;
             }
             size_t dst_vmo_size;
             status = dst->vmo().get_size(&dst_vmo_size);
             if (status != ZX_OK) {
-              zxlogf(ERROR, "Failed to get the size of the VMO for the captured image: %s",
-                     zx_status_get_string(status));
+              FDF_LOG(ERROR, "Failed to get the size of the VMO for the captured image: %s",
+                      zx_status_get_string(status));
               continue;
             }
             if (dst_vmo_size != src_vmo_size) {
-              zxlogf(ERROR,
-                     "Capture will fail; the displayed image VMO size %zu does not match the "
-                     "captured image VMO size %zu",
-                     src_vmo_size, dst_vmo_size);
+              FDF_LOG(ERROR,
+                      "Capture will fail; the displayed image VMO size %zu does not match the "
+                      "captured image VMO size %zu",
+                      src_vmo_size, dst_vmo_size);
               continue;
             }
             fzl::VmoMapper mapped_src;
             status = mapped_src.Map(src->vmo(), 0, src_vmo_size, ZX_VM_PERM_READ);
             if (status != ZX_OK) {
-              zxlogf(ERROR, "Capture thread will exit; failed to map displayed image VMO: %s",
-                     zx_status_get_string(status));
+              FDF_LOG(ERROR, "Capture thread will exit; failed to map displayed image VMO: %s",
+                      zx_status_get_string(status));
               return status;
             }
 
@@ -752,8 +753,8 @@ int FakeDisplay::CaptureThread() {
             status =
                 mapped_dst.Map(dst->vmo(), 0, dst_vmo_size, ZX_VM_PERM_READ | ZX_VM_PERM_WRITE);
             if (status != ZX_OK) {
-              zxlogf(ERROR, "Capture thread will exit; failed to map capture image VMO: %s",
-                     zx_status_get_string(status));
+              FDF_LOG(ERROR, "Capture thread will exit; failed to map capture image VMO: %s",
+                      zx_status_get_string(status));
               return status;
             }
             if (src->metadata().coherency_domain == fuchsia_sysmem2::CoherencyDomain::kRam) {
@@ -818,13 +819,14 @@ zx_status_t FakeDisplay::Initialize() {
 
   zx_status_t status = InitSysmemAllocatorClient();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to initialize sysmem Allocator client: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to initialize sysmem Allocator client: %s",
+            zx_status_get_string(status));
     return status;
   }
 
   status = InitializeCapture();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to initialize display capture: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to initialize display capture: %s", zx_status_get_string(status));
     return status;
   }
 
@@ -834,7 +836,7 @@ zx_status_t FakeDisplay::Initialize() {
         [](void* context) { return static_cast<FakeDisplay*>(context)->VSyncThread(); }, this,
         "vsync_thread"));
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to create VSync thread: %s", zx_status_get_string(status));
+      FDF_LOG(ERROR, "Failed to create VSync thread: %s", zx_status_get_string(status));
       return status;
     }
     vsync_thread_running_ = true;
@@ -846,7 +848,7 @@ zx_status_t FakeDisplay::Initialize() {
         [](void* context) { return static_cast<FakeDisplay*>(context)->CaptureThread(); }, this,
         "capture_thread"));
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to not create image capture thread: %s", zx_status_get_string(status));
+      FDF_LOG(ERROR, "Failed to not create image capture thread: %s", zx_status_get_string(status));
       return status;
     }
   }
