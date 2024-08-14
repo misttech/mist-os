@@ -206,6 +206,80 @@ print(inst.echo("foobar"))
 While this instance can run inside a non-async context, it is still runs
 async code. However, this can make it much easier to read and write overall.
 
+### Adapting code to support async Python
+
+FIDL is a language designed around being async. However, test frameworks like
+`Mobly` expect synchronous Python functions for running tests. If you have an
+interface that you'd like to test and it is primarily used in synchronous
+Python, then this applies to you.
+
+`fuchsia-controller` comes with some mixin code under its `wrappers` module to
+support using async code in synchronous contexts, in particular `AsyncAdapter`,
+which can be used as a wrapper or a mixin, and the decorator `asyncmethod`.
+
+When used in conjunction with each other, this creates a setup where all code
+run in a given instance will execute against a common `asyncio` event loop.
+
+For most cases async Python can be run in synchronous Python with the use
+of `asyncio.run()`. However, when you may have queues or async tasks expected to
+check on state across function calls, this becomes prohibitively difficult to
+do. Each invocation of `asyncio.run()` creates a totally new event loop, which
+can create headaches for managing asynchronous data structures, which expect to
+be used in just one event loop at a time. By keeping a single `asyncio` event
+loop, you can avoid running into these exceptions.
+
+For example, let's say you're writing a `Mobly` test case, but the class you're
+exposing relies on some underlying async Python, you can write your code like
+so to allow for its use in `Mobly`:
+
+```py {:.devsite-disable-click-to-copy}
+import asyncio
+from mobly import asserts, base_test, test_runner
+from fuchsia_controller_py.wrappers import AsyncAdapter, asyncmethod
+
+# AsyncAdapter should be included first in the list of base classes.
+class ClassYouWantToTest(AsyncAdapter, SomeBaseClass):
+
+    def __init__(self):
+        super().__init__()
+        self.async_init()
+
+    @asyncmethod
+    async def async_init(self):
+        self.queue: asyncio.Queue[int] = asyncio.Queue()
+        await self.queue.put(1)
+
+    @asyncmethod
+    async def function_we_care_about(self) -> int:
+        got = await self.queue.get()
+        self.queue.task_done()
+        return got
+
+
+class ExampleTest(base_test.BaseTestClass):
+
+    def test_case_example(self) -> None:
+        """Example... doesn't really do much useful."""
+        c = ClassYouWantToTest()
+        asserts.assert_equal(c.function_we_care_about(), 1)
+
+if __name__ == "__main__":
+    test_runner.main()
+```
+
+The method `function_we_care_about` will be wrapped so that functionally the
+following code is being executed when the `Mobly` test case is executed:
+
+```py {:.devsite-disable-click-to-copy}
+def function_we_care_about(self) -> None:
+  coro = self._function_we_care_about_impl()
+  self._mixin_asyncio_loop.run_until_complete(coro)
+```
+
+Note: If using `AsyncAdapter` as a mixin, it should be the first thing included
+in the inheritance, particularly if using `Mobly`, as this will ensure that the
+loop logic is initialized properly.
+
 <!-- Reference links -->
 
 [asyncio-wait]: https://docs.python.org/3/library/asyncio-task.html#asyncio.wait
