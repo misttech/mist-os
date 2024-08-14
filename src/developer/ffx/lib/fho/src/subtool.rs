@@ -50,6 +50,12 @@ pub trait FfxMain: Sized {
     async fn try_print_schema(self, mut writer: Self::Writer) -> Result<()> {
         writer.try_print_schema().map_err(|e| e.into())
     }
+
+    /// Returns the basename of the log file to use with this tool. With the exception
+    /// of long running tools, subtools are strongly encouraged to use the default basename.
+    fn log_basename(&self) -> Option<String> {
+        None
+    }
 }
 
 #[derive(FromArgs)]
