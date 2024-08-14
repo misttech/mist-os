@@ -163,7 +163,7 @@ int main(int argc, char* argv[]) {
     }
   }
   fuchsia_logging::LogSettingsBuilder builder;
-  builder.WithMinLogSeverity(CAMERA_MIN_LOG_LEVEL).BuildAndInitializeWithTags({"camera-gym"});
+  builder.WithMinLogSeverity(CAMERA_MIN_LOG_LEVEL).WithTags({"camera-gym"}).BuildAndInitialize();
 
   async::Loop buffer_collage_loop(&kAsyncLoopConfigAttachToCurrentThread);
   async::Loop cycler_loop(&kAsyncLoopConfigNoAttachToCurrentThread);

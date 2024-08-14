@@ -106,11 +106,6 @@ class LogSettingsBuilder {
   // and initializes (or re-initializes) the LogSink connection.
   void BuildAndInitialize();
 
-  // TODO(b/299996898): Remove once everyone has migrated to WithTags.
-  void BuildAndInitializeWithTags(const std::initializer_list<std::string>& tags) {
-    WithTags(tags).BuildAndInitialize();
-  }
-
  private:
   LogSettings settings_;
 };
