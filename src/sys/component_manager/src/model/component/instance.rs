@@ -40,7 +40,7 @@ use cm_fidl_validator::error::{DeclType, Error as ValidatorError};
 use cm_logger::scoped::ScopedLogger;
 use cm_rust::{
     CapabilityDecl, CapabilityTypeName, ChildDecl, CollectionDecl, ComponentDecl, DeliveryType,
-    ExposeDeclCommon, FidlIntoNative, NativeIntoFidl, OfferDeclCommon, SourceName, UseDecl,
+    ExposeDeclCommon, FidlIntoNative, NativeIntoFidl, OfferDeclCommon, UseDecl,
 };
 use cm_types::{Name, RelativePath};
 use config_encoder::ConfigFields;
@@ -57,7 +57,7 @@ use router_error::RouterError;
 use sandbox::{
     Capability, Dict, DirEntry, RemotableCapability, Request, Routable, Router, WeakInstanceToken,
 };
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 use std::fmt;
 use std::sync::Arc;
 use tracing::warn;
@@ -325,13 +325,6 @@ pub struct ResolvedInstanceState {
     /// Created on demand.
     exposed_dir: Once<DirEntry>,
 
-    /// Dynamic capabilities this component supports.
-    ///
-    /// For now, these are added in the the `AddChild` API for a realm, and we only
-    /// support configuration capabilities. In the `AddChild` API these are paired with
-    /// a dynamic offer, and are removed when that dynamic offer is removed.
-    dynamic_capabilities: Vec<cm_rust::CapabilityDecl>,
-
     /// Dynamic offers targeting this component's dynamic children.
     ///
     /// Invariant: the `target` field of all offers must refer to a live dynamic
@@ -426,7 +419,6 @@ impl ResolvedInstanceState {
             namespace_dir: Once::default(),
             exposed_dict: Once::default(),
             exposed_dir: Once::default(),
-            dynamic_capabilities: vec![],
             dynamic_offers: vec![],
             address,
             anonymized_services: HashMap::new(),
@@ -678,8 +670,6 @@ impl ResolvedInstanceState {
             return;
         }
 
-        let mut capability_names_to_remove = HashSet::new();
-
         // Delete any dynamic offers whose `source` or `target` matches the
         // component we're deleting.
         self.dynamic_offers.retain(|offer| {
@@ -693,14 +683,8 @@ impl ResolvedInstanceState {
                     name: moniker.name().clone(),
                     collection: moniker.collection().map(|c| c.clone()),
                 });
-            if target_matches && offer.source() == &cm_rust::OfferSource::Self_ {
-                capability_names_to_remove.insert(offer.source_name().clone());
-            }
             !source_matches && !target_matches
         });
-        // Delete any dynamic capabilities whose `source` or `target` matches the
-        // component we're deleting.
-        self.dynamic_capabilities.retain(|cap| !capability_names_to_remove.contains(cap.name()))
     }
 
     /// Creates a set of Environments instantiated from their EnvironmentDecls.
@@ -767,20 +751,11 @@ impl ResolvedInstanceState {
         child: &ChildDecl,
         collection: Option<&CollectionDecl>,
         dynamic_offers: Option<Vec<fdecl::Offer>>,
-        dynamic_capabilities: Option<Vec<fdecl::Capability>>,
         controller: Option<ServerEnd<fcomponent::ControllerMarker>>,
         input: ComponentInput,
     ) -> Result<Arc<ComponentInstance>, AddDynamicChildError> {
-        let child = self
-            .add_child_internal(
-                component,
-                child,
-                collection,
-                dynamic_offers,
-                dynamic_capabilities,
-                input,
-            )
-            .await?;
+        let child =
+            self.add_child_internal(component, child, collection, dynamic_offers, input).await?;
 
         if let Some(controller) = controller {
             if let Ok(stream) = controller.into_stream() {
@@ -798,19 +773,14 @@ impl ResolvedInstanceState {
         child: &ChildDecl,
         collection: Option<&CollectionDecl>,
         dynamic_offers: Option<Vec<fdecl::Offer>>,
-        dynamic_capabilities: Option<Vec<fdecl::Capability>>,
         child_input: ComponentInput,
     ) -> Result<Arc<ComponentInstance>, AddChildError> {
         assert!(
             (dynamic_offers.is_none()) || collection.is_some(),
             "setting numbered handles or dynamic offers for static children",
         );
-        let (dynamic_offers, dynamic_capabilities) = self.validate_and_convert_dynamic_component(
-            dynamic_offers,
-            dynamic_capabilities,
-            child,
-            collection,
-        )?;
+        let dynamic_offers =
+            self.validate_and_convert_dynamic_component(dynamic_offers, child, collection)?;
 
         let child_name =
             ChildName::try_new(child.name.as_str(), collection.map(|c| c.name.as_str()))?;
@@ -862,8 +832,6 @@ impl ResolvedInstanceState {
         self.children.insert(child_name, child.clone());
 
         self.dynamic_offers.extend(dynamic_offers.into_iter());
-        self.dynamic_capabilities.extend(dynamic_capabilities.into_iter());
-
         Ok(child)
     }
 
@@ -911,27 +879,17 @@ impl ResolvedInstanceState {
         &self,
         all_dynamic_children: Vec<(&str, &str)>,
         dynamic_offers: Vec<fdecl::Offer>,
-        dynamic_capabilities: Vec<fdecl::Capability>,
     ) -> Result<(), AddChildError> {
         // Combine all our dynamic offers.
         let mut all_dynamic_offers: Vec<_> =
             self.dynamic_offers.clone().into_iter().map(NativeIntoFidl::native_into_fidl).collect();
         all_dynamic_offers.append(&mut dynamic_offers.clone());
 
-        // Combine all our dynamic capabilities.
-        let mut decl = self.resolved_component.decl.clone();
-        decl.capabilities.extend(self.dynamic_capabilities.clone().into_iter());
-        let mut decl = decl.native_into_fidl();
-        match &mut decl.capabilities.as_mut() {
-            Some(c) => c.extend(dynamic_capabilities.into_iter()),
-            None => decl.capabilities = Some(dynamic_capabilities),
-        }
-
         // Validate!
         cm_fidl_validator::validate_dynamic_offers(
             all_dynamic_children,
             &all_dynamic_offers,
-            &decl,
+            &self.resolved_component.decl.clone().native_into_fidl(),
         )
         .map_err(|err| {
             if err.errs.iter().all(|e| matches!(e, ValidatorError::DependencyCycle(_))) {
@@ -956,15 +914,13 @@ impl ResolvedInstanceState {
     pub fn validate_and_convert_dynamic_component(
         &self,
         dynamic_offers: Option<Vec<fdecl::Offer>>,
-        dynamic_capabilities: Option<Vec<fdecl::Capability>>,
         child: &ChildDecl,
         collection: Option<&CollectionDecl>,
-    ) -> Result<(Vec<cm_rust::OfferDecl>, Vec<cm_rust::CapabilityDecl>), AddChildError> {
+    ) -> Result<Vec<cm_rust::OfferDecl>, AddChildError> {
         let dynamic_offers = dynamic_offers.unwrap_or_default();
-        let dynamic_capabilities = dynamic_capabilities.unwrap_or_default();
 
         let dynamic_offers = self.add_target_dynamic_offers(dynamic_offers, child, collection)?;
-        if !dynamic_offers.is_empty() || !dynamic_capabilities.is_empty() {
+        if !dynamic_offers.is_empty() {
             let mut all_dynamic_children: Vec<_> = self
                 .children()
                 .filter_map(|(n, _)| {
@@ -982,16 +938,9 @@ impl ResolvedInstanceState {
                     .name
                     .as_str(),
             ));
-            self.validate_dynamic_component(
-                all_dynamic_children,
-                dynamic_offers.clone(),
-                dynamic_capabilities.clone(),
-            )?;
+            self.validate_dynamic_component(all_dynamic_children, dynamic_offers.clone())?;
         }
-        let dynamic_offers = dynamic_offers.into_iter().map(|o| o.fidl_into_native()).collect();
-        let dynamic_capabilities =
-            dynamic_capabilities.into_iter().map(|c| c.fidl_into_native()).collect();
-        Ok((dynamic_offers, dynamic_capabilities))
+        Ok(dynamic_offers.into_iter().map(|o| o.fidl_into_native()).collect())
     }
 
     async fn add_static_children(
@@ -1004,7 +953,7 @@ impl ResolvedInstanceState {
         for child in &children {
             // `child_input` will be populated later, after the component's sandbox is
             // constructed.
-            self.add_child_internal(component, child, None, None, None, ComponentInput::default())
+            self.add_child_internal(component, child, None, None, ComponentInput::default())
                 .await
                 .map_err(|err| ResolveActionError::AddStaticChildError {
                     child_name: child.name.to_string(),
@@ -1061,13 +1010,7 @@ impl ResolvedInstanceInterface for ResolvedInstanceState {
     }
 
     fn capabilities(&self) -> Vec<cm_rust::CapabilityDecl> {
-        self.resolved_component
-            .decl
-            .capabilities
-            .iter()
-            .chain(self.dynamic_capabilities.iter())
-            .cloned()
-            .collect()
+        self.resolved_component.decl.capabilities.clone()
     }
 
     fn collections(&self) -> Vec<cm_rust::CollectionDecl> {

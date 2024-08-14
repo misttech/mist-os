@@ -3,13 +3,14 @@
 // found in the LICENSE file.
 
 use crate::cobalt;
+use anyhow::anyhow;
 use fidl::endpoints::{create_proxy, ServerEnd};
 use thiserror::Error;
 use tracing::info;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-    fidl_fuchsia_io as fio, fidl_fuchsia_session as fsession, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_io as fio,
+    fidl_fuchsia_session as fsession, fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 /// Errors returned by calls startup functions.
@@ -17,6 +18,9 @@ use {
 pub enum StartupError {
     #[error("Existing session not destroyed at \"{}/{}\": {:?}", collection, name, err)]
     NotDestroyed { name: String, collection: String, err: fcomponent::Error },
+
+    #[error("Session {} not created at \"{}/{}\": Bedrock error {:?}", url, collection, name, err)]
+    BedrockError { name: String, collection: String, url: String, err: String },
 
     #[error("Session {} not created at \"{}/{}\": {:?}", url, collection, name, err)]
     NotCreated { name: String, collection: String, url: String, err: fcomponent::Error },
@@ -45,10 +49,9 @@ impl From<StartupError> for fsession::LaunchError {
                 fcomponent::Error::InstanceCannotResolve => fsession::LaunchError::NotFound,
                 _ => fsession::LaunchError::CreateComponentFailed,
             },
-            StartupError::ExposedDirNotOpened { .. } => {
-                fsession::LaunchError::CreateComponentFailed
-            }
-            StartupError::NotLaunched { .. } => fsession::LaunchError::CreateComponentFailed,
+            StartupError::ExposedDirNotOpened { .. }
+            | StartupError::BedrockError { .. }
+            | StartupError::NotLaunched { .. } => fsession::LaunchError::CreateComponentFailed,
             StartupError::NotRunning => fsession::LaunchError::NotFound,
         }
     }
@@ -62,10 +65,9 @@ impl From<StartupError> for fsession::RestartError {
                 fcomponent::Error::InstanceCannotResolve => fsession::RestartError::NotFound,
                 _ => fsession::RestartError::CreateComponentFailed,
             },
-            StartupError::ExposedDirNotOpened { .. } => {
-                fsession::RestartError::CreateComponentFailed
-            }
-            StartupError::NotLaunched { .. } => fsession::RestartError::CreateComponentFailed,
+            StartupError::ExposedDirNotOpened { .. }
+            | StartupError::BedrockError { .. }
+            | StartupError::NotLaunched { .. } => fsession::RestartError::CreateComponentFailed,
             StartupError::NotRunning => fsession::RestartError::NotRunning,
         }
     }
@@ -81,10 +83,9 @@ impl From<StartupError> for fsession::LifecycleError {
                 }
                 _ => fsession::LifecycleError::CreateComponentFailed,
             },
-            StartupError::ExposedDirNotOpened { .. } => {
-                fsession::LifecycleError::CreateComponentFailed
-            }
-            StartupError::NotLaunched { .. } => fsession::LifecycleError::CreateComponentFailed,
+            StartupError::ExposedDirNotOpened { .. }
+            | StartupError::BedrockError { .. }
+            | StartupError::NotLaunched { .. } => fsession::LifecycleError::CreateComponentFailed,
             StartupError::NotRunning => fsession::LifecycleError::NotFound,
         }
     }
@@ -152,6 +153,42 @@ pub async fn stop_session(realm: &fcomponent::RealmProxy) -> Result<(), StartupE
         })
 }
 
+async fn create_config_dict(
+    config_capabilities: Vec<fdecl::Configuration>,
+) -> Result<Option<fsandbox::DictionaryRef>, anyhow::Error> {
+    if config_capabilities.is_empty() {
+        return Ok(None);
+    }
+    let dict_store =
+        fuchsia_component::client::connect_to_protocol::<fsandbox::CapabilityStoreMarker>()?;
+    let dict_id = 1;
+    dict_store.dictionary_create(dict_id).await?.map_err(|e| anyhow!("{:#?}", e))?;
+    let mut config_id = 2;
+    for config in config_capabilities {
+        let Some(value) = config.value else { continue };
+        let Some(key) = config.name else { continue };
+
+        dict_store
+            .import(
+                config_id,
+                fsandbox::Capability::Data(fsandbox::Data::Bytes(fidl::persist(&value)?)),
+            )
+            .await?
+            .map_err(|e| anyhow!("{:#?}", e))?;
+
+        dict_store
+            .dictionary_insert(dict_id, &fsandbox::DictionaryItem { key, value: config_id })
+            .await?
+            .map_err(|e| anyhow!("{:#?}", e))?;
+        config_id += 1;
+    }
+    let dict = dict_store.export(dict_id).await?.map_err(|e| anyhow!("{:#?}", e))?;
+    let fsandbox::Capability::Dictionary(dict) = dict else {
+        return Err(anyhow!("Bad bedrock capability type"));
+    };
+    Ok(Some(dict))
+}
+
 /// Sets the currently active session.
 ///
 /// If an existing session is running, the session's component instance will be destroyed prior to
@@ -191,7 +228,14 @@ async fn set_session(
         create_proxy::<fcomponent::ControllerMarker>().expect("creating proxy should not fail");
     let create_child_args = fcomponent::CreateChildArgs {
         controller: Some(controller_server_end),
-        config_capabilities: Some(config_capabilities),
+        dictionary: create_config_dict(config_capabilities).await.map_err(|err| {
+            StartupError::BedrockError {
+                name: SESSION_NAME.to_string(),
+                collection: SESSION_CHILD_COLLECTION.to_string(),
+                url: session_url.to_string(),
+                err: format!("{err:#?}"),
+            }
+        })?,
         ..Default::default()
     };
     realm_management::create_child_component(
