@@ -254,45 +254,6 @@ void VnodeF2fs::ReportPagerErrorUnsafe(const uint32_t op, const uint64_t offset,
   }
 }
 
-zx_status_t VnodeF2fs::Allocate(F2fs *fs, ino_t ino, umode_t mode, fbl::RefPtr<VnodeF2fs> *out) {
-  if (fs->GetNodeManager().CheckNidRange(ino)) {
-    if (S_ISDIR(mode)) {
-      *out = fbl::MakeRefCounted<Dir>(fs, ino, mode);
-    } else {
-      *out = fbl::MakeRefCounted<File>(fs, ino, mode);
-    }
-    return ZX_OK;
-  }
-  return ZX_ERR_NOT_FOUND;
-}
-
-zx_status_t VnodeF2fs::Create(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out) {
-  LockedPage node_page;
-  SuperblockInfo &superblock_info = fs->GetSuperblockInfo();
-  if (ino < superblock_info.GetRootIno() || !fs->GetNodeManager().CheckNidRange(ino) ||
-      fs->GetNodeManager().GetNodePage(ino, &node_page) != ZX_OK) {
-    return ZX_ERR_NOT_FOUND;
-  }
-
-  Inode &inode = node_page->GetAddress<Node>()->i;
-  std::string_view name(reinterpret_cast<char *>(inode.i_name),
-                        std::min(kMaxNameLen, inode.i_namelen));
-  if (inode.i_namelen != name.length() ||
-      (ino != superblock_info.GetRootIno() && !fs::IsValidName(name))) {
-    // TODO: Need to repair the file or set NeedFsck flag when fsck supports repair feature.
-    // For now, we set kBad and clear link, so that it can be deleted without purging.
-    return ZX_ERR_NOT_FOUND;
-  }
-  fbl::RefPtr<VnodeF2fs> vnode;
-  if (zx_status_t status = Allocate(fs, ino, LeToCpu(inode.i_mode), &vnode); status != ZX_OK) {
-    return status;
-  }
-
-  vnode->Init(node_page);
-  *out = std::move(vnode);
-  return ZX_OK;
-}
-
 void VnodeF2fs::RecycleNode() TA_NO_THREAD_SAFETY_ANALYSIS {
   ZX_ASSERT_MSG(open_count() == 0, "RecycleNode[%s:%u]: open_count must be zero (%lu)",
                 GetNameView().data(), GetKey(), open_count());
@@ -410,47 +371,13 @@ struct f2fs_iget_args {
 //   if (vnode)
 //     return vnode;
 //   if (!args.on_free) {
-//     Vget(fs(), ino, &vnode_refptr);
+//     fs()->GetVnode(ino, &vnode_refptr);
 //     vnode = vnode_refptr.get();
 //     return vnode;
 //   }
 //   return static_cast<VnodeF2fs *>(ErrPtr(ZX_ERR_NOT_FOUND));
 // }
 #endif
-
-zx_status_t VnodeF2fs::Vget(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out) {
-  fbl::RefPtr<VnodeF2fs> vnode;
-  if (fs->LookupVnode(ino, &vnode) == ZX_OK) {
-    vnode->WaitForInit();
-    *out = std::move(vnode);
-    return ZX_OK;
-  }
-
-  if (zx_status_t status = Create(fs, ino, &vnode); status != ZX_OK) {
-    return status;
-  }
-
-  // VnodeCache should keep vnodes holding valid links except when purging orphans at mount time.
-  if (ino != fs->GetSuperblockInfo().GetNodeIno() && ino != fs->GetSuperblockInfo().GetMetaIno() &&
-      (!fs->IsOnRecovery() && !vnode->GetNlink())) {
-    vnode->SetFlag(InodeInfoFlag::kBad);
-    return ZX_ERR_NOT_FOUND;
-  }
-
-  if (zx_status_t status = fs->InsertVnode(vnode.get()); status != ZX_OK) {
-    ZX_ASSERT(status == ZX_ERR_ALREADY_EXISTS);
-    vnode->SetFlag(InodeInfoFlag::kBad);
-    vnode.reset();
-    ZX_ASSERT(fs->LookupVnode(ino, &vnode) == ZX_OK);
-    vnode->WaitForInit();
-    *out = std::move(vnode);
-    return ZX_OK;
-  }
-
-  vnode->UnlockNewInode();
-  *out = std::move(vnode);
-  return ZX_OK;
-}
 
 void VnodeF2fs::UpdateInodePage(LockedPage &inode_page, bool update_size) {
   inode_page->WaitOnWriteback();
@@ -664,7 +591,7 @@ void VnodeF2fs::EvictVnode() {
     TruncateToSize();
   }
   RemoveInodePage();
-  fs()->EvictVnode(this);
+  fs()->GetVCache().Evict(this);
 }
 
 zx_status_t VnodeF2fs::InitFileCache(uint64_t nbytes) {

@@ -15,19 +15,15 @@ F2fs::FsyncInodeEntry *F2fs::GetFsyncInode(FsyncInodeList &inode_list, nid_t ino
 }
 
 zx_status_t F2fs::RecoverDentry(NodePage &ipage, VnodeF2fs &vnode) {
-  Inode &inode = ipage.GetAddress<Node>()->i;
-  fbl::RefPtr<VnodeF2fs> dir_refptr;
-  zx_status_t err = ZX_OK;
-
   if (!ipage.IsDentDnode()) {
     return ZX_OK;
   }
 
-  if (err = VnodeF2fs::Vget(this, LeToCpu(inode.i_pino), &dir_refptr); err != ZX_OK) {
-    return err;
+  auto vnode_or = GetVnode(LeToCpu(ipage.GetAddress<Node>()->i.i_pino));
+  if (vnode_or.is_error()) {
+    return vnode_or.status_value();
   }
-
-  return fbl::RefPtr<Dir>::Downcast(dir_refptr)->RecoverLink(vnode).status_value();
+  return fbl::RefPtr<Dir>::Downcast(*vnode_or)->RecoverLink(vnode).status_value();
 }
 
 zx_status_t F2fs::RecoverInode(VnodeF2fs &vnode, NodePage &node_page) {
@@ -100,11 +96,12 @@ zx::result<F2fs::FsyncInodeList> F2fs::FindFsyncDnodes() {
         }
       }
 
-      fbl::RefPtr<VnodeF2fs> vnode_refptr;
-      if (zx_status_t err = VnodeF2fs::Vget(this, ino, &vnode_refptr); err != ZX_OK) {
-        return zx::error(err);
+      auto vnode_or = GetVnode(ino);
+      if (vnode_or.is_error()) {
+        return vnode_or.take_error();
       }
 
+      fbl::RefPtr<VnodeF2fs> vnode_refptr = *std::move(vnode_or);
       auto entry = std::make_unique<FsyncInodeEntry>(std::move(vnode_refptr));
       entry->SetLastDnodeBlkaddr(blkaddr);
       inode_list.push_back(std::move(entry));
@@ -174,7 +171,9 @@ void F2fs::CheckIndexInPrevNodes(block_t blkaddr) {
       return;
     }
     nid_t ino = node_page.GetPage<NodePage>().InoOfNode();
-    ZX_ASSERT(VnodeF2fs::Vget(this, ino, &vnode_refptr) == ZX_OK);
+    auto vnode_or = GetVnode(ino);
+    ZX_ASSERT(vnode_or.is_ok());
+    vnode_refptr = *std::move(vnode_or);
     bidx = node_page.GetPage<NodePage>().StartBidxOfNode(vnode_refptr->GetAddrsPerInode()) +
            LeToCpu(sum.ofs_in_node);
   }

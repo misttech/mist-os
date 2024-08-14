@@ -8,81 +8,26 @@
 
 namespace f2fs {
 
-zx_status_t Dir::NewInode(umode_t mode, fbl::RefPtr<VnodeF2fs> *out) {
-  fbl::RefPtr<VnodeF2fs> vnode;
-
-  auto ino_or = fs()->GetNodeManager().AllocNid();
-  if (ino_or.is_error()) {
-    return ZX_ERR_NO_SPACE;
-  }
-
-  if (auto ret = VnodeF2fs::Allocate(fs(), *ino_or, mode, &vnode); ret != ZX_OK) {
-    return ret;
-  }
-  vnode->SetUid(getuid());
-  if (HasGid()) {
-    vnode->SetGid(gid_);
-    if (S_ISDIR(mode))
-      mode |= S_ISGID;
-  } else {
-    vnode->SetGid(getgid());
-  }
-
-  vnode->InitNlink();
-  vnode->SetBlocks(0);
-  vnode->InitTime();
-  vnode->SetGeneration(superblock_info_.GetNextGeneration());
-  superblock_info_.IncNextGeneration();
-
-  if (superblock_info_.TestOpt(MountOption::kInlineXattr)) {
-    vnode->SetFlag(InodeInfoFlag::kInlineXattr);
-    vnode->SetInlineXattrAddrs(kInlineXattrAddrs);
-  }
-
-  if (superblock_info_.TestOpt(MountOption::kInlineDentry) && vnode->IsDir()) {
-    vnode->SetFlag(InodeInfoFlag::kInlineDentry);
-    vnode->SetInlineXattrAddrs(kInlineXattrAddrs);
-  }
-
-  if (vnode->IsReg()) {
-    vnode->InitExtentTree();
-  }
-  vnode->InitFileCache();
-  vnode->SetFlag(InodeInfoFlag::kNewInode);
-
-  fs()->InsertVnode(vnode.get());
-  vnode->SetDirty();
-
-  *out = std::move(vnode);
-  return ZX_OK;
-}
-
 zx_status_t Dir::DoCreate(std::string_view name, umode_t mode, fbl::RefPtr<fs::Vnode> *out) {
-  fbl::RefPtr<VnodeF2fs> vnode_refptr;
-  VnodeF2fs *vnode = nullptr;
+  auto vnode_or = fs()->CreateNewVnode(safemath::CheckOr<umode_t>(S_IFREG, mode).ValueOrDie());
+  if (vnode_or.is_error()) {
+    return vnode_or.error_value();
+  }
 
-  if (zx_status_t err =
-          NewInode(safemath::CheckOr<umode_t>(S_IFREG, mode).ValueOrDie(), &vnode_refptr);
-      err != ZX_OK) {
+  vnode_or->SetName(name);
+  if (!superblock_info_.TestOpt(MountOption::kDisableExtIdentify)) {
+    vnode_or->SetColdFile();
+  }
+
+  if (zx_status_t err = AddLink(name, (*vnode_or).get()); err != ZX_OK) {
+    vnode_or->ClearNlink();
+    vnode_or->ClearDirty();
+    fs()->GetNodeManager().AddFreeNid(vnode_or->Ino());
     return err;
   }
 
-  vnode = vnode_refptr.get();
-  vnode->SetName(name);
-
-  if (!superblock_info_.TestOpt(MountOption::kDisableExtIdentify))
-    vnode->SetColdFile();
-
-  if (zx_status_t err = AddLink(name, vnode); err != ZX_OK) {
-    vnode->ClearNlink();
-    vnode->UnlockNewInode();
-    vnode->ClearDirty();
-    fs()->GetNodeManager().AddFreeNid(vnode->Ino());
-    return err;
-  }
-
-  vnode->UnlockNewInode();
-  *out = std::move(vnode_refptr);
+  vnode_or->ClearFlag(InodeInfoFlag::kNewInode);
+  *out = *std::move(vnode_or);
   return ZX_OK;
 }
 
@@ -95,11 +40,11 @@ zx::result<> Dir::RecoverLink(VnodeF2fs &vnode) {
     AddLink(vnode.GetNameView(), &vnode);
   } else if (vnode.Ino() != dir_entry->ino) {
     // Remove old dentry
-    fbl::RefPtr<VnodeF2fs> old_vnode_refptr;
-    if (zx_status_t err = VnodeF2fs::Vget(fs(), dir_entry->ino, &old_vnode_refptr); err != ZX_OK) {
-      return zx::error(err);
+    auto old_vnode_or = fs()->GetVnode(dir_entry->ino);
+    if (old_vnode_or.is_error()) {
+      return old_vnode_or.take_error();
     }
-    DeleteEntry(*dir_entry, page, old_vnode_refptr.get());
+    DeleteEntry(*dir_entry, page, (*old_vnode_or).get());
     ZX_ASSERT(AddLink(vnode.GetNameView(), &vnode) == ZX_OK);
   }
   return zx::ok();
@@ -144,11 +89,11 @@ zx_status_t Dir::DoLookup(std::string_view name, fbl::RefPtr<fs::Vnode> *out) {
     return ZX_ERR_INVALID_ARGS;
   }
   if (auto ino_or = LookUpEntries(name); ino_or.is_ok()) {
-    fbl::RefPtr<VnodeF2fs> vn;
-    if (zx_status_t ret = VnodeF2fs::Vget(fs(), *ino_or, &vn); ret != ZX_OK) {
-      return ret;
+    auto vnode_or = fs()->GetVnode(*ino_or);
+    if (vnode_or.is_error()) {
+      return vnode_or.error_value();
     }
-    *out = std::move(vn);
+    *out = *std::move(vnode_or);
     return ZX_OK;
   }
   return ZX_ERR_NOT_FOUND;
@@ -210,27 +155,21 @@ zx_status_t Dir::DoUnlink(VnodeF2fs *vnode, std::string_view name) {
 #endif
 
 zx_status_t Dir::Mkdir(std::string_view name, umode_t mode, fbl::RefPtr<fs::Vnode> *out) {
-  fbl::RefPtr<VnodeF2fs> vnode_refptr;
-  VnodeF2fs *vnode = nullptr;
-
-  if (zx_status_t err =
-          NewInode(safemath::CheckOr<umode_t>(S_IFDIR, mode).ValueOrDie(), &vnode_refptr);
-      err != ZX_OK)
-    return err;
-  vnode = vnode_refptr.get();
-  vnode->SetName(name);
-  vnode->SetFlag(InodeInfoFlag::kIncLink);
-  if (zx_status_t err = AddLink(name, vnode); err != ZX_OK) {
-    vnode->ClearFlag(InodeInfoFlag::kIncLink);
-    vnode->ClearNlink();
-    vnode->UnlockNewInode();
-    vnode->ClearDirty();
-    fs()->GetNodeManager().AddFreeNid(vnode->Ino());
+  auto vnode_or = fs()->CreateNewVnode(safemath::CheckOr<umode_t>(S_IFDIR, mode).ValueOrDie());
+  if (vnode_or.is_error()) {
+    return vnode_or.error_value();
+  }
+  vnode_or->SetName(name);
+  vnode_or->SetFlag(InodeInfoFlag::kIncLink);
+  if (zx_status_t err = AddLink(name, (*vnode_or).get()); err != ZX_OK) {
+    vnode_or->ClearFlag(InodeInfoFlag::kIncLink);
+    vnode_or->ClearNlink();
+    vnode_or->ClearDirty();
+    fs()->GetNodeManager().AddFreeNid(vnode_or->Ino());
     return err;
   }
-  vnode->UnlockNewInode();
-
-  *out = std::move(vnode_refptr);
+  vnode_or->ClearFlag(InodeInfoFlag::kNewInode);
+  *out = *std::move(vnode_or);
   return ZX_OK;
 }
 
@@ -279,18 +218,16 @@ zx_status_t Dir::Rmdir(Dir *vnode, std::string_view name) {
 
 zx::result<bool> Dir::IsSubdir(Dir *possible_dir) {
   VnodeF2fs *vnode = possible_dir;
-  fbl::RefPtr<VnodeF2fs> parent;
   while (vnode->Ino() != superblock_info_.GetRootIno()) {
     if (vnode->Ino() == Ino()) {
       return zx::ok(true);
     }
 
-    if (zx_status_t status = VnodeF2fs::Vget(fs(), vnode->GetParentNid(), &parent);
-        status != ZX_OK) {
-      return zx::error(status);
+    auto parent_or = fs()->GetVnode(vnode->GetParentNid());
+    if (parent_or.is_error()) {
+      return parent_or.take_error();
     }
-
-    vnode = parent.get();
+    vnode = (*parent_or).get();
   }
   return zx::ok(false);
 }
@@ -321,12 +258,13 @@ zx_status_t Dir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname
       return ZX_ERR_NOT_FOUND;
     }
 
-    fbl::RefPtr<VnodeF2fs> old_vnode;
     nid_t old_ino = old_entry->ino;
-    if (zx_status_t err = VnodeF2fs::Vget(fs(), old_ino, &old_vnode); err != ZX_OK) {
-      return err;
+    auto old_vnode_or = fs()->GetVnode(old_ino);
+    if (old_vnode_or.is_error()) {
+      return old_vnode_or.error_value();
     }
 
+    fbl::RefPtr<VnodeF2fs> old_vnode = *std::move(old_vnode_or);
     ZX_DEBUG_ASSERT(old_vnode->IsSameName(oldname));
 
     if (!old_vnode->IsDir() && (src_must_be_dir || dst_must_be_dir)) {
@@ -362,11 +300,12 @@ zx_status_t Dir::Rename(fbl::RefPtr<fs::Vnode> _newdir, std::string_view oldname
 
     if (new_entry.is_ok()) {
       ino_t new_ino = new_entry->ino;
-      fbl::RefPtr<VnodeF2fs> new_vnode;
-      if (zx_status_t err = VnodeF2fs::Vget(fs(), new_ino, &new_vnode); err != ZX_OK) {
-        return err;
+      auto new_vnode_or = fs()->GetVnode(new_ino);
+      if (new_vnode_or.is_error()) {
+        return new_vnode_or.error_value();
       }
 
+      fbl::RefPtr<VnodeF2fs> new_vnode = *std::move(new_vnode_or);
       if (!new_vnode->IsDir() && (src_must_be_dir || dst_must_be_dir)) {
         return ZX_ERR_NOT_DIR;
       }

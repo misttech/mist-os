@@ -351,14 +351,13 @@ zx::result<std::pair<nid_t, block_t>> GcManager::CheckDnode(const Summary &sum, 
 
   fs_->GetNodeManager().CheckNidRange(dnode_info.ino);
 
-  fbl::RefPtr<VnodeF2fs> vnode;
-  if (zx_status_t err = VnodeF2fs::Vget(fs_, dnode_info.ino, &vnode); err != ZX_OK) {
-    return zx::error(err);
+  zx::result vnode_or = fs_->GetVnode(dnode_info.ino);
+  if (vnode_or.is_error()) {
+    return vnode_or.take_error();
   }
 
-  auto start_bidx = node_page.GetPage<NodePage>().StartBidxOfNode(vnode->GetAddrsPerInode());
+  auto start_bidx = node_page.GetPage<NodePage>().StartBidxOfNode(vnode_or->GetAddrsPerInode());
   block_t source_blkaddr = node_page.GetPage<NodePage>().GetBlockAddr(ofs_in_node);
-
   if (source_blkaddr != blkaddr) {
     return zx::error(ZX_ERR_BAD_STATE);
   }
@@ -393,19 +392,19 @@ zx_status_t GcManager::GcDataSegment(const SummaryBlock &sum_blk, unsigned int s
 
     uint32_t ofs_in_node = LeToCpu(entry->ofs_in_node);
 
-    fbl::RefPtr<VnodeF2fs> vnode;
-    if (auto err = VnodeF2fs::Vget(fs_, ino, &vnode); err != ZX_OK) {
+    zx::result vnode_or = fs_->GetVnode(ino);
+    if (vnode_or.is_error()) {
       continue;
     }
 
     LockedPage data_page;
     const size_t block_index = start_bidx + ofs_in_node;
     // Keeps as long as dir vnodes use discardable vmos.
-    if (vnode->IsReg()) {
-      if (auto err = vnode->GrabCachePage(block_index, &data_page); err != ZX_OK) {
+    if (vnode_or->IsReg()) {
+      if (auto err = vnode_or->GrabCachePage(block_index, &data_page); err != ZX_OK) {
         continue;
       }
-    } else if (auto err = vnode->GetLockedDataPage(block_index, &data_page); err != ZX_OK) {
+    } else if (auto err = vnode_or->GetLockedDataPage(block_index, &data_page); err != ZX_OK) {
       continue;
     }
 
@@ -413,21 +412,21 @@ zx_status_t GcManager::GcDataSegment(const SummaryBlock &sum_blk, unsigned int s
     pgoff_t offset = safemath::CheckMul(data_page->GetKey(), kBlockSize).ValueOrDie();
     // Ask kernel to dirty the vmo area for |data_page|. If the regarding pages are not present, we
     // supply a vmo and dirty it again.
-    if (auto dirty_or = data_page.SetVmoDirty(); dirty_or.is_error()) {
-      vnode->VmoRead(offset, kBlockSize);
+    if (zx::result dirty_or = data_page.SetVmoDirty(); dirty_or.is_error()) {
+      vnode_or->VmoRead(offset, kBlockSize);
     }
     ZX_ASSERT(data_page.SetVmoDirty().is_ok());
-    if (!vnode->IsValid()) {
+    if (!vnode_or->IsValid()) {
       // When victim blocks belongs to orphans, we load and keep them on paged_vmo until the orphans
       // close or kernel reclaims the pages.
       data_page.reset();
-      vnode->TruncateHole(offset, offset + kBlockSize, false);
+      vnode_or->TruncateHole(offset, offset + kBlockSize, false);
       continue;
     }
     data_page.SetDirty();
     data_page->SetColdData();
     if (gc_type == GcType::kFgGc) {
-      block_t addr = vnode->GetBlockAddr(data_page);
+      block_t addr = vnode_or->GetBlockAddr(data_page);
       if (addr == kNullAddr) {
         continue;
       }

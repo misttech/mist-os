@@ -126,8 +126,10 @@ void FileTester::SuddenPowerOff(std::unique_ptr<F2fs> fs, std::unique_ptr<Bcache
 }
 
 void FileTester::CreateRoot(F2fs *fs, fbl::RefPtr<VnodeF2fs> *out) {
-  ASSERT_EQ(VnodeF2fs::Vget(fs, fs->GetSuperblockInfo().GetRootIno(), out), ZX_OK);
-  ASSERT_EQ((*out)->Open(nullptr), ZX_OK);
+  auto vnode_or = fs->GetVnode(fs->GetSuperblockInfo().GetRootIno());
+  ASSERT_TRUE(vnode_or.is_ok());
+  ASSERT_EQ(vnode_or->Open(nullptr), ZX_OK);
+  *out = *std::move(vnode_or);
 }
 
 void FileTester::Lookup(VnodeF2fs *parent, std::string_view name, fbl::RefPtr<fs::Vnode> *out) {
@@ -187,13 +189,17 @@ void FileTester::VnodeWithoutParent(F2fs *fs, umode_t mode, fbl::RefPtr<VnodeF2f
   ASSERT_TRUE(nid_or.is_ok());
   inode_nid = *nid_or;
 
-  VnodeF2fs::Allocate(fs, inode_nid, mode, &vnode);
+  if (S_ISDIR(mode)) {
+    vnode = fbl::MakeRefCounted<Dir>(fs, inode_nid, mode);
+  } else {
+    vnode = fbl::MakeRefCounted<File>(fs, inode_nid, mode);
+  }
+
   ASSERT_EQ(vnode->Open(nullptr), ZX_OK);
   vnode->InitTime();
   vnode->InitFileCache();
   vnode->InitExtentTree();
-  vnode->UnlockNewInode();
-  fs->InsertVnode(vnode.get());
+  fs->GetVCache().Add(vnode.get());
   vnode->SetDirty();
 }
 

@@ -20,8 +20,6 @@ class VnodeCache {
   // it will be blocked until it gets inactive (deactivated) and
   // valid ref_count.
   zx_status_t Lookup(const ino_t& ino, fbl::RefPtr<VnodeF2fs>* out) __TA_EXCLUDES(table_lock_);
-  zx_status_t LookupUnsafe(const ino_t& ino, fbl::RefPtr<VnodeF2fs>* out)
-      __TA_REQUIRES(table_lock_);
 
   // It tries to evict |vnode| from vnode_table_.
   // It returns ZX_ERR_NOT_FOUND if it cannot find |vnode| in the table.

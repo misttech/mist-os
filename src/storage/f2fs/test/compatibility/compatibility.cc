@@ -368,7 +368,9 @@ void FuchsiaOperator::Mount(MountOptions opt) {
   (*fs_or)->SetVfsForTests(std::move(*vfs_or));
   fs_ = std::move(*fs_or);
 
-  ASSERT_EQ(VnodeF2fs::Vget(fs_.get(), fs_->GetSuperblockInfo().GetRootIno(), &root_), ZX_OK);
+  auto vnode_or = fs_->GetVnode(fs_->GetSuperblockInfo().GetRootIno());
+  ASSERT_TRUE(vnode_or.is_ok());
+  root_ = *std::move(vnode_or);
   ASSERT_EQ(root_->Open(root_->ValidateOptions(fs::VnodeConnectionOptions()).value(), nullptr),
             ZX_OK);
 }

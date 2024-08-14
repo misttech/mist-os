@@ -126,9 +126,9 @@ class CheckpointTest : public F2fsFakeDevTestFixture {
   }
 
   void CreateDirs(int dir_cnt, uint64_t version) {
-    fbl::RefPtr<VnodeF2fs> data_root;
-    ASSERT_EQ(VnodeF2fs::Vget(fs_.get(), fs_->GetSuperblockInfo().GetRootIno(), &data_root), ZX_OK);
-    Dir *root_dir = static_cast<Dir *>(data_root.get());
+    auto root_or = fs_->GetVnode(fs_->GetSuperblockInfo().GetRootIno());
+    ASSERT_TRUE(root_or.is_ok());
+    Dir *root_dir = fbl::RefPtr<Dir>::Downcast(*root_or).get();
 
     for (int i = 0; i < dir_cnt; ++i) {
       std::string filename = "dir_" + std::to_string(version) + "_" + std::to_string(i);
@@ -139,9 +139,9 @@ class CheckpointTest : public F2fsFakeDevTestFixture {
   }
 
   void CreateFiles(int file_cnt, uint64_t version) {
-    fbl::RefPtr<VnodeF2fs> data_root;
-    ASSERT_EQ(VnodeF2fs::Vget(fs_.get(), fs_->GetSuperblockInfo().GetRootIno(), &data_root), ZX_OK);
-    Dir *root_dir = static_cast<Dir *>(data_root.get());
+    auto root_or = fs_->GetVnode(fs_->GetSuperblockInfo().GetRootIno());
+    ASSERT_TRUE(root_or.is_ok());
+    Dir *root_dir = fbl::RefPtr<Dir>::Downcast(*root_or).get();
 
     for (int i = 0; i < file_cnt; ++i) {
       std::string filename = "file_" + std::to_string(version) + "_" + std::to_string(i);
@@ -526,22 +526,14 @@ TEST_F(CheckpointTest, PurgeOrphanInode) {
                  std::default_random_engine(static_cast<uint32_t>(cp->checkpoint_ver)));
 
     for (auto ino : inos) {
-      fbl::RefPtr<VnodeF2fs> vnode_refptr;
-      VnodeF2fs *vnode = nullptr;
-
-      VnodeF2fs::Allocate(fs_.get(), ino, S_IFREG, &vnode_refptr);
-      vnode_refptr->InitFileCache();
-      ASSERT_NE(vnode = vnode_refptr.get(), nullptr);
-
+      fbl::RefPtr<VnodeF2fs> vnode =
+          fbl::MakeRefCounted<File>(fs_.get(), ino, static_cast<umode_t>(S_IFREG));
+      vnode->InitFileCache();
       vnode->ClearNlink();
       vnode->IncNlink();
-      vnode->UnlockNewInode();
-
-      fs_->InsertVnode(vnode);
-
-      vnodes.push_back(std::move(vnode_refptr));
+      fs_->GetVCache().Add(vnode.get());
+      vnodes.push_back(std::move(vnode));
       fs_->AddToVnodeSet(VnodeSet::kOrphan, ino);
-      vnode_refptr.reset();
     }
 
     ASSERT_EQ(fs_->GetVnodeSetSize(VnodeSet::kOrphan), orphan_inos);

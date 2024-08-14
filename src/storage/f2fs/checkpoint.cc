@@ -72,11 +72,14 @@ zx_status_t F2fs::CheckOrphanSpace() {
   return ZX_OK;
 }
 
-void F2fs::PurgeOrphanInode(nid_t ino) {
-  fbl::RefPtr<VnodeF2fs> vnode;
-  ZX_ASSERT(VnodeF2fs::Vget(this, ino, &vnode) == ZX_OK);
-  vnode->ClearNlink();
-  // truncate all the data and nodes in VnodeF2fs::Recycle()
+zx::result<> F2fs::PurgeOrphanInode(nid_t ino) {
+  zx::result vnode_or = GetVnode(ino);
+  if (vnode_or.is_error()) {
+    return vnode_or.take_error();
+  }
+  vnode_or->ClearNlink();
+  // Here, |*vnode_or| should be deleted to purge its metadata.
+  return zx::ok();
 }
 
 zx_status_t F2fs::PurgeOrphanInodes() {
@@ -102,7 +105,9 @@ zx_status_t F2fs::PurgeOrphanInodes() {
     ZX_ASSERT(entry_count <= kOrphansPerBlock);
     for (block_t j = 0; j < entry_count; ++j) {
       nid_t ino = LeToCpu(orphan_blk->ino[j]);
-      PurgeOrphanInode(ino);
+      if (PurgeOrphanInode(ino).is_error()) {
+        FX_LOGS(WARNING) << "failed to purge an orphan file (ino: " << ino << ")";
+      }
     }
   }
   // clear Orphan Flag

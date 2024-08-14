@@ -105,12 +105,11 @@ class F2fs final {
   zx::result<fs::FilesystemInfo> GetFilesystemInfo();
   InspectTree &GetInspectTree() { return *inspect_tree_; }
 
+  zx::result<fbl::RefPtr<VnodeF2fs>> GetVnode(ino_t ino);
+  zx::result<fbl::RefPtr<VnodeF2fs>> CreateNewVnode(umode_t mode,
+                                                    std::optional<gid_t> gid = std::nullopt);
+
   VnodeCache &GetVCache() { return vnode_cache_; }
-  zx_status_t InsertVnode(VnodeF2fs *vn) { return vnode_cache_.Add(vn); }
-  zx_status_t EvictVnode(VnodeF2fs *vn) { return vnode_cache_.Evict(vn); }
-  zx_status_t LookupVnode(ino_t ino, fbl::RefPtr<VnodeF2fs> *out) {
-    return vnode_cache_.Lookup(ino, out);
-  }
 
   zx::result<std::unique_ptr<f2fs::BcacheMapper>> TakeBc() {
     if (!bc_) {
@@ -152,7 +151,7 @@ class F2fs final {
   void SetTearDown();
 
   zx_status_t CheckOrphanSpace();
-  void PurgeOrphanInode(nid_t ino);
+  zx::result<> PurgeOrphanInode(nid_t ino);
   int PurgeOrphanInodes();
   void WriteOrphanInodes(block_t start_blk);
   zx_status_t GetValidCheckpoint();
