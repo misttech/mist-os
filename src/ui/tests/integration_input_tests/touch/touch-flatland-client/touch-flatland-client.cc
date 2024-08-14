@@ -97,7 +97,12 @@ class TouchFlatlandClient final : public fidl::Server<fuchsia_ui_app::ViewProvid
       Watch(res.value().events());
     });
 
-    // TODO(chaopeng): add TestAppReady to notify test class.
+    auto test_app_status_listener_connect =
+        component::Connect<fuchsia_ui_test_input::TestAppStatusListener>();
+    ZX_ASSERT_OK(test_app_status_listener_connect);
+    fidl::SyncClient test_app_status_listener(std::move(test_app_status_listener_connect.value()));
+    ZX_ASSERT_OK(test_app_status_listener->ReportStatus(
+        {fuchsia_ui_test_input::TestAppStatus::kHandlersRegistered}));
   }
 
   // |fuchsia_ui_app::ViewProvider|

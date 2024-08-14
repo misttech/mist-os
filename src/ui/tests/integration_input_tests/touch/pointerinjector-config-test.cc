@@ -105,13 +105,16 @@ constexpr auto kMockResponseListener = "response_listener";
 
 class ResponseState {
  public:
-  using CallbackT =
-      fit::function<void(fuchsia_ui_test_input::TouchInputListenerReportTouchInputRequest)>;
-  void SetRespondCallback(CallbackT callback) { respond_callback_ = std::move(callback); }
+  const std::vector<fuchsia_ui_test_input::TouchInputListenerReportTouchInputRequest>&
+  events_received() {
+    return events_received_;
+  }
+  bool ready_to_inject() const { return ready_to_inject_; }
 
  private:
   friend class ResponseListenerServer;
-  CallbackT respond_callback_ = nullptr;
+  std::vector<fuchsia_ui_test_input::TouchInputListenerReportTouchInputRequest> events_received_;
+  bool ready_to_inject_ = false;
 };
 
 // This component implements fuchsia.ui.test.input.TouchInputListener
@@ -122,6 +125,7 @@ class ResponseState {
 // library creates the necessary plumbing. It creates a manifest for the component
 // and routes all capabilities to and from it.
 class ResponseListenerServer : public fidl::Server<fuchsia_ui_test_input::TouchInputListener>,
+                               public fidl::Server<fuchsia_ui_test_input::TestAppStatusListener>,
                                public LocalComponentImpl {
  public:
   explicit ResponseListenerServer(async_dispatcher_t* dispatcher,
@@ -133,8 +137,27 @@ class ResponseListenerServer : public fidl::Server<fuchsia_ui_test_input::TouchI
                         ReportTouchInputCompleter::Sync& completer) override {
     FX_LOGS(INFO) << "ReportTouchInput";
     if (auto s = state_.lock()) {
-      s->respond_callback_(std::move(request));
+      s->events_received_.push_back(std::move(request));
     }
+  }
+
+  // |fuchsia_ui_test_input::TestAppStatusListener|
+  void ReportStatus(ReportStatusRequest& req, ReportStatusCompleter::Sync& completer) override {
+    if (req.status() == fuchsia_ui_test_input::TestAppStatus::kHandlersRegistered) {
+      if (auto s = state_.lock()) {
+        s->ready_to_inject_ = true;
+      }
+    }
+
+    completer.Reply();
+  }
+
+  // |fuchsia_ui_test_input::TestAppStatusListener|
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_ui_test_input::TestAppStatusListener> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    FX_LOGS(WARNING) << "TestAppStatusListener Received an unknown method with ordinal "
+                     << metadata.method_ordinal;
   }
 
   // |LocalComponentImpl::Start|
@@ -144,12 +167,19 @@ class ResponseListenerServer : public fidl::Server<fuchsia_ui_test_input::TouchI
     // When this component starts, add a binding to the test.touch.ResponseListener
     // protocol to this component's outgoing directory.
     outgoing()->AddProtocol<fuchsia_ui_test_input::TouchInputListener>(
-        bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
+        touch_input_listener_bindings_.CreateHandler(this, dispatcher_,
+                                                     fidl::kIgnoreBindingClosure));
+    outgoing()->AddProtocol<fuchsia_ui_test_input::TestAppStatusListener>(
+        app_status_listener_bindings_.CreateHandler(this, dispatcher_,
+                                                    fidl::kIgnoreBindingClosure));
   }
 
  private:
   async_dispatcher_t* dispatcher_ = nullptr;
-  fidl::ServerBindingGroup<fuchsia_ui_test_input::TouchInputListener> bindings_;
+  fidl::ServerBindingGroup<fuchsia_ui_test_input::TouchInputListener>
+      touch_input_listener_bindings_;
+  fidl::ServerBindingGroup<fuchsia_ui_test_input::TestAppStatusListener>
+      app_status_listener_bindings_;
   std::weak_ptr<ResponseState> state_;
 };
 
@@ -165,6 +195,17 @@ struct PointerInjectorConfigTestData {
   float expected_x;
   float expected_y;
 };
+
+void ExpectLocationAndPhase(
+    const fuchsia_ui_test_input::TouchInputListenerReportTouchInputRequest& e, double expected_x,
+    double expected_y, fuchsia_ui_pointer::EventPhase expected_phase) {
+  auto pixel_scale = e.device_pixel_ratio().has_value() ? e.device_pixel_ratio().value() : 1;
+  auto actual_x = pixel_scale * e.local_x().value();
+  auto actual_y = pixel_scale * e.local_y().value();
+  EXPECT_NEAR(expected_x, actual_x, kViewCoordinateEpsilon);
+  EXPECT_NEAR(expected_y, actual_y, kViewCoordinateEpsilon);
+  EXPECT_EQ(expected_phase, e.phase());
+}
 
 class PointerInjectorConfigTest
     : public ui_testing::PortableUITest,
@@ -203,30 +244,32 @@ class PointerInjectorConfigTest
     auto magnifier_connect = realm_root()->component().Connect<test_accessibility::Magnifier>();
     ZX_ASSERT_OK(magnifier_connect);
     fake_magnifier_ = fidl::SyncClient(std::move(magnifier_connect.value()));
+
+    FX_LOGS(INFO) << "Wait for test app status: kHandlersRegistered";
+    RunLoopUntil([&]() { return response_state()->ready_to_inject(); });
+    FX_LOGS(INFO) << "test app status: kHandlersRegistered";
   }
 
-  // Waits for one or more pointer events; calls QuitLoop once one meets expectations.
-  void WaitForAResponseMeetingExpectations(float expected_x, float expected_y,
-                                           const std::string& component_name) {
-    response_state()->SetRespondCallback(
-        [this, expected_x, expected_y,
-         component_name](fuchsia_ui_test_input::TouchInputListenerReportTouchInputRequest request) {
-          FX_LOGS(INFO) << "Client received tap at (" << request.local_x().value() << ", "
-                        << request.local_y().value() << ").";
-          FX_LOGS(INFO) << "Expected tap is at approximately (" << expected_x << ", " << expected_y
-                        << ").";
+  bool LastEventReceivedMatchesPhase(fuchsia_ui_pointer::EventPhase phase,
+                                     const std::string& component_name) {
+    const auto& events_received = response_state_->events_received();
+    if (events_received.empty()) {
+      return false;
+    }
 
-          // Allow for minor rounding differences in coordinates.
-          EXPECT_EQ(request.component_name(), component_name);
-          if (abs(request.local_x().value() - expected_x) <= kViewCoordinateEpsilon &&
-              abs(request.local_y().value() - expected_y) <= kViewCoordinateEpsilon) {
-            response_state()->SetRespondCallback([](const auto&) {});
-            QuitLoop();
-          }
-        });
+    const auto& last_event = events_received.back();
+    const auto actual_phase = last_event.phase().value();
+    auto actual_component_name = last_event.component_name().value();
+
+    FX_LOGS(INFO) << "Expecting event for component " << component_name << " at phase ("
+                  << static_cast<uint32_t>(phase) << ")";
+    FX_LOGS(INFO) << "Received event for component " << actual_component_name << " at phase ("
+                  << static_cast<uint32_t>(actual_phase) << ")";
+
+    return phase == actual_phase && actual_component_name == component_name;
   }
 
-  void TryInjectRepeatedly() {
+  void InjectTapOnTopLeft() {
     int32_t x = 0;
     int32_t y = 0;
 
@@ -248,7 +291,7 @@ class PointerInjectorConfigTest
         FX_NOTREACHED();
     }
 
-    InjectTapWithRetry(x, y);
+    InjectTap(x, y);
   }
 
   void SetClipSpaceTransform(float scale, float x, float y, int display_rotation) {
@@ -283,6 +326,8 @@ class PointerInjectorConfigTest
 
   std::shared_ptr<ResponseState> response_state() { return response_state_; }
 
+  static constexpr auto kCppFlatlandClient = "touch-flatland-client";
+
  private:
   void ExtendRealm() override {
     // Key part of service setup: have this test component vend the
@@ -299,8 +344,13 @@ class PointerInjectorConfigTest
          .source = ChildRef{kCppFlatlandClient},
          .targets = {ParentRef()}});
     realm_builder().AddRoute(
-        {.capabilities = {Protocol{
-             fidl::DiscoverableProtocolName<fuchsia_ui_test_input::TouchInputListener>}},
+        {.capabilities =
+             {
+                 Protocol{
+                     fidl::DiscoverableProtocolName<fuchsia_ui_test_input::TouchInputListener>},
+                 Protocol{
+                     fidl::DiscoverableProtocolName<fuchsia_ui_test_input::TestAppStatusListener>},
+             },
          .source = ChildRef{kMockResponseListener},
          .targets = {ChildRef{kCppFlatlandClient}}});
     realm_builder().AddRoute(
@@ -315,7 +365,6 @@ class PointerInjectorConfigTest
 
   fidl::SyncClient<test_accessibility::Magnifier> fake_magnifier_;
 
-  static constexpr auto kCppFlatlandClient = "client";
   static constexpr auto kCppFlatlandClientUrl = "#meta/touch-flatland-client.cm";
 };
 
@@ -388,26 +437,27 @@ TEST_P(PointerInjectorConfigTest, CppClientTapTest) {
   SetClipSpaceTransform(test_data.clip_scale, test_data.clip_translation_x,
                         test_data.clip_translation_y, test_data.display_rotation);
 
-  TryInjectRepeatedly();
+  InjectTapOnTopLeft();
 
-  switch (test_data.display_rotation) {
-    case 0:
-      WaitForAResponseMeetingExpectations(
-          /*expected_x=*/display_width_float() * test_data.expected_x,
-          /*expected_y=*/display_height_float() * test_data.expected_y,
-          /*component_name=*/"touch-flatland-client");
-      break;
-    case 90:
-      WaitForAResponseMeetingExpectations(
-          /*expected_x=*/display_height_float() * test_data.expected_x,
-          /*expected_y=*/display_width_float() * test_data.expected_y,
-          /*component_name=*/"touch-flatland-client");
-      break;
-    default:
-      FX_NOTREACHED();
+  RunLoopUntil([this] {
+    return LastEventReceivedMatchesPhase(fuchsia_ui_pointer::EventPhase::kRemove,
+                                         kCppFlatlandClient);
+  });
+
+  const auto& events_received = this->response_state()->events_received();
+  ASSERT_EQ(events_received.size(), 2u);
+
+  float expect_x = display_width_float() * test_data.expected_x;
+  float expect_y = display_height_float() * test_data.expected_y;
+  if (test_data.display_rotation == 90) {
+    expect_x = display_height_float() * test_data.expected_x;
+    expect_y = display_width_float() * test_data.expected_y;
   }
 
-  RunLoop();
+  ExpectLocationAndPhase(events_received[0], expect_x, expect_y,
+                         fuchsia_ui_pointer::EventPhase::kAdd);
+  ExpectLocationAndPhase(events_received[1], expect_x, expect_y,
+                         fuchsia_ui_pointer::EventPhase::kRemove);
 }
 
 }  // namespace

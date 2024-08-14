@@ -73,8 +73,6 @@ class WebApp : public integration_tests::WebAppBase {
     ZX_ASSERT_OK(mouse_input_listener_connect);
     fidl::SyncClient mouse_input_listener(std::move(mouse_input_listener_connect.value()));
 
-    // TODO(chaopeng): notify ready to inject events to test.
-
     while (true) {
       bool got_mouse_event = false;
       FX_LOGS(INFO) << "Waiting for mouse response message";

@@ -327,10 +327,12 @@ class ResponseState {
   events_received() {
     return events_received_;
   }
+  bool ready_to_inject() const { return ready_to_inject_; }
 
  private:
   friend class ResponseListenerServer;
   std::vector<fuchsia_ui_test_input::TouchInputListenerReportTouchInputRequest> events_received_;
+  bool ready_to_inject_ = false;
 };
 
 // This component implements the test.touch.ResponseListener protocol
@@ -341,6 +343,7 @@ class ResponseState {
 // library creates the necessary plumbing. It creates a manifest for the component
 // and routes all capabilities to and from it.
 class ResponseListenerServer : public fidl::Server<fuchsia_ui_test_input::TouchInputListener>,
+                               public fidl::Server<fuchsia_ui_test_input::TestAppStatusListener>,
                                public LocalComponentImpl {
  public:
   explicit ResponseListenerServer(async_dispatcher_t* dispatcher,
@@ -355,6 +358,25 @@ class ResponseListenerServer : public fidl::Server<fuchsia_ui_test_input::TouchI
     }
   }
 
+  // |fuchsia_ui_test_input::TestAppStatusListener|
+  void ReportStatus(ReportStatusRequest& req, ReportStatusCompleter::Sync& completer) override {
+    if (req.status() == fuchsia_ui_test_input::TestAppStatus::kHandlersRegistered) {
+      if (auto s = state_.lock()) {
+        s->ready_to_inject_ = true;
+      }
+    }
+
+    completer.Reply();
+  }
+
+  // |fuchsia_ui_test_input::TestAppStatusListener|
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_ui_test_input::TestAppStatusListener> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    FX_LOGS(WARNING) << "TestAppStatusListener Received an unknown method with ordinal "
+                     << metadata.method_ordinal;
+  }
+
   // |LocalComponentImpl::Start|
   // When the component framework requests for this component to start, this
   // method will be invoked by the realm_builder library.
@@ -362,12 +384,19 @@ class ResponseListenerServer : public fidl::Server<fuchsia_ui_test_input::TouchI
     // When this component starts, add a binding to the test.touch.ResponseListener
     // protocol to this component's outgoing directory.
     outgoing()->AddProtocol<fuchsia_ui_test_input::TouchInputListener>(
-        bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure));
+        touch_input_listener_bindings_.CreateHandler(this, dispatcher_,
+                                                     fidl::kIgnoreBindingClosure));
+    outgoing()->AddProtocol<fuchsia_ui_test_input::TestAppStatusListener>(
+        app_status_listener_bindings_.CreateHandler(this, dispatcher_,
+                                                    fidl::kIgnoreBindingClosure));
   }
 
  private:
   async_dispatcher_t* dispatcher_ = nullptr;
-  fidl::ServerBindingGroup<fuchsia_ui_test_input::TouchInputListener> bindings_;
+  fidl::ServerBindingGroup<fuchsia_ui_test_input::TouchInputListener>
+      touch_input_listener_bindings_;
+  fidl::ServerBindingGroup<fuchsia_ui_test_input::TestAppStatusListener>
+      app_status_listener_bindings_;
   std::weak_ptr<ResponseState> state_;
 };
 
@@ -393,6 +422,12 @@ class TouchInputBase : public ui_testing::PortableUITest,
     // Register input injection device.
     FX_LOGS(INFO) << "Registering input injection device";
     RegisterTouchScreen();
+
+    LaunchClient();
+
+    FX_LOGS(INFO) << "Wait for test app status: kHandlersRegistered";
+    RunLoopUntil([&]() { return response_state()->ready_to_inject(); });
+    FX_LOGS(INFO) << "test app status: kHandlersRegistered";
   }
 
   // Subclass should implement this method to add capability routes to the test
@@ -521,8 +556,10 @@ class CppInputTestBase : public TouchInputBase<Ts...> {
         {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_app::ViewProvider>}},
          .source = ChildRef{view_provider},
          .targets = {ParentRef()}},
-        {.capabilities = {Protocol{
-             fidl::DiscoverableProtocolName<fuchsia_ui_test_input::TouchInputListener>}},
+        {.capabilities =
+             {Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_test_input::TouchInputListener>},
+              Protocol{
+                  fidl::DiscoverableProtocolName<fuchsia_ui_test_input::TestAppStatusListener>}},
          .source = ChildRef{kMockResponseListener},
          .targets = {ChildRef{kCppFlatlandClient}}},
         {.capabilities =
@@ -544,11 +581,6 @@ INSTANTIATE_TEST_SUITE_P(CppInputTestParametized, CppInputTest,
                          testing::ValuesIn(AsTuples(ConfigsToTest())));
 
 TEST_P(CppInputTest, CppClientTap) {
-  // Launch client view, and wait until it's rendering to proceed with the test.
-  FX_LOGS(INFO) << "Initializing scene";
-  LaunchClient();
-  FX_LOGS(INFO) << "Client launched";
-
   InjectInput(TapLocation::kTopLeft);
   RunLoopUntil([this] {
     return LastEventReceivedMatchesPhase(fuchsia_ui_pointer::EventPhase::kRemove,
@@ -573,11 +605,6 @@ INSTANTIATE_TEST_SUITE_P(
                                      GetLeftSwipeParams(), GetUpwardSwipeParams())));
 
 TEST_P(CppSwipeTest, CppClientSwipeTest) {
-  // Launch client view, and wait until it's rendering to proceed with the test.
-  FX_LOGS(INFO) << "Initializing scene";
-  LaunchClient();
-  FX_LOGS(INFO) << "Client launched";
-
   const auto& [direction, begin_x, begin_y, expected_events] = std::get<1>(GetParam());
 
   // Inject a swipe on the display. As the child view is rotated by 90 degrees, the direction of
