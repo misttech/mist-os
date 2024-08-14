@@ -226,7 +226,7 @@ AVB metadata which will be used to validate public key
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/android/platform/external/avb/test/data/atx_metadata.bin"`
 
-From //boards/arm64.gni:37
+From //boards/arm64.gni:39
 
 **Overridden from the default:** `""`
 
@@ -234,7 +234,7 @@ From //build/images/vbmeta.gni:23
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/atx_metadata.bin"`
 
-From //boards/common/x64-common.gni:45
+From //boards/x64.gni:57
 
 **Overridden from the default:** `""`
 
@@ -246,7 +246,7 @@ a key which will be used to sign VBMETA and images for AVB
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"`
 
-From //boards/arm64.gni:39
+From //boards/arm64.gni:41
 
 **Overridden from the default:** `""`
 
@@ -254,7 +254,7 @@ From //build/images/vbmeta.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"`
 
-From //boards/common/x64-common.gni:43
+From //boards/x64.gni:55
 
 **Overridden from the default:** `""`
 
@@ -336,7 +336,7 @@ From //build/bazel/bazel_fuchsia_sdk.gni:14
 
 **Current value for `target_cpu = "arm64"`:** `"arm64"`
 
-From //boards/arm64.gni:44
+From //boards/arm64.gni:25
 
 **Overridden from the default:** `false`
 
@@ -344,7 +344,7 @@ From //build/images/args.gni:212
 
 **Current value for `target_cpu = "x64"`:** `"x64"`
 
-From //boards/x64.gni:31
+From //boards/x64.gni:28
 
 **Overridden from the default:** `false`
 
@@ -456,7 +456,7 @@ False means no limit.
 
 **Current value for `target_cpu = "arm64"`:** `10485760000`
 
-From //boards/common/arm64-common.gni:24
+From //boards/arm64.gni:46
 
 **Overridden from the default:** `false`
 
@@ -464,7 +464,7 @@ From //build/images/filesystem_limits.gni:17
 
 **Current value for `target_cpu = "x64"`:** `10485760000`
 
-From //boards/common/x64-common.gni:47
+From //boards/x64.gni:59
 
 **Overridden from the default:** `false`
 
@@ -527,7 +527,7 @@ The label for the board configuration target to use with Product Assembly
 
 **Current value for `target_cpu = "arm64"`:** `"//boards/arm64"`
 
-From //boards/arm64.gni:23
+From //boards/arm64.gni:24
 
 **Overridden from the default:** `false`
 
@@ -535,7 +535,7 @@ From //build/board.gni:54
 
 **Current value for `target_cpu = "x64"`:** `"//boards/x64"`
 
-From //boards/x64.gni:23
+From //boards/x64.gni:27
 
 **Overridden from the default:** `false`
 
@@ -556,7 +556,7 @@ Human readable board description corresponding to the board name.
 
 **Current value for `target_cpu = "arm64"`:** `"A generic emulated arm64 device."`
 
-From //boards/arm64.gni:26
+From //boards/arm64.gni:28
 
 **Overridden from the default:** `""`
 
@@ -564,7 +564,7 @@ From //build/board.gni:14
 
 **Current value for `target_cpu = "x64"`:** `"A generic x64 device"`
 
-From //boards/x64.gni:26
+From //boards/x64.gni:24
 
 **Overridden from the default:** `""`
 
@@ -604,7 +604,7 @@ physical/virtual device spec or both.
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //boards/arm64.gni:29
+From //boards/arm64.gni:31
 
 **Overridden from the default:** `false`
 
@@ -612,7 +612,7 @@ From //build/board.gni:59
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:29
+From //boards/x64.gni:31
 
 **Overridden from the default:** `false`
 
@@ -622,7 +622,7 @@ From //build/board.gni:59
 
 **Current value for `target_cpu = "arm64"`:** `false`
 
-From //boards/arm64.gni:30
+From //boards/arm64.gni:32
 
 **Overridden from the default:** `true`
 
@@ -638,7 +638,7 @@ Board name used for paving and amber updates.
 
 **Current value for `target_cpu = "arm64"`:** `"arm64"`
 
-From //boards/arm64.gni:25
+From //boards/arm64.gni:27
 
 **Overridden from the default:** `""`
 
@@ -646,7 +646,7 @@ From //build/board.gni:11
 
 **Current value for `target_cpu = "x64"`:** `"x64"`
 
-From //boards/x64.gni:25
+From //boards/x64.gni:23
 
 **Overridden from the default:** `""`
 
@@ -829,7 +829,7 @@ Generate a UEFI disk image
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //boards/arm64.gni:33
+From //boards/arm64.gni:35
 
 **Overridden from the default:** `false`
 
@@ -837,7 +837,7 @@ From //build/images/args.gni:30
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:51
+From //boards/x64.gni:63
 
 **Overridden from the default:** `false`
 
@@ -3666,7 +3666,7 @@ This is a build that imports a board (vs. sdk).  If a board is set
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //boards/common/arm64-common.gni:20
+From //boards/arm64.gni:20
 
 **Overridden from the default:** `false`
 
@@ -3674,7 +3674,7 @@ From //build/board.gni:8
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:22
+From //boards/x64.gni:20
 
 **Overridden from the default:** `false`
 
@@ -4566,7 +4566,7 @@ of how they are stored).
 
 **Current value for `target_cpu = "arm64"`:** `5216665600`
 
-From //boards/common/arm64-common.gni:26
+From //boards/arm64.gni:48
 
 **Overridden from the default:** `false`
 
@@ -4574,7 +4574,7 @@ From //build/images/filesystem_limits.gni:12
 
 **Current value for `target_cpu = "x64"`:** `5216665600`
 
-From //boards/common/x64-common.gni:49
+From //boards/x64.gni:61
 
 **Overridden from the default:** `false`
 
@@ -5366,7 +5366,7 @@ From //build/packages/prebuilt_package_with_flavors.gni:29
 
 **Current value for `target_cpu = "arm64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/arm64.gni:42
+From //boards/arm64.gni:44
 
 **Overridden from the default:** `[]`
 
@@ -5374,7 +5374,7 @@ From //build/board.gni:65
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/common/x64-common.gni:39
+From //boards/x64.gni:51
 
 **Overridden from the default:** `[]`
 
@@ -5387,7 +5387,7 @@ product bundle.
 
 **Current value for `target_cpu = "arm64"`:** `"//boards/partitions:arm64"`
 
-From //boards/arm64.gni:41
+From //boards/arm64.gni:43
 
 **Overridden from the default:** `false`
 
@@ -5395,7 +5395,7 @@ From //build/board.gni:64
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/common/x64-common.gni:38
+From //boards/x64.gni:50
 
 **Overridden from the default:** `false`
 
@@ -8394,7 +8394,7 @@ Build the gigaboot bootloader.
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //boards/arm64.gni:34
+From //boards/arm64.gni:36
 
 **Overridden from the default:** `false`
 
@@ -8402,7 +8402,7 @@ From //build/images/args.gni:27
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:52
+From //boards/x64.gni:64
 
 **Overridden from the default:** `false`
 
@@ -8532,7 +8532,7 @@ LINT.IfChange
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //boards/arm64.gni:35
+From //boards/arm64.gni:37
 
 **Overridden from the default:** `false`
 
@@ -8540,7 +8540,7 @@ From //build/images/vbmeta.gni:15
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:41
+From //boards/x64.gni:53
 
 **Overridden from the default:** `false`
 
