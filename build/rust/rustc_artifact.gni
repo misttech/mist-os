@@ -91,6 +91,9 @@ import("//build/toolchain/rbe.gni")
 #   disable_clippy (optional)
 #     Don't run clippy on this target.
 #
+#   emit_tool_path (optional)
+#     Exclude this target from tool_paths.json.
+#
 #   quiet_clippy (boolean, optional)
 #     Run clippy on this target, producing a JSON output but do not print the output or fail the
 #     target based on clippy's success. Intended for use when testing clippy itself, use in normal
@@ -348,6 +351,7 @@ template("rustc_artifact") {
 
     forward_variables_from(invoker,
                            [
+                             "emit_tool_path",
                              "applicable_licenses",
                              "assert_no_deps",
                              "pool",

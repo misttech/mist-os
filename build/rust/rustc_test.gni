@@ -131,6 +131,9 @@ template("rustc_test_internal") {
     # anything defined with rustc_test MUST be a test target
     testonly = true
 
+    # Exclude tests from tool_paths.json.
+    emit_tool_path = false
+
     forward_variables_from(invoker,
                            [
                              "check_cfgs",
