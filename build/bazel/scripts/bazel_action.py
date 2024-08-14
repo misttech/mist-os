@@ -913,7 +913,7 @@ def main() -> int:
     parser.add_argument(
         "--directory-outputs",
         action=DirectoryOutputsAction,
-        help="3 or more arguments to specify a single Bazel output directory. Begins with (bazel_path, ninja_path) values, followed by one or more tracked relative file",
+        help="4 or more arguments to specify a single Bazel output directory. Begins with (bazel_path, ninja_path, copy_debug_symbols) values, followed by one or more tracked relative file",
     )
     parser.add_argument(
         "--package-outputs",
@@ -1245,6 +1245,7 @@ def main() -> int:
         file_copies.append((src_path, dst_path))
 
         if dir_output.copy_debug_symbols:
+            bazel_execroot = find_bazel_execroot(args.workspace_dir)
             debug_symbol_dirs = run_starlark_cquery(
                 args.bazel_targets[0],
                 "FuchsiaDebugSymbolInfo_debug_symbol_dirs.cquery",

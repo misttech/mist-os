@@ -379,6 +379,8 @@ template("bazel_action") {
         bazel_target = get_label_info(_bazel_target, "label_no_toolchain")
         bazel_dir = _bazel_dir
         ninja_dir = "$target_out_dir/${entry.ninja_dir}"
+        copy_debug_symbols =
+            defined(entry.copy_debug_symbols) && entry.copy_debug_symbols
         tracked_files = entry.tracked_files
       },
     ]
@@ -594,6 +596,7 @@ template("bazel_action") {
                     "--directory-outputs",
                     output.bazel_dir,
                     rebase_path(output.ninja_dir, root_build_dir),
+                    "${output.copy_debug_symbols}",
                   ] + output.tracked_files
           outputs += [ output.ninja_dir ]
           foreach(tracked_file, output.tracked_files) {
