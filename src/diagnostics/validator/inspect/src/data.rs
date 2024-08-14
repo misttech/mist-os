@@ -75,15 +75,16 @@ pub struct Property {
     payload: Payload,
 }
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 #[derive(Debug, Clone)]
+// Note: Some of the inner members on this struct are flagged by the compiler as
+// Unused. In reality, they're used in the `Debug` impl.
 enum Payload {
-    String(String),
+    String(#[allow(unused)] String),
     Bytes(Vec<u8>),
     Int(i64),
     Uint(u64),
     Double(f64),
-    Bool(bool),
+    Bool(#[allow(unused)] bool),
     IntArray(Vec<i64>, ArrayFormat),
     UintArray(Vec<u64>, ArrayFormat),
     DoubleArray(Vec<f64>, ArrayFormat),
@@ -93,10 +94,10 @@ enum Payload {
     // Used when parsing from JSON. We have trouble identifying numeric types and types of
     // histograms from the output. We can use these generic types to be safe for comparison from
     // JSON.
-    GenericNumber(String),
-    GenericArray(Vec<String>),
-    GenericLinearHistogram(Vec<String>),
-    GenericExponentialHistogram(Vec<String>),
+    GenericNumber(#[allow(unused)] String),
+    GenericArray(#[allow(unused)] Vec<String>),
+    GenericLinearHistogram(#[allow(unused)] Vec<String>),
+    GenericExponentialHistogram(#[allow(unused)] Vec<String>),
 }
 
 fn to_string<T: std::fmt::Display>(v: T) -> String {
