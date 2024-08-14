@@ -346,7 +346,7 @@ with categories. For example, the command below enables all the default
 categories and the `my_cat` category:
 
 ```none {:.devsite-disable-click-to-copy}
-$ ffx trace start --categories #default,my_cat
+$ ffx trace start --categories '#default,my_cat'
 ```
 
 To see the full list of category groups on your host machine, run the
