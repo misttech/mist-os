@@ -4,7 +4,7 @@
 
 use std::io::Write;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use assembly_config_schema::{
     BoardInputBundle, BoardProvidedConfig, PackageDetails, PackageSet, PackagedDriverDetails,
 };
@@ -27,6 +27,7 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
         power_manager_config,
         cpu_manager_config,
         thermal_config,
+        thread_roles,
         power_metrics_recorder_config,
     } = args;
     let bundle_file_path = outdir.join("board_input_bundle.json");
@@ -71,16 +72,27 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
     //========
     // Copy the configuration files provided, if any
     let cpu_manager_config =
-        copy_config_file(&cpu_manager_config, "cpu_manager.json5", &config_files_dir)?;
+        copy_optional_config_file(&cpu_manager_config, "cpu_manager.json5", &config_files_dir)?;
     let power_manager_config =
-        copy_config_file(&power_manager_config, "power_manager.json5", &config_files_dir)?;
-    let power_metrics_recorder_config = copy_config_file(
+        copy_optional_config_file(&power_manager_config, "power_manager.json5", &config_files_dir)?;
+    let power_metrics_recorder_config = copy_optional_config_file(
         &power_metrics_recorder_config,
         "power_metrics_recorder_config.json",
         &config_files_dir,
     )?;
     let thermal_config =
-        copy_config_file(&thermal_config, "thermal_config.json", &config_files_dir)?;
+        copy_optional_config_file(&thermal_config, "thermal_config.json", &config_files_dir)?;
+
+    let thread_roles_config = thread_roles
+        .iter()
+        .map(|thread_roles_file| {
+            let filename = thread_roles_file.file_name().ok_or_else(|| {
+                anyhow!("Thread roles file doesn't have a filename: {}", thread_roles_file)
+            })?;
+            copy_config_file(thread_roles_file, filename, &config_files_dir)
+                .context("copying thread roles file to config files dir")
+        })
+        .collect::<Result<Vec<FileRelativePathBuf>>>()?;
 
     //========
     // Copy the drivers and packages to the outdir, writing the package manifests
@@ -137,12 +149,14 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
             || cpu_manager_config.is_some()
             || thermal_config.is_some()
             || power_metrics_recorder_config.is_some()
+            || !thread_roles.is_empty()
         {
             Some(BoardProvidedConfig {
                 power_manager: power_manager_config,
                 cpu_manager: cpu_manager_config,
                 thermal: thermal_config,
                 power_metrics_recorder: power_metrics_recorder_config,
+                thread_roles: thread_roles_config,
             })
         } else {
             None
@@ -208,22 +222,25 @@ fn write_depfile(
     Ok(())
 }
 
-fn copy_config_file(
+fn copy_optional_config_file(
     source: &Option<Utf8PathBuf>,
     name: &str,
     config_files_dir: &Utf8PathBuf,
 ) -> Result<Option<FileRelativePathBuf>> {
-    Ok(match source {
-        Some(src) => {
-            let dst = config_files_dir.join(name);
-            if !dst.exists() {
-                fast_copy(src, &dst)
-                    .with_context(|| format!("Copying config file from {src} to {dst}"))?;
-                Some(dst.into())
-            } else {
-                bail!("Destination file exists copying config file from {src} to {dst}");
-            }
-        }
-        None => None,
-    })
+    source.as_ref().map(|source| copy_config_file(source, name, config_files_dir)).transpose()
+}
+
+fn copy_config_file(
+    source: &Utf8PathBuf,
+    name: &str,
+    config_files_dir: &Utf8PathBuf,
+) -> Result<FileRelativePathBuf> {
+    let dst = config_files_dir.join(name);
+    if !dst.exists() {
+        fast_copy(source, &dst)
+            .with_context(|| format!("Copying config file from {source} to {dst}"))?;
+        Ok(dst.into())
+    } else {
+        bail!("Destination file exists copying config file from {source} to {dst}");
+    }
 }

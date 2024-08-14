@@ -145,6 +145,12 @@ pub struct BoardProvidedConfig {
     /// Thermal configuration for the power-manager service
     #[file_relative_paths]
     pub thermal: Option<FileRelativePathBuf>,
+
+    /// These files describe performance "roles" that threads can take.  These roles translate to
+    /// Zircon profiles that change the runtime properties of the thread
+    #[serde(default)]
+    #[file_relative_paths]
+    pub thread_roles: Vec<FileRelativePathBuf>,
 }
 
 /// Where to print the serial logs.

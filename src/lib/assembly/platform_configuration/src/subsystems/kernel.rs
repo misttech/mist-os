@@ -3,10 +3,13 @@
 // found in the LICENSE file.
 
 use crate::subsystems::prelude::*;
+use anyhow::{anyhow, Context};
 use assembly_config_schema::board_config::SerialMode;
 use assembly_config_schema::platform_config::kernel_config::{
     OOMBehavior, OOMRebootTimeout, PlatformKernelConfig,
 };
+use assembly_util::{BootfsDestination, FileEntry};
+use camino::Utf8PathBuf;
 pub(crate) struct KernelSubsystem;
 
 impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
@@ -79,8 +82,25 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
         }
 
         if let Some(aslr_entropy_bits) = kernel_config.aslr_entropy_bits {
-            let kernek_arg = format!("aslr.entropy_bits={}", aslr_entropy_bits);
-            builder.kernel_arg(kernek_arg);
+            let kernel_arg = format!("aslr.entropy_bits={}", aslr_entropy_bits);
+            builder.kernel_arg(kernel_arg);
+        }
+
+        for thread_roles_file in &context.board_info.configuration.thread_roles {
+            let filename = thread_roles_file
+                .as_utf8_pathbuf()
+                .file_name()
+                .ok_or_else(|| {
+                    anyhow!("Thread roles file doesn't have a filename: {}", thread_roles_file)
+                })?
+                .to_owned();
+            builder
+                .bootfs()
+                .file(FileEntry {
+                    source: Utf8PathBuf::from(thread_roles_file.clone()),
+                    destination: BootfsDestination::ThreadRoles(filename),
+                })
+                .with_context(|| format!("Adding thread roles file: {}", thread_roles_file))?;
         }
 
         Ok(())

@@ -130,6 +130,18 @@
       "short": null,
       "description": "thermal management configuration",
       "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "thread-roles"
+        }
+      },
+      "optionality": "repeating",
+      "long": "--thread-roles",
+      "short": null,
+      "description": "thread role configuration files",
+      "hidden": false
     }
   ],
   "notes": [],

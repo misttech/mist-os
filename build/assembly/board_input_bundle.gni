@@ -61,6 +61,7 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #    - power_manager: configuration for the power_manager system.
 #    - power_metrics_recorder: configuration for power_metrics_recorder system.
 #    - thermal: configuration of the thermal management system.
+#    - thread_roles: files defining thread roles
 #
 #  Outputs
 #    A directory structure and manifest
@@ -250,7 +251,7 @@ template("board_input_bundle") {
       creation_inputs += [ configuration.cpu_manager ]
       creation_args += [
         "--cpu-manager-config",
-        rebase_path(configuration.cpu_manager),
+        rebase_path(configuration.cpu_manager, root_build_dir),
       ]
     }
 
@@ -258,7 +259,7 @@ template("board_input_bundle") {
       creation_inputs += [ configuration.power_manager ]
       creation_args += [
         "--power-manager-config",
-        rebase_path(configuration.power_manager),
+        rebase_path(configuration.power_manager, root_build_dir),
       ]
     }
 
@@ -266,7 +267,7 @@ template("board_input_bundle") {
       creation_inputs += [ configuration.power_metrics_recorder ]
       creation_args += [
         "--power-metrics-recorder-config",
-        rebase_path(configuration.power_metrics_recorder),
+        rebase_path(configuration.power_metrics_recorder, root_build_dir),
       ]
     }
 
@@ -274,8 +275,18 @@ template("board_input_bundle") {
       creation_inputs += [ configuration.thermal ]
       creation_args += [
         "--thermal-config",
-        rebase_path(configuration.thermal),
+        rebase_path(configuration.thermal, root_build_dir),
       ]
+    }
+
+    if (defined(configuration.thread_roles)) {
+      creation_inputs += configuration.thread_roles
+      foreach(thread_roles_file, configuration.thread_roles) {
+        creation_args += [
+          "--thread-roles",
+          rebase_path(thread_roles_file, root_build_dir),
+        ]
+      }
     }
   }
 
