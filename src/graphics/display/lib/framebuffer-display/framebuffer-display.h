@@ -10,7 +10,6 @@
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
-#include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fidl/cpp/wire/server.h>
 #include <lib/fit/function.h>
@@ -44,9 +43,11 @@ using BufferKey = std::pair<uint64_t, uint32_t>;
 class FramebufferDisplay : public HeapServer,
                            public ddk::DisplayEngineProtocol<FramebufferDisplay> {
  public:
+  // `dispatcher` must be non-null and outlive the newly created instance.
   FramebufferDisplay(fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem,
                      fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem,
-                     fdf::MmioBuffer framebuffer_mmio, const DisplayProperties& properties);
+                     fdf::MmioBuffer framebuffer_mmio, const DisplayProperties& properties,
+                     async_dispatcher_t* dispatcher);
   ~FramebufferDisplay() = default;
 
   // Initialization logic not suitable in the constructor.
@@ -108,7 +109,7 @@ class FramebufferDisplay : public HeapServer,
                      fidl::WireSyncClient<fuchsia_sysmem2::BufferCollection>>
       buffer_collections_;
 
-  async::Loop loop_;
+  async_dispatcher_t& dispatcher_;
 
   // protects only framebuffer_key_
   fbl::Mutex framebuffer_key_mtx_;

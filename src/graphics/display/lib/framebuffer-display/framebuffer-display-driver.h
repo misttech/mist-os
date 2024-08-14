@@ -8,6 +8,7 @@
 #include <lib/driver/compat/cpp/banjo_server.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/mmio/mmio-buffer.h>
 
 #include <memory>
@@ -47,6 +48,7 @@ class FramebufferDisplayDriver : public fdf::DriverBase {
   // Must be called after `framebuffer_display_` is initialized.
   zx::result<> InitializeBanjoServerNode();
 
+  fdf::SynchronizedDispatcher framebuffer_display_dispatcher_;
   std::unique_ptr<FramebufferDisplay> framebuffer_display_;
 
   std::optional<compat::BanjoServer> banjo_server_;

@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire_test_base.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire_test_base.h>
+#include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
@@ -256,13 +257,13 @@ void ExpectObjectsArePaired(zx::unowned<T> lhs, zx::unowned<T> rhs) {
 }
 
 TEST_F(FramebufferDisplayTest, ImportBufferCollection) {
-  async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  FakeSysmem fake_sysmem(loop.dispatcher(), /*framebuffer_vmo=*/{}, 0);
+  async::Loop env_loop(&kAsyncLoopConfigAttachToCurrentThread);
+  FakeSysmem fake_sysmem(env_loop.dispatcher(), /*framebuffer_vmo=*/{}, 0);
   FakeMmio fake_mmio;
 
   auto [hardware_sysmem_client, hardware_sysmem_server] =
       fidl::Endpoints<fuchsia_hardware_sysmem::Sysmem>::Create();
-  fidl::BindServer(loop.dispatcher(), std::move(hardware_sysmem_server), &fake_sysmem);
+  fidl::BindServer(env_loop.dispatcher(), std::move(hardware_sysmem_server), &fake_sysmem);
 
   auto sysmem_client_result = fake_sysmem.MakeFakeSysmemAllocator();
   ASSERT_TRUE(sysmem_client_result.is_ok());
@@ -279,8 +280,11 @@ TEST_F(FramebufferDisplayTest, ImportBufferCollection) {
       .pixel_format = kPixelFormat,
   };
 
+  async::Loop display_loop(&kAsyncLoopConfigNeverAttachToThread);
+  display_loop.StartThread("framebuffer-display-loop");
   FramebufferDisplay display(fidl::WireSyncClient(std::move(hardware_sysmem_client)),
-                             std::move(sysmem_client), fake_mmio.MmioBuffer(), kDisplayProperties);
+                             std::move(sysmem_client), fake_mmio.MmioBuffer(), kDisplayProperties,
+                             display_loop.dispatcher());
 
   auto token1_endpoints = fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
   zx::result token2_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
@@ -298,7 +302,7 @@ TEST_F(FramebufferDisplayTest, ImportBufferCollection) {
                                                         token2_endpoints->client.TakeChannel()),
             ZX_ERR_ALREADY_EXISTS);
 
-  loop.RunUntilIdle();
+  env_loop.RunUntilIdle();
 
   EXPECT_EQ(fake_sysmem.mock_allocators().size(), 1u);
   auto& allocator = fake_sysmem.mock_allocators().front();
@@ -325,7 +329,7 @@ TEST_F(FramebufferDisplayTest, ImportBufferCollection) {
                 ZX_ERR_NOT_FOUND);
   EXPECT_OK(display.DisplayEngineReleaseBufferCollection(kBanjoValidCollectionId));
 
-  loop.RunUntilIdle();
+  env_loop.RunUntilIdle();
 
   // Verify that the current buffer collection token is released.
   {
@@ -335,7 +339,8 @@ TEST_F(FramebufferDisplayTest, ImportBufferCollection) {
 
   // Shutdown the loop before destroying the FakeSysmem and MockAllocator which
   // may still have pending callbacks.
-  loop.Shutdown();
+  env_loop.Shutdown();
+  display_loop.Shutdown();
 }
 
 TEST_F(FramebufferDisplayTest, ImportKernelFramebufferImage) {
@@ -351,15 +356,15 @@ TEST_F(FramebufferDisplayTest, ImportKernelFramebufferImage) {
   zx::vmo framebuffer_vmo;
   EXPECT_OK(zx::vmo::create(/*size=*/kImageBytes, /*options=*/0, &framebuffer_vmo));
 
-  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-  FakeSysmem fake_sysmem(loop.dispatcher(), framebuffer_vmo.borrow(), kBanjoCollectionId);
+  async::Loop env_loop(&kAsyncLoopConfigNeverAttachToThread);
+  FakeSysmem fake_sysmem(env_loop.dispatcher(), framebuffer_vmo.borrow(), kBanjoCollectionId);
   FakeMmio fake_mmio;
 
-  loop.StartThread("sysmem loop");
+  env_loop.StartThread("env-loop");
 
   auto [hardware_sysmem_client, hardware_sysmem_server] =
       fidl::Endpoints<fuchsia_hardware_sysmem::Sysmem>::Create();
-  fidl::BindServer(loop.dispatcher(), std::move(hardware_sysmem_server), &fake_sysmem);
+  fidl::BindServer(env_loop.dispatcher(), std::move(hardware_sysmem_server), &fake_sysmem);
 
   auto sysmem_client_result = fake_sysmem.MakeFakeSysmemAllocator();
   ASSERT_TRUE(sysmem_client_result.is_ok());
@@ -372,8 +377,11 @@ TEST_F(FramebufferDisplayTest, ImportKernelFramebufferImage) {
       .pixel_format = kPixelFormat,
   };
 
+  async::Loop display_loop(&kAsyncLoopConfigNeverAttachToThread);
+  display_loop.StartThread("framebuffer-display-loop");
   FramebufferDisplay display(fidl::WireSyncClient(std::move(hardware_sysmem_client)),
-                             std::move(sysmem_client), fake_mmio.MmioBuffer(), kDisplayProperties);
+                             std::move(sysmem_client), fake_mmio.MmioBuffer(), kDisplayProperties,
+                             display_loop.dispatcher());
 
   zx::result token_endpoints = fidl::CreateEndpoints<fuchsia_sysmem2::BufferCollectionToken>();
   ASSERT_TRUE(token_endpoints.is_ok());
@@ -390,7 +398,7 @@ TEST_F(FramebufferDisplayTest, ImportKernelFramebufferImage) {
       display.DisplayEngineSetBufferCollectionConstraints(&kDisplayUsage, kBanjoCollectionId));
 
   auto [heap_client, heap_server] = fidl::Endpoints<fuchsia_hardware_sysmem::Heap>::Create();
-  auto bind_ref = fidl::BindServer(loop.dispatcher(), std::move(heap_server), &display);
+  auto bind_ref = fidl::BindServer(env_loop.dispatcher(), std::move(heap_server), &display);
   fidl::WireSyncClient heap{std::move(heap_client)};
 
   fidl::Arena arena;
@@ -454,11 +462,12 @@ TEST_F(FramebufferDisplayTest, ImportKernelFramebufferImage) {
   // Release buffer collection.
   EXPECT_OK(display.DisplayEngineReleaseBufferCollection(kBanjoCollectionId));
 
-  loop.RunUntilIdle();
+  env_loop.RunUntilIdle();
 
   // Shutdown the loop before destroying the FakeSysmem and MockAllocator which
   // may still have pending callbacks.
-  loop.Shutdown();
+  env_loop.Shutdown();
+  display_loop.Shutdown();
 }
 
 }  // namespace

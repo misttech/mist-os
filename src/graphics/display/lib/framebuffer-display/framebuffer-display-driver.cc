@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.sysmem/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <lib/driver/logging/cpp/logger.h>
+#include <lib/fdf/cpp/dispatcher.h>
 #include <lib/mmio/mmio-buffer.h>
 
 #include <memory>
@@ -90,10 +91,21 @@ FramebufferDisplayDriver::CreateAndInitializeFramebufferDisplay() {
   }
   fidl::WireSyncClient sysmem(std::move(sysmem_result).value());
 
+  zx::result<fdf::SynchronizedDispatcher> create_dispatcher_result =
+      fdf::SynchronizedDispatcher::Create(fdf::SynchronizedDispatcher::Options::kAllowSyncCalls,
+                                          "framebuffer-display-dispatcher",
+                                          [](fdf_dispatcher_t*) {});
+  if (create_dispatcher_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to create framebuffer display dispatcher: %s",
+            create_dispatcher_result.status_string());
+    return create_dispatcher_result.take_error();
+  }
+  framebuffer_display_dispatcher_ = std::move(create_dispatcher_result).value();
+
   fbl::AllocChecker alloc_checker;
   auto framebuffer_display = fbl::make_unique_checked<FramebufferDisplay>(
       &alloc_checker, std::move(hardware_sysmem), std::move(sysmem), std::move(frame_buffer_mmio),
-      std::move(display_properties));
+      std::move(display_properties), framebuffer_display_dispatcher_.async_dispatcher());
   if (!alloc_checker.check()) {
     FDF_LOG(ERROR, "Failed to allocate memory for FramebufferDisplay");
     return zx::error(ZX_ERR_NO_MEMORY);
