@@ -43,8 +43,10 @@ class InterruptTest : public testing::Test {
   }
 
  protected:
-  fdf_testing::DriverRuntime driver_runtime_;
+  // `logger_` must outlive `driver_runtime_` to allow for any
+  // logging in driver de-initialization code.
   fdf_testing::ScopedGlobalLogger logger_;
+  fdf_testing::DriverRuntime driver_runtime_;
   fdf::UnownedSynchronizedDispatcher interrupt_dispatcher_ =
       driver_runtime_.StartBackgroundDispatcher();
 
