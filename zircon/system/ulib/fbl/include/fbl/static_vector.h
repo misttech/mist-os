@@ -115,7 +115,6 @@ using static_vector_storage_t = typename static_vector_storage<T, N>::type;
 // For now we have elided a few unneeded methods:
 //   - swap() method and std::swap() specialization
 //   - insert(), emplace(), and erase()
-//   - emplace_back()
 //   - (in)equality operators
 //
 template <typename T, size_t N>
@@ -313,6 +312,13 @@ class static_vector : private internal::static_vector_storage_t<T, N> {
   constexpr void push_back(value_type&& value) {
     ZX_DEBUG_ASSERT(size() < N);
     construct_at(size(), std::move(value));
+    set_size(size() + 1);
+  }
+
+  template <class... Args>
+  constexpr void emplace_back(Args&&... args) {
+    ZX_DEBUG_ASSERT(size() < N);
+    construct_at(size(), std::forward<Args>(args)...);
     set_size(size() + 1);
   }
 

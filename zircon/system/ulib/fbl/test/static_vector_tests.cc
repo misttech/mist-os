@@ -56,6 +56,24 @@ class Obj {
   int value_ = kDefaultValue;
 };
 
+class ImmovableObj {
+ public:
+  ImmovableObj(int value1) : value1_(value1), value2_(kDefaultValue) {}
+  ImmovableObj(int value1, int value2) : value1_(value1), value2_(value2) {}
+
+  ImmovableObj(const ImmovableObj&) = delete;
+  ImmovableObj& operator=(const ImmovableObj&) = delete;
+
+  ~ImmovableObj() = default;
+
+  int value1() const { return value1_; }
+  int value2() const { return value2_; }
+
+ private:
+  int value1_;
+  int value2_;
+};
+
 static constexpr fbl::static_vector<int, kSize> MakeConstexprWithPushPop() {
   fbl::static_vector<int, kSize> v;
   v.push_back(0);
@@ -560,6 +578,33 @@ TEST(StaticVectorTest, PushFromMove) {
   EXPECT_EQ(obj.value(), 0);
   ASSERT_EQ(v.size(), 1);
   EXPECT_EQ(v[0].value(), 9);
+}
+
+TEST(StaticVectorTest, EmplaceOneArg) {
+  fbl::static_vector<ImmovableObj, kSize> v{};
+  v.emplace_back(5);
+  EXPECT_EQ(v.size(), 1);
+  EXPECT_EQ(v[0].value1(), 5);
+  EXPECT_EQ(v[0].value2(), kDefaultValue);
+}
+
+TEST(StaticVectorTest, EmplaceTwoArgs) {
+  fbl::static_vector<ImmovableObj, kSize> v{};
+  v.emplace_back(5, 10);
+  EXPECT_EQ(v.size(), 1);
+  EXPECT_EQ(v[0].value1(), 5);
+  EXPECT_EQ(v[0].value2(), 10);
+}
+
+TEST(StaticVectorTest, EmplaceMoveOnlyArg) {
+  std::unique_ptr<int> move_only_pointer = std::make_unique<int>(5);
+  int* raw_pointer = move_only_pointer.get();
+  fbl::static_vector<std::unique_ptr<int>, kSize> v{};
+  v.emplace_back(std::move(move_only_pointer));
+  EXPECT_EQ(v.size(), 1);
+  EXPECT_EQ(v[0].get(), raw_pointer);
+  EXPECT_EQ(*raw_pointer, 5);
+  EXPECT_NULL(move_only_pointer);
 }
 
 TEST(StaticVectorTest, Pop) {
