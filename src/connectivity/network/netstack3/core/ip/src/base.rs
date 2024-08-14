@@ -39,7 +39,7 @@ use netstack3_filter::{
     FilterHandler as _, FilterIpContext, FilterIpMetadata, FilterTimerId, ForwardedPacket,
     IngressVerdict, IpPacket, NatType, NestedWithInnerIpPacket, TransportPacketSerializer, Tuple,
 };
-use packet::{Buf, BufferMut, ParseBufferMut, ParseMetadata, Serializer};
+use packet::{Buf, BufferMut, GrowBuffer, ParseBufferMut, ParseMetadata, Serializer};
 use packet_formats::error::IpParseError;
 use packet_formats::ip::{DscpAndEcn, IpPacket as _, IpPacketBuilder as _};
 use packet_formats::ipv4::{Ipv4FragmentType, Ipv4Packet};
@@ -112,9 +112,6 @@ pub enum TransportReceiveError {
 }
 
 /// Sidecar metadata passed along with the packet.
-///
-/// NOTE: This metadata may be reset after a packet goes through reassembly, and
-/// consumers must be able to handle this case.
 #[derive(Derivative)]
 #[derivative(Default(bound = ""))]
 pub struct IpLayerPacketMetadata<I: packet_formats::ip::IpExt, BT: FilterBindingsTypes> {
@@ -2252,16 +2249,20 @@ pub fn receive_ipv4_packet<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: Option<FrameDestination>,
-    mut buffer: B,
+    buffer: B,
 ) {
     if !core_ctx.is_ip_device_enabled(&device) {
         return;
     }
 
+    // This is required because we may need to process the buffer that was
+    // passed in or a reassembled one, which have different types.
+    let mut buffer: packet::Either<B, Buf<Vec<u8>>> = packet::Either::A(buffer);
+
     core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.receive_ip_packet);
     trace!("receive_ip_packet({device:?})");
 
-    let mut packet: Ipv4Packet<_> = match try_parse_ip_packet!(buffer) {
+    let packet: Ipv4Packet<_> = match try_parse_ip_packet!(buffer) {
         Ok(packet) => packet,
         // Conditionally send an ICMP response if we encountered a parameter
         // problem error when parsing an IPv4 packet. Note, we do not always
@@ -2334,6 +2335,42 @@ pub fn receive_ipv4_packet<
         return;
     };
 
+    // Reassemble all packets before local delivery or forwarding. Reassembly
+    // before forwarding is not RFC-compliant, but it's the easiest way to
+    // ensure that fragments are filtered properly. Linux does this and it
+    // doesn't seem to create major problems.
+    //
+    // TODO(https://fxbug.dev/345814518): Forward fragments without reassembly.
+    //
+    // Note, the `process_fragment` function could panic if the packet does not
+    // have fragment data. However, we are guaranteed that it will not panic
+    // because the fragment data is in the fixed header so it is always present
+    // (even if the fragment data has values that implies that the packet is not
+    // fragmented).
+    let mut packet = match process_fragment(core_ctx, bindings_ctx, packet) {
+        Ok(ProcessFragmentResult::Done) => return,
+        Ok(ProcessFragmentResult::NotNeeded(packet)) => packet,
+        Ok(ProcessFragmentResult::Reassembled(buf)) => {
+            let buf = Buf::new(buf, ..);
+            buffer = packet::Either::B(buf);
+
+            match buffer.parse_mut() {
+                Ok(packet) => packet,
+                Err(err) => {
+                    core_ctx.increment(|counters: &IpCounters<Ipv4>| {
+                        &counters.fragment_reassembly_error
+                    });
+                    debug!("receive_ip_packet: fragmented, failed to reassemble: {:?}", err);
+                    return;
+                }
+            }
+        }
+        Err(err) => {
+            err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device);
+            return;
+        }
+    };
+
     // TODO(ghanan): Act upon options.
 
     let mut packet_metadata = IpLayerPacketMetadata::default();
@@ -2400,78 +2437,19 @@ pub fn receive_ipv4_packet<
                 broadcast: address_status.to_broadcast_marker(),
                 transport_override: None,
             };
-            // Process a potential IPv4 fragment if the destination is this
-            // host.
-            //
-            // We process IPv4 packet reassembly here because, for IPv4, the
-            // fragment data is in the header itself so we can handle it right
-            // away.
-            //
-            // Note, the `process_fragment` function could panic if the packet does not
-            // have fragment data. However, we are guaranteed that it will not
-            // panic because the fragment data is in the fixed header so it is
-            // always present (even if the fragment data has values that implies
-            // that the packet is not fragmented).
-            match process_fragment(core_ctx, bindings_ctx, packet) {
-                Ok(ProcessFragmentResult::Done) => packet_metadata.acknowledge_drop(),
-                Ok(ProcessFragmentResult::NotNeeded(packet)) => {
-                    dispatch_receive_ipv4_packet(
-                        core_ctx,
-                        bindings_ctx,
-                        device,
-                        frame_dst,
-                        packet,
-                        packet_metadata,
-                        meta,
-                    )
-                    .unwrap_or_else(|err| {
-                        err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device)
-                    });
-                }
-                Ok(ProcessFragmentResult::Reassembled(buffer)) => {
-                    // The packet metadata associated with this last fragment
-                    // will be dropped and a new metadata struct created for the
-                    // reassembled packet.
-                    packet_metadata.acknowledge_drop();
 
-                    let mut buffer = Buf::new(buffer, ..);
-                    match buffer.parse_mut() {
-                        Ok(packet) => {
-                            dispatch_receive_ipv4_packet(
-                                core_ctx,
-                                bindings_ctx,
-                                device,
-                                frame_dst,
-                                packet,
-                                // Since each fragment had its own packet
-                                // metadata, it's not clear what metadata to use
-                                // for the reassembled packet. Resetting the
-                                // metadata is the safest bet, though it means
-                                // downstream consumers must be aware of this
-                                // case.
-                                IpLayerPacketMetadata::default(),
-                                meta,
-                            )
-                            .unwrap_or_else(|err| {
-                                err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device)
-                            });
-                        }
-                        Err(err) => {
-                            core_ctx.increment(|counters: &IpCounters<Ipv4>| {
-                                &counters.fragment_reassembly_error
-                            });
-                            debug!(
-                                "receive_ip_packet: fragmented, failed to reassemble: {:?}",
-                                err
-                            );
-                        }
-                    }
-                }
-                Err(err) => {
-                    packet_metadata.acknowledge_drop();
-                    err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device)
-                }
-            }
+            dispatch_receive_ipv4_packet(
+                core_ctx,
+                bindings_ctx,
+                device,
+                frame_dst,
+                packet,
+                packet_metadata,
+                meta,
+            )
+            .unwrap_or_else(|err| {
+                err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device)
+            });
         }
         ReceivePacketAction::Forward {
             original_dst: dst_ip,
@@ -2614,16 +2592,20 @@ pub fn receive_ipv6_packet<
     bindings_ctx: &mut BC,
     device: &CC::DeviceId,
     frame_dst: Option<FrameDestination>,
-    mut buffer: B,
+    buffer: B,
 ) {
     if !core_ctx.is_ip_device_enabled(&device) {
         return;
     }
 
+    // This is required because we may need to process the buffer that was
+    // passed in or a reassembled one, which have different types.
+    let mut buffer: packet::Either<B, Buf<Vec<u8>>> = packet::Either::A(buffer);
+
     core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.receive_ip_packet);
     trace!("receive_ipv6_packet({:?})", device);
 
-    let mut packet: Ipv6Packet<_> = match try_parse_ip_packet!(buffer) {
+    let packet: Ipv6Packet<_> = match try_parse_ip_packet!(buffer) {
         Ok(packet) => packet,
         // Conditionally send an ICMP response if we encountered a parameter
         // problem error when parsing an IPv4 packet. Note, we do not always
@@ -2696,6 +2678,91 @@ pub fn receive_ipv6_packet<
         return;
     };
 
+    // Reassemble all packets before local delivery or forwarding. Reassembly
+    // before forwarding is not RFC-compliant, but it's the easiest way to
+    // ensure that fragments are filtered properly. Linux does this and it
+    // doesn't seem to create major problems.
+    //
+    // TODO(https://fxbug.dev/345814518): Forward fragments without reassembly.
+    //
+    // delivery_extension_header_action is used to prevent looking at the
+    // extension headers twice when a non-fragmented packet is delivered
+    // locally.
+    let (mut packet, delivery_extension_header_action) =
+        match ipv6::handle_extension_headers(core_ctx, device, frame_dst, &packet, true) {
+            Ipv6PacketAction::_Discard => {
+                core_ctx.increment(|counters: &IpCounters<Ipv6>| {
+                    &counters.version_rx.extension_header_discard
+                });
+                trace!("receive_ipv6_packet: handled IPv6 extension headers: discarding packet");
+                return;
+            }
+            Ipv6PacketAction::Continue => {
+                trace!("receive_ipv6_packet: handled IPv6 extension headers: dispatching packet");
+                (packet, Some(Ipv6PacketAction::Continue))
+            }
+            Ipv6PacketAction::ProcessFragment => {
+                trace!(
+                    "receive_ipv6_packet: handled IPv6 extension headers: handling \
+                    fragmented packet"
+                );
+
+                // Note, `IpPacketFragmentCache::process_fragment`
+                // could panic if the packet does not have fragment data.
+                // However, we are guaranteed that it will not panic for an
+                // IPv6 packet because the fragment data is in an (optional)
+                // fragment extension header which we attempt to handle by
+                // calling `ipv6::handle_extension_headers`. We will only
+                // end up here if its return value is
+                // `Ipv6PacketAction::ProcessFragment` which is only
+                // possible when the packet has the fragment extension
+                // header (even if the fragment data has values that implies
+                // that the packet is not fragmented).
+                match process_fragment(core_ctx, bindings_ctx, packet) {
+                    Ok(ProcessFragmentResult::Done) => return,
+                    Ok(ProcessFragmentResult::NotNeeded(packet)) => {
+                        // While strange, it's possible for there to be a Fragment
+                        // header that says the packet doesn't need defragmentation.
+                        // As per RFC 8200 4.5:
+                        //
+                        //   If the fragment is a whole datagram (that is, both the
+                        //   Fragment Offset field and the M flag are zero), then it
+                        //   does not need any further reassembly and should be
+                        //   processed as a fully reassembled packet (i.e., updating
+                        //   Next Header, adjust Payload Length, removing the
+                        //   Fragment header, etc.).
+                        //
+                        // In this case, we're not technically reassembling the
+                        // packet, since, per the RFC, that would mean removing the
+                        // Fragment header.
+                        (packet, Some(Ipv6PacketAction::Continue))
+                    }
+                    Ok(ProcessFragmentResult::Reassembled(buf)) => {
+                        let buf = Buf::new(buf, ..);
+                        buffer = packet::Either::B(buf);
+
+                        match buffer.parse_mut() {
+                            Ok(packet) => (packet, None),
+                            Err(err) => {
+                                core_ctx.increment(|counters: &IpCounters<Ipv6>| {
+                                    &counters.fragment_reassembly_error
+                                });
+                                debug!(
+                                    "receive_ip_packet: fragmented, failed to reassemble: {:?}",
+                                    err
+                                );
+                                return;
+                            }
+                        }
+                    }
+                    Err(err) => {
+                        err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device);
+                        return;
+                    }
+                }
+            }
+        };
+
     let mut packet_metadata = IpLayerPacketMetadata::default();
     let mut filter = core_ctx.filter_handler();
     match filter.ingress_hook(bindings_ctx, &mut packet, device, &mut packet_metadata) {
@@ -2759,20 +2826,12 @@ pub fn receive_ipv6_packet<
         | ReceivePacketAction::Deliver { address_status: _ } => {
             trace!("receive_ipv6_packet: delivering locally");
 
-            // Process a potential IPv6 fragment if the destination is this
-            // host.
-            //
-            // We need to process extension headers in the order they appear in
-            // the header. With some extension headers, we do not proceed to the
-            // next header, and do some action immediately. For example, say we
-            // have an IPv6 packet with two extension headers (routing extension
-            // header before a fragment extension header). Until we get to the
-            // final destination node in the routing header, we would need to
-            // reroute the packet to the next destination without reassembling.
-            // Once the packet gets to the last destination in the routing
-            // header, that node will process the fragment extension header and
-            // handle reassembly.
-            match ipv6::handle_extension_headers(core_ctx, device, frame_dst, &packet, true) {
+            let action = if let Some(action) = delivery_extension_header_action {
+                action
+            } else {
+                ipv6::handle_extension_headers(core_ctx, device, frame_dst, &packet, true)
+            };
+            match action {
                 Ipv6PacketAction::_Discard => {
                     core_ctx.increment(|counters: &IpCounters<Ipv6>| {
                         &counters.version_rx.extension_header_discard
@@ -2805,94 +2864,8 @@ pub fn receive_ipv6_packet<
                     });
                 }
                 Ipv6PacketAction::ProcessFragment => {
-                    trace!(
-                        "receive_ipv6_packet: handled IPv6 extension headers: handling \
-                            fragmented packet"
-                    );
-
-                    let meta = ReceiveIpPacketMeta::default();
-
-                    // Note, `IpPacketFragmentCache::process_fragment`
-                    // could panic if the packet does not have fragment data.
-                    // However, we are guaranteed that it will not panic for an
-                    // IPv6 packet because the fragment data is in an (optional)
-                    // fragment extension header which we attempt to handle by
-                    // calling `ipv6::handle_extension_headers`. We will only
-                    // end up here if its return value is
-                    // `Ipv6PacketAction::ProcessFragment` which is only
-                    // possible when the packet has the fragment extension
-                    // header (even if the fragment data has values that implies
-                    // that the packet is not fragmented).
-                    //
-                    // TODO(ghanan): Handle extension headers again since there
-                    //               could be some more in a reassembled packet
-                    //               (after the fragment header).
-                    match process_fragment(core_ctx, bindings_ctx, packet) {
-                        Ok(ProcessFragmentResult::Done) => packet_metadata.acknowledge_drop(),
-                        Ok(ProcessFragmentResult::NotNeeded(packet)) => {
-                            dispatch_receive_ipv6_packet(
-                                core_ctx,
-                                bindings_ctx,
-                                device,
-                                frame_dst,
-                                packet,
-                                packet_metadata,
-                                meta,
-                            )
-                            .unwrap_or_else(|err| {
-                                err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device)
-                            });
-                        }
-                        Ok(ProcessFragmentResult::Reassembled(buffer)) => {
-                            // The packet metadata associated with this last fragment
-                            // will be dropped and a new metadata struct created for the
-                            // reassembled packet.
-                            packet_metadata.acknowledge_drop();
-
-                            let mut buffer = Buf::new(buffer, ..);
-                            match buffer.parse_mut() {
-                                Ok(packet) => {
-                                    dispatch_receive_ipv6_packet(
-                                        core_ctx,
-                                        bindings_ctx,
-                                        device,
-                                        frame_dst,
-                                        packet,
-                                        // Since each fragment had its own
-                                        // packet metadata, it's not clear what
-                                        // metadata to use for the reassembled
-                                        // packet. Resetting the metadata is the
-                                        // safest bet, though it means
-                                        // downstream consumers must be aware of
-                                        // this case.
-                                        IpLayerPacketMetadata::default(),
-                                        meta,
-                                    )
-                                    .unwrap_or_else(|err| {
-                                        err.respond_with_icmp_error(
-                                            core_ctx,
-                                            bindings_ctx,
-                                            buffer,
-                                            device,
-                                        )
-                                    });
-                                }
-                                Err(err) => {
-                                    core_ctx.increment(|counters: &IpCounters<Ipv6>| {
-                                        &counters.fragment_reassembly_error
-                                    });
-                                    debug!(
-                                        "receive_ip_packet: fragmented, failed to reassemble: {:?}",
-                                        err
-                                    );
-                                }
-                            }
-                        }
-                        Err(err) => {
-                            packet_metadata.acknowledge_drop();
-                            err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device)
-                        }
-                    }
+                    debug!("receive_ipv6_packet: found fragment header after reassembly; dropping");
+                    packet_metadata.acknowledge_drop();
                 }
             }
         }
@@ -2905,6 +2878,10 @@ pub fn receive_ipv6_packet<
                 trace!("receive_ipv6_packet: forwarding");
 
                 // Handle extension headers first.
+                //
+                // We can't reuse delivery_extension_header_action here because
+                // that was parsed under the assumption that we are the final
+                // destination of the packet.
                 match ipv6::handle_extension_headers(core_ctx, device, frame_dst, &packet, false) {
                     Ipv6PacketAction::_Discard => {
                         core_ctx.increment(|counters: &IpCounters<Ipv6>| {
