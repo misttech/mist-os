@@ -11,21 +11,24 @@ use std::io::{Error as IOError, Read, Write};
 use std::os::fd::AsFd as _;
 use std::sync::Arc;
 
-// Holding a reference to File so it lives as long as the associated socket. If the FD is closed
-// the socket closes with it. This way the process object can be dropped before the blocking socket.
-#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
-pub struct BlockingSocket(Arc<File>, Arc<Socket>);
+pub struct BlockingSocket {
+    // Holding a reference to File so it lives as long as the associated socket. If the FD is closed
+    // the socket closes with it. This way the process object can be dropped before the blocking
+    // socket.
+    _file: Arc<File>,
+    socket: Arc<Socket>,
+}
 
 impl Read for BlockingSocket {
     fn read(&mut self, buf: &mut [u8]) -> Result<usize, IOError> {
-        if self.1.outstanding_read_bytes()? == 0 {
+        if self.socket.outstanding_read_bytes()? == 0 {
             let wait_sigs = Signals::SOCKET_READABLE | Signals::SOCKET_PEER_CLOSED;
-            let signals = self.1.wait_handle(wait_sigs, Time::INFINITE)?;
+            let signals = self.socket.wait_handle(wait_sigs, Time::INFINITE)?;
             if signals.contains(Signals::SOCKET_PEER_CLOSED) {
                 return Err(Status::PEER_CLOSED.into());
             }
         }
-        self.1.read(buf).or_else(|status| match status {
+        self.socket.read(buf).or_else(|status| match status {
             Status::SHOULD_WAIT => Ok(0),
             _ => Err(status.into()),
         })
@@ -34,7 +37,7 @@ impl Read for BlockingSocket {
 
 impl Write for BlockingSocket {
     fn write(&mut self, buf: &[u8]) -> Result<usize, IOError> {
-        self.1.write(buf).map_err(Into::into)
+        self.socket.write(buf).map_err(Into::into)
     }
 
     fn flush(&mut self) -> Result<(), IOError> {
@@ -94,15 +97,15 @@ impl TestProcess {
     }
 
     pub fn stdin_blocking(&self) -> BlockingSocket {
-        BlockingSocket(self.stdin_file.clone(), self.stdin.clone())
+        BlockingSocket { _file: self.stdin_file.clone(), socket: self.stdin.clone() }
     }
 
     pub fn stdout_blocking(&self) -> BlockingSocket {
-        BlockingSocket(self.stdout_file.clone(), self.stdout.clone())
+        BlockingSocket { _file: self.stdout_file.clone(), socket: self.stdout.clone() }
     }
 
     pub fn stderr_blocking(&self) -> BlockingSocket {
-        BlockingSocket(self.stderr_file.clone(), self.stderr.clone())
+        BlockingSocket { _file: self.stderr_file.clone(), socket: self.stderr.clone() }
     }
 
     pub fn process(&self) -> &zx::Process {

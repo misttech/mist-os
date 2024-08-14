@@ -281,7 +281,7 @@ impl AgIndicatorsReporting {
         match status {
             0 => self.is_enabled = false,
             1 => self.is_enabled = true,
-            _ => return Err(UnsupportedReportingStatus(status)),
+            _ => return Err(UnsupportedReportingStatus { _status: status }),
         }
         Ok(())
     }
@@ -352,10 +352,11 @@ impl Default for AgIndicatorsReporting {
     }
 }
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 #[derive(Debug)]
 /// An error representing an unsupported reporting status value.
-pub struct UnsupportedReportingStatus(i64);
+pub struct UnsupportedReportingStatus {
+    _status: i64,
+}
 
 #[cfg(test)]
 mod tests {
