@@ -421,7 +421,7 @@ impl Ffx {
                         return_val.target = Some(val.to_string());
                     }
                 }
-                "-T" | "--timeout" => {
+                "--timeout" => {
                     if let Some(val) = argv_iter.next() {
                         return_val.timeout = val.to_string().parse::<f64>().ok();
                     }
