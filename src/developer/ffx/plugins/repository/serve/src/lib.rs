@@ -9,7 +9,7 @@ use ffx_config::environment::EnvironmentKind;
 use ffx_config::EnvironmentContext;
 use ffx_repository_serve_args::ServeCommand;
 use ffx_target::{knock_target, TargetProxy};
-use fho::{return_user_error, AvailabilityFlag, Connector, FfxMain, FfxTool, Result, SimpleWriter};
+use fho::{return_user_error, Connector, FfxMain, FfxTool, Result, SimpleWriter};
 use fidl_fuchsia_developer_ffx::{
     RepositoryStorageType, RepositoryTarget as FfxCliRepositoryTarget, TargetInfo,
 };
@@ -43,14 +43,12 @@ const REPO_CONNECT_TIMEOUT_CONFIG: &str = "repository.connect_timeout_secs";
 const DEFAULT_CONNECTION_TIMEOUT_SECS: u64 = 120;
 const MAX_CONSECUTIVE_CONNECT_ATTEMPTS: u8 = 10;
 const REPO_BACKGROUND_FEATURE_FLAG: &str = "repository.server.enabled";
-const REPO_FOREGROUND_FEATURE_FLAG: &str = "repository.foreground.enabled";
 const REPOSITORY_MANAGER_MONIKER: &str = "/core/pkg-resolver";
 const ENGINE_MONIKER: &str = "/core/pkg-resolver";
 const DEFAULT_REPO_NAME: &str = "devhost";
 const REPO_PATH_RELATIVE_TO_BUILD_DIR: &str = "amber-files";
 
 #[derive(FfxTool)]
-#[check(AvailabilityFlag(REPO_FOREGROUND_FEATURE_FLAG))]
 pub struct ServeTool {
     #[command]
     pub cmd: ServeCommand,
@@ -383,12 +381,11 @@ impl FfxMain for ServeTool {
             .context("checking for background server flag")?;
         if bg {
             return_user_error!(
-                r#"The ffx setting '{}' and the foreground server '{}' are mutually incompatible.
+                r#"The ffx setting '{}' and the foreground server are mutually incompatible.
 Please disable background serving by running the following commands:
 $ ffx config remove repository.server.enabled
 $ ffx doctor --restart-daemon"#,
                 REPO_BACKGROUND_FEATURE_FLAG,
-                REPO_FOREGROUND_FEATURE_FLAG,
             );
         }
 
@@ -949,17 +946,7 @@ mod test {
     }
 
     async fn get_test_env() -> TestEnv {
-        let test_env = ffx_config::test_init().await.expect("test initialization");
-
-        test_env
-            .context
-            .query(REPO_FOREGROUND_FEATURE_FLAG)
-            .level(Some(ConfigLevel::User))
-            .set("true".into())
-            .await
-            .unwrap();
-
-        test_env
+        ffx_config::test_init().await.expect("test initialization")
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
