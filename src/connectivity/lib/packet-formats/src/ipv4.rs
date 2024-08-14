@@ -989,7 +989,7 @@ pub(crate) fn reassemble_fragmented_packet<
     mut buffer: BV,
     header: Vec<u8>,
     body_fragments: I,
-) -> IpParseResult<Ipv4, Ipv4Packet<B>> {
+) -> IpParseResult<Ipv4, ()> {
     let bytes = buffer.as_mut();
 
     // First, copy over the header data.
@@ -1029,7 +1029,7 @@ pub(crate) fn reassemble_fragmented_packet<
     header.hdr_checksum = [0; 2];
     header.hdr_checksum = compute_header_checksum(header.as_bytes(), &[]);
 
-    Ipv4Packet::parse_mut(buffer, ())
+    Ok(())
 }
 
 /// Parsing and serialization of IPv4 options.

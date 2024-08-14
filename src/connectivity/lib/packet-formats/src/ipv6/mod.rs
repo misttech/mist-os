@@ -1250,7 +1250,7 @@ pub(crate) fn reassemble_fragmented_packet<
     mut buffer: BV,
     header: Vec<u8>,
     body_fragments: I,
-) -> IpParseResult<Ipv6, Ipv6Packet<B>> {
+) -> IpParseResult<Ipv6, ()> {
     let bytes = buffer.as_mut();
 
     // First, copy over the header data.
@@ -1293,7 +1293,7 @@ pub(crate) fn reassemble_fragmented_packet<
     // Update the payload length field.
     header.payload_len.set(u16::try_from(payload_length).unwrap());
 
-    Ipv6Packet::parse_mut(buffer, ())
+    Ok(())
 }
 
 #[cfg(test)]
