@@ -72,20 +72,25 @@ async fn serve_fidl(
         fasync::Timer::new(REGULATORY_LISTENER_TIMEOUT_SEC.seconds().after_now());
     select! {
         _ = regulatory_listener_timeout.fuse() => {
+            // Log at info level because we expect RegulatoryManager may in some
+            // cases be delayed.
             info!(
-                "Country code was not set after {} seconds.  Proceeding to serve policy API.",
+                "RegulatoryManager did not send a country code after {} seconds.",
                 REGULATORY_LISTENER_TIMEOUT_SEC,
             );
         },
         result = regulatory_receiver.fuse() => {
             match result {
                 Ok(()) => {
-                    info!("Country code has been set.  Proceeding to serve policy API.");
+                    info!("Received country code from RegulatoryManager.");
                 },
-                Err(e) => info!("Waiting for initial country code failed: {:?}", e),
+                // Log at warning level because RegulatoryManager should not
+                // normally drop its end.
+                Err(e) => warn!("Failed to receive country code from RegulatoryManager: {:?}", e),
             }
         }
     }
+    info!("Proceeding to serve policy API.");
 
     let mut fs = ServiceFs::new();
 
