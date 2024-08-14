@@ -21,7 +21,7 @@ use moniker::{ChildName, ExtendedMoniker, Moniker};
 use router_error::Explain;
 use routing::capability_source::{
     BuiltinSource, CapabilitySource, CapabilityToCapabilitySource, ComponentCapability,
-    ComponentSource, InternalCapability, NamespaceSource,
+    ComponentSource, InternalCapability,
 };
 use routing::component_instance::{
     ComponentInstanceInterface, ExtendedInstanceInterface, TopInstanceInterface,
@@ -78,7 +78,7 @@ pub enum AnalyzerModelError {
     #[error(
         "at component {0} the capability `{1}` is not a valid source for the capability `{2}`"
     )]
-    InvalidSourceCapability(Moniker, String, String),
+    InvalidSourceCapability(ExtendedMoniker, String, String),
 
     #[error("no resolver found in environment of component `{0}` for scheme `{1}`")]
     MissingResolverForScheme(Moniker, String),
@@ -105,8 +105,8 @@ impl AnalyzerModelError {
 impl From<AnalyzerModelError> for ExtendedMoniker {
     fn from(err: AnalyzerModelError) -> ExtendedMoniker {
         match err {
-            AnalyzerModelError::InvalidSourceCapability(moniker, _, _)
-            | AnalyzerModelError::MissingResolverForScheme(moniker, _)
+            AnalyzerModelError::InvalidSourceCapability(moniker, _, _) => moniker,
+            AnalyzerModelError::MissingResolverForScheme(moniker, _)
             | AnalyzerModelError::SourceInstanceNotExecutable(moniker) => moniker.into(),
             AnalyzerModelError::ComponentInstanceError(err) => err.into(),
             AnalyzerModelError::RoutingError(err) => err.into(),
@@ -1127,14 +1127,12 @@ impl ComponentModelForAnalyzer {
                 let source_component = target.find_absolute(&moniker).await?;
                 self.check_executable(&source_component)
             }
-            CapabilitySource::Namespace(NamespaceSource { .. }) => Ok(()),
+            CapabilitySource::Namespace(_) => Ok(()),
             CapabilitySource::Capability(CapabilityToCapabilitySource {
                 source_capability,
-                moniker,
-            }) => {
-                let source_component = target.find_absolute(&moniker).await?;
-                self.check_capability_source(&source_component, &source_capability)
-            }
+                moniker: _,
+            }) => self
+                .check_capability_source(&source_capability, route_source.source.source_moniker()),
             CapabilitySource::Builtin(_) => Ok(()),
             CapabilitySource::Framework(_) => Ok(()),
             CapabilitySource::Void(_) => Ok(()),
@@ -1143,34 +1141,19 @@ impl ComponentModelForAnalyzer {
     }
 
     // A helper function validating a source of type `Capability`.
-    // The source should be a `StorageAdmin` protocol since that is only supported capability
-    // source, and it should route to a valid storage source.
+    // The only capability which may have a source of another capability is the `StorageAdmin`
+    // protocol. We confirm that the source is a storage capability.
     fn check_capability_source(
         &self,
-        source_component: &Arc<ComponentInstanceForAnalyzer>,
         source_capability: &ComponentCapability,
+        source_moniker: ExtendedMoniker,
     ) -> Result<(), AnalyzerModelError> {
-        let source_capability_name = source_capability
-            .source_capability_name()
-            .expect("failed to get source capability name");
-
-        match source_capability.source_name().map(|name| name.to_string()).as_deref() {
-            Some(fsys::StorageAdminMarker::PROTOCOL_NAME) => {
-                match source_component.decl.find_storage_source(source_capability_name) {
-                    Some(_) => Ok(()),
-                    None => Err(AnalyzerModelError::InvalidSourceCapability(
-                        source_component.moniker().clone(),
-                        source_capability_name.to_string(),
-                        fsys::StorageAdminMarker::PROTOCOL_NAME.to_string(),
-                    )),
-                }
-            }
+        match source_capability {
+            ComponentCapability::Storage(_) => Ok(()),
             _ => Err(AnalyzerModelError::InvalidSourceCapability(
-                source_component.moniker().clone(),
-                source_capability_name.to_string(),
-                source_capability
-                    .source_name()
-                    .map_or_else(|| "".to_string(), |name| name.to_string()),
+                source_moniker,
+                format!("{:?}", source_capability.source_name()),
+                fsys::StorageAdminMarker::PROTOCOL_NAME.to_string(),
             )),
         }
     }
@@ -1364,7 +1347,7 @@ impl ComponentModelForAnalyzer {
     }
 }
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Child {
     pub child_moniker: ChildName,
     pub url: Url,

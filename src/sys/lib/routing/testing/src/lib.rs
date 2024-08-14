@@ -4348,9 +4348,6 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             "root",
             ComponentDeclBuilder::new()
                 .dictionary_default("my_dict")
-                // It doesn't actually matter that this dictionary doesn't
-                // contain the requested protocol, because routing should
-                // fail before that with a DictionariesNotSupported.
                 .use_(
                     UseBuilder::protocol()
                         .source(UseSource::Self_)
@@ -4379,10 +4376,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         assert_matches!(
             route_result,
-            Err(RoutingError::DictionariesNotSupported {
-                cap_type: CapabilityTypeName::Protocol,
-                ..
-            })
+            Err(RoutingError::UseFromSelfNotFound { moniker, capability_id })
+                if capability_id == "my_dict/A" && moniker == Moniker::root()
         );
     }
 
@@ -4451,10 +4446,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         assert_matches!(
             route_result,
-            Err(RoutingError::DictionariesNotSupported {
-                cap_type: CapabilityTypeName::Protocol,
-                ..
-            })
+            Err(RoutingError::BedrockNotPresentInDictionary { name, .. })
+                if name == "svc/dict_protocol"
         );
     }
 
@@ -4518,10 +4511,8 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         assert_matches!(
             route_result,
-            Err(RoutingError::DictionariesNotSupported {
-                cap_type: CapabilityTypeName::Protocol,
-                ..
-            })
+            Err(RoutingError::BedrockNotPresentInDictionary { name, .. })
+                if name == "svc/dict_protocol"
         );
     }
 }

@@ -640,20 +640,29 @@ fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
         }
         cm_rust::OfferSource::Child(child_ref) => {
             let child_name: ChildName = child_ref.clone().try_into().expect("invalid child ref");
-            let Some(child_component_output) =
-                child_component_output_dictionary_routers.get(&child_name)
-            else {
-                return;
-            };
-            let router = child_component_output.clone().lazy_get(
-                source_path.to_owned(),
-                RoutingError::offer_from_child_expose_not_found(
+            match child_component_output_dictionary_routers.get(&child_name) {
+                None => Router::new_error(RoutingError::offer_from_child_instance_not_found(
                     &child_name,
                     &component.moniker(),
-                    offer.source_name().clone(),
-                ),
-            );
-            router.with_porcelain_type(offer.into(), component.moniker().clone())
+                    source_path.iter_segments().join("/"),
+                )),
+                Some(child_component_output) => {
+                    let router = child_component_output.clone().lazy_get(
+                        source_path.to_owned(),
+                        RoutingError::offer_from_child_expose_not_found(
+                            &child_name,
+                            &component.moniker(),
+                            offer.source_name().clone(),
+                        ),
+                    );
+                    match offer {
+                        cm_rust::OfferDecl::Protocol(_) => {
+                            router.with_porcelain_type(offer.into(), component.moniker().clone())
+                        }
+                        _ => router,
+                    }
+                }
+            }
         }
         cm_rust::OfferSource::Framework => {
             if offer.is_from_dictionary() {
@@ -738,22 +747,30 @@ fn extend_dict_with_expose<C: ComponentInstanceInterface + 'static>(
             .with_porcelain_type(expose.into(), component.moniker().clone()),
         cm_rust::ExposeSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid static child name");
-            let Some(child_component_output) =
+            if let Some(child_component_output) =
                 child_component_output_dictionary_routers.get(&child_name)
-            else {
-                return;
-            };
-            child_component_output
-                .clone()
-                .lazy_get(
+            {
+                let router = child_component_output.clone().lazy_get(
                     source_path.to_owned(),
                     RoutingError::expose_from_child_expose_not_found(
                         &child_name,
                         &component.moniker(),
                         expose.source_name().clone(),
                     ),
-                )
-                .with_porcelain_type(expose.into(), component.moniker().clone())
+                );
+                match expose {
+                    cm_rust::ExposeDecl::Protocol(_) => {
+                        router.with_porcelain_type(expose.into(), component.moniker().clone())
+                    }
+                    _ => router,
+                }
+            } else {
+                Router::new_error(RoutingError::expose_from_child_instance_not_found(
+                    &child_name,
+                    &component.moniker(),
+                    expose.source_name().clone(),
+                ))
+            }
         }
         cm_rust::ExposeSource::Framework => {
             if expose.is_from_dictionary() {

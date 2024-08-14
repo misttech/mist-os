@@ -21,7 +21,10 @@ use cm_rust_testing::*;
 use cm_types::Url;
 use fidl::prelude::*;
 use moniker::Moniker;
-use routing::capability_source::{CapabilitySource, ComponentCapability, ComponentSource};
+use routing::capability_source::{
+    BuiltinSource, CapabilitySource, ComponentCapability, ComponentSource, FrameworkSource,
+    InternalCapability, NamespaceSource,
+};
 use routing::component_instance::ComponentInstanceInterface;
 use routing::environment::RunnerRegistry;
 use routing::error::RoutingError;
@@ -469,7 +472,9 @@ impl RoutingTestModel for RoutingTestForAnalyzer {
                     .error
                 {
                     Some(err) => match expected {
-                        ExpectedResult::Ok => panic!("routing failed, expected success"),
+                        ExpectedResult::Ok => {
+                            panic!("expected success, but routing failed with error {:?}", err)
+                        }
                         ExpectedResult::Err(status) => {
                             assert_eq!(err.as_zx_status(), status);
                         }
@@ -1117,7 +1122,7 @@ mod tests {
     /// a: offers protocol /svc/foo from self as /svc/bar
     /// b: uses protocol /svc/bar as /svc/hippo
     #[fuchsia::test]
-    async fn map_route_use_from_parent() {
+    async fn route_use_from_parent() {
         let use_decl = UseBuilder::protocol().name("bar").path("/svc/hippo").build();
         let offer_decl = OfferBuilder::protocol()
             .name("foo")
@@ -1138,24 +1143,20 @@ mod tests {
             ("b", ComponentDeclBuilder::new().use_(use_decl.clone()).build()),
         ];
         let test = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
+        let root_component = test.look_up_instance(&Moniker::root()).await.expect("root instance");
         let b_component =
             test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
         let route_result = test.model.check_use_capability(&use_decl, &b_component).await;
         assert_eq!(route_result.len(), 1);
         let route_result = &route_result[0];
         assert!(route_result.error.is_none());
-
         assert_eq!(
-            route_result.route,
-            vec![
-                RouteSegment::UseBy {
-                    moniker: vec!["b"].try_into().unwrap(),
-                    capability: use_decl
-                },
-                RouteSegment::OfferBy { moniker: Moniker::root(), capability: offer_decl },
-                RouteSegment::DeclareBy { moniker: Moniker::root(), capability: protocol_decl }
-            ]
-        )
+            route_result.source,
+            Some(CapabilitySource::Component(ComponentSource {
+                capability: protocol_decl.into(),
+                moniker: root_component.moniker().clone(),
+            })),
+        );
     }
 
     ///   a
@@ -1165,7 +1166,7 @@ mod tests {
     /// a: uses protocol /svc/bar from b as /svc/hippo
     /// b: exposes protocol /svc/foo from self as /svc/bar
     #[fuchsia::test]
-    async fn map_route_use_from_child() {
+    async fn route_use_from_child() {
         let use_decl = UseBuilder::protocol()
             .name("bar")
             .source(UseSource::Child("b".parse().unwrap()))
@@ -1189,30 +1190,24 @@ mod tests {
         ];
         let test = RoutingTestBuilderForAnalyzer::new("a", components).build().await;
         let a_component = test.look_up_instance(&Moniker::root()).await.expect("a instance");
+        let b_component =
+            test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
         let route_results = test.model.check_use_capability(&use_decl, &a_component).await;
         assert_eq!(route_results.len(), 1);
         let route_result = &route_results[0];
         assert_matches!(route_result.error, None);
-
         assert_eq!(
-            route_result.route,
-            vec![
-                RouteSegment::UseBy { moniker: Moniker::root(), capability: use_decl },
-                RouteSegment::ExposeBy {
-                    moniker: vec!["b"].try_into().unwrap(),
-                    capability: expose_decl
-                },
-                RouteSegment::DeclareBy {
-                    moniker: vec!["b"].try_into().unwrap(),
-                    capability: protocol_decl,
-                }
-            ]
-        )
+            route_result.source,
+            Some(CapabilitySource::Component(ComponentSource {
+                capability: protocol_decl.into(),
+                moniker: b_component.moniker().clone(),
+            })),
+        );
     }
 
     /// a: uses protocol /svc/foo from self under the path /svc/hippo
     #[fuchsia::test]
-    async fn map_route_use_from_self() {
+    async fn route_use_from_self() {
         let use_decl =
             UseBuilder::protocol().name("foo").source(UseSource::Self_).path("/svc/hippo").build();
         let protocol_decl = CapabilityBuilder::protocol().name("foo").build();
@@ -1230,14 +1225,13 @@ mod tests {
         assert_eq!(route_results.len(), 1);
         let route_result = &route_results[0];
         assert_matches!(route_result.error, None);
-
         assert_eq!(
-            route_result.route,
-            vec![
-                RouteSegment::UseBy { moniker: Moniker::root(), capability: use_decl },
-                RouteSegment::DeclareBy { moniker: Moniker::root(), capability: protocol_decl }
-            ]
-        )
+            route_result.source,
+            Some(CapabilitySource::Component(ComponentSource {
+                capability: protocol_decl.into(),
+                moniker: a_component.moniker().clone(),
+            })),
+        );
     }
 
     ///     a
@@ -1484,7 +1478,7 @@ mod tests {
     /// a: offers framework protocol "fuchsia.component.Realm" to b
     /// b: uses protocol "fuchsia.component.Realm"
     #[fuchsia::test]
-    async fn route_map_use_from_framework_and_builtin() {
+    async fn route_use_from_framework() {
         let offer_realm_decl = OfferBuilder::protocol()
             .name("fuchsia.component.Realm")
             .source(OfferSource::Framework)
@@ -1506,6 +1500,7 @@ mod tests {
         let builder = RoutingTestBuilderForAnalyzer::new("a", components);
         let test = builder.build().await;
 
+        let a_component = test.look_up_instance(&Moniker::root()).await.expect("a instance");
         let b_component =
             test.look_up_instance(&vec!["b"].try_into().unwrap()).await.expect("b instance");
         let realm_route_results =
@@ -1513,19 +1508,14 @@ mod tests {
         assert_eq!(realm_route_results.len(), 1);
         let realm_route_result = &realm_route_results[0];
         assert_matches!(realm_route_result.error, None);
-
         assert_eq!(
-            realm_route_result.route,
-            vec![
-                RouteSegment::UseBy {
-                    moniker: vec!["b"].try_into().unwrap(),
-                    capability: use_realm_decl
-                },
-                RouteSegment::OfferBy { moniker: Moniker::root(), capability: offer_realm_decl },
-                RouteSegment::ProvideFromFramework {
-                    capability: "fuchsia.component.Realm".parse().unwrap()
-                }
-            ]
+            realm_route_result.source,
+            Some(CapabilitySource::Framework(FrameworkSource {
+                capability: InternalCapability::Protocol(
+                    "fuchsia.component.Realm".parse().unwrap()
+                ),
+                moniker: a_component.moniker().clone(),
+            })),
         );
     }
 
@@ -1539,7 +1529,7 @@ mod tests {
     ///    namespace as bar
     /// b: uses protocol bar as /svc/hippo
     #[fuchsia::test]
-    async fn route_map_offer_from_component_manager_namespace() {
+    async fn route_offer_from_component_manager_namespace() {
         let offer_decl = OfferBuilder::protocol()
             .name("foo")
             .target_name("bar")
@@ -1567,17 +1557,11 @@ mod tests {
         assert_eq!(route_results.len(), 1);
         let route_result = &route_results[0];
         assert!(route_result.error.is_none());
-
         assert_eq!(
-            route_result.route,
-            vec![
-                RouteSegment::UseBy {
-                    moniker: vec!["b"].try_into().unwrap(),
-                    capability: use_decl
-                },
-                RouteSegment::OfferBy { moniker: Moniker::root(), capability: offer_decl },
-                RouteSegment::ProvideFromNamespace { capability: capability_decl }
-            ]
+            route_result.source,
+            Some(CapabilitySource::Namespace(NamespaceSource {
+                capability: capability_decl.into()
+            })),
         );
     }
 
@@ -1616,15 +1600,8 @@ mod tests {
         assert!(route_result.error.is_none());
 
         assert_eq!(
-            route_result.route,
-            vec![
-                RouteSegment::UseBy {
-                    moniker: vec!["b"].try_into().unwrap(),
-                    capability: use_decl
-                },
-                RouteSegment::OfferBy { moniker: Moniker::root(), capability: offer_decl },
-                RouteSegment::ProvideAsBuiltin { capability: capability_decl }
-            ]
+            route_result.source,
+            Some(CapabilitySource::Builtin(BuiltinSource { capability: capability_decl.into() })),
         );
     }
 
@@ -1919,6 +1896,7 @@ mod tests {
     async fn route_maps_all_routes_for_instance() {
         let a_url = make_test_url("a");
         let b_url = "base://b/".to_string();
+        let c_url = "base://c/".to_string();
 
         let resolver_registration_decl = ResolverRegistration {
             resolver: "base_resolver".parse().unwrap(),
@@ -1968,12 +1946,14 @@ mod tests {
             (
                 b_url,
                 ComponentDeclBuilder::new_empty_component()
+                    .child(ChildBuilder::new().name("c").url(&c_url))
                     .program_runner("dwarf")
                     .expose(expose_protocol_decl.clone())
                     .use_(use_directory_decl.clone())
                     .use_(use_event_decl)
                     .build(),
             ),
+            (c_url, ComponentDeclBuilder::new_empty_component().build()),
         ];
 
         let test =
@@ -2102,16 +2082,13 @@ mod tests {
                 target_decl: TargetDecl::Expose(expose_protocol_decl.clone()),
                 capability: Some("bad_protocol".parse().unwrap()),
                 error: Some(AnalyzerModelError::RoutingError(
-                    RoutingError::ExposeFromChildInstanceNotFound {
+                    RoutingError::ExposeFromChildExposeNotFound {
                         capability_id: "bad_protocol".to_string(),
                         child_moniker: "c".try_into().unwrap(),
                         moniker: b_component.moniker().clone(),
                     },
                 )),
-                route: vec![RouteSegment::ExposeBy {
-                    moniker: vec!["b"].try_into().unwrap(),
-                    capability: expose_protocol_decl
-                }],
+                route: vec![],
                 source: None,
             }],
         );
@@ -2172,68 +2149,5 @@ mod tests {
         let protocols =
             route_maps.get(&CapabilityTypeName::Protocol).expect("expected protocol results");
         assert_eq!(protocols, &vec![]);
-    }
-
-    ///   a
-    ///    \
-    ///     b
-    ///
-    /// a: Offers protocol "fuchsia.examples.Echo" from c (non-existent) to b
-    #[fuchsia::test]
-    async fn route_from_offer_decl_fails() {
-        let a_url = make_test_url("a");
-        let b_url = "base://b/".to_string();
-
-        let offer_protocol_decl = OfferBuilder::protocol()
-            .name("fuchsia.examples.Echo")
-            .source(offer_source_static_child("c"))
-            .target(offer_target_static_child("b"))
-            .build();
-
-        let components = vec![
-            (
-                a_url.clone(),
-                ComponentDeclBuilder::new()
-                    .child(ChildBuilder::new().name("b").url(&b_url))
-                    .offer(offer_protocol_decl.clone())
-                    .build(),
-            ),
-            (b_url, ComponentDeclBuilder::new_empty_component().program_runner("dwarf").build()),
-        ];
-
-        let test =
-            RoutingTestBuilderForAnalyzer::new_with_custom_urls(a_url, components).build().await;
-        let root_component = test.look_up_instance(&Moniker::root()).await.expect("a instance");
-
-        let route_maps = test
-            .model
-            .check_routes_for_instance(
-                &root_component,
-                &HashSet::from_iter(vec![CapabilityTypeName::Protocol].into_iter()),
-            )
-            .await;
-        assert_eq!(route_maps.len(), 1);
-        let protocols =
-            route_maps.get(&CapabilityTypeName::Protocol).expect("expected protocol results");
-        assert_eq!(
-            protocols,
-            &vec![VerifyRouteResult {
-                using_node: Moniker::root(),
-                target_decl: TargetDecl::Offer(offer_protocol_decl.clone()),
-                capability: Some("fuchsia.examples.Echo".parse().unwrap()),
-                error: Some(AnalyzerModelError::RoutingError(
-                    RoutingError::OfferFromChildInstanceNotFound {
-                        capability_id: "fuchsia.examples.Echo".to_string(),
-                        child_moniker: "c".try_into().unwrap(),
-                        moniker: root_component.moniker().clone(),
-                    },
-                )),
-                route: vec![RouteSegment::OfferBy {
-                    moniker: Moniker::root(),
-                    capability: offer_protocol_decl
-                }],
-                source: None,
-            }]
-        );
     }
 }

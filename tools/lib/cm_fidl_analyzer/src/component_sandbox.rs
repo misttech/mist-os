@@ -98,11 +98,12 @@ pub fn build_framework_dictionary(component: &Arc<ComponentInstanceForAnalyzer>)
         fcomponent::BinderMarker::PROTOCOL_NAME,
         fsandbox::CapabilityStoreMarker::PROTOCOL_NAME,
         fcomponent::IntrospectorMarker::PROTOCOL_NAME,
-        fsys::LifecycleControllerMarker::PROTOCOL_NAME,
         fcomponent::NamespaceMarker::PROTOCOL_NAME,
         fcomponent::RealmMarker::PROTOCOL_NAME,
+        fsys::LifecycleControllerMarker::PROTOCOL_NAME,
         fsys::RealmQueryMarker::PROTOCOL_NAME,
         fsys::RouteValidatorMarker::PROTOCOL_NAME,
+        "fuchsia.sys2.RealmExplorer",
     ] {
         let name = cm_types::Name::new(*protocol_name).unwrap();
         framework_dict
@@ -208,10 +209,11 @@ pub(crate) fn static_children_component_output_dictionary_routers(
                 .get(&self.child_name)
                 .cloned()
                 .ok_or(RouterError::NotFound(Arc::new(
-                    RoutingError::BedrockNotPresentInDictionary {
-                        moniker: self.weak_component.moniker.clone(),
-                        name: format!("{}", &self.child_name),
-                    },
+                    RoutingError::offer_from_child_instance_not_found(
+                        &self.child_name,
+                        &self.weak_component.moniker,
+                        "component output dictionary",
+                    ),
                 )))?;
             let component_output_dict = child.sandbox.component_output_dict.clone();
             Ok(component_output_dict.into())

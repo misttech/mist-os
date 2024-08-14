@@ -8,7 +8,7 @@ use clonable_error::ClonableError;
 use cm_rust::CapabilityTypeName;
 use cm_types::Name;
 use moniker::{ChildName, ExtendedMoniker, Moniker};
-use router_error::{Explain, RouterError};
+use router_error::{DowncastErrorForTest, Explain, RouterError};
 use std::sync::Arc;
 use thiserror::Error;
 use {fidl_fuchsia_component as fcomponent, fuchsia_zircon_status as zx};
@@ -430,6 +430,17 @@ impl From<RoutingError> for ExtendedMoniker {
 impl From<RoutingError> for RouterError {
     fn from(value: RoutingError) -> Self {
         Self::NotFound(Arc::new(value))
+    }
+}
+
+impl From<RouterError> for RoutingError {
+    fn from(value: RouterError) -> Self {
+        match value {
+            RouterError::NotFound(arc_dyn_explain) => {
+                arc_dyn_explain.downcast_for_test::<Self>().clone()
+            }
+            err => panic!("Cannot downcast {err} to RoutingError!"),
+        }
     }
 }
 

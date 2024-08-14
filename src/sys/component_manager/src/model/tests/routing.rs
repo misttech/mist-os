@@ -1640,9 +1640,8 @@ async fn use_with_destroyed_parent() {
         .expect_err("routing unexpectedly succeeded");
     assert_matches!(
         err,
-        RoutingError::ComponentInstanceError(
-            ComponentInstanceError::InstanceNotFound { moniker }
-        ) if moniker == vec!["coll:b"].try_into().unwrap()
+        RoutingError::ComponentInstanceError(ComponentInstanceError::ResolveFailed { moniker, ..})
+        if moniker == vec!["coll:b", "c"].try_into().unwrap()
     );
 }
 
