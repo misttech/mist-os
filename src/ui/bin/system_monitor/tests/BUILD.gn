@@ -22,6 +22,7 @@ executable("system_monitor_integration_test_bin") {
   deps = [
     "//sdk/lib/sys/cpp",
     "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/loop_fixture",
     "//src/ui/bin/system_monitor:lib",
     "//zircon/system/ulib/async:async",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
