@@ -303,4 +303,11 @@ type ExposeConfiguration = table {
     /// (Optional, defaults to `REQUIRED`) The availability of this capability.
     /// See [`Availability`].
     5: availability Availability;
+
+    /// (Optional) Path in a dictionary provided by `source` which contains `source_name`.
+    /// If this field is absent, `source_name` identifies a capability directly routed
+    /// by `source`. If set, `source_name` identifies a capability nested inside this
+    /// dictionary.
+    @available(added=HEAD)
+    6: source_dictionary string:MAX_PATH_LENGTH;
 };

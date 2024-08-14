@@ -822,6 +822,7 @@ impl UseBuilder {
                 availability: self.availability,
                 type_: self.config_type.expect("config_type not set"),
                 default: None,
+                source_dictionary: self.source_dictionary,
             }),
             CapabilityTypeName::Resolver | CapabilityTypeName::Dictionary => unreachable!(),
         }
@@ -1016,6 +1017,7 @@ impl ExposeBuilder {
                 cm_rust::ExposeDecl::Config(cm_rust::ExposeConfigurationDecl {
                     source: self.source.expect("source not set"),
                     source_name: self.source_name.expect("name not set"),
+                    source_dictionary: self.source_dictionary,
                     target: self.target,
                     target_name: self.target_name.expect("name not set"),
                     availability: self.availability,
@@ -1317,6 +1319,7 @@ impl OfferBuilder {
                     target: self.target.expect("target not set"),
                     target_name: self.target_name.expect("name not set"),
                     availability: self.availability,
+                    source_dictionary: self.source_dictionary,
                 })
             }
             CapabilityTypeName::Dictionary => {

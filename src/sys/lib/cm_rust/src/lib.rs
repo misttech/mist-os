@@ -464,34 +464,19 @@ impl UseDeclCommon for UseRunnerDecl {
 
 #[cfg(fuchsia_api_level_at_least = "20")]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::UseConfiguration", source_path = "name_only")]
+#[derive(FidlDecl, UseDeclCommon, Debug, Clone, PartialEq, Eq)]
+#[fidl_decl(fidl_table = "fdecl::UseConfiguration", source_path = "dictionary")]
 pub struct UseConfigurationDecl {
     pub source: UseSource,
     pub source_name: Name,
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    #[fidl_decl(default_preserve_none)]
+    pub source_dictionary: RelativePath,
     pub target_name: Name,
     #[fidl_decl(default)]
     pub availability: Availability,
     pub type_: ConfigValueType,
     pub default: Option<ConfigValue>,
-}
-
-#[cfg(fuchsia_api_level_at_least = "20")]
-impl SourceName for UseConfigurationDecl {
-    fn source_name(&self) -> &Name {
-        &self.source_name
-    }
-}
-
-#[cfg(fuchsia_api_level_at_least = "20")]
-impl UseDeclCommon for UseConfigurationDecl {
-    fn source(&self) -> &UseSource {
-        &self.source
-    }
-
-    fn availability(&self) -> &Availability {
-        &self.availability
-    }
 }
 
 #[cfg_attr(
@@ -672,10 +657,13 @@ pub struct OfferDictionaryDecl {
 #[cfg(fuchsia_api_level_at_least = "20")]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, OfferDeclCommon, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::OfferConfiguration", source_path = "name_only")]
+#[fidl_decl(fidl_table = "fdecl::OfferConfiguration", source_path = "dictionary")]
 pub struct OfferConfigurationDecl {
     pub source: OfferSource,
     pub source_name: Name,
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    #[fidl_decl(default_preserve_none)]
+    pub source_dictionary: RelativePath,
     pub target: OfferTarget,
     pub target_name: Name,
     #[fidl_decl(default)]
@@ -1056,6 +1044,9 @@ pub struct ExposeConfigurationDecl {
     pub source_name: Name,
     pub target: ExposeTarget,
     pub target_name: Name,
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    #[fidl_decl(default_preserve_none)]
+    pub source_dictionary: RelativePath,
     #[fidl_decl(default)]
     pub availability: Availability,
 }
@@ -3438,6 +3429,7 @@ mod tests {
                             availability: Availability::Required,
                             type_: ConfigValueType::Bool,
                             default: None,
+                            source_dictionary: ".".parse().unwrap(),
                         }),
                     ],
                     exposes: vec![

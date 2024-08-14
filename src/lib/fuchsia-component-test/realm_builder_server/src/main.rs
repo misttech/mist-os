@@ -1660,6 +1660,8 @@ fn create_offer_decl(
                 target,
                 target_name: try_into_target_name(&config.name, &config.as_)?,
                 availability,
+                #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                source_dictionary: ".".parse().unwrap(),
             })
         }
         #[cfg(fuchsia_api_level_at_least = "HEAD")]

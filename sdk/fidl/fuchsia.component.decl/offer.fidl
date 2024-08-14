@@ -464,4 +464,11 @@ type OfferConfiguration = table {
     /// The `same_as_target` value causes this offer's availability to match the
     /// availability set in the target.
     5: availability Availability;
+
+    /// (Optional) Path in a dictionary provided by `source` which contains `source_name`.
+    /// If this field is absent, `source_name` identifies a capability directly routed
+    /// by `source`. If set, `source_name` identifies a capability nested inside this
+    /// dictionary.
+    @available(added=HEAD)
+    6: source_dictionary dictionary_path;
 };

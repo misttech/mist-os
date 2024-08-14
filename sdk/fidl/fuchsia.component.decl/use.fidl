@@ -307,4 +307,11 @@ type UseConfiguration = table {
     /// (Optional): If this is set, this is the value that will be provided via routing
     /// if the capability is successfully routed from void.
     6: default ConfigValue;
+
+    /// (Optional) Path in a dictionary provided by `source` which contains `source_name`.
+    /// If this field is absent, `source_name` identifies a capability directly routed
+    /// by `source`. If set, `source_name` identifies a capability nested inside this
+    /// dictionary.
+    @available(added=HEAD)
+    7: source_dictionary dictionary_path;
 };
