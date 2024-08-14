@@ -11,7 +11,6 @@
 #include <optional>
 
 #include "src/graphics/display/lib/coordinator-getter/client.h"
-#include "src/lib/async-watchdog/watchdog.h"
 #include "src/lib/fsl/io/device_watcher.h"
 #include "src/ui/lib/escher/escher.h"
 #include "src/ui/scenic/lib/allocation/allocator.h"
@@ -129,8 +128,6 @@ class App {
 
   uint64_t flatland_frame_count_ = 0;
   uint64_t skipped_frame_count_ = 0;
-
-  async_watchdog::Watchdog watchdog_;
 
   const bool enable_snapshot_dump_ = false;
 };

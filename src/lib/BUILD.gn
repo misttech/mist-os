@@ -9,7 +9,6 @@ group("tests") {
     "analytics:tests",
     "async-gunzip:tests",
     "async-utils:tests",
-    "async-watchdog:tests",
     "backoff:tests",
     "callback:tests",
     "chunked-compression:tests",

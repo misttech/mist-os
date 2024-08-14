@@ -149,21 +149,6 @@ scenic_structured_config::Config GetConfig() {
   return values;
 }
 
-#ifdef NDEBUG
-// TODO(https://fxbug.dev/42125470): Scenic sometimes gets stuck for consecutive 60 seconds.
-// Here we set up a Watchdog polling Scenic status every 15 seconds.
-constexpr uint32_t kWatchdogWarningIntervalMs = 15000u;
-// On some devices, the time to start up Scenic may exceed 15 seconds.
-// In that case we should only send a warning, and we should only crash
-// Scenic if the main thread is blocked for longer time.
-constexpr uint32_t kWatchdogTimeoutMs = 45000u;
-#else   // !defined(NDEBUG)
-// We set a higher warning interval and timeout length for debug builds,
-// since these builds could be slower than the default release ones.
-constexpr uint32_t kWatchdogWarningIntervalMs = 30000u;
-constexpr uint32_t kWatchdogTimeoutMs = 90000u;
-#endif  // NDEBUG
-
 // Interval at which we log that Scenic is waiting for Vulkan or display.
 static constexpr zx::duration kWaitWarningInterval = zx::sec(5);
 
@@ -235,9 +220,7 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
           })),
       geometry_provider_(),
       observer_registry_(geometry_provider_),
-      scoped_observer_registry_(geometry_provider_),
-      watchdog_("Scenic main thread", kWatchdogWarningIntervalMs, kWatchdogTimeoutMs,
-                async_get_default_dispatcher()) {
+      scoped_observer_registry_(geometry_provider_) {
   fpromise::bridge<escher::EscherUniquePtr> escher_bridge;
   fpromise::bridge<std::shared_ptr<display::Display>> display_bridge;
 
