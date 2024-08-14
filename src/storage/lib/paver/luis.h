@@ -6,6 +6,7 @@
 #define SRC_STORAGE_LIB_PAVER_LUIS_H_
 
 #include "src/storage/lib/paver/abr-client.h"
+#include "src/storage/lib/paver/block-devices.h"
 #include "src/storage/lib/paver/device-partitioner.h"
 #include "src/storage/lib/paver/gpt.h"
 #include "src/storage/lib/paver/partition-client.h"
@@ -14,7 +15,7 @@ namespace paver {
 class LuisPartitioner : public DevicePartitioner {
  public:
   static zx::result<std::unique_ptr<DevicePartitioner>> Initialize(
-      fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+      const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
       fidl::ClientEnd<fuchsia_device::Controller> block_device);
 
   bool IsFvmWithinFtl() const override { return false; }
@@ -42,7 +43,7 @@ class LuisPartitioner : public DevicePartitioner {
   zx::result<> OnStop() const override { return zx::ok(); }
 
  private:
-  LuisPartitioner(std::unique_ptr<GptDevicePartitioner> gpt) : gpt_(std::move(gpt)) {}
+  explicit LuisPartitioner(std::unique_ptr<GptDevicePartitioner> gpt) : gpt_(std::move(gpt)) {}
 
   zx::result<std::unique_ptr<PartitionClient>> GetBootloaderPartitionClient() const;
 
@@ -52,15 +53,15 @@ class LuisPartitioner : public DevicePartitioner {
 class LuisPartitionerFactory : public DevicePartitionerFactory {
  public:
   zx::result<std::unique_ptr<DevicePartitioner>> New(
-      fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-      std::shared_ptr<Context> context,
+      const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+      Arch arch, std::shared_ptr<Context> context,
       fidl::ClientEnd<fuchsia_device::Controller> block_device) final;
 };
 
 class LuisAbrClientFactory : public abr::ClientFactory {
  public:
   zx::result<std::unique_ptr<abr::Client>> New(
-      fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+      const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
       std::shared_ptr<paver::Context> context) final;
 };
 }  // namespace paver

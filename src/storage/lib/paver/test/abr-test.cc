@@ -45,9 +45,10 @@ TEST(AstroAbrTests, CreateFails) {
   ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr));
   ASSERT_OK(RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/platform").status_value());
 
+  zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
+  ASSERT_OK(devices);
   fidl::ClientEnd<fuchsia_io::Directory> svc_root;
-  ASSERT_NOT_OK(
-      paver::AstroAbrClientFactory().New(devmgr.devfs_root().duplicate(), svc_root, nullptr));
+  ASSERT_NOT_OK(paver::AstroAbrClientFactory().New(*devices, svc_root, nullptr));
 }
 
 TEST(SherlockAbrTests, CreateFails) {
@@ -59,8 +60,10 @@ TEST(SherlockAbrTests, CreateFails) {
   ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr));
   ASSERT_OK(RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/platform").status_value());
 
-  ASSERT_NOT_OK(paver::SherlockAbrClientFactory().Create(devmgr.devfs_root().duplicate(),
-                                                         devmgr.fshost_svc_dir(), nullptr));
+  zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
+  ASSERT_OK(devices);
+  ASSERT_NOT_OK(
+      paver::SherlockAbrClientFactory().Create(*devices, devmgr.fshost_svc_dir(), nullptr));
 }
 
 TEST(LuisAbrTests, CreateFails) {
@@ -72,8 +75,9 @@ TEST(LuisAbrTests, CreateFails) {
   ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr));
   ASSERT_OK(RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/platform").status_value());
 
-  ASSERT_NOT_OK(paver::LuisAbrClientFactory().Create(devmgr.devfs_root().duplicate(),
-                                                     devmgr.fshost_svc_dir(), nullptr));
+  zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
+  ASSERT_OK(devices);
+  ASSERT_NOT_OK(paver::LuisAbrClientFactory().Create(*devices, devmgr.fshost_svc_dir(), nullptr));
 }
 
 TEST(X64AbrTests, CreateFails) {
@@ -85,8 +89,9 @@ TEST(X64AbrTests, CreateFails) {
   ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr));
   ASSERT_OK(RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/platform").status_value());
 
-  ASSERT_NOT_OK(paver::X64AbrClientFactory().Create(devmgr.devfs_root().duplicate(),
-                                                    devmgr.fshost_svc_dir(), nullptr));
+  zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
+  ASSERT_OK(devices);
+  ASSERT_NOT_OK(paver::X64AbrClientFactory().Create(*devices, devmgr.fshost_svc_dir(), nullptr));
 }
 
 class CurrentSlotUuidTest : public zxtest::Test {
@@ -147,7 +152,9 @@ class CurrentSlotUuidTest : public zxtest::Test {
 TEST_F(CurrentSlotUuidTest, TestZirconAIsSlotA) {
   ASSERT_NO_FATAL_FAILURE(CreateDiskWithPartition("zircon-a"));
 
-  auto result = abr::PartitionUuidToConfiguration(devmgr_.devfs_root(), uuid::Uuid(kTestUuid));
+  zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
+  ASSERT_OK(devices);
+  auto result = abr::PartitionUuidToConfiguration(*devices, uuid::Uuid(kTestUuid));
   ASSERT_OK(result);
   ASSERT_EQ(result.value(), fuchsia_paver::wire::Configuration::kA);
 }
@@ -155,7 +162,9 @@ TEST_F(CurrentSlotUuidTest, TestZirconAIsSlotA) {
 TEST_F(CurrentSlotUuidTest, TestZirconAWithUnderscore) {
   ASSERT_NO_FATAL_FAILURE(CreateDiskWithPartition("zircon_a"));
 
-  auto result = abr::PartitionUuidToConfiguration(devmgr_.devfs_root(), uuid::Uuid(kTestUuid));
+  zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
+  ASSERT_OK(devices);
+  auto result = abr::PartitionUuidToConfiguration(*devices, uuid::Uuid(kTestUuid));
   ASSERT_OK(result);
   ASSERT_EQ(result.value(), fuchsia_paver::wire::Configuration::kA);
 }
@@ -163,7 +172,9 @@ TEST_F(CurrentSlotUuidTest, TestZirconAWithUnderscore) {
 TEST_F(CurrentSlotUuidTest, TestZirconAMixedCase) {
   ASSERT_NO_FATAL_FAILURE(CreateDiskWithPartition("ZiRcOn-A"));
 
-  auto result = abr::PartitionUuidToConfiguration(devmgr_.devfs_root(), uuid::Uuid(kTestUuid));
+  zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
+  ASSERT_OK(devices);
+  auto result = abr::PartitionUuidToConfiguration(*devices, uuid::Uuid(kTestUuid));
   ASSERT_OK(result);
   ASSERT_EQ(result.value(), fuchsia_paver::wire::Configuration::kA);
 }
@@ -171,7 +182,9 @@ TEST_F(CurrentSlotUuidTest, TestZirconAMixedCase) {
 TEST_F(CurrentSlotUuidTest, TestZirconB) {
   ASSERT_NO_FATAL_FAILURE(CreateDiskWithPartition("zircon_b"));
 
-  auto result = abr::PartitionUuidToConfiguration(devmgr_.devfs_root(), uuid::Uuid(kTestUuid));
+  zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
+  ASSERT_OK(devices);
+  auto result = abr::PartitionUuidToConfiguration(*devices, uuid::Uuid(kTestUuid));
   ASSERT_OK(result);
   ASSERT_EQ(result.value(), fuchsia_paver::wire::Configuration::kB);
 }
@@ -179,7 +192,9 @@ TEST_F(CurrentSlotUuidTest, TestZirconB) {
 TEST_F(CurrentSlotUuidTest, TestZirconR) {
   ASSERT_NO_FATAL_FAILURE(CreateDiskWithPartition("ZIRCON-R"));
 
-  auto result = abr::PartitionUuidToConfiguration(devmgr_.devfs_root(), uuid::Uuid(kTestUuid));
+  zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
+  ASSERT_OK(devices);
+  auto result = abr::PartitionUuidToConfiguration(*devices, uuid::Uuid(kTestUuid));
   ASSERT_OK(result);
   ASSERT_EQ(result.value(), fuchsia_paver::wire::Configuration::kRecovery);
 }
@@ -187,7 +202,9 @@ TEST_F(CurrentSlotUuidTest, TestZirconR) {
 TEST_F(CurrentSlotUuidTest, TestInvalid) {
   ASSERT_NO_FATAL_FAILURE(CreateDiskWithPartition("ZERCON-R"));
 
-  auto result = abr::PartitionUuidToConfiguration(devmgr_.devfs_root(), uuid::Uuid(kTestUuid));
+  zx::result devices = paver::BlockDevices::Create(devmgr_.devfs_root().duplicate());
+  ASSERT_OK(devices);
+  auto result = abr::PartitionUuidToConfiguration(*devices, uuid::Uuid(kTestUuid));
   ASSERT_TRUE(result.is_error());
   ASSERT_EQ(result.error_value(), ZX_ERR_NOT_SUPPORTED);
 }

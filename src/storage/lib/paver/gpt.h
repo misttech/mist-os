@@ -15,6 +15,7 @@
 #include <gpt/gpt.h>
 
 #include "src/lib/uuid/uuid.h"
+#include "src/storage/lib/paver/block-devices.h"
 #include "src/storage/lib/paver/device-partitioner.h"
 
 namespace paver {
@@ -43,7 +44,7 @@ class GptDevicePartitioner {
   // with an entry for an FVM. If multiple devices with valid GPT containing
   // FVM entries are found, an error is returned.
   static zx::result<InitializeGptResult> InitializeGpt(
-      fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+      const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
       fidl::ClientEnd<fuchsia_device::Controller> block_controller);
 
   // Returns block info for a specified block device.
@@ -89,7 +90,7 @@ class GptDevicePartitioner {
   // Wipes all partitions meeting given criteria.
   zx::result<> WipePartitions(FilterCallback filter) const;
 
-  const fbl::unique_fd& devfs_root() { return devfs_root_; }
+  const paver::BlockDevices& devices() { return devices_; }
 
   fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root() { return svc_root_; }
 
@@ -101,20 +102,21 @@ class GptDevicePartitioner {
   };
 
   // Find all block devices which could contain a GPT.
+  // TODO(https://fxbug.dev/339491886): Re-initializing the GPT might be better managed by
+  // storage-host or fshost.  Then we can eliminate this direct dependency on devfs.
   static zx::result<std::vector<GptClients>> FindGptDevices(const fbl::unique_fd& devfs_root);
 
  private:
   // Initializes GPT for a device which was explicitly provided. If |gpt_device| doesn't have a
   // valid GPT, it will initialize it with a valid one.
   static zx::result<std::unique_ptr<GptDevicePartitioner>> InitializeProvidedGptDevice(
-      fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+      const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
       fidl::UnownedClientEnd<fuchsia_device::Controller> gpt_device);
 
-  GptDevicePartitioner(fbl::unique_fd devfs_root,
-                       fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+  GptDevicePartitioner(BlockDevices devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
                        std::unique_ptr<GptDevice> gpt,
                        fuchsia_hardware_block::wire::BlockInfo block_info)
-      : devfs_root_(std::move(devfs_root)),
+      : devices_(std::move(devices)),
         svc_root_(component::MaybeClone(svc_root)),
         gpt_(std::move(gpt)),
         block_info_(block_info) {}
@@ -122,7 +124,7 @@ class GptDevicePartitioner {
   zx::result<uuid::Uuid> CreateGptPartition(const char* name, const uuid::Uuid& type,
                                             uint64_t offset, uint64_t blocks) const;
 
-  const fbl::unique_fd devfs_root_;
+  const paver::BlockDevices devices_;
   fidl::ClientEnd<fuchsia_io::Directory> svc_root_;
   mutable std::unique_ptr<GptDevice> gpt_;
   fuchsia_hardware_block::wire::BlockInfo block_info_;

@@ -76,8 +76,11 @@ int main(int argc, char** argv) {
   async_dispatcher_t* dispatcher = loop.dispatcher();
   component::OutgoingDirectory outgoing(dispatcher);
 
-  paver::Paver paver;
-  paver.set_dispatcher(dispatcher);
+  zx::result paver = paver::Paver::Create();
+  if (paver.is_error()) {
+    return paver.status_value();
+  }
+  paver->set_dispatcher(dispatcher);
 
 #if defined(LEGACY_PAVER)
   // NOTE: Ordering matters!
@@ -123,7 +126,7 @@ int main(int argc, char** argv) {
 
   fidl::ServerBindingGroup<fuchsia_paver::Paver> bindings;
   zx::result result = outgoing.AddUnmanagedProtocol<fuchsia_paver::Paver>(
-      bindings.CreateHandler(&paver, dispatcher, fidl::kIgnoreBindingClosure));
+      bindings.CreateHandler(paver.value().get(), dispatcher, fidl::kIgnoreBindingClosure));
   if (result.is_error()) {
     ERROR("paver: error: Failed add paver protocol: %s.\n", result.status_string());
     return 1;
@@ -143,7 +146,8 @@ int main(int argc, char** argv) {
   fidl::ServerEnd<fuchsia_process_lifecycle::Lifecycle> lifecycle_request(
       std::move(lifecycle_channel));
 
-  LifecycleServer lifecycle(fit::bind_member<&paver::Paver::LifecycleStopCallback>(&paver));
+  LifecycleServer lifecycle(
+      fit::bind_member<&paver::Paver::LifecycleStopCallback>(paver.value().get()));
   fidl::ServerBinding lifecycle_binding(dispatcher, std::move(lifecycle_request), &lifecycle,
                                         fidl::kIgnoreBindingClosure);
   if (result.is_error()) {

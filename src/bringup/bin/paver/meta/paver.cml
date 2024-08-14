@@ -27,6 +27,12 @@
             path: "/dev",
         },
         {
+            directory: "partitions",
+            rights: [ "r*" ],
+            path: "/partitions",
+            availability: "optional",
+        },
+        {
             protocol: [
                 // Services from bootsvc
                 "fuchsia.boot.Arguments",

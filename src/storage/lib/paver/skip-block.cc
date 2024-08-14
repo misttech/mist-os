@@ -34,34 +34,38 @@ namespace skipblock = fuchsia_hardware_skipblock;
 
 zx::result<std::unique_ptr<SkipBlockPartitionClient>> SkipBlockDevicePartitioner::FindPartition(
     const Uuid& type) const {
-  zx::result partition = OpenSkipBlockPartition(devfs_root_, type, ZX_SEC(5));
+  zx::result partition = OpenSkipBlockPartition(devices_, type, ZX_SEC(5));
   if (partition.is_error()) {
     return partition.take_error();
   }
 
+  zx::result connection = partition->Connect();
+  if (connection.is_error()) {
+    return connection.take_error();
+  }
   return zx::ok(new SkipBlockPartitionClient(
-      fidl::ClientEnd<fuchsia_hardware_skipblock::SkipBlock>(std::move(partition->device))));
+      fidl::ClientEnd<fuchsia_hardware_skipblock::SkipBlock>(connection->TakeChannel())));
 }
 
 zx::result<std::unique_ptr<PartitionClient>> SkipBlockDevicePartitioner::FindFvmPartition() const {
   // FVM partition is managed so it should expose a normal block device.
   zx::result partition =
-      OpenBlockPartition(devfs_root_, std::nullopt, Uuid(GUID_FVM_VALUE), ZX_SEC(5));
+      OpenBlockPartition(devices_, std::nullopt, Uuid(GUID_FVM_VALUE), ZX_SEC(5));
   if (partition.is_error()) {
     return partition.take_error();
   }
-  return zx::ok(new BlockPartitionClient(std::move(*partition)));
+  return BlockPartitionClient::Create(std::move(*partition));
 }
 
 zx::result<> SkipBlockDevicePartitioner::WipeFvm() const {
   const uint8_t fvm_type[GPT_GUID_LEN] = GUID_FVM_VALUE;
-  zx::result partition = OpenBlockPartition(devfs_root_, std::nullopt, Uuid(fvm_type), ZX_SEC(3));
+  zx::result partition = OpenBlockPartition(devices_, std::nullopt, Uuid(fvm_type), ZX_SEC(3));
   if (partition.is_error()) {
     ERROR("Warning: Could not open partition to wipe: %s\n", partition.status_string());
     return zx::ok();
   }
 
-  fidl::WireSyncClient<device::Controller> block_client(std::move(partition->controller));
+  fidl::WireSyncClient<device::Controller> block_client(partition->TakeController());
 
   auto result = block_client->GetTopologicalPath();
   if (!result.ok()) {
@@ -80,7 +84,7 @@ zx::result<> SkipBlockDevicePartitioner::WipeFvm() const {
                      static_cast<size_t>(response.value()->path.size()));
 
   {
-    auto status = zx::make_result(FvmUnbind(devfs_root_, name_buffer.data()));
+    auto status = zx::make_result(FvmUnbind(devices_.devfs_root(), name_buffer.data()));
     if (status.is_error()) {
       // The driver may refuse to bind to a corrupt volume.
       ERROR("Warning: Failed to unbind FVM: %s\n", status.status_string());
@@ -97,7 +101,8 @@ zx::result<> SkipBlockDevicePartitioner::WipeFvm() const {
   }
   parent += kDevRootLen;
 
-  fdio_cpp::UnownedFdioCaller caller(devfs_root_);
+  // TODO(https://fxbug.dev/339491886): Support FVM in storage-host
+  fdio_cpp::UnownedFdioCaller caller(devices_.devfs_root());
   zx::result channel = component::ConnectAt<block::Ftl>(caller.directory(), parent);
   if (channel.is_error()) {
     ERROR("Warning: Unable to open block parent device: %s\n", channel.status_string());

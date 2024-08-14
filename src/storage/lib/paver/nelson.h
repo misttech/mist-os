@@ -5,6 +5,7 @@
 #define SRC_STORAGE_LIB_PAVER_NELSON_H_
 
 #include "src/storage/lib/paver/abr-client.h"
+#include "src/storage/lib/paver/block-devices.h"
 #include "src/storage/lib/paver/device-partitioner.h"
 #include "src/storage/lib/paver/gpt.h"
 #include "src/storage/lib/paver/partition-client.h"
@@ -16,7 +17,7 @@ constexpr size_t kNelsonBL2Size = 64 * 1024;
 class NelsonPartitioner : public DevicePartitioner {
  public:
   static zx::result<std::unique_ptr<DevicePartitioner>> Initialize(
-      fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+      const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
       fidl::ClientEnd<fuchsia_device::Controller> block_device);
 
   bool IsFvmWithinFtl() const override { return false; }
@@ -57,15 +58,15 @@ class NelsonPartitioner : public DevicePartitioner {
 class NelsonPartitionerFactory : public DevicePartitionerFactory {
  public:
   zx::result<std::unique_ptr<DevicePartitioner>> New(
-      fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-      std::shared_ptr<Context> context,
+      const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+      Arch arch, std::shared_ptr<Context> context,
       fidl::ClientEnd<fuchsia_device::Controller> block_device) final;
 };
 
 class NelsonAbrClientFactory : public abr::ClientFactory {
  public:
   zx::result<std::unique_ptr<abr::Client>> New(
-      fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+      const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
       std::shared_ptr<paver::Context> context) final;
 };
 

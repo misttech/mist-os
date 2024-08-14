@@ -4,7 +4,10 @@
 #ifndef SRC_STORAGE_LIB_PAVER_X64_H_
 #define SRC_STORAGE_LIB_PAVER_X64_H_
 
+#include <utility>
+
 #include "src/storage/lib/paver/abr-client.h"
+#include "src/storage/lib/paver/block-devices.h"
 #include "src/storage/lib/paver/gpt.h"
 
 namespace paver {
@@ -13,8 +16,9 @@ namespace paver {
 class EfiDevicePartitioner : public DevicePartitioner {
  public:
   static zx::result<std::unique_ptr<DevicePartitioner>> Initialize(
-      fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-      fidl::ClientEnd<fuchsia_device::Controller> block_device, std::shared_ptr<Context> context);
+      const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+      Arch arch, fidl::ClientEnd<fuchsia_device::Controller> block_device,
+      std::shared_ptr<Context> context);
 
   bool IsFvmWithinFtl() const override { return false; }
 
@@ -44,7 +48,7 @@ class EfiDevicePartitioner : public DevicePartitioner {
  private:
   EfiDevicePartitioner(Arch arch, std::unique_ptr<GptDevicePartitioner> gpt,
                        std::shared_ptr<Context> context)
-      : gpt_(std::move(gpt)), arch_(arch), context_(context) {}
+      : gpt_(std::move(gpt)), arch_(arch), context_(std::move(context)) {}
 
   zx::result<> CallAbr(std::function<zx::result<>(abr::Client&)> call_abr) const;
 
@@ -56,15 +60,15 @@ class EfiDevicePartitioner : public DevicePartitioner {
 class X64PartitionerFactory : public DevicePartitionerFactory {
  public:
   zx::result<std::unique_ptr<DevicePartitioner>> New(
-      fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-      std::shared_ptr<Context> context,
+      const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+      Arch arch, std::shared_ptr<Context> context,
       fidl::ClientEnd<fuchsia_device::Controller> block_device) final;
 };
 
 class X64AbrClientFactory : public abr::ClientFactory {
  public:
   zx::result<std::unique_ptr<abr::Client>> New(
-      fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+      const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
       std::shared_ptr<paver::Context> context) final;
 };
 

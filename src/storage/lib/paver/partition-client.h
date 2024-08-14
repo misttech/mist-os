@@ -14,6 +14,7 @@
 #include <zircon/types.h>
 
 #include <cstddef>
+#include <memory>
 #include <optional>
 #include <vector>
 
@@ -22,9 +23,10 @@
 #include <fbl/unique_fd.h>
 #include <storage/buffer/owned_vmoid.h>
 
+#include "lib/fidl/cpp/wire/internal/transport_channel.h"
 #include "src/devices/block/drivers/core/block-fifo.h"
 #include "src/storage/lib/block_client/cpp/client.h"
-#include "src/storage/lib/paver/utils.h"
+#include "src/storage/lib/paver/block-devices.h"
 
 namespace paver {
 
@@ -61,16 +63,8 @@ class PartitionClient {
 
 class BlockPartitionClient : public PartitionClient {
  public:
-  explicit BlockPartitionClient(fidl::ClientEnd<fuchsia_device::Controller> controller,
-                                fidl::ClientEnd<fuchsia_hardware_block::Block> partition)
-      : controller_(std::move(controller)), partition_(std::move(partition)) {}
-
-  explicit BlockPartitionClient(PartitionConnection connection)
-      : controller_(std::move(connection.controller)),
-        partition_(fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(connection.device))) {}
-
   static zx::result<std::unique_ptr<BlockPartitionClient>> Create(
-      fidl::UnownedClientEnd<fuchsia_device::Controller> partition_controller);
+      std::unique_ptr<VolumeConnector> connector);
 
   zx::result<size_t> GetBlockSize() override;
   zx::result<size_t> GetPartitionSize() override;
@@ -88,8 +82,17 @@ class BlockPartitionClient : public PartitionClient {
   zx::result<> Trim() override;
   zx::result<> Flush() override;
 
-  fidl::UnownedClientEnd<fuchsia_hardware_block::Block> block_channel();
-  fidl::UnownedClientEnd<fuchsia_device::Controller> controller_channel();
+  // Returns the Controller connection for the partition.  Asserts if the partition is not backed by
+  // a Devfs instance.
+  // TODO(https://fxbug.dev/339491886): This only exists to support Fvm's need to rebind drivers.
+  // Remove once FVM is ported to storage-host.
+  fidl::UnownedClientEnd<fuchsia_device::Controller> Controller() const {
+    return partition_connector_->Controller();
+  }
+
+  fidl::UnownedClientEnd<fuchsia_hardware_block::Block> Block() const {
+    return partition_.client_end().borrow();
+  }
 
   // No copy.
   BlockPartitionClient(const BlockPartitionClient&) = delete;
@@ -99,11 +102,17 @@ class BlockPartitionClient : public PartitionClient {
 
   bool SupportsBlockPartition() override { return true; }
 
+  friend class FixedOffsetBlockPartitionClient;
+
  private:
+  BlockPartitionClient(std::unique_ptr<VolumeConnector> connector,
+                       fidl::WireSyncClient<fuchsia_hardware_block::Block> partition)
+      : partition_connector_(std::move(connector)), partition_(std::move(partition)) {}
+
   zx::result<> RegisterFastBlockIo();
   zx::result<std::reference_wrapper<fuchsia_hardware_block::wire::BlockInfo>> ReadBlockInfo();
 
-  fidl::WireSyncClient<fuchsia_device::Controller> controller_;
+  std::unique_ptr<VolumeConnector> partition_connector_;
   fidl::WireSyncClient<fuchsia_hardware_block::Block> partition_;
   std::unique_ptr<block_client::Client> client_;
   std::optional<fuchsia_hardware_block::wire::BlockInfo> block_info_;
@@ -116,31 +125,15 @@ class BlockPartitionClient : public PartitionClient {
 // It's also used for cases where input image is a combined image for multiple partitions.
 class FixedOffsetBlockPartitionClient final : public BlockPartitionClient {
  public:
-  explicit FixedOffsetBlockPartitionClient(fidl::ClientEnd<fuchsia_device::Controller> controller,
-                                           fidl::ClientEnd<fuchsia_hardware_block::Block> partition,
-                                           size_t offset_partition_in_blocks,
-                                           size_t offset_buffer_in_blocks)
-      : BlockPartitionClient(std::move(controller), std::move(partition)),
-        offset_partition_in_blocks_(offset_partition_in_blocks),
-        offset_buffer_in_blocks_(offset_buffer_in_blocks) {}
-
-  explicit FixedOffsetBlockPartitionClient(PartitionConnection connection,
-                                           size_t offset_partition_in_blocks,
-                                           size_t offset_buffer_in_blocks)
-      : BlockPartitionClient(std::move(connection)),
-        offset_partition_in_blocks_(offset_partition_in_blocks),
-        offset_buffer_in_blocks_(offset_buffer_in_blocks) {}
-
-  explicit FixedOffsetBlockPartitionClient(BlockPartitionClient client,
-                                           size_t offset_partition_in_blocks,
-                                           size_t offset_buffer_in_blocks)
+  FixedOffsetBlockPartitionClient(BlockPartitionClient client, size_t offset_partition_in_blocks,
+                                  size_t offset_buffer_in_blocks)
       : BlockPartitionClient(std::move(client)),
         offset_partition_in_blocks_(offset_partition_in_blocks),
         offset_buffer_in_blocks_(offset_buffer_in_blocks) {}
 
   static zx::result<std::unique_ptr<FixedOffsetBlockPartitionClient>> Create(
-      fidl::UnownedClientEnd<fuchsia_device::Controller> partition_controller,
-      size_t offset_partition_in_blocks, size_t offset_buffer_in_blocks);
+      std::unique_ptr<VolumeConnector> connector, size_t offset_partition_in_blocks,
+      size_t offset_buffer_in_blocks);
 
   zx::result<size_t> GetPartitionSize() final;
   zx::result<> Read(const zx::vmo& vmo, size_t size) final;
@@ -171,11 +164,17 @@ class PartitionCopyClient final : public PartitionClient {
   explicit PartitionCopyClient(std::vector<std::unique_ptr<PartitionClient>> partitions)
       : partitions_(std::move(partitions)) {}
 
+  // Returns the LCM of all block sizes.
   zx::result<size_t> GetBlockSize() final;
+  // Returns the minimum of all partition sizes.
   zx::result<size_t> GetPartitionSize() final;
+  // Attempt to read from each partition, returning on the first successful one.
   zx::result<> Read(const zx::vmo& vmo, size_t size) final;
+  // Write to *every* partition.
   zx::result<> Write(const zx::vmo& vmo, size_t vmo_size) final;
+  // Trim *every* partition.
   zx::result<> Trim() final;
+  // Flush *every* partition.
   zx::result<> Flush() final;
 
   // No copy, no move.

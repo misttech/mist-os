@@ -243,8 +243,9 @@ class FakeBootArgs : public fidl::WireServer<fuchsia_boot::Arguments> {
 class PaverServiceTest : public zxtest::Test {
  public:
   PaverServiceTest();
-
   ~PaverServiceTest() override;
+
+  void StartPaver(fbl::unique_fd devfs_root, fidl::ClientEnd<fuchsia_io::Directory> svc_root = {});
 
  protected:
   static void CreatePayload(size_t num_pages, fuchsia_mem::wire::Buffer* out);
@@ -276,12 +277,6 @@ PaverServiceTest::PaverServiceTest()
     : loop_(&kAsyncLoopConfigAttachToCurrentThread),
       loop2_(&kAsyncLoopConfigNoAttachToCurrentThread),
       fake_svc_(loop2_.dispatcher(), FakeBootArgs()) {
-  auto [client, server] = fidl::Endpoints<fuchsia_paver::Paver>::Create();
-
-  client_ = fidl::WireSyncClient(std::move(client));
-
-  paver_ = std::make_unique<paver::Paver>();
-  paver_->set_dispatcher(loop_.dispatcher());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::AstroPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::NelsonPartitionerFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::SherlockPartitionerFactory>());
@@ -296,7 +291,6 @@ PaverServiceTest::PaverServiceTest()
   abr::ClientFactory::Register(std::make_unique<paver::Vim3AbrClientFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::X64AbrClientFactory>());
 
-  fidl::BindServer(loop_.dispatcher(), std::move(server), paver_.get());
   loop_.StartThread("paver-svc-test-loop");
   loop2_.StartThread("paver-svc-test-loop-2");
 }
@@ -305,6 +299,19 @@ PaverServiceTest::~PaverServiceTest() {
   loop_.Shutdown();
   loop2_.Shutdown();
   paver_.reset();
+}
+
+void PaverServiceTest::StartPaver(fbl::unique_fd devfs_root,
+                                  fidl::ClientEnd<fuchsia_io::Directory> svc_root) {
+  zx::result paver = paver::Paver::Create(std::move(devfs_root));
+  ASSERT_OK(paver);
+  paver_ = std::move(*paver);
+  paver_->set_dispatcher(loop_.dispatcher());
+  paver_->set_svc_root(std::move(svc_root));
+
+  auto [client, server] = fidl::Endpoints<fuchsia_paver::Paver>::Create();
+  client_ = fidl::WireSyncClient(std::move(client));
+  fidl::BindServer(loop_.dispatcher(), std::move(server), paver_.get());
 }
 
 void PaverServiceTest::CreatePayload(size_t num_pages, fuchsia_mem::wire::Buffer* out) {
@@ -329,9 +336,7 @@ class PaverServiceSkipBlockTest : public PaverServiceTest {
   void SpawnIsolatedDevmgr(fuchsia_hardware_nand::wire::RamNandInfo nand_info) {
     ASSERT_EQ(device_.get(), nullptr);
     ASSERT_NO_FATAL_FAILURE(SkipBlockDevice::Create(std::move(nand_info), &device_));
-    paver_->set_dispatcher(loop_.dispatcher());
-    paver_->set_devfs_root(device_->devfs_root());
-    paver_->set_svc_root(std::move(fake_svc_.svc_chan()));
+    StartPaver(device_->devfs_root(), std::move(fake_svc_.svc_chan()));
   }
 
   void WaitForDevices() {
@@ -1885,8 +1890,7 @@ class PaverServiceBlockTest : public PaverServiceTest {
 
     ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform/ram-disk/ramctl")
                   .status_value());
-    paver_->set_devfs_root(devmgr_.devfs_root().duplicate());
-    paver_->set_svc_root(std::move(fake_svc_.svc_chan()));
+    StartPaver(devmgr_.devfs_root().duplicate(), std::move(fake_svc_.svc_chan()));
   }
 
   void UseBlockDevice(DeviceAndController block_device) {
@@ -1974,10 +1978,7 @@ class PaverServiceGptDeviceTest : public PaverServiceTest {
     ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform/ram-disk/ramctl")
                   .status_value());
     ASSERT_OK(RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform").status_value());
-    paver_->set_dispatcher(loop_.dispatcher());
-    paver_->set_devfs_root(devmgr_.devfs_root().duplicate());
-    fidl::ClientEnd<fuchsia_io::Directory> svc_root = GetSvcRoot();
-    paver_->set_svc_root(std::move(svc_root));
+    StartPaver(devmgr_.devfs_root().duplicate(), GetSvcRoot());
   }
 
   void InitializeGptDevice(const char* board_name, uint64_t block_count, uint32_t block_size) {
@@ -2075,7 +2076,7 @@ TEST_F(PaverServiceLuisTest, CreateAbr) {
   ASSERT_NO_FATAL_FAILURE(InitializeLuisGPTPartitions());
   std::shared_ptr<paver::Context> context;
   fidl::ClientEnd<fuchsia_io::Directory> svc_root = GetSvcRoot();
-  EXPECT_OK(abr::ClientFactory::Create(devmgr_.devfs_root().duplicate(), svc_root, context));
+  EXPECT_OK(abr::ClientFactory::Create(paver_->devices(), svc_root, context));
 }
 
 TEST_F(PaverServiceLuisTest, SysconfigNotSupportedAndFailWithPeerClosed) {
@@ -2093,9 +2094,11 @@ TEST_F(PaverServiceLuisTest, FindGPTDevicesIgnoreFvmPartitions) {
   // Initialize the primary block solely as FVM and allocate sub-partitions.
   fvm::SparseImage header = {};
   header.slice_size = 1 << 20;
-  zx::result fvm = FvmPartitionFormat(devmgr_.devfs_root(), gpt_dev_->block_interface(),
-                                      gpt_dev_->block_controller_interface(), header,
-                                      paver::BindOption::Reformat);
+  zx::result block_client = paver::BlockPartitionClient::Create(
+      std::make_unique<paver::DevfsVolumeConnector>(gpt_dev_->ConnectToController()));
+  ASSERT_OK(block_client);
+  zx::result fvm =
+      FvmPartitionFormat(devmgr_.devfs_root(), **block_client, header, paver::BindOption::Reformat);
   ASSERT_OK(fvm);
 
   auto [volume, volume_server] =
@@ -2144,8 +2147,8 @@ TEST_F(PaverServiceLuisTest, WriteOpaqueVolume) {
   ASSERT_OK(result.status());
 
   // Create a block partition client to read the written content directly.
-  zx::result block_client =
-      paver::BlockPartitionClient::Create(gpt_dev_->block_controller_interface());
+  zx::result block_client = paver::BlockPartitionClient::Create(
+      std::make_unique<paver::DevfsVolumeConnector>(gpt_dev_->ConnectToController()));
   ASSERT_OK(block_client);
 
   // Read the partition directly from block and verify.
@@ -2332,8 +2335,8 @@ TEST_F(PaverServiceLuisTest, WriteSparseVolume) {
   ASSERT_OK(result.status());
 
   // Create a block partition client to read the written content directly.
-  zx::result block_client =
-      paver::BlockPartitionClient::Create(gpt_dev_->block_controller_interface());
+  zx::result block_client = paver::BlockPartitionClient::Create(
+      std::make_unique<paver::DevfsVolumeConnector>(gpt_dev_->ConnectToController()));
   ASSERT_OK(block_client);
 
   // Read the partition directly from block and verify.  Read `image.image_length` bytes so we know

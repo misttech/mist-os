@@ -25,15 +25,15 @@ using uuid::Uuid;
 }  // namespace
 
 zx::result<std::unique_ptr<DevicePartitioner>> Vim3Partitioner::Initialize(
-    fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     fidl::ClientEnd<fuchsia_device::Controller> block_device) {
-  auto status = IsBoard(devfs_root, "vim3");
+  auto status = IsBoard(devices.devfs_root(), "vim3");
   if (status.is_error()) {
     return status.take_error();
   }
 
   auto status_or_gpt =
-      GptDevicePartitioner::InitializeGpt(std::move(devfs_root), svc_root, std::move(block_device));
+      GptDevicePartitioner::InitializeGpt(devices, svc_root, std::move(block_device));
   if (status_or_gpt.is_error()) {
     return status_or_gpt.take_error();
   }
@@ -69,24 +69,28 @@ zx::result<std::unique_ptr<PartitionClient>> Vim3Partitioner::AddPartition(
 
 zx::result<std::unique_ptr<PartitionClient>> Vim3Partitioner::GetEmmcBootPartitionClient() const {
   auto boot0_part =
-      OpenBlockPartition(gpt_->devfs_root(), std::nullopt, Uuid(GUID_EMMC_BOOT1_VALUE), ZX_SEC(5));
+      OpenBlockPartition(gpt_->devices(), std::nullopt, Uuid(GUID_EMMC_BOOT1_VALUE), ZX_SEC(5));
   if (boot0_part.is_error()) {
     return boot0_part.take_error();
   }
-  auto boot0 =
-      std::make_unique<FixedOffsetBlockPartitionClient>(std::move(boot0_part.value()), 1, 0);
+  zx::result boot0 = FixedOffsetBlockPartitionClient::Create(std::move(boot0_part.value()), 1, 0);
+  if (boot0.is_error()) {
+    return boot0.take_error();
+  }
 
   auto boot1_part =
-      OpenBlockPartition(gpt_->devfs_root(), std::nullopt, Uuid(GUID_EMMC_BOOT2_VALUE), ZX_SEC(5));
+      OpenBlockPartition(gpt_->devices(), std::nullopt, Uuid(GUID_EMMC_BOOT2_VALUE), ZX_SEC(5));
   if (boot1_part.is_error()) {
     return boot1_part.take_error();
   }
-  auto boot1 =
-      std::make_unique<FixedOffsetBlockPartitionClient>(std::move(boot1_part.value()), 1, 0);
+  zx::result boot1 = FixedOffsetBlockPartitionClient::Create(std::move(boot1_part.value()), 2, 0);
+  if (boot1.is_error()) {
+    return boot1.take_error();
+  }
 
   std::vector<std::unique_ptr<PartitionClient>> partitions;
-  partitions.push_back(std::move(boot0));
-  partitions.push_back(std::move(boot1));
+  partitions.push_back(std::move(*boot0));
+  partitions.push_back(std::move(*boot1));
 
   return zx::ok(std::make_unique<PartitionCopyClient>(std::move(partitions)));
 }
@@ -137,6 +141,7 @@ zx::result<std::unique_ptr<PartitionClient>> Vim3Partitioner::FindPartition(
     utf16_to_cstring(cstring_name, part.name, GPT_NAME_LEN);
     return part_name == std::string_view(cstring_name);
   };
+  LOG("Looking for part %s\n", std::string(part_name).c_str());
 
   auto status = gpt_->FindPartition(std::move(filter_by_name));
   if (status.is_error()) {
@@ -166,16 +171,16 @@ zx::result<> Vim3Partitioner::ValidatePayload(const PartitionSpec& spec,
 }
 
 zx::result<std::unique_ptr<DevicePartitioner>> Vim3PartitionerFactory::New(
-    fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-    std::shared_ptr<Context> context, fidl::ClientEnd<fuchsia_device::Controller> block_device) {
-  return Vim3Partitioner::Initialize(std::move(devfs_root), svc_root, std::move(block_device));
+    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+    Arch arch, std::shared_ptr<Context> context,
+    fidl::ClientEnd<fuchsia_device::Controller> block_device) {
+  return Vim3Partitioner::Initialize(devices, svc_root, std::move(block_device));
 }
 
 zx::result<std::unique_ptr<abr::Client>> Vim3AbrClientFactory::New(
-    fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     std::shared_ptr<paver::Context> context) {
-  zx::result partitioner =
-      Vim3Partitioner::Initialize(std::move(devfs_root), std::move(svc_root), {});
+  zx::result partitioner = Vim3Partitioner::Initialize(devices, svc_root, {});
 
   if (partitioner.is_error()) {
     return partitioner.take_error();
@@ -187,6 +192,7 @@ zx::result<std::unique_ptr<abr::Client>> Vim3AbrClientFactory::New(
   if (partition.is_error()) {
     return partition.take_error();
   }
+  LOG("Found partition\n");
 
   return abr::AbrPartitionClient::Create(std::move(partition.value()));
 }

@@ -14,7 +14,7 @@ namespace paver {
 class Vim3Partitioner : public DevicePartitioner {
  public:
   static zx::result<std::unique_ptr<DevicePartitioner>> Initialize(
-      fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+      const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
       fidl::ClientEnd<fuchsia_device::Controller> block_device);
 
   bool IsFvmWithinFtl() const override { return false; }
@@ -52,15 +52,15 @@ class Vim3Partitioner : public DevicePartitioner {
 class Vim3PartitionerFactory : public DevicePartitionerFactory {
  public:
   zx::result<std::unique_ptr<DevicePartitioner>> New(
-      fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-      std::shared_ptr<Context> context,
+      const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+      Arch arch, std::shared_ptr<Context> context,
       fidl::ClientEnd<fuchsia_device::Controller> block_device) final;
 };
 
 class Vim3AbrClientFactory : public abr::ClientFactory {
  public:
   zx::result<std::unique_ptr<abr::Client>> New(
-      fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+      const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
       std::shared_ptr<paver::Context> context) final;
 };
 

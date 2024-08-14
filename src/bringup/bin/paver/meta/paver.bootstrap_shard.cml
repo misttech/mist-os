@@ -33,6 +33,12 @@
             to: "#paver",
         },
         {
+            directory: "partitions",
+            from: "#fshost",
+            to: "#paver",
+            availability: "optional",
+        },
+        {
             protocol: [ "fuchsia.device.manager.SystemStateTransition" ],
             from: "#shutdown_shim",
             to: "#paver",

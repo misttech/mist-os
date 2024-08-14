@@ -224,6 +224,8 @@ zx_status_t StreamFvmPartition(fvm::SparseReader* reader, PartitionInfo* part,
 
 }  // namespace
 
+// TODO(https://fxbug.dev/339491886): Support FVM in storage-host
+
 zx::result<fidl::ClientEnd<fuchsia_device::Controller>> TryBindToFvmDriver(
     const fbl::unique_fd& devfs_root, fidl::UnownedClientEnd<fuchsia_device::Controller> partition,
     zx::duration timeout) {
@@ -289,10 +291,8 @@ zx::result<fidl::ClientEnd<fuchsia_device::Controller>> TryBindToFvmDriver(
 }
 
 zx::result<fidl::ClientEnd<fuchsia_device::Controller>> FvmPartitionFormat(
-    const fbl::unique_fd& devfs_root,
-    fidl::UnownedClientEnd<fuchsia_hardware_block::Block> partition,
-    fidl::UnownedClientEnd<fuchsia_device::Controller> partition_controller,
-    const fvm::SparseImage& header, BindOption option, FormatResult* format_result) {
+    const fbl::unique_fd& devfs_root, BlockPartitionClient& block, const fvm::SparseImage& header,
+    BindOption option, FormatResult* format_result) {
   // Although the format (based on the magic in the FVM superblock)
   // indicates this is (or at least was) an FVM image, it may be invalid.
   //
@@ -303,9 +303,9 @@ zx::result<fidl::ClientEnd<fuchsia_device::Controller>> FvmPartitionFormat(
     *format_result = FormatResult::kUnknown;
   }
   if (option == BindOption::TryBind) {
-    fs_management::DiskFormat df = fs_management::DetectDiskFormat(partition);
+    fs_management::DiskFormat df = fs_management::DetectDiskFormat(block.Block());
     if (df == fs_management::kDiskFormatFvm) {
-      zx::result fvm = TryBindToFvmDriver(devfs_root, partition_controller, zx::sec(3));
+      zx::result fvm = TryBindToFvmDriver(devfs_root, block.Controller(), zx::sec(3));
       if (fvm.is_ok()) {
         LOG("Found already formatted FVM.\n");
         auto [volume, volume_server] = fidl::Endpoints<volume::VolumeManager>::Create();
@@ -348,7 +348,7 @@ zx::result<fidl::ClientEnd<fuchsia_device::Controller>> FvmPartitionFormat(
       *format_result = FormatResult::kReformatted;
     }
 
-    const fidl::WireResult result = fidl::WireCall(partition)->GetInfo();
+    const fidl::WireResult result = fidl::WireCall(block.Block())->GetInfo();
     if (!result.ok()) {
       ERROR("Failed to query block info: %s\n", result.FormatDescription().c_str());
       return zx::error(result.status());
@@ -364,7 +364,7 @@ zx::result<fidl::ClientEnd<fuchsia_device::Controller>> FvmPartitionFormat(
     uint64_t max_disk_size =
         (header.maximum_disk_size == 0) ? initial_disk_size : header.maximum_disk_size;
 
-    zx_status_t status = fs_management::FvmInitPreallocated(partition, initial_disk_size,
+    zx_status_t status = fs_management::FvmInitPreallocated(block.Block(), initial_disk_size,
                                                             max_disk_size, header.slice_size);
     if (status != ZX_OK) {
       ERROR("Failed to initialize fvm: %s\n", zx_status_get_string(status));
@@ -372,10 +372,12 @@ zx::result<fidl::ClientEnd<fuchsia_device::Controller>> FvmPartitionFormat(
     }
   }
 
-  return TryBindToFvmDriver(devfs_root, partition_controller, zx::sec(3));
+  return TryBindToFvmDriver(devfs_root, block.Controller(), zx::sec(3));
 }
 
 namespace {
+
+// TODO(https://fxbug.dev/339491886): Support zxcrypt in storage-host
 
 // Formats a block device as a zxcrypt volume.
 //
@@ -750,8 +752,7 @@ zx::result<> FvmStreamPartitions(const fbl::unique_fd& devfs_root,
   fvm::SparseImage* hdr = reader->Image();
   // Acquire an fd to the FVM, either by finding one that already
   // exists, or formatting a new one.
-  zx::result fvm = FvmPartitionFormat(devfs_root, block->block_channel(),
-                                      block->controller_channel(), *hdr, BindOption::TryBind);
+  zx::result fvm = FvmPartitionFormat(devfs_root, *block, *hdr, BindOption::TryBind);
   if (fvm.is_error()) {
     ERROR("Couldn't find FVM partition: %s\n", fvm.status_string());
     return fvm.take_error();
@@ -808,8 +809,7 @@ zx::result<> FvmStreamPartitions(const fbl::unique_fd& devfs_root,
   if (free_slices < requested_slices) {
     Warn("Not enough space to non-destructively pave",
          "Automatically reinitializing FVM; Expect data loss");
-    fvm = FvmPartitionFormat(devfs_root, block->block_channel(), block->controller_channel(), *hdr,
-                             BindOption::Reformat);
+    fvm = FvmPartitionFormat(devfs_root, *block, *hdr, BindOption::Reformat);
     if (fvm.is_error()) {
       ERROR("Couldn't reformat FVM partition: %s\n", fvm.status_string());
       return zx::error(ZX_ERR_IO);

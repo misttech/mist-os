@@ -42,6 +42,11 @@
             from: "#fxfs",
         },
         {
+            directory: "partitions",
+            from: "void",
+            availability: "optional",
+        },
+        {
             protocol: "fuchsia.fs.startup.Volumes",
             from: "#fxfs",
         },

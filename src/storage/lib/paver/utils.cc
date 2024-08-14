@@ -5,7 +5,6 @@
 #include "src/storage/lib/paver/utils.h"
 
 #include <dirent.h>
-#include <errno.h>
 #include <fidl/fuchsia.hardware.block.partition/cpp/wire.h>
 #include <fidl/fuchsia.hardware.skipblock/cpp/wire.h>
 #include <fidl/fuchsia.sysinfo/cpp/wire.h>
@@ -63,6 +62,7 @@ zx::result<BlockWatcherPauser> BlockWatcherPauser::Create(
 
   BlockWatcherPauser pauser(std::move(*local));
   if (auto status = pauser.Pause(); status.is_error()) {
+    ERROR("Failed to pause block watcher: %s", status.status_string());
     return status.take_error();
   }
 
@@ -83,77 +83,10 @@ zx::result<> BlockWatcherPauser::Pause() {
   return zx::ok();
 }
 
-zx::result<PartitionConnection> OpenPartition(
-    const fbl::unique_fd& devfs_root, const char* path,
-    fit::function<bool(const zx::channel&)> should_filter_file, zx_duration_t timeout) {
-  ZX_ASSERT(path != nullptr);
-
-  struct CallbackInfo {
-    PartitionConnection out_partition;
-    fit::function<bool(const zx::channel&)> should_filter_file;
-  };
-
-  CallbackInfo info = {
-      .out_partition = {},
-      .should_filter_file = std::move(should_filter_file),
-  };
-
-  auto cb = [](int dirfd, int event, const char* filename, void* cookie) {
-    if (event != WATCH_EVENT_ADD_FILE) {
-      return ZX_OK;
-    }
-    if ((strcmp(filename, ".") == 0) || strcmp(filename, "..") == 0) {
-      return ZX_OK;
-    }
-    fdio_cpp::UnownedFdioCaller caller(dirfd);
-
-    zx::channel partition_local, partition_remote;
-    if (zx::channel::create(0, &partition_local, &partition_remote) != ZX_OK) {
-      return ZX_OK;
-    }
-    if (fdio_service_connect_at(caller.borrow_channel(), filename, partition_remote.release()) !=
-        ZX_OK) {
-      return ZX_OK;
-    }
-    auto info = static_cast<CallbackInfo*>(cookie);
-    if (info->should_filter_file(partition_local)) {
-      return ZX_OK;
-    }
-
-    zx::result controller_server = fidl::CreateEndpoints(&info->out_partition.controller);
-    if (controller_server.is_error()) {
-      return ZX_OK;
-    }
-    std::string controller_path = std::string(filename) + "/device_controller";
-    if (fdio_service_connect_at(caller.borrow_channel(), controller_path.c_str(),
-                                controller_server->TakeChannel().release()) != ZX_OK) {
-      return ZX_OK;
-    }
-    info->out_partition.device = std::move(partition_local);
-    return ZX_ERR_STOP;
-  };
-
-  fbl::unique_fd dir_fd;
-  if (zx_status_t status = fdio_open_fd_at(devfs_root.get(), path,
-                                           static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                                           dir_fd.reset_and_get_address());
-      status != ZX_OK) {
-    return zx::error(status);
-  }
-
-  zx_time_t deadline = zx_deadline_after(timeout);
-  if (fdio_watch_directory(dir_fd.get(), cb, deadline, &info) != ZX_ERR_STOP) {
-    return zx::error(ZX_ERR_NOT_FOUND);
-  }
-  return zx::ok(std::move(info.out_partition));
-}
-
-constexpr char kBlockDevPath[] = "class/block/";
-
-zx::result<PartitionConnection> OpenBlockPartition(const fbl::unique_fd& devfs_root,
-                                                   std::optional<Uuid> unique_guid,
-                                                   std::optional<Uuid> type_guid,
-                                                   zx_duration_t timeout) {
+zx::result<std::unique_ptr<VolumeConnector>> OpenBlockPartition(const paver::BlockDevices& devices,
+                                                                std::optional<Uuid> unique_guid,
+                                                                std::optional<Uuid> type_guid,
+                                                                zx_duration_t timeout) {
   ZX_ASSERT(unique_guid || type_guid);
 
   auto cb = [&](const zx::channel& chan) {
@@ -161,62 +94,70 @@ zx::result<PartitionConnection> OpenBlockPartition(const fbl::unique_fd& devfs_r
       auto result = fidl::WireCall(fidl::UnownedClientEnd<partition::Partition>(chan.borrow()))
                         ->GetTypeGuid();
       if (!result.ok()) {
-        return true;
+        ERROR("Failed to GetTypeGuid: %s\n", result.status_string());
+        return false;
       }
       auto& response = result.value();
       if (response.status != ZX_OK || type_guid != Uuid(response.guid->value.data())) {
-        return true;
+        if (response.status != ZX_OK) {
+          ERROR("Failed to GetTypeGuid: %s\n", zx_status_get_string(response.status));
+        }
+        return false;
       }
     }
     if (unique_guid) {
       auto result = fidl::WireCall(fidl::UnownedClientEnd<partition::Partition>(chan.borrow()))
                         ->GetInstanceGuid();
       if (!result.ok()) {
-        return true;
+        ERROR("Failed to GetInstanceGuid: %s\n", result.status_string());
+        return false;
       }
       const auto& response = result.value();
       if (response.status != ZX_OK || unique_guid != Uuid(response.guid->value.data())) {
-        return true;
+        if (response.status != ZX_OK) {
+          ERROR("Failed to GetInstanceGuid: %s\n", zx_status_get_string(response.status));
+        }
+        LOG("Mismatch instance\n");
+        return false;
       }
     }
-    return false;
+    return true;
   };
 
-  return OpenPartition(devfs_root, kBlockDevPath, cb, timeout);
+  return devices.WaitForPartition(cb, timeout);
 }
 
-constexpr char kSkipBlockDevPath[] = "class/skip-block/";
+constexpr char kSkipBlockDevPath[] = "class/skip-block";
 
-zx::result<PartitionConnection> OpenSkipBlockPartition(const fbl::unique_fd& devfs_root,
-                                                       const Uuid& type_guid,
-                                                       zx_duration_t timeout) {
+zx::result<std::unique_ptr<VolumeConnector>> OpenSkipBlockPartition(
+    const paver::BlockDevices& devices, const Uuid& type_guid, zx_duration_t timeout) {
   auto cb = [&](const zx::channel& chan) {
     auto result = fidl::WireCall(fidl::UnownedClientEnd<skipblock::SkipBlock>(chan.borrow()))
                       ->GetPartitionInfo();
     if (!result.ok()) {
-      return true;
+      return false;
     }
     const auto& response = result.value();
-    return response.status != ZX_OK ||
-           type_guid != Uuid(response.partition_info.partition_guid.data());
+    return response.status == ZX_OK &&
+           type_guid == Uuid(response.partition_info.partition_guid.data());
   };
 
-  return OpenPartition(devfs_root, kSkipBlockDevPath, cb, timeout);
+  return devices.WaitForPartition(cb, timeout, kSkipBlockDevPath);
 }
 
-bool HasSkipBlockDevice(const fbl::unique_fd& devfs_root) {
+bool HasSkipBlockDevice(const paver::BlockDevices& devices) {
   // Our proxy for detected a skip-block device is by checking for the
   // existence of a device enumerated under the skip-block class.
-  return OpenSkipBlockPartition(devfs_root, GUID_ZIRCON_A_VALUE, ZX_SEC(1)).is_ok();
+  return OpenSkipBlockPartition(devices, GUID_ZIRCON_A_VALUE, ZX_SEC(1)).is_ok();
 }
 
 // Attempts to open and overwrite the first block of the underlying
 // partition. Does not rebind partition drivers.
 //
 // At most one of |unique_guid| and |type_guid| may be nullptr.
-zx::result<> WipeBlockPartition(const fbl::unique_fd& devfs_root, std::optional<Uuid> unique_guid,
+zx::result<> WipeBlockPartition(const paver::BlockDevices& devices, std::optional<Uuid> unique_guid,
                                 std::optional<Uuid> type_guid) {
-  zx::result partition = OpenBlockPartition(devfs_root, unique_guid, type_guid, g_wipe_timeout);
+  zx::result partition = OpenBlockPartition(devices, unique_guid, type_guid, g_wipe_timeout);
   if (partition.is_error()) {
     ERROR("Warning: Could not open partition to wipe: %s\n", partition.status_string());
     return partition.take_error();
@@ -224,10 +165,11 @@ zx::result<> WipeBlockPartition(const fbl::unique_fd& devfs_root, std::optional<
 
   // Overwrite the first block to (hackily) ensure the destroyed partition
   // doesn't "reappear" in place.
-  BlockPartitionClient block_partition(
-      std::move(partition->controller),
-      fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(partition->device)));
-  auto status2 = block_partition.GetBlockSize();
+  zx::result block_partition = BlockPartitionClient::Create(std::move(*partition));
+  if (block_partition.is_error()) {
+    return block_partition.take_error();
+  }
+  auto status2 = block_partition->GetBlockSize();
   if (status2.is_error()) {
     ERROR("Warning: Could not get block size of partition: %s\n", status2.status_string());
     return status2.take_error();
@@ -245,12 +187,12 @@ zx::result<> WipeBlockPartition(const fbl::unique_fd& devfs_root, std::optional<
     }
   }
 
-  if (auto status = block_partition.Write(vmo, block_size); status.is_error()) {
+  if (auto status = block_partition->Write(vmo, block_size); status.is_error()) {
     ERROR("Warning: Could not write to block device: %s\n", status.status_string());
     return status.take_error();
   }
 
-  if (auto status = block_partition.Flush(); status.is_error()) {
+  if (auto status = block_partition->Flush(); status.is_error()) {
     ERROR("Warning: Failed to synchronize block device: %s\n", status.status_string());
     return status.take_error();
   }

@@ -13,12 +13,12 @@
 
 namespace paver {
 
-void Sysconfig::Bind(async_dispatcher_t* dispatcher, fbl::unique_fd devfs_root,
+void Sysconfig::Bind(async_dispatcher_t* dispatcher, const BlockDevices& devices,
                      fidl::ClientEnd<fuchsia_io::Directory> svc_root,
                      std::shared_ptr<Context> context,
                      fidl::ServerEnd<fuchsia_paver::Sysconfig> server) {
-  zx::result device_partitioner = DevicePartitionerFactory::Create(
-      devfs_root.duplicate(), svc_root, GetCurrentArch(), std::move(context));
+  zx::result device_partitioner =
+      DevicePartitionerFactory::Create(devices, svc_root, GetCurrentArch(), std::move(context));
   if (device_partitioner.is_error()) {
     ERROR("Unable to initialize a partitioner: %s.\n", device_partitioner.status_string());
     fidl_epitaph_write(server.channel().get(), ZX_ERR_BAD_STATE);

@@ -17,6 +17,7 @@ test("test") {
   output_name = "paver-test"
   sources = [
     "abr-test.cc",
+    "block-devices-test.cc",
     "data-sink-test.cc",
     "device-partitioner-test.cc",
     "fvm-test.cc",
@@ -45,10 +46,13 @@ test("test") {
     "//sdk/lib/sys/cpp/testing:unit",
     "//src/devices/lib/amlogic",
     "//src/firmware/lib/abr",
+    "//src/lib/files",
     "//src/lib/uuid",
     "//src/storage/fvm",
     "//src/storage/gpt",
     "//src/storage/lib/block_client/cpp",
+    "//src/storage/lib/block_server:block_server_cc",
+    "//src/storage/lib/block_server:fake_block_server_cc",
     "//src/storage/lib/fs_management",
     "//src/storage/lib/paver",
     "//src/storage/lib/ramdevice_client/cpp:ramdevice-client-test",

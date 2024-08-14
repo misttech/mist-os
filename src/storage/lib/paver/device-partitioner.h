@@ -22,6 +22,7 @@
 #include <fbl/string.h>
 #include <fbl/unique_fd.h>
 
+#include "src/storage/lib/paver/block-devices.h"
 #include "src/storage/lib/paver/partition-client.h"
 #include "src/storage/lib/paver/paver-context.h"
 
@@ -157,8 +158,8 @@ class DevicePartitionerFactory {
   // |block_device| is root block device which contains the logical partitions we wish to operate
   // against. It's only meaningful for EFI and CROS devices which may have multiple storage devices.
   static zx::result<std::unique_ptr<DevicePartitioner>> Create(
-      fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-      std::shared_ptr<Context> context, BlockAndController block_device = {});
+      const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+      Arch arch, std::shared_ptr<Context> context, BlockAndController block_device = {});
 
   static void Register(std::unique_ptr<DevicePartitionerFactory> factory);
 
@@ -168,8 +169,8 @@ class DevicePartitionerFactory {
   // This method is overridden by derived classes that implement different kinds
   // of DevicePartitioners.
   virtual zx::result<std::unique_ptr<DevicePartitioner>> New(
-      fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-      std::shared_ptr<Context> context,
+      const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+      Arch arch, std::shared_ptr<Context> context,
       fidl::ClientEnd<fuchsia_device::Controller> block_device) = 0;
 
   static std::vector<std::unique_ptr<DevicePartitionerFactory>>* registered_factory_list();
@@ -181,7 +182,7 @@ class DevicePartitionerFactory {
 // ZIRCON-R).
 class FixedDevicePartitioner : public DevicePartitioner {
  public:
-  static zx::result<std::unique_ptr<DevicePartitioner>> Initialize(fbl::unique_fd devfs_root);
+  static zx::result<std::unique_ptr<DevicePartitioner>> Initialize(const BlockDevices& devices);
 
   bool IsFvmWithinFtl() const override { return false; }
 
@@ -208,16 +209,16 @@ class FixedDevicePartitioner : public DevicePartitioner {
   zx::result<> OnStop() const override { return zx::ok(); }
 
  private:
-  explicit FixedDevicePartitioner(fbl::unique_fd devfs_root) : devfs_root_(std::move(devfs_root)) {}
+  explicit FixedDevicePartitioner(BlockDevices devices) : devices_(std::move(devices)) {}
 
-  fbl::unique_fd devfs_root_;
+  BlockDevices devices_;
 };
 
 class DefaultPartitionerFactory : public DevicePartitionerFactory {
  public:
   zx::result<std::unique_ptr<DevicePartitioner>> New(
-      fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-      std::shared_ptr<Context> context,
+      const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+      Arch arch, std::shared_ptr<Context> context,
       fidl::ClientEnd<fuchsia_device::Controller> block_device) final;
 };
 

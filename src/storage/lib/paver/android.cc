@@ -36,14 +36,13 @@ using uuid::Uuid;
 }  // namespace
 
 zx::result<std::unique_ptr<DevicePartitioner>> AndroidDevicePartitioner::Initialize(
-    fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
+    const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
     fidl::ClientEnd<fuchsia_device::Controller> block_device, std::shared_ptr<Context> context) {
   if (arch != Arch::kX64 && arch != Arch::kArm64) {
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
-  auto status =
-      GptDevicePartitioner::InitializeGpt(std::move(devfs_root), svc_root, std::move(block_device));
+  auto status = GptDevicePartitioner::InitializeGpt(devices, svc_root, std::move(block_device));
   if (status.is_error()) {
     return status.take_error();
   }
@@ -123,6 +122,7 @@ zx::result<std::unique_ptr<PartitionClient>> AndroidDevicePartitioner::FindParti
       ERROR("Android partitioner cannot find unknown partition type\n");
       return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
+  LOG("Looking for part %s\n", std::string(part_name).c_str());
 
   const auto filter = [&](const gpt_partition_t& part) { return FilterByName(part, part_name); };
   auto status = gpt_->FindPartition(filter);
@@ -192,10 +192,10 @@ zx::result<> AndroidDevicePartitioner::OnStop() const {
 }
 
 zx::result<std::unique_ptr<DevicePartitioner>> AndroidPartitionerFactory::New(
-    fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
+    const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
     std::shared_ptr<Context> context, fidl::ClientEnd<fuchsia_device::Controller> block_device) {
-  return AndroidDevicePartitioner::Initialize(std::move(devfs_root), svc_root, arch,
-                                              std::move(block_device), std::move(context));
+  return AndroidDevicePartitioner::Initialize(devices, svc_root, arch, std::move(block_device),
+                                              std::move(context));
 }
 
 class AndroidAbrClient : public abr::Client, android::IoOps {
@@ -323,12 +323,13 @@ class AndroidAbrClient : public abr::Client, android::IoOps {
 };
 
 zx::result<std::unique_ptr<abr::Client>> AndroidAbrClientFactory::New(
-    fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+    const BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     std::shared_ptr<paver::Context> context) {
-  auto partitioner = AndroidDevicePartitioner::Initialize(
-      std::move(devfs_root), std::move(svc_root), GetCurrentArch(), {}, std::move(context));
+  auto partitioner = AndroidDevicePartitioner::Initialize(devices, std::move(svc_root),
+                                                          GetCurrentArch(), {}, std::move(context));
 
   if (partitioner.is_error()) {
+    ERROR("Failed to initialize android partitioner: %s\n", partitioner.status_string());
     return partitioner.take_error();
   }
 

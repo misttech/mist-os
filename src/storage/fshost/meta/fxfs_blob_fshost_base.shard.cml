@@ -85,6 +85,11 @@
             from: "self",
         },
         {
+            directory: "partitions",
+            from: "void",
+            availability: "optional",
+        },
+        {
             directory: "volumes",
             from: "#fxfs",
         },

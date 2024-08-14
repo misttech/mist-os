@@ -17,6 +17,7 @@ group("tests") {
 source_set("paver-core") {
   sources = [
     "abr-client.cc",
+    "block-devices.cc",
     "device-partitioner.cc",
     "fvm.cc",
     "partition-client.cc",

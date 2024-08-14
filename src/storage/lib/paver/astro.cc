@@ -99,12 +99,13 @@ bool AstroPartitioner::CanSafelyUpdateLayout(std::shared_ptr<Context> context) {
   return true;
 }
 
-zx::result<> AstroPartitioner::InitializeContext(const fbl::unique_fd& devfs_root,
+zx::result<> AstroPartitioner::InitializeContext(const paver::BlockDevices& devices,
                                                  AbrWearLevelingOption abr_wear_leveling_opt,
                                                  Context* context) {
   return context->Initialize<AstroPartitionerContext>(
       [&]() -> zx::result<std::unique_ptr<AstroPartitionerContext>> {
-        fdio_cpp::UnownedFdioCaller caller(devfs_root);
+        // TODO(https://fxbug.dev/339491886): Support sysconfig client in storage-host
+        fdio_cpp::UnownedFdioCaller caller(devices.devfs_root());
         zx::result client = sysconfig::SyncClient::Create(caller.directory());
         if (client.is_error()) {
           ERROR("Failed to create sysconfig client. %s\n", client.status_string());
@@ -129,10 +130,11 @@ zx::result<> AstroPartitioner::InitializeContext(const fbl::unique_fd& devfs_roo
 }
 
 zx::result<std::unique_ptr<DevicePartitioner>> AstroPartitioner::Initialize(
-    fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     std::shared_ptr<Context> context) {
   auto boot_arg_client = OpenBootArgumentClient(svc_root);
-  zx::result<> status = IsBoard(devfs_root, "astro");
+  // TODO(https://fxbug.dev/339491886): Support IsBoard with partitions directory
+  zx::result<> status = IsBoard(devices.devfs_root(), "astro");
   if (status.is_error()) {
     return status.take_error();
   }
@@ -144,7 +146,7 @@ zx::result<std::unique_ptr<DevicePartitioner>> AstroPartitioner::Initialize(
           ? AbrWearLevelingOption::ON
           : AbrWearLevelingOption::OFF;
 
-  if (auto status = InitializeContext(devfs_root, option, context.get()); status.is_error()) {
+  if (auto status = InitializeContext(devices, option, context.get()); status.is_error()) {
     ERROR("Failed to initialize context. %s\n", status.status_string());
     return status.take_error();
   }
@@ -163,7 +165,7 @@ zx::result<std::unique_ptr<DevicePartitioner>> AstroPartitioner::Initialize(
 
   LOG("Successfully initialized AstroPartitioner Device Partitioner\n");
   std::unique_ptr<SkipBlockDevicePartitioner> skip_block(
-      new SkipBlockDevicePartitioner(std::move(devfs_root)));
+      new SkipBlockDevicePartitioner(devices.Duplicate()));
 
   return zx::ok(new AstroPartitioner(std::move(skip_block), std::move(context)));
 }
@@ -300,15 +302,16 @@ zx::result<> AstroPartitioner::ValidatePayload(const PartitionSpec& spec,
 }
 
 zx::result<std::unique_ptr<DevicePartitioner>> AstroPartitionerFactory::New(
-    fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-    std::shared_ptr<Context> context, fidl::ClientEnd<fuchsia_device::Controller> block_device) {
-  return AstroPartitioner::Initialize(std::move(devfs_root), svc_root, context);
+    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+    Arch arch, std::shared_ptr<Context> context,
+    fidl::ClientEnd<fuchsia_device::Controller> block_device) {
+  return AstroPartitioner::Initialize(devices, svc_root, context);
 }
 
 zx::result<std::unique_ptr<abr::Client>> AstroAbrClientFactory::New(
-    fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     std::shared_ptr<paver::Context> context) {
-  auto status = AstroPartitioner::Initialize(std::move(devfs_root), svc_root, context);
+  auto status = AstroPartitioner::Initialize(devices, svc_root, context);
   if (status.is_error()) {
     return status.take_error();
   }

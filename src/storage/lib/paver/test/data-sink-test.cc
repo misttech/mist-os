@@ -5,6 +5,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/paged_vmo.h>
+#include <lib/driver-integration-test/fixture.h>
 #include <lib/zx/pager.h>
 #include <zircon/limits.h>
 
@@ -12,6 +13,7 @@
 
 #include <zxtest/zxtest.h>
 
+#include "src/storage/lib/paver/block-devices.h"
 #include "src/storage/lib/paver/paver.h"
 #include "src/storage/lib/paver/test/test-utils.h"
 
@@ -130,7 +132,8 @@ TEST(DataSinkTest, WriteAssetPaged) {
   auto partitioner = std::make_unique<MockDevicePartitioner>(&pager);
   ASSERT_NE(partitioner.get(), nullptr);
 
-  auto data_sink = paver::DataSinkImpl(fbl::unique_fd(), std::move(partitioner));
+  auto devices = paver::BlockDevices::CreateEmpty();
+  auto data_sink = paver::DataSinkImpl(std::move(devices), std::move(partitioner));
 
   fuchsia_mem::wire::Buffer payload;
   pager.CreatePayloadPaged(kPageCount, &payload);
