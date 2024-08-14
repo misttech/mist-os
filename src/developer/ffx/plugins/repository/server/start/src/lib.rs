@@ -88,6 +88,18 @@ impl FfxMain for ServerStartTool {
             }
         }
     }
+    fn log_basename(&self) -> Option<String> {
+        match (self.cmd.daemon, self.cmd.foreground) {
+            // Daemon based servers are logged with ffx.daemon.log.
+            (true, _) | (false, false) => return None,
+            _ => {
+                //TODO(https://fxbug.dev/359534719): Move devhost usages to a constant.
+                let basename =
+                    format!("repo_{}", self.cmd.repository.clone().unwrap_or("devhost".into()));
+                Some(basename)
+            }
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Serialize, Deserialize, JsonSchema)]
@@ -99,7 +111,6 @@ async fn start_daemon_server(
     cmd: StartCommand,
     repos: ffx::RepositoryRegistryProxy,
 ) -> Result<std::net::SocketAddr> {
-
     if cmd.no_device
         || !cmd.alias.is_empty()
         || cmd.port_path.is_some()
