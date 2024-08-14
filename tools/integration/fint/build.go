@@ -20,6 +20,7 @@ import (
 	"strings"
 	"time"
 
+	"golang.org/x/sync/errgroup"
 	"google.golang.org/protobuf/proto"
 	"google.golang.org/protobuf/types/known/structpb"
 
@@ -51,6 +52,10 @@ const (
 	// buildstatsJSONName is the name of the JSON build stats files to produce
 	// The directory is unspecified.
 	buildstatsJSONName = "buildstats.json"
+
+	// subbuildsJSONName names the JSON file listing potential ninja sub-build directories.
+	// It is expected to be located in the top build directory.
+	subbuildsJSONName = "ninja_subbuilds.json"
 
 	// Name of the directory within the build directory that will contain clang
 	// crash reports. This name is configured by the `crash_diagnostics_dir` GN
@@ -112,9 +117,50 @@ type ninjaDebugFileSet struct {
 	statsPath string
 }
 
+type byLogPath []*ninjaDebugFileSet
+
+// functions for sorting
+func (n byLogPath) Len() int           { return len(n) }
+func (n byLogPath) Swap(i, j int)      { n[i], n[j] = n[j], n[i] }
+func (n byLogPath) Less(i, j int) bool { return n[i].logPath < n[j].logPath }
+
+// subbuildEntry follows from the metadata written by GN to 'ninja_subbuilds.json'
+type subbuildEntry struct {
+	BuildDir string `json:"build_dir"`
+}
+
 func checkFileExists(filePath string) bool {
 	_, error := os.Stat(filePath)
 	return !errors.Is(error, os.ErrNotExist)
+}
+
+func getSubbuildSubdirs(ctx context.Context, subbuildsJSON string) ([]string, error) {
+	subbuildSubdirs := []string{}
+	if checkFileExists(subbuildsJSON) {
+		var subbuildEntries []subbuildEntry
+		subbuildsData, err := os.ReadFile(subbuildsJSON)
+		if err != nil {
+			return nil, err
+		}
+		if err := json.Unmarshal(subbuildsData, &subbuildEntries); err != nil {
+			return nil, err
+		}
+		for _, e := range subbuildEntries {
+			subbuildSubdirs = append(subbuildSubdirs, e.BuildDir)
+		}
+	}
+	return subbuildSubdirs, nil
+}
+
+// subninjaLogIsRecent returns true if the mtime of the `log` is
+// newer than time `t`.  This is passed a function to facilitate
+// unit-testing.
+func subninjaLogIsRecent(log string, t time.Time) (bool, error) {
+	info, err := os.Stat(log)
+	if err != nil {
+		return false, err
+	}
+	return t.Before(info.ModTime()), nil
 }
 
 // Build runs `ninja` given a static and context spec. It's intended to be
@@ -130,7 +176,7 @@ func Build(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb.C
 		return nil, err
 	}
 
-	artifacts, err := buildImpl(ctx, &subprocess.Runner{}, checkFileExists, staticSpec, contextSpec, modules, platform)
+	artifacts, err := buildImpl(ctx, &subprocess.Runner{}, subninjaLogIsRecent, checkFileExists, staticSpec, contextSpec, modules, platform)
 	if err != nil && artifacts != nil && artifacts.FailureSummary == "" {
 		// Fall back to using the error text as the failure summary if the
 		// failure summary is unset. It's better than failing without emitting
@@ -145,6 +191,7 @@ func Build(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb.C
 func buildImpl(
 	ctx context.Context,
 	runner subprocessRunner,
+	subninjaLogIsRecent func(string, time.Time) (bool, error),
 	fileExists func(string) bool,
 	staticSpec *fintpb.Static,
 	contextSpec *fintpb.Context,
@@ -234,22 +281,77 @@ func buildImpl(
 
 	// Each ninja invocation produces a log file located in its build dir.
 	// Depending on the status of the build, not all sub-build logs are guaranteed to exist.
-	// TODO(b/349155983): Support ninja logs from multiple sub-builds
 	topNinjaLog := filepath.Join(buildDir, ninjaLogPath)
-	ninjaLogCandidates := []string{topNinjaLog}
-
-	ninjaDebugFileSets := []*ninjaDebugFileSet{}
-	for _, ninjaLog := range ninjaLogCandidates {
-		if !fileExists(ninjaLog) {
+	subbuildsJSON := filepath.Join(buildDir, subbuildsJSONName)
+	subbuildSubdirs, err := getSubbuildSubdirs(ctx, subbuildsJSON)
+	if err != nil {
+		return nil, err
+	}
+	subNinjaLogCandidates := []string{}
+	for _, subdir := range subbuildSubdirs {
+		subninjaLog := filepath.Join(buildDir, subdir, ninjaLogPath)
+		if !fileExists(subninjaLog) {
 			continue
 		}
-		ninjaDebugFiles, traceErr := getNinjaDebugFiles(ctx, r, buildDir, targets, ninjaLog, ninjatraceToolPath, buildstatsToolPath)
-		if traceErr != nil {
-			logger.Warningf(ctx, "(ignored) Failed to analyze ninja log %s, with error: %v", ninjaLog, traceErr)
+		// A ninja log could exist from a previous build,
+		// so only take logs that were touched since the start time.
+		recent, err := subninjaLogIsRecent(subninjaLog, ninjaStartTime)
+		if err != nil {
+			return nil, err
 		}
-
-		ninjaDebugFileSets = append(ninjaDebugFileSets, ninjaDebugFiles)
+		if !recent {
+			continue
+		}
+		subNinjaLogCandidates = append(subNinjaLogCandidates, subninjaLog)
 	}
+
+	// Process ninja logs (top and sub-builds), in parallel.
+	ninjaFileSetChan := make(chan *ninjaDebugFileSet, len(subNinjaLogCandidates)+1)
+	eg, egCtx := errgroup.WithContext(ctx)
+	// Handle top-level build differently, pass targets
+	eg.Go(func() error {
+		subninjaRunner := ninjaRunner{
+			runner:    runner,
+			ninjaPath: ninjaPath,
+			buildDir:  buildDir,
+		}
+		fs, err := getNinjaDebugFiles(egCtx, subninjaRunner, targets, topNinjaLog, ninjatraceToolPath, buildstatsToolPath)
+		if err != nil {
+			logger.Warningf(ctx, "(ignored) Failed to analyze top ninja log %s, with error: %v", topNinjaLog, err)
+			return nil
+		}
+		ninjaFileSetChan <- fs
+		return nil
+	})
+	for _, ninjaLog := range subNinjaLogCandidates { // sub-builds
+		ninjaLog := ninjaLog
+		eg.Go(func() error {
+			// `egCtx` allows errgroup to cancel other goroutines as soon as one of them errors.
+			subninjaRunner := ninjaRunner{
+				runner:    runner,
+				ninjaPath: ninjaPath,
+				buildDir:  filepath.Dir(ninjaLog),
+			}
+			fs, err := getNinjaDebugFiles(egCtx, subninjaRunner, []string{}, ninjaLog, ninjatraceToolPath, buildstatsToolPath)
+			if err != nil {
+				logger.Warningf(ctx, "(ignored) Failed to analyze sub ninja log %s, with error: %v", ninjaLog, err)
+				return nil
+			}
+			ninjaFileSetChan <- fs
+			return nil
+		})
+	}
+	if err := eg.Wait(); err != nil {
+		return artifacts, err
+	}
+	// Pull file sets from channel into array.
+	close(ninjaFileSetChan)
+	var ninjaDebugFileSets []*ninjaDebugFileSet
+	for fs := range ninjaFileSetChan {
+		ninjaDebugFileSets = append(ninjaDebugFileSets, fs)
+	}
+	// Make ordering deterministic for the sake of testing.
+	sort.Sort(byLogPath(ninjaDebugFileSets))
 
 	if contextSpec.ArtifactDir != "" {
 		for _, debugFileSet := range ninjaDebugFileSets {
@@ -366,9 +468,10 @@ func buildImpl(
 }
 
 // getNinjaDebugFiles creates a ninja trace file that will be exposed for debugging.
-func getNinjaDebugFiles(ctx context.Context, r ninjaRunner, buildDir string, targets []string, ninjaLog string, ninjatraceToolPath string, buildstatsToolPath string) (*ninjaDebugFileSet, error) {
+func getNinjaDebugFiles(ctx context.Context, r ninjaRunner, targets []string, ninjaLog string, ninjatraceToolPath string, buildstatsToolPath string) (*ninjaDebugFileSet, error) {
 	// Write auxiliary files and the final ninja trace to the same dir where the ninja log resides.
 	// This this assumes that the build dir is writeable.
+	logger.Debugf(ctx, "analyzing ninja log: %s", ninjaLog)
 	subBuildDirAbs := filepath.Dir(ninjaLog)
 
 	ninjaDepsFile := filepath.Join(subBuildDirAbs, ninjaDepsPath)

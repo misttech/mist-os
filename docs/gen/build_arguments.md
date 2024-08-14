@@ -226,7 +226,7 @@ AVB metadata which will be used to validate public key
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/android/platform/external/avb/test/data/atx_metadata.bin"`
 
-From //boards/arm64.gni:37
+From //boards/arm64.gni:39
 
 **Overridden from the default:** `""`
 
@@ -234,7 +234,7 @@ From //build/images/vbmeta.gni:23
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/atx_metadata.bin"`
 
-From //boards/common/x64-common.gni:45
+From //boards/x64.gni:57
 
 **Overridden from the default:** `""`
 
@@ -246,7 +246,7 @@ a key which will be used to sign VBMETA and images for AVB
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"`
 
-From //boards/arm64.gni:39
+From //boards/arm64.gni:41
 
 **Overridden from the default:** `""`
 
@@ -254,7 +254,7 @@ From //build/images/vbmeta.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"`
 
-From //boards/common/x64-common.gni:43
+From //boards/x64.gni:55
 
 **Overridden from the default:** `""`
 
@@ -270,7 +270,7 @@ Base) for a product. These packages are never evicted by the system.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:16
+From //out/not-default/args.gn:12
 
 **Overridden from the default:** `[]`
 
@@ -278,7 +278,7 @@ From //BUILD.gn:39
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:16
+From //out/not-default/args.gn:12
 
 **Overridden from the default:** `[]`
 
@@ -336,7 +336,7 @@ From //build/bazel/bazel_fuchsia_sdk.gni:14
 
 **Current value for `target_cpu = "arm64"`:** `"arm64"`
 
-From //boards/arm64.gni:44
+From //boards/arm64.gni:25
 
 **Overridden from the default:** `false`
 
@@ -344,7 +344,7 @@ From //build/images/args.gni:212
 
 **Current value for `target_cpu = "x64"`:** `"x64"`
 
-From //boards/x64.gni:31
+From //boards/x64.gni:28
 
 **Overridden from the default:** `false`
 
@@ -402,6 +402,18 @@ to stdout/stderr during the Ninja build.
 
 From //build/bazel/bazel_action.gni:18
 
+### bazel_rbe_download_outputs
+
+Control what bazel remote-built outputs are downloaded.
+See https://bazel.build/reference/command-line-reference#flag--remote_download_outputs
+Valid options: all, minimal, toplevel (default since Bazel 7.1)
+- 'toplevel' and 'minimal' can save significant download bandwidth
+- 'all' is useful for debugging remote build issues
+
+**Current value (from the default):** `"toplevel"`
+
+From //build/bazel/remote_services.gni:31
+
 ### bazel_rbe_exec_strategy
 
 When bazel is configured to use RBE, this controls the execution strategy
@@ -434,7 +446,7 @@ Valid options:
 
 **Current value (from the default):** `""`
 
-From //build/bazel/remote_services.gni:40
+From //build/bazel/remote_services.gni:47
 
 ### blobfs_capacity
 
@@ -444,7 +456,7 @@ False means no limit.
 
 **Current value for `target_cpu = "arm64"`:** `10485760000`
 
-From //boards/common/arm64-common.gni:24
+From //boards/arm64.gni:46
 
 **Overridden from the default:** `false`
 
@@ -452,7 +464,7 @@ From //build/images/filesystem_limits.gni:17
 
 **Current value for `target_cpu = "x64"`:** `10485760000`
 
-From //boards/common/x64-common.gni:47
+From //boards/x64.gni:59
 
 **Overridden from the default:** `false`
 
@@ -515,19 +527,19 @@ The label for the board configuration target to use with Product Assembly
 
 **Current value for `target_cpu = "arm64"`:** `"//boards/arm64"`
 
-From //boards/arm64.gni:23
+From //boards/arm64.gni:24
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:60
+From //build/board.gni:54
 
 **Current value for `target_cpu = "x64"`:** `"//boards/x64"`
 
-From //boards/x64.gni:23
+From //boards/x64.gni:27
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:60
+From //build/board.gni:54
 
 ### board_core_realm_shards
 
@@ -536,7 +548,7 @@ context.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:42
+From //build/board.gni:36
 
 ### board_description
 
@@ -544,7 +556,7 @@ Human readable board description corresponding to the board name.
 
 **Current value for `target_cpu = "arm64"`:** `"A generic emulated arm64 device."`
 
-From //boards/arm64.gni:26
+From //boards/arm64.gni:28
 
 **Overridden from the default:** `""`
 
@@ -552,7 +564,7 @@ From //build/board.gni:14
 
 **Current value for `target_cpu = "x64"`:** `"A generic x64 device"`
 
-From //boards/x64.gni:26
+From //boards/x64.gni:24
 
 **Overridden from the default:** `""`
 
@@ -582,7 +594,7 @@ board's fastboot protocol.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:46
+From //build/board.gni:40
 
 ### board_is_emu
 
@@ -592,33 +604,33 @@ physical/virtual device spec or both.
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //boards/arm64.gni:29
+From //boards/arm64.gni:31
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:65
+From //build/board.gni:59
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:29
+From //boards/x64.gni:31
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:65
+From //build/board.gni:59
 
 ### board_is_phys
 
 **Current value for `target_cpu = "arm64"`:** `false`
 
-From //boards/arm64.gni:30
+From //boards/arm64.gni:32
 
 **Overridden from the default:** `true`
 
-From //build/board.gni:66
+From //build/board.gni:60
 
 **Current value (from the default):** `true`
 
-From //build/board.gni:66
+From //build/board.gni:60
 
 ### board_name
 
@@ -626,7 +638,7 @@ Board name used for paving and amber updates.
 
 **Current value for `target_cpu = "arm64"`:** `"arm64"`
 
-From //boards/arm64.gni:25
+From //boards/arm64.gni:27
 
 **Overridden from the default:** `""`
 
@@ -634,7 +646,7 @@ From //build/board.gni:11
 
 **Current value for `target_cpu = "x64"`:** `"x64"`
 
-From //boards/x64.gni:25
+From //boards/x64.gni:23
 
 **Overridden from the default:** `""`
 
@@ -648,14 +660,6 @@ board definition rather than the product definition.
 **Current value (from the default):** `[]`
 
 From //build/board.gni:25
-
-### board_recovery_bootfs_labels
-
-A list of binary labels to include in the recovery ZBI.
-
-**Current value (from the default):** `[]`
-
-From //build/board.gni:38
 
 ### board_recovery_package_labels
 
@@ -680,15 +684,7 @@ any kind of stable contract for users of the archive.
 
 **Current value (from the default):** `[]`
 
-From //build/board.gni:57
-
-### board_zedboot_bootfs_labels
-
-A list of binary labels to include in the zedboot ZBI.
-
-**Current value (from the default):** `[]`
-
-From //build/board.gni:35
+From //build/board.gni:51
 
 ### bootfs_only
 
@@ -803,7 +799,7 @@ dependency of anything else, and so are "build only".
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:19
+From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
@@ -811,7 +807,7 @@ From //build/input/BUILD.gn:9
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:19
+From //out/not-default/args.gn:15
 
 **Overridden from the default:** `[]`
 
@@ -833,7 +829,7 @@ Generate a UEFI disk image
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //boards/arm64.gni:33
+From //boards/arm64.gni:35
 
 **Overridden from the default:** `false`
 
@@ -841,7 +837,7 @@ From //build/images/args.gni:30
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:51
+From //boards/x64.gni:63
 
 **Overridden from the default:** `false`
 
@@ -877,7 +873,7 @@ pressure arises or other policies indicate.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:17
+From //out/not-default/args.gn:13
 
 **Overridden from the default:** `[]`
 
@@ -885,7 +881,7 @@ From //BUILD.gn:48
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:17
+From //out/not-default/args.gn:13
 
 **Overridden from the default:** `[]`
 
@@ -1305,7 +1301,7 @@ From //build/images/custom_signing.gni:26
 
 **Current value (from the default):** `""`
 
-From //third_party/Vulkan-Loader/BUILD.gn:20
+From //third_party/Vulkan-Loader/BUILD.gn:21
 
 ### cxx_rbe_check
 
@@ -1353,19 +1349,7 @@ From //build/toolchain/rbe.gni:218
 Set to true to enable distributed compilation of C++ using RBE.
 Remote execution offers increased build parallelism and caching.
 
-**Current value for `target_cpu = "arm64"`:** `false`
-
-From //out/not-default/args.gn:7
-
-**Overridden from the default:** `false`
-
-From //build/toolchain/rbe.gni:159
-
-**Current value for `target_cpu = "x64"`:** `false`
-
-From //out/not-default/args.gn:7
-
-**Overridden from the default:** `false`
+**Current value (from the default):** `false`
 
 From //build/toolchain/rbe.gni:159
 
@@ -1472,7 +1456,7 @@ These are always a dependency of the main product assembly.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:28
+From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
@@ -1480,7 +1464,7 @@ From //BUILD.gn:109
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:28
+From //out/not-default/args.gn:24
 
 **Overridden from the default:** `[]`
 
@@ -2794,7 +2778,7 @@ hardware or emulated).
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:24
+From //out/not-default/args.gn:20
 
 **Overridden from the default:** `[]`
 
@@ -2802,7 +2786,7 @@ From //BUILD.gn:98
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:24
+From //out/not-default/args.gn:20
 
 **Overridden from the default:** `[]`
 
@@ -2833,19 +2817,7 @@ The Remote Execution API can be found at:
 https://github.com/bazelbuild/remote-apis
 For an overview of remote execution for Bazel, see https://bazel.build/remote/rbe
 
-**Current value for `target_cpu = "arm64"`:** `false`
-
-From //out/not-default/args.gn:8
-
-**Overridden from the default:** `false`
-
-From //build/bazel/remote_services.gni:16
-
-**Current value for `target_cpu = "x64"`:** `false`
-
-From //out/not-default/args.gn:8
-
-**Overridden from the default:** `false`
+**Current value (from the default):** `false`
 
 From //build/bazel/remote_services.gni:16
 
@@ -3694,7 +3666,7 @@ This is a build that imports a board (vs. sdk).  If a board is set
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //boards/common/arm64-common.gni:20
+From //boards/arm64.gni:20
 
 **Overridden from the default:** `false`
 
@@ -3702,7 +3674,7 @@ From //build/board.gni:8
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:22
+From //boards/x64.gni:20
 
 **Overridden from the default:** `false`
 
@@ -3714,7 +3686,7 @@ Fully hermetic tests (both by packaging and at runtime)
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:22
+From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
@@ -3722,7 +3694,7 @@ From //BUILD.gn:90
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:22
+From //out/not-default/args.gn:18
 
 **Overridden from the default:** `[]`
 
@@ -3748,7 +3720,7 @@ These will be added to the build using the host toolchain.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:9
+From //out/not-default/args.gn:7
 
 **Overridden from the default:** `[]`
 
@@ -3756,7 +3728,7 @@ From //BUILD.gn:116
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:9
+From //out/not-default/args.gn:7
 
 **Overridden from the default:** `[]`
 
@@ -3775,7 +3747,7 @@ These will be added to the build using the host toolchain.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:25
+From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
@@ -3783,7 +3755,7 @@ From //BUILD.gn:104
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:25
+From //out/not-default/args.gn:21
 
 **Overridden from the default:** `[]`
 
@@ -4100,7 +4072,7 @@ Debug build.
 
 **Current value for `target_cpu = "arm64"`:** `false`
 
-From //out/not-default/args.gn:10
+From //out/not-default/args.gn:8
 
 **Overridden from the default:** `""`
 
@@ -4108,7 +4080,7 @@ From //build/config/compilation_modes.gni:54
 
 **Current value for `target_cpu = "x64"`:** `false`
 
-From //out/not-default/args.gn:10
+From //out/not-default/args.gn:8
 
 **Overridden from the default:** `""`
 
@@ -4476,19 +4448,7 @@ Set to true to enable remote linking using RBE.
 This covers actions that use `ar`, or use `clang` to drive
 linkers like `lld`.
 
-**Current value for `target_cpu = "arm64"`:** `false`
-
-From //out/not-default/args.gn:11
-
-**Overridden from the default:** `false`
-
-From //build/toolchain/rbe.gni:227
-
-**Current value for `target_cpu = "x64"`:** `false`
-
-From //out/not-default/args.gn:11
-
-**Overridden from the default:** `false`
+**Current value (from the default):** `false`
 
 From //build/toolchain/rbe.gni:227
 
@@ -4606,7 +4566,7 @@ of how they are stored).
 
 **Current value for `target_cpu = "arm64"`:** `5216665600`
 
-From //boards/common/arm64-common.gni:26
+From //boards/arm64.gni:48
 
 **Overridden from the default:** `false`
 
@@ -4614,7 +4574,7 @@ From //build/images/filesystem_limits.gni:12
 
 **Current value for `target_cpu = "x64"`:** `5216665600`
 
-From //boards/common/x64-common.gni:49
+From //boards/x64.gni:61
 
 **Overridden from the default:** `false`
 
@@ -5406,19 +5366,19 @@ From //build/packages/prebuilt_package_with_flavors.gni:29
 
 **Current value for `target_cpu = "arm64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/arm64.gni:42
+From //boards/arm64.gni:44
 
 **Overridden from the default:** `[]`
 
-From //build/board.gni:71
+From //build/board.gni:65
 
 **Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
 
-From //boards/common/x64-common.gni:39
+From //boards/x64.gni:51
 
 **Overridden from the default:** `[]`
 
-From //build/board.gni:71
+From //build/board.gni:65
 
 ### partitions_config_label
 
@@ -5427,19 +5387,19 @@ product bundle.
 
 **Current value for `target_cpu = "arm64"`:** `"//boards/partitions:arm64"`
 
-From //boards/arm64.gni:41
+From //boards/arm64.gni:43
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:70
+From //build/board.gni:64
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
-From //boards/common/x64-common.gni:38
+From //boards/x64.gni:50
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:70
+From //build/board.gni:64
 
 ### perfetto_build_with_android
 
@@ -5599,7 +5559,19 @@ Example:
    }
  ]
 
-**Current value (from the default):** `[]`
+**Current value for `target_cpu = "arm64"`:** `[]`
+
+From //out/not-default/args.gn:26
+
+**Overridden from the default:** `[]`
+
+From //build/assembly/developer_overrides.gni:372
+
+**Current value for `target_cpu = "x64"`:** `[]`
+
+From //out/not-default/args.gn:26
+
+**Overridden from the default:** `[]`
 
 From //build/assembly/developer_overrides.gni:372
 
@@ -7089,16 +7061,18 @@ The overall mode for RBE to be operating in.  The valid values are:
                        remote services.
  * 'cloudtop' => An RBE configuration that's optimized for running on a
                  cloudtop. Suitable for high-bandwidth connections to
-                 remote services.
- * 'infra' => The RBE configuration used by CI/CQ bots. Also high-bandwidth.
+                 remote services and downloading remote outputs.
+ * 'infra' => The RBE configuration recommended for CI/CQ bots.
+              Also uses high-bandwidth.
  * 'remote_cache_only' => Use RBE only as a remote-cache: on cache-miss,
                           execute locally instead of remotely.
- * 'low_bandwidth' => An RBE configuration for developers that have a
-                      powerful workstations, but low bandwidth.
+ * 'low_bandwidth_remote' => An RBE configuration for low network bandwidth.
+                             Saves bandwidth by avoiding downloading some
+                             intermediate results.
 
 **Current value (from the default):** `"off"`
 
-From //build/toolchain/rbe_modes.gni:34
+From //build/toolchain/rbe_modes.gni:36
 
 ### rbe_settings_overrides
 
@@ -7107,7 +7081,7 @@ variables whose default values are set by the chosen RBE mode (above).
 
 **Current value (from the default):** `{ }`
 
-From //build/toolchain/rbe_modes.gni:38
+From //build/toolchain/rbe_modes.gni:40
 
 ### recovery_board_configuration_label
 
@@ -7119,7 +7093,7 @@ provided value for 'board_configuration_label'
 
 **Current value (from the default):** `"//boards/arm64"`
 
-From //build/board.gni:80
+From //build/board.gni:74
 
 ### recovery_label
 
@@ -7347,19 +7321,7 @@ From //build/toolchain/rbe.gni:141
 
 Set to true to enable distributed compilation of Rust using RBE.
 
-**Current value for `target_cpu = "arm64"`:** `false`
-
-From //out/not-default/args.gn:12
-
-**Overridden from the default:** `false`
-
-From //build/toolchain/rbe.gni:89
-
-**Current value for `target_cpu = "x64"`:** `false`
-
-From //out/not-default/args.gn:12
-
-**Overridden from the default:** `false`
+**Current value (from the default):** `false`
 
 From //build/toolchain/rbe.gni:89
 
@@ -8005,13 +7967,13 @@ From //src/storage/lib/trace/BUILD.gn:11
 
 **Current value for `target_cpu = "arm64"`:** `"arm64"`
 
-From //out/not-default/args.gn:13
+From //out/not-default/args.gn:9
 
 **Overridden from the default:** `""`
 
 **Current value for `target_cpu = "x64"`:** `"x64"`
 
-From //out/not-default/args.gn:13
+From //out/not-default/args.gn:9
 
 **Overridden from the default:** `""`
 
@@ -8149,7 +8111,7 @@ be flagged as an error by the build.
 
 **Current value for `target_cpu = "arm64"`:** `[]`
 
-From //out/not-default/args.gn:23
+From //out/not-default/args.gn:19
 
 **Overridden from the default:** `[]`
 
@@ -8157,7 +8119,7 @@ From //BUILD.gn:94
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
-From //out/not-default/args.gn:23
+From //out/not-default/args.gn:19
 
 **Overridden from the default:** `[]`
 
@@ -8297,7 +8259,7 @@ include those labels in this variable.
 
 **Current value for `target_cpu = "arm64"`:** `["//bundles/kitchen_sink"]`
 
-From //out/not-default/args.gn:18
+From //out/not-default/args.gn:14
 
 **Overridden from the default:** `[]`
 
@@ -8305,7 +8267,7 @@ From //BUILD.gn:57
 
 **Current value for `target_cpu = "x64"`:** `["//bundles/kitchen_sink"]`
 
-From //out/not-default/args.gn:18
+From //out/not-default/args.gn:14
 
 **Overridden from the default:** `[]`
 
@@ -8432,7 +8394,7 @@ Build the gigaboot bootloader.
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //boards/arm64.gni:34
+From //boards/arm64.gni:36
 
 **Overridden from the default:** `false`
 
@@ -8440,7 +8402,7 @@ From //build/images/args.gni:27
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:52
+From //boards/x64.gni:64
 
 **Overridden from the default:** `false`
 
@@ -8570,7 +8532,7 @@ LINT.IfChange
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //boards/arm64.gni:35
+From //boards/arm64.gni:37
 
 **Overridden from the default:** `false`
 
@@ -8578,7 +8540,7 @@ From //build/images/vbmeta.gni:15
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/common/x64-common.gni:41
+From //boards/x64.gni:53
 
 **Overridden from the default:** `false`
 

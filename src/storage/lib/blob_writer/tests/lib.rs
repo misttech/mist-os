@@ -6,7 +6,7 @@
 mod tests {
     use blob_writer::BlobWriter;
     use delivery_blob::{CompressionMode, Type1Blob};
-    use fidl_fuchsia_fxfs::MountOptions;
+    use fidl_fuchsia_fs_startup::MountOptions;
     use fs_management::filesystem::Filesystem;
     use fs_management::Fxfs;
     use fuchsia_component::client::connect_to_protocol_at_dir_svc;
@@ -24,7 +24,7 @@ mod tests {
         let mut serving_filesystem =
             fs.serve_multi_volume().await.expect("Failed to start the filesystem");
         let vol = serving_filesystem
-            .create_volume("blob", MountOptions { crypt: None, as_blob: true })
+            .create_volume("blob", MountOptions { as_blob: Some(true), ..MountOptions::default() })
             .await
             .expect("Failed to create volume");
         let blob_creator = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
@@ -74,7 +74,7 @@ mod tests {
         let mut serving_filesystem =
             fs.serve_multi_volume().await.expect("Failed to start the filesystem");
         let vol = serving_filesystem
-            .create_volume("blob", MountOptions { crypt: None, as_blob: true })
+            .create_volume("blob", MountOptions { as_blob: Some(true), ..MountOptions::default() })
             .await
             .expect("Failed to create volume");
         let blob_creator = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(

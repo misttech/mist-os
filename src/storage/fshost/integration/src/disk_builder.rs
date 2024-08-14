@@ -3,13 +3,13 @@
 // found in the LICENSE file.
 
 use blob_writer::BlobWriter;
+use block_client::BlockClient as _;
 use delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob};
 use device_watcher::{recursive_wait_and_open, recursive_wait_and_open_directory};
 use fidl::endpoints::{create_proxy, Proxy as _, ServerEnd};
 use fidl_fuchsia_device::{ControllerMarker, ControllerProxy};
-use fidl_fuchsia_fxfs::{
-    BlobCreatorProxy, CryptManagementMarker, CryptMarker, KeyPurpose, MountOptions,
-};
+use fidl_fuchsia_fs_startup::MountOptions;
+use fidl_fuchsia_fxfs::{BlobCreatorProxy, CryptManagementMarker, CryptMarker, KeyPurpose};
 use fidl_fuchsia_hardware_block::BlockMarker;
 use fs_management::filesystem::ServingMultiVolumeFilesystem;
 use fs_management::format::constants::{F2FS_MAGIC, FXFS_MAGIC, MINFS_MAGIC};
@@ -24,7 +24,6 @@ use fuchsia_zircon::{self as zx, HandleBased};
 use gpt::{partition_types, GptConfig};
 use key_bag::Aes256Key;
 use ramdevice_client::{RamdiskClient, RamdiskClientBuilder};
-use remote_block_device::BlockClient as _;
 use std::io::Write;
 use std::ops::Deref;
 use storage_isolated_driver_manager::fvm::{create_fvm_volume, set_up_fvm};
@@ -386,7 +385,7 @@ impl DiskBuilder {
         fxfs.format().await.expect("format failed");
         let mut fs = fxfs.serve_multi_volume().await.expect("serve_multi_volume failed");
         let blob_volume = fs
-            .create_volume("blob", MountOptions { crypt: None, as_blob: true })
+            .create_volume("blob", MountOptions { as_blob: Some(true), ..MountOptions::default() })
             .await
             .expect("failed to create blob volume");
         let blob_creator = connect_to_protocol_at_dir_svc::<fidl_fuchsia_fxfs::BlobCreatorMarker>(
@@ -623,7 +622,7 @@ impl DiskBuilder {
 
         let vol = {
             let vol = fs
-                .create_volume("unencrypted", MountOptions { crypt: None, as_blob: false })
+                .create_volume("unencrypted", MountOptions::default())
                 .await
                 .expect("create_volume failed");
             vol.bind_to_path("/unencrypted_volume").unwrap();
@@ -647,9 +646,12 @@ impl DiskBuilder {
                     .into_zx_channel()
                     .into(),
             );
-            fs.create_volume("data", MountOptions { crypt: crypt_service, as_blob: false })
-                .await
-                .expect("create_volume failed")
+            fs.create_volume(
+                "data",
+                MountOptions { crypt: crypt_service, ..MountOptions::default() },
+            )
+            .await
+            .expect("create_volume failed")
         };
         self.write_test_data(&vol.root()).await;
         fs.shutdown().await.expect("shutdown failed");
@@ -716,14 +718,14 @@ impl DiskBuilder {
         value: [u8; N],
         offset: u64,
     ) {
-        let client = remote_block_device::RemoteBlockClient::new(block_proxy)
+        let client = block_client::RemoteBlockClient::new(block_proxy)
             .await
             .expect("Failed to create client");
         let block_size = client.block_size() as usize;
         assert!(value.len() <= block_size);
         let mut data = vec![0xffu8; block_size];
         data[..value.len()].copy_from_slice(&value);
-        let buffer = remote_block_device::BufferSlice::Memory(&data[..]);
+        let buffer = block_client::BufferSlice::Memory(&data[..]);
         client.write_at(buffer, offset).await.expect("write failed");
     }
 

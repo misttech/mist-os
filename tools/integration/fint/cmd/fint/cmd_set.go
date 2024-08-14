@@ -57,7 +57,7 @@ func (c *SetCommand) Execute(ctx context.Context, _ *flag.FlagSet, _ ...interfac
 			return err
 		}
 
-		artifacts, setErr := fint.Set(ctx, staticSpec, contextSpec, c.skipLocalArgs)
+		artifacts, setErr := fint.Set(ctx, staticSpec, contextSpec, c.skipLocalArgs, []string{})
 		if contextSpec.ArtifactDir != "" {
 			path := filepath.Join(contextSpec.ArtifactDir, setArtifactsManifest)
 			if err := writeJSONPB(artifacts, path); err != nil {

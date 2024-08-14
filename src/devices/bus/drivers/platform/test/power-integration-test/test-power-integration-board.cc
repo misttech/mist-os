@@ -14,6 +14,8 @@
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/test/platform/cpp/bind.h>
 
+#include "tools/power_config/lib/cpp/power_config.h"
+
 namespace power_integration_board {
 
 zx::result<> PowerIntegrationBoard::Start() {
@@ -33,55 +35,24 @@ zx::result<> PowerIntegrationBoard::Start() {
     return zx::error_result(ZX_ERR_IO);
   }
 
-  fuchsia_hardware_power::PowerElementConfiguration config;
-
-  // create the composite node for the child
   {
-    fuchsia_hardware_power::Transition to_on;
-    to_on.latency_us() = 350;
-    to_on.target_level() = 1;
-
-    fuchsia_hardware_power::PowerLevel off = fuchsia_hardware_power::PowerLevel();
-    off.level() = 0;
-    off.name() = "off";
-    off.transitions() = std::vector<fuchsia_hardware_power::Transition>{to_on};
-
-    fuchsia_hardware_power::Transition to_off;
-    to_off.latency_us() = 20;
-    to_off.target_level() = 0;
-
-    fuchsia_hardware_power::PowerLevel on;
-    on.name() = "on";
-    on.level() = 1;
-    on.transitions() = std::vector<fuchsia_hardware_power::Transition>{to_off};
-
-    fuchsia_hardware_power::PowerElement element;
-    element.name() = "pe-fake-child";
-    element.levels() = std::vector<fuchsia_hardware_power::PowerLevel>{on, off};
-
-    fuchsia_hardware_power::PowerElementConfiguration config;
-    config.element() = element;
-
-    // set up dependency between parent and child
-    fuchsia_hardware_power::PowerDependency dep;
-    dep.child() = "pe-fake-child";
-    dep.parent() = fuchsia_hardware_power::ParentElement::WithName("pe-fake-parent");
-    dep.level_deps() = std::vector<fuchsia_hardware_power::LevelTuple>{{{
-        .child_level = 1,
-        .parent_level = 1,
-    }}};
-    dep.strength() = fuchsia_hardware_power::RequirementType::kAssertive;
-    config.dependencies() = std::vector<fuchsia_hardware_power::PowerDependency>{dep};
-
-    std::vector<fuchsia_hardware_power::PowerElementConfiguration> power_config =
-        std::vector<fuchsia_hardware_power::PowerElementConfiguration>{config};
+    // Load our power config.
+    zx::result open_result = incoming()->Open<fuchsia_io::File>(
+        "/pkg/data/power_config.fidl", fuchsia_io::wire::OpenFlags::kRightReadable);
+    if (!open_result.is_ok() || !open_result->is_valid()) {
+      return zx::error(ZX_ERR_INTERNAL);
+    }
+    zx::result config = power_config::Load(std::move(open_result.value()));
+    if (config.is_error()) {
+      return config.take_error();
+    }
 
     fuchsia_hardware_platform_bus::Node pdev;
     pdev.name() = "composite_fake_child";
     pdev.vid() = bind_fuchsia_test_platform::BIND_PLATFORM_DEV_VID_TEST;
     pdev.pid() = bind_fuchsia_test_platform::BIND_PLATFORM_DEV_PID_POWER_TEST;
     pdev.did() = bind_fuchsia_test_platform::BIND_PLATFORM_DEV_DID_FAKE_POWER_PLATFORM_DEVICE_CHILD;
-    pdev.power_config() = power_config;
+    pdev.power_config() = std::move(config.value().power_elements());
 
     auto bind_rules = std::vector{
         fdf::MakeAcceptBindRule(bind_fuchsia::PLATFORM_DEV_VID,

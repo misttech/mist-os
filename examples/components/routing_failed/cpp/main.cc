@@ -26,7 +26,7 @@ int main(int argc, const char* argv[], char* envp[]) {
   // Sets an error handler that will be called if an error causes the underlying
   // channel to be closed.
   echo_proxy.set_error_handler([&loop](zx_status_t status) {
-    FX_SLOG(WARNING, "Echo protocol failed", FX_KV("status", status));
+    FX_LOG_KV(WARNING, "Echo protocol failed", FX_KV("status", status));
     ZX_ASSERT(status == ZX_ERR_UNAVAILABLE);
     loop.Quit();
   });
@@ -37,7 +37,7 @@ int main(int argc, const char* argv[], char* envp[]) {
   // The epitaph itself is just a zx_status_t. To get detailed information about why the routing
   // failed, you'll need to check the kernel debuglog.
   echo_proxy->EchoString("Hippos rule!", [&](fidl::StringPtr response) {
-    FX_SLOG(INFO, "Server response", FX_KV("response", response->c_str()));
+    FX_LOG_KV(INFO, "Server response", FX_KV("response", response->c_str()));
     loop.Quit();
   });
 
@@ -52,7 +52,7 @@ int main(int argc, const char* argv[], char* envp[]) {
   // Sets an error handler that will be called if an error causes the underlying
   // channel to be closed.
   echo2_proxy.set_error_handler([&loop](zx_status_t status) {
-    FX_SLOG(WARNING, "Echo2 protocol failed", FX_KV("status", status));
+    FX_LOG_KV(WARNING, "Echo2 protocol failed", FX_KV("status", status));
     ZX_ASSERT(status == ZX_ERR_PEER_CLOSED);
     loop.Quit();
   });
@@ -62,7 +62,7 @@ int main(int argc, const char* argv[], char* envp[]) {
   // component's outgoing directory request handle and that causes the channel for the service
   // connection to be closed as well.
   echo2_proxy->EchoString("Hippos rule!", [&](fidl::StringPtr response) {
-    FX_SLOG(INFO, "Server response", FX_KV("response", response->c_str()));
+    FX_LOG_KV(INFO, "Server response", FX_KV("response", response->c_str()));
     loop.Quit();
   });
 

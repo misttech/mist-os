@@ -85,6 +85,7 @@
             from: "#config",
             to: "#bootstrap",
             config: [
+                "fuchsia.network.PrimaryInterface",
                 "fuchsia.sysmem.ContiguousGuardPagesUnused",
                 "fuchsia.sysmem.FixedContiguousMemorySize",
                 "fuchsia.sysmem.FixedProtectedMemorySize",
@@ -185,7 +186,6 @@
                 "capability_requested",
                 "debug_started",
                 "destroyed",
-                "discovered",
                 "started",
                 "stopped",
             ],

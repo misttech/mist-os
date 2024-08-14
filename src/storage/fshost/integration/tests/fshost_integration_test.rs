@@ -5,8 +5,8 @@
 use assert_matches::assert_matches;
 use delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob};
 use fidl::endpoints::create_proxy;
+use fidl_fuchsia_fs_startup::VolumeMarker as FsStartupVolumeMarker;
 use fidl_fuchsia_fshost::AdminMarker;
-use fidl_fuchsia_fxfs::VolumeMarker as FxfsVolumeMarker;
 use fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeMarker};
 use fs_management::format::constants::DATA_PARTITION_LABEL;
 use fs_management::partition::{find_partition_in, PartitionMatcher};
@@ -360,11 +360,13 @@ async fn set_volume_bytes_limit() {
     let volumes_dir = fixture.dir("volumes", fio::OpenFlags::empty());
 
     let blob_volume_proxy =
-        connect_to_named_protocol_at_dir_root::<FxfsVolumeMarker>(&volumes_dir, "blob").unwrap();
+        connect_to_named_protocol_at_dir_root::<FsStartupVolumeMarker>(&volumes_dir, "blob")
+            .unwrap();
     let blob_volume_bytes_limit = blob_volume_proxy.get_limit().await.unwrap().unwrap();
 
     let data_volume_proxy =
-        connect_to_named_protocol_at_dir_root::<FxfsVolumeMarker>(&volumes_dir, "data").unwrap();
+        connect_to_named_protocol_at_dir_root::<FsStartupVolumeMarker>(&volumes_dir, "data")
+            .unwrap();
     let data_volume_bytes_limit = data_volume_proxy.get_limit().await.unwrap().unwrap();
     assert_eq!(blob_volume_bytes_limit, BLOBFS_MAX_BYTES);
     assert_eq!(data_volume_bytes_limit, DATA_MAX_BYTES);

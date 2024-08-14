@@ -60,16 +60,30 @@ void FakeGpio::GetInterrupt(GetInterruptRequestView request,
   }
 }
 
+void FakeGpio::ConfigureInterrupt(ConfigureInterruptRequestView request,
+                                  ConfigureInterruptCompleter::Sync& completer) {
+  if (request->config.has_mode()) {
+    auto sub_state = state_log_.empty()
+                         ? ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull}
+                         : state_log_.back().sub_state;
+    state_log_.emplace_back(State{
+        .interrupt_mode = request->config.mode(),
+        .sub_state = sub_state,
+    });
+  }
+  completer.ReplySuccess();
+}
+
 void FakeGpio::SetAltFunction(SetAltFunctionRequestView request,
                               SetAltFunctionCompleter::Sync& completer) {
-  state_log_.emplace_back(State{.polarity = GetCurrentPolarity(),
+  state_log_.emplace_back(State{.interrupt_mode = GetCurrentInterruptMode(),
                                 .sub_state = AltFunctionSubState{.function = request->function}});
   completer.ReplySuccess();
 }
 
 void FakeGpio::ConfigIn(ConfigInRequestView request, ConfigInCompleter::Sync& completer) {
   if (state_log_.empty() || !std::holds_alternative<ReadSubState>(state_log_.back().sub_state)) {
-    state_log_.emplace_back(State{.polarity = GetCurrentPolarity(),
+    state_log_.emplace_back(State{.interrupt_mode = GetCurrentInterruptMode(),
                                   .sub_state = ReadSubState{.flags = request->flags}});
   } else {
     auto& state = std::get<ReadSubState>(state_log_.back().sub_state);
@@ -79,7 +93,7 @@ void FakeGpio::ConfigIn(ConfigInRequestView request, ConfigInCompleter::Sync& co
 }
 
 void FakeGpio::ConfigOut(ConfigOutRequestView request, ConfigOutCompleter::Sync& completer) {
-  state_log_.emplace_back(State{.polarity = GetCurrentPolarity(),
+  state_log_.emplace_back(State{.interrupt_mode = GetCurrentInterruptMode(),
                                 .sub_state = WriteSubState{.value = request->initial_value}});
   completer.ReplySuccess();
 }
@@ -91,8 +105,8 @@ void FakeGpio::Write(WriteRequestView request, WriteCompleter::Sync& completer) 
     return;
   }
 
-  state_log_.emplace_back(
-      State{.polarity = GetCurrentPolarity(), .sub_state = WriteSubState{.value = request->value}});
+  state_log_.emplace_back(State{.interrupt_mode = GetCurrentInterruptMode(),
+                                .sub_state = WriteSubState{.value = request->value}});
   zx_status_t response = write_callback_(*this);
   if (response == ZX_OK) {
     completer.ReplySuccess();
@@ -123,17 +137,6 @@ void FakeGpio::ReleaseInterrupt(ReleaseInterruptCompleter::Sync& completer) {
   completer.ReplySuccess();
 }
 
-void FakeGpio::SetPolarity(SetPolarityRequestView request, SetPolarityCompleter::Sync& completer) {
-  auto sub_state = state_log_.empty()
-                       ? ReadSubState{.flags = fuchsia_hardware_gpio::GpioFlags::kNoPull}
-                       : state_log_.back().sub_state;
-  state_log_.emplace_back(State{
-      .polarity = request->polarity,
-      .sub_state = std::move(sub_state),
-  });
-  completer.ReplySuccess();
-}
-
 void FakeGpio::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_hardware_gpio::Gpio> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
@@ -156,8 +159,8 @@ fuchsia_hardware_gpio::GpioFlags FakeGpio::GetReadFlags() const {
   return state.flags;
 }
 
-fuchsia_hardware_gpio::GpioPolarity FakeGpio::GetPolarity() const {
-  return state_log_.back().polarity;
+fuchsia_hardware_gpio::InterruptMode FakeGpio::GetInterruptMode() const {
+  return state_log_.back().interrupt_mode;
 }
 
 void FakeGpio::SetInterrupt(zx::result<zx::interrupt> interrupt) {
@@ -197,11 +200,11 @@ fuchsia_hardware_gpio::Service::InstanceHandler FakeGpio::CreateInstanceHandler(
            bindings_.CreateHandler(this, GetDefaultDispatcher(), fidl::kIgnoreBindingClosure)});
 }
 
-fuchsia_hardware_gpio::GpioPolarity FakeGpio::GetCurrentPolarity() {
+fuchsia_hardware_gpio::InterruptMode FakeGpio::GetCurrentInterruptMode() {
   if (state_log_.empty()) {
-    return fuchsia_hardware_gpio::GpioPolarity::kHigh;
+    return fuchsia_hardware_gpio::InterruptMode::kEdgeHigh;
   }
-  return state_log_.back().polarity;
+  return state_log_.back().interrupt_mode;
 }
 
 }  // namespace fake_gpio

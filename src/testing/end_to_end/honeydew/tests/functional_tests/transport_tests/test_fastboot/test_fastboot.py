@@ -27,15 +27,15 @@ class FastbootTransportTests(fuchsia_base_test.FuchsiaBaseTest):
         super().setup_class()
         self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
 
-        # Calling some fastboot method such that Fastboot __init__ gets called
-        # which will retrieve the fastboot node-id.
-        # Reason for doing this is, if DUT uses TCP based fastboot connection
-        # then retrieving the fastboot node-id involves :
-        #   * rebooting the device into fastboot mode,
+        # Calling some fastboot method here, so that Fastboot __init__ gets called which will
+        # retrieve the fastboot node-id.
+        # Reason for doing this is, if DUT uses TCP based fastboot connection then retrieving the
+        # fastboot node-id involves:
+        #   * rebooting the device into fastboot mode
         #   * retrieve the fastboot node-id
         #   * reboot back to fuchsia mode
-        # So to avoid all these steps in actual test case, we are calling some
-        # fastboot method here in setup_class
+        # So to avoid all these additional steps in actual test case, we are explicitly
+        # instantiating fastboot transport in setup_class
         self._fastboot_node_id: str = self.device.fastboot.node_id
 
     def teardown_test(self) -> None:
@@ -88,12 +88,11 @@ class FastbootTransportTests(fuchsia_base_test.FuchsiaBaseTest):
 
         self.device.fastboot.wait_for_fuchsia_mode()
 
-        # TODO(b/353345798): Causing CQ failures. Re-enable the assertion once bug is fixed.
-        # asserts.assert_false(
-        #     self.device.fastboot.is_in_fastboot_mode(),
-        #     msg=f"{self.device.device_name} is in fastboot mode when not "
-        #     f"expected",
-        # )
+        asserts.assert_false(
+            self.device.fastboot.is_in_fastboot_mode(),
+            msg=f"{self.device.device_name} is in fastboot mode when not "
+            f"expected",
+        )
 
 
 if __name__ == "__main__":

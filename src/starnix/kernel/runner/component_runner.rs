@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::run_component_features;
+use crate::{create_filesystem_from_spec, run_component_features};
 use anyhow::{anyhow, bail, Error};
 use fidl::endpoints::{ControlHandle, RequestStream, ServerEnd};
 use fidl::AsyncChannel;
@@ -10,18 +10,19 @@ use fidl_fuchsia_component_runner::{
     ComponentControllerMarker, ComponentControllerRequest, ComponentControllerRequestStream,
     ComponentStartInfo,
 };
+use fuchsia_runtime::{HandleInfo, HandleType};
 use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt};
 use rand::distributions::Alphanumeric;
 use rand::{thread_rng, Rng};
 use runner::{get_program_string, get_program_strvec, StartInfoProgramError};
-use starnix_core::execution::{
-    create_filesystem_from_spec, execute_task_with_prerun_result, parse_numbered_handles,
-};
-use starnix_core::fs::fuchsia::RemoteFs;
+use starnix_core::execution::execute_task_with_prerun_result;
+use starnix_core::fs::fuchsia::{create_file_from_handle, RemoteFs, SyslogFile};
 use starnix_core::signals;
 use starnix_core::task::{CurrentTask, ExitStatus, Task};
-use starnix_core::vfs::{FileSystemOptions, FsString, LookupContext, NamespaceNode, WhatToMount};
+use starnix_core::vfs::{
+    FdNumber, FdTable, FileSystemOptions, FsString, LookupContext, NamespaceNode, WhatToMount,
+};
 use starnix_logging::{log_error, log_info};
 use starnix_sync::{FileOpsCore, LockBefore, Locked, Mutex};
 use starnix_uapi::auth::{Capabilities, Credentials};
@@ -40,8 +41,8 @@ use std::os::unix::ffi::OsStrExt;
 use std::path::Path;
 use std::sync::Arc;
 use {
-    fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fuchsia_async as fasync,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fidl_fuchsia_process as fprocess,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 /// Component controller epitaph value used as the base value to pass non-zero error
@@ -160,11 +161,19 @@ pub async fn start_component(
         },
     );
 
+    let security_context = {
+        let s = get_program_string(&start_info, "seclabel");
+        match s {
+            Some(s) => Some(CString::new(s.to_owned())?),
+            None => None,
+        }
+    };
     let (task_complete_sender, task_complete) = oneshot::channel::<TaskResult>();
     let current_task = CurrentTask::create_init_child_process(
         system_task.kernel().kthreads.unlocked_for_async().deref_mut(),
         system_task.kernel(),
         &binary_path,
+        security_context.as_ref(),
     )?;
 
     let weak_task = execute_task_with_prerun_result(
@@ -191,17 +200,17 @@ pub async fn start_component(
                     })?;
                 if let Some(local_mounts) = local_mounts {
                     for mount in local_mounts.iter() {
-                        let (mount_point, child_fs) =
-                            create_filesystem_from_spec(locked, current_task, &pkg, mount)
-                                .map_err(|e| {
-                                    log_error!("Error while mounting the filesystems: {e:?}");
-                                    errno!(EINVAL)
-                                })?;
-                        let mount_point = current_task.lookup_path_from_root(mount_point)?;
+                        let action = create_filesystem_from_spec(locked, current_task, &pkg, mount)
+                            .map_err(|e| {
+                                log_error!("Error while mounting the filesystems: {e:?}");
+                                errno!(EINVAL)
+                            })?;
+                        let mount_point =
+                            current_task.lookup_path_from_root(action.path.as_ref())?;
                         mount_record.lock().mount(
                             mount_point,
-                            WhatToMount::Fs(child_fs),
-                            MountFlags::empty(),
+                            WhatToMount::Fs(action.fs),
+                            action.flags,
                         )?;
                     }
                 }
@@ -347,6 +356,42 @@ where
     Ok(component_path)
 }
 
+/// Adds the given startup handles to a CurrentTask.
+///
+/// The `numbered_handles` of type `HandleType::FileDescriptor` are used to
+/// create files, and the handles are required to be of type `zx::Socket`.
+///
+/// If there is a `numbered_handles` of type `HandleType::User0`, that is
+/// interpreted as the server end of the ShellController protocol.
+fn parse_numbered_handles(
+    current_task: &CurrentTask,
+    numbered_handles: Option<Vec<fprocess::HandleInfo>>,
+    files: &FdTable,
+) -> Result<(), Error> {
+    if let Some(numbered_handles) = numbered_handles {
+        for numbered_handle in numbered_handles {
+            let info = HandleInfo::try_from(numbered_handle.id)?;
+            if info.handle_type() == HandleType::FileDescriptor {
+                files.insert(
+                    current_task,
+                    FdNumber::from_raw(info.arg().into()),
+                    create_file_from_handle(current_task, numbered_handle.handle)?,
+                )?;
+            }
+        }
+    }
+
+    let stdio = SyslogFile::new_file(current_task);
+    // If no numbered handle is provided for each stdio handle, default to syslog.
+    for i in [0, 1, 2] {
+        if files.get(FdNumber::from_raw(i)).is_err() {
+            files.insert(current_task, FdNumber::from_raw(i), stdio.clone())?;
+        }
+    }
+
+    Ok(())
+}
+
 /// A record of the mounts created when starting a component.
 ///
 /// When the record is dropped, the mounts are unmounted.
@@ -419,7 +464,10 @@ impl MountRecord {
             FileSystemOptions { source: path.into(), ..Default::default() },
             rights,
         )?;
-        current_node.mount(WhatToMount::Fs(fs), MountFlags::empty())?;
+        // Fuchsia doesn't specify mount flags in the incoming namespace, so we need to make
+        // up some flags.
+        let flags = MountFlags::NOSUID | MountFlags::NODEV | MountFlags::RELATIME;
+        current_node.mount(WhatToMount::Fs(fs), flags)?;
         self.mounts.push(current_node);
 
         Ok(())

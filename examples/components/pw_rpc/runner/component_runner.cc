@@ -62,19 +62,19 @@ void ComponentInstance::Start() {
   zx::socket log_socket, log_server_socket;
   zx::socket::create(0, &log_socket, &log_server_socket);
   if (!log_socket.is_valid()) {
-    FX_SLOG(WARNING, "Failed to establish connection to log sink. Terminating component.");
+    FX_LOG_KV(WARNING, "Failed to establish connection to log sink. Terminating component.");
     Close();
     return;
   }
   if (auto result = log_sink_->ConnectStructured(std::move(log_server_socket)); result.is_error()) {
-    FX_SLOG(WARNING, "Failed to establish connection to log sink. Terminating component.");
+    FX_LOG_KV(WARNING, "Failed to establish connection to log sink. Terminating component.");
     Close();
     return;
   }
   auto result = OpenLoggerStream();
   if (result.is_error()) {
-    FX_SLOG(WARNING, "Failed to open connection for log forwarding. Terminating component.",
-            KV("status", result.status_string()));
+    FX_LOG_KV(WARNING, "Failed to open connection for log forwarding. Terminating component.",
+              KV("status", result.status_string()));
     Close();
     return;
   }
@@ -134,43 +134,43 @@ static zx::result<std::tuple<std::string, uint16_t>> ExtractHostPort(
   std::optional<std::string> host;
   std::optional<uint16_t> port;
   if (!start_info.program().has_value() || !start_info.program()->entries().has_value()) {
-    FX_SLOG(WARNING, "Attempted to launch component without program.");
+    FX_LOG_KV(WARNING, "Attempted to launch component without program.");
     return zx::error(InstanceCannotStart());
   }
   for (const fuchsia_data::DictionaryEntry& entry : *start_info.program()->entries()) {
     if (entry.key() == "host") {
       if (entry.value()->Which() != fuchsia_data::DictionaryValue::Tag::kStr) {
-        FX_SLOG(WARNING, "Attempted to launch component with malformed host.");
+        FX_LOG_KV(WARNING, "Attempted to launch component with malformed host.");
         return zx::error(InstanceCannotStart());
       }
       if (host.has_value()) {
-        FX_SLOG(WARNING, "Attempted to launch component with duplicate host.");
+        FX_LOG_KV(WARNING, "Attempted to launch component with duplicate host.");
         return zx::error(InstanceCannotStart());
       }
       host.emplace(entry.value()->str().value());
     } else if (entry.key() == "port") {
       if (entry.value()->Which() != fuchsia_data::DictionaryValue::Tag::kStr) {
-        FX_SLOG(WARNING, "Attempted to launch component with malformed port.");
+        FX_LOG_KV(WARNING, "Attempted to launch component with malformed port.");
         return zx::error(InstanceCannotStart());
       }
       if (port.has_value()) {
-        FX_SLOG(WARNING, "Attempted to launch component with duplicate port.");
+        FX_LOG_KV(WARNING, "Attempted to launch component with duplicate port.");
         return zx::error(InstanceCannotStart());
       }
       char* end = nullptr;
       const unsigned long port_long = std::strtoul(entry.value()->str().value().c_str(), &end, 10);
       if (errno == ERANGE || port_long > std::numeric_limits<uint16_t>::max()) {
-        FX_SLOG(WARNING, "Attempted to launch component with malformed port.");
+        FX_LOG_KV(WARNING, "Attempted to launch component with malformed port.");
         return zx::error(InstanceCannotStart());
       }
       port.emplace(static_cast<uint16_t>(port_long));
     } else {
-      FX_SLOG(WARNING, "Attempted to launch component with unrecognized property.");
+      FX_LOG_KV(WARNING, "Attempted to launch component with unrecognized property.");
       return zx::error(InstanceCannotStart());
     }
   }
   if (!host.has_value() || !port.has_value()) {
-    FX_SLOG(WARNING, "Attempted to launch component without host or port.");
+    FX_LOG_KV(WARNING, "Attempted to launch component without host or port.");
     return zx::error(InstanceCannotStart());
   }
   return zx::success(std::make_tuple(*host, *port));
@@ -190,8 +190,8 @@ static fidl::Client<fuchsia_logger::LogSink> ConnectLogSink(
         if (zx_status_t status = fdio_service_connect_at(
                 svc_handle, "fuchsia.logger.LogSink", log_sink_server_end.TakeChannel().release());
             status != ZX_OK) {
-          FX_SLOG(WARNING, "Failed to open component's /svc.",
-                  KV("status", zx_status_get_string(status)));
+          FX_LOG_KV(WARNING, "Failed to open component's /svc.",
+                    KV("status", zx_status_get_string(status)));
         }
         return fidl::Client<fuchsia_logger::LogSink>(std::move(log_sink_client_end), dispatcher);
       }
@@ -210,14 +210,14 @@ zx::result<> ComponentRunnerImpl::DoStart(
   const auto [host, port] = std::move(*result);
 
   if (!start_info.outgoing_dir().has_value()) {
-    FX_SLOG(WARNING, "Attempted to launch component without outgoing dir.");
+    FX_LOG_KV(WARNING, "Attempted to launch component without outgoing dir.");
     return zx::error(InstanceCannotStart());
   }
 
   // TODO: This is blocking, make it async or spin up another thread.
   pw::stream::SocketStream stream;
   if (!stream.Connect(host.c_str(), port).ok()) {
-    FX_SLOG(WARNING, "Failed to connect to remote endpoint", KV("host", host), KV("port", port));
+    FX_LOG_KV(WARNING, "Failed to connect to remote endpoint", KV("host", host), KV("port", port));
     return zx::error(InstanceCannotStart());
   }
   const int flags = fcntl(stream.connection_fd(), F_GETFD, 0) | O_NONBLOCK;
@@ -230,8 +230,8 @@ zx::result<> ComponentRunnerImpl::DoStart(
       std::make_unique<ComponentInstance>(dispatcher_, std::move(stream), std::move(log_sink),
                                           std::move(controller), std::move(deletion_cb));
   if (auto result = instance->Serve(std::move(*start_info.outgoing_dir())); result.is_error()) {
-    FX_SLOG(WARNING, "Failed to serve component's outgoing dir.",
-            KV("status", result.status_string()));
+    FX_LOG_KV(WARNING, "Failed to serve component's outgoing dir.",
+              KV("status", result.status_string()));
     return zx::error(InstanceCannotStart());
   }
   components_.emplace(component_id, std::move(instance));

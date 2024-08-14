@@ -230,7 +230,8 @@ mod tests {
             size: u64,
         ) -> Result<(CopyOnWriteBackend, CopyOnWriteBackendController), Error> {
             let (file_backend, file_controller) = FileBackendTest::create_with_size(size).await?;
-            let (memory_backend, memory_controller) = MemoryBackend::with_size(size as usize);
+            let (memory_backend, memory_controller) =
+                MemoryBackend::with_size_and_controller(size as usize);
 
             let cow_backend = CopyOnWriteBackend::new(
                 Box::new(file_backend),

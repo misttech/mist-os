@@ -26,6 +26,20 @@ rustc_library("flatland-frame-scheduling-lib") {
   ]
 }
 
+source_set("simple_present_hlcpp") {
+  sources = [
+    "src/simple_present_hlcpp.cc",
+    "src/simple_present_hlcpp.h",
+  ]
+
+  public_deps = [
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
+    "//sdk/lib/fidl/cpp",
+    "//sdk/lib/sys/cpp:cpp",
+    "//sdk/lib/syslog/cpp",
+  ]
+}
+
 source_set("simple_present") {
   sources = [
     "src/simple_present.cc",
@@ -33,9 +47,12 @@ source_set("simple_present") {
   ]
 
   public_deps = [
-    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_cpp",
     "//sdk/lib/fidl/cpp",
-    "//sdk/lib/sys/cpp:cpp",
+  ]
+
+  deps = [
+    "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/syslog/cpp",
   ]
 }

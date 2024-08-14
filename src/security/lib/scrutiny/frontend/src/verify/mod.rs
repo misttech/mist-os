@@ -8,55 +8,17 @@ pub mod pre_signing;
 pub mod route_sources;
 pub mod structured_config;
 
-use cm_fidl_analyzer::route::CapabilityRouteError;
+use cm_fidl_analyzer::component_model::AnalyzerModelError;
+use cm_fidl_analyzer::route::TargetDecl;
 use cm_rust::CapabilityTypeName;
 use cm_types::Name;
 use moniker::Moniker;
-use routing::mapper::RouteSegment;
+use routing::capability_source::CapabilitySource;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use std::error::Error;
 use std::path::PathBuf;
 
 pub use route_sources::VerifyRouteSourcesResults;
-
-/// Error for use with serialization: Stores both structured error and message,
-/// and assesses equality using structured error.
-#[derive(Clone, Default, Deserialize, Serialize)]
-pub struct ErrorWithMessage<E: Clone + Error + Serialize> {
-    pub error: E,
-    #[serde(default)]
-    pub message: String,
-}
-
-impl<E: Clone + Error + PartialEq + Serialize> PartialEq<ErrorWithMessage<E>>
-    for ErrorWithMessage<E>
-{
-    fn eq(&self, other: &Self) -> bool {
-        // Ignore `message` when comparing.
-        self.error == other.error
-    }
-}
-
-impl<'de, E> From<E> for ErrorWithMessage<E>
-where
-    E: Clone + Deserialize<'de> + Error + Serialize,
-{
-    fn from(error: E) -> Self {
-        Self::from(&error)
-    }
-}
-
-impl<'de, E> From<&E> for ErrorWithMessage<E>
-where
-    E: Clone + Deserialize<'de> + Error + Serialize,
-{
-    fn from(error: &E) -> Self {
-        let message = error.to_string();
-        let error = error.clone();
-        Self { error, message }
-    }
-}
 
 /// Top-level result type for `CapabilityRouteController` query result.
 #[derive(Deserialize, Serialize)]
@@ -88,10 +50,10 @@ pub struct ResultsBySeverity {
 #[derive(Clone, Deserialize, Serialize)]
 pub struct ErrorResult {
     pub using_node: Moniker,
+    pub target_decl: TargetDecl,
     pub capability: Option<Name>,
-    pub error: ErrorWithMessage<CapabilityRouteError>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub route: Vec<RouteSegment>,
+    pub error: AnalyzerModelError,
+    pub message: String,
 }
 
 impl PartialEq for ErrorResult {
@@ -109,10 +71,10 @@ impl PartialEq for ErrorResult {
 #[derive(Clone, Deserialize, Serialize)]
 pub struct WarningResult {
     pub using_node: Moniker,
+    pub target_decl: TargetDecl,
     pub capability: Option<Name>,
-    pub warning: ErrorWithMessage<CapabilityRouteError>,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub route: Vec<RouteSegment>,
+    pub warning: AnalyzerModelError,
+    pub message: String,
 }
 
 impl PartialEq for WarningResult {
@@ -130,9 +92,9 @@ impl PartialEq for WarningResult {
 #[derive(Clone, Deserialize, Serialize)]
 pub struct OkResult {
     pub using_node: Moniker,
+    pub target_decl: TargetDecl,
     pub capability: Name,
-    #[serde(skip_serializing_if = "Vec::is_empty", default)]
-    pub route: Vec<RouteSegment>,
+    pub source: CapabilitySource,
 }
 
 #[cfg(test)]
@@ -998,7 +960,9 @@ mod tests {
         .unwrap();
         let response = serde_json::to_value(&response).unwrap();
         let expected = json!({
-          "deps": ["v2_component_tree_dep"],
+            "deps": [
+                "v2_component_tree_dep"
+            ],
             "results": [
                 {
                     "capability_type": "directory",
@@ -1007,44 +971,59 @@ mod tests {
                             {
                                 "capability": "bad_dir",
                                 "error": {
-                                    "error": {
-                                        "analyzer_model_error": {
-                                            "routing_error": {
-                                                "use_from_parent_not_found": {
-                                                    "capability_id": "bad_dir",
-                                                    "moniker": "child",
-                                                }
-                                            }
+                                    "routing_error": {
+                                        "use_from_parent_not_found": {
+                                            "capability_id": "bad_dir",
+                                            "moniker": "child"
                                         }
-                                    },
-                                    "message": "`bad_dir` was not offered to `child` by parent",
+                                    }
                                 },
-                                "using_node": "child",
-                                "route": [
-                                    {
-                                        "action": "use_by",
-                                        "capability": {
-                                            "availability": "required",
-                                            "dependency_type": "strong",
-                                            "rights": 1,
-                                            "source": "parent",
-                                            "source_dictionary": ".",
-                                            "source_name": "bad_dir",
-                                            "subdir": ".",
-                                            "target_path": "/dir",
-                                            "type": "directory",
-                                        },
-                                        "moniker": "child",
-                                    },
-                                ],
-                            },
+                                "message": "`bad_dir` was not offered to `child` by parent",
+                                "target_decl": {
+                                    "use": {
+                                        "availability": "required",
+                                        "dependency_type": "strong",
+                                        "rights": 1,
+                                        "source": "parent",
+                                        "source_dictionary": ".",
+                                        "source_name": "bad_dir",
+                                        "subdir": ".",
+                                        "target_path": "/dir",
+                                        "type": "directory"
+                                    }
+                                },
+                                "using_node": "child"
+                            }
                         ],
                         "ok": [
                             {
                                 "capability": "good_dir",
-                                "using_node": "child",
-                            },
-                        ],
+                                "source": {
+                                    "capability": {
+                                        "name": "good_dir",
+                                        "rights": 1,
+                                        "source_path": null,
+                                        "type": "directory"
+                                    },
+                                    "moniker": ".",
+                                    "type": "component"
+                                },
+                                "target_decl": {
+                                    "use": {
+                                        "availability": "required",
+                                        "dependency_type": "strong",
+                                        "rights": 1,
+                                        "source": "parent",
+                                        "source_dictionary": ".",
+                                        "source_name": "good_dir",
+                                        "subdir": ".",
+                                        "target_path": "/dir",
+                                        "type": "directory"
+                                    }
+                                },
+                                "using_node": "child"
+                            }
+                        ]
                     }
                 },
                 {
@@ -1053,62 +1032,30 @@ mod tests {
                         "warnings": [
                             {
                                 "capability": "protocol",
-                                "warning": {
-                                    "error": {
-                                        "analyzer_model_error": {
-                                            "routing_error": {
-                                                "offer_from_child_instance_not_found": {
-                                                    "capability_id": "protocol",
-                                                    "child_moniker": "missing_child",
-                                                    "moniker": ".",
-                                                }
-                                            }
-                                        }
-                                    },
-                                    "message": "`.` does not have child `#missing_child`",
+                                "message": "`.` does not have child `#missing_child`",
+                                "target_decl": {
+                                    "use": {
+                                        "availability": "required",
+                                        "dependency_type": "strong",
+                                        "source": "parent",
+                                        "source_dictionary": ".",
+                                        "source_name": "protocol",
+                                        "target_path": "/dir/svc",
+                                        "type": "protocol"
+                                    }
                                 },
                                 "using_node": "child",
-                                "route": [
-                                    {
-                                        "action": "use_by",
-                                        "capability": {
-                                            "availability": "required",
-                                            "dependency_type": "strong",
-                                            "source": "parent",
-                                            "source_dictionary": ".",
-                                            "source_name": "protocol",
-                                            "target_path": "/dir/svc",
-                                            "type": "protocol",
-                                        },
-                                        "moniker": "child",
-                                    },
-                                    {
-                                        "action": "offer_by",
-                                        "capability": {
-                                            "availability": "required",
-                                            "dependency_type": "strong",
-                                            "source": {
-                                                "child": {
-                                                    "collection": null,
-                                                    "name": "missing_child",
-                                                },
-                                            },
-                                            "source_dictionary": ".",
-                                            "source_name": "protocol",
-                                            "target": {
-                                                "child": {
-                                                    "collection": null,
-                                                    "name": "child",
-                                                },
-                                            },
-                                            "target_name": "protocol",
-                                            "type": "protocol",
-                                        },
-                                        "moniker": ".",
-                                    },
-                                ],
-                            },
-                        ],
+                                "warning": {
+                                    "routing_error": {
+                                        "offer_from_child_instance_not_found": {
+                                            "capability_id": "protocol",
+                                            "child_moniker": "missing_child",
+                                            "moniker": "."
+                                        }
+                                    }
+                                }
+                            }
+                        ]
                     }
                 }
             ]
@@ -1135,168 +1082,105 @@ mod tests {
         let response = serde_json::to_value(&response).unwrap();
 
         let expected = json!({
-          "deps": ["v2_component_tree_dep"],
-          "results": [
-            {
-              "capability_type": "directory",
-              "results": {
-                  "errors": [
-                      {
-                          "capability": "bad_dir",
-                          "error": {
-                              "error": {
-                                  "analyzer_model_error": {
-                                      "routing_error": {
-                                          "use_from_parent_not_found": {
-                                              "capability_id": "bad_dir",
-                                              "moniker": "child",
-                                          }
-                                      }
-                                  }
-                              },
-                              "message": "`bad_dir` was not offered to `child` by parent",
-                          },
-                          "using_node": "child",
-                          "route": [
-                              {
-                                  "action": "use_by",
-                                  "capability": {
-                                      "availability": "required",
-                                      "dependency_type": "strong",
-                                      "rights": 1,
-                                      "source": "parent",
-                                      "source_name": "bad_dir",
-                                      "source_dictionary": ".",
-                                      "subdir": ".",
-                                      "target_path": "/dir",
-                                      "type": "directory",
-                                  },
-                                  "moniker": "child",
-                              },
-                          ],
-                      },
-                  ],
-                  "ok": [
-                      {
-                          "capability": "good_dir",
-                          "route": [
-                              {
-                                  "action": "use_by",
-                                  "capability": {
-                                      "availability": "required",
-                                      "dependency_type": "strong",
-                                      "rights": 1,
-                                      "source": "parent",
-                                      "source_name": "good_dir",
-                                      "source_dictionary": ".",
-                                      "subdir": ".",
-                                      "target_path": "/dir",
-                                      "type": "directory"
-                                  },
-                                  "moniker": "child"
-                              },
-                              {
-                                  "action": "offer_by",
-                                  "capability": {
-                                      "availability": "required",
-                                      "dependency_type": "strong",
-                                      "rights": 1,
-                                      "source": "self_",
-                                      "source_name": "good_dir",
-                                      "source_dictionary": ".",
-                                      "subdir": ".",
-                                      "target": {
-                                          "child": {
-                                              "name": "child",
-                                              "collection": null,
-                                          }
-                                      },
-                                      "target_name": "good_dir",
-                                      "type": "directory"
-                                  },
-                                  "moniker": "."
-                              },
-                              {
-                                  "action": "declare_by",
-                                  "capability": {
-                                      "name": "good_dir",
-                                      "rights": 1,
-                                      "source_path": null,
-                                      "type": "directory"
-                                  },
-                                  "moniker": "."
-                              }
-                          ],
-                          "using_node": "child"
-                      }
-                  ]
-              }
-            },
-            {
-              "capability_type": "protocol",
-              "results": {
-                "warnings": [
-                    {
-                        "capability": "protocol",
-                        "warning": {
-                            "error": {
-                                "analyzer_model_error": {
+            "deps": [
+                "v2_component_tree_dep"
+            ],
+            "results": [
+                {
+                    "capability_type": "directory",
+                    "results": {
+                        "errors": [
+                            {
+                                "capability": "bad_dir",
+                                "error": {
+                                    "routing_error": {
+                                        "use_from_parent_not_found": {
+                                            "capability_id": "bad_dir",
+                                            "moniker": "child"
+                                        }
+                                    }
+                                },
+                                "message": "`bad_dir` was not offered to `child` by parent",
+                                "target_decl": {
+                                    "use": {
+                                        "availability": "required",
+                                        "dependency_type": "strong",
+                                        "rights": 1,
+                                        "source": "parent",
+                                        "source_dictionary": ".",
+                                        "source_name": "bad_dir",
+                                        "subdir": ".",
+                                        "target_path": "/dir",
+                                        "type": "directory"
+                                    }
+                                },
+                                "using_node": "child"
+                            }
+                        ],
+                        "ok": [
+                            {
+                                "capability": "good_dir",
+                                "source": {
+                                    "capability": {
+                                        "name": "good_dir",
+                                        "rights": 1,
+                                        "source_path": null,
+                                        "type": "directory"
+                                    },
+                                    "moniker": ".",
+                                    "type": "component"
+                                },
+                                "target_decl": {
+                                    "use": {
+                                        "availability": "required",
+                                        "dependency_type": "strong",
+                                        "rights": 1,
+                                        "source": "parent",
+                                        "source_dictionary": ".",
+                                        "source_name": "good_dir",
+                                        "subdir": ".",
+                                        "target_path": "/dir",
+                                        "type": "directory"
+                                    }
+                                },
+                                "using_node": "child"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "capability_type": "protocol",
+                    "results": {
+                        "warnings": [
+                            {
+                                "capability": "protocol",
+                                "message": "`.` does not have child `#missing_child`",
+                                "target_decl": {
+                                    "use": {
+                                        "availability": "required",
+                                        "dependency_type": "strong",
+                                        "source": "parent",
+                                        "source_dictionary": ".",
+                                        "source_name": "protocol",
+                                        "target_path": "/dir/svc",
+                                        "type": "protocol"
+                                    }
+                                },
+                                "using_node": "child",
+                                "warning": {
                                     "routing_error": {
                                         "offer_from_child_instance_not_found": {
                                             "capability_id": "protocol",
                                             "child_moniker": "missing_child",
-                                            "moniker": ".",
+                                            "moniker": "."
                                         }
                                     }
                                 }
-                            },
-                            "message": "`.` does not have child `#missing_child`",
-                        },
-                        "using_node": "child",
-                        "route": [
-                            {
-                                "action": "use_by",
-                                "capability": {
-                                    "availability": "required",
-                                    "dependency_type": "strong",
-                                    "source": "parent",
-                                    "source_name": "protocol",
-                                    "source_dictionary": ".",
-                                    "target_path": "/dir/svc",
-                                    "type": "protocol",
-                                },
-                                "moniker": "child",
-                            },
-                            {
-                                "action": "offer_by",
-                                "capability": {
-                                    "availability": "required",
-                                    "dependency_type": "strong",
-                                    "source": {
-                                        "child": {
-                                            "collection": null,
-                                            "name": "missing_child",
-                                        },
-                                    },
-                                    "source_name": "protocol",
-                                    "source_dictionary": ".",
-                                    "target": {
-                                        "child": {
-                                            "collection": null,
-                                            "name": "child",
-                                        },
-                                    },
-                                    "target_name": "protocol",
-                                    "type": "protocol",
-                                },
-                                "moniker": ".",
-                            },
-                        ],
-                    },
-                ]
-              }
-            }
-          ]
+                            }
+                        ]
+                    }
+                }
+            ]
         });
 
         assert_json_eq(response, expected);
@@ -1321,7 +1205,7 @@ mod tests {
 
         let expected = json!({
             "deps": [
-                "v2_component_tree_dep",
+                "v2_component_tree_dep"
             ],
             "results": [
                 {
@@ -1331,39 +1215,31 @@ mod tests {
                             {
                                 "capability": "bad_dir",
                                 "error": {
-                                    "error": {
-                                        "analyzer_model_error": {
-                                            "routing_error": {
-                                                "use_from_parent_not_found": {
-                                                    "capability_id": "bad_dir",
-                                                    "moniker": "child",
-                                                },
-                                            },
-                                        },
-                                    },
-                                    "message": "`bad_dir` was not offered to `child` by parent",
+                                    "routing_error": {
+                                        "use_from_parent_not_found": {
+                                            "capability_id": "bad_dir",
+                                            "moniker": "child"
+                                        }
+                                    }
                                 },
-                                "using_node": "child",
-                                "route": [
-                                    {
-                                        "action": "use_by",
-                                        "capability": {
-                                            "availability": "required",
-                                            "dependency_type": "strong",
-                                            "rights": 1,
-                                            "source": "parent",
-                                            "source_name": "bad_dir",
-                                            "source_dictionary": ".",
-                                            "subdir": ".",
-                                            "target_path": "/dir",
-                                            "type": "directory",
-                                        },
-                                        "moniker": "child",
-                                    },
-                                ],
-                            },
-                        ],
-                    },
+                                "message": "`bad_dir` was not offered to `child` by parent",
+                                "target_decl": {
+                                    "use": {
+                                        "availability": "required",
+                                        "dependency_type": "strong",
+                                        "rights": 1,
+                                        "source": "parent",
+                                        "source_dictionary": ".",
+                                        "source_name": "bad_dir",
+                                        "subdir": ".",
+                                        "target_path": "/dir",
+                                        "type": "directory"
+                                    }
+                                },
+                                "using_node": "child"
+                            }
+                        ]
+                    }
                 },
                 {
                     "capability_type": "protocol",
@@ -1371,65 +1247,33 @@ mod tests {
                         "warnings": [
                             {
                                 "capability": "protocol",
+                                "message": "`.` does not have child `#missing_child`",
+                                "target_decl": {
+                                    "use": {
+                                        "availability": "required",
+                                        "dependency_type": "strong",
+                                        "source": "parent",
+                                        "source_dictionary": ".",
+                                        "source_name": "protocol",
+                                        "target_path": "/dir/svc",
+                                        "type": "protocol"
+                                    }
+                                },
                                 "using_node": "child",
                                 "warning": {
-                                    "error": {
-                                        "analyzer_model_error": {
-                                            "routing_error": {
-                                                "offer_from_child_instance_not_found": {
-                                                    "capability_id": "protocol",
-                                                    "child_moniker": "missing_child",
-                                                    "moniker": ".",
-                                                },
-                                            },
-                                        },
-                                    },
-                                    "message": "`.` does not have child `#missing_child`",
-                                },
-                                "route": [
-                                    {
-                                        "action": "use_by",
-                                        "capability": {
-                                            "availability": "required",
-                                            "dependency_type": "strong",
-                                            "source": "parent",
-                                            "source_name": "protocol",
-                                            "source_dictionary": ".",
-                                            "target_path": "/dir/svc",
-                                            "type": "protocol",
-                                        },
-                                        "moniker": "child",
-                                    },
-                                    {
-                                        "action": "offer_by",
-                                        "capability": {
-                                            "availability": "required",
-                                            "dependency_type": "strong",
-                                            "source": {
-                                                "child": {
-                                                    "collection": null,
-                                                    "name": "missing_child",
-                                                },
-                                            },
-                                            "source_name": "protocol",
-                                            "source_dictionary": ".",
-                                            "target": {
-                                                "child": {
-                                                    "collection": null,
-                                                    "name": "child",
-                                                },
-                                            },
-                                            "target_name": "protocol",
-                                            "type": "protocol",
-                                        },
-                                        "moniker": ".",
-                                    },
-                                ],
-                            },
-                        ],
-                    },
-                },
-            ],
+                                    "routing_error": {
+                                        "offer_from_child_instance_not_found": {
+                                            "capability_id": "protocol",
+                                            "child_moniker": "missing_child",
+                                            "moniker": "."
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                }
+            ]
         });
 
         assert_json_eq(response, expected);
@@ -1453,54 +1297,48 @@ mod tests {
         let response = serde_json::to_value(&response).unwrap();
 
         let expected = json!({
-          "deps": ["v2_component_tree_dep"],
-          "results": [
-            {
-              "capability_type": "directory",
-              "results": {
-                  "errors": [
-                      {
-                          "capability": "bad_dir",
-                          "error": {
-                              "error": {
-                                  "analyzer_model_error": {
-                                      "routing_error": {
-                                          "use_from_parent_not_found": {
-                                              "capability_id": "bad_dir",
-                                              "moniker": "child",
-                                          }
-                                      }
-                                  }
-                              },
-                              "message": "`bad_dir` was not offered to `child` by parent",
-                          },
-                          "using_node": "child",
-                          "route": [
-                              {
-                                  "action": "use_by",
-                                  "capability": {
-                                      "availability": "required",
-                                      "dependency_type": "strong",
-                                      "rights": 1,
-                                      "source": "parent",
-                                      "source_name": "bad_dir",
-                                      "source_dictionary": ".",
-                                      "subdir": ".",
-                                      "target_path": "/dir",
-                                      "type": "directory",
-                                  },
-                                  "moniker": "child",
-                              },
-                          ],
-                      }
-                  ]
-              }
-            },
-            {
-              "capability_type": "protocol",
-              "results": {}
-            }
-          ]
+            "deps": [
+                "v2_component_tree_dep"
+            ],
+            "results": [
+                {
+                    "capability_type": "directory",
+                    "results": {
+                        "errors": [
+                            {
+                                "capability": "bad_dir",
+                                "error": {
+                                    "routing_error": {
+                                        "use_from_parent_not_found": {
+                                            "capability_id": "bad_dir",
+                                            "moniker": "child"
+                                        }
+                                    }
+                                },
+                                "message": "`bad_dir` was not offered to `child` by parent",
+                                "target_decl": {
+                                    "use": {
+                                        "availability": "required",
+                                        "dependency_type": "strong",
+                                        "rights": 1,
+                                        "source": "parent",
+                                        "source_dictionary": ".",
+                                        "source_name": "bad_dir",
+                                        "subdir": ".",
+                                        "target_path": "/dir",
+                                        "type": "directory"
+                                    }
+                                },
+                                "using_node": "child"
+                            }
+                        ]
+                    }
+                },
+                {
+                    "capability_type": "protocol",
+                    "results": {}
+                }
+            ]
         });
 
         assert_json_eq(response, expected);

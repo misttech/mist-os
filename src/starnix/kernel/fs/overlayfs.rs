@@ -5,12 +5,13 @@
 use crate::fs::tmpfs::{TmpFs, TmpfsDirectory};
 use crate::mm::memory::MemoryObject;
 use crate::task::{CurrentTask, Kernel};
+use crate::vfs::fs_args::MountParams;
 use crate::vfs::rw_queue::RwQueueReadGuard;
 use crate::vfs::{
     default_seek, emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync,
-    fileops_impl_seekable, fs_args, AlreadyLockedAppendLockStrategy, AppendLockGuard, CacheMode,
-    DirEntry, DirEntryHandle, DirectoryEntryType, DirentSink, FallocMode, FileHandle, FileObject,
-    FileOps, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
+    fileops_impl_seekable, AlreadyLockedAppendLockStrategy, AppendLockGuard, CacheMode, DirEntry,
+    DirEntryHandle, DirectoryEntryType, DirentSink, FallocMode, FileHandle, FileObject, FileOps,
+    FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle,
     FsNodeInfo, FsNodeOps, FsStr, FsString, InputBuffer, MountInfo, OutputBuffer, RenameFlags,
     SeekTarget, SymlinkTarget, UnlinkKind, ValueOrSize, VecInputBuffer, VecOutputBuffer, XattrOp,
 };
@@ -27,7 +28,7 @@ use starnix_uapi::errors::{Errno, EEXIST, ENOENT};
 use starnix_uapi::file_mode::FileMode;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::{errno, error, ino_t, off_t, statfs};
-use std::collections::{BTreeSet, HashMap};
+use std::collections::BTreeSet;
 use std::sync::Arc;
 use syncio::zxio_node_attr_has_t;
 
@@ -1000,8 +1001,7 @@ impl OverlayFs {
         L: LockBefore<DeviceOpen>,
         L: LockBefore<BeforeFsNodeAppend>,
     {
-        let mount_options = fs_args::generic_parse_mount_options(options.params.as_ref())?;
-        match mount_options.get("redirect_dir".as_bytes()) {
+        match options.params.get("redirect_dir".as_bytes()) {
             None => (),
             Some(o) if o == "off" => (),
             Some(_) => {
@@ -1010,9 +1010,9 @@ impl OverlayFs {
             }
         }
 
-        let lower = resolve_dir_param(locked, current_task, &mount_options, "lowerdir".into())?;
-        let upper = resolve_dir_param(locked, current_task, &mount_options, "upperdir".into())?;
-        let work = resolve_dir_param(locked, current_task, &mount_options, "workdir".into())?;
+        let lower = resolve_dir_param(locked, current_task, &options.params, "lowerdir".into())?;
+        let upper = resolve_dir_param(locked, current_task, &options.params, "upperdir".into())?;
+        let work = resolve_dir_param(locked, current_task, &options.params, "workdir".into())?;
 
         let lower_fs = lower.entry().node.fs().clone();
         let upper_fs = upper.entry().node.fs().clone();
@@ -1194,7 +1194,7 @@ impl FileSystemOps for Arc<OverlayFs> {
 fn resolve_dir_param<L>(
     locked: &mut Locked<'_, L>,
     current_task: &CurrentTask,
-    mount_options: &HashMap<FsString, FsString>,
+    params: &MountParams,
     name: &FsStr,
 ) -> Result<ActiveEntry, Errno>
 where
@@ -1202,7 +1202,7 @@ where
     L: LockBefore<DeviceOpen>,
     L: LockBefore<BeforeFsNodeAppend>,
 {
-    let path = mount_options.get(&**name).ok_or_else(|| {
+    let path = params.get(&**name).ok_or_else(|| {
         log_error!("overlayfs: {name} was not specified");
         errno!(EINVAL)
     })?;

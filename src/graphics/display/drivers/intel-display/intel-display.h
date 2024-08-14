@@ -134,7 +134,6 @@ class Controller : public ddk::DisplayEngineProtocol<Controller>,
   bool DisplayEngineIsCaptureSupported() { return false; }
   zx_status_t DisplayEngineStartCapture(uint64_t capture_handle) { return ZX_ERR_NOT_SUPPORTED; }
   zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle) { return ZX_ERR_NOT_SUPPORTED; }
-  bool DisplayEngineIsCaptureCompleted() { return false; }
   zx_status_t DisplayEngineSetMinimumRgb(uint8_t minimum_rgb) { return ZX_ERR_NOT_SUPPORTED; }
 
   // gpu core ops

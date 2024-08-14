@@ -47,7 +47,7 @@ int StartComponent() {
 
 int main(int argc, char** argv) {
   fuchsia_logging::LogSettingsBuilder builder;
-  builder.BuildAndInitializeWithTags({"minfs"});
+  builder.WithTags({"minfs"}).BuildAndInitialize();
 
   if (zx_status_t status = StartComponent(); status != ZX_OK) {
     return EXIT_FAILURE;

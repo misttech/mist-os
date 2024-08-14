@@ -53,6 +53,24 @@ use syncio::{
 use vfs::{ProtocolsExt, ToFlags};
 use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
+/// Create a filesystem to access the content of the fuchsia directory available at `fs_src` inside
+/// `pkg`.
+pub fn create_remotefs_filesystem(
+    kernel: &Arc<Kernel>,
+    root: &fio::DirectorySynchronousProxy,
+    options: FileSystemOptions,
+    rights: fio::OpenFlags,
+) -> Result<FileSystemHandle, Errno> {
+    let root = syncio::directory_open_directory_async(
+        root,
+        std::str::from_utf8(&options.source)
+            .map_err(|_| errno!(EINVAL, "source path is not utf8"))?,
+        rights,
+    )
+    .map_err(|e| errno!(EIO, format!("Failed to open root: {e}")))?;
+    RemoteFs::new_fs(kernel, root.into_channel(), options, rights)
+}
+
 pub struct RemoteFs {
     supports_open3: bool,
 

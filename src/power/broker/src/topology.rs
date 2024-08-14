@@ -9,12 +9,12 @@ use fuchsia_inspect_contrib::graph::{
     Digraph as IGraph, DigraphOpts as IGraphOpts, Edge as IGraphEdge, Metadata as IGraphMeta,
     Vertex as IGraphVertex,
 };
+use rand::distributions::{Alphanumeric, DistString};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
 use std::fmt;
 use std::rc::Rc;
-use uuid::Uuid;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct IndexedPowerLevel {
@@ -270,7 +270,16 @@ impl Topology {
         let id: ElementID = if ID_DEBUG_MODE {
             ElementID::from(name)
         } else {
-            ElementID::from(Uuid::new_v4().as_simple().to_string())
+            loop {
+                let element_id = ElementID::from(format!(
+                    "{}-{}",
+                    name,
+                    Alphanumeric.sample_string(&mut rand::thread_rng(), 4)
+                ));
+                if !self.elements.contains_key(&element_id) {
+                    break element_id;
+                }
+            }
         };
         let inspect_graph =
             if synthetic { &self.synthetic_inspect_graph } else { &self.inspect_graph };

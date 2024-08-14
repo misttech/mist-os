@@ -43,6 +43,9 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 use std::{fmt, slice};
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 /// Routes a capability from its `Use` declaration to its source by following `Offer` and `Expose`
 /// declarations.
 ///
@@ -399,6 +402,7 @@ where
 }
 
 /// Defines which capability source types are supported.
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, Debug, PartialEq, Clone)]
 #[fidl_decl(fidl_table = "finternal::Sources")]
 pub struct Sources {

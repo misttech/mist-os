@@ -12,6 +12,7 @@
 #include <mock-boot-arguments/server.h>
 #include <zxtest/zxtest.h>
 
+#include "src/bringup/bin/device-name-provider/device_name_provider_config.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/service.h"
 #include "src/storage/lib/vfs/cpp/synchronous_vfs.h"
@@ -67,9 +68,27 @@ TEST_F(ArgsTest, DeviceNameProviderNoneProvided) {
   int argc = 1;
   const char* argv[] = {"device-name-provider"};
   const char* error = nullptr;
+  device_name_provider_config::Config config;
   DeviceNameProviderArgs args;
-  ASSERT_EQ(ParseArgs(argc, const_cast<char**>(argv), svc_root(), &error, &args), 0, "%s", error);
+  ASSERT_EQ(ParseArgs(argc, const_cast<char**>(argv), config, svc_root(), &error, &args), 0, "%s",
+            error);
   ASSERT_TRUE(args.interface.empty());
+  ASSERT_TRUE(args.nodename.empty());
+  ASSERT_EQ(args.namegen, 1);
+  ASSERT_EQ(args.devdir, kDefaultDevdir);
+  ASSERT_EQ(error, nullptr);
+}
+
+TEST_F(ArgsTest, DeviceNameConfigCapabilityProvided) {
+  int argc = 1;
+  const char* argv[] = {"device-name-provider"};
+  const char* error = nullptr;
+  device_name_provider_config::Config config;
+  config.primary_interface() = kInterface;
+  DeviceNameProviderArgs args;
+  ASSERT_EQ(ParseArgs(argc, const_cast<char**>(argv), config, svc_root(), &error, &args), 0, "%s",
+            error);
+  ASSERT_EQ(args.interface, kInterface);
   ASSERT_TRUE(args.nodename.empty());
   ASSERT_EQ(args.namegen, 1);
   ASSERT_EQ(args.devdir, kDefaultDevdir);
@@ -89,8 +108,10 @@ TEST_F(ArgsTest, DeviceNameProviderAllProvided) {
                         "--namegen",
                         "0"};
   const char* error = nullptr;
+  device_name_provider_config::Config config;
   DeviceNameProviderArgs args;
-  ASSERT_EQ(ParseArgs(argc, const_cast<char**>(argv), svc_root(), &error, &args), 0, "%s", error);
+  ASSERT_EQ(ParseArgs(argc, const_cast<char**>(argv), config, svc_root(), &error, &args), 0, "%s",
+            error);
   ASSERT_EQ(args.interface, std::string(kInterface));
   ASSERT_EQ(args.nodename, std::string(kNodename));
   ASSERT_EQ(args.devdir, std::string(kDevDir));
@@ -104,9 +125,10 @@ TEST_F(ArgsTest, DeviceNameProviderValidation) {
       "device-name-provider",
       "--interface",
   };
+  device_name_provider_config::Config config;
   DeviceNameProviderArgs args;
   const char* error = nullptr;
-  ASSERT_LT(ParseArgs(argc, const_cast<char**>(argv), svc_root(), &error, &args), 0);
+  ASSERT_LT(ParseArgs(argc, const_cast<char**>(argv), config, svc_root(), &error, &args), 0);
   ASSERT_TRUE(args.interface.empty());
   ASSERT_TRUE(strstr(error, "interface"));
 
@@ -116,7 +138,7 @@ TEST_F(ArgsTest, DeviceNameProviderValidation) {
   args.nodename = "";
   args.namegen = 1;
   error = nullptr;
-  ASSERT_LT(ParseArgs(argc, const_cast<char**>(argv), svc_root(), &error, &args), 0);
+  ASSERT_LT(ParseArgs(argc, const_cast<char**>(argv), config, svc_root(), &error, &args), 0);
   ASSERT_TRUE(args.nodename.empty());
   ASSERT_TRUE(strstr(error, "nodename"));
 
@@ -126,7 +148,7 @@ TEST_F(ArgsTest, DeviceNameProviderValidation) {
   args.nodename = "";
   args.namegen = 1;
   error = nullptr;
-  ASSERT_LT(ParseArgs(argc, const_cast<char**>(argv), svc_root(), &error, &args), 0);
+  ASSERT_LT(ParseArgs(argc, const_cast<char**>(argv), config, svc_root(), &error, &args), 0);
   ASSERT_EQ(args.namegen, 1);
   ASSERT_TRUE(strstr(error, "namegen"));
 }

@@ -9,7 +9,7 @@
     children: [
         {
             name: "bt-gap",
-            url: "fuchsia-pkg://fuchsia.com/bt-gap#meta/bt-gap.cm",
+            url: "#meta/bt-gap.cm",
         },
         {
             name: "bt-rfcomm",

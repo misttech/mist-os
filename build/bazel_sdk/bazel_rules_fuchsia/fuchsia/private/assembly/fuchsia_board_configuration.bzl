@@ -9,6 +9,7 @@ load(
     ":providers.bzl",
     "FuchsiaBoardConfigInfo",
     "FuchsiaBoardInputBundleInfo",
+    "FuchsiaPostProcessingScriptInfo",
 )
 load(
     ":utils.bzl",
@@ -16,6 +17,10 @@ load(
     "extract_labels",
     "replace_labels_with_files",
     "select_single_file",
+)
+load(
+    "//fuchsia/private/licenses:common.bzl",
+    "check_type",
 )
 
 def _copy_bash(ctx, src, dst):
@@ -48,12 +53,13 @@ def _fuchsia_board_configuration_impl(ctx):
     board_files = [board_config_file]
 
     filesystems = json.decode(ctx.attr.filesystems)
+    check_type(filesystems, "dict")
     replace_labels_with_files(filesystems, ctx.attr.filesystems_labels)
-
     for label, _ in ctx.attr.filesystems_labels.items():
         src = label.files.to_list()[0]
         dest = ctx.actions.declare_file(src.path)
         ctx.actions.symlink(output = dest, target_file = src)
+        board_files.append(src)
         board_files.append(dest)
 
     board_config = {}
@@ -61,6 +67,16 @@ def _fuchsia_board_configuration_impl(ctx):
     board_config["provided_features"] = ctx.attr.provided_features
     if filesystems != {}:
         board_config["filesystems"] = filesystems
+
+    kernel = json.decode(ctx.attr.kernel)
+    check_type(kernel, "dict")
+    if kernel != {}:
+        board_config["kernel"] = kernel
+
+    platform = json.decode(ctx.attr.platform)
+    check_type(platform, "dict")
+    if platform != {}:
+        board_config["platform"] = platform
 
     if ctx.attr.board_bundles_dir:
         board_dir_name = ctx.file.board_bundles_dir.basename
@@ -91,15 +107,55 @@ def _fuchsia_board_configuration_impl(ctx):
         else:
             board_config["devicetree"] = board_config_relative_to_root + ctx.file.devicetree.path
 
+    args = []
+    if ctx.attr.post_processing_script:
+        script = ctx.attr.post_processing_script[FuchsiaPostProcessingScriptInfo]
+        filesystems = board_config.get("filesystems", {})
+        board_config["filesystems"] = filesystems
+
+        zbi = filesystems.get("zbi", {})
+        zbi["postprocessing_script"] = {
+            "board_script_path": "scripts/" + script.post_processing_script_path,
+            "args": script.post_processing_script_args,
+        }
+        board_config["filesystems"]["zbi"] = zbi
+
+        paths_map = {}
+        for source, dest in script.post_processing_script_inputs.items():
+            source_path = source.files.to_list()[0].path
+            board_files.extend(source.files.to_list())
+            paths_map[source_path] = dest
+        args += [
+            "--script-inputs",
+            str(paths_map),
+        ]
+
     content = json.encode_indent(board_config, indent = "  ")
     ctx.actions.write(board_config_file, content)
+
+    board_config_dir = ctx.actions.declare_directory(ctx.label.name + "_board_configuration")
+    args += [
+        "--config-file",
+        board_config_file.path,
+        "--output-dir",
+        board_config_dir.path,
+    ]
+
+    ctx.actions.run(
+        outputs = [board_config_dir],
+        inputs = board_files,
+        executable = ctx.executable._establish_board_config_dir,
+        arguments = args,
+        **LOCAL_ONLY_ACTION_KWARGS
+    )
+    board_files.append(board_config_dir)
 
     return [
         DefaultInfo(
             files = depset(board_files),
         ),
         FuchsiaBoardConfigInfo(
-            config = board_config_file,
+            config = board_config_dir.path + "/board_configuration.json",
             files = board_files,
         ),
     ]
@@ -140,31 +196,42 @@ _fuchsia_board_configuration = rule(
             doc = "Devicetree binary (.dtb) file",
             allow_single_file = True,
         ),
+        "post_processing_script": attr.label(
+            doc = "The post processing script to be included into the board configuration",
+            providers = [FuchsiaPostProcessingScriptInfo],
+        ),
+        "platform": attr.string(
+            doc = "The platform related configuration provided by the board.",
+            default = "{}",
+        ),
+        "kernel": attr.string(
+            doc = "The kernel related configuration provided by the board.",
+            default = "{}",
+        ),
+        "_establish_board_config_dir": attr.label(
+            default = "//fuchsia/tools:establish_board_config_dir",
+            executable = True,
+            cfg = "exec",
+        ),
     },
 )
 
 def fuchsia_board_configuration(
         name,
-        board_name,
-        board_bundles_dir = None,
-        input_bundles = [],
-        board_input_bundles = [],
-        provided_features = [],
         filesystems = {},
-        devicetree = None):
+        platform = {},
+        kernel = {},
+        **kwargs):
     """A board configuration that takes a dict for the filesystems config."""
     filesystem_labels = extract_labels(filesystems)
 
     _fuchsia_board_configuration(
         name = name,
-        board_name = board_name,
-        input_bundles = input_bundles,
-        board_bundles_dir = board_bundles_dir,
-        board_input_bundles = board_input_bundles,
-        provided_features = provided_features,
         filesystems = json.encode_indent(filesystems, indent = "    "),
+        platform = json.encode_indent(platform, indent = "    "),
+        kernel = json.encode_indent(kernel, indent = "    "),
         filesystems_labels = filesystem_labels,
-        devicetree = devicetree,
+        **kwargs
     )
 
 def _fuchsia_prebuilt_board_configuration_impl(ctx):
@@ -176,7 +243,7 @@ def _fuchsia_prebuilt_board_configuration_impl(ctx):
     return [
         FuchsiaBoardConfigInfo(
             files = ctx.files.files,
-            config = board_configuration,
+            config = board_configuration.path,
         ),
     ]
 

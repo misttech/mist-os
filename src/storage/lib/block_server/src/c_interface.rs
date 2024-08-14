@@ -341,6 +341,7 @@ impl Drop for BlockServer {
         let mbox = manager.mbox.0.lock().unwrap();
         let _unused = manager.mbox.1.wait_while(mbox, |mbox| !matches!(mbox, Mail::Finished));
         manager.terminate();
+        debug_assert!(Arc::strong_count(manager) > 0);
     }
 }
 
@@ -422,7 +423,7 @@ pub unsafe extern "C" fn block_server_new(
 /// `arg` must be the value passed to the `start_thread` callback.
 #[no_mangle]
 pub unsafe extern "C" fn block_server_thread(arg: *const c_void) {
-    let session_manager = Arc::from_raw(arg as *const SessionManager);
+    let session_manager = &*(arg as *const SessionManager);
 
     let mut executor = fasync::LocalExecutor::new();
     let (abort_handle, registration) = AbortHandle::new_pair();
@@ -442,6 +443,7 @@ pub unsafe extern "C" fn block_server_thread(arg: *const c_void) {
 pub unsafe extern "C" fn block_server_thread_delete(arg: *const c_void) {
     let session_manager = Arc::from_raw(arg as *const SessionManager);
     session_manager.mbox.post(Mail::Finished);
+    debug_assert!(Arc::strong_count(&session_manager) > 0);
 }
 
 /// # Safety

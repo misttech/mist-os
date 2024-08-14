@@ -42,7 +42,6 @@
                 "capability_requested",
                 "debug_started",
                 "destroyed",
-                "discovered",
                 "started",
                 "stopped",
             ],
@@ -86,7 +85,7 @@
         },
         {
             protocol: [ "fuchsia.media.drm.Widevine" ],
-            from: "#trusted-apps/trusted-app-capabilities",
+            from: "#tee-clients/tee-client-capabilities",
             to: "#test_manager",
             source_availability: "unknown",
         },

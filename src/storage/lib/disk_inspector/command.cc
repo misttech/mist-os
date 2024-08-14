@@ -4,13 +4,18 @@
 
 // This file contains apis needed for inspection of on-disk data structures.
 
-#include "disk_inspector/command.h"
+#include "src/storage/lib/disk_inspector/command.h"
 
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/result.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
 
-#include <iterator>
+#include <cstdint>
+#include <cstdlib>
 #include <sstream>
-#include <utility>
+#include <string>
+#include <vector>
 
 namespace disk_inspector {
 
@@ -40,15 +45,15 @@ std::string PrintCommandList(const std::vector<Command>& commands) {
   return os.str();
 }
 
-fpromise::result<ParsedCommand, zx_status_t> ParseCommand(const std::vector<std::string>& args,
-                                                          const Command& command) {
+zx::result<ParsedCommand> ParseCommand(const std::vector<std::string>& args,
+                                       const Command& command) {
   ZX_DEBUG_ASSERT(!args.empty() && args[0] == command.name);
   ParsedCommand parsed_args;
   parsed_args.name = args[0];
   if (command.fields.size() != args.size() - 1) {
     FX_LOGS(INFO) << "Number of arguments provided(" << args.size() - 1
                   << ") does not match number of arguments needed(" << command.fields.size() << ")";
-    return fpromise::error(ZX_ERR_INVALID_ARGS);
+    return zx::error(ZX_ERR_INVALID_ARGS);
   }
   for (uint32_t i = 0; i < command.fields.size(); ++i) {
     Field field = command.fields[i];
@@ -65,18 +70,18 @@ fpromise::result<ParsedCommand, zx_status_t> ParseCommand(const std::vector<std:
         if (*endptr != '\0') {
           FX_LOGS(INFO) << "Argument " << field.name
                         << " cannot be converted to uint64 (value: " << args[i] << ")";
-          return fpromise::error(ZX_ERR_INVALID_ARGS);
+          return zx::error(ZX_ERR_INVALID_ARGS);
         }
         parsed_args.uint64_fields[field.name] = value;
         break;
       }
       default: {
         FX_LOGS(INFO) << "Command parsing reached unknown ArgType.";
-        return fpromise::error(ZX_ERR_NOT_SUPPORTED);
+        return zx::error(ZX_ERR_NOT_SUPPORTED);
       }
     }
   }
-  return fpromise::ok(parsed_args);
+  return zx::ok(parsed_args);
 }
 
 }  // namespace disk_inspector

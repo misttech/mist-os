@@ -745,12 +745,8 @@ config("default_warnings") {
   }
 
   cflags_cc = []
-  if (fuchsia_cxx_version == 20) {
-    # TODO(https://fxbug.dev/42064981): Remove these after we switch to C++20.
+  if (fuchsia_cxx_version >= 20) {
     cflags_cc += [
-      "-Wc++20-compat",
-      "-Wno-error=c++20-compat",
-
       # TODO(https://fxbug.dev/42073532): The use of implicit capture of this via [=] has
       # been deprecated in C++20, but we cannot address this because adding an
       # explicit capture of 'this' to capture '*this' by reference is a C++20

@@ -18,11 +18,11 @@
 namespace fuchsia_logging {
 
 TEST(StructuredLogging, Log) {
-  FX_SLOG(WARNING, "test_log", FX_KV("foo", "bar"));
+  FX_LOG_KV(WARNING, "test_log", FX_KV("foo", "bar"));
   constexpr std::string_view kStringView = "string_view";
-  FX_SLOG(WARNING, "test_log", FX_KV("foo", kStringView));
+  FX_LOG_KV(WARNING, "test_log", FX_KV("foo", kStringView));
   const std::string kString = "string";
-  FX_SLOG(WARNING, "test_log", FX_KV("foo", kString));
+  FX_LOG_KV(WARNING, "test_log", FX_KV("foo", kString));
   // TODO(https://fxbug.dev/42135333): Figure out how to verify this appropriately.
 }
 
@@ -34,9 +34,9 @@ class SideEffectTracker {
 
 TEST(StructuredLogging, NoSideEffectsIfLoggingIsDisabled) {
   bool called = false;
-  FX_SLOG(DEBUG, "test", FX_KV("a", static_cast<int64_t>(SideEffectTracker(&called))));
+  FX_LOG_KV(DEBUG, "test", FX_KV("a", static_cast<int64_t>(SideEffectTracker(&called))));
   ASSERT_FALSE(called);
-  FX_SLOG(INFO, "test", FX_KV("a", static_cast<int64_t>(SideEffectTracker(&called))));
+  FX_LOG_KV(INFO, "test", FX_KV("a", static_cast<int64_t>(SideEffectTracker(&called))));
   ASSERT_TRUE(called);
 }
 
@@ -75,7 +75,7 @@ TEST(StructuredLogging, ThreadInitialization) {
   });
   std::thread thread_b([&]() {
     while (running) {
-      FX_SLOG(WARNING, "test_log", FX_KV("foo", "bar"));
+      FX_LOG_KV(WARNING, "test_log", FX_KV("foo", "bar"));
     }
   });
   while (true) {
@@ -89,7 +89,7 @@ TEST(StructuredLogging, ThreadInitialization) {
     zx::channel::create(0, &temp[0], &temp[1]);
     LogSettingsBuilder builder;
     builder.DisableWaitForInitialInterest().WithLogSink(temp[0].release()).BuildAndInitialize();
-    FX_SLOG(WARNING, "test_log", FX_KV("foo", "bar"));
+    FX_LOG_KV(WARNING, "test_log", FX_KV("foo", "bar"));
   }
   thread_a.join();
   thread_b.join();

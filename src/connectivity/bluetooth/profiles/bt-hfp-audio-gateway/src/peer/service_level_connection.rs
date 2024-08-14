@@ -1261,10 +1261,10 @@ pub(crate) mod tests {
     async fn read_error_result_is_propagated_to_stream() {
         // Close the remote end of the channel so that local reads and remote writes
         // fail.
-        let (local, remote) = Channel::create();
-        let socket = local.into_socket().unwrap();
-        assert!(socket.half_close().is_ok());
-        let local = Channel::from_socket(socket, Channel::DEFAULT_MAX_TX).unwrap();
+        let (remote, local) = zx::Socket::create_datagram();
+        assert!(local.half_close().is_ok());
+        let local = Channel::from_socket_infallible(local, Channel::DEFAULT_MAX_TX);
+        let remote = Channel::from_socket_infallible(remote, Channel::DEFAULT_MAX_TX);
         let mut connection = DataController::new(local);
 
         // Remote writing to us should fail.
@@ -1278,9 +1278,9 @@ pub(crate) mod tests {
     async fn write_error_result_is_propagated_to_stream() {
         // Close the local end of the channel so that remote reads and local writes
         // fail.
-        let (local, remote) = Channel::create();
-        let socket = remote.into_socket().unwrap();
-        assert!(socket.half_close().is_ok());
+        let (remote, local) = zx::Socket::create_datagram();
+        assert!(remote.half_close().is_ok());
+        let local = Channel::from_socket_infallible(local, Channel::DEFAULT_MAX_TX);
         let mut connection = DataController::new(local);
 
         // Queue some data to be sent to the remote.

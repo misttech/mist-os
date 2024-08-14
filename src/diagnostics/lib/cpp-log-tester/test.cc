@@ -19,7 +19,7 @@ namespace {
 
 TEST(LogDecoder, DecodesCorrectly) {
   auto channel = SetupFakeLog();
-  FX_SLOG(INFO, "Test log message", FX_KV("tag", "logging-test"), FX_KV("custom-kvp", 5));
+  FX_LOG_KV(INFO, "Test log message", FX_KV("tag", "logging-test"), FX_KV("custom-kvp", 5));
   auto ret = RetrieveLogs(std::move(channel));
   ASSERT_EQ(ret,
             "[src/diagnostics/lib/cpp-log-tester/test.cc(22)] Test log message custom-kvp=5\n");
@@ -27,7 +27,7 @@ TEST(LogDecoder, DecodesCorrectly) {
 
 TEST(LogDecoder, DecodesRawMessageCorrectly) {
   auto channel = SetupFakeLog();
-  FX_SLOG(INFO, "Test log message", FX_KV("tag", "logging-test"), FX_KV("custom-kvp", 5));
+  FX_LOG_KV(INFO, "Test log message", FX_KV("tag", "logging-test"), FX_KV("custom-kvp", 5));
   auto ret = RetrieveLogsAsLogMessage(std::move(channel));
   ASSERT_EQ(ret[0].msg,
             "[src/diagnostics/lib/cpp-log-tester/test.cc(30)] Test log message custom-kvp=5");

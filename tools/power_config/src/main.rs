@@ -89,12 +89,15 @@ enum ParentElement {
     Name(String),
     #[serde(alias = "sag")]
     Sag(SagElement),
+    #[serde(alias = "instance_name")]
+    InstanceName(String),
 }
 
 impl From<ParentElement> for fidl_power::ParentElement {
     fn from(value: ParentElement) -> Self {
         match value {
             ParentElement::Name(s) => fidl_power::ParentElement::Name(s),
+            ParentElement::InstanceName(s) => fidl_power::ParentElement::InstanceName(s),
             ParentElement::Sag(s) => fidl_power::ParentElement::Sag(s.into()),
         }
     }

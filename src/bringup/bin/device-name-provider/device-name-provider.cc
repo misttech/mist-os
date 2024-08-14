@@ -20,6 +20,7 @@
 
 #include "args.h"
 #include "name_tokens.h"
+#include "src/bringup/bin/device-name-provider/device_name_provider_config.h"
 #include "src/bringup/bin/netsvc/netifc-discover.h"
 
 // Copies a word from the wordlist starting at |dest| and then adds |sep| at the end.
@@ -116,9 +117,10 @@ int main(int argc, char** argv) {
     return -1;
   }
 
+  auto config = device_name_provider_config::Config::TakeFromStartupHandle();
   DeviceNameProviderArgs args;
   const char* errmsg = nullptr;
-  int err = ParseArgs(argc, argv, svc_root, &errmsg, &args);
+  int err = ParseArgs(argc, argv, config, svc_root, &errmsg, &args);
   if (err) {
     printf("device-name-provider: FATAL: ParseArgs(_) = %d; %s\n", err, errmsg);
     return err;

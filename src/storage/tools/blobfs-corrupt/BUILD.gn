@@ -32,9 +32,11 @@ executable("blobfs-corrupt-test") {
 }
 
 source_set("common") {
+  public = [ "corrupt_blob.h" ]
   sources = [
     "corrupt_blob.cc",
     "fs_block_client.cc",
+    "fs_block_client.h",
   ]
   deps = [
     "//sdk/lib/syslog/cpp",

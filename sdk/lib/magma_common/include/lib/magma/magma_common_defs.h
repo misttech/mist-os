@@ -333,7 +333,7 @@ typedef struct magma_image_info {
   uint32_t unused;
 } magma_image_info_t;
 
-// LINT.ThenChange(version)
+// LINT.ThenChange(:version)
 // NOLINTEND(modernize-use-using)
 
 #if defined(__cplusplus)

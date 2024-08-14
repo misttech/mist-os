@@ -12,7 +12,10 @@
 import("//build/sdk/sdk_host_tool.gni")
 
 executable("minfs") {
-  sources = [ "main.cc" ]
+  sources = [
+    "main.cc",
+    "minfs.h",
+  ]
   deps = [
     "//src/storage/lib/host",
     "//src/storage/lib/vfs/cpp/journal",

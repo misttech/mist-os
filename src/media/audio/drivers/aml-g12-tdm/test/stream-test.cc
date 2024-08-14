@@ -101,8 +101,7 @@ class PowerManagementTest : public zxtest::Test {
     auto pll = pll_.SyncCall(&FakeClock::Connect);
     pll_client_ = fidl::WireSyncClient<fuchsia_hardware_clock::Clock>(std::move(pll));
     enable_gpio_.SyncCall(&fake_gpio::FakeGpio::SetCurrentState,
-                          fake_gpio::State{.polarity = fuchsia_hardware_gpio::GpioPolarity::kHigh,
-                                           .sub_state = fake_gpio::WriteSubState{.value = 1}});
+                          fake_gpio::State{.sub_state = fake_gpio::WriteSubState{.value = 1}});
     fake_parent_ = MockDevice::FakeRootParent();
   }
 
@@ -130,8 +129,7 @@ class StreamTest : public zxtest::Test {
   void SetUp() override {
     ASSERT_OK(gpio_loop_.StartThread("gpio"));
     enable_gpio_.SyncCall(&fake_gpio::FakeGpio::SetCurrentState,
-                          fake_gpio::State{.polarity = fuchsia_hardware_gpio::GpioPolarity::kHigh,
-                                           .sub_state = fake_gpio::WriteSubState{.value = 1}});
+                          fake_gpio::State{.sub_state = fake_gpio::WriteSubState{.value = 1}});
     fake_parent_ = MockDevice::FakeRootParent();
   }
 

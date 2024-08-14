@@ -23,10 +23,7 @@
     ],
     offer: [
         {
-            protocol: [
-                "fuchsia.logger.LogSink",
-                "fuchsia.process.Launcher",
-            ],
+            protocol: [ "fuchsia.logger.LogSink" ],
             from: "parent",
             to: "#storage_driver_test_realm",
         },

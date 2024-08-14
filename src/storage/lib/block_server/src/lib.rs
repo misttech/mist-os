@@ -105,6 +105,40 @@ pub trait SessionManager {
         stream: fblock::SessionRequestStream,
         block_size: u32,
     ) -> impl Future<Output = Result<(), Error>> + Send;
+
+    /// Called to handle the GetVolumeInfo FIDL call.
+    fn get_volume_info(
+        &self,
+    ) -> impl Future<Output = Result<(fvolume::VolumeManagerInfo, fvolume::VolumeInfo), zx::Status>> + Send
+    {
+        async { Err(zx::Status::NOT_SUPPORTED) }
+    }
+
+    /// Called to handle the QuerySlices FIDL call.
+    fn query_slices(
+        &self,
+        _start_slices: &[u64],
+    ) -> impl Future<Output = Result<Vec<fvolume::VsliceRange>, zx::Status>> + Send {
+        async { Err(zx::Status::NOT_SUPPORTED) }
+    }
+
+    /// Called to handle the Shrink FIDL call.
+    fn extend(
+        &self,
+        _start_slice: u64,
+        _slice_count: u64,
+    ) -> impl Future<Output = Result<(), zx::Status>> + Send {
+        async { Err(zx::Status::NOT_SUPPORTED) }
+    }
+
+    /// Called to handle the Shrink FIDL call.
+    fn shrink(
+        &self,
+        _start_slice: u64,
+        _slice_count: u64,
+    ) -> impl Future<Output = Result<(), zx::Status>> + Send {
+        async { Err(zx::Status::NOT_SUPPORTED) }
+    }
 }
 
 pub trait IntoSessionManager {
@@ -132,7 +166,7 @@ impl<SM: SessionManager> BlockServer<SM> {
             futures::select! {
                 request = requests.next() => {
                     if let Some(request) = request {
-                        if let Some(session) = self.handle_request(request?)? {
+                        if let Some(session) = self.handle_request(request?).await? {
                             sessions.push(session);
                         }
                     }
@@ -144,7 +178,7 @@ impl<SM: SessionManager> BlockServer<SM> {
     }
 
     /// Processes a partition request.
-    fn handle_request(
+    async fn handle_request(
         &self,
         request: fvolume::VolumeRequest,
     ) -> Result<Option<impl Future<Output = Result<(), Error>> + Send>, Error> {
@@ -181,21 +215,46 @@ impl<SM: SessionManager> BlockServer<SM> {
             fvolume::VolumeRequest::GetName { responder } => {
                 responder.send(zx::sys::ZX_OK, Some(&self.partition_info.name))?;
             }
-            fvolume::VolumeRequest::QuerySlices { responder, .. } => {
-                responder.send(
-                    zx::sys::ZX_ERR_NOT_SUPPORTED,
-                    &[fvolume::VsliceRange { allocated: false, count: 0 }; 16],
-                    0,
-                )?;
+            fvolume::VolumeRequest::QuerySlices { responder, start_slices } => {
+                match self.session_manager.query_slices(&start_slices).await {
+                    Ok(mut results) => {
+                        let results_len = results.len();
+                        assert!(results_len <= 16);
+                        results.resize(16, fvolume::VsliceRange { allocated: false, count: 0 });
+                        responder.send(
+                            zx::sys::ZX_OK,
+                            &results.try_into().unwrap(),
+                            results_len as u64,
+                        )?;
+                    }
+                    Err(s) => {
+                        responder.send(
+                            s.into_raw(),
+                            &[fvolume::VsliceRange { allocated: false, count: 0 }; 16],
+                            0,
+                        )?;
+                    }
+                }
             }
             fvolume::VolumeRequest::GetVolumeInfo { responder, .. } => {
-                responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED, None, None)?;
+                match self.session_manager.get_volume_info().await {
+                    Ok((manager_info, volume_info)) => {
+                        responder.send(zx::sys::ZX_OK, Some(&manager_info), Some(&volume_info))?
+                    }
+                    Err(s) => responder.send(s.into_raw(), None, None)?,
+                }
             }
-            fvolume::VolumeRequest::Extend { responder, .. } => {
-                responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED)?;
+            fvolume::VolumeRequest::Extend { responder, start_slice, slice_count } => {
+                responder.send(
+                    zx::Status::from(self.session_manager.extend(start_slice, slice_count).await)
+                        .into_raw(),
+                )?;
             }
-            fvolume::VolumeRequest::Shrink { responder, .. } => {
-                responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED)?;
+            fvolume::VolumeRequest::Shrink { responder, start_slice, slice_count } => {
+                responder.send(
+                    zx::Status::from(self.session_manager.shrink(start_slice, slice_count).await)
+                        .into_raw(),
+                )?;
             }
             fvolume::VolumeRequest::Destroy { responder, .. } => {
                 responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED)?;

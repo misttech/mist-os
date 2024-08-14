@@ -17,6 +17,7 @@
             protocol: [
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
+                "fuchsia.ui.test.input.TestAppStatusListener",
                 "fuchsia.ui.test.input.TouchInputListener",
             ],
         },

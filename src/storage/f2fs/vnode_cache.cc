@@ -133,22 +133,10 @@ void VnodeCache::Downgrade(VnodeF2fs* raw_vnode) {
 }
 
 zx_status_t VnodeCache::Lookup(const ino_t& ino, fbl::RefPtr<VnodeF2fs>* out) {
-  fbl::RefPtr<VnodeF2fs> vnode;
-  {
-    std::lock_guard lock(table_lock_);
-    if (zx_status_t status = LookupUnsafe(ino, &vnode); status != ZX_OK) {
-      return status;
-    }
-  }
-  *out = std::move(vnode);
-  return ZX_OK;
-}
-
-zx_status_t VnodeCache::LookupUnsafe(const ino_t& ino, fbl::RefPtr<VnodeF2fs>* out) {
   while (true) {
+    std::lock_guard lock(table_lock_);
     auto raw_ptr = vnode_table_.find(ino).CopyPointer();
     if (raw_ptr != nullptr) {
-      // When the vnode is active, we should check if it is being recycled.
       if (raw_ptr->IsActive()) {
         *out = fbl::MakeRefPtrUpgradeFromRaw(raw_ptr, table_lock_);
         if (*out == nullptr) {

@@ -9,6 +9,7 @@
 #include <lib/zx/clock.h>
 #include <poll.h>
 
+#include <cmath>
 #include <iostream>
 
 #include "src/media/audio/lib/clock/clone_mono.h"

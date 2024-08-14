@@ -49,7 +49,7 @@ async fn create_backend(
     };
     if mode == BlockMode::VolatileWrite {
         let size = backend.get_attrs(trace_id).await?.capacity.to_bytes().unwrap();
-        let (memory_backend, _) = MemoryBackend::with_size(size as usize);
+        let memory_backend = MemoryBackend::with_size(size as usize);
         Ok(Box::new(CopyOnWriteBackend::new(backend, Box::new(memory_backend), trace_id).await?))
     } else {
         Ok(backend)

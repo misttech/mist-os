@@ -69,14 +69,14 @@ void ControllerImpl::CreateGuest(CreateGuestRequestView request,
     return;
   }
 
-  FX_LOGST(INFO, request->name.get().begin()) << "connecting to guest over serial";
+  FX_LOGST(INFO, name.c_str()) << "connecting to guest over serial";
   GuestConsole serial(std::make_unique<ZxSocket>(std::move(get_serial_console_result->socket())));
   if (zx_status_t status = serial.Start(zx::time::infinite()); status != ZX_OK) {
     FX_PLOGST(ERROR, name.c_str(), status) << "failed to start serial";
     completer.ReplyError(fuchsia_netemul_guest::wire::ControllerCreateGuestError::kLaunchFailed);
     return;
   }
-  FX_LOGST(INFO, request->name.get().begin()) << "successfully connected to guest over serial";
+  FX_LOGST(INFO, name.c_str()) << "successfully connected to guest over serial";
 
   // Wait until the guest-interaction daemon wakes up and logs that it's ready to accept
   // incoming connections.

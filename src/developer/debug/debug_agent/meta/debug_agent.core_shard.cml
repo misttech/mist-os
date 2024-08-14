@@ -23,7 +23,6 @@
         {
             event_stream: [
                 "debug_started",
-                "discovered",
                 "stopped",
             ],
             from: "parent",

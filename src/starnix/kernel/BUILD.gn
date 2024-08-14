@@ -24,7 +24,6 @@ group("tests") {
     ":starnix-tests",
     ":starnix_kernel_bin-tests",
     ":starnix_kernel_runner-tests",
-    ":starnix_lifecycle-tests",
     ":starnix_logging-tests",
     ":starnix_sync-tests",
     "device/input:tests",
@@ -138,10 +137,9 @@ rustc_library("starnix_core") {
     "device/tun.rs",
     "device/zram.rs",
     "dynamic_thread_spawner.rs",
-    "execution/crash_report.rs",
+    "execution/crash_reporter.rs",
+    "execution/executor.rs",
     "execution/mod.rs",
-    "execution/restricted_executor.rs",
-    "execution/shared.rs",
     "fs/devpts.rs",
     "fs/devtmpfs.rs",
     "fs/ext4/mod.rs",
@@ -203,6 +201,7 @@ rustc_library("starnix_core") {
     "security/mod.rs",
     "security/selinux_hooks/fs.rs",
     "security/selinux_hooks/mod.rs",
+    "security/selinux_hooks/task.rs",
     "security/selinux_hooks/testing.rs",
     "signals/mod.rs",
     "signals/signal_handling.rs",
@@ -322,7 +321,6 @@ rustc_library("starnix_core") {
 
   deps = [
     ":perfetto_consumer_proto",
-    ":starnix_lifecycle",
     ":starnix_logging",
     ":starnix_sync",
     ":vdso-data($bionic_linux_toolchain)",
@@ -344,6 +342,7 @@ rustc_library("starnix_core") {
     "//sdk/fidl/fuchsia.net.filter:fuchsia.net.filter_rust",
     "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
     "//sdk/fidl/fuchsia.net.tun:fuchsia.net.tun_rust",
+    "//sdk/fidl/fuchsia.netpol.socketproxy:fuchsia.netpol.socketproxy_rust",
     "//sdk/fidl/fuchsia.posix:fuchsia.posix_rust",
     "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
     "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_rust",
@@ -351,7 +350,6 @@ rustc_library("starnix_core") {
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
     "//sdk/fidl/fuchsia.power.suspend:fuchsia.power.suspend_rust",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
-    "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//sdk/fidl/fuchsia.recovery:fuchsia.recovery_rust",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_rust",
     "//sdk/fidl/fuchsia.session.power:fuchsia.session.power_rust",
@@ -398,6 +396,7 @@ rustc_library("starnix_core") {
     "//src/starnix/lib/range_map",
     "//src/starnix/lib/selinux",
     "//src/starnix/lib/selinux/core",
+    "//src/starnix/lib/starnix-lifecycle",
     "//src/starnix/lib/starnix-syscalls",
     "//src/starnix/lib/starnix-uapi",
     "//src/starnix/lib/syncio",
@@ -541,6 +540,7 @@ rustc_library("starnix_kernel_runner") {
     "runner/container.rs",
     "runner/features.rs",
     "runner/lib.rs",
+    "runner/mounts.rs",
     "runner/serve_protocols.rs",
   ]
 
@@ -555,6 +555,7 @@ rustc_library("starnix_kernel_runner") {
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.memory.attribution:fuchsia.memory.attribution_rust",
+    "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_rust",
     "//sdk/fidl/fuchsia.starnix.container:fuchsia.starnix.container_rust",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_rust",
@@ -608,36 +609,6 @@ rustc_library("starnix_kernel_runner") {
   if (is_mistos) {
     features += [ "starnix_lite" ]
   }
-
-  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
-}
-
-rustc_library("starnix_lifecycle") {
-  name = "starnix_lifecycle"
-  edition = "2021"
-  version = "0.1.0"
-  with_unit_tests = true
-  source_root = "lifecycle/lib.rs"
-
-  sources = [
-    "lifecycle/atomic_counter.rs",
-    "lifecycle/delayed_releaser.rs",
-    "lifecycle/drop_notifier.rs",
-    "lifecycle/lib.rs",
-  ]
-
-  deps = [
-    "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-async",
-    "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/starnix/lib/starnix-uapi",
-    "//third_party/rust_crates:paste",
-  ]
-
-  test_deps = [
-    "//src/lib/fuchsia",
-    "//third_party/rust_crates:futures",
-  ]
 
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
@@ -899,10 +870,6 @@ fuchsia_unittest_package("starnix_kernel_runner-tests") {
     }
   }
   test_type = "starnix"
-}
-
-fuchsia_unittest_package("starnix_lifecycle-tests") {
-  deps = [ ":starnix_lifecycle_test" ]
 }
 
 fuchsia_unittest_package("starnix_logging-tests") {

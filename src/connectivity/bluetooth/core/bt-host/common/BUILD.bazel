@@ -5,9 +5,9 @@
 load(
     "@fuchsia_sdk//fuchsia:defs.bzl",
     "fuchsia_cc_test",
-    "fuchsia_select",
     "fuchsia_unittest_package",
 )
+load("//src/connectivity/bluetooth/core/bt-host:variables.bzl", "COPTS")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -30,7 +30,7 @@ cc_library(
         "supplement_data.cc",
         "uuid.cc",
     ],
-    copts = ["-Wswitch-enum"],
+    copts = COPTS,
     deps = [
         "//src/connectivity/bluetooth/core/bt-host:config",
         "//src/connectivity/bluetooth/core/bt-host:public",
@@ -47,7 +47,7 @@ cc_library(
         "@pigweed//pw_string",
         "@pigweed//pw_string:utf_codecs",
         "@pigweed//third_party/fuchsia:fit",
-    ] + fuchsia_select({
+    ] + select({
         "@platforms//os:fuchsia": [
             "@fuchsia_sdk//pkg/inspect_component_cpp",
             "@fuchsia_sdk//pkg/trace",
@@ -58,6 +58,7 @@ cc_library(
 cc_library(
     name = "uuid_string_util",
     srcs = ["uuid_string_util.cc"],
+    copts = COPTS,
     deps = [":common"],
 )
 
@@ -85,6 +86,7 @@ fuchsia_cc_test(
         "weak_self_test.cc",
         "windowed_inspect_numeric_property_test.cc",
     ],
+    copts = COPTS,
     death_unittest = True,
     visibility = ["//visibility:public"],
     deps = [

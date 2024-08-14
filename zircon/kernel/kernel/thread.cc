@@ -2316,7 +2316,7 @@ void Thread::Current::GetBacktrace(Backtrace& out_bt) {
   // (https://fxbug.dev/42179766): Force the function to not tail call GetBacktraceCommon.
   // This will make sure the frame pointer we grabbed at the top
   // of the function is still valid across the call.
-  asm("");
+  asm volatile("");
 }
 
 void Thread::Current::GetBacktrace(vaddr_t fp, Backtrace& out_bt) {

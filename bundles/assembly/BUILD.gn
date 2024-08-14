@@ -2051,7 +2051,6 @@ assembly_input_bundle("bluetooth_avrcp") {
 #
 assembly_input_bundle("bluetooth_core") {
   base_packages = [
-    "//src/connectivity/bluetooth/core/bt-gap",
     "//src/connectivity/bluetooth/core/bt-host",
     "//src/connectivity/bluetooth/core/bt-init",
     "//src/connectivity/bluetooth/profiles/bt-rfcomm",
@@ -4048,7 +4047,7 @@ assembly_resources_directory("resources") {
     # Core shard templates.
     "//src/connectivity/weave/meta/weavestack.core_shard.cml.template",
     "//src/developer/forensics/flash_ts_feedback_id/meta/flash_ts_feedback_id.core_shard.cml.template",
-    "//src/lib/assembly/platform_configuration/src/subsystems/meta/trusted-apps.core_shard.cml",
+    "//src/lib/assembly/platform_configuration/src/subsystems/meta/tee-clients.core_shard.cml",
     "//src/media/audio/meta/multizone_leader.core_shard.cml.template",
     "//src/media/audio/meta/multizone_leader.core_shard_eng.cml",
   ]

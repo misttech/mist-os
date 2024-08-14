@@ -457,6 +457,16 @@ std::unique_ptr<uint8_t[]> DebugFont::GetFontPixels() {
   // == 10001 01010 00100 01010 10001
   glyph_bits[int32_t{'X'}] = 0x1151151;
 
+  // 'Y'
+  // 1...1
+  // .1.1.
+  // ..1..
+  // ..1..
+  // ..1..
+  // == 10001 01010 00100 00100 00100
+  // == == 1 0001 0101 0001 0000 1000 0100
+  glyph_bits[int32_t{'Y'}] = 0x1151084;
+
   // TODO(https://fxbug.dev/42152489): glyphs for ASCII 0x58 - 0x7F
 
   // Process the bits that describe each glyph, turning them into black

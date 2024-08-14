@@ -41,7 +41,7 @@ use starnix_sync::{
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_syscalls::decls::Syscall;
 use starnix_syscalls::SyscallResult;
-use starnix_uapi::auth::{Credentials, CAP_SYS_ADMIN};
+use starnix_uapi::auth::{Credentials, UserAndOrGroupId, CAP_SYS_ADMIN};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::{Access, AccessCheck, FileMode};
@@ -874,12 +874,18 @@ impl CurrentTask {
             elf_security_state,
         )?;
 
+        let maybe_set_id = if self.kernel().features.enable_suid {
+            resolved_elf.file.name.suid_and_sgid(&self)?
+        } else {
+            Default::default()
+        };
+
         if self.thread_group.read().tasks_count() > 1 {
             track_stub!(TODO("https://fxbug.dev/297434895"), "exec on multithread process");
             return error!(EINVAL);
         }
 
-        if let Err(err) = self.finish_exec(locked, path, resolved_elf) {
+        if let Err(err) = self.finish_exec(locked, path, resolved_elf, maybe_set_id) {
             log_warn!("unrecoverable error in exec: {err:?}");
 
             send_standard_signal(
@@ -903,6 +909,7 @@ impl CurrentTask {
         locked: &mut Locked<'_, L>,
         path: CString,
         resolved_elf: ResolvedElf,
+        mut maybe_set_id: UserAndOrGroupId,
     ) -> Result<(), Errno>
     where
         L: LockBefore<MmDumpable>,
@@ -919,12 +926,6 @@ impl CurrentTask {
         // Update the SELinux state, if enabled.
         // TODO: Do we need to update this state after up the creds for exec?
         security::update_state_on_exec(self, &resolved_elf.security_state);
-
-        let mut maybe_set_id = if self.kernel().features.enable_suid {
-            resolved_elf.file.name.suid_and_sgid()
-        } else {
-            Default::default()
-        };
 
         {
             let mut state = self.write();
@@ -1246,6 +1247,7 @@ impl CurrentTask {
         locked: &mut Locked<'_, L>,
         kernel: &Arc<Kernel>,
         initial_name: &CString,
+        seclabel: Option<&CString>,
     ) -> Result<TaskBuilder, Errno>
     where
         L: LockBefore<TaskRelease>,
@@ -1254,6 +1256,11 @@ impl CurrentTask {
         let weak_init = kernel.pids.read().get_task(1);
         let init_task = weak_init.upgrade().ok_or_else(|| errno!(EINVAL))?;
         let initial_name_bytes = initial_name.as_bytes().to_owned();
+        let security_context = match seclabel {
+            Some(s) => security::task_for_context(&init_task, s.as_bytes().into())?,
+            None => security::task_alloc(&init_task, 0),
+        };
+
         let task = Self::create_task(
             locked,
             kernel,
@@ -1270,7 +1277,7 @@ impl CurrentTask {
                     &initial_name_bytes,
                 )
             },
-            security::task_alloc(&init_task, 0),
+            security_context,
         )?;
         {
             let mut init_writer = init_task.thread_group.write();

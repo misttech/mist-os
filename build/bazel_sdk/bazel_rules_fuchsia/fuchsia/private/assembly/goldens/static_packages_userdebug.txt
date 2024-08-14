@@ -7,7 +7,6 @@
 ?bt-a2dp
 ?bt-avrcp
 ?bt-avrcp-target
-?bt-gap
 ?bt-hfp-audio-gateway-default
 ?bt-host
 ?bt-init
@@ -91,12 +90,12 @@ system-update-committer
 ?system-update-realm
 ?system-updater
 ?system_image
+?tee-clients
 ?text_manager
 ?time-zone-info-service
 ?timekeeper
 ?toolbox
 ?triage-detect
-?trusted-apps
 ?tzdata-provider
 ?uart
 ?ui

@@ -25,12 +25,14 @@ declare_args() {
   #                        remote services.
   #  * 'cloudtop' => An RBE configuration that's optimized for running on a
   #                  cloudtop. Suitable for high-bandwidth connections to
-  #                  remote services.
-  #  * 'infra' => The RBE configuration used by CI/CQ bots. Also high-bandwidth.
+  #                  remote services and downloading remote outputs.
+  #  * 'infra' => The RBE configuration recommended for CI/CQ bots.
+  #               Also uses high-bandwidth.
   #  * 'remote_cache_only' => Use RBE only as a remote-cache: on cache-miss,
   #                           execute locally instead of remotely.
-  #  * 'low_bandwidth' => An RBE configuration for developers that have a
-  #                       powerful workstations, but low bandwidth.
+  #  * 'low_bandwidth_remote' => An RBE configuration for low network bandwidth.
+  #                              Saves bandwidth by avoiding downloading some
+  #                              intermediate results.
   rbe_mode = "off"
 
   # Overridden settings for the RBE mode.  This is a set of override values for
@@ -62,6 +64,13 @@ _all_modes_defaults = {
 
   # bazel defaults
   bazel_exec_strategy = "remote"
+
+  # bazel 7.1+ defaults downloads to toplevel only, which means
+  # that intermediate artifacts of remote builds won't be downloaded
+  # by default, which saves bandwidth.
+  # When debugging remote build issues, however, one may wish to
+  # fetch all intermedates by overriding this to "all".
+  bazel_download_outputs = "toplevel"
 }
 
 _default_rbe_settings = {
@@ -166,8 +175,10 @@ _default_rbe_settings = {
     rust_download_rlibs = false
     rust_download_unstripped_binaries = false
 
-    # bazel-7 already defaults to --remote_download_outputs=minimal
     bazel_enable = true
+
+    # bazel-7.1 already defaults to --remote_download_outputs=toplevel
+    bazel_download_outputs = "toplevel"
   }
 }
 
@@ -271,5 +282,8 @@ rbe_settings = {
   }
   if (defined(rbe_settings_overrides["bazel_exec_strategy"])) {
     bazel_exec_strategy = rbe_settings_overrides["bazel_exec_strategy"]
+  }
+  if (defined(rbe_settings_overrides["bazel_download_outputs"])) {
+    bazel_download_outputs = rbe_settings_overrides["bazel_download_outputs"]
   }
 }

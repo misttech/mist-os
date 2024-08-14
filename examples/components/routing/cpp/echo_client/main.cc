@@ -32,9 +32,9 @@ int main(int argc, const char* argv[], char* envp[]) {
   for (int i = 1; i < argc; i++) {
     ZX_ASSERT(echo_proxy->EchoString(argv[i], &response) == ZX_OK);
     if (!response.has_value()) {
-      FX_SLOG(INFO, "echo_string got empty result");
+      FX_LOG_KV(INFO, "echo_string got empty result");
     } else {
-      FX_SLOG(INFO, "Server response", FX_KV("response", response->c_str()));
+      FX_LOG_KV(INFO, "Server response", FX_KV("response", response->c_str()));
     }
   }
 

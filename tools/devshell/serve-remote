@@ -275,12 +275,6 @@ if "${serve}"; then
 
   if [[ "${remote_server_mode}" == \"pm\" ]]; then
     fx-error "Invoking pm on a remote host via fx serve-remote is no longer supported."
-    fx-error "To resolve your issue, please migrate to the ffx foreground server:"
-    fx-error ""
-    fx-error "On both the local and remote host, ensure your shell does *not* export"
-    fx-error "the environment variable:"
-    fx-error "FUCHSIA_DISABLED_foreground_repo_server"
-    fx-error ""
     fx-error "On both the local and remote host, migrate to ffx foreground serving:"
     fx-error ""
     fx-error "$ ffx config remove repository.server.mode"

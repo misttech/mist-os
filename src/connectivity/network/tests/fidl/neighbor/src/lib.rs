@@ -9,12 +9,13 @@ use std::collections::{HashMap, HashSet};
 use std::convert::From as _;
 use std::pin::pin;
 
-use fidl_fuchsia_net_ext::FromExt as _;
+use fidl_fuchsia_net_ext::{FromExt as _, IntoExt as _};
 
 use anyhow::Context as _;
 use assert_matches::assert_matches;
 use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
 use net_declare::{fidl_ip, fidl_ip_v4_with_prefix, fidl_mac};
+use net_types::ip::{Ip, IpVersion};
 use netemul::{RealmUdpSocket as _, TestInterface, TestNetwork, TestRealm, TestSandbox};
 use netstack_testing_common::interfaces::TestInterfaceExt as _;
 use netstack_testing_common::nud::FrameMetadata;
@@ -624,7 +625,8 @@ async fn neigh_wrong_interface<N: Netstack>(
 
 #[netstack_test]
 #[variant(N, Netstack)]
-async fn neigh_clear_entries<N: Netstack>(name: &str) {
+#[variant(I, Ip)]
+async fn neigh_clear_entries<N: Netstack, I: Ip>(name: &str) {
     let sandbox = TestSandbox::new().expect("failed to create sandbox");
     let network = sandbox.create_network("net").await.expect("failed to create network");
 
@@ -650,19 +652,21 @@ async fn neigh_clear_entries<N: Netstack>(name: &str) {
     );
     assert_entries(&mut iter, [ItemMatch::Idle]).await;
 
+    let (alice_ip, bob_ip) = match I::VERSION {
+        IpVersion::V4 => (ALICE_IP, BOB_IP),
+        IpVersion::V6 => (alice.ipv6, bob.ipv6),
+    };
+
     // Exchange some datagrams to add some entries to the list and check that we
     // observe the neighbor solicitations over the network.
-    let () = exchange_dgrams(&alice, &bob).await;
+    let () = exchange_dgram(&alice, alice_ip, &bob, bob_ip).await;
 
-    assert_eq!(next_solicitation_resolution(&mut solicit_stream).await, BOB_IP);
-    assert_entries(&mut iter, incomplete_then_reachable(alice.ep.id(), BOB_IP, BOB_MAC)).await;
-    assert_eq!(next_solicitation_resolution(&mut solicit_stream).await, bob.ipv6);
-    assert_entries(&mut iter, incomplete_then_reachable(alice.ep.id(), bob.ipv6.clone(), BOB_MAC))
-        .await;
+    assert_eq!(next_solicitation_resolution(&mut solicit_stream).await, bob_ip);
+    assert_entries(&mut iter, incomplete_then_reachable(alice.ep.id(), bob_ip, BOB_MAC)).await;
 
     // Clear entries and verify they go away.
     let () = alice_controller
-        .clear_entries(alice.ep.id(), fidl_fuchsia_net::IpVersion::V4)
+        .clear_entries(alice.ep.id(), I::VERSION.into_ext())
         .await
         .expect("clear_entries FIDL error")
         .map_err(fuchsia_zircon::Status::from_raw)
@@ -672,39 +676,7 @@ async fn neigh_clear_entries<N: Netstack>(name: &str) {
         &mut iter,
         [ItemMatch::Removed(EntryMatch {
             interface: alice.ep.id(),
-            neighbor: BOB_IP,
-            state: fidl_fuchsia_net_neighbor::EntryState::Reachable,
-            mac: Some(BOB_MAC),
-        })],
-    )
-    .await;
-
-    // V6 entry hasn't been removed.
-    let mut entries = list_existing_entries(&alice.realm).await;
-    // IPv6 entry.
-    let () = assert_entry(
-        entries.remove(&(alice.ep.id(), bob.ipv6)).expect("missing IPv6 neighbor entry"),
-        EntryMatch::new(
-            alice.ep.id(),
-            bob.ipv6,
-            fidl_fuchsia_net_neighbor::EntryState::Reachable,
-            Some(BOB_MAC),
-        ),
-    );
-    assert!(entries.is_empty(), "unexpected neighbors remaining in list: {:?}", entries);
-
-    let () = alice_controller
-        .clear_entries(alice.ep.id(), fidl_fuchsia_net::IpVersion::V6)
-        .await
-        .expect("clear_entries FIDL error")
-        .map_err(fuchsia_zircon::Status::from_raw)
-        .expect("clear_entries failed");
-
-    assert_entries(
-        &mut iter,
-        [ItemMatch::Removed(EntryMatch {
-            interface: alice.ep.id(),
-            neighbor: bob.ipv6.clone(),
+            neighbor: bob_ip,
             state: fidl_fuchsia_net_neighbor::EntryState::Reachable,
             mac: Some(BOB_MAC),
         })],
@@ -715,23 +687,20 @@ async fn neigh_clear_entries<N: Netstack>(name: &str) {
         .realm
         .connect_to_protocol::<fidl_fuchsia_net_neighbor::ControllerMarker>()
         .expect("failed to connect to Controller");
-    for ip in [&alice.ipv6, &ALICE_IP] {
-        // Add static entries on Bob so that it will never send out neighbor
-        // solicitations that could cause confusion for the assertions at the
-        // end of this test.
-        let () = bob_controller
-            .add_entry(bob.ep.id(), ip, &ALICE_MAC)
-            .await
-            .expect("add_entry FIDL error")
-            .map_err(fuchsia_zircon::Status::from_raw)
-            .expect("add_entry failed");
-    }
+    // Add static entries on Bob so that it will never send out neighbor
+    // solicitations that could cause confusion for the assertions at the
+    // end of this test.
+    let () = bob_controller
+        .add_entry(bob.ep.id(), &alice_ip, &ALICE_MAC)
+        .await
+        .expect("add_entry FIDL error")
+        .map_err(fuchsia_zircon::Status::from_raw)
+        .expect("add_entry failed");
 
     // Exchange datagrams again and assert that new solicitation requests were
     // sent.
-    let () = exchange_dgrams(&alice, &bob).await;
-    assert_eq!(next_solicitation_resolution(&mut solicit_stream).await, BOB_IP);
-    assert_eq!(next_solicitation_resolution(&mut solicit_stream).await, bob.ipv6);
+    let () = exchange_dgram(&alice, alice_ip, &bob, bob_ip).await;
+    assert_eq!(next_solicitation_resolution(&mut solicit_stream).await, bob_ip);
 }
 
 #[netstack_test]

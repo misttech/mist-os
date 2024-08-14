@@ -22,6 +22,7 @@ source_set("lz4-compression") {
   public = [
     "lz4_compressor.h",
     "lz4_decompressor.h",
+    "lz4_result.h",
   ]
   public_deps = [
     ":compression-interfaces",

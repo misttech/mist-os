@@ -37,19 +37,8 @@ extern "C" int LLVMFuzzerTestOneInput(uint8_t* data, size_t size) {
   LOGRTNC(size != kRequiredFuzzingBytes, "size: %zu != kRequiredFuzzingBytes: %zu\n", size,
           kRequiredFuzzingBytes);
   auto inproc_sysmem = display::FakeSysmemDeviceHierarchy::Create();
-  auto outgoing_dir_result = inproc_sysmem->GetOutgoingDirectory();
-  ZX_ASSERT_MSG(outgoing_dir_result.is_ok(), "%s", outgoing_dir_result.status_string());
-  auto outgoing_dir = std::move(outgoing_dir_result).value();
 
-  auto svc_dir_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
-  ZX_ASSERT(svc_dir_endpoints.is_ok());
-  zx_status_t open_status = fdio_open_at(outgoing_dir.channel().get(), "/svc", 0,
-                                         svc_dir_endpoints->server.TakeChannel().release());
-  ZX_ASSERT(open_status == ZX_OK);
-
-  auto allocator_client_result =
-      component::ConnectAtMember<fuchsia_hardware_sysmem::Service::AllocatorV1>(
-          svc_dir_endpoints->client);
+  auto allocator_client_result = inproc_sysmem->ConnectAllocator();
   ZX_ASSERT(allocator_client_result.is_ok());
   auto allocator_client = std::move(allocator_client_result.value());
 

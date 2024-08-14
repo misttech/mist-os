@@ -309,8 +309,16 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
         if let Some(netsvc_interface) =
             &context.board_info.platform.connectivity.network.netsvc_interface
         {
-            let arg = format!("netsvc.interface={}", netsvc_interface);
-            builder.kernel_arg(arg);
+            builder.set_config_capability(
+                "fuchsia.network.PrimaryInterface",
+                Config::new(
+                    ConfigValueType::String { max_size: 200 },
+                    netsvc_interface.clone().into(),
+                ),
+            )?;
+        } else {
+            builder
+                .set_config_capability("fuchsia.network.PrimaryInterface", Config::new_void())?;
         }
 
         Ok(())

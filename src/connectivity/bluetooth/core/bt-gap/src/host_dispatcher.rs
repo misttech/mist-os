@@ -456,6 +456,7 @@ impl HostDispatcher {
     /// GenericAccessService struct and ensuring its run method is scheduled.
     pub fn new(
         appearance: Appearance,
+        config: build_config::Config,
         stash: Stash,
         inspect: inspect::Node,
         gas_channel_sender: mpsc::Sender<LocalServiceRequest>,
@@ -469,7 +470,7 @@ impl HostDispatcher {
             host_devices: HashMap::new(),
             name: None,
             appearance,
-            config_settings: build_config::load_default(),
+            config_settings: config,
             peers: HashMap::new(),
             gas_channel_sender,
             stash,
@@ -1325,6 +1326,7 @@ pub(crate) mod test {
         let (gas_channel_sender, _ignored_gas_task_req_stream) = mpsc::channel(0);
         HostDispatcher::new(
             Appearance::Display,
+            Default::default(),
             Stash::in_memory_mock(),
             fuchsia_inspect::Node::default(),
             gas_channel_sender,

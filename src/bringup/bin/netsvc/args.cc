@@ -28,12 +28,15 @@ int ParseCommonArgs(int argc, char** argv, const char** error, std::string* inte
 }
 }  // namespace
 
-int ParseArgs(int argc, char** argv, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir,
-              const char** error, NetsvcArgs* out) {
+int ParseArgs(int argc, char** argv, const netsvc_structured_config::Config& config,
+              fidl::UnownedClientEnd<fuchsia_io::Directory> svc_dir, const char** error,
+              NetsvcArgs* out) {
   // Reset the args.
   *out = NetsvcArgs();
 
-  // First parse from kernel args, then use use cmdline args as overrides.
+  // First parse from kernel and config args, then use use cmdline args as overrides.
+  out->interface = config.primary_interface();
+
   zx::result client_end = component::ConnectAt<fuchsia_boot::Arguments>(svc_dir);
   if (client_end.is_error()) {
     *error = "netsvc: unable to connect to fuchsia.boot.Arguments";
@@ -41,12 +44,6 @@ int ParseArgs(int argc, char** argv, fidl::UnownedClientEnd<fuchsia_io::Director
   }
 
   fidl::WireSyncClient client{std::move(client_end.value())};
-  fidl::WireResult string_resp = client->GetString(fidl::StringView{"netsvc.interface"});
-  if (string_resp.ok()) {
-    auto& value = string_resp->value;
-    out->interface = std::string{value.data(), value.size()};
-  }
-
   fuchsia_boot::wire::BoolPair bool_keys[]{
       {fidl::StringView{"netsvc.disable"}, true},
       {fidl::StringView{"netsvc.netboot"}, false},

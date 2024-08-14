@@ -63,15 +63,11 @@ if [[ $? -ne 0 ]]; then
   exit 1
 fi
 
-# Note: the background and exit trick here loosely gives us a "successful"
-# command completion, provided the shell parses our input. As dm reboot is
-# synchronous, we can't wait for it to complete, as the shell/ssh get no
-# shutdown message, and will simply observe a peer connection dropping.
-# Sometimes the reboot races the exit, in which case this command also exits
-# with error, but the following SSH check will fail (provided the device
-# doesn't reboot to SSH in less than a few seconds), so the loop will exit with
-# success.
-fx-command-run shell "dm \"${reboot_type}\" & exit 0"
+# The following command reboots the device using `dm` over SSH. This
+# command can often fail since the connection races with the device
+# shutdown. To ensure we correctly shelled into the device and
+# issued a reboot, we use the loop following this line to verify.
+fx-command-run shell "dm \"${reboot_type}\" &" || true
 
 # Wait for the SSH connection to go down. As we use ControlMaster, we can
 # observe this using the control master check.
@@ -80,8 +76,9 @@ while fx-command-run shell -O check > /dev/null 2>&1; do
   if [[ "$monotime" -gt $(fx-command-run shell clock --monotonic) ]]; then
     # If we get here, then we raced between reboot and check, the device
     # rebooted so fast that someone reconnected our SSH ControlMaster before we
-    # observed it going down (this generally only happens if the 'exit 0' above
-    # also races, and `fx serve` is busy trying to re-connect).
+    # observed it going down (this generally only happens if the `dm` command
+    # is backgrounded before being issued and another command happens to shell
+    # into the device (usually package serving causes this)).
     exit 0
   fi
 

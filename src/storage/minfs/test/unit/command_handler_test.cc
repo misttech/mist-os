@@ -6,15 +6,29 @@
 
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
+#include <lib/sync/completion.h>
+#include <lib/zx/time.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
-#include <iostream>
+#include <cstdint>
+#include <memory>
+#include <sstream>
+#include <string>
+#include <utility>
+#include <vector>
 
-#include <disk_inspector/vmo_buffer_factory.h>
-#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "src/storage/lib/block_client/cpp/block_device.h"
 #include "src/storage/lib/block_client/cpp/fake_block_device.h"
+#include "src/storage/lib/disk_inspector/inspector_transaction_handler.h"
+#include "src/storage/lib/disk_inspector/vmo_buffer_factory.h"
+#include "src/storage/minfs/bcache.h"
 #include "src/storage/minfs/format.h"
+#include "src/storage/minfs/inspector/minfs_inspector.h"
+#include "src/storage/minfs/minfs.h"
+#include "src/storage/minfs/mount.h"
 #include "src/storage/minfs/runner.h"
 
 namespace minfs {
@@ -112,7 +126,7 @@ void CreateMinfsInspector(std::unique_ptr<block_client::BlockDevice> device,
       std::make_unique<disk_inspector::VmoBufferFactory>(inspector_handler.get(), kMinfsBlockSize);
   auto result = MinfsInspector::Create(std::move(inspector_handler), std::move(buffer_factory));
   ASSERT_TRUE(result.is_ok());
-  *out = result.take_value();
+  *out = std::move(result).value();
 }
 // Make sure commands don't fail when running on an unformatted device.
 TEST(MinfsCommandHandler, CheckSupportedCommandsNoFail) {

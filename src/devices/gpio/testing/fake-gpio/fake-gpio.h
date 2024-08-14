@@ -51,7 +51,7 @@ bool operator==(const SubState& sub_state1, const T& sub_state2) {
 }
 
 struct State {
-  fuchsia_hardware_gpio::GpioPolarity polarity;
+  fuchsia_hardware_gpio::InterruptMode interrupt_mode;
   SubState sub_state;
 };
 
@@ -68,6 +68,8 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
   // fidl::testing::WireTestBase<fuchsia_hardware_gpu::Gpio>
   void GetInterrupt(GetInterruptRequestView request,
                     GetInterruptCompleter::Sync& completer) override;
+  void ConfigureInterrupt(ConfigureInterruptRequestView request,
+                          ConfigureInterruptCompleter::Sync& completer) override;
   void SetAltFunction(SetAltFunctionRequestView request,
                       SetAltFunctionCompleter::Sync& completer) override;
   void ConfigIn(ConfigInRequestView request, ConfigInCompleter::Sync& completer) override;
@@ -75,7 +77,6 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
   void Write(WriteRequestView request, WriteCompleter::Sync& completer) override;
   void Read(ReadCompleter::Sync& completer) override;
   void ReleaseInterrupt(ReleaseInterruptCompleter::Sync& completer) override;
-  void SetPolarity(SetPolarityRequestView request, SetPolarityCompleter::Sync& completer) override;
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_gpio::Gpio> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
   void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override {
@@ -94,9 +95,9 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
   // isn't `Read`.
   fuchsia_hardware_gpio::GpioFlags GetReadFlags() const;
 
-  // Return the most recent polarity set by `SetPolarity`. Will fail if there
-  // is not a current state.
-  fuchsia_hardware_gpio::GpioPolarity GetPolarity() const;
+  // Return the most recent mode set by `GetInterrupt` or
+  // `ConfigureInterrupt`. Will fail if there is not a current state.
+  fuchsia_hardware_gpio::InterruptMode GetInterruptMode() const;
 
   // Set the interrupt used for GetInterrupt requests to `interrupt`.
   void SetInterrupt(zx::result<zx::interrupt> interrupt);
@@ -132,7 +133,7 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
  private:
   // Returns the polarity of the current state. Returns high if there isn't a
   // current state.
-  fuchsia_hardware_gpio::GpioPolarity GetCurrentPolarity();
+  fuchsia_hardware_gpio::InterruptMode GetCurrentInterruptMode();
 
   // Contains the states that the gpio has been set to in chronological order.
   std::vector<State> state_log_;

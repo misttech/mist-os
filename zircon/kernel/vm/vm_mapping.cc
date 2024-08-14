@@ -558,10 +558,8 @@ class VmMappingCoalescer {
       TA_REQ(mapping->lock()) TA_REQ(mapping->object_lock());
   ~VmMappingCoalescer();
 
-  // Add a page to the mapping run.  If this fails, the VmMappingCoalescer is
-  // no longer valid.
+  // Add a page to the mapping run.
   zx_status_t Append(vaddr_t vaddr, paddr_t paddr) {
-    DEBUG_ASSERT(!aborted_);
     // If this isn't the expected vaddr, flush the run we have first.
     if (!can_append(vaddr)) {
       zx_status_t status = Flush();
@@ -576,7 +574,6 @@ class VmMappingCoalescer {
   }
 
   zx_status_t AppendOrAdjustMapping(vaddr_t vaddr, paddr_t paddr, uint mmu_flags) {
-    DEBUG_ASSERT(!aborted_);
     // If this isn't the expected vaddr or mmu_flags have changed, flush the run we have first.
     if (!can_append(vaddr) || mmu_flags != mmu_flags_) {
       zx_status_t status = Flush();
@@ -606,13 +603,11 @@ class VmMappingCoalescer {
 
   void IncrementCount(size_t i) { count_ += i; }
 
-  // Submit any outstanding mappings to the MMU.  If this fails, the
-  // VmMappingCoalescer is no longer valid.
+  // Submit any outstanding mappings to the MMU.
   zx_status_t Flush();
 
   // Drop the current outstanding mappings without sending them to the MMU.
-  // After this call, the VmMappingCoalescer is no longer valid.
-  void Abort() { aborted_ = true; }
+  void Drop() { count_ = 0; }
 
  private:
   // Vaddr can be appended if it's the next free slot and the coalescer isn't full.
@@ -626,7 +621,6 @@ class VmMappingCoalescer {
   vaddr_t base_;
   paddr_t phys_[NumPages];
   size_t count_;
-  bool aborted_;
   uint mmu_flags_;
   const ArchVmAspace::ExistingEntryAction existing_entry_action_;
 };
@@ -638,7 +632,6 @@ VmMappingCoalescer<NumPages>::VmMappingCoalescer(
     : mapping_(mapping),
       base_(base),
       count_(0),
-      aborted_(false),
       mmu_flags_(mmu_flags),
       existing_entry_action_(existing_entry_action) {
   // Mapping is only valid if there is at least some access in the flags.
@@ -647,8 +640,8 @@ VmMappingCoalescer<NumPages>::VmMappingCoalescer(
 
 template <size_t NumPages>
 VmMappingCoalescer<NumPages>::~VmMappingCoalescer() {
-  // Make sure we've flushed or aborted
-  DEBUG_ASSERT(count_ == 0 || aborted_);
+  // Make sure no outstanding mappings.
+  DEBUG_ASSERT(count_ == 0);
 }
 
 template <size_t NumPages>
@@ -669,13 +662,11 @@ zx_status_t VmMappingCoalescer<NumPages>::Flush() {
                                                           existing_entry_action_, &mapped);
   if (ret != ZX_OK) {
     TRACEF("error %d mapping %zu pages starting at va %#" PRIxPTR "\n", ret, count_, base_);
-    aborted_ = true;
-    return ret;
   }
-  DEBUG_ASSERT_MSG(mapped == count_, "mapped %zu, count %zu\n", mapped, count_);
+  DEBUG_ASSERT_MSG(ret != ZX_OK || mapped == count_, "mapped %zu, count %zu\n", mapped, count_);
   base_ += count_ * PAGE_SIZE;
   count_ = 0;
-  return ZX_OK;
+  return ret;
 }
 
 }  // namespace
@@ -782,7 +773,7 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
                 // waited on.
                 ASSERT(status != ZX_ERR_SHOULD_WAIT);
                 // fail when we can't commit every requested page
-                coalescer.Abort();
+                coalescer.Drop();
                 return status;
               }
               page = result->page;

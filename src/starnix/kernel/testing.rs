@@ -13,7 +13,7 @@ use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, fs_node_impl_not_dir, Anon, CacheMode,
     FdNumber, FileHandle, FileObject, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
-    FileSystemOptions, FsContext, FsNode, FsNodeOps, FsStr,
+    FileSystemOptions, FsContext, FsNode, FsNodeOps, FsStr, Namespace,
 };
 
 use selinux_core::security_server::SecurityServer;
@@ -103,7 +103,7 @@ fn create_kernel_task_and_unlocked_with_fs_and_selinux<'l>(
 
     let init_pid = kernel.pids.write().allocate_pid();
     assert_eq!(init_pid, 1);
-    let fs = FsContext::new(create_fs(&kernel));
+    let fs = FsContext::new(Namespace::new(create_fs(&kernel)));
     let init_task = CurrentTask::create_init_process(
         &mut locked,
         &kernel,
@@ -137,9 +137,13 @@ pub fn create_task(
     kernel: &Arc<Kernel>,
     task_name: &str,
 ) -> AutoReleasableTask {
-    let task =
-        CurrentTask::create_init_child_process(locked, kernel, &CString::new(task_name).unwrap())
-            .expect("failed to create second task");
+    let task = CurrentTask::create_init_child_process(
+        locked,
+        kernel,
+        &CString::new(task_name).unwrap(),
+        None,
+    )
+    .expect("failed to create second task");
 
     // Take the lock on thread group and task in the correct order to ensure any wrong ordering
     // will trigger the tracing-mutex at the right call site.

@@ -5,9 +5,10 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_JOURNAL_DISK_STRUCT_H_
 #define SRC_STORAGE_LIB_VFS_CPP_JOURNAL_DISK_STRUCT_H_
 
-#include <disk_inspector/disk_struct.h>
+#include <cstdint>
+#include <memory>
 
-#include "src/storage/lib/vfs/cpp/journal/format.h"
+#include "src/storage/lib/disk_inspector/disk_struct.h"
 
 namespace fs {
 

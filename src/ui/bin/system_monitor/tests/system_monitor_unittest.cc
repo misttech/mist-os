@@ -20,7 +20,7 @@ TEST_F(SystemMonitorUnitTest, GetTargetFromDiagnostics_DiagnosticsIncludeTarget_
   constexpr char kTargetString[] = "this contains platform_metrics";
   std::vector<std::string> input = {"command", "testing", "123", "42", "hello", kTargetString};
   system_monitor::SystemMonitor systemMonitor;
-  std::string actual_output = systemMonitor.GetTargetFromDiagnostics(input);
+  const std::string& actual_output = systemMonitor.GetTargetFromDiagnostics(input);
   EXPECT_EQ(kTargetString, actual_output);
 }
 

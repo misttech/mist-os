@@ -11,6 +11,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/result.h>
 #include <zircon/status.h>
@@ -18,6 +19,7 @@
 #include <fbl/alloc_checker.h>
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
+#include "src/devices/sysmem/drivers/sysmem/allocator.h"
 #include "src/devices/sysmem/drivers/sysmem/device.h"
 
 namespace display {
@@ -73,6 +75,49 @@ FakeSysmemDeviceHierarchy::FakeSysmemDeviceHierarchy() {
   ZX_ASSERT_MSG(start_result.is_ok(), "%s", start_result.status_string());
 }
 
+zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>>
+FakeSysmemDeviceHierarchy::ConnectAllocator() {
+  auto [client, server] = fidl::Endpoints<fuchsia_sysmem::Allocator>::Create();
+  device_.SyncCall([request = std::move(server)](
+                       fdf_testing::DriverUnderTest<sysmem_driver::Device>* device) mutable {
+    sysmem_driver::Device* dev = **device;
+    dev->PostTask([request = std::move(request), dev]() mutable {
+      sysmem_driver::Allocator::CreateOwnedV1(std::move(request), dev, dev->v1_allocators());
+    });
+  });
+
+  return zx::ok(std::move(client));
+}
+
+zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>>
+FakeSysmemDeviceHierarchy::ConnectAllocator2() {
+  auto [client, server] = fidl::Endpoints<fuchsia_sysmem2::Allocator>::Create();
+  device_.SyncCall([request = std::move(server)](
+                       fdf_testing::DriverUnderTest<sysmem_driver::Device>* device) mutable {
+    sysmem_driver::Device* dev = **device;
+    dev->PostTask([request = std::move(request), dev]() mutable {
+      sysmem_driver::Allocator::CreateOwnedV2(std::move(request), dev, dev->v2_allocators());
+    });
+  });
+
+  return zx::ok(std::move(client));
+}
+
+zx::result<fidl::ClientEnd<fuchsia_hardware_sysmem::Sysmem>>
+FakeSysmemDeviceHierarchy::ConnectHardwareSysmem() {
+  auto [client, server] = fidl::Endpoints<fuchsia_hardware_sysmem::Sysmem>::Create();
+  runtime_->PerformBlockingWork([this, request = std::move(server)]() mutable {
+    device_.SyncCall([request = std::move(request)](
+                         fdf_testing::DriverUnderTest<sysmem_driver::Device>* device) mutable {
+      sysmem_driver::Device* dev = **device;
+      dev->BindingsForTest().AddBinding(dev->loop_dispatcher(), std::move(request), dev,
+                                        fidl::kIgnoreBindingClosure);
+    });
+  });
+
+  return zx::ok(std::move(client));
+}
+
 FakeSysmemDeviceHierarchy::~FakeSysmemDeviceHierarchy() {
   zx::result prepare_stop_result = runtime_->RunToCompletion(
       device_.SyncCall(&fdf_testing::DriverUnderTest<sysmem_driver::Device>::PrepareStop));
@@ -86,22 +131,6 @@ FakeSysmemDeviceHierarchy::~FakeSysmemDeviceHierarchy() {
   fake_pdev_.reset();
   node_server_.reset();
   device_.reset();
-}
-
-zx::result<fidl::ClientEnd<fuchsia_io::Directory>>
-FakeSysmemDeviceHierarchy::GetOutgoingDirectory() {
-  auto dir_endpoints = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  // this effectively just dups the outgoing dir Node - the dir has /svc/fuchsia.sysmem2.Service
-  // under it
-  zx_status_t status = fdio_open_at(driver_outgoing_.handle()->get(), "/",
-                                    static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                                    std::move(dir_endpoints.server).TakeChannel().release());
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to open /svc directory of sysmem's outgoing directory: %s",
-           zx_status_get_string(status));
-    return zx::error(status);
-  }
-  return zx::ok(std::move(dir_endpoints.client));
 }
 
 }  // namespace display

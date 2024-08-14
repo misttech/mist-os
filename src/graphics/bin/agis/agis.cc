@@ -76,7 +76,7 @@ bool PeerEndpointIsOpen(const zx::socket &endpoint) {
 
   // Report abnormal status for remaining possible return values.
   if (!(status == ZX_OK || status == ZX_ERR_CANCELED)) {
-    FX_SLOG(ERROR, "PeerEndpointIsOpen", FX_KV("status", status));
+    FX_LOG_KV(ERROR, "PeerEndpointIsOpen", FX_KV("status", status));
   }
 
   return false;
@@ -94,7 +94,7 @@ class ComponentRegistryImpl final : public fuchsia::gpu::agis::ComponentRegistry
       auto global_id = session_pair.second->global_id;
       auto i = registry.find(global_id);
       if (i == registry.end()) {
-        FX_SLOG(ERROR, "Corrupt registry");
+        FX_LOG_KV(ERROR, "Corrupt registry");
       }
       registry.erase(global_id);
     }
@@ -262,7 +262,7 @@ class ConnectorImpl final : public fuchsia::gpu::agis::Connector {
     zx::socket ffx_socket;
     auto status = zx::socket::create(0u, &entry->vulkan_socket, &ffx_socket);
     if (status != ZX_OK) {
-      FX_SLOG(ERROR, "zx::socket::create() failed", FX_KV("status", status));
+      FX_LOG_KV(ERROR, "zx::socket::create() failed", FX_KV("status", status));
       result.set_err(fuchsia::gpu::agis::Error::INTERNAL_ERROR);
       callback(std::move(result));
       return;

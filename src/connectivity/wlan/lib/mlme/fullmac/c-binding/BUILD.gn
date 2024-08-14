@@ -23,7 +23,10 @@ rustc_staticlib("wlan-fullmac-mlme-c") {
 
 source_set("wlan-fullmac-mlme-c-stub") {
   testonly = true
-  public = [ "bindings.h" ]
+  public = [
+    "bindings.h",
+    "testing/bindings_stubs.h",
+  ]
   sources = [ "testing/bindings_stubs.cc" ]
   deps = [ "//sdk/fidl/fuchsia.wlan.fullmac:fuchsia.wlan.fullmac_banjo_cpp" ]
 }

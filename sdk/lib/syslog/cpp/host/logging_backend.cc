@@ -177,11 +177,6 @@ void SetLogSettings(const fuchsia_logging::LogSettings& settings) {
     }
   }
 }
-
-void SetLogSettings(const fuchsia_logging::LogSettings& settings,
-                    const std::initializer_list<std::string>& tags) {
-  syslog_runtime::SetLogSettings(settings);
-}
 }  // namespace
 void SetLogTags(const std::initializer_list<std::string>& tags) {
   // Global tags aren't supported on host.
@@ -273,10 +268,11 @@ LogSettingsBuilder& LogSettingsBuilder::WithLogFile(const std::string_view& log_
   return *this;
 }
 
-// Configures the log settings with the specified tags.
-void LogSettingsBuilder::BuildAndInitializeWithTags(
-    const std::initializer_list<std::string>& tags) {
-  syslog_runtime::SetLogSettings(settings_, tags);
+LogSettingsBuilder& LogSettingsBuilder::WithTags(const std::initializer_list<std::string>& tags) {
+  for (auto& tag : tags) {
+    settings_.tags.push_back(tag);
+  }
+  return *this;
 }
 
 // Configures the log settings.

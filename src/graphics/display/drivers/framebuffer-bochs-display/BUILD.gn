@@ -13,7 +13,6 @@ driver_bind_rules("framebuffer-bochs-display-bind") {
 
   deps = [
     "//sdk/fidl/fuchsia.hardware.pci:fuchsia.hardware.pci_bindlib",
-    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
     "//src/devices/bind/fuchsia.acpi",
     "//src/devices/bind/fuchsia.pci",
   ]

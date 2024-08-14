@@ -5,6 +5,8 @@
 #ifndef SRC_STORAGE_MINFS_INSPECTOR_PARSER_H_
 #define SRC_STORAGE_MINFS_INSPECTOR_PARSER_H_
 
+#include <cstdint>
+
 #include <storage/buffer/block_buffer.h>
 
 #include "src/storage/minfs/format.h"

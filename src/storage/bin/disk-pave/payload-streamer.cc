@@ -4,6 +4,7 @@
 
 #include "src/storage/bin/disk-pave/payload-streamer.h"
 
+#include <fidl/fuchsia.paver/cpp/wire.h>
 #include <lib/async/default.h>
 
 namespace disk_pave {

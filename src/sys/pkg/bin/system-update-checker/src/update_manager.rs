@@ -124,11 +124,11 @@ pub(crate) enum UpdateManagerRequest<N: StateNotifier, A> {
     RegisterAttemptsMonitor {
         callback: NoDebug<MakeAttemptsMonitor<N, A>>,
     },
-    #[cfg_attr(not(test), allow(dead_code))]
+    #[cfg_attr(not(test), expect(dead_code))]
     GetState {
         responder: oneshot::Sender<Option<State>>,
     },
-    #[cfg_attr(not(test), allow(dead_code))]
+    #[cfg_attr(not(test), expect(dead_code))]
     GetLastKnownUpdatePackageHash {
         responder: oneshot::Sender<Option<Hash>>,
     },

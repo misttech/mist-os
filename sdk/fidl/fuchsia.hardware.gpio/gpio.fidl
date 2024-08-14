@@ -78,11 +78,6 @@ open protocol Gpio {
         value uint8;
     }) -> () error zx.Status;
 
-    /// Set GPIO polarity.
-    strict SetPolarity(struct {
-        polarity GpioPolarity;
-    }) -> () error zx.Status;
-
     /// Sets the drive strength of the GPIO.
     /// actual_ds_ua is always >= ds_ua. If ds_ua is larger than max value, the drive strength will be set to the max value.
     /// Return error if unable to set drive strength. actual_ds_ua is not set in this case.
@@ -105,6 +100,16 @@ open protocol Gpio {
     }) -> (resource struct {
         irq zx.Handle:INTERRUPT;
     }) error zx.Status;
+
+    /// Configures the polarity of an interrupt and whether it is edge- or level-triggered. Only the
+    /// client with the interrupt can call `ConfigureInterrupt()`, unless no client has an
+    /// interrupt.
+    ///
+    /// Returns `ZX_ERR_INVALID_ARGS` of no fields are set, or `ZX_ERR_ACCESS_DENIED` if another
+    /// client has the interrupt.
+    strict ConfigureInterrupt(struct {
+        config InterruptConfiguration;
+    }) -> () error zx.Status;
 
     /// Release the interrupt.
     strict ReleaseInterrupt() -> () error zx.Status;

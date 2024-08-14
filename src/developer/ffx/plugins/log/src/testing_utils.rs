@@ -2,20 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-// TODO(https://fxbug.dev/42080002): Move this somewhere else and
-// make the logic more generic.
-
-use std::cell::Cell;
-use std::rc::Rc;
-
 use diagnostics_data::{BuilderArgs, LogsData, LogsDataBuilder, Severity, Timestamp};
-use event_listener::Event;
-use fidl::endpoints::{DiscoverableProtocolMarker as _, RequestStream, ServerEnd};
-use fidl_fuchsia_developer_ffx::{
-    TargetCollectionMarker, TargetCollectionRequest, TargetMarker, TargetRequest,
-};
+use fho::testing::ToolEnv;
+use fho::{FhoEnvironment, TryFromEnv};
+use fidl::endpoints::DiscoverableProtocolMarker as _;
 use fidl_fuchsia_developer_remotecontrol::{
-    IdentifyHostResponse, RemoteControlMarker, RemoteControlRequest,
+    IdentifyHostResponse, RemoteControlMarker, RemoteControlProxy, RemoteControlRequest,
 };
 use fidl_fuchsia_diagnostics::{
     LogInterestSelector, LogSettingsMarker, LogSettingsRequest, LogSettingsRequestStream,
@@ -24,240 +16,376 @@ use fidl_fuchsia_diagnostics::{
 use fidl_fuchsia_diagnostics_host::{
     ArchiveAccessorMarker, ArchiveAccessorRequest, ArchiveAccessorRequestStream,
 };
-use fuchsia_async::Task;
-use futures::channel::mpsc::{unbounded, UnboundedReceiver, UnboundedSender};
-use futures::StreamExt;
+use futures::channel::{mpsc, oneshot};
+use futures::{Stream, StreamExt, TryStreamExt};
+use log_command::parse_time;
+use moniker::Moniker;
+use std::cell::RefCell;
+use std::collections::HashMap;
+use std::rc::Rc;
+use {fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync};
 
 const NODENAME: &str = "Rust";
 
 /// Test configuration
-pub struct Configuration {
+pub struct TestEnvironmentConfig {
     pub messages: Vec<LogsData>,
-    pub send_mode_event: bool,
-    pub boot_timestamp: Cell<u64>,
+    pub boot_timestamp: u64,
+    pub instances: Vec<Moniker>,
+    pub send_connected_event: bool,
 }
 
-impl Default for Configuration {
+pub fn test_log_with_severity(timestamp: impl Into<Timestamp>, severity: Severity) -> LogsData {
+    LogsDataBuilder::new(BuilderArgs {
+        component_url: Some("ffx".into()),
+        moniker: "host/ffx".try_into().unwrap(),
+        severity,
+        timestamp_nanos: timestamp.into(),
+    })
+    .set_pid(1)
+    .set_tid(2)
+    .set_message("Hello world!")
+    .build()
+}
+
+pub fn test_log(timestamp: impl Into<Timestamp>) -> LogsData {
+    LogsDataBuilder::new(BuilderArgs {
+        component_url: Some("ffx".into()),
+        moniker: "host/ffx".try_into().unwrap(),
+        severity: Severity::Info,
+        timestamp_nanos: timestamp.into(),
+    })
+    .set_pid(1)
+    .set_tid(2)
+    .set_message("Hello world!")
+    .build()
+}
+
+pub fn test_log_with_file(timestamp: impl Into<Timestamp>) -> LogsData {
+    LogsDataBuilder::new(BuilderArgs {
+        component_url: Some("ffx".into()),
+        moniker: "host/ffx".try_into().unwrap(),
+        severity: Severity::Info,
+        timestamp_nanos: timestamp.into(),
+    })
+    .set_file("test_filename.cc")
+    .set_line(42)
+    .add_tag("test tag")
+    .set_pid(1)
+    .set_tid(2)
+    .set_message("Hello world!")
+    .build()
+}
+
+pub fn test_log_with_tag(timestamp: impl Into<Timestamp>) -> LogsData {
+    LogsDataBuilder::new(BuilderArgs {
+        component_url: Some("ffx".into()),
+        moniker: "host/ffx".try_into().unwrap(),
+        severity: Severity::Info,
+        timestamp_nanos: timestamp.into(),
+    })
+    .add_tag("test tag")
+    .set_pid(1)
+    .set_tid(2)
+    .set_message("Hello world!")
+    .build()
+}
+
+pub fn naive_utc_nanos(utc_time: &str) -> Timestamp {
+    Timestamp::from(parse_time(utc_time).unwrap().time.naive_utc().timestamp_nanos_opt().unwrap())
+}
+
+impl Default for TestEnvironmentConfig {
     fn default() -> Self {
         Self {
-            messages: vec![LogsDataBuilder::new(BuilderArgs {
-                component_url: Some("ffx".into()),
-                moniker: "ffx".try_into().unwrap(),
-                severity: Severity::Info,
-                timestamp_nanos: Timestamp::from(0),
-            })
-            .set_pid(1)
-            .set_tid(2)
-            .set_message("Hello world!")
-            .build()],
-            send_mode_event: false,
-            boot_timestamp: Cell::new(1),
+            messages: vec![test_log(Timestamp::from(0))],
+            boot_timestamp: 1,
+            instances: Vec::new(),
+            send_connected_event: false,
         }
     }
 }
 
-pub struct Manager {
-    environment: Environment,
-    events_receiver: Option<UnboundedReceiver<TestEvent>>,
-}
-
-impl Manager {
-    /// Create a new Manager
-    pub fn new() -> Self {
-        Self::new_with_config(Rc::new(Configuration::default()))
-    }
-
-    /// Create a new Manager
-    pub fn new_with_config(config: Rc<Configuration>) -> Self {
-        let (events_sender, events_receiver) = unbounded();
-        Self {
-            environment: Environment::new(events_sender, config),
-            events_receiver: Some(events_receiver),
-        }
-    }
-
-    pub fn get_environment(&self) -> Environment {
-        self.environment.clone()
-    }
-
-    pub fn take_event_stream(&mut self) -> Option<UnboundedReceiver<TestEvent>> {
-        self.events_receiver.take()
-    }
-}
-
-/// Events that happen during execution of a test
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum TestEvent {
-    /// Log severity has been changed
-    SeverityChanged(Vec<LogInterestSelector>),
-    /// Log settings connection closed
-    LogSettingsConnectionClosed,
-    /// Log stream started with a specific mode.
     Connected(StreamMode),
+    SetInterest(Vec<LogInterestSelector>),
+    LogSettingsClosed,
 }
 
-/// Holds the test environment.
-#[derive(Clone)]
-pub struct Environment {
-    event_sender: UnboundedSender<TestEvent>,
-    pub config: Rc<Configuration>,
-    disconnect_event: Rc<Event>,
+pub struct TestEnvironment {
+    fho_env: FhoEnvironment,
+    state: Rc<State>,
+    event_rcv: Option<mpsc::UnboundedReceiver<TestEvent>>,
+    disconnect_snd: oneshot::Sender<()>,
 }
 
-impl Environment {
-    /// Create a new Environment
-    fn new(event_sender: UnboundedSender<TestEvent>, config: Rc<Configuration>) -> Self {
-        Self { event_sender, config, disconnect_event: Rc::new(Event::new()) }
+impl TestEnvironment {
+    pub fn new(config: TestEnvironmentConfig) -> Self {
+        let (event_snd, event_rcv) = mpsc::unbounded();
+        let (disconnect_snd, disconnect_rcv) = oneshot::channel();
+        let state = Rc::new(State::new(config, event_snd, disconnect_rcv));
+        let state_clone = state.clone();
+        let tool_env = ToolEnv::new().remote_factory_closure(move || {
+            let state = state_clone.clone();
+            async { Ok(setup_fake_rcs(state)) }
+        });
+        let fho_env = tool_env.make_environment(ffx_config::EnvironmentContext::no_context(
+            ffx_config::environment::ExecutableKind::Test,
+            Default::default(),
+            None,
+            true,
+        ));
+        Self { fho_env, state, event_rcv: Some(event_rcv), disconnect_snd: disconnect_snd }
     }
 
-    fn send_event(&mut self, event: TestEvent) {
-        // Result intentionally ignored as the test might not need
-        // to read the event and choose to close the channel instead.
-        let _ = self.event_sender.unbounded_send(event);
+    pub fn take_event_stream(&mut self) -> Option<impl Stream<Item = TestEvent>> {
+        self.event_rcv.take()
     }
 
-    /// Simulates Archivist crashing/disconnecting.  This will only work if there is an active
-    /// connection to Archivist; i.e. callers probably want to call `check_for_message` prior to
-    /// this.
-    pub fn disconnect_target(&self) {
-        self.disconnect_event.notify(usize::MAX);
+    pub async fn rcs_connector(&self) -> fho::Connector<RemoteControlProxy> {
+        fho::Connector::try_from_env(&self.fho_env).await.expect("Could not make test connector")
     }
 
     /// Simulates a target reboot.
-    pub fn reboot_target(&self, new_boot_time: u64) {
-        self.config.boot_timestamp.set(new_boot_time);
+    pub fn reboot_target(&mut self, new_boot_time: u64) {
+        self.state.mutable.borrow_mut().boot_timestamp = new_boot_time;
         self.disconnect_target();
     }
+
+    pub fn disconnect_target(&mut self) {
+        let mut mutable_state = self.state.mutable.borrow_mut();
+        // This must have already been taken and is been awaited on.
+        assert!(mutable_state.disconnect_rcv.is_none());
+        let (snd, rcv) = oneshot::channel();
+        let disconnect_snd = std::mem::replace(&mut self.disconnect_snd, snd);
+        let _ = disconnect_snd.send(());
+        mutable_state.disconnect_rcv = Some(rcv);
+    }
 }
 
-async fn handle_archive_accessor(
-    mut stream: ArchiveAccessorRequestStream,
-    mut environment: Environment,
-) {
-    while let Some(Ok(ArchiveAccessorRequest::StreamDiagnostics {
-        parameters,
-        stream,
-        responder,
-    })) = stream.next().await
-    {
-        if environment.config.send_mode_event {
-            environment.send_event(TestEvent::Connected(parameters.stream_mode.unwrap()));
-        }
-        // Ignore the result, because the client may choose to close the channel.
-        let _ = responder.send();
-        stream
-            .write(serde_json::to_string(&environment.config.messages).unwrap().as_bytes())
-            .unwrap();
+struct State {
+    messages: Vec<LogsData>,
+    instances: Vec<Moniker>,
+    send_connected_event: bool,
+    event_snd: mpsc::UnboundedSender<TestEvent>,
+    mutable: RefCell<MutableState>,
+}
 
-        match parameters.stream_mode.unwrap() {
-            StreamMode::Snapshot => {}
-            StreamMode::SnapshotThenSubscribe | StreamMode::Subscribe => {
-                environment.disconnect_event.listen().await
-            }
+impl State {
+    fn new(
+        config: TestEnvironmentConfig,
+        snd: mpsc::UnboundedSender<TestEvent>,
+        disconnect_rcv: oneshot::Receiver<()>,
+    ) -> Self {
+        Self {
+            messages: config.messages,
+            instances: config.instances,
+            send_connected_event: config.send_connected_event,
+            event_snd: snd,
+            mutable: RefCell::new(MutableState {
+                boot_timestamp: config.boot_timestamp,
+                disconnect_rcv: Some(disconnect_rcv),
+            }),
         }
     }
 }
 
-async fn handle_log_settings(channel: fidl::Channel, mut environment: Environment) {
-    let mut stream =
-        LogSettingsRequestStream::from_channel(fuchsia_async::Channel::from_channel(channel));
+struct MutableState {
+    boot_timestamp: u64,
+    disconnect_rcv: Option<oneshot::Receiver<()>>,
+}
+
+async fn handle_realm_query(
+    instances: Vec<fsys::Instance>,
+    server_end: fidl::endpoints::ServerEnd<fsys::RealmQueryMarker>,
+) {
+    let mut stream = server_end.into_stream().unwrap();
+    let mut instance_map = HashMap::new();
+    for instance in instances {
+        let moniker = Moniker::parse_str(instance.moniker.as_ref().unwrap()).unwrap();
+        let previous = instance_map.insert(moniker.to_string(), instance);
+        assert!(previous.is_none());
+    }
+
     while let Some(Ok(request)) = stream.next().await {
         match request {
-            LogSettingsRequest::RegisterInterest { .. } => {
-                panic!("fuchsia.diagnostics/LogSettings.RegisterInterest is not supported");
+            fsys::RealmQueryRequest::GetInstance { moniker, responder } => {
+                let moniker = Moniker::parse_str(&moniker).unwrap().to_string();
+                if let Some(instance) = instance_map.get(&moniker) {
+                    responder.send(Ok(instance)).unwrap();
+                } else {
+                    responder.send(Err(fsys::GetInstanceError::InstanceNotFound)).unwrap();
+                }
             }
-            LogSettingsRequest::SetInterest { selectors, responder } => {
-                environment.send_event(TestEvent::SeverityChanged(selectors));
-                responder.send().unwrap();
+            fsys::RealmQueryRequest::GetAllInstances { responder } => {
+                let instances = instance_map.values().cloned().collect();
+                let iterator = serve_instance_iterator(instances);
+                responder.send(Ok(iterator)).unwrap();
             }
+            _ => panic!("Unexpected RealmQuery request"),
         }
     }
-    environment.send_event(TestEvent::LogSettingsConnectionClosed);
+}
+
+fn serve_instance_iterator(
+    instances: Vec<fsys::Instance>,
+) -> fidl::endpoints::ClientEnd<fsys::InstanceIteratorMarker> {
+    let (client, mut stream) =
+        fidl::endpoints::create_request_stream::<fsys::InstanceIteratorMarker>().unwrap();
+    fasync::Task::local(async move {
+        let fsys::InstanceIteratorRequest::Next { responder } =
+            stream.next().await.unwrap().unwrap();
+        responder.send(&instances).unwrap();
+        let Some(Ok(fsys::InstanceIteratorRequest::Next { responder })) = stream.next().await
+        else {
+            return;
+        };
+        responder.send(&[]).unwrap();
+    })
+    .detach();
+    client
+}
+
+fn setup_fake_rcs(state: Rc<State>) -> RemoteControlProxy {
+    let (proxy, mut stream) =
+        fidl::endpoints::create_proxy_and_stream::<RemoteControlMarker>().unwrap();
+    fasync::Task::local(async move {
+        let mut task_group = fasync::TaskGroup::new();
+        while let Ok(Some(req)) = stream.try_next().await {
+            match req {
+                RemoteControlRequest::EchoString { value, responder } => {
+                    responder.send(value.as_ref()).expect("should send");
+                }
+                RemoteControlRequest::OpenCapability {
+                    moniker,
+                    capability_set,
+                    capability_name,
+                    server_channel,
+                    flags: _,
+                    responder,
+                } => {
+                    assert_eq!(capability_set, rcs::OpenDirType::NamespaceDir);
+                    let state_clone = state.clone();
+                    task_group.add(fasync::Task::local(async move {
+                        handle_open_capability(
+                            &moniker,
+                            &capability_name,
+                            server_channel,
+                            state_clone,
+                        )
+                        .await
+                    }));
+                    responder.send(Ok(())).unwrap();
+                }
+                RemoteControlRequest::IdentifyHost { responder } => {
+                    responder
+                        .send(Ok(&IdentifyHostResponse {
+                            nodename: Some(NODENAME.into()),
+                            boot_timestamp_nanos: Some(state.mutable.borrow().boot_timestamp),
+                            ..Default::default()
+                        }))
+                        .unwrap();
+                }
+                _ => panic!("unexpected request: {:?}", req),
+            }
+        }
+        task_group.join().await;
+    })
+    .detach();
+    proxy
 }
 
 async fn handle_open_capability(
+    moniker: &str,
     capability_name: &str,
     channel: fidl::Channel,
-    environment: Environment,
+    state: Rc<State>,
 ) {
     let Some(capability_name) = capability_name.strip_prefix("svc/") else {
         panic!("Expected a protocol starting with svc/. Got: {capability_name}");
     };
     match capability_name {
         ArchiveAccessorMarker::PROTOCOL_NAME => {
+            assert_eq!(moniker, rcs::toolbox::MONIKER);
             handle_archive_accessor(
-                ServerEnd::<ArchiveAccessorMarker>::new(channel).into_stream().unwrap(),
-                environment.clone(),
+                fidl::endpoints::ServerEnd::<ArchiveAccessorMarker>::from(channel)
+                    .into_stream()
+                    .unwrap(),
+                state,
             )
-            .await
+            .await;
         }
-        LogSettingsMarker::PROTOCOL_NAME => handle_log_settings(channel, environment.clone()).await,
+        LogSettingsMarker::PROTOCOL_NAME => {
+            assert_eq!(moniker, rcs::toolbox::MONIKER);
+            handle_log_settings(
+                fidl::endpoints::ServerEnd::<LogSettingsMarker>::from(channel)
+                    .into_stream()
+                    .unwrap(),
+                state,
+            )
+            .await;
+        }
+        "fuchsia.sys2.RealmQuery.root" | fsys::RealmQueryMarker::PROTOCOL_NAME => {
+            assert_eq!(moniker, "core/remote-control");
+            let server_end = fidl::endpoints::ServerEnd::from(channel);
+            handle_realm_query(
+                state
+                    .instances
+                    .iter()
+                    .map(|moniker| fsys::Instance {
+                        moniker: Some(moniker.to_string()),
+                        url: Some("fuchsia-pkg://test".into()),
+                        ..Default::default()
+                    })
+                    .collect(),
+                server_end,
+            )
+            .await;
+        }
         other => {
             unreachable!("Attempted to connect to {other:?}");
         }
     }
 }
 
-pub async fn handle_rcs_connection(
-    connection: ServerEnd<RemoteControlMarker>,
-    environment: Environment,
-) {
-    let mut stream = connection.into_stream().unwrap();
-    while let Some(Ok(request)) = stream.next().await {
-        match request {
-            RemoteControlRequest::IdentifyHost { responder } => {
-                responder
-                    .send(Ok(&IdentifyHostResponse {
-                        nodename: Some(NODENAME.into()),
-                        boot_timestamp_nanos: Some(environment.config.boot_timestamp.get()),
-                        ..Default::default()
-                    }))
-                    .unwrap();
-            }
-            RemoteControlRequest::OpenCapability {
-                moniker,
-                capability_set,
-                capability_name,
-                server_channel,
-                flags: _,
-                responder,
-            } => {
-                assert_eq!(moniker, rcs::toolbox::MONIKER);
-                assert_eq!(capability_set, rcs::OpenDirType::NamespaceDir);
-                let environment_2 = environment.clone();
-                Task::local(async move {
-                    handle_open_capability(&capability_name, server_channel, environment_2).await
-                })
-                .detach();
-                responder.send(Ok(())).unwrap();
-            }
-            _ => {
-                unreachable!();
+async fn handle_archive_accessor(mut stream: ArchiveAccessorRequestStream, state: Rc<State>) {
+    while let Some(Ok(ArchiveAccessorRequest::StreamDiagnostics {
+        parameters,
+        stream,
+        responder,
+    })) = stream.next().await
+    {
+        if state.send_connected_event {
+            let _ = state
+                .event_snd
+                .unbounded_send(TestEvent::Connected(parameters.stream_mode.unwrap()));
+        }
+        // Ignore the result, because the client may choose to close the channel.
+        let _ = responder.send();
+        stream.write(serde_json::to_string(&state.messages).unwrap().as_bytes()).unwrap();
+
+        match parameters.stream_mode.unwrap() {
+            StreamMode::Snapshot => {}
+            StreamMode::SnapshotThenSubscribe | StreamMode::Subscribe => {
+                let rcv = state.mutable.borrow_mut().disconnect_rcv.take().unwrap();
+                let _ = rcv.await;
             }
         }
     }
 }
-async fn handle_target_connection(connection: ServerEnd<TargetMarker>, environment: Environment) {
-    let mut stream = connection.into_stream().unwrap();
-    while let Some(Ok(TargetRequest::OpenRemoteControl { remote_control, responder })) =
-        stream.next().await
-    {
-        Task::local(handle_rcs_connection(remote_control, environment.clone())).detach();
-        responder.send(Ok(())).unwrap();
-    }
-}
 
-pub async fn handle_target_collection_connection(
-    connection: ServerEnd<TargetCollectionMarker>,
-    environment: Environment,
-) {
-    let mut stream = connection.into_stream().unwrap();
-
-    while let Some(Ok(TargetCollectionRequest::OpenTarget { query, target_handle, responder })) =
-        stream.next().await
-    {
-        assert_eq!(query.string_matcher, Some(NODENAME.into()));
-        Task::local(handle_target_connection(target_handle, environment.clone())).detach();
-        responder.send(Ok(())).unwrap();
+async fn handle_log_settings(mut stream: LogSettingsRequestStream, state: Rc<State>) {
+    while let Some(Ok(request)) = stream.next().await {
+        match request {
+            LogSettingsRequest::RegisterInterest { .. } => {
+                panic!("fuchsia.diagnostics/LogSettings.RegisterInterest is not supported");
+            }
+            LogSettingsRequest::SetInterest { selectors, responder } => {
+                let _ = state.event_snd.unbounded_send(TestEvent::SetInterest(selectors));
+                responder.send().unwrap();
+            }
+        }
     }
+    let _ = state.event_snd.unbounded_send(TestEvent::LogSettingsClosed);
 }

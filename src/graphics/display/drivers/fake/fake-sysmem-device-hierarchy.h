@@ -25,7 +25,18 @@ class FakeSysmemDeviceHierarchy : public SysmemServiceProvider {
   FakeSysmemDeviceHierarchy();
   ~FakeSysmemDeviceHierarchy() override;
 
-  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> GetOutgoingDirectory() override;
+  FakeSysmemDeviceHierarchy(const FakeSysmemDeviceHierarchy&) = delete;
+  FakeSysmemDeviceHierarchy& operator=(const FakeSysmemDeviceHierarchy&) = delete;
+  FakeSysmemDeviceHierarchy(FakeSysmemDeviceHierarchy&&) = delete;
+  FakeSysmemDeviceHierarchy& operator=(FakeSysmemDeviceHierarchy&&) = delete;
+
+  // Initialization logic not suitable for the constructor.
+  zx::result<> Initialize();
+
+  // SysmemServiceProvider:
+  zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> ConnectAllocator() override;
+  zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> ConnectAllocator2() override;
+  zx::result<fidl::ClientEnd<fuchsia_hardware_sysmem::Sysmem>> ConnectHardwareSysmem() override;
 
  private:
   fdf_testing::DriverRuntime& runtime() { return *runtime_; }

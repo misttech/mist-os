@@ -253,6 +253,58 @@ impl Arena {
         unsafe { ArenaStaticBox::new_unchecked(self.clone(), data) }
     }
 
+    /// Creates an [`ArenaBox`]ed slice from an iterator implementing [`ExactSizeIterator`]. Note
+    /// that if [`ExactSizeIterator::len`] returns an incorrect value, the returned [`ArenaBox`]
+    /// will be no more than the length returned, and may be less.
+    pub fn insert_from_iter<I: IntoIterator>(&self, source: I) -> ArenaBox<'_, [I::Item]>
+    where
+        I::IntoIter: ExactSizeIterator,
+    {
+        let iter = source.into_iter();
+        let len = iter.len();
+        let mut actual_len = 0;
+        let mut storage = self.insert_uninit_slice(len);
+        for (output, input) in storage.iter_mut().zip(iter) {
+            output.write(input);
+            actual_len += 1;
+        }
+        // SAFETY: we wrote to `actual_len` elements of the storage
+        unsafe { ArenaBox::assume_init_slice_len(storage, actual_len) }
+    }
+
+    /// Tries to create an [`ArenaBox`]ed slice from an iterator implementing [`ExactSizeIterator`].
+    /// Note that if [`ExactSizeIterator::len`] returns an incorrect value, the returned
+    /// [`ArenaBox`] will be no more than the length returned, and may be less.
+    ///
+    /// If any item returned by the iterator returns an Err() result, results so far are discarded
+    pub fn try_insert_from_iter<I, T, E>(&self, source: I) -> Result<ArenaBox<'_, [T]>, E>
+    where
+        I: IntoIterator<Item = Result<T, E>>,
+        I::IntoIter: ExactSizeIterator,
+    {
+        let iter = source.into_iter();
+        let len = iter.len();
+        let mut actual_len = 0;
+        let mut storage = self.insert_uninit_slice(len);
+        for (output, input) in storage.iter_mut().zip(iter) {
+            match input {
+                Ok(input) => {
+                    output.write(input);
+                    actual_len += 1;
+                }
+                Err(e) => {
+                    // `assume_init` the slice so far so that drop handlers are properly called on the
+                    // items already moved. This will be dropped immediately.
+                    // SAFETY: `actual_len` will be the length of moved values into the slice so far.
+                    unsafe { ArenaBox::assume_init_slice_len(storage, actual_len) };
+                    return Err(e);
+                }
+            }
+        }
+        // SAFETY: we wrote to `actual_len` elements of the storage
+        Ok(unsafe { ArenaBox::assume_init_slice_len(storage, actual_len) })
+    }
+
     /// Transforms this Arena into an fdf_arena_t without dropping the reference.
     ///
     /// If the caller drops the returned fdf_arena_t, the memory allocated by the
@@ -284,6 +336,10 @@ impl Drop for Arena {
 /// out of scope.
 #[derive(Debug)]
 pub struct ArenaBox<'a, T: ?Sized>(NonNull<T>, PhantomData<&'a Arena>);
+
+/// SAFETY: [`ArenaBox`] impls [`Send`] and [`Sync`] if `T` impls them.
+unsafe impl<'a, T: ?Sized> Send for ArenaBox<'a, T> where T: Send {}
+unsafe impl<'a, T: ?Sized> Sync for ArenaBox<'a, T> where T: Sync {}
 
 impl<'a, T> ArenaBox<'a, T> {
     /// Moves the inner value of this ArenaBox out to owned storage.
@@ -339,6 +395,27 @@ impl<'a, T> ArenaBox<'a, [MaybeUninit<T>]> {
     /// safety requirements of this.
     pub unsafe fn assume_init_slice(self) -> ArenaBox<'a, [T]> {
         let len = self.len();
+        // SAFETY: We are about to reconstitute this pointer back into
+        // a new `ArenaBox` with the same lifetime, and casting
+        // `MaybeUninit<T>` to `T` is safe.
+        let data: NonNull<T> = unsafe { ArenaBox::into_ptr(self) }.cast();
+        let slice_ptr = NonNull::slice_from_raw_parts(data, len);
+
+        // SAFETY: We just got this pointer from an `ArenaBox` we decomposed.
+        unsafe { ArenaBox::new(slice_ptr) }
+    }
+
+    /// Assumes the contents of this box of `[MaybeUninit<T>]` are initialized now,
+    /// up to `len` elements and ignores the rest.
+    ///
+    /// # Safety
+    ///
+    /// The caller is responsible for ensuring that the value is initialized
+    /// properly. See [`MaybeUninit::assume_init`] for more details on the
+    /// safety requirements of this.
+    pub unsafe fn assume_init_slice_len(self, len: usize) -> ArenaBox<'a, [T]> {
+        // only use up to `len` elements of the slice.
+        let len = self.len().min(len);
         // SAFETY: We are about to reconstitute this pointer back into
         // a new `ArenaBox` with the same lifetime, and casting
         // `MaybeUninit<T>` to `T` is safe.
@@ -419,6 +496,23 @@ impl<'a, T: ?Sized> ArenaBox<'a, T> {
     }
 }
 
+impl<'a> ArenaBox<'a, [MaybeUninit<u8>]> {
+    /// Transforms the [`ArenaBox`] into an `ArenaBox<T>`.
+    ///
+    /// # Safety
+    ///
+    /// The caller is responsible for ensuring that the contents of this
+    /// [`ArenaBox`] originated from a source with a properly allocated `T` with correct
+    /// alignment
+    pub unsafe fn cast_unchecked<T>(this: Self) -> ArenaBox<'a, T> {
+        let ptr = this.0.cast();
+        // Ensure we don't drop the original `ArenaBox`.
+        core::mem::forget(this);
+        // SAFETY: caller promises this is the correct type
+        unsafe { ArenaBox::new(ptr) }
+    }
+}
+
 impl<'a, T: ?Sized> Drop for ArenaBox<'a, T> {
     fn drop(&mut self) {
         // SAFETY: Since this value is allocated in the arena, and the arena
@@ -447,6 +541,66 @@ impl<T: ?Sized> DerefMut for ArenaBox<'_, T> {
     }
 }
 
+impl<'a, T: 'a> IntoIterator for ArenaBox<'a, [T]> {
+    type IntoIter = IntoIter<T, PhantomData<&'a Arena>>;
+    type Item = T;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let len = self.len();
+        let ptr = self.0.cast();
+        // SAFETY: we will never dereference `end`
+        let end = unsafe { ptr.add(len) };
+        IntoIter { ptr, end, _arena: PhantomData }
+    }
+}
+
+pub struct IntoIter<T, A> {
+    ptr: NonNull<T>,
+    end: NonNull<T>,
+    _arena: A,
+}
+
+impl<T, A> Iterator for IntoIter<T, A> {
+    type Item = T;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.ptr == self.end {
+            return None;
+        }
+        // SAFETY: all items from `ptr` to `end-1` are valid until moved out.
+        unsafe {
+            let res = self.ptr.read();
+            self.ptr = self.ptr.add(1);
+            Some(res)
+        }
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let len = self.len();
+        (len, Some(self.len()))
+    }
+}
+
+impl<T, A> ExactSizeIterator for IntoIter<T, A> {
+    fn len(&self) -> usize {
+        // SAFETY: end is always >= ptr
+        unsafe { self.end.offset_from(self.ptr) as usize }
+    }
+}
+
+impl<T, A> Drop for IntoIter<T, A> {
+    fn drop(&mut self) {
+        // go through and read all remaining items to drop them
+        while self.ptr != self.end {
+            // SAFETY: all items from `ptr` to `end-1` are valid until moved out.
+            unsafe {
+                drop(self.ptr.read());
+                self.ptr = self.ptr.add(1);
+            }
+        }
+    }
+}
+
 /// An equivalent to [`ArenaBox`] that holds onto a reference to the
 /// arena to allow it to have static lifetime.
 #[derive(Debug)]
@@ -456,6 +610,10 @@ pub struct ArenaStaticBox<T: ?Sized> {
     // guaranteed to be freed after the [`ArenaBox`].
     arena: Arena,
 }
+
+/// SAFETY: [`ArenaStaticBox`] impls [`Send`] and [`Sync`] if `T` impls them.
+unsafe impl<T: ?Sized> Send for ArenaStaticBox<T> where T: Send {}
+unsafe impl<T: ?Sized> Sync for ArenaStaticBox<T> where T: Sync {}
 
 impl<T: ?Sized> ArenaStaticBox<T> {
     /// Transforms the given [`ArenaBox`] into an [`ArenaStaticBox`] with an owned
@@ -496,6 +654,19 @@ impl<T: ?Sized> ArenaStaticBox<T> {
         // or box
         core::mem::forget(this);
         res
+    }
+}
+
+impl<T: 'static> IntoIterator for ArenaStaticBox<[T]> {
+    type IntoIter = IntoIter<T, Arena>;
+    type Item = T;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let len = self.len();
+        let ptr = self.data.0.cast();
+        // SAFETY: we will never dereference `end`
+        let end = unsafe { ptr.add(len) };
+        IntoIter { ptr, end, _arena: self.arena }
     }
 }
 
@@ -835,5 +1006,56 @@ pub(crate) mod tests {
         let val = unsafe { arena.assume(data_ptr) };
 
         assert_eq!(*val, 2);
+    }
+
+    #[test]
+    fn arena_into_and_from_iter() {
+        let arena = Arena::new().unwrap();
+
+        // empty slice to vec
+        let val: ArenaBox<'_, [()]> = arena.insert_slice(&[]);
+        let vec_val = Vec::from_iter(val);
+        assert!(vec_val.len() == 0);
+
+        // filled slice to vec
+        let val = arena.insert_slice(&[1, 2, 3, 4]);
+        let vec_val = Vec::from_iter(val);
+        assert_eq!(&[1, 2, 3, 4], &*vec_val);
+
+        // filled static slice to vec
+        let val = arena.make_static(arena.insert_slice(&[1, 2, 3, 4]));
+        let vec_val = Vec::from_iter(val);
+        assert_eq!(&[1, 2, 3, 4], &*vec_val);
+
+        // empty vec to arena box
+        let val: Vec<()> = vec![];
+        let arena_val = arena.insert_from_iter(val.clone());
+        assert_eq!(val, &*arena_val);
+
+        // filled vec to arena box
+        let val = vec![1, 2, 3, 4];
+        let arena_val = arena.insert_from_iter(val);
+        assert_eq!(&[1, 2, 3, 4], &*arena_val);
+    }
+
+    #[test]
+    fn arena_try_from_iter() {
+        let arena = Arena::new().unwrap();
+
+        let val: Vec<Result<_, ()>> = vec![Ok(1), Ok(2), Ok(3), Ok(4)];
+        let arena_val = arena.try_insert_from_iter(val).unwrap();
+        assert_eq!(&[1, 2, 3, 4], &*arena_val);
+
+        let (tx, rx) = mpsc::channel();
+        let val = vec![Ok(DropSender::new(0, tx.clone())), Err(-1), Ok(DropSender::new(1, tx))];
+        let Err(-1) = arena.try_insert_from_iter(val) else {
+            panic!("early exit from try_insert_from_iter")
+        };
+        let Ok(0) = rx.try_recv() else {
+            panic!("expected drop of leading ok value to have happened")
+        };
+        let Ok(1) = rx.try_recv() else {
+            panic!("expected drop of trailing ok value to have happened")
+        };
     }
 }

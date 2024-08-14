@@ -4,7 +4,6 @@
 
 #include "src/graphics/display/drivers/fake/sysmem-service-forwarder.h"
 
-#include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
@@ -23,49 +22,6 @@ namespace display {
 
 namespace {
 
-zx::result<fidl::ClientEnd<fuchsia_io::Directory>> OpenSvcDirectory(
-    const fidl::ClientEnd<fuchsia_io::Directory>& root_directory) {
-  auto [svc_client, svc_server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  zx_status_t status = fdio_open_at(root_directory.handle()->get(), "/svc",
-                                    static_cast<uint32_t>(fuchsia_io::OpenFlags::kDirectory),
-                                    std::move(svc_server).TakeChannel().release());
-  if (status != ZX_OK) {
-    return zx::error(status);
-  }
-  return zx::ok(std::move(svc_client));
-}
-
-TEST(SysmemServiceForwarder, ServiceDirectoryContainsSysmemService) {
-  zx::result<std::unique_ptr<SysmemServiceForwarder>> create_result =
-      SysmemServiceForwarder::Create();
-  ASSERT_OK(create_result);
-
-  std::unique_ptr<SysmemServiceForwarder> sysmem_service_forwarder =
-      std::move(create_result).value();
-
-  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> outgoing_directory_result =
-      sysmem_service_forwarder->GetOutgoingDirectory();
-  ASSERT_OK(outgoing_directory_result);
-
-  fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory =
-      std::move(outgoing_directory_result).value();
-  ASSERT_TRUE(outgoing_directory.is_valid());
-
-  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> svc_directory_result =
-      OpenSvcDirectory(outgoing_directory);
-  ASSERT_OK(svc_directory_result);
-  fidl::ClientEnd<fuchsia_io::Directory> svc_directory = std::move(svc_directory_result).value();
-
-  static const std::string kExpectedServiceName = "fuchsia.hardware.sysmem.Service";
-  zx::result<> watch_svc_result = device_watcher::WatchDirectoryForItems(
-      svc_directory, [](std::string_view name) -> std::optional<std::monostate> {
-        if (name == kExpectedServiceName)
-          return std::monostate{};
-        return std::nullopt;
-      });
-  EXPECT_OK(watch_svc_result);
-}
-
 TEST(SysmemServiceForwarder, OpenAllocatorV1) {
   zx::result<std::unique_ptr<SysmemServiceForwarder>> create_result =
       SysmemServiceForwarder::Create();
@@ -74,21 +30,8 @@ TEST(SysmemServiceForwarder, OpenAllocatorV1) {
   std::unique_ptr<SysmemServiceForwarder> sysmem_service_forwarder =
       std::move(create_result).value();
 
-  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> outgoing_directory_result =
-      sysmem_service_forwarder->GetOutgoingDirectory();
-  ASSERT_OK(outgoing_directory_result);
-
-  fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory =
-      std::move(outgoing_directory_result).value();
-  ASSERT_TRUE(outgoing_directory.is_valid());
-
-  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> svc_directory_result =
-      OpenSvcDirectory(outgoing_directory);
-  ASSERT_OK(svc_directory_result);
-  fidl::ClientEnd<fuchsia_io::Directory> svc_directory = std::move(svc_directory_result).value();
-
   zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>> allocator_v1_result =
-      component::ConnectAtMember<fuchsia_hardware_sysmem::Service::AllocatorV1>(svc_directory);
+      sysmem_service_forwarder->ConnectAllocator();
   ASSERT_OK(allocator_v1_result);
 
   fidl::SyncClient allocator_v1(std::move(allocator_v1_result).value());
@@ -136,21 +79,8 @@ TEST(SysmemServiceForwarder, OpenAllocatorV2) {
   std::unique_ptr<SysmemServiceForwarder> sysmem_service_forwarder =
       std::move(create_result).value();
 
-  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> outgoing_directory_result =
-      sysmem_service_forwarder->GetOutgoingDirectory();
-  ASSERT_OK(outgoing_directory_result);
-
-  fidl::ClientEnd<fuchsia_io::Directory> outgoing_directory =
-      std::move(outgoing_directory_result).value();
-  ASSERT_TRUE(outgoing_directory.is_valid());
-
-  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> svc_directory_result =
-      OpenSvcDirectory(outgoing_directory);
-  ASSERT_OK(svc_directory_result);
-  fidl::ClientEnd<fuchsia_io::Directory> svc_directory = std::move(svc_directory_result).value();
-
   zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> allocator_v2_result =
-      component::ConnectAtMember<fuchsia_hardware_sysmem::Service::AllocatorV2>(svc_directory);
+      sysmem_service_forwarder->ConnectAllocator2();
   ASSERT_OK(allocator_v2_result);
 
   fidl::SyncClient allocator_v2(std::move(allocator_v2_result).value());

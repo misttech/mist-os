@@ -7,13 +7,21 @@ import("//tools/cmc/build/expect_includes.gni")
 
 static_library("fs_test") {
   testonly = true
+  public = [
+    "fs_test.h",
+    "fs_test_fixture.h",
+    "misc.h",
+    "test_filesystem.h",
+  ]
   sources = [
+    "blobfs_test.h",
     "fs_test.cc",
     "fs_test_fixture.cc",
     "json_filesystem.cc",
     "json_filesystem.h",
     "misc.cc",
     "test_filesystem.cc",
+    "truncate_fixture.h",
   ]
   deps = [
     ":crypt_service",
@@ -47,6 +55,7 @@ static_library("fs_test") {
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/zx",
   ]
+  friend = [ ":*" ]
 }
 
 test("access_tests") {

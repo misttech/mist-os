@@ -22,6 +22,12 @@
             from: "#device-name-provider",
             to: "#integration-test",
         },
+        {
+            from: "void",
+            to: "#device-name-provider",
+            availability: "optional",
+            config: [ "fuchsia.network.PrimaryInterface" ],
+        },
     ],
     expose: [
         {

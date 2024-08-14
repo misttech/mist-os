@@ -8,6 +8,10 @@ source_set("raw-nand-options") {
   public = [ "options.h" ]
 }
 
+source_set("raw-nand-image") {
+  public = [ "raw_nand_image.h" ]
+}
+
 source_set("raw-nand-image-utils") {
   public = [ "raw_nand_image_utils.h" ]
   public_deps = [
@@ -52,6 +56,7 @@ source_set("ftl-raw-nand-image-writer") {
   sources = [ "ftl_raw_nand_image_writer.cc" ]
   public = [ "ftl_raw_nand_image_writer.h" ]
   public_deps = [
+    ":raw-nand-image",
     ":raw-nand-options",
     "//sdk/lib/fit-promise",
     "//src/storage/volume_image/utils:io-interfaces",

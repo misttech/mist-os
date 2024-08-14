@@ -82,10 +82,7 @@ enum class ElementRunnerError : uint8_t {
 
 class ParentElementHasher final {
  public:
-  /// Make a unique string as our hash key. The string is the ordinal of the SAG
-  /// value or 0 if not present followed by a forward slash, followed by the
-  /// parent name, or the empty string if name is not present.
-  /// [${sag}|0]/[${name}]
+  /// Make a unique string as our hash key.
   size_t operator()(const fuchsia_hardware_power::ParentElement& element) const;
 };
 

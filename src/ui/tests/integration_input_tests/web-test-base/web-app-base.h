@@ -17,6 +17,9 @@
 
 namespace integration_tests {
 
+// Parse buffer to string.
+std::string StringFromBuffer(const fuchsia_mem::Buffer& buffer);
+
 // Parse buffer to json object. Exception when parsing failed.
 rapidjson::Document JsonFromBuffer(const fuchsia_mem::Buffer& buffer);
 
@@ -49,12 +52,15 @@ class WebAppBase : public fidl::Server<fuchsia_ui_app::ViewProvider> {
 
  protected:
   // Parameters:
+  // - `web_app_name`: only used in logs.
   // - `js_code`: injected to web page. It requires REGISTER_PORT/
   //    WINDOW_RESIZED handling in receiveMessage(), see mouse-input-chromium
   //    for example.
-  void Setup(const std::string& js_code, fuchsia_web::ContextFeatureFlags context_feature_flags =
-                                             fuchsia_web::ContextFeatureFlags::kVulkan |
-                                             fuchsia_web::ContextFeatureFlags::kNetwork);
+  // - `context_feature_flags`: the feature flags to create web context.
+  void Setup(const std::string& web_app_name, const std::string& js_code,
+             fuchsia_web::ContextFeatureFlags context_feature_flags =
+                 fuchsia_web::ContextFeatureFlags::kVulkan |
+                 fuchsia_web::ContextFeatureFlags::kNetwork);
 
   template <typename PredicateT>
   void RunLoopUntil(PredicateT predicate) {
@@ -68,7 +74,8 @@ class WebAppBase : public fidl::Server<fuchsia_ui_app::ViewProvider> {
   fidl::Client<fuchsia_web::MessagePort> out_message_port_;
 
  private:
-  void SetupWebEngine(fuchsia_web::ContextFeatureFlags context_feature_flags);
+  void SetupWebEngine(const std::string& web_app_name,
+                      fuchsia_web::ContextFeatureFlags context_feature_flags);
   void SetupViewProvider();
   void SetupWebPage(const std::string& js_code);
   void SendMessageToWebPage(fidl::ServerEnd<fuchsia_web::MessagePort> message_port,

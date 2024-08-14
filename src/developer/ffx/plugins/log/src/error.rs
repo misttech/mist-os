@@ -4,17 +4,12 @@
 
 use crate::transactional_symbolizer::ReadError;
 use ffx_config::api::ConfigError;
-use fidl_fuchsia_developer_ffx::{OpenTargetError, TargetConnectionError};
 use fidl_fuchsia_developer_remotecontrol::{ConnectCapabilityError, IdentifyHostError};
 use log_command::log_formatter::FormatterError;
 use thiserror::Error;
 
 #[derive(Error, Debug)]
 pub enum LogError {
-    #[error("Failed to open target: {:?}", error)]
-    OpenTargetError { error: OpenTargetError },
-    #[error("Failed to connect to target: {:?}", error)]
-    TargetConnectionError { error: TargetConnectionError },
     #[error("Failed to identify host: {:?}", error)]
     IdentifyHostError { error: IdentifyHostError },
     #[error(transparent)]
@@ -45,6 +40,8 @@ pub enum LogError {
     SymbolizerError(#[from] ReadError),
     #[error("Daemon connection was lost and retries are disabled.")]
     DaemonRetriesDisabled,
+    #[error(transparent)]
+    Internal(#[from] fho::Error),
 }
 
 impl From<log_command::LogError> for LogError {
@@ -75,8 +72,6 @@ impl From<LogError> for fho::Error {
             | NoBootTimestamp
             | NoSymbolizerConfig
             | RealmQueryConnectionFailed { .. }
-            | OpenTargetError { .. }
-            | TargetConnectionError { .. }
             | IdentifyHostError { .. }
             | SdkNotAvailable { .. }
             | ConnectCapabilityError { .. } => fho::Error::User(value.into()),
@@ -87,6 +82,7 @@ impl From<LogError> for fho::Error {
             SymbolizerError(err) => fho::Error::Unexpected(err.into()),
             DaemonRetriesDisabled => fho::Error::Unexpected(value.into()),
             FormatterError(error) => fho::Error::Unexpected(error.into()),
+            Internal(error) => error,
         }
     }
 }
@@ -100,18 +96,6 @@ impl From<i32> for LogError {
 impl From<ConnectCapabilityError> for LogError {
     fn from(error: ConnectCapabilityError) -> Self {
         Self::ConnectCapabilityError { error }
-    }
-}
-
-impl From<OpenTargetError> for LogError {
-    fn from(error: OpenTargetError) -> Self {
-        LogError::OpenTargetError { error }
-    }
-}
-
-impl From<TargetConnectionError> for LogError {
-    fn from(error: TargetConnectionError) -> Self {
-        LogError::TargetConnectionError { error }
     }
 }
 

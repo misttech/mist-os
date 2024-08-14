@@ -43,6 +43,7 @@ static_library("cpp") {
   public = [
     "block_group_registry.h",
     "client.h",
+    "pass_through_read_only_device.h",
     "remote_block_device.h",
   ]
   sources = [

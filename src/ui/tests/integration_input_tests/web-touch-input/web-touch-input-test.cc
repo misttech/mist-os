@@ -310,11 +310,11 @@ class WebEngineTest : public ui_testing::PortableUITest,
     switch (tap_location) {
       case TapLocation::kTopLeft:
         // center of top right quadrant -> ends up as center of top left quadrant
-        InjectTap(/* x = */ 3 * display_size().width / 4, /* y = */ display_size().height / 4);
+        InjectTap(/* x = */ 3 * display_width() / 4, /* y = */ display_height() / 4);
         break;
       case TapLocation::kTopRight:
         // center of bottom right quadrant -> ends up as center of top right quadrant
-        InjectTap(/* x = */ 3 * display_size().width / 4, /* y = */ 3 * display_size().height / 4);
+        InjectTap(/* x = */ 3 * display_width() / 4, /* y = */ 3 * display_height() / 4);
         break;
       default:
         FX_NOTREACHED();
@@ -459,9 +459,6 @@ class WebEngineTest : public ui_testing::PortableUITest,
     };
   }
 
-  // Guaranteed to be initialized after SetUp().
-  uint32_t display_width() { return display_size().width; }
-  uint32_t display_height() { return display_size().height; }
   uint32_t display_rotation() override { return 90; }
 
   // TODO: https://fxbug.dev/42082519 - Test for DPR=2.0, too.

@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
-import("//build/rust/rustc_library.gni")
+import("//build/rust/rustc_binary.gni")
 import("//build/test.gni")
 
 group("tests") {
@@ -18,6 +18,14 @@ group("tests") {
 }
 
 static_library("fvm") {
+  public = [
+    "format.h",
+    "fvm.h",
+    "fvm_sparse.h",
+    "metadata.h",
+    "metadata_buffer.h",
+    "sparse_reader.h",
+  ]
   sources = [
     "format.cc",
     "fvm.cc",
@@ -47,6 +55,11 @@ static_library("fvm") {
       "client.cc",
       "fvm_check.cc",
       "vmo_metadata_buffer.cc",
+    ]
+    public += [
+      "client.h",
+      "fvm_check.h",
+      "vmo_metadata_buffer.h",
     ]
 
     deps += [
@@ -188,24 +201,26 @@ fuchsia_test_package("fvm-integration-test") {
   deps = [ "//src/storage/minfs/bin:minfs-component" ]
 }
 
-rustc_library("fvm_rust") {
+rustc_binary("fvm_rust") {
   with_unit_tests = true
   name = "fvm"
   edition = "2021"
-  sources = [ "src/lib.rs" ]
+  sources = [ "src/main.rs" ]
   deps = [
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
     "//sdk/fidl/fuchsia.hardware.block.volume:fuchsia.hardware.block.volume_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/lib/fidl/rust/fidl",
+    "//src/lib/fuchsia",
+    "//src/lib/fuchsia-runtime",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
-    "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
-    "//src/storage/lib/block_client/rust:remote-block-device",
+    "//src/storage/lib/block_client/rust",
     "//src/storage/lib/block_server",
     "//src/storage/lib/storage_device",
     "//src/storage/lib/vfs/rust:vfs",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:async-lock",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:sha2",
     "//third_party/rust_crates:tracing",
@@ -214,11 +229,17 @@ rustc_library("fvm_rust") {
   ]
   test_deps = [
     ":golden",
-    "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
     "//src/storage/lib/block_server:fake_block_server",
+    "//third_party/rust_crates:assert_matches",
   ]
+}
+
+fuchsia_component("fvm-component") {
+  component_name = "fvm2"
+  manifest = "meta/fvm2.cml"
+  deps = [ ":fvm_rust" ]
 }
 
 resource("golden") {

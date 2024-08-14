@@ -2,13 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <dirent.h>
+#include <fcntl.h>
 #include <lib/stdcompat/span.h>
 
-#include <iterator>
+#include <cstddef>
+#include <cstdio>
+#include <cstring>
+#include <string_view>
+#include <vector>
 
 #include <fbl/algorithm.h>
+#include <gtest/gtest.h>
 
 #include "src/storage/host_fs_test/fixture.h"
+#include "src/storage/minfs/host.h"
 
 namespace fs_test {
 namespace {

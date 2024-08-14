@@ -53,7 +53,7 @@ fuchsia_unittest_package("block_server_tests") {
 rustc_staticlib("block_server_c") {
   visibility = [ ":*" ]
   edition = "2021"
-  public = [ "block_server.h" ]
+  public = [ "block_server_c.h" ]
   sources = block_server_sources
   deps = block_server_deps
 }

@@ -72,11 +72,14 @@ zx_status_t F2fs::CheckOrphanSpace() {
   return ZX_OK;
 }
 
-void F2fs::PurgeOrphanInode(nid_t ino) {
-  fbl::RefPtr<VnodeF2fs> vnode;
-  ZX_ASSERT(VnodeF2fs::Vget(this, ino, &vnode) == ZX_OK);
-  vnode->ClearNlink();
-  // truncate all the data and nodes in VnodeF2fs::Recycle()
+zx::result<> F2fs::PurgeOrphanInode(nid_t ino) {
+  zx::result vnode_or = GetVnode(ino);
+  if (vnode_or.is_error()) {
+    return vnode_or.take_error();
+  }
+  vnode_or->ClearNlink();
+  // Here, |*vnode_or| should be deleted to purge its metadata.
+  return zx::ok();
 }
 
 zx_status_t F2fs::PurgeOrphanInodes() {
@@ -102,7 +105,9 @@ zx_status_t F2fs::PurgeOrphanInodes() {
     ZX_ASSERT(entry_count <= kOrphansPerBlock);
     for (block_t j = 0; j < entry_count; ++j) {
       nid_t ino = LeToCpu(orphan_blk->ino[j]);
-      PurgeOrphanInode(ino);
+      if (PurgeOrphanInode(ino).is_error()) {
+        FX_LOGS(WARNING) << "failed to purge an orphan file (ino: " << ino << ")";
+      }
     }
   }
   // clear Orphan Flag
@@ -508,14 +513,15 @@ bool F2fs::IsTearDown() const { return teardown_flag_.test(std::memory_order_rel
 void F2fs::SetTearDown() { teardown_flag_.test_and_set(std::memory_order_relaxed); }
 
 // We guarantee that this checkpoint procedure should not fail.
-zx_status_t F2fs::WriteCheckpoint(bool blocked, bool is_umount) {
+zx_status_t F2fs::WriteCheckpoint(bool stop_writeback, bool is_umount) {
   if (superblock_info_->TestCpFlags(CpFlag::kCpErrorFlag)) {
     return ZX_ERR_BAD_STATE;
   }
 
   // Stop writeback during checkpoint.
   FlagAcquireGuard flag(&stop_reclaim_flag_);
-  if (flag.IsAcquired()) {
+  if (stop_writeback) {
+    ZX_ASSERT(flag.IsAcquired());
     ZX_ASSERT(WaitForWriteback().is_ok());
   }
   ZX_DEBUG_ASSERT(segment_manager_->FreeSections() > GetFreeSectionsForDirtyPages());

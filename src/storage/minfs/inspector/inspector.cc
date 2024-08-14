@@ -5,18 +5,30 @@
 #include "src/storage/minfs/inspector/inspector.h"
 
 #include <lib/syslog/cpp/macros.h>
-#include <sys/stat.h>
+#include <lib/zx/result.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
-#include <disk_inspector/common_types.h>
-#include <fbl/unique_fd.h>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <utility>
+
+#include <fbl/string.h>
 #include <safemath/safe_conversions.h>
 
-#include "src/storage/lib/block_client/cpp/block_device.h"
+#include "src/storage/lib/disk_inspector/common_types.h"
+#include "src/storage/lib/disk_inspector/disk_inspector.h"
+#include "src/storage/lib/vfs/cpp/journal/format.h"
 #include "src/storage/lib/vfs/cpp/journal/inspector_journal.h"
 #include "src/storage/minfs/bcache.h"
+#include "src/storage/minfs/format.h"
 #include "src/storage/minfs/inspector/inspector_inode_table.h"
 #include "src/storage/minfs/inspector/inspector_private.h"
 #include "src/storage/minfs/inspector/inspector_superblock.h"
+#include "src/storage/minfs/mount.h"
+#include "src/storage/minfs/runner.h"
 
 namespace minfs {
 

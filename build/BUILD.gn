@@ -99,6 +99,7 @@ group("non_hermetic_deps") {
     "//src/sys/component_manager/tests/fuchsia_boot_resolver:*",
     "//src/tests/assembly/*",
     "//src/tests/kernel_cprng/*",
+    "//src/tests/limited_netsvc/image:*",
     "//third_party/network-conformance/images/*",
     "//zircon/kernel/*",
     "//zircon/system/*",

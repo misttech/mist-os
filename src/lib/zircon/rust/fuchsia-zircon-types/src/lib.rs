@@ -137,6 +137,7 @@ multiconst!(u32, [
     ZX_VMO_RESIZABLE = 1 << 1;
     ZX_VMO_DISCARDABLE = 1 << 2;
     ZX_VMO_TRAP_DIRTY = 1 << 3;
+    ZX_VMO_UNBOUNDED = 1 << 4;
 ]);
 
 multiconst!(u64, [

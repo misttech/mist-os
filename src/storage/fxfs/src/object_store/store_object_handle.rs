@@ -23,7 +23,6 @@ use crate::range::RangeExt;
 use crate::round::{round_down, round_up};
 use anyhow::{anyhow, bail, ensure, Context, Error};
 use assert_matches::assert_matches;
-use fidl_fuchsia_io as fio;
 use futures::stream::{FuturesOrdered, FuturesUnordered};
 use futures::{try_join, TryStreamExt};
 use fxfs_crypto::{KeyPurpose, WrappedKeys, XtsCipherSet};
@@ -34,6 +33,7 @@ use std::ops::Range;
 use std::sync::atomic::{self, AtomicBool, Ordering};
 use std::sync::Arc;
 use storage_device::buffer::{Buffer, BufferFuture, BufferRef, MutableBufferRef};
+use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
 /// Maximum size for an extended attribute name.
 pub const MAX_XATTR_NAME_SIZE: usize = 255;
@@ -156,6 +156,33 @@ impl<S: HandleOwner> ObjectHandle for StoreObjectHandle<S> {
 
     fn block_size(&self) -> u64 {
         self.store().block_size()
+    }
+}
+
+struct Watchdog {
+    _task: fasync::Task<()>,
+}
+
+impl Watchdog {
+    fn new(increment_seconds: u64, cb: impl Fn(u64) + Send + 'static) -> Self {
+        Self {
+            _task: fasync::Task::spawn(async move {
+                let increment = increment_seconds.try_into().unwrap();
+                let mut fired_counter = 0;
+                let mut next_wake = fasync::Time::now();
+                loop {
+                    next_wake += std::time::Duration::from_secs(increment).into();
+                    // If this isn't being scheduled this will purposely result in fast looping when
+                    // it does. This will be insightful about the state of the thread and task
+                    // scheduling.
+                    if fasync::Time::now() < next_wake {
+                        fasync::Timer::new(next_wake).await;
+                    }
+                    fired_counter += 1;
+                    cb(fired_counter);
+                }
+            }),
+        }
     }
 }
 
@@ -321,6 +348,9 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
         let store = self.store();
         store.device_write_ops.fetch_add(1, Ordering::Relaxed);
         let mut checksums = Vec::new();
+        let _watchdog = Watchdog::new(10, |count| {
+            warn!("Write has been stalled for {} seconds", count * 10);
+        });
         try_join!(store.device.write(device_offset, buf), async {
             if !self.options.skip_checksums {
                 let block_size = self.block_size();
@@ -523,11 +553,16 @@ impl<S: HandleOwner> StoreObjectHandle<S> {
     ) -> Result<(), Error> {
         let store = self.store();
         store.device_read_ops.fetch_add(1, Ordering::Relaxed);
-        let ((), keys) = futures::future::try_join(
-            store.device.read(device_offset, buffer.reborrow()),
-            self.get_keys(),
-        )
-        .await?;
+        let ((), keys) = {
+            let _watchdog = Watchdog::new(10, |count| {
+                warn!("Read has been stalled for {} seconds", count * 10);
+            });
+            futures::future::try_join(
+                store.device.read(device_offset, buffer.reborrow()),
+                self.get_keys(),
+            )
+            .await?
+        };
         if let Some(keys) = keys {
             keys.decrypt(file_offset, key_id, buffer.as_mut_slice())?;
         }
@@ -2171,5 +2206,48 @@ mod tests {
         );
 
         fs.close().await.expect("close failed");
+    }
+
+    // Running on target only, to use fake time features in the executor.
+    #[cfg(target_os = "fuchsia")]
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_watchdog() {
+        use super::Watchdog;
+        use fuchsia_async::{Duration, TestExecutor, Time};
+        use std::sync::mpsc::channel;
+
+        TestExecutor::advance_to(make_time(0)).await;
+        let (sender, receiver) = channel();
+
+        fn make_time(time_secs: i64) -> Time {
+            Time::from_nanos(0) + Duration::from_seconds(time_secs)
+        }
+
+        {
+            let _watchdog = Watchdog::new(10, move |count| {
+                sender.send(count).expect("Sending value");
+            });
+
+            // Too early.
+            TestExecutor::advance_to(make_time(5)).await;
+            receiver.try_recv().expect_err("Should not have message");
+
+            // First message.
+            TestExecutor::advance_to(make_time(10)).await;
+            assert_eq!(1, receiver.recv().expect("Receiving"));
+
+            // Too early for the next.
+            TestExecutor::advance_to(make_time(15)).await;
+            receiver.try_recv().expect_err("Should not have message");
+
+            // Missed one. They'll be spooled up.
+            TestExecutor::advance_to(make_time(30)).await;
+            assert_eq!(2, receiver.recv().expect("Receiving"));
+            assert_eq!(3, receiver.recv().expect("Receiving"));
+        }
+
+        // Watchdog is dropped, nothing should trigger.
+        TestExecutor::advance_to(make_time(100)).await;
+        receiver.recv().expect_err("Watchdog should be gone");
     }
 }

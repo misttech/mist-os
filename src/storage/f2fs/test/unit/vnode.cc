@@ -33,7 +33,7 @@ void VgetFaultInjetionAndTest(F2fs &fs, Dir &root_dir, std::string_view name, T 
   ASSERT_EQ(name, test_vnode->GetNameView());
 
   // fault injection on the inode page after evicting the child from vnode cache
-  ASSERT_EQ(fs.EvictVnode(test_vnode.get()), ZX_OK);
+  ASSERT_EQ(fs.GetVCache().Evict(test_vnode.get()), ZX_OK);
   test_vnode->Close();
   test_vnode.reset();
   {
@@ -45,9 +45,10 @@ void VgetFaultInjetionAndTest(F2fs &fs, Dir &root_dir, std::string_view name, T 
   }
 
   // Create the child from the faulty node page
-  ASSERT_EQ(VnodeF2fs::Vget(&fs, nid, &test_vnode), expected_status);
+  auto vnode_or = fs.GetVnode(nid);
+  ASSERT_EQ(vnode_or.status_value(), expected_status);
   if (expected_status == ZX_OK) {
-    test_vnode->Close();
+    vnode_or->Close();
   }
 }
 
@@ -152,8 +153,7 @@ TEST_F(VnodeTest, Mode) {
 TEST_F(VnodeTest, WriteInode) {
   fbl::RefPtr<VnodeF2fs> test_vnode;
   // 1. Check node ino exception
-  ASSERT_EQ(VnodeF2fs::Vget(fs_.get(), fs_->GetSuperblockInfo().GetNodeIno(), &test_vnode),
-            ZX_ERR_NOT_FOUND);
+  ASSERT_EQ(fs_->GetVnode(fs_->GetSuperblockInfo().GetNodeIno()).status_value(), ZX_ERR_NOT_FOUND);
 
   // 2. Check GetNodePage() exception
   FileTester::CreateChild(root_dir_.get(), S_IFDIR, "write_inode_dir");
@@ -170,24 +170,20 @@ TEST_F(VnodeTest, WriteInode) {
   test_vnode = nullptr;
 }
 
-TEST_F(VnodeTest, VgetExceptionCase) {
+TEST_F(VnodeTest, GetVnodeExceptionCase) {
   DisableFsck();
 
   fbl::RefPtr<VnodeF2fs> test_vnode;
   NodeManager &node_manager = fs_->GetNodeManager();
   nid_t nid;
 
-  // 1. Check Create() GetNodePage() exception
+  // 1. Check GetVnode() GetNodePage() exception
   auto nid_or = node_manager.AllocNid();
   ASSERT_TRUE(nid_or.is_ok());
   nid = *nid_or;
-  ASSERT_EQ(VnodeF2fs::Vget(fs_.get(), nid, &test_vnode), ZX_ERR_NOT_FOUND);
+  ASSERT_EQ(fs_->GetVnode(nid).status_value(), ZX_ERR_NOT_FOUND);
 
-  // 2. Check Create() namelen exception
-  auto namelen_fault_inject = [](Node *node) { node->i.i_namelen = 0; };
-  VgetFaultInjetionAndTest(*fs_, *root_dir_, "namelen_dir", namelen_fault_inject, ZX_ERR_NOT_FOUND);
-
-  // 3. Check Vget() GetNlink() exception
+  // 2. Check GetVnode() GetNlink() exception
   auto nlink_fault_inject = [](Node *node) { node->i.i_links = 0; };
   VgetFaultInjetionAndTest(*fs_, *root_dir_, "nlink_dir", nlink_fault_inject, ZX_ERR_NOT_FOUND);
 }

@@ -222,6 +222,10 @@ if [[ "${script_dir}" != "${fuchsia_dir}"* ]]; then
   exit 1
 fi
 
+# This line allows commands to find other scripts even if they have not
+# run `source scripts/fx-env.sh`
+export PATH="$PATH:${script_dir}"
+
 declare -r vars_sh="${fuchsia_dir}/tools/devshell/lib/vars.sh"
 source "${vars_sh}" || exit $?
 

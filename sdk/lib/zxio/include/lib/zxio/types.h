@@ -497,44 +497,6 @@ typedef uint32_t zxio_watch_directory_event_t;
 typedef zx_status_t (*zxio_watch_directory_cb)(zxio_watch_directory_event_t event, const char* name,
                                                void* context) ZX_AVAILABLE_SINCE(7);
 
-// The possible entry creation modes. See fuchsia.io's CreationMode.
-typedef uint32_t zxio_creation_mode_t;
-
-#define ZXIO_CREATION_MODE_NEVER 0x0
-#define ZXIO_CREATION_MODE_NEVER_DEPRECATED 0x1
-#define ZXIO_CREATION_MODE_ALLOW_EXISTING 0x2
-#define ZXIO_CREATION_MODE_ALWAYS 0x3
-
-// See fuchsia.io for detailed semantics.
-typedef struct zxio_open2_options {
-  // Which protocols to accept. If no protocols are specified, a limited node protocol will
-  // be used; see fuchsia.io's node protocol.
-  zxio_node_protocols_t protocols;
-
-  // Directory options
-  // If zero, then this will translate to the field not being present in fuchsia.io.
-  uint64_t optional_rights;
-
-  // File flags  See fuchsia.io's FileProtocolFlags.
-  uint64_t file_flags;
-
-  // Node flags (only applicable if no protocols are specified above).  See fuchsia.io's
-  // NodeProtocolFlags.
-  uint64_t node_flags;
-
-  // Specifies behaviour with respect to existence. See fuchia.io's CreationMode, and use constants
-  // defined above.
-  zxio_creation_mode_t mode;
-
-  // Requested rights for the connection. If zero, this will mean inherit the rights of the
-  // connection that handles the open.
-  uint64_t rights;
-
-  // Attributes to be set if creating an object. Not all servers support setting
-  // all attributes.
-  const zxio_node_attributes_t* create_attr;
-} zxio_open2_options_t;
-
 // The mode for setting extended attributes.
 typedef uint32_t zxio_xattr_set_mode_t;
 

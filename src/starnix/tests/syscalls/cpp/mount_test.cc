@@ -10,6 +10,7 @@
 #include <sys/mount.h>
 #include <unistd.h>
 
+#include <cerrno>
 #include <fstream>
 #include <iostream>
 
@@ -338,6 +339,16 @@ TEST_F(MountTest, BusyWithMmap) {
   ASSERT_THAT(umount(dir.c_str()), SyscallSucceeds());
 }
 
+TEST_F(MountTest, NoDev) {
+  ASSERT_SUCCESS(MakeDir("a"));
+  auto dir = TestPath("a");
+  ASSERT_THAT(mount(nullptr, dir.c_str(), "tmpfs", MS_NODEV, nullptr), SyscallSucceeds());
+  auto path = TestPath("a/foo");
+  ASSERT_THAT(mknod(path.c_str(), S_IFBLK | 0777, 0), SyscallSucceeds());
+  ASSERT_THAT(open(path.c_str(), O_RDONLY), SyscallFailsWithErrno(EACCES));
+  ASSERT_THAT(umount(dir.c_str()), SyscallSucceeds());
+}
+
 class ProcMountsTest : public ProcTestBase {
   // Note that these tests can be affected by those in other suites e.g. a
   // MountTest above that doesn't clean up its mounts may change the value of
@@ -365,8 +376,8 @@ TEST_F(ProcMountsTest, Basic) {
     GTEST_SKIP() << "ProcMountsTest::Basic can not be run on Linux, skipping.";
   }
   EXPECT_THAT(read_mounts(), IsSupersetOf({
-                                 "data/system / remote_bundle rw 0 0",
-                                 "none /dev tmpfs rw 0 0",
+                                 "data/system / remote_bundle rw,nosuid,nodev 0 0",
+                                 "none /dev tmpfs rw,nosuid 0 0",
                                  ". /tmp tmpfs rw 0 0",
                              }));
 }

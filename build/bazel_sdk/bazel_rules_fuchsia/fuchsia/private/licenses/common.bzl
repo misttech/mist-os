@@ -13,7 +13,7 @@ def check_type(value, expected_type):
     """
     t = type(value)
     if t != expected_type:
-        fail("Expected value of type %s but got %s" % (t, expected_type))
+        fail("Expected value of type %s but got %s" % (expected_type, t))
 
 def is_target(value):
     """Whether value is of type Target.

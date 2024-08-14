@@ -2094,11 +2094,11 @@ pub(crate) mod tests {
         let _ = exec.wake_expired_timers();
 
         // Simulate inbound browse connection.
-        let (remote_browse, local_browse) = Channel::create();
+        let (remote_browse, local_browse) = zx::Socket::create_datagram();
+        assert!(local_browse.half_close().is_ok());
         // Set write to not work to trigger error on socket read.
-        let socket = local_browse.into_socket().unwrap();
-        assert!(socket.half_close().is_ok());
-        let local_browse = Channel::from_socket(socket, Channel::DEFAULT_MAX_TX).unwrap();
+        let local_browse = Channel::from_socket_infallible(local_browse, Channel::DEFAULT_MAX_TX);
+        let remote_browse = Channel::from_socket_infallible(remote_browse, Channel::DEFAULT_MAX_TX);
 
         let browse_channel = AvctpPeer::new(local_browse);
         peer_handle.set_browse_connection(browse_channel);

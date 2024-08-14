@@ -44,7 +44,8 @@ static zx::result<DeviceHandle> GetCameraHandle() {
 int main(int argc, char* argv[]) {
   fuchsia_logging::LogSettingsBuilder builder;
   builder.WithMinLogSeverity(CAMERA_MIN_LOG_LEVEL)
-      .BuildAndInitializeWithTags({"camera", "camera_device"});
+      .WithTags({"camera", "camera_device"})
+      .BuildAndInitialize();
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   async::Executor executor(loop.dispatcher());

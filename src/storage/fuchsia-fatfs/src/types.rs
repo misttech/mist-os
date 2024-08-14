@@ -19,7 +19,7 @@ impl Disk for std::io::Cursor<Vec<u8>> {
     }
 }
 
-impl Disk for remote_block_device::Cache {
+impl Disk for block_client::Cache {
     fn is_present(&self) -> bool {
         self.device().is_connected()
     }

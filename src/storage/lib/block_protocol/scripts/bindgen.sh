@@ -46,5 +46,7 @@ use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};"
   --with-derive-custom-struct=${ZEROCOPY_SYMS_REGEX}={AsBytes,FromBytes,FromZeros,NoCell} \
   --impl-debug \
   --allowlist-type=${ZEROCOPY_SYMS_REGEX} \
-  "${source_file}" | \
-  grep -vF 'pub type __' > "${target_file}"
+  --output "${target_file}" \
+  "${source_file}" \
+  -- \
+  -I${FUCHSIA_DIR}/zircon/system/public

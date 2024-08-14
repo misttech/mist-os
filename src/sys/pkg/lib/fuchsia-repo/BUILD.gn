@@ -96,8 +96,7 @@ rustc_library("fuchsia-repo") {
     "src/util.rs",
   ]
 
-  # TODO(https://fxbug.dev/356474618): re-enable and fix existing lints
-  # configs += [ "//build/config/rust/lints:clippy_warn_all" ]
+  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
   rustenv = [ "ROOT_OUT_DIR=$relative_root_out_dir" ]
 }
 

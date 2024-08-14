@@ -111,8 +111,7 @@ class FakeUsbServer : public ddk::UsbProtocol<FakeUsbServer> {
   usb_protocol_t proto() { return {.ops = &usb_protocol_ops_, .ctx = this}; }
 };
 
-class FakeBtHciServer : public ddk::BtHciProtocol<FakeBtHciServer>,
-                        public fidl::Server<fhbt::HciTransport> {
+class FakeBtHciServer : public fidl::Server<fhbt::HciTransport> {
  public:
   FakeBtHciServer() = default;
 
@@ -122,33 +121,6 @@ class FakeBtHciServer : public ddk::BtHciProtocol<FakeBtHciServer>,
             this, fdf::Dispatcher::GetCurrent()->async_dispatcher(), fidl::kIgnoreBindingClosure),
     });
   }
-
-  zx_status_t BtHciOpenCommandChannel(zx::channel channel) {
-    cmd_channel_ = std::move(channel);
-    // Queue the two events that the driver needs during initialization. The driver will read them
-    // from the channel as soon as it send commands to the test. The full channel based tx and rx
-    // mechanism is not implemented in the unittest here since it'll be deprecated soon.
-    zx_status_t write_status = cmd_channel_.write(/*flags=*/0, kResetCommandCompleteEvent.data(),
-                                                  kResetCommandCompleteEvent.size(),
-                                                  /*handles=*/nullptr, /*num_handles=*/0);
-    EXPECT_EQ(write_status, ZX_OK);
-    write_status = cmd_channel_.write(/*flags=*/0, kReadVersionTlvCompleteEvent.data(),
-                                      kReadVersionTlvCompleteEvent.size(),
-                                      /*handles=*/nullptr, /*num_handles=*/0);
-    EXPECT_EQ(write_status, ZX_OK);
-    return ZX_OK;
-  }
-  zx_status_t BtHciOpenAclDataChannel(zx::channel channel) {
-    acl_channel_ = std::move(channel);
-    return ZX_OK;
-  }
-  zx_status_t BtHciOpenScoChannel(zx::channel channel) { return ZX_OK; }
-  void BtHciConfigureSco(sco_coding_format_t coding_format, sco_encoding_t encoding,
-                         sco_sample_rate_t sample_rate, bt_hci_configure_sco_callback callback,
-                         void* cookie) {}
-  void BtHciResetSco(bt_hci_reset_sco_callback callback, void* cookie) {}
-  zx_status_t BtHciOpenIsoDataChannel(zx::channel channel) { return ZX_OK; }
-  zx_status_t BtHciOpenSnoopChannel(zx::channel channel) { return ZX_OK; }
 
   // fhbt::HciTransport request handler implementations:
   void Send(SendRequest& request, SendCompleter::Sync& completer) override {
@@ -184,14 +156,10 @@ class FakeBtHciServer : public ddk::BtHciProtocol<FakeBtHciServer>,
     ZX_PANIC("Unknown method in HciTransport requests");
   }
 
-  bt_hci_protocol_t proto() { return {.ops = &bt_hci_protocol_ops_, .ctx = this}; }
-
  private:
   // Mark the state of driver initialization. |reset_| is true means that the driver has sent the
   // reset command and |FakeBtHciServer| should expect a ReadVersionTlv command.
   bool reset_{false};
-  zx::channel cmd_channel_;
-  zx::channel acl_channel_;
   fidl::ServerBindingGroup<fhbt::HciTransport> hci_transport_binding_;
 };
 
@@ -220,11 +188,7 @@ class TestEnvironment : public fdf_testing::Environment {
         fbl::MakeRefCounted<fs::VmoFile>(std::move(vmo), kFirmware.size());
     ZX_ASSERT(firmware_dir_->AddEntry(kFirmwarePath, firmware_file) == ZX_OK);
 
-    compat::DeviceServer::BanjoConfig banjo_config{ZX_PROTOCOL_BT_HCI};
-    banjo_config.callbacks[ZX_PROTOCOL_BT_HCI] = [this]() {
-      return compat::DeviceServer::GenericProtocol{.ops = bt_hci_server_.proto().ops,
-                                                   .ctx = bt_hci_server_.proto().ctx};
-    };
+    compat::DeviceServer::BanjoConfig banjo_config{ZX_PROTOCOL_USB};
     banjo_config.callbacks[ZX_PROTOCOL_USB] = [this]() {
       return compat::DeviceServer::GenericProtocol{.ops = usb_server_.proto().ops,
                                                    .ctx = usb_server_.proto().ctx};

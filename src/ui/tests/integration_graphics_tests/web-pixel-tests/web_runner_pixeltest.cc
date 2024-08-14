@@ -292,7 +292,7 @@ INSTANTIATE_TEST_SUITE_P(ParameterizedStaticHtmlPixelTests, StaticHtmlPixelTests
 
 TEST_P(StaticHtmlPixelTests, ValidPixelTest) {
   LaunchClient();
-  const auto num_pixels = display_size().width * display_size().height;
+  const auto num_pixels = display_size().width() * display_size().height();
 
   // TODO(https://fxbug.dev/42067818): Find a better replacement for screenshot loops to verify that
   // content has been rendered on the display. Take screenshot until we see the web page's
@@ -318,11 +318,12 @@ class DynamicHtmlPixelTests : public WebRunnerPixelTest {
     auto touch = std::make_unique<fuchsia::ui::input::TouchscreenReport>();
     switch (tap_location) {
       case TapLocation::kTopLeft:
-        InjectTapWithRetry(/* x = */ display_size().width / 4, /* y = */ display_size().height / 4);
+        InjectTapWithRetry(/* x = */ display_size().width() / 4,
+                           /* y = */ display_size().height() / 4);
         break;
       case TapLocation::kTopRight:
-        InjectTapWithRetry(/* x = */ 3 * display_size().width / 4,
-                           /* y = */ display_size().height / 4);
+        InjectTapWithRetry(/* x = */ 3 * display_size().width() / 4,
+                           /* y = */ display_size().height() / 4);
         break;
       default:
         FX_NOTREACHED();
@@ -341,7 +342,7 @@ INSTANTIATE_TEST_SUITE_P(ParameterizedDynamicHtmlPixelTests, DynamicHtmlPixelTes
 
 TEST_P(DynamicHtmlPixelTests, ValidPixelTest) {
   LaunchClient();
-  const auto num_pixels = display_size().width * display_size().height;
+  const auto num_pixels = display_size().width() * display_size().height();
 
   // The web page should have a magenta background color.
   {

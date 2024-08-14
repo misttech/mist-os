@@ -154,7 +154,7 @@ std::optional<Error> GetTokensFromParents(ElementDependencyMap& dependencies, To
   // Go through the service instances we have and ask for a token. For all
   // GetToken calls that return a name in our list of parent names we need to
   // insert that token in the map under the name provided by the parent
-  for (const auto& instance : service_instances) {
+  for (const std::string& instance : service_instances) {
     // Get the PowerTokenProvider for a particular service instance.
     fidl::WireSyncClient<fuchsia_hardware_power::PowerTokenProvider> token_client;
     {
@@ -185,8 +185,12 @@ std::optional<Error> GetTokensFromParents(ElementDependencyMap& dependencies, To
 
     // Check that we depend on this element per our configuration
     if (dependencies.find(parent) == dependencies.end()) {
-      // Seems like we don't depend on this provider, oh well, let's keep looking.
-      continue;
+      // We didn't find it in the Name dependencies, maybe we can find it in the instance deps.
+      parent = fuchsia_hardware_power::ParentElement::WithInstanceName(instance);
+      if (dependencies.find(parent) == dependencies.end()) {
+        // Seems like we don't depend on this provider, oh well, let's keep looking.
+        continue;
+      }
     }
 
     // Woohoo! We found something we depend upon, let's store it
@@ -293,18 +297,21 @@ void ElementRunner::SetLevel(
 }
 
 size_t ParentElementHasher::operator()(const fuchsia_hardware_power::ParentElement& element) const {
+  // The string is the FIDL enum tag followed by slash followed by the data contained in that enum
+  // variant.
+  std::string hash_str = std::to_string(static_cast<uint64_t>(element.Which())).append("/");
   switch (element.Which()) {
     case fuchsia_hardware_power::ParentElement::Tag::kSag: {
-      return std::hash<std::string>{}(std::to_string(static_cast<uint32_t>(element.sag().value())) +
-                                      "/");
+      hash_str.append(std::to_string(static_cast<uint32_t>(element.sag().value())));
     } break;
     case fuchsia_hardware_power::ParentElement::Tag::kName: {
-      return std::hash<std::string>{}(
-          std::to_string(static_cast<uint32_t>(0)) + "/" +
-          std::string(element.name()->data(), element.name()->length()));
-
+      hash_str.append(element.name().value());
+    } break;
+    case fuchsia_hardware_power::ParentElement::Tag::kInstanceName: {
+      hash_str.append(element.instance_name().value());
     } break;
   }
+  return std::hash<std::string>{}(hash_str);
 }
 
 fit::result<Error, ElementDependencyMap> LevelDependencyFromConfig(
@@ -403,6 +410,9 @@ fit::result<Error, TokenMap> GetDependencyTokens(
         break;
       case fuchsia_hardware_power::ParentElement::Tag::kSag:
         have_sag_dep = true;
+        break;
+      case fuchsia_hardware_power::ParentElement::Tag::kInstanceName:
+        have_driver_dep = true;
         break;
     }
     if (have_driver_dep && have_sag_dep) {

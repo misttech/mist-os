@@ -4,7 +4,7 @@
 
 use async_trait::async_trait;
 use errors::FfxError;
-use ffx_command::{return_user_error, FfxCommandLine, FfxContext, Result};
+use ffx_command::{return_bug, return_user_error, FfxCommandLine, FfxContext, Result};
 use ffx_config::EnvironmentContext;
 use ffx_core::Injector;
 use ffx_fidl::VersionInfo;
@@ -14,6 +14,7 @@ use fidl_fuchsia_developer_ffx as ffx_fidl;
 use rcs::OpenDirType;
 use std::future::Future;
 use std::marker::PhantomData;
+use std::path::PathBuf;
 use std::pin::Pin;
 use std::rc::Rc;
 use std::sync::Arc;
@@ -48,6 +49,40 @@ pub struct FhoEnvironment {
     pub ffx: FfxCommandLine,
     pub context: EnvironmentContext,
     pub injector: Arc<dyn Injector>,
+}
+
+impl FhoEnvironment {
+    /// Update the log file name which can be influenced by the
+    /// FfxMain implementation being run.
+    pub fn update_log_file(&self, basename: Option<String>) -> Result<()> {
+        if let Some(basename) = basename {
+            // If the base name is the default, no action is needed.
+            if basename == ffx_config::logging::LOG_BASENAME {
+                return Ok(());
+            }
+            // If the log was specified on the command line, no action is needed
+            if self.ffx.global.log_destination.is_some() {
+                return Ok(());
+            }
+
+            // Some simple validation of the basename.
+            if basename.is_empty() {
+                return_bug!("basename cannot be empty")
+            }
+
+            // Build the path to the new log file.
+            let dir: PathBuf = self.context.get(ffx_config::logging::LOG_DIR).unwrap_or(".".into());
+            let mut log_file = dir.join(basename);
+            log_file.set_extension("log");
+
+            tracing::info!("Switching log file to {log_file:?}");
+            eprintln!("Switching log file to {log_file:?}");
+
+            ffx_config::logging::change_log_file(&log_file)?;
+        }
+
+        Ok(())
+    }
 }
 
 /// This is so that you can use a () somewhere that generically expects something

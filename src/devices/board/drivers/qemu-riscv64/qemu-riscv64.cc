@@ -12,17 +12,13 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/fdf/cpp/arena.h>
 #include <lib/zx/result.h>
-#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <zircon/threads.h>
 
 #include <fbl/alloc_checker.h>
-
-#include "fidl/fuchsia.hardware.platform.bus/cpp/natural_types.h"
-#include "lib/fdf/cpp/arena.h"
 
 namespace board_qemu_riscv64 {
 namespace fpbus = fuchsia_hardware_platform_bus;

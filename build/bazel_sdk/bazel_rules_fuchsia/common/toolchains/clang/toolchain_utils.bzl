@@ -20,11 +20,14 @@ load(
 load("//:toolchains/clang/providers.bzl", "ClangInfo")
 load("//:toolchains/clang/sanitizer.bzl", "sanitizer_features")
 
-def compute_clang_features(clang_info):
+def compute_clang_features(clang_info, target_os, target_cpu):
     """Compute list of C++ toolchain features required by Clang.
 
     Args:
       clang_info: A ClangInfo provider value.
+      target_os: Target OS, following Bazel conventions.
+      target_cpu: Target CPU, following Bazel conventions.
+
     Returns:
       A list of feature() objects.
     """
@@ -149,11 +152,36 @@ def compute_clang_features(clang_info):
         ],
     )
 
+    is_macos = target_os in ("osx", "macos")
+
+    generate_linkmap_feature = feature(
+        name = "generate_linkmap",
+        enabled = True,
+        flag_sets = [
+            flag_set(
+                actions = [
+                    ACTION_NAMES.cpp_link_executable,
+                    ACTION_NAMES.cpp_link_dynamic_library,
+                    ACTION_NAMES.cpp_link_nodeps_dynamic_library,
+                ],
+                flag_groups = [
+                    flag_group(
+                        flags = [
+                            "-Wl,-map=%{output_execpath}.map" if is_macos else "-Wl,--Map=%{output_execpath}",
+                        ],
+                        expand_if_available = "output_execpath",
+                    ),
+                ],
+            ),
+        ],
+    )
+
     features = [
         opt_feature,
         dependency_file_feature,
         ml_inliner_feature,
         coverage_feature,
+        generate_linkmap_feature,
     ] + sanitizer_features
 
     return features
@@ -283,9 +311,8 @@ def _prebuilt_clang_cc_toolchain_config_impl(ctx):
 
     clang_info = ctx.attr.clang_info[ClangInfo]
 
-    # TODO(digit): Change features list based on target_os and build variants
-    # For now, this is only enough for host toolchains.
-    features = compute_clang_features(clang_info)
+    # TODO(digit): Change features list based on build variants
+    features = compute_clang_features(clang_info, ctx.attr.target_os, ctx.attr.target_arch)
 
     return cc_common.create_cc_toolchain_config_info(
         ctx = ctx,

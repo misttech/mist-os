@@ -2,15 +2,21 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "disk_inspector/inspector_transaction_handler.h"
+#include "src/storage/lib/disk_inspector/inspector_transaction_handler.h"
 
-#include <lib/fdio/fdio.h>
+#include <fidl/fuchsia.hardware.block/cpp/wire.h>
 #include <lib/syslog/cpp/macros.h>
-#include <zircon/assert.h>
+#include <lib/zx/vmo.h>
 #include <zircon/errors.h>
+#include <zircon/types.h>
 
-#include <safemath/checked_math.h>
-#include <storage/buffer/vmo_buffer.h>
+#include <cstdint>
+#include <memory>
+#include <utility>
+
+#include <storage/buffer/vmoid_registry.h>
+
+#include "src/storage/lib/block_client/cpp/block_device.h"
 
 namespace disk_inspector {
 

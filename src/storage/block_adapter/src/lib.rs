@@ -9,8 +9,8 @@
 // interact with block devices.
 
 use anyhow::Error;
+use block_client::{BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient};
 use fidl::endpoints::{create_endpoints, ServerEnd};
-use remote_block_device::{BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient};
 use std::sync::Arc;
 use vfs::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use vfs::directory::entry_container::Directory;

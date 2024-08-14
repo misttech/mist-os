@@ -17,8 +17,8 @@ use netstack3_base::{
 };
 
 use crate::internal::base::{
-    self, IpLayerBindingsContext, IpLayerContext, IpLayerIpExt, IpStateContext, ResolveRouteError,
-    RoutingTableId,
+    self, IpLayerBindingsContext, IpLayerContext, IpLayerIpExt, IpRouteTablesContext,
+    ResolveRouteError, RoutingTableId,
 };
 use crate::internal::device::{
     IpDeviceBindingsContext, IpDeviceConfigurationContext, IpDeviceIpExt,

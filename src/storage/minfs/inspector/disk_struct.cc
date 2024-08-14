@@ -4,11 +4,13 @@
 
 #include "src/storage/minfs/inspector/disk_struct.h"
 
-#include <zircon/assert.h>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <string>
 
-#include <disk_inspector/disk_struct.h>
-#include <disk_inspector/type_utils.h>
-
+#include "src/storage/lib/disk_inspector/disk_struct.h"
+#include "src/storage/lib/disk_inspector/type_utils.h"
 #include "src/storage/minfs/format.h"
 
 namespace minfs {

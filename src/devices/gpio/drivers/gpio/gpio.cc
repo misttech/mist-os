@@ -171,6 +171,47 @@ void GpioDevice::GetInterrupt(GetInterruptRequestView request,
               }));
 }
 
+void GpioDevice::ConfigureInterrupt(
+    fuchsia_hardware_gpio::wire::GpioConfigureInterruptRequest* request,
+    ConfigureInterruptCompleter::Sync& completer) {
+  if (!request->config.has_mode()) {
+    return completer.ReplyError(ZX_ERR_INVALID_ARGS);
+  }
+
+  fuchsia_hardware_gpio::GpioPolarity polarity{};
+  switch (request->config.mode()) {
+    case fuchsia_hardware_gpio::InterruptMode::kEdgeHigh:
+    case fuchsia_hardware_gpio::InterruptMode::kLevelHigh:
+      polarity = fuchsia_hardware_gpio::GpioPolarity::kHigh;
+      break;
+    case fuchsia_hardware_gpio::InterruptMode::kEdgeLow:
+    case fuchsia_hardware_gpio::InterruptMode::kLevelLow:
+      polarity = fuchsia_hardware_gpio::GpioPolarity::kLow;
+      break;
+    case fuchsia_hardware_gpio::InterruptMode::kEdgeBoth:
+    default:
+      // TODO(42082459): Remove this case when gpioimpl is converted to pinimpl.
+      return completer.ReplySuccess();
+  }
+
+  fdf::Arena arena('GPIO');
+  gpio_.buffer(arena)
+      ->SetPolarity(pin_, polarity)
+      .ThenExactlyOnce(
+          fit::inline_callback<
+              void(fdf::WireUnownedResult<fuchsia_hardware_gpioimpl::GpioImpl::SetPolarity>&),
+              sizeof(ConfigureInterruptCompleter::Async)>(
+              [completer = completer.ToAsync()](auto& result) mutable {
+                if (!result.ok()) {
+                  completer.ReplyError(result.status());
+                } else if (result->is_error()) {
+                  completer.ReplyError(result->error_value());
+                } else {
+                  completer.ReplySuccess();
+                }
+              }));
+}
+
 void GpioDevice::ReleaseInterrupt(ReleaseInterruptCompleter::Sync& completer) {
   fdf::Arena arena('GPIO');
   gpio_.buffer(arena)->ReleaseInterrupt(pin_).ThenExactlyOnce(
@@ -197,26 +238,6 @@ void GpioDevice::SetAltFunction(SetAltFunctionRequestView request,
           fit::inline_callback<
               void(fdf::WireUnownedResult<fuchsia_hardware_gpioimpl::GpioImpl::SetAltFunction>&),
               sizeof(SetAltFunctionCompleter::Async)>(
-              [completer = completer.ToAsync()](auto& result) mutable {
-                if (!result.ok()) {
-                  completer.ReplyError(result.status());
-                } else if (result->is_error()) {
-                  completer.ReplyError(result->error_value());
-                } else {
-                  completer.ReplySuccess();
-                }
-              }));
-}
-
-void GpioDevice::SetPolarity(SetPolarityRequestView request,
-                             SetPolarityCompleter::Sync& completer) {
-  fdf::Arena arena('GPIO');
-  gpio_.buffer(arena)
-      ->SetPolarity(pin_, request->polarity)
-      .ThenExactlyOnce(
-          fit::inline_callback<
-              void(fdf::WireUnownedResult<fuchsia_hardware_gpioimpl::GpioImpl::SetPolarity>&),
-              sizeof(SetPolarityCompleter::Async)>(
               [completer = completer.ToAsync()](auto& result) mutable {
                 if (!result.ok()) {
                   completer.ReplyError(result.status());

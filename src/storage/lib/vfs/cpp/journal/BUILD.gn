@@ -16,8 +16,6 @@ static_library("journal") {
     "format.h",
     "header_view.h",
     "initializer.h",
-    "inspector_journal.h",
-    "inspector_parser.h",
     "journal.h",
     "journal_writer.h",
     "replay.h",
@@ -43,6 +41,10 @@ static_library("journal") {
   configs += [ "//build/config:all_source" ]
 
   if (is_fuchsia) {
+    public += [
+      "inspector_journal.h",
+      "inspector_parser.h",
+    ]
     sources += [
       "background_executor.cc",
       "data_streamer.cc",
@@ -130,6 +132,7 @@ test("journal-unit") {
 }
 
 source_set("fuzz-utils") {
+  public = [ "fuzzer_utils.h" ]
   sources = [ "fuzzer_utils.cc" ]
   public_deps = [
     ":journal",

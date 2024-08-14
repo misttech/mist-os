@@ -1461,10 +1461,10 @@ TEST_F(AdapterTest, LEReadMaximumAdvertisingDataLengthSupported) {
       static_cast<uint64_t>(hci_spec::LMPFeature::kLESupportedHost);
   settings.le_acl_data_packet_length = 0x1B;
   settings.le_total_num_acl_data_packets = 2;
+  settings.SupportedCommandsView()
+      .le_read_maximum_advertising_data_length()
+      .Write(true);
 
-  constexpr size_t octet = 36;
-  settings.supported_commands[octet] |= static_cast<uint8_t>(
-      hci_spec::SupportedCommand::kLEReadMaximumAdvertisingDataLength);
   test_device()->set_settings(settings);
   test_device()->set_maximum_advertising_data_length(
       hci_spec::kMaxLEExtendedAdvertisingDataLength);
@@ -1490,10 +1490,9 @@ TEST_F(AdapterTest, ScoDataChannelInitializedSuccessfully) {
   settings.synchronous_data_packet_length = 6;
   settings.total_num_synchronous_data_packets = 2;
   // Enable SCO flow control command.
-  constexpr size_t flow_control_enable_octet = 10;
-  settings.supported_commands[flow_control_enable_octet] |=
-      static_cast<uint8_t>(
-          hci_spec::SupportedCommand::kWriteSynchronousFlowControlEnable);
+  settings.SupportedCommandsView()
+      .write_synchronous_flow_control_enable()
+      .Write(true);
   test_device()->set_settings(settings);
 
   bool success = false;
@@ -1510,11 +1509,9 @@ TEST_F(AdapterTest,
   settings.AddBREDRSupportedCommands();
   settings.lmp_features_page0 |=
       static_cast<uint64_t>(hci_spec::LMPFeature::kLESupportedHost);
-  constexpr size_t flow_control_command_byte = 10;
-  constexpr uint8_t disable_flow_control_mask = ~static_cast<uint8_t>(
-      hci_spec::SupportedCommand::kWriteSynchronousFlowControlEnable);
-  settings.supported_commands[flow_control_command_byte] &=
-      disable_flow_control_mask;
+  settings.SupportedCommandsView()
+      .write_synchronous_flow_control_enable()
+      .Write(false);
   settings.le_acl_data_packet_length = 5;
   settings.le_total_num_acl_data_packets = 1;
   // Ensure SCO buffers are available.
@@ -1541,10 +1538,9 @@ TEST_F(AdapterTest, ScoDataChannelNotInitializedBecauseBufferInfoNotAvailable) {
   settings.synchronous_data_packet_length = 1;
   settings.total_num_synchronous_data_packets = 0;
   // Enable SCO flow control command.
-  constexpr size_t flow_control_enable_octet = 10;
-  settings.supported_commands[flow_control_enable_octet] |=
-      static_cast<uint8_t>(
-          hci_spec::SupportedCommand::kWriteSynchronousFlowControlEnable);
+  settings.SupportedCommandsView()
+      .write_synchronous_flow_control_enable()
+      .Write(true);
   test_device()->set_settings(settings);
 
   bool success = false;
@@ -1567,10 +1563,9 @@ TEST_F(AdapterScoAndIsoDisabledTest,
   settings.synchronous_data_packet_length = 6;
   settings.total_num_synchronous_data_packets = 2;
   // Enable SCO flow control command.
-  constexpr size_t flow_control_enable_octet = 10;
-  settings.supported_commands[flow_control_enable_octet] |=
-      static_cast<uint8_t>(
-          hci_spec::SupportedCommand::kWriteSynchronousFlowControlEnable);
+  settings.SupportedCommandsView()
+      .write_synchronous_flow_control_enable()
+      .Write(true);
   test_device()->set_settings(settings);
 
   bool success = false;
@@ -1661,16 +1656,9 @@ void AdapterTest::GetSupportedDelayRangeHelper(
   settings.le_total_num_acl_data_packets = 1;
 
   // Enable or disable the "Read Local Supported Controller Delay" command
-  constexpr size_t kReadLocalSupportedControllerDelayOctet = 45;
-  if (supported) {
-    settings.supported_commands[kReadLocalSupportedControllerDelayOctet] |=
-        static_cast<uint8_t>(
-            hci_spec::SupportedCommand::kReadLocalSupportedControllerDelay);
-  } else {
-    settings.supported_commands[kReadLocalSupportedControllerDelayOctet] &=
-        ~static_cast<uint8_t>(
-            hci_spec::SupportedCommand::kReadLocalSupportedControllerDelay);
-  }
+  settings.SupportedCommandsView()
+      .read_local_supported_controller_delay()
+      .Write(supported);
 
   test_device()->set_settings(settings);
 

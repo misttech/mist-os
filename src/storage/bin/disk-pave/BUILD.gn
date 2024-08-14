@@ -14,6 +14,19 @@ group("disk-pave") {
   deps = [ ":install-disk-image" ]
 }
 
+source_set("payload-streamer") {
+  public = [ "payload-streamer.h" ]
+  sources = [ "payload-streamer.cc" ]
+  visibility = [ ":*" ]
+  deps = [ "//zircon/system/ulib/async-default" ]
+  public_deps = [
+    "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/fzl",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
 executable("install-disk-image") {
   if (is_fuchsia) {
     fdio_config = [ "//build/config/fuchsia:fdio_config" ]
@@ -21,11 +34,9 @@ executable("install-disk-image") {
       configs -= fdio_config
     }
   }
-  sources = [
-    "disk-pave.cc",
-    "payload-streamer.cc",
-  ]
+  sources = [ "disk-pave.cc" ]
   deps = [
+    ":payload-streamer",
     "//sdk/fidl/fuchsia.fshost:fuchsia.fshost_cpp",
     "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp",
     "//sdk/lib/component/incoming/cpp",
@@ -49,11 +60,9 @@ test("install-disk-image-test") {
     }
   }
   output_name = "install-disk-image-test"
-  sources = [
-    "payload-streamer.cc",
-    "test/payload-streamer-test.cc",
-  ]
+  sources = [ "test/payload-streamer-test.cc" ]
   deps = [
+    ":payload-streamer",
     "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp",
     "//sdk/lib/fdio",
     "//zircon/system/ulib/async",

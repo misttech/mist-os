@@ -1514,6 +1514,87 @@ TEST_F(PowerLibTest, TestDriverAndSagElements) {
   EXPECT_EQ(info1.koid, info2.koid);
 }
 
+/// Add an element which uses the instance name to get the dependency token.
+TEST_F(PowerLibTest, TestDriverInstanceDep) {
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+  loop.StartThread();
+
+  fbl::RefPtr<fs::PseudoDir> svcs_dir = fbl::MakeRefCounted<fs::PseudoDir>();
+
+  // Now let's add dependencies on non-SAG elements
+  std::string driver_parent_name = "element_name";
+  std::string driver_instance_name = "instance_name";
+  fuchsia_hardware_power::ParentElement driver_parent =
+      fuchsia_hardware_power::ParentElement::WithInstanceName(driver_instance_name);
+
+  fidl::ServerBindingGroup<fuchsia_hardware_power::PowerTokenProvider> token_service_bindings;
+  // Service dir which contains the service instances
+  fbl::RefPtr<fs::PseudoDir> power_token_service = fbl::MakeRefCounted<fs::PseudoDir>();
+  AddInstanceResult instance_data =
+      AddServiceInstance(driver_parent_name, loop.dispatcher(), &token_service_bindings);
+  ASSERT_EQ(ZX_OK,
+            power_token_service->AddEntry(driver_instance_name, instance_data.service_instance));
+  svcs_dir->AddEntry(fuchsia_hardware_power::PowerTokenService::Name, power_token_service);
+
+  fidl::Endpoints<fuchsia_io::Directory> dir_endpoints =
+      fidl::CreateEndpoints<fuchsia_io::Directory>().value();
+
+  fs::SynchronousVfs vfs(loop.dispatcher());
+  vfs.ServeDirectory(std::move(svcs_dir), std::move(dir_endpoints.server));
+
+  fuchsia_hardware_power::PowerLevel one = {{.level = 0, .name = "one", .transitions = {}}};
+  fuchsia_hardware_power::PowerLevel two = {{.level = 1, .name = "two", .transitions = {}}};
+  fuchsia_hardware_power::PowerLevel three = {{.level = 2, .name = "three", .transitions = {}}};
+
+  fuchsia_hardware_power::PowerElement pe = {{
+      .name = "the_element",
+      .levels = {{one, two, three}},
+  }};
+
+  fuchsia_hardware_power::LevelTuple one_to_one = {{
+      .child_level = 1,
+      .parent_level = 1,
+  }};
+  fuchsia_hardware_power::LevelTuple three_to_two = {{
+      .child_level = 3,
+      .parent_level = 2,
+  }};
+
+  fuchsia_hardware_power::LevelTuple two_to_two = {{
+      .child_level = 2,
+      .parent_level = 2,
+  }};
+
+  fuchsia_hardware_power::PowerDependency driver_power_dep = {{
+      .child = "n/a",
+      .parent = driver_parent,
+      .level_deps = {{two_to_two}},
+      .strength = fuchsia_hardware_power::RequirementType::kOpportunistic,
+  }};
+
+  fuchsia_hardware_power::PowerElementConfiguration df_config = {
+      {.element = pe, .dependencies = {{driver_power_dep}}}};
+
+  fidl::Arena test;
+  fit::result<fdf_power::Error, fdf_power::TokenMap> call_result = fdf_power::GetDependencyTokens(
+      fidl::ToWire(test, df_config), std::move(dir_endpoints.client));
+
+  EXPECT_TRUE(call_result.is_ok());
+
+  loop.Shutdown();
+  loop.JoinThreads();
+
+  fdf_power::TokenMap map = std::move(call_result.value());
+  EXPECT_EQ(size_t(1), map.size());
+  zx_info_handle_basic_t info1, info2;
+
+  instance_data.token->get_info(ZX_INFO_HANDLE_BASIC, &info1, sizeof(zx_info_handle_basic_t),
+                                nullptr, nullptr);
+  map.at(driver_parent)
+      .get_info(ZX_INFO_HANDLE_BASIC, &info2, sizeof(zx_info_handle_basic_t), nullptr, nullptr);
+  EXPECT_EQ(info1.koid, info2.koid);
+}
+
 // TODO(https://fxbug.dev/328527466) This dependency is invalid because it has
 // no level deps add a test that checks we return a proper error
 }  // namespace power_lib_test

@@ -4,9 +4,16 @@
 
 #include "src/storage/lib/vfs/cpp/journal/inspector_journal.h"
 
-#include <disk_inspector/common_types.h>
+#include <zircon/assert.h>
 
-#include "inspector_journal_entries.h"
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+
+#include "src/storage/lib/disk_inspector/common_types.h"
+#include "src/storage/lib/disk_inspector/disk_inspector.h"
+#include "src/storage/lib/vfs/cpp/journal/format.h"
+#include "src/storage/lib/vfs/cpp/journal/inspector_journal_entries.h"
 
 namespace fs {
 

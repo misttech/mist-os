@@ -7,6 +7,8 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace/event.h>
 
+#include <cmath>
+
 #include "src/lib/fxl/strings/string_printf.h"
 #include "src/media/audio/lib/format/format.h"
 

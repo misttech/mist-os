@@ -12,7 +12,7 @@ void ArchPanicReset() {
   // Don't go back into our own handlers when we crash.  Probably trying to
   // crash this way just loops forever, but at least it won't reenter our
   // exception code and confuse things further.
-  __asm__("csrw stvec, zero");
+  __asm__ volatile("csrw stvec, zero");
 
   while (true) {
     arch::RiscvSbi::SystemReset(arch::RiscvSbiResetType::kWarmReboot,

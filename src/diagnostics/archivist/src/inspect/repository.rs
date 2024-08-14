@@ -16,7 +16,6 @@ use fuchsia_sync::{RwLock, RwLockWriteGuard};
 use futures::channel::{mpsc, oneshot};
 use futures::prelude::*;
 use moniker::ExtendedMoniker;
-use selectors::SelectorExt;
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 use tracing::{debug, warn};
@@ -262,7 +261,7 @@ impl InspectRepositoryInner {
 
     fn fetch_inspect_data(
         &self,
-        component_selectors: &Option<Vec<Selector>>,
+        all_dynamic_selectors: &Option<Vec<Selector>>,
         moniker_to_static_matcher_map: Option<HashMap<ExtendedMoniker, Arc<HierarchyMatcher>>>,
     ) -> Vec<UnpopulatedInspectDataContainer> {
         let mut containers = vec![];
@@ -279,22 +278,12 @@ impl InspectRepositoryInner {
                 None => None,
             };
 
-            // Verify that the dynamic selectors contain an entry that applies to
-            // this moniker as well.
-            if !match component_selectors {
-                Some(component_selectors) => component_selectors
-                    .iter()
-                    .any(|s| matches!(identity.moniker.matches_selector(s), Ok(true))),
-                None => true,
-            } {
-                continue;
-            }
-
             // This artifact contains inspect and matches a passed selector.
-            if let Some(unpopulated) = container
-                .create_unpopulated(identity, optional_hierarchy_matcher)
-                .map(|unpopulated| unpopulated.prefilter(component_selectors))
-            {
+            if let Some(unpopulated) = container.create_unpopulated(
+                identity,
+                optional_hierarchy_matcher,
+                all_dynamic_selectors,
+            ) {
                 containers.push(unpopulated);
             }
         }

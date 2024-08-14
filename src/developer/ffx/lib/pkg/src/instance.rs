@@ -3,15 +3,18 @@
 // found in the LICENSE file.
 
 use crate::{RegistrationConflictMode, RepoStorageType};
-use anyhow::Result;
+use anyhow::{bail, Result};
 use ffx_config::EnvironmentContext;
+use nix::sys::wait::{waitpid, WaitPidFlag, WaitStatus};
+use nix::unistd::Pid;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use std::fmt::Display;
 use std::net::SocketAddr;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 use std::{fs, process};
-
+use timeout::timeout;
 /// PathType is an enum encapulating filesystem and URL based paths.
 #[derive(Clone, Debug, Deserialize, Serialize, PartialEq, JsonSchema)]
 #[serde(rename_all = "lowercase")]
@@ -77,21 +80,65 @@ pub struct PkgServerInfo {
 impl PkgServerInfo {
     /// Returns true if the process identified by the pid is running.
     fn is_running(&self) -> bool {
-        if self.pid != 0 {
+        let pid: Pid = nix::unistd::Pid::from_raw(
+            self.pid.try_into().expect("pid to be representable as i32"),
+        );
+        if pid.as_raw() != 0 {
             // First do a no-hang wait to collect the process if it's defunct.
-            let _ = nix::sys::wait::waitpid(
-                nix::unistd::Pid::from_raw(self.pid.try_into().unwrap()),
-                Some(nix::sys::wait::WaitPidFlag::WNOHANG),
-            );
+            let _ = nix::sys::wait::waitpid(pid, Some(nix::sys::wait::WaitPidFlag::WNOHANG));
             // Check to see if it is running by sending signal 0. If there is no error,
             // the process is running.
-            return nix::sys::signal::kill(
-                nix::unistd::Pid::from_raw(self.pid.try_into().unwrap()),
-                None,
-            )
-            .is_ok();
+            return nix::sys::signal::kill(pid, None).is_ok();
         }
         return false;
+    }
+
+    /// Terminate the running process if the server type is no Daemon.
+    /// Termination is done by sending the SIGTERM signal and then waiting
+    /// the specified timeout, and if the process is still running, SIGKILL is
+    /// is sent.
+    pub async fn terminate(&self, wait_timeout: Duration) -> Result<()> {
+        if self.server_mode == ServerMode::Daemon {
+            bail!("terminate can only be called on non-daemon server instances");
+        }
+        if self.is_running() {
+            let pid: Pid = nix::unistd::Pid::from_raw(
+                self.pid.try_into().expect("pid to be representable as i32"),
+            );
+            match nix::sys::signal::kill(pid, Some(nix::sys::signal::Signal::SIGTERM)) {
+                Err(e) => bail!("Terminate error: {}", e),
+                Ok(_) => {
+                    match timeout(wait_timeout, async {
+                        let options =
+                            WaitPidFlag::union(WaitPidFlag::WNOHANG, WaitPidFlag::WEXITED);
+                        loop {
+                            match waitpid(pid, Some(options)) {
+                                Err(e) => bail!("Terminate error: {}", e),
+                                Ok(WaitStatus::Exited(p, code)) => {
+                                    tracing::debug!("process {p} exited with code {code}");
+                                    return Ok(());
+                                }
+                                Ok(WaitStatus::Signaled(_, _, _)) => return Ok(()),
+                                _ => fuchsia_async::Timer::new(Duration::from_millis(100)).await,
+                            }
+                        }
+                    })
+                    .await
+                    {
+                        Ok(_) => return Ok(()),
+                        Err(e) => {
+                            tracing::info!("error terminating {}: {e}", self.name);
+                            return nix::sys::signal::kill(
+                                pid,
+                                Some(nix::sys::signal::Signal::SIGKILL),
+                            )
+                            .map_err(Into::into);
+                        }
+                    }
+                }
+            }
+        }
+        Ok(())
     }
 }
 
@@ -247,6 +294,7 @@ pub async fn write_instance_info(
 mod tests {
     use super::*;
     use std::net::Ipv6Addr;
+    use std::os::unix::fs::PermissionsExt as _;
     use std::process;
 
     #[fuchsia::test]
@@ -610,5 +658,38 @@ mod tests {
 
         assert!(mgr.get_instance(instance_name.into()).expect("get instance").is_some());
         assert!(mgr.get_instance(another_instance_name.into()).expect("get instance").is_none());
+    }
+    #[fuchsia::test]
+    async fn test_terminate() {
+        let tmp = tempfile::TempDir::new().expect("temp dir");
+        let fake_server = tmp.path().join(format!("fake_server.sh"));
+        const FAKE_SERVER_CONTENTS: &str = r#"#!/bin/bash
+        while sleep 1s
+          echo "."
+        done
+     "#;
+
+        // write out the shell script
+        fs::write(&fake_server, FAKE_SERVER_CONTENTS).expect("writing fake server");
+        let mut perm =
+            fs::metadata(&fake_server).expect("Failed to get test server metadata").permissions();
+
+        perm.set_mode(0o755);
+        fs::set_permissions(&fake_server, perm).expect("Failed to set permissions on test runner");
+
+        let child = process::Command::new(fake_server).spawn().expect("child process");
+
+        let info = PkgServerInfo {
+            name: "some-server".into(),
+            address: (Ipv6Addr::UNSPECIFIED, 8000).into(),
+            repo_path: Path::new("").into(),
+            registration_alias_conflict_mode: RegistrationConflictMode::ErrorOut,
+            server_mode: ServerMode::Foreground,
+            pid: child.id(),
+            registration_aliases: vec![],
+            registration_storage_type: RepoStorageType::Ephemeral,
+        };
+        assert!(info.is_running(), "expect server process to be running");
+        info.terminate(Duration::from_secs(10)).await.expect("terminate success");
     }
 }

@@ -5,7 +5,9 @@
 use crate::vfs::{FsStr, FsString};
 use starnix_uapi::errno;
 use starnix_uapi::errors::Errno;
+use starnix_uapi::mount_flags::MountFlags;
 use std::collections::HashMap;
+use std::fmt::Display;
 
 /// Parses a comma-separated list of options of the form `key` or `key=value` or `key="value"`.
 /// Commas and equals-signs are only permitted in the `key="value"` case. In the case of
@@ -21,8 +23,63 @@ use std::collections::HashMap;
 /// `map{"key0":"value0","key1":"quoted,with=punc:tua-tion."}`
 ///
 /// `key0="mis"quoted,key2=unquoted` -> `EINVAL`
-pub fn generic_parse_mount_options(data: &FsStr) -> Result<HashMap<FsString, FsString>, Errno> {
-    parse_mount_options::parse_mount_options(data).map_err(|_| errno!(EINVAL))
+#[derive(Debug, Default, Clone)]
+pub struct MountParams {
+    options: HashMap<FsString, FsString>,
+}
+
+impl MountParams {
+    pub fn parse(data: &FsStr) -> Result<Self, Errno> {
+        let options = parse_mount_options::parse_mount_options(data).map_err(|_| errno!(EINVAL))?;
+        Ok(MountParams { options })
+    }
+
+    pub fn get(&self, key: &[u8]) -> Option<&FsString> {
+        self.options.get(key)
+    }
+
+    pub fn remove(&mut self, key: &[u8]) -> Option<FsString> {
+        self.options.remove(key)
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.options.is_empty()
+    }
+
+    pub fn remove_mount_flags(&mut self) -> MountFlags {
+        let mut flags = MountFlags::empty();
+        if self.remove(b"ro").is_some() {
+            flags |= MountFlags::RDONLY;
+        }
+        if self.remove(b"nosuid").is_some() {
+            flags |= MountFlags::NOSUID;
+        }
+        if self.remove(b"nodev").is_some() {
+            flags |= MountFlags::NODEV;
+        }
+        if self.remove(b"noexec").is_some() {
+            flags |= MountFlags::NOEXEC;
+        }
+        if self.remove(b"noatime").is_some() {
+            flags |= MountFlags::NOATIME;
+        }
+        if self.remove(b"nodiratime").is_some() {
+            flags |= MountFlags::NODIRATIME;
+        }
+        if self.remove(b"relatime").is_some() {
+            flags |= MountFlags::RELATIME;
+        }
+        if self.remove(b"strictatime").is_some() {
+            flags |= MountFlags::STRICTATIME;
+        }
+        flags
+    }
+}
+
+impl Display for MountParams {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", itertools::join(self.options.iter().map(|(k, v)| format!("{k}={v}")), ","))
+    }
 }
 
 /// Parses `data` slice into another type.
@@ -96,21 +153,23 @@ mod parse_mount_options {
 
 #[cfg(test)]
 mod tests {
-    use super::{generic_parse_mount_options, parse};
+    use super::{parse, MountParams};
+    use crate::vfs::FsString;
     use maplit::hashmap;
+    use starnix_uapi::mount_flags::MountFlags;
 
     #[::fuchsia::test]
     fn empty_data() {
-        assert!(generic_parse_mount_options(Default::default()).unwrap().is_empty());
+        assert!(MountParams::parse(Default::default()).unwrap().is_empty());
     }
 
     #[::fuchsia::test]
     fn parse_options_with_trailing_comma() {
         let data = b"key0=value0,";
         let parsed_data =
-            generic_parse_mount_options(data.into()).expect("mount options parse:  key0=value0,");
+            MountParams::parse(data.into()).expect("mount options parse:  key0=value0,");
         assert_eq!(
-            parsed_data,
+            parsed_data.options,
             hashmap! {
                 b"key0".into() => b"value0".into(),
             }
@@ -121,10 +180,10 @@ mod tests {
     fn parse_options_last_value_wins() {
         // Repeat key `key0`.
         let data = b"key0=value0,key1,key2=value2,key0=value3";
-        let parsed_data = generic_parse_mount_options(data.into())
+        let parsed_data = MountParams::parse(data.into())
             .expect("mount options parse:  key0=value0,key1,key2=value2,key0=value3");
         assert_eq!(
-            parsed_data,
+            parsed_data.options,
             hashmap! {
                 b"key1".into() => b"".into(),
                 b"key2".into() => b"value2".into(),
@@ -137,10 +196,10 @@ mod tests {
     #[::fuchsia::test]
     fn parse_options_quoted() {
         let data = b"key0=unqouted,key1=\"quoted,with=punc:tua-tion.\"";
-        let parsed_data = generic_parse_mount_options(data.into())
+        let parsed_data = MountParams::parse(data.into())
             .expect("mount options parse:  key0=value0,key1,key2=value2,key0=value3");
         assert_eq!(
-            parsed_data,
+            parsed_data.options,
             hashmap! {
                 b"key0".into() => b"unqouted".into(),
                 b"key1".into() => b"quoted,with=punc:tua-tion.".into(),
@@ -151,7 +210,7 @@ mod tests {
     #[::fuchsia::test]
     fn parse_options_misquoted() {
         let data = b"key0=\"mis\"quoted,key1=\"quoted\"";
-        let parse_result = generic_parse_mount_options(data.into());
+        let parse_result = MountParams::parse(data.into());
         assert!(
             parse_result.is_err(),
             "expected parse failure:  key0=\"mis\"quoted,key1=\"quoted\""
@@ -161,10 +220,38 @@ mod tests {
     #[::fuchsia::test]
     fn parse_options_misquoted_tail() {
         let data = b"key0=\"quoted\",key1=\"mis\"quoted";
-        let parse_result = generic_parse_mount_options(data.into());
+        let parse_result = MountParams::parse(data.into());
         assert!(
             parse_result.is_err(),
             "expected parse failure:  key0=\"quoted\",key1=\"mis\"quoted"
+        );
+    }
+
+    #[::fuchsia::test]
+    fn parse_normal_mount_flags() {
+        let data = b"nosuid,nodev,noexec,relatime";
+        let parsed_data = MountParams::parse(data.into())
+            .expect("mount options parse:  nosuid,nodev,noexec,relatime");
+        assert_eq!(
+            parsed_data.options,
+            hashmap! {
+                b"nosuid".into() => FsString::default(),
+                b"nodev".into() => FsString::default(),
+                b"noexec".into() => FsString::default(),
+                b"relatime".into() => FsString::default(),
+            }
+        );
+    }
+
+    #[::fuchsia::test]
+    fn parse_and_remove_normal_mount_flags() {
+        let data = b"nosuid,nodev,noexec,relatime";
+        let mut parsed_data = MountParams::parse(data.into())
+            .expect("mount options parse:  nosuid,nodev,noexec,relatime");
+        let flags = parsed_data.remove_mount_flags();
+        assert_eq!(
+            flags,
+            MountFlags::NOSUID | MountFlags::NODEV | MountFlags::NOEXEC | MountFlags::RELATIME
         );
     }
 

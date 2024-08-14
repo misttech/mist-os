@@ -5,112 +5,8 @@
 import("//build/config/compiler.gni")
 import("//build/config/fuchsia/platform_version.gni")
 import("//build/sdk/config.gni")
+import("//build/subbuild.gni")
 import("//sdk/config.gni")
-
-# Create a GN directory, and build an `sdk_collection` target for a particular
-# target_cpu and api_level by calling `gn gen` and then `ninja` in that
-# directory.
-template("_subbuild") {
-  assert(defined(invoker.sdk_collection))
-  assert(defined(invoker.target_cpu))
-  assert(defined(invoker.api_level))
-  assert(defined(invoker.extra_deps))
-  assert(defined(invoker.build_dir_prefix))
-
-  _build_dir = root_build_dir + "/${invoker.build_dir_prefix}"
-
-  # LINT.IfChange
-  _build_dir_stamp = _build_dir + ".stamp"
-
-  # LINT.ThenChange(//build/scripts/ninjatrace2json.py)
-
-  _sdk_collection_dir = get_label_info(invoker.sdk_collection, "dir")
-  _sdk_collection_name = get_label_info(invoker.sdk_collection, "name")
-  _sdk_collection = "${_sdk_collection_dir}:${_sdk_collection_name}"
-
-  _collection_dir = _build_dir + "/sdk/exported/${_sdk_collection_name}"
-  _collection_dir_manifest = "${_collection_dir}/meta/manifest.json"
-
-  action(target_name) {
-    script = "//build/sdk/subbuild.py"
-    outputs = [
-      _build_dir_stamp,
-      _collection_dir_manifest,
-    ]
-
-    # //sdk:idk_build_tools contains the host tools that must be used in the
-    # subbuilds. Make sure those (and any extra deps) are built first.
-    deps = [ "//sdk:idk_build_tools" ] + invoker.extra_deps
-
-    args = [
-      "--stamp-file",
-      rebase_path(_build_dir_stamp, root_build_dir),
-      "--sdk-id",
-      sdk_id,
-      "--output-build-dir",
-      rebase_path(_build_dir, root_build_dir),
-
-      "--sdk-collection-label",
-      _sdk_collection,
-      "--target-cpu",
-      invoker.target_cpu,
-      "--api-level",
-      invoker.api_level,
-
-      "--fuchsia-dir",
-      rebase_path("//", root_build_dir),
-      "--prebuilt-host-tools-dir",
-      rebase_path("$root_build_dir/sdk/idk_build_tools", _build_dir),
-      "--compress-debuginfo",
-      compress_debuginfo,
-    ]
-
-    if (sdk_sub_build_parallelism != "") {
-      args += [
-        "--parallelism",
-        "${sdk_sub_build_parallelism}",
-      ]
-    }
-    if (sdk_sub_build_max_load_average != "") {
-      args += [
-        "--max-load-average",
-        "${sdk_sub_build_max_load_average}",
-      ]
-    }
-    if (sdk_sub_build_verbose) {
-      args += [ "--verbose" ]
-    }
-
-    if (cxx_rbe_enable) {
-      args += [ "--cxx-rbe-enable" ]
-    }
-    if (link_rbe_enable) {
-      args += [ "--link-rbe-enable" ]
-    }
-    if (rust_rbe_enable) {
-      args += [ "--rust-rbe-enable" ]
-    }
-
-    pool = "//sdk:subbuild_pool"
-
-    # This script cannot be hermetic.
-    hermetic_deps = false
-
-    forward_variables_from(invoker,
-                           [
-                             "testonly",
-                             "visibility",
-                           ])
-
-    metadata = {
-      ninja_subbuilds = [
-        {
-          build_dir = rebase_path(_build_dir, root_build_dir)
-        },
-      ]
-    }
-  }
-}
 
 # Calling this template generates a set of action() targets, each one building
 # the atoms of a given sdk_collection() for a specific CPU architecture and API
@@ -162,8 +58,17 @@ template("idk_subbuilds") {
     _subbuild_target = "${main_target_name}-${target_cpu}"
     _subbuild_dir_prefix = "${subbuild_prefix}-${target_cpu}"
 
-    _subbuild(_subbuild_target) {
-      sdk_collection = invoker.sdk_collection_label
+    subbuild(_subbuild_target) {
+      target = invoker.sdk_collection_label
+      use_idk_tools_only = true
+
+      _sdk_collection_name = get_label_info(target, "name")
+      _collection_dir_manifest =
+          "/sdk/exported/${_sdk_collection_name}/meta/manifest.json"
+      outputs = [ _collection_dir_manifest ]
+
+      api_level_path = "/sdk/exported/${_sdk_collection_name}/api_level"
+
       target_cpu = target_cpu
       api_level = "PLATFORM"
       build_dir_prefix = _subbuild_dir_prefix
@@ -187,8 +92,17 @@ template("idk_subbuilds") {
       _subbuild_target = "${main_target_name}-api${api_level}-${target_cpu}"
       _subbuild_dir_prefix = "${subbuild_prefix}-api${api_level}-${target_cpu}"
 
-      _subbuild(_subbuild_target) {
-        sdk_collection = invoker.sdk_collection_label
+      subbuild(_subbuild_target) {
+        target = invoker.sdk_collection_label
+        use_idk_tools_only = true
+
+        _sdk_collection_name = get_label_info(target, "name")
+        _collection_dir_manifest =
+            "/sdk/exported/${_sdk_collection_name}/meta/manifest.json"
+        outputs = [ _collection_dir_manifest ]
+
+        api_level_path = "/sdk/exported/${_sdk_collection_name}/api_level"
+
         target_cpu = target_cpu
         api_level = "$api_level"
         build_dir_prefix = _subbuild_dir_prefix

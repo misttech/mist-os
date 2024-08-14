@@ -147,8 +147,22 @@ impl InspectArtifactsContainer {
         &self,
         identity: &Arc<ComponentIdentity>,
         matcher: Option<Arc<HierarchyMatcher>>,
+        dynamic_selectors: &Option<impl AsRef<[fdiagnostics::Selector]>>,
     ) -> Option<UnpopulatedInspectDataContainer> {
         if self.inspect_handles.is_empty() {
+            return None;
+        }
+
+        // Verify that dynamic selectors contain an entry that applies to this moniker
+        let mut dynamic_selectors = dynamic_selectors.as_ref().map(|all_components| {
+            all_components
+                .as_ref()
+                .iter()
+                .filter(|s| matches!(identity.moniker.matches_selector(s), Ok(true)))
+                .peekable()
+        });
+
+        if let Some(None) = dynamic_selectors.as_mut().map(|s| s.peek()) {
             return None;
         }
 
@@ -158,9 +172,54 @@ impl InspectArtifactsContainer {
             inspect_handles: self
                 .inspect_handles
                 .values()
+                .filter(|s| {
+                    // dynamic_selectors.clone() should just be a clone of the iterator, so as to
+                    // always start at the beginning
+                    Self::name_filters_satisfied(s.handle.as_ref(), dynamic_selectors.clone())
+                })
                 .map(|s| Arc::downgrade(&s.handle))
                 .collect::<Vec<_>>(),
         })
+    }
+
+    fn name_filters_satisfied<'a>(
+        handle: &InspectHandle,
+        mut dynamic_selectors: Option<impl Iterator<Item = &'a fdiagnostics::Selector>>,
+    ) -> bool {
+        let Some(ref mut selectors) = dynamic_selectors else {
+            return true;
+        };
+        match handle {
+            InspectHandle::Tree { name, .. } | InspectHandle::Escrow { name, .. } => {
+                selectors.any(|s| match s.tree_names.as_ref() {
+                    Some(fdiagnostics::TreeNames::All(_)) => true,
+
+                    Some(fdiagnostics::TreeNames::Some(filters)) => filters.iter().any(|f| {
+                        f == name
+                            .as_ref()
+                            .map(|name_ref| name_ref.as_str())
+                            .unwrap_or(DEFAULT_TREE_NAME.as_str())
+                    }),
+
+                    // None for name filter and None for the name imply that the default
+                    // name filter should be used for both, ie this is a match.
+                    //
+                    // TODO(https://fxbug.dev/355732696): None for name filter and
+                    // Some(name) for name should use DEFAULT_TREE_NAME as an implicit
+                    // filter value. This has to be done after tests relying on the current
+                    // behavior where a bare selector matches all trees (mainly driver
+                    // manager) have been updated to specify tree names or [...].
+                    None => true,
+
+                    Some(fdiagnostics::TreeNames::__SourceBreaking { .. }) => {
+                        unreachable!("FIDL convention to ensure exhaustive match")
+                    }
+                })
+            }
+            InspectHandle::Directory { .. } => selectors.any(|s| {
+                matches!(s.tree_names.as_ref(), None | Some(fdiagnostics::TreeNames::All(_)))
+            }),
+        }
     }
 
     fn on_closed_task(
@@ -429,77 +488,6 @@ pub struct UnpopulatedInspectDataContainer {
 }
 
 impl UnpopulatedInspectDataContainer {
-    pub fn prefilter(mut self, selectors: &Option<Vec<fdiagnostics::Selector>>) -> Self {
-        let filtered_handles = match selectors {
-            None => self.inspect_handles,
-            Some(selectors) => self
-                .inspect_handles
-                .into_iter()
-                .filter(|handle| {
-                    let Some(handle) = handle.upgrade() else {
-                        return false;
-                    };
-                    selectors
-                        .iter()
-                        .filter(|s| self.identity.moniker.matches_selector(s).unwrap_or(false))
-                        .any(|s| match (s.tree_names.as_ref(), handle.as_ref()) {
-                            // Match every tree name, including for directories
-                            (Some(fdiagnostics::TreeNames::All(_)), _) => true,
-
-                            // None for the name filter and None for the Tree/Escrow name imply
-                            // that the default name should be used, which is a match.
-                            // None for the name filter when the handle is a directory is also a
-                            // match, because trees in directories don't have names.
-                            (
-                                None,
-                                InspectHandle::Tree { name: None, .. }
-                                | InspectHandle::Escrow { name: None, .. }
-                                | InspectHandle::Directory { .. },
-                            ) => true,
-
-                            // TODO(https://fxbug.dev/355732696): this should actually use
-                            // DEFAULT_TREE_NAME as an implicit filter when tree_names is None.
-                            // This has to be done after tests relying on the current behavior
-                            // where a bare selector matches all trees (mainly driver manager)
-                            // have been updated to specify tree names or [...]
-                            (
-                                None,
-                                InspectHandle::Tree { name: Some(_name), .. }
-                                | InspectHandle::Escrow { name: Some(_name), .. },
-                            ) => true,
-
-                            // Use DEFAULT_TREE_NAME as the implicit name of the handle and compare
-                            // it to the provided name filters
-                            (
-                                Some(fdiagnostics::TreeNames::Some(filters)),
-                                InspectHandle::Tree { name: None, .. }
-                                | InspectHandle::Escrow { name: None, .. },
-                            ) => filters
-                                .iter()
-                                .any(|f| f.to_lowercase() == DEFAULT_TREE_NAME.as_str()),
-
-                            // Compare the known handle name to all the filters looking for any
-                            // matches
-                            (
-                                Some(fdiagnostics::TreeNames::Some(filters)),
-                                InspectHandle::Tree { name: Some(name), .. }
-                                | InspectHandle::Escrow { name: Some(name), .. },
-                            ) => filters
-                                .iter()
-                                .any(|f| f.to_lowercase() == name.as_str().to_lowercase()),
-
-                            (filter, _) => {
-                                warn!(?filter, "bad name filter received in selector");
-                                false
-                            }
-                        })
-                })
-                .collect::<Vec<_>>(),
-        };
-
-        self.inspect_handles = filtered_handles;
-        self
-    }
     /// Populates this data container with a timeout. On the timeout firing returns a
     /// container suitable to return to clients, but with timeout error information recorded.
     pub fn populate(
@@ -582,6 +570,9 @@ mod test {
     static EMPTY_IDENTITY: LazyLock<Arc<ComponentIdentity>> =
         LazyLock::new(|| Arc::new(ComponentIdentity::unknown()));
 
+    static O_K_IDENTITY: LazyLock<Arc<ComponentIdentity>> =
+        LazyLock::new(|| Arc::new(ComponentIdentity::from(vec!["o", "k"])));
+
     #[fuchsia::test]
     async fn population_times_out() {
         // Simulate a directory that hangs indefinitely in any request so that we consistently
@@ -643,26 +634,20 @@ mod test {
         assert!(container.push_handle(InspectHandle::directory(directory2)).is_none());
     }
 
+    fn inspect_artifacts_container_with_one_dir(
+    ) -> (Option<oneshot::Receiver<zx::Koid>>, InspectArtifactsContainer) {
+        let (directory, _) =
+            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
+        let handle = InspectHandle::directory(directory);
+        let mut container = InspectArtifactsContainer::default();
+        let rx = container.push_handle(handle);
+        (rx, container)
+    }
+
     #[fuchsia::test]
     fn prefilter_on_names_for_directories() {
         let _executor = fuchsia_async::LocalExecutor::new();
-
-        let (directory, _) =
-            fidl::endpoints::create_proxy_and_stream::<fio::DirectoryMarker>().unwrap();
-        let handle = Arc::new(InspectHandle::directory(directory));
-
-        let identity = Arc::new(ComponentIdentity::from(vec!["o", "k"]));
-
-        let container = UnpopulatedInspectDataContainer {
-            identity: Arc::clone(&identity),
-            inspect_handles: vec![Arc::downgrade(&handle)],
-            inspect_matcher: None,
-        };
-
-        let container = container.prefilter(&None);
-        assert_eq!(1, container.inspect_handles.len());
-
-        let selectors = Some(vec![fdiagnostics::Selector {
+        let all_selector = fdiagnostics::Selector {
             tree_names: Some(fdiagnostics::TreeNames::All(fdiagnostics::All {})),
             component_selector: Some(fdiagnostics::ComponentSelector {
                 moniker_segments: Some(vec![
@@ -677,12 +662,15 @@ mod test {
                 },
             )),
             ..Default::default()
-        }]);
+        };
+        let selectors = Some(vec![all_selector]);
 
-        let container = container.prefilter(&selectors);
+        let (_rx, iac) = inspect_artifacts_container_with_one_dir();
+        let container = iac.create_unpopulated(&O_K_IDENTITY, None, &selectors).unwrap();
+
         assert_eq!(1, container.inspect_handles.len());
 
-        let selectors = Some(vec![fdiagnostics::Selector {
+        let selector_with_wrong_tree_name = fdiagnostics::Selector {
             tree_names: Some(fdiagnostics::TreeNames::Some(vec!["a".to_string()])),
             component_selector: Some(fdiagnostics::ComponentSelector {
                 moniker_segments: Some(vec![
@@ -697,18 +685,15 @@ mod test {
                 },
             )),
             ..Default::default()
-        }]);
+        };
+        let selectors = Some(vec![selector_with_wrong_tree_name]);
 
-        let container = container.prefilter(&selectors);
+        let (_rx, iac) = inspect_artifacts_container_with_one_dir();
+        let container = iac.create_unpopulated(&O_K_IDENTITY, None, &selectors).unwrap();
+
         assert_eq!(0, container.inspect_handles.len());
 
-        let container = UnpopulatedInspectDataContainer {
-            identity: Arc::clone(&identity),
-            inspect_handles: vec![Arc::downgrade(&handle)],
-            inspect_matcher: None,
-        };
-
-        let selectors = Some(vec![fdiagnostics::Selector {
+        let selector_with_no_tree_names = fdiagnostics::Selector {
             tree_names: None,
             component_selector: Some(fdiagnostics::ComponentSelector {
                 moniker_segments: Some(vec![
@@ -723,28 +708,34 @@ mod test {
                 },
             )),
             ..Default::default()
-        }]);
+        };
 
-        let container = container.prefilter(&selectors);
+        let selectors = Some(vec![selector_with_no_tree_names]);
+
+        let (_rx, iac) = inspect_artifacts_container_with_one_dir();
+        let container = iac.create_unpopulated(&O_K_IDENTITY, None, &selectors).unwrap();
         assert_eq!(1, container.inspect_handles.len());
     }
 
+    fn inspect_artifacts_container_with_n_trees<const N: usize>(
+        tree_names: [&str; N],
+    ) -> ([Option<oneshot::Receiver<zx::Koid>>; N], InspectArtifactsContainer) {
+        let mut container = InspectArtifactsContainer::default();
+        let mut rxs: [Option<oneshot::Receiver<zx::Koid>>; N] = [const { None }; N];
+        for (i, name) in tree_names.into_iter().enumerate() {
+            let (proxy, _) = fidl::endpoints::create_proxy::<finspect::TreeMarker>().unwrap();
+            let handle = InspectHandle::tree(proxy, Some(name));
+            rxs[i] = container.push_handle(handle)
+        }
+
+        (rxs, container)
+    }
+
     #[fuchsia::test]
-    fn prefilter_no_matches_tree() {
+    fn name_filter_with_no_matches() {
         let _executor = fuchsia_async::LocalExecutor::new();
 
-        let (proxy, _) = fidl::endpoints::create_proxy::<finspect::TreeMarker>().unwrap();
-        let handle1 = Arc::new(InspectHandle::tree(proxy, Some("a")));
-
-        let identity = Arc::new(ComponentIdentity::from(vec!["o", "k"]));
-
-        let container = UnpopulatedInspectDataContainer {
-            identity: Arc::clone(&identity),
-            inspect_handles: vec![Arc::downgrade(&handle1)],
-            inspect_matcher: None,
-        };
-
-        let selectors = Some(vec![fdiagnostics::Selector {
+        let b_only = fdiagnostics::Selector {
             tree_names: Some(fdiagnostics::TreeNames::Some(vec!["b".to_string()])),
             component_selector: Some(fdiagnostics::ComponentSelector {
                 moniker_segments: Some(vec![
@@ -759,34 +750,25 @@ mod test {
                 },
             )),
             ..Default::default()
-        }]);
+        };
+        let selectors = Some(vec![b_only]);
 
-        let container = container.prefilter(&selectors);
+        let (_rx, iac) = inspect_artifacts_container_with_n_trees(["a"]);
+        let container = iac.create_unpopulated(&O_K_IDENTITY, None, &selectors).unwrap();
         assert_eq!(0, container.inspect_handles.len());
     }
 
     #[fuchsia::test]
-    fn prefilter_on_names_for_tree() {
+    fn all_name_filter_matches_everything() {
         let _executor = fuchsia_async::LocalExecutor::new();
 
-        let (proxy, _) = fidl::endpoints::create_proxy::<finspect::TreeMarker>().unwrap();
-        let handle1 = Arc::new(InspectHandle::tree(proxy, Some("a")));
-
-        let (proxy, _) = fidl::endpoints::create_proxy::<finspect::TreeMarker>().unwrap();
-        let handle2 = Arc::new(InspectHandle::tree(proxy, Some("b")));
-
-        let identity = Arc::new(ComponentIdentity::from(vec!["o", "k"]));
-
-        let container = UnpopulatedInspectDataContainer {
-            identity: Arc::clone(&identity),
-            inspect_handles: vec![Arc::downgrade(&handle1), Arc::downgrade(&handle2)],
-            inspect_matcher: None,
-        };
-
-        let container = container.prefilter(&None);
+        let (_rxs, iac) = inspect_artifacts_container_with_n_trees(["a", "b"]);
+        let container = iac
+            .create_unpopulated(&O_K_IDENTITY, None, &None::<&[fdiagnostics::Selector]>)
+            .unwrap();
         assert_eq!(2, container.inspect_handles.len());
 
-        let selectors = Some(vec![fdiagnostics::Selector {
+        let all_selector = fdiagnostics::Selector {
             tree_names: Some(fdiagnostics::TreeNames::All(fdiagnostics::All {})),
             component_selector: Some(fdiagnostics::ComponentSelector {
                 moniker_segments: Some(vec![
@@ -801,12 +783,21 @@ mod test {
                 },
             )),
             ..Default::default()
-        }]);
+        };
+        let selectors = Some(vec![all_selector]);
 
-        let container = container.prefilter(&selectors);
+        let (_rxs, iac) = inspect_artifacts_container_with_n_trees(["a", "b"]);
+        let container = iac.create_unpopulated(&O_K_IDENTITY, None, &selectors).unwrap();
         assert_eq!(2, container.inspect_handles.len());
+    }
 
-        let selectors = Some(vec![fdiagnostics::Selector {
+    // TODO(https://fxbug.dev/355732696): Not specifying a name filter list should implicitly mean
+    // selecting for the root Inspect tree
+    #[fuchsia::test]
+    fn none_name_filter_matches_everything() {
+        let _executor = fuchsia_async::LocalExecutor::new();
+
+        let lists_each_name = fdiagnostics::Selector {
             tree_names: Some(fdiagnostics::TreeNames::Some(vec!["a".to_string(), "b".to_string()])),
             component_selector: Some(fdiagnostics::ComponentSelector {
                 moniker_segments: Some(vec![
@@ -821,12 +812,19 @@ mod test {
                 },
             )),
             ..Default::default()
-        }]);
+        };
+        let selectors = Some(vec![lists_each_name]);
 
-        let container = container.prefilter(&selectors);
+        let (_rxs, iac) = inspect_artifacts_container_with_n_trees(["a", "b"]);
+        let container = iac.create_unpopulated(&O_K_IDENTITY, None, &selectors).unwrap();
         assert_eq!(2, container.inspect_handles.len());
+    }
 
-        let selectors = Some(vec![fdiagnostics::Selector {
+    #[fuchsia::test]
+    fn select_subset_of_names() {
+        let _executor = fuchsia_async::LocalExecutor::new();
+
+        let a_only = fdiagnostics::Selector {
             tree_names: Some(fdiagnostics::TreeNames::Some(vec!["a".to_string()])),
             component_selector: Some(fdiagnostics::ComponentSelector {
                 moniker_segments: Some(vec![
@@ -841,18 +839,26 @@ mod test {
                 },
             )),
             ..Default::default()
-        }]);
+        };
+        let selectors = Some(vec![a_only]);
 
-        let container = container.prefilter(&selectors);
+        let (_rxs, iac) = inspect_artifacts_container_with_n_trees(["a", "b"]);
+        let container = iac.create_unpopulated(&O_K_IDENTITY, None, &selectors).unwrap();
         assert_eq!(1, container.inspect_handles.len());
+
         match container.inspect_handles[0].upgrade().unwrap().as_ref() {
             InspectHandle::Tree { name: Some(n), .. } => assert_eq!(n.as_str(), "a"),
             bad_handle => {
                 panic!("filtering failed, got {bad_handle:?}");
             }
-        }
+        };
+    }
 
-        let selectors = Some(vec![fdiagnostics::Selector {
+    #[fuchsia::test]
+    fn names_are_case_sensitive() {
+        let _executor = fuchsia_async::LocalExecutor::new();
+
+        let a_but_wrong_case = fdiagnostics::Selector {
             tree_names: Some(fdiagnostics::TreeNames::Some(vec!["A".to_string()])),
             component_selector: Some(fdiagnostics::ComponentSelector {
                 moniker_segments: Some(vec![
@@ -867,15 +873,11 @@ mod test {
                 },
             )),
             ..Default::default()
-        }]);
+        };
+        let selectors = Some(vec![a_but_wrong_case]);
 
-        let container = container.prefilter(&selectors);
-        assert_eq!(1, container.inspect_handles.len());
-        match container.inspect_handles[0].upgrade().unwrap().as_ref() {
-            InspectHandle::Tree { name: Some(n), .. } => assert_eq!(n.as_str(), "a"),
-            bad_handle => {
-                panic!("filtering failed, got {bad_handle:?}");
-            }
-        }; // semi colon necessary for executor
+        let (_rxs, iac) = inspect_artifacts_container_with_n_trees(["a", "b"]);
+        let container = iac.create_unpopulated(&O_K_IDENTITY, None, &selectors).unwrap();
+        assert_eq!(0, container.inspect_handles.len());
     }
 }

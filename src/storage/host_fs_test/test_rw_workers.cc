@@ -4,13 +4,24 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
+#include <stdio.h>
 
+#include <algorithm>
+#include <cstdint>
+#include <cstdio>
+#include <cstring>
 #include <iostream>
 #include <iterator>
 #include <memory>
 #include <random>
+#include <utility>
+#include <vector>
+
+#include <gtest/gtest.h>
 
 #include "src/storage/host_fs_test/fixture.h"
+#include "src/storage/minfs/host.h"
 
 namespace fs_test {
 namespace {

@@ -37,8 +37,6 @@ namespace internal {
 class LogState {
  public:
   static void Set(const fuchsia_logging::LogSettings& settings, const GlobalStateLock& lock);
-  static void Set(const fuchsia_logging::LogSettings& settings,
-                  const std::initializer_list<std::string>& tags, const GlobalStateLock& lock);
 
   fuchsia_logging::LogSeverity min_severity() const { return min_severity_; }
 
@@ -48,8 +46,7 @@ class LogState {
   cpp17::variant<zx::socket, std::ofstream>& descriptor() const { return logsink_socket_; }
 
  private:
-  LogState(const fuchsia_logging::LogSettings& settings,
-           const std::initializer_list<std::string>& tags);
+  explicit LogState(const fuchsia_logging::LogSettings& settings);
 
   void Connect();
 
@@ -174,12 +171,6 @@ void SetLogSettings(const fuchsia_logging::LogSettings& settings) {
   internal::LogState::Set(settings, lock);
 }
 
-void SetLogSettings(const fuchsia_logging::LogSettings& settings,
-                    const std::initializer_list<std::string>& tags) {
-  GlobalStateLock lock(false);
-  internal::LogState::Set(settings, tags, lock);
-}
-
 fuchsia_logging::LogSeverity GetMinLogSeverity() {
   GlobalStateLock lock;
   return lock->min_severity();
@@ -293,21 +284,14 @@ bool LogBuffer::Flush() {
 
 void internal::LogState::Set(const fuchsia_logging::LogSettings& settings,
                              const GlobalStateLock& lock) {
-  Set(settings, {}, lock);
-}
-
-void internal::LogState::Set(const fuchsia_logging::LogSettings& settings,
-                             const std::initializer_list<std::string>& tags,
-                             const GlobalStateLock& lock) {
   auto old = *lock;
-  lock.Set(new LogState(settings, tags));
+  lock.Set(new LogState(settings));
   if (old) {
     delete old;
   }
 }
 
-internal::LogState::LogState(const fuchsia_logging::LogSettings& settings,
-                             const std::initializer_list<std::string>& tags)
+internal::LogState::LogState(const fuchsia_logging::LogSettings& settings)
     : unused_loop_(&kAsyncLoopConfigNeverAttachToThread),
       min_severity_(settings.min_log_level),
       default_severity_(settings.min_log_level) {
@@ -322,7 +306,7 @@ internal::LogState::LogState(const fuchsia_logging::LogSettings& settings,
   if (!on_severity_changed_) {
     on_severity_changed_ = [](fuchsia_logging::LogSeverity severity) {};
   }
-  for (auto& tag : tags) {
+  for (auto& tag : settings.tags) {
     tags_.push_back(tag);
   }
   Connect();
@@ -393,14 +377,16 @@ LogSettingsBuilder& LogSettingsBuilder::WithDispatcher(async_dispatcher_t* dispa
   return *this;
 }
 
-// Configures the log settings with the specified tags.
-void LogSettingsBuilder::BuildAndInitializeWithTags(
-    const std::initializer_list<std::string>& tags) {
-  syslog_runtime::SetLogSettings(settings_, tags);
+LogSettingsBuilder& LogSettingsBuilder::WithTags(const std::initializer_list<std::string>& tags) {
+  for (auto& tag : tags) {
+    settings_.tags.push_back(tag);
+  }
+  return *this;
 }
 
 void SetTags(const std::initializer_list<std::string>& tags) {
-  syslog_runtime::SetLogSettings({.min_log_level = GetMinLogSeverity()}, tags);
+  fuchsia_logging::LogSettings settings;
+  syslog_runtime::SetLogSettings({.min_log_level = GetMinLogSeverity(), .tags = tags});
 }
 
 // Configures the log settings.

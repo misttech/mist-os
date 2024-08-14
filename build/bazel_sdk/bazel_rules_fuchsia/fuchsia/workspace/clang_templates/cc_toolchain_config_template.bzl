@@ -86,6 +86,7 @@ def _cc_toolchain_config_impl(ctx):
         features.ml_inliner,
         features.static_cpp_standard_library,
         features.no_runtime_library_search_directories,
+        features.generate_linkmap,
     ] + sanitizer_features
 
     return cc_common.create_cc_toolchain_config_info(

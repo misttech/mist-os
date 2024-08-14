@@ -592,5 +592,5 @@ MAGMA_EXPORT magma_status_t magma_virt_connection_get_image_info(
 }
 #endif
 
-// LINT.ThenChange(magma_common_defs.h:version)
+// LINT.ThenChange(/sdk/lib/magma_common/include/lib/magma/magma_common_defs.h:version)
 #endif  // LIB_MAGMA_MAGMA_H_

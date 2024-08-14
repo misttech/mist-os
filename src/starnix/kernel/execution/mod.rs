@@ -2,10 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-mod crash_report;
-mod restricted_executor;
-mod shared;
+mod crash_reporter;
+mod executor;
 
-pub use crash_report::*;
-pub use restricted_executor::*;
-pub use shared::*;
+pub use crash_reporter::*;
+pub use executor::*;

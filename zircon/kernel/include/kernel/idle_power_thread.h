@@ -235,6 +235,7 @@ class IdlePowerThread final {
   // Shorthand expressions for various comparisons and asserts.
   static constexpr StateMachine kActive{State::Active, State::Active};
   static constexpr StateMachine kActiveToSuspend{State::Active, State::Suspend};
+  static constexpr StateMachine kSuspendToActive{State::Suspend, State::Active};
   static constexpr StateMachine kWakeup{State::Wakeup, State::Wakeup};
   static constexpr StateMachine kSuspend{State::Suspend, State::Suspend};
   static constexpr StateMachine kSuspendToWakeup{State::Suspend, State::Wakeup};
@@ -249,6 +250,20 @@ class IdlePowerThread final {
   static WakeResult WakeBootCpu();
   static WakeResult TriggerSystemWakeEvent();
   static void AcknowledgeSystemWakeEvent();
+
+  // This function does different things depending on the current_cpu and current_state.
+  //
+  // 1. If the current_cpu is equal to the boot CPU, and:
+  //    a. If the state indicates that we are suspending, then pause the monotonic clock.
+  //    b. If the state indicates that we are waking up, then unpause the monotonic clock and update
+  //       the platform timer.
+  // 2. If the current_cpu is a secondary CPU and the state indicates that we are resuming, then
+  //    just update the platform timer.
+  //
+  // The boot CPU is responsible for pausing and resuming the clock since it is the last CPU to
+  // suspend and the first CPU to resume. However, each CPU has its own platform timer that it must
+  // update after the monotonic clock is resumed.
+  static void UpdateMonotonicClock(cpu_num_t current_cpu, const StateMachine& current_state);
 
   ktl::atomic<StateMachine> state_{};
   AutounsignalMpUnplugEvent complete_;

@@ -315,41 +315,6 @@ void Guest::LaunchContainerShell() {
       });
 }
 
-void Guest::AddMagmaDeviceToContainer() {
-  FX_CHECK(maitred_) << "Called AddMagma without a maitre'd connection";
-  FX_LOGS(INFO) << "Adding magma device to container";
-  MaitredRunCommandSync(*maitred_,
-                        {"/usr/bin/lxc", "config", "device", "add", kContainerName, "magma0",
-                         "unix-char", "source=/dev/magma0", "mode=0666"},
-                        {
-                            {"LXD_DIR", "/mnt/stateful/lxd"},
-                            {"LXD_CONF", "/mnt/stateful/lxd_conf"},
-                            {"LXD_UNPRIVILEGED_ONLY", "true"},
-                        });
-}
-
-void Guest::SetupGPUDriversInContainer() {
-  FX_CHECK(maitred_) << "Called SetupGPUDrivers without a maitre'd connection";
-  FX_LOGS(INFO) << "Setup GPU drivers in container";
-  MaitredRunCommandSync(
-      *maitred_,
-      {"/usr/bin/lxc", "exec", kContainerName, "--", "sh", "-c",
-       "mkdir -p /usr/share/vulkan/icd.d; /usr/bin/update-alternatives --install "
-       "/usr/share/vulkan/icd.d/10_magma_intel_icd.x86_64.json vulkan-icd "
-       "/opt/google/cros-containers/drivers/share/vulkan/icd.d/intel_icd.x86_64.json 20; "
-       "/usr/bin/update-alternatives --install "
-       "/usr/share/vulkan/icd.d/10_magma_intel_icd.i686.json vulkan-icd32 "
-       "/opt/google/cros-containers/drivers/share/vulkan/icd.d/intel_icd.i686.json 20; "
-       "echo /opt/google/cros-containers/drivers/lib64=libc6 > /etc/ld.so.conf.d/cros.conf;"
-       "echo /opt/google/cros-containers/drivers/lib32=libc6 >> /etc/ld.so.conf.d/cros.conf;"
-       "/sbin/ldconfig; "},
-      {
-          {"LXD_DIR", "/mnt/stateful/lxd"},
-          {"LXD_CONF", "/mnt/stateful/lxd_conf"},
-          {"LXD_UNPRIVILEGED_ONLY", "true"},
-      });
-}
-
 void Guest::StartLxd() {
   TRACE_DURATION("termina_guest_manager", "Guest::StartLxd");
   FX_CHECK(tremplin_) << "StartLxd called without a Tremplin connection";
@@ -664,10 +629,6 @@ grpc::Status Guest::ContainerReady(grpc::ServerContext* context,
                                    const vm_tools::container::ContainerStartupInfo* request,
                                    vm_tools::EmptyMessage* response) {
   TRACE_DURATION("termina_guest_manager", "Guest::ContainerReady");
-
-  // Add Magma GPU support to container.
-  AddMagmaDeviceToContainer();
-  SetupGPUDriversInContainer();
 
   // Start required user services.
   LaunchContainerShell();

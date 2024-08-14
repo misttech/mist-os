@@ -31,7 +31,6 @@
 #include "src/storage/volume_image/ftl/ftl_raw_nand_image_writer.h"
 #include "src/storage/volume_image/ftl/options.h"
 #include "src/storage/volume_image/ftl/raw_nand_image.h"
-#include "src/storage/volume_image/ftl/raw_nand_image_utils.h"
 #include "src/storage/volume_image/fvm/fvm_sparse_image.h"
 #include "src/storage/volume_image/fvm/fvm_sparse_image_reader.h"
 #include "src/storage/volume_image/fvm/fvm_unpack.h"

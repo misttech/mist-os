@@ -4,12 +4,13 @@
 
 #include "src/storage/host_fs_test/fixture.h"
 
-#include <errno.h>
 #include <fcntl.h>
 #include <stdlib.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
+#include <cstdint>
+#include <cstdio>
 #include <cstring>
 #include <filesystem>
 #include <iostream>
@@ -18,8 +19,12 @@
 #include <utility>
 
 #include <fbl/unique_fd.h>
+#include <gtest/gtest.h>
 
+#include "src/storage/minfs/bcache.h"
+#include "src/storage/minfs/format.h"
 #include "src/storage/minfs/fsck.h"
+#include "src/storage/minfs/host.h"
 
 namespace fs_test {
 

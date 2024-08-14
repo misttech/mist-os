@@ -141,7 +141,7 @@ def ifchange():
 
 
 def thenchange():
-    return "// LINT.ThenChange(magma_common_defs.h:version)"
+    return "// LINT.ThenChange(/sdk/lib/magma_common/include/lib/magma/magma_common_defs.h:version)"
 
 
 def main():

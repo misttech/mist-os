@@ -50,16 +50,26 @@
 ##   --fuzz-with           Pass a sanitizer name, e.g. "--fuzz-with asan" to
 ##                         enable ALL supporting fuzzers.  Use --variant for
 ##                         individual fuzzers, e.g. "--variant asan-fuzzer/foo".
+##   --rbe-mode            Use a preset RBE configuration.
+##                         Valid options: auto, off, cloudtop, legacy_default,
+##                         remote_cache_only, low_bandwidth.
+##                         'auto' chooses one of the other options for you.
+##                         See also build/toolchain/rbe_modes.gni for details.
+##                         Default: auto
 ##   --cxx-rbe             If set, use reclient (RBE) to remotely compile and
 ##                         cache C++ targets.
+##                         This overrides the C++ setting in --rbe-mode.
 ##                         Default: enabled on linux-x64, disabled elsewhere.
 ##   --link-rbe            If set, use reclient (RBE) to remotely link and
 ##                         cache C++ targets.
+##                         This overrides the linking setting in --rbe-mode.
 ##                         Default: disabled
 ##   --rust-rbe            If set, use the remote backend (RBE) service for
 ##                         building and caching Rust targets.
+##                         This overrides the Rust setting in --rbe-mode.
 ##                         Default: disabled
 ##   --bazel-rbe           If set, allow bazel to build remotely on RBE.
+##                         This overrides the Bazel setting in --rbe-mode.
 ##                         Default: disabled
 ##   --ide                 Pass --ide=VALUE to gn when generating to create project
 ##                         files usable with that IDE. Useful values include "vs"
@@ -121,6 +131,10 @@
 ##                         selected by `fx repro`. If set, no other flags that
 ##                         influence the build configuration should be set.
 ##   --dev                 Always recompile fx-set from source.
+##   --assembly-override   Pairs of ASSEMBLY_TARGET=OVERRIDE_TARGET labels to use
+##                         to define the developer assembly overrides targets to
+##                         use with the given assembly target.  Can be provided
+##                         multiple times with different ASSEMBLY_TARGET labels.
 ##
 ## Example:
 ##

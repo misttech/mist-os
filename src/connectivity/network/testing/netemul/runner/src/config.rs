@@ -50,6 +50,8 @@ pub(crate) struct Interface {
     gateway: Option<fnet_ext::IpAddress>,
     enable_ipv4_forwarding: bool,
     enable_ipv6_forwarding: bool,
+    ipv4_multicast_neighbor_solicitations: Option<u16>,
+    ipv6_multicast_neighbor_solicitations: Option<u16>,
 }
 
 // Represents a configuration that has been deserialized but not yet validated.
@@ -267,6 +269,22 @@ impl TryFrom<Dictionary> for Interface {
             .unwrap_or_else(|| Ok(Ok(false)))
             .map_err(|e| anyhow!("`enable_ipv6_forwarding` is not a string: {:?}", e))?
             .context("parse `enable_ipv6_forwarding`")?;
+        let ipv4_multicast_neighbor_solicitations = dict
+            .try_take_str_into::<u16>("ipv4_multicast_neighbor_solicitations")
+            .transpose()
+            .map_err(|e| {
+                anyhow!("`ipv4_multicast_neighbor_solicitations` is not a string: {:?}", e)
+            })?
+            .transpose()
+            .context("parse `ipv4_multicast_neighbor_solicitations`")?;
+        let ipv6_multicast_neighbor_solicitations = dict
+            .try_take_str_into::<u16>("ipv6_multicast_neighbor_solicitations")
+            .transpose()
+            .map_err(|e| {
+                anyhow!("`ipv6_multicast_neighbor_solicitations` is not a string: {:?}", e)
+            })?
+            .transpose()
+            .context("parse `ipv6_multicast_neighbor_solicitations`")?;
 
         dict.into_empty()
             .map_err(|e| anyhow!("unrecognized fields in interface `{}`: {:?}", name, e))?;
@@ -278,6 +296,8 @@ impl TryFrom<Dictionary> for Interface {
             gateway,
             enable_ipv4_forwarding,
             enable_ipv6_forwarding,
+            ipv4_multicast_neighbor_solicitations,
+            ipv6_multicast_neighbor_solicitations,
         })
     }
 }
@@ -471,6 +491,8 @@ impl Config {
                 gateway,
                 enable_ipv4_forwarding,
                 enable_ipv6_forwarding,
+                ipv4_multicast_neighbor_solicitations,
+                ipv6_multicast_neighbor_solicitations,
             } in interfaces
             {
                 debug!("configuring interface `{}` with static IPs {:?}", name, static_ips);
@@ -490,7 +512,9 @@ impl Config {
                     gateway: gateway.map(Into::into),
                     enable_ipv4_forwarding: Some(enable_ipv4_forwarding),
                     enable_ipv6_forwarding: Some(enable_ipv6_forwarding),
-                    ..Default::default()
+                    ipv4_multicast_neighbor_solicitations,
+                    ipv6_multicast_neighbor_solicitations,
+                    __source_breaking: fidl::marker::SourceBreaking,
                 };
                 netstack
                     .configure_interface(options)
@@ -544,6 +568,8 @@ mod tests {
                             gateway: Some(fidl_ip!("192.168.1.1").into()),
                             enable_ipv4_forwarding: true,
                             enable_ipv6_forwarding: true,
+                            ipv4_multicast_neighbor_solicitations: Some(100),
+                            ipv6_multicast_neighbor_solicitations: Some(100),
                         },
                         Interface {
                             name: "local-ep2".to_string(),
@@ -552,6 +578,8 @@ mod tests {
                             gateway: None,
                             enable_ipv4_forwarding: false,
                             enable_ipv6_forwarding: false,
+                            ipv4_multicast_neighbor_solicitations: None,
+                            ipv6_multicast_neighbor_solicitations: None,
                         },
                     ],
                 },
@@ -564,6 +592,8 @@ mod tests {
                         gateway: None,
                         enable_ipv4_forwarding: false,
                         enable_ipv6_forwarding: false,
+                        ipv4_multicast_neighbor_solicitations: None,
+                        ipv6_multicast_neighbor_solicitations: None,
                     }],
                 },
             ],
@@ -619,7 +649,9 @@ mod tests {
                         "static_ips": [ "192.168.0.2/24" ],
                         "gateway": "192.168.1.1",
                         "enable_ipv4_forwarding": "true",
-                        "enable_ipv6_forwarding": "true"
+                        "enable_ipv6_forwarding": "true",
+                        "ipv4_multicast_neighbor_solicitations": "100",
+                        "ipv6_multicast_neighbor_solicitations": "100"
                     },
                     {
                         "name": "local-ep2",
@@ -737,6 +769,8 @@ mod tests {
                             gateway: None,
                             enable_ipv4_forwarding: false,
                             enable_ipv6_forwarding: false,
+                            ipv4_multicast_neighbor_solicitations: None,
+                            ipv6_multicast_neighbor_solicitations: None,
                         },
                     ],
                 },
@@ -844,6 +878,8 @@ mod tests {
                             gateway: None,
                             enable_ipv4_forwarding: false,
                             enable_ipv6_forwarding: false,
+                            ipv4_multicast_neighbor_solicitations: None,
+                            ipv6_multicast_neighbor_solicitations: None,
                         },
                     ],
                 },
@@ -857,6 +893,8 @@ mod tests {
                             gateway: None,
                             enable_ipv4_forwarding: false,
                             enable_ipv6_forwarding: false,
+                            ipv4_multicast_neighbor_solicitations: None,
+                            ipv6_multicast_neighbor_solicitations: None,
                         },
                     ],
                 },
@@ -919,7 +957,9 @@ mod tests {
                 enable_ipv4_forwarding,
                 enable_ipv6_forwarding,
                 device: _,
-                ..
+                ipv4_multicast_neighbor_solicitations,
+                ipv6_multicast_neighbor_solicitations,
+                __source_breaking,
             } = payload;
             assert_eq!(
                 Interface {
@@ -934,6 +974,8 @@ mod tests {
                     gateway: gateway.map(Into::into),
                     enable_ipv4_forwarding: enable_ipv4_forwarding.unwrap_or_default(),
                     enable_ipv6_forwarding: enable_ipv6_forwarding.unwrap_or_default(),
+                    ipv4_multicast_neighbor_solicitations,
+                    ipv6_multicast_neighbor_solicitations,
                 },
                 expected_config
             );
@@ -996,6 +1038,8 @@ mod tests {
                         gateway: Some(fidl_ip!("192.168.1.1").into()),
                         enable_ipv4_forwarding: true,
                         enable_ipv6_forwarding: true,
+                        ipv4_multicast_neighbor_solicitations: Some(100),
+                        ipv6_multicast_neighbor_solicitations: Some(100),
                     },
                     Interface {
                         name: "local-ep2".to_string(),
@@ -1004,6 +1048,8 @@ mod tests {
                         gateway: None,
                         enable_ipv4_forwarding: false,
                         enable_ipv6_forwarding: false,
+                        ipv4_multicast_neighbor_solicitations: None,
+                        ipv6_multicast_neighbor_solicitations: None,
                     },
                 ],
             )
@@ -1018,6 +1064,8 @@ mod tests {
                     gateway: None,
                     enable_ipv4_forwarding: false,
                     enable_ipv6_forwarding: false,
+                    ipv4_multicast_neighbor_solicitations: None,
+                    ipv6_multicast_neighbor_solicitations: None,
                 }],
             )
             .await;

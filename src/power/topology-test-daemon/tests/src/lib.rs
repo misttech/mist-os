@@ -5,12 +5,15 @@
 use anyhow::Result;
 use diagnostics_assertions::{tree_assertion, AnyProperty};
 use diagnostics_reader::{ArchiveReader, Inspect};
-use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker};
 use fuchsia_component_test::{
     Capability, ChildOptions, RealmBuilder, RealmInstance, Ref, Route, DEFAULT_COLLECTION_NAME,
 };
 use tracing::*;
-use {fidl_fuchsia_power_topology_test as fpt, fuchsia_zircon as zx};
+use {
+    fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_topology_test as fpt,
+    fuchsia_zircon as zx,
+};
 
 const MACRO_LOOP_EXIT: bool = false; // useful in development; prevent hangs from inspect mismatch
 
@@ -484,6 +487,82 @@ async fn test_topology_control() -> Result<()> {
             (name = "P", current_level = 0u64),
             (name = "GP", current_level = 10u64)
         ]
+    );
+
+    Ok(())
+}
+
+#[fuchsia::test]
+async fn test_topology_control_and_status() -> Result<()> {
+    let env = create_test_env().await;
+
+    let topology_control = env.connect_to_protocol::<fpt::TopologyControlMarker>();
+    // Create a topology of one child element (C) with a parent (P)
+    // C -> P
+    // Child requires Parent at 50 to support its own level of 5.
+    // All other elements have a default of 0.
+    let element: [fpt::Element; 2] = [
+        fpt::Element {
+            element_name: "C".to_string(),
+            initial_current_level: 0,
+            valid_levels: vec![0, 5],
+            dependencies: vec![fpt::LevelDependency {
+                dependency_type: fpt::DependencyType::Assertive,
+                dependent_level: 5,
+                requires_element: "P".to_string(),
+                requires_level: 50,
+            }],
+        },
+        fpt::Element {
+            element_name: "P".to_string(),
+            initial_current_level: 0,
+            valid_levels: vec![0, 30, 50],
+            dependencies: vec![],
+        },
+    ];
+    let _ = topology_control.create(&element).await.unwrap();
+    let (status_channel, server_channel) = create_proxy::<fbroker::StatusMarker>()?;
+    let _ = topology_control.open_status_channel("C", server_channel).await?;
+
+    info!("Initial check");
+    let level = status_channel
+        .watch_power_level()
+        .await
+        .expect("Fidl call should work")
+        .expect("Result should be good");
+    assert_eq!(level, 0);
+    block_until_power_elements_match!(
+        &env.broker_moniker,
+        [(name = "C", current_level = 0u64), (name = "P", current_level = 0u64)]
+    );
+
+    // Acquire lease for C @ 5.
+    let _ = topology_control.acquire_lease("C", 5).await.unwrap();
+    info!("Checking after lease for C");
+    let level = status_channel
+        .watch_power_level()
+        .await
+        .expect("Fidl call should work")
+        .expect("Result should be good");
+    assert_eq!(level, 5);
+    block_until_power_elements_match!(
+        &env.broker_moniker,
+        [(name = "C", current_level = 5u64), (name = "P", current_level = 50u64)]
+    );
+
+    // Drop lease for C.
+    let _ = topology_control.drop_lease("C").await.unwrap();
+    info!("Checking after drop lease from C");
+    let level = status_channel
+        .watch_power_level()
+        .await
+        .expect("Fidl call should work")
+        .expect("Result should be good");
+    assert_eq!(level, 0);
+
+    block_until_power_elements_match!(
+        &env.broker_moniker,
+        [(name = "C", current_level = 0u64), (name = "P", current_level = 0u64)]
     );
 
     Ok(())

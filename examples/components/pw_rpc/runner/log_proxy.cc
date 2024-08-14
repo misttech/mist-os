@@ -202,13 +202,13 @@ void ListenNext(SocketClient<pw::log::pw_rpc::raw::Logs>& sc, const zx::socket& 
         pw::log::pwpb::LogEntries::Fields::kEntries) {
       pw::ConstByteSpan entry;
       if (!entries_decoder.ReadBytes(&entry).ok()) {
-        FX_SLOG(WARNING, "Failed to decode pigweed log entry");
+        FX_LOG_KV(WARNING, "Failed to decode pigweed log entry");
         continue;
       }
       pw::protobuf::Decoder entry_decoder(entry);
       ::pw::Status status = LogEntry(entry_decoder, log_socket);
       if (!status.ok()) {
-        FX_SLOG(WARNING, "Encountered invalid pigweed log entry");
+        FX_LOG_KV(WARNING, "Encountered invalid pigweed log entry");
       }
     } else if (static_cast<pw::log::pwpb::LogEntries::Fields>(entries_decoder.FieldNumber()) ==
                pw::log::pwpb::LogEntries::Fields::kFirstEntrySequenceId) {
@@ -231,12 +231,12 @@ void LogProxy::Run() {
       {}, [&sc, this](pw::ConstByteSpan response) { ListenNext(sc, log_socket_, response); },
       [&](pw::Status status) {
         if (!status.ok()) {
-          FX_SLOG(INFO, "Log listener completed with error", KV("status", status.str()));
+          FX_LOG_KV(INFO, "Log listener completed with error", KV("status", status.str()));
         }
         sc.terminate();
       },
       [&](pw::Status status) {
-        FX_SLOG(INFO, "Failed to read logs", KV("status", status.str()));
+        FX_LOG_KV(INFO, "Failed to read logs", KV("status", status.str()));
         sc.terminate();
       });
 

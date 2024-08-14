@@ -47,6 +47,8 @@ python_library("honeydew_no_testonly") {
     "affordances/fuchsia_controller/tracing.py",
     "affordances/fuchsia_controller/ui/__init__.py",
     "affordances/fuchsia_controller/ui/user_input.py",
+    "affordances/fuchsia_controller/wlan/__init__.py",
+    "affordances/fuchsia_controller/wlan/wlan.py",
     "affordances/sl4f/__init__.py",
     "affordances/sl4f/bluetooth/__init__.py",
     "affordances/sl4f/bluetooth/bluetooth_common.py",

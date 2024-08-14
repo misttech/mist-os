@@ -26,7 +26,7 @@ namespace fpbus = fuchsia_hardware_platform_bus;
 
 zx_status_t QemuArm64Pciroot::Create(PciRootHost* root_host, QemuArm64Pciroot::Context ctx,
                                      zx_device_t* parent, const char* name) {
-  auto pciroot = new QemuArm64Pciroot(root_host, std::move(ctx), parent, name);
+  auto pciroot = new QemuArm64Pciroot(root_host, ctx, parent, name);
   return pciroot->DdkAdd(name);
 }
 
@@ -59,8 +59,9 @@ zx_status_t QemuArm64::PciInit() {
     return status;
   }
 
-  if ((status = pci_root_host_.Io().AddRegion({.base = PCIE_PIO_BASE_PHYS, .size = PCIE_PIO_SIZE},
-                                              RegionAllocator::AllowOverlap::No)) != ZX_OK) {
+  ralloc_region_t io = {.base = PCIE_PIO_BASE_PHYS, .size = PCIE_PIO_SIZE};
+  if (status = pci_root_host_.Io().AddRegion(io, RegionAllocator::AllowOverlap::No);
+      status != ZX_OK) {
     zxlogf(ERROR, "Failed to add IO region { %#lx - %#lx } to the PCI root allocator: %s",
            PCIE_PIO_BASE_PHYS, PCIE_PIO_BASE_PHYS + PCIE_PIO_SIZE, zx_status_get_string(status));
     return status;

@@ -255,6 +255,36 @@ func TestParseArgsAndEnv(t *testing.T) {
 				includeClippy:  true,
 			},
 		},
+		{
+			name: "RBE mode auto",
+			args: []string{"core.x64", "--rbe-mode=auto"},
+			expected: setArgs{
+				product:       "core",
+				board:         "x64",
+				includeClippy: true,
+				rbeMode:       "auto",
+			},
+		},
+		{
+			name: "RBE mode off",
+			args: []string{"core.x64", "--rbe-mode=off"},
+			expected: setArgs{
+				product:       "core",
+				board:         "x64",
+				includeClippy: true,
+				rbeMode:       "off",
+			},
+		},
+		{
+			name: "RBE mode cloudtop",
+			args: []string{"core.x64", "--rbe-mode=cloudtop"},
+			expected: setArgs{
+				product:       "core",
+				board:         "x64",
+				includeClippy: true,
+				rbeMode:       "cloudtop",
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -264,6 +294,9 @@ func TestParseArgsAndEnv(t *testing.T) {
 
 			if tc.expected.buildDir == "" {
 				tc.expected.buildDir = defaultBuildDir
+			}
+			if tc.expected.rbeMode == "" {
+				tc.expected.rbeMode = defaultRbeMode
 			}
 
 			env := map[string]string{checkoutDirEnvVar: checkoutDir}
@@ -301,6 +334,9 @@ func (r fakeSubprocessRunner) Run(context.Context, []string, subprocess.RunOptio
 
 func TestConstructStaticSpec(t *testing.T) {
 	rbeSupported := rbeIsSupported()
+	const (
+		rbe_mode_off = `rbe_mode="off"`
+	)
 	testCases := []struct {
 		name         string
 		args         *setArgs
@@ -336,7 +372,7 @@ func TestConstructStaticSpec(t *testing.T) {
 				Variants:         []string{"variant"},
 				IdeFiles:         []string{"json"},
 				JsonIdeScripts:   []string{"foo.py"},
-				GnArgs:           []string{"args"},
+				GnArgs:           []string{"args", rbe_mode_off},
 			},
 		},
 		{
@@ -345,7 +381,7 @@ func TestConstructStaticSpec(t *testing.T) {
 				useCcache: true,
 			},
 			expected: &fintpb.Static{
-				GnArgs: []string{"use_ccache=true"},
+				GnArgs: []string{"use_ccache=true", rbe_mode_off},
 			},
 		},
 		{
@@ -450,7 +486,7 @@ func TestConstructStaticSpec(t *testing.T) {
 				disableCxxRbe: true,
 			},
 			expected: &fintpb.Static{
-				GnArgs: []string{"enable_netboot=true"},
+				GnArgs: []string{rbe_mode_off, "enable_netboot=true"},
 			},
 		},
 		{
@@ -476,6 +512,9 @@ func TestConstructStaticSpec(t *testing.T) {
 			if tc.args.product == "" {
 				tc.args.product = "core"
 			}
+			if tc.args.rbeMode == "" {
+				tc.args.rbeMode = "off"
+			}
 
 			expected := &fintpb.Static{
 				Board:             "boards/x64.gni",
@@ -484,6 +523,10 @@ func TestConstructStaticSpec(t *testing.T) {
 				ExportRustProject: true,
 			}
 			proto.Merge(expected, tc.expected)
+
+			if len(expected.GnArgs) == 0 {
+				expected.GnArgs = []string{rbe_mode_off}
+			}
 
 			checkoutDir := t.TempDir()
 			createFile(t, checkoutDir, expected.Board)

@@ -11,6 +11,7 @@ use crate::task::{
 use crate::timer::{Timeline, TimerWakeup};
 use crate::vfs::buffers::{UserBuffersInputBuffer, UserBuffersOutputBuffer};
 use crate::vfs::eventfd::{new_eventfd, EventFdFileObject, EventFdType};
+use crate::vfs::fs_args::MountParams;
 use crate::vfs::inotify::InotifyFileObject;
 use crate::vfs::namespace::FileSystemCreator;
 use crate::vfs::pidfd::new_pidfd;
@@ -60,14 +61,14 @@ use starnix_uapi::{
     AT_EMPTY_PATH, AT_NO_AUTOMOUNT, AT_REMOVEDIR, AT_SYMLINK_FOLLOW, AT_SYMLINK_NOFOLLOW,
     CLOCK_BOOTTIME, CLOCK_BOOTTIME_ALARM, CLOCK_MONOTONIC, CLOCK_REALTIME, CLOCK_REALTIME_ALARM,
     CLOSE_RANGE_CLOEXEC, CLOSE_RANGE_UNSHARE, EFD_CLOEXEC, EFD_NONBLOCK, EFD_SEMAPHORE,
-    EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLL_CTL_DEL, EPOLL_CTL_MOD, F_ADD_SEALS, F_DUPFD,
-    F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_GETLEASE, F_GETLK, F_GETOWN, F_GETOWN_EX, F_GET_SEALS,
-    F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW, F_OWNER_PGRP, F_OWNER_PID, F_OWNER_TID, F_SETFD,
-    F_SETFL, F_SETLEASE, F_SETLK, F_SETLKW, F_SETOWN, F_SETOWN_EX, IN_CLOEXEC, IN_NONBLOCK,
-    IOCB_FLAG_RESFD, MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_HUGETLB, MFD_HUGE_MASK, MFD_HUGE_SHIFT,
-    NAME_MAX, O_CLOEXEC, O_CREAT, O_NOFOLLOW, O_PATH, O_TMPFILE, PATH_MAX, PIDFD_NONBLOCK, POLLERR,
-    POLLHUP, POLLIN, POLLOUT, POLLPRI, POLLRDBAND, POLLRDNORM, POLLWRBAND, POLLWRNORM,
-    POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL, POSIX_FADV_RANDOM,
+    EPOLL_CLOEXEC, EPOLL_CTL_ADD, EPOLL_CTL_DEL, EPOLL_CTL_MOD, FIOCLEX, FIONCLEX, F_ADD_SEALS,
+    F_DUPFD, F_DUPFD_CLOEXEC, F_GETFD, F_GETFL, F_GETLEASE, F_GETLK, F_GETOWN, F_GETOWN_EX,
+    F_GET_SEALS, F_OFD_GETLK, F_OFD_SETLK, F_OFD_SETLKW, F_OWNER_PGRP, F_OWNER_PID, F_OWNER_TID,
+    F_SETFD, F_SETFL, F_SETLEASE, F_SETLK, F_SETLKW, F_SETOWN, F_SETOWN_EX, IN_CLOEXEC,
+    IN_NONBLOCK, IOCB_FLAG_RESFD, MFD_ALLOW_SEALING, MFD_CLOEXEC, MFD_HUGETLB, MFD_HUGE_MASK,
+    MFD_HUGE_SHIFT, NAME_MAX, O_CLOEXEC, O_CREAT, O_NOFOLLOW, O_PATH, O_TMPFILE, PATH_MAX,
+    PIDFD_NONBLOCK, POLLERR, POLLHUP, POLLIN, POLLOUT, POLLPRI, POLLRDBAND, POLLRDNORM, POLLWRBAND,
+    POLLWRNORM, POSIX_FADV_DONTNEED, POSIX_FADV_NOREUSE, POSIX_FADV_NORMAL, POSIX_FADV_RANDOM,
     POSIX_FADV_SEQUENTIAL, POSIX_FADV_WILLNEED, RWF_SUPPORTED, TFD_CLOEXEC, TFD_NONBLOCK,
     TFD_TIMER_ABSTIME, TFD_TIMER_CANCEL_ON_SET, XATTR_CREATE, XATTR_NAME_MAX, XATTR_REPLACE,
 };
@@ -241,9 +242,11 @@ pub fn sys_fcntl(
             file.set_async_owner(owner);
             Ok(SUCCESS)
         }
-        F_GETFD => Ok(current_task.files.get_fd_flags(fd)?.into()),
+        F_GETFD => Ok(current_task.files.get_fd_flags_allowing_opath(fd)?.into()),
         F_SETFD => {
-            current_task.files.set_fd_flags(fd, FdFlags::from_bits_truncate(arg as u32))?;
+            current_task
+                .files
+                .set_fd_flags_allowing_opath(fd, FdFlags::from_bits_truncate(arg as u32))?;
             Ok(SUCCESS)
         }
         F_GETFL => {
@@ -515,7 +518,8 @@ pub fn sys_fstatfs(
     //
     // See https://man7.org/linux/man-pages/man2/open.2.html
     let file = current_task.files.get_allowing_opath(fd)?;
-    let stat = file.fs.statfs(current_task)?;
+    let mut stat = file.fs.statfs(current_task)?;
+    stat.f_flags |= file.name.mount.flags().bits() as i64;
     current_task.write_object(user_buf, &stat)?;
     Ok(())
 }
@@ -526,9 +530,10 @@ pub fn sys_statfs(
     user_path: UserCString,
     user_buf: UserRef<statfs>,
 ) -> Result<(), Errno> {
-    let node = lookup_at(current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
-    let file_system = node.entry.node.fs();
-    let stat = file_system.statfs(current_task)?;
+    let name = lookup_at(current_task, FdNumber::AT_FDCWD, user_path, LookupFlags::default())?;
+    let fs = name.entry.node.fs();
+    let mut stat = fs.statfs(current_task)?;
+    stat.f_flags |= name.mount.flags().bits() as i64;
     current_task.write_object(user_buf, &stat)?;
 
     Ok(())
@@ -1502,8 +1507,20 @@ pub fn sys_ioctl(
     request: u32,
     arg: SyscallArg,
 ) -> Result<SyscallResult, Errno> {
-    let file = current_task.files.get(fd)?;
-    file.ioctl(locked, current_task, request, arg)
+    match request {
+        FIOCLEX => {
+            current_task.files.set_fd_flags(fd, FdFlags::CLOEXEC)?;
+            Ok(SUCCESS)
+        }
+        FIONCLEX => {
+            current_task.files.set_fd_flags(fd, FdFlags::empty())?;
+            Ok(SUCCESS)
+        }
+        _ => {
+            let file = current_task.files.get(fd)?;
+            file.ioctl(locked, current_task, request, arg)
+        }
+    }
 }
 
 pub fn sys_symlinkat(
@@ -1783,7 +1800,7 @@ where
     let options = FileSystemOptions {
         source: source.into(),
         flags: flags & MountFlags::STORED_ON_FILESYSTEM,
-        params: data.into(),
+        params: MountParams::parse(&data)?,
     };
 
     let fs = current_task.create_filesystem(locked, fs_type, options)?;
@@ -3118,8 +3135,8 @@ mod tests {
         assert_ne!(oldfd, newfd);
         let files = &current_task.files;
         assert!(Arc::ptr_eq(&files.get(oldfd).unwrap(), &files.get(newfd).unwrap()));
-        assert_eq!(files.get_fd_flags(oldfd).unwrap(), FdFlags::empty());
-        assert_eq!(files.get_fd_flags(newfd).unwrap(), FdFlags::CLOEXEC);
+        assert_eq!(files.get_fd_flags_allowing_opath(oldfd).unwrap(), FdFlags::empty());
+        assert_eq!(files.get_fd_flags_allowing_opath(newfd).unwrap(), FdFlags::CLOEXEC);
 
         assert_eq!(sys_dup3(&mut locked, &current_task, oldfd, oldfd, O_CLOEXEC), error!(EINVAL));
 
@@ -3156,7 +3173,7 @@ mod tests {
             O_RDONLY | O_CLOEXEC,
             FileMode::default(),
         )?;
-        assert!(current_task.files.get_fd_flags(fd)?.contains(FdFlags::CLOEXEC));
+        assert!(current_task.files.get_fd_flags_allowing_opath(fd)?.contains(FdFlags::CLOEXEC));
         Ok(())
     }
 

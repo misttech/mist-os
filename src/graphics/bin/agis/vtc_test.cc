@@ -67,7 +67,7 @@ class VtcTest {
         context->svc()->Connect(component_registry_.NewRequest(loop_->dispatcher()));
     ZX_ASSERT(status == ZX_OK);
     component_registry_.set_error_handler([this](zx_status_t status) {
-      FX_SLOG(ERROR, "|component_registry_| error handler", KV("status", status));
+      FX_LOG_KV(ERROR, "|component_registry_| error handler", KV("status", status));
       loop_->Quit();
       assert(false);
     });

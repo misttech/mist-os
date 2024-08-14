@@ -3,14 +3,14 @@
 // found in the LICENSE file.
 
 use crate::visitor::{BpfVisitor, DataWidth, ProgramCounter, Register, Source};
-use crate::{BpfValue, EbpfProgram, EpbfRunContext, BPF_STACK_SIZE, GENERAL_REGISTER_COUNT};
+use crate::{BpfValue, EbpfProgram, EbpfRunContext, BPF_STACK_SIZE, GENERAL_REGISTER_COUNT};
 use byteorder::{BigEndian, ByteOrder, LittleEndian};
 use std::mem::MaybeUninit;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicU32, AtomicU64, Ordering};
 use zerocopy::AsBytes;
 
-pub fn execute_with_arguments<C: EpbfRunContext>(
+pub fn execute_with_arguments<C: EbpfRunContext>(
     program: &EbpfProgram<C>,
     run_context: &mut C::Context<'_>,
     arguments: &[u64],
@@ -19,7 +19,7 @@ pub fn execute_with_arguments<C: EpbfRunContext>(
     execute_impl(program, run_context, &arguments)
 }
 
-pub fn execute<C: EpbfRunContext>(
+pub fn execute<C: EbpfRunContext>(
     program: &EbpfProgram<C>,
     run_context: &mut C::Context<'_>,
     data: &mut [u8],
@@ -31,7 +31,7 @@ pub fn execute<C: EpbfRunContext>(
     )
 }
 
-fn execute_impl<C: EpbfRunContext>(
+fn execute_impl<C: EbpfRunContext>(
     program: &EbpfProgram<C>,
     run_context: &mut C::Context<'_>,
     arguments: &[BpfValue],
@@ -68,7 +68,7 @@ impl BpfValue {
 
 /// The state of the computation as known by the interpreter at a given point in time.
 #[derive(Debug)]
-struct ComputationContext<'a, C: EpbfRunContext> {
+struct ComputationContext<'a, C: EbpfRunContext> {
     /// The program to execute.
     program: &'a EbpfProgram<C>,
     /// Register 0 to 9.
@@ -81,7 +81,7 @@ struct ComputationContext<'a, C: EpbfRunContext> {
     result: Option<u64>,
 }
 
-impl<C: EpbfRunContext> ComputationContext<'_, C> {
+impl<C: EbpfRunContext> ComputationContext<'_, C> {
     fn reg(&mut self, index: Register) -> BpfValue {
         if index < GENERAL_REGISTER_COUNT {
             self.registers[index as usize]
@@ -257,7 +257,7 @@ impl<C: EpbfRunContext> ComputationContext<'_, C> {
     }
 }
 
-impl<C: EpbfRunContext> BpfVisitor for ComputationContext<'_, C> {
+impl<C: EbpfRunContext> BpfVisitor for ComputationContext<'_, C> {
     type Context<'a> = C::Context<'a>;
 
     fn add<'a>(

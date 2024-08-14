@@ -6,7 +6,6 @@
 import argparse
 import json
 import sys
-from pathlib import Path
 
 
 def parse_args():

@@ -5,12 +5,11 @@
 use anyhow::{anyhow, Context};
 use async_trait::async_trait;
 use camino::{Utf8Path, Utf8PathBuf};
-use errors::ffx_bail;
 use ffx_config::environment::EnvironmentKind;
 use ffx_config::EnvironmentContext;
 use ffx_repository_serve_args::ServeCommand;
 use ffx_target::{knock_target, TargetProxy};
-use fho::{AvailabilityFlag, Connector, FfxMain, FfxTool, Result, SimpleWriter};
+use fho::{return_user_error, Connector, FfxMain, FfxTool, Result, SimpleWriter};
 use fidl_fuchsia_developer_ffx::{
     RepositoryStorageType, RepositoryTarget as FfxCliRepositoryTarget, TargetInfo,
 };
@@ -44,20 +43,18 @@ const REPO_CONNECT_TIMEOUT_CONFIG: &str = "repository.connect_timeout_secs";
 const DEFAULT_CONNECTION_TIMEOUT_SECS: u64 = 120;
 const MAX_CONSECUTIVE_CONNECT_ATTEMPTS: u8 = 10;
 const REPO_BACKGROUND_FEATURE_FLAG: &str = "repository.server.enabled";
-const REPO_FOREGROUND_FEATURE_FLAG: &str = "repository.foreground.enabled";
 const REPOSITORY_MANAGER_MONIKER: &str = "/core/pkg-resolver";
 const ENGINE_MONIKER: &str = "/core/pkg-resolver";
 const DEFAULT_REPO_NAME: &str = "devhost";
 const REPO_PATH_RELATIVE_TO_BUILD_DIR: &str = "amber-files";
 
 #[derive(FfxTool)]
-#[check(AvailabilityFlag(REPO_FOREGROUND_FEATURE_FLAG))]
 pub struct ServeTool {
     #[command]
-    cmd: ServeCommand,
-    context: EnvironmentContext,
-    target_proxy_connector: Connector<TargetProxy>,
-    rcs_proxy_connector: Connector<RemoteControlProxy>,
+    pub cmd: ServeCommand,
+    pub context: EnvironmentContext,
+    pub target_proxy_connector: Connector<TargetProxy>,
+    pub rcs_proxy_connector: Connector<RemoteControlProxy>,
 }
 
 fho::embedded_plugin!(ServeTool);
@@ -325,7 +322,9 @@ async fn main_connect_loop(
     // Outer connection loop, retries when disconnected.
     loop {
         if attempts >= MAX_CONSECUTIVE_CONNECT_ATTEMPTS {
-            ffx_bail!("Stopping reconnecting after {attempts} consecutive failed attempts");
+            return_user_error!(
+                "Stopping reconnecting after {attempts} consecutive failed attempts"
+            );
         } else {
             attempts += 1;
         }
@@ -373,6 +372,23 @@ async fn main_connect_loop(
 impl FfxMain for ServeTool {
     type Writer = SimpleWriter;
     async fn main(self, writer: Self::Writer) -> Result<()> {
+        /* This check is specific to the `ffx repository serve` command and should be ignored
+        if the entry point is `ffx repository server start`.
+         */
+        let bg: bool = self
+            .context
+            .get(REPO_BACKGROUND_FEATURE_FLAG)
+            .context("checking for background server flag")?;
+        if bg {
+            return_user_error!(
+                r#"The ffx setting '{}' and the foreground server are mutually incompatible.
+Please disable background serving by running the following commands:
+$ ffx config remove repository.server.enabled
+$ ffx doctor --restart-daemon"#,
+                REPO_BACKGROUND_FEATURE_FLAG,
+            );
+        }
+
         serve_impl(
             self.target_proxy_connector,
             self.rcs_proxy_connector,
@@ -385,26 +401,13 @@ impl FfxMain for ServeTool {
     }
 }
 
-async fn serve_impl<W: Write + 'static>(
+pub async fn serve_impl<W: Write + 'static>(
     target_proxy: Connector<TargetProxy>,
     rcs_proxy: Connector<RemoteControlProxy>,
     cmd: ServeCommand,
     context: EnvironmentContext,
     mut writer: W,
 ) -> Result<()> {
-    let bg: bool =
-        context.get(REPO_BACKGROUND_FEATURE_FLAG).context("checking for background server flag")?;
-    if bg {
-        ffx_bail!(
-            r#"The ffx setting '{}' and the foreground server '{}' are mutually incompatible.
-Please disable background serving by running the following commands:
-$ ffx config remove repository.server.enabled
-$ ffx doctor --restart-daemon"#,
-            REPO_BACKGROUND_FEATURE_FLAG,
-            REPO_FOREGROUND_FEATURE_FLAG,
-        );
-    }
-
     let connect_timeout =
         context.get(REPO_CONNECT_TIMEOUT_CONFIG).unwrap_or(DEFAULT_CONNECTION_TIMEOUT_SECS);
     let connect_timeout = std::time::Duration::from_secs(connect_timeout);
@@ -413,11 +416,11 @@ $ ffx doctor --restart-daemon"#,
 
     let repo_path = match (cmd.repo_path.clone(), cmd.product_bundle.clone()) {
         (Some(_), Some(_)) => {
-            ffx_bail!("Cannot specify both --repo-path and --product-bundle");
+            return_user_error!("Cannot specify both --repo-path and --product-bundle");
         }
         (None, Some(product_bundle)) => {
             if cmd.repository.is_some() {
-                ffx_bail!("--repository is not supported with --product-bundle");
+                return_user_error!("--repository is not supported with --product-bundle");
             }
             let repositories = sdk_metadata::get_repositories(product_bundle.clone())
                 .with_context(|| {
@@ -468,7 +471,7 @@ $ ffx doctor --restart-daemon"#,
 
                 build_dir.join(REPO_PATH_RELATIVE_TO_BUILD_DIR)
             } else {
-                ffx_bail!("Either --repo-path or --product-bundle need to be specified");
+                return_user_error!("Either --repo-path or --product-bundle need to be specified");
             };
 
             // Create PmRepository and RepoClient
@@ -943,17 +946,7 @@ mod test {
     }
 
     async fn get_test_env() -> TestEnv {
-        let test_env = ffx_config::test_init().await.expect("test initialization");
-
-        test_env
-            .context
-            .query(REPO_FOREGROUND_FEATURE_FLAG)
-            .level(Some(ConfigLevel::User))
-            .set("true".into())
-            .await
-            .unwrap();
-
-        test_env
+        ffx_config::test_init().await.expect("test initialization")
     }
 
     #[fuchsia_async::run_singlethreaded(test)]

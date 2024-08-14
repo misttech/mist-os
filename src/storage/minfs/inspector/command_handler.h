@@ -5,21 +5,19 @@
 #ifndef SRC_STORAGE_MINFS_INSPECTOR_COMMAND_HANDLER_H_
 #define SRC_STORAGE_MINFS_INSPECTOR_COMMAND_HANDLER_H_
 
+#include <cstdint>
 #include <iostream>
 #include <map>
+#include <memory>
 #include <ostream>
 #include <string>
+#include <utility>
 #include <vector>
 
-#include <disk_inspector/command.h>
-#include <disk_inspector/command_handler.h>
-#include <disk_inspector/common_types.h>
-#include <disk_inspector/disk_struct.h>
-#include <disk_inspector/inspector_transaction_handler.h>
-#include <storage/buffer/vmo_buffer.h>
-
-#include "src/storage/lib/block_client/cpp/block_device.h"
-#include "src/storage/minfs/format.h"
+#include "src/devices/block/drivers/core/block-fifo.h"
+#include "src/storage/lib/disk_inspector/command.h"
+#include "src/storage/lib/disk_inspector/command_handler.h"
+#include "src/storage/lib/disk_inspector/supported_types.h"
 #include "src/storage/minfs/inspector/minfs_inspector.h"
 
 namespace minfs {
@@ -74,7 +72,7 @@ class CommandHandler : public disk_inspector::CommandHandler {
   zx_status_t PrintJournalSuperblock();
 
   // Prints to |output_| every JournalEntry block in order by first getting
-  // the prefix at each block to check if it is a header, commit, recovation,
+  // the prefix at each block to check if it is a header, commit, revocation,
   // or payload and printing based on the specific format. |max| represents
   // the number of entries to print if |max| is less the the total number of
   // entries.
@@ -83,7 +81,7 @@ class CommandHandler : public disk_inspector::CommandHandler {
   // Prints the journal entry at |index| as a JournalHeader struct to |output_|.
   zx_status_t PrintJournalHeader(uint64_t index);
 
-  // Prints the jouranl entry at |index| as a JournalCommit struct to |output_|.
+  // Prints the journal entry at |index| as a JournalCommit struct to |output_|.
   zx_status_t PrintJournalCommit(uint64_t index);
 
   // Prints the minfs backup superblock to |output_|.

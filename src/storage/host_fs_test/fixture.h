@@ -5,11 +5,11 @@
 #ifndef SRC_STORAGE_HOST_FS_TEST_FIXTURE_H_
 #define SRC_STORAGE_HOST_FS_TEST_FIXTURE_H_
 
-#include <fcntl.h>
+#include <cstddef>
+#include <cstdio>
+#include <string>
 
 #include <gtest/gtest.h>
-
-#include "src/storage/minfs/host.h"
 
 namespace fs_test {
 

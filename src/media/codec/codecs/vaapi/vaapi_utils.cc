@@ -23,11 +23,11 @@ std::unique_ptr<VADisplayWrapper> display_wrapper;
 }
 
 static void libva_error_callback(void* user_context, const char* message) {
-  FX_SLOG(ERROR, "libva error", FX_KV("error_message", message));
+  FX_LOG_KV(ERROR, "libva error", FX_KV("error_message", message));
 }
 
 static void libva_info_callback(void* user_context, const char* message) {
-  FX_SLOG(INFO, "libva message", FX_KV("message", message));
+  FX_LOG_KV(INFO, "libva message", FX_KV("message", message));
 }
 
 // static
@@ -139,7 +139,7 @@ static bool SupportsEntrypointForProfile(VAProfile profile, VAEntrypoint require
   VAStatus status =
       vaQueryConfigEntrypoints(display, profile, entrypoints.data(), &num_entrypoints);
   if (status != VA_STATUS_SUCCESS) {
-    FX_SLOG(ERROR, "vaQueryConfigEntrypoints failed", FX_KV("error_str", vaErrorStr(status)));
+    FX_LOG_KV(ERROR, "vaQueryConfigEntrypoints failed", FX_KV("error_str", vaErrorStr(status)));
     return false;
   }
 
@@ -165,7 +165,7 @@ static bool SupportsAttribsForProfile(VAProfile profile, VAEntrypoint required_e
       vaGetConfigAttributes(display, profile, required_entrypoint, config_attrib.data(),
                             safemath::checked_cast<int>(config_attrib.size()));
   if (status != VA_STATUS_SUCCESS) {
-    FX_SLOG(ERROR, "vaGetConfigAttributes failed", FX_KV("error_str", vaErrorStr(status)));
+    FX_LOG_KV(ERROR, "vaGetConfigAttributes failed", FX_KV("error_str", vaErrorStr(status)));
     return false;
   }
 
@@ -173,10 +173,10 @@ static bool SupportsAttribsForProfile(VAProfile profile, VAEntrypoint required_e
     if ((config_attrib[i].type != required_attribs[i].type) ||
         ((config_attrib[i].value & required_attribs[i].value) != required_attribs[i].value)) {
       using UnderlyingType = std::underlying_type_t<decltype(required_attribs[i].type)>;
-      FX_SLOG(DEBUG, "Unsupported attribute",
-              FX_KV("type", static_cast<UnderlyingType>(required_attribs[i].type)),
-              FX_KV("required_value", required_attribs[i].value),
-              FX_KV("actual_value", config_attrib[i].value));
+      FX_LOG_KV(DEBUG, "Unsupported attribute",
+                FX_KV("type", static_cast<UnderlyingType>(required_attribs[i].type)),
+                FX_KV("required_value", required_attribs[i].value),
+                FX_KV("actual_value", config_attrib[i].value));
       return false;
     }
   }
@@ -211,7 +211,7 @@ std::optional<ProfileDescription> GetProfileDescription(
       vaCreateConfig(display, profile, required_entrypoint, required_attribs.data(),
                      safemath::checked_cast<int>(required_attribs.size()), &config_id);
   if (status != VA_STATUS_SUCCESS) {
-    FX_SLOG(ERROR, "vaCreateConfig failed", FX_KV("error_str", vaErrorStr(status)));
+    FX_LOG_KV(ERROR, "vaCreateConfig failed", FX_KV("error_str", vaErrorStr(status)));
     return std::nullopt;
   }
   ScopedContextID scoped_context(config_id);
@@ -219,14 +219,14 @@ std::optional<ProfileDescription> GetProfileDescription(
   unsigned int num_attribs = 0;
   status = vaQuerySurfaceAttributes(display, config_id, nullptr, &num_attribs);
   if (status != VA_STATUS_SUCCESS) {
-    FX_SLOG(ERROR, "vaQuerySurfaceAttributes failed", FX_KV("error_str", vaErrorStr(status)));
+    FX_LOG_KV(ERROR, "vaQuerySurfaceAttributes failed", FX_KV("error_str", vaErrorStr(status)));
     return std::nullopt;
   }
 
   std::vector<VASurfaceAttrib> attrib_list(safemath::checked_cast<size_t>(num_attribs));
   status = vaQuerySurfaceAttributes(display, profile, attrib_list.data(), &num_attribs);
   if (status != VA_STATUS_SUCCESS) {
-    FX_SLOG(ERROR, "vaQuerySurfaceAttributes failed", FX_KV("error_str", vaErrorStr(status)));
+    FX_LOG_KV(ERROR, "vaQuerySurfaceAttributes failed", FX_KV("error_str", vaErrorStr(status)));
     return std::nullopt;
   }
 
@@ -303,7 +303,7 @@ std::vector<VAProfile> GetHardwareSupportedProfiles() {
   int num_profiles = 0;
   VAStatus status = vaQueryConfigProfiles(display, supported_profiles.data(), &num_profiles);
   if (status != VA_STATUS_SUCCESS) {
-    FX_SLOG(ERROR, "vaQueryConfigProfiles failed", FX_KV("error_str", vaErrorStr(status)));
+    FX_LOG_KV(ERROR, "vaQueryConfigProfiles failed", FX_KV("error_str", vaErrorStr(status)));
     return {};
   }
 
@@ -383,8 +383,8 @@ static VaProfileMapType GetVaProfileTranslation() {
   return *kVaProfileToMap;
 }
 
-// TODO(https://fxbug.dev/42073599): Remove [[maybe_unused]] once used, or potentially remove the method if no
-// longer expect to need to convert the other direction.
+// TODO(https://fxbug.dev/42073599): Remove [[maybe_unused]] once used, or potentially remove the
+// method if no longer expect to need to convert the other direction.
 [[maybe_unused]] static VAProfile CodecProfileToVaProfile(fuchsia::media::CodecProfile profile) {
   const auto& profile_map = GetCodecProfileTranslation();
   const auto& profile_itr = profile_map.find(profile);
@@ -427,9 +427,9 @@ std::vector<fuchsia::mediacodec::DetailedCodecDescription> GetCodecDescriptions(
 
           auto codec_profile = VaProfileToCodecProfile(profile_description.profile);
           if (codec_profile.IsUnknown()) {
-            FX_SLOG(ERROR, "Unknown translation from VAProfile to CodecProfile",
-                    FX_KV("va_profile", safemath::strict_cast<std::underlying_type_t<VAProfile>>(
-                                            profile_description.profile)));
+            FX_LOG_KV(ERROR, "Unknown translation from VAProfile to CodecProfile",
+                      FX_KV("va_profile", safemath::strict_cast<std::underlying_type_t<VAProfile>>(
+                                              profile_description.profile)));
             continue;
           }
           decoder_description.set_profile(codec_profile);

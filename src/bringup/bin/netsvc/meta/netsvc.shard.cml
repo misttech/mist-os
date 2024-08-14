@@ -11,6 +11,12 @@
     ],
     offer: [
         {
+            from: "parent",
+            to: "#netsvc",
+            config: [ "fuchsia.network.PrimaryInterface" ],
+            availability: "optional",
+        },
+        {
             protocol: [ "fuchsia.boot.Arguments" ],
             from: "parent",
             to: "#netsvc",

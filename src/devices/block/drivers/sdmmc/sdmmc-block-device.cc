@@ -54,26 +54,13 @@ zx::result<fuchsia_hardware_sdmmc::wire::SdmmcBufferRegion> GetBufferRegion(zx_h
 }
 
 zx::result<fuchsia_hardware_power::ComponentPowerConfiguration> GetAllPowerConfigs(
-    const fdf::Namespace& ns, fuchsia_hardware_power::ParentElement parent_element) {
+    const fdf::Namespace& ns) {
   zx::result open_result = ns.Open<fuchsia_io::File>("/pkg/data/power_config.fidl",
                                                      fuchsia_io::wire::OpenFlags::kRightReadable);
   if (!open_result.is_ok() || !open_result->is_valid()) {
     return zx::error(ZX_ERR_INTERNAL);
   }
-  zx::result config = power_config::Load(std::move(open_result.value()));
-  if (config.is_error()) {
-    return config;
-  }
-  for (fuchsia_hardware_power::PowerElementConfiguration& element :
-       config.value().power_elements()) {
-    if (!element.element().has_value() || !element.element().value().name().has_value()) {
-      continue;
-    }
-    if (element.element()->name().value() == "sdmmc-hardware") {
-      element.dependencies().value()[0].parent() = std::move(parent_element);
-    }
-  }
-  return config;
+  return power_config::Load(std::move(open_result.value()));
 }
 
 }  // namespace
@@ -289,29 +276,8 @@ zx_status_t SdmmcBlockDevice::AddDevice() {
 }
 
 zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
-  // Find out parent element.
-  auto power_token_provider =
-      parent_->driver_incoming()
-          ->Connect<fuchsia_hardware_power::PowerTokenService::TokenProvider>();
-  if (power_token_provider.is_error() || !power_token_provider->is_valid()) {
-    FDF_LOGL(ERROR, logger(), "Failed to connect to power token provider: %s",
-             power_token_provider.status_string());
-    return power_token_provider.take_error();
-  }
-  auto get_token = fidl::WireCall(power_token_provider.value())->GetToken();
-  if (!get_token.ok()) {
-    FDF_LOGL(ERROR, logger(), "Call to GetToken failed: %s", get_token.status_string());
-    return zx::error(get_token.status());
-  } else if (get_token->is_error()) {
-    FDF_LOGL(ERROR, logger(), "GetToken returned failure: %s",
-             zx_status_get_string(get_token->error_value()));
-    return zx::error(get_token->error_value());
-  }
-  fuchsia_hardware_power::ParentElement parent_element =
-      fuchsia_hardware_power::ParentElement::WithName(std::string(get_token.value()->name.data()));
-
-  zx::result natural_power_configs =
-      GetAllPowerConfigs(*parent_->driver_incoming(), std::move(parent_element));
+  // Load our config from the package.
+  zx::result natural_power_configs = GetAllPowerConfigs(*parent_->driver_incoming());
   if (natural_power_configs.is_error()) {
     FDF_LOGL(INFO, logger(), "Error getting power configs: %s",
              natural_power_configs.status_string());

@@ -33,7 +33,7 @@ const EAGER_PACKAGE_PERSISTENT_FIDL_NAME: &str = "eager_packages.pf";
 
 #[derive(Clone, Debug)]
 struct EagerPackage {
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     executable: bool,
     package_directory_and_hash: Option<(PackageDirectory, Hash)>,
     cup: Option<CupData>,

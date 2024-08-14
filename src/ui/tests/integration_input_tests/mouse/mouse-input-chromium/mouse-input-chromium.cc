@@ -58,7 +58,7 @@ fuchsia_ui_test_input::MouseEventPhase GetPhase(const std::string& type) {
 // Implements a simple web app, which responds to mouse events.
 class WebApp : public integration_tests::WebAppBase {
  public:
-  WebApp() { Setup(kAppCode); }
+  WebApp() { Setup("mouse-input-chromium", kAppCode); }
 
   void RunLoopForMouseReponse() {
     auto test_app_status_listener_connect =
@@ -72,8 +72,6 @@ class WebApp : public integration_tests::WebAppBase {
         component::Connect<fuchsia_ui_test_input::MouseInputListener>();
     ZX_ASSERT_OK(mouse_input_listener_connect);
     fidl::SyncClient mouse_input_listener(std::move(mouse_input_listener_connect.value()));
-
-    // TODO(chaopeng): notify ready to inject events to test.
 
     while (true) {
       bool got_mouse_event = false;

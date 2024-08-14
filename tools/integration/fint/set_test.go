@@ -70,7 +70,7 @@ func TestSet(t *testing.T) {
 
 	t.Run("sets artifacts metadata fields", func(t *testing.T) {
 		runner := &fakeSubprocessRunner{}
-		artifacts, err := setImpl(ctx, runner, staticSpec, contextSpec, "linux-x64", false)
+		artifacts, err := setImpl(ctx, runner, staticSpec, contextSpec, "linux-x64", false, []string{})
 		if err != nil {
 			t.Fatalf("Unexpected error from setImpl: %s", err)
 		}
@@ -92,7 +92,7 @@ func TestSet(t *testing.T) {
 			mockStdout: []byte("some stdout"),
 			fail:       true,
 		}
-		artifacts, err := setImpl(ctx, runner, staticSpec, contextSpec, "linux-x64", false)
+		artifacts, err := setImpl(ctx, runner, staticSpec, contextSpec, "linux-x64", false, []string{})
 		if !errors.Is(err, errSubprocessFailure) {
 			t.Fatalf("Unexpected error from setImpl: %s", err)
 		}
@@ -107,7 +107,7 @@ func TestSet(t *testing.T) {
 		runner := &fakeSubprocessRunner{
 			mockStdout: []byte("some stdout"),
 		}
-		artifacts, err := setImpl(ctx, runner, staticSpec, contextSpec, "linux-x64", false)
+		artifacts, err := setImpl(ctx, runner, staticSpec, contextSpec, "linux-x64", false, []string{})
 		if err != nil {
 			t.Fatalf("Unexpected error from setImpl: %s", err)
 		}
@@ -126,7 +126,7 @@ func TestSet(t *testing.T) {
 		runner := &fakeSubprocessRunner{
 			mockStdout: []byte("some stdout"),
 		}
-		artifacts, err := setImpl(ctx, runner, staticSpec, contextSpec, "linux-x64", false)
+		artifacts, err := setImpl(ctx, runner, staticSpec, contextSpec, "linux-x64", false, []string{})
 		if err != nil {
 			t.Fatalf("Unexpected error from setImpl: %s", err)
 		}
@@ -145,7 +145,7 @@ func TestSet(t *testing.T) {
 		runner := &fakeSubprocessRunner{
 			mockStdout: []byte("some stdout"),
 		}
-		artifacts, err := setImpl(ctx, runner, staticSpec, contextSpec, "linux-x64", false)
+		artifacts, err := setImpl(ctx, runner, staticSpec, contextSpec, "linux-x64", false, []string{})
 		if err != nil {
 			t.Fatalf("Unexpected error from setImpl: %s", err)
 		}
@@ -158,7 +158,7 @@ func TestSet(t *testing.T) {
 		runner := &fakeSubprocessRunner{
 			mockStdout: []byte("some stdout"),
 		}
-		artifacts, err := setImpl(ctx, runner, staticSpec, contextSpec, "linux-x64", false)
+		artifacts, err := setImpl(ctx, runner, staticSpec, contextSpec, "linux-x64", false, []string{})
 		if err != nil {
 			t.Fatalf("Unexpected error from setImpl: %s", err)
 		}
@@ -246,7 +246,7 @@ func TestRunGen(t *testing.T) {
 			if _, err := os.Stat(filepath.Join(contextSpec.BuildDir, "args.gn")); err != nil {
 				t.Errorf("Failed to read args.gn file: %s", err)
 			}
-			assertSubset(t, tc.expectedOptions, otherOptions, false)
+			assertSubset(t, tc.expectedOptions, otherOptions, false, false)
 		})
 	}
 }
@@ -299,6 +299,8 @@ func TestGenArgs(t *testing.T) {
 		// Whether `expectedArgs` must be found in the same relative order in
 		// the return value. Disabled by default to make tests less fragile.
 		orderMatters bool
+		// Whether `isSubset` should enforce no duplicates or not.
+		allowDuplicateArgs bool
 		// Whether we expect genArgs to return an error.
 		expectErr bool
 		// Relative paths to files to create in the checkout dir prior to
@@ -309,6 +311,8 @@ func TestGenArgs(t *testing.T) {
 		extraChecks func(t *testing.T, args []string)
 		// Whether to skip any local arguments file.
 		skipLocalArgs bool
+		// assembly developer overrides strings
+		assemblyOverridesStrings []string
 	}{
 		{
 			name: "minimal specs",
@@ -607,6 +611,23 @@ func TestGenArgs(t *testing.T) {
 				`pgo_profile_path="/tmp/pgo_profile_path"`,
 			},
 		},
+		{
+			name:               "developer overrides",
+			orderMatters:       true,
+			allowDuplicateArgs: true,
+			assemblyOverridesStrings: []string{
+				"//build/images/fuchsia/*=//local:test_args",
+				"//build/images/bringup/*=//local:bringup_args",
+			},
+			expectedArgs: []string{
+				"\n\nproduct_assembly_overrides = [",
+				`assembly = "//build/images/fuchsia/*"`,
+				`overrides = "//local:test_args"`,
+				`assembly = "//build/images/bringup/*"`,
+				`overrides = "//local:bringup_args"`,
+				`]`,
+			},
+		},
 	}
 
 	for _, tc := range testCases {
@@ -643,7 +664,7 @@ func TestGenArgs(t *testing.T) {
 				}
 			}
 
-			args, err := genArgs(ctx, tc.staticSpec, tc.contextSpec, tc.skipLocalArgs)
+			args, err := genArgs(ctx, tc.staticSpec, tc.contextSpec, tc.skipLocalArgs, tc.assemblyOverridesStrings)
 			if err != nil {
 				if tc.expectErr {
 					return
@@ -653,7 +674,7 @@ func TestGenArgs(t *testing.T) {
 				t.Fatalf("Expected genArgs() to return an error, but got nil")
 			}
 
-			assertSubset(t, tc.expectedArgs, args, tc.orderMatters)
+			assertSubset(t, tc.expectedArgs, args, tc.orderMatters, tc.allowDuplicateArgs)
 			if len(tc.unexpectedArgs) > 0 {
 				assertNotOverlap(t, tc.unexpectedArgs, args)
 			}
@@ -668,8 +689,8 @@ func TestGenArgs(t *testing.T) {
 // assertSubset checks that every item in `subset` is also in `set`. If
 // `orderMatters`, then we'll also check that the relative ordering of the items
 // in `subset` is the same as their relative ordering in `set`.
-func assertSubset(t *testing.T, subset, set []string, orderMatters bool) {
-	if isSub, msg := isSubset(subset, set, orderMatters); !isSub {
+func assertSubset(t *testing.T, subset, set []string, orderMatters bool, allowDuplicates bool) {
+	if isSub, msg := isSubset(subset, set, orderMatters, allowDuplicates); !isSub {
 		t.Fatalf(msg)
 	}
 }
@@ -687,13 +708,15 @@ func assertNotOverlap(t *testing.T, set1, set2 []string) {
 
 // isSubset is extracted from `assertSubset()` to make it possible to test this
 // logic.
-func isSubset(subset, set []string, orderMatters bool) (bool, string) {
+func isSubset(subset, set []string, orderMatters bool, allowDuplicates bool) (bool, string) {
 	indices := make(map[string]int)
 	for i, item := range set {
-		if duplicateIndex, ok := indices[item]; ok {
-			// Disallowing duplicates makes this function simpler, and we have
-			// no need to handle duplicates.
-			return false, fmt.Sprintf("Duplicate item %q found at indices %d and %d", item, duplicateIndex, i)
+		if !allowDuplicates {
+			if duplicateIndex, ok := indices[item]; ok {
+				// Disallowing duplicates makes this function simpler, and we have
+				// no need to handle duplicates.
+				return false, fmt.Sprintf("Duplicate item %q found at indices %d and %d", item, duplicateIndex, i)
+			}
 		}
 		indices[item] = i
 	}
@@ -713,11 +736,12 @@ func isSubset(subset, set []string, orderMatters bool) (bool, string) {
 
 func TestAssertSubset(t *testing.T) {
 	testCases := []struct {
-		name          string
-		subset        []string
-		set           []string
-		orderMatters  bool
-		expectFailure bool
+		name            string
+		subset          []string
+		set             []string
+		orderMatters    bool
+		expectFailure   bool
+		allowDuplicates bool
 	}{
 		{
 			name:   "empty subset and set",
@@ -769,11 +793,17 @@ func TestAssertSubset(t *testing.T) {
 			set:           []string{"foo", "foo"},
 			expectFailure: true,
 		},
+		{
+			name:            "duplicates allowed in set",
+			subset:          []string{"foo"},
+			set:             []string{"foo", "foo"},
+			allowDuplicates: true,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			isSub, msg := isSubset(tc.subset, tc.set, tc.orderMatters)
+			isSub, msg := isSubset(tc.subset, tc.set, tc.orderMatters, tc.allowDuplicates)
 			if tc.expectFailure && isSub {
 				t.Errorf("Expected assertSubset() to fail but it passed")
 			} else if !tc.expectFailure && !isSub {

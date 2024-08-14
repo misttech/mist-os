@@ -290,7 +290,6 @@
                 "ElfTest.MissingPhdr",
                 "ElfTest.UnalignedOffset",
                 "ExecveTest.BrkAfterBinary",
-                "InterpreterScriptTest.BinaryNoExecute",
                 "InterpreterScriptTest.Execute",
                 "InterpreterScriptTest.MaxRecursion",
                 "InterpreterScriptTest.RelativePath",
@@ -368,8 +367,6 @@
                 // ioctl_test
                 "IoctlTest/IoctlTestSIOCGIFCONF.ValidateNoArrayGetsLength/*",
                 "IoctlTest.FIONBIOFails",
-                "IoctlTest.FIOCLEXSucceeds",
-                "IoctlTest.FIONCLEXSucceeds",
                 "IoctlTest.FIOASYNCFails",
                 "IoctlTest.FIOASYNCSucceeds",
                 "IoctlTest.FIOASYNCNoTarget",
@@ -486,7 +483,6 @@
                 "MountTest.ActiveSubmountBusy",
                 "MountTest.BindSlaveToShared",
                 "MountTest.BindSlaveToSlave",
-                "MountTest.ChangeMountFlags",
                 "MountTest.DetachedMountBindFails",
                 "MountTest.LargeTreePropagationEvent",
                 "MountTest.LockedMountStopsNonRecBind",
@@ -494,7 +490,6 @@
                 "MountTest.MaxRecursiveBind",
                 "MountTest.MountInfo",
                 "MountTest.MountNamespaceSlavesNewUserNamespace",
-                "MountTest.MountNoExec",
                 "MountTest.MountProc",
                 "MountTest.MountTmpfsMagicValIgnored",
                 "MountTest.MountWithStrictAtime",
@@ -1185,10 +1180,7 @@
                 "IntervalTimerTest.PeriodicGroupDirectedSignal",
 
                 // TODO(https://fxbug.dev/353534690) deflake
-                "AllInetTests/RawPacketTest.SendFromLoopback/0",
-
-                // TODO(https://fxbug.dev/356145523) deflake
-                "AllInetTests/RawPacketTest.SendFromLoopback/1",
+                "AllInetTests/RawPacketTest.SendFrom*/*",
 
                 // TODO(https://fxbug.dev/354049980) deflake
                 "RtSignalTest.InvalidCodes",
@@ -1199,8 +1191,8 @@
                 // TODO(https://fxbug.dev/358452019) deflake
                 "SigstopTest.Correctness",
 
-                // TODO(https://fxbug.dev/358452376) deflake
-                "AllInetTests/RawPacketTest.SendFromUnspec/0",
+                // TODO(https://fxbug.dev/358626000) deflake
+                "AllInetTests/SimpleTcpSocketTest.ListenConnectParallel/*",
             ],
         },
     ],

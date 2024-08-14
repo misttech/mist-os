@@ -45,7 +45,16 @@ FuchsiaBoardConfigInfo = provider(
     doc = "A board info used to containing the board_configuration.json and its associated files",
     fields = {
         "files": "A list of files consisting the board config.",
-        "config": "The JSON board configuration file.",
+        "config": "The path to JSON board configuration file.",
+    },
+)
+
+FuchsiaPostProcessingScriptInfo = provider(
+    doc = "A post processing script info used to containing the post processing script related artifacts",
+    fields = {
+        "post_processing_script_path": "Path to post processing script",
+        "post_processing_script_args": "Post processing script arguments",
+        "post_processing_script_inputs": "Dictionary for artifacts used by post processing script.",
     },
 )
 

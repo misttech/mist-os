@@ -3,7 +3,7 @@
     init: [],
     kernel_cmdline: "",
     mounts: [
-        "/:remotefs",
+        "/:remotefs::nosuid,nodev,relatime",
     ],
     rlimits: [],
     name: "empty_container",

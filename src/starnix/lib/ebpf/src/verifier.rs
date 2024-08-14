@@ -58,6 +58,14 @@ impl MemoryId {
             }
         }
     }
+
+    /// Returns whether the parent of `self` is `parent`
+    fn has_parent(&self, parent: &MemoryId) -> bool {
+        match &self.parent {
+            None => false,
+            Some(p) => p.as_ref() == parent,
+        }
+    }
 }
 
 /// The target type of a pointer type in a struct.
@@ -218,6 +226,9 @@ pub enum Type {
     PtrToEndArray { id: MemoryId },
     /// A pointer that might be null and must be validated before being referenced.
     NullOr { id: MemoryId, inner: Box<Type> },
+    /// An object that must be passed to a method with an associated `ReleaseParameter` before the
+    /// end of the program.
+    Releasable { id: MemoryId, inner: Box<Type> },
     /// A function parameter that must be a `ScalarValue` when called.
     ScalarValueParameter,
     /// A function parameter that must be a `ConstPtrToMap` when called.
@@ -253,6 +264,11 @@ pub enum Type {
     NullOrParameter(Box<Type>),
     /// A function parameter that must be a pointer to memory with the given id.
     StructParameter { id: MemoryId },
+    /// A function return value that must be passed to a method with an associated
+    /// `ReleaseParameter` before the end of the program.
+    ReleasableParameter { id: MemoryId, inner: Box<Type> },
+    /// A function parameter that will release the value.
+    ReleaseParameter { id: MemoryId },
 }
 
 /// Defines a partial ordering on `Type` instances, capturing the notion of how "broad"
@@ -355,6 +371,19 @@ impl Type {
         }
     }
 
+    fn inner(&self, context: &ComputationContext) -> Result<&Type, String> {
+        match self {
+            Self::Releasable { id, inner } => {
+                if context.resources.contains(id) {
+                    Ok(&inner)
+                } else {
+                    Err(format!("Access to released resource at pc {}", context.pc))
+                }
+            }
+            _ => Ok(self),
+        }
+    }
+
     /// Given the given conditional jump `jump_type` having been tasken, constraint the type of
     /// `type1` and `type2`.
     fn constraint(
@@ -363,8 +392,8 @@ impl Type {
         jump_width: JumpWidth,
         type1: Self,
         type2: Self,
-    ) -> (Self, Self) {
-        match (jump_width, jump_type, &type1, &type2) {
+    ) -> Result<(Self, Self), String> {
+        let result = match (jump_width, jump_type, type1.inner(context)?, type2.inner(context)?) {
             (
                 JumpWidth::W64,
                 JumpType::Eq,
@@ -419,7 +448,9 @@ impl Type {
                 Self::ScalarValue { value: 0, unknown_mask: 0, .. },
             ) if jump_type.is_strict() => {
                 context.set_null(id, false);
-                (*inner.clone(), type2)
+                let inner = *inner.clone();
+                inner.register_resource(context);
+                (inner, type2)
             }
             (
                 JumpWidth::W64,
@@ -428,7 +459,9 @@ impl Type {
                 Self::NullOr { id, inner },
             ) if jump_type.is_strict() => {
                 context.set_null(id, false);
-                (type1, *inner.clone())
+                let inner = *inner.clone();
+                inner.register_resource(context);
+                (type1, inner)
             }
 
             (
@@ -469,6 +502,105 @@ impl Type {
             }
             (JumpWidth::W64, JumpType::Eq, _, _) => (type1.clone(), type1),
             _ => (type1, type2),
+        };
+        Ok(result)
+    }
+
+    fn match_parameter_type(
+        &self,
+        context: &ComputationContext,
+        parameter_type: &Type,
+        index: usize,
+        next: &mut ComputationContext,
+    ) -> Result<(), String> {
+        match (parameter_type, self) {
+            (Type::ScalarValueParameter, Type::ScalarValue { unwritten_mask: 0, .. })
+            | (Type::ConstPtrToMapParameter, Type::ConstPtrToMap { .. }) => Ok(()),
+            (
+                Type::MapKeyParameter { map_ptr_index },
+                Type::PtrToMemory { offset, buffer_size, .. },
+            ) => {
+                let schema = context.get_map_schema(*map_ptr_index)?;
+                context.check_memory_access(*offset, *buffer_size, 0, schema.key_size as usize)
+            }
+            (Type::MapKeyParameter { map_ptr_index }, Type::PtrToStack { offset }) => {
+                let schema = context.get_map_schema(*map_ptr_index)?;
+                if !context.stack.can_read_data_ptr(*offset, schema.key_size as u64) {
+                    Err(format!("cannot read key buffer from the stack at pc {}", context.pc))
+                } else {
+                    Ok(())
+                }
+            }
+            (
+                Type::MapValueParameter { map_ptr_index },
+                Type::PtrToMemory { offset, buffer_size, .. },
+            ) => {
+                let schema = context.get_map_schema(*map_ptr_index)?;
+                context.check_memory_access(*offset, *buffer_size, 0, schema.value_size as usize)
+            }
+            (Type::MapValueParameter { map_ptr_index }, Type::PtrToStack { offset }) => {
+                let schema = context.get_map_schema(*map_ptr_index)?;
+                if !context.stack.can_read_data_ptr(*offset, schema.value_size as u64) {
+                    Err(format!("cannot read value buffer from the stack at pc {}", context.pc))
+                } else {
+                    Ok(())
+                }
+            }
+            (Type::MemoryParameter { size, .. }, Type::PtrToMemory { offset, buffer_size, .. }) => {
+                let expected_size = size.size(context)?;
+                if expected_size <= buffer_size - offset {
+                    Ok(())
+                } else {
+                    Err(format!("out of bound read at pc {}", context.pc))
+                }
+            }
+
+            (Type::MemoryParameter { size, input, output }, Type::PtrToStack { offset }) => {
+                let size = size.size(context)?;
+                let buffer_end = *offset + size;
+                if !buffer_end.is_valid() {
+                    Err(format!("out of bound access at pc {}", context.pc))
+                } else {
+                    if *output {
+                        next.stack.write_data_ptr(context.pc, *offset, size)?;
+                    }
+                    if !input || context.stack.can_read_data_ptr(*offset, size) {
+                        Ok(())
+                    } else {
+                        Err(format!("out of bound read at pc {}", context.pc))
+                    }
+                }
+            }
+
+            (Type::StructParameter { id: id1 }, Type::PtrToMemory { id: id2, offset: 0, .. })
+                if *id1 == *id2 =>
+            {
+                Ok(())
+            }
+            (
+                Type::ReleasableParameter { id: id1, inner: inner1 },
+                Type::Releasable { id: id2, inner: inner2 },
+            ) if id2.has_parent(id1) => {
+                if next.resources.contains(id2) {
+                    inner2.match_parameter_type(context, inner1, index, next)
+                } else {
+                    Err(format!("Resource already released for index {index} at pc {}", context.pc))
+                }
+            }
+            (Type::ReleaseParameter { id: id1 }, Type::Releasable { id: id2, .. })
+                if id2.has_parent(id1) =>
+            {
+                if next.resources.remove(id2) {
+                    Ok(())
+                } else {
+                    Err(format!(
+                        "{id2:?} Resource already released for index {index} at pc {}",
+                        context.pc
+                    ))
+                }
+            }
+
+            _ => Err(format!("incorrect parameter for index {index} at pc {}", context.pc)),
         }
     }
 
@@ -482,6 +614,15 @@ impl Type {
                 } else {
                     *self = *inner.clone();
                 }
+            }
+            _ => {}
+        }
+    }
+
+    fn register_resource(&self, context: &mut ComputationContext) {
+        match self {
+            Type::Releasable { id, .. } => {
+                context.resources.insert(id.clone());
             }
             _ => {}
         }
@@ -1009,6 +1150,8 @@ struct ComputationContext {
     stack: Stack,
     /// The dynamically known bounds of buffers indexed by their ids.
     array_bounds: BTreeMap<MemoryId, u64>,
+    /// The currently allocated resources.
+    resources: HashSet<MemoryId>,
     /// The previous context in the computation.
     parent: Option<Arc<ComputationContext>>,
     /// The data dependencies of this context. This is used to broaden a known ending context to
@@ -1023,6 +1166,7 @@ impl Clone for ComputationContext {
             registers: self.registers.clone(),
             stack: self.stack.clone(),
             array_bounds: self.array_bounds.clone(),
+            resources: self.resources.clone(),
             parent: self.parent.clone(),
             // dependencies are erased as they must always be used on the same instance of the
             // context.
@@ -1102,6 +1246,7 @@ impl ComputationContext {
             registers: self.registers.clone(),
             stack: self.stack.clone(),
             array_bounds: self.array_bounds.clone(),
+            resources: self.resources.clone(),
             parent,
             dependencies: Default::default(),
         };
@@ -1165,6 +1310,7 @@ impl ComputationContext {
     }
 
     fn store_memory(&mut self, addr: &Type, field: Field, value: Type) -> Result<(), String> {
+        let addr = addr.inner(self)?;
         match *addr {
             Type::PtrToStack { offset } => {
                 self.stack.store(self.pc, offset + field.offset_as_u64(), value, field.width)?;
@@ -1197,13 +1343,14 @@ impl ComputationContext {
     }
 
     fn load_memory(&self, addr: Type, field: Field) -> Result<Type, String> {
+        let addr = addr.inner(self)?;
         Ok(match addr {
             Type::PtrToStack { offset } => {
-                let stack_offset = offset + field.offset_as_u64();
+                let stack_offset = *offset + field.offset_as_u64();
                 self.stack.load(self, stack_offset, field.width)?
             }
             Type::PtrToMemory { id, offset, buffer_size, fields, .. } => {
-                self.check_field_access(offset, buffer_size, field)?;
+                self.check_field_access(*offset, *buffer_size, field)?;
                 let memory_offset = offset.overflowing_add(field.offset_as_u64()).0;
                 // If the read is for a full pointer and the offset correspond to a pointer, use
                 // the `field_type` to specify the returned type.
@@ -1212,12 +1359,14 @@ impl ComputationContext {
                         match field.field_type.deref() {
                             Type::PtrToArray { id: array_id, .. } => {
                                 return Ok(Type::PtrToArray {
-                                    id: array_id.prepended(id),
+                                    id: array_id.prepended(id.clone()),
                                     offset: 0,
                                 });
                             }
                             Type::PtrToEndArray { id: array_id } => {
-                                return Ok(Type::PtrToEndArray { id: array_id.prepended(id) });
+                                return Ok(Type::PtrToEndArray {
+                                    id: array_id.prepended(id.clone()),
+                                });
                             }
                             _ => panic!("Unexpected field_type: {field:?}"),
                         }
@@ -1232,25 +1381,53 @@ impl ComputationContext {
                 }
             }
             Type::PtrToArray { id, offset } => {
-                self.check_field_access(offset, *self.array_bounds.get(&id).unwrap_or(&0), field)?;
+                self.check_field_access(*offset, *self.array_bounds.get(&id).unwrap_or(&0), field)?;
                 Type::unknown_written_scalar_value()
             }
             _ => return Err(format!("incorrect load at pc {}", self.pc)),
         })
     }
 
+    /**
+     * Given the given `return_value` in a method signature, return the concrete type to use,
+     * updating the `next` context is needed.
+     *
+     * `maybe_null` is true is the computed value will be a descendant of a `NullOr` type.
+     */
     fn resolve_return_value(
         &self,
         verification_context: &mut VerificationContext<'_>,
         return_value: &Type,
+        next: &mut ComputationContext,
+        maybe_null: bool,
     ) -> Result<Type, String> {
         match return_value {
             Type::AliasParameter { parameter_index } => self.reg(parameter_index + 1),
+            Type::ReleasableParameter { id, inner } => {
+                let id = MemoryId::from(verification_context.next_id()).prepended(id.clone());
+                if !maybe_null {
+                    next.resources.insert(id.clone());
+                }
+                Ok(Type::Releasable {
+                    id,
+                    inner: Box::new(self.resolve_return_value(
+                        verification_context,
+                        inner,
+                        next,
+                        maybe_null,
+                    )?),
+                })
+            }
             Type::NullOrParameter(t) => {
                 let id = verification_context.next_id();
                 Ok(Type::NullOr {
                     id: id.into(),
-                    inner: Box::new(self.resolve_return_value(verification_context, t)?),
+                    inner: Box::new(self.resolve_return_value(
+                        verification_context,
+                        t,
+                        next,
+                        true,
+                    )?),
                 })
             }
             Type::MapValueParameter { map_ptr_index } => {
@@ -1537,7 +1714,7 @@ impl ComputationContext {
         if branch.unwrap_or(true) {
             let mut next = self.next()?;
             let (dst, r0) =
-                Type::constraint(&mut next, JumpType::Eq, jump_width, dst.clone(), r0.clone());
+                Type::constraint(&mut next, JumpType::Eq, jump_width, dst.clone(), r0.clone())?;
             next.set_reg(0, dst)?;
             next.store_memory(&addr, field, value.clone())?;
             verification_context.states.push(next);
@@ -1546,7 +1723,7 @@ impl ComputationContext {
         if !branch.unwrap_or(false) {
             let mut next = self.next()?;
             let (dst, r0) =
-                Type::constraint(&mut next, JumpType::Ne, jump_width, dst.clone(), r0.clone());
+                Type::constraint(&mut next, JumpType::Ne, jump_width, dst.clone(), r0.clone())?;
             next.set_reg(0, dst.clone())?;
             next.store_memory(&addr, field, dst)?;
             verification_context.states.push(next);
@@ -1668,7 +1845,7 @@ impl ComputationContext {
          -> Result<Self, String> {
             if jump_type != JumpType::Unknown {
                 let (new_op1, new_op2) =
-                    Type::constraint(&mut next, jump_type, jump_width, op1.clone(), op2.clone());
+                    Type::constraint(&mut next, jump_type, jump_width, op1.clone(), op2.clone())?;
                 if dst < REGISTER_COUNT {
                     next.set_reg(dst, new_op1)?;
                 }
@@ -1796,7 +1973,7 @@ impl Drop for ComputationContext {
 /// a proof that a program in a state `t2` finish.
 impl PartialOrd for ComputationContext {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        if self.pc != other.pc {
+        if self.pc != other.pc || self.resources != other.resources {
             return None;
         }
         let mut result = self.stack.partial_cmp(&other.stack)?;
@@ -2956,81 +3133,14 @@ impl BpfVisitor for ComputationContext {
         let mut next = self.next()?;
         for (index, arg) in signature.args.iter().enumerate() {
             let reg = (index + 1) as u8;
-            match (arg, self.reg(reg)?) {
-                (Type::ScalarValueParameter, Type::ScalarValue { unwritten_mask: 0, .. })
-                | (Type::ConstPtrToMapParameter, Type::ConstPtrToMap { .. }) => Ok(()),
-                (
-                    Type::MapKeyParameter { map_ptr_index },
-                    Type::PtrToMemory { offset, buffer_size, .. },
-                ) => {
-                    let schema = self.get_map_schema(*map_ptr_index)?;
-                    self.check_memory_access(offset, buffer_size, 0, schema.key_size as usize)
-                }
-                (Type::MapKeyParameter { map_ptr_index }, Type::PtrToStack { offset }) => {
-                    let schema = self.get_map_schema(*map_ptr_index)?;
-                    if !self.stack.can_read_data_ptr(offset, schema.key_size as u64) {
-                        Err(format!("cannot read key buffer from the stack at pc {}", self.pc))
-                    } else {
-                        Ok(())
-                    }
-                }
-                (
-                    Type::MapValueParameter { map_ptr_index },
-                    Type::PtrToMemory { offset, buffer_size, .. },
-                ) => {
-                    let schema = self.get_map_schema(*map_ptr_index)?;
-                    self.check_memory_access(offset, buffer_size, 0, schema.value_size as usize)
-                }
-                (Type::MapValueParameter { map_ptr_index }, Type::PtrToStack { offset }) => {
-                    let schema = self.get_map_schema(*map_ptr_index)?;
-                    if !self.stack.can_read_data_ptr(offset, schema.value_size as u64) {
-                        Err(format!("cannot read value buffer from the stack at pc {}", self.pc))
-                    } else {
-                        Ok(())
-                    }
-                }
-                (
-                    Type::MemoryParameter { size, .. },
-                    Type::PtrToMemory { offset, buffer_size, .. },
-                ) => {
-                    let expected_size = size.size(self)?;
-                    if expected_size <= buffer_size - offset {
-                        Ok(())
-                    } else {
-                        Err(format!("out of bound read at pc {}", self.pc))
-                    }
-                }
-
-                (Type::MemoryParameter { size, input, output }, Type::PtrToStack { offset }) => {
-                    let size = size.size(self)?;
-                    let buffer_end = offset + size;
-                    if !buffer_end.is_valid() {
-                        Err(format!("out of bound access at pc {}", self.pc))
-                    } else {
-                        if *output {
-                            next.stack.write_data_ptr(self.pc, offset, size)?;
-                        }
-                        if !input || self.stack.can_read_data_ptr(offset, size) {
-                            Ok(())
-                        } else {
-                            Err(format!("out of bound read at pc {}", self.pc))
-                        }
-                    }
-                }
-
-                (
-                    Type::StructParameter { id: id1 },
-                    Type::PtrToMemory { id: id2, offset: 0, .. },
-                ) if *id1 == id2 => Ok(()),
-
-                _ => Err(format!("incorrect parameter for index {index} at pc {}", self.pc)),
-            }?;
+            self.reg(reg)?.match_parameter_type(self, arg, index, &mut next)?;
         }
         // Parameters have been validated, specify the return value on return.
         if signature.invalidate_array_bounds {
             next.array_bounds.clear();
         }
-        let value = self.resolve_return_value(context, &signature.return_value)?;
+        let value =
+            self.resolve_return_value(context, &signature.return_value, &mut next, false)?;
         next.set_reg(0, value)?;
         for i in 1..=5 {
             next.set_reg(i, Type::default())?;
@@ -3043,6 +3153,12 @@ impl BpfVisitor for ComputationContext {
         bpf_log!(self, context, "exit");
         if !matches!(self.reg(0)?, Type::ScalarValue { unwritten_mask: 0, .. }) {
             return Err(format!("register 0 is incorrect at exit time at pc {}", self.pc));
+        }
+        if !self.resources.is_empty() {
+            return Err(format!(
+                "some resources have not been released at exit time at pc {}",
+                self.pc
+            ));
         }
         let this = self.clone();
         this.terminate(context)?;

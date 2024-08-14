@@ -51,6 +51,7 @@ source_set("kernel") {
     "//zircon/kernel/lib/libc",
     "//zircon/kernel/lib/thread_sampler",
     "//zircon/kernel/lib/topology",
+    "//zircon/kernel/lib/userabi",
     "//zircon/kernel/lib/version",
     "//zircon/kernel/object",
     "//zircon/kernel/vm",

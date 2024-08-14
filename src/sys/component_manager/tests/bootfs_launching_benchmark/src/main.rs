@@ -3,15 +3,17 @@
 // found in the LICENSE file.
 
 use fidl::endpoints::{self, DiscoverableProtocolMarker};
+use fsandbox::DictionaryRef;
 use fuchsia_component::client;
 use fuchsia_component_test::ScopedInstance;
+use fuchsia_criterion::{criterion, FuchsiaCriterion};
 use fuchsia_runtime::{HandleInfo, HandleType};
 use fuchsia_zircon::{self as zx, HandleBased};
 use futures::stream::FuturesUnordered;
 use futures::{StreamExt, TryStreamExt};
 use std::fs::File;
 use std::io::Read;
-use test_case::test_case;
+use std::time::Duration;
 use {
     fidl_fidl_examples_routing_echo as fecho, fidl_fuchsia_component as fcomponent,
     fidl_fuchsia_component_sandbox as fsandbox, fidl_fuchsia_process as fprocess,
@@ -28,43 +30,105 @@ fn read_file_to_vmo(path: &str) -> zx::Vmo {
     vmo
 }
 
-/// This test starts `number_of_echo_connections` ELF components, each of which
-/// links some dynamic libraries, then waits for all of them to call back. It is
-/// intended to measure the latency from component_manager to hitting `main()` in
-/// a number of ELF components.
-#[test_case(1)]
-#[test_case(5)]
-#[test_case(10)]
-#[test_case(15)]
-#[test_case(20)]
-#[test_case(25)]
-#[fuchsia::test]
-async fn launch_elf_component(number_of_echo_connections: usize) {
-    let vmo = read_file_to_vmo(ZBI_PATH);
-    let numbered_handles = vec![fprocess::HandleInfo {
-        handle: vmo.into_handle(),
-        id: HandleInfo::from(HandleType::BootfsVmo).as_raw(),
-    }];
-    let cm_url = format!("#meta/component_manager_{number_of_echo_connections}.cm");
-    let instance = ScopedInstance::new("coll".into(), cm_url).await.unwrap();
+static TEST_CASES: [usize; 6] = [1, 5, 10, 15, 20, 25];
 
-    let (dict_ref, echo_receiver_stream) = build_echo_dictionary().await;
+/// This test starts different numbers of ELF components specified in
+/// [`TEST_CASES`], each of which links some dynamic libraries, then waits for
+/// all of them to call back. It is intended to measure the latency from
+/// component_manager to hitting `main()` in a number of ELF components.
+#[fuchsia::main]
+fn main() {
+    // Initialize benchmark.
+    let mut c = FuchsiaCriterion::default();
+    let internal_c: &mut criterion::Criterion = &mut c;
+    *internal_c = std::mem::take(internal_c)
+        .warm_up_time(Duration::from_millis(1000))
+        .measurement_time(Duration::from_millis(20000))
+        .sample_size(20);
 
-    let receiver_task = fasync::Task::local(async move {
-        handle_receiver(echo_receiver_stream, number_of_echo_connections).await
-    });
+    // Run benchmark.
+    for test_case in TEST_CASES {
+        let bench = criterion::Benchmark::new(format!("ElfComponent/{test_case:0>2}"), move |b| {
+            b.iter_with_setup(|| ElfComponentLaunchTest::new(test_case), |test| test.run());
+        });
+        c.bench("fuchsia.bootfs.launching", bench);
+    }
+}
 
-    // Start component_manager.
-    // TODO(https://fxbug.dev/355009003): Track start time here.
-    let args = fcomponent::StartChildArgs {
-        numbered_handles: Some(numbered_handles),
-        dictionary: Some(dict_ref),
-        ..Default::default()
-    };
-    let _cm_controller = instance.start_with_args(args).await.unwrap();
+struct ElfComponentLaunchTest {
+    numbered_handles: Vec<fprocess::HandleInfo>,
+    receiver_task: fasync::Task<PendingResponses>,
+    dict_ref: DictionaryRef,
+    instance: ScopedInstance,
+    executor: fasync::LocalExecutor,
+}
 
-    // Wait for test ELF component run by component_manager to report back.
-    receiver_task.await;
+struct FinishedElfComponentLaunchTest {
+    pending_responses: Option<PendingResponses>,
+    instance: Option<ScopedInstance>,
+    executor: fasync::LocalExecutor,
+}
+
+impl ElfComponentLaunchTest {
+    fn new(number_of_echo_connections: usize) -> Self {
+        let mut executor = fasync::LocalExecutor::new();
+
+        let vmo = read_file_to_vmo(ZBI_PATH);
+        let numbered_handles = vec![fprocess::HandleInfo {
+            handle: vmo.into_handle(),
+            id: HandleInfo::from(HandleType::BootfsVmo).as_raw(),
+        }];
+        let cm_url = format!("#meta/component_manager_{number_of_echo_connections}.cm");
+        let instance = executor.run_singlethreaded(async move {
+            ScopedInstance::new("coll".into(), cm_url).await.unwrap()
+        });
+
+        let (dict_ref, echo_receiver_stream) = executor.run_singlethreaded(build_echo_dictionary());
+
+        let receiver_task = fasync::Task::local(async move {
+            handle_receiver(echo_receiver_stream, number_of_echo_connections).await
+        });
+
+        Self { numbered_handles, receiver_task, dict_ref, instance, executor }
+    }
+
+    fn run(mut self) -> FinishedElfComponentLaunchTest {
+        // Start component_manager.
+        let args = fcomponent::StartChildArgs {
+            numbered_handles: Some(self.numbered_handles),
+            dictionary: Some(self.dict_ref),
+            ..Default::default()
+        };
+
+        let (instance, pending_responses) = self.executor.run_singlethreaded(async move {
+            let _cm_controller = self.instance.start_with_args(args).await.unwrap();
+
+            // Wait for test ELF component run by component_manager to report back.
+            let pending_responses = self.receiver_task.await;
+
+            (self.instance, pending_responses)
+        });
+
+        FinishedElfComponentLaunchTest {
+            pending_responses: Some(pending_responses),
+            instance: Some(instance),
+            executor: self.executor,
+        }
+    }
+}
+
+/// Time taking during the drop won't be counted towards the benchmark metrics.
+/// We can wait until the realm is cleaned up here.
+impl Drop for FinishedElfComponentLaunchTest {
+    fn drop(&mut self) {
+        let FinishedElfComponentLaunchTest { pending_responses, instance, executor } = self;
+        executor.run_singlethreaded(async move {
+            drop(pending_responses.take());
+            let destruction_waiter = instance.as_mut().unwrap().take_destroy_waiter();
+            drop(instance.take());
+            destruction_waiter.await.unwrap();
+        });
+    }
 }
 
 /// Build a dictionary with an echo protocol capability and return the receiver stream
@@ -97,6 +161,20 @@ async fn build_echo_dictionary() -> (fsandbox::DictionaryRef, fsandbox::Receiver
     (dict_ref, echo_receiver_stream)
 }
 
+struct PendingResponses {
+    values: Vec<(fecho::EchoEchoStringResponder, String)>,
+}
+
+impl Drop for PendingResponses {
+    fn drop(&mut self) {
+        // Respond to them all, causing the test ELF components to exit.
+        let values = std::mem::replace(&mut self.values, Default::default());
+        for (responder, response) in values {
+            responder.send(Some(&response)).unwrap();
+        }
+    }
+}
+
 /// Serve echo connection requests.
 ///
 /// number_of_echo_connections: How many Echo protocol connection do we expect to wait for.
@@ -104,7 +182,7 @@ async fn build_echo_dictionary() -> (fsandbox::DictionaryRef, fsandbox::Receiver
 async fn handle_receiver(
     receiver_stream: fsandbox::ReceiverRequestStream,
     number_of_echo_connections: usize,
-) {
+) -> PendingResponses {
     // Read `number_of_echo_connections` echo connection requests while handling them concurrently.
     let mut receiver_stream = receiver_stream.take(number_of_echo_connections);
     let futures = FuturesUnordered::new();
@@ -121,13 +199,7 @@ async fn handle_receiver(
 
     // Wait to receive the first request in those connections.
     let values: Vec<_> = futures.take(number_of_echo_connections).collect().await;
-
-    // TODO(https://fxbug.dev/355009003): Track end time here.
-
-    // Respond to them all, causing the test ELF components to exit.
-    for (responder, response) in values {
-        responder.send(Some(&response)).unwrap();
-    }
+    PendingResponses { values }
 }
 
 async fn run_echo_service(

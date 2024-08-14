@@ -15,8 +15,6 @@ use fuchsia_component::client::{connect_to_protocol, connect_to_protocol_sync};
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
 use futures::StreamExt;
 use once_cell::sync::OnceCell;
-use rand::distributions::Alphanumeric;
-use rand::Rng;
 use starnix_logging::{log_error, log_info, log_warn};
 use starnix_sync::{Mutex, MutexGuard};
 use starnix_uapi::errors::Errno;
@@ -465,12 +463,7 @@ pub struct WakeLease {
 
 impl WakeLease {
     pub fn new(name: &str) -> Self {
-        let random_string: String =
-            rand::thread_rng().sample_iter(&Alphanumeric).take(8).map(char::from).collect();
-        Self {
-            name: format!("starnix-wake-lock-{}-{}", name, random_string),
-            lease: Default::default(),
-        }
+        Self { name: format!("starnix-wake-lock-{}", name), lease: Default::default() }
     }
 
     pub fn activate(&self) -> Result<(), Errno> {

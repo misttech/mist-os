@@ -9,7 +9,6 @@ use crate::vfs::{
     FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps, FsStr,
     InputBuffer, OutputBuffer, VecDirectory, VecDirectoryEntry,
 };
-use bstr::B;
 use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex};
 use starnix_uapi::errors::Errno;
@@ -67,19 +66,18 @@ impl FunctionFs {
             return error!(ENODEV);
         }
 
-        let fs = FileSystem::new(current_task.kernel(), CacheMode::Uncached, FunctionFs, options)?;
-
-        let mut mount_options = fs_args::generic_parse_mount_options(fs.options.params.as_ref())?;
-        let uid = if let Some(uid) = mount_options.remove(B("uid")) {
+        let uid = if let Some(uid) = options.params.get(b"uid") {
             fs_args::parse::<uid_t>(uid.as_ref())?
         } else {
             0
         };
-        let gid = if let Some(gid) = mount_options.remove(B("gid")) {
+        let gid = if let Some(gid) = options.params.get(b"gid") {
             fs_args::parse::<gid_t>(gid.as_ref())?
         } else {
             0
         };
+
+        let fs = FileSystem::new(current_task.kernel(), CacheMode::Uncached, FunctionFs, options)?;
 
         let mut root = FsNode::new_root_with_properties(FunctionFsRootDir::default(), |info| {
             info.ino = ROOT_NODE_ID;

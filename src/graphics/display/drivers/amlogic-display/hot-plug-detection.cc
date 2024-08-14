@@ -132,7 +132,7 @@ HotPlugDetectionState HotPlugDetection::CurrentState() {
 zx::result<> HotPlugDetection::Init() {
   fidl::WireResult<fuchsia_hardware_gpio::Gpio::ConfigIn> config_in_result =
       pin_gpio_->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kPullDown);
-  if (config_in_result->is_error()) {
+  if (!config_in_result.ok()) {
     FDF_LOG(ERROR, "Failed to send ConfigIn request to hpd gpio: %s",
             config_in_result.status_string());
     return zx::error(config_in_result.status());
@@ -160,11 +160,11 @@ HotPlugDetectionState HotPlugDetection::GpioValueToState(bool gpio_value) {
 }
 
 // static
-fuchsia_hardware_gpio::wire::GpioPolarity HotPlugDetection::GpioPolarityForStateChange(
+fuchsia_hardware_gpio::InterruptMode HotPlugDetection::InterruptModeForStateChange(
     HotPlugDetectionState current_state) {
   return (current_state == HotPlugDetectionState::kDetected)
-             ? fuchsia_hardware_gpio::GpioPolarity::kLow
-             : fuchsia_hardware_gpio::GpioPolarity::kHigh;
+             ? fuchsia_hardware_gpio::InterruptMode::kLevelLow
+             : fuchsia_hardware_gpio::InterruptMode::kLevelHigh;
 }
 
 zx::result<> HotPlugDetection::UpdateState() {
@@ -175,7 +175,7 @@ zx::result<> HotPlugDetection::UpdateState() {
   }
 
   HotPlugDetectionState current_pin_state = pin_state_result.value();
-  zx::result<> polarity_change_result;
+  zx::result<> interrupt_mode_change_result;
   {
     fbl::AutoLock lock(&mutex_);
     if (current_pin_state == current_pin_state_) {
@@ -183,7 +183,8 @@ zx::result<> HotPlugDetection::UpdateState() {
     }
     current_pin_state_ = current_pin_state;
 
-    polarity_change_result = SetPinGpioPolarity(GpioPolarityForStateChange(current_pin_state));
+    interrupt_mode_change_result =
+        SetPinInterruptMode(InterruptModeForStateChange(current_pin_state));
   }
 
   // We call the state change handler after setting the GPIO polarity so that
@@ -191,7 +192,7 @@ zx::result<> HotPlugDetection::UpdateState() {
   // handler takes a long time.
   on_state_change_(current_pin_state);
 
-  return polarity_change_result;
+  return interrupt_mode_change_result;
 }
 
 void HotPlugDetection::InterruptHandler(async_dispatcher_t* dispatcher, async::IrqBase* irq,
@@ -239,16 +240,21 @@ zx::result<HotPlugDetectionState> HotPlugDetection::ReadPinGpioState() {
   return zx::ok(GpioValueToState(read_response->value));
 }
 
-zx::result<> HotPlugDetection::SetPinGpioPolarity(fuchsia_hardware_gpio::GpioPolarity polarity) {
-  fidl::WireResult result = pin_gpio_->SetPolarity(polarity);
+zx::result<> HotPlugDetection::SetPinInterruptMode(fuchsia_hardware_gpio::InterruptMode mode) {
+  fidl::Arena arena;
+  auto interrupt_config =
+      fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena).mode(mode).Build();
+  fidl::WireResult result = pin_gpio_->ConfigureInterrupt(interrupt_config);
   if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to send SetPolarity request to hpd gpio: %s", result.status_string());
-    return result->take_error();
+    FDF_LOG(ERROR, "Failed to send ConfigureInterrupt request to hpd gpio: %s",
+            result.status_string());
+    return zx::error(result.status());
   }
 
-  fidl::WireResultUnwrapType<fuchsia_hardware_gpio::Gpio::SetPolarity>& response = result.value();
+  fidl::WireResultUnwrapType<fuchsia_hardware_gpio::Gpio::ConfigureInterrupt>& response =
+      result.value();
   if (response.is_error()) {
-    FDF_LOG(ERROR, "Failed to set polarity of hpd gpio: %s",
+    FDF_LOG(ERROR, "Failed to reconfigure interrupt of hpd gpio: %s",
             zx_status_get_string(response.error_value()));
     return response.take_error();
   }

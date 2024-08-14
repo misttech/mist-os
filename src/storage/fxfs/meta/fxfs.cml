@@ -33,9 +33,9 @@
             protocol: [
                 "fuchsia.fs.Admin",
                 "fuchsia.fs.startup.Startup",
+                "fuchsia.fs.startup.Volumes",
                 "fuchsia.fxfs.BlobReader",
                 "fuchsia.fxfs.Debug",
-                "fuchsia.fxfs.Volumes",
             ],
         },
     ],
@@ -69,9 +69,9 @@
             protocol: [
                 "fuchsia.fs.Admin",
                 "fuchsia.fs.startup.Startup",
+                "fuchsia.fs.startup.Volumes",
                 "fuchsia.fxfs.BlobReader",
                 "fuchsia.fxfs.Debug",
-                "fuchsia.fxfs.Volumes",
             ],
             from: "self",
         },

@@ -465,6 +465,26 @@ _no_runtime_library_search_directories_feature = feature(
     enabled = False,
 )
 
+# This feature only works with Bazel 7.2+. Its name is hard-coded in Bazel to
+# enable extra linker outputs for cc_binary() and cc_test() targets.
+_generate_linkmap_feature = feature(
+    name = "generate_linkmap",
+    enabled = True,
+    flag_sets = [
+        flag_set(
+            actions = _all_link_actions,
+            flag_groups = [
+                flag_group(
+                    flags = [
+                        "-Wl,--Map=%{output_execpath}.map",
+                    ],
+                    expand_if_available = "output_execpath",
+                ),
+            ],
+        ),
+    ],
+)
+
 features = struct(
     default_compile_flags = _default_compile_flags_feature,
     dbg = _dbg_feature,
@@ -476,6 +496,7 @@ features = struct(
     ml_inliner = _ml_inliner_feature,
     static_cpp_standard_library = _static_cpp_standard_library_feature,
     no_runtime_library_search_directories = _no_runtime_library_search_directories_feature,
+    generate_linkmap = _generate_linkmap_feature,
 )
 
 # Redefine the features here so that we can share with the in-tree definitions.

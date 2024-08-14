@@ -2,32 +2,31 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/accessibility/semantics/cpp/fidl.h>
-#include <fuchsia/buildinfo/cpp/fidl.h>
-#include <fuchsia/component/cpp/fidl.h>
-#include <fuchsia/fonts/cpp/fidl.h>
-#include <fuchsia/input/injection/cpp/fidl.h>
-#include <fuchsia/intl/cpp/fidl.h>
-#include <fuchsia/kernel/cpp/fidl.h>
-#include <fuchsia/memorypressure/cpp/fidl.h>
-#include <fuchsia/metrics/cpp/fidl.h>
-#include <fuchsia/net/interfaces/cpp/fidl.h>
-#include <fuchsia/posix/socket/cpp/fidl.h>
-#include <fuchsia/process/cpp/fidl.h>
-#include <fuchsia/scheduler/cpp/fidl.h>
-#include <fuchsia/sysmem/cpp/fidl.h>
-#include <fuchsia/tracing/provider/cpp/fidl.h>
-#include <fuchsia/ui/app/cpp/fidl.h>
-#include <fuchsia/ui/input/cpp/fidl.h>
-#include <fuchsia/ui/pointer/cpp/fidl.h>
-#include <fuchsia/ui/scenic/cpp/fidl.h>
-#include <fuchsia/ui/test/input/cpp/fidl.h>
-#include <fuchsia/vulkan/loader/cpp/fidl.h>
+#include <fidl/fuchsia.accessibility.semantics/cpp/fidl.h>
+#include <fidl/fuchsia.buildinfo/cpp/fidl.h>
+#include <fidl/fuchsia.component/cpp/fidl.h>
+#include <fidl/fuchsia.fonts/cpp/fidl.h>
+#include <fidl/fuchsia.input.injection/cpp/fidl.h>
+#include <fidl/fuchsia.intl/cpp/fidl.h>
+#include <fidl/fuchsia.kernel/cpp/fidl.h>
+#include <fidl/fuchsia.memorypressure/cpp/fidl.h>
+#include <fidl/fuchsia.metrics/cpp/fidl.h>
+#include <fidl/fuchsia.net.interfaces/cpp/fidl.h>
+#include <fidl/fuchsia.posix.socket/cpp/fidl.h>
+#include <fidl/fuchsia.process/cpp/fidl.h>
+#include <fidl/fuchsia.scheduler/cpp/fidl.h>
+#include <fidl/fuchsia.sysmem/cpp/fidl.h>
+#include <fidl/fuchsia.tracing.provider/cpp/fidl.h>
+#include <fidl/fuchsia.ui.app/cpp/fidl.h>
+#include <fidl/fuchsia.ui.input/cpp/fidl.h>
+#include <fidl/fuchsia.ui.pointer/cpp/fidl.h>
+#include <fidl/fuchsia.ui.scenic/cpp/fidl.h>
+#include <fidl/fuchsia.ui.test.input/cpp/fidl.h>
+#include <fidl/fuchsia.vulkan.loader/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
-#include <lib/fidl/cpp/binding_set.h>
+#include <lib/fidl/cpp/channel.h>
 #include <lib/sys/component/cpp/testing/realm_builder.h>
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
-#include <lib/sys/cpp/component_context.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/view_token_pair.h>
 #include <lib/zx/clock.h>
@@ -43,8 +42,8 @@
 #include <vector>
 
 #include <gtest/gtest.h>
-
-#include "src/ui/testing/util/portable_ui_test.h"
+#include <src/ui/testing/util/fidl_cpp_helpers.h>
+#include <src/ui/testing/util/portable_ui_test.h>
 
 // This test exercises the touch input dispatch path from Input Pipeline to a Scenic client. It is a
 // multi-component test, and carefully avoids sleeping or polling for component coordination.
@@ -134,11 +133,11 @@ using time_utc = zx::basic_time<1>;
 constexpr auto kMockResponseListener = "response_listener";
 
 void ExpectLocationAndPhase(
-    const fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest& e, double expected_x,
-    double expected_y, fuchsia::ui::pointer::EventPhase expected_phase) {
-  auto pixel_scale = e.has_device_pixel_ratio() ? e.device_pixel_ratio() : 1;
-  auto actual_x = pixel_scale * e.local_x();
-  auto actual_y = pixel_scale * e.local_y();
+    const fuchsia_ui_test_input::TouchInputListenerReportTouchInputRequest& e, double expected_x,
+    double expected_y, fuchsia_ui_pointer::EventPhase expected_phase) {
+  auto pixel_scale = e.device_pixel_ratio().has_value() ? e.device_pixel_ratio().value() : 1;
+  auto actual_x = pixel_scale * e.local_x().value();
+  auto actual_y = pixel_scale * e.local_y().value();
   EXPECT_NEAR(expected_x, actual_x, kEpsilon);
   EXPECT_NEAR(expected_y, actual_y, kEpsilon);
   EXPECT_EQ(expected_phase, e.phase());
@@ -152,7 +151,7 @@ std::vector<float> ConfigsToTest() {
 }
 
 template <typename T>
-std::vector<std::tuple<T>> AsTuples(std::vector<T> v) {
+std::vector<std::tuple<T>> AsTuples(const std::vector<T>& v) {
   std::vector<std::tuple<T>> result;
   for (const auto& elt : v) {
     result.push_back(elt);
@@ -172,7 +171,7 @@ enum class SwipeGesture {
 
 struct ExpectedSwipeEvent {
   double x = 0, y = 0;
-  fuchsia::ui::pointer::EventPhase phase;
+  fuchsia_ui_pointer::EventPhase phase;
 };
 
 struct InjectSwipeParams {
@@ -193,14 +192,14 @@ std::vector<T> merge(std::initializer_list<std::vector<T>> vecs) {
 
 // Checks whether all the coordinates in |expected_events| are contained in |actual_events|.
 void AssertSwipeEvents(
-    const std::vector<fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest>&
+    const std::vector<fuchsia_ui_test_input::TouchInputListenerReportTouchInputRequest>&
         actual_events,
     const std::vector<ExpectedSwipeEvent>& expected_events) {
   FX_DCHECK(actual_events.size() == expected_events.size());
 
   for (size_t i = 0; i < actual_events.size(); i++) {
-    const auto& actual_x = actual_events[i].local_x();
-    const auto& actual_y = actual_events[i].local_y();
+    const auto& actual_x = actual_events[i].local_x().value();
+    const auto& actual_y = actual_events[i].local_y().value();
 
     const auto& [expected_x, expected_y, expected_phase] = expected_events[i];
 
@@ -221,15 +220,15 @@ InjectSwipeParams GetLeftSwipeParams() {
     expected_events.push_back({
         .x = static_cast<double>(kDisplayHeight) / 2,
         .y = i * tap_distance,
-        .phase = fuchsia::ui::pointer::EventPhase::CHANGE,
+        .phase = fuchsia_ui_pointer::EventPhase::kChange,
     });
   }
 
-  expected_events[0].phase = fuchsia::ui::pointer::EventPhase::ADD;
+  expected_events[0].phase = fuchsia_ui_pointer::EventPhase::kAdd;
   expected_events.push_back({
       .x = expected_events.back().x,
       .y = expected_events.back().y,
-      .phase = fuchsia::ui::pointer::EventPhase::REMOVE,
+      .phase = fuchsia_ui_pointer::EventPhase::kRemove,
   });
 
   return {.direction = SwipeGesture::LEFT,
@@ -249,15 +248,15 @@ InjectSwipeParams GetRightSwipeParams() {
     expected_events.push_back({
         .x = static_cast<double>(kDisplayHeight) / 2,
         .y = i * tap_distance,
-        .phase = fuchsia::ui::pointer::EventPhase::CHANGE,
+        .phase = fuchsia_ui_pointer::EventPhase::kChange,
     });
   }
 
-  expected_events[0].phase = fuchsia::ui::pointer::EventPhase::ADD;
+  expected_events[0].phase = fuchsia_ui_pointer::EventPhase::kAdd;
   expected_events.push_back({
       .x = expected_events.back().x,
       .y = expected_events.back().y,
-      .phase = fuchsia::ui::pointer::EventPhase::REMOVE,
+      .phase = fuchsia_ui_pointer::EventPhase::kRemove,
   });
 
   return {.direction = SwipeGesture::RIGHT,
@@ -277,15 +276,15 @@ InjectSwipeParams GetUpwardSwipeParams() {
     expected_events.push_back({
         .x = i * tap_distance,
         .y = static_cast<double>(kDisplayWidth) / 2,
-        .phase = fuchsia::ui::pointer::EventPhase::CHANGE,
+        .phase = fuchsia_ui_pointer::EventPhase::kChange,
     });
   }
 
-  expected_events[0].phase = fuchsia::ui::pointer::EventPhase::ADD;
+  expected_events[0].phase = fuchsia_ui_pointer::EventPhase::kAdd;
   expected_events.push_back({
       .x = expected_events.back().x,
       .y = expected_events.back().y,
-      .phase = fuchsia::ui::pointer::EventPhase::REMOVE,
+      .phase = fuchsia_ui_pointer::EventPhase::kRemove,
   });
 
   return {.direction = SwipeGesture::UP,
@@ -305,15 +304,15 @@ InjectSwipeParams GetDownwardSwipeParams() {
     expected_events.push_back({
         .x = i * tap_distance,
         .y = static_cast<double>(kDisplayWidth) / 2,
-        .phase = fuchsia::ui::pointer::EventPhase::CHANGE,
+        .phase = fuchsia_ui_pointer::EventPhase::kChange,
     });
   }
 
-  expected_events[0].phase = fuchsia::ui::pointer::EventPhase::ADD;
+  expected_events[0].phase = fuchsia_ui_pointer::EventPhase::kAdd;
   expected_events.push_back({
       .x = expected_events.back().x,
       .y = expected_events.back().y,
-      .phase = fuchsia::ui::pointer::EventPhase::REMOVE,
+      .phase = fuchsia_ui_pointer::EventPhase::kRemove,
   });
 
   return {.direction = SwipeGesture::DOWN,
@@ -324,14 +323,16 @@ InjectSwipeParams GetDownwardSwipeParams() {
 
 class ResponseState {
  public:
-  const std::vector<fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest>&
+  const std::vector<fuchsia_ui_test_input::TouchInputListenerReportTouchInputRequest>&
   events_received() {
     return events_received_;
   }
+  bool ready_to_inject() const { return ready_to_inject_; }
 
  private:
   friend class ResponseListenerServer;
-  std::vector<fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest> events_received_;
+  std::vector<fuchsia_ui_test_input::TouchInputListenerReportTouchInputRequest> events_received_;
+  bool ready_to_inject_ = false;
 };
 
 // This component implements the test.touch.ResponseListener protocol
@@ -341,19 +342,39 @@ class ResponseState {
 // component. This is accomplished, in part, because the realm_builder
 // library creates the necessary plumbing. It creates a manifest for the component
 // and routes all capabilities to and from it.
-class ResponseListenerServer : public fuchsia::ui::test::input::TouchInputListener,
+class ResponseListenerServer : public fidl::Server<fuchsia_ui_test_input::TouchInputListener>,
+                               public fidl::Server<fuchsia_ui_test_input::TestAppStatusListener>,
                                public LocalComponentImpl {
  public:
   explicit ResponseListenerServer(async_dispatcher_t* dispatcher,
                                   std::weak_ptr<ResponseState> state)
       : dispatcher_(dispatcher), state_(std::move(state)) {}
 
-  // |fuchsia::ui::test::input::TouchInputListener|
-  void ReportTouchInput(
-      fuchsia::ui::test::input::TouchInputListenerReportTouchInputRequest request) override {
+  // |fuchsia_ui_test_input::TouchInputListener|
+  void ReportTouchInput(ReportTouchInputRequest& request,
+                        ReportTouchInputCompleter::Sync& completer) override {
     if (auto s = state_.lock()) {
       s->events_received_.push_back(std::move(request));
     }
+  }
+
+  // |fuchsia_ui_test_input::TestAppStatusListener|
+  void ReportStatus(ReportStatusRequest& req, ReportStatusCompleter::Sync& completer) override {
+    if (req.status() == fuchsia_ui_test_input::TestAppStatus::kHandlersRegistered) {
+      if (auto s = state_.lock()) {
+        s->ready_to_inject_ = true;
+      }
+    }
+
+    completer.Reply();
+  }
+
+  // |fuchsia_ui_test_input::TestAppStatusListener|
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_ui_test_input::TestAppStatusListener> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {
+    FX_LOGS(WARNING) << "TestAppStatusListener Received an unknown method with ordinal "
+                     << metadata.method_ordinal;
   }
 
   // |LocalComponentImpl::Start|
@@ -362,16 +383,20 @@ class ResponseListenerServer : public fuchsia::ui::test::input::TouchInputListen
   void OnStart() override {
     // When this component starts, add a binding to the test.touch.ResponseListener
     // protocol to this component's outgoing directory.
-    FX_CHECK(outgoing()->AddPublicService(
-                 fidl::InterfaceRequestHandler<fuchsia::ui::test::input::TouchInputListener>(
-                     [this](auto request) {
-                       bindings_.AddBinding(this, std::move(request), dispatcher_);
-                     })) == ZX_OK);
+    outgoing()->AddProtocol<fuchsia_ui_test_input::TouchInputListener>(
+        touch_input_listener_bindings_.CreateHandler(this, dispatcher_,
+                                                     fidl::kIgnoreBindingClosure));
+    outgoing()->AddProtocol<fuchsia_ui_test_input::TestAppStatusListener>(
+        app_status_listener_bindings_.CreateHandler(this, dispatcher_,
+                                                    fidl::kIgnoreBindingClosure));
   }
 
  private:
   async_dispatcher_t* dispatcher_ = nullptr;
-  fidl::BindingSet<fuchsia::ui::test::input::TouchInputListener> bindings_;
+  fidl::ServerBindingGroup<fuchsia_ui_test_input::TouchInputListener>
+      touch_input_listener_bindings_;
+  fidl::ServerBindingGroup<fuchsia_ui_test_input::TestAppStatusListener>
+      app_status_listener_bindings_;
   std::weak_ptr<ResponseState> state_;
 };
 
@@ -397,6 +422,12 @@ class TouchInputBase : public ui_testing::PortableUITest,
     // Register input injection device.
     FX_LOGS(INFO) << "Registering input injection device";
     RegisterTouchScreen();
+
+    LaunchClient();
+
+    FX_LOGS(INFO) << "Wait for test app status: kHandlersRegistered";
+    RunLoopUntil([&]() { return response_state()->ready_to_inject(); });
+    FX_LOGS(INFO) << "test app status: kHandlersRegistered";
   }
 
   // Subclass should implement this method to add capability routes to the test
@@ -407,7 +438,7 @@ class TouchInputBase : public ui_testing::PortableUITest,
   // next to the base ones added.
   virtual std::vector<std::pair<ChildName, std::string>> GetTestComponents() { return {}; }
 
-  bool LastEventReceivedMatchesPhase(fuchsia::ui::pointer::EventPhase phase,
+  bool LastEventReceivedMatchesPhase(fuchsia_ui_pointer::EventPhase phase,
                                      const std::string& component_name) {
     const auto& events_received = response_state_->events_received();
     if (events_received.empty()) {
@@ -415,8 +446,8 @@ class TouchInputBase : public ui_testing::PortableUITest,
     }
 
     const auto& last_event = events_received.back();
-    const auto actual_phase = last_event.phase();
-    auto actual_component_name = last_event.component_name();
+    const auto actual_phase = last_event.phase().value();
+    auto actual_component_name = last_event.component_name().value();
 
     FX_LOGS(INFO) << "Expecting event for component " << component_name << " at phase ("
                   << static_cast<uint32_t>(phase) << ")";
@@ -433,15 +464,15 @@ class TouchInputBase : public ui_testing::PortableUITest,
     //
     // Hence, a tap in the center of the display's top-right quadrant is observed by the child
     // view as a tap in the center of its top-left quadrant.
-    auto touch = std::make_unique<fuchsia::ui::input::TouchscreenReport>();
+    auto touch = std::make_unique<fuchsia_ui_input::TouchscreenReport>();
     switch (tap_location) {
       case TapLocation::kTopLeft:
         // center of top right quadrant -> ends up as center of top left quadrant
-        InjectTap(/* x = */ 3 * display_size().width / 4, /* y = */ display_size().height / 4);
+        InjectTap(/* x = */ 3 * display_width() / 4, /* y = */ display_height() / 4);
         break;
       case TapLocation::kTopRight:
         // center of bottom right quadrant -> ends up as center of top right quadrant
-        InjectTap(/* x = */ 3 * display_size().width / 4, /* y = */ 3 * display_size().height / 4);
+        InjectTap(/* x = */ 3 * display_width() / 4, /* y = */ 3 * display_height() / 4);
         break;
       default:
         FX_NOTREACHED();
@@ -471,22 +502,18 @@ class TouchInputBase : public ui_testing::PortableUITest,
         FX_NOTREACHED();
     }
 
-    fuchsia::ui::test::input::TouchScreenSimulateSwipeRequest swipe_request;
-    swipe_request.mutable_start_location()->x = begin_x;
-    swipe_request.mutable_start_location()->y = begin_y;
-    swipe_request.mutable_end_location()->x = begin_x + x_dir * display_width();
-    swipe_request.mutable_end_location()->y = begin_y + y_dir * display_height();
+    fuchsia_ui_test_input::TouchScreenSimulateSwipeRequest swipe_request;
+    swipe_request.start_location() = {begin_x, begin_y};
+    swipe_request.end_location() = {static_cast<int32_t>(begin_x + (x_dir * display_width())),
+                                    static_cast<int32_t>(begin_y + (y_dir * display_height()))};
     // Generate move events 50 pixels apart.
-    swipe_request.set_move_event_count(kMoveEventCount);
+    swipe_request.move_event_count(kMoveEventCount);
 
     InjectSwipe(/* start_x = */ begin_x, /* start_y = */ begin_y,
-                /* end_x = */ begin_x + x_dir * display_width(),
-                /* end_y = */ begin_y + y_dir * display_height(),
+                /* end_x = */ begin_x + (x_dir * display_width()),
+                /* end_y = */ begin_y + (y_dir * display_height()),
                 /* move_event_count = */ kMoveEventCount);
   }
-
-  uint32_t display_width() { return display_size().width; }
-  uint32_t display_height() { return display_size().height; }
   uint32_t display_rotation() override { return 90; }
 
   // TODO: https://fxbug.dev/42082519 - Test for DPR=2.0, too.
@@ -526,14 +553,18 @@ class CppInputTestBase : public TouchInputBase<Ts...> {
   std::vector<Route> GetTestRoutes() override {
     const std::string_view view_provider = kCppFlatlandClient;
     return {
-        {.capabilities = {Protocol{fuchsia::ui::app::ViewProvider::Name_}},
+        {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_app::ViewProvider>}},
          .source = ChildRef{view_provider},
          .targets = {ParentRef()}},
-        {.capabilities = {Protocol{fuchsia::ui::test::input::TouchInputListener::Name_}},
+        {.capabilities =
+             {Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_test_input::TouchInputListener>},
+              Protocol{
+                  fidl::DiscoverableProtocolName<fuchsia_ui_test_input::TestAppStatusListener>}},
          .source = ChildRef{kMockResponseListener},
          .targets = {ChildRef{kCppFlatlandClient}}},
-        {.capabilities = {Protocol{fuchsia::ui::composition::Flatland::Name_},
-                          Protocol{fuchsia::ui::composition::Allocator::Name_}},
+        {.capabilities =
+             {Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Flatland>},
+              Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Allocator>}},
          .source = ui_testing::PortableUITest::kTestUIStackRef,
          .targets = {ChildRef{kCppFlatlandClient}}},
     };
@@ -550,14 +581,9 @@ INSTANTIATE_TEST_SUITE_P(CppInputTestParametized, CppInputTest,
                          testing::ValuesIn(AsTuples(ConfigsToTest())));
 
 TEST_P(CppInputTest, CppClientTap) {
-  // Launch client view, and wait until it's rendering to proceed with the test.
-  FX_LOGS(INFO) << "Initializing scene";
-  LaunchClient();
-  FX_LOGS(INFO) << "Client launched";
-
   InjectInput(TapLocation::kTopLeft);
   RunLoopUntil([this] {
-    return LastEventReceivedMatchesPhase(fuchsia::ui::pointer::EventPhase::REMOVE,
+    return LastEventReceivedMatchesPhase(fuchsia_ui_pointer::EventPhase::kRemove,
                                          kCppFlatlandClient);
   });
 
@@ -565,10 +591,10 @@ TEST_P(CppInputTest, CppClientTap) {
   ASSERT_EQ(events_received.size(), 2u);
   ExpectLocationAndPhase(events_received[0], static_cast<float>(display_height()) / 4.f,
                          static_cast<float>(display_width()) / 4.f,
-                         fuchsia::ui::pointer::EventPhase::ADD);
+                         fuchsia_ui_pointer::EventPhase::kAdd);
   ExpectLocationAndPhase(events_received[1], static_cast<float>(display_height()) / 4.f,
                          static_cast<float>(display_width()) / 4.f,
-                         fuchsia::ui::pointer::EventPhase::REMOVE);
+                         fuchsia_ui_pointer::EventPhase::kRemove);
 }
 
 class CppSwipeTest : public CppInputTestBase<InjectSwipeParams> {};
@@ -579,11 +605,6 @@ INSTANTIATE_TEST_SUITE_P(
                                      GetLeftSwipeParams(), GetUpwardSwipeParams())));
 
 TEST_P(CppSwipeTest, CppClientSwipeTest) {
-  // Launch client view, and wait until it's rendering to proceed with the test.
-  FX_LOGS(INFO) << "Initializing scene";
-  LaunchClient();
-  FX_LOGS(INFO) << "Client launched";
-
   const auto& [direction, begin_x, begin_y, expected_events] = std::get<1>(GetParam());
 
   // Inject a swipe on the display. As the child view is rotated by 90 degrees, the direction of

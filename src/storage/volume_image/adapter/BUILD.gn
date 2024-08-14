@@ -284,6 +284,7 @@ source_set("adapter-tests") {
     "commands/create_test.cc",
     "commands/extend_test.cc",
     "commands/file_client.cc",
+    "commands/file_client.h",
     "commands/pave_test.cc",
     "commands/size_test.cc",
     "empty_partition_test.cc",

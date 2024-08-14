@@ -9,6 +9,7 @@ if (is_fuchsia) {
   shared_library("fs-management") {
     public = [
       "admin.h",
+      "component.h",
       "format.h",
       "fvm.h",
       "mount.h",

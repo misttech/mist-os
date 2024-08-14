@@ -7,6 +7,7 @@ group("lib") {
     "linux_uapi",
     "magma",
     "selinux/core",
+    "starnix-lifecycle",
     "starnix-uapi",
     "syncio",
   ]
@@ -24,6 +25,7 @@ group("tests") {
     "extended_pstate:tests",
     "range_map:tests",
     "selinux:tests",
+    "starnix-lifecycle:tests",
     "starnix-uapi:tests",
     "syncio:tests",
     "third_party:tests",

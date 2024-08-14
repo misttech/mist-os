@@ -88,22 +88,22 @@ void DoConnect(fidl::Result<fidl_examples_pigweed::RemoteEndpoint::Connect>& res
   FX_CHECK(status == ZX_OK) << "Failed to bind file descriptor: " << zx_status_get_string(status);
 
   SocketClient<pw::rpc::pw_rpc::pwpb::EchoService> sc{connection_fd};
-  FX_SLOG(INFO, "Sending echo request.");
+  FX_LOG_KV(INFO, "Sending echo request.");
   auto echo_call = sc->Echo(
       {.msg = "Hello, Pigweed"},
       [&](const pw::rpc::pwpb::EchoMessage::Message& message, pw::Status status) {
-        FX_SLOG(INFO, "Received echo reply", KV("msg", message.msg.c_str()));
+        FX_LOG_KV(INFO, "Received echo reply", KV("msg", message.msg.c_str()));
         sc.terminate();
       },
       [&](pw::Status status) {
-        FX_SLOG(INFO, "Received error", KV("status", status.str()));
+        FX_LOG_KV(INFO, "Received error", KV("status", status.str()));
         sc.terminate();
       });
 
-  FX_SLOG(INFO, "Processing packets.");
+  FX_LOG_KV(INFO, "Processing packets.");
   sc.ProcessPackets();
 
-  FX_SLOG(INFO, "Done.");
+  FX_LOG_KV(INFO, "Done.");
 }
 
 }  // namespace
@@ -112,7 +112,7 @@ int main(int argc, const char* argv[], char* envp[]) {
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
 
   // Print a greeting to syslog
-  FX_SLOG(INFO, "Starting up.");
+  FX_LOG_KV(INFO, "Starting up.");
   zx::result client_end = component::Connect<fidl_examples_pigweed::RemoteEndpoint>();
   FX_CHECK(client_end.is_ok()) << "Failed to connect to remote endpoint: "
                                << client_end.status_string();

@@ -69,7 +69,7 @@ async fn main() -> Result<()> {
     let suspender = match connect_to_suspender().await {
         Ok(s) => Some(s),
         Err(e) => {
-            tracing::warn!("Unable to connect to suspender prototocol: {e:?}");
+            tracing::warn!("Unable to connect to suspender protocol: {e:?}");
             None
         }
     };

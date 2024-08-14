@@ -29,8 +29,7 @@
             {
                 child: "sdmmc-hardware",
                 parent: {
-                    // NOTE: this name gets replaced at runtime by the driver.
-                    name: "parent",
+                    instance_name: "default",
                 },
                 level_deps: [
                     {

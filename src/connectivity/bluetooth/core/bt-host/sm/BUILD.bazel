@@ -7,6 +7,7 @@ load(
     "fuchsia_cc_test",
     "fuchsia_unittest_package",
 )
+load("//src/connectivity/bluetooth/core/bt-host:variables.bzl", "COPTS")
 
 package(default_visibility = ["//visibility:public"])
 
@@ -17,7 +18,7 @@ cc_library(
         "packet.cc",
         "types.cc",
     ],
-    copts = ["-Wswitch-enum"],
+    copts = COPTS,
     deps = [
         "//src/connectivity/bluetooth/core/bt-host:public",
         "//src/connectivity/bluetooth/core/bt-host/common",
@@ -41,6 +42,7 @@ cc_library(
         "security_request_phase.cc",
         "util.cc",
     ],
+    copts = COPTS,
     deps = [
         ":definitions",
         "//src/connectivity/bluetooth/core/bt-host:public",
@@ -58,6 +60,7 @@ cc_library(
     srcs = [
         "test_security_manager.cc",
     ],
+    copts = COPTS,
     deps = [
         ":sm",
         "//src/connectivity/bluetooth/core/bt-host:public",
@@ -84,6 +87,7 @@ fuchsia_cc_test(
         "types_test.cc",
         "util_test.cc",
     ],
+    copts = COPTS,
     death_unittest = True,
     visibility = ["//visibility:public"],
     deps = [

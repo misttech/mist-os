@@ -26,7 +26,7 @@ int main(int argc, const char* argv[], char* envp[]) {
   arguments.push_back(favorite_animal);
 
   // Print a greeting to syslog
-  FX_SLOG(INFO, "Hello", FX_KV("greeting", echo::greeting(arguments).c_str()));
+  FX_LOG_KV(INFO, "Hello", FX_KV("greeting", echo::greeting(arguments).c_str()));
 
   return 0;
 }

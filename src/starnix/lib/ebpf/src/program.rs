@@ -24,11 +24,11 @@ pub fn new_bpf_type_identifier() -> MemoryId {
     BPF_TYPE_IDENTIFIER_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed).into()
 }
 
-pub trait EpbfRunContext {
+pub trait EbpfRunContext {
     type Context<'a>;
 }
 
-impl EpbfRunContext for () {
+impl EbpfRunContext for () {
     type Context<'a> = ();
 }
 
@@ -149,7 +149,7 @@ impl BpfValue {
     }
 }
 
-pub struct EbpfHelper<C: EpbfRunContext> {
+pub struct EbpfHelper<C: EbpfRunContext> {
     pub index: u32,
     pub name: &'static str,
     pub function_pointer: Arc<
@@ -160,7 +160,7 @@ pub struct EbpfHelper<C: EpbfRunContext> {
     pub signature: FunctionSignature,
 }
 
-impl<C: EpbfRunContext> Clone for EbpfHelper<C> {
+impl<C: EbpfRunContext> Clone for EbpfHelper<C> {
     fn clone(&self) -> Self {
         Self {
             index: self.index,
@@ -171,7 +171,7 @@ impl<C: EpbfRunContext> Clone for EbpfHelper<C> {
     }
 }
 
-impl<C: EpbfRunContext> std::fmt::Debug for EbpfHelper<C> {
+impl<C: EbpfRunContext> std::fmt::Debug for EbpfHelper<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         f.debug_struct("EbpfHelper")
             .field("index", &self.index)
@@ -181,18 +181,18 @@ impl<C: EpbfRunContext> std::fmt::Debug for EbpfHelper<C> {
     }
 }
 
-pub struct EbpfProgramBuilder<C: EpbfRunContext> {
+pub struct EbpfProgramBuilder<C: EbpfRunContext> {
     helpers: HashMap<u32, EbpfHelper<C>>,
     calling_context: CallingContext,
 }
 
-impl<C: EpbfRunContext> Default for EbpfProgramBuilder<C> {
+impl<C: EbpfRunContext> Default for EbpfProgramBuilder<C> {
     fn default() -> Self {
         Self { helpers: Default::default(), calling_context: Default::default() }
     }
 }
 
-impl<C: EpbfRunContext> std::fmt::Debug for EbpfProgramBuilder<C> {
+impl<C: EbpfRunContext> std::fmt::Debug for EbpfProgramBuilder<C> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), std::fmt::Error> {
         f.debug_struct("EbpfProgramBuilder")
             .field("helpers", &self.helpers)
@@ -201,7 +201,7 @@ impl<C: EpbfRunContext> std::fmt::Debug for EbpfProgramBuilder<C> {
     }
 }
 
-impl<C: EpbfRunContext> EbpfProgramBuilder<C> {
+impl<C: EbpfRunContext> EbpfProgramBuilder<C> {
     pub fn register_map_reference(&mut self, pc: usize, schema: MapSchema) {
         self.calling_context.register_map_reference(pc, schema);
     }
@@ -231,12 +231,12 @@ impl<C: EpbfRunContext> EbpfProgramBuilder<C> {
 
 /// An abstraction over a ebpf program and its registered helper functions.
 #[derive(Debug)]
-pub struct EbpfProgram<C: EpbfRunContext> {
+pub struct EbpfProgram<C: EbpfRunContext> {
     pub code: Vec<bpf_insn>,
     pub helpers: HashMap<u32, EbpfHelper<C>>,
 }
 
-impl<C: EpbfRunContext> EbpfProgram<C> {
+impl<C: EbpfRunContext> EbpfProgram<C> {
     /// Executes the current program on the provided data.  Warning: If
     /// this program was a cbpf program, and it uses BPF_MEM, the
     /// scratch memory must be provided by the caller to this

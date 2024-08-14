@@ -7,15 +7,21 @@
 
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/assert.h>
+#include <zircon/errors.h>
 #include <zircon/types.h>
 
+#include <cstdint>
+#include <cstdlib>
+#include <ios>
+#include <limits>
 #include <sstream>
 #include <string>
+#include <type_traits>
 #include <utility>
 #include <vector>
 
-#include <disk_inspector/disk_obj.h>
-#include <disk_inspector/supported_types.h>
+#include "src/storage/lib/disk_inspector/disk_obj.h"
+#include "src/storage/lib/disk_inspector/supported_types.h"
 
 namespace disk_inspector {
 

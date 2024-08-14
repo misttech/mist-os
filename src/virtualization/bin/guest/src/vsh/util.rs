@@ -71,11 +71,10 @@ mod test {
         Ok((s1, s2))
     }
 
-    #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
     #[derive(Debug)]
     enum TestError {
-        SendErr(anyhow::Error),
-        RecvErr(anyhow::Error),
+        SendErr { _error: anyhow::Error },
+        RecvErr { _error: anyhow::Error },
     }
 
     async fn send_and_recv_data_msg(data: Vec<u8>) -> Result<(), TestError> {
@@ -91,12 +90,12 @@ mod test {
         send_message(&mut hvsock, &test_msg)
             .await
             .context("failed to send test message")
-            .map_err(TestError::SendErr)?;
+            .map_err(|e| TestError::SendErr { _error: e })?;
 
         let recv_msg = recv_message::<vsh::GuestMessage>(&mut gvsock)
             .await
             .context("failed to receive test message")
-            .map_err(TestError::RecvErr)?;
+            .map_err(|e| TestError::RecvErr { _error: e })?;
 
         assert_eq!(test_msg, recv_msg);
         Ok(())
@@ -122,7 +121,7 @@ mod test {
             .await
             .expect_err("send_recv_oversized_message unexpectedly succeeded")
         {
-            TestError::SendErr(_) => (),
+            TestError::SendErr { _error: _ } => (),
             other => panic!("send_recv_oversized_message had unexpected result: {other:?}"),
         }
     }

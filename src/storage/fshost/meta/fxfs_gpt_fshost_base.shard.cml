@@ -104,7 +104,7 @@
             from: "#fxfs",
         },
         {
-            protocol: "fuchsia.fxfs.Volumes",
+            protocol: "fuchsia.fs.startup.Volumes",
             from: "#fxfs",
         },
         {

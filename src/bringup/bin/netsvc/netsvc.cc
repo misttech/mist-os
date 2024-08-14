@@ -25,6 +25,7 @@
 #include "src/bringup/bin/netsvc/inet6.h"
 #include "src/bringup/bin/netsvc/netboot.h"
 #include "src/bringup/bin/netsvc/netifc.h"
+#include "src/bringup/bin/netsvc/netsvc_structured_config.h"
 #include "src/bringup/bin/netsvc/tftp.h"
 #include "src/sys/lib/stdout-to-debuglog/cpp/stdout-to-debuglog.h"
 
@@ -135,8 +136,9 @@ int main(int argc, char** argv) {
       printf("netsvc: FATAL: did not find /svc in namespace\n");
       return -1;
     }
+    auto config = netsvc_structured_config::Config::TakeFromStartupHandle();
     const char* error;
-    if (ParseArgs(argc, argv, svc_root, &error, &args) < 0) {
+    if (ParseArgs(argc, argv, config, svc_root, &error, &args) < 0) {
       printf("netsvc: fatal error: %s\n", error);
       return -1;
     };

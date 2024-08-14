@@ -6,12 +6,12 @@
 #define SRC_DEVICES_BLOCK_DRIVERS_CORE_BLOCK_FIFO_H_
 
 #include <stdint.h>
+#include <zircon/types.h>
 
 // LINT.IfChange
 
 // bindgen doesn't like 'using'.
 // NOLINTBEGIN(modernize-use-using)
-typedef int32_t zx_status_t;
 typedef uint32_t reqid_t;
 typedef uint16_t groupid_t;
 typedef uint16_t vmoid_t;
@@ -47,6 +47,6 @@ typedef struct BlockFifoResponse {
 
 // Notify humans to update Rust bindings because there's no bindgen automation.
 // TODO(https://fxbug.dev/42153476): Remove lint when no longer necessary.
-// LINT.ThenChange(/src/storage/lib/block_client/rust/src/fifo.rs)
+// LINT.ThenChange(//src/storage/lib/block_protocol/src/lib.rs)
 
 #endif  // SRC_DEVICES_BLOCK_DRIVERS_CORE_BLOCK_FIFO_H_

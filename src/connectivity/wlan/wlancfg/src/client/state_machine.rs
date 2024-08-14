@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::client::roaming::local_roam_manager::RoamManager;
+use crate::client::roaming::roam_monitor::RoamDataSender;
 use crate::client::types;
 use crate::config_management::{PastConnectionData, SavedNetworksManagerApi};
 use crate::mode_management::{Defect, IfaceFailure};
@@ -13,7 +14,7 @@ use crate::telemetry::{
 use crate::util::historical_list::HistoricalList;
 use crate::util::listener::Message::NotifyListeners;
 use crate::util::listener::{ClientListenerMessageSender, ClientNetworkState, ClientStateUpdate};
-use crate::util::state_machine::{self, ExitReason, IntoStateExt};
+use crate::util::state_machine::{self, ExitReason, IntoStateExt, StateMachineStatusPublisher};
 use anyhow::format_err;
 use fidl::endpoints::create_proxy;
 use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
@@ -91,6 +92,29 @@ pub enum ManualRequest {
     Disconnect((types::DisconnectReason, oneshot::Sender<()>)),
 }
 
+#[derive(Clone, Debug, Default, PartialEq)]
+pub enum Status {
+    Disconnecting,
+    #[default]
+    Disconnected,
+    Connecting,
+    Connected {
+        channel: u8,
+        rssi: i8,
+        snr: i8,
+    },
+}
+
+impl Status {
+    fn from_ap_state(ap_state: &types::ApState) -> Self {
+        Status::Connected {
+            channel: ap_state.tracked.channel.primary,
+            rssi: ap_state.tracked.signal.rssi_dbm,
+            snr: ap_state.tracked.signal.snr_db,
+        }
+    }
+}
+
 fn send_listener_state_update(
     sender: &ClientListenerMessageSender,
     network_update: Option<ClientNetworkState>,
@@ -119,6 +143,7 @@ pub async fn serve(
     telemetry_sender: TelemetrySender,
     defect_sender: mpsc::UnboundedSender<Defect>,
     roam_manager: RoamManager,
+    status_publisher: StateMachineStatusPublisher<Status>,
 ) {
     let next_network = connect_selection
         .map(|selection| ConnectingOptions { connect_selection: selection, attempt_counter: 0 });
@@ -137,6 +162,7 @@ pub async fn serve(
         iface_id,
         defect_sender,
         roam_manager,
+        status_publisher: status_publisher.clone(),
     };
     let state_machine =
         disconnecting_state(common_options, disconnect_options).into_state_machine();
@@ -161,6 +187,8 @@ pub async fn serve(
                 iface_id, e);
         },
     }
+
+    status_publisher.publish_status(Status::Disconnected);
 }
 
 /// Common parameters passed to all states
@@ -173,6 +201,25 @@ struct CommonStateOptions {
     iface_id: u16,
     defect_sender: mpsc::UnboundedSender<Defect>,
     roam_manager: RoamManager,
+    status_publisher: StateMachineStatusPublisher<Status>,
+}
+
+impl CommonStateOptions {
+    async fn network_is_likely_hidden(&self, options: &ConnectingOptions) -> bool {
+        match self
+            .saved_networks_manager
+            .lookup(&options.connect_selection.target.network)
+            .await
+            .iter()
+            .find(|&config| config.credential == options.connect_selection.target.credential)
+        {
+            Some(config) => config.is_hidden(),
+            None => {
+                error!("Could not lookup if connected network is hidden.");
+                false
+            }
+        }
+    }
 }
 
 pub type ConnectionStatsSender = mpsc::UnboundedSender<fidl_internal::SignalReportIndication>;
@@ -218,7 +265,7 @@ struct DisconnectingOptions {
 /// - exit otherwise
 async fn disconnecting_state(
     common_options: CommonStateOptions,
-    options: DisconnectingOptions,
+    mut options: DisconnectingOptions,
 ) -> Result<State, ExitReason> {
     // Log a message with the disconnect reason
     match options.reason {
@@ -233,6 +280,8 @@ async fn disconnecting_state(
         }
     }
 
+    notify_on_disconnect_attempt(&common_options);
+
     // TODO(https://fxbug.dev/42130926): either make this fire-and-forget in the SME, or spawn a thread for this,
     // so we don't block on it
     common_options
@@ -243,10 +292,29 @@ async fn disconnecting_state(
             ExitReason(Err(format_err!("Failed to send command to wlanstack: {:?}", e)))
         })?;
 
+    notify_once_disconnected(&common_options, &mut options);
+
+    // Transition to next state
+    match options.next_network {
+        Some(next_network) => Ok(to_connecting_state(common_options, next_network)),
+        None => Err(ExitReason(Ok(()))),
+    }
+}
+
+fn notify_on_disconnect_attempt(common_options: &CommonStateOptions) {
+    common_options.status_publisher.publish_status(Status::Disconnecting);
+}
+
+fn notify_once_disconnected(
+    common_options: &CommonStateOptions,
+    options: &mut DisconnectingOptions,
+) {
+    common_options.status_publisher.publish_status(Status::Disconnected);
+
     // Notify listeners if a disconnect request was sent, or ensure that listeners know client
     // connections are enabled.
     let networks =
-        options.previous_network.map(|(network_identifier, status)| ClientNetworkState {
+        options.previous_network.clone().map(|(network_identifier, status)| ClientNetworkState {
             id: network_identifier,
             state: types::ConnectionState::Disconnected,
             status: Some(status),
@@ -256,15 +324,9 @@ async fn disconnecting_state(
     // Notify the caller that disconnect was sent to the SME once the final disconnected update has
     // been sent.  This ensures that there will not be a race when the IfaceManager sends out a
     // ConnectionsDisabled update.
-    match options.disconnect_responder {
+    match options.disconnect_responder.take() {
         Some(responder) => responder.send(()).unwrap_or(()),
         None => (),
-    }
-
-    // Transition to next state
-    match options.next_network {
-        Some(next_network) => Ok(to_connecting_state(common_options, next_network)),
-        None => Err(ExitReason(Ok(()))),
     }
 }
 
@@ -364,25 +426,7 @@ async fn connecting_state<'a>(
     options: ConnectingOptions,
 ) -> Result<State, ExitReason> {
     debug!("Entering connecting state");
-
-    if options.attempt_counter > 0 {
-        info!(
-            "Retrying connection, {} attempts remaining",
-            MAX_CONNECTION_ATTEMPTS - options.attempt_counter
-        );
-    }
-
-    // Send a "Connecting" update to listeners, unless this is a retry
-    if options.attempt_counter == 0 {
-        send_listener_state_update(
-            &common_options.update_sender,
-            Some(ClientNetworkState {
-                id: options.connect_selection.target.network.clone(),
-                state: types::ConnectionState::Connecting,
-                status: None,
-            }),
-        );
-    };
+    notify_on_connection_attempt(&common_options, &options);
 
     // Release the sequestered BSS description. While considered a "black box" elsewhere, the state
     // machine uses this by design to construct its AP state and to report telemetry.
@@ -421,53 +465,12 @@ async fn connecting_state<'a>(
         })
         .await?;
 
-    // Report the connect result to the saved networks manager.
-    common_options
-        .saved_networks_manager
-        .record_connect_result(
-            options.connect_selection.target.network.clone(),
-            &options.connect_selection.target.credential,
-            ap_state.original().bssid,
-            sme_result,
-            options.connect_selection.target.bss.observation,
-        )
-        .await;
-
-    let network_is_likely_hidden = match common_options
-        .saved_networks_manager
-        .lookup(&options.connect_selection.target.network)
-        .await
-        .iter()
-        .find(|&config| config.credential == options.connect_selection.target.credential)
-    {
-        Some(config) => config.is_hidden(),
-        None => {
-            error!("Could not lookup if connected network is hidden.");
-            false
-        }
-    };
-
-    // Log the connect result for metrics.
-    common_options.telemetry_sender.send(TelemetryEvent::ConnectResult {
-        ap_state: ap_state.clone(),
-        result: sme_result,
-        policy_connect_reason: Some(options.connect_selection.reason),
-        multiple_bss_candidates: options.connect_selection.target.network_has_multiple_bss,
-        iface_id: common_options.iface_id,
-        network_is_likely_hidden,
-    });
+    notify_on_connection_result(&common_options, &options, ap_state.clone(), sme_result).await;
 
     match (sme_result.code, sme_result.is_credential_rejected) {
         (fidl_ieee80211::StatusCode::Success, _) => {
             info!("Successfully connected to network");
-            send_listener_state_update(
-                &common_options.update_sender,
-                Some(ClientNetworkState {
-                    id: options.connect_selection.target.network.clone(),
-                    state: types::ConnectionState::Connected,
-                    status: None,
-                }),
-            );
+            let network_is_likely_hidden = common_options.network_is_likely_hidden(&options).await;
             let connected_options = ConnectedOptions {
                 currently_fulfilled_connection: options.connect_selection.clone(),
                 connect_txn_stream: connect_txn.take_event_stream(),
@@ -481,28 +484,92 @@ async fn connecting_state<'a>(
         }
         (code, true) => {
             info!("Failed to connect: {:?}. Will not retry because of credential error.", code);
-            send_listener_state_update(
-                &common_options.update_sender,
-                Some(ClientNetworkState {
-                    id: options.connect_selection.target.network,
-                    state: types::ConnectionState::Failed,
-                    status: Some(types::DisconnectStatus::CredentialsFailed),
-                }),
-            );
-            Err(ExitReason(Ok(())))
+            return Err(ExitReason(Ok(())));
         }
         (code, _) => {
             info!("Failed to connect: {:?}", code);
-
-            // Defects should be logged for connection failures that are not due to
-            // bad credentials.
-            if let Err(e) = common_options.defect_sender.unbounded_send(Defect::Iface(
-                IfaceFailure::ConnectionFailure { iface_id: common_options.iface_id },
-            )) {
-                warn!("Failed to log connection failure: {}", e);
-            }
-
             handle_connecting_error_and_retry(common_options, options).await
+        }
+    }
+}
+
+fn notify_on_connection_attempt(common_options: &CommonStateOptions, options: &ConnectingOptions) {
+    common_options.status_publisher.publish_status(Status::Connecting);
+
+    if options.attempt_counter > 0 {
+        info!(
+            "Retrying connection, {} attempts remaining",
+            MAX_CONNECTION_ATTEMPTS - options.attempt_counter
+        );
+    }
+
+    // Send a "Connecting" update to listeners, unless this is a retry
+    if options.attempt_counter == 0 {
+        send_listener_state_update(
+            &common_options.update_sender,
+            Some(ClientNetworkState {
+                id: options.connect_selection.target.network.clone(),
+                state: types::ConnectionState::Connecting,
+                status: None,
+            }),
+        );
+    };
+}
+
+async fn notify_on_connection_result(
+    common_options: &CommonStateOptions,
+    options: &ConnectingOptions,
+    ap_state: types::ApState,
+    sme_result: fidl_sme::ConnectResult,
+) {
+    common_options.status_publisher.publish_status(Status::from_ap_state(&ap_state));
+
+    // Report the connect result to the saved networks manager.
+    common_options
+        .saved_networks_manager
+        .record_connect_result(
+            options.connect_selection.target.network.clone(),
+            &options.connect_selection.target.credential,
+            ap_state.clone().original().bssid,
+            sme_result,
+            options.connect_selection.target.bss.observation,
+        )
+        .await;
+
+    let network_is_likely_hidden = common_options.network_is_likely_hidden(options).await;
+    common_options.telemetry_sender.send(TelemetryEvent::ConnectResult {
+        ap_state,
+        result: sme_result,
+        policy_connect_reason: Some(options.connect_selection.reason),
+        multiple_bss_candidates: options.connect_selection.target.network_has_multiple_bss,
+        iface_id: common_options.iface_id,
+        network_is_likely_hidden,
+    });
+
+    if sme_result.code == fidl_ieee80211::StatusCode::Success {
+        send_listener_state_update(
+            &common_options.update_sender,
+            Some(ClientNetworkState {
+                id: options.connect_selection.target.network.clone(),
+                state: types::ConnectionState::Connected,
+                status: None,
+            }),
+        );
+    } else if sme_result.is_credential_rejected {
+        send_listener_state_update(
+            &common_options.update_sender,
+            Some(ClientNetworkState {
+                id: options.connect_selection.target.network.clone(),
+                state: types::ConnectionState::Failed,
+                status: Some(types::DisconnectStatus::CredentialsFailed),
+            }),
+        );
+    } else {
+        // Defects should be logged for connection failures that are not due to bad credentials.
+        if let Err(e) = common_options.defect_sender.unbounded_send(Defect::Iface(
+            IfaceFailure::ConnectionFailure { iface_id: common_options.iface_id },
+        )) {
+            warn!("Failed to log connection failure: {}", e);
         }
     }
 }
@@ -566,30 +633,16 @@ async fn connected_state(
                 Some(Ok(event)) => {
                     let is_sme_idle = match event {
                         fidl_sme::ConnectTransactionEvent::OnDisconnect { info: fidl_info } => {
-                            // Log a disconnect in Cobalt
-                            let now = fasync::Time::now();
-                            let info = DisconnectInfo {
-                                connected_duration: now - connect_start_time,
-                                is_sme_reconnecting: fidl_info.is_sme_reconnecting,
-                                disconnect_source: fidl_info.disconnect_source,
-                                previous_connect_reason: options.currently_fulfilled_connection.reason,
-                                ap_state: (*options.ap_state).clone(),
-                                signals: past_signals.clone(),
-                            };
-                            common_options.telemetry_sender.send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
-
-                            // Record data about the connection and disconnect for future network
-                            // selection.
-                            record_disconnect(
+                            notify_when_disconnect_detected(
                                 &common_options,
                                 &options,
                                 connect_start_time,
-                                types::DisconnectReason::DisconnectDetectedFromSme,
-                                options.ap_state.tracked.signal,
+                                fidl_info,
+                                past_signals.clone(),
                             ).await;
 
                             !fidl_info.is_sme_reconnecting
-                            }
+                        }
                         fidl_sme::ConnectTransactionEvent::OnConnectResult { result } => {
                             let connected = result.code == fidl_ieee80211::StatusCode::Success;
                             if connected {
@@ -598,18 +651,9 @@ async fn connected_state(
                                 // to track as a new connection.
                                 connect_start_time = fasync::Time::now();
                             }
-                            common_options.telemetry_sender.send(TelemetryEvent::ConnectResult {
-                                iface_id: common_options.iface_id,
-                                result,
-                                policy_connect_reason: None,
-                                // It's not necessarily true that there are still multiple BSS
-                                // candidates in the network at this point in time, but we use the
-                                // heuristic that if previously there were multiple BSS's, then
-                                // it likely remains the same.
-                                multiple_bss_candidates: options.multiple_bss_candidates,
-                                ap_state: (*options.ap_state).clone(),
-                                network_is_likely_hidden: options.network_is_likely_hidden,
-                            });
+
+                            notify_when_reconnect_detected(&common_options, &options, result);
+
                             !connected
                         }
                         fidl_sme::ConnectTransactionEvent::OnSignalReport { ind } => {
@@ -622,18 +666,18 @@ async fn connected_state(
                                 signal: ind.into(),
                             });
 
-                            // Send signal report metrics
-                            common_options.telemetry_sender.send(TelemetryEvent::OnSignalReport {
+                            notify_on_signal_report(
+                                &common_options,
+                                &options,
+                                &mut roam_monitor_sender,
                                 ind
-                            });
+                            );
 
-                            // Forward signal report data to roam monitor.
-                            let _ = roam_monitor_sender.send_signal_report_ind(ind).inspect_err(|e| error!("Error handling signal report: {}", e));
                             false
                         }
                         fidl_sme::ConnectTransactionEvent::OnChannelSwitched { info } => {
                             options.ap_state.tracked.channel.primary = info.new_channel;
-                            common_options.telemetry_sender.send(TelemetryEvent::OnChannelSwitched { info });
+                            notify_on_channel_switch(&common_options, &options, info);
                             false
                         }
                     };
@@ -642,7 +686,10 @@ async fn connected_state(
                         info!("Idle sme detected.");
                         let options = DisconnectingOptions {
                             disconnect_responder: None,
-                            previous_network: Some((options.currently_fulfilled_connection.target.network.clone(), types::DisconnectStatus::ConnectionFailed)),
+                            previous_network: Some((
+                                options.currently_fulfilled_connection.target.network.clone(),
+                                types::DisconnectStatus::ConnectionFailed
+                            )),
                             next_network: None,
                             reason: types::DisconnectReason::DisconnectDetectedFromSme,
                         };
@@ -655,97 +702,124 @@ async fn connected_state(
                 }
             },
             req = common_options.req_stream.next() => {
-                let now = fasync::Time::now();
                 match req {
                     Some(ManualRequest::Disconnect((reason, responder))) => {
                         debug!("Disconnect requested");
-                        record_disconnect(
+                        notify_on_manual_disconnect(
                             &common_options,
                             &options,
                             connect_start_time,
+                            past_signals.clone(),
                             reason,
-                            options.ap_state.tracked.signal,
                         ).await;
-                        let ConnectedOptions {ap_state, currently_fulfilled_connection, ..} = options;
+
                         let options = DisconnectingOptions {
                             disconnect_responder: Some(responder),
-                            previous_network: Some((currently_fulfilled_connection.target.network.clone(), types::DisconnectStatus::ConnectionStopped)),
+                            previous_network: Some((
+                                options.currently_fulfilled_connection.target.network.clone(),
+                                types::DisconnectStatus::ConnectionStopped
+                            )),
                             next_network: None,
                             reason,
                         };
-                        let info = DisconnectInfo {
-                            connected_duration: now - connect_start_time,
-                            is_sme_reconnecting: false,
-                            disconnect_source: fidl_sme::DisconnectSource::User(types::convert_to_sme_disconnect_reason(options.reason)),
-                            ap_state: *ap_state,
-                            previous_connect_reason: currently_fulfilled_connection.reason,
-                            signals: past_signals.clone(),
-                        };
-                        common_options.telemetry_sender.send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
                         return Ok(disconnecting_state(common_options, options).into_state());
                     }
                     Some(ManualRequest::Connect(new_connect_selection)) => {
                         // Check if it's the same network as we're currently connected to. If yes, reply immediately
-                        if new_connect_selection.target.network == options.currently_fulfilled_connection.target.network {
+                        if new_connect_selection.target.network
+                            == options.currently_fulfilled_connection.target.network {
                             info!("Received connection request for current network, deduping");
-                        } else {
-                            let disconnect_reason = convert_manual_connect_to_disconnect_reason(&new_connect_selection.reason).unwrap_or_else(|_| {
-                                error!("Unexpected connection reason: {:?}", new_connect_selection.reason);
-                                types::DisconnectReason::Unknown
-                            });
+                            continue
+                        }
 
-                            record_disconnect(
-                                &common_options,
-                                &options,
-                                connect_start_time,
-                                disconnect_reason,
-                                options.ap_state.tracked.signal,
-                            ).await;
-                            let next_connecting_options = ConnectingOptions {
+                        let reason = convert_manual_connect_to_disconnect_reason(
+                            &new_connect_selection.reason
+                        ).unwrap_or_else(|_| {
+                            error!("Unexpected connection reason: {:?}", new_connect_selection.reason);
+                            types::DisconnectReason::Unknown
+                        });
+                        notify_on_manual_connect(
+                            &common_options,
+                            &options,
+                            connect_start_time,
+                            past_signals.clone(),
+                            reason,
+                        ).await;
+
+                        let options = DisconnectingOptions {
+                            disconnect_responder: None,
+                            previous_network: Some((
+                                options.currently_fulfilled_connection.target.network,
+                                types::DisconnectStatus::ConnectionStopped
+                            )),
+                            next_network: Some(ConnectingOptions {
                                 connect_selection: new_connect_selection.clone(),
                                 attempt_counter: 0,
-                            };
-                            let ConnectedOptions { ap_state, currently_fulfilled_connection, ..} = options;
-                            let options = DisconnectingOptions {
-                                disconnect_responder: None,
-                                previous_network: Some((currently_fulfilled_connection.target.network, types::DisconnectStatus::ConnectionStopped)),
-                                next_network: Some(next_connecting_options),
-                                reason: disconnect_reason,
-                            };
-                            info!("Connection to new network requested, disconnecting from current network");
-                            let info = DisconnectInfo {
-                                connected_duration: now - connect_start_time,
-                                is_sme_reconnecting: false,
-                                disconnect_source: fidl_sme::DisconnectSource::User(types::convert_to_sme_disconnect_reason(options.reason)),
-                                ap_state: *ap_state,
-                                previous_connect_reason: currently_fulfilled_connection.reason,
-                                signals: past_signals.clone(),
-                            };
-                            common_options.telemetry_sender.send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
-                            return Ok(disconnecting_state(common_options, options).into_state())
-                        }
+                            }),
+                            reason
+                        };
+                        info!("Connection to new network requested, disconnecting from current network");
+                        return Ok(disconnecting_state(common_options, options).into_state())
                     }
                     None => return handle_none_request(),
                 };
             },
             () = post_connect_metric_timer => {
-                common_options.telemetry_sender.send(
-                    TelemetryEvent::PostConnectionSignals { connect_time: connect_start_time, signal_at_connect: initial_signal, signals: past_signals.clone() }
-                );
+                common_options.telemetry_sender.send(TelemetryEvent::PostConnectionSignals {
+                        connect_time: connect_start_time,
+                        signal_at_connect: initial_signal,
+                        signals: past_signals.clone()
+                });
             },
             () = connect_duration_metric_timer => {
                 // Log the average connection score metric for a long duration connection.
-                common_options.telemetry_sender.send(
-                    TelemetryEvent::LongDurationSignals{ signals: past_signals.get_before(fasync::Time::now()) }
-                );
+                common_options.telemetry_sender.send(TelemetryEvent::LongDurationSignals{
+                    signals: past_signals.get_before(fasync::Time::now())
+                });
             }
             roam_request = roam_receiver.select_next_some() => {
                 // TODO(nmccracken) Roam to this network once we have decided proactive roaming is ready to enable.
-                debug!("Roam request to candidate {:?} received, not yet implemented.", roam_request.to_string_without_pii());
+                debug!(
+                    "Roam request to candidate {:?} received, not yet implemented.",
+                    roam_request.to_string_without_pii()
+                );
                 common_options.telemetry_sender.send(TelemetryEvent::WouldRoamConnect);
             }
         }
     }
+}
+
+async fn notify_when_disconnect_detected(
+    common_options: &CommonStateOptions,
+    options: &ConnectedOptions,
+    connect_start_time: fasync::Time,
+    fidl_info: fidl_sme::DisconnectInfo,
+    past_signals: HistoricalList<types::TimestampedSignal>,
+) {
+    // Log a disconnect in Cobalt
+    let now = fasync::Time::now();
+    let info = DisconnectInfo {
+        connected_duration: now - connect_start_time,
+        is_sme_reconnecting: fidl_info.is_sme_reconnecting,
+        disconnect_source: fidl_info.disconnect_source,
+        previous_connect_reason: options.currently_fulfilled_connection.reason,
+        ap_state: (*options.ap_state).clone(),
+        signals: past_signals,
+    };
+    common_options
+        .telemetry_sender
+        .send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+
+    // Record data about the connection and disconnect for future network
+    // selection.
+    record_disconnect(
+        common_options,
+        options,
+        connect_start_time,
+        types::DisconnectReason::DisconnectDetectedFromSme,
+        options.ap_state.tracked.signal,
+    )
+    .await;
 }
 
 async fn record_disconnect(
@@ -778,6 +852,120 @@ async fn record_disconnect(
         .await;
 }
 
+fn notify_when_reconnect_detected(
+    common_options: &CommonStateOptions,
+    options: &ConnectedOptions,
+    result: fidl_sme::ConnectResult,
+) {
+    common_options.telemetry_sender.send(TelemetryEvent::ConnectResult {
+        iface_id: common_options.iface_id,
+        result,
+        policy_connect_reason: None,
+        // It's not necessarily true that there are still multiple BSS
+        // candidates in the network at this point in time, but we use the
+        // heuristic that if previously there were multiple BSS's, then
+        // it likely remains the same.
+        multiple_bss_candidates: options.multiple_bss_candidates,
+        ap_state: (*options.ap_state).clone(),
+        network_is_likely_hidden: options.network_is_likely_hidden,
+    });
+}
+
+fn notify_on_signal_report(
+    common_options: &CommonStateOptions,
+    options: &ConnectedOptions,
+    roam_monitor_sender: &mut RoamDataSender,
+    ind: fidl_internal::SignalReportIndication,
+) {
+    // Update reported state.
+    common_options.status_publisher.publish_status(Status::from_ap_state(&options.ap_state));
+
+    // Send signal report metrics
+    common_options.telemetry_sender.send(TelemetryEvent::OnSignalReport { ind });
+
+    // Forward signal report data to roam monitor.
+    let _ = roam_monitor_sender
+        .send_signal_report_ind(ind)
+        .inspect_err(|e| error!("Error handling signal report: {}", e));
+}
+
+fn notify_on_channel_switch(
+    common_options: &CommonStateOptions,
+    options: &ConnectedOptions,
+    info: fidl_internal::ChannelSwitchInfo,
+) {
+    common_options.telemetry_sender.send(TelemetryEvent::OnChannelSwitched { info });
+
+    // Update reported state.
+    common_options.status_publisher.publish_status(Status::from_ap_state(&options.ap_state));
+}
+
+async fn notify_on_manual_disconnect(
+    common_options: &CommonStateOptions,
+    options: &ConnectedOptions,
+    connect_start_time: fasync::Time,
+    past_signals: HistoricalList<types::TimestampedSignal>,
+    reason: types::DisconnectReason,
+) {
+    let now = fasync::Time::now();
+
+    record_disconnect(
+        common_options,
+        options,
+        connect_start_time,
+        reason,
+        options.ap_state.tracked.signal,
+    )
+    .await;
+
+    let info = DisconnectInfo {
+        connected_duration: now - connect_start_time,
+        is_sme_reconnecting: false,
+        disconnect_source: fidl_sme::DisconnectSource::User(
+            types::convert_to_sme_disconnect_reason(reason),
+        ),
+        ap_state: *options.ap_state.clone(),
+        previous_connect_reason: options.currently_fulfilled_connection.reason,
+        signals: past_signals,
+    };
+    common_options
+        .telemetry_sender
+        .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
+}
+
+async fn notify_on_manual_connect(
+    common_options: &CommonStateOptions,
+    options: &ConnectedOptions,
+    connect_start_time: fasync::Time,
+    past_signals: HistoricalList<types::TimestampedSignal>,
+    reason: types::DisconnectReason,
+) {
+    let now = fasync::Time::now();
+
+    record_disconnect(
+        common_options,
+        options,
+        connect_start_time,
+        reason,
+        options.ap_state.tracked.signal,
+    )
+    .await;
+
+    let info = DisconnectInfo {
+        connected_duration: now - connect_start_time,
+        is_sme_reconnecting: false,
+        disconnect_source: fidl_sme::DisconnectSource::User(
+            types::convert_to_sme_disconnect_reason(reason),
+        ),
+        ap_state: *options.ap_state.clone(),
+        previous_connect_reason: options.currently_fulfilled_connection.reason,
+        signals: past_signals.clone(),
+    };
+    common_options
+        .telemetry_sender
+        .send(TelemetryEvent::Disconnected { track_subsequent_downtime: false, info });
+}
+
 /// Get the disconnect reason corresponding to the connect reason. Return an error if the connect
 /// reason does not correspond to a manual connect.
 pub fn convert_manual_connect_to_disconnect_reason(
@@ -804,6 +992,7 @@ mod tests {
     use crate::config_management::network_config::{self, Credential};
     use crate::config_management::PastConnectionList;
     use crate::util::listener;
+    use crate::util::state_machine::{status_publisher_and_reader, StateMachineStatusReader};
     use crate::util::testing::{
         generate_connect_selection, generate_disconnect_info, poll_sme_req, random_connection_data,
         ConnectResultRecord, ConnectionRecord, FakeSavedNetworksManager,
@@ -833,6 +1022,7 @@ mod tests {
         telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
         defect_receiver: mpsc::UnboundedReceiver<Defect>,
         roam_service_request_receiver: mpsc::Receiver<RoamServiceRequest>,
+        status_reader: StateMachineStatusReader<Status>,
     }
 
     fn test_setup() -> TestValues {
@@ -848,6 +1038,7 @@ mod tests {
         let (defect_sender, defect_receiver) = mpsc::unbounded();
         let (roam_service_request_sender, roam_service_request_receiver) = mpsc::channel(100);
         let roam_manager = RoamManager::new(roam_service_request_sender);
+        let (status_publisher, status_reader) = status_publisher_and_reader::<Status>();
 
         TestValues {
             common_options: CommonStateOptions {
@@ -859,6 +1050,7 @@ mod tests {
                 iface_id: 1,
                 defect_sender,
                 roam_manager,
+                status_publisher,
             },
             sme_req_stream,
             saved_networks_manager,
@@ -867,6 +1059,7 @@ mod tests {
             telemetry_receiver,
             defect_receiver,
             roam_service_request_receiver,
+            status_reader,
         }
     }
 
@@ -1226,6 +1419,10 @@ mod tests {
             exec.run_until_stalled(&mut test_values.update_receiver.into_future()),
             Poll::Pending
         );
+
+        // Verify the Connected status was set.
+        let status = test_values.status_reader.read_status().expect("failed to read status");
+        assert_variant!(status, Status::Connected { .. });
 
         // Send a disconnect and check that the connection data is correctly recorded
         let is_sme_reconnecting = false;
@@ -2621,6 +2818,10 @@ mod tests {
 
         let mut test_values = test_setup();
 
+        // Verify the status is initialized to default.
+        let status = test_values.status_reader.read_status().expect("failed to read status");
+        assert_variant!(status, Status::Disconnected);
+
         // Set initial RSSI and SNR values
         let mut connect_selection = generate_connect_selection();
         let init_rssi = -40;
@@ -2652,7 +2853,7 @@ mod tests {
                 .expect("failed to create a connect txn channel");
         let options = ConnectedOptions {
             currently_fulfilled_connection: connect_selection.clone(),
-            ap_state: Box::new(ap_state),
+            ap_state: Box::new(ap_state.clone()),
             multiple_bss_candidates: connect_selection.target.network_has_multiple_bss,
             connect_txn_stream: connect_txn_proxy.take_event_stream(),
             network_is_likely_hidden: false,
@@ -2699,6 +2900,17 @@ mod tests {
 
             // Verify that signal report is sent to the roam monitor
             assert_variant!(roam_trigger_data_receiver.try_next(), Ok(Some(RoamTriggerData::SignalReportInd(_))));
+
+            // Verify that the status is updated.
+            let status = test_values.status_reader.read_status().expect("failed to read status");
+            assert_eq!(
+                status,
+                Status::Connected {
+                    rssi: rssi_1,
+                    snr: snr_1,
+                    channel: ap_state.tracked.channel.primary
+                }
+            );
 
             // Send a second signal report with higher RSSI and SNR than the previous reports.
             let rssi_2 = -30;
@@ -2969,6 +3181,7 @@ mod tests {
             test_values.common_options.telemetry_sender,
             test_values.common_options.defect_sender,
             test_values.common_options.roam_manager,
+            test_values.common_options.status_publisher,
         );
         let mut fut = pin!(fut);
 
@@ -3017,6 +3230,7 @@ mod tests {
             test_values.common_options.telemetry_sender,
             test_values.common_options.defect_sender,
             test_values.common_options.roam_manager,
+            test_values.common_options.status_publisher,
         );
         let mut fut = pin!(fut);
 
@@ -3061,6 +3275,7 @@ mod tests {
             test_values.common_options.telemetry_sender,
             test_values.common_options.defect_sender,
             test_values.common_options.roam_manager,
+            test_values.common_options.status_publisher,
         );
         let mut fut = pin!(fut);
 
@@ -3133,6 +3348,10 @@ mod tests {
         let sme_event_stream = sme_proxy.take_event_stream();
         let (_client_req_sender, client_req_stream) = mpsc::channel(1);
 
+        // Set the status to something non-disconnected so that we can verify that the state is set
+        // when the state machine exits.
+        test_values.common_options.status_publisher.publish_status(Status::Connecting);
+
         // Create a connect request so that the state machine does not immediately exit.
         let connect_selection = generate_connect_selection();
 
@@ -3147,6 +3366,7 @@ mod tests {
             test_values.common_options.telemetry_sender,
             test_values.common_options.defect_sender,
             test_values.common_options.roam_manager,
+            test_values.common_options.status_publisher.clone(),
         );
         let mut fut = pin!(fut);
 
@@ -3155,6 +3375,10 @@ mod tests {
 
         // Ensure the state machine exits
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Ready(()));
+
+        // Verify that the state has been set to disconnected.
+        let status = test_values.status_reader.read_status().expect("could not get reader");
+        assert_eq!(status, Status::Disconnected);
     }
 
     fn fake_successful_connect_result() -> fidl_sme::ConnectResult {
@@ -3163,5 +3387,51 @@ mod tests {
             is_credential_rejected: false,
             is_reconnect: false,
         }
+    }
+
+    #[fuchsia::test]
+    fn disconnecting_sets_status() {
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+
+        let (sender, _) = oneshot::channel();
+        let disconnecting_options = DisconnectingOptions {
+            disconnect_responder: Some(sender),
+            previous_network: None,
+            next_network: None,
+            reason: types::DisconnectReason::RegulatoryRegionChange,
+        };
+
+        // Run the disconnecting state machine.
+        let initial_state = disconnecting_state(test_values.common_options, disconnecting_options);
+        let fut = run_state_machine(initial_state);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify the disconnecting state has been reported.
+        let status = test_values.status_reader.read_status().expect("could not get reader");
+        assert_eq!(status, Status::Disconnecting);
+    }
+
+    #[fuchsia::test]
+    fn connecting_sets_status() {
+        let mut exec = fasync::TestExecutor::new_with_fake_time();
+        let connection_attempt_time = fasync::Time::from_nanos(0);
+        exec.set_fake_time(connection_attempt_time);
+        let test_values = test_setup();
+
+        let connect_selection = generate_connect_selection();
+        let connecting_options =
+            ConnectingOptions { connect_selection: connect_selection.clone(), attempt_counter: 0 };
+
+        // Run the connecting state
+        let initial_state = connecting_state(test_values.common_options, connecting_options);
+        let fut = run_state_machine(initial_state);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify the status was set.
+        let status = test_values.status_reader.read_status().expect("failed to read status");
+        assert_variant!(status, Status::Connecting);
     }
 }

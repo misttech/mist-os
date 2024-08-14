@@ -10,7 +10,7 @@ use anyhow::{Context, Result};
 use argh::FromArgValue;
 use cm_fidl_analyzer::component_instance::ComponentInstanceForAnalyzer;
 use cm_fidl_analyzer::component_model::{AnalyzerModelError, ComponentModelForAnalyzer};
-use cm_fidl_analyzer::route::{CapabilityRouteError, VerifyRouteResult};
+use cm_fidl_analyzer::route::VerifyRouteResult;
 use cm_fidl_analyzer::{BreadthFirstModelWalker, ComponentInstanceVisitor, ComponentModelWalker};
 use cm_rust::CapabilityTypeName;
 use futures::FutureExt;
@@ -33,10 +33,11 @@ impl From<VerifyRouteResult> for ResultBySeverity {
         match verify_route_result.error {
             None => OkResult {
                 using_node: verify_route_result.using_node,
+                target_decl: verify_route_result.target_decl,
                 capability: verify_route_result
                     .capability
                     .expect("successful route should have a capability"),
-                route: verify_route_result.route,
+                source: verify_route_result.source.expect("successful route should have a source"),
             }
             .into(),
             Some(error) => {
@@ -65,16 +66,18 @@ impl From<VerifyRouteResult> for ResultBySeverity {
                         ..
                     }) => WarningResult {
                         using_node: verify_route_result.using_node,
+                        target_decl: verify_route_result.target_decl,
                         capability: verify_route_result.capability,
-                        warning: CapabilityRouteError::AnalyzerModelError(error).into(),
-                        route: verify_route_result.route,
+                        warning: error.clone(),
+                        message: error.to_string(),
                     }
                     .into(),
                     _ => ErrorResult {
                         using_node: verify_route_result.using_node,
+                        target_decl: verify_route_result.target_decl,
                         capability: verify_route_result.capability,
-                        error: CapabilityRouteError::AnalyzerModelError(error).into(),
-                        route: verify_route_result.route,
+                        error: error.clone(),
+                        message: error.to_string(),
                     }
                     .into(),
                 }
@@ -182,19 +185,7 @@ impl CapabilityRouteVisitor {
             let filtered_for_type = match level {
                 ResponseLevel::Error => ResultsBySeverity { errors, ..Default::default() },
                 ResponseLevel::Warn => ResultsBySeverity { errors, warnings, ..Default::default() },
-                ResponseLevel::All => ResultsBySeverity {
-                    errors,
-                    warnings,
-                    ok: ok
-                        .into_iter()
-                        .map(|result| OkResult {
-                            // `All` response level omits route details that depend on an
-                            // unstable route details format.
-                            route: vec![],
-                            ..result
-                        })
-                        .collect(),
-                },
+                ResponseLevel::All => ResultsBySeverity { errors, warnings, ok },
                 ResponseLevel::Verbose => ResultsBySeverity { errors, warnings, ok },
             };
             filtered_results.push(ResultsForCapabilityType {

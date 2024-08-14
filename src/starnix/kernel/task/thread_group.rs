@@ -226,6 +226,7 @@ impl Releasable for ThreadGroup {
 impl Drop for ThreadGroup {
     fn drop(&mut self) {
         let state = self.mutable_state.get_mut();
+        assert!(state.tasks.is_empty());
         assert!(state.children.is_empty());
     }
 }

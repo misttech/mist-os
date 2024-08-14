@@ -4,7 +4,7 @@
 
 use async_trait::async_trait;
 use delivery_blob::{CompressionMode, Type1Blob};
-use fidl_fuchsia_fxfs::MountOptions;
+use fidl_fuchsia_fs_startup::MountOptions;
 use fs_management::filesystem::{ServingMultiVolumeFilesystem, ServingSingleVolumeFilesystem};
 use fs_management::FSConfig;
 use fuchsia_merkle::Hash;
@@ -91,7 +91,11 @@ impl FsManagementFilesystemInstance {
             let vol = serving_filesystem
                 .create_volume(
                     "default",
-                    MountOptions { crypt: fs.config().crypt_client().map(|c| c.into()), as_blob },
+                    MountOptions {
+                        crypt: fs.config().crypt_client().map(|c| c.into()),
+                        as_blob: Some(as_blob),
+                        ..MountOptions::default()
+                    },
                 )
                 .await
                 .expect("Failed to create volume");
@@ -169,7 +173,8 @@ impl CacheClearableFilesystem for FsManagementFilesystemInstance {
                         "default",
                         MountOptions {
                             crypt: self.fs.config().crypt_client().map(|c| c.into()),
-                            as_blob: self.as_blob,
+                            as_blob: Some(self.as_blob),
+                            ..MountOptions::default()
                         },
                     )
                     .await

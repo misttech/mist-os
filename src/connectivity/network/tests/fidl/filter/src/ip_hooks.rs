@@ -4,6 +4,7 @@
 
 //! Tests for the IP filtering hooks.
 
+use std::any::Any;
 use std::num::NonZeroU64;
 use std::sync::atomic::{AtomicU32, Ordering};
 
@@ -121,6 +122,17 @@ pub(crate) struct OriginalDestination {
     pub known_to_server: bool,
 }
 
+/// Contains some sort of handle to a socket purely for the purposes of keeping the socket open.
+pub(crate) struct OpaqueSocketHandle {
+    _handle: Box<dyn Any>,
+}
+
+impl OpaqueSocketHandle {
+    fn new<T: Any>(handle: T) -> Self {
+        Self { _handle: Box::new(handle) }
+    }
+}
+
 pub(crate) trait SocketType {
     type Client;
     type Server;
@@ -133,7 +145,7 @@ pub(crate) trait SocketType {
         sock_addrs: SockAddrs,
         expected_connectivity: ExpectedConnectivity,
         expected_original_dst: Option<OriginalDestination>,
-    );
+    ) -> OpaqueSocketHandles;
 }
 
 const CLIENT_PAYLOAD: &'static str = "hello from client";
@@ -168,7 +180,7 @@ impl SocketType for IrrelevantToTest {
         sock_addrs: SockAddrs,
         expected_connectivity: ExpectedConnectivity,
         expected_original_dst: Option<OriginalDestination>,
-    ) {
+    ) -> OpaqueSocketHandles {
         let Sockets { client: client_sock, server: server_sock } = sockets;
         UdpSocket::run_test::<I>(
             realms,
@@ -241,7 +253,7 @@ impl SocketType for TcpSocket {
         sock_addrs: SockAddrs,
         expected_connectivity: ExpectedConnectivity,
         expected_original_dst: Option<OriginalDestination>,
-    ) {
+    ) -> OpaqueSocketHandles {
         let Sockets { client, mut server } = sockets;
         let SockAddrs { client: client_addr, server: server_addr } = sock_addrs;
 
@@ -296,7 +308,7 @@ impl SocketType for TcpSocket {
                     }) = expected_original_dst
                     {
                         if !known_to_server {
-                            return;
+                            return server;
                         }
                         if expected.is_ipv4() {
                             let original_dst = socket2::Socket::from(
@@ -312,6 +324,7 @@ impl SocketType for TcpSocket {
                     }
                 }
             }
+            server
         };
 
         let client_fut = async move {
@@ -325,7 +338,7 @@ impl SocketType for TcpSocket {
                         .expect("connect to server")
                     {
                         Some(_stream) => panic!("unexpectedly connected successfully"),
-                        None => {}
+                        None => None,
                     }
                 }
                 ExpectedConnectivity::TwoWay => {
@@ -356,7 +369,7 @@ impl SocketType for TcpSocket {
                     }) = expected_original_dst
                     {
                         if !known_to_client {
-                            return;
+                            return Some(stream);
                         }
                         if expected.is_ipv4() {
                             let original_dst = socket2::Socket::from(
@@ -370,11 +383,16 @@ impl SocketType for TcpSocket {
                             // IP6T_SO_ORIGINAL_DST on Fuchsia.
                         };
                     }
+                    Some(stream)
                 }
             }
         };
 
-        futures::future::join(server_fut, client_fut).await;
+        let (server, client) = futures::future::join(server_fut, client_fut).await;
+        OpaqueSocketHandles {
+            _client: OpaqueSocketHandle::new(client),
+            _server: OpaqueSocketHandle::new(server),
+        }
     }
 }
 
@@ -417,7 +435,7 @@ impl SocketType for UdpSocket {
         expected_connectivity: ExpectedConnectivity,
         // NB: SO_ORIGINAL_DST is not supported for UDP sockets.
         _expected_original_dst: Option<OriginalDestination>,
-    ) {
+    ) -> OpaqueSocketHandles {
         let Sockets { client, server } = sockets;
         let SockAddrs { client: client_addr, server: server_addr } = sock_addrs;
 
@@ -460,6 +478,7 @@ impl SocketType for UdpSocket {
                     assert_eq!(bytes, SERVER_PAYLOAD.as_bytes().len());
                 }
             }
+            server
         };
 
         let client_fut = async move {
@@ -505,8 +524,13 @@ impl SocketType for UdpSocket {
                     assert_eq!(from, server_addr);
                 }
             }
+            client
         };
-        futures::future::join(server_fut, client_fut).await;
+        let (server, client) = futures::future::join(server_fut, client_fut).await;
+        OpaqueSocketHandles {
+            _server: OpaqueSocketHandle::new(server),
+            _client: OpaqueSocketHandle::new(client),
+        }
     }
 }
 
@@ -537,12 +561,12 @@ impl SocketType for IcmpSocket {
 
     async fn run_test<I: ping::FuchsiaIpExt>(
         realms: Realms<'_>,
-        _sockets: Sockets<Self>,
+        sockets: Sockets<Self>,
         sock_addrs: SockAddrs,
         expected_connectivity: ExpectedConnectivity,
         // NB: SO_ORIGINAL_DST is not supported for ICMP sockets.
         _expected_original_dst: Option<OriginalDestination>,
-    ) {
+    ) -> OpaqueSocketHandles {
         let Realms { client, server } = realms;
 
         const SEQ: u16 = 1;
@@ -581,6 +605,12 @@ impl SocketType for IcmpSocket {
                 .await;
             }
         }
+
+        let Sockets { client, server } = sockets;
+        OpaqueSocketHandles {
+            _client: OpaqueSocketHandle::new(client),
+            _server: OpaqueSocketHandle::new(server),
+        }
     }
 }
 
@@ -598,6 +628,11 @@ pub(crate) struct Addrs {
 pub(crate) struct Sockets<S: SocketType + ?Sized> {
     pub client: S::Client,
     pub server: S::Server,
+}
+
+pub(crate) struct OpaqueSocketHandles {
+    _client: OpaqueSocketHandle,
+    _server: OpaqueSocketHandle,
 }
 
 #[derive(Clone, Copy)]
@@ -747,13 +782,18 @@ impl<'a> TestNet<'a> {
         Addrs { client: self.client.local_subnet.addr, server: self.server.local_subnet.addr }
     }
 
-    pub(crate) async fn run_test<I, S>(&mut self, expected_connectivity: ExpectedConnectivity)
+    /// Returns `OpaqueSocketHandles` so that a previous test case's sockets can be kept alive so
+    /// that subsequent bind calls don't collide with previous cases' ports.
+    pub(crate) async fn run_test<I, S>(
+        &mut self,
+        expected_connectivity: ExpectedConnectivity,
+    ) -> OpaqueSocketHandles
     where
         I: TestIpExt,
         S: SocketType,
     {
         let (sockets, sock_addrs) = S::bind_sockets(self.realms(), self.addrs()).await;
-        S::run_test::<I>(self.realms(), sockets, sock_addrs, expected_connectivity, None).await;
+        S::run_test::<I>(self.realms(), sockets, sock_addrs, expected_connectivity, None).await
     }
 
     /// NB: in order for callers to provide a `setup` that captures its environment,
@@ -764,11 +804,15 @@ impl<'a> TestNet<'a> {
     /// implies the bound.
     ///
     /// See https://stackoverflow.com/a/72673740 for a more thorough explanation.
+    ///
+    /// Returns `OpaqueSocketHandles` so that a previous test case's sockets can be kept alive so
+    /// that subsequent bind calls don't collide with previous cases' ports.
     pub(crate) async fn run_test_with<'params, I, S, F>(
         &'params mut self,
         expected_connectivity: ExpectedConnectivity,
         setup: F,
-    ) where
+    ) -> OpaqueSocketHandles
+    where
         I: TestIpExt,
         S: SocketType,
         F: for<'b> FnOnce(
@@ -779,7 +823,7 @@ impl<'a> TestNet<'a> {
     {
         let (sockets, sock_addrs) = S::bind_sockets(self.realms(), self.addrs()).await;
         setup(self, sock_addrs, &&()).await;
-        S::run_test::<I>(self.realms(), sockets, sock_addrs, expected_connectivity, None).await;
+        S::run_test::<I>(self.realms(), sockets, sock_addrs, expected_connectivity, None).await
     }
 }
 
@@ -1029,88 +1073,91 @@ async fn drop_incoming<I: TestIpExt, M: Matcher>(name: &str, hook: IncomingHook,
 
     // Send from the client to server and back; assert that we have two-way
     // connectivity when no filtering has been configured.
-    net.run_test::<I, M::SocketType>(ExpectedConnectivity::TwoWay).await;
+    let _handles = net.run_test::<I, M::SocketType>(ExpectedConnectivity::TwoWay).await;
 
     // Install a rule that explicitly accepts traffic of a certain type on the
     // incoming hook for both the client and server. This should not change the
     // two-way connectivity because accepting traffic is the default.
-    net.run_test_with::<I, M::SocketType, _>(
-        ExpectedConnectivity::TwoWay,
-        |TestNet { client, server }, addrs, ()| {
-            Box::pin(async move {
-                client
-                    .install_rule_for_incoming_traffic::<I, _>(
-                        LOW_RULE_PRIORITY,
-                        &matcher,
-                        addrs.server_ports(),
-                        Action::Accept,
-                    )
-                    .await;
-                server
-                    .install_rule_for_incoming_traffic::<I, _>(
-                        LOW_RULE_PRIORITY,
-                        &matcher,
-                        addrs.client_ports(),
-                        Action::Accept,
-                    )
-                    .await;
-            })
-        },
-    )
-    .await;
+    let _handles = net
+        .run_test_with::<I, M::SocketType, _>(
+            ExpectedConnectivity::TwoWay,
+            |TestNet { client, server }, addrs, ()| {
+                Box::pin(async move {
+                    client
+                        .install_rule_for_incoming_traffic::<I, _>(
+                            LOW_RULE_PRIORITY,
+                            &matcher,
+                            addrs.server_ports(),
+                            Action::Accept,
+                        )
+                        .await;
+                    server
+                        .install_rule_for_incoming_traffic::<I, _>(
+                            LOW_RULE_PRIORITY,
+                            &matcher,
+                            addrs.client_ports(),
+                            Action::Accept,
+                        )
+                        .await;
+                })
+            },
+        )
+        .await;
 
     // Prepend a rule that *drops* traffic of the same type to the incoming hook on
     // the client. This should still allow traffic to go from the client to the
     // server, but not the reverse.
-    net.run_test_with::<I, M::SocketType, _>(
-        ExpectedConnectivity::ClientToServerOnly,
-        |TestNet { client, server: _ }, addrs, ()| {
-            Box::pin(async move {
-                client
-                    .install_rule_for_incoming_traffic::<I, _>(
-                        MEDIUM_RULE_PRIORITY,
-                        &matcher,
-                        addrs.server_ports(),
-                        Action::Drop,
-                    )
-                    .await;
-            })
-        },
-    )
-    .await;
+    let _handles = net
+        .run_test_with::<I, M::SocketType, _>(
+            ExpectedConnectivity::ClientToServerOnly,
+            |TestNet { client, server: _ }, addrs, ()| {
+                Box::pin(async move {
+                    client
+                        .install_rule_for_incoming_traffic::<I, _>(
+                            MEDIUM_RULE_PRIORITY,
+                            &matcher,
+                            addrs.server_ports(),
+                            Action::Drop,
+                        )
+                        .await;
+                })
+            },
+        )
+        .await;
 
     // Prepend the drop rule to the incoming hook on *both* the client and server.
     // Now neither should be able to reach each other.
-    net.run_test_with::<I, M::SocketType, _>(
-        ExpectedConnectivity::None,
-        |TestNet { client, server }, addrs, ()| {
-            Box::pin(async move {
-                client
-                    .install_rule_for_incoming_traffic::<I, _>(
-                        HIGH_RULE_PRIORITY,
-                        &matcher,
-                        addrs.server_ports(),
-                        Action::Drop,
-                    )
-                    .await;
-                server
-                    .install_rule_for_incoming_traffic::<I, _>(
-                        HIGH_RULE_PRIORITY,
-                        &matcher,
-                        addrs.client_ports(),
-                        Action::Drop,
-                    )
-                    .await;
-            })
-        },
-    )
-    .await;
+    let _handles = net
+        .run_test_with::<I, M::SocketType, _>(
+            ExpectedConnectivity::None,
+            |TestNet { client, server }, addrs, ()| {
+                Box::pin(async move {
+                    client
+                        .install_rule_for_incoming_traffic::<I, _>(
+                            HIGH_RULE_PRIORITY,
+                            &matcher,
+                            addrs.server_ports(),
+                            Action::Drop,
+                        )
+                        .await;
+                    server
+                        .install_rule_for_incoming_traffic::<I, _>(
+                            HIGH_RULE_PRIORITY,
+                            &matcher,
+                            addrs.client_ports(),
+                            Action::Drop,
+                        )
+                        .await;
+                })
+            },
+        )
+        .await;
 
     // Remove all filtering rules; two-way connectivity should now be possible
     // again.
     net.client.clear_filter().await;
     net.server.clear_filter().await;
-    net.run_test::<I, M::SocketType>(ExpectedConnectivity::TwoWay).await;
+    let _handles = net.run_test::<I, M::SocketType>(ExpectedConnectivity::TwoWay).await;
 }
 
 generate_test_cases_for_all_matchers!(drop_incoming, IncomingHook::Ingress, ingress);
@@ -1140,88 +1187,91 @@ async fn drop_outgoing<I: TestIpExt, M: Matcher>(name: &str, hook: OutgoingHook,
 
     // Send from the client to server and back; assert that we have two-way
     // connectivity when no filtering has been configured.
-    net.run_test::<I, M::SocketType>(ExpectedConnectivity::TwoWay).await;
+    let _handles = net.run_test::<I, M::SocketType>(ExpectedConnectivity::TwoWay).await;
 
     // Install a rule that explicitly accepts traffic of a certain type on the local
     // egress hook for both the client and server. This should not change the
     // two-way connectivity because accepting traffic is the default.
-    net.run_test_with::<I, M::SocketType, _>(
-        ExpectedConnectivity::TwoWay,
-        |TestNet { client, server }, addrs, ()| {
-            Box::pin(async move {
-                client
-                    .install_rule_for_outgoing_traffic::<I, _>(
-                        LOW_RULE_PRIORITY,
-                        &matcher,
-                        addrs.client_ports(),
-                        Action::Accept,
-                    )
-                    .await;
-                server
-                    .install_rule_for_outgoing_traffic::<I, _>(
-                        LOW_RULE_PRIORITY,
-                        &matcher,
-                        addrs.server_ports(),
-                        Action::Accept,
-                    )
-                    .await;
-            })
-        },
-    )
-    .await;
+    let _handles = net
+        .run_test_with::<I, M::SocketType, _>(
+            ExpectedConnectivity::TwoWay,
+            |TestNet { client, server }, addrs, ()| {
+                Box::pin(async move {
+                    client
+                        .install_rule_for_outgoing_traffic::<I, _>(
+                            LOW_RULE_PRIORITY,
+                            &matcher,
+                            addrs.client_ports(),
+                            Action::Accept,
+                        )
+                        .await;
+                    server
+                        .install_rule_for_outgoing_traffic::<I, _>(
+                            LOW_RULE_PRIORITY,
+                            &matcher,
+                            addrs.server_ports(),
+                            Action::Accept,
+                        )
+                        .await;
+                })
+            },
+        )
+        .await;
 
     // Prepend a rule that *drops* traffic of the same type to the local egress hook
     // on the server. This should still allow traffic to go from the client to the
     // server, but not the reverse.
-    net.run_test_with::<I, M::SocketType, _>(
-        ExpectedConnectivity::ClientToServerOnly,
-        |TestNet { client: _, server }, addrs, ()| {
-            Box::pin(async move {
-                server
-                    .install_rule_for_outgoing_traffic::<I, _>(
-                        MEDIUM_RULE_PRIORITY,
-                        &matcher,
-                        addrs.server_ports(),
-                        Action::Drop,
-                    )
-                    .await;
-            })
-        },
-    )
-    .await;
+    let _handles = net
+        .run_test_with::<I, M::SocketType, _>(
+            ExpectedConnectivity::ClientToServerOnly,
+            |TestNet { client: _, server }, addrs, ()| {
+                Box::pin(async move {
+                    server
+                        .install_rule_for_outgoing_traffic::<I, _>(
+                            MEDIUM_RULE_PRIORITY,
+                            &matcher,
+                            addrs.server_ports(),
+                            Action::Drop,
+                        )
+                        .await;
+                })
+            },
+        )
+        .await;
 
     // Prepend the drop rule to the local egress hook on *both* the client and
     // server. Now neither should be able to reach each other.
-    net.run_test_with::<I, M::SocketType, _>(
-        ExpectedConnectivity::None,
-        |TestNet { client, server }, addrs, ()| {
-            Box::pin(async move {
-                client
-                    .install_rule_for_outgoing_traffic::<I, _>(
-                        HIGH_RULE_PRIORITY,
-                        &matcher,
-                        addrs.client_ports(),
-                        Action::Drop,
-                    )
-                    .await;
-                server
-                    .install_rule_for_outgoing_traffic::<I, _>(
-                        HIGH_RULE_PRIORITY,
-                        &matcher,
-                        addrs.server_ports(),
-                        Action::Drop,
-                    )
-                    .await;
-            })
-        },
-    )
-    .await;
+    let _handles = net
+        .run_test_with::<I, M::SocketType, _>(
+            ExpectedConnectivity::None,
+            |TestNet { client, server }, addrs, ()| {
+                Box::pin(async move {
+                    client
+                        .install_rule_for_outgoing_traffic::<I, _>(
+                            HIGH_RULE_PRIORITY,
+                            &matcher,
+                            addrs.client_ports(),
+                            Action::Drop,
+                        )
+                        .await;
+                    server
+                        .install_rule_for_outgoing_traffic::<I, _>(
+                            HIGH_RULE_PRIORITY,
+                            &matcher,
+                            addrs.server_ports(),
+                            Action::Drop,
+                        )
+                        .await;
+                })
+            },
+        )
+        .await;
 
     // Remove all filtering rules; two-way connectivity should now be possible
     // again.
     net.client.clear_filter().await;
     net.server.clear_filter().await;
-    net.run_test::<I, M::SocketType>(ExpectedConnectivity::TwoWay).await;
+    let _handles = net.run_test::<I, M::SocketType>(ExpectedConnectivity::TwoWay).await;
 }
 
 generate_test_cases_for_all_matchers!(drop_outgoing, OutgoingHook::LocalEgress, local_egress);
@@ -1648,9 +1698,12 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
         Addrs { client: I::CLIENT_ADDR_WITH_PREFIX.addr, server: I::SERVER_ADDR_WITH_PREFIX.addr }
     }
 
-    async fn run_test<S: SocketType>(&mut self, expected_connectivity: ExpectedConnectivity) {
+    async fn run_test<S: SocketType>(
+        &mut self,
+        expected_connectivity: ExpectedConnectivity,
+    ) -> OpaqueSocketHandles {
         let (sockets, sock_addrs) = S::bind_sockets(self.realms(), Self::addrs()).await;
-        S::run_test::<I>(self.realms(), sockets, sock_addrs, expected_connectivity, None).await;
+        S::run_test::<I>(self.realms(), sockets, sock_addrs, expected_connectivity, None).await
     }
 
     /// NB: in order for callers to provide a `setup` that captures its environment,
@@ -1665,7 +1718,8 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
         &'params mut self,
         expected_connectivity: ExpectedConnectivity,
         setup: F,
-    ) where
+    ) -> OpaqueSocketHandles
+    where
         S: SocketType,
         F: for<'b> FnOnce(
             &'b mut TestRouterNet<'a, I>,
@@ -1675,7 +1729,7 @@ impl<'a, I: RouterTestIpExt> TestRouterNet<'a, I> {
     {
         let (sockets, sock_addrs) = S::bind_sockets(self.realms(), Self::addrs()).await;
         setup(self, sock_addrs, &&()).await;
-        S::run_test::<I>(self.realms(), sockets, sock_addrs, expected_connectivity, None).await;
+        S::run_test::<I>(self.realms(), sockets, sock_addrs, expected_connectivity, None).await
     }
 }
 
@@ -1702,7 +1756,7 @@ async fn forwarded_traffic_skips_local_ingress<I: RouterTestIpExt, M: Matcher>(
 
     // Send from the client to server and back; assert that we have two-way
     // connectivity when no filtering has been configured.
-    net.run_test::<M::SocketType>(ExpectedConnectivity::TwoWay).await;
+    let _handles = net.run_test::<M::SocketType>(ExpectedConnectivity::TwoWay).await;
 
     // Install a rule on either the ingress or local ingress hook on the router that
     // drops traffic from the server to the client. If the rule was installed on the
@@ -1710,40 +1764,42 @@ async fn forwarded_traffic_skips_local_ingress<I: RouterTestIpExt, M: Matcher>(
     // this traffic is being forwarded. If the rule was installed on the ingress
     // hook, this should still allow traffic to go from the client to the server,
     // but not the reverse.
-    net.run_test_with::<M::SocketType, _>(
-        match hook {
-            IncomingHook::Ingress => ExpectedConnectivity::ClientToServerOnly,
-            IncomingHook::LocalIngress => ExpectedConnectivity::TwoWay,
-        },
-        |net, addrs, ()| {
-            Box::pin(async move {
-                net.install_filter_incoming_server_to_client(&matcher, addrs).await;
-            })
-        },
-    )
-    .await;
+    let _handles = net
+        .run_test_with::<M::SocketType, _>(
+            match hook {
+                IncomingHook::Ingress => ExpectedConnectivity::ClientToServerOnly,
+                IncomingHook::LocalIngress => ExpectedConnectivity::TwoWay,
+            },
+            |net, addrs, ()| {
+                Box::pin(async move {
+                    net.install_filter_incoming_server_to_client(&matcher, addrs).await;
+                })
+            },
+        )
+        .await;
 
     // Install a similar rule on the same hook, but which drops traffic from the
     // client to the server. For local ingress, this should again have no effect.
     // For ingress, this should result in neither host being able to reach each
     // other.
-    net.run_test_with::<M::SocketType, _>(
-        match hook {
-            IncomingHook::Ingress => ExpectedConnectivity::None,
-            IncomingHook::LocalIngress => ExpectedConnectivity::TwoWay,
-        },
-        |net, addrs, ()| {
-            Box::pin(async move {
-                net.install_filter_incoming_client_to_server(&matcher, addrs).await;
-            })
-        },
-    )
-    .await;
+    let _handles = net
+        .run_test_with::<M::SocketType, _>(
+            match hook {
+                IncomingHook::Ingress => ExpectedConnectivity::None,
+                IncomingHook::LocalIngress => ExpectedConnectivity::TwoWay,
+            },
+            |net, addrs, ()| {
+                Box::pin(async move {
+                    net.install_filter_incoming_client_to_server(&matcher, addrs).await;
+                })
+            },
+        )
+        .await;
 
     // Remove all filtering rules; two-way connectivity should now be possible
     // again.
     net.clear_filter().await;
-    net.run_test::<M::SocketType>(ExpectedConnectivity::TwoWay).await;
+    let _handles = net.run_test::<M::SocketType>(ExpectedConnectivity::TwoWay).await;
 }
 
 generate_test_cases_for_all_matchers!(
@@ -1780,7 +1836,7 @@ async fn forwarded_traffic_skips_local_egress<I: RouterTestIpExt, M: Matcher>(
 
     // Send from the client to server and back; assert that we have two-way
     // connectivity when no filtering has been configured.
-    net.run_test::<M::SocketType>(ExpectedConnectivity::TwoWay).await;
+    let _handles = net.run_test::<M::SocketType>(ExpectedConnectivity::TwoWay).await;
 
     // Install a rule on either the egress or local egress hook on the router that
     // drops traffic from the server to the client. If the rule was installed on the
@@ -1788,40 +1844,42 @@ async fn forwarded_traffic_skips_local_egress<I: RouterTestIpExt, M: Matcher>(
     // this traffic is being forwarded. If the rule was installed on the egress
     // hook, this should still allow traffic to go from the client to the server,
     // but not the reverse.
-    net.run_test_with::<M::SocketType, _>(
-        match hook {
-            OutgoingHook::LocalEgress => ExpectedConnectivity::TwoWay,
-            OutgoingHook::Egress => ExpectedConnectivity::ClientToServerOnly,
-        },
-        |net, addrs, ()| {
-            Box::pin(async move {
-                net.install_filter_outgoing_server_to_client(&matcher, addrs).await;
-            })
-        },
-    )
-    .await;
+    let _handles = net
+        .run_test_with::<M::SocketType, _>(
+            match hook {
+                OutgoingHook::LocalEgress => ExpectedConnectivity::TwoWay,
+                OutgoingHook::Egress => ExpectedConnectivity::ClientToServerOnly,
+            },
+            |net, addrs, ()| {
+                Box::pin(async move {
+                    net.install_filter_outgoing_server_to_client(&matcher, addrs).await;
+                })
+            },
+        )
+        .await;
 
     // Install a similar rule on the same hook, but which drops traffic from the
     // client to the server. For local ingress, this should again have no effect.
     // For ingress, this should result in neither host being able to reach each
     // other.
-    net.run_test_with::<M::SocketType, _>(
-        match hook {
-            OutgoingHook::LocalEgress => ExpectedConnectivity::TwoWay,
-            OutgoingHook::Egress => ExpectedConnectivity::None,
-        },
-        |net, addrs, ()| {
-            Box::pin(async move {
-                net.install_filter_outgoing_client_to_server(&matcher, addrs).await;
-            })
-        },
-    )
-    .await;
+    let _handles = net
+        .run_test_with::<M::SocketType, _>(
+            match hook {
+                OutgoingHook::LocalEgress => ExpectedConnectivity::TwoWay,
+                OutgoingHook::Egress => ExpectedConnectivity::None,
+            },
+            |net, addrs, ()| {
+                Box::pin(async move {
+                    net.install_filter_outgoing_client_to_server(&matcher, addrs).await;
+                })
+            },
+        )
+        .await;
 
     // Remove all filtering rules; two-way connectivity should now be possible
     // again.
     net.clear_filter().await;
-    net.run_test::<M::SocketType>(ExpectedConnectivity::TwoWay).await;
+    let _handles = net.run_test::<M::SocketType>(ExpectedConnectivity::TwoWay).await;
 }
 
 generate_test_cases_for_all_matchers!(
@@ -1847,35 +1905,37 @@ async fn drop_forwarded<I: RouterTestIpExt, M: Matcher>(name: &str, matcher: M) 
 
     // Send from the client to server and back; assert that we have two-way
     // connectivity when no filtering has been configured.
-    net.run_test::<M::SocketType>(ExpectedConnectivity::TwoWay).await;
+    let _handles = net.run_test::<M::SocketType>(ExpectedConnectivity::TwoWay).await;
 
     // Install a rule on the forwarding hook on the router that drops traffic
     // from the server to the client. This should still allow traffic to go from
     // the client to the server, but not the reverse.
-    net.run_test_with::<M::SocketType, _>(
-        ExpectedConnectivity::ClientToServerOnly,
-        |net, addrs, ()| {
-            Box::pin(async move {
-                net.install_filter_forwarded_server_to_client(&matcher, addrs).await;
-            })
-        },
-    )
-    .await;
+    let _handles = net
+        .run_test_with::<M::SocketType, _>(
+            ExpectedConnectivity::ClientToServerOnly,
+            |net, addrs, ()| {
+                Box::pin(async move {
+                    net.install_filter_forwarded_server_to_client(&matcher, addrs).await;
+                })
+            },
+        )
+        .await;
 
     // Install a similar rule on the same hook, but which drops traffic from the
     // client to the server. This should result in neither host being able to
     // reach each other.
-    net.run_test_with::<M::SocketType, _>(ExpectedConnectivity::None, |net, addrs, ()| {
-        Box::pin(async move {
-            net.install_filter_forwarded_client_to_server(&matcher, addrs).await;
+    let _handles = net
+        .run_test_with::<M::SocketType, _>(ExpectedConnectivity::None, |net, addrs, ()| {
+            Box::pin(async move {
+                net.install_filter_forwarded_client_to_server(&matcher, addrs).await;
+            })
         })
-    })
-    .await;
+        .await;
 
     // Remove all filtering rules; two-way connectivity should now be possible
     // again.
     net.clear_filter().await;
-    net.run_test::<M::SocketType>(ExpectedConnectivity::TwoWay).await;
+    let _handles = net.run_test::<M::SocketType>(ExpectedConnectivity::TwoWay).await;
 }
 
 generate_test_cases_for_all_matchers!(drop_forwarded);
@@ -1893,7 +1953,7 @@ async fn local_traffic_skips_forwarding<I: RouterTestIpExt, M: Matcher>(name: &s
     // connectivity when no filtering has been configured. Having client-server
     // connectivity implies that client-router and server-router connectivity is
     // also established.
-    net.run_test::<M::SocketType>(ExpectedConnectivity::TwoWay).await;
+    let _handles = net.run_test::<M::SocketType>(ExpectedConnectivity::TwoWay).await;
 
     async fn drop_traffic_between_realms<I: RouterTestIpExt, M: Matcher>(
         controller: &mut Controller,
@@ -1931,7 +1991,7 @@ async fn local_traffic_skips_forwarding<I: RouterTestIpExt, M: Matcher>(name: &s
         matcher: &M,
         realms: Realms<'_>,
         subnets: Subnets,
-    ) {
+    ) -> OpaqueSocketHandles {
         let (sockets, sock_addrs) = M::SocketType::bind_sockets(
             realms,
             Addrs { client: subnets.src.addr, server: subnets.dst.addr },
@@ -1954,7 +2014,7 @@ async fn local_traffic_skips_forwarding<I: RouterTestIpExt, M: Matcher>(name: &s
             ExpectedConnectivity::TwoWay,
             None,
         )
-        .await;
+        .await
     }
 
     let TestRouterNet {
@@ -1964,7 +2024,7 @@ async fn local_traffic_skips_forwarding<I: RouterTestIpExt, M: Matcher>(name: &s
     // Dropping traffic between the client and router in the forwarding hook
     // should not affect client-router connectivity, because this traffic is
     // never forwarded; it is always locally-generated and locally-delivered.
-    drop_forwarded_traffic_and_assert_connectivity::<I, M>(
+    let _handles = drop_forwarded_traffic_and_assert_connectivity::<I, M>(
         controller,
         routine.clone(),
         &matcher,
@@ -1980,7 +2040,7 @@ async fn local_traffic_skips_forwarding<I: RouterTestIpExt, M: Matcher>(name: &s
     // Dropping traffic between the server and router in the forwarding hook
     // should not affect server-router connectivity, because this traffic is
     // never forwarded; it is always locally-generated and locally-delivered.
-    drop_forwarded_traffic_and_assert_connectivity::<I, M>(
+    let _handles = drop_forwarded_traffic_and_assert_connectivity::<I, M>(
         controller,
         routine.clone(),
         &matcher,

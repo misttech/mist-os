@@ -7,9 +7,11 @@
 
 #include <fuchsia/hardware/pciroot/c/banjo.h>
 #include <lib/ddk/device.h>
+#include <lib/ddk/driver.h>
 #include <lib/pci/pciroot.h>
 #include <lib/zx/resource.h>
 #include <zircon/compiler.h>
+#include <zircon/errors.h>
 #include <zircon/syscalls/pci.h>
 
 #include <unordered_map>
@@ -45,7 +47,9 @@ struct acpi_legacy_irq {
 zx_status_t get_pci_init_arg(acpi::Acpi* acpi, zx_pci_init_arg_t** arg, uint32_t* size);
 zx_status_t pci_report_current_resources(acpi::Acpi* acpi, zx_handle_t mmio_resource_handle);
 
-class AcpiPciroot : public PcirootBase {
+class AcpiPciroot;
+using AcpiPcirootType = ddk::Device<AcpiPciroot, ddk::GetProtocolable>;
+class AcpiPciroot : public AcpiPcirootType, public PcirootBase {
  public:
   struct Context {
     char name[ACPI_NAMESEG_SIZE + 1];
@@ -70,12 +74,25 @@ class AcpiPciroot : public PcirootBase {
   zx_status_t PcirootWriteConfig16(const pci_bdf_t* address, uint16_t offset, uint16_t value) final;
   zx_status_t PcirootWriteConfig32(const pci_bdf_t* address, uint16_t offset, uint32_t value) final;
 
+  void DdkRelease() { delete this; }
+  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out) {
+    if (proto_id != ZX_PROTOCOL_PCIROOT) {
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+
+    auto* proto = static_cast<ddk::AnyProtocol*>(out);
+    proto->ops = &pciroot_protocol_ops_;
+    proto->ctx = this;
+    return ZX_OK;
+  }
+
  private:
   Context context_;
   std::vector<pci_bdf_t> acpi_bdfs_;
   AcpiPciroot(PciRootHost* root_host, AcpiPciroot::Context ctx, zx_device_t* parent,
               const char* name, std::vector<pci_bdf_t> acpi_bdfs)
-      : PcirootBase(root_host, parent, name),
+      : AcpiPcirootType(parent),
+        PcirootBase(root_host),
         context_(std::move(ctx)),
         acpi_bdfs_(std::move(acpi_bdfs)) {}
   ~AcpiPciroot() override = default;

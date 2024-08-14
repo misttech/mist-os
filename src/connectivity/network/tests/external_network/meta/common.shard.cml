@@ -76,5 +76,11 @@
             from: "#client",
             to: "#expectation-comparer",
         },
+        {
+            from: "void",
+            to: "#device-name-provider",
+            availability: "optional",
+            config: [ "fuchsia.network.PrimaryInterface" ],
+        },
     ],
 }

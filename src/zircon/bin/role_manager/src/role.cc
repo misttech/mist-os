@@ -29,8 +29,8 @@ zx::result<std::unique_ptr<RoleManager>> RoleManager::Create() {
 
   auto config_result = zircon_profile::LoadConfigs(kConfigPath);
   if (config_result.is_error()) {
-    FX_SLOG(ERROR, "Failed to load configs", FX_KV("error", config_result.error_value()),
-            FX_KV("tag", "RoleManager"));
+    FX_LOG_KV(ERROR, "Failed to load configs", FX_KV("error", config_result.error_value()),
+              FX_KV("tag", "RoleManager"));
     return zx::error(ZX_ERR_INTERNAL);
   }
 
@@ -41,8 +41,8 @@ zx::result<std::unique_ptr<RoleManager>> RoleManager::Create() {
       const zx_status_t status =
           zx::profile::create(profile_resource, 0, &iter->second.info, &iter->second.profile);
       if (status != ZX_OK) {
-        FX_SLOG(ERROR, "Failed to create profile for role. Requests for this role will fail.",
-                FX_KV("role", iter->first.name()), FX_KV("status", zx_status_get_string(status)));
+        FX_LOG_KV(ERROR, "Failed to create profile for role. Requests for this role will fail.",
+                  FX_KV("role", iter->first.name()), FX_KV("status", zx_status_get_string(status)));
         iter = profiles.erase(iter);
       } else {
         ++iter;
@@ -56,16 +56,16 @@ zx::result<std::unique_ptr<RoleManager>> RoleManager::Create() {
   const std::string dispatch_role_name = "fuchsia.system.profile-provider.dispatch";
   const fit::result dispatch_role = Role::Create(dispatch_role_name);
   if (dispatch_role.is_error()) {
-    FX_SLOG(ERROR, "Failed to parse dispatch role.",
-            FX_KV("error", zx_status_get_string(dispatch_role.error_value())),
-            FX_KV("tag", "ProfileProvider"));
+    FX_LOG_KV(ERROR, "Failed to parse dispatch role.",
+              FX_KV("error", zx_status_get_string(dispatch_role.error_value())),
+              FX_KV("tag", "ProfileProvider"));
   }
   const auto search = config_result->thread.find(*dispatch_role);
   if (search != config_result->thread.end()) {
     const zx_status_t status = zx::thread::self()->set_profile(search->second.profile, 0);
     if (status != ZX_OK) {
-      FX_SLOG(ERROR, "Failed to set role", FX_KV("error", zx_status_get_string(status)),
-              FX_KV("tag", "RoleManager"));
+      FX_LOG_KV(ERROR, "Failed to set role", FX_KV("error", zx_status_get_string(status)),
+                FX_KV("tag", "RoleManager"));
     }
   }
 
@@ -76,7 +76,7 @@ zx::result<std::unique_ptr<RoleManager>> RoleManager::Create() {
 void RoleManager::handle_unknown_method(
     fidl::UnknownMethodMetadata<fuchsia_scheduler::RoleManager> metadata,
     fidl::UnknownMethodCompleter::Sync& completer) {
-  FX_SLOG(ERROR, "Got request to handle unknown method", FX_KV("tag", "RoleManager"));
+  FX_LOG_KV(ERROR, "Got request to handle unknown method", FX_KV("tag", "RoleManager"));
 }
 
 void RoleManager::LogRequest(SetRoleRequestView request) {
@@ -92,24 +92,24 @@ void RoleManager::LogRequest(SetRoleRequestView request) {
     zx_status_t status = request->target().thread().get_info(ZX_INFO_HANDLE_BASIC, &handle_info,
                                                              sizeof(handle_info), nullptr, nullptr);
     if (status != ZX_OK) {
-      FX_SLOG(ERROR, "Failed to get info for thread: ", FX_KV("role", role_name),
-              FX_KV("status", status), FX_KV("tag", "RoleManager"));
+      FX_LOG_KV(ERROR, "Failed to get info for thread: ", FX_KV("role", role_name),
+                FX_KV("status", status), FX_KV("tag", "RoleManager"));
       return;
     }
-    FX_SLOG(DEBUG, "Role requested for thread:", FX_KV("role", role_name),
-            FX_KV("pid", handle_info.related_koid), FX_KV("tid", handle_info.koid),
-            FX_KV("tag", "RoleManager"));
+    FX_LOG_KV(DEBUG, "Role requested for thread:", FX_KV("role", role_name),
+              FX_KV("pid", handle_info.related_koid), FX_KV("tid", handle_info.koid),
+              FX_KV("tag", "RoleManager"));
   } else if (request->target().is_vmar()) {
     zx_status_t status = request->target().vmar().get_info(ZX_INFO_HANDLE_BASIC, &handle_info,
                                                            sizeof(handle_info), nullptr, nullptr);
     if (status != ZX_OK) {
-      FX_SLOG(ERROR, "Failed to get info for vmar: ", FX_KV("role", role_name),
-              FX_KV("status", status), FX_KV("tag", "RoleManager"));
+      FX_LOG_KV(ERROR, "Failed to get info for vmar: ", FX_KV("role", role_name),
+                FX_KV("status", status), FX_KV("tag", "RoleManager"));
       return;
     }
-    FX_SLOG(DEBUG, "Role requested for vmar:", FX_KV("role", role_name),
-            FX_KV("pid", handle_info.related_koid), FX_KV("koid", handle_info.koid),
-            FX_KV("tag", "RoleManager"));
+    FX_LOG_KV(DEBUG, "Role requested for vmar:", FX_KV("role", role_name),
+              FX_KV("pid", handle_info.related_koid), FX_KV("koid", handle_info.koid),
+              FX_KV("tag", "RoleManager"));
   }
 }
 
@@ -132,8 +132,8 @@ void RoleManager::SetRole(SetRoleRequestView request, SetRoleCompleter::Sync& co
     std::optional<std::vector<fuchsia_scheduler::Parameter>> maybe_input_params =
         fidl::ToNatural(request->input_parameters());
     if (!maybe_input_params.has_value()) {
-      FX_SLOG(WARNING, "Unable to take ownership of input parameters.", FX_KV("role", role_name),
-              FX_KV("tag", "RoleManager"));
+      FX_LOG_KV(WARNING, "Unable to take ownership of input parameters.", FX_KV("role", role_name),
+                FX_KV("tag", "RoleManager"));
       completer.ReplyError(ZX_ERR_INVALID_ARGS);
       return;
     }
@@ -162,7 +162,7 @@ void RoleManager::SetRole(SetRoleRequestView request, SetRoleCompleter::Sync& co
     return;
   }
 
-  FX_SLOG(DEBUG, "Requested role not found", FX_KV("role", role->name()),
-          FX_KV("tag", "RoleManager"));
+  FX_LOG_KV(DEBUG, "Requested role not found", FX_KV("role", role->name()),
+            FX_KV("tag", "RoleManager"));
   completer.ReplyError(ZX_ERR_NOT_FOUND);
 }

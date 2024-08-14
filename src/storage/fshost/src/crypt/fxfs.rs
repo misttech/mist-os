@@ -6,7 +6,8 @@ use super::{format_sources, get_policy, unseal_sources, KeyConsumer};
 use anyhow::{anyhow, Context, Error};
 use fidl::endpoints::{ClientEnd, Proxy};
 use fidl_fuchsia_component::{self as fcomponent, RealmMarker};
-use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose, MountOptions};
+use fidl_fuchsia_fs_startup::MountOptions;
+use fidl_fuchsia_fxfs::{CryptManagementMarker, CryptMarker, KeyPurpose};
 use fs_management::filesystem::{ServingMultiVolumeFilesystem, ServingVolume};
 use fuchsia_component::client::{
     connect_to_protocol, connect_to_protocol_at_dir_root, open_childs_exposed_directory,
@@ -79,7 +80,7 @@ pub async fn unlock_data_volume<'a>(
         fs.check_volume("unencrypted", None).await.context("Failed to verify unencrypted")?;
     }
     let root_vol = fs
-        .open_volume("unencrypted", MountOptions { crypt: None, as_blob: false })
+        .open_volume("unencrypted", MountOptions::default())
         .await
         .context("Failed to open unencrypted")?;
     let keybag_dir = fuchsia_fs::directory::open_directory(
@@ -110,7 +111,7 @@ pub async fn unlock_data_volume<'a>(
     let crypt = Some(crypt_service.connect());
 
     let volume = fs
-        .open_volume("data", MountOptions { crypt, as_blob: false })
+        .open_volume("data", MountOptions { crypt, ..MountOptions::default() })
         .await
         .context("Failed to open data")?;
 
@@ -125,7 +126,7 @@ pub async fn init_data_volume<'a>(
 ) -> Result<(CryptService, String, &'a mut ServingVolume), Error> {
     // Open up the unencrypted volume so that we can access the key-bag for data.
     let root_vol = fs
-        .create_volume("unencrypted", MountOptions { crypt: None, as_blob: false })
+        .create_volume("unencrypted", MountOptions::default())
         .await
         .context("Failed to create unencrypted")?;
     let keybag_dir = fuchsia_fs::directory::create_directory(
@@ -148,7 +149,7 @@ pub async fn init_data_volume<'a>(
     let crypt = Some(crypt_service.connect());
 
     let volume = fs
-        .create_volume("data", MountOptions { crypt, as_blob: false })
+        .create_volume("data", MountOptions { crypt, ..MountOptions::default() })
         .await
         .context("Failed to create data")?;
 

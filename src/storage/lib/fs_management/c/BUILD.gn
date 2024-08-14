@@ -4,6 +4,7 @@
 
 static_library("fvm") {
   sources = [ "fvm.cc" ]
+  public = [ "fvm.h" ]
   deps = [ "//src/storage/lib/fs_management" ]
 }
 

@@ -397,4 +397,8 @@ pub struct BoardInputBundleArgs {
     /// thermal management configuration
     #[argh(option)]
     pub thermal_config: Option<Utf8PathBuf>,
+
+    /// thread role configuration files
+    #[argh(option)]
+    pub thread_roles: Vec<Utf8PathBuf>,
 }

@@ -4,11 +4,15 @@
 
 #![cfg(test)]
 
-use selinux_core::security_server::{Mode, SecurityServer};
+use crate::security::selinux_hooks::XATTR_NAME_SELINUX;
+use crate::security::{SecurityId, SecurityServer};
+use crate::testing::AutoReleasableTask;
+use crate::vfs::{FsNode, NamespaceNode, XattrOp};
+use selinux_core::security_server::Mode;
+use starnix_sync::{Locked, Unlocked};
+use starnix_uapi::device_type::DeviceType;
+use starnix_uapi::file_mode::FileMode;
 use std::sync::Arc;
-
-use crate::vfs::FsNode;
-use selinux_core::SecurityId;
 
 /// Returns the security id currently stored in `fs_node`, if any. This API should only be used
 /// by code that is responsible for controlling the cached security id; e.g., to check its
@@ -29,4 +33,28 @@ pub fn security_server_with_policy() -> Arc<SecurityServer> {
     security_server.set_enforcing(true);
     security_server.load_policy(policy_bytes).expect("policy load failed");
     security_server
+}
+
+pub fn create_test_executable(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &AutoReleasableTask,
+    security_context: &[u8],
+) -> NamespaceNode {
+    let namespace_node = current_task
+        .fs()
+        .root()
+        .create_node(locked, &current_task, "executable".into(), FileMode::IFREG, DeviceType::NONE)
+        .expect("create_node(file)");
+    let fs_node = &namespace_node.entry.node;
+    fs_node
+        .ops()
+        .set_xattr(
+            fs_node,
+            current_task,
+            XATTR_NAME_SELINUX.to_bytes().into(),
+            security_context.into(),
+            XattrOp::Set,
+        )
+        .expect("set security.selinux xattr");
+    namespace_node
 }

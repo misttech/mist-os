@@ -10,6 +10,12 @@
     ],
     offer: [
         {
+            from: "parent",
+            to: "#device_name_provider",
+            config: [ "fuchsia.network.PrimaryInterface" ],
+            availability: "optional",
+        },
+        {
             protocol: [
                 "fuchsia.boot.Arguments",
                 "fuchsia.boot.WriteOnlyLog",

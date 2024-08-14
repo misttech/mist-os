@@ -4,8 +4,14 @@
 
 #include "src/storage/minfs/inspector/inspector_inode.h"
 
-#include <disk_inspector/common_types.h>
+#include <zircon/assert.h>
 
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+
+#include "src/storage/lib/disk_inspector/disk_inspector.h"
+#include "src/storage/minfs/format.h"
 #include "src/storage/minfs/inspector/inspector_private.h"
 
 namespace minfs {

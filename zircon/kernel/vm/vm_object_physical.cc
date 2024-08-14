@@ -270,25 +270,3 @@ zx_status_t VmObjectPhysical::SetMappingCachePolicy(const uint32_t cache_policy)
   mapping_cache_flags_ = cache_policy;
   return ZX_OK;
 }
-
-zx_status_t VmObjectPhysical::CacheOp(const uint64_t offset, const uint64_t len,
-                                      const CacheOpType type) {
-  if (unlikely(len == 0)) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-  if (unlikely(!InRange(offset, len, size_))) {
-    return ZX_ERR_OUT_OF_RANGE;
-  }
-
-  // Check if this physical VMO is present in the physmap.
-  if (unlikely(!is_physmap_phys_addr(base_))) {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-
-  // For syncing instruction caches there may be work that is more efficient to batch together, and
-  // so we use an abstract consistency manager to optimize it for the given architecture.
-  ArchVmICacheConsistencyManager sync_cm;
-
-  CacheOpPhys(base_ + offset, len, type, sync_cm);
-  return ZX_OK;
-}

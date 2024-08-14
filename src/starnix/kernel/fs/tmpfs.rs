@@ -10,7 +10,6 @@ use crate::vfs::{
     FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
     FsNodeOps, FsStr, MemoryFileNode, MemoryXattrStorage, SymlinkNode,
 };
-use bstr::B;
 use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, MutexGuard};
 use starnix_uapi::auth::FsCred;
@@ -131,18 +130,18 @@ impl TmpFs {
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let fs = FileSystem::new(kernel, CacheMode::Permanent, Arc::new(TmpFs(())), options)?;
-        let mut mount_options = fs_args::generic_parse_mount_options(fs.options.params.as_ref())?;
-        let mode = if let Some(mode) = mount_options.remove(B("mode")) {
+        let mut mount_options = fs.options.params.clone();
+        let mode = if let Some(mode) = mount_options.remove(b"mode") {
             FileMode::from_string(mode.as_ref())?
         } else {
             mode!(IFDIR, 0o777)
         };
-        let uid = if let Some(uid) = mount_options.remove(B("uid")) {
+        let uid = if let Some(uid) = mount_options.remove(b"uid") {
             fs_args::parse::<uid_t>(uid.as_ref())?
         } else {
             0
         };
-        let gid = if let Some(gid) = mount_options.remove(B("gid")) {
+        let gid = if let Some(gid) = mount_options.remove(b"gid") {
             fs_args::parse::<gid_t>(gid.as_ref())?
         } else {
             0
@@ -159,10 +158,7 @@ impl TmpFs {
                 TODO("https://fxbug.dev/322873419"),
                 "unknown tmpfs options, see logs for strings"
             );
-            log_warn!(
-                "Unknown tmpfs options: {}",
-                itertools::join(mount_options.iter().map(|(k, v)| format!("{k}={v}")), ",")
-            );
+            log_warn!("Unknown tmpfs options: {}", mount_options);
         }
 
         Ok(fs)
@@ -347,6 +343,7 @@ mod test {
     use super::*;
     use crate::testing::*;
     use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
+    use crate::vfs::fs_args::MountParams;
     use crate::vfs::{FdNumber, UnlinkKind};
     use starnix_uapi::errno;
     use starnix_uapi::file_mode::AccessCheck;
@@ -600,7 +597,8 @@ mod test {
             FileSystemOptions {
                 source: Default::default(),
                 flags: MountFlags::empty(),
-                params: b"mode=0123,uid=42,gid=84".into(),
+                params: MountParams::parse(b"mode=0123,uid=42,gid=84".into())
+                    .expect("parsed correctly"),
             },
         )
         .expect("new_fs");

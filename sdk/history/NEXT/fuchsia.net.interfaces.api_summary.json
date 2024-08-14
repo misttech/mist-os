@@ -22,23 +22,6 @@
         "name": "fuchsia.net.interfaces/Address"
     },
     {
-        "kind": "union/member",
-        "name": "fuchsia.net.interfaces/DeviceClass.device",
-        "ordinal": "2",
-        "type": "fuchsia.hardware.network/DeviceClass"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.net.interfaces/DeviceClass.loopback",
-        "ordinal": "1",
-        "type": "fuchsia.net.interfaces/Empty"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.net.interfaces/DeviceClass",
-        "strictness": "strict"
-    },
-    {
         "kind": "struct",
         "name": "fuchsia.net.interfaces/Empty"
     },
@@ -122,12 +105,6 @@
         "name": "fuchsia.net.interfaces/Properties.addresses",
         "ordinal": "2",
         "type": "vector<fuchsia.net.interfaces/Address>"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.net.interfaces/Properties.device_class",
-        "ordinal": "4",
-        "type": "fuchsia.net.interfaces/DeviceClass"
     },
     {
         "kind": "table/member",

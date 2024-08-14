@@ -46,12 +46,13 @@ mod fuchsia_details {
     // i.e. we start at Unregistered, move to Finished, and for a time we may be Registered, or not.
     // The or not case happens when we get the receive_packet callback *before* we record the registration on
     // the WaitEnder instance.
-    #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
     enum Registration {
         // Wait registration not yet recorded.
         Unregistered,
         // Wait registered. We expect to receive_packet sometime in the future.
-        Registered(fasync::ReceiverRegistration<WaitEnder>),
+        // Hold onto the [`ReceiverRegistration`], as dropping it would cause
+        // deregistration.
+        Registered { _receiver: fasync::ReceiverRegistration<WaitEnder> },
         // We have gotten a receive_packet callback.
         Finished,
     }
@@ -88,7 +89,7 @@ mod fuchsia_details {
         ) {
             let mut lock = self.registration.lock();
             if let Registration::Finished =
-                std::mem::replace(&mut *lock, Registration::Registered(registration))
+                std::mem::replace(&mut *lock, Registration::Registered { _receiver: registration })
             {
                 // Need to be able to cope with the callback coming before we reach this code and finish
                 // the cycle holding our registration.

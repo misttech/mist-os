@@ -18,7 +18,6 @@
 #include <zircon/status.h>
 #include <zircon/types.h>
 
-#include <cmath>
 #include <thread>
 
 #include <fbl/auto_lock.h>
@@ -393,7 +392,7 @@ zx_status_t UsbHidbus::Bind(ddk::UsbProtocolClient usbhid,
                endptin->b_interval);
         return ZX_ERR_OUT_OF_RANGE;
       }
-      info_builder.polling_rate(static_cast<uint64_t>(pow(2, endptin->b_interval - 1)) *
+      info_builder.polling_rate((uint64_t{1} << (endptin->b_interval - 1)) *
                                 zx::usec(125).to_usecs());
       break;
     default:

@@ -5,13 +5,17 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_JOURNAL_INSPECTOR_JOURNAL_ENTRIES_H_
 #define SRC_STORAGE_LIB_VFS_CPP_JOURNAL_INSPECTOR_JOURNAL_ENTRIES_H_
 
+#include <zircon/assert.h>
+
 #include <array>
 #include <cstddef>
-#include <functional>
+#include <cstdint>
+#include <memory>
+#include <utility>
 
-#include <disk_inspector/common_types.h>
-#include <fbl/string_printf.h>
+#include <fbl/string.h>
 
+#include "src/storage/lib/disk_inspector/disk_inspector.h"
 #include "src/storage/lib/vfs/cpp/journal/format.h"
 #include "src/storage/lib/vfs/cpp/journal/inspector_journal.h"
 

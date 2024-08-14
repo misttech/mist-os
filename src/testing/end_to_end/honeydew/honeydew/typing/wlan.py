@@ -227,6 +227,19 @@ class QueryIfaceResponse:
     sta_addr: list[int]
 
 
+class InformationElementType(enum.IntEnum):
+    """Information Element type.
+
+    As defined by IEEE 802.11-1997 Section 7.3.2 and further expanded by
+    802.11d, 802.11g, 802.11h, and 802.11i.
+
+    https://www.oreilly.com/library/view/80211-wireless-networks/0596100523/ch04.html#wireless802dot112-CHP-4-TABLE-7
+    """
+
+    SSID = 0
+    # Types 1-255 are not implemented. Only implement a new type if it is being used.
+
+
 @dataclass(frozen=True)
 class BssDescription:
     """BssDescription

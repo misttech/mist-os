@@ -20,43 +20,42 @@ namespace adb_file_sync {
 
 zx_status_t AdbFileSync::StartService(adb_file_sync_config::Config config) {
   FX_LOGS(DEBUG) << "Starting ADB File Sync Service";
-  std::unique_ptr file_sync = std::make_unique<AdbFileSync>(std::move(config));
+  async::Loop loop{&kAsyncLoopConfigNeverAttachToThread};
+  AdbFileSync file_sync(std::move(config), loop.dispatcher());
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_sys2::RealmQuery>();
   if (endpoints.is_error()) {
     FX_LOGS(ERROR) << "Could not create endpoints " << endpoints.error_value();
     return endpoints.error_value();
   }
-  auto status = file_sync->context_->svc()->Connect("fuchsia.sys2.RealmQuery.root",
-                                                    endpoints->server.TakeChannel());
+  auto status = file_sync.context_->svc()->Connect("fuchsia.sys2.RealmQuery.root",
+                                                   endpoints->server.TakeChannel());
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "Could not connect to cache RealmQuery " << status;
     return status;
   }
-  file_sync->realm_query_.Bind(std::move(endpoints->client));
+  file_sync.realm_query_.Bind(std::move(endpoints->client));
 
   auto lifecycle_ep = fidl::CreateEndpoints<fuchsia_sys2::LifecycleController>();
   if (lifecycle_ep.is_error()) {
     FX_LOGS(ERROR) << "Could not create endpoints " << lifecycle_ep.error_value();
     return lifecycle_ep.error_value();
   }
-  status = file_sync->context_->svc()->Connect("fuchsia.sys2.LifecycleController.root",
-                                               lifecycle_ep->server.TakeChannel());
+  status = file_sync.context_->svc()->Connect("fuchsia.sys2.LifecycleController.root",
+                                              lifecycle_ep->server.TakeChannel());
   if (status != ZX_OK) {
     FX_LOGS(ERROR) << "Could not connect to cache RealmQuery " << status;
     return status;
   }
-  file_sync->lifecycle_.Bind(std::move(lifecycle_ep->client));
+  file_sync.lifecycle_.Bind(std::move(lifecycle_ep->client));
 
-  component::OutgoingDirectory outgoing =
-      component::OutgoingDirectory(file_sync->loop_.dispatcher());
+  component::OutgoingDirectory outgoing = component::OutgoingDirectory(loop.dispatcher());
 
   auto result = outgoing.AddUnmanagedProtocol<fuchsia_hardware_adb::Provider>(
-      [file_sync_ptr =
-           file_sync.get()](fidl::ServerEnd<fuchsia_hardware_adb::Provider> server_end) {
-        file_sync_ptr->binding_ref_.emplace(fidl::BindServer(file_sync_ptr->loop_.dispatcher(),
-                                                             std::move(server_end), file_sync_ptr,
-                                                             std::mem_fn(&AdbFileSync::OnUnbound)));
+      [&file_sync, &loop](fidl::ServerEnd<fuchsia_hardware_adb::Provider> server_end) {
+        file_sync.binding_ref_.emplace(fidl::BindServer(loop.dispatcher(), std::move(server_end),
+                                                        &file_sync,
+                                                        std::mem_fn(&AdbFileSync::OnUnbound)));
       });
   if (result.is_error()) {
     FX_LOGS(ERROR) << "Could not publish service " << result.error_value();
@@ -69,7 +68,7 @@ zx_status_t AdbFileSync::StartService(adb_file_sync_config::Config config) {
     return result.error_value();
   }
 
-  file_sync->loop_.JoinThreads();
+  loop.Run();
   return ZX_OK;
 }
 

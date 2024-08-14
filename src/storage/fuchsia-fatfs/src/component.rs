@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{bail, Context, Error};
+use block_client::RemoteBlockClientSync;
 use fidl::endpoints::{ClientEnd, DiscoverableProtocolMarker, RequestStream};
 use fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream};
 use fidl_fuchsia_fs_startup::{
@@ -13,7 +14,6 @@ use fidl_fuchsia_process_lifecycle::{LifecycleRequest, LifecycleRequestStream};
 use fuchsia_fatfs::{fatfs_error_to_status, FatDirectory, FatFs};
 use futures::lock::Mutex;
 use futures::TryStreamExt;
-use remote_block_device::RemoteBlockClientSync;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 use vfs::directory::entry_container::Directory;
@@ -182,7 +182,7 @@ impl Component {
         state.stop(&self.outgoing_dir).await;
 
         let remote_block_client = RemoteBlockClientSync::new(device)?;
-        let device = remote_block_device::Cache::new(remote_block_client)?;
+        let device = block_client::Cache::new(remote_block_client)?;
 
         // Start the filesystem and open the root directory.
         let fs = FatFs::new(Box::new(device)).map_err(|_| zx::Status::IO)?;

@@ -39,6 +39,7 @@ rustc_library("ebpf") {
   with_unit_tests = true
 
   test_deps = [
+    "//third_party/rust_crates:libc",
     "//third_party/rust_crates:pest",
     "//third_party/rust_crates:pest_derive",
     "//third_party/rust_crates:test-case",
@@ -47,13 +48,16 @@ rustc_library("ebpf") {
   inputs = [
     "src/test_grammar.pest",
     "src/tests/err-offset-overflow.data",
+    "src/tests/err-read-only-helper.data",
     "src/tests/err-write-r10.data",
     "src/tests/exponential-verification.data",
+    "src/tests/forget-release.data",
+    "src/tests/malloc-double-free.data",
+    "src/tests/malloc-use-free.data",
     "src/tests/null-checks-propagated.data",
     "src/tests/read-only-helper.data",
-    "src/tests/write-only-helper.data",
-    "src/tests/err-read-only-helper.data",
     "src/tests/stack-access.data",
+    "src/tests/write-only-helper.data",
     "//third_party/ubpf/src/tests/add64.data",
     "//third_party/ubpf/src/tests/add.data",
     "//third_party/ubpf/src/tests/alu64-arith.data",

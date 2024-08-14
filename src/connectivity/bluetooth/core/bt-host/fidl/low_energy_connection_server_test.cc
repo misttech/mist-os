@@ -263,9 +263,10 @@ TEST_F(LowEnergyConnectionServerAutoStartTest, GetCodecLocalDelayMissingParams) 
 TEST_F(LowEnergyConnectionServerAutoStartTest, GetCodecLocalDelayCommandNotSupported) {
   // Disable the Read Local Supported Controller Delay instruction
   bt::testing::FakeController::Settings settings;
-  constexpr size_t kReadLocalSupportedControllerDelayOctet = 45;
-  settings.supported_commands[kReadLocalSupportedControllerDelayOctet] &=
-      ~static_cast<uint8_t>(bt::hci_spec::SupportedCommand::kReadLocalSupportedControllerDelay);
+  pw::bluetooth::emboss::MakeSupportedCommandsView(settings.supported_commands,
+                                                   sizeof(settings.supported_commands))
+      .read_local_supported_controller_delay()
+      .Write(false);
   test_device()->set_settings(settings);
 
   ::fuchsia::bluetooth::le::CodecDelayGetCodecLocalDelayRangeRequest params =

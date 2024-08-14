@@ -347,12 +347,24 @@ impl FdTable {
         }
     }
 
-    pub fn get_fd_flags(&self, fd: FdNumber) -> Result<FdFlags, Errno> {
+    pub fn get_fd_flags_allowing_opath(&self, fd: FdNumber) -> Result<FdFlags, Errno> {
         self.get_allowing_opath_with_flags(fd).map(|(_file, flags)| flags)
     }
 
     pub fn set_fd_flags(&self, fd: FdNumber, flags: FdFlags) -> Result<(), Errno> {
         profile_duration!("SetFdFlags");
+        self.inner.lock().store.lock().get_mut(fd).ok_or_else(|| errno!(EBADF)).map(|entry| {
+            if entry.file.flags().contains(OpenFlags::PATH) {
+                error!(EBADF)
+            } else {
+                entry.flags = flags;
+                Ok(())
+            }
+        })?
+    }
+
+    pub fn set_fd_flags_allowing_opath(&self, fd: FdNumber, flags: FdFlags) -> Result<(), Errno> {
+        profile_duration!("SetFdFlagsAllowingOpath");
         self.inner
             .lock()
             .store
@@ -453,9 +465,9 @@ mod test {
         assert!(files.get(fd2).is_err());
         assert!(forked.get(fd2).is_err());
 
-        files.set_fd_flags(fd0, FdFlags::CLOEXEC).unwrap();
-        assert_eq!(FdFlags::CLOEXEC, files.get_fd_flags(fd0).unwrap());
-        assert_ne!(FdFlags::CLOEXEC, forked.get_fd_flags(fd0).unwrap());
+        files.set_fd_flags_allowing_opath(fd0, FdFlags::CLOEXEC).unwrap();
+        assert_eq!(FdFlags::CLOEXEC, files.get_fd_flags_allowing_opath(fd0).unwrap());
+        assert_ne!(FdFlags::CLOEXEC, forked.get_fd_flags_allowing_opath(fd0).unwrap());
 
         forked.release(());
         files.release(());
@@ -470,7 +482,7 @@ mod test {
         let fd0 = add(&current_task, &files, file.clone()).unwrap();
         let fd1 = add(&current_task, &files, file).unwrap();
 
-        files.set_fd_flags(fd0, FdFlags::CLOEXEC).unwrap();
+        files.set_fd_flags_allowing_opath(fd0, FdFlags::CLOEXEC).unwrap();
 
         assert!(files.get(fd0).is_ok());
         assert!(files.get(fd1).is_ok());

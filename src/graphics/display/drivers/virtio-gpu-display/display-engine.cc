@@ -419,8 +419,6 @@ zx::result<> DisplayEngine::ReleaseCapture(display::DriverCaptureImageId capture
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
-bool DisplayEngine::IsCaptureCompleted() { return false; }
-
 zx::result<> DisplayEngine::SetMinimumRgb(uint8_t minimum_rgb) {
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }

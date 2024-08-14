@@ -8,14 +8,16 @@
 #ifndef SRC_STORAGE_MINFS_INSPECTOR_INSPECTOR_PRIVATE_H_
 #define SRC_STORAGE_MINFS_INSPECTOR_INSPECTOR_PRIVATE_H_
 
-#include <sys/stat.h>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <utility>
 
-#include <disk_inspector/common_types.h>
-#include <fbl/unique_fd.h>
+#include <fbl/string.h>
 
-#include "src/storage/lib/vfs/cpp/journal/format.h"
-#include "src/storage/minfs/allocator/inode_manager.h"
-#include "src/storage/minfs/format.h"
+#include "src/storage/lib/disk_inspector/common_types.h"
+#include "src/storage/lib/disk_inspector/disk_inspector.h"
+#include "src/storage/minfs/minfs_private.h"
 #include "src/storage/minfs/runner.h"
 
 namespace minfs {

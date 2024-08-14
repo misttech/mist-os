@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 {
     include: [
-        "//sdk/lib/driver_test_realm/meta/realm_builder.shard.cml",
         "sys/component/realm_builder.shard.cml",
         "syslog/client.shard.cml",
         "trace/client.shard.cml",
@@ -13,26 +12,45 @@
         binary: "bin/driver_test_realm",
     },
     capabilities: [
-        // From #realm_builder to test.
         {
             protocol: [
-                "fuchsia.device.manager.Administrator",
                 "fuchsia.device.manager.SystemStateTransition",
-                "fuchsia.driver.development.Manager",
-                "fuchsia.driver.registrar.DriverRegistrar",
                 "fuchsia.driver.test.Realm",
-                "fuchsia.inspect.InspectSink",
             ],
+        },
+
+        // From #realm_builder to test.
+        {
+            protocol: "fuchsia.device.manager.Administrator",
+            path: "/realm_builder_exposed_dir/fuchsia.device.manager.Administrator",
+        },
+        {
+            protocol: "fuchsia.driver.development.Manager",
+            path: "/realm_builder_exposed_dir/fuchsia.driver.development.Manager",
+        },
+        {
+            protocol: "fuchsia.driver.registrar.DriverRegistrar",
+            path: "/realm_builder_exposed_dir/fuchsia.driver.registrar.DriverRegistrar",
+        },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            path: "/realm_builder_exposed_dir/fuchsia.inspect.InspectSink",
         },
         {
             directory: "dev-topological",
             rights: [ "r*" ],
-            path: "/dev-topological",
+            path: "/realm_builder_exposed_dir/dev-topological",
         },
         {
             directory: "dev-class",
             rights: [ "r*" ],
-            path: "/dev-class",
+            path: "/realm_builder_exposed_dir/dev-class",
+        },
+
+        // TODO(https://fxbug.dev/357251576): expose this in a better way
+        {
+            service: "fuchsia.hardware.ramdisk.Service",
+            path: "/realm_builder_exposed_dir/fuchsia.hardware.ramdisk.Service",
         },
 
         // From DTR to #realm_builder
@@ -53,9 +71,6 @@
             rights: [ "rx*" ],
             path: "/pkg_drivers",
         },
-
-        // TODO(https://fxbug.dev/357251576): expose this in a better way
-        { service: "fuchsia.hardware.ramdisk.Service" },
     ],
     use: [
         // Provided by the parent when it wants to override the DTR

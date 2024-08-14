@@ -305,8 +305,15 @@ func (cmd upCommand) execute(ctx context.Context, buildDir string) error {
 	if err != nil {
 		return err
 	}
-	_, err = out.Write(data)
-	return err
+	if _, err := out.Write(data); err != nil {
+		return err
+	}
+
+	if collisions := checkForCollisions(ctx, uploads); len(collisions) > 0 {
+		return fmt.Errorf("multiple files point to the same destinations: %v\n"+
+			"Colliding entries can be found in the generated upload manifest.", collisions)
+	}
+	return nil
 }
 
 // filterNonExistentFiles filters out files which do not exist. The associated
@@ -328,4 +335,22 @@ func filterNonExistentFiles(ctx context.Context, uploads []artifactory.Upload) (
 		filtered = append(filtered, u)
 	}
 	return filtered, nil
+}
+
+func checkForCollisions(ctx context.Context, uploads []artifactory.Upload) []string {
+	numUploadsPerDest := make(map[string]int)
+	for _, u := range uploads {
+		if u.Deduplicate {
+			// Deduplicate means collisions are ok, so ignore.
+			continue
+		}
+		numUploadsPerDest[u.Destination] += 1
+	}
+	var collisions []string
+	for dest, numUploads := range numUploadsPerDest {
+		if numUploads > 1 {
+			collisions = append(collisions, dest)
+		}
+	}
+	return collisions
 }

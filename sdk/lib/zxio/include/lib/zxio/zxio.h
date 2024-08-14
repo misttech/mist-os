@@ -421,19 +421,6 @@ ZXIO_EXPORT zx_status_t zxio_shutdown(zxio_t* io, zxio_shutdown_options_t option
 ZXIO_EXPORT zx_status_t zxio_open(zxio_t* directory, uint32_t flags, const char* path,
                                   size_t path_len, zxio_storage_t* storage);
 
-// EXPERIMENTAL: This is not widely supported.
-//
-// Open a new zxio object relative to the given |directory| and initialize it
-// into |storage|.
-//
-// This call blocks on the remote server.
-//
-// See fuchsia.io/Directory.Open2 for precise semantics. |inout_attr| if specified, indicates
-// attributes to be returned upon successful open.
-ZXIO_EXPORT zx_status_t zxio_open2(zxio_t* directory, const char* path, size_t path_len,
-                                   const zxio_open2_options_t* options,
-                                   zxio_node_attributes_t* inout_attr, zxio_storage_t* storage);
-
 // Open a new zxio object relative to the given |directory| and initialize it into |storage|.
 //
 // This call blocks on the remote server.

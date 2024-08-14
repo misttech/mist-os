@@ -9,19 +9,25 @@ import os
 import shutil
 import stat
 import tempfile
+import time
 from importlib import resources
 from typing import Any
 
 from honeydew import errors
+from honeydew.interfaces.auxiliary_devices import (
+    power_switch as power_switch_interface,
+)
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.interfaces.transports import fastboot as fastboot_interface
 from honeydew.interfaces.transports import ffx as ffx_interface
+from honeydew.interfaces.transports import serial as serial_interface
 from honeydew.utils import common, host_shell, properties
 
 _FASTBOOT_PATH_ENV_VAR = "HONEYDEW_FASTBOOT_OVERRIDE"
 
 _FASTBOOT_CMDS: dict[str, list[str]] = {
     "BOOT_TO_FUCHSIA_MODE": ["reboot"],
+    "IS_IN_FASTBOOT_MODE": ["getvar", "serialno"],
 }
 
 _FFX_CMDS: dict[str, list[str]] = {
@@ -94,8 +100,8 @@ class Fastboot(fastboot_interface.Fastboot):
             reboot_affordance
         )
         self._ffx_transport: ffx_interface.FFX = ffx_transport
+        self._fastboot_binary: str = _get_fastboot_binary()
         self._get_fastboot_node(fastboot_node_id)
-        self._fastboot_binary = _get_fastboot_binary()
 
     # List all the public properties
     @properties.PersistentProperty
@@ -108,33 +114,54 @@ class Fastboot(fastboot_interface.Fastboot):
         return self._fastboot_node_id
 
     # List all the public methods
-    def boot_to_fastboot_mode(self) -> None:
+    def boot_to_fastboot_mode(
+        self,
+        use_serial: bool = False,
+        serial_transport: serial_interface.Serial | None = None,
+        power_switch: power_switch_interface.PowerSwitch | None = None,
+        outlet: int | None = None,
+    ) -> None:
         """Boot the device to fastboot mode from fuchsia mode.
+
+        Args:
+            use_serial: Use serial port on the device to boot into Fastboot mode.
+                If set to True, user need to also pass serial_transport, power_switch and outlet
+                args so that device can be power cycled.
+            serial_transport: Implementation of Serial interface.
+            power_switch: Implementation of PowerSwitch interface.
+            outlet (int): If required by power switch hardware, outlet on
+                power switch hardware where this fuchsia device is connected.
 
         Raises:
             errors.FuchsiaStateError: Invalid state to perform this operation.
             errors.FuchsiaDeviceError: Failed to boot the device to fastboot
                 mode.
         """
-        try:
-            self.wait_for_fuchsia_mode()
-        except errors.FuchsiaDeviceError as err:
-            raise errors.FuchsiaStateError(
-                f"'{self._device_name}' is not in fuchsia mode to perform "
-                f"this operation."
-            ) from err
+        # Note: Rebooting the device into fastboot mode using serial is mostly used when device is
+        # in bad state. So Do not check if device is in Fuchsia mode and directly perform the
+        # operation.
+        if use_serial is False:
+            try:
+                self.wait_for_fuchsia_mode()
+            except errors.FuchsiaDeviceError as err:
+                raise errors.FuchsiaStateError(
+                    f"'{self._device_name}' is not in fuchsia mode to perform "
+                    f"this operation."
+                ) from err
 
-        # LINT.IfChange
-        _LOGGER.info(
-            "Lacewing is booting the following device to fastboot mode: %s",
-            self._device_name,
-        )
-        # LINT.ThenChange(//tools/testing/tefmocheck/string_in_log_check.go)
         try:
-            self._ffx_transport.run(cmd=_FFX_CMDS["BOOT_TO_FASTBOOT_MODE"])
-        except errors.FfxCommandError:
-            # Command is expected to fail as device reboots immediately
-            pass
+            if use_serial:
+                self._boot_to_fastboot_mode_using_serial(
+                    serial_transport,
+                    power_switch,
+                    outlet,
+                )
+            else:
+                self._boot_to_fastboot_mode_using_ffx()
+        except errors.HoneydewError as err:
+            raise errors.FuchsiaDeviceError(
+                f"Failed to boot {self._device_name} into fastboot mode"
+            ) from err
 
         self.wait_for_fastboot_mode()
 
@@ -168,16 +195,35 @@ class Fastboot(fastboot_interface.Fastboot):
 
         Returns:
             True if in fastboot mode, False otherwise.
-        """
-        target_info: dict[
-            str, Any
-        ] = self._ffx_transport.get_target_info_from_target_list()
 
-        return (
-            target_info["nodename"],
-            target_info["rcs_state"],
-            target_info["target_state"],
-        ) == (self._device_name, "N", "Fastboot")
+        Raises:
+            errors.FastbootCommandError: Failed to check if device is in fastboot mode or not.
+        """
+        _LOGGER.debug(
+            "Checking if '%s' is in fastboot mode or not", self._device_name
+        )
+        try:
+            output: str = (
+                host_shell.run(
+                    cmd=[
+                        self._fastboot_binary,
+                        "devices",
+                    ],
+                )
+                or ""
+            )
+        except errors.HostCmdError as err:
+            raise errors.FastbootCommandError(
+                f"Failed to check if {self._device_name} is in fastboot mode or not"
+            ) from err
+
+        fastboot_devices: list[str] = output.strip().split("\n")
+        for fastboot_device in fastboot_devices:
+            if self._fastboot_node_id.lower() in fastboot_device.lower():
+                _LOGGER.info("'%s' is in fastboot mode", self._device_name)
+                return True
+        _LOGGER.info("'%s' is not in fastboot mode", self._device_name)
+        return False
 
     def run(
         self,
@@ -230,7 +276,6 @@ class Fastboot(fastboot_interface.Fastboot):
             state_fn=self.is_in_fastboot_mode,
             expected_state=True,
         )
-        _LOGGER.info("%s is in fastboot mode...", self._device_name)
 
     def wait_for_fuchsia_mode(self) -> None:
         """Wait for Fuchsia device to go to fuchsia mode."""
@@ -239,6 +284,68 @@ class Fastboot(fastboot_interface.Fastboot):
         _LOGGER.info("%s is in fuchsia mode...", self._device_name)
 
     # List all the private methods
+    def _boot_to_fastboot_mode_using_ffx(self) -> None:
+        """Boot the device to fastboot mode using FFX."""
+        # LINT.IfChange
+        _LOGGER.info(
+            "Lacewing is booting the following device to fastboot mode: %s",
+            self._device_name,
+        )
+        # LINT.ThenChange(//tools/testing/tefmocheck/string_in_log_check.go)
+        try:
+            self._ffx_transport.run(cmd=_FFX_CMDS["BOOT_TO_FASTBOOT_MODE"])
+        except errors.FfxCommandError:
+            # Command is expected to fail as device reboots immediately
+            pass
+
+    # TODO(b/359261703): Once issue is resolved, remove `| None` from type hint for `serial_transport` and `power_switch`
+    def _boot_to_fastboot_mode_using_serial(
+        self,
+        serial_transport: serial_interface.Serial | None,
+        power_switch: power_switch_interface.PowerSwitch | None,
+        outlet: int | None = None,
+    ) -> None:
+        """Boot the device to fastboot mode using serial.
+
+        Args:
+            serial_transport: Implementation of Serial interface.
+            power_switch: Implementation of PowerSwitch interface.
+            outlet (int): If required by power switch hardware, outlet on
+                power switch hardware where this fuchsia device is connected.
+
+        Raises:
+            ValueError: Invalid args sent.
+        """
+        if power_switch is None or serial_transport is None:
+            raise ValueError(
+                f"'power_switch' and 'serial_transport' args need to be provided to reboot "
+                f"'{self._device_name}' into Fastboot using Serial"
+            )
+
+        # Note: Rebooting the device into fastboot mode using serial is mostly used when device is
+        # in bad state. So Do not check if device is in Fuchsia mode and directly perform the operation
+
+        _LOGGER.info("Powering off %s...", self._device_name)
+        power_switch.power_off(outlet)
+
+        _LOGGER.info("Powering on %s...", self._device_name)
+        power_switch.power_on(outlet)
+
+        # LINT.IfChange
+        _LOGGER.info(
+            "Lacewing is booting the following device to fastboot mode: %s",
+            self._device_name,
+        )
+        # LINT.ThenChange(//tools/testing/tefmocheck/string_in_log_check.go)
+
+        start_time: float = time.time()
+        end_time: float = start_time + 10
+
+        while time.time() < end_time:
+            serial_transport.send(cmd="f")
+            # Do not send continuously, it will fill buffers very quickly
+            time.sleep(0.2)
+
     def _get_fastboot_node(self, fastboot_node_id: str | None = None) -> None:
         """Gets the fastboot node id and stores it in `self._fastboot_node_id`.
 

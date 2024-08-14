@@ -64,6 +64,12 @@ def _main_arg_parser() -> argparse.ArgumentParser:
         description=__doc__, formatter_class=argparse.RawTextHelpFormatter
     )
     parser.add_argument(
+        "--remote_download_outputs",
+        help="Argument for bazel --remote_download_outputs",
+        type=str,
+        default="toplevel",
+    )
+    parser.add_argument(
         "--output",
         help="Output file to write expanded template",
         type=Path,
@@ -102,6 +108,9 @@ def main(argv: Sequence[str]) -> int:
         config.update(read_rbe_config_file(f))
 
     format_substitutions = _rbe_config_to_template_substitutions(config)
+    format_substitutions[
+        "remote_download_outputs"
+    ] = args.remote_download_outputs
 
     template_text = args.template.read_text()
 

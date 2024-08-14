@@ -8,10 +8,6 @@ import("$dir_pw_unit_test/test.gni")
 
 dir_public_att = "../public/pw_bluetooth_sapphire/internal/host/att"
 
-config("warnings") {
-  cflags_cc = [ "-Wswitch-enum" ]
-}
-
 # Basic target with protocol definitions and no logic, suitable for test
 # emulation.
 pw_source_set("definitions") {
@@ -19,6 +15,8 @@ pw_source_set("definitions") {
     "$dir_public_att/att.h",
     "$dir_public_att/packet.h",
   ]
+
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
 
   sources = [ "packet.cc" ]
 
@@ -48,14 +46,14 @@ pw_source_set("att") {
     "write_queue.cc",
   ]
 
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
+
   public_deps = [
     ":definitions",
     "$dir_pw_third_party/fuchsia:fit",
     "//src/connectivity/bluetooth/core/bt-host/l2cap",
     "//src/connectivity/bluetooth/core/bt-host/sm:definitions",
   ]
-
-  configs = [ ":warnings" ]
 
   deps = [
     "$dir_pw_preprocessor",
@@ -71,6 +69,8 @@ pw_test("tests") {
     "error_test.cc",
     "permissions_test.cc",
   ]
+
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
 
   deps = [
     ":att",

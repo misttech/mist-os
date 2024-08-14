@@ -11,7 +11,8 @@
 namespace {
 
 TEST(SystemMonitorTest, GetsCPUData) {
-  system_monitor::SystemMonitor systemMonitor(true);
+  system_monitor::SystemMonitor systemMonitor;
+  systemMonitor.ConnectToArchiveAccessor(true);
   systemMonitor.UpdateRecentDiagnostic();
   std::string cpuData = systemMonitor.GetCPUData();
   ASSERT_FALSE(cpuData.empty());

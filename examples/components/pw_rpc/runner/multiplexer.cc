@@ -67,7 +67,7 @@ std::vector<int> Multiplexer::PollForData() {
       connections = nullptr;
     }
     if (auto res = Poll(poll_streams, kPollTimeoutMs); !res.ok()) {
-      FX_SLOG(FATAL, "Failed to poll connections", KV("status", res.str()));
+      FX_LOG_KV(FATAL, "Failed to poll connections", KV("status", res.str()));
     }
     connections = connections_.lock();
     if (connections == nullptr) {
@@ -114,7 +114,7 @@ bool Multiplexer::ReadData(const std::vector<int>& streams) {
         return false;
       }
     } else if (!status.ok()) {
-      FX_SLOG(ERROR, "Read failed", KV("status", status.str()));
+      FX_LOG_KV(ERROR, "Read failed", KV("status", status.str()));
     }
   }
   return true;
@@ -143,14 +143,14 @@ bool Multiplexer::ForwardPackets() {
             // Peer disconnected.
             connections->CloseConnection(out_connection->connection_fd());
           } else if (!status.ok()) {
-            FX_SLOG(ERROR, "Failed to send inbound packet", KV("address", address),
-                    KV("status", status.str()));
+            FX_LOG_KV(ERROR, "Failed to send inbound packet", KV("address", address),
+                      KV("status", status.str()));
           }
         }
       } else if (res.status().IsResourceExhausted()) {
         // No complete packet yet.
       } else {
-        FX_SLOG(ERROR, "Failed to read inbound packet", KV("status", res.status().str()));
+        FX_LOG_KV(ERROR, "Failed to read inbound packet", KV("status", res.status().str()));
       }
     }
     for (HdlcChannelSocketConnection& connection : connections->virtual_connections) {
@@ -164,13 +164,13 @@ bool Multiplexer::ForwardPackets() {
           // Peer disconnected.
           return false;
         } else if (!status.ok()) {
-          FX_SLOG(ERROR, "Failed to send outbound packet", KV("address", address),
-                  KV("status", status.str()));
+          FX_LOG_KV(ERROR, "Failed to send outbound packet", KV("address", address),
+                    KV("status", status.str()));
         }
       } else if (res.status().IsResourceExhausted()) {
         // No complete packet yet.
       } else {
-        FX_SLOG(ERROR, "Failed to read outbound packet", KV("status", res.status().str()));
+        FX_LOG_KV(ERROR, "Failed to read outbound packet", KV("status", res.status().str()));
       }
     }
   }

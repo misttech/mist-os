@@ -39,8 +39,8 @@ void SecureVmoReadTester::Init() {
   EXPECT_EQ(reinterpret_cast<uint8_t*>(child_vaddr), map_addr_);
 
   // No data should be in CPU cache for a secure VMO; no fault should happen here.
-  EXPECT_OK(unowned_secure_vmo_->op_range(ZX_VMO_OP_CACHE_CLEAN_INVALIDATE, vmo_offset,
-                                          zx_system_get_page_size(), nullptr, 0));
+  EXPECT_OK(zx_cache_flush(reinterpret_cast<void*>(map_addr_raw), zx_system_get_page_size(),
+                           ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE));
 
   // But currently the read doesn't visibly fault while the vaddr is mapped to
   // a secure page.  Instead the read gets stuck and doesn't complete (perhaps

@@ -73,6 +73,16 @@
         },
     ],
     offer: [
+        {
+            from: "void",
+            to: [
+                "#local-name-provider",
+                "#remote-name-provider",
+            ],
+            availability: "optional",
+            config: [ "fuchsia.network.PrimaryInterface" ],
+        },
+
         // ================== local node ==================
         {
             protocol: "fuchsia.logger.LogSink",

@@ -120,15 +120,10 @@ class ThreadRuntimeStats {
 
     // Make sure that our sampling of the ticks counter takes place between the
     // two stores of the sequence number, and is not allowed to move outside of
-    // the update transaction because of pipelined execution.  We need to
-    // explicitly specify that this read needs to take place after previous
-    // stores, but we should not need to explicitly prevent it from moving
-    // beyond subsequent stores. This is because we have data dependency in the
-    // pipeline.  We store our TSC sample in our updated payload, and that store
-    // is not allowed to move past our store of the final updated sequence
-    // number.
+    // the update transaction because of pipelined execution.
     const zx_ticks_t now =
-        timer_current_mono_ticks_synchronized<GetTicksSyncFlag::kAfterPreviousStores>();
+        timer_current_mono_ticks_synchronized<GetTicksSyncFlag::kAfterPreviousStores |
+                                              GetTicksSyncFlag::kBeforeSubsequentStores>();
 
     // Now go ahead an update our payload, making sure to use relaxed atomic
     // stores when writing to the contents.
@@ -209,12 +204,14 @@ class ThreadRuntimeStats {
       // enter the lock exclusively multiple times.
       //
       Guard<SeqLock<kRuntimeStatsSyncType>, SharedIrqSave> guard{&seq_lock_, success};
+      // Read the payload.
+      published_stats_.Read(ret.stats);
+
       // Make sure that our sampling of the ticks counter takes place between
       // the two reads of the sequence number, and is not allowed to move
       // outside of the region because of pipelined execution.
       ret.now = timer_current_mono_ticks_synchronized<GetTicksSyncFlag::kAfterPreviousLoads |
                                                       GetTicksSyncFlag::kBeforeSubsequentLoads>();
-      published_stats_.Read(ret.stats);
     }
 
     return ret;

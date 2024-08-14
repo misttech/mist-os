@@ -5,13 +5,14 @@
 
 #[cfg(not(feature = "starnix_lite"))]
 use crate::{
-    expose_root, get_serial_number, parse_features, run_container_features, serve_component_runner,
-    serve_container_controller, serve_graphical_presenter, Features,
+    create_filesystem_from_spec, expose_root, get_serial_number, parse_features,
+    run_container_features, serve_component_runner, serve_container_controller,
+    serve_graphical_presenter, Features,
 };
 #[cfg(feature = "starnix_lite")]
 use crate::{
-    expose_root, parse_features, run_container_features, serve_component_runner,
-    serve_container_controller, Features,
+    create_filesystem_from_spec, expose_root, parse_features, run_container_features,
+    serve_component_runner, serve_container_controller, Features,
 };
 use anyhow::{anyhow, bail, Error};
 use bstr::BString;
@@ -32,29 +33,21 @@ use futures::{FutureExt, StreamExt, TryStreamExt};
 use magma_device::get_magma_params;
 use runner::{get_program_string, get_program_strvec};
 use starnix_core::device::init_common_devices;
-#[cfg(not(feature = "starnix_lite"))]
-use starnix_core::execution::{
-    create_filesystem_from_spec, create_remote_block_device_from_spec, create_remotefs_filesystem,
-    execute_task_with_prerun_result,
-};
-#[cfg(feature = "starnix_lite")]
-use starnix_core::execution::{
-    create_filesystem_from_spec, create_remotefs_filesystem, execute_task_with_prerun_result,
-};
+use starnix_core::execution::execute_task_with_prerun_result;
+use starnix_core::fs::fuchsia::create_remotefs_filesystem;
 use starnix_core::fs::layeredfs::LayeredFs;
 use starnix_core::fs::overlayfs::OverlayFs;
 use starnix_core::fs::tmpfs::TmpFs;
 use starnix_core::security;
 use starnix_core::task::{set_thread_role, CurrentTask, ExitStatus, Kernel, Task};
 use starnix_core::time::utc::update_utc_clock;
-use starnix_core::vfs::{FileSystemOptions, FsContext, LookupContext, WhatToMount};
+use starnix_core::vfs::{FileSystemOptions, FsContext, LookupContext, Namespace, WhatToMount};
 use starnix_kernel_config::Config;
 use starnix_logging::{
     log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
 };
 use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::errors::{SourceContext, ENOENT};
-use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::{errno, rlimit};
@@ -548,13 +541,13 @@ where
     // point doesn't exist in a previous mount. The root must be first so other mounts can be
     // applied on top of it.
     let mut mounts_iter = config.mounts.iter();
-    let (root_point, mut root_fs) = create_filesystem_from_spec(
+    let mut root = create_filesystem_from_spec(
         locked,
         kernel,
         pkg_dir_proxy,
         mounts_iter.next().ok_or_else(|| anyhow!("Mounts list is empty"))?,
     )?;
-    if root_point != "/" {
+    if root.path != "/" {
         anyhow::bail!("First mount in mounts list is not the root");
     }
 
@@ -570,8 +563,8 @@ where
             create_remotefs_filesystem(
                 kernel,
                 pkg_dir_proxy,
-                rights,
                 FileSystemOptions { source: "data".into(), ..Default::default() },
+                rights,
             )?,
             BTreeMap::from([("component".into(), TmpFs::new_fs(kernel))]),
         );
@@ -587,12 +580,12 @@ where
     if !mappings.is_empty() {
         // If this container has enabled any features that mount directories that might not exist
         // in the root file system, we add a LayeredFs to hold these mappings.
-        root_fs = LayeredFs::new_fs(kernel, root_fs, mappings.into_iter().collect());
+        root.fs = LayeredFs::new_fs(kernel, root.fs, mappings.into_iter().collect());
     }
     if features.rootfs_rw {
-        root_fs = OverlayFs::wrap_fs_in_writable_layer(kernel, root_fs)?;
+        root.fs = OverlayFs::wrap_fs_in_writable_layer(kernel, root.fs)?;
     }
-    Ok(FsContext::new(root_fs))
+    Ok(FsContext::new(Namespace::new_with_flags(root.fs, root.flags)))
 }
 
 pub fn set_rlimits(task: &Task, rlimits: &[String]) -> Result<(), Error> {
@@ -646,15 +639,12 @@ where
     // Skip the first mount, that was used to create the root filesystem.
     let _ = mounts_iter.next();
     for mount_spec in mounts_iter {
-        let (mount_point, child_fs) =
-            create_filesystem_from_spec(locked, system_task, pkg_dir_proxy, mount_spec)
-                .with_source_context(|| {
-                    format!("creating filesystem from spec: {}", &mount_spec)
-                })?;
+        let action = create_filesystem_from_spec(locked, system_task, pkg_dir_proxy, mount_spec)
+            .with_source_context(|| format!("creating filesystem from spec: {}", &mount_spec))?;
         let mount_point = system_task
-            .lookup_path_from_root(mount_point)
-            .with_source_context(|| format!("lookup path from root: {mount_point}"))?;
-        mount_point.mount(WhatToMount::Fs(child_fs), MountFlags::empty())?;
+            .lookup_path_from_root(action.path.as_ref())
+            .with_source_context(|| format!("lookup path from root: {}", action.path))?;
+        mount_point.mount(WhatToMount::Fs(action.fs), action.flags)?;
     }
     Ok(())
 }
@@ -675,6 +665,49 @@ where
             .with_source_context(|| format!("creating remoteblk from spec: {}", &device_spec))?;
     }
     Ok(())
+}
+
+fn parse_block_size(block_size_str: &str) -> Result<u64, Error> {
+    if block_size_str.is_empty() {
+        return Err(anyhow!("Invalid empty block size"));
+    }
+    let (mut string, suffix) = block_size_str.split_at(block_size_str.len() - 1);
+    let multiplier: u64 = match suffix {
+        "K" => 1024,
+        "M" => 1024 * 1024,
+        "G" => 1024 * 1024 * 1024,
+        _ => {
+            string = block_size_str;
+            1
+        }
+    };
+    u64::from_str_radix(string, 10)
+        .map_err(|_| anyhow!("Invalid block size {string}"))
+        .and_then(|val| multiplier.checked_mul(val).ok_or(anyhow!("Block size overflow")))
+}
+
+fn create_remote_block_device_from_spec<'a, L>(
+    locked: &mut Locked<'_, L>,
+    current_task: &CurrentTask,
+    spec: &'a str,
+) -> Result<(), Error>
+where
+    L: LockBefore<FileOpsCore>,
+    L: LockBefore<DeviceOpen>,
+{
+    let mut iter = spec.splitn(2, ':');
+    let device_name =
+        iter.next().ok_or_else(|| anyhow!("remoteblk name is missing from {:?}", spec))?;
+    let device_size =
+        iter.next().ok_or_else(|| anyhow!("remoteblk size is missing from {:?}", spec))?;
+    let device_size = parse_block_size(device_size)?;
+
+    current_task.kernel().remote_block_device_registry.create_remote_block_device_if_absent(
+        locked,
+        current_task,
+        device_name,
+        device_size,
+    )
 }
 
 async fn wait_for_init_file(

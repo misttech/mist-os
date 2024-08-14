@@ -33,7 +33,13 @@ var (
 
 // Set runs `gn gen` given a static and context spec. It's intended to be
 // consumed as a library function.
-func Set(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb.Context, skipLocalArgs bool) (*fintpb.SetArtifacts, error) {
+func Set(
+	ctx context.Context,
+	staticSpec *fintpb.Static,
+	contextSpec *fintpb.Context,
+	skipLocalArgs bool,
+	assemblyOverridesStrings []string,
+) (*fintpb.SetArtifacts, error) {
 	platform, err := hostplatform.Name()
 	if err != nil {
 		return nil, err
@@ -44,7 +50,7 @@ func Set(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb.Con
 		return nil, err
 	}
 
-	artifacts, err := setImpl(ctx, &subprocess.Runner{}, staticSpec, contextSpec, platform, skipLocalArgs)
+	artifacts, err := setImpl(ctx, &subprocess.Runner{}, staticSpec, contextSpec, platform, skipLocalArgs, assemblyOverridesStrings)
 	if err != nil && artifacts != nil && artifacts.FailureSummary == "" {
 		// Fall back to using the error text as the failure summary if the
 		// failure summary is unset. It's better than failing without emitting
@@ -63,6 +69,7 @@ func setImpl(
 	contextSpec *fintpb.Context,
 	platform string,
 	skipLocalArgs bool,
+	assemblyOverridesStrings []string,
 ) (*fintpb.SetArtifacts, error) {
 	if contextSpec.CheckoutDir == "" {
 		return nil, fmt.Errorf("checkout_dir must be set")
@@ -71,7 +78,7 @@ func setImpl(
 		return nil, fmt.Errorf("build_dir must be set")
 	}
 
-	genArgs, err := genArgs(ctx, staticSpec, contextSpec, skipLocalArgs)
+	genArgs, err := genArgs(ctx, staticSpec, contextSpec, skipLocalArgs, assemblyOverridesStrings)
 	if err != nil {
 		return nil, err
 	}
@@ -223,7 +230,13 @@ func findGNIFile(checkoutDir, dirname, basename string) (string, error) {
 	return "", nil
 }
 
-func genArgs(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb.Context, skipLocalArgs bool) ([]string, error) {
+func genArgs(
+	ctx context.Context,
+	staticSpec *fintpb.Static,
+	contextSpec *fintpb.Context,
+	skipLocalArgs bool,
+	assemblyOverridesStrings []string,
+) ([]string, error) {
 	// GN variables to set via args (mapping from variable name to value).
 	vars := make(map[string]interface{})
 	// GN list variables that could historically be set by products, and should go
@@ -260,10 +273,20 @@ func genArgs(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb
 		vars["rustc_prefix"] = filepath.Join(contextSpec.RustToolchainDir)
 	}
 
-	vars["rust_rbe_enable"] = staticSpec.RustRbeEnable
-	vars["cxx_rbe_enable"] = staticSpec.CxxRbeEnable
-	vars["link_rbe_enable"] = staticSpec.LinkRbeEnable
-	vars["enable_bazel_remote_rbe"] = staticSpec.BazelRbeEnable
+	// Only set these GN variables if they are != the default value
+	// (which is false).
+	if staticSpec.RustRbeEnable {
+		vars["rust_rbe_enable"] = staticSpec.RustRbeEnable
+	}
+	if staticSpec.CxxRbeEnable {
+		vars["cxx_rbe_enable"] = staticSpec.CxxRbeEnable
+	}
+	if staticSpec.LinkRbeEnable {
+		vars["link_rbe_enable"] = staticSpec.LinkRbeEnable
+	}
+	if staticSpec.BazelRbeEnable {
+		vars["enable_bazel_remote_rbe"] = staticSpec.BazelRbeEnable
+	}
 
 	if staticSpec.Product != "" {
 		basename := filepath.Base(staticSpec.Product)
@@ -368,7 +391,7 @@ func genArgs(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb
 		vars["rust_incremental"] = filepath.Join(contextSpec.CacheDir, "rust_cache")
 	}
 
-	var importArgs, varArgs, targetListArgs, testArgs, localArgs []string
+	var importArgs, varArgs, targetListArgs, testArgs, localArgs, overridesArgs []string
 
 	// Add comments to make args.gn more readable.
 	varArgs = append(varArgs, "\n\n# Basic args:")
@@ -436,6 +459,33 @@ func genArgs(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb
 		}
 	}
 
+	var assemblyOverrides = make(map[string]string)
+	// Since map iteration order isn't stable, a separate list is needed to keep a consistent ordering
+	// of the entries (to match user expectations and to allow tests to properly validate which
+	// override target is used by each assembly target).
+	var assemblyTargetOrder = []string{}
+	for _, overrideString := range assemblyOverridesStrings {
+		pair := strings.Split(overrideString, "=")
+		if len(pair) != 2 {
+			return nil, fmt.Errorf("assembly overrides must be in ASSEMBLY_TARGET=OVERRIDE_TARGET pairs")
+		}
+		_, duplicate := assemblyOverrides[pair[0]]
+		if duplicate {
+			return nil, fmt.Errorf("Only one override target can be provided for each assembly target: %s", pair[0])
+		}
+		assemblyOverrides[pair[0]] = pair[1]
+		assemblyTargetOrder = append(assemblyTargetOrder, pair[0])
+	}
+	overridesArgs = append(overridesArgs, "\n\nproduct_assembly_overrides = [")
+	for _, assembly_target := range assemblyTargetOrder {
+		override_target := assemblyOverrides[assembly_target]
+		overridesArgs = append(overridesArgs, "{")
+		overridesArgs = append(overridesArgs, fmt.Sprintf("assembly = %s", toGNValue(assembly_target)))
+		overridesArgs = append(overridesArgs, fmt.Sprintf("overrides = %s", toGNValue(override_target)))
+		overridesArgs = append(overridesArgs, "},")
+	}
+	overridesArgs = append(overridesArgs, "]")
+
 	// Ensure that imports come before args that set or modify variables, as
 	// otherwise the imported files might blindly redefine variables set or
 	// modified by other arguments.
@@ -444,6 +494,7 @@ func genArgs(ctx context.Context, staticSpec *fintpb.Static, contextSpec *fintpb
 	finalArgs = append(finalArgs, varArgs...)
 	finalArgs = append(finalArgs, targetListArgs...)
 	finalArgs = append(finalArgs, testArgs...)
+	finalArgs = append(finalArgs, overridesArgs...)
 	finalArgs = append(finalArgs, localArgs...)
 	finalArgs = append(finalArgs, "\n")
 	return finalArgs, nil

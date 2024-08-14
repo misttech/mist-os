@@ -46,6 +46,9 @@ _BAZEL_BUILTIN_REPOSITORIES = (
     "@bazel_tools//",
     "@local_config_cc//",
     "@local_config_platform//",
+    # The two repositories below were added by Bazel 7.2.
+    "@host_platform//",
+    "@internal_platforms_do_not_use//",
 )
 
 # A list of file extensions for files that should be ignored from depfiles.

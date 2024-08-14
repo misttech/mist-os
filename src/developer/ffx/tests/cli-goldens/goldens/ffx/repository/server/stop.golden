@@ -10,10 +10,25 @@
       "short": null,
       "description": "display usage information",
       "hidden": false
+    },
+    {
+      "kind": "Switch",
+      "optionality": "optional",
+      "long": "--all",
+      "short": null,
+      "description": "stop all repository servers.",
+      "hidden": false
     }
   ],
   "notes": [],
   "commands": [],
-  "positionals": [],
+  "positionals": [
+    {
+      "name": "name",
+      "description": "stop the repository server with the given name.",
+      "optionality": "optional",
+      "hidden": false
+    }
+  ],
   "error_codes": []
 }

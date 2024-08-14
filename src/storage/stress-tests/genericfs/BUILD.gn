@@ -22,6 +22,7 @@ rustc_test("stressor-bin") {
     "//src/lib/fuchsia-component",
     "//src/lib/fuchsia-component-test",
     "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/storage/lib/fs_management/rust:fs_management",
     "//src/storage/lib/key-bag",

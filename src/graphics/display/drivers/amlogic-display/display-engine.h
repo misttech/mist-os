@@ -104,7 +104,6 @@ class DisplayEngine : public ddk::DisplayEngineProtocol<DisplayEngine> {
                                                  uint32_t index, uint64_t* out_capture_handle);
   zx_status_t DisplayEngineStartCapture(uint64_t capture_handle);
   zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle);
-  bool DisplayEngineIsCaptureCompleted() __TA_EXCLUDES(capture_mutex_);
 
   const display_engine_protocol_ops_t* display_engine_protocol_ops() const {
     return &display_engine_protocol_ops_;

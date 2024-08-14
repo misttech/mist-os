@@ -128,8 +128,7 @@ TEST_F(VnodeCacheTest, VnodeCacheExceptionCase) {
   // Check Create() exception
   ASSERT_EQ(GetDirtyVnodeCount(), 2U);
   ASSERT_EQ(GetCachedVnodeCount(), 2U);
-  ASSERT_EQ(VnodeF2fs::Vget(fs_.get(), fs_->GetSuperblockInfo().GetNodeIno(), &new_vnode),
-            ZX_ERR_NOT_FOUND);
+  ASSERT_EQ(fs_->GetVnode(fs_->GetSuperblockInfo().GetNodeIno()).status_value(), ZX_ERR_NOT_FOUND);
 
   // Check Add() exception
   auto &test_vnode = vnode<Dir>();
@@ -199,15 +198,13 @@ TEST_F(VnodeCacheTest, VnodeActivation) {
   std::thread thread1 = std::thread([&]() {
     int iter = 10000;
     while (--iter) {
-      fbl::RefPtr<VnodeF2fs> test_vnode;
-      ASSERT_EQ(VnodeF2fs::Vget(fs_.get(), raw_pointer->Ino(), &test_vnode), ZX_OK);
+      ASSERT_TRUE(fs_->GetVnode(raw_pointer->Ino()).is_ok());
     }
   });
   std::thread thread2 = std::thread([&]() {
     int iter = 10000;
     while (--iter) {
-      fbl::RefPtr<VnodeF2fs> test_vnode;
-      ASSERT_EQ(VnodeF2fs::Vget(fs_.get(), raw_pointer->Ino(), &test_vnode), ZX_OK);
+      ASSERT_TRUE(fs_->GetVnode(raw_pointer->Ino()).is_ok());
     }
   });
 

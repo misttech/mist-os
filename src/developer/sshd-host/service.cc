@@ -112,7 +112,7 @@ Service::Service(async_dispatcher_t* dispatcher, uint16_t port)
     FX_LOGS(FATAL) << "Failed to bind to " << port << ": " << strerror(errno);
   }
 
-  FX_SLOG(INFO, "listen() for inbound SSH connections", FX_KV("port", (int)port));
+  FX_LOG_KV(INFO, "listen() for inbound SSH connections", FX_KV("port", (int)port));
   if (listen(sock_.get(), 10) < 0) {
     FX_LOGS(FATAL) << "Failed to listen: " << strerror(errno);
   }
@@ -123,7 +123,7 @@ Service::Service(async_dispatcher_t* dispatcher, uint16_t port)
 Service::~Service() = default;
 
 void Service::Wait() {
-  FX_SLOG(DEBUG, "Waiting for next connection");
+  FX_LOG_KV(DEBUG, "Waiting for next connection");
 
   waiter_.Wait(
       [this](zx_status_t status, uint32_t /*events*/) {
@@ -131,7 +131,7 @@ void Service::Wait() {
           FX_PLOGS(FATAL, status) << "Failed to wait on socket";
         }
 
-        struct sockaddr_storage peer_addr {};
+        struct sockaddr_storage peer_addr{};
         socklen_t peer_addr_len = sizeof(peer_addr);
         fbl::unique_fd conn(
             accept(sock_.get(), reinterpret_cast<struct sockaddr*>(&peer_addr), &peer_addr_len));
@@ -159,7 +159,7 @@ void Service::Wait() {
               << "Error from getnameinfo(.., NI_NUMERICHOST | NI_NUMERICSERV) for peer address: "
               << gai_strerror(res);
         }
-        FX_SLOG(INFO, "Accepted connection", FX_KV("remote", peer_name.c_str()));
+        FX_LOG_KV(INFO, "Accepted connection", FX_KV("remote", peer_name.c_str()));
 
         Launch(std::move(conn));
         Wait();

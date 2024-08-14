@@ -225,7 +225,6 @@ pub fn merge_configs(mut base: GuestConfig, overrides: GuestConfig) -> GuestConf
         cpus,
         guest_memory,
         wayland_device,
-        magma_device,
         default_net,
         virtio_balloon,
         virtio_console,

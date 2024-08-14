@@ -32,7 +32,7 @@ Service::Service(async_dispatcher_t* dispatcher, uint16_t port) : dispatcher_(di
     FX_LOGS(FATAL) << "Failed to connect to vsock connector" << connector.status_string();
   }
 
-  FX_SLOG(INFO, "listen() for inbound SSH connections", FX_KV("port", int{port}));
+  FX_LOG_KV(INFO, "listen() for inbound SSH connections", FX_KV("port", int{port}));
   auto [acceptor_client, acceptor_server] = fidl::Endpoints<fuchsia_vsock::Acceptor>::Create();
   auto listen_result = fidl::Call(*connector)
                            ->Listen({{
@@ -49,9 +49,9 @@ Service::Service(async_dispatcher_t* dispatcher, uint16_t port) : dispatcher_(di
 Service::~Service() = default;
 
 void Service::Accept(AcceptRequest& request, AcceptCompleter::Sync& completer) {
-  FX_SLOG(INFO, "Accepted connection", FX_KV("local_port", request.addr().local_port()),
-          FX_KV("remote_cid", request.addr().remote_cid()),
-          FX_KV("remote_port", request.addr().remote_port()));
+  FX_LOG_KV(INFO, "Accepted connection", FX_KV("local_port", request.addr().local_port()),
+            FX_KV("remote_cid", request.addr().remote_cid()),
+            FX_KV("remote_port", request.addr().remote_port()));
 
   zx::socket sock1, sock2;
   ZX_ASSERT(zx::socket::create(0, &sock1, &sock2) == ZX_OK);

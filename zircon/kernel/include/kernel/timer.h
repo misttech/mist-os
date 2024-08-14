@@ -198,6 +198,7 @@ class TimerQueue {
   // 3. The preemption timer deadline.
   //
   // This can only be called when interrupts are disabled.
+  void UpdatePlatformTimer() TA_EXCL(Timer::TimerLock::Get());
   void UpdatePlatformTimerLocked() TA_REQ(Timer::TimerLock::Get());
 
  private:

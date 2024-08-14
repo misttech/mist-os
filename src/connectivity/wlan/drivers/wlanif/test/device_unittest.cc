@@ -28,6 +28,7 @@
 #include <zircon/errors.h>
 #include <zircon/system/ulib/async-default/include/lib/async/default.h>
 
+#include <future>
 #include <memory>
 
 #include <gtest/gtest.h>
@@ -36,7 +37,7 @@
 #include "fuchsia/wlan/fullmac/c/banjo.h"
 #include "src/connectivity/wlan/drivers/wlanif/test/test_bss.h"
 #include "src/connectivity/wlan/lib/common/cpp/include/wlan/common/macaddr.h"
-#include "src/connectivity/wlan/lib/mlme/fullmac/c-binding/bindings.h"
+#include "src/connectivity/wlan/lib/mlme/fullmac/c-binding/testing/bindings_stubs.h"
 
 constexpr zx::duration kWaitForCallbackDuration = zx::msec(1000);
 namespace {
@@ -196,76 +197,117 @@ class FakeFullmacParent : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFull
     completer.Reply();
   }
 
-  void SendDeauthConf() {
+  auto SendDeauthConf() {
     fidl::Array<uint8_t, ETH_ALEN> peer_sta_address;
     memcpy(peer_sta_address.data(), peer_sta_addr_, ETH_ALEN);
 
     auto req = fuchsia_wlan_fullmac::wire::WlanFullmacImplIfcDeauthConfRequest::Builder(arena_)
                    .peer_sta_address(peer_sta_address)
                    .Build();
-    auto result = client_.buffer(arena_)->DeauthConf(req);
-    EXPECT_TRUE(result.ok());
+    return client_.buffer(arena_)->DeauthConf(req);
   }
 
-  void SendScanResult() {
+  auto SendScanResult() {
     fuchsia_wlan_fullmac::wire::WlanFullmacScanResult scan_result = {};
     scan_result.bss.bss_type = fuchsia_wlan_common::wire::BssType::kInfrastructure;
     scan_result.bss.channel.primary = 9;
     scan_result.bss.channel.cbw = fuchsia_wlan_common::wire::ChannelBandwidth::kCbw20;
 
-    auto result = client_.buffer(arena_)->OnScanResult(scan_result);
-    EXPECT_TRUE(result.ok());
+    return client_.buffer(arena_)->OnScanResult(scan_result);
   }
 
-  void SendScanEnd() {
+  auto SendScanEnd() {
     fuchsia_wlan_fullmac::wire::WlanFullmacScanEnd scan_end = {};
     scan_end.code = fuchsia_wlan_fullmac::WlanScanResult::kSuccess;
-    auto result = client_.buffer(arena_)->OnScanEnd(scan_end);
-    EXPECT_TRUE(result.ok());
+    return client_.buffer(arena_)->OnScanEnd(scan_end);
   }
 
-  void SendConnectConf() {
+  auto SendConnectConf() {
     fuchsia_wlan_fullmac::wire::WlanFullmacConnectConfirm conf = {};
     conf.result_code = fuchsia_wlan_ieee80211::wire::StatusCode::kSuccess;
-    auto result = client_.buffer(arena_)->ConnectConf(conf);
-    EXPECT_TRUE(result.ok());
+    return client_.buffer(arena_)->ConnectConf(conf);
   }
 
-  void SendRoamConf() {
+  auto SendRoamConf() {
     fuchsia_wlan_fullmac::wire::WlanFullmacRoamConfirm conf = {};
     conf.result_code = fuchsia_wlan_ieee80211::wire::StatusCode::kSuccess;
     conf.selected_bss.bss_type = fuchsia_wlan_common::wire::BssType::kInfrastructure;
     conf.selected_bss.channel.primary = 9;
     conf.selected_bss.channel.cbw = fuchsia_wlan_common::wire::ChannelBandwidth::kCbw20;
     conf.selected_bss.channel.cbw = fuchsia_wlan_common::wire::ChannelBandwidth::kCbw20;
-    auto result = client_.buffer(arena_)->RoamConf(conf);
-    EXPECT_TRUE(result.ok());
+    return client_.buffer(arena_)->RoamConf(conf);
   }
 
-  void SendAuthInd() {
+  auto SendAuthInd() {
     fuchsia_wlan_fullmac::wire::WlanFullmacAuthInd ind = {};
     ind.auth_type = fuchsia_wlan_fullmac::wire::WlanAuthType::kOpenSystem;
-    auto result = client_.buffer(arena_)->AuthInd(ind);
-    EXPECT_TRUE(result.ok());
+    return client_.buffer(arena_)->AuthInd(ind);
   }
 
-  void SendDeauthInd() {
+  auto SendDeauthInd() {
     fuchsia_wlan_fullmac::wire::WlanFullmacDeauthIndication ind = {};
     ind.reason_code = fuchsia_wlan_ieee80211::wire::ReasonCode::kUnspecifiedReason;
-    auto result = client_.buffer(arena_)->DeauthInd(ind);
-    EXPECT_TRUE(result.ok());
+    return client_.buffer(arena_)->DeauthInd(ind);
   }
 
-  void SendAssocInd() {
+  auto SendAssocInd() {
     fuchsia_wlan_fullmac::wire::WlanFullmacAssocInd ind = {};
-    auto result = client_.buffer(arena_)->AssocInd(ind);
-    EXPECT_TRUE(result.ok());
+    return client_.buffer(arena_)->AssocInd(ind);
   }
 
-  void SendDisassocInd() {
+  auto SendDisassocInd() {
     fuchsia_wlan_fullmac::wire::WlanFullmacDisassocIndication ind = {};
-    auto result = client_.buffer(arena_)->DisassocInd(ind);
-    EXPECT_TRUE(result.ok());
+    return client_.buffer(arena_)->DisassocInd(ind);
+  }
+
+  auto SendStartConf() {
+    fuchsia_wlan_fullmac::wire::WlanFullmacStartConfirm conf = {};
+    return client_.buffer(arena_)->StartConf(conf);
+  }
+
+  auto SendStopConf() {
+    fuchsia_wlan_fullmac::wire::WlanFullmacStopConfirm conf = {};
+    return client_.buffer(arena_)->StopConf(conf);
+  }
+
+  auto SendEapolConf() {
+    fuchsia_wlan_fullmac::wire::WlanFullmacEapolConfirm conf = {};
+    return client_.buffer(arena_)->EapolConf(conf);
+  }
+
+  auto SendOnChannelSwitch() {
+    fuchsia_wlan_fullmac::wire::WlanFullmacChannelSwitchInfo info = {};
+    return client_.buffer(arena_)->OnChannelSwitch(info);
+  }
+
+  auto SendSignalReport() {
+    fuchsia_wlan_fullmac::wire::WlanFullmacSignalReportIndication ind = {};
+    return client_.buffer(arena_)->SignalReport(ind);
+  }
+
+  auto SendEapolInd() {
+    fuchsia_wlan_fullmac::wire::WlanFullmacEapolIndication ind = {};
+    return client_.buffer(arena_)->EapolInd(ind);
+  }
+
+  auto SendOnPmkAvailable() {
+    fuchsia_wlan_fullmac::wire::WlanFullmacPmkInfo info = {};
+    return client_.buffer(arena_)->OnPmkAvailable(info);
+  }
+
+  auto SendSaeHandshakeInd() {
+    fuchsia_wlan_fullmac::wire::WlanFullmacSaeHandshakeInd ind = {};
+    return client_.buffer(arena_)->SaeHandshakeInd(ind);
+  }
+
+  auto SendSaeFrameRx() {
+    fuchsia_wlan_fullmac::wire::WlanFullmacSaeFrame frame = {};
+    return client_.buffer(arena_)->SaeFrameRx(frame);
+  }
+
+  auto SendOnWmmStatusResp() {
+    fuchsia_wlan_common::wire::WlanWmmParameters params = {};
+    return client_.buffer(arena_)->OnWmmStatusResp(ZX_OK, params);
   }
 
   void SetDataPlaneType(fuchsia_wlan_common::wire::DataPlaneType data_plane_type) {
@@ -297,7 +339,7 @@ class FakeFullmacParent : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFull
 
 using fdf_testing::TestEnvironment;
 
-class WlanifDeviceTest : public ::testing::Test {
+class WlanifDeviceTestNoStopOnTeardown : public ::testing::Test {
  public:
   void SetUp() override {
     // Create start args
@@ -334,7 +376,6 @@ class WlanifDeviceTest : public ::testing::Test {
   }
 
   void TearDown() override {
-    DriverPrepareStop();
     test_environment_.reset();
     node_server_.reset();
     runtime_.ShutdownAllDispatchers(fdf::Dispatcher::GetCurrent()->get());
@@ -380,6 +421,91 @@ class WlanifDeviceTest : public ::testing::Test {
   async_patterns::TestDispatcherBound<FakeFullmacParent> fake_wlanfullmac_parent_{
       fullmac_dispatcher(), std::in_place};
   fdf_testing::DriverUnderTest<wlanif::Device> driver_;
+
+  bindings_stubs::FullmacMlmeBindingsStubs bindings_stubs_;
+};
+
+TEST_F(WlanifDeviceTestNoStopOnTeardown, CheckRustProtoOpsCannotBeCalledAfterMlmeStopped) {
+  auto ops = EmptyRustProtoOps();
+
+  libsync::Completion complete_stop_fullmac_mlme;
+  libsync::Completion stop_fullmac_mlme_called;
+  bindings_stubs_.stop_fullmac_mlme_stub = [&](wlan_fullmac_mlme_handle_t*) {
+    // pause in the middle of this function to be able to check that rust proto ops are not called
+    // and WlanFullmacImplIfc calls fail.
+    stop_fullmac_mlme_called.Signal();
+    complete_stop_fullmac_mlme.Wait();
+  };
+
+  ops.deauth_conf = [](void* ctx, const uint8_t peer_sta_address[ETH_ALEN]) { ADD_FAILURE(); };
+  ops.on_scan_result = [](void* ctx, const wlan_fullmac_scan_result_t* result) { ADD_FAILURE(); };
+  ops.on_scan_end = [](void* ctx, const wlan_fullmac_scan_end_t* end) { ADD_FAILURE(); };
+  ops.connect_conf = [](void* ctx, const wlan_fullmac_connect_confirm_t* resp) { ADD_FAILURE(); };
+  ops.roam_conf = [](void* ctx, const wlan_fullmac_roam_confirm_t* resp) { ADD_FAILURE(); };
+  ops.auth_ind = [](void* ctx, const wlan_fullmac_auth_ind_t* ind) { ADD_FAILURE(); };
+  ops.deauth_ind = [](void* ctx, const wlan_fullmac_deauth_indication_t* ind) { ADD_FAILURE(); };
+  ops.assoc_ind = [](void* ctx, const wlan_fullmac_assoc_ind_t* ind) { ADD_FAILURE(); };
+  ops.disassoc_ind = [](void* ctx, const wlan_fullmac_disassoc_indication_t* ind) {
+    ADD_FAILURE();
+  };
+  ops.start_conf = [](void* ctx, const wlan_fullmac_start_confirm_t* resp) { ADD_FAILURE(); };
+  ops.stop_conf = [](void* ctx, const wlan_fullmac_stop_confirm_t* resp) { ADD_FAILURE(); };
+  ops.eapol_conf = [](void* ctx, const wlan_fullmac_eapol_confirm_t* resp) { ADD_FAILURE(); };
+  ops.on_channel_switch = [](void* ctx, const wlan_fullmac_channel_switch_info_t* resp) {
+    ADD_FAILURE();
+  };
+  ops.signal_report = [](void* ctx, const wlan_fullmac_signal_report_indication_t* ind) {
+    ADD_FAILURE();
+  };
+  ops.eapol_ind = [](void* ctx, const wlan_fullmac_eapol_indication_t* ind) { ADD_FAILURE(); };
+  ops.on_pmk_available = [](void* ctx, const wlan_fullmac_pmk_info_t* info) { ADD_FAILURE(); };
+  ops.sae_handshake_ind = [](void* ctx, const wlan_fullmac_sae_handshake_ind_t* ind) {
+    ADD_FAILURE();
+  };
+  ops.sae_frame_rx = [](void* ctx, const wlan_fullmac_sae_frame_t* frame) { ADD_FAILURE(); };
+  ops.on_wmm_status_resp = [](void* ctx, zx_status_t status,
+                              const wlan_wmm_parameters_t* wmm_params) { ADD_FAILURE(); };
+
+  EXPECT_EQ(ZX_OK, StartWlanifDevice(&ops, nullptr));
+
+  [[maybe_unused]] auto f = std::async(std::launch::async, [&]() {
+    stop_fullmac_mlme_called.Wait();
+    // now we know that we're in stop_fullmac_mlme
+
+    // ensure that WlanFullmacImplIfc calls don't result in FFI calls
+    EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendDeauthConf).ok());
+    EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendScanResult).ok());
+    EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendScanEnd).ok());
+    EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendConnectConf).ok());
+    EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendRoamConf).ok());
+    EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendAuthInd).ok());
+    EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendDeauthInd).ok());
+    EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendAssocInd).ok());
+    EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendDisassocInd).ok());
+    EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendStartConf).ok());
+    EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendStopConf).ok());
+    EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendEapolConf).ok());
+    EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendOnChannelSwitch).ok());
+    EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendSignalReport).ok());
+    EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendEapolInd).ok());
+    EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendOnPmkAvailable).ok());
+    EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendSaeHandshakeInd).ok());
+    EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendSaeFrameRx).ok());
+    EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendOnWmmStatusResp).ok());
+
+    // let driver complete operation
+    complete_stop_fullmac_mlme.Signal();
+  });
+
+  DriverPrepareStop();
+}
+
+class WlanifDeviceTest : public WlanifDeviceTestNoStopOnTeardown {
+ public:
+  void TearDown() override {
+    DriverPrepareStop();
+    WlanifDeviceTestNoStopOnTeardown::TearDown();
+  }
 };
 
 TEST_F(WlanifDeviceTest, Basic) {
@@ -480,7 +606,7 @@ TEST_F(WlanifDeviceTest, CheckDeauthConf) {
   memcpy(req.peer_sta_address, kPeerStaAddress, ETH_ALEN);
   req.reason_code = 0;
   driver()->Deauthenticate(&req);
-  fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendDeauthConf);
+  EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendDeauthConf).ok());
   zx_status_t status = signal.Wait(kWaitForCallbackDuration);
   EXPECT_EQ(status, ZX_OK);
   driver()->Stop();
@@ -581,50 +707,51 @@ TEST_F(WlanifDeviceTest, CheckCallbacks) {
   };
 
   EXPECT_EQ(ZX_OK, StartWlanifDevice(&ops, &signal));
-  fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendDeauthConf);
+  EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendDeauthConf).ok());
   zx_status_t status = signal.Wait(kWaitForCallbackDuration);
   EXPECT_EQ(status, ZX_OK);
   signal.Reset();
 
-  fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendScanResult);
+  EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendScanResult).ok());
   status = signal.Wait(kWaitForCallbackDuration);
   EXPECT_EQ(status, ZX_OK);
   signal.Reset();
 
-  fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendScanEnd);
+  EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendScanEnd).ok());
   status = signal.Wait(kWaitForCallbackDuration);
   EXPECT_EQ(status, ZX_OK);
   signal.Reset();
 
-  fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendConnectConf);
+  EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendConnectConf).ok());
   status = signal.Wait(kWaitForCallbackDuration);
   EXPECT_EQ(status, ZX_OK);
   signal.Reset();
 
-  fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendRoamConf);
+  EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendRoamConf).ok());
   status = signal.Wait(kWaitForCallbackDuration);
   EXPECT_EQ(status, ZX_OK);
   signal.Reset();
 
-  fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendAuthInd);
+  EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendAuthInd).ok());
   status = signal.Wait(kWaitForCallbackDuration);
   EXPECT_EQ(status, ZX_OK);
   signal.Reset();
 
-  fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendDeauthInd);
+  EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendDeauthInd).ok());
   status = signal.Wait(kWaitForCallbackDuration);
   EXPECT_EQ(status, ZX_OK);
   signal.Reset();
 
-  fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendAssocInd);
+  EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendAssocInd).ok());
   status = signal.Wait(kWaitForCallbackDuration);
   EXPECT_EQ(status, ZX_OK);
   signal.Reset();
 
-  fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendDisassocInd);
+  EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendDisassocInd).ok());
   status = signal.Wait(kWaitForCallbackDuration);
   EXPECT_EQ(status, ZX_OK);
   signal.Reset();
 }
+
 // TODO(https://fxbug.dev/42072483) Add unit tests for other functions in wlanif::Device
 }  // namespace

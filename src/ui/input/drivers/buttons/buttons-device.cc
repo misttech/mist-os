@@ -365,18 +365,21 @@ zx::result<bool> ButtonsDevice::ReconfigurePolarity(uint32_t idx, uint64_t int_p
   }
   current = read_result1.value()->value;
 
+  fidl::Arena arena;
+  auto config = fuchsia_hardware_gpio::wire::InterruptConfiguration::Builder(arena)
+                    .mode(current ? fuchsia_hardware_gpio::InterruptMode::kEdgeLow
+                                  : fuchsia_hardware_gpio::InterruptMode::kEdgeHigh)
+                    .Build();
   do {
     {
-      fidl::WireResult result =
-          gpio.client->SetPolarity(current ? fuchsia_hardware_gpio::GpioPolarity::kLow
-                                           : fuchsia_hardware_gpio::GpioPolarity::kHigh);
+      fidl::WireResult result = gpio.client->ConfigureInterrupt(config);
       if (!result.ok()) {
-        FDF_LOG(ERROR, "Failed to send SetPolarity request to gpio %u: %s", idx,
+        FDF_LOG(ERROR, "Failed to send ConfigureInterrupt request to gpio %u: %s", idx,
                 result.status_string());
         return zx::error(result.status());
       }
       if (result->is_error()) {
-        FDF_LOG(ERROR, "Failed to set polarity of gpio %u: %s", idx,
+        FDF_LOG(ERROR, "Failed to set interrupt configuration of gpio %u: %s", idx,
                 zx_status_get_string(result->error_value()));
         return zx::error(result->error_value());
       }

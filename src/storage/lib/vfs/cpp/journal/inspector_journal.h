@@ -5,10 +5,16 @@
 #ifndef SRC_STORAGE_LIB_VFS_CPP_JOURNAL_INSPECTOR_JOURNAL_H_
 #define SRC_STORAGE_LIB_VFS_CPP_JOURNAL_INSPECTOR_JOURNAL_H_
 
+#include <zircon/assert.h>
+#include <zircon/types.h>
+
+#include <cstddef>
+#include <cstdint>
 #include <functional>
+#include <memory>
+#include <utility>
 
-#include <disk_inspector/common_types.h>
-
+#include "src/storage/lib/disk_inspector/disk_inspector.h"
 #include "src/storage/lib/vfs/cpp/journal/format.h"
 
 namespace fs {
@@ -29,7 +35,7 @@ class JournalObject : public disk_inspector::DiskObject {
 
   JournalObject(fs::JournalInfo info, uint64_t start_block, uint64_t length,
                 BlockReadCallback read_block)
-      : journal_info_(std::move(info)),
+      : journal_info_(info),
         start_block_(start_block),
         length_(length),
         read_block_(std::move(read_block)) {

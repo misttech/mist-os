@@ -26,11 +26,10 @@ impl PointerInjectorMock {
     }
 
     async fn serve_one_client(self, mut request_stream: SetupRequestStream) {
-        #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
         enum WatchState {
             WaitingFirstRequest(pointerinjector::Viewport),
             WaitingSecondRequest,
-            GotSecondRequest(SetupWatchViewportResponder),
+            GotSecondRequest { _responder: SetupWatchViewportResponder },
         }
         let mut watch_state = WatchState::WaitingFirstRequest(self.viewport.clone());
         let injection_context =
@@ -59,9 +58,9 @@ impl PointerInjectorMock {
                         }
                         WatchState::WaitingSecondRequest => {
                             // Save the responder, to prevent causing errors on the client side.
-                            WatchState::GotSecondRequest(responder)
+                            WatchState::GotSecondRequest { _responder: responder }
                         }
-                        WatchState::GotSecondRequest(_) => {
+                        WatchState::GotSecondRequest { _responder: _ } => {
                             panic!("Client sent WatchViewport when a request was already pending.")
                         }
                     }

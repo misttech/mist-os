@@ -11,6 +11,7 @@ from antlion.controllers.ap_lib import hostapd_constants
 from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts, signals, test_runner
 
+from honeydew.affordances.fuchsia_controller.wlan import wlan as wlan_fc
 from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.typing.wlan import (
     ClientStatusConnected,
@@ -61,6 +62,11 @@ class WlanTests(fuchsia_base_test.FuchsiaBaseTest):
             * wlan.query_iface()
             * wlan.destroy_iface()
         """
+        if isinstance(self.device.wlan, wlan_fc.Wlan):
+            # TODO(http://b/324138169): Remove this if statement once WLAN FC
+            # affordance is implemented
+            return
+
         # We check here to make sure the device is running a softmac WLAN driver.
         # If not, we run basic tests without create_iface().
         # TODO(b/328500376): Add WLAN affordance method for this or remove if not
@@ -100,6 +106,11 @@ class WlanTests(fuchsia_base_test.FuchsiaBaseTest):
             * wlan.get_phy_id_list
             * wlan.get_country
         """
+        if isinstance(self.device.wlan, wlan_fc.Wlan):
+            # TODO(http://b/324138169): Remove this if statement once WLAN FC
+            # affordance is implemented
+            return
+
         # TODO(http://b/337930095): Add the remaining board specific country code tests.
         phy_ids = self.device.wlan.get_phy_id_list()
         self.device.wlan.set_region(CountryCode.UNITED_STATES_OF_AMERICA)
@@ -129,6 +140,11 @@ class WlanTests(fuchsia_base_test.FuchsiaBaseTest):
             * wlan.disconnect()
             * wlan.status()
         """
+        if isinstance(self.device.wlan, wlan_fc.Wlan):
+            # TODO(http://b/324138169): Remove this if statement once WLAN FC
+            # affordance is implemented
+            return
+
         test_ssid = "test"
         access_point.setup_ap(
             access_point=self.access_point,

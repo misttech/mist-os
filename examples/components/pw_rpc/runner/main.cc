@@ -32,7 +32,7 @@
 int main(int argc, const char* argv[], char* envp[]) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
-  FX_SLOG(INFO, "Starting up.");
+  FX_LOG_KV(INFO, "Starting up.");
 
   component::OutgoingDirectory outgoing = component::OutgoingDirectory(loop.dispatcher());
 

@@ -39,6 +39,8 @@ const MOCK_SERVICES_NAME: &str = "mock";
 
 const DEV_NETWORK_DIRECTORY: &str = "dev-class-network";
 
+const PRIMARY_INTERFACE_CONFIGURATION: &str = "fuchsia.network.PrimaryInterface";
+
 const BUFFER_SIZE: usize = 2048;
 
 const MOCK_BOARD_NAME: &str = "mock-board";
@@ -323,6 +325,16 @@ where
                         ),
                         fidl_fuchsia_netemul::Capability::ChildDep(
                             fidl_fuchsia_netemul::ChildDep {
+                                capability: Some(
+                                    fidl_fuchsia_netemul::ExposedCapability::Configuration(
+                                        PRIMARY_INTERFACE_CONFIGURATION.to_string(),
+                                    ),
+                                ),
+                                ..Default::default()
+                            },
+                        ),
+                        fidl_fuchsia_netemul::Capability::ChildDep(
+                            fidl_fuchsia_netemul::ChildDep {
                                 name: Some(NAME_PROVIDER_NAME.to_string()),
                                 capability: Some(
                                     fidl_fuchsia_netemul::ExposedCapability::Protocol(
@@ -382,6 +394,16 @@ where
                             fidl_fuchsia_netemul::DevfsDep {
                                 name: Some(DEV_NETWORK_DIRECTORY.to_string()),
                                 subdir: Some(netemul::NETDEVICE_DEVFS_PATH.to_string()),
+                                ..Default::default()
+                            },
+                        ),
+                        fidl_fuchsia_netemul::Capability::ChildDep(
+                            fidl_fuchsia_netemul::ChildDep {
+                                capability: Some(
+                                    fidl_fuchsia_netemul::ExposedCapability::Configuration(
+                                        PRIMARY_INTERFACE_CONFIGURATION.to_string(),
+                                    ),
+                                ),
                                 ..Default::default()
                             },
                         ),

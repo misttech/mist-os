@@ -176,7 +176,7 @@
         },
         {
             protocol: "fuchsia.weave.FactoryDataManager",
-            from: "#trusted-apps/trusted-app-capabilities",
+            from: "#tee-clients/tee-client-capabilities",
             to: "#sl4f",
             source_availability: "unknown",
         },

@@ -34,7 +34,7 @@
                 "fuchsia.weave.FactoryDataManager",
                 "fuchsia.weave.Signer",
             ],
-            from: "#trusted-apps/trusted-app-capabilities",
+            from: "#tee-clients/tee-client-capabilities",
             to: "#weavestack",
         },
         {

@@ -28,7 +28,7 @@ if (is_fuchsia || is_mistos) {
   lib_deps += [
     "//src/lib/fuchsia-runtime",
     "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/storage/lib/block_client/rust:remote-block-device",
+    "//src/storage/lib/block_client/rust",
   ]
 }
 
@@ -39,6 +39,7 @@ rustc_library("storage_device") {
   test_deps = [
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-async",
+    "//src/storage/lib/block_client/rust:fake-block-client",
     "//third_party/rust_crates:rand",
   ]
   sources = lib_srcs

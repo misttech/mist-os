@@ -5,9 +5,7 @@
 use async_trait::async_trait;
 use error::LogError;
 use ffx_log_args::LogCommand;
-use fho::{daemon_protocol, FfxMain, FfxTool, FhoEnvironment, MachineWriter, ToolIO, TryFromEnv};
-use fidl::endpoints::DiscoverableProtocolMarker;
-use fidl_fuchsia_developer_ffx::{TargetCollectionMarker, TargetCollectionProxy, TargetQuery};
+use fho::{Connector, FfxMain, FfxTool, MachineWriter, ToolIO};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_diagnostics::{LogSettingsMarker, LogSettingsProxy, StreamParameters};
 use fidl_fuchsia_diagnostics_host::ArchiveAccessorMarker;
@@ -21,26 +19,24 @@ use transactional_symbolizer::{RealSymbolizerProcess, TransactionalSymbolizer};
 
 // NOTE: This is required for the legacy ffx toolchain
 // which automatically adds ffx_core even though we don't use it.
-use ffx_core::{self as _, FfxInjectorError};
+use ffx_core::{self as _};
 
 mod condition_variable;
 mod error;
 mod mutex;
+mod transactional_symbolizer;
+
 #[cfg(test)]
 mod testing_utils;
-mod transactional_symbolizer;
 
 const ARCHIVIST_MONIKER: &str = "bootstrap/archivist";
 const TIMEOUT: std::time::Duration = std::time::Duration::from_secs(15);
 
 #[derive(FfxTool)]
 pub struct LogTool {
-    #[with(daemon_protocol())]
-    target_collection: TargetCollectionProxy,
-    rcs_proxy: RemoteControlProxy,
     #[command]
     cmd: LogCommand,
-    connector: FfxConnector,
+    rcs_connector: Connector<RemoteControlProxy>,
 }
 
 struct NoOpSymoblizer;
@@ -52,47 +48,6 @@ impl Symbolize for NoOpSymoblizer {
     }
 }
 
-/// Production implementation of ffx connector.
-/// We can't use Connector because we need access to a
-/// daemon protocol.
-pub struct FfxConnector {
-    env: FhoEnvironment,
-}
-
-#[async_trait(?Send)]
-impl TryFromEnv for FfxConnector {
-    async fn try_from_env(env: &FhoEnvironment) -> Result<Self, fho::Error> {
-        Ok(Self { env: env.clone() })
-    }
-}
-
-impl FfxConnector {
-    async fn connect(&self) -> Result<TargetCollectionProxy, LogError> {
-        loop {
-            let maybe_err = self.env.injector.daemon_factory().await;
-            let daemon_proxy = match maybe_err {
-                Err(FfxInjectorError::DaemonAutostartDisabled) => {
-                    return Err(LogError::DaemonRetriesDisabled);
-                }
-                Ok(daemon_proxy) => daemon_proxy,
-                _ => continue,
-            };
-            let (tc_proxy, server_end) = fidl::endpoints::create_proxy::<TargetCollectionMarker>()
-                .expect("Could not create FIDL proxy");
-            let Ok(Ok(())) = daemon_proxy
-                .connect_to_protocol(
-                    TargetCollectionMarker::PROTOCOL_NAME,
-                    server_end.into_channel(),
-                )
-                .await
-            else {
-                continue;
-            };
-            return Ok(tc_proxy);
-        }
-    }
-}
-
 fho::embedded_plugin!(LogTool);
 
 #[async_trait::async_trait(?Send)]
@@ -100,8 +55,7 @@ impl FfxMain for LogTool {
     type Writer = MachineWriter<LogEntry>;
 
     async fn main(self, writer: Self::Writer) -> fho::Result<()> {
-        log_impl(writer, self.rcs_proxy, self.target_collection, self.cmd, Some(self.connector))
-            .await?;
+        log_impl(writer, self.cmd, self.rcs_connector).await?;
         Ok(())
     }
 }
@@ -109,11 +63,10 @@ impl FfxMain for LogTool {
 // Main entrypoint called from other plugins
 pub async fn log_impl(
     writer: impl ToolIO<OutputItem = LogEntry> + Write + 'static,
-    rcs_proxy: RemoteControlProxy,
-    target_collection_proxy: TargetCollectionProxy,
     cmd: LogCommand,
-    connector: Option<FfxConnector>,
+    rcs_connector: Connector<RemoteControlProxy>,
 ) -> Result<(), LogError> {
+    let rcs_proxy = connect_to_rcs(&rcs_connector).await?;
     let instance_getter = rcs::root_realm_query(&rcs_proxy, TIMEOUT).await?;
     // TODO(b/333908164): We have 3 different flags that all do the same thing.
     // Remove them when possible.
@@ -121,8 +74,6 @@ pub async fn log_impl(
     let prettification_disabled = cmd.symbolize.is_prettification_disabled();
     log_main(
         writer,
-        rcs_proxy,
-        target_collection_proxy,
         cmd,
         if symbolize_disabled {
             None
@@ -132,7 +83,7 @@ pub async fn log_impl(
             )?)
         },
         instance_getter,
-        connector,
+        rcs_connector,
     )
     .await
 }
@@ -140,29 +91,16 @@ pub async fn log_impl(
 // Main logging event loop.
 async fn log_main<W>(
     writer: W,
-    rcs_proxy: RemoteControlProxy,
-    target_collection_proxy: TargetCollectionProxy,
     cmd: LogCommand,
     symbolizer: Option<impl Symbolize>,
     instance_getter: impl InstanceGetter,
-    connector: Option<FfxConnector>,
+    rcs_connector: Connector<RemoteControlProxy>,
 ) -> Result<(), LogError>
 where
     W: ToolIO<OutputItem = LogEntry> + Write + 'static,
 {
-    let node_name = rcs_proxy.identify_host().await??.nodename;
-    let target_query = TargetQuery { string_matcher: node_name, ..Default::default() };
     let formatter = DefaultLogFormatter::<W>::new_from_args(&cmd, writer);
-    log_loop(
-        target_collection_proxy,
-        target_query,
-        cmd,
-        formatter,
-        symbolizer,
-        &instance_getter,
-        connector,
-    )
-    .await?;
+    log_loop(cmd, formatter, symbolizer, &instance_getter, rcs_connector).await?;
     Ok(())
 }
 
@@ -172,16 +110,21 @@ struct DeviceConnection {
     log_settings_client: LogSettingsProxy,
 }
 
+async fn connect_to_rcs(
+    rcs_connector: &Connector<RemoteControlProxy>,
+) -> fho::Result<RemoteControlProxy> {
+    rcs_connector.try_connect(|_target| Ok(())).await
+}
+
 // TODO(https://fxbug.dev/42080003): Remove this once Overnet
 // has support for reconnect handling.
 async fn connect_to_target(
-    target_collection_proxy: &TargetCollectionProxy,
-    query: &TargetQuery,
     stream_mode: &mut fidl_fuchsia_diagnostics::StreamMode,
     prev_timestamp: Option<u64>,
+    rcs_connector: &Connector<RemoteControlProxy>,
 ) -> Result<DeviceConnection, LogError> {
     // Connect to device
-    let rcs_client = connect_to_rcs(target_collection_proxy, query).await?;
+    let rcs_client = connect_to_rcs(rcs_connector).await?;
     let boot_timestamp =
         rcs_client.identify_host().await??.boot_timestamp_nanos.ok_or(LogError::NoBootTimestamp)?;
     // If we detect a reboot we want to SnapshotThenSubscribe so
@@ -230,25 +173,12 @@ async fn connect_to_target(
     })
 }
 
-async fn connect_to_rcs(
-    target_collection_proxy: &TargetCollectionProxy,
-    query: &TargetQuery,
-) -> Result<RemoteControlProxy, LogError> {
-    let (client, server) = fidl::endpoints::create_proxy()?;
-    target_collection_proxy.open_target(query, server).await??;
-    let (rcs_client, rcs_server) = fidl::endpoints::create_proxy()?;
-    client.open_remote_control(rcs_server).await??;
-    Ok(rcs_client)
-}
-
 async fn log_loop<W>(
-    mut target_collection_proxy: TargetCollectionProxy,
-    target_query: TargetQuery,
     cmd: LogCommand,
     mut formatter: impl LogFormatter + BootTimeAccessor + WriterContainer<W>,
     symbolizer: Option<impl Symbolize>,
     realm_query: &impl InstanceGetter,
-    connector: Option<FfxConnector>,
+    rcs_connector: Connector<RemoteControlProxy>,
 ) -> Result<(), LogError>
 where
     W: ToolIO<OutputItem = LogEntry> + Write,
@@ -270,13 +200,8 @@ where
         let mut backoff = 0;
         let mut last_error = None;
         loop {
-            let maybe_connection = connect_to_target(
-                &target_collection_proxy,
-                &target_query,
-                &mut stream_mode,
-                prev_timestamp,
-            )
-            .await;
+            let maybe_connection =
+                connect_to_target(&mut stream_mode, prev_timestamp, &rcs_connector).await;
             if let Ok(connected) = maybe_connection {
                 connection = connected;
                 break;
@@ -287,17 +212,15 @@ where
             }
             let err = maybe_connection.err().unwrap();
             if matches!(err, LogError::FidlError(fidl::Error::ClientChannelClosed { .. })) {
-                let Some(connector) = connector.as_ref() else {
-                    return Err(LogError::DaemonRetriesDisabled);
-                };
-                eprintln!("Lost connection to ffx daemon, attempting to reconnect.");
-                target_collection_proxy = connector.connect().await?;
                 continue;
             }
             let err = format!("{:?}", err);
             if matches!(&last_error, Some(value) if *value == err) {
                 eprintln!("Error connecting to device, retrying in {backoff} seconds.");
             } else {
+                if err.contains("FFX Daemon was told not to autostart and no existing Daemon instance was found") {
+                    return Err(LogError::DaemonRetriesDisabled);
+                }
                 eprintln!(
                     "Error connecting to device, retrying in {backoff} seconds. Error: {err}",
                 );
@@ -360,84 +283,53 @@ fn get_stream_mode(cmd: LogCommand) -> Result<fidl_fuchsia_diagnostics::StreamMo
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testing_utils::{
-        handle_rcs_connection, handle_target_collection_connection, Configuration, Manager,
-        TestEvent,
-    };
+    use crate::testing_utils::{TestEnvironment, TestEnvironmentConfig, TestEvent};
     use assert_matches::assert_matches;
-    use async_trait::async_trait;
     use chrono::{Local, TimeZone};
     use diagnostics_data::{BuilderArgs, LogsDataBuilder, Severity, Timestamp};
     use ffx_writer::{Format, TestBuffers};
-    use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
     use fidl_fuchsia_diagnostics::StreamMode;
-    use fuchsia_async::Task;
+    use fuchsia_async as fasync;
     use futures::StreamExt;
     use log_command::log_formatter::{LogData, TIMESTAMP_FORMAT};
-    use log_command::{parse_seconds_string_as_duration, parse_time, DumpCommand, TimeFormat};
+    use log_command::{
+        parse_seconds_string_as_duration, parse_time, DumpCommand, SymbolizeMode, TimeFormat,
+    };
     use moniker::Moniker;
     use selectors::parse_log_interest_selector;
-    use std::rc::Rc;
 
-    const TEST_STR: &str = "[1980-01-01 00:00:03.000][ffx] INFO: Hello world 2!\u{1b}[m\n";
+    const TEST_STR: &str = "[1980-01-01 00:00:03.000][ffx] INFO: Hello world!\u{1b}[m\n";
 
-    #[derive(Default)]
-    struct FakeInstanceGetter {
-        output: Vec<Moniker>,
-        expected_selector: Option<String>,
-    }
-
-    #[async_trait(?Send)]
-    impl InstanceGetter for FakeInstanceGetter {
-        async fn get_monikers_from_query(
-            &self,
-            query: &str,
-        ) -> Result<Vec<Moniker>, log_command::LogError> {
-            if let Some(expected) = &self.expected_selector {
-                assert_eq!(expected, query);
-            }
-            Ok(self.output.clone())
+    async fn check_for_message(buffers: &TestBuffers, msg: &str) {
+        while buffers.stdout.clone().into_string() != msg {
+            buffers.stdout.wait_ready().await;
         }
     }
 
     #[fuchsia::test]
     async fn json_logger_test() {
-        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
-        let (target_collection_proxy, target_collection_server) =
-            fidl::endpoints::create_proxy().unwrap();
+        let environment = TestEnvironment::new(TestEnvironmentConfig::default());
+        let rcs_connector = environment.rcs_connector().await;
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
+            symbolize: SymbolizeMode::Off,
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymoblizer;
-        let manager = Manager::new();
-        let environment = manager.get_environment();
-        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
-        Task::local(handle_target_collection_connection(
-            target_collection_server,
-            environment.clone(),
-        ))
-        .detach();
-        let test_buffers = TestBuffers::default();
-        log_main(
-            MachineWriter::<LogEntry>::new_test(Some(Format::Json), &test_buffers),
-            rcs_proxy,
-            target_collection_proxy,
-            cmd,
-            Some(symbolizer),
-            FakeInstanceGetter::default(),
-            None,
-        )
-        .await
-        .expect("log_main failed");
+        let tool = LogTool { cmd, rcs_connector };
+        let buffers = TestBuffers::default();
+        let writer = MachineWriter::<LogEntry>::new_test(Some(Format::Json), &buffers);
+
+        assert_matches!(tool.main(writer).await, Ok(()));
+        let output = buffers.into_stdout_str();
+
         assert_eq!(
-            serde_json::from_str::<LogEntry>(&test_buffers.stdout.into_string()).unwrap(),
+            serde_json::from_str::<LogEntry>(&output).unwrap(),
             LogEntry {
                 timestamp: 1.into(),
                 data: LogData::TargetLog(
                     LogsDataBuilder::new(BuilderArgs {
                         component_url: Some("ffx".into()),
-                        moniker: "ffx".try_into().unwrap(),
+                        moniker: "host/ffx".try_into().unwrap(),
                         severity: Severity::Info,
                         timestamp_nanos: Timestamp::from(0),
                     })
@@ -452,48 +344,26 @@ mod tests {
 
     #[fuchsia::test]
     async fn logger_prints_error_if_ambiguous_selector() {
-        let (rcs_proxy, rcs_server) =
-            fidl::endpoints::create_proxy::<RemoteControlMarker>().unwrap();
-        let (target_collection_proxy, target_collection_server) =
-            fidl::endpoints::create_proxy::<TargetCollectionMarker>().unwrap();
-
+        let environment = TestEnvironment::new(TestEnvironmentConfig {
+            instances: vec![
+                Moniker::try_from("core/some/ambiguous_selector:thing/test").unwrap(),
+                Moniker::try_from("core/other/ambiguous_selector:thing/test").unwrap(),
+            ],
+            ..Default::default()
+        });
+        let rcs_connector = environment.rcs_connector().await;
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
             select: vec![parse_log_interest_selector("ambiguous_selector#INFO").unwrap()],
+            symbolize: SymbolizeMode::Off,
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymoblizer;
-        let manager = Manager::new();
-        let environment = manager.get_environment();
-        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
-        Task::local(handle_target_collection_connection(
-            target_collection_server,
-            environment.clone(),
-        ))
-        .detach();
-        let test_buffers = TestBuffers::default();
-        let mut getter = FakeInstanceGetter::default();
-        getter.expected_selector = Some("ambiguous_selector".into());
-        getter.output = vec![
-            Moniker::try_from("core/some/ambiguous_selector:thing/test").unwrap(),
-            Moniker::try_from("core/other/ambiguous_selector:thing/test").unwrap(),
-        ];
 
-        // Main should return an error
-        let error = format!(
-            "{}",
-            log_main(
-                MachineWriter::<LogEntry>::new_test(None, &test_buffers),
-                rcs_proxy,
-                target_collection_proxy,
-                cmd,
-                Some(symbolizer),
-                getter,
-                None,
-            )
-            .await
-            .expect_err("log_main succeeded")
-        );
+        let tool = LogTool { cmd, rcs_connector };
+        let buffers = TestBuffers::default();
+        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
+
+        let error = format!("{}", tool.main(writer).await.unwrap_err());
 
         const EXPECTED_INTEREST_ERROR: &str = r#"WARN: One or more of your selectors appears to be ambiguous
 and may not match any components on your system.
@@ -502,8 +372,8 @@ If this is unintentional you can explicitly match using the
 following command:
 
 ffx log \
-	--select core/some/ambiguous_selector\\:thing/test#INFO \
-	--select core/other/ambiguous_selector\\:thing/test#INFO
+	--select core/other/ambiguous_selector\\:thing/test#INFO \
+	--select core/some/ambiguous_selector\\:thing/test#INFO
 
 If this is intentional, you can disable this with
 ffx log --force-select.
@@ -511,346 +381,155 @@ ffx log --force-select.
         assert_eq!(error, EXPECTED_INTEREST_ERROR);
     }
 
-    #[fuchsia::test]
-    async fn logger_translates_selector_if_one_match() {
-        let (rcs_proxy, rcs_server) =
-            fidl::endpoints::create_proxy::<RemoteControlMarker>().unwrap();
-        let (target_collection_proxy, target_collection_server) =
-            fidl::endpoints::create_proxy::<TargetCollectionMarker>().unwrap();
-
+    async fn logger_dump_test(
+        config: TestEnvironmentConfig,
+        cmd: LogCommand,
+        expected_output: &str,
+    ) {
+        let mut environment = TestEnvironment::new(config);
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            select: vec![parse_log_interest_selector("ambiguous_selector#INFO").unwrap()],
+            symbolize: SymbolizeMode::Off,
+            ..cmd
+        };
+
+        let rcs_connector = environment.rcs_connector().await;
+        let tool = LogTool { cmd, rcs_connector };
+        let buffers = TestBuffers::default();
+        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let mut event_stream = environment.take_event_stream().unwrap();
+
+        assert_matches!(tool.main(writer).await, Ok(()));
+        assert_eq!(buffers.into_stdout_str(), expected_output);
+        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
+    }
+
+    #[fuchsia::test]
+    async fn logger_sets_interest_if_one_match() {
+        let selectors = vec![parse_log_interest_selector("core/foo#INFO").unwrap()];
+        let mut environment = TestEnvironment::new(TestEnvironmentConfig {
+            instances: vec![Moniker::try_from("core/foo").unwrap()],
+            ..Default::default()
+        });
+        let cmd = LogCommand {
+            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
+            select: selectors.clone(),
+            symbolize: SymbolizeMode::Off,
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymoblizer;
-        let mut manager = Manager::new();
-        let mut event_stream = manager.take_event_stream().unwrap();
-        let environment = manager.get_environment();
-        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
-        Task::local(handle_target_collection_connection(
-            target_collection_server,
-            environment.clone(),
-        ))
-        .detach();
-        let test_buffers = TestBuffers::default();
-        let mut getter = FakeInstanceGetter::default();
-        getter.expected_selector = Some("ambiguous_selector".into());
-        getter.output = vec![Moniker::try_from("core/some/ambiguous_selector").unwrap()];
-        log_main(
-            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
-            rcs_proxy,
-            target_collection_proxy,
-            cmd,
-            Some(symbolizer),
-            getter,
-            None,
-        )
-        .await
-        .expect("log_main failed");
+        let rcs_connector = environment.rcs_connector().await;
+        let tool = LogTool { cmd, rcs_connector };
+        let buffers = TestBuffers::default();
+        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let mut event_stream = environment.take_event_stream().unwrap();
 
-        let severity =
-            vec![parse_log_interest_selector("core/some/ambiguous_selector#INFO").unwrap()];
-        assert_matches!(event_stream.next().await, Some(TestEvent::SeverityChanged(s)) if s == severity);
+        assert_matches!(tool.main(writer).await, Ok(()));
+        assert_eq!(event_stream.next().await, Some(TestEvent::SetInterest(selectors)));
     }
 
     #[fuchsia::test]
     async fn logger_prints_error_if_both_dump_and_since_now_are_combined() {
-        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
-        let (target_collection_proxy, target_collection_server) =
-            fidl::endpoints::create_proxy().unwrap();
+        let environment = TestEnvironment::new(TestEnvironmentConfig::default());
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
+            symbolize: SymbolizeMode::Off,
             since: Some(parse_time("now").unwrap()),
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymoblizer;
-        let manager = Manager::new();
-        let environment = manager.get_environment();
-        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
-        Task::local(handle_target_collection_connection(
-            target_collection_server,
-            environment.clone(),
-        ))
-        .detach();
-        let test_buffers = TestBuffers::default();
+        let rcs_connector = environment.rcs_connector().await;
+        let tool = LogTool { cmd, rcs_connector };
+        let buffers = TestBuffers::default();
+        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
 
-        assert_matches!(
-            log_main(
-                MachineWriter::<LogEntry>::new_test(None, &test_buffers),
-                rcs_proxy,
-                target_collection_proxy,
-                cmd,
-                Some(symbolizer),
-                FakeInstanceGetter::default(),
-                None,
-            )
-            .await,
-            Err(LogError::DumpWithSinceNow)
-        );
+        let result = tool.main(writer).await;
+        assert_matches!(result, Err(fho::Error::User(err)) => {
+            assert_matches!(err.downcast_ref::<LogError>(), Some(LogError::DumpWithSinceNow));
+        });
     }
 
     #[fuchsia::test]
-    async fn logger_prints_hello_world_message_and_exits_in_snapshot_mode() {
-        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
-        let (target_collection_proxy, target_collection_server) =
-            fidl::endpoints::create_proxy().unwrap();
+    async fn logger_prints_current_logs_and_exits_on_dump() {
+        let mut environment = TestEnvironment::new(TestEnvironmentConfig::default());
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
+            symbolize: SymbolizeMode::Off,
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymoblizer;
-        let mut manager = Manager::new();
-        let mut event_stream = manager.take_event_stream().unwrap();
-        let environment = manager.get_environment();
-        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
-        Task::local(handle_target_collection_connection(
-            target_collection_server,
-            environment.clone(),
-        ))
-        .detach();
-        let test_buffers = TestBuffers::default();
-        log_main(
-            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
-            rcs_proxy,
-            target_collection_proxy,
-            cmd,
-            Some(symbolizer),
-            FakeInstanceGetter::default(),
-            None,
-        )
-        .await
-        .expect("log_main failed");
+        let rcs_connector = environment.rcs_connector().await;
+        let tool = LogTool { cmd, rcs_connector };
+        let buffers = TestBuffers::default();
+        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let mut event_stream = environment.take_event_stream().unwrap();
 
-        assert_eq!(
-            test_buffers.stdout.into_string(),
-            "[00000.000000][ffx] INFO: Hello world!\u{1b}[m\n".to_string()
-        );
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+        assert_matches!(tool.main(writer).await, Ok(()));
+        assert_eq!(buffers.into_stdout_str(), "[00000.000000][ffx] INFO: Hello world!\u{1b}[m\n",);
+        // ffx log keeps this connection always open. If it exits, it means that ffx log exits.
+        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
     }
 
     #[fuchsia::test]
     async fn logger_does_not_color_logs_if_disabled() {
-        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
-        let (target_collection_proxy, target_collection_server) =
-            fidl::endpoints::create_proxy().unwrap();
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            no_color: true,
-            ..LogCommand::default()
-        };
-        let symbolizer = NoOpSymoblizer;
-        let mut manager = Manager::new();
-        let mut event_stream = manager.take_event_stream().unwrap();
-        let environment = manager.get_environment();
-        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
-        Task::local(handle_target_collection_connection(
-            target_collection_server,
-            environment.clone(),
-        ))
-        .detach();
-        let test_buffers = TestBuffers::default();
-        log_main(
-            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
-            rcs_proxy,
-            target_collection_proxy,
-            cmd,
-            Some(symbolizer),
-            FakeInstanceGetter::default(),
-            None,
+        logger_dump_test(
+            TestEnvironmentConfig::default(),
+            LogCommand { no_color: true, ..LogCommand::default() },
+            "[00000.000000][ffx] INFO: Hello world!\n",
         )
-        .await
-        .expect("log_main failed");
-
-        assert_eq!(
-            test_buffers.stdout.into_string(),
-            "[00000.000000][ffx] INFO: Hello world!\n".to_string()
-        );
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+        .await;
     }
 
     #[fuchsia::test]
     async fn logger_shows_metadata_if_enabled() {
-        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
-        let (target_collection_proxy, target_collection_server) =
-            fidl::endpoints::create_proxy().unwrap();
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            show_metadata: true,
-            no_color: true,
-            ..LogCommand::default()
-        };
-        let symbolizer = NoOpSymoblizer;
-        let mut manager = Manager::new();
-        let mut event_stream = manager.take_event_stream().unwrap();
-        let environment = manager.get_environment();
-        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
-        Task::local(handle_target_collection_connection(
-            target_collection_server,
-            environment.clone(),
-        ))
-        .detach();
-        let test_buffers = TestBuffers::default();
-        log_main(
-            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
-            rcs_proxy,
-            target_collection_proxy,
-            cmd,
-            Some(symbolizer),
-            FakeInstanceGetter::default(),
-            None,
+        logger_dump_test(
+            TestEnvironmentConfig::default(),
+            LogCommand { no_color: true, show_metadata: true, ..LogCommand::default() },
+            "[00000.000000][1][2][ffx] INFO: Hello world!\n",
         )
-        .await
-        .expect("log_main failed");
-
-        assert_eq!(
-            test_buffers.stdout.into_string(),
-            "[00000.000000][1][2][ffx] INFO: Hello world!\n".to_string()
-        );
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+        .await;
     }
 
     #[fuchsia::test]
     async fn logger_shows_utc_time_if_enabled() {
-        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
-        let (target_collection_proxy, target_collection_server) =
-            fidl::endpoints::create_proxy().unwrap();
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            clock: TimeFormat::Utc,
-            ..LogCommand::default()
-        };
-        let symbolizer = NoOpSymoblizer;
-        let mut manager = Manager::new_with_config(Rc::new(Configuration {
-            messages: vec![LogsDataBuilder::new(BuilderArgs {
-                component_url: Some("ffx".into()),
-                moniker: "ffx".try_into().unwrap(),
-                severity: Severity::Info,
-                timestamp_nanos: Timestamp::from(1),
-            })
-            .set_pid(1)
-            .set_tid(2)
-            .set_message("Hello world!")
-            .build()],
-            ..Default::default()
-        }));
-        let mut event_stream = manager.take_event_stream().unwrap();
-        let environment = manager.get_environment();
-        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
-        Task::local(handle_target_collection_connection(
-            target_collection_server,
-            environment.clone(),
-        ))
-        .detach();
-        let test_buffers = TestBuffers::default();
-        log_main(
-            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
-            rcs_proxy,
-            target_collection_proxy,
-            cmd,
-            Some(symbolizer),
-            FakeInstanceGetter::default(),
-            None,
+        logger_dump_test(
+            TestEnvironmentConfig::default(),
+            LogCommand { clock: TimeFormat::Utc, ..LogCommand::default() },
+            "[1970-01-01 00:00:00.000][ffx] INFO: Hello world!\u{1b}[m\n",
         )
-        .await
-        .expect("log_main failed");
-
-        assert_eq!(
-            test_buffers.stdout.into_string(),
-            "[1970-01-01 00:00:00.000][ffx] INFO: Hello world!\u{1b}[m\n".to_string()
-        );
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+        .await;
     }
 
     #[fuchsia::test]
     async fn logger_shows_logs_filtered_by_severity() {
-        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
-        let (target_collection_proxy, target_collection_server) =
-            fidl::endpoints::create_proxy().unwrap();
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            clock: TimeFormat::Utc,
-            severity: Severity::Error,
-            ..LogCommand::default()
-        };
-        let symbolizer = NoOpSymoblizer;
-        let mut manager = Manager::new_with_config(Rc::new(Configuration {
-            messages: vec![
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".try_into().unwrap(),
-                    severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(0),
-                })
-                .set_pid(1)
-                .set_tid(2)
-                .set_message("Hello world!")
-                .build(),
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".try_into().unwrap(),
-                    severity: Severity::Error,
-                    timestamp_nanos: Timestamp::from(3000000000i64),
-                })
-                .set_pid(1)
-                .set_tid(2)
-                .set_message("Hello world!")
-                .build(),
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".try_into().unwrap(),
-                    severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(6000000000i64),
-                })
-                .set_pid(1)
-                .set_tid(2)
-                .set_message("Hello world!")
-                .build(),
-            ],
-            ..Default::default()
-        }));
-        let mut event_stream = manager.take_event_stream().unwrap();
-        let environment = manager.get_environment();
-        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
-        Task::local(handle_target_collection_connection(
-            target_collection_server,
-            environment.clone(),
-        ))
-        .detach();
-        let test_buffers = TestBuffers::default();
-        log_main(
-            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
-            rcs_proxy,
-            target_collection_proxy,
-            cmd,
-            Some(symbolizer),
-            FakeInstanceGetter::default(),
-            None,
+        logger_dump_test(
+            TestEnvironmentConfig {
+                messages: vec![
+                    testing_utils::test_log_with_severity(0, Severity::Info),
+                    testing_utils::test_log_with_severity(3000000000i64, Severity::Error),
+                    testing_utils::test_log_with_severity(6000000000i64, Severity::Info),
+                ],
+                ..Default::default()
+            },
+            LogCommand {
+                clock: TimeFormat::Utc,
+                severity: Severity::Error,
+                ..LogCommand::default()
+            },
+            "\u{1b}[38;5;1m[1970-01-01 00:00:03.000][ffx] ERROR: Hello world!\u{1b}[m\n",
         )
-        .await
-        .expect("log_main failed");
-
-        assert_eq!(
-            test_buffers.stdout.into_string(),
-            "\u{1b}[38;5;1m[1970-01-01 00:00:03.000][ffx] ERROR: Hello world!\u{1b}[m\n"
-                .to_string()
-        );
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
-    }
-
-    async fn check_for_message(test_buffers: &fho::macro_deps::ffx_writer::TestBuffers, msg: &str) {
-        while test_buffers.stdout.clone().into_string() != msg {
-            test_buffers.stdout.wait_ready().await;
-        }
+        .await;
     }
 
     #[fuchsia::test]
     async fn logger_shows_logs_since_specific_timestamp_across_reboots() {
-        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
-        let (target_collection_proxy, target_collection_server) =
-            fidl::endpoints::create_proxy().unwrap();
+        let mut environment = TestEnvironment::new(TestEnvironmentConfig {
+            messages: vec![testing_utils::test_log(testing_utils::naive_utc_nanos(
+                "1980-01-01T00:00:03",
+            ))],
+            send_connected_event: true,
+            ..Default::default()
+        });
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Watch(WatchCommand {})),
+            symbolize: SymbolizeMode::Off,
             clock: TimeFormat::Local,
             since: Some(log_command::DetailedDateTime {
                 is_now: true,
@@ -859,51 +538,18 @@ ffx log --force-select.
             until: None,
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymoblizer;
-        let mut manager = Manager::new_with_config(Rc::new(Configuration {
-            messages: vec![LogsDataBuilder::new(BuilderArgs {
-                component_url: Some("ffx".into()),
-                moniker: "ffx".try_into().unwrap(),
-                severity: Severity::Info,
-                timestamp_nanos: Timestamp::from(
-                    parse_time("1980-01-01T00:00:03")
-                        .unwrap()
-                        .time
-                        .naive_utc()
-                        .timestamp_nanos_opt()
-                        .unwrap(),
-                ),
-            })
-            .set_pid(1)
-            .set_tid(2)
-            .set_message("Hello world 2!")
-            .build()],
-            send_mode_event: true,
-            ..Default::default()
-        }));
-        let mut event_stream = manager.take_event_stream().unwrap();
-        let environment = manager.get_environment();
-        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
-        Task::local(handle_target_collection_connection(
-            target_collection_server,
-            environment.clone(),
-        ))
-        .detach();
-        let test_buffers = TestBuffers::default();
+
+        let rcs_connector = environment.rcs_connector().await;
+        let tool = LogTool { cmd, rcs_connector };
+        let buffers = TestBuffers::default();
+        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let mut event_stream = environment.take_event_stream().unwrap();
 
         // Intentionally unused. When in streaming mode, this should never return a value.
-        let _result = Task::local(log_main(
-            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
-            rcs_proxy,
-            target_collection_proxy,
-            cmd,
-            Some(symbolizer),
-            FakeInstanceGetter::default(),
-            None,
-        ));
+        let _result = fasync::Task::local(tool.main(writer));
 
         // Run the stream until we get the expected message.
-        check_for_message(&test_buffers, TEST_STR).await;
+        check_for_message(&buffers, TEST_STR).await;
 
         // First connection should have used Subscribe mode.
         assert_matches!(
@@ -915,9 +561,9 @@ ffx log --force-select.
 
         // Device is paused when we exit the loop because there's nothing
         // polling the future.
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
 
-        check_for_message(&test_buffers, TEST_STR).await;
+        check_for_message(&buffers, TEST_STR).await;
 
         // Second connection has a different timestamp so should be treated
         // as a reboot.
@@ -928,16 +574,21 @@ ffx log --force-select.
 
         environment.disconnect_target();
 
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
     }
 
     #[fuchsia::test]
     async fn logger_shows_logs_since_specific_timestamp_across_reboots_heuristic() {
-        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
-        let (target_collection_proxy, target_collection_server) =
-            fidl::endpoints::create_proxy().unwrap();
+        let mut environment = TestEnvironment::new(TestEnvironmentConfig {
+            messages: vec![testing_utils::test_log(testing_utils::naive_utc_nanos(
+                "1980-01-01T00:00:03",
+            ))],
+            send_connected_event: true,
+            ..Default::default()
+        });
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Watch(WatchCommand {})),
+            symbolize: SymbolizeMode::Off,
             clock: TimeFormat::Local,
             since: Some(log_command::DetailedDateTime {
                 is_now: true,
@@ -946,51 +597,18 @@ ffx log --force-select.
             until: None,
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymoblizer;
-        let mut manager = Manager::new_with_config(Rc::new(Configuration {
-            messages: vec![LogsDataBuilder::new(BuilderArgs {
-                component_url: Some("ffx".into()),
-                moniker: "ffx".try_into().unwrap(),
-                severity: Severity::Info,
-                timestamp_nanos: Timestamp::from(
-                    parse_time("1980-01-01T00:00:03")
-                        .unwrap()
-                        .time
-                        .naive_utc()
-                        .timestamp_nanos_opt()
-                        .unwrap(),
-                ),
-            })
-            .set_pid(1)
-            .set_tid(2)
-            .set_message("Hello world 2!")
-            .build()],
-            send_mode_event: true,
-            ..Default::default()
-        }));
-        let mut event_stream = manager.take_event_stream().unwrap();
-        let environment = manager.get_environment();
-        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
-        Task::local(handle_target_collection_connection(
-            target_collection_server,
-            environment.clone(),
-        ))
-        .detach();
-        let test_buffers = TestBuffers::default();
+
+        let rcs_connector = environment.rcs_connector().await;
+        let tool = LogTool { cmd, rcs_connector };
+        let buffers = TestBuffers::default();
+        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
+        let mut event_stream = environment.take_event_stream().unwrap();
 
         // Intentionally unused. When in streaming mode, this should never return a value.
-        let _result = Task::local(log_main(
-            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
-            rcs_proxy,
-            target_collection_proxy,
-            cmd,
-            Some(symbolizer),
-            FakeInstanceGetter::default(),
-            None,
-        ));
+        let _result = fasync::Task::local(tool.main(writer));
 
         // Run the stream until we get the expected message.
-        check_for_message(&test_buffers, TEST_STR).await;
+        check_for_message(&buffers, TEST_STR).await;
 
         // First connection should have used Subscribe mode.
         assert_matches!(
@@ -1002,10 +620,10 @@ ffx log --force-select.
 
         // Device is paused when we exit the loop because there's nothing
         // polling the future.
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
 
         // We should reconnect and get another message.
-        check_for_message(&test_buffers, TEST_STR).await;
+        check_for_message(&buffers, TEST_STR).await;
 
         // Second connection has a matching timestamp to the first one, so we should
         // Subscribe to not repeat messages.
@@ -1019,9 +637,9 @@ ffx log --force-select.
         // changed and it's clear it's actually a separate boot not a disconnect/reconnect
         environment.reboot_target(42);
 
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
 
-        check_for_message(&test_buffers, TEST_STR).await;
+        check_for_message(&buffers, TEST_STR).await;
 
         assert_matches!(
             event_stream.next().await,
@@ -1031,592 +649,166 @@ ffx log --force-select.
 
     #[fuchsia::test]
     async fn logger_shows_logs_since_specific_timestamp() {
-        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
-        let (target_collection_proxy, target_collection_server) =
-            fidl::endpoints::create_proxy().unwrap();
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            clock: TimeFormat::Local,
-            since: Some(parse_time("1980-01-01T00:00:01").unwrap()),
-            until: Some(parse_time("1980-01-01T00:00:05").unwrap()),
-            ..LogCommand::default()
-        };
-        let symbolizer = NoOpSymoblizer;
-        let mut manager = Manager::new_with_config(Rc::new(Configuration {
-            messages: vec![
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".try_into().unwrap(),
-                    severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(
-                        parse_time("1980-01-01T00:00:00")
-                            .unwrap()
-                            .time
-                            .naive_utc()
-                            .timestamp_nanos_opt()
-                            .unwrap(),
-                    ),
-                })
-                .set_pid(1)
-                .set_tid(2)
-                .set_message("Hello world!")
-                .build(),
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".try_into().unwrap(),
-                    severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(
-                        parse_time("1980-01-01T00:00:03")
-                            .unwrap()
-                            .time
-                            .naive_utc()
-                            .timestamp_nanos_opt()
-                            .unwrap(),
-                    ),
-                })
-                .set_pid(1)
-                .set_tid(2)
-                .set_message("Hello world!")
-                .build(),
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".try_into().unwrap(),
-                    severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(
-                        parse_time("1980-01-01T00:00:06")
-                            .unwrap()
-                            .time
-                            .naive_utc()
-                            .timestamp_nanos_opt()
-                            .unwrap(),
-                    ),
-                })
-                .set_pid(1)
-                .set_tid(2)
-                .set_message("Hello world!")
-                .build(),
-            ],
-            ..Default::default()
-        }));
-        let mut event_stream = manager.take_event_stream().unwrap();
-        let environment = manager.get_environment();
-        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
-        Task::local(handle_target_collection_connection(
-            target_collection_server,
-            environment.clone(),
-        ))
-        .detach();
-        let test_buffers = TestBuffers::default();
-        log_main(
-            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
-            rcs_proxy,
-            target_collection_proxy,
-            cmd,
-            Some(symbolizer),
-            FakeInstanceGetter::default(),
-            None,
+        logger_dump_test(
+            TestEnvironmentConfig {
+                messages: vec![
+                    testing_utils::test_log(testing_utils::naive_utc_nanos("1980-01-01T00:00:00")),
+                    testing_utils::test_log(testing_utils::naive_utc_nanos("1980-01-01T00:00:03")),
+                    testing_utils::test_log(testing_utils::naive_utc_nanos("1980-01-01T00:00:06")),
+                ],
+                ..Default::default()
+            },
+            LogCommand {
+                since: Some(parse_time("1980-01-01T00:00:01").unwrap()),
+                until: Some(parse_time("1980-01-01T00:00:05").unwrap()),
+                clock: TimeFormat::Utc,
+                ..LogCommand::default()
+            },
+            "[1980-01-01 00:00:03.000][ffx] INFO: Hello world!\u{1b}[m\n",
         )
-        .await
-        .expect("log_main failed");
-
-        assert_eq!(
-            test_buffers.stdout.into_string(),
-            "[1980-01-01 00:00:03.000][ffx] INFO: Hello world!\u{1b}[m\n".to_string()
-        );
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+        .await;
     }
 
     #[fuchsia::test]
     async fn logger_shows_logs_since_specific_timestamp_monotonic() {
-        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
-        let (target_collection_proxy, target_collection_server) =
-            fidl::endpoints::create_proxy().unwrap();
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            clock: TimeFormat::Utc,
-            since_monotonic: Some(parse_seconds_string_as_duration("1").unwrap()),
-            until_monotonic: Some(parse_seconds_string_as_duration("5").unwrap()),
-            ..LogCommand::default()
-        };
-        let symbolizer = NoOpSymoblizer;
-        let mut manager = Manager::new_with_config(Rc::new(Configuration {
-            messages: vec![
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".try_into().unwrap(),
-                    severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(0),
-                })
-                .set_pid(1)
-                .set_tid(2)
-                .set_message("Hello world!")
-                .build(),
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".try_into().unwrap(),
-                    severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(3000000000i64),
-                })
-                .set_pid(1)
-                .set_tid(2)
-                .set_message("Hello world!")
-                .build(),
-                LogsDataBuilder::new(BuilderArgs {
-                    component_url: Some("ffx".into()),
-                    moniker: "ffx".try_into().unwrap(),
-                    severity: Severity::Info,
-                    timestamp_nanos: Timestamp::from(6000000000i64),
-                })
-                .set_pid(1)
-                .set_tid(2)
-                .set_message("Hello world!")
-                .build(),
-            ],
-            ..Default::default()
-        }));
-        let mut event_stream = manager.take_event_stream().unwrap();
-        let environment = manager.get_environment();
-        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
-        Task::local(handle_target_collection_connection(
-            target_collection_server,
-            environment.clone(),
-        ))
-        .detach();
-        let test_buffers = TestBuffers::default();
-        log_main(
-            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
-            rcs_proxy,
-            target_collection_proxy,
-            cmd,
-            Some(symbolizer),
-            FakeInstanceGetter::default(),
-            None,
+        logger_dump_test(
+            TestEnvironmentConfig {
+                messages: vec![
+                    testing_utils::test_log(0),
+                    testing_utils::test_log(3000000000i64),
+                    testing_utils::test_log(6000000000i64),
+                ],
+                ..Default::default()
+            },
+            LogCommand {
+                clock: TimeFormat::Utc,
+                since_monotonic: Some(parse_seconds_string_as_duration("1").unwrap()),
+                until_monotonic: Some(parse_seconds_string_as_duration("5").unwrap()),
+                ..LogCommand::default()
+            },
+            "[1970-01-01 00:00:03.000][ffx] INFO: Hello world!\u{1b}[m\n",
         )
-        .await
-        .expect("log_main failed");
-
-        assert_eq!(
-            test_buffers.stdout.into_string(),
-            "[1970-01-01 00:00:03.000][ffx] INFO: Hello world!\u{1b}[m\n".to_string()
-        );
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+        .await;
     }
 
     #[fuchsia::test]
     async fn logger_shows_local_time_if_enabled() {
-        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
-        let (target_collection_proxy, target_collection_server) =
-            fidl::endpoints::create_proxy().unwrap();
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            clock: TimeFormat::Local,
-            ..LogCommand::default()
-        };
-        let symbolizer = NoOpSymoblizer;
-        let mut manager = Manager::new_with_config(Rc::new(Configuration {
-            messages: vec![LogsDataBuilder::new(BuilderArgs {
-                component_url: Some("ffx".into()),
-                moniker: "ffx".try_into().unwrap(),
-                severity: Severity::Info,
-                timestamp_nanos: Timestamp::from(1),
-            })
-            .set_pid(1)
-            .set_tid(2)
-            .set_message("Hello world!")
-            .build()],
-            ..Default::default()
-        }));
-        let mut event_stream = manager.take_event_stream().unwrap();
-        let environment = manager.get_environment();
-        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
-        Task::local(handle_target_collection_connection(
-            target_collection_server,
-            environment.clone(),
-        ))
-        .detach();
-        let test_buffers = TestBuffers::default();
-        log_main(
-            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
-            rcs_proxy,
-            target_collection_proxy,
-            cmd,
-            Some(symbolizer),
-            FakeInstanceGetter::default(),
-            None,
-        )
-        .await
-        .expect("log_main failed");
-
-        assert_eq!(
-            test_buffers.stdout.into_string(),
-            format!(
+        logger_dump_test(
+            TestEnvironmentConfig::default(),
+            LogCommand { clock: TimeFormat::Local, ..LogCommand::default() },
+            &format!(
                 "[{}][ffx] INFO: Hello world!\u{1b}[m\n",
                 Local.timestamp_opt(0, 1).unwrap().format(TIMESTAMP_FORMAT)
-            )
-        );
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+            ),
+        )
+        .await;
     }
 
     #[fuchsia::test]
     async fn logger_shows_tags_by_default() {
-        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
-        let (target_collection_proxy, target_collection_server) =
-            fidl::endpoints::create_proxy().unwrap();
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            ..LogCommand::default()
-        };
-        let symbolizer = NoOpSymoblizer;
-        let mut manager = Manager::new_with_config(Rc::new(Configuration {
-            messages: vec![LogsDataBuilder::new(BuilderArgs {
-                component_url: Some("ffx".into()),
-                moniker: "ffx".try_into().unwrap(),
-                severity: Severity::Info,
-                timestamp_nanos: Timestamp::from(0),
-            })
-            .set_pid(1)
-            .set_tid(2)
-            .add_tag("test tag")
-            .set_message("Hello world!")
-            .build()],
-            ..Default::default()
-        }));
-        let mut event_stream = manager.take_event_stream().unwrap();
-        let environment = manager.get_environment();
-        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
-        Task::local(handle_target_collection_connection(
-            target_collection_server,
-            environment.clone(),
-        ))
-        .detach();
-        let test_buffers = TestBuffers::default();
-        log_main(
-            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
-            rcs_proxy,
-            target_collection_proxy,
-            cmd,
-            Some(symbolizer),
-            FakeInstanceGetter::default(),
-            None,
+        logger_dump_test(
+            TestEnvironmentConfig {
+                messages: vec![testing_utils::test_log_with_tag(0)],
+                ..Default::default()
+            },
+            LogCommand::default(),
+            "[00000.000000][ffx][test tag] INFO: Hello world!\u{1b}[m\n",
         )
-        .await
-        .expect("log_main failed");
-
-        assert_eq!(
-            test_buffers.stdout.into_string(),
-            "[00000.000000][ffx][test tag] INFO: Hello world!\u{1b}[m\n".to_string()
-        );
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+        .await;
     }
 
     #[fuchsia::test]
     async fn logger_hides_full_moniker_by_default() {
-        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
-        let (target_collection_proxy, target_collection_server) =
-            fidl::endpoints::create_proxy().unwrap();
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            ..LogCommand::default()
-        };
-        let symbolizer = NoOpSymoblizer;
-        let mut manager = Manager::new_with_config(Rc::new(Configuration {
-            messages: vec![LogsDataBuilder::new(BuilderArgs {
-                component_url: Some("ffx".into()),
-                moniker: "host/ffx".try_into().unwrap(),
-                severity: Severity::Info,
-                timestamp_nanos: Timestamp::from(0),
-            })
-            .set_pid(1)
-            .set_tid(2)
-            .add_tag("test tag")
-            .set_message("Hello world!")
-            .build()],
-            ..Default::default()
-        }));
-        let mut event_stream = manager.take_event_stream().unwrap();
-        let environment = manager.get_environment();
-        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
-        Task::local(handle_target_collection_connection(
-            target_collection_server,
-            environment.clone(),
-        ))
-        .detach();
-        let test_buffers = TestBuffers::default();
-        log_main(
-            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
-            rcs_proxy,
-            target_collection_proxy,
-            cmd,
-            Some(symbolizer),
-            FakeInstanceGetter::default(),
-            None,
+        logger_dump_test(
+            TestEnvironmentConfig {
+                messages: vec![testing_utils::test_log_with_tag(0)],
+                ..Default::default()
+            },
+            LogCommand::default(),
+            "[00000.000000][ffx][test tag] INFO: Hello world!\u{1b}[m\n",
         )
-        .await
-        .expect("log_main failed");
-
-        assert_eq!(
-            test_buffers.stdout.into_string(),
-            "[00000.000000][ffx][test tag] INFO: Hello world!\u{1b}[m\n".to_string()
-        );
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+        .await;
     }
 
     #[fuchsia::test]
-    async fn logger_hides_full_moniker_when_enabled() {
-        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
-        let (target_collection_proxy, target_collection_server) =
-            fidl::endpoints::create_proxy().unwrap();
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            show_full_moniker: true,
-            ..LogCommand::default()
-        };
-        let symbolizer = NoOpSymoblizer;
-        let mut manager = Manager::new_with_config(Rc::new(Configuration {
-            messages: vec![LogsDataBuilder::new(BuilderArgs {
-                component_url: Some("ffx".into()),
-                moniker: "host/ffx".try_into().unwrap(),
-                severity: Severity::Info,
-                timestamp_nanos: Timestamp::from(0),
-            })
-            .set_pid(1)
-            .set_tid(2)
-            .add_tag("test tag")
-            .set_message("Hello world!")
-            .build()],
-            ..Default::default()
-        }));
-        let mut event_stream = manager.take_event_stream().unwrap();
-        let environment = manager.get_environment();
-        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
-        Task::local(handle_target_collection_connection(
-            target_collection_server,
-            environment.clone(),
-        ))
-        .detach();
-        let test_buffers = TestBuffers::default();
-        log_main(
-            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
-            rcs_proxy,
-            target_collection_proxy,
-            cmd,
-            Some(symbolizer),
-            FakeInstanceGetter::default(),
-            None,
+    async fn logger_shows_full_moniker_when_enabled() {
+        logger_dump_test(
+            TestEnvironmentConfig {
+                messages: vec![testing_utils::test_log_with_tag(0)],
+                ..Default::default()
+            },
+            LogCommand { show_full_moniker: true, ..LogCommand::default() },
+            "[00000.000000][host/ffx][test tag] INFO: Hello world!\u{1b}[m\n",
         )
-        .await
-        .expect("log_main failed");
-
-        assert_eq!(
-            test_buffers.stdout.into_string(),
-            "[00000.000000][host/ffx][test tag] INFO: Hello world!\u{1b}[m\n".to_string()
-        );
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+        .await;
     }
 
     #[fuchsia::test]
-    async fn logger_hides_tag_when_hidden() {
-        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
-        let (target_collection_proxy, target_collection_server) =
-            fidl::endpoints::create_proxy().unwrap();
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            hide_tags: true,
-            ..LogCommand::default()
-        };
-        let symbolizer = NoOpSymoblizer;
-        let mut manager = Manager::new_with_config(Rc::new(Configuration {
-            messages: vec![LogsDataBuilder::new(BuilderArgs {
-                component_url: Some("ffx".into()),
-                moniker: "ffx".try_into().unwrap(),
-                severity: Severity::Info,
-                timestamp_nanos: Timestamp::from(0),
-            })
-            .set_pid(1)
-            .set_tid(2)
-            .add_tag("test tag")
-            .set_message("Hello world!")
-            .build()],
-            ..Default::default()
-        }));
-        let mut event_stream = manager.take_event_stream().unwrap();
-        let environment = manager.get_environment();
-        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
-        Task::local(handle_target_collection_connection(
-            target_collection_server,
-            environment.clone(),
-        ))
-        .detach();
-        let test_buffers = TestBuffers::default();
-        log_main(
-            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
-            rcs_proxy,
-            target_collection_proxy,
-            cmd,
-            Some(symbolizer),
-            FakeInstanceGetter::default(),
-            None,
+    async fn logger_hides_tag_when_instructed() {
+        logger_dump_test(
+            TestEnvironmentConfig {
+                messages: vec![testing_utils::test_log_with_tag(0)],
+                ..Default::default()
+            },
+            LogCommand { hide_tags: true, ..LogCommand::default() },
+            "[00000.000000][ffx] INFO: Hello world!\u{1b}[m\n",
         )
-        .await
-        .expect("log_main failed");
-
-        assert_eq!(
-            test_buffers.stdout.into_string(),
-            "[00000.000000][ffx] INFO: Hello world!\u{1b}[m\n".to_string()
-        );
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+        .await;
     }
 
     #[fuchsia::test]
     async fn logger_sets_severity_appropriately_then_exits() {
-        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
-        let (target_collection_proxy, target_collection_server) =
-            fidl::endpoints::create_proxy().unwrap();
-        let severity = vec![parse_log_interest_selector("archivist.cm#TRACE").unwrap()];
+        let mut environment = TestEnvironment::new(TestEnvironmentConfig {
+            messages: vec![testing_utils::test_log(0)],
+            ..Default::default()
+        });
+        let selector = vec![parse_log_interest_selector("archivist.cm#TRACE").unwrap()];
         let cmd = LogCommand {
             sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            select: severity.clone(),
+            symbolize: SymbolizeMode::Off,
+            select: selector.clone(),
             ..LogCommand::default()
         };
-        let symbolizer = NoOpSymoblizer;
-        let mut manager = Manager::new();
-        let mut event_stream = manager.take_event_stream().unwrap();
-        let environment = manager.get_environment();
-        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
-        Task::local(handle_target_collection_connection(
-            target_collection_server,
-            environment.clone(),
-        ))
-        .detach();
-        let test_buffers = TestBuffers::default();
-        log_main(
-            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
-            rcs_proxy,
-            target_collection_proxy,
-            cmd,
-            Some(symbolizer),
-            FakeInstanceGetter::default(),
-            None,
-        )
-        .await
-        .expect("log_main failed");
+        let mut event_stream = environment.take_event_stream().unwrap();
 
-        assert_eq!(
-            test_buffers.stdout.into_string(),
-            "[00000.000000][ffx] INFO: Hello world!\u{1b}[m\n".to_string()
+        let rcs_connector = environment.rcs_connector().await;
+        let tool = LogTool { cmd, rcs_connector };
+        let buffers = TestBuffers::default();
+        let writer = MachineWriter::<LogEntry>::new_test(None, &buffers);
+
+        assert_matches!(tool.main(writer).await, Ok(()));
+        assert_eq!(buffers.into_stdout_str(), "[00000.000000][ffx] INFO: Hello world!\u{1b}[m\n");
+        assert_matches!(
+            event_stream.next().await,
+            Some(TestEvent::SetInterest(s)) if s == selector
         );
-        assert_matches!(event_stream.next().await, Some(TestEvent::SeverityChanged(s)) if s == severity);
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsClosed));
     }
 
     #[fuchsia::test]
     async fn logger_shows_file_names_by_default() {
-        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
-        let (target_collection_proxy, target_collection_server) =
-            fidl::endpoints::create_proxy().unwrap();
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            ..LogCommand::default()
-        };
-        let symbolizer = NoOpSymoblizer;
-        let mut manager = Manager::new_with_config(Rc::new(Configuration {
-            messages: vec![LogsDataBuilder::new(BuilderArgs {
-                component_url: Some("ffx".into()),
-                moniker: "ffx".try_into().unwrap(),
-                severity: Severity::Info,
-                timestamp_nanos: Timestamp::from(0),
-            })
-            .set_pid(1)
-            .set_tid(2)
-            .set_file("test_filename.cc")
-            .set_line(42)
-            .add_tag("test tag")
-            .set_message("Hello world!")
-            .build()],
-            ..Default::default()
-        }));
-        let mut event_stream = manager.take_event_stream().unwrap();
-        let environment = manager.get_environment();
-        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
-        Task::local(handle_target_collection_connection(
-            target_collection_server,
-            environment.clone(),
-        ))
-        .detach();
-        let test_buffers = TestBuffers::default();
-        log_main(
-            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
-            rcs_proxy,
-            target_collection_proxy,
-            cmd,
-            Some(symbolizer),
-            FakeInstanceGetter::default(),
-            None,
+        logger_dump_test(
+            TestEnvironmentConfig {
+                messages: vec![testing_utils::test_log_with_file(0)],
+                ..Default::default()
+            },
+            LogCommand::default(),
+            "[00000.000000][ffx][test tag] INFO: [test_filename.cc(42)] Hello world!\u{1b}[m\n",
         )
-        .await
-        .expect("log_main failed");
-
-        assert_eq!(
-            test_buffers.stdout.into_string(),
-            "[00000.000000][ffx][test tag] INFO: [test_filename.cc(42)] Hello world!\u{1b}[m\n"
-                .to_string()
-        );
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+        .await;
     }
 
     #[fuchsia::test]
     async fn logger_hides_filename_if_disabled() {
-        let (rcs_proxy, rcs_server) = fidl::endpoints::create_proxy().unwrap();
-        let (target_collection_proxy, target_collection_server) =
-            fidl::endpoints::create_proxy().unwrap();
-        let cmd = LogCommand {
-            sub_command: Some(LogSubCommand::Dump(DumpCommand {})),
-            hide_file: true,
-            ..LogCommand::default()
-        };
-        let symbolizer = NoOpSymoblizer;
-        let mut manager = Manager::new_with_config(Rc::new(Configuration {
-            messages: vec![LogsDataBuilder::new(BuilderArgs {
-                component_url: Some("ffx".into()),
-                moniker: "ffx".try_into().unwrap(),
-                severity: Severity::Info,
-                timestamp_nanos: Timestamp::from(0),
-            })
-            .set_pid(1)
-            .set_tid(2)
-            .set_file("test_filename.cc")
-            .set_line(42)
-            .add_tag("test tag")
-            .set_message("Hello world!")
-            .build()],
-            ..Default::default()
-        }));
-        let mut event_stream = manager.take_event_stream().unwrap();
-        let environment = manager.get_environment();
-        Task::local(handle_rcs_connection(rcs_server, environment.clone())).detach();
-        Task::local(handle_target_collection_connection(
-            target_collection_server,
-            environment.clone(),
-        ))
-        .detach();
-        let test_buffers = TestBuffers::default();
-        log_main(
-            MachineWriter::<LogEntry>::new_test(None, &test_buffers),
-            rcs_proxy,
-            target_collection_proxy,
-            cmd,
-            Some(symbolizer),
-            FakeInstanceGetter::default(),
-            None,
+        logger_dump_test(
+            TestEnvironmentConfig {
+                messages: vec![testing_utils::test_log_with_file(0)],
+                ..Default::default()
+            },
+            LogCommand { hide_file: true, ..LogCommand::default() },
+            "[00000.000000][ffx][test tag] INFO: Hello world!\u{1b}[m\n",
         )
-        .await
-        .expect("log_main failed");
-
-        assert_eq!(
-            test_buffers.stdout.into_string(),
-            "[00000.000000][ffx][test tag] INFO: Hello world!\u{1b}[m\n".to_string()
-        );
-        assert_matches!(event_stream.next().await, Some(TestEvent::LogSettingsConnectionClosed));
+        .await;
     }
 
     #[fuchsia::test]

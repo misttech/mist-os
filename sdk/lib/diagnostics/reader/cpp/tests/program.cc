@@ -23,9 +23,9 @@ int main() {
   auto option_b = inspector->root().CreateChild("option_b");
   option_b.RecordInt("value", 20);
 
-  FX_SLOG(INFO, "I'm an info log", FX_KV("tag", "hello"), FX_KV("foo", 100));
-  FX_SLOG(WARNING, "I'm a warn log", FX_KV("bar", "baz"));
-  FX_SLOG(ERROR, "I'm an error log");
+  FX_LOG_KV(INFO, "I'm an info log", FX_KV("tag", "hello"), FX_KV("foo", 100));
+  FX_LOG_KV(WARNING, "I'm a warn log", FX_KV("bar", "baz"));
+  FX_LOG_KV(ERROR, "I'm an error log");
 
   loop.Run();
   return 0;

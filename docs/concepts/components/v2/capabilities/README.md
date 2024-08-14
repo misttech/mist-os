@@ -56,6 +56,40 @@ Routing terminology divides into the following categories:
         These capabilities often map to a node in the
         [outgoing directory][glossary.outgoing-directory].
 
+### Cycle detection {#cycle-detection}
+
+The component framework enforces that capababilities offered between components
+do not form a cycle. The simplest example of a cycle would be a component that
+offers a capability from child `A` to child `B`, and from `B` to `A`, without
+the weak option.
+
+Note: For more information on the weak option, see the `dependency` field documentation
+in the [CML reference](https://fuchsia.dev/reference/cml).
+
+Cycles are detected between:
+
+- Child components and their parents.
+- The current component and its children.
+
+The current component is allowed to:
+
+- `use` capabilities from its children, unless it is offering capabilities to
+  those children.
+- `use` a capability from its parent.
+- `expose` a capability to its parent.
+
+If there is a cycle, there are several strategies to address this.
+
+- Mark one of the links as `dependency: "weak"`. Weak capabilities do not count
+  as a dependency with respect to cycle detection or shutdown ordering. A
+  component using a capability weakly should be programmed to operate correctly if
+  the weak capability does not exist or goes away.
+- Split one of the components into two smaller components that do not have a cycle.
+- Invert the order of one of the dependencies. For example, instead of `B` using a capability
+  from `A`, `A` could use a second capability from `B`. This can be done by
+  adding a new capability to `A` and `B`'s manifest, and then adding a new `use`
+  to `A`'s manifest.
+
 ## Capability types {#capability-types}
 
 The following capabilities can be routed:

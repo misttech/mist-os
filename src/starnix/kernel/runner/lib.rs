@@ -7,9 +7,11 @@
 mod component_runner;
 mod container;
 mod features;
+mod mounts;
 mod serve_protocols;
 
 pub use component_runner::*;
 pub use container::*;
 pub use features::*;
+pub use mounts::*;
 pub use serve_protocols::*;

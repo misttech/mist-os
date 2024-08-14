@@ -30,10 +30,11 @@ zx::result<> MkfsWithDefault(const char* device_path, FsComponent& component,
     std::cerr << "Could not mount to create default volume: " << fs.status_string() << std::endl;
     return fs.take_error();
   }
-  auto volume = fs->CreateVolume(
-      "default", fuchsia_fxfs::wire::MountOptions{
-                     .crypt = fidl::ClientEnd<fuchsia_fxfs::Crypt>(std::move(crypt_client)),
-                     .as_blob = false});
+  fidl::Arena arena;
+  auto mount_options = fuchsia_fs_startup::wire::MountOptions::Builder(arena)
+                           .crypt(fidl::ClientEnd<fuchsia_fxfs::Crypt>(std::move(crypt_client)))
+                           .Build();
+  auto volume = fs->CreateVolume("default", mount_options);
   if (volume.is_error()) {
     std::cerr << "Failed to create default volume: " << volume.status_string() << std::endl;
     return volume.take_error();

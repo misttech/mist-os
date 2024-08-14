@@ -1809,7 +1809,7 @@ impl BinderThreadState {
                 });
                 Ok((process, thread, policy))
             }
-            TransactionRole::Sender(_) => {
+            TransactionRole::Sender => {
                 log_warn!("caller got confused, nothing to reply to!");
                 error!(EINVAL)?
             }
@@ -2578,13 +2578,12 @@ struct LocalBinderObject {
     strong_ref_addr: UserAddress,
 }
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 /// A binder thread's role (sender or receiver) in a synchronous transaction. Oneway transactions
 /// do not record roles, since they end as soon as they begin.
 #[derive(Debug)]
 enum TransactionRole {
     /// The binder thread initiated the transaction and is awaiting a reply from a peer.
-    Sender(WeakBinderPeer),
+    Sender,
     /// The binder thread is receiving a transaction and is expected to reply to the peer binder
     /// process and thread.
     Receiver(WeakBinderPeer, SchedulerGuard),
@@ -3601,9 +3600,7 @@ impl BinderDriver {
 
                         // Make the sender thread part of the transaction so it doesn't get scheduled to handle
                         // any other transactions.
-                        binder_thread.lock().transactions.push(TransactionRole::Sender(
-                            WeakBinderPeer::new(binder_proc, binder_thread),
-                        ));
+                        binder_thread.lock().transactions.push(TransactionRole::Sender);
 
                         // Register the transaction buffer.
                         target_proc.lock().active_transactions.insert(
@@ -3801,7 +3798,7 @@ impl BinderDriver {
                             thread_state.transactions.pop().expect("transaction stack underflow!");
                         // Command::Reply is sent to the receiver side. So the popped transaction
                         // must be a Sender role.
-                        assert!(matches!(transaction, TransactionRole::Sender(..)));
+                        assert!(matches!(transaction, TransactionRole::Sender));
                     }
                     Command::TransactionComplete
                     | Command::OnewayTransaction(..)
@@ -7374,7 +7371,7 @@ pub mod tests {
 
         // The FD should have the same flags.
         assert_eq!(
-            receiver.task.files.get_fd_flags(receiver_fd).expect("get flags"),
+            receiver.task.files.get_fd_flags_allowing_opath(receiver_fd).expect("get flags"),
             FdFlags::CLOEXEC
         );
 
@@ -7829,7 +7826,7 @@ pub mod tests {
             sender.thread.lock().command_queue.commands.front(),
             Some(Command::DeadReply { pop_transaction: true })
         );
-        assert_matches!(sender.thread.lock().transactions.pop(), Some(TransactionRole::Sender(..)));
+        assert_matches!(sender.thread.lock().transactions.pop(), Some(TransactionRole::Sender));
     }
 
     #[fuchsia::test]
@@ -7886,7 +7883,7 @@ pub mod tests {
             sender.thread.lock().command_queue.commands.front(),
             Some(Command::DeadReply { pop_transaction: true })
         );
-        assert_matches!(sender.thread.lock().transactions.pop(), Some(TransactionRole::Sender(..)));
+        assert_matches!(sender.thread.lock().transactions.pop(), Some(TransactionRole::Sender));
     }
 
     #[fuchsia::test]
@@ -7968,7 +7965,7 @@ pub mod tests {
             sender.thread.lock().command_queue.commands.front(),
             Some(Command::DeadReply { pop_transaction: true })
         );
-        assert_matches!(sender.thread.lock().transactions.pop(), Some(TransactionRole::Sender(..)));
+        assert_matches!(sender.thread.lock().transactions.pop(), Some(TransactionRole::Sender));
     }
 
     #[fuchsia::test]

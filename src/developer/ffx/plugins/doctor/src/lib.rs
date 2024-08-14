@@ -27,6 +27,7 @@ use fuchsia_lockfile::LockfileCreateError;
 use futures::TryStreamExt;
 use serde_json::json;
 use std::collections::HashSet;
+use std::fs;
 use std::io::{stdout, BufWriter, ErrorKind, Write};
 use std::path::PathBuf;
 use std::process::Command;
@@ -218,7 +219,6 @@ fho::embedded_plugin!(DoctorTool);
 impl FfxMain for DoctorTool {
     type Writer = SimpleWriter;
 
-    // TODO(https://fxbug.dev/42078544): use the writer instead of directly using std::io::stdout.
     async fn main(self, _writer: Self::Writer) -> fho::Result<()> {
         doctor_cmd_impl(self.version_info, self.cmd, stdout()).await?;
         Ok(())
@@ -467,10 +467,7 @@ async fn doctor_record(
     let output_dir =
         record_params.output_dir.context("output_dir not present despite record set to true")?;
 
-    let mut daemon_log = log_root.clone();
-    daemon_log.push("ffx.daemon.log");
-    let mut fe_log = log_root.clone();
-    fe_log.push("ffx.log");
+    let log_files: Vec<PathBuf> = collect_log_files(log_root.clone())?;
 
     step_handler.step(StepType::GeneratingRecord).await?;
 
@@ -481,7 +478,7 @@ async fn doctor_record(
 
     let final_path = {
         let mut r = record_params.recorder.lock().await;
-        r.add_sources(vec![daemon_log, fe_log]);
+        r.add_sources(log_files);
         r.add_content(PLATFORM_INFO_FILENAME, platform_info);
 
         if record_params.user_config_enabled {
@@ -520,6 +517,70 @@ async fn doctor_record(
     step_handler.result(StepResult::Success).await?;
     step_handler.output_step(StepType::RecordGenerated(final_path.canonicalize()?)).await?;
     Ok(())
+}
+
+fn collect_log_files(root_dir: PathBuf) -> Result<Vec<PathBuf>> {
+    let now = std::time::SystemTime::now();
+    // Get all log files that have been modified recently.
+    const NINETY_DAYS_SECS: u64 = 60 * 60 * 24 * 90;
+    const MAX_AGE: Duration = Duration::from_secs(NINETY_DAYS_SECS);
+
+    let list = root_dir
+        .read_dir()?
+        .filter_map(|entry| {
+            if let Ok(d) = entry {
+                Some(d.path())
+            } else {
+                tracing::info!("Skipping read dir was an error: {entry:?}");
+                None
+            }
+        })
+        .filter_map(|p| {
+            if p.is_dir() {
+                tracing::info!("Skipping dir {:?}", p);
+                None
+            } else {
+                Some(p)
+            }
+        })
+        .filter(|p| {
+            if p.extension().unwrap_or_default() == "log" {
+                true
+            } else {
+                tracing::info!("Skipping non .log extension {:?}", p);
+                false
+            }
+        })
+        .filter_map(|p| match fs::metadata(p.clone()) {
+            Ok(mdata) => Some((p, mdata)),
+            Err(e) => {
+                tracing::error!("could not read metadata for {:?}: {e}", p);
+                None
+            }
+        })
+        .filter_map(|(p, mdata)| match mdata.modified() {
+            Ok(mdate) => Some((p, mdate)),
+            Err(e) => {
+                tracing::error!("could not read modified time for {:?}: {e}", p);
+                None
+            }
+        })
+        .filter_map(|(p, mdate)| match now.duration_since(mdate) {
+            Ok(age) => {
+                if age < MAX_AGE {
+                    Some(p)
+                } else {
+                    tracing::info!("Skipping {p:?} too  old {}", age.as_secs());
+                    None
+                }
+            }
+            Err(e) => {
+                tracing::error!("could not determine duration {p:?}: {e}");
+                None
+            }
+        })
+        .collect();
+    Ok(list)
 }
 
 async fn get_daemon_pid<W: Write>(
@@ -2021,6 +2082,8 @@ mod test {
         fe_log.push("ffx.log");
         let mut daemon_log = root.clone();
         daemon_log.push("ffx.daemon.log");
+        fs::write(&fe_log, "ffx.log contents").expect("writing test ffx.log");
+        fs::write(&daemon_log, "ffx.daemon.log contents").expect("writing test ffx.daemon.log");
         let recorder =
             Arc::new(Mutex::new(FakeRecorder::new(vec![fe_log, daemon_log], root.clone())));
         (
@@ -3513,5 +3576,29 @@ mod test {
                 priv_key = priv_key.display()
             )
         );
+    }
+
+    #[test]
+    fn test_collect_log_files() {
+        let temp = tempdir().unwrap();
+        let root = temp.path().to_path_buf();
+        let mut expected = vec![root.join("f1.log"), root.join("f2.log")];
+        for p in &expected {
+            fs::write(p, "something").expect("written testdata");
+        }
+        // write out other files
+        fs::write(root.join("no_extension"), "something").expect("written testdata");
+        fs::write(root.join("notlog.txt"), "something").expect("written testdata");
+        fs::write(root.join("save.log.save"), "something").expect("written testdata");
+
+        let subdir = root.join("subdir");
+        fs::create_dir_all(&subdir).expect("subdir created");
+        fs::write(subdir.join("sublog.log"), "something").expect("written testdata");
+
+        let mut actual = collect_log_files(root.clone()).expect("collecting");
+        // Sort the lists to make comparison easy.
+        expected.sort();
+        actual.sort();
+        assert_eq!(expected, actual);
     }
 }

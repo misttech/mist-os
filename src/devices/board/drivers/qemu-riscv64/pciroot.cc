@@ -19,9 +19,6 @@
 #include <zircon/status.h>
 #include <zircon/syscalls/types.h>
 
-#include <array>
-#include <limits>
-
 #include <fbl/alloc_checker.h>
 #include <region-alloc/region-alloc.h>
 
@@ -85,8 +82,9 @@ zx::result<> QemuRiscv64Pciroot::Create(PciRootHost* root_host, QemuRiscv64Pciro
     return result.take_error();
   }
 
-  zx_status_t status =
-      pciroot->DdkAdd(ddk::DeviceAddArgs(name).set_inspect_vmo(pciroot->inspect().DuplicateVmo()));
+  zx_status_t status = pciroot->DdkAdd(ddk::DeviceAddArgs(name)
+                                           .set_proto_id(ZX_PROTOCOL_PCIROOT)
+                                           .set_inspect_vmo(pciroot->inspect().DuplicateVmo()));
   if (status == ZX_OK) {
     [[maybe_unused]] auto ptr = pciroot.release();
   }

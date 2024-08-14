@@ -10,10 +10,6 @@ import("$dir_pw_unit_test/test.gni")
 
 dir_public_sm = "../public/pw_bluetooth_sapphire/internal/host/sm"
 
-config("warnings") {
-  cflags_cc = [ "-Wswitch-enum" ]
-}
-
 pw_source_set("definitions") {
   public = [
     "$dir_public_sm/error.h",
@@ -28,12 +24,13 @@ pw_source_set("definitions") {
     "types.cc",
   ]
 
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
+
   public_deps = [
     "//src/connectivity/bluetooth/core/bt-host/common",
     "//src/connectivity/bluetooth/core/bt-host/hci-spec",  # hci_spec::LinkKey
   ]
 
-  configs = [ ":warnings" ]
   deps = [ "$dir_pw_preprocessor" ]
 }
 
@@ -69,6 +66,8 @@ pw_source_set("sm") {
     "util.cc",
   ]
 
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
+
   public_deps = [
     ":definitions",
     "$dir_pw_string",
@@ -90,6 +89,8 @@ pw_source_set("testing") {
   ]
 
   sources = [ "test_security_manager.cc" ]
+
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
 
   deps = [ ":sm" ]
 }
@@ -113,6 +114,8 @@ pw_test("tests") {
     "util_test.cc",
   ]
 
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
+
   deps = [
     ":sm",
     ":testing",
@@ -126,6 +129,7 @@ pw_test("tests") {
 
 fuchsia_library_fuzzer("valid_packet_reader_fuzzer") {
   sources = [ "valid_packet_reader_parse_sdu_fuzztest.cc" ]
+  configs += [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
   deps = [
     ":definitions",
     "//src/connectivity/bluetooth/core/bt-host/testing:fuzztest_driver",
@@ -134,6 +138,7 @@ fuchsia_library_fuzzer("valid_packet_reader_fuzzer") {
 
 pw_fuzzer("pw_valid_packet_reader_fuzzer") {
   sources = [ "valid_packet_reader_parse_sdu_fuzztest.cc" ]
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
   deps = [ ":definitions" ]
 }
 

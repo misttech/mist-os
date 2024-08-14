@@ -4,7 +4,6 @@
 
 import("//build/components.gni")
 import("//build/test.gni")
-import("//build/zircon/zx_library.gni")
 
 test("disk_inspector_unit") {
   testonly = true
@@ -38,82 +37,44 @@ group("tests") {
   deps = [ ":disk-inspector-unit" ]
 }
 
-if (is_fuchsia) {
-  zx_library("disk_inspector") {
-    sdk = "source"
-    sdk_headers = [
-      "disk_inspector/inspector_transaction_handler.h",
-      "disk_inspector/command_handler.h",
-      "disk_inspector/command.h",
-      "disk_inspector/common_types.h",
-      "disk_inspector/disk_inspector.h",
-      "disk_inspector/disk_obj.h",
-      "disk_inspector/disk_struct.h",
-      "disk_inspector/supported_types.h",
-      "disk_inspector/type_utils.h",
-      "disk_inspector/buffer_factory.h",
-      "disk_inspector/vmo_buffer_factory.h",
-      "disk_inspector/loader.h",
-    ]
-    sources = [
-      "command.cc",
-      "disk_inspector.cc",
-      "disk_struct.cc",
-      "loader.cc",
-      "vmo_buffer_factory.cc",
-    ]
-
-    public_deps = [ "//zircon/system/ulib/fbl" ]
-    deps = [
-      "//sdk/lib/syslog/cpp",
-      "//third_party/re2",
-      "//zircon/system/ulib/fbl",
-    ]
-
-    if (is_fuchsia) {
-      sources += [ "inspector_transaction_handler.cc" ]
-
-      public_deps += [
-        "//sdk/lib/fit-promise",
-        "//src/storage/lib/block_client/cpp",
-        "//src/storage/lib/vfs/cpp",
-        "//src/storage/lib/vfs/cpp/transaction",
-        "//zircon/system/ulib/storage/buffer",
-      ]
-
-      deps += [
-        "//sdk/lib/fdio",
-        "//zircon/system/ulib/storage/operation",
-        "//zircon/third_party/ulib/safemath",
-      ]
-    }
-  }
-} else {
-  config("headers_config") {
-    include_dirs = [ "include" ]
-  }
-
-  source_set("disk_inspector") {
-    public = [
-      "include/disk_inspector/buffer_factory.h",
-      "include/disk_inspector/command.h",
-      "include/disk_inspector/command_handler.h",
-      "include/disk_inspector/common_types.h",
-      "include/disk_inspector/disk_inspector.h",
-      "include/disk_inspector/disk_obj.h",
-      "include/disk_inspector/disk_struct.h",
-      "include/disk_inspector/inspector_transaction_handler.h",
-      "include/disk_inspector/loader.h",
-      "include/disk_inspector/supported_types.h",
-      "include/disk_inspector/type_utils.h",
-      "include/disk_inspector/vmo_buffer_factory.h",
-    ]
-
-    public_configs = [ ":headers_config" ]
-
-    public_deps = [
-      "//sdk/lib/fit-promise",
-      "//src/storage/lib/vfs/cpp/transaction",
-    ]
-  }
+source_set("disk_inspector") {
+  public = [
+    "buffer_factory.h",
+    "command.h",
+    "command_handler.h",
+    "common_types.h",
+    "disk_inspector.h",
+    "disk_obj.h",
+    "disk_struct.h",
+    "inspector_transaction_handler.h",
+    "loader.h",
+    "supported_types.h",
+    "type_utils.h",
+    "vmo_buffer_factory.h",
+  ]
+  sources = [
+    "command.cc",
+    "disk_inspector.cc",
+    "disk_primitive.h",
+    "disk_struct.cc",
+    "inspector_transaction_handler.cc",
+    "loader.cc",
+    "vmo_buffer_factory.cc",
+  ]
+  public_deps = [
+    "//src/storage/lib/block_client/cpp",
+    "//src/storage/lib/vfs/cpp",
+    "//src/storage/lib/vfs/cpp/transaction",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/storage/buffer",
+  ]
+  deps = [
+    "//sdk/lib/fdio",
+    "//sdk/lib/syslog/cpp",
+    "//third_party/re2",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/storage/operation",
+    "//zircon/third_party/ulib/safemath",
+  ]
+  friend = [ ":*" ]
 }

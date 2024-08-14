@@ -11,9 +11,10 @@ function package-server-mode {
     return "${err}"
   fi
 
-  # If unspecified, default to using `pm`.
+  # If unspecified, it indicates an invalid configuration.
   if [[ "${mode}" = "" || "${mode}" = "null" ]]; then
-    mode="pm"
+    fx-error "Invalid repository server mode: ${mode}"
+    return 1
   else
     # Regex: Remove the leading and trailing quotes from the server mode.
     if [[ $mode =~ \"(.*)\" ]]; then

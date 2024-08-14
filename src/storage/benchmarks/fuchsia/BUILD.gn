@@ -41,6 +41,7 @@ rustc_library("framework") {
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/storage/benchmarks:framework",
     "//src/storage/benchmarks/fuchsia/pkgdir-component/fidl/test.pkgdir:test.pkgdir_rust",
+    "//src/storage/fidl/fuchsia.fs.startup:fuchsia.fs.startup_rust",
     "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust",
     "//src/storage/lib/blob_writer:blob-writer",
     "//src/storage/lib/delivery_blob",

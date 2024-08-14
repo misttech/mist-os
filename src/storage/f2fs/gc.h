@@ -16,7 +16,7 @@ class GcManager {
   GcManager() = delete;
   GcManager(F2fs *fs);
 
-  zx::result<uint32_t> Run() __TA_EXCLUDES(f2fs::GetGlobalLock());
+  zx::result<uint32_t> Run(bool stop_writeback = true) __TA_EXCLUDES(f2fs::GetGlobalLock());
 
   // For testing
   void DisableFgGc() { disable_gc_for_test_ = true; }
@@ -38,7 +38,6 @@ class GcManager {
   F2fs *fs_ = nullptr;
   SuperblockInfo &superblock_info_;
   uint32_t cur_victim_sec_ = kNullSecNo;  // current victim section num
-  std::binary_semaphore run_{1};
   SegmentManager &segment_manager_;
 
   // For testing

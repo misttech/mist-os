@@ -51,17 +51,12 @@ void SynchronousVfs::CloseAllConnectionsForVnode(const Vnode& node,
 
 zx::result<> SynchronousVfs::RegisterConnection(std::unique_ptr<internal::Connection> connection,
                                                 zx::channel& channel) {
-  internal::Connection* ptr;
-
-  {
-    std::lock_guard lock(vfs_lock_);
-    if (IsTerminating())
-      return zx::error(ZX_ERR_CANCELED);
-    ptr = connection.get();
-    connections_.push_back(connection.release());
+  std::lock_guard lock(vfs_lock_);
+  if (IsTerminating()) {
+    return zx::error(ZX_ERR_CANCELED);
   }
-
-  ptr->Bind(std::move(channel), [](internal::Connection* connection) {
+  connections_.push_back(connection.release());
+  connections_.back().Bind(std::move(channel), [](internal::Connection* connection) {
     auto vfs = connection->vfs();
     if (vfs) {
       SynchronousVfs* sync_vfs = static_cast<SynchronousVfs*>(vfs.get());

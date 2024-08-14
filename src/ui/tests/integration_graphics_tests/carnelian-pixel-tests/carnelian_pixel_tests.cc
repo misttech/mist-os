@@ -76,8 +76,8 @@ class CarnelianPixelTest : public ui_testing::PortableUITest {
 //  |                                 |
 //  |_________________________________|
 TEST_F(CarnelianPixelTest, ValidPixelTest) {
-  const uint32_t total_pixels = display_size().width * display_size().height;
-  const uint32_t square_pixels = display_size().height / 2 * display_size().height / 2;
+  const uint32_t total_pixels = display_size().width() * display_size().height();
+  const uint32_t square_pixels = display_size().height() / 2 * display_size().height() / 2;
   const uint32_t background_pixels = total_pixels - square_pixels;
 
   LaunchClient();
@@ -90,8 +90,8 @@ TEST_F(CarnelianPixelTest, ValidPixelTest) {
           return false;
         // TODO(https://fxbug.dev/42067818): Switch to exact comparisons after Astro
         // precision issues are resolved.
-        EXPECT_NEAR(histogram[utils::kMagenta], square_pixels, display_size().width);
-        EXPECT_NEAR(histogram[utils::kBlue], background_pixels, display_size().width);
+        EXPECT_NEAR(histogram[utils::kMagenta], square_pixels, display_size().width());
+        EXPECT_NEAR(histogram[utils::kBlue], background_pixels, display_size().width());
         return true;
       },
       kPredicateTimeout));

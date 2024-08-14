@@ -17,6 +17,7 @@ macro_rules! embedded_plugin {
             use $crate::macro_deps::{
                 argh, bug, ffx_writer::Format, global_env_context, return_bug, FfxCommandLine,
             };
+            use $crate::FfxMain as _;
 
             let ffx = FfxCommandLine::from_env()?;
             let context = if let Some(gc) = global_env_context() {
@@ -43,7 +44,8 @@ macro_rules! embedded_plugin {
                 return Ok(());
             }
 
-            let tool = <$tool as $crate::FfxTool>::from_env(env, cmd).await?;
+            let tool = <$tool as $crate::FfxTool>::from_env(env.clone(), cmd).await?;
+            env.update_log_file(tool.log_basename())?;
             $crate::FfxMain::main(tool, writer).await
         }
 

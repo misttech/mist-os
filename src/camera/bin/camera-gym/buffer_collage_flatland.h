@@ -21,7 +21,7 @@
 #include <map>
 
 #include "fuchsia/camera/gym/cpp/fidl.h"
-#include "src/lib/ui/flatland-frame-scheduling/src/simple_present.h"
+#include "src/lib/ui/flatland-frame-scheduling/src/simple_present_hlcpp.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 
 namespace camera_flatland {

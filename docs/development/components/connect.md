@@ -535,8 +535,7 @@ component terminates for any reason (including successful exit).
 
 Note: This is a special feature intended for use only by system components
 deemed critical to the system's function. Therefore, its use is governed by a
-security policy allowlist. If you believe you need this option, please reach out
-to the [Component Framework team][cf-dev-list].
+security policy allowlist.
 
 To enable this feature, do the following:
 
@@ -811,7 +810,6 @@ troubleshoot the cause:
 *   Use `ffx debug fidl` to examine the FIDL connection traffic with
     [`fidlcat`][doc-fidlcat] for errors or unexpected behavior.
 
-[cf-dev-list]: https://groups.google.com/a/fuchsia.dev/g/component-framework-dev
 [core-shard]: /src/sys/core/README.md
 [cml-capabilities]: https://fuchsia.dev/reference/cml#capabilities
 [cml-children]: https://fuchsia.dev/reference/cml#children

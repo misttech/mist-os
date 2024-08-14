@@ -81,10 +81,6 @@ class VnodeF2fs : public fs::PagedVnode,
             .ValueOrDie());
   }
 
-  static zx_status_t Allocate(F2fs *fs, ino_t ino, umode_t mode, fbl::RefPtr<VnodeF2fs> *out);
-  static zx_status_t Create(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out);
-  static zx_status_t Vget(F2fs *fs, ino_t ino, fbl::RefPtr<VnodeF2fs> *out);
-
   void Init(LockedPage &node_page) __TA_EXCLUDES(mutex_);
   void InitTime() __TA_EXCLUDES(mutex_);
   zx_status_t InitFileCache(uint64_t nbytes = 0) __TA_EXCLUDES(mutex_);
@@ -294,11 +290,6 @@ class VnodeF2fs : public fs::PagedVnode,
   bool TestFlag(const InodeInfoFlag &flag) const {
     return flags_[static_cast<uint8_t>(flag)].test(std::memory_order_acquire);
   }
-  void WaitOnFlag(InodeInfoFlag flag) const {
-    while (flags_[static_cast<uint8_t>(flag)].test(std::memory_order_acquire)) {
-      flags_[static_cast<uint8_t>(flag)].wait(true, std::memory_order_relaxed);
-    }
-  }
 
   void Activate();
   void Deactivate();
@@ -306,12 +297,6 @@ class VnodeF2fs : public fs::PagedVnode,
   void WaitForDeactive(std::mutex &mutex);
 
   bool IsBad() const { return TestFlag(InodeInfoFlag::kBad); }
-
-  void WaitForInit() const { WaitOnFlag(InodeInfoFlag::kInit); }
-  void UnlockNewInode() {
-    ClearFlag(InodeInfoFlag::kInit);
-    flags_[static_cast<uint8_t>(InodeInfoFlag::kInit)].notify_all();
-  }
 
   bool IsValid() const { return HasLink() && !IsBad() && !file_cache_->IsOrphan(); }
 

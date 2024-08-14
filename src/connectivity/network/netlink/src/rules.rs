@@ -7,7 +7,6 @@
 //! RTM_DELRULE.
 
 use std::collections::BTreeMap;
-use std::sync::{Arc, Mutex};
 
 use derivative::Derivative;
 use either::Either;
@@ -111,6 +110,60 @@ struct RuleTableInner {
 }
 
 impl RuleTableInner {
+    fn new_with_defaults<I: Ip>() -> RuleTableInner {
+        fn build_lookup_rule<I: Ip>(priority: RulePriority, table: u8) -> RuleMessage {
+            let mut rule = RuleMessage::default();
+            rule.header.family = match I::VERSION {
+                IpVersion::V4 => AddressFamily::Inet,
+                IpVersion::V6 => AddressFamily::Inet6,
+            };
+            rule.header.table = table;
+            rule.header.action = RuleAction::ToTable;
+            rule.attributes.push(RuleAttribute::Priority(priority));
+            rule
+        }
+
+        let mut table = RuleTableInner::default();
+        let rules_to_add = match I::VERSION {
+            IpVersion::V4 => itertools::Either::Left(
+                [
+                    build_lookup_rule::<Ipv4>(
+                        LINUX_DEFAULT_LOOKUP_LOCAL_PRIORITY,
+                        rt_class_t_RT_TABLE_LOCAL as u8,
+                    ),
+                    build_lookup_rule::<Ipv4>(
+                        LINUX_DEFAULT_LOOKUP_MAIN_PRIORITY,
+                        rt_class_t_RT_TABLE_MAIN as u8,
+                    ),
+                    build_lookup_rule::<Ipv4>(
+                        LINUX_DEFAULT_LOOKUP_DEFAULT_PRIORITY,
+                        rt_class_t_RT_TABLE_DEFAULT as u8,
+                    ),
+                ]
+                .into_iter(),
+            ),
+            IpVersion::V6 => itertools::Either::Right(
+                [
+                    build_lookup_rule::<Ipv6>(
+                        LINUX_DEFAULT_LOOKUP_LOCAL_PRIORITY,
+                        rt_class_t_RT_TABLE_LOCAL as u8,
+                    ),
+                    build_lookup_rule::<Ipv6>(
+                        LINUX_DEFAULT_LOOKUP_MAIN_PRIORITY,
+                        rt_class_t_RT_TABLE_MAIN as u8,
+                    ),
+                ]
+                .into_iter(),
+            ),
+        };
+
+        for rule in rules_to_add {
+            table.add_rule(rule).expect("should not fail to add a default rule");
+        }
+
+        table
+    }
+
     /// Adds the given rule to the table.
     fn add_rule(&mut self, mut rule: RuleMessage) -> Result<(), AddRuleError> {
         // Get the rule's priority, setting it to a default if unset.
@@ -241,19 +294,16 @@ impl DelRuleError {
 ///
 /// The inner rule tables are wrapped with `Arc<Mutex>` to support concurrent
 /// access from multiple NETLINK_ROUTE clients.
-#[derive(Clone)]
 pub(crate) struct RuleTable {
-    v4_rules: Arc<Mutex<RuleTableInner>>,
-    v6_rules: Arc<Mutex<RuleTableInner>>,
+    v4_rules: RuleTableInner,
+    v6_rules: RuleTableInner,
 }
 
 impl RuleTable {
+    #[cfg(test)]
     /// Constructs an empty RuleTable.
     pub(crate) fn new() -> RuleTable {
-        RuleTable {
-            v4_rules: Arc::new(Mutex::new(RuleTableInner::default())),
-            v6_rules: Arc::new(Mutex::new(RuleTableInner::default())),
-        }
+        RuleTable { v4_rules: RuleTableInner::default(), v6_rules: RuleTableInner::default() }
     }
 
     /// Constructs a RuleTable prepopulated with the default rules present on
@@ -264,61 +314,10 @@ impl RuleTable {
     /// * [V6] 0:        from all lookup local
     /// * [V6] 32766:    from all lookup main
     pub(crate) fn new_with_defaults() -> RuleTable {
-        fn build_lookup_rule<I: Ip>(priority: RulePriority, table: u8) -> RuleMessage {
-            let mut rule = RuleMessage::default();
-            rule.header.family = match I::VERSION {
-                IpVersion::V4 => AddressFamily::Inet,
-                IpVersion::V6 => AddressFamily::Inet6,
-            };
-            rule.header.table = table;
-            rule.header.action = RuleAction::ToTable;
-            rule.attributes.push(RuleAttribute::Priority(priority));
-            rule
+        RuleTable {
+            v4_rules: RuleTableInner::new_with_defaults::<Ipv4>(),
+            v6_rules: RuleTableInner::new_with_defaults::<Ipv6>(),
         }
-
-        let table = RuleTable::new();
-        // Conversions to u8 is safe as these constants fit into a u8.
-        for rule in [
-            build_lookup_rule::<Ipv4>(
-                LINUX_DEFAULT_LOOKUP_LOCAL_PRIORITY,
-                rt_class_t_RT_TABLE_LOCAL as u8,
-            ),
-            build_lookup_rule::<Ipv4>(
-                LINUX_DEFAULT_LOOKUP_MAIN_PRIORITY,
-                rt_class_t_RT_TABLE_MAIN as u8,
-            ),
-            build_lookup_rule::<Ipv4>(
-                LINUX_DEFAULT_LOOKUP_DEFAULT_PRIORITY,
-                rt_class_t_RT_TABLE_DEFAULT as u8,
-            ),
-        ] {
-            table
-                .v4_rules
-                .lock()
-                .unwrap()
-                .add_rule(rule)
-                .expect("should not fail to add a default ipv4 rule");
-        }
-
-        for rule in [
-            build_lookup_rule::<Ipv6>(
-                LINUX_DEFAULT_LOOKUP_LOCAL_PRIORITY,
-                rt_class_t_RT_TABLE_LOCAL as u8,
-            ),
-            build_lookup_rule::<Ipv6>(
-                LINUX_DEFAULT_LOOKUP_MAIN_PRIORITY,
-                rt_class_t_RT_TABLE_MAIN as u8,
-            ),
-        ] {
-            table
-                .v6_rules
-                .lock()
-                .unwrap()
-                .add_rule(rule)
-                .expect("should not fail to add a default ipv6 rule");
-        }
-
-        table
     }
 }
 
@@ -351,7 +350,7 @@ pub(crate) struct RuleRequest<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerM
 
 /// Handler trait for NETLINK_ROUTE requests related to PBR rules.
 pub(crate) trait RuleRequestHandler<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>:
-    Clone + Send + 'static
+    Send + 'static
 {
     fn handle_request(&mut self, req: RuleRequest<S>) -> Result<(), Errno>;
 }
@@ -362,25 +361,25 @@ impl<S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>> RuleRequestHandl
     fn handle_request(&mut self, req: RuleRequest<S>) -> Result<(), Errno> {
         let RuleTable { v4_rules, v6_rules } = self;
         let RuleRequest { args, ip_version, sequence_number, mut client } = req;
-        let mut locked_rule_table = match ip_version {
-            IpVersion::V4 => v4_rules.lock().unwrap(),
-            IpVersion::V6 => v6_rules.lock().unwrap(),
+        let rule_table = match ip_version {
+            IpVersion::V4 => v4_rules,
+            IpVersion::V6 => v6_rules,
         };
 
         match args {
             RuleRequestArgs::DumpRules => {
-                for rule in locked_rule_table.iter_rules() {
+                for rule in rule_table.iter_rules() {
                     client.send_unicast(to_nlm_new_rule(rule.clone(), sequence_number, true));
                 }
                 Ok(())
             }
             RuleRequestArgs::New(rule) => {
-                locked_rule_table.add_rule(rule).map_err(|e| e.errno())
+                rule_table.add_rule(rule).map_err(|e| e.errno())
                 // TODO(https://issues.fuchsia.dev/292587350): Notify
                 // multicast groups of `RTM_NEWRULE`.
             }
             RuleRequestArgs::Del(del_pattern) => {
-                locked_rule_table.del_rule(&del_pattern).map_err(|e| e.errno())
+                rule_table.del_rule(&del_pattern).map_err(|e| e.errno())
                 // TODO(https://issues.fuchsia.dev/292587350): Notify
                 // multicast groups of `RTM_DELRULE`.
             }

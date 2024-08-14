@@ -53,7 +53,7 @@ class AgisTest : public testing::Test {
         context->svc()->Connect(component_registry_.NewRequest(loop_->dispatcher()));
     EXPECT_EQ(status, ZX_OK);
     component_registry_.set_error_handler([this](zx_status_t status) {
-      FX_SLOG(ERROR, "|component_registry_| error handler", FX_KV("status", status));
+      FX_LOG_KV(ERROR, "|component_registry_| error handler", FX_KV("status", status));
       loop_->Quit();
       ASSERT_TRUE(false);
     });
@@ -61,7 +61,7 @@ class AgisTest : public testing::Test {
     status = context->svc()->Connect(observer_.NewRequest(loop_->dispatcher()));
     EXPECT_EQ(status, ZX_OK);
     observer_.set_error_handler([this](zx_status_t status) {
-      FX_SLOG(ERROR, "agis-test: |observer_| error handler");
+      FX_LOG_KV(ERROR, "agis-test: |observer_| error handler");
       loop_->Quit();
       ASSERT_TRUE(false);
     });
@@ -69,7 +69,7 @@ class AgisTest : public testing::Test {
     status = context->svc()->Connect(connector_.NewRequest(loop_->dispatcher()));
     EXPECT_EQ(status, ZX_OK);
     connector_.set_error_handler([this](zx_status_t status) {
-      FX_SLOG(ERROR, "agis-test: |connector_| error handler");
+      FX_LOG_KV(ERROR, "agis-test: |connector_| error handler");
       loop_->Quit();
       ASSERT_TRUE(false);
     });
@@ -454,7 +454,7 @@ TEST(AgisDisconnect, Main) {
     fuchsia::gpu::agis::ComponentRegistryPtr component_registry;
     context->svc()->Connect(component_registry.NewRequest(loop->dispatcher()));
     component_registry.set_error_handler([&loop](zx_status_t status) {
-      FX_SLOG(ERROR, "Register Disconnect ComponentRegistry ErrHandler", FX_KV("status", status));
+      FX_LOG_KV(ERROR, "Register Disconnect ComponentRegistry ErrHandler", FX_KV("status", status));
       if (loop) {
         loop->Quit();
       }
@@ -471,7 +471,7 @@ TEST(AgisDisconnect, Main) {
     fuchsia::gpu::agis::ObserverPtr observer;
     context->svc()->Connect(observer.NewRequest(loop->dispatcher()));
     observer.set_error_handler([&loop](zx_status_t status) {
-      FX_SLOG(ERROR, "Register Disconnect Observer ErrHandler", FX_KV("status", status));
+      FX_LOG_KV(ERROR, "Register Disconnect Observer ErrHandler", FX_KV("status", status));
       if (loop) {
         loop->Quit();
       }
@@ -500,7 +500,7 @@ TEST(AgisDisconnect, Main) {
   fuchsia::gpu::agis::ObserverPtr observer;
   context->svc()->Connect(observer.NewRequest(loop->dispatcher()));
   observer.set_error_handler([&loop](zx_status_t status) {
-    FX_SLOG(ERROR, "Verify Disconnect Observer ErrHandler ", FX_KV("status", status));
+    FX_LOG_KV(ERROR, "Verify Disconnect Observer ErrHandler ", FX_KV("status", status));
     if (loop) {
       loop->Quit();
     }

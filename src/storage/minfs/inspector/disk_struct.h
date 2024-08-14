@@ -5,7 +5,10 @@
 #ifndef SRC_STORAGE_MINFS_INSPECTOR_DISK_STRUCT_H_
 #define SRC_STORAGE_MINFS_INSPECTOR_DISK_STRUCT_H_
 
-#include <disk_inspector/disk_struct.h>
+#include <cstdint>
+#include <memory>
+
+#include "src/storage/lib/disk_inspector/disk_struct.h"
 
 namespace minfs {
 

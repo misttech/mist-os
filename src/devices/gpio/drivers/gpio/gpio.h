@@ -52,10 +52,11 @@ class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio> {
   void GetDriveStrength(GetDriveStrengthCompleter::Sync& completer) override;
   void GetInterrupt(GetInterruptRequestView request,
                     GetInterruptCompleter::Sync& completer) override;
+  void ConfigureInterrupt(fuchsia_hardware_gpio::wire::GpioConfigureInterruptRequest* request,
+                          ConfigureInterruptCompleter::Sync& completer) override;
   void ReleaseInterrupt(ReleaseInterruptCompleter::Sync& completer) override;
   void SetAltFunction(SetAltFunctionRequestView request,
                       SetAltFunctionCompleter::Sync& completer) override;
-  void SetPolarity(SetPolarityRequestView request, SetPolarityCompleter::Sync& completer) override;
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_gpio::Gpio> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;

@@ -104,7 +104,7 @@ closed protocol Sandbox {
                             /// The name of the child exposing the needed
                             /// capability.
                             ///
-                            /// Required.
+                            /// If not specified, route assumed to be from "void".
                             1: name fuchsia.component.name;
                             /// The exposed capability.
                             ///
@@ -112,6 +112,8 @@ closed protocol Sandbox {
                             2: capability @generated_name("ExposedCapability") strict union {
                                 /// The name of the exposed protocol.
                                 1: protocol fuchsia.component.name;
+                                /// The name of the exposed capability.
+                                2: configuration fuchsia.component.name;
                             };
                         };
 

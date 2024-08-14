@@ -96,12 +96,13 @@ async fn main() -> Result<()> {
         compile_container_manifest(
             package_name,
             &[
-                "/:remote_bundle:data/rootfs",
-                "/dev:devtmpfs",
-                "/dev/pts:devpts",
-                "/dev/shm:tmpfs",
-                "/proc:proc",
-                "/sys:sysfs",
+                // Should we set nosuid for the root mount?
+                "/:remote_bundle:data/rootfs:nodev,relatime",
+                "/dev:devtmpfs::nosuid,relatime",
+                "/dev/pts:devpts::nosuid,noexec,relatime",
+                "/dev/shm:tmpfs::nosuid,nodev",
+                "/proc:proc::nosuid,nodev,noexec,relatime",
+                "/sys:sysfs::nosuid,nodev,noexec,relatime",
                 "/tmp:tmpfs",
             ],
             &features,

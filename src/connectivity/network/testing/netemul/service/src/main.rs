@@ -49,8 +49,6 @@ enum CreateRealmError {
     #[error("name not provided")]
     NameNotProvided,
     #[error("capability source not provided")]
-    CapabilitySourceNotProvided,
-    #[error("capability name not provided")]
     CapabilityNameNotProvided,
     #[error("duplicate capability '{0}' used by component '{1}'")]
     DuplicateCapabilityUse(String, String),
@@ -73,7 +71,6 @@ impl Into<zx::Status> for CreateRealmError {
         match self {
             CreateRealmError::SourceNotProvided
             | CreateRealmError::NameNotProvided
-            | CreateRealmError::CapabilitySourceNotProvided
             | CreateRealmError::CapabilityNameNotProvided
             | CreateRealmError::DuplicateCapabilityUse(String { .. }, String { .. })
             | CreateRealmError::ModifiedNonexistentProgram(String { .. })
@@ -147,6 +144,7 @@ impl std::fmt::Display for StorageVariant {
 enum UniqueCapability<'a> {
     DevFs { name: Cow<'a, str> },
     Protocol { proto_name: Cow<'a, str> },
+    Configuration { name: Cow<'a, str> },
     Storage { mount_path: Cow<'a, str> },
 }
 
@@ -371,21 +369,41 @@ async fn create_realm_instance(
                                 capability,
                                 ..
                             }) => {
-                                let source =
-                                    source.ok_or(CreateRealmError::CapabilitySourceNotProvided)?;
-                                let fnetemul::ExposedCapability::Protocol(capability) = capability
-                                    .ok_or(CreateRealmError::CapabilityNameNotProvided)?;
-                                debug!(
-                                    "routing capability '{}' from component '{}' to '{}'",
-                                    capability, source, name
-                                );
-                                let () = child_dep_routes.push(
-                                    Route::new()
-                                        .capability(Capability::protocol_by_name(&capability))
-                                        .from(Ref::child(source))
-                                        .to(&child_ref),
-                                );
-                                UniqueCapability::Protocol { proto_name: capability.into() }
+                                let source = source
+                                    .map(|source| Ref::child(source))
+                                    .unwrap_or_else(|| Ref::void());
+                                match capability
+                                    .ok_or(CreateRealmError::CapabilityNameNotProvided)?
+                                {
+                                    fnetemul::ExposedCapability::Protocol(capability) => {
+                                        debug!(
+                                            "routing capability '{}' from component '{}' to '{}'",
+                                            capability, source, name
+                                        );
+                                        let () = child_dep_routes.push(
+                                            Route::new()
+                                                .capability(Capability::protocol_by_name(
+                                                    &capability,
+                                                ))
+                                                .from(source)
+                                                .to(&child_ref),
+                                        );
+                                        UniqueCapability::Protocol { proto_name: capability.into() }
+                                    }
+                                    fnetemul::ExposedCapability::Configuration(capability) => {
+                                        debug!(
+                                            "routing capability '{}' from component '{}' to '{}'",
+                                            capability, source, name
+                                        );
+                                        let () = child_dep_routes.push(
+                                            Route::new()
+                                                .capability(Capability::configuration(&capability))
+                                                .from(source)
+                                                .to(&child_ref),
+                                        );
+                                        UniqueCapability::Configuration { name: capability.into() }
+                                    }
+                                }
                             }
                             fnetemul::Capability::StorageDep(fnetemul::StorageDep {
                                 variant,
@@ -1006,19 +1024,30 @@ mod tests {
     const COUNTER_COMPONENT_NAME: &str = "counter";
     const COUNTER_URL: &str = "#meta/counter.cm";
     const COUNTER_WITHOUT_PROGRAM_URL: &str = "#meta/counter-without-program.cm";
+    const COUNTER_CONFIGURATION_NAME: &str = "fuchsia.netemul.test.Config";
     const COUNTER_A_PROTOCOL_NAME: &str = "fuchsia.netemul.test.CounterA";
     const COUNTER_B_PROTOCOL_NAME: &str = "fuchsia.netemul.test.CounterB";
     const DATA_PATH: &str = "/data";
     const CACHE_PATH: &str = "/cache";
+
+    fn counter_config_cap() -> fnetemul::Capability {
+        fnetemul::Capability::ChildDep(fnetemul::ChildDep {
+            capability: Some(fidl_fuchsia_netemul::ExposedCapability::Configuration(
+                COUNTER_CONFIGURATION_NAME.to_string(),
+            )),
+            ..Default::default()
+        })
+    }
 
     fn counter_component() -> fnetemul::ChildDef {
         fnetemul::ChildDef {
             source: Some(fnetemul::ChildSource::Component(COUNTER_URL.to_string())),
             name: Some(COUNTER_COMPONENT_NAME.to_string()),
             exposes: Some(vec![CounterMarker::PROTOCOL_NAME.to_string()]),
-            uses: Some(fnetemul::ChildUses::Capabilities(vec![fnetemul::Capability::LogSink(
-                fnetemul::Empty {},
-            )])),
+            uses: Some(fnetemul::ChildUses::Capabilities(vec![
+                fnetemul::Capability::LogSink(fnetemul::Empty {}),
+                counter_config_cap(),
+            ])),
             ..Default::default()
         }
     }
@@ -1463,6 +1492,7 @@ mod tests {
                         uses: Some(fnetemul::ChildUses::Capabilities(vec![
                             fnetemul::Capability::LogSink(fnetemul::Empty {}),
                             fnetemul::Capability::NetemulNetworkContext(fnetemul::Empty {}),
+                            counter_config_cap(),
                         ])),
                         ..Default::default()
                     },
@@ -1809,6 +1839,7 @@ mod tests {
                                 )),
                                 ..Default::default()
                             }),
+                            counter_config_cap(),
                         ])),
                         ..Default::default()
                     },
@@ -1818,6 +1849,7 @@ mod tests {
                         exposes: Some(vec![COUNTER_B_PROTOCOL_NAME.to_string()]),
                         uses: Some(fnetemul::ChildUses::Capabilities(vec![
                             fnetemul::Capability::LogSink(fnetemul::Empty {}),
+                            counter_config_cap(),
                         ])),
                         ..Default::default()
                     },
@@ -2088,6 +2120,7 @@ mod tests {
                                 subdir: None,
                                 ..Default::default()
                             }),
+                            counter_config_cap(),
                         ])),
                         ..Default::default()
                     },
@@ -2175,6 +2208,7 @@ mod tests {
                                 path: Some(String::from(CACHE_PATH)),
                                 ..Default::default()
                             }),
+                            counter_config_cap(),
                         ])),
                         ..Default::default()
                     },
@@ -2184,6 +2218,7 @@ mod tests {
                         exposes: Some(vec![COUNTER_B_PROTOCOL_NAME.to_string()]),
                         uses: Some(fnetemul::ChildUses::Capabilities(vec![
                             fnetemul::Capability::LogSink(fnetemul::Empty {}),
+                            counter_config_cap(),
                         ])),
                         ..Default::default()
                     },
@@ -2497,7 +2532,12 @@ mod tests {
             fnetemul::RealmOptions {
                 children: Some(vec![fnetemul::ChildDef {
                     source: Some(fnetemul::ChildSource::Mock(mock_dir)),
-                    ..counter_component()
+                    name: Some(COUNTER_COMPONENT_NAME.to_string()),
+                    exposes: Some(vec![CounterMarker::PROTOCOL_NAME.to_string()]),
+                    uses: Some(fnetemul::ChildUses::Capabilities(vec![
+                        fnetemul::Capability::LogSink(fnetemul::Empty {}),
+                    ])),
+                    ..Default::default()
                 }]),
                 ..Default::default()
             },

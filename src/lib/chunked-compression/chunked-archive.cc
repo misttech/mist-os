@@ -124,7 +124,7 @@ Status HeaderReader::CheckMagic(const uint8_t* data, size_t len) {
   // In practice the magic is always at the start of the header, but for consistency with other
   // accesses we offset |data| by |kChunkArchiveMagicOffset|.
   if (memcmp(data + kChunkArchiveMagicOffset, kChunkArchiveMagic, kArchiveMagicLength)) {
-    FX_SLOG(ERROR, "File magic doesn't match");
+    FX_LOG_KV(ERROR, "File magic doesn't match");
     return kStatusErrIoDataIntegrity;
   }
   return kStatusOk;
@@ -137,8 +137,8 @@ Status HeaderReader::CheckVersion(const uint8_t* data, size_t len) {
   const ArchiveVersionType& version =
       reinterpret_cast<const ArchiveVersionType*>(data + kChunkArchiveVersionOffset)[0];
   if (version != kVersion) {
-    FX_SLOG(ERROR, "Unsupported archive version", FX_KV("actual", version),
-            FX_KV("expected", kVersion));
+    FX_LOG_KV(ERROR, "Unsupported archive version", FX_KV("actual", version),
+              FX_KV("expected", kVersion));
     return kStatusErrInvalidArgs;
   }
   return kStatusOk;
@@ -151,7 +151,7 @@ Status HeaderReader::CheckChecksum(const uint8_t* data, size_t len) {
   uint32_t crc = reinterpret_cast<const uint32_t*>(data + kChunkArchiveHeaderCrc32Offset)[0];
   uint32_t expected_crc = ComputeChecksum(data, len);
   if (crc != expected_crc) {
-    FX_SLOG(ERROR, "Bad archive checksum");
+    FX_LOG_KV(ERROR, "Bad archive checksum");
     return kStatusErrIoDataIntegrity;
   }
   return kStatusOk;
@@ -174,7 +174,7 @@ Status HeaderReader::ParseSeekTable(const uint8_t* data, size_t len, size_t file
   }
   size_t header_end = kChunkArchiveSeekTableOffset + (num_chunks * sizeof(SeekTableEntry));
   if (len < header_end) {
-    FX_SLOG(ERROR, "Invalid archive. Header too small for seek table size");
+    FX_LOG_KV(ERROR, "Invalid archive. Header too small for seek table size");
     return kStatusErrIoDataIntegrity;
   }
 
@@ -199,7 +199,7 @@ Status HeaderReader::CheckSeekTable(const fbl::Array<SeekTableEntry>& table, siz
     const SeekTableEntry* prev = i > 0 ? &table[i - 1] : nullptr;
     Status status;
     if ((status = CheckSeekTableEntry(table[i], prev, header_end, file_length)) != kStatusOk) {
-      FX_SLOG(ERROR, "Invalid archive. Bad seek table entry", FX_KV("entry", i));
+      FX_LOG_KV(ERROR, "Invalid archive. Bad seek table entry", FX_KV("entry", i));
       return status;
     }
   }
@@ -210,41 +210,41 @@ Status HeaderReader::CheckSeekTableEntry(const SeekTableEntry& entry, const Seek
                                          size_t header_end, size_t file_length) {
   if (entry.compressed_size == 0 || entry.decompressed_size == 0) {
     // Invariant I4
-    FX_SLOG(ERROR, "Zero-sized entry");
+    FX_LOG_KV(ERROR, "Zero-sized entry");
     return kStatusErrIoDataIntegrity;
   } else if (entry.compressed_offset < header_end) {
     // Invariant I1
-    FX_SLOG(ERROR, "Invalid archive. Chunk overlaps with header");
+    FX_LOG_KV(ERROR, "Invalid archive. Chunk overlaps with header");
     return kStatusErrIoDataIntegrity;
   }
   uint64_t compressed_end;
   if (add_overflow(entry.compressed_offset, entry.compressed_size, &compressed_end)) {
-    FX_SLOG(ERROR, "Compressed frame too big");
+    FX_LOG_KV(ERROR, "Compressed frame too big");
     return kStatusErrIoDataIntegrity;
   } else if (compressed_end > file_length) {
     // Invariant I5
-    FX_SLOG(ERROR, "Invalid archive. Chunk exceeds file length");
+    FX_LOG_KV(ERROR, "Invalid archive. Chunk exceeds file length");
     return kStatusErrIoDataIntegrity;
   }
   [[maybe_unused]] uint64_t decompressed_end;
   if (add_overflow(entry.decompressed_offset, entry.decompressed_size, &decompressed_end)) {
-    FX_SLOG(ERROR, "Decompressed frame too big");
+    FX_LOG_KV(ERROR, "Decompressed frame too big");
     return kStatusErrIoDataIntegrity;
   }
   if (prev != nullptr) {
     if (prev->decompressed_offset + prev->decompressed_size != entry.decompressed_offset) {
       // Invariant I2
-      FX_SLOG(ERROR, "Invalid archive. Decompressed chunks are non-contiguous");
+      FX_LOG_KV(ERROR, "Invalid archive. Decompressed chunks are non-contiguous");
       return kStatusErrIoDataIntegrity;
     }
     if (prev->compressed_offset + prev->compressed_size > entry.compressed_offset) {
       // Invariant I3
-      FX_SLOG(ERROR, "Invalid archive. Chunks are non-monotonic");
+      FX_LOG_KV(ERROR, "Invalid archive. Chunks are non-monotonic");
       return kStatusErrIoDataIntegrity;
     }
   } else if (entry.decompressed_offset != 0) {
     // Invariant I0
-    FX_SLOG(ERROR, "Invalid archive. Decompressed chunks must start at offset 0");
+    FX_LOG_KV(ERROR, "Invalid archive. Decompressed chunks must start at offset 0");
     return kStatusErrIoDataIntegrity;
   }
   return kStatusOk;

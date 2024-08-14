@@ -11,6 +11,7 @@
 #include <zircon/syscalls/clock.h>
 #include <zircon/types.h>
 
+#include <cmath>
 #include <string>
 
 #include "src/media/audio/lib/timeline/timeline_function.h"

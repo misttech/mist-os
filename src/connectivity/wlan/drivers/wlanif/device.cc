@@ -117,6 +117,12 @@ zx::result<> Device::Start() {
 
 void Device::PrepareStop(fdf::PrepareStopCompleter completer) {
   client_.AsyncTeardown();
+
+  // Destroy the WlanFullmacImplIfc FFI bridge.
+  {
+    std::lock_guard guard(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
+    wlan_fullmac_impl_ifc_banjo_protocol_.reset();
+  }
   if (mlme_.get()) {
     mlme_->StopMainLoop();
   }
@@ -173,9 +179,9 @@ zx_status_t Device::ConnectToWlanFullmacImpl() {
 
 zx_status_t Device::StartFullmac(const rust_wlan_fullmac_ifc_protocol_copy_t* ifc,
                                  zx::channel* out_sme_channel) {
-  // We manually populate the protocol ops here so that we can verify at compile time that our rust
-  // bindings have the expected parameters.
-  wlan_fullmac_impl_ifc_protocol_ops_.reset(new wlan_fullmac_impl_ifc_banjo_protocol_ops_t{
+  // We manually populate the protocol ops here so that we can verify at compile time
+  // that our rust bindings have the expected parameters.
+  wlan_fullmac_impl_ifc_banjo_protocol_ops_.reset(new wlan_fullmac_impl_ifc_banjo_protocol_ops_t{
       .on_scan_result = ifc->ops->on_scan_result,
       .on_scan_end = ifc->ops->on_scan_end,
       .connect_conf = ifc->ops->connect_conf,
@@ -198,9 +204,13 @@ zx_status_t Device::StartFullmac(const rust_wlan_fullmac_ifc_protocol_copy_t* if
       .on_wmm_status_resp = ifc->ops->on_wmm_status_resp,
   });
 
-  wlan_fullmac_impl_ifc_protocol_ = std::make_unique<wlan_fullmac_impl_ifc_banjo_protocol_t>();
-  wlan_fullmac_impl_ifc_protocol_->ops = wlan_fullmac_impl_ifc_protocol_ops_.get();
-  wlan_fullmac_impl_ifc_protocol_->ctx = ifc->ctx;
+  {
+    std::lock_guard guard(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
+    wlan_fullmac_impl_ifc_banjo_protocol_ =
+        std::make_unique<wlan_fullmac_impl_ifc_banjo_protocol_t>();
+    wlan_fullmac_impl_ifc_banjo_protocol_->ops = wlan_fullmac_impl_ifc_banjo_protocol_ops_.get();
+    wlan_fullmac_impl_ifc_banjo_protocol_->ctx = ifc->ctx;
+  }
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_wlan_fullmac::WlanFullmacImplIfc>();
   if (endpoints.is_error()) {
@@ -731,164 +741,230 @@ void Device::WmmStatusReq() {
 
 // Implementation of fuchsia_wlan_fullmac::WlanFullmacImplIfc.
 void Device::OnScanResult(OnScanResultRequestView request, OnScanResultCompleter::Sync& completer) {
-  wlan_fullmac_scan_result_t scan_result;
-  ConvertFullmacScanResult(request->result, &scan_result);
-  wlan_fullmac_impl_ifc_protocol_ops_->on_scan_result(wlan_fullmac_impl_ifc_protocol_->ctx,
-                                                      &scan_result);
+  std::lock_guard guard(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
+  if (wlan_fullmac_impl_ifc_banjo_protocol_ != nullptr) {
+    wlan_fullmac_scan_result_t scan_result;
+    ConvertFullmacScanResult(request->result, &scan_result);
+    wlan_fullmac_impl_ifc_banjo_protocol_ops_->on_scan_result(
+        wlan_fullmac_impl_ifc_banjo_protocol_->ctx, &scan_result);
+  }
   completer.Reply();
 }
 
 void Device::OnScanEnd(OnScanEndRequestView request, OnScanEndCompleter::Sync& completer) {
-  wlan_fullmac_scan_end_t scan_end;
-  ConvertScanEnd(request->end, &scan_end);
-  wlan_fullmac_impl_ifc_protocol_ops_->on_scan_end(wlan_fullmac_impl_ifc_protocol_->ctx, &scan_end);
+  std::lock_guard guard(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
+  if (wlan_fullmac_impl_ifc_banjo_protocol_ != nullptr) {
+    wlan_fullmac_scan_end_t scan_end;
+    ConvertScanEnd(request->end, &scan_end);
+    wlan_fullmac_impl_ifc_banjo_protocol_ops_->on_scan_end(
+        wlan_fullmac_impl_ifc_banjo_protocol_->ctx, &scan_end);
+  }
   completer.Reply();
 }
 
 void Device::ConnectConf(ConnectConfRequestView request, ConnectConfCompleter::Sync& completer) {
   wlan_fullmac_connect_confirm_t connect_conf;
   ConvertConnectConfirm(request->resp, &connect_conf);
-  wlan_fullmac_impl_ifc_protocol_ops_->connect_conf(wlan_fullmac_impl_ifc_protocol_->ctx,
-                                                    &connect_conf);
+  std::lock_guard guard(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
+  if (wlan_fullmac_impl_ifc_banjo_protocol_ != nullptr) {
+    wlan_fullmac_impl_ifc_banjo_protocol_ops_->connect_conf(
+        wlan_fullmac_impl_ifc_banjo_protocol_->ctx, &connect_conf);
+  }
   completer.Reply();
 }
 
 void Device::RoamConf(RoamConfRequestView request, RoamConfCompleter::Sync& completer) {
-  wlan_fullmac_roam_confirm_t roam_conf;
-  ConvertRoamConfirm(request->resp, &roam_conf);
-  wlan_fullmac_impl_ifc_protocol_ops_->roam_conf(wlan_fullmac_impl_ifc_protocol_->ctx, &roam_conf);
+  std::lock_guard guard(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
+  if (wlan_fullmac_impl_ifc_banjo_protocol_ != nullptr) {
+    wlan_fullmac_roam_confirm_t roam_conf;
+    ConvertRoamConfirm(request->resp, &roam_conf);
+    wlan_fullmac_impl_ifc_banjo_protocol_ops_->roam_conf(wlan_fullmac_impl_ifc_banjo_protocol_->ctx,
+                                                         &roam_conf);
+  }
   completer.Reply();
 }
 
 void Device::AuthInd(AuthIndRequestView request, AuthIndCompleter::Sync& completer) {
-  wlan_fullmac_auth_ind_t auth_ind;
-  ConvertAuthInd(request->resp, &auth_ind);
-  wlan_fullmac_impl_ifc_protocol_ops_->auth_ind(wlan_fullmac_impl_ifc_protocol_->ctx, &auth_ind);
+  std::lock_guard guard(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
+  if (wlan_fullmac_impl_ifc_banjo_protocol_ != nullptr) {
+    wlan_fullmac_auth_ind_t auth_ind;
+    ConvertAuthInd(request->resp, &auth_ind);
+    wlan_fullmac_impl_ifc_banjo_protocol_ops_->auth_ind(wlan_fullmac_impl_ifc_banjo_protocol_->ctx,
+                                                        &auth_ind);
+  }
   completer.Reply();
 }
 
 void Device::DeauthConf(DeauthConfRequestView request, DeauthConfCompleter::Sync& completer) {
-  ZX_ASSERT(request->has_peer_sta_address());
-  ZX_ASSERT(request->peer_sta_address().size() == ETH_ALEN);
-  wlan_fullmac_impl_ifc_protocol_ops_->deauth_conf(wlan_fullmac_impl_ifc_protocol_->ctx,
-                                                   request->peer_sta_address().data());
+  std::lock_guard guard(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
+  if (wlan_fullmac_impl_ifc_banjo_protocol_ != nullptr) {
+    ZX_ASSERT(request->has_peer_sta_address());
+    ZX_ASSERT(request->peer_sta_address().size() == ETH_ALEN);
+    wlan_fullmac_impl_ifc_banjo_protocol_ops_->deauth_conf(
+        wlan_fullmac_impl_ifc_banjo_protocol_->ctx, request->peer_sta_address().data());
+  }
   completer.Reply();
 }
 
 void Device::DeauthInd(DeauthIndRequestView request, DeauthIndCompleter::Sync& completer) {
-  wlan_fullmac_deauth_indication_t deauth_ind;
-  ConvertDeauthInd(request->ind, &deauth_ind);
-  wlan_fullmac_impl_ifc_protocol_ops_->deauth_ind(wlan_fullmac_impl_ifc_protocol_->ctx,
-                                                  &deauth_ind);
+  std::lock_guard guard(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
+  if (wlan_fullmac_impl_ifc_banjo_protocol_ != nullptr) {
+    wlan_fullmac_deauth_indication_t deauth_ind;
+    ConvertDeauthInd(request->ind, &deauth_ind);
+    wlan_fullmac_impl_ifc_banjo_protocol_ops_->deauth_ind(
+        wlan_fullmac_impl_ifc_banjo_protocol_->ctx, &deauth_ind);
+  }
   completer.Reply();
 }
 
 void Device::AssocInd(AssocIndRequestView request, AssocIndCompleter::Sync& completer) {
-  wlan_fullmac_assoc_ind_t assoc_ind;
-  ConvertAssocInd(request->resp, &assoc_ind);
-  wlan_fullmac_impl_ifc_protocol_ops_->assoc_ind(wlan_fullmac_impl_ifc_protocol_->ctx, &assoc_ind);
+  std::lock_guard guard(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
+  if (wlan_fullmac_impl_ifc_banjo_protocol_ != nullptr) {
+    wlan_fullmac_assoc_ind_t assoc_ind;
+    ConvertAssocInd(request->resp, &assoc_ind);
+    wlan_fullmac_impl_ifc_banjo_protocol_ops_->assoc_ind(wlan_fullmac_impl_ifc_banjo_protocol_->ctx,
+                                                         &assoc_ind);
+  }
   completer.Reply();
 }
 
 void Device::DisassocConf(DisassocConfRequestView request, DisassocConfCompleter::Sync& completer) {
-  wlan_fullmac_disassoc_confirm_t disassoc_conf;
-  disassoc_conf.status = request->resp.status;
-  wlan_fullmac_impl_ifc_protocol_ops_->disassoc_conf(wlan_fullmac_impl_ifc_protocol_->ctx,
-                                                     &disassoc_conf);
+  std::lock_guard guard(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
+  if (wlan_fullmac_impl_ifc_banjo_protocol_ != nullptr) {
+    wlan_fullmac_disassoc_confirm_t disassoc_conf;
+    disassoc_conf.status = request->resp.status;
+    wlan_fullmac_impl_ifc_banjo_protocol_ops_->disassoc_conf(
+        wlan_fullmac_impl_ifc_banjo_protocol_->ctx, &disassoc_conf);
+  }
   completer.Reply();
 }
 
 void Device::DisassocInd(DisassocIndRequestView request, DisassocIndCompleter::Sync& completer) {
-  wlan_fullmac_disassoc_indication_t disassoc_ind;
-  ConvertDisassocInd(request->ind, &disassoc_ind);
-  wlan_fullmac_impl_ifc_protocol_ops_->disassoc_ind(wlan_fullmac_impl_ifc_protocol_->ctx,
-                                                    &disassoc_ind);
+  std::lock_guard guard(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
+  if (wlan_fullmac_impl_ifc_banjo_protocol_ != nullptr) {
+    wlan_fullmac_disassoc_indication_t disassoc_ind;
+    ConvertDisassocInd(request->ind, &disassoc_ind);
+    wlan_fullmac_impl_ifc_banjo_protocol_ops_->disassoc_ind(
+        wlan_fullmac_impl_ifc_banjo_protocol_->ctx, &disassoc_ind);
+  }
   completer.Reply();
 }
 
 void Device::StartConf(StartConfRequestView request, StartConfCompleter::Sync& completer) {
-  wlan_fullmac_start_confirm_t start_conf;
-  start_conf.result_code = ConvertStartResultCode(request->resp.result_code);
-  wlan_fullmac_impl_ifc_protocol_ops_->start_conf(wlan_fullmac_impl_ifc_protocol_->ctx,
-                                                  &start_conf);
+  std::lock_guard guard(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
+  if (wlan_fullmac_impl_ifc_banjo_protocol_ != nullptr) {
+    wlan_fullmac_start_confirm_t start_conf;
+    start_conf.result_code = ConvertStartResultCode(request->resp.result_code);
+    wlan_fullmac_impl_ifc_banjo_protocol_ops_->start_conf(
+        wlan_fullmac_impl_ifc_banjo_protocol_->ctx, &start_conf);
+  }
   completer.Reply();
 }
 
 void Device::StopConf(StopConfRequestView request, StopConfCompleter::Sync& completer) {
-  wlan_fullmac_stop_confirm_t stop_conf;
-  stop_conf.result_code = ConvertStopResultCode(request->resp.result_code);
-  wlan_fullmac_impl_ifc_protocol_ops_->stop_conf(wlan_fullmac_impl_ifc_protocol_->ctx, &stop_conf);
+  std::lock_guard guard(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
+  if (wlan_fullmac_impl_ifc_banjo_protocol_ != nullptr) {
+    wlan_fullmac_stop_confirm_t stop_conf;
+    stop_conf.result_code = ConvertStopResultCode(request->resp.result_code);
+    wlan_fullmac_impl_ifc_banjo_protocol_ops_->stop_conf(wlan_fullmac_impl_ifc_banjo_protocol_->ctx,
+                                                         &stop_conf);
+  }
   completer.Reply();
 }
 
 void Device::EapolConf(EapolConfRequestView request, EapolConfCompleter::Sync& completer) {
-  wlan_fullmac_eapol_confirm_t eapol_conf;
-  ConvertEapolConf(request->resp, &eapol_conf);
-  wlan_fullmac_impl_ifc_protocol_ops_->eapol_conf(wlan_fullmac_impl_ifc_protocol_->ctx,
-                                                  &eapol_conf);
+  std::lock_guard guard(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
+  if (wlan_fullmac_impl_ifc_banjo_protocol_ != nullptr) {
+    wlan_fullmac_eapol_confirm_t eapol_conf;
+    ConvertEapolConf(request->resp, &eapol_conf);
+    wlan_fullmac_impl_ifc_banjo_protocol_ops_->eapol_conf(
+        wlan_fullmac_impl_ifc_banjo_protocol_->ctx, &eapol_conf);
+  }
   completer.Reply();
 }
 
 void Device::OnChannelSwitch(OnChannelSwitchRequestView request,
                              OnChannelSwitchCompleter::Sync& completer) {
-  wlan_fullmac_channel_switch_info channel_switch_info;
-  channel_switch_info.new_channel = request->ind.new_channel;
-  wlan_fullmac_impl_ifc_protocol_ops_->on_channel_switch(wlan_fullmac_impl_ifc_protocol_->ctx,
-                                                         &channel_switch_info);
+  std::lock_guard guard(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
+  if (wlan_fullmac_impl_ifc_banjo_protocol_ != nullptr) {
+    wlan_fullmac_channel_switch_info channel_switch_info;
+    channel_switch_info.new_channel = request->ind.new_channel;
+    wlan_fullmac_impl_ifc_banjo_protocol_ops_->on_channel_switch(
+        wlan_fullmac_impl_ifc_banjo_protocol_->ctx, &channel_switch_info);
+  }
   completer.Reply();
 }
 
 void Device::SignalReport(SignalReportRequestView request, SignalReportCompleter::Sync& completer) {
-  wlan_fullmac_signal_report_indication_t signal_report_ind;
-  signal_report_ind.rssi_dbm = request->ind.rssi_dbm;
-  signal_report_ind.snr_db = request->ind.snr_db;
-  wlan_fullmac_impl_ifc_protocol_ops_->signal_report(wlan_fullmac_impl_ifc_protocol_->ctx,
-                                                     &signal_report_ind);
+  std::lock_guard guard(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
+  if (wlan_fullmac_impl_ifc_banjo_protocol_ != nullptr) {
+    wlan_fullmac_signal_report_indication_t signal_report_ind;
+    signal_report_ind.rssi_dbm = request->ind.rssi_dbm;
+    signal_report_ind.snr_db = request->ind.snr_db;
+    wlan_fullmac_impl_ifc_banjo_protocol_ops_->signal_report(
+        wlan_fullmac_impl_ifc_banjo_protocol_->ctx, &signal_report_ind);
+  }
   completer.Reply();
 }
 
 void Device::EapolInd(EapolIndRequestView request, EapolIndCompleter::Sync& completer) {
-  wlan_fullmac_eapol_indication_t eapol_ind;
-  ConvertEapolIndication(request->ind, &eapol_ind);
-  wlan_fullmac_impl_ifc_protocol_ops_->eapol_ind(wlan_fullmac_impl_ifc_protocol_->ctx, &eapol_ind);
+  std::lock_guard guard(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
+  if (wlan_fullmac_impl_ifc_banjo_protocol_ != nullptr) {
+    wlan_fullmac_eapol_indication_t eapol_ind;
+    ConvertEapolIndication(request->ind, &eapol_ind);
+    wlan_fullmac_impl_ifc_banjo_protocol_ops_->eapol_ind(wlan_fullmac_impl_ifc_banjo_protocol_->ctx,
+                                                         &eapol_ind);
+  }
   completer.Reply();
 }
 
 void Device::OnPmkAvailable(OnPmkAvailableRequestView request,
                             OnPmkAvailableCompleter::Sync& completer) {
-  wlan_fullmac_pmk_info_t pmk_info;
-  pmk_info.pmk_list = request->info.pmk.data();
-  pmk_info.pmk_count = request->info.pmk.count();
-  pmk_info.pmkid_list = request->info.pmkid.data();
-  pmk_info.pmkid_count = request->info.pmkid.count();
-  wlan_fullmac_impl_ifc_protocol_ops_->on_pmk_available(wlan_fullmac_impl_ifc_protocol_->ctx,
-                                                        &pmk_info);
+  std::lock_guard guard(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
+  if (wlan_fullmac_impl_ifc_banjo_protocol_ != nullptr) {
+    wlan_fullmac_pmk_info_t pmk_info;
+    pmk_info.pmk_list = request->info.pmk.data();
+    pmk_info.pmk_count = request->info.pmk.count();
+    pmk_info.pmkid_list = request->info.pmkid.data();
+    pmk_info.pmkid_count = request->info.pmkid.count();
+    wlan_fullmac_impl_ifc_banjo_protocol_ops_->on_pmk_available(
+        wlan_fullmac_impl_ifc_banjo_protocol_->ctx, &pmk_info);
+  }
   completer.Reply();
 }
 
 void Device::SaeHandshakeInd(SaeHandshakeIndRequestView request,
                              SaeHandshakeIndCompleter::Sync& completer) {
-  wlan_fullmac_sae_handshake_ind_t sae_handshake_ind;
-  memcpy(sae_handshake_ind.peer_sta_address, request->ind.peer_sta_address.data(), ETH_ALEN);
-  wlan_fullmac_impl_ifc_protocol_ops_->sae_handshake_ind(wlan_fullmac_impl_ifc_protocol_->ctx,
-                                                         &sae_handshake_ind);
+  std::lock_guard guard(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
+  if (wlan_fullmac_impl_ifc_banjo_protocol_ != nullptr) {
+    wlan_fullmac_sae_handshake_ind_t sae_handshake_ind;
+    memcpy(sae_handshake_ind.peer_sta_address, request->ind.peer_sta_address.data(), ETH_ALEN);
+    wlan_fullmac_impl_ifc_banjo_protocol_ops_->sae_handshake_ind(
+        wlan_fullmac_impl_ifc_banjo_protocol_->ctx, &sae_handshake_ind);
+  }
   completer.Reply();
 }
 
 void Device::SaeFrameRx(SaeFrameRxRequestView request, SaeFrameRxCompleter::Sync& completer) {
-  wlan_fullmac_sae_frame_t sae_frame;
-  ConvertSaeFrame(request->frame, &sae_frame);
-  wlan_fullmac_impl_ifc_protocol_ops_->sae_frame_rx(wlan_fullmac_impl_ifc_protocol_->ctx,
-                                                    &sae_frame);
+  std::lock_guard guard(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
+  if (wlan_fullmac_impl_ifc_banjo_protocol_ != nullptr) {
+    wlan_fullmac_sae_frame_t sae_frame;
+    ConvertSaeFrame(request->frame, &sae_frame);
+    wlan_fullmac_impl_ifc_banjo_protocol_ops_->sae_frame_rx(
+        wlan_fullmac_impl_ifc_banjo_protocol_->ctx, &sae_frame);
+  }
   completer.Reply();
 }
 
 void Device::OnWmmStatusResp(OnWmmStatusRespRequestView request,
                              OnWmmStatusRespCompleter::Sync& completer) {
-  wlan_wmm_parameters_t wmm_params;
-  ConvertWmmParams(request->wmm_params, &wmm_params);
-  wlan_fullmac_impl_ifc_protocol_ops_->on_wmm_status_resp(wlan_fullmac_impl_ifc_protocol_->ctx,
-                                                          request->status, &wmm_params);
+  std::lock_guard guard(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
+  if (wlan_fullmac_impl_ifc_banjo_protocol_ != nullptr) {
+    wlan_wmm_parameters_t wmm_params;
+    ConvertWmmParams(request->wmm_params, &wmm_params);
+    wlan_fullmac_impl_ifc_banjo_protocol_ops_->on_wmm_status_resp(
+        wlan_fullmac_impl_ifc_banjo_protocol_->ctx, request->status, &wmm_params);
+  }
   completer.Reply();
 }
 

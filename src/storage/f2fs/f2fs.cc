@@ -9,6 +9,7 @@
 #include <lib/async/dispatcher.h>
 #include <lib/trace-provider/provider.h>
 #include <lib/zx/event.h>
+#include <sys/stat.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 
@@ -216,9 +217,10 @@ void F2fs::ScheduleWritebackAndReclaimPages(size_t num_pages) {
   // dirty Pages is less than kMaxDirtyDataPages / 4. |writeback_flag_| ensures that neither
   // checkpoint nor gc runs during this writeback. If there is not enough space, stop writeback as
   // flushing N of dirty Pages can produce N of additional dirty node Pages in the worst case.
-  if (HasNotEnoughMemory() && writeback_flag_.try_acquire()) {
-    auto promise = fpromise::make_promise([this]() mutable {
-      while (!segment_manager_->HasNotEnoughFreeSecs() && CanReclaim() && !StopWriteback()) {
+  if (HasNotEnoughMemory()) {
+    auto promise = fpromise::make_promise([this]() __TA_EXCLUDES(writeback_mutex_) {
+      std::lock_guard<std::shared_timed_mutex> lock(writeback_mutex_);
+      while (!segment_manager_->HasNotEnoughFreeSecs() && CanReclaim() && HasNotEnoughMemory(4)) {
         GetVCache().ForDirtyVnodesIf(
             [&](fbl::RefPtr<VnodeF2fs>& vnode) {
               WritebackOperation op = {.bReclaim = true};
@@ -234,8 +236,6 @@ void F2fs::ScheduleWritebackAndReclaimPages(size_t num_pages) {
       }
       node_vnode_->CleanupPages();
       GetVCache().EvictInactiveVnodes();
-      // Wake waiters of WaitForWriteback().
-      writeback_flag_.release();
       return fpromise::ok();
     });
     writer_->ScheduleWriteback(std::move(promise));
@@ -263,7 +263,7 @@ zx_status_t F2fs::SyncFs(bool bShutdown) {
       }
       // If necessary, do gc.
       if (segment_manager_->HasNotEnoughFreeSecs()) {
-        if (auto ret = gc_manager_->Run(); ret.is_error()) {
+        if (auto ret = gc_manager_->Run(false); ret.is_error()) {
           if (superblock_info_->TestCpFlags(CpFlag::kCpErrorFlag)) {
             return ZX_ERR_INTERNAL;
           }
@@ -286,7 +286,7 @@ zx_status_t F2fs::SyncFs(bool bShutdown) {
     } while (superblock_info_->GetPageCount(CountType::kDirtyData) && target_vnodes);
   }
   std::lock_guard lock(f2fs::GetGlobalLock());
-  return WriteCheckpoint(false, bShutdown);
+  return WriteCheckpoint(true, bShutdown);
 }
 
 #if 0  // porting needed
@@ -330,7 +330,7 @@ zx_status_t F2fs::SyncFs(bool bShutdown) {
 //    * However f2fs_iget currently does appropriate checks to handle stale
 //    * inodes so everything is OK.
 //    */
-//   err = VnodeF2fs::Vget(this, ino, &vnode_refptr);
+//   err = GetVnode(ino, &vnode_refptr);
 //   if (err)
 //     return (VnodeF2fs *)ErrPtr(err);
 //   vnode = vnode_refptr.get();
@@ -404,10 +404,11 @@ zx_status_t F2fs::LoadSuper(std::unique_ptr<Superblock> sb) {
   }
 
   // read root inode and dentry
-  if (zx_status_t err = VnodeF2fs::Vget(this, superblock_info_->GetRootIno(), &root_vnode_);
-      err != ZX_OK) {
-    return err;
+  zx::result vnode_or = GetVnode(superblock_info_->GetRootIno());
+  if (vnode_or.is_error()) {
+    return vnode_or.status_value();
   }
+  root_vnode_ = std::move(*vnode_or);
 
   // root vnode is corrupted
   if (!root_vnode_->IsDir() || !root_vnode_->GetBlocks() || !root_vnode_->GetSize()) {
@@ -475,6 +476,96 @@ void F2fs::ClearVnodeSet() {
     vnode_set_size_[i] = 0;
   }
   vnode_set_.clear();
+}
+
+zx::result<fbl::RefPtr<VnodeF2fs>> F2fs::GetVnode(ino_t ino) {
+  if (ino < superblock_info_->GetRootIno() || !node_manager_->CheckNidRange(ino)) {
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+
+  fbl::RefPtr<VnodeF2fs> vnode;
+  if (vnode_cache_.Lookup(ino, &vnode) == ZX_OK) {
+    if (unlikely(vnode->TestFlag(InodeInfoFlag::kNewInode))) {
+      return zx::error(ZX_ERR_NOT_FOUND);
+    }
+    return zx::ok(std::move(vnode));
+  }
+
+  LockedPage node_page;
+  if (zx_status_t status = node_manager_->GetNodePage(ino, &node_page); status != ZX_OK) {
+    return zx::error(status);
+  }
+
+  umode_t mode = LeToCpu(node_page->GetAddress<Node>()->i.i_mode);
+  ZX_DEBUG_ASSERT(node_page.GetPage<NodePage>().InoOfNode() == ino);
+  if (S_ISDIR(mode)) {
+    vnode = fbl::MakeRefCounted<Dir>(this, ino, mode);
+  } else {
+    vnode = fbl::MakeRefCounted<File>(this, ino, mode);
+  }
+  vnode->Init(node_page);
+
+  // VnodeCache is allowed to keep invalid vnodes only on recovery.
+  if (!IsOnRecovery() && !vnode->GetNlink()) {
+    vnode->SetFlag(InodeInfoFlag::kBad);
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+
+  if (zx_status_t status = vnode_cache_.Add(vnode.get()); status != ZX_OK) {
+    return zx::error(status);
+  }
+
+  return zx::ok(std::move(vnode));
+}
+
+zx::result<fbl::RefPtr<VnodeF2fs>> F2fs::CreateNewVnode(umode_t mode, std::optional<gid_t> gid) {
+  zx::result ino_or = node_manager_->AllocNid();
+  if (ino_or.is_error()) {
+    return ino_or.take_error();
+  }
+
+  fbl::RefPtr<VnodeF2fs> vnode;
+  if (S_ISDIR(mode)) {
+    vnode = fbl::MakeRefCounted<Dir>(this, *ino_or, mode);
+  } else {
+    vnode = fbl::MakeRefCounted<File>(this, *ino_or, mode);
+  }
+
+  vnode->SetFlag(InodeInfoFlag::kNewInode);
+  if (gid) {
+    vnode->SetGid(*gid);
+    if (S_ISDIR(mode)) {
+      vnode->SetMode(mode | S_ISGID);
+    }
+  } else {
+    vnode->SetUid(getuid());
+  }
+
+  vnode->InitNlink();
+  vnode->SetBlocks(0);
+  vnode->InitTime();
+  vnode->SetGeneration(superblock_info_->GetNextGeneration());
+  superblock_info_->IncNextGeneration();
+
+  if (superblock_info_->TestOpt(MountOption::kInlineXattr)) {
+    vnode->SetFlag(InodeInfoFlag::kInlineXattr);
+    vnode->SetInlineXattrAddrs(kInlineXattrAddrs);
+  }
+
+  if (superblock_info_->TestOpt(MountOption::kInlineDentry) && vnode->IsDir()) {
+    vnode->SetFlag(InodeInfoFlag::kInlineDentry);
+    vnode->SetInlineXattrAddrs(kInlineXattrAddrs);
+  }
+
+  if (vnode->IsReg()) {
+    vnode->InitExtentTree();
+  }
+  vnode->InitFileCache();
+
+  vnode_cache_.Add(vnode.get());
+  vnode->SetDirty();
+
+  return zx::ok(std::move(vnode));
 }
 
 }  // namespace f2fs

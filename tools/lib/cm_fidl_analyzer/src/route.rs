@@ -8,22 +8,24 @@ use moniker::Moniker;
 use routing::capability_source::CapabilitySource;
 use routing::mapper::RouteSegment;
 use serde::{Deserialize, Serialize};
-use thiserror::Error;
+
+#[derive(Clone, Deserialize, PartialEq, Debug, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum TargetDecl {
+    Use(cm_rust::UseDecl),
+    Offer(cm_rust::OfferDecl),
+    Expose(cm_rust::ExposeDecl),
+    ResolverFromEnvironment(String),
+}
 
 /// A summary of a specific capability route and the outcome of verification.
 #[derive(Clone, Debug, PartialEq)]
 pub struct VerifyRouteResult {
     /// TODO(https://fxbug.dev/42053778): Rename to `moniker`.
     pub using_node: Moniker,
+    pub target_decl: TargetDecl,
     pub capability: Option<Name>,
     pub error: Option<AnalyzerModelError>,
     pub route: Vec<RouteSegment>,
     pub source: Option<CapabilitySource>,
-}
-
-#[derive(Clone, Debug, Deserialize, Error, PartialEq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum CapabilityRouteError {
-    #[error(transparent)]
-    AnalyzerModelError(#[from] AnalyzerModelError),
 }

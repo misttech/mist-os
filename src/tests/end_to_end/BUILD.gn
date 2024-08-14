@@ -14,10 +14,10 @@
 # groups are created:
 #
 # <PRODUCT>.<BOARD>
-#     Stable (Tests that passed for at least 200+ consecutive runs)
+#     Stable (Tests that passed for at least 1000+ consecutive runs)
 #         Tests that require SL4F transport, if any
 #         Tests that does not require SL4F transport
-#     Unstable (Tests that are yet to pass 200 consecutive runs)
+#     Unstable (Tests that are yet to pass 1000 consecutive runs)
 #         Tests that require SL4F transport, if any
 #         Tests that does not require SL4F transport
 #
@@ -49,6 +49,7 @@ group_with_no_dir_target_deps("workbench_x64_stable_tests") {
   public_deps = [
     "//scripts/lib/ffx_cmd:ffx_cmd_inspect_e2e_test($host_toolchain)",
     "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests($host_toolchain)",
+    "//src/performance/experimental/profiler:e2e_tests",
     "//src/storage/blackout/host:blackout_emulator_stable",
     "//src/tests/end_to_end/diagnostics:diagnostics_test($host_toolchain)",
     "//src/tests/end_to_end/snapshot:snapshot_test_fc($host_toolchain)",
@@ -59,7 +60,6 @@ group_with_no_dir_target_deps("workbench_x64_unstable_tests") {
   testonly = true
   public_deps = [
     "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests_staging",
-    "//src/performance/experimental/profiler:e2e_tests",
     "//src/storage/blackout/host:blackout_emulator_unstable",
   ]
 }
@@ -78,6 +78,7 @@ group_with_no_dir_target_deps("workbench_vim3_stable_tests") {
   public_deps = [
     "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests($host_toolchain)",
     "//src/firmware/tests/lacewing:lacewing($host_toolchain)",
+    "//src/performance/experimental/profiler:e2e_tests",
     "//src/storage/blackout/host:blackout_workbench_vim3_stable",
     "//src/tests/end_to_end/diagnostics:diagnostics_test($host_toolchain)",
     "//src/tests/end_to_end/rtc:rtc_conformance_test($host_toolchain)",
@@ -90,7 +91,6 @@ group_with_no_dir_target_deps("workbench_vim3_unstable_tests") {
   public_deps = [
     "//src/developer/ffx/lib/fuchsia-controller/end_to_end_tests/mobly:fuchsia_controller_tests_staging",
     "//src/firmware/tests/lacewing:lacewing($host_toolchain)",
-    "//src/performance/experimental/profiler:e2e_tests",
     "//src/storage/blackout/host:blackout_workbench_vim3_unstable",
   ]
 }

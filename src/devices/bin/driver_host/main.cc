@@ -27,17 +27,19 @@ using namespace fuchsia_driver_framework;
 int main(int argc, char** argv) {
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   fuchsia_logging::LogSettingsBuilder builder;
-  builder.WithDispatcher(loop.dispatcher()).BuildAndInitializeWithTags({"driver_host", "driver"});
+  builder.WithDispatcher(loop.dispatcher())
+      .WithTags({"driver_host", "driver"})
+      .BuildAndInitialize();
   driver_logger::GetLogger().AddTag("driver_host").AddTag("driver");
   // TODO(https://fxbug.dev/42108351): Lock down job.
   zx_status_t status = StdoutToDebuglog::Init();
   if (status != ZX_OK) {
-    FX_SLOG(INFO,
-            "Failed to redirect stdout to debuglog, assuming test environment and continuing");
+    FX_LOG_KV(INFO,
+              "Failed to redirect stdout to debuglog, assuming test environment and continuing");
   }
 
   if (zx_status_t status = fdf_env_start(); status != ZX_OK) {
-    FX_SLOG(ERROR, "Failed to create the initial dispatcher thread");
+    FX_LOG_KV(ERROR, "Failed to create the initial dispatcher thread");
     return status;
   }
 
@@ -47,7 +49,7 @@ int main(int argc, char** argv) {
 
   auto serve = outgoing.ServeFromStartupInfo();
   if (serve.is_error()) {
-    FX_SLOG(ERROR, "Failed to serve outgoing directory", FX_KV("status", serve.status_string()));
+    FX_LOG_KV(ERROR, "Failed to serve outgoing directory", FX_KV("status", serve.status_string()));
     return serve.status_value();
   }
 

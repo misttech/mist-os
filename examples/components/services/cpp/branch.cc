@@ -24,8 +24,8 @@ class BankAccountTest : public ::gtest::RealLoopFixture {
   // Create and instance of the provider component and return its exposed directory
   fuchsia::io::DirectorySyncPtr StartProvider(const char* component_name,
                                               const char* component_url) {
-    FX_SLOG(INFO, "Creating BankAccount provider", FX_KV("url", component_url),
-            FX_KV("name", component_name));
+    FX_LOG_KV(INFO, "Creating BankAccount provider", FX_KV("url", component_url),
+              FX_KV("name", component_name));
     fuchsia::component::decl::CollectionRef collection_ref = {
         .name = "account_providers",
     };
@@ -38,8 +38,8 @@ class BankAccountTest : public ::gtest::RealLoopFixture {
     realm_proxy_->CreateChild(std::move(collection_ref), std::move(child_decl),
                               fuchsia::component::CreateChildArgs(), &create_result);
 
-    FX_SLOG(INFO, "Open exposed dir of BankAccount provider", FX_KV("url", component_url),
-            FX_KV("name", component_name));
+    FX_LOG_KV(INFO, "Open exposed dir of BankAccount provider", FX_KV("url", component_url),
+              FX_KV("name", component_name));
     fuchsia::component::decl::ChildRef child_ref = {
         .name = component_name,
         .collection = "account_providers",

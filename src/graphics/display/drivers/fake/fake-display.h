@@ -98,7 +98,6 @@ class FakeDisplay : public ddk::DisplayEngineProtocol<FakeDisplay> {
   bool DisplayEngineIsCaptureSupported();
   zx_status_t DisplayEngineStartCapture(uint64_t capture_handle) __TA_EXCLUDES(capture_mutex_);
   zx_status_t DisplayEngineReleaseCapture(uint64_t capture_handle) __TA_EXCLUDES(capture_mutex_);
-  bool DisplayEngineIsCaptureCompleted() __TA_EXCLUDES(capture_mutex_);
 
   zx_status_t DisplayEngineSetMinimumRgb(uint8_t minimum_rgb);
 

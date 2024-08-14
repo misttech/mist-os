@@ -84,7 +84,7 @@ void arch_sync_cache_range(vaddr_t start, size_t len) {
 
   // Shootdown on all cores.  Using mp_sync_exec instead of an SBI remote fence to handle race
   // conditions with cores going offline.
-  auto fencei = [](void*) { __asm__("fence.i"); };
+  auto fencei = [](void*) { __asm__ volatile("fence.i"); };
   mp_sync_exec(MP_IPI_TARGET_ALL, /* cpu_mask */ 0, fencei, nullptr);
 }
 

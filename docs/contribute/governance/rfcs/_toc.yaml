@@ -526,3 +526,7 @@ toc:
     path: /docs/contribute/governance/rfcs/0254_changing_attribution_for_copy_on_write_pages.md
   - title: "RFC-0255: System Activity Governor"
     path: /docs/contribute/governance/rfcs/0255_system_activity_governor.md
+  - title: "RFC-0256: Python application bundling for Lacewing tests"
+    path: /docs/contribute/governance/rfcs/0256_python_application_bundling_for_lacewing_tests.md
+  - title: "RFC-0257: storage-host: Componentizing upper-layer storage drivers"
+    path: /docs/contribute/governance/rfcs/0257_storage-host.md

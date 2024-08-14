@@ -81,7 +81,7 @@ impl AppSet for FuchsiaAppSet {
 
 pub struct EagerPackage {
     app: App,
-    #[allow(dead_code)]
+    #[expect(dead_code)]
     channel_configs: Option<ChannelConfigs>,
 }
 

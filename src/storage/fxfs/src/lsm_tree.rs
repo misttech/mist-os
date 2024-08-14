@@ -949,7 +949,10 @@ mod fuzz {
         const DELETED_MARKER: Self = 0;
     }
 
-    #[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
+    // Note: This code isn't really dead. it's used below in
+    // `fuzz_lsm_tree_action`. However, the `#[fuzz]` proc macro attribute
+    // obfuscates the usage enough to confuse the compiler.
+    #[allow(dead_code)]
     #[derive(Arbitrary)]
     enum FuzzAction {
         Insert(Item<TestKey, u64>),

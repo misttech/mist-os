@@ -64,18 +64,6 @@ pub struct PlatformUiConfig {
     #[serde(default)]
     pub renderer: RendererType,
 
-    /// The constraints on the display mode horizontal resolution, in pixels.
-    #[serde(default)]
-    pub display_mode_horizontal_resolution_px_range: UnsignedIntegerRangeInclusive,
-
-    /// The constraints on the display mode vertical resolution, in pixels.
-    #[serde(default)]
-    pub display_mode_vertical_resolution_px_range: UnsignedIntegerRangeInclusive,
-
-    /// The constraints on the display mode refresh rate, in millihertz (10^-3 Hz).
-    #[serde(default)]
-    pub display_mode_refresh_rate_millihertz_range: UnsignedIntegerRangeInclusive,
-
     // The constraints on the display mode
     #[serde(default)]
     pub display_mode: DisplayModeConfig,
@@ -96,9 +84,6 @@ impl Default for PlatformUiConfig {
             brightness_manager: Default::default(),
             with_synthetic_device_support: Default::default(),
             renderer: Default::default(),
-            display_mode_horizontal_resolution_px_range: Default::default(),
-            display_mode_vertical_resolution_px_range: Default::default(),
-            display_mode_refresh_rate_millihertz_range: Default::default(),
             display_mode: Default::default(),
         }
     }

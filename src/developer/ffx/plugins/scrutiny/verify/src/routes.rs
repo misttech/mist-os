@@ -6,7 +6,6 @@ use anyhow::Result;
 use cm_rust::CapabilityTypeName;
 use errors::ffx_bail;
 use ffx_scrutiny_verify_args::routes::Command;
-use scrutiny_frontend::verify::capability_routing::ResponseLevel;
 use scrutiny_frontend::verify::ResultsForCapabilityType;
 use scrutiny_frontend::Scrutiny;
 use std::collections::HashSet;
@@ -46,61 +45,26 @@ pub async fn verify(
     for entry in route_analysis.results.iter_mut() {
         // If there are any errors, produce the human-readable version of each.
         for error in entry.results.errors.iter_mut() {
-            // Remove all route segments so they don't show up in JSON snippet.
-            let mut context: Vec<String> = error
-                .route
-                .drain(..)
-                .enumerate()
-                .map(|(i, s)| {
-                    let step = format!("step {}", i + 1);
-                    format!("{:>8}: {}", step, s)
-                })
-                .collect();
-
             // Add the failure to the route segments.
             let error = format!(
-                "❌ ERROR: {}\n    Moniker: {}\n    Capability: {}",
-                error.error.message,
+                "❌ ERROR: {}\n    Moniker: {}\n    Capability: {}\n    Starting with: {:?}",
+                error.error.to_string(),
                 error.using_node,
-                error.capability.as_ref().map(|c| c.to_string()).unwrap_or("".into())
+                error.capability.as_ref().map(|c| c.to_string()).unwrap_or("".into()),
+                error.target_decl,
             );
-            context.push(error);
-
-            // The context must begin from the point of failure.
-            context.reverse();
-
-            // Chain the error context into a single string.
-            let error_with_context = context.join("\n");
-            human_readable_errors.push(error_with_context);
+            human_readable_errors.push(error);
         }
 
         for warning in entry.results.warnings.iter_mut() {
-            // Remove all route segments so they don't show up in JSON snippet.
-            let mut context: Vec<String> = warning
-                .route
-                .drain(..)
-                .enumerate()
-                .map(|(i, s)| {
-                    let step = format!("step {}", i + 1);
-                    format!("{:>8}: {}", step, s)
-                })
-                .collect();
-
-            // Add the warning to the route segments.
             let warning = format!(
-                "⚠️ WARNING: {}\n    Moniker: {}\n    Capability: {}",
-                warning.warning.message,
+                "⚠️ WARNING: {}\n    Moniker: {}\n    Capability: {}\n    Starting with: {:?}",
+                warning.warning.to_string(),
                 warning.using_node,
-                warning.capability.as_ref().map(|c| c.to_string()).unwrap_or("".into())
+                warning.capability.as_ref().map(|c| c.to_string()).unwrap_or("".into()),
+                warning.target_decl,
             );
-            context.push(warning);
-
-            // The context must begin from the warning message.
-            context.reverse();
-
-            // Chain the warning context into a single string.
-            let warning_with_context = context.join("\n");
-            human_readable_errors.push(warning_with_context);
+            human_readable_errors.push(warning);
         }
 
         let mut ok_item = ResultsForCapabilityType {
@@ -108,27 +72,8 @@ pub async fn verify(
             results: Default::default(),
         };
         for ok in entry.results.ok.iter_mut() {
-            let mut context: Vec<String> = if cmd.response_level != ResponseLevel::Verbose {
-                // Remove all route segments so they don't show up in JSON snippet.
-                ok.route
-                    .drain(..)
-                    .enumerate()
-                    .map(|(i, s)| {
-                        let step = format!("step {}", i + 1);
-                        format!("{:>8}: {}", step, s)
-                    })
-                    .collect()
-            } else {
-                vec![]
-            };
-            context.push(format!("ℹ️ INFO: {}: {}", ok.using_node, ok.capability));
-
-            // The context must begin from the capability description.
-            context.reverse();
-
-            // Chain the report context into a single string.
-            let message_with_context = context.join("\n");
-            human_readable_messages.push(message_with_context);
+            let success = format!("ℹ️ INFO: {}: {}", ok.using_node, ok.capability);
+            human_readable_messages.push(success);
 
             // Accumulate ok data outside the collection reported on error/warning.
             ok_item.results.ok.push(ok.clone());

@@ -55,9 +55,9 @@ mod starnix;
 mod storage;
 mod swd;
 mod sysmem;
+mod tee_clients;
 mod thermal;
 mod timekeeper;
-mod trusted_apps;
 mod ui;
 mod usb;
 mod virtualization;
@@ -481,12 +481,12 @@ fn configure_subsystems(
     )
     .context("Configuring the 'usb' subsystem")?;
 
-    trusted_apps::TrustedAppsConfig::define_configuration(
-        &context_base.for_subsystem("trusted_apps"),
-        &product.trusted_apps,
+    tee_clients::TeeClientsConfig::define_configuration(
+        &context_base.for_subsystem("tee_clients"),
+        &product.tee_clients,
         builder,
     )
-    .context("configuring the 'trusted_apps' subsystem")?;
+    .context("configuring the 'tee_clients' subsystem")?;
 
     Ok(())
 }

@@ -12,10 +12,9 @@ use std::pin::Pin;
 #[derive(Debug)]
 pub struct Barrier(mpsc::Receiver<Never>);
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 /// Any clone of a barrier block prevents the associated [`Barrier`] future from completing.
 #[derive(Debug, Clone)]
-pub struct BarrierBlock(mpsc::Sender<Never>);
+pub struct BarrierBlock(#[expect(dead_code)] mpsc::Sender<Never>);
 
 impl Barrier {
     /// Creates a new barrier and associated blocker.

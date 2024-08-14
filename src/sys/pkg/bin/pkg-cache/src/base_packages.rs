@@ -43,7 +43,8 @@ pub struct Cache;
 ///   * is_package returning false for the package
 ///   * list_blobs not returning any of the package's blobs (unless the blobs happen to be
 ///     referenced by another package)
-///   * root_package_urls_and_hashes will still return the URLs and hashes of dropped packages.
+///
+/// root_package_urls_and_hashes will still return the URLs and hashes of dropped packages.
 pub type CachePackages = FrozenIndex<Cache>;
 
 #[derive(Debug, Clone, Copy)]

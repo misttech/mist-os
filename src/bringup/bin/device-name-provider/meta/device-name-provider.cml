@@ -20,6 +20,14 @@
         {
             protocol: [ "fuchsia.boot.Arguments" ],
         },
+        {
+            config: "fuchsia.network.PrimaryInterface",
+            key: "primary_interface",
+            availability: "optional",
+            type: "string",
+            max_size: 200,
+            default: "",
+        },
     ],
     expose: [
         {

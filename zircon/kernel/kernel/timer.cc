@@ -111,6 +111,11 @@ zx_ticks_t TimerQueue::ConvertBootTimeToRawTicks(zx_boot_time_t boot) {
   return deadline_boot_ticks - timer_get_boot_ticks_offset();
 }
 
+void TimerQueue::UpdatePlatformTimer() {
+  Guard<MonitoredSpinLock, NoIrqSave> guard{Timer::TimerLock::Get(), SOURCE_TAG};
+  UpdatePlatformTimerLocked();
+}
+
 void TimerQueue::UpdatePlatformTimerLocked() {
   DEBUG_ASSERT(arch_ints_disabled());
   zx_ticks_t timer_deadline = ZX_TIME_INFINITE;
@@ -481,10 +486,7 @@ void TimerQueue::Tick(cpu_num_t cpu) {
   TickInternal(boot_now, cpu, &boot_timer_list_);
 
   // Update the platform timer.
-  {
-    Guard<MonitoredSpinLock, NoIrqSave> guard{Timer::TimerLock::Get(), SOURCE_TAG};
-    UpdatePlatformTimerLocked();
-  }
+  UpdatePlatformTimer();
 }
 
 template <typename TimestampType>

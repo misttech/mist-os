@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Context, Error, Result};
-use fidl::endpoints::{ClientEnd, Proxy};
+use fidl::endpoints::{ClientEnd, Proxy, ServerEnd};
 use fidl_test_powerelementrunner::ControlMarker;
 use fuchsia_component::client::connect_to_protocol;
 use fuchsia_component::server::ServiceFs;
@@ -42,7 +42,7 @@ async fn lease(lessor: &fbroker::LessorProxy, level: u8) -> Result<fbroker::Leas
 /// components, the client ends are taken and sent to the designated component for the power element
 /// to run on.
 struct PowerElement {
-    _element_control: fbroker::ElementControlProxy,
+    element_control: fbroker::ElementControlProxy,
     lessor: fbroker::LessorProxy,
     required_level: RefCell<Option<ClientEnd<fbroker::RequiredLevelMarker>>>,
     current_level: RefCell<Option<ClientEnd<fbroker::CurrentLevelMarker>>>,
@@ -98,7 +98,7 @@ impl PowerElement {
             .unwrap();
 
         Ok(Self {
-            _element_control: element_control,
+            element_control,
             lessor,
             required_level: RefCell::new(Some(required_level.into_client_end().unwrap())),
             current_level: RefCell::new(Some(current_level.into_client_end().unwrap())),
@@ -236,6 +236,22 @@ impl TopologyTestDaemon {
                         warn!(
                             ?error,
                             "Error while responding to TopologyControl.DropLease request"
+                        );
+                    }
+                }
+                Ok(
+                    fidl_fuchsia_power_topology_test::TopologyControlRequest::OpenStatusChannel {
+                        responder,
+                        element_name,
+                        status_channel,
+                    },
+                ) => {
+                    let result = responder
+                        .send(self.clone().open_status_channel(element_name, status_channel).await);
+                    if let Err(error) = result {
+                        warn!(
+                            ?error,
+                            "Error while responding to TopologyControl.OpenStatusChannel request"
                         );
                     }
                 }
@@ -404,6 +420,25 @@ impl TopologyTestDaemon {
             fpt::LeaseControlError::InvalidElement
         })?;
         element.lease.borrow_mut().take();
+
+        Ok(())
+    }
+
+    async fn open_status_channel(
+        self: Rc<Self>,
+        element_name: String,
+        status_channel: ServerEnd<fbroker::StatusMarker>,
+    ) -> fpt::TopologyControlOpenStatusChannelResult {
+        let elements = self.internal_topology.elements.borrow_mut();
+        let element = elements.get(&element_name).ok_or_else(|| {
+            warn!(element_name, "Failed to find element name in the created topology graph");
+            fpt::OpenStatusChannelError::InvalidElement
+        })?;
+
+        let _ = element.element_control.open_status_channel(status_channel).map_err(|err| {
+            warn!(%err, element_name, "Failed to open_status_channel");
+            fpt::OpenStatusChannelError::Internal
+        })?;
 
         Ok(())
     }

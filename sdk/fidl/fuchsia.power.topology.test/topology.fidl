@@ -41,6 +41,15 @@ type LeaseControlError = strict enum : uint32 {
     INVALID_ELEMENT = 2;
 };
 
+/// Errors associated with TopologyControl.OpenStatusChannel method.
+type OpenStatusChannelError = strict enum : uint32 {
+    /// Indicates that the request failed due to an internal error.
+    INTERNAL = 1;
+    /// Indicates that an invalid power element name was provided in
+    /// OpenStatusChannel
+    INVALID_ELEMENT = 2;
+};
+
 /// Errors associated with SystemActivityControl methods.
 type SystemActivityControlError = strict enum : uint32 {
     /// Indicates that the request failed due to an internal error.
@@ -86,6 +95,13 @@ open protocol TopologyControl {
     strict DropLease(struct {
         element_name ElementName;
     }) -> () error LeaseControlError;
+
+    /// Register a new Status channel on which Power Broker will send
+    /// read-only updates of the element's current power level.
+    strict OpenStatusChannel(resource struct {
+        element_name ElementName;
+        status_channel server_end:fuchsia.power.broker.Status;
+    }) -> () error OpenStatusChannelError;
 };
 
 /// The protocol used by a client to hold or drop the lease to the System Activity Governor.

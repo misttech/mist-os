@@ -22,10 +22,13 @@ expect_includes("decompressor_includes") {
 
 static_library("blobfs_integration_fixtures") {
   testonly = true
+  public = [
+    "blobfs_fixtures.h",
+    "fdio_test.h",
+  ]
   sources = [
     "blobfs_fixtures.cc",
     "fdio_test.cc",
-    "fdio_test.h",
   ]
   deps = [
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_cpp",

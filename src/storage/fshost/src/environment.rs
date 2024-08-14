@@ -17,7 +17,7 @@ use anyhow::{anyhow, bail, Context, Error};
 use async_trait::async_trait;
 use device_watcher::{recursive_wait, recursive_wait_and_open};
 use fidl::endpoints::{create_proxy, Proxy as _, ServerEnd};
-use fidl_fuchsia_fxfs::MountOptions;
+use fidl_fuchsia_fs_startup::MountOptions;
 use fidl_fuchsia_hardware_block_partition::Guid;
 use fidl_fuchsia_hardware_block_volume::{VolumeManagerMarker, VolumeMarker};
 use fs_management::filesystem::{
@@ -641,7 +641,7 @@ impl Environment for FshostEnvironment {
             .await
             .context("Failed to verify the blob volume")?;
         let blobfs = multi_vol_fs
-            .open_volume("blob", MountOptions { crypt: None, as_blob: true })
+            .open_volume("blob", MountOptions { as_blob: Some(true), ..MountOptions::default() })
             .await
             .context("Failed to open the blob volume")?;
         let exposed_dir = blobfs.exposed_dir();
@@ -870,16 +870,6 @@ impl Environment for FshostEnvironment {
             })
         }
         Ok(())
-    }
-}
-
-#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
-#[derive(Debug)]
-struct ReformatRequired(Error);
-impl std::error::Error for ReformatRequired {}
-impl std::fmt::Display for ReformatRequired {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        write!(f, "{:?}", self)
     }
 }
 

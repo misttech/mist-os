@@ -16,6 +16,7 @@ use test_case::test_case;
 const IPERF_URL: &str = "#meta/iperf.cm";
 const NAME_PROVIDER_URL: &str = "#meta/device-name-provider.cm";
 const NAME_PROVIDER_MONIKER: &str = "device-name-provider";
+const PRIMARY_INTERFACE_CONFIGURATION: &str = "fuchsia.network.PrimaryInterface";
 
 fn iperf_component(
     name: &str,
@@ -58,9 +59,15 @@ fn device_name_provider_component() -> fnetemul::ChildDef {
         source: Some(fnetemul::ChildSource::Component(NAME_PROVIDER_URL.to_string())),
         name: Some(NAME_PROVIDER_MONIKER.to_string()),
         exposes: Some(vec![fidl_fuchsia_device::NameProviderMarker::DEBUG_NAME.to_string()]),
-        uses: Some(fnetemul::ChildUses::Capabilities(vec![fnetemul::Capability::LogSink(
-            fnetemul::Empty,
-        )])),
+        uses: Some(fnetemul::ChildUses::Capabilities(vec![
+            fnetemul::Capability::LogSink(fnetemul::Empty),
+            fidl_fuchsia_netemul::Capability::ChildDep(fidl_fuchsia_netemul::ChildDep {
+                capability: Some(fidl_fuchsia_netemul::ExposedCapability::Configuration(
+                    PRIMARY_INTERFACE_CONFIGURATION.to_string(),
+                )),
+                ..Default::default()
+            }),
+        ])),
         program_args: Some(vec!["--nodename".to_string(), "fuchsia-test-device".to_string()]),
         ..Default::default()
     }

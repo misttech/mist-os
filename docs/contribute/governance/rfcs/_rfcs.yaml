@@ -3335,3 +3335,29 @@
   reviewers: ['andresoportus@google.com', 'awolter@google.com', 'geb@google.com', 'gkalsi@google.com', 'harshanv@google.com', 'jmatt@google.com', 'kgong@google.com', 'quiche@google.com', 'maniscalco@google.com', 'claridge@google.com']
   submitted: '2024-05-07'
   reviewed: '2024-08-02'
+
+- name: 'RFC-0256'
+  title: 'Python application bundling for Lacewing tests'
+  short_description: 'Propose to use compiled self-extracting Rust host binaries to bundle Python Lacewing test applications.'
+  authors: ['chok@google.com']
+  file: '0256_python_application_bundling_for_lacewing_tests.md'
+  area: ['Build', 'Software Delivery', 'Testing', 'Toolchain']
+  issue: ['']
+  gerrit_change_id: ['1051234']
+  status: 'Accepted'
+  reviewers: ['abarth@google.com', 'chaselatta@google.com', 'hjfreyer@google.com', 'keir@google.com', 'tmandry@google.com',]
+  submitted: '2024-05-22'
+  reviewed: '2024-08-08'
+
+- name: 'RFC-0257'
+  title: 'storage-host: Componentizing upper-layer storage drivers'
+  short_description: 'Move upper-layer storage drivers (GPT, FVM, etc) to a new storage-host component.'
+  authors: ['jfsulliv@google.com']
+  file: '0257_storage-host.md'
+  area: ['Storage']
+  issue: ['339491886']
+  gerrit_change_id: ['1077832']
+  status: 'Accepted'
+  reviewers: ['csuter@google.com', 'garratt@google.comm', 'surajmalhotra@google.com, curtisgalloway@google.com']
+  submitted: '2024-07-08'
+  reviewed: '2024-08-13'

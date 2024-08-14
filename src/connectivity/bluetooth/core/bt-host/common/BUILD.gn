@@ -10,10 +10,6 @@ import("$dir_pw_unit_test/test.gni")
 
 dir_public_common = "../public/pw_bluetooth_sapphire/internal/host/common"
 
-config("warnings") {
-  cflags_cc = [ "-Wswitch-enum" ]
-}
-
 pw_source_set("common") {
   public = [
     "$dir_public_common/advertising_data.h",
@@ -68,6 +64,8 @@ pw_source_set("common") {
     "uuid.cc",
   ]
 
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
+
   public_deps = [
     "$dir_pw_assert",
     "$dir_pw_async:dispatcher",
@@ -93,11 +91,11 @@ pw_source_set("common") {
   }
 
   deps = [ "$dir_pw_preprocessor" ]
-  configs = [ ":warnings" ]
 }
 
 pw_source_set("uuid_string_util") {
   sources = [ "uuid_string_util.cc" ]
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
   public_deps = [ ":common" ]
 }
 
@@ -124,6 +122,8 @@ pw_test("tests") {
     "windowed_inspect_numeric_property_test.cc",
   ]
 
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
+
   deps = [
     ":common",
     ":uuid_string_util",
@@ -136,6 +136,7 @@ pw_test("tests") {
 
 fuchsia_library_fuzzer("advertising_data_fuzzer") {
   sources = [ "advertising_data_fuzztest.cc" ]
+  configs += [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
   deps = [
     ":common",
     "//src/connectivity/bluetooth/core/bt-host/testing:fuzztest_driver",
@@ -144,6 +145,7 @@ fuchsia_library_fuzzer("advertising_data_fuzzer") {
 
 pw_fuzzer("pw_advertising_data_fuzzer") {
   sources = [ "advertising_data_fuzztest.cc" ]
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
   deps = [ ":common" ]
 }
 

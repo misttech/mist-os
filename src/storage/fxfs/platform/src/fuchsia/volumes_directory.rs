@@ -13,10 +13,8 @@ use crate::fuchsia::RemoteCrypt;
 use anyhow::{anyhow, bail, ensure, Context, Error};
 use fidl::endpoints::{DiscoverableProtocolMarker, ServerEnd};
 use fidl_fuchsia_fs::{AdminMarker, AdminRequest, AdminRequestStream};
-use fidl_fuchsia_fxfs::{
-    BlobCreatorMarker, BlobReaderMarker, CheckOptions, MountOptions, ProjectIdMarker,
-    VolumeRequest, VolumeRequestStream,
-};
+use fidl_fuchsia_fs_startup::{CheckOptions, MountOptions, VolumeRequest, VolumeRequestStream};
+use fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobReaderMarker, ProjectIdMarker};
 use fs_inspect::{FsInspectTree, FsInspectVolume};
 use fuchsia_zircon::{self as zx, AsHandleRef};
 use futures::stream::FuturesUnordered;
@@ -40,7 +38,7 @@ use {fidl_fuchsia_io as fio, fuchsia_async as fasync};
 const MEBIBYTE: u64 = 1024 * 1024;
 
 /// VolumesDirectory is a special pseudo-directory used to enumerate and operate on volumes.
-/// Volume creation happens via fuchsia.fxfs.Volumes.Create, rather than open.
+/// Volume creation happens via fuchsia.fs.startup.Volumes.Create, rather than open.
 ///
 /// Note that VolumesDirectory assumes exclusive access to |root_volume| and if volumes are
 /// manipulated from elsewhere, strange things will happen.
@@ -520,12 +518,13 @@ impl VolumesDirectory {
         mount_options: MountOptions,
     ) -> Result<(), Error> {
         let mut guard = self.lock().await;
-        let MountOptions { crypt, as_blob } = mount_options;
+        let MountOptions { crypt, as_blob, .. } = mount_options;
         let crypt = if let Some(crypt) = crypt {
             Some(Arc::new(RemoteCrypt::new(crypt)) as Arc<dyn Crypt>)
         } else {
             None
         };
+        let as_blob = as_blob.unwrap_or(false);
         let volume = guard.create_and_mount_volume(&name, crypt, as_blob).await?;
         self.serve_volume(&volume, outgoing_directory, as_blob).context("failed to serve volume")
     }
@@ -686,12 +685,10 @@ impl VolumesDirectory {
         } else {
             None
         };
-        let volume = self
-            .mount_volume(name, crypt, options.as_blob)
-            .await
-            .context("failed to mount volume")?;
-        self.serve_volume(&volume, outgoing_directory, options.as_blob)
-            .context("failed to serve volume")
+        let as_blob = options.as_blob.unwrap_or(false);
+        let volume =
+            self.mount_volume(name, crypt, as_blob).await.context("failed to mount volume")?;
+        self.serve_volume(&volume, outgoing_directory, as_blob).context("failed to serve volume")
     }
 
     async fn handle_admin_requests(
@@ -752,7 +749,8 @@ mod tests {
     use crate::fuchsia::volumes_directory::VolumesDirectory;
     use fidl::endpoints::{create_proxy, create_request_stream, ServerEnd};
     use fidl_fuchsia_fs::AdminMarker;
-    use fidl_fuchsia_fxfs::{KeyPurpose, MountOptions, VolumeMarker, VolumeProxy};
+    use fidl_fuchsia_fs_startup::{MountOptions, VolumeMarker, VolumeProxy};
+    use fidl_fuchsia_fxfs::KeyPurpose;
     use fuchsia_component::client::connect_to_protocol_at_dir_svc;
     use fuchsia_fs::file;
     use fuchsia_zircon::Status;
@@ -1174,7 +1172,10 @@ mod tests {
         join!(
             async {
                 volume_proxy
-                    .mount(dir_server_end, MountOptions { crypt: Some(client1), as_blob: false })
+                    .mount(
+                        dir_server_end,
+                        MountOptions { crypt: Some(client1), ..MountOptions::default() },
+                    )
                     .await
                     .expect("mount (fidl) failed")
                     .expect("mount failed");
@@ -1198,7 +1199,7 @@ mod tests {
                         volume_proxy
                             .mount(
                                 dir_server_end,
-                                MountOptions { crypt: Some(client2), as_blob: false },
+                                MountOptions { crypt: Some(client2), ..MountOptions::default() },
                             )
                             .await
                             .expect("mount (fidl) failed")
@@ -1306,7 +1307,10 @@ mod tests {
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                         .expect("Create proxy to succeed");
                 if let Err(status) = volume_proxy
-                    .mount(dir_server_end, MountOptions { crypt: Some(client1), as_blob: false })
+                    .mount(
+                        dir_server_end,
+                        MountOptions { crypt: Some(client1), ..MountOptions::default() },
+                    )
                     .await
                     .expect("mount (fidl) failed")
                 {
@@ -1321,7 +1325,10 @@ mod tests {
                     fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
                         .expect("Create proxy to succeed");
                 if let Err(status) = volume_proxy
-                    .mount(dir_server_end, MountOptions { crypt: Some(client2), as_blob: false })
+                    .mount(
+                        dir_server_end,
+                        MountOptions { crypt: Some(client2), ..MountOptions::default() },
+                    )
                     .await
                     .expect("mount (fidl) failed")
                 {

@@ -33,8 +33,6 @@ pub use block_protocol::*;
 
 pub mod cache;
 
-pub mod testing;
-
 const TEMP_VMO_SIZE: usize = 65536;
 
 pub use block_driver::{BlockIoFlag, BlockOpcode};
@@ -816,16 +814,16 @@ mod tests {
             .expect("RamdiskClient::create failed");
         let client_end = ramdisk.open().await.expect("ramdisk.open failed");
         let proxy = client_end.into_proxy().expect("into_proxy failed");
-        let remote_block_device = RemoteBlockClient::new(proxy).await.expect("new failed");
-        assert_eq!(remote_block_device.block_size(), 1024);
+        let block_client = RemoteBlockClient::new(proxy).await.expect("new failed");
+        assert_eq!(block_client.block_size(), 1024);
         let client_end = ramdisk.open().await.expect("ramdisk.open failed");
         let proxy = client_end.into_proxy().expect("into_proxy failed");
-        (ramdisk, proxy, remote_block_device)
+        (ramdisk, proxy, block_client)
     }
 
     #[fuchsia::test]
     async fn test_against_ram_disk() {
-        let (_ramdisk, block_proxy, remote_block_device) = make_ramdisk().await;
+        let (_ramdisk, block_proxy, block_client) = make_ramdisk().await;
 
         let stats_before = block_proxy
             .get_stats(false)
@@ -836,19 +834,19 @@ mod tests {
 
         let vmo = zx::Vmo::create(131072).expect("Vmo::create failed");
         vmo.write(b"hello", 5).expect("vmo.write failed");
-        let vmo_id = remote_block_device.attach_vmo(&vmo).await.expect("attach_vmo failed");
-        remote_block_device
+        let vmo_id = block_client.attach_vmo(&vmo).await.expect("attach_vmo failed");
+        block_client
             .write_at(BufferSlice::new_with_vmo_id(&vmo_id, 0, 1024), 0)
             .await
             .expect("write_at failed");
-        remote_block_device
+        block_client
             .read_at(MutableBufferSlice::new_with_vmo_id(&vmo_id, 1024, 2048), 0)
             .await
             .expect("read_at failed");
         let mut buf: [u8; 5] = Default::default();
         vmo.read(&mut buf, 1029).expect("vmo.read failed");
         assert_eq!(&buf, b"hello");
-        remote_block_device.detach_vmo(vmo_id).await.expect("detach_vmo failed");
+        block_client.detach_vmo(vmo_id).await.expect("detach_vmo failed");
 
         // check that the stats are what we expect them to be
         let stats_after = block_proxy
@@ -878,7 +876,7 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_against_ram_disk_with_flush() {
-        let (_ramdisk, block_proxy, remote_block_device) = make_ramdisk().await;
+        let (_ramdisk, block_proxy, block_client) = make_ramdisk().await;
 
         let stats_before = block_proxy
             .get_stats(false)
@@ -889,20 +887,20 @@ mod tests {
 
         let vmo = zx::Vmo::create(131072).expect("Vmo::create failed");
         vmo.write(b"hello", 5).expect("vmo.write failed");
-        let vmo_id = remote_block_device.attach_vmo(&vmo).await.expect("attach_vmo failed");
-        remote_block_device
+        let vmo_id = block_client.attach_vmo(&vmo).await.expect("attach_vmo failed");
+        block_client
             .write_at(BufferSlice::new_with_vmo_id(&vmo_id, 0, 1024), 0)
             .await
             .expect("write_at failed");
-        remote_block_device.flush().await.expect("flush failed");
-        remote_block_device
+        block_client.flush().await.expect("flush failed");
+        block_client
             .read_at(MutableBufferSlice::new_with_vmo_id(&vmo_id, 1024, 2048), 0)
             .await
             .expect("read_at failed");
         let mut buf: [u8; 5] = Default::default();
         vmo.read(&mut buf, 1029).expect("vmo.read failed");
         assert_eq!(&buf, b"hello");
-        remote_block_device.detach_vmo(vmo_id).await.expect("detach_vmo failed");
+        block_client.detach_vmo(vmo_id).await.expect("detach_vmo failed");
 
         // check that the stats are what we expect them to be
         let stats_after = block_proxy
@@ -938,51 +936,50 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_alignment() {
-        let (_ramdisk, _block_proxy, remote_block_device) = make_ramdisk().await;
+        let (_ramdisk, _block_proxy, block_client) = make_ramdisk().await;
         let vmo = zx::Vmo::create(131072).expect("Vmo::create failed");
-        let vmo_id = remote_block_device.attach_vmo(&vmo).await.expect("attach_vmo failed");
-        remote_block_device
+        let vmo_id = block_client.attach_vmo(&vmo).await.expect("attach_vmo failed");
+        block_client
             .write_at(BufferSlice::new_with_vmo_id(&vmo_id, 0, 1024), 1)
             .await
             .expect_err("expected failure due to bad alignment");
-        remote_block_device.detach_vmo(vmo_id).await.expect("detach_vmo failed");
+        block_client.detach_vmo(vmo_id).await.expect("detach_vmo failed");
     }
 
     #[fuchsia::test]
     async fn test_parallel_io() {
-        let (_ramdisk, _block_proxy, remote_block_device) = make_ramdisk().await;
+        let (_ramdisk, _block_proxy, block_client) = make_ramdisk().await;
         let vmo = zx::Vmo::create(131072).expect("Vmo::create failed");
-        let vmo_id = remote_block_device.attach_vmo(&vmo).await.expect("attach_vmo failed");
+        let vmo_id = block_client.attach_vmo(&vmo).await.expect("attach_vmo failed");
         let mut reads = Vec::new();
         for _ in 0..1024 {
             reads.push(
-                remote_block_device
+                block_client
                     .read_at(MutableBufferSlice::new_with_vmo_id(&vmo_id, 0, 1024), 0)
                     .inspect_err(|e| panic!("read should have succeeded: {}", e)),
             );
         }
         futures::future::join_all(reads).await;
-        remote_block_device.detach_vmo(vmo_id).await.expect("detach_vmo failed");
+        block_client.detach_vmo(vmo_id).await.expect("detach_vmo failed");
     }
 
     #[fuchsia::test]
     async fn test_closed_device() {
-        let (ramdisk, _block_proxy, remote_block_device) = make_ramdisk().await;
+        let (ramdisk, _block_proxy, block_client) = make_ramdisk().await;
         let vmo = zx::Vmo::create(131072).expect("Vmo::create failed");
-        let vmo_id = remote_block_device.attach_vmo(&vmo).await.expect("attach_vmo failed");
+        let vmo_id = block_client.attach_vmo(&vmo).await.expect("attach_vmo failed");
         let mut reads = Vec::new();
         for _ in 0..1024 {
             reads.push(
-                remote_block_device
-                    .read_at(MutableBufferSlice::new_with_vmo_id(&vmo_id, 0, 1024), 0),
+                block_client.read_at(MutableBufferSlice::new_with_vmo_id(&vmo_id, 0, 1024), 0),
             );
         }
-        assert!(remote_block_device.is_connected());
+        assert!(block_client.is_connected());
         let _ = futures::join!(futures::future::join_all(reads), async {
             ramdisk.destroy().await.expect("ramdisk.destroy failed")
         });
         // Destroying the ramdisk is asynchronous. Keep issuing reads until they start failing.
-        while remote_block_device
+        while block_client
             .read_at(MutableBufferSlice::new_with_vmo_id(&vmo_id, 0, 1024), 0)
             .await
             .is_ok()
@@ -990,27 +987,26 @@ mod tests {
 
         // Sometimes the FIFO will start rejecting requests before FIFO is actually closed, so we
         // get false-positives from is_connected.
-        while remote_block_device.is_connected() {
+        while block_client.is_connected() {
             // Sleep for a bit to minimise lock contention.
             fasync::Timer::new(fasync::Time::after(zx::Duration::from_millis(500))).await;
         }
 
         // But once is_connected goes negative, it should stay negative.
-        assert_eq!(remote_block_device.is_connected(), false);
-        let _ = remote_block_device.detach_vmo(vmo_id).await;
+        assert_eq!(block_client.is_connected(), false);
+        let _ = block_client.detach_vmo(vmo_id).await;
     }
 
     #[fuchsia::test]
     async fn test_cancelled_reads() {
-        let (_ramdisk, _block_proxy, remote_block_device) = make_ramdisk().await;
+        let (_ramdisk, _block_proxy, block_client) = make_ramdisk().await;
         let vmo = zx::Vmo::create(131072).expect("Vmo::create failed");
-        let vmo_id = remote_block_device.attach_vmo(&vmo).await.expect("attach_vmo failed");
+        let vmo_id = block_client.attach_vmo(&vmo).await.expect("attach_vmo failed");
         {
             let mut reads = FuturesUnordered::new();
             for _ in 0..1024 {
                 reads.push(
-                    remote_block_device
-                        .read_at(MutableBufferSlice::new_with_vmo_id(&vmo_id, 0, 1024), 0),
+                    block_client.read_at(MutableBufferSlice::new_with_vmo_id(&vmo_id, 0, 1024), 0),
                 );
             }
             // Read the first 500 results and then dump the rest.
@@ -1018,22 +1014,19 @@ mod tests {
                 reads.next().await;
             }
         }
-        remote_block_device.detach_vmo(vmo_id).await.expect("detach_vmo failed");
+        block_client.detach_vmo(vmo_id).await.expect("detach_vmo failed");
     }
 
     #[fuchsia::test]
     async fn test_parallel_large_read_and_write_with_memory_succeds() {
-        let (_ramdisk, _block_proxy, remote_block_device) = make_ramdisk().await;
-        let remote_block_device_ref = &remote_block_device;
+        let (_ramdisk, _block_proxy, block_client) = make_ramdisk().await;
+        let block_client_ref = &block_client;
         let test_one = |offset, len, fill| async move {
             let buf = vec![fill; len];
-            remote_block_device_ref
-                .write_at(buf[..].into(), offset)
-                .await
-                .expect("write_at failed");
+            block_client_ref.write_at(buf[..].into(), offset).await.expect("write_at failed");
             // Read back an extra block either side.
             let mut read_buf = vec![0u8; len + 2 * RAMDISK_BLOCK_SIZE as usize];
-            remote_block_device_ref
+            block_client_ref
                 .read_at(read_buf.as_mut_slice().into(), offset - RAMDISK_BLOCK_SIZE)
                 .await
                 .expect("read_at failed");
@@ -1189,7 +1182,7 @@ mod tests {
         let (client_end, server) = fidl::endpoints::create_endpoints::<block::BlockMarker>();
 
         std::thread::spawn(move || {
-            let _remote_block_device =
+            let _block_client =
                 RemoteBlockClientSync::new(client_end).expect("RemoteBlockClientSync::new failed");
             // The drop here should cause Close to be sent.
         });
@@ -1253,9 +1246,9 @@ mod tests {
 
         futures::join!(
             async {
-                let remote_block_device = RemoteBlockClient::new(proxy).await.expect("new failed");
+                let block_client = RemoteBlockClient::new(proxy).await.expect("new failed");
 
-                remote_block_device.flush().await.expect("flush failed");
+                block_client.flush().await.expect("flush failed");
             },
             async {
                 let block_server = BlockServer::new(
@@ -1281,8 +1274,8 @@ mod tests {
 
         futures::join!(
             async {
-                let remote_block_device = RemoteBlockClient::new(proxy).await.expect("new failed");
-                remote_block_device.flush().await.expect("flush failed");
+                let block_client = RemoteBlockClient::new(proxy).await.expect("new failed");
+                block_client.flush().await.expect("flush failed");
             },
             async {
                 let flow_id: std::sync::Mutex<Option<u64>> = std::sync::Mutex::new(None);

@@ -106,11 +106,6 @@ def main() -> int:
     topology = graph["topology"]
     events = graph["events"]
 
-    # cache human-readable names
-    elem_names = {}
-    for elem_hash in topology:
-        elem_names[elem_hash] = topology[elem_hash]["meta"]["name"]
-
     event_keys_sorted = sorted(events)
     start_idx = int(event_keys_sorted[0])
     end_idx = int(event_keys_sorted[-1])
@@ -130,12 +125,12 @@ def main() -> int:
             # level demand
             line.append(f"required_level")
             line.append(f'{curr["update"]}')
-            line.append(f'{elem_names[curr["vertex_id"]]}')
+            line.append(f'{curr["vertex_id"]}')
         elif curr["event"] == "update_key" and curr["key"] == "current_level":
             # level comply
             line.append("current_level")
             line.append(f'{curr["update"]}')
-            line.append(f'{elem_names[curr["vertex_id"]]}')
+            line.append(f'{curr["vertex_id"]}')
             # reverse search for matching event
             for r in range(int(n) - 1, start_idx - 1, -1):
                 prev = events[str(r)]
@@ -145,7 +140,7 @@ def main() -> int:
                 ):
                     dur = (curr["@time"] - prev["@time"]) / 1000  # microseconds
                     line.append(f"{dur}")
-                    level_durations[n] = (elem_names[curr["vertex_id"]], dur)
+                    level_durations[n] = (curr["vertex_id"], dur)
                     break
         elif curr["event"] == "update_key" and curr["key"].startswith(
             "lease_status_"
@@ -154,7 +149,7 @@ def main() -> int:
                 # lease lifecycle
                 line.append(f"lease_status")
                 line.append("Pend")
-                line.append(f'{elem_names[curr["vertex_id"]]}')
+                line.append(f'{curr["vertex_id"]}')
                 # reverse search for matching event
                 for r in range(int(n) - 1, start_idx - 1, -1):
                     prev = events[str(r)]
@@ -164,14 +159,14 @@ def main() -> int:
                         ) / 1000  # microseconds
                         line.append(f"{dur}")
                         lease_durations[n] = (
-                            elem_names[curr["vertex_id"]],
+                            curr["vertex_id"],
                             dur,
                         )
             elif curr["update"] == "Satisfied":
                 # lease lifecycle
                 line.append("lease_status")
                 line.append("Satf")
-                line.append(f'{elem_names[curr["vertex_id"]]}')
+                line.append(f'{curr["vertex_id"]}')
                 # reverse search for matching event
                 for r in range(int(n) - 1, start_idx - 1, -1):
                     prev = events[str(r)]
@@ -181,34 +176,40 @@ def main() -> int:
                         ) / 1000  # microseconds
                         line.append(f"{dur}")
                         lease_durations[n] = (
-                            elem_names[curr["vertex_id"]],
+                            curr["vertex_id"],
                             dur,
                         )
         elif curr["event"] == "update_key" and curr["key"].startswith("lease_"):
             # lease lifecycle, start
             line.append("lease")
             line.append("New")
-            line.append(f'{elem_names[curr["vertex_id"]]}')
+            line.append(f'{curr["vertex_id"]}')
         elif curr["event"] == "drop_key" and curr["key"].startswith("lease_"):
             # lease lifecycle, end
             line.append("lease")
             line.append("Drop")
-            line.append(f'{elem_names[curr["vertex_id"]]}')
+            line.append(f'{curr["vertex_id"]}')
         elif curr["event"] == "add_vertex":
             # topology change, new node
             line.append("element")
             line.append("Add")
-            line.append(f'{elem_names[curr["vertex_id"]]}')
+            line.append(f'{curr["vertex_id"]}')
         elif curr["event"] == "add_edge":
             # topology change, new edge
             line.append("dependency")
             line.append(f'{curr["meta"]}')
-            line.append(f'{elem_names[curr["from"]]}->{elem_names[curr["to"]]}')
+            line.append(f'{curr["from"]}->{curr["to"]}')
         elif curr["event"] == "update_key" and curr["key"].isnumeric():
             # topology change, edge update
             line.append("dependency")
             line.append(f"update")
             line.append(f"TBD")
+        elif curr["event"] == "remove_vertex" or curr["event"] == "remove_edge":
+            # topology change, remove edge
+            line.append("dependency")
+            line.append(f"update")
+            line.append(f"TBD")
+
         lines.append(line)  # list of list of strings
 
     # splice in SAG and FSH events too

@@ -70,11 +70,13 @@ pub struct Namespace {
 
 impl Namespace {
     pub fn new(fs: FileSystemHandle) -> Arc<Namespace> {
+        Self::new_with_flags(fs, MountFlags::empty())
+    }
+
+    pub fn new_with_flags(fs: FileSystemHandle, flags: MountFlags) -> Arc<Namespace> {
         let kernel = fs.kernel.upgrade().expect("can't create namespace without a kernel");
-        Arc::new(Self {
-            root_mount: Mount::new(WhatToMount::Fs(fs), MountFlags::empty()),
-            id: kernel.get_next_namespace_id(),
-        })
+        let root_mount = Mount::new(WhatToMount::Fs(fs), flags);
+        Arc::new(Self { root_mount, id: kernel.get_next_namespace_id() })
     }
 
     pub fn root(&self) -> NamespaceNode {
@@ -194,10 +196,18 @@ impl MountInfo {
         }
     }
 
-    /// Checks whether this `MountInfo` represents a writable file system mounted.
+    /// Checks whether this `MountInfo` represents a writable file system mount.
     pub fn check_readonly_filesystem(&self) -> Result<(), Errno> {
         if self.flags().contains(MountFlags::RDONLY) {
             return error!(EROFS);
+        }
+        Ok(())
+    }
+
+    /// Checks whether this `MountInfo` represents an executable file system mount.
+    pub fn check_noexec_filesystem(&self) -> Result<(), Errno> {
+        if self.flags().contains(MountFlags::NOEXEC) {
+            return error!(EACCES);
         }
         Ok(())
     }
@@ -279,7 +289,7 @@ pub enum WhatToMount {
 }
 
 impl Mount {
-    fn new(what: WhatToMount, flags: MountFlags) -> MountHandle {
+    pub fn new(what: WhatToMount, flags: MountFlags) -> MountHandle {
         match what {
             WhatToMount::Fs(fs) => Self::new_with_root(fs.root().clone(), flags),
             WhatToMount::Bind(node) => {
@@ -729,13 +739,13 @@ impl FileSystemCreator for Arc<Kernel> {
             b"binder" => BinderFs::new_fs(self, options)?,
             #[cfg(not(feature = "starnix_lite"))]
             b"bpf" => BpfFs::new_fs(self, options)?,
-            b"remotefs" => crate::execution::create_remotefs_filesystem(
+            b"remotefs" => crate::fs::fuchsia::create_remotefs_filesystem(
                 self,
                 self.container_data_dir
                     .as_ref()
                     .ok_or_else(|| errno!(EPERM, "Missing container data directory"))?,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
                 options,
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
             )?,
             b"tmpfs" => TmpFs::new_fs_with_options(self, options)?,
             _ => {
@@ -1559,11 +1569,12 @@ impl NamespaceNode {
         ArcKey::ref_cast(&self.entry)
     }
 
-    pub fn suid_and_sgid(&self) -> UserAndOrGroupId {
+    pub fn suid_and_sgid(&self, current_task: &CurrentTask) -> Result<UserAndOrGroupId, Errno> {
         if self.mount.flags().contains(MountFlags::NOSUID) {
-            UserAndOrGroupId::default()
+            Ok(UserAndOrGroupId::default())
         } else {
-            self.entry.node.info().suid_and_sgid()
+            let creds = current_task.creds();
+            self.entry.node.info().suid_and_sgid(&creds)
         }
     }
 

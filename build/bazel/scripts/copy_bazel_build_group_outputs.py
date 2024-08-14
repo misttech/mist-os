@@ -81,9 +81,15 @@ def main() -> int:
                 update_needed = True
                 break
 
-            if not filecmp.cmp(src_file, dst_file, shallow=False):
-                # destination and source files are different, update is needed.
-                updated_needed = True
+            if src_file.lstat().st_mtime != dst_file.lstat().st_mtime:
+                # destination and source files have different mtimes, update is
+                # needed.
+                #
+                # NOTE: The __mtime__, instead of __content__, of tracked files
+                # are used to represent freshness of directory outputs.
+                #
+                # See https://fxbug.dev/359710469.
+                update_needed = True
                 break
 
         if update_needed:

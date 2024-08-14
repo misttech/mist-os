@@ -114,7 +114,9 @@ async fn configure_interface(
         gateway,
         enable_ipv4_forwarding,
         enable_ipv6_forwarding,
-        ..
+        ipv4_multicast_neighbor_solicitations,
+        ipv6_multicast_neighbor_solicitations,
+        __source_breaking,
     }: fnetemul::InterfaceOptions,
 ) -> Result<(), InterfaceConfigError> {
     let name = name.ok_or(InterfaceConfigError::NameNotProvided)?;
@@ -364,32 +366,50 @@ async fn configure_interface(
         info!("interface '{}': configured default route with gateway address {:?}", name, gateway);
     }
 
-    let ipv4 = enable_ipv4_forwarding.unwrap_or_default();
-    let ipv6 = enable_ipv6_forwarding.unwrap_or_default();
-    if ipv4 || ipv6 {
-        let _prev_config = control
-            .set_configuration(&fnet_interfaces_admin::Configuration {
-                ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
-                    forwarding: ipv4.then(|| true),
-                    ..Default::default()
-                }),
-                ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
-                    forwarding: ipv6.then(|| true),
+    let _prev_config = control
+        .set_configuration(&fnet_interfaces_admin::Configuration {
+            ipv4: Some(fnet_interfaces_admin::Ipv4Configuration {
+                forwarding: enable_ipv4_forwarding,
+                arp: Some(fnet_interfaces_admin::ArpConfiguration {
+                    nud: Some(fnet_interfaces_admin::NudConfiguration {
+                        max_multicast_solicitations: ipv4_multicast_neighbor_solicitations,
+                        ..Default::default()
+                    }),
                     ..Default::default()
                 }),
                 ..Default::default()
-            })
-            .await
-            .map_err(NetstackError::InterfaceControl)?
-            .map_err(NetstackError::SetConfiguration)?;
-
-        let which = match (ipv4, ipv6) {
-            (true, false) => "IPv4",
-            (false, true) => "IPv6",
-            (true, true) => "IPv4 and IPv6",
-            (false, false) => unreachable!(),
-        };
-        info!("interface '{}': enabled {} forwarding", name, which);
+            }),
+            ipv6: Some(fnet_interfaces_admin::Ipv6Configuration {
+                forwarding: enable_ipv6_forwarding,
+                ndp: Some(fnet_interfaces_admin::NdpConfiguration {
+                    nud: Some(fnet_interfaces_admin::NudConfiguration {
+                        max_multicast_solicitations: ipv6_multicast_neighbor_solicitations,
+                        ..Default::default()
+                    }),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            }),
+            ..Default::default()
+        })
+        .await
+        .map_err(NetstackError::InterfaceControl)?
+        .map_err(NetstackError::SetConfiguration)?;
+    if enable_ipv4_forwarding.is_some_and(|enabled| enabled) {
+        info!("interface `{name}`: enabled IPv4 forwarding");
+    }
+    if enable_ipv6_forwarding.is_some_and(|enabled| enabled) {
+        info!("interface `{name}`: enabled IPv6 forwarding");
+    }
+    if let Some(max_solicits) = ipv4_multicast_neighbor_solicitations {
+        info!(
+            "interface `{name}`: set IPv4 max multicast neighbor solicitations to: {max_solicits}",
+        );
+    }
+    if let Some(max_solicits) = ipv6_multicast_neighbor_solicitations {
+        info!(
+            "interface `{name}`: set IPv6 max multicast neighbor solicitations to: {max_solicits}",
+        );
     }
 
     Ok(())

@@ -1,0 +1,374 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+
+use crate::subsystems::prelude::*;
+use anyhow::{anyhow, Context};
+use assembly_config_schema::assembly_config::{
+    CompiledComponentDefinition, CompiledPackageDefinition,
+};
+use assembly_config_schema::product_config::TeeClient as ProductTeeClient;
+use assembly_util::{BlobfsCompiledPackageDestination, CompiledPackageDestination, FileEntry};
+use fuchsia_url::AbsoluteComponentUrl;
+use std::io::Write;
+
+fn create_name(name: &str) -> Result<cml::Name, anyhow::Error> {
+    cml::Name::new(name).with_context(|| format!("Invalid name: {}", name))
+}
+
+pub(crate) struct TeeClientsConfig;
+impl DefineSubsystemConfiguration<Vec<ProductTeeClient>> for TeeClientsConfig {
+    fn define_configuration(
+        context: &ConfigurationContext<'_>,
+        config: &Vec<ProductTeeClient>,
+        builder: &mut dyn ConfigurationBuilder,
+    ) -> anyhow::Result<()> {
+        // If we don't have any tee clients, we're done.
+        if config.is_empty() {
+            return Ok(());
+        }
+
+        let gendir = context.get_gendir()?;
+
+        // Create a dictionary and expose it to the parent.
+        let capabilities = vec![cml::Capability {
+            dictionary: Some(create_name("tee-client-capabilities")?),
+            ..Default::default()
+        }];
+        let expose = vec![cml::Expose {
+            dictionary: Some(create_name("tee-client-capabilities")?.into()),
+            ..cml::Expose::new_from(cml::ExposeFromRef::Self_.into())
+        }];
+
+        let mut children = vec![];
+        let mut offer = vec![
+            cml::Offer {
+                protocol: Some(create_name("fuchsia.inspect.InspectSink")?.into()),
+                ..cml::Offer::empty(cml::OfferFromRef::Parent.into(), cml::OfferToRef::All.into())
+            },
+            cml::Offer {
+                protocol: Some(create_name("fuchsia.logger.LogSink")?.into()),
+                ..cml::Offer::empty(cml::OfferFromRef::Parent.into(), cml::OfferToRef::All.into())
+            },
+            cml::Offer {
+                protocol: Some(create_name("fuchsia.tracing.provider.Registry")?.into()),
+                availability: Some(cml::Availability::SameAsTarget),
+                ..cml::Offer::empty(cml::OfferFromRef::Parent.into(), cml::OfferToRef::All.into())
+            },
+        ];
+
+        // Offer all of the protocols our children require to them.
+        // Offer all of the protocols our children expose to the dictionary we
+        // just created.
+        for tee_client in config {
+            let component_url = AbsoluteComponentUrl::parse(&tee_client.component_url)?;
+            let component_name = create_name(
+                component_url
+                    .resource()
+                    .split('/')
+                    .last()
+                    .ok_or_else(|| anyhow!("no resource name: {}", component_url.resource()))?
+                    .split('.')
+                    .next()
+                    .ok_or_else(|| anyhow!("no component name: {}", component_url.resource()))?,
+            )?;
+            children.push(cml::Child {
+                name: component_name.clone(),
+                url: cm_types::Url::new(component_url.to_string())?,
+                startup: cml::StartupMode::Lazy,
+                on_terminate: None,
+                environment: None,
+            });
+
+            for capability in &tee_client.capabilities {
+                // Expose the capabilities up from the component URL to the
+                // dictionary we provide to the parent
+                offer.push(cml::Offer {
+                    protocol: Some(create_name(capability)?.into()),
+                    availability: Some(cml::Availability::SameAsTarget),
+                    ..cml::Offer::empty(
+                        cml::OfferFromRef::Named(component_name.clone()).into(),
+                        cml::OfferToRef::OwnDictionary(create_name("tee-client-capabilities")?)
+                            .into(),
+                    )
+                });
+            }
+
+            for guid in &tee_client.guids {
+                // Expose the guids from tee_manager to the component in question
+                let guid_protocol_name = create_name(&format!("fuchsia.tee.Application.{}", guid))?;
+                offer.push(cml::Offer {
+                    protocol: Some(guid_protocol_name.into()),
+                    ..cml::Offer::empty(
+                        cml::OfferFromRef::Parent.into(),
+                        cml::OfferToRef::Named(component_name.clone()).into(),
+                    )
+                });
+            }
+
+            for protocol in &tee_client.additional_required_protocols {
+                let protocol_name = create_name(protocol)?;
+                offer.push(cml::Offer {
+                    protocol: Some(protocol_name.into()),
+
+                    // Most of these additional capabilities will come from
+                    // tee_manager or factory_store_providers, and not all
+                    // boards contain those components.
+                    source_availability: Some(cml::SourceAvailability::Unknown),
+                    ..cml::Offer::empty(
+                        cml::OfferFromRef::Parent.into(),
+                        cml::OfferToRef::Named(component_name.clone()).into(),
+                    )
+                });
+            }
+
+            if let Some(config_data) = &tee_client.config_data {
+                // For each key in config data, add the file at the path of the value to config data
+                let package_name = component_url.package_url().name();
+
+                for (key, value) in config_data {
+                    builder
+                        .package(package_name.as_ref())
+                        .config_data(FileEntry { source: value.into(), destination: key.into() })
+                        .context(format!(
+                            "Adding config data file {} to package {}",
+                            key, package_name
+                        ))?;
+                }
+
+                // Route the config-data subdir named with the package-name to this component
+                let directory_name = create_name("config-data")?;
+                let subdir_name: cml::RelativePath = cm_types::RelativePath::new(package_name)?;
+                offer.push(cml::Offer {
+                    directory: Some(directory_name.into()),
+                    subdir: Some(subdir_name),
+                    ..cml::Offer::empty(
+                        cml::OfferFromRef::Parent.into(),
+                        cml::OfferToRef::Named(component_name.clone()).into(),
+                    )
+                })
+            }
+
+            if let Some(true) = tee_client.additional_required_features.persistent_storage {
+                offer.push(cml::Offer {
+                    storage: Some(create_name("data")?.into()),
+                    ..cml::Offer::empty(
+                        cml::OfferFromRef::Parent.into(),
+                        cml::OfferToRef::Named(component_name.clone()).into(),
+                    )
+                })
+            }
+
+            if let Some(true) = tee_client.additional_required_features.tmp_storage {
+                offer.push(cml::Offer {
+                    storage: Some(create_name("tmp")?.into()),
+                    ..cml::Offer::empty(
+                        cml::OfferFromRef::Parent.into(),
+                        cml::OfferToRef::Named(component_name.clone()).into(),
+                    )
+                })
+            }
+
+            if let Some(true) = tee_client.additional_required_features.securemem {
+                offer.push(cml::Offer {
+                    directory: Some(create_name("dev-securemem")?.into()),
+                    rights: Some(cml::Rights(vec![cml::Right::ReadAlias])),
+                    ..cml::Offer::empty(
+                        cml::OfferFromRef::Parent.into(),
+                        cml::OfferToRef::Named(component_name.clone()).into(),
+                    )
+                })
+            }
+        }
+
+        let cml = cml::Document {
+            capabilities: Some(capabilities),
+            expose: Some(expose),
+            children: Some(children),
+            offer: Some(offer),
+            ..Default::default()
+        };
+
+        let cml_name = "tee-clients.cml";
+        let cml_path = gendir.join(cml_name);
+        let mut cml_file = std::fs::File::create(&cml_path)?;
+        cml_file.write_all(serde_json::to_string_pretty(&cml)?.as_bytes())?;
+
+        let components = vec![CompiledComponentDefinition {
+            component_name: "tee-clients".into(),
+            shards: vec![cml_path.into()],
+        }];
+
+        let destination =
+            CompiledPackageDestination::Blob(BlobfsCompiledPackageDestination::TeeClients);
+        let def = CompiledPackageDefinition {
+            name: destination.clone(),
+            components,
+            contents: Default::default(),
+            includes: Default::default(),
+            bootfs_package: Default::default(),
+        };
+
+        builder
+            .compiled_package(destination.clone(), def)
+            .with_context(|| format!("Inserting compiled package: {}", destination))?;
+        builder.core_shard(&context.get_resource("tee-clients.core_shard.cml"));
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::subsystems::ConfigurationBuilderImpl;
+    use assembly_config_schema::product_config::TeeClientFeatures;
+    use assembly_file_relative_path::FileRelativePathBuf;
+    use std::collections::BTreeMap;
+
+    #[test]
+    // This test is a change detector, but we actually want to observe changes
+    // in this type of code, which is dynamically generating CML for
+    // components which might have security implications.
+    fn test_define_configuration() {
+        let context = ConfigurationContext::default_for_tests();
+        let config = vec![ProductTeeClient {
+            component_url: "fuchsia-pkg://fuchsia.com/tee-clients/test-app#meta/test-app.cm"
+                .to_string(),
+            guids: vec!["1234".to_string(), "5678".to_string()],
+            additional_required_protocols: vec!["fuchsia.foo.bar".to_string()],
+            capabilities: vec!["fuchsia.baz.bang".to_string()],
+            config_data: Some(BTreeMap::from([
+                ("foo".to_string(), "bar".to_string()),
+                ("baz".to_string(), "qux".to_string()),
+            ])),
+            additional_required_features: TeeClientFeatures {
+                tmp_storage: Some(true),
+                persistent_storage: Some(true),
+                securemem: Some(true),
+            },
+        }];
+
+        let mut builder = ConfigurationBuilderImpl::default();
+        TeeClientsConfig::define_configuration(&context, &config, &mut builder)
+            .expect("defining tee_clients configuration");
+
+        let completed_configuration = builder.build();
+        let compiled_packages = completed_configuration.compiled_packages;
+        assert_eq!(compiled_packages.len(), 1);
+
+        let compiled_package = compiled_packages.values().next().unwrap();
+
+        let shard: FileRelativePathBuf;
+        if let CompiledPackageDefinition {
+            name: CompiledPackageDestination::Blob(BlobfsCompiledPackageDestination::TeeClients),
+            components,
+            contents,
+            includes,
+            bootfs_package: None,
+        } = compiled_package
+        {
+            assert_eq!(components.len(), 1);
+            let component = &components[0];
+            assert_eq!(contents.len(), 0);
+            assert_eq!(includes.len(), 0);
+
+            assert_eq!(component.component_name, "tee-clients");
+            assert_eq!(component.shards.len(), 1);
+
+            shard = component.shards[0].clone();
+        } else {
+            panic!("unexpected compiled package definition: {:#?}", compiled_package);
+        }
+
+        let contents = std::fs::read_to_string(shard).unwrap();
+        let contents_json: serde_json::Value =
+            serde_json::from_str(&contents).expect("parsing cml");
+
+        let expected_json = serde_json::json!({"children": [
+          {
+            "name": "test-app",
+            "url": "fuchsia-pkg://fuchsia.com/tee-clients/test-app#meta/test-app.cm"
+          }
+        ],
+        "capabilities": [
+          {
+            "dictionary": "tee-client-capabilities"
+          }
+        ],
+        "expose": [
+          {
+            "dictionary": "tee-client-capabilities",
+            "from": "self"
+          }
+        ],
+        "offer": [
+          {
+            "protocol": "fuchsia.inspect.InspectSink",
+            "from": "parent",
+            "to": "all"
+          },
+          {
+            "protocol": "fuchsia.logger.LogSink",
+            "from": "parent",
+            "to": "all"
+          },
+          {
+            "protocol": "fuchsia.tracing.provider.Registry",
+            "from": "parent",
+            "to": "all",
+            "availability": "same_as_target",
+          },
+          {
+            "protocol": "fuchsia.baz.bang",
+            "from": "#test-app",
+            "to": "self/tee-client-capabilities",
+            "availability": "same_as_target"
+          },
+          {
+            "protocol": "fuchsia.tee.Application.1234",
+            "from": "parent",
+            "to": "#test-app"
+          },
+          {
+            "protocol": "fuchsia.tee.Application.5678",
+            "from": "parent",
+            "to": "#test-app"
+          },
+          {
+            "protocol": "fuchsia.foo.bar",
+            "from": "parent",
+            "to": "#test-app",
+            "source_availability": "unknown"
+          },
+          {
+            "directory": "config-data",
+            "from": "parent",
+            "to": "#test-app",
+            "subdir": "tee-clients",
+          },
+          {
+            "storage": "data",
+            "from": "parent",
+            "to": "#test-app",
+          },
+          {
+            "storage": "tmp",
+            "from": "parent",
+            "to": "#test-app",
+          },
+          {
+            "directory": "dev-securemem",
+            "from": "parent",
+            "rights": ["r*"],
+            "to": "#test-app",
+          }
+        ]});
+
+        assert_eq!(
+            expected_json, contents_json,
+            "cml mismatch: Expected: \n\n{:#?}\n\nActual:n\n{:#?}",
+            expected_json, contents_json,
+        );
+    }
+}

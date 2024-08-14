@@ -17,6 +17,7 @@
 
 #include <fbl/unique_fd.h>
 
+#include "src/bringup/bin/netsvc/match.h"
 #include "src/lib/fsl/io/device_watcher.h"
 
 namespace {
@@ -225,8 +226,8 @@ std::optional<Netdevice::Info> netifc_evaluate(cpp17::string_view topological_pa
     }
 
     cpp17::string_view topo_path = SkipInstanceSigil(resp.value()->path.get());
-    // Look for a suffix to avoid coupling too tightly.
-    if (!cpp20::ends_with(topo_path, topological_path)) {
+    // Allow for limited wildcard matching to avoid coupling too tightly.
+    if (!EndsWithWildcardMatch(topo_path, topological_path)) {
       return std::nullopt;
     }
   }

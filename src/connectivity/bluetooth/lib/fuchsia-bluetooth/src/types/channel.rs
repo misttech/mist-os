@@ -97,7 +97,12 @@ impl Channel {
     /// Attempt to make a Channel from a zircon socket and a Maximum TX size received out of band.
     /// Returns Err(status) if there is an error.
     pub fn from_socket(socket: zx::Socket, max_tx_size: usize) -> Result<Self, zx::Status> {
-        Ok(Channel {
+        Ok(Self::from_socket_infallible(socket, max_tx_size))
+    }
+
+    /// Make a Channel from a zircon socket and a Maximum TX size received out of band.
+    pub fn from_socket_infallible(socket: zx::Socket, max_tx_size: usize) -> Self {
+        Channel {
             socket: fasync::Socket::from_socket(socket),
             mode: ChannelMode::Basic,
             max_tx_size,
@@ -105,7 +110,7 @@ impl Channel {
             audio_direction_ext: None,
             l2cap_parameters_ext: None,
             terminated: false,
-        })
+        }
     }
 
     /// The default max tx size is the default MTU size for L2CAP minus the channel header content.
@@ -158,12 +163,6 @@ impl Channel {
                     .map_err(|e| Error::profile(format!("setting priority failed: {e:?}"))),
             }
         }
-    }
-
-    /// Consume this to make it into a socket.  Useful in tests to adjust socket parameters.
-    /// If it fails, returns itself back.
-    pub fn into_socket(self) -> Result<zx::Socket, Self> {
-        Ok(self.socket.into_zx_socket())
     }
 
     /// Attempt to set the flush timeout for this channel.

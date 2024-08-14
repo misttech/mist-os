@@ -6,7 +6,6 @@
 #define SRC_CONNECTIVITY_BLUETOOTH_HCI_TRANSPORT_USB_BT_TRANSPORT_USB_H_
 
 #include <fidl/fuchsia.hardware.bluetooth/cpp/fidl.h>
-#include <fuchsia/hardware/bt/hci/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
@@ -54,7 +53,6 @@ using DeviceType = ddk::Device<Device, ddk::GetProtocolable, ddk::Unbindable>;
 //
 // BtHciProtocol is not a ddk::base_protocol because vendor drivers proxy requests to this driver.
 class Device final : public DeviceType,
-                     public ddk::BtHciProtocol<Device>,
                      public fidl::Server<fuchsia_hardware_bluetooth::HciTransport>,
                      public fidl::Server<fuchsia_hardware_bluetooth::Snoop> {
  public:
@@ -87,17 +85,6 @@ class Device final : public DeviceType,
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
 
-  // ddk::BtHciProtocol mixins:
-  zx_status_t BtHciOpenCommandChannel(zx::channel channel);
-  zx_status_t BtHciOpenAclDataChannel(zx::channel channel);
-  zx_status_t BtHciOpenScoChannel(zx::channel channel);
-  void BtHciConfigureSco(sco_coding_format_t coding_format, sco_encoding_t encoding,
-                         sco_sample_rate_t sample_rate, bt_hci_configure_sco_callback callback,
-                         void* cookie);
-  void BtHciResetSco(bt_hci_reset_sco_callback callback, void* cookie);
-  zx_status_t BtHciOpenIsoDataChannel(zx::channel channel);
-  zx_status_t BtHciOpenSnoopChannel(zx::channel channel);
-
   // fuchsia_hardware_bluetooth::HciTransport protocol overrides.
   void Send(SendRequest& request, SendCompleter::Sync& completer) override;
   void AckReceive(AckReceiveCompleter::Sync& completer) override;
@@ -120,89 +107,6 @@ class Device final : public DeviceType,
     usb_endpoint_descriptor_t in;
     usb_endpoint_descriptor_t out;
   };
-
-  struct IsocAltSettingRequest {
-    uint8_t alt_setting;
-    bt_hci_configure_sco_callback callback;
-    // The pointer to pass to callback.
-    void* cookie;
-  };
-
-  class ChannelWrapper;
-
-  // This wrapper around async_wait enables us to get a Device* in the handler.
-  // We use this instead of async::WaitMethod because async::WaitBase isn't thread safe.
-  struct Wait : public async_wait {
-    explicit Wait(Device* device, ChannelWrapper* channel);
-    static void Handler(async_dispatcher_t* dispatcher, async_wait_t* async_wait,
-                        zx_status_t status, const zx_packet_signal_t* signal);
-    Device* device;
-    // Indicates whether a wait has begun and not ended.
-    bool pending = false;
-    // The channel that this wait waits on.
-    ChannelWrapper* channel;
-  };
-
-  // This wrapper around zx::channel enables us to process handles more generically and tightly
-  // couple a channel with its Wait.
-  class ChannelWrapper {
-   public:
-    using SignalHandler = void (Device::*)(zx_signals_t);
-
-    explicit ChannelWrapper(const char* name, Device* device, SignalHandler handler)
-        : device_(device), wait_(device, this), signal_handler_(handler), name_(name) {}
-
-    bool IsOpen() const { return channel_.is_valid(); }
-
-    void CleanUp();
-
-    bool WaitPending() const { return wait_.pending; }
-
-    // Begins waiting for signals. Cleans up the channel on error.
-    // Returns true if the wait was successfully started.
-    bool BeginWait();
-
-    zx_status_t Read(void* bytes, uint32_t num_bytes, uint32_t* actual_bytes) {
-      return channel_.read(/*flags=*/0, bytes, /*handles=*/nullptr, num_bytes, /*num_handles=*/0,
-                           actual_bytes, /*actual_handles=*/nullptr);
-    }
-
-    zx_status_t Write(const void* bytes, uint32_t num_bytes) {
-      return channel_.write(/*flags=*/0, bytes, num_bytes, /*handles=*/nullptr, /*num_handles=*/0);
-    }
-
-    // Write multiple arrays at once, using the iovec option.
-    // Used to add a flag byte to write to the snoop channel.
-    zx_status_t WriteMulti(const void* bytes_first, uint32_t num_bytes_first,
-                           const void* bytes_second, uint32_t num_bytes_second) {
-      zx_channel_iovec_t vecs[2];
-      vecs[0] = {.buffer = bytes_first, .capacity = num_bytes_first, .reserved = 0};
-      vecs[1] = {.buffer = bytes_second, .capacity = num_bytes_second, .reserved = 0};
-      return channel_.write(ZX_CHANNEL_WRITE_USE_IOVEC, vecs, std::size(vecs), /*handles=*/nullptr,
-                            /*num_handles=*/0);
-    }
-
-    void set_channel(zx::channel channel) {
-      channel_ = std::move(channel);
-      wait_.object = channel_.get();
-    }
-
-    const char* name() const { return name_; }
-
-   private:
-    friend struct Wait;
-
-    Device* device_;
-    zx::channel channel_;
-    Wait wait_;
-    const SignalHandler signal_handler_;
-    const char* const name_;
-  };
-
-  // The number of currently supported HCI channel endpoints. We currently have
-  // one channel for command/event flow and one for ACL data flow. The snoop channel is managed
-  // separately.
-  static const int kNumChannels = 2;
 
   using usb_callback_t = void (*)(void*, usb_request_t*);
 
@@ -246,22 +150,8 @@ class Device final : public DeviceType,
 
   void HciScoWriteComplete(usb_request_t* req);
 
-  // Handle a readable or closed signal from the command channel.
-  void HciHandleCmdReadEvents(zx_signals_t);
-
-  // Handle a readable or closed signal from the ACL channel.
-  void HciHandleAclReadEvents(zx_signals_t);
-
-  // Handle a readable or closed signal from the SCO channel.
-  void HciHandleScoReadEvents(zx_signals_t);
-
-  // Handle a readable or closed signal from the snoop channel.
-  void HciHandleSnoopSignals(zx_signals_t);
-
   void OnScoData(std::vector<uint8_t>&, fit::function<void(void)>);
   void OnScoStop();
-
-  zx_status_t HciOpenChannel(ChannelWrapper* out, zx::channel in);
 
   zx_status_t AllocBtUsbPackets(int limit, uint64_t data_size, uint8_t ep_address, size_t req_size,
                                 list_node_t* list);
@@ -272,8 +162,6 @@ class Device final : public DeviceType,
   void HandleUsbResponseError(usb_request_t* req, const char* req_description)
       __TA_REQUIRES(mutex_);
 
-  void ProcessNextIsocAltSettingRequest();
-
   mtx_t mutex_;
 
   usb_protocol_t usb_ __TA_GUARDED(mutex_);
@@ -282,12 +170,6 @@ class Device final : public DeviceType,
   // In production, this is loop_.dispatcher(). In tests, this is the test dispatcher.
   async_dispatcher_t* dispatcher_ = nullptr;
 
-  ChannelWrapper cmd_channel_ __TA_GUARDED(mutex_){"command", this,
-                                                   &Device::HciHandleCmdReadEvents};
-  ChannelWrapper acl_channel_ __TA_GUARDED(mutex_){"ACL", this, &Device::HciHandleAclReadEvents};
-  ChannelWrapper sco_channel_ __TA_GUARDED(mutex_){"SCO", this, &Device::HciHandleScoReadEvents};
-  ChannelWrapper snoop_channel_ __TA_GUARDED(mutex_){"snoop", this, &Device::HciHandleSnoopSignals};
-
   // Set during binding and never modified after.
   std::optional<usb_endpoint_descriptor_t> bulk_out_endp_desc_;
   std::optional<usb_endpoint_descriptor_t> bulk_in_endp_desc_;
@@ -295,12 +177,6 @@ class Device final : public DeviceType,
 
   // The alternate setting of the ISOC (SCO) interface.
   uint8_t isoc_alt_setting_ __TA_GUARDED(mutex_) = 0;
-
-  std::queue<IsocAltSettingRequest> isoc_alt_setting_requests_ __TA_GUARDED(mutex_);
-
-  // If true, ISOC out requests may be queued.
-  // Must only be modified while isoc_alt_setting_mutex_ is held.
-  bool isoc_alt_setting_being_changed_ __TA_GUARDED(mutex_) = false;
 
   // Set during bind, never modified afterwards.
   std::vector<IsocEndpointDescriptors> isoc_endp_descriptors_;

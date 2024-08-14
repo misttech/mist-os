@@ -47,8 +47,10 @@
     ],
     use: [
         {
-            // The Realm service allows session_manager to start components.
-            protocol: "fuchsia.component.Realm",
+            protocol: [
+                "fuchsia.component.Realm",
+                "fuchsia.component.sandbox.CapabilityStore",
+            ],
             from: "framework",
         },
         {
@@ -147,6 +149,7 @@
                 "fuchsia.net.stackmigrationdeprecated.State",
                 "fuchsia.paver.Paver",
                 "fuchsia.power.battery.BatteryManager",
+                "fuchsia.power.broker.Topology",
                 "fuchsia.power.button.Monitor",
                 "fuchsia.power.profile.Watcher",
                 "fuchsia.power.system.ActivityGovernor",
@@ -185,7 +188,7 @@
             availability: "same_as_target",
         },
         {
-            // Routed to session-manager via trusted-apps.core_shard.cml
+            // Routed to session-manager via tee-clients.core_shard.cml
             protocol: [
                 "fuchsia.castauth.CastCertificateRetriever",
                 "fuchsia.castauth.CastKeySigner",
@@ -196,7 +199,7 @@
                 "fuchsia.weave.Signer",
                 "google.cast.cryptokey.NamedKeyProvider",
             ],
-            from: "parent/trusted-app-capabilities",
+            from: "parent/tee-client-capabilities",
             to: "#session",
         },
         {

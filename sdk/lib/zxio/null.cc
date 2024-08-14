@@ -311,12 +311,6 @@ zx_status_t zxio_default_xattr_remove(zxio_t* io, const uint8_t* name, size_t na
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-zx_status_t zxio_default_open2(zxio_t* directory, const char* path, size_t path_len,
-                               const zxio_open2_options_t* options,
-                               zxio_node_attributes_t* inout_attr, zxio_storage_t* storage) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
 zx_status_t zxio_default_allocate(zxio_t* io, uint64_t offset, uint64_t len,
                                   zxio_allocate_mode_t mode) {
   return ZX_ERR_NOT_SUPPORTED;

@@ -6,6 +6,7 @@ package fint
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -13,6 +14,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/go-cmp/cmp/cmpopts"
@@ -45,6 +47,31 @@ func (m fakeBuildModules) Images() []build.Image                         { retur
 func (m fakeBuildModules) PrebuiltBinarySets() []build.PrebuiltBinarySet { return m.pbinSets }
 func (m fakeBuildModules) TestSpecs() []build.TestSpec                   { return m.testSpecs }
 func (m fakeBuildModules) Tools() build.Tools                            { return m.tools }
+
+func TestGetSubbuildSubdirs(t *testing.T) {
+	tmpDir := t.TempDir()
+	subbuildJSONFile := filepath.Join(tmpDir, "subbuilds.json")
+	contents := []byte(`[
+  {
+    "build_dir": "subbuild.1"
+  },
+  {
+    "build_dir": "subbuild.2"
+  }
+]`)
+	if err := os.WriteFile(subbuildJSONFile, contents, 0600); err != nil {
+		t.Fatalf("Got unexpected error writing file: %s", err)
+	}
+	ctx := context.Background()
+	gotSubdirs, err := getSubbuildSubdirs(ctx, subbuildJSONFile)
+	if err != nil {
+		t.Fatalf("Got unexpected error in getSubbuildSubdirs(): %s", err)
+	}
+	wantSubdirs := []string{"subbuild.1", "subbuild.2"}
+	if diff := cmp.Diff(wantSubdirs, gotSubdirs, cmp.Options{}); diff != "" {
+		t.Errorf("Got wrong subdirs (-want +got):\n%s", diff)
+	}
+}
 
 func TestBuild(t *testing.T) {
 	checkoutDir := t.TempDir()
@@ -80,6 +107,11 @@ func TestBuild(t *testing.T) {
 		return fmt.Errorf("failed to run command: %s", cmd)
 	}
 
+	type subbuildFreshness struct {
+		dir   string
+		fresh bool // if true, consider the ninja log in this dir fresh, from the latest build
+	}
+
 	testCases := []struct {
 		name        string
 		staticSpec  *fintpb.Static
@@ -92,12 +124,12 @@ func TestBuild(t *testing.T) {
 		// Mock files to populate the build directory with.
 		buildDirFiles []string
 		modules       fakeBuildModules
+		// ninja sub-build directories, relative to the root build dir
+		subbuildDirs []subbuildFreshness
 		// Callback that is called by the fake runner whenever it starts
 		// "running" a command, allowing each test to fake the result and output
 		// of any subprocess.
 		runnerFunc func(cmd []string, stdout io.Writer) error
-		// Callback function that returns a list of ninja logs (including sub-ninja logs).
-		ninjaLogFinderFunc func() []string
 		// List of regex strings, where each string corresponds to a subprocess
 		// that must have been run by the runner.
 		mustRun []string
@@ -249,6 +281,50 @@ func TestBuild(t *testing.T) {
 				},
 			},
 			expectErr: true,
+		},
+		{
+			name:       "sub-builds all fresh",
+			staticSpec: &fintpb.Static{},
+			contextSpec: &fintpb.Context{
+				ArtifactDir: artifactDir,
+			},
+			subbuildDirs: []subbuildFreshness{
+				{dir: "sub1", fresh: true},
+				{dir: "sub2", fresh: true},
+			},
+			expectedArtifacts: &fintpb.BuildArtifacts{
+				BuildstatsJsonFiles: []string{
+					filepath.Join(buildDir, buildstatsJSONName),
+					filepath.Join(buildDir, "sub1", buildstatsJSONName),
+					filepath.Join(buildDir, "sub2", buildstatsJSONName),
+				},
+				NinjatraceJsonFiles: []string{
+					filepath.Join(buildDir, ninjatraceJSONName),
+					filepath.Join(buildDir, "sub1", ninjatraceJSONName),
+					filepath.Join(buildDir, "sub2", ninjatraceJSONName),
+				},
+			},
+		},
+		{
+			name:       "sub-builds partially fresh",
+			staticSpec: &fintpb.Static{},
+			contextSpec: &fintpb.Context{
+				ArtifactDir: artifactDir,
+			},
+			subbuildDirs: []subbuildFreshness{
+				{dir: "sub/sub3", fresh: false}, // this contains stale .ninja_log
+				{dir: "sub/sub4", fresh: true},
+			},
+			expectedArtifacts: &fintpb.BuildArtifacts{
+				BuildstatsJsonFiles: []string{
+					filepath.Join(buildDir, buildstatsJSONName),
+					filepath.Join(buildDir, "sub/sub4", buildstatsJSONName),
+				},
+				NinjatraceJsonFiles: []string{
+					filepath.Join(buildDir, ninjatraceJSONName),
+					filepath.Join(buildDir, "sub/sub4", ninjatraceJSONName),
+				},
+			},
 		},
 		{
 			name: "incremental build",
@@ -643,6 +719,32 @@ func TestBuild(t *testing.T) {
 			tc.contextSpec = defaultContextSpec
 			runner := &fakeSubprocessRunner{run: tc.runnerFunc}
 
+			// Write out a ninja_subbuilds.json file
+			// and construct a map of each subbuild's freshness.
+			subbuildFreshnessMap := make(map[string]bool)
+			if len(tc.subbuildDirs) > 0 {
+				subbuildJSONFile := filepath.Join(buildDir, subbuildsJSONName)
+				var subbuildEntries []subbuildEntry
+				for _, dir := range tc.subbuildDirs {
+					subbuildEntries = append(subbuildEntries, subbuildEntry{BuildDir: dir.dir})
+					subbuildFreshnessMap[dir.dir] = dir.fresh
+				}
+				contents, err := json.Marshal(subbuildEntries)
+				if err != nil {
+					t.Fatalf("Failed to marshal to JSON: %v", subbuildEntries)
+				}
+				if err := os.WriteFile(subbuildJSONFile, contents, 0600); err != nil {
+					t.Fatalf("Got unexpected error writing JSON file: %s", err)
+				}
+			}
+
+			// Fake function for determining which subbuild dirs have a fresh ninja log.
+			subninjaLogIsRecent := func(log string, ninjaStart time.Time) (bool, error) {
+				baseDir := filepath.Dir(log)
+				subdir := strings.TrimPrefix(baseDir, buildDir+"/")
+				return subbuildFreshnessMap[subdir], nil
+			}
+
 			fileExists := func(_ string) bool { return true }
 			tc.modules.tools = append(tc.modules.tools, makeTools(
 				map[string][]string{
@@ -654,7 +756,7 @@ func TestBuild(t *testing.T) {
 			)...)
 			ctx := context.Background()
 			artifacts, err := buildImpl(
-				ctx, runner, fileExists, tc.staticSpec, tc.contextSpec, tc.modules, platform)
+				ctx, runner, subninjaLogIsRecent, fileExists, tc.staticSpec, tc.contextSpec, tc.modules, platform)
 			if err != nil {
 				if !tc.expectErr {
 					t.Fatalf("Got unexpected error: %s", err)

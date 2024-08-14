@@ -5,7 +5,7 @@
 pub mod instance;
 pub mod manager;
 
-use crate::bedrock::program::StopRequestSuccess;
+use crate::bedrock::program::{StopConclusion, StopDisposition};
 use crate::framework::controller;
 use crate::model::actions::{
     start, ActionsManager, DestroyAction, ResolveAction, ShutdownAction, ShutdownType, StartAction,
@@ -41,7 +41,7 @@ use futures::lock::{MappedMutexGuard, Mutex, MutexGuard};
 use hooks::{Event, EventPayload, Hooks};
 use instance::{
     InstanceState, ResolvedInstanceState, ShutdownInstanceState, StartedInstanceState,
-    StopConclusion, UnresolvedInstanceState,
+    UnresolvedInstanceState,
 };
 use manager::ComponentManagerInstance;
 use moniker::{ChildName, Moniker};
@@ -475,38 +475,12 @@ impl ComponentInstance {
             return Err(AddDynamicChildError::NameTooLong { max_len: cm_types::MAX_NAME_LENGTH });
         }
 
-        let mut dynamic_offers = child_args.dynamic_offers.unwrap_or_else(Vec::new);
+        let dynamic_offers = child_args.dynamic_offers.unwrap_or_else(Vec::new);
         if dynamic_offers.len() > 0
             && collection_decl.allowed_offers != cm_types::AllowedOffers::StaticAndDynamic
         {
             return Err(AddDynamicChildError::DynamicOffersNotAllowed { collection_name });
         }
-
-        let dynamic_capabilities = {
-            let configs = child_args.config_capabilities.unwrap_or_else(Vec::new);
-            if !configs.is_empty()
-                && collection_decl.allowed_offers != cm_types::AllowedOffers::StaticAndDynamic
-            {
-                return Err(AddDynamicChildError::DynamicOffersNotAllowed { collection_name });
-            }
-            let mut dynamic_capabilities = Vec::new();
-            for mut config in configs {
-                let original_name = config.name.clone();
-                if let Some(original_name) = original_name.as_ref() {
-                    config.name =
-                        Some(format!("{}.{}.{}", original_name, collection_name, child_decl.name));
-                }
-
-                dynamic_offers.push(fdecl::Offer::Config(fdecl::OfferConfiguration {
-                    source: Some(fdecl::Ref::Self_(fdecl::SelfRef {})),
-                    source_name: config.name.clone(),
-                    target_name: original_name,
-                    ..Default::default()
-                }));
-                dynamic_capabilities.push(fdecl::Capability::Config(config));
-            }
-            dynamic_capabilities
-        };
 
         let child_input = state
             .sandbox
@@ -553,7 +527,6 @@ impl ComponentInstance {
                 child_decl,
                 Some(&collection_decl),
                 Some(dynamic_offers),
-                Some(dynamic_capabilities),
                 child_args.controller,
                 child_input,
             )
@@ -662,8 +635,8 @@ impl ComponentInstance {
                     .stop(stop_timer, kill_timer)
                     .await
                     .map_err(StopActionError::ProgramStopError)?;
-                if ret.outcome.request == StopRequestSuccess::KilledAfterTimeout
-                    || ret.outcome.request == StopRequestSuccess::Killed
+                if matches!(ret.disposition, StopDisposition::KilledAfterTimeout)
+                    || matches!(ret.disposition, StopDisposition::Killed(_))
                 {
                     warn!(
                         "component {} did not stop in {:?}. Killed it.",
@@ -702,7 +675,7 @@ impl ComponentInstance {
             .await
             .map_err(|err| StopActionError::DestroyDynamicChildrenFailed { err: Box::new(err) })?;
 
-        if let Some((StopConclusion { outcome, escrow_request, stop_info }, start_time)) =
+        if let Some((StopConclusion { disposition, escrow_request, stop_info }, start_time)) =
             stop_result
         {
             let requested_escrow = escrow_request.is_some();
@@ -719,7 +692,7 @@ impl ComponentInstance {
 
             let stop_time = zx::Time::get_monotonic();
             let event = self.new_event(EventPayload::Stopped {
-                status: outcome.component_exit_status,
+                status: disposition.status(),
                 exit_code: stop_info.map(|info| info.exit_code).flatten(),
                 stop_time,
                 execution_duration: stop_time - start_time,
@@ -1430,7 +1403,6 @@ pub mod tests {
     use ::routing::bedrock::structured_dict::ComponentInput;
     use ::routing::resolving::ComponentAddress;
     use assert_matches::assert_matches;
-    use cm_fidl_validator::error::DeclType;
     use cm_rust::{
         Availability, ChildRef, DependencyType, ExposeSource, OfferDecl, OfferProtocolDecl,
         OfferSource, OfferTarget, UseEventStreamDecl, UseSource,
@@ -2282,17 +2254,13 @@ pub mod tests {
                 .expect("failed to get resolved state")
                 .validate_and_convert_dynamic_component(
                     Some(offers),
-                    None,
                     &ChildBuilder::new().name("foo").url("http://foo").into(),
                     Some(&collection_decl),
                 )
         };
 
         assert_eq!(
-            validate_and_convert(vec![])
-                .await
-                .expect("failed to validate/convert dynamic offers")
-                .0,
+            validate_and_convert(vec![]).await.expect("failed to validate/convert dynamic offers"),
             vec![],
         );
 
@@ -2307,8 +2275,7 @@ pub mod tests {
                 ..Default::default()
             })])
             .await
-            .expect("failed to validate/convert dynamic offers")
-            .0,
+            .expect("failed to validate/convert dynamic offers"),
             vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Parent,
                 source_name: "fuchsia.example.Echo".parse().unwrap(),
@@ -2334,8 +2301,7 @@ pub mod tests {
                 ..Default::default()
             })])
             .await
-            .expect("failed to validate/convert dynamic offers")
-            .0,
+            .expect("failed to validate/convert dynamic offers"),
             vec![OfferDecl::Protocol(OfferProtocolDecl {
                 source: OfferSource::Void,
                 source_name: "fuchsia.example.Echo".parse().unwrap(),
@@ -2386,90 +2352,6 @@ pub mod tests {
                     availability: Availability::Optional,
                 })
             }
-        );
-    }
-
-    #[fuchsia::test]
-    async fn validate_and_convert_dynamic_capabilities() {
-        let components = vec![(
-            "root",
-            ComponentDeclBuilder::new()
-                .collection(
-                    CollectionBuilder::new()
-                        .name("col")
-                        .allowed_offers(cm_types::AllowedOffers::StaticAndDynamic),
-                )
-                .build(),
-        )];
-        let test = ActionsTest::new("root", components, None).await;
-        let root = test.model.root();
-
-        let _root = root
-            .start_instance(&Moniker::root(), &StartReason::Root)
-            .await
-            .expect("failed to start root");
-        test.runner.wait_for_urls(&["test:///root_resolved"]).await;
-
-        let collection_decl = root
-            .lock_resolved_state()
-            .await
-            .unwrap()
-            .resolved_component
-            .decl
-            .collections
-            .iter()
-            .find(|c| c.name.as_str() == "col")
-            .unwrap()
-            .clone();
-
-        let validate_and_convert = |capabilities: Vec<fdecl::Capability>| async {
-            root.lock_resolved_state()
-                .await
-                .expect("failed to get resolved state")
-                .validate_and_convert_dynamic_component(
-                    None,
-                    Some(capabilities),
-                    &ChildBuilder::new().name("foo").url("http://foo").into(),
-                    Some(&collection_decl),
-                )
-        };
-
-        assert_eq!(validate_and_convert(vec![]).await.unwrap().1, vec![],);
-
-        assert_eq!(
-            validate_and_convert(vec![fdecl::Capability::Config(fdecl::Configuration {
-                name: Some("myConfig".to_string()),
-                value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Bool(true))),
-                ..Default::default()
-            })])
-            .await
-            .unwrap()
-            .1,
-            vec![cm_rust::CapabilityDecl::Config(cm_rust::ConfigurationDecl {
-                name: "myConfig".parse().unwrap(),
-                value: cm_rust::ConfigValue::Single(cm_rust::ConfigSingleValue::Bool(true)),
-            })],
-        );
-
-        assert_matches!(
-            validate_and_convert(vec![
-                fdecl::Capability::Config(fdecl::Configuration {
-                name: Some("dupe".to_string()),
-                value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Bool(true))),
-                ..Default::default()
-            }),
-            fdecl::Capability::Config(fdecl::Configuration {
-                name: Some("dupe".to_string()),
-                value: Some(fdecl::ConfigValue::Single(fdecl::ConfigSingleValue::Bool(true))),
-                ..Default::default()
-            }),
-        ])
-            .await.unwrap_err(),
-            AddChildError::DynamicCapabilityError { err: DynamicCapabilityError::Invalid { err } }
-            if err ==
-                cm_fidl_validator::error::ErrorList {
-                    errs: vec![cm_fidl_validator::error::Error::duplicate_field(DeclType::Configuration, "name", "dupe")],
-                }
         );
     }
 

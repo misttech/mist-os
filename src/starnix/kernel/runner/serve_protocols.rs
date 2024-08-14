@@ -112,6 +112,7 @@ async fn spawn_console(
             kernel.kthreads.unlocked_for_async().deref_mut(),
             kernel,
             &binary_path,
+            None,
         )?;
         let (sender, receiver) = oneshot::channel();
         let pty = execute_task_with_prerun_result(

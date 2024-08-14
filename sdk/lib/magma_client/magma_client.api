@@ -1,4 +1,4 @@
 {
-  "pkg/magma_client/include/lib/magma/magma.h": "d2205059520bb0548e7641ac2e158589",
-  "pkg/magma_client/include/lib/magma/magma_sysmem.h": "14fec4fd92203cf116a3efc8dcbffcd1"
+  "pkg/magma_client/include/lib/magma/magma.h": "aed8410c5252c6912c722fac83d1d366",
+  "pkg/magma_client/include/lib/magma/magma_sysmem.h": "7a8f5d43776a2e04e5a2fa5184892747"
 }

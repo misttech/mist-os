@@ -17,7 +17,8 @@
 #
 #   //boards/riscv64/BUILD.gn
 
-import("//boards/common/riscv64-common.gni")
+has_board = true
+target_cpu = "riscv64"
 
 # Board configuration for Product Assembly
 board_configuration_label = "//boards/riscv64"

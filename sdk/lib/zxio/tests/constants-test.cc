@@ -32,20 +32,4 @@ static_assert(ZXIO_OPERATION_MODIFY_DIRECTORY ==
               static_cast<uint64_t>(Operations::kModifyDirectory));
 static_assert(ZXIO_OPERATION_ALL == static_cast<uint64_t>(Operations::kMask));
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(19)
-using fio::CreationMode;
-static_assert(ZXIO_CREATION_MODE_NEVER == static_cast<uint32_t>(CreationMode::kNever));
-static_assert(ZXIO_CREATION_MODE_NEVER_DEPRECATED ==
-              static_cast<uint32_t>(CreationMode::kNeverDeprecated));
-static_assert(ZXIO_CREATION_MODE_ALLOW_EXISTING ==
-              static_cast<uint32_t>(CreationMode::kAllowExisting));
-static_assert(ZXIO_CREATION_MODE_ALWAYS == static_cast<uint32_t>(CreationMode::kAlways));
-#else
-using fio::OpenMode;
-static_assert(ZXIO_CREATION_MODE_NEVER_DEPRECATED ==
-              static_cast<uint32_t>(OpenMode::kOpenExisting));
-static_assert(ZXIO_CREATION_MODE_ALLOW_EXISTING == static_cast<uint32_t>(OpenMode::kMaybeCreate));
-static_assert(ZXIO_CREATION_MODE_ALWAYS == static_cast<uint32_t>(OpenMode::kAlwaysCreate));
-#endif
-
 }  // namespace

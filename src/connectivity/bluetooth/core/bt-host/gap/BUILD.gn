@@ -10,14 +10,10 @@ import("$dir_pw_unit_test/test.gni")
 
 dir_public_gap = "../public/pw_bluetooth_sapphire/internal/host/gap"
 
-config("warnings") {
-  cflags_cc = [ "-Wswitch-enum" ]
-}
-
 pw_source_set("definitions") {
   public = [ "$dir_public_gap/gap.h" ]
-
   sources = [ "gap.cc" ]
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
   deps = [ "//src/connectivity/bluetooth/core/bt-host/common" ]
 }
 
@@ -85,7 +81,7 @@ pw_source_set("gap") {
     "types.cc",
   ]
 
-  configs = [ ":warnings" ]
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
 
   deps = [
     "$dir_pw_preprocessor",
@@ -124,6 +120,8 @@ pw_source_set("testing") {
     "fake_pairing_delegate.cc",
   ]
 
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
+
   public_deps = [
     ":gap",
     "$dir_pw_unit_test",
@@ -154,6 +152,8 @@ pw_test("tests") {
     "types_test.cc",
   ]
 
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
+
   deps = [
     ":gap",
     ":testing",
@@ -171,6 +171,7 @@ pw_test("tests") {
 
 fuchsia_library_fuzzer("peer_cache_fuzzer") {
   sources = [ "peer_cache_fuzztest.cc" ]
+  configs += [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
   deps = [
     ":gap",
     "$dir_pw_async:fake_dispatcher",
@@ -182,6 +183,7 @@ fuchsia_library_fuzzer("peer_cache_fuzzer") {
 
 pw_fuzzer("pw_peer_cache_fuzzer") {
   sources = [ "peer_cache_fuzztest.cc" ]
+  configs = [ "//src/connectivity/bluetooth/core/bt-host:copts" ]
   deps = [
     ":gap",
     "$dir_pw_async:fake_dispatcher",

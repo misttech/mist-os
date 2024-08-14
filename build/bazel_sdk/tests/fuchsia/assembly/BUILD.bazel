@@ -13,6 +13,7 @@ load(
     "fuchsia_bootstrap_partition",
     "fuchsia_partition",
     "fuchsia_partitions_configuration",
+    "fuchsia_post_processing_script",
     "fuchsia_prebuilt_board_input_bundle",
     "fuchsia_prebuilt_package",
     "fuchsia_prebuilt_product_configuration",
@@ -51,6 +52,7 @@ fuchsia_board_input_bundle(
         ":prebuilt_driver",
     ],
     cpu_manager_config = "test_data/config_data.json",
+    thread_roles = [],
 )
 
 filegroup(
@@ -78,33 +80,54 @@ fuchsia_board_configuration(
     ],
     board_name = "x64",
     devicetree = "test_data/test.dtb",
+    kernel = {
+        "contiguous_physical_pages": True,
+    },
+    platform = {
+        "connectivity": {
+            "network": {
+                "netsvc_interface": "/dwmac-ff3f0000_group/dwmac/Designware-MAC/netdevice-migration/network-device",
+            },
+        },
+        "development_support": {
+            "enable_debug_access_port_for_soc": "amlogic-a311d",
+        },
+        "sysmem_defaults": {
+            "contiguous_guard_pages_unused": False,
+            "contiguous_memory_size": {
+                "fixed": 209715200,
+            },
+            "protected_memory_size": {
+                "fixed": 0,
+            },
+        },
+    },
+    post_processing_script = ":post_processing_script",
+)
+
+fuchsia_post_processing_script(
+    name = "post_processing_script",
+    post_processing_script_args = [
+        "-t",
+        "mkbootimg",
+        "-k",
+        "linux-kola-boot-shim.bin",
+        "-d",
+        "kola.dtb",
+        "-p",
+        "fuchsia-vendored-python",
+    ],
+    post_processing_script_inputs = {
+        "test_data/fake_dep": "fake_dep",
+        "test_data/test.dtb": "test.dtb",
+    },
+    post_processing_script_path = "zbi_signing_script",
 )
 
 fuchsia_board_configuration_test(
     name = "board_configuration_golden_test",
     board_config = ":testing_board_configuration",
-    golden_file = select({
-        "@fuchsia_sdk//fuchsia/constraints:cpu_arm64": ":test_data/board_configuration_golden_file_arm64.json",
-        "@fuchsia_sdk//fuchsia/constraints:cpu_x64": ":test_data/board_configuration_golden_file_x64.json",
-        "@fuchsia_sdk//fuchsia/constraints:cpu_riscv64": ":test_data/board_configuration_golden_file_riscv64.json",
-    }),
-    visibility = ["//visibility:public"],
-)
-
-fuchsia_board_configuration(
-    name = "prebuilt_inputs_testing_board_configuration",
-    board_bundles_dir = "test_data",
-    board_name = "x64",
-    devicetree = "test_data/test.dtb",
-    input_bundles = [
-        "prebuilt_bib/testing_board_input_bundle",
-    ],
-)
-
-fuchsia_board_configuration_test(
-    name = "prebuilt_inputs_board_configuration_golden_test",
-    board_config = ":prebuilt_inputs_testing_board_configuration",
-    golden_file = ":test_data/prebuilt_inputs_board_configuration_golden_file.json",
+    golden_file = ":test_data/board_configuration_golden_file.json",
     visibility = ["//visibility:public"],
 )
 

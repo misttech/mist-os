@@ -978,11 +978,6 @@ zx_status_t DisplayEngine::DisplayEngineReleaseCapture(uint64_t capture_handle) 
   return ZX_OK;
 }
 
-bool DisplayEngine::DisplayEngineIsCaptureCompleted() {
-  fbl::AutoLock lock(&capture_mutex_);
-  return (current_capture_target_image_ == nullptr);
-}
-
 void DisplayEngine::OnVsync(zx::time timestamp) {
   display::ConfigStamp current_config_stamp = display::kInvalidConfigStamp;
   if (fully_initialized()) {

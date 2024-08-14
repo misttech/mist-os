@@ -1274,16 +1274,17 @@ mod tests {
     #[fuchsia::test]
     fn error_in_slc_ends_peer_task() {
         let mut exec = fasync::TestExecutor::new();
-        let (connection, remote) = create_and_initialize_slc(SlcState::default());
+        let mut connection = ServiceLevelConnection::new();
+        let (local, remote) = zx::Socket::create_datagram();
+        // Produce an error when polling the ServiceLevelConnection stream by disabling write
+        // on the remote socket and read on the local socket.
+        assert!(remote.set_disposition(Some(zx::SocketWriteDisposition::Disabled), None).is_ok());
+        let local = Channel::from_socket_infallible(local, Channel::DEFAULT_MAX_TX);
+        connection.initialize_at_state(local, SlcState::default());
         let (peer, _sender, receiver, _profile) = setup_peer_task(Some(connection));
 
         let run_fut = peer.run(receiver);
         let mut run_fut = pin!(run_fut);
-
-        // Produces an error when polling the ServiceLevelConnection stream by disabling write
-        // on the remote socket and read on the local socket.
-        let socket = remote.into_socket().unwrap();
-        assert!(socket.set_disposition(Some(zx::SocketWriteDisposition::Disabled), None).is_ok());
 
         // Error on the SLC connection will result in the completion of the peer task.
         let result = exec.run_until_stalled(&mut run_fut);

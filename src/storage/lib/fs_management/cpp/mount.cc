@@ -181,7 +181,7 @@ zx::result<> StartedMultiVolumeFilesystem::Unmount() {
 
 __EXPORT
 zx::result<MountedVolume*> StartedMultiVolumeFilesystem::OpenVolume(
-    std::string_view name, fuchsia_fxfs::wire::MountOptions options) {
+    std::string_view name, fuchsia_fs_startup::wire::MountOptions options) {
   if (volumes_.find(name) != volumes_.end()) {
     return zx::error(ZX_ERR_ALREADY_BOUND);
   }
@@ -196,7 +196,7 @@ zx::result<MountedVolume*> StartedMultiVolumeFilesystem::OpenVolume(
 
 __EXPORT
 zx::result<MountedVolume*> StartedMultiVolumeFilesystem::CreateVolume(
-    std::string_view name, fuchsia_fxfs::wire::MountOptions options) {
+    std::string_view name, fuchsia_fs_startup::wire::MountOptions options) {
   if (volumes_.find(name) != volumes_.end()) {
     return zx::error(ZX_ERR_ALREADY_BOUND);
   }
@@ -290,12 +290,12 @@ zx::result<StartedSingleVolumeMultiVolumeFilesystem> MountMultiVolumeWithDefault
 
   auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
 
-  auto volume = OpenVolume(
-      *outgoing_dir_or, volume_name, std::move(server),
-      options.crypt_client
-          ? fuchsia_fxfs::wire::MountOptions{.crypt = fidl::ClientEnd<fuchsia_fxfs::Crypt>(
-                                                 options.crypt_client())}
-          : fuchsia_fxfs::wire::MountOptions());
+  fidl::Arena arena;
+  auto mount_options = fuchsia_fs_startup::wire::MountOptions::Builder(arena);
+  if (options.crypt_client)
+    mount_options.crypt(fidl::ClientEnd<fuchsia_fxfs::Crypt>(options.crypt_client()));
+
+  auto volume = OpenVolume(*outgoing_dir_or, volume_name, std::move(server), mount_options.Build());
 
   if (volume.is_error()) {
     std::cerr << "Volume status " << volume.status_string() << std::endl;

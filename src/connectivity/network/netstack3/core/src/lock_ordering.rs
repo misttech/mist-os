@@ -181,6 +181,7 @@ pub struct NudConfig<I>(PhantomData<I>, Never);
 pub struct IpState<I>(PhantomData<I>, Never);
 pub struct IpStatePmtuCache<I>(PhantomData<I>, Never);
 pub struct IpStateFragmentCache<I>(PhantomData<I>, Never);
+pub struct IpStateRulesTable<I>(PhantomData<I>, Never);
 pub struct IpStateRoutingTables<I>(PhantomData<I>, Never);
 pub struct IpStateRoutingTable<I>(PhantomData<I>, Never);
 // Lock level attributed to the state of an individual raw IP sockets.
@@ -278,7 +279,9 @@ impl_lock_after!(IpMulticastRouteTable<Ipv4> => IpMulticastForwardingPendingPack
 impl_lock_after!(IpMulticastForwardingPendingPackets<Ipv4> => IpMulticastForwardingState<Ipv6>);
 impl_lock_after!(IpMulticastForwardingState<Ipv6> => IpMulticastRouteTable<Ipv6>);
 impl_lock_after!(IpMulticastRouteTable<Ipv6> => IpMulticastForwardingPendingPackets<Ipv6>);
-impl_lock_after!(IpMulticastForwardingPendingPackets<Ipv6> => IpStateRoutingTables<Ipv4>);
+impl_lock_after!(IpMulticastForwardingPendingPackets<Ipv6> => IpStateRulesTable<Ipv4>);
+impl_lock_after!(IpStateRulesTable<Ipv4> => IpStateRulesTable<Ipv6>);
+impl_lock_after!(IpStateRulesTable<Ipv6> => IpStateRoutingTables<Ipv4>);
 impl_lock_after!(IpStateRoutingTables<Ipv4> => IpStateRoutingTables<Ipv6>);
 impl_lock_after!(IpStateRoutingTables<Ipv6> => IpStateRoutingTable<Ipv4>);
 impl_lock_after!(IpStateRoutingTable<Ipv4> => IpStateRoutingTable<Ipv6>);

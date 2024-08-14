@@ -49,15 +49,24 @@ def _fuchsia_board_input_bundle_impl(ctx):
         ("--power-metrics-recorder-config", "power_metrics_recorder_config"),
         ("--thermal-config", "thermal_config"),
     ]:
-        if not getattr(ctx.file, file):
-            continue
-        creation_inputs.append(getattr(ctx.file, file))
-        creation_args.extend(
-            [
-                arg,
-                getattr(ctx.file, file).path,
-            ],
-        )
+        config_file = getattr(ctx.file, file)
+        if config_file:
+            creation_inputs.append(config_file)
+            creation_args.extend(
+                [
+                    arg,
+                    config_file.path,
+                ],
+            )
+
+    thread_role_files = getattr(ctx.files, "thread_roles")
+    if thread_role_files:
+        for config_file in thread_role_files:
+            creation_inputs.append(config_file)
+            creation_args.extend([
+                "--thread-roles",
+                config_file.path,
+            ])
 
     # Add package entries
     for dep in ctx.attr.base_packages:
@@ -158,6 +167,11 @@ fuchsia_board_input_bundle = rule(
         "thermal_config": attr.label(
             doc = "Path to thermal configuration",
             allow_single_file = True,
+        ),
+        "thread_roles": attr.label_list(
+            doc = "Path to thread role configuration files",
+            default = [],
+            allow_files = True,
         ),
         "_sdk_manifest": attr.label(
             allow_single_file = True,

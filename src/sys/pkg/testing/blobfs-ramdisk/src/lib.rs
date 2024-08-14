@@ -11,6 +11,7 @@ use anyhow::{anyhow, Context as _, Error};
 use delivery_blob::{delivery_blob_path, CompressionMode, Type1Blob};
 use fdio::{SpawnAction, SpawnOptions};
 use fidl::endpoints::ClientEnd;
+use fidl_fuchsia_fs_startup::MountOptions;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_merkle::Hash;
 use fuchsia_zircon::prelude::*;
@@ -160,7 +161,7 @@ impl BlobfsRamdiskBuilder {
                     let _: &mut fs_management::filesystem::ServingVolume = fs
                         .create_volume(
                             FXFS_BLOB_VOLUME_NAME,
-                            ffxfs::MountOptions { crypt: None, as_blob: true },
+                            MountOptions { as_blob: Some(true), ..MountOptions::default() },
                         )
                         .await
                         .context("creating blob volume")?;
@@ -168,7 +169,7 @@ impl BlobfsRamdiskBuilder {
                     let _: &mut fs_management::filesystem::ServingVolume = fs
                         .open_volume(
                             FXFS_BLOB_VOLUME_NAME,
-                            ffxfs::MountOptions { crypt: None, as_blob: true },
+                            MountOptions { as_blob: Some(true), ..MountOptions::default() },
                         )
                         .await
                         .context("opening blob volume")?;

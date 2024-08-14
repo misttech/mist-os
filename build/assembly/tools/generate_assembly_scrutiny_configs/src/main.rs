@@ -144,7 +144,8 @@ fn main() {
             // Files from AIBs are collected and merged in a separate process.
             BootfsDestination::FromAIB(_)
             | BootfsDestination::ForTest
-            | BootfsDestination::SshAuthorizedKeys => None,
+            | BootfsDestination::SshAuthorizedKeys
+            | BootfsDestination::ThreadRoles(_) => None,
             a @ _ => Some(a.to_string()),
         })
         .collect();

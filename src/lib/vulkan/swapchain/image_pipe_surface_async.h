@@ -15,7 +15,7 @@
 #include <mutex>
 
 #include "image_pipe_surface.h"
-#include "src/lib/ui/flatland-frame-scheduling/src/simple_present.h"
+#include "src/lib/ui/flatland-frame-scheduling/src/simple_present_hlcpp.h"
 
 namespace image_pipe_swapchain {
 

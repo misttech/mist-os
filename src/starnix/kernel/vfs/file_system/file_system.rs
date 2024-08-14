@@ -8,9 +8,10 @@
 
 use crate::security;
 use crate::task::{CurrentTask, Kernel};
+use crate::vfs::fs_args::MountParams;
 use crate::vfs::{
-    fs_args, DirEntry, DirEntryHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr,
-    FsString, WeakFsNodeHandle, XattrOp,
+    DirEntry, DirEntryHandle, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+    WeakFsNodeHandle, XattrOp,
 };
 use linked_hash_map::LinkedHashMap;
 use once_cell::sync::OnceCell;
@@ -84,7 +85,7 @@ pub struct FileSystemOptions {
     /// Flags kept per-superblock, i.e. included in MountFlags::STORED_ON_FILESYSTEM.
     pub flags: MountFlags,
     /// Filesystem options passed as the last argument to mount().
-    pub params: FsString,
+    pub params: MountParams,
 }
 
 impl FileSystemOptions {
@@ -138,8 +139,7 @@ impl FileSystem {
         ops: impl FileSystemOps,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
-        let mount_options = fs_args::generic_parse_mount_options(options.params.as_ref())?;
-        let security_state = security::file_system_init_security(ops.name(), &mount_options)?;
+        let security_state = security::file_system_init_security(ops.name(), &options.params)?;
         Ok(Arc::new(FileSystem {
             kernel: Arc::downgrade(kernel),
             root: OnceCell::new(),
@@ -203,7 +203,7 @@ impl FileSystem {
     ) -> WeakFsNodeHandle {
         // TODO(b/355180447): Move this logic so the parent inode (if any) can be taken into account.
         if let Some(xattr) =
-            security::fs_node_security_xattr(current_task, &node, None).unwrap_or(None)
+            security::fs_node_init_security_and_xattr(current_task, &node, None).unwrap_or(None)
         {
             let _ = node.ops().set_xattr(
                 node,

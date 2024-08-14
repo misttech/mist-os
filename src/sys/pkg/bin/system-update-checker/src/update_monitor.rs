@@ -28,8 +28,7 @@ where
     attempt_queue: ControlHandle<A>,
     update_state: InspectableDebugString<Option<State>>,
     version_available: InspectableDebugString<Option<String>>,
-    // TODO(https://fxbug.dev/42165549)
-    #[allow(unused)]
+    #[expect(dead_code)]
     inspect_node: fuchsia_inspect::Node,
 }
 

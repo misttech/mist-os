@@ -7,14 +7,14 @@
 
 #include <zircon/types.h>  // zx_handle_t
 
+// Referenced by _start, defined wherever in the main executable's link (it
+// could be in a DSO or statically linked into the main executable).
+int main(int, char**, char**);
+
 extern "C" {
 
 // Defined in Scrt1.o, linked into main executable.
 [[noreturn]] void _start(zx_handle_t bootstrap);
-
-// Referenced by _start, defined wherever in the main executable's link (it
-// could be in a DSO or statically linked into the main executable).
-int main(int, char**, char**);
 
 using main_t = decltype(main)*;
 

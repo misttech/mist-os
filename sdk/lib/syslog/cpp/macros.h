@@ -244,7 +244,7 @@ class LogBufferBuilder {
 namespace fuchsia_logging {
 
 // Used to denote a key-value pair for use in structured logging API calls.
-// This macro exists solely to improve readability of calls to FX_SLOG
+// This macro exists solely to improve readability of calls to FX_LOG_KV
 #define FX_KV(a, b) ::syslog_runtime::KeyValue(a, b)
 
 class LogMessageVoidify final {
@@ -384,13 +384,13 @@ void fx_slog_internal(fuchsia_logging::LogSeverity severity, const char* file, i
   buffer.Flush();
 }
 
-#define FX_SLOG_ETC(severity, args...)                      \
+#define FX_LOG_KV_ETC(severity, args...)                    \
   do {                                                      \
     if (::fuchsia_logging::IsSeverityEnabled(severity)) {   \
       fx_slog_internal(severity, __FILE__, __LINE__, args); \
     }                                                       \
   } while (0)
 
-#define FX_SLOG(severity, msg...) FX_SLOG_ETC(::fuchsia_logging::LOG_##severity, msg)
+#define FX_LOG_KV(severity, msg...) FX_LOG_KV_ETC(::fuchsia_logging::LOG_##severity, msg)
 
 #endif  // LIB_SYSLOG_CPP_MACROS_H_

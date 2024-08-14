@@ -27,6 +27,9 @@ use std::fmt;
 use thiserror::Error;
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_internal as finternal};
 
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
+
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("Invalid framework capability.")]
@@ -35,6 +38,7 @@ pub enum Error {
     InvalidBuiltinCapability {},
 }
 
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(Debug, Hash, PartialEq, Eq, Clone)]
 pub enum AggregateMember {
     Child(ChildRef),
@@ -93,6 +97,11 @@ impl NativeIntoFidl<finternal::AggregateMember> for AggregateMember {
 }
 
 /// Describes the source of a capability, as determined by `find_capability_source`
+#[cfg_attr(
+    feature = "serde",
+    derive(Deserialize, Serialize),
+    serde(tag = "type", rename_all = "snake_case")
+)]
 #[derive(FidlDecl, Debug, Derivative)]
 #[derivative(Clone(bound = ""), PartialEq)]
 #[fidl_decl(fidl_union = "finternal::CapabilitySource")]
@@ -130,34 +139,40 @@ pub enum CapabilitySource {
     Void(VoidSource),
 }
 
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, Debug, PartialEq, Clone)]
 #[fidl_decl(fidl_table = "finternal::Component")]
 pub struct ComponentSource {
     pub capability: ComponentCapability,
     pub moniker: Moniker,
 }
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, Debug, PartialEq, Clone)]
 #[fidl_decl(fidl_table = "finternal::Framework")]
 pub struct FrameworkSource {
     pub capability: InternalCapability,
     pub moniker: Moniker,
 }
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, Debug, PartialEq, Clone)]
 #[fidl_decl(fidl_table = "finternal::Builtin")]
 pub struct BuiltinSource {
     pub capability: InternalCapability,
 }
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, Debug, PartialEq, Clone)]
 #[fidl_decl(fidl_table = "finternal::Namespace")]
 pub struct NamespaceSource {
     pub capability: ComponentCapability,
 }
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, Debug, PartialEq, Clone)]
 #[fidl_decl(fidl_table = "finternal::Capability")]
 pub struct CapabilityToCapabilitySource {
     pub source_capability: ComponentCapability,
     pub moniker: Moniker,
 }
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, Debug, PartialEq, Clone)]
 #[fidl_decl(fidl_table = "finternal::AnonymizedAggregate")]
 pub struct AnonymizedAggregateSource {
@@ -166,6 +181,7 @@ pub struct AnonymizedAggregateSource {
     pub members: Vec<AggregateMember>,
     pub sources: Sources,
 }
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, Debug, PartialEq, Clone)]
 #[fidl_decl(fidl_table = "finternal::FilteredProvider")]
 pub struct FilteredProviderSource {
@@ -174,6 +190,7 @@ pub struct FilteredProviderSource {
     pub service_capability: ComponentCapability,
     pub offer_service_decl: OfferServiceDecl,
 }
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, Debug, PartialEq, Clone)]
 #[fidl_decl(fidl_table = "finternal::FilteredAggregateProvider")]
 pub struct FilteredAggregateProviderSource {
@@ -182,12 +199,14 @@ pub struct FilteredAggregateProviderSource {
     pub offer_service_decls: Vec<OfferServiceDecl>,
     pub sources: Sources,
 }
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, Debug, PartialEq, Clone)]
 #[fidl_decl(fidl_table = "finternal::Environment")]
 pub struct EnvironmentSource {
     pub capability: ComponentCapability,
     pub moniker: Moniker,
 }
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, Debug, PartialEq, Clone)]
 #[fidl_decl(fidl_table = "finternal::Void")]
 pub struct VoidSource {
@@ -400,6 +419,7 @@ impl fmt::Debug for Box<dyn FilteredAggregateCapabilityProvider> {
 /// Describes a capability provided by the component manager which could be a framework capability
 /// scoped to a realm, a built-in global capability, or a capability from component manager's own
 /// namespace.
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize), serde(rename_all = "snake_case"))]
 #[derive(FidlDecl, Clone, Debug, PartialEq, Eq)]
 #[fidl_decl(fidl_union = "finternal::InternalCapability")]
 pub enum InternalCapability {
@@ -548,6 +568,11 @@ impl From<cm_rust::ConfigurationDecl> for InternalCapability {
 }
 
 /// A capability being routed from a component.
+#[cfg_attr(
+    feature = "serde",
+    derive(Deserialize, Serialize),
+    serde(tag = "type", rename_all = "snake_case")
+)]
 #[derive(FidlDecl, FromEnum, Clone, Debug, PartialEq, Eq)]
 #[fidl_decl(fidl_union = "finternal::ComponentCapability")]
 pub enum ComponentCapability {
@@ -736,6 +761,11 @@ impl fmt::Display for ComponentCapability {
     }
 }
 
+#[cfg_attr(
+    feature = "serde",
+    derive(Deserialize, Serialize),
+    serde(tag = "type", rename_all = "snake_case")
+)]
 #[derive(FidlDecl, Clone, Debug, PartialEq, Eq)]
 #[fidl_decl(fidl_union = "finternal::EnvironmentCapability")]
 pub enum EnvironmentCapability {
@@ -754,6 +784,7 @@ impl EnvironmentCapability {
     }
 }
 
+#[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, Clone, Debug, PartialEq, Eq)]
 #[fidl_decl(fidl_table = "finternal::EnvironmentSource")]
 pub struct EnvironmentCapabilityData {
@@ -763,6 +794,11 @@ pub struct EnvironmentCapabilityData {
 
 /// Describes a capability provided by component manager that is an aggregation
 /// of multiple instances of a capability.
+#[cfg_attr(
+    feature = "serde",
+    derive(Deserialize, Serialize),
+    serde(tag = "type", rename_all = "snake_case")
+)]
 #[derive(FidlDecl, Debug, Clone, PartialEq, Eq, Hash)]
 #[fidl_decl(fidl_union = "finternal::AggregateCapability")]
 pub enum AggregateCapability {

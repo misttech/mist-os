@@ -91,6 +91,10 @@ class FakeGpio : public fidl::WireServer<Gpio> {
     mock_get_interrupt_.Call();
     completer.ReplySuccess(std::move(interrupt));
   }
+  void ConfigureInterrupt(fuchsia_hardware_gpio::wire::GpioConfigureInterruptRequest* request,
+                          ConfigureInterruptCompleter::Sync& completer) override {
+    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
   void ReleaseInterrupt(ReleaseInterruptCompleter::Sync& completer) override {
     if (!client_got_interrupt_) {
       return completer.ReplyError(ZX_ERR_NOT_FOUND);
@@ -103,9 +107,6 @@ class FakeGpio : public fidl::WireServer<Gpio> {
                       SetAltFunctionCompleter::Sync& completer) override {
     mock_set_alt_function_.Call(request->function);
     completer.ReplySuccess();
-  }
-  void SetPolarity(SetPolarityRequestView request, SetPolarityCompleter::Sync& completer) override {
-    completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_gpio::Gpio> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override {

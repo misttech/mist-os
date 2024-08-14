@@ -2,65 +2,76 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{format_err, Error};
 use fidl_fuchsia_bluetooth_sys::{self as sys, BrEdrSecurityMode, LeSecurityMode};
-use serde::{Deserialize, Serialize};
 use std::cmp::PartialEq;
-use std::fs::OpenOptions;
-use std::path::Path;
 
-static OVERRIDE_CONFIG_FILE_PATH: &'static str = "/config/data/build-config.json";
-static DEFAULT_CONFIG_FILE_PATH: &'static str = "/pkg/data/bt-gap-default.json";
-
-/// The `build_config` module enables build-time configuration of the Bluetooth Host Subsystem.
-/// Default configuration parameters are taken from //src/connectivity/bluetooth/core/bt-gap/
-/// config/default.json. `build_config` also enables overriding the default configuration without
-/// changing the Fuchsia source tree through the `config-data` component sandbox feature and
-/// associated `config_data` GN template with the arguments:
-/// ```
-///     for_pkg = "bt-gap",
-///     outputs = [
-///         "build-config.json"
-///     ]
-/// ``` (https://fuchsia.dev/fuchsia-src/development/components/config_data).
-/// `build_config::Config` clients access the configuration settings through the `load_default`
-/// free function.
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct Config {
     pub le: LeConfig,
     pub bredr: BrEdrConfig,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+impl TryFrom<bt_gap_config::Config> for Config {
+    type Error = Error;
+    fn try_from(value: bt_gap_config::Config) -> Result<Self, Self::Error> {
+        Ok(Self {
+            le: LeConfig {
+                privacy_enabled: value.le_privacy,
+                background_scan_enabled: value.le_background_scanning,
+                security_mode: le_security_mode_from_str(value.le_security_mode)?,
+            },
+            bredr: BrEdrConfig {
+                connectable: value.bredr_connectable,
+                security_mode: bredr_security_mode_from_str(value.bredr_security_mode)?,
+            },
+        })
+    }
+}
+
+fn le_security_mode_from_str(security_mode: String) -> Result<LeSecurityMode, Error> {
+    match security_mode.as_str() {
+        "Mode1" => Ok(LeSecurityMode::Mode1),
+        "SecureConnectionsOnly" => Ok(LeSecurityMode::SecureConnectionsOnly),
+        x => Err(format_err!("Unrecognized le_security_mode: {x:?}")),
+    }
+}
+
+fn bredr_security_mode_from_str(security_mode: String) -> Result<BrEdrSecurityMode, Error> {
+    match security_mode.as_str() {
+        "Mode4" => Ok(BrEdrSecurityMode::Mode4),
+        "SecureConnectionsOnly" => Ok(BrEdrSecurityMode::SecureConnectionsOnly),
+        x => Err(format_err!("Unrecognized bredr_security_mode: {x:?}")),
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct LeConfig {
-    #[serde(rename = "privacy-enabled")]
     pub privacy_enabled: bool,
-    #[serde(rename = "background-scan-enabled")]
     pub background_scan_enabled: bool,
-    #[serde(rename = "security-mode")]
-    #[serde(with = "LeSecurityModeDef")]
     pub security_mode: LeSecurityMode,
 }
 
-#[derive(Serialize, Deserialize, Debug, PartialEq, Clone)]
+impl Default for LeConfig {
+    fn default() -> Self {
+        Self {
+            privacy_enabled: true,
+            background_scan_enabled: true,
+            security_mode: LeSecurityMode::Mode1,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
 pub struct BrEdrConfig {
     pub connectable: bool,
-    #[serde(rename = "security-mode")]
-    #[serde(with = "BrEdrSecurityModeDef")]
     pub security_mode: BrEdrSecurityMode,
 }
 
-#[derive(Serialize, Deserialize)]
-#[serde(remote = "BrEdrSecurityMode")]
-pub enum BrEdrSecurityModeDef {
-    Mode4 = 1,
-    SecureConnectionsOnly = 2,
-}
-
-#[derive(Serialize, Deserialize)]
-#[serde(remote = "LeSecurityMode")]
-pub enum LeSecurityModeDef {
-    Mode1 = 1,
-    SecureConnectionsOnly = 2,
+impl Default for BrEdrConfig {
+    fn default() -> Self {
+        Self { connectable: true, security_mode: BrEdrSecurityMode::Mode4 }
+    }
 }
 
 impl Config {
@@ -92,16 +103,8 @@ impl Into<sys::Settings> for Config {
     }
 }
 
-pub fn load_default() -> Config {
-    load_internal(Path::new(OVERRIDE_CONFIG_FILE_PATH), Path::new(DEFAULT_CONFIG_FILE_PATH))
-}
-
-fn load_internal(override_file_path: &Path, default_file_path: &Path) -> Config {
-    let config_path =
-        if override_file_path.exists() { override_file_path } else { default_file_path };
-    let config_file = OpenOptions::new().read(true).write(false).open(config_path).unwrap();
-    serde_json::from_reader(config_file)
-        .expect("Malformatted bt-gap config file, cannot initialize Bluetooth stack")
+pub fn load_default() -> Result<Config, Error> {
+    bt_gap_config::Config::take_from_startup_handle().try_into()
 }
 
 #[cfg(test)]
@@ -114,7 +117,6 @@ mod tests {
     use futures::stream::TryStreamExt;
     use futures::{future, join};
     use std::collections::HashSet;
-    use tempfile::NamedTempFile;
 
     static BASIC_CONFIG: Config = Config {
         le: LeConfig {
@@ -124,35 +126,6 @@ mod tests {
         },
         bredr: BrEdrConfig { connectable: true, security_mode: BrEdrSecurityMode::Mode4 },
     };
-
-    #[test]
-    fn prefer_overridden_config() {
-        let default_file = NamedTempFile::new().unwrap();
-        serde_json::to_writer(&default_file, &BASIC_CONFIG).unwrap();
-        // There should be no file at OVERRIDE_CONFIG_FILE_PATH; `config_data` templates should not
-        // target this test package. This means config will load from the (existing) default path.
-        assert_eq!(
-            BASIC_CONFIG,
-            load_internal(Path::new(OVERRIDE_CONFIG_FILE_PATH), default_file.path())
-        );
-
-        // Write a different config file and set it as the override location to verify that `load`
-        // picks up and prefers the override file.
-        let override_config = Config {
-            le: LeConfig {
-                privacy_enabled: true,
-                background_scan_enabled: false,
-                security_mode: LeSecurityMode::SecureConnectionsOnly,
-            },
-            bredr: BrEdrConfig {
-                connectable: false,
-                security_mode: BrEdrSecurityMode::SecureConnectionsOnly,
-            },
-        };
-        let override_file = NamedTempFile::new().unwrap();
-        serde_json::to_writer(&override_file, &override_config).unwrap();
-        assert_eq!(override_config, load_internal(override_file.path(), default_file.path()));
-    }
 
     #[fuchsia::test]
     async fn apply_config() {

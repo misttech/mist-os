@@ -25,9 +25,9 @@ impl AsByteRange for Sector {
     }
 }
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 /// The `Controller` provides a way for tests to interact with the state of the memory buffer
 /// without retaining a reference to the backend.
+#[cfg(test)]
 pub struct Controller(Rc<RefCell<Vec<u8>>>);
 
 #[cfg(test)]
@@ -55,16 +55,24 @@ impl MemoryBackend {
     pub fn new() -> (Self, Controller) {
         const DEFAULT_CAPACITY: usize = 64 * 1024;
 
-        Self::with_size(DEFAULT_CAPACITY)
+        Self::with_size_and_controller(DEFAULT_CAPACITY)
     }
 
-    /// Creates a `MemoryBackend` with the requestsed size in bytes.
+    /// Creates a `MemoryBackend` +`Controller` with the requested size in bytes.
+    #[cfg(test)]
+    pub fn with_size_and_controller(size: usize) -> (Self, Controller) {
+        let this = Self::with_size(size);
+        let controller = Controller(this.0.clone());
+        (this, controller)
+    }
+
+    /// Creates a `MemoryBackend` with the requested size in bytes.
     ///
     /// `size` must be aligned to `wire::VIRTIO_BLOCK_SECTOR_SIZE`.
-    pub fn with_size(size: usize) -> (Self, Controller) {
+    pub fn with_size(size: usize) -> Self {
         let size = Sector::from_bytes_round_down(size as u64).to_bytes().unwrap() as usize;
         let buffer = Rc::new(RefCell::new(vec![0; size]));
-        (Self(buffer.clone()), Controller(buffer))
+        Self(buffer.clone())
     }
 }
 
@@ -146,7 +154,7 @@ mod tests {
         type Controller = super::Controller;
 
         async fn create_with_size(size: u64) -> Result<(MemoryBackend, Controller), Error> {
-            Ok(MemoryBackend::with_size(size as usize))
+            Ok(MemoryBackend::with_size_and_controller(size as usize))
         }
     }
 

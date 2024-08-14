@@ -74,5 +74,8 @@ group("chromium_test_base_deps") {
 
     # A font provider without built-in font file assets.
     "//src/fonts:fonts_configurable_for_test",
+
+    # test-ui-stack.
+    "//src/ui/testing/test_ui_stack:flatland-scene-manager-test-ui-stack",
   ]
 }
