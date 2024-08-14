@@ -38,6 +38,7 @@ config/build_info/minimum_utc_stamp
 ?config/cpu_manager/node_config.json
 ?config/power_manager/node_config.json
 ?config/power_manager/thermal_config.json
+?config/profiles/*
 config/profiles/bringup.profiles
 ?config/profiles/core.profiles
 ?config/profiles/starnix.profiles
