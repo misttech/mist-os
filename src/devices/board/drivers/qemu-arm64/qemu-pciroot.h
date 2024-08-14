@@ -7,27 +7,40 @@
 #include <lib/zx/bti.h>
 #include <zircon/status.h>
 
-#include <memory>
-
 #include <ddktl/device.h>
 
 namespace board_qemu_arm64 {
-class QemuArm64Pciroot : public PcirootBase {
+class QemuArm64Pciroot;
+using QemuArm64PcirootType = ddk::Device<QemuArm64Pciroot, ddk::GetProtocolable>;
+class QemuArm64Pciroot : public QemuArm64PcirootType, public PcirootBase {
  public:
   struct Context {
     pci_platform_info_t info;
   };
+  ~QemuArm64Pciroot() override = default;
   static zx_status_t Create(PciRootHost* root_host, QemuArm64Pciroot::Context ctx,
                             zx_device_t* parent, const char* name);
-  virtual zx_status_t PcirootGetBti(uint32_t bdf, uint32_t index, zx::bti* bti) final;
-  virtual zx_status_t PcirootGetPciPlatformInfo(pci_platform_info_t* info) final;
-  ~QemuArm64Pciroot() override = default;
+  zx_status_t PcirootGetBti(uint32_t bdf, uint32_t index, zx::bti* bti) final;
+  zx_status_t PcirootGetPciPlatformInfo(pci_platform_info_t* info) final;
+
+  // DDK implementations
+  void DdkRelease() { delete this; }
+  zx_status_t DdkGetProtocol(uint32_t proto_id, void* out) {
+    if (proto_id != ZX_PROTOCOL_PCIROOT) {
+      return ZX_ERR_NOT_SUPPORTED;
+    }
+
+    auto* proto = static_cast<ddk::AnyProtocol*>(out);
+    proto->ops = &pciroot_protocol_ops_;
+    proto->ctx = this;
+    return ZX_OK;
+  }
 
  private:
   Context context_;
   QemuArm64Pciroot(PciRootHost* root_host, QemuArm64Pciroot::Context ctx, zx_device_t* parent,
                    const char* name)
-      : PcirootBase(root_host, parent, name), context_(ctx) {}
+      : QemuArm64PcirootType(parent), PcirootBase(root_host), context_(ctx) {}
 };
 
 }  // namespace board_qemu_arm64

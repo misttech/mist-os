@@ -123,14 +123,9 @@ class PcirootInspect {
 // Many methods may overlap between platforms, but the metadata that a given platform may need to
 // track can vary. To support this a PcirootBase class templated off the context type is provided
 // here and platforms are expected to derive it and override the methods they need to implement.
-class PcirootBase : public ddk::Device<PcirootBase>,
-                    public ddk::PcirootProtocol<PcirootBase, ddk::base_protocol>,
-                    public PcirootInspect {
+class PcirootBase : public ddk::PcirootProtocol<PcirootBase>, public PcirootInspect {
  public:
-  PcirootBase(PciRootHost* host, zx_device_t* parent, const char* name)
-      : ddk::Device<PcirootBase>(parent), root_host_(host) {
-    InitializeInspect(root_host_);
-  }
+  explicit PcirootBase(PciRootHost* host) : root_host_(host) { InitializeInspect(root_host_); }
 
   virtual ~PcirootBase() = default;
   zx_status_t PcirootGetAuxdata(const char* args, void* out_data, size_t data_size,
@@ -230,14 +225,11 @@ class PcirootBase : public ddk::Device<PcirootBase>,
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  // DDK mix-in impls
-  void DdkRelease() { delete this; }
-
  private:
-  // TODO(https://fxbug.dev/42108122): presently, pciroot instances will always outlive the root host
-  // it references here because it exists within the same devhost process as a
-  // singleton. This will be updated when the pciroot implementation changes to
-  // move away from a standalone banjo protocol.
+  // TODO(https://fxbug.dev/42108122): presently, pciroot instances will always outlive the root
+  // host it references here because it exists within the same devhost process as a singleton. This
+  // will be updated when the pciroot implementation changes to move away from a standalone banjo
+  // protocol.
   PciRootHost* root_host_;
 };
 

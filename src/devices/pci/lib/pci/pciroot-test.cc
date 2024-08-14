@@ -17,7 +17,7 @@
 class TestPciroot final : public PcirootBase, public inspect::InspectTestHelper {
  public:
   TestPciroot(PciRootHost* root_host, zx_device_t* parent, const char* name)
-      : PcirootBase(root_host, parent, name) {}
+      : PcirootBase(root_host) {}
   ~TestPciroot() final = default;
 };
 
