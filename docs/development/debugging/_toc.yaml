@@ -17,6 +17,8 @@ toc:
 - title: "Using the native debugger (zxdb)"
   section:
   - include: /docs/development/debugger/_toc.yaml
+- title: "Developing the native debugger (zxdb)"
+  path: /docs/development/debugger/developing.md
 - title: "Debug the kernel"
   section:
   - title: "Debug the kernel using QEMU"

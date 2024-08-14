@@ -28,8 +28,6 @@ toc:
   path: /docs/development/debugger/assembly.md
 - title: "Work with exceptions"
   path: /docs/development/debugger/exceptions.md
-- title: "Developing and debugging the debugger"
-  path: /docs/development/debugger/developing.md
 - title: "Advanced topics"
   path: /docs/development/debugger/advanced.md
 - title: "Troubleshooting zxdb"

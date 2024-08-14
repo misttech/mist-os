@@ -10,7 +10,7 @@ Interpreted code such as Dart and JavaScript is not supported.
 ## Run zxdb
 
 There are several ways to attach `zxdb` to a component through
-`ffx component debug`.
+`ffx component debug`:
 
 Note: If you have any issues with launching `zxdb`, see
 [Troubleshooting][zxdb-troubleshooting].
@@ -134,14 +134,18 @@ Once you have successfully connected to the `zxdb` debugger, you may want to:
 * [Work with exceptions][zxdb-exceptions]
 * [See advanced zxdb topics][zxdb-advanced]
 
-Additionally, you can also follow the zxdb tutorials:
+You can also follow the zxdb tutorials:
 
 * [Tutorial: Debug tests using zxdb][zxdb-testing-tutorial]
 
+Additionally, if you are interested in contributing to zxdb:
+
+* [Developing and debugging zxdb][zxdb-developing]
 
 [zxdb-troubleshooting]: /docs/development/debugger/troubleshooting.md
 [zxdb-commands]: /docs/development/debugger/commands.md
 [zxdb-advanced]: /docs/development/debugger/advanced.md
+[zxdb-developing]: /docs/development/debugger/developing.md
 [zxdb-execution]: /docs/development/debugger/execution.md
 [zxdb-breakpoints]: /docs/development/debugger/breakpoints.md
 [zxdb-expressions]: /docs/development/debugger/expressions.md
