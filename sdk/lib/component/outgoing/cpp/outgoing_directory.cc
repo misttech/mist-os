@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/component/outgoing/cpp/globals.h>
 #include <lib/component/outgoing/cpp/handlers.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/svc/dir.h>
@@ -43,23 +42,21 @@ OutgoingDirectory::Inner::Inner(async_dispatcher_t* dispatcher, svc_dir_t* root)
     : dispatcher_(dispatcher),
       checker_(dispatcher, kOutgoingDirectoryThreadSafetyDescription),
       root_(root) {
-  if (enable_synchronization_check_dispatcher_task) {
-    synchronization_check_dispatcher_task_.emplace(
-        [this](async_dispatcher_t* dispatcher, async::Task* task, zx_status_t status) {
-          if (status == ZX_ERR_CANCELED) {
-            // This can happen if the dispatcher was shut down. Since the dispatcher is being
-            // joined, we can avoid checking threads and still know that there's no
-            // concurrent access.
-            return;
-          }
-          ZX_ASSERT_MSG(status == ZX_OK,
-                        "The synchronization checker task encountered an "
-                        "unexpected status: %s",
-                        zx_status_get_string(status));
-          std::lock_guard guard(checker_);
-        });
-    synchronization_check_dispatcher_task_.value().Post(dispatcher);
-  }
+  synchronization_check_dispatcher_task_.emplace(
+      [this](async_dispatcher_t* dispatcher, async::Task* task, zx_status_t status) {
+        if (status == ZX_ERR_CANCELED) {
+          // This can happen if the dispatcher was shut down. Since the dispatcher is being
+          // joined, we can avoid checking threads and still know that there's no
+          // concurrent access.
+          return;
+        }
+        ZX_ASSERT_MSG(status == ZX_OK,
+                      "The synchronization checker task encountered an "
+                      "unexpected status: %s",
+                      zx_status_get_string(status));
+        std::lock_guard guard(checker_);
+      });
+  synchronization_check_dispatcher_task_.value().Post(dispatcher);
 }
 
 OutgoingDirectory::OutgoingDirectory(OutgoingDirectory&& other) noexcept = default;

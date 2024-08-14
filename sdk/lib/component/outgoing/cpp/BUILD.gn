@@ -13,8 +13,6 @@ sdk_source_set("cpp") {
   stable = true
 
   sources = [
-    "globals.cc",
-    "globals.h",
     "handlers.h",
     "outgoing_directory.cc",
     "outgoing_directory.h",
@@ -42,29 +40,4 @@ sdk_source_set("cpp") {
   ]
 
   public_configs = _shared_public_configs
-}
-
-source_set("cpp_disable_synchronization_check") {
-  public_deps = [ ":cpp" ]
-  public_configs = _shared_public_configs
-
-  sources = [ "disable_synchronization_check.cc" ]
-
-  # Allowlist of components permitted to skip the synchronization check, which
-  # is turned on by default.
-  #
-  # Some components (mostly tests) use OutgoingDirectory with a multithreaded
-  # dispatcher, without honoring the requirement that the dispatcher servicing
-  # the outgoing directory is the same one that created it. These are granted a
-  # legacy exemption to run them with the check disabled so we can enable the
-  # checker in the SDK.
-  #
-  # Do not add to this allowlist without a good reason.
-  #
-  # TODO(https://fxbug.dev/42065251): Fix all deps in this allowlist and remove it.
-  visibility = [
-    "//src/devices/light-sensor/drivers/ams-light:ams-light-test-bin",
-    "//src/devices/sysmem/drivers/sysmem:sysmem_common_srcs",
-    "//src/ui/input/drivers/gt6853:gt6853-test",
-  ]
 }
