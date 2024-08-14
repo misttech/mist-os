@@ -394,6 +394,7 @@ fn bpf_ktime_get_boot_ns(
 
 pub static BPF_HELPERS: Lazy<Vec<EbpfHelper<HelperFunctionContextMarker>>> = Lazy::new(|| {
     let sk_buf_id = SK_BUF_ID.clone();
+    let ring_buffer_reservation = RING_BUFFER_RESERVATION.clone();
     vec![
         EbpfHelper {
             index: bpf_func_id_BPF_FUNC_map_lookup_elem,
@@ -491,10 +492,13 @@ pub static BPF_HELPERS: Lazy<Vec<EbpfHelper<HelperFunctionContextMarker>>> = Laz
                     Type::ScalarValueParameter,
                     Type::ScalarValueParameter,
                 ],
-                return_value: Type::NullOrParameter(Box::new(Type::MemoryParameter {
-                    size: MemoryParameterSize::Reference { index: 1 },
-                    input: false,
-                    output: false,
+                return_value: Type::NullOrParameter(Box::new(Type::ReleasableParameter {
+                    id: ring_buffer_reservation.clone(),
+                    inner: Box::new(Type::MemoryParameter {
+                        size: MemoryParameterSize::Reference { index: 1 },
+                        input: false,
+                        output: false,
+                    }),
                 })),
                 invalidate_array_bounds: false,
             },
@@ -504,8 +508,10 @@ pub static BPF_HELPERS: Lazy<Vec<EbpfHelper<HelperFunctionContextMarker>>> = Laz
             name: RINGBUF_SUBMIT_NAME,
             function_pointer: Arc::new(bpf_ringbuf_submit),
             signature: FunctionSignature {
-                // TODO(347257215): Implement verifier feature
-                args: vec![],
+                args: vec![
+                    Type::ReleaseParameter { id: ring_buffer_reservation.clone() },
+                    Type::ScalarValueParameter,
+                ],
                 return_value: Type::default(),
                 invalidate_array_bounds: false,
             },
@@ -515,8 +521,10 @@ pub static BPF_HELPERS: Lazy<Vec<EbpfHelper<HelperFunctionContextMarker>>> = Laz
             name: RINGBUF_DISCARD_NAME,
             function_pointer: Arc::new(bpf_ringbuf_discard),
             signature: FunctionSignature {
-                // TODO(347257215): Implement verifier feature
-                args: vec![],
+                args: vec![
+                    Type::ReleaseParameter { id: ring_buffer_reservation.clone() },
+                    Type::ScalarValueParameter,
+                ],
                 return_value: Type::default(),
                 invalidate_array_bounds: false,
             },
@@ -770,6 +778,7 @@ struct SkBuf {
     pub data_end: uref<u8>,
 }
 static SK_BUF_ID: Lazy<MemoryId> = Lazy::new(new_bpf_type_identifier);
+static RING_BUFFER_RESERVATION: Lazy<MemoryId> = Lazy::new(new_bpf_type_identifier);
 static SK_BUF_ARGS: Lazy<Vec<Type>> = Lazy::new(|| {
     let mut builder = ArgBuilder::default();
     // Set the id of the main struct.

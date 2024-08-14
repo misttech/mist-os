@@ -607,6 +607,29 @@ pub mod test {
         0.into()
     }
 
+    fn malloc(
+        _context: &mut (),
+        size: BpfValue,
+        _: BpfValue,
+        _: BpfValue,
+        _: BpfValue,
+        _: BpfValue,
+    ) -> BpfValue {
+        unsafe { libc::malloc(usize::from(size) as libc::size_t) }.into()
+    }
+
+    fn free(
+        _context: &mut (),
+        ptr: BpfValue,
+        _: BpfValue,
+        _: BpfValue,
+        _: BpfValue,
+        _: BpfValue,
+    ) -> BpfValue {
+        unsafe { libc::free(usize::from(ptr) as *mut libc::c_void) };
+        0.into()
+    }
+
     pub fn parse_asm(data: &str) -> Vec<bpf_insn> {
         let mut pairs =
             TestGrammar::parse(Rule::ASM_INSTRUCTIONS, data).expect("Parsing must be successful");
@@ -762,10 +785,14 @@ pub mod test {
     #[test_case(local_test_data!("err-read-only-helper.data"))]
     #[test_case(local_test_data!("err-write-r10.data"))]
     #[test_case(local_test_data!("exponential-verification.data"))]
+    #[test_case(local_test_data!("forget-release.data"))]
+    #[test_case(local_test_data!("malloc-double-free.data"))]
+    #[test_case(local_test_data!("malloc-use-free.data"))]
     #[test_case(local_test_data!("null-checks-propagated.data"))]
     #[test_case(local_test_data!("read-only-helper.data"))]
     #[test_case(local_test_data!("stack-access.data"))]
     #[test_case(local_test_data!("write-only-helper.data"))]
+    // #[test_case(local_test_data!(""))]
     fn test_ebpf_conformance(content: &str) {
         let Some(mut test_case) = TestCase::parse(content) else {
             // Special case that only test the test framework.
@@ -787,6 +814,8 @@ pub mod test {
         } else {
             builder.set_args(&[Type::from(0), Type::from(0)]);
         }
+
+        let malloc_id = new_bpf_type_identifier();
 
         builder
             .register(&EbpfHelper {
@@ -907,6 +936,37 @@ pub mod test {
                         },
                         Type::ScalarValueParameter,
                     ],
+                    return_value: Type::unknown_written_scalar_value(),
+                    invalidate_array_bounds: false,
+                },
+            })
+            .expect("register");
+        builder
+            .register(&EbpfHelper {
+                index: 103,
+                name: "malloc",
+                function_pointer: Arc::new(malloc),
+                signature: FunctionSignature {
+                    args: vec![Type::ScalarValueParameter],
+                    return_value: Type::NullOrParameter(Box::new(Type::ReleasableParameter {
+                        id: malloc_id.clone(),
+                        inner: Box::new(Type::MemoryParameter {
+                            size: MemoryParameterSize::Reference { index: 0 },
+                            input: true,
+                            output: true,
+                        }),
+                    })),
+                    invalidate_array_bounds: false,
+                },
+            })
+            .expect("register");
+        builder
+            .register(&EbpfHelper {
+                index: 104,
+                name: "free",
+                function_pointer: Arc::new(free),
+                signature: FunctionSignature {
+                    args: vec![Type::ReleaseParameter { id: malloc_id.clone() }],
                     return_value: Type::unknown_written_scalar_value(),
                     invalidate_array_bounds: false,
                 },
