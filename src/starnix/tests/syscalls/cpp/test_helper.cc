@@ -315,7 +315,8 @@ void RecursiveUnmountAndRemove(const std::string &path) {
     // Repeatedly call umount to handle shadowed mounts properly.
     do {
       errno = 0;
-      ASSERT_THAT(umount(path.c_str()), AnyOf(SyscallSucceeds(), SyscallFailsWithErrno(EINVAL)))
+      ASSERT_THAT(umount2(path.c_str(), MNT_DETACH),
+                  AnyOf(SyscallSucceeds(), SyscallFailsWithErrno(EINVAL)))
           << path;
     } while (errno != EINVAL);
   }
