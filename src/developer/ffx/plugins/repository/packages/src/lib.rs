@@ -21,7 +21,7 @@ use fuchsia_repo::repo_client::{PackageEntry, RepoClient};
 use fuchsia_repo::repository::{PmRepository, RepoProvider};
 use humansize::{file_size_opts, FileSize};
 use pkg::repo::repo_spec_to_backend;
-use prettytable::format::TableFormat;
+use prettytable::format::{FormatBuilder, TableFormat};
 use prettytable::{cell, row, Row, Table};
 use std::fs::File;
 use std::io::{BufWriter, Cursor, Read};
@@ -73,8 +73,8 @@ async fn packages_impl(
     mut writer: PackagesWriter,
 ) -> Result<()> {
     match cmd.subcommand {
-        PackagesSubCommand::List(subcmd) => list_impl(subcmd, context, None, &mut writer).await,
-        PackagesSubCommand::Show(subcmd) => show_impl(subcmd, context, None, &mut writer).await,
+        PackagesSubCommand::List(subcmd) => list_impl(subcmd, context, &mut writer).await,
+        PackagesSubCommand::Show(subcmd) => show_impl(subcmd, context, &mut writer).await,
         PackagesSubCommand::ExtractArchive(subcmd) => extract_archive_impl(subcmd, context).await,
     }
 }
@@ -82,7 +82,6 @@ async fn packages_impl(
 async fn show_impl(
     cmd: ShowSubCommand,
     context: EnvironmentContext,
-    table_format: Option<TableFormat>,
     writer: &mut PackagesWriter,
 ) -> Result<()> {
     let repo = connect_to_repo(cmd.repository.clone(), context).await?;
@@ -101,27 +100,31 @@ async fn show_impl(
         let blobs = Vec::from_iter(blobs.into_iter().map(PackagesOutput::Show));
         writer.machine(&blobs).context("writing machine representation of blobs")?;
     } else {
-        print_blob_table(&cmd, &blobs, table_format, writer).context("printing repository table")?
+        print_blob_table(&cmd, &blobs, writer).context("printing repository table")?
     }
 
     Ok(())
 }
 
+fn table_format() -> TableFormat {
+    let padl = 0;
+    let padr = 1;
+    FormatBuilder::new().padding(padl, padr).build()
+}
+
 fn print_blob_table(
     cmd: &ShowSubCommand,
     blobs: &[PackageEntry],
-    table_format: Option<TableFormat>,
     writer: &mut PackagesWriter,
 ) -> Result<()> {
     let mut table = Table::new();
+
     let mut header = row!("NAME", "SIZE", "HASH", "MODIFIED");
     if cmd.include_subpackages {
         header.insert_cell(1, cell!("SUBPACKAGE"));
     }
     table.set_titles(header);
-    if let Some(fmt) = table_format {
-        table.set_format(fmt);
-    }
+    table.set_format(table_format());
 
     let mut rows = vec![];
 
@@ -156,7 +159,6 @@ fn print_blob_table(
 async fn list_impl(
     cmd: ListSubCommand,
     context: EnvironmentContext,
-    table_format: Option<TableFormat>,
     writer: &mut PackagesWriter,
 ) -> Result<()> {
     let repo = connect_to_repo(cmd.repository.clone(), context).await?;
@@ -190,8 +192,7 @@ async fn list_impl(
         let packages = Vec::from_iter(packages.into_iter().map(PackagesOutput::List));
         writer.machine(&packages).context("writing machine representation of packages")?;
     } else {
-        print_package_table(&cmd, packages, table_format, writer)
-            .context("printing repository table")?
+        print_package_table(&cmd, packages, writer).context("printing repository table")?
     }
 
     Ok(())
@@ -200,7 +201,6 @@ async fn list_impl(
 fn print_package_table(
     cmd: &ListSubCommand,
     packages: Vec<RepositoryPackage>,
-    table_format: Option<TableFormat>,
     writer: &mut PackagesWriter,
 ) -> Result<()> {
     let mut table = Table::new();
@@ -209,9 +209,7 @@ fn print_package_table(
         header.add_cell(cell!("COMPONENTS"));
     }
     table.set_titles(header);
-    if let Some(fmt) = table_format {
-        table.set_format(fmt);
-    }
+    table.set_format(table_format());
 
     let mut rows = vec![];
 
@@ -386,7 +384,6 @@ mod test {
     use fuchsia_async as fasync;
     use fuchsia_repo::test_utils;
     use pretty_assertions::assert_eq;
-    use prettytable::format::FormatBuilder;
     use std::path::Path;
 
     const PKG1_HASH: &str = "2881455493b5870aaea36537d70a2adc635f516ac2092598f4b6056dabc6b25d";
@@ -421,13 +418,10 @@ mod test {
         context: EnvironmentContext,
         writer: &mut PackagesWriter,
     ) {
-        timeout::timeout(
-            std::time::Duration::from_millis(1000),
-            list_impl(cmd, context, Some(FormatBuilder::new().padding(1, 1).build()), writer),
-        )
-        .await
-        .unwrap()
-        .unwrap();
+        timeout::timeout(std::time::Duration::from_millis(1000), list_impl(cmd, context, writer))
+            .await
+            .unwrap()
+            .unwrap();
     }
 
     async fn run_impl_for_show_command(
@@ -435,13 +429,10 @@ mod test {
         context: EnvironmentContext,
         writer: &mut PackagesWriter,
     ) {
-        timeout::timeout(
-            std::time::Duration::from_millis(1000),
-            show_impl(cmd, context, Some(FormatBuilder::new().padding(1, 1).build()), writer),
-        )
-        .await
-        .unwrap()
-        .unwrap();
+        timeout::timeout(std::time::Duration::from_millis(1000), show_impl(cmd, context, writer))
+            .await
+            .unwrap()
+            .unwrap();
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -477,9 +468,10 @@ mod test {
         assert_eq!(
             stdout,
             format!(
-                " NAME        SIZE      HASH         MODIFIED \n \
-                package1/0  24.03 KB  {pkg1_hash}  {pkg1_modified} \n \
-                package2/0  24.03 KB  {pkg2_hash}  {pkg2_modified} \n",
+                "\
+NAME       SIZE     HASH        MODIFIED \n\
+package1/0 24.03 KB {pkg1_hash} {pkg1_modified} \n\
+package2/0 24.03 KB {pkg2_hash} {pkg2_modified} \n",
             ),
         );
 
@@ -519,9 +511,10 @@ mod test {
         assert_eq!(
             stdout,
             format!(
-                " NAME        SIZE      HASH                                                              MODIFIED \n \
-                package1/0  24.03 KB  {pkg1_hash}  {pkg1_modified} \n \
-                package2/0  24.03 KB  {pkg2_hash}  {pkg2_modified} \n",
+                "\
+NAME       SIZE     HASH                                                             MODIFIED \n\
+package1/0 24.03 KB {pkg1_hash} {pkg1_modified} \n\
+package2/0 24.03 KB {pkg2_hash} {pkg2_modified} \n",
             ),
         );
 
@@ -561,9 +554,10 @@ mod test {
         assert_eq!(
             stdout,
             format!(
-                " NAME        SIZE      HASH         {:1$}  COMPONENTS \n \
-                package1/0  24.03 KB  {pkg1_hash}  {pkg1_modified}  meta/package1.cm \n \
-                package2/0  24.03 KB  {pkg2_hash}  {pkg2_modified}  meta/package2.cm \n",
+                "\
+NAME       SIZE     HASH        {:1$} COMPONENTS \n\
+package1/0 24.03 KB {pkg1_hash} {pkg1_modified} meta/package1.cm \n\
+package2/0 24.03 KB {pkg2_hash} {pkg2_modified} meta/package2.cm \n",
                 "MODIFIED",
                 pkg1_modified.len().max(pkg2_modified.len())
             ),
@@ -612,15 +606,16 @@ mod test {
         assert_eq!(
             stdout,
             format!(
-                " NAME                           SIZE   HASH         MODIFIED \n \
-                  bin/package1                   15 B   {pkg1_bin_hash}  {pkg1_bin_modified} \n \
-                  lib/package1                   12 B   {pkg1_lib_hash}  {pkg1_lib_modified} \n \
-                  meta.far                       24 KB  {pkg1_hash}  {pkg1_modified} \n \
-                  meta/contents                  156 B  <unknown>    {pkg1_modified} \n \
-                  meta/fuchsia.abi/abi-revision  8 B    <unknown>    {pkg1_modified} \n \
-                  meta/package                   33 B   <unknown>    {pkg1_modified} \n \
-                  meta/package1.cm               11 B   <unknown>    {pkg1_modified} \n \
-                  meta/package1.cmx              12 B   <unknown>    {pkg1_modified} \n"
+                "\
+NAME                          SIZE  HASH        MODIFIED \n\
+bin/package1                  15 B  {pkg1_bin_hash} {pkg1_bin_modified} \n\
+lib/package1                  12 B  {pkg1_lib_hash} {pkg1_lib_modified} \n\
+meta.far                      24 KB {pkg1_hash} {pkg1_modified} \n\
+meta/contents                 156 B <unknown>   {pkg1_modified} \n\
+meta/fuchsia.abi/abi-revision 8 B   <unknown>   {pkg1_modified} \n\
+meta/package                  33 B  <unknown>   {pkg1_modified} \n\
+meta/package1.cm              11 B  <unknown>   {pkg1_modified} \n\
+meta/package1.cmx             12 B  <unknown>   {pkg1_modified} \n"
             ),
         );
 
@@ -664,20 +659,19 @@ mod test {
             to_rfc2822(std::fs::metadata(pkg1_lib_path).unwrap().modified().unwrap());
 
         let (stdout, stderr) = test_buffers.into_strings();
-        assert_eq!(
-            stdout,
-            format!(
-                " NAME                           SIZE   HASH                                                              MODIFIED \n \
-                  bin/package1                   15 B   {pkg1_bin_hash}  {pkg1_bin_modified} \n \
-                  lib/package1                   12 B   {pkg1_lib_hash}  {pkg1_lib_modified} \n \
-                  meta.far                       24 KB  {pkg1_hash}  {pkg1_modified} \n \
-                  meta/contents                  156 B  <unknown>                                                         {pkg1_modified} \n \
-                  meta/fuchsia.abi/abi-revision  8 B    <unknown>                                                         {pkg1_modified} \n \
-                  meta/package                   33 B   <unknown>                                                         {pkg1_modified} \n \
-                  meta/package1.cm               11 B   <unknown>                                                         {pkg1_modified} \n \
-                  meta/package1.cmx              12 B   <unknown>                                                         {pkg1_modified} \n"
-            ),
-        );
+
+        let expected = format!("\
+NAME                          SIZE  HASH                                                             MODIFIED \n\
+bin/package1                  15 B  {pkg1_bin_hash} {pkg1_bin_modified} \n\
+lib/package1                  12 B  {pkg1_lib_hash} {pkg1_lib_modified} \n\
+meta.far                      24 KB {pkg1_hash} {pkg1_modified} \n\
+meta/contents                 156 B <unknown>                                                        {pkg1_modified} \n\
+meta/fuchsia.abi/abi-revision 8 B   <unknown>                                                        {pkg1_modified} \n\
+meta/package                  33 B  <unknown>                                                        {pkg1_modified} \n\
+meta/package1.cm              11 B  <unknown>                                                        {pkg1_modified} \n\
+meta/package1.cmx             12 B  <unknown>                                                        {pkg1_modified} \n"
+        ).to_owned();
+        assert_eq!(stdout, expected);
 
         assert_eq!(stderr, "");
     }
@@ -722,15 +716,16 @@ mod test {
         assert_eq!(
             stdout,
             format!(
-                " NAME                           SUBPACKAGE  SIZE   HASH         MODIFIED \n \
-                  bin/package1                   <root>      15 B   {pkg1_bin_hash}  {pkg1_bin_modified} \n \
-                  lib/package1                   <root>      12 B   {pkg1_lib_hash}  {pkg1_lib_modified} \n \
-                  meta.far                       <root>      24 KB  {pkg1_hash}  {pkg1_modified} \n \
-                  meta/contents                  <root>      156 B  <unknown>    {pkg1_modified} \n \
-                  meta/fuchsia.abi/abi-revision  <root>      8 B    <unknown>    {pkg1_modified} \n \
-                  meta/package                   <root>      33 B   <unknown>    {pkg1_modified} \n \
-                  meta/package1.cm               <root>      11 B   <unknown>    {pkg1_modified} \n \
-                  meta/package1.cmx              <root>      12 B   <unknown>    {pkg1_modified} \n"
+                "\
+NAME                          SUBPACKAGE SIZE  HASH        MODIFIED \n\
+bin/package1                  <root>     15 B  {pkg1_bin_hash} {pkg1_bin_modified} \n\
+lib/package1                  <root>     12 B  {pkg1_lib_hash} {pkg1_lib_modified} \n\
+meta.far                      <root>     24 KB {pkg1_hash} {pkg1_modified} \n\
+meta/contents                 <root>     156 B <unknown>   {pkg1_modified} \n\
+meta/fuchsia.abi/abi-revision <root>     8 B   <unknown>   {pkg1_modified} \n\
+meta/package                  <root>     33 B  <unknown>   {pkg1_modified} \n\
+meta/package1.cm              <root>     11 B  <unknown>   {pkg1_modified} \n\
+meta/package1.cmx             <root>     12 B  <unknown>   {pkg1_modified} \n"
             ),
         );
 
