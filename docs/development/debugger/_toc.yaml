@@ -22,11 +22,11 @@ toc:
   path: /docs/development/debugger/memory.md
 - title: "List handles and kernerl objects"
   path: /docs/development/debugger/kernel_objects.md
+- title: "Understand how symbols are loaded"
+  path: /docs/development/debugger/symbols.md
 - title: "Work with assembly language"
   path: /docs/development/debugger/assembly.md
-- title: "Diagnosing symbol problems"
-  path: /docs/development/debugger/symbols.md
-- title: "Working with exceptions"
+- title: "Work with exceptions"
   path: /docs/development/debugger/exceptions.md
 - title: "Developing and debugging the debugger"
   path: /docs/development/debugger/developing.md

@@ -1,30 +1,34 @@
-# Working with exceptions in zxdb
+# Work with exceptions
 
-## Overview
+[Exceptions in Zircon](/docs/concepts/kernel/exceptions.md) are handled in
+several phases:
 
-[Exceptions in Zircon](/docs/concepts/kernel/exceptions.md) are handled in several phases:
+1. zxdb is notified of an exception which is called the "first chance".
+   At this stage, zxdb may handle this exception. For example, if the debugger
+   continues after a single-step or breakpoint exception, the case exception
+   processing stops.
 
-  1. The debugger is notified of the exception ("first chance"). The debugger might handle the
-  exception at this stage (for example, the debugger might continue continue after a single-step or
-  breakpoint exception) in which case exception processing stops.
+1. zxdb can choose to forward the exception to the normal handlers as if a
+   debugger were not present. Then, the component itself may resolve the
+   exception.
 
-  2. The debugger can choose to forward the exception to the normal handlers as if a debugger were
-  not present. The program itself may resolve the exception at this point.
-
-  3. If still unhandled, the debugger will get the exception again as a "second chance" exception.
+1. If at this stage, the exception is still unhandled, zxdb gets the exception
+   again as a "second chance" exception.
 
 ## Forwarding exceptions
 
-Continuing execution (via `continue`, `step`, `next`, etc.) after an exception will re-run the
-excepting instruction. Normally, this will cause the same exception again and the program will not
-make progress. In particular, this will cause problems with gtest "death tests" where an exception is
-the expected result of the test. The test harness expects to catch this exception and continue
-with the test.
+If an exception is found and execution is continued through `continue`, `step`,
+`next`, etc..., zxdb re-runs the excepting instruction. Normally, this causes
+the same exception again and the component execution cannot make progress.
 
-To forward the exception to the program, the exception needs to be explicitly forwarded. This is
-done with the `--forward` (`-f` for short) flag to the `continue` command:
+This behavior can cause problems with `gtest`, where an exception is
+the expected result of the test. This is called a "death test". However, the
+test harness expects to catch this exception and continue with the test.
 
-For example, upon the expected crash, a death test will report:
+To forward the exception to the component, the exception needs to be explicitly
+forwarded. You can forward the exception with `--forward` to `continue` command:
+
+For example, upon the expected crash, a death test reports:
 
 ```none {:.devsite-disable-click-to-copy}
 ══════════════════════════
@@ -41,34 +45,46 @@ For example, upon the expected crash, a death test will report:
    30 // We zero-initialize the Extra parameter of map(), make sure this is consistent
 ```
 
-And to continue on with the test:
+You can then continue with the test by using `--forward`:
+
+Note: The `--forward` option can also be expressed with `-f`.
 
 ```none {:.devsite-disable-click-to-copy}
 [zxdb] continue --forward
-
-[zxdb] c -f             # Alternate Short form.
 ```
 
 ## Automatically forwarding certain types of exceptions
 
-The debugger can automatically forward certain exception types to the program and only handle
-them as second-chance exceptions. By default, only page faults are included.
+zxdb can automatically forward certain exception types to the component and only
+handle them as second chance exceptions. By default, only page faults are
+included.
 
-The debugger's `second-chance-exception` setting contains the list of exceptions that will be
-handled only as second-chance by default. This setting holds a list of exception type abbreviations:
+The debugger's `second-chance-exception` setting contains the list of exceptions
+that are handled only as second-chance by default. This setting holds a list of
+exception type abbreviations:
 
- * "gen": general
- * "pf": page faults
- * "ui": undefined instruction
- * "ua": unaligned access
+ * `gen`: General
+ * `pf`: Page faults
+ * `ui`: Undefined instruction
+ * `ua`: Unaligned access
 
 See the debugger's `help get` and `help set` for more details on dealing with list settings. Some
 examples:
 
+To list the current values of `second-chance-exceptions`:
+
 ```none {:.devsite-disable-click-to-copy}
-[zxdb] get second-chance-exceptions           # List the current values.
+[zxdb] get second-chance-exceptions
+```
 
-[zxdb] set second-chance-exceptions += gen    # Add "general" to the list.
+To add the general exception type to `second-chance-exceptions`:
 
-[zxdb] set second-chance-exceptions -= pf     # Remove "page fault" from the list.
+```none {:.devsite-disable-click-to-copy}
+[zxdb] set second-chance-exceptions += gen
+```
+
+To remove the page fault type from the list of `second-chance-exceptions`:
+
+```none {:.devsite-disable-click-to-copy}
+[zxdb] set second-chance-exceptions -= pf
 ```

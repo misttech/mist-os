@@ -129,7 +129,8 @@ Once you have successfully connected to the `zxdb` debugger, you may want to:
 * [Inspect memory][zxdb-memory]
 * [List handles and kernel objects][zxdb-kernel-objects]
 * [Work with assembly language][zxdb-assembly]
-* [Diagnose symbol problems][zxdb-symbols]
+* [Look at handles][zxdb-kernel-objects]
+* [Understand how symbols are loaded][zxdb-symbols]
 * [Work with exceptions][zxdb-exceptions]
 * [See advanced zxdb topics][zxdb-advanced]
 

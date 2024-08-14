@@ -1,38 +1,13 @@
 # Troubleshooting zxdb
 
-This page lists common troubleshooting tips for `zxdb`.
+This page lists common troubleshooting tips for `zxdb`:
 
-## The build type is compatible
+* [Ensure that zxdb and `debug_agent` are built](#zxdb-built)
+* [Ensure that ffx can communicate with the device](#ffx-device-communication)
+* [Ensure that the Fuchsia package server is running](#package-server-running)
+* [Diagnose problems with symbols](#diagnose-problems-symbols)
 
-Debuggers on Fuchsia depend on privileged syscalls, most notably
-[`zx_process_write_memory`](/reference/syscalls/process_write_memory.md).
-These syscalls are only enabled when the kernel flag
-[`kernel.enable-debugging-syscalls`](/docs/gen/boot-options.md#kernelenable-debugging-syscallsbool)
-is set to `true`, which means debuggers are not available for `user` and `userdebug`
-[build types](/docs/contribute/governance/rfcs/0115_build_types.md).
-
-If you are building from source, most probably these syscalls are enabled.
-
-## zxdb and debug_agent are built
-
-Zxdb depends on a target-side component called debug\_agent.  If an error message says "The plugin
-service selector 'core/debug\_agent:expose:fuchsia.debugger.DebugAgent' did not match any services
-on the target", it means that debug\_agent is not built.  You can also check whether there's
-`debug_agent` and `host_x64/zxdb` in your build directory.
-
-If you don't have the debugger in your build, add `//bundles/tools` to your "universe", either with:
-
-```posix-terminal
-fx <normal_stuff_you_use> --with //bundles/tools
-```
-
-Or you can edit your GN args directly by editing `<build_dir>/args.gn` and adding to the bottom:
-
-```none
-universe_package_labels += [ "//bundles/tools" ]
-```
-
-## ffx can talk with the device
+## Ensure that ffx can communicate with the device {:#ffx-device-communication}
 
 Make sure that ffx can discover the device, either a emulator or a hardware device, and
 RCS is started on the device.
@@ -46,71 +21,217 @@ demo-emu   <unknown>    core.x64         Product    [10.0.2.15,                 
                                                     127.0.0.1]
 ```
 
-## Package server is running
+## Ensure that the Fuchsia package server is running {:#package-server-running}
 
-For most build configurations, the debug agent will be in the "universe" (i.e. "available to use")
-but not in the base build so won't be on the system before boot. You will need to run:
+For most in-tree build configurations, the `debug_agent` which is used by zxdb
+is in the universe dependency set, but not in the base dependency set so won't
+be on the Fuchsia target device before boot. This may lead you to see errors
+similar to the following:
+
+```none {:.devsite-disable-click-to-copy}
+BUG: An internal command error occurred.
+Error: Attempted to find protocol marker fuchsia.debugger.Launcher at '/core/toolbox' or '/core/debugger', but it wasn't available at either of those monikers.
+
+Make sure the target is connected and otherwise functioning, and that it is configured to provide capabilities over the network to host tools.
+    1.  This service dependency exists but connecting to it failed with error CapabilityConnectFailed. Moniker: /core/debugger. Capability name: fuchsia.debugger.Launcher
+More information may be available in ffx host logs in directory:
+```
+
+If you see this type of error, make sure that `fx serve` is running in a
+separate terminal. For example:
 
 ```posix-terminal
 fx serve
 ```
 
-## Debug symbols are registered {#set-symbol-location}
+## Diagnose problems with symbols {#diagnose-problems-symbols}
 
-Zxdb will by default obtain the locations of the debug symbols from the
+### Debug symbols are registered {#set-symbol-location}
+
+By default, zxdb obtains the locations of the debug symbols from the
 [symbol index](/docs/development/sdk/ffx/register-debug-symbols.md).
-The registrations of debug symbols from in-tree and most out-of-tree environments are automated.
-In case these doesn't work out, there are three command-line flags in zxdb to provide additional
-symbol lookup locations for zxdb: `--build-id-dir`, `--ids-txt`, and a general `--symbol-path`.
-They all have the corresponding settings that can be manipulated using `set` or `get`.
+The registrations of debug symbols from in-tree and most out-of-tree
+environments are automated.
 
-For example, to add a ".build-id" directory, either use `--build-id-dir` flag:
+In case symbol registration fails, zxdb has these command-line options to provide
+additional symbol lookup locations:
 
-```posix-terminal
-ffx debug connect -- --build-id-dir some/other_location/.build-id
-```
+* [`--build-id-dir`](#build-id-dir)
+* [`--ids-txt`](#ids-txt)
+* [`--symbol-path`](#symbol-path)
 
-Or add it to the `build-id-dirs` list option in the interactive UI:
+These options have  settings that can be manipulated using `set` or `get`.
+
+For example, to add a `.build-id` directory, you can do either of the following:
+
+Note: For in-tree development, `ffx debug connect` automatically sets up all
+necessary options.
+
+* {set `build-id-dirs`}
+
+  ```none {:.devsite-disable-click-to-copy}
+  [zxdb] set build-id-dirs += some/other_location/.build-id
+  ```
+
+* {`--build-id-dir` flag}
+
+  ```posix-terminal
+  ffx debug connect -- --build-id-dir some/other_location/.build-id
+  ```
+
+### `build-id-dir` {:#build-id-dir}
+
+Some builds produce a `.build-id` directory. Symbol files in this directory are
+indexed according to their build IDs. For example, the Fuchsia build makes a
+`.build-id` directory inside it's build directory, e.g., `out/x64/.build-id`.
+
+These directories can be added to zxdb through the `build-id-dirs` setting or
+the `--build-id-dir`.
+
+### `ids-txt` {#ids-txt}
+
+Instead of a `.build-id` directory, some builds produce a file called `ids.txt`
+that lists build IDs and local paths to the corresponding binaries. These files
+can be added to zxdb through the `ids-txts` setting or the `--ids-txt`
+command-line flag.
+
+### `symbol-path` {#symbol-path}
+
+The `--symbol-path` flag can be used to add arbitrary files or directories to
+the symbol index. If the path is pointing to a file, zxdb treats it as an ELF
+file and adds it to the symbol index. If it's a directory, all binaries under
+the given path are indexed.
+
+### Check symbol status {#check-symbol-status}
+
+The `sym-stat` command returns the status for symbols. If there is no running
+process, it returns information on the different symbol locations that you have
+specified. If your symbols aren't found, make sure this matches your
+expectations.
+
+To see the status of symbols, run `sym-stat`:
 
 ```none {:.devsite-disable-click-to-copy}
-[zxdb] set build-id-dirs += some/other_location/.build-id
+[zxdb] sym-stat
+Symbol index status
+
+  Indexed  Source path
+ (folder)  /home/alice/.build-id
+ (folder)  /home/alice/build/out/x64
+        0  my_dir/my_file
 ```
 
-For in-tree development, `ffx debug connect` automatically sets up all necessary
-flags.
+If you see a `0` in the `Indexed` column of `Symbol index status` this indicates
+that zxdb could not find the source of the symbols. If you cannot debug the
+issue, file a [zxdb bug][zxdb-bug-link].
 
-### `build-id-dir`
+### Variable values are unavailable
 
-Some builds produce a `.build-id` directory. Symbol files in it are already indexed according to
-their build IDs. For example, the Fuchsia build itself makes a `.build-id` directory inside the
-build directory, e.g., `out/x64/.build-id`. They can be added to zxdb by `--build-id-dir`
-command-line flag or `build-id-dirs` setting. This is the best option.
+Zxdb can return an issue around variable values, which in most cases is related
+to the optimization level of the program. For example:
 
-### `ids-txt`
+* _Optimized out_: This indicates that the program symbols declare a variable
+with the given name, but that it has no value or location. This indicates that
+the compiler has entirely optimized out the variable and the debugger can't
+display it. If you need to see the variable, use a less-optimized build setting.
 
-Instead of a `.build-id` directory, some builds produce a file called `ids.txt` that lists build IDs
-and local paths to the corresponding binaries. They can be added to zxdb by `--ids-txt` command-line
-flag or `ids-txts` setting. This is the second-best option.
+* _Unavailable_: This indicates that the variable is invalid at the current
+address, but that its value is known at other addresses. In optimized code, the
+compiler often re-uses registers, which can overwrite previous values, which
+then become unavailable.
 
-### `symbol-path`
+For example, you can see the valid ranges for the `my_variable` variable with
+the `sym-info` command:
 
-In addition, `--symbol-path` flag can be used to add arbitrary files or directories to symbol index.
-If the path is pointing to a file, it will be treated as an ELF file and added to the symbol index.
-If it's a directory, all binaries under the given path are indexed.
+```none {:.devsite-disable-click-to-copy}
+[zxdb] sym-info my_variable
+Variable: my_variable
+  Type: int
+  DWARF tag: 0x05
+  DWARF location (address range + DWARF expression bytes):
+    [0x3e0d0a3e05b, 0x3e0d0a3e0b2): 0x70 0x88 0x78
+    [0x3e0d0a3e0b2, 0x3e0d0a3eb11): 0x76 0x48 0x10 0xf8 0x07 0x1c 0x06
 
-## Source code location is correctly set up
+```
 
-The Fuchsia build generates symbols relative to the build directory so relative paths look like
-`../../src/my_component/file.cc`. The build directory is usually provided by the symbol index,
-so the source files can be located.
+Note: DWARF is a standardized debugging data format.
 
-If your files are not being found, you will need to manually tweak the source map setting.
-For example, if the debugger cannot find `./../../src/my_component/file.cc`, and the file is
-located at `/path/to/fuchsia/src/my_component/file.cc`, you could
+`DWARF location` gives you a list of address ranges where the value of the
+variable is known. The address range is inclusive at the beginning of the range
+and non-inclusive at the end of the range.
+
+`DWARF expression bytes` indicate the internal instructions for finding the
+variable.
+
+You can also use the `di` command to see the current address.
+
+### Source code location is correctly set up
+
+The Fuchsia build generates symbols relative to the build directory. The
+relative paths look like `../../src/my_component/file.cc`. The build directory
+is usually provided by the symbol index, so that source files can be located.
+
+If your source files are not being found, you need to manually set the source
+map setting.
+
+For example, if the debugger can't find `./../../src/my_component/file.cc`, an
+the file is located at `/path/to/fuchsia/src/my_component/file.cc`, you need
+to set the `source_map`:
 
 ```none
 [zxdb] set source-map += ./../..=/path/to/fuchsia
 ```
 
-So the debugger will look for `/path/to/fuchsia/src/my_component/file.cc` instead. For more help,
-please check `get source-map`.
+Once you have set `source-map`, zxdb looks for
+`/path/to/fuchsia/src/my_component/file.cc`.
+
+### Mismatched source lines {:#mismatches-source-lines}
+
+Sometimes the source file listings may not match the code. The most common
+reason is that the build is out-of-date and no longer matches the source. The
+debugger checks that the symbol file modification time is newer than the source
+file, but it only prints the warning the first time the file is displayed.
+
+Some users have multiple checkouts. Use the `-f` option with the `list` command
+to check the file name of the file that zxdb found. For example:
+
+```none {:.devsite-disable-click-to-copy}
+[zxdb] list -f
+/home/alice/fuchsia/out/x64/../../src/foo/bar.cc
+ ... <source code> ...
+```
+
+If zxdb is finding a file in the incorrect checkout, override the `build-dirs`
+option as described in [Debug symbols are registered][debug-symbols-location].
+
+You can set the `show-file-paths` option to increase the information for file
+paths. When this setting is set to `true`:
+
+  * It shows the full resolved path in source listings as in `list -f`.
+  * It shows the full path instead of just the file name.
+
+To set `show-file-paths` to `true`:
+
+```none {:.devsite-disable-click-to-copy}
+[zxdb] set show-file-paths true
+```
+
+#### When setting breakpoints
+
+You may notice a mismatch source line when setting a breakpoint on a specific
+line where the displayed breakpoint location doesn't match the line number you
+typed. In most cases, this is because this symbols did not identify any code on
+the specified line so zxdb used the next line. This can happen even in
+unoptimized builds, and is most common for variable declarations.
+
+```none {:.devsite-disable-click-to-copy}
+[zxdb] b file.cc:138
+Breakpoint 1 (Software) @ file.cc:138
+   138   int my_value = 0;          <- Breakpoint was requested here.
+ ◉ 139   DoSomething(&my_value);    <- But ended up here.
+   140   if (my_value > 0) {
+```
+
+[fuchsia-dependency-sets]: /docs/get-started/learn/build/product-packages.md#dependency_sets
+[debug-symbols-location]: /docs/development/debugger/troubleshooting.md#set-symbol-location
+[zxdb-bug-link]: https://issues.fuchsia.dev/issues/new?component=1389559&template=1849567
