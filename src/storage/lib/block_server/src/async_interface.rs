@@ -11,7 +11,10 @@ use futures::FutureExt;
 use std::future::Future;
 use std::mem::MaybeUninit;
 use std::sync::Arc;
-use {fidl_fuchsia_hardware_block as fblock, fuchsia_zircon as zx};
+use {
+    fidl_fuchsia_hardware_block as fblock, fidl_fuchsia_hardware_block_volume as fvolume,
+    fuchsia_zircon as zx,
+};
 
 pub trait Interface: Send + Sync + Unpin + 'static {
     /// Called whenever a VMO is attached, prior to the VMO's usage in any other methods.
@@ -46,6 +49,40 @@ pub trait Interface: Send + Sync + Unpin + 'static {
         device_block_offset: u64,
         block_count: u32,
     ) -> impl Future<Output = Result<(), zx::Status>> + Send;
+
+    /// Called to handle the GetVolumeInfo FIDL call.
+    fn get_volume_info(
+        &self,
+    ) -> impl Future<Output = Result<(fvolume::VolumeManagerInfo, fvolume::VolumeInfo), zx::Status>> + Send
+    {
+        async { Err(zx::Status::NOT_SUPPORTED) }
+    }
+
+    /// Called to handle the QuerySlices FIDL call.
+    fn query_slices(
+        &self,
+        _start_slices: &[u64],
+    ) -> impl Future<Output = Result<Vec<fvolume::VsliceRange>, zx::Status>> + Send {
+        async { Err(zx::Status::NOT_SUPPORTED) }
+    }
+
+    /// Called to handle the Extend FIDL call.
+    fn extend(
+        &self,
+        _start_slice: u64,
+        _slice_count: u64,
+    ) -> impl Future<Output = Result<(), zx::Status>> + Send {
+        async { Err(zx::Status::NOT_SUPPORTED) }
+    }
+
+    /// Called to handle the Shrink FIDL call.
+    fn shrink(
+        &self,
+        _start_slice: u64,
+        _slice_count: u64,
+    ) -> impl Future<Output = Result<(), zx::Status>> + Send {
+        async { Err(zx::Status::NOT_SUPPORTED) }
+    }
 }
 
 pub struct SessionManager<I> {
@@ -121,6 +158,27 @@ impl<I: Interface> super::SessionManager for SessionManager<I> {
                 }
             }
         }
+    }
+
+    async fn get_volume_info(
+        &self,
+    ) -> Result<(fvolume::VolumeManagerInfo, fvolume::VolumeInfo), zx::Status> {
+        self.interface.get_volume_info().await
+    }
+
+    async fn query_slices(
+        &self,
+        start_slices: &[u64],
+    ) -> Result<Vec<fvolume::VsliceRange>, zx::Status> {
+        self.interface.query_slices(start_slices).await
+    }
+
+    async fn extend(&self, start_slice: u64, slice_count: u64) -> Result<(), zx::Status> {
+        self.interface.extend(start_slice, slice_count).await
+    }
+
+    async fn shrink(&self, start_slice: u64, slice_count: u64) -> Result<(), zx::Status> {
+        self.interface.shrink(start_slice, slice_count).await
     }
 }
 
