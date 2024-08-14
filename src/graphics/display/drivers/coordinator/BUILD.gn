@@ -22,11 +22,7 @@ fuchsia_driver("coordinator-driver") {
     "coordinator-driver.cc",
     "coordinator-driver.h",
   ]
-  deps = [
-    ":shared",
-    "//sdk/lib/driver/logging/cpp",
-    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv2",
-  ]
+  deps = [ ":shared" ]
 }
 
 fuchsia_driver_component("coordinator") {
@@ -88,6 +84,7 @@ source_set("shared") {
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/component/cpp",
     "//sdk/lib/driver/devfs/cpp",
+    "//sdk/lib/driver/logging/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/fidl",
     "//sdk/lib/zbi-format",

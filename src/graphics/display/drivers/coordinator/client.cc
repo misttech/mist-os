@@ -11,6 +11,7 @@
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/dispatcher.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/fit/defer.h>
 #include <lib/fit/function.h>
 #include <lib/image-format/image_format.h>
@@ -75,7 +76,6 @@
 #include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace fhd = fuchsia_hardware_display;
 namespace fhdt = fuchsia_hardware_display_types;
@@ -199,7 +199,7 @@ zx_status_t Client::ImportImageForDisplay(const ImageMetadata& image_metadata, B
   fbl::RefPtr<Image> image = fbl::AdoptRef(new (&alloc_checker) Image(
       controller_, image_metadata, driver_image_id, &proxy_->node(), id_));
   if (!alloc_checker.check()) {
-    zxlogf(DEBUG, "Alloc checker failed while constructing Image.\n");
+    FDF_LOG(DEBUG, "Alloc checker failed while constructing Image.\n");
     return ZX_ERR_NO_MEMORY;
   }
   // `dc_image` is now owned by the Image instance.
@@ -226,7 +226,7 @@ void Client::ReleaseImage(ReleaseImageRequestView request,
     // Make sure we are not releasing an active capture.
     if (current_capture_image_id_ == image_id) {
       // we have an active capture. Release it when capture is completed
-      zxlogf(WARNING, "Capture is active. Will release after capture is complete");
+      FDF_LOG(WARNING, "Capture is active. Will release after capture is complete");
       pending_release_capture_image_id_ = current_capture_image_id_;
     } else {
       // release image now
@@ -235,14 +235,14 @@ void Client::ReleaseImage(ReleaseImageRequestView request,
     return;
   }
 
-  zxlogf(ERROR, "Invalid Image ID requested for release");
+  FDF_LOG(ERROR, "Invalid Image ID requested for release");
 }
 
 void Client::ImportEvent(ImportEventRequestView request,
                          ImportEventCompleter::Sync& /*_completer*/) {
   const EventId event_id = ToEventId(request->id);
   if (event_id == kInvalidEventId) {
-    zxlogf(ERROR, "Cannot import events with an invalid ID #%" PRIu64, event_id.value());
+    FDF_LOG(ERROR, "Cannot import events with an invalid ID #%" PRIu64, event_id.value());
     TearDown();
   } else if (fences_.ImportEvent(std::move(request->event), event_id) != ZX_OK) {
     TearDown();
@@ -264,8 +264,8 @@ void Client::ImportBufferCollection(ImportBufferCollectionRequestView request,
   zx::result<> import_result = controller_->engine_driver_client()->ImportBufferCollection(
       driver_buffer_collection_id, std::move(request->buffer_collection_token));
   if (import_result.is_error()) {
-    zxlogf(WARNING, "Cannot import BufferCollection to display driver: %s",
-           import_result.status_string());
+    FDF_LOG(WARNING, "Cannot import BufferCollection to display driver: %s",
+            import_result.status_string());
     completer.ReplyError(ZX_ERR_INTERNAL);
     return;
   }
@@ -311,9 +311,9 @@ void Client::SetBufferCollectionConstraints(
   zx::result<> result = controller_->engine_driver_client()->SetBufferCollectionConstraints(
       image_buffer_usage, collections.driver_buffer_collection_id);
   if (result.is_error()) {
-    zxlogf(WARNING,
-           "Cannot set BufferCollection constraints using imported buffer collection (id=%lu) %s.",
-           buffer_collection_id.value(), result.status_string());
+    FDF_LOG(WARNING,
+            "Cannot set BufferCollection constraints using imported buffer collection (id=%lu) %s.",
+            buffer_collection_id.value(), result.status_string());
     completer.ReplyError(ZX_ERR_INTERNAL);
   }
   completer.ReplySuccess();
@@ -364,12 +364,12 @@ void Client::DestroyLayer(DestroyLayerRequestView request,
 
   auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
-    zxlogf(ERROR, "Tried to destroy invalid layer %" PRIu64, layer_id.value());
+    FDF_LOG(ERROR, "Tried to destroy invalid layer %" PRIu64, layer_id.value());
     TearDown();
     return;
   }
   if (layer->in_use()) {
-    zxlogf(ERROR, "Destroyed layer %" PRIu64 " which was in use", layer_id.value());
+    FDF_LOG(ERROR, "Destroyed layer %" PRIu64 " which was in use", layer_id.value());
     TearDown();
     return;
   }
@@ -391,8 +391,8 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
   zx::result<cpp20::span<const DisplayTiming>> display_timings_result =
       controller_->GetDisplayTimings(display_id);
   if (display_timings_result.is_error()) {
-    zxlogf(ERROR, "Failed to get display timings for display #%" PRIu64 ": %s", display_id.value(),
-           display_timings_result.status_string());
+    FDF_LOG(ERROR, "Failed to get display timings for display #%" PRIu64 ": %s", display_id.value(),
+            display_timings_result.status_string());
     return;
   }
 
@@ -415,14 +415,14 @@ void Client::SetDisplayMode(SetDisplayModeRequestView request,
       });
 
   if (display_timing_it == display_timings.end()) {
-    zxlogf(ERROR, "Display mode not found: (%" PRIu32 " x %" PRIu32 ") @ %" PRIu32 " centihertz",
-           request->mode.horizontal_resolution, request->mode.vertical_resolution,
-           request->mode.refresh_rate_e2);
+    FDF_LOG(ERROR, "Display mode not found: (%" PRIu32 " x %" PRIu32 ") @ %" PRIu32 " centihertz",
+            request->mode.horizontal_resolution, request->mode.vertical_resolution,
+            request->mode.refresh_rate_e2);
     return;
   }
 
   if (display_timings.size() == 1) {
-    zxlogf(INFO, "Display has only one timing available. Modeset is skipped.");
+    FDF_LOG(INFO, "Display has only one timing available. Modeset is skipped.");
     tear_down_on_error.cancel();
     return;
   }
@@ -486,13 +486,13 @@ void Client::SetDisplayLayers(SetDisplayLayersRequestView request,
     DriverLayerId driver_layer_id(layer_id.value());
     auto layer = layers_.find(driver_layer_id);
     if (!layer.IsValid()) {
-      zxlogf(ERROR, "Unknown layer %lu", request->layer_ids[i].value);
+      FDF_LOG(ERROR, "Unknown layer %lu", request->layer_ids[i].value);
       TearDown();
       return;
     }
 
     if (!layer->AppendToConfig(&config->pending_layers_)) {
-      zxlogf(ERROR, "Tried to reuse an in-use layer");
+      FDF_LOG(ERROR, "Tried to reuse an in-use layer");
       TearDown();
       return;
     }
@@ -510,7 +510,7 @@ void Client::SetLayerPrimaryConfig(SetLayerPrimaryConfigRequestView request,
   DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
-    zxlogf(ERROR, "SetLayerPrimaryConfig on invalid layer");
+    FDF_LOG(ERROR, "SetLayerPrimaryConfig on invalid layer");
     TearDown();
     return;
   }
@@ -529,13 +529,13 @@ void Client::SetLayerPrimaryPosition(SetLayerPrimaryPositionRequestView request,
   DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid() || layer->pending_type() != LAYER_TYPE_PRIMARY) {
-    zxlogf(ERROR, "SetLayerPrimaryPosition on invalid layer");
+    FDF_LOG(ERROR, "SetLayerPrimaryPosition on invalid layer");
     TearDown();
     return;
   }
   if (request->image_source_transformation > fhdt::wire::CoordinateTransformation::kRotateCcw270) {
-    zxlogf(ERROR, "Invalid transform %" PRIu8,
-           static_cast<uint8_t>(request->image_source_transformation));
+    FDF_LOG(ERROR, "Invalid transform %" PRIu8,
+            static_cast<uint8_t>(request->image_source_transformation));
     TearDown();
     return;
   }
@@ -554,14 +554,14 @@ void Client::SetLayerPrimaryAlpha(SetLayerPrimaryAlphaRequestView request,
   DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid() || layer->pending_type() != LAYER_TYPE_PRIMARY) {
-    zxlogf(ERROR, "SetLayerPrimaryAlpha on invalid layer");
+    FDF_LOG(ERROR, "SetLayerPrimaryAlpha on invalid layer");
     TearDown();
     return;
   }
 
   if (request->mode > fhdt::wire::AlphaMode::kHwMultiply ||
       (!isnan(request->val) && (request->val < 0 || request->val > 1))) {
-    zxlogf(ERROR, "Invalid args %hhu %f", static_cast<uint8_t>(request->mode), request->val);
+    FDF_LOG(ERROR, "Invalid args %hhu %f", static_cast<uint8_t>(request->mode), request->val);
     TearDown();
     return;
   }
@@ -579,7 +579,7 @@ void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
   DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
-    zxlogf(ERROR, "SetLayerColorConfig on invalid layer");
+    FDF_LOG(ERROR, "SetLayerColorConfig on invalid layer");
     return;
   }
 
@@ -587,7 +587,7 @@ void Client::SetLayerColorConfig(SetLayerColorConfigRequestView request,
       request->pixel_format,
       /*pixel_format_modifier_param=*/fuchsia_images2::wire::PixelFormatModifier::kLinear));
   if (request->color_bytes.count() != bytes_per_pixel) {
-    zxlogf(ERROR, "SetLayerColorConfig with invalid color bytes");
+    FDF_LOG(ERROR, "SetLayerColorConfig with invalid color bytes");
     TearDown();
     return;
   }
@@ -606,12 +606,12 @@ void Client::SetLayerImage(SetLayerImageRequestView request,
   DriverLayerId driver_layer_id(layer_id.value());
   auto layer = layers_.find(driver_layer_id);
   if (!layer.IsValid()) {
-    zxlogf(ERROR, "SetLayerImage with invalid layer ID: %" PRIu64, request->layer_id.value);
+    FDF_LOG(ERROR, "SetLayerImage with invalid layer ID: %" PRIu64, request->layer_id.value);
     TearDown();
     return;
   }
   if (layer->pending_type() != LAYER_TYPE_PRIMARY) {
-    zxlogf(ERROR, "SetLayerImage with invalid layer type: %" PRIu32, layer->pending_type());
+    FDF_LOG(ERROR, "SetLayerImage with invalid layer type: %" PRIu32, layer->pending_type());
     TearDown();
     return;
   }
@@ -619,14 +619,14 @@ void Client::SetLayerImage(SetLayerImageRequestView request,
   const ImageId image_id = ToImageId(request->image_id);
   auto image_it = images_.find(image_id);
   if (!image_it.IsValid()) {
-    zxlogf(ERROR, "SetLayerImage with invalid image ID: %" PRIu64, image_id.value());
+    FDF_LOG(ERROR, "SetLayerImage with invalid image ID: %" PRIu64, image_id.value());
     TearDown();
     return;
   }
 
   Image& image = *image_it;
   if (!image.Acquire()) {
-    zxlogf(ERROR, "SetLayerImage with image that is already in use");
+    FDF_LOG(ERROR, "SetLayerImage with image that is already in use");
     TearDown();
     return;
   }
@@ -648,7 +648,7 @@ void Client::SetLayerImage(SetLayerImageRequestView request,
   // and compare this Image's sysmem buffer collection information against the
   // Layer's format support.
   if (image.metadata() != display::ImageMetadata(layer->pending_image_metadata())) {
-    zxlogf(ERROR, "SetLayerImage with mismatching layer and image metadata");
+    FDF_LOG(ERROR, "SetLayerImage with mismatching layer and image metadata");
     image.DiscardAcquire();
     TearDown();
     return;
@@ -679,7 +679,7 @@ void Client::ApplyConfig(ApplyConfigCompleter::Sync& /*_completer*/) {
   if (!pending_config_valid_) {
     pending_config_valid_ = CheckConfig(nullptr, nullptr);
     if (!pending_config_valid_) {
-      zxlogf(INFO, "Tried to apply invalid config");
+      FDF_LOG(INFO, "Tried to apply invalid config");
       return;
     }
   }
@@ -708,14 +708,14 @@ void Client::ApplyConfig(ApplyConfigCompleter::Sync& /*_completer*/) {
     // that needs to know if there are any waiting images.
     for (auto& layer_node : display_config.pending_layers_) {
       if (!layer_node.layer->ResolvePendingLayerProperties()) {
-        zxlogf(ERROR, "Failed to resolve pending layer properties for layer %" PRIu64,
-               layer_node.layer->id.value());
+        FDF_LOG(ERROR, "Failed to resolve pending layer properties for layer %" PRIu64,
+                layer_node.layer->id.value());
         TearDown();
         return;
       }
       if (!layer_node.layer->ResolvePendingImage(&fences_, latest_config_stamp_)) {
-        zxlogf(ERROR, "Failed to resolve pending images for layer %" PRIu64,
-               layer_node.layer->id.value());
+        FDF_LOG(ERROR, "Failed to resolve pending images for layer %" PRIu64,
+                layer_node.layer->id.value());
         TearDown();
         return;
       }
@@ -780,7 +780,8 @@ void Client::EnableVsync(EnableVsyncRequestView request,
 void Client::SetVirtconMode(SetVirtconModeRequestView request,
                             SetVirtconModeCompleter::Sync& /*_completer*/) {
   if (priority_ != ClientPriority::kVirtcon) {
-    zxlogf(ERROR, "SetVirtconMode() called by %s client", DebugStringFromClientPriority(priority_));
+    FDF_LOG(ERROR, "SetVirtconMode() called by %s client",
+            DebugStringFromClientPriority(priority_));
     TearDown();
     return;
   }
@@ -860,7 +861,7 @@ void Client::StartCapture(StartCaptureRequestView request, StartCaptureCompleter
   const ImageId capture_image_id = ToImageId(request->image_id);
   auto image = capture_images_.find(capture_image_id);
   if (!image.IsValid()) {
-    zxlogf(ERROR, "Invalid Capture Image ID requested for capture");
+    FDF_LOG(ERROR, "Invalid Capture Image ID requested for capture");
     completer.ReplyError(ZX_ERR_INVALID_ARGS);
     return;
   }
@@ -1154,7 +1155,7 @@ void Client::SetOwnership(bool is_owner) {
 
   fidl::Status result = NotifyOwnershipChange(/*client_has_ownership=*/is_owner);
   if (!result.ok()) {
-    zxlogf(ERROR, "Error writing remove message: %s", result.FormatDescription().c_str());
+    FDF_LOG(ERROR, "Error writing remove message: %s", result.FormatDescription().c_str());
   }
 
   // Only apply the current config if the client has previously applied a config.
@@ -1207,7 +1208,7 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
     fbl::AllocChecker ac;
     auto config = fbl::make_unique_checked<DisplayConfig>(&ac);
     if (!ac.check()) {
-      zxlogf(WARNING, "Out of memory when processing hotplug");
+      FDF_LOG(WARNING, "Out of memory when processing hotplug");
       continue;
     }
 
@@ -1216,8 +1217,8 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
     zx::result get_supported_pixel_formats_result =
         controller_->GetSupportedPixelFormats(config->id);
     if (get_supported_pixel_formats_result.is_error()) {
-      zxlogf(WARNING, "Failed to get pixel formats when processing hotplug: %s",
-             get_supported_pixel_formats_result.status_string());
+      FDF_LOG(WARNING, "Failed to get pixel formats when processing hotplug: %s",
+              get_supported_pixel_formats_result.status_string());
       continue;
     }
     config->pixel_formats_ = std::move(get_supported_pixel_formats_result.value());
@@ -1225,8 +1226,8 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
     zx::result<cpp20::span<const DisplayTiming>> display_timings_result =
         controller_->GetDisplayTimings(config->id);
     if (display_timings_result.is_error()) {
-      zxlogf(WARNING, "Failed to get display timings when processing hotplug: %s",
-             display_timings_result.status_string());
+      FDF_LOG(WARNING, "Failed to get display timings when processing hotplug: %s",
+              display_timings_result.status_string());
       continue;
     }
 
@@ -1311,7 +1312,7 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
           info.vertical_size_mm = static_cast<uint32_t>(display_info.GetVerticalSizeMm());
         });
     if (!found_display_info) {
-      zxlogf(ERROR, "Failed to get DisplayInfo for display %" PRIu64, added_display_id.value());
+      FDF_LOG(ERROR, "Failed to get DisplayInfo for display %" PRIu64, added_display_id.value());
       ZX_DEBUG_ASSERT(false);
     }
 
@@ -1340,7 +1341,7 @@ void Client::OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
   if (!coded_configs.empty() || !fidl_removed_display_ids.empty()) {
     fidl::Status result = NotifyDisplayChanges(coded_configs, fidl_removed_display_ids);
     if (!result.ok()) {
-      zxlogf(ERROR, "Error writing remove message: %s", result.FormatDescription().c_str());
+      FDF_LOG(ERROR, "Error writing remove message: %s", result.FormatDescription().c_str());
     }
   }
 }
@@ -1391,9 +1392,9 @@ void Client::TearDown() {
   running_ = false;
 
   CleanUpAllImages();
-  zxlogf(INFO, "Releasing %zu capture images cur=%" PRIu64 ", pending=%" PRIu64,
-         capture_images_.size(), current_capture_image_id_.value(),
-         pending_release_capture_image_id_.value());
+  FDF_LOG(INFO, "Releasing %zu capture images cur=%" PRIu64 ", pending=%" PRIu64,
+          capture_images_.size(), current_capture_image_id_.value(),
+          pending_release_capture_image_id_.value());
   current_capture_image_id_ = pending_release_capture_image_id_ = kInvalidImageId;
   capture_images_.clear();
 
@@ -1509,7 +1510,7 @@ void Client::AcknowledgeVsync(AcknowledgeVsyncRequestView request,
                               AcknowledgeVsyncCompleter::Sync& /*_completer*/) {
   VsyncAckCookie ack_cookie = ToVsyncAckCookie(request->cookie);
   acked_cookie_ = ack_cookie;
-  zxlogf(TRACE, "Cookie %" PRIu64 " Acked\n", ack_cookie.value());
+  FDF_LOG(TRACE, "Cookie %" PRIu64 " Acked\n", ack_cookie.value());
 }
 
 std::string GetObjectName(zx_handle_t handle) {
@@ -1556,7 +1557,7 @@ void ClientProxy::SetOwnership(bool is_owner) {
   fbl::AllocChecker ac;
   auto task = fbl::make_unique_checked<async::Task>(&ac);
   if (!ac.check()) {
-    zxlogf(WARNING, "Failed to allocate set ownership task");
+    FDF_LOG(WARNING, "Failed to allocate set ownership task");
     return;
   }
   task->set_handler([this, client_handler = &handler_, is_owner](
@@ -1590,7 +1591,7 @@ void ClientProxy::ReapplySpecialConfigs() {
   zx::result<> result =
       controller_->engine_driver_client()->SetMinimumRgb(handler_.GetMinimumRgb());
   if (!result.is_ok()) {
-    zxlogf(ERROR, "Failed to reapply minimum RGB value: %s", result.status_string());
+    FDF_LOG(ERROR, "Failed to reapply minimum RGB value: %s", result.status_string());
   }
 }
 
@@ -1598,7 +1599,7 @@ void ClientProxy::ReapplyConfig() {
   fbl::AllocChecker ac;
   auto task = fbl::make_unique_checked<async::Task>(&ac);
   if (!ac.check()) {
-    zxlogf(WARNING, "Failed to reapply config");
+    FDF_LOG(WARNING, "Failed to reapply config");
     return;
   }
 
@@ -1682,7 +1683,7 @@ zx_status_t ClientProxy::OnDisplayVsync(DisplayId display_id, zx_time_t timestam
   if (number_of_vsyncs_sent_ >= kMaxVsyncMessages) {
     // We have reached/exceeded maximum allowed vsyncs without any acknowledgement. At this point,
     // start storing them
-    zxlogf(TRACE, "Vsync not sent due to none acknowledgment.\n");
+    FDF_LOG(TRACE, "Vsync not sent due to none acknowledgment.\n");
     ZX_DEBUG_ASSERT(vsync_ack_cookie == kInvalidVsyncAckCookie);
     if (buffered_vsync_messages_.full()) {
       buffered_vsync_messages_.pop();  // discard
@@ -1707,15 +1708,15 @@ zx_status_t ClientProxy::OnDisplayVsync(DisplayId display_id, zx_time_t timestam
       // OOM errors are most likely not recoverable. Print the error message
       // once every kChannelErrorPrintFreq cycles
       if (chn_oom_print_freq_++ == 0) {
-        zxlogf(ERROR, "Failed to send vsync event (OOM) (total occurrences: %lu)",
-               total_oom_errors_);
+        FDF_LOG(ERROR, "Failed to send vsync event (OOM) (total occurrences: %lu)",
+                total_oom_errors_);
       }
       if (chn_oom_print_freq_ >= kChannelOomPrintFreq) {
         chn_oom_print_freq_ = 0;
       }
     } else {
-      zxlogf(WARNING, "Failed to send vsync event: %s",
-             event_sending_result.FormatDescription().c_str());
+      FDF_LOG(WARNING, "Failed to send vsync event: %s",
+              event_sending_result.FormatDescription().c_str());
     }
   });
 
@@ -1727,8 +1728,8 @@ zx_status_t ClientProxy::OnDisplayVsync(DisplayId display_id, zx_time_t timestam
         handler_.NotifyVsync(vsync_message_data.display_id, zx::time{vsync_message_data.timestamp},
                              vsync_message_data.config_stamp, kInvalidVsyncAckCookie);
     if (!event_sending_result.ok()) {
-      zxlogf(ERROR, "Failed to send all buffered vsync messages: %s\n",
-             event_sending_result.FormatDescription().c_str());
+      FDF_LOG(ERROR, "Failed to send all buffered vsync messages: %s\n",
+              event_sending_result.FormatDescription().c_str());
       return event_sending_result.status();
     }
     number_of_vsyncs_sent_++;

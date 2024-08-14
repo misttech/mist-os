@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/drivers/coordinator/image.h"
 
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/trace/event.h>
 #include <threads.h>
 #include <zircon/assert.h>
@@ -22,7 +23,6 @@
 #include "src/graphics/display/lib/api-types-cpp/driver-image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types-cpp/image-tiling-type.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace display {
 
@@ -65,7 +65,7 @@ void Image::PrepareFences(fbl::RefPtr<FenceReference>&& wait,
   if (wait_fence_) {
     zx_status_t status = wait_fence_->StartReadyWait();
     if (status != ZX_OK) {
-      zxlogf(ERROR, "Failed to start waiting %d", status);
+      FDF_LOG(ERROR, "Failed to start waiting %d", status);
       // Mark the image as ready. Displaying garbage is better than hanging or crashing.
       wait_fence_ = nullptr;
     }

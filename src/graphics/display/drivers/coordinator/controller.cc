@@ -8,6 +8,7 @@
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/function.h>
 #include <lib/stdcompat/span.h>
@@ -56,7 +57,6 @@
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/driver-capture-image-id.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/graphics/display/lib/edid/edid.h"
 #include "src/graphics/display/lib/edid/timings.h"
 
@@ -127,7 +127,7 @@ void Controller::PopulateDisplayTimings(const fbl::RefPtr<DisplayInfo>& info) {
       fbl::AllocChecker ac;
       info->edid->timings.push_back(timing, &ac);
       if (!ac.check()) {
-        zxlogf(WARNING, "Edid skip allocation failed");
+        FDF_LOG(WARNING, "Edid skip allocation failed");
         break;
       }
     }
@@ -138,8 +138,8 @@ zx::result<> Controller::AddDisplay(const raw_display_info_t& banjo_display_info
   zx::result<fbl::RefPtr<DisplayInfo>> display_info_result =
       DisplayInfo::Create(banjo_display_info);
   if (display_info_result.is_error()) {
-    zxlogf(WARNING, "Failed to add display %" PRIu64 ": %s", banjo_display_info.display_id,
-           display_info_result.status_string());
+    FDF_LOG(WARNING, "Failed to add display %" PRIu64 ": %s", banjo_display_info.display_id,
+            display_info_result.status_string());
     return display_info_result.take_error();
   }
 
@@ -149,8 +149,8 @@ zx::result<> Controller::AddDisplay(const raw_display_info_t& banjo_display_info
   fbl::AutoLock lock(mtx());
   auto display_it = displays_.find(display_id);
   if (display_it != displays_.end()) {
-    zxlogf(WARNING, "Display %" PRIu64 " is already created; add display request ignored",
-           display_id.value());
+    FDF_LOG(WARNING, "Display %" PRIu64 " is already created; add display request ignored",
+            display_id.value());
     return zx::error(ZX_ERR_ALREADY_EXISTS);
   }
   displays_.insert(display_info);
@@ -158,7 +158,7 @@ zx::result<> Controller::AddDisplay(const raw_display_info_t& banjo_display_info
   fbl::AllocChecker alloc_checker;
   auto post_task_state = fbl::make_unique_checked<DisplayTaskState>(&alloc_checker);
   if (!alloc_checker.check()) {
-    zxlogf(ERROR, "No memory when processing hotplug");
+    FDF_LOG(ERROR, "No memory when processing hotplug");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -185,7 +185,7 @@ zx::result<> Controller::AddDisplay(const raw_display_info_t& banjo_display_info
                    display_info->init_done = true;
                    display_info->InitializeInspect(&root_);
                  } else {
-                   zxlogf(WARNING, "Ignoring display with no compatible edid timings");
+                   FDF_LOG(WARNING, "Ignoring display with no compatible edid timings");
                    added_ids = {};
                  }
 
@@ -200,7 +200,7 @@ zx::result<> Controller::AddDisplay(const raw_display_info_t& banjo_display_info
                });
 
   if (post_task_result.is_error()) {
-    zxlogf(ERROR, "Failed to dispatch task: %s", post_task_result.status_string());
+    FDF_LOG(ERROR, "Failed to dispatch task: %s", post_task_result.status_string());
   }
   return post_task_result;
 }
@@ -209,7 +209,7 @@ zx::result<> Controller::RemoveDisplay(DisplayId display_id) {
   fbl::AutoLock lock(mtx());
   fbl::RefPtr<DisplayInfo> removed_display = displays_.erase(display_id);
   if (!removed_display) {
-    zxlogf(WARNING, "Unknown display %" PRIu64 " removed", display_id.value());
+    FDF_LOG(WARNING, "Unknown display %" PRIu64 " removed", display_id.value());
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
@@ -222,7 +222,7 @@ zx::result<> Controller::RemoveDisplay(DisplayId display_id) {
   fbl::AllocChecker alloc_checker;
   auto post_task_state = fbl::make_unique_checked<DisplayTaskState>(&alloc_checker);
   if (!alloc_checker.check()) {
-    zxlogf(ERROR, "No memory when processing hotplug");
+    FDF_LOG(ERROR, "No memory when processing hotplug");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
   zx::result<> post_task_result = PostTask(
@@ -242,7 +242,7 @@ zx::result<> Controller::RemoveDisplay(DisplayId display_id) {
       });
 
   if (post_task_result.is_error()) {
-    zxlogf(ERROR, "Failed to dispatch task: %s", post_task_result.status_string());
+    FDF_LOG(ERROR, "Failed to dispatch task: %s", post_task_result.status_string());
   }
   return post_task_result;
 }
@@ -251,8 +251,8 @@ void Controller::DisplayEngineListenerOnDisplayAdded(const raw_display_info_t* b
   ZX_DEBUG_ASSERT(banjo_display_info != nullptr);
   zx::result<> added_display_result = AddDisplay(*banjo_display_info);
   if (added_display_result.is_error()) {
-    zxlogf(WARNING, "Failed to add a display %" PRIu64 ": %s", banjo_display_info->display_id,
-           added_display_result.status_string());
+    FDF_LOG(WARNING, "Failed to add a display %" PRIu64 ": %s", banjo_display_info->display_id,
+            added_display_result.status_string());
   }
 }
 
@@ -260,15 +260,15 @@ void Controller::DisplayEngineListenerOnDisplayRemoved(uint64_t banjo_display_id
   DisplayId display_id = ToDisplayId(banjo_display_id);
   zx::result<> remove_display_result = RemoveDisplay(display_id);
   if (remove_display_result.is_error()) {
-    zxlogf(WARNING, "Failed to remove a display: %s", remove_display_result.status_string());
+    FDF_LOG(WARNING, "Failed to remove a display: %s", remove_display_result.status_string());
   }
 }
 
 void Controller::DisplayEngineListenerOnCaptureComplete() {
   if (!supports_capture_) {
-    zxlogf(ERROR,
-           "OnCaptureComplete(): the display engine doesn't support "
-           "display capture.");
+    FDF_LOG(ERROR,
+            "OnCaptureComplete(): the display engine doesn't support "
+            "display capture.");
     return;
   }
 
@@ -291,7 +291,8 @@ void Controller::DisplayEngineListenerOnCaptureComplete() {
         }
       });
   if (post_task_result.is_error()) {
-    zxlogf(ERROR, "Failed to dispatch capture complete task: %s", post_task_result.status_string());
+    FDF_LOG(ERROR, "Failed to dispatch capture complete task: %s",
+            post_task_result.status_string());
   }
 }
 
@@ -320,7 +321,7 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
   }
 
   if (!info) {
-    zxlogf(ERROR, "No such display %" PRIu64, display_id.value());
+    FDF_LOG(ERROR, "No such display %" PRIu64, display_id.value());
     return;
   }
 
@@ -452,10 +453,10 @@ void Controller::DisplayEngineListenerOnDisplayVsync(uint64_t banjo_display_id,
         // A previous client applied a config and then disconnected before the vsync. Don't send
         // garbage image IDs to the new primary client.
         if (primary_client_->client_id() != applied_client_id_) {
-          zxlogf(DEBUG,
-                 "Dropping vsync. This was meant for client[%" PRIu64 "], but client[%" PRIu64
-                 "] is currently active.\n",
-                 applied_client_id_.value(), primary_client_->client_id().value());
+          FDF_LOG(DEBUG,
+                  "Dropping vsync. This was meant for client[%" PRIu64 "], but client[%" PRIu64
+                  "] is currently active.\n",
+                  applied_client_id_.value(), primary_client_->client_id().value());
         }
       }
   }
@@ -643,7 +644,7 @@ void Controller::HandleClientOwnershipChanges() {
 }
 
 void Controller::OnClientDead(ClientProxy* client) {
-  zxlogf(DEBUG, "Client %" PRIu64 " dead", client->client_id().value());
+  FDF_LOG(DEBUG, "Client %" PRIu64 " dead", client->client_id().value());
   fbl::AutoLock lock(mtx());
   if (unbinding_) {
     return;
@@ -707,12 +708,12 @@ void PrintChannelKoids(ClientPriority client_priority, const zx::channel& channe
   size_t actual, avail;
   zx_status_t status = channel.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), &actual, &avail);
   if (status != ZX_OK || info.type != ZX_OBJ_TYPE_CHANNEL) {
-    zxlogf(DEBUG, "Could not get koids for handle(type=%d): %d", info.type, status);
+    FDF_LOG(DEBUG, "Could not get koids for handle(type=%d): %d", info.type, status);
     return;
   }
   ZX_DEBUG_ASSERT(actual == avail);
-  zxlogf(INFO, "%s client connecting on channel (c=0x%lx, s=0x%lx)",
-         DebugStringFromClientPriority(client_priority), info.related_koid, info.koid);
+  FDF_LOG(INFO, "%s client connecting on channel (c=0x%lx, s=0x%lx)",
+          DebugStringFromClientPriority(client_priority), info.related_koid, info.koid);
 }
 
 }  // namespace
@@ -728,19 +729,19 @@ zx_status_t Controller::CreateClient(
   fbl::AllocChecker alloc_checker;
   auto post_task_state = fbl::make_unique_checked<DisplayTaskState>(&alloc_checker);
   if (!alloc_checker.check()) {
-    zxlogf(DEBUG, "Failed to alloc client task");
+    FDF_LOG(DEBUG, "Failed to alloc client task");
     return ZX_ERR_NO_MEMORY;
   }
 
   fbl::AutoLock lock(mtx());
   if (unbinding_) {
-    zxlogf(DEBUG, "Client connected during unbind");
+    FDF_LOG(DEBUG, "Client connected during unbind");
     return ZX_ERR_UNAVAILABLE;
   }
 
   if ((client_priority == ClientPriority::kVirtcon && virtcon_client_ != nullptr) ||
       (client_priority == ClientPriority::kPrimary && primary_client_ != nullptr)) {
-    zxlogf(DEBUG, "%s client already bound", DebugStringFromClientPriority(client_priority));
+    FDF_LOG(DEBUG, "%s client already bound", DebugStringFromClientPriority(client_priority));
     return ZX_ERR_ALREADY_BOUND;
   }
 
@@ -751,15 +752,15 @@ zx_status_t Controller::CreateClient(
 
   zx_status_t status = client->Init(&root_, std::move(coordinator_server_end));
   if (status != ZX_OK) {
-    zxlogf(DEBUG, "Failed to init client %d", status);
+    FDF_LOG(DEBUG, "Failed to init client %d", status);
     return status;
   }
 
   ClientProxy* client_ptr = client.get();
   clients_.push_back(std::move(client));
 
-  zxlogf(DEBUG, "New %s client [%" PRIu64 "] connected.",
-         DebugStringFromClientPriority(client_priority), client_ptr->client_id().value());
+  FDF_LOG(DEBUG, "New %s client [%" PRIu64 "] connected.",
+          DebugStringFromClientPriority(client_priority), client_ptr->client_id().value());
 
   switch (client_priority) {
     case ClientPriority::kVirtcon:
@@ -861,14 +862,14 @@ zx::result<std::unique_ptr<Controller>> Controller::Create(
   auto controller = fbl::make_unique_checked<Controller>(
       &alloc_checker, std::move(engine_driver_client), std::move(dispatcher));
   if (!alloc_checker.check()) {
-    zxlogf(ERROR, "Failed to allocate memory for Controller");
+    FDF_LOG(ERROR, "Failed to allocate memory for Controller");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
   zx::result<> initialize_result = controller->Initialize();
   if (initialize_result.is_error()) {
-    zxlogf(ERROR, "Failed to initialize the Controller device: %s",
-           initialize_result.status_string());
+    FDF_LOG(ERROR, "Failed to initialize the Controller device: %s",
+            initialize_result.status_string());
     return initialize_result.take_error();
   }
 
@@ -888,13 +889,13 @@ zx::result<> Controller::Initialize() {
   });
 
   supports_capture_ = engine_driver_client_->IsCaptureSupported();
-  zxlogf(INFO, "Display capture is%s supported", supports_capture_ ? "" : " not");
+  FDF_LOG(INFO, "Display capture is%s supported", supports_capture_ ? "" : " not");
 
   return zx::ok();
 }
 
 void Controller::PrepareStop() {
-  zxlogf(INFO, "Controller::PrepareStop");
+  FDF_LOG(INFO, "Controller::PrepareStop");
 
   fbl::AutoLock lock(mtx());
   unbinding_ = true;
@@ -943,7 +944,7 @@ Controller::Controller(std::unique_ptr<EngineDriverClient> engine_driver_client,
 }
 
 Controller::~Controller() {
-  zxlogf(INFO, "Controller::~Controller");
+  FDF_LOG(INFO, "Controller::~Controller");
   engine_driver_client_->DeregisterDisplayEngineListener();
 }
 

@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/coordinator/vsync-monitor.h"
 
 #include <lib/async-loop/loop.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/result.h>
@@ -13,7 +14,6 @@
 #include <atomic>
 
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace display {
 
@@ -40,7 +40,7 @@ VsyncMonitor::~VsyncMonitor() { Deinitialize(); }
 zx::result<> VsyncMonitor::Initialize() {
   zx_status_t post_status = updater_.PostDelayed(updater_loop_.dispatcher(), kVsyncMonitorInterval);
   if (post_status != ZX_OK) {
-    zxlogf(ERROR, "Failed to schedule vsync monitor: %s", zx_status_get_string(post_status));
+    FDF_LOG(ERROR, "Failed to schedule vsync monitor: %s", zx_status_get_string(post_status));
     return zx::error(post_status);
   }
 
@@ -64,7 +64,7 @@ void VsyncMonitor::UpdateStatistics() {
 
   zx_status_t status = updater_.PostDelayed(updater_loop_.dispatcher(), kVsyncMonitorInterval);
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Failed to schedule vsync monitor: %s", zx_status_get_string(status));
+    FDF_LOG(ERROR, "Failed to schedule vsync monitor: %s", zx_status_get_string(status));
   }
 }
 
