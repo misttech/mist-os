@@ -10,6 +10,7 @@ group("lib") {
     "starnix-lifecycle",
     "starnix-uapi",
     "syncio",
+    "third_party",
   ]
 }
 

@@ -1,4 +1,4 @@
-group("lib") {
+group("third_party") {
   deps = [ "rust_netlink" ]
 }
 
