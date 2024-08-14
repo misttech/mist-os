@@ -26,7 +26,7 @@
 /// +--------------------+                  +---------------------------------+
 /// |       ACTIVE       |<-----------------|             ACTIVE              |
 /// +--------------------+                  +---------------------------------+
-/// |   WAKE_HANDLING    |<--------+        |            INACTIVE             |
+/// |     SUSPENDING     |<--------+        |            INACTIVE             |
 /// |                    |<------+ |        +---------------------------------+
 /// +--------------------+       | |
 /// |      INACTIVE      |       | |        +---------------------------------+
@@ -110,13 +110,13 @@ type ExecutionState = resource table {
 /// suspends.
 ///
 /// Drivers can take an opportunistic dependency on either
-/// `ExecutionStateLevel::WAKE_HANDLING` or `ExecutionStateLevel::ACTIVE` and
+/// `ExecutionStateLevel::SUSPENDING` or `ExecutionStateLevel::ACTIVE` and
 /// request a persistent lease on this state to ensure that their element's
 /// power level is always activated when the system comes out of a suspend
 /// state.
 type ExecutionStateLevel = flexible enum : uint8 {
     INACTIVE = 0;
-    WAKE_HANDLING = 1;
+    SUSPENDING = 1;
     ACTIVE = 2;
 };
 

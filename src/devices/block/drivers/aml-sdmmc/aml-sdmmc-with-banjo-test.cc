@@ -628,7 +628,7 @@ class AmlSdmmcWithBanjoTest : public zxtest::Test {
     fuchsia_hardware_power::LevelTuple on_to_wake_handling = {{
         .child_level = AmlSdmmc::kPowerLevelOn,
         .parent_level =
-            static_cast<uint8_t>(fuchsia_power_system::ExecutionStateLevel::kWakeHandling),
+            static_cast<uint8_t>(fuchsia_power_system::ExecutionStateLevel::kSuspending),
     }};
     fuchsia_hardware_power::PowerDependency opportunistic_on_exec_state_wake_handling = {{
         .child = AmlSdmmc::kHardwarePowerElementName,

@@ -35,7 +35,7 @@ fpb::ElementSchema BuildSchema(zx::event requires_token, fidl::ServerEnd<fpb::Le
       /*dependent_level=*/kPowerLevelActive,
       /*requires_token=*/std::move(requires_token),
       /*requires_level_by_preference=*/
-      std::vector<uint8_t>(1, fidl::ToUnderlying(fps::ExecutionStateLevel::kWakeHandling)));
+      std::vector<uint8_t>(1, fidl::ToUnderlying(fps::ExecutionStateLevel::kSuspending)));
 
   fpb::ElementSchema schema;
   schema.element_name(element_name)
@@ -192,7 +192,7 @@ fpromise::promise<void, Error> WakeLease::AddPowerElement() {
 fpromise::promise<fidl::Client<fpb::LeaseControl>, Error> WakeLease::DoAcquireLease() {
   return add_power_element_barrier_.sync().then(
       [this](const fpromise::result<>& result) mutable
-      -> fpromise::promise<fidl::Client<fpb::LeaseControl>, Error> {
+          -> fpromise::promise<fidl::Client<fpb::LeaseControl>, Error> {
         if (!lessor_.is_valid()) {
           // Power element addition must have failed.
           FX_LOGS(ERROR) << "Failed to acquire wake lease because Lessor client is not valid.";

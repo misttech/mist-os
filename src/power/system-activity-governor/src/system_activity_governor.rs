@@ -379,7 +379,7 @@ impl SuspendStatsManager {
 /// `fuchsia.power.system.ActivityGovernor`.
 ///
 /// A wake lease blocks suspension by requiring the power level of the Execution
-/// State to be at least [`ExecutionStateLevel::WakeHandling`].
+/// State to be at least [`ExecutionStateLevel::Suspending`].
 struct WakeLeaseManager {
     /// The inspect node for lease stats.
     inspect_node: INode,
@@ -401,20 +401,21 @@ impl WakeLeaseManager {
     async fn create_wake_lease(&self, name: String) -> Result<fsystem::WakeLeaseToken> {
         let (server_token, client_token) = fsystem::WakeLeaseToken::create();
 
-        let lease_helper = LeaseHelper::new(
-            &self.topology,
-            &name,
-            vec![power_broker_client::LeaseDependency {
-                dependency_type: fbroker::DependencyType::Assertive,
-                requires_token: self
-                    .execution_state_assertive_dependency_token
-                    .duplicate_handle(zx::Rights::SAME_RIGHTS)?,
-                requires_level_by_preference: vec![
-                    ExecutionStateLevel::WakeHandling.into_primitive()
-                ],
-            }],
-        )
-        .await?;
+        let lease_helper =
+            LeaseHelper::new(
+                &self.topology,
+                &name,
+                vec![power_broker_client::LeaseDependency {
+                    dependency_type: fbroker::DependencyType::Assertive,
+                    requires_token: self
+                        .execution_state_assertive_dependency_token
+                        .duplicate_handle(zx::Rights::SAME_RIGHTS)?,
+                    requires_level_by_preference: vec![
+                        ExecutionStateLevel::Suspending.into_primitive()
+                    ],
+                }],
+            )
+            .await?;
         tracing::debug!("Acquiring lease for '{}'", name);
         let lease = lease_helper.lease().await?;
 
@@ -483,7 +484,7 @@ impl SystemActivityGovernor {
             "execution_state",
             &[
                 ExecutionStateLevel::Inactive.into_primitive(),
-                ExecutionStateLevel::WakeHandling.into_primitive(),
+                ExecutionStateLevel::Suspending.into_primitive(),
                 ExecutionStateLevel::Active.into_primitive(),
             ],
         )
@@ -501,7 +502,7 @@ impl SystemActivityGovernor {
             "execution_state",
             vec![
                 (ExecutionStateLevel::Inactive.into_primitive(), "Inactive".to_string()),
-                (ExecutionStateLevel::WakeHandling.into_primitive(), "WakeHandling".to_string()),
+                (ExecutionStateLevel::Suspending.into_primitive(), "Suspending".to_string()),
                 (ExecutionStateLevel::Active.into_primitive(), "Active".to_string()),
             ],
         ));
@@ -548,7 +549,7 @@ impl SystemActivityGovernor {
             requires_token: execution_state
                 .assertive_dependency_token()
                 .expect("token not registered"),
-            requires_level_by_preference: vec![ExecutionStateLevel::WakeHandling.into_primitive()],
+            requires_level_by_preference: vec![ExecutionStateLevel::Suspending.into_primitive()],
         }])
         .build()
         .await
@@ -576,7 +577,7 @@ impl SystemActivityGovernor {
             requires_token: execution_state
                 .assertive_dependency_token()
                 .expect("token not registered"),
-            requires_level_by_preference: vec![ExecutionStateLevel::WakeHandling.into_primitive()],
+            requires_level_by_preference: vec![ExecutionStateLevel::Suspending.into_primitive()],
         }])
         .build()
         .await
