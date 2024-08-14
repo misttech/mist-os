@@ -384,7 +384,7 @@ def CheckSampleSize(expected_sample_size, results_maps):
     for results_map in results_maps:
         for label, stats in sorted(results_map.items()):
             if stats.sample_size != expected_sample_size:
-                mismatches.append("%s (got %d)" % (label, stats.sample_size))
+                mismatches.append("  %s (got %d)" % (label, stats.sample_size))
     if len(mismatches) != 0:
         raise AssertionError(
             "The following metrics had an unexpected sample size"
