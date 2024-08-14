@@ -27,6 +27,7 @@ use linux_uapi::{
 use once_cell::sync::Lazy;
 use starnix_logging::track_stub;
 use starnix_sync::{BpfHelperOps, Locked};
+use std::collections::HashSet;
 use std::sync::Arc;
 use zerocopy::{AsBytes, FromBytes, FromZeros, NoCell};
 
@@ -268,7 +269,19 @@ fn bpf_probe_read_str(
 
 const GET_SOCKET_COOKIE_NAME: &'static str = "get_socket_cookie";
 
-fn bpf_get_socket_cookie(
+fn bpf_get_socket_cookie_sk_buf(
+    _context: &mut HelperFunctionContext<'_>,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+    _: BpfValue,
+) -> BpfValue {
+    track_stub!(TODO("https://fxbug.dev/287120494"), "bpf_get_socket_cookie");
+    0.into()
+}
+
+fn bpf_get_socket_cookie_bpf_sock(
     _context: &mut HelperFunctionContext<'_>,
     _: BpfValue,
     _: BpfValue,
@@ -392,313 +405,415 @@ fn bpf_ktime_get_boot_ns(
     0.into()
 }
 
-pub static BPF_HELPERS: Lazy<Vec<EbpfHelper<HelperFunctionContextMarker>>> = Lazy::new(|| {
-    let sk_buf_id = SK_BUF_ID.clone();
-    let ring_buffer_reservation = RING_BUFFER_RESERVATION.clone();
-    vec![
-        EbpfHelper {
-            index: bpf_func_id_BPF_FUNC_map_lookup_elem,
-            name: MAP_LOOKUP_ELEM_NAME,
-            function_pointer: Arc::new(bpf_map_lookup_elem),
-            signature: FunctionSignature {
-                args: vec![
-                    Type::ConstPtrToMapParameter,
-                    Type::MapKeyParameter { map_ptr_index: 0 },
-                ],
-                return_value: Type::NullOrParameter(Box::new(Type::MapValueParameter {
-                    map_ptr_index: 0,
-                })),
-                invalidate_array_bounds: false,
-            },
-        },
-        EbpfHelper {
-            index: bpf_func_id_BPF_FUNC_map_update_elem,
-            name: MAP_UPDATE_ELEM_NAME,
-            function_pointer: Arc::new(bpf_map_update_elem),
-            signature: FunctionSignature {
-                args: vec![
-                    Type::ConstPtrToMapParameter,
-                    Type::MapKeyParameter { map_ptr_index: 0 },
-                    Type::MapValueParameter { map_ptr_index: 0 },
-                    Type::ScalarValueParameter,
-                ],
-                return_value: Type::unknown_written_scalar_value(),
-                invalidate_array_bounds: false,
-            },
-        },
-        EbpfHelper {
-            index: bpf_func_id_BPF_FUNC_map_delete_elem,
-            name: MAP_DELETE_ELEM_NAME,
-            function_pointer: Arc::new(bpf_map_delete_elem),
-            signature: FunctionSignature {
-                args: vec![
-                    Type::ConstPtrToMapParameter,
-                    Type::MapKeyParameter { map_ptr_index: 0 },
-                ],
-                return_value: Type::unknown_written_scalar_value(),
-                invalidate_array_bounds: false,
-            },
-        },
-        EbpfHelper {
-            index: bpf_func_id_BPF_FUNC_ktime_get_ns,
-            name: KTIME_GET_NS_NAME,
-            function_pointer: Arc::new(bpf_ktime_get_ns),
-            signature: FunctionSignature {
-                args: vec![],
-                return_value: Type::unknown_written_scalar_value(),
-                invalidate_array_bounds: false,
-            },
-        },
-        EbpfHelper {
-            index: bpf_func_id_BPF_FUNC_get_socket_uid,
-            name: GET_SOCKET_UID_NAME,
-            function_pointer: Arc::new(bpf_get_socket_uid),
-            signature: FunctionSignature {
-                args: vec![Type::StructParameter { id: sk_buf_id.clone() }],
-                return_value: Type::unknown_written_scalar_value(),
-                invalidate_array_bounds: false,
-            },
-        },
-        EbpfHelper {
-            index: bpf_func_id_BPF_FUNC_get_current_uid_gid,
-            name: GET_CURRENT_UID_GID_NAME,
-            function_pointer: Arc::new(bpf_get_current_uid_gid),
-            signature: FunctionSignature {
-                args: vec![],
-                return_value: Type::unknown_written_scalar_value(),
-                invalidate_array_bounds: false,
-            },
-        },
-        EbpfHelper {
-            index: bpf_func_id_BPF_FUNC_skb_pull_data,
-            name: SKB_PULL_DATA_NAME,
-            function_pointer: Arc::new(bpf_skb_pull_data),
-            signature: FunctionSignature {
-                args: vec![
-                    Type::StructParameter { id: sk_buf_id.clone() },
-                    Type::ScalarValueParameter,
-                ],
-                return_value: Type::unknown_written_scalar_value(),
-                invalidate_array_bounds: true,
-            },
-        },
-        EbpfHelper {
-            index: bpf_func_id_BPF_FUNC_ringbuf_reserve,
-            name: RINGBUF_RESERVE_NAME,
-            function_pointer: Arc::new(bpf_ringbuf_reserve),
-            signature: FunctionSignature {
-                args: vec![
-                    Type::ConstPtrToMapParameter,
-                    Type::ScalarValueParameter,
-                    Type::ScalarValueParameter,
-                ],
-                return_value: Type::NullOrParameter(Box::new(Type::ReleasableParameter {
-                    id: ring_buffer_reservation.clone(),
-                    inner: Box::new(Type::MemoryParameter {
-                        size: MemoryParameterSize::Reference { index: 1 },
-                        input: false,
-                        output: false,
-                    }),
-                })),
-                invalidate_array_bounds: false,
-            },
-        },
-        EbpfHelper {
-            index: bpf_func_id_BPF_FUNC_ringbuf_submit,
-            name: RINGBUF_SUBMIT_NAME,
-            function_pointer: Arc::new(bpf_ringbuf_submit),
-            signature: FunctionSignature {
-                args: vec![
-                    Type::ReleaseParameter { id: ring_buffer_reservation.clone() },
-                    Type::ScalarValueParameter,
-                ],
-                return_value: Type::default(),
-                invalidate_array_bounds: false,
-            },
-        },
-        EbpfHelper {
-            index: bpf_func_id_BPF_FUNC_ringbuf_discard,
-            name: RINGBUF_DISCARD_NAME,
-            function_pointer: Arc::new(bpf_ringbuf_discard),
-            signature: FunctionSignature {
-                args: vec![
-                    Type::ReleaseParameter { id: ring_buffer_reservation.clone() },
-                    Type::ScalarValueParameter,
-                ],
-                return_value: Type::default(),
-                invalidate_array_bounds: false,
-            },
-        },
-        EbpfHelper {
-            index: bpf_func_id_BPF_FUNC_skb_change_proto,
-            name: SKB_CHANGE_PROTO_NAME,
-            function_pointer: Arc::new(bpf_skb_change_proto),
-            signature: FunctionSignature {
-                args: vec![
-                    Type::StructParameter { id: sk_buf_id.clone() },
-                    Type::ScalarValueParameter,
-                    Type::ScalarValueParameter,
-                ],
-                return_value: Type::unknown_written_scalar_value(),
-                invalidate_array_bounds: true,
-            },
-        },
-        EbpfHelper {
-            index: bpf_func_id_BPF_FUNC_csum_update,
-            name: CSUM_UPDATE_NAME,
-            function_pointer: Arc::new(bpf_csum_update),
-            signature: FunctionSignature {
-                args: vec![
-                    Type::StructParameter { id: sk_buf_id.clone() },
-                    Type::ScalarValueParameter,
-                ],
-                return_value: Type::unknown_written_scalar_value(),
-                invalidate_array_bounds: false,
-            },
-        },
-        EbpfHelper {
-            index: bpf_func_id_BPF_FUNC_probe_read_str,
-            name: PROBE_READ_STR_NAME,
-            function_pointer: Arc::new(bpf_probe_read_str),
-            signature: FunctionSignature {
-                // TODO(347257215): Implement verifier feature
-                args: vec![],
-                return_value: Type::unknown_written_scalar_value(),
-                invalidate_array_bounds: false,
-            },
-        },
-        EbpfHelper {
-            index: bpf_func_id_BPF_FUNC_get_socket_cookie,
-            name: GET_SOCKET_COOKIE_NAME,
-            function_pointer: Arc::new(bpf_get_socket_cookie),
-            signature: FunctionSignature {
-                args: vec![Type::StructParameter { id: sk_buf_id.clone() }],
-                return_value: Type::unknown_written_scalar_value(),
-                invalidate_array_bounds: false,
-            },
-        },
-        EbpfHelper {
-            index: bpf_func_id_BPF_FUNC_redirect,
-            name: REDIRECT_NAME,
-            function_pointer: Arc::new(bpf_redirect),
-            signature: FunctionSignature {
-                args: vec![Type::ScalarValueParameter, Type::ScalarValueParameter],
-                return_value: Type::unknown_written_scalar_value(),
-                invalidate_array_bounds: false,
-            },
-        },
-        EbpfHelper {
-            index: bpf_func_id_BPF_FUNC_skb_adjust_room,
-            name: SKB_ADJUST_ROOM_NAME,
-            function_pointer: Arc::new(bpf_skb_adjust_room),
-            signature: FunctionSignature {
-                args: vec![
-                    Type::StructParameter { id: sk_buf_id.clone() },
-                    Type::ScalarValueParameter,
-                    Type::ScalarValueParameter,
-                    Type::ScalarValueParameter,
-                ],
-                return_value: Type::unknown_written_scalar_value(),
-                invalidate_array_bounds: true,
-            },
-        },
-        EbpfHelper {
-            index: bpf_func_id_BPF_FUNC_l3_csum_replace,
-            name: L3_CSUM_REPLACE,
-            function_pointer: Arc::new(bpf_l3_csum_replace),
-            signature: FunctionSignature {
-                args: vec![
-                    Type::StructParameter { id: sk_buf_id.clone() },
-                    Type::ScalarValueParameter,
-                    Type::ScalarValueParameter,
-                    Type::ScalarValueParameter,
-                    Type::ScalarValueParameter,
-                ],
-                return_value: Type::unknown_written_scalar_value(),
-                invalidate_array_bounds: true,
-            },
-        },
-        EbpfHelper {
-            index: bpf_func_id_BPF_FUNC_l4_csum_replace,
-            name: L4_CSUM_REPLACE,
-            function_pointer: Arc::new(bpf_l4_csum_replace),
-            signature: FunctionSignature {
-                args: vec![
-                    Type::StructParameter { id: sk_buf_id.clone() },
-                    Type::ScalarValueParameter,
-                    Type::ScalarValueParameter,
-                    Type::ScalarValueParameter,
-                    Type::ScalarValueParameter,
-                ],
-                return_value: Type::unknown_written_scalar_value(),
-                invalidate_array_bounds: true,
-            },
-        },
-        EbpfHelper {
-            index: bpf_func_id_BPF_FUNC_skb_store_bytes,
-            name: SKB_STORE_BYTES,
-            function_pointer: Arc::new(bpf_skb_store_bytes),
-            signature: FunctionSignature {
-                args: vec![
-                    Type::StructParameter { id: sk_buf_id.clone() },
-                    Type::ScalarValueParameter,
-                    Type::MemoryParameter {
-                        size: MemoryParameterSize::Reference { index: 3 },
-                        input: true,
-                        output: false,
+#[derive(Clone, Default, Debug)]
+pub struct BpfTypeFilter(HashSet<ProgramType>);
+
+impl BpfTypeFilter {
+    pub fn accept(&self, program_type: ProgramType) -> bool {
+        self.0.is_empty() || self.0.contains(&program_type)
+    }
+}
+
+impl<T: IntoIterator<Item = ProgramType>> From<T> for BpfTypeFilter {
+    fn from(types: T) -> Self {
+        Self(types.into_iter().collect())
+    }
+}
+
+pub static BPF_HELPERS: Lazy<Vec<(BpfTypeFilter, EbpfHelper<HelperFunctionContextMarker>)>> =
+    Lazy::new(|| {
+        let ring_buffer_reservation = RING_BUFFER_RESERVATION.clone();
+        let sk_buf_id = SK_BUF_ID.clone();
+        let bpf_sock_id = BPF_SOCK_ID.clone();
+        vec![
+            (
+                BpfTypeFilter::default(),
+                EbpfHelper {
+                    index: bpf_func_id_BPF_FUNC_map_lookup_elem,
+                    name: MAP_LOOKUP_ELEM_NAME,
+                    function_pointer: Arc::new(bpf_map_lookup_elem),
+                    signature: FunctionSignature {
+                        args: vec![
+                            Type::ConstPtrToMapParameter,
+                            Type::MapKeyParameter { map_ptr_index: 0 },
+                        ],
+                        return_value: Type::NullOrParameter(Box::new(Type::MapValueParameter {
+                            map_ptr_index: 0,
+                        })),
+                        invalidate_array_bounds: false,
                     },
-                    Type::ScalarValueParameter,
-                    Type::ScalarValueParameter,
-                ],
-                return_value: Type::unknown_written_scalar_value(),
-                invalidate_array_bounds: true,
-            },
-        },
-        EbpfHelper {
-            index: bpf_func_id_BPF_FUNC_skb_change_head,
-            name: SKB_CHANGE_HEAD,
-            function_pointer: Arc::new(bpf_skb_change_head),
-            signature: FunctionSignature {
-                args: vec![
-                    Type::StructParameter { id: sk_buf_id.clone() },
-                    Type::ScalarValueParameter,
-                    Type::ScalarValueParameter,
-                ],
-                return_value: Type::unknown_written_scalar_value(),
-                invalidate_array_bounds: true,
-            },
-        },
-        EbpfHelper {
-            index: bpf_func_id_BPF_FUNC_skb_load_bytes_relative,
-            name: SKB_LOAD_BYTES_RELATIVE_NAME,
-            function_pointer: Arc::new(bpf_skb_load_bytes_relative),
-            signature: FunctionSignature {
-                args: vec![
-                    Type::StructParameter { id: sk_buf_id.clone() },
-                    Type::ScalarValueParameter,
-                    Type::MemoryParameter {
-                        size: MemoryParameterSize::Reference { index: 3 },
-                        input: false,
-                        output: true,
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelper {
+                    index: bpf_func_id_BPF_FUNC_map_update_elem,
+                    name: MAP_UPDATE_ELEM_NAME,
+                    function_pointer: Arc::new(bpf_map_update_elem),
+                    signature: FunctionSignature {
+                        args: vec![
+                            Type::ConstPtrToMapParameter,
+                            Type::MapKeyParameter { map_ptr_index: 0 },
+                            Type::MapValueParameter { map_ptr_index: 0 },
+                            Type::ScalarValueParameter,
+                        ],
+                        return_value: Type::unknown_written_scalar_value(),
+                        invalidate_array_bounds: false,
                     },
-                    Type::ScalarValueParameter,
-                ],
-                return_value: Type::unknown_written_scalar_value(),
-                invalidate_array_bounds: false,
-            },
-        },
-        EbpfHelper {
-            index: bpf_func_id_BPF_FUNC_ktime_get_boot_ns,
-            name: KTIME_GET_BOOT_NS_NAME,
-            function_pointer: Arc::new(bpf_ktime_get_boot_ns),
-            signature: FunctionSignature {
-                args: vec![],
-                return_value: Type::unknown_written_scalar_value(),
-                invalidate_array_bounds: false,
-            },
-        },
-    ]
-});
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelper {
+                    index: bpf_func_id_BPF_FUNC_map_delete_elem,
+                    name: MAP_DELETE_ELEM_NAME,
+                    function_pointer: Arc::new(bpf_map_delete_elem),
+                    signature: FunctionSignature {
+                        args: vec![
+                            Type::ConstPtrToMapParameter,
+                            Type::MapKeyParameter { map_ptr_index: 0 },
+                        ],
+                        return_value: Type::unknown_written_scalar_value(),
+                        invalidate_array_bounds: false,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelper {
+                    index: bpf_func_id_BPF_FUNC_ktime_get_ns,
+                    name: KTIME_GET_NS_NAME,
+                    function_pointer: Arc::new(bpf_ktime_get_ns),
+                    signature: FunctionSignature {
+                        args: vec![],
+                        return_value: Type::unknown_written_scalar_value(),
+                        invalidate_array_bounds: false,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelper {
+                    index: bpf_func_id_BPF_FUNC_get_socket_uid,
+                    name: GET_SOCKET_UID_NAME,
+                    function_pointer: Arc::new(bpf_get_socket_uid),
+                    signature: FunctionSignature {
+                        args: vec![Type::StructParameter { id: sk_buf_id.clone() }],
+                        return_value: Type::unknown_written_scalar_value(),
+                        invalidate_array_bounds: false,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelper {
+                    index: bpf_func_id_BPF_FUNC_get_current_uid_gid,
+                    name: GET_CURRENT_UID_GID_NAME,
+                    function_pointer: Arc::new(bpf_get_current_uid_gid),
+                    signature: FunctionSignature {
+                        args: vec![],
+                        return_value: Type::unknown_written_scalar_value(),
+                        invalidate_array_bounds: false,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelper {
+                    index: bpf_func_id_BPF_FUNC_skb_pull_data,
+                    name: SKB_PULL_DATA_NAME,
+                    function_pointer: Arc::new(bpf_skb_pull_data),
+                    signature: FunctionSignature {
+                        args: vec![
+                            Type::StructParameter { id: sk_buf_id.clone() },
+                            Type::ScalarValueParameter,
+                        ],
+                        return_value: Type::unknown_written_scalar_value(),
+                        invalidate_array_bounds: true,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelper {
+                    index: bpf_func_id_BPF_FUNC_ringbuf_reserve,
+                    name: RINGBUF_RESERVE_NAME,
+                    function_pointer: Arc::new(bpf_ringbuf_reserve),
+                    signature: FunctionSignature {
+                        args: vec![
+                            Type::ConstPtrToMapParameter,
+                            Type::ScalarValueParameter,
+                            Type::ScalarValueParameter,
+                        ],
+                        return_value: Type::NullOrParameter(Box::new(Type::ReleasableParameter {
+                            id: ring_buffer_reservation.clone(),
+                            inner: Box::new(Type::MemoryParameter {
+                                size: MemoryParameterSize::Reference { index: 1 },
+                                input: false,
+                                output: false,
+                            }),
+                        })),
+                        invalidate_array_bounds: false,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelper {
+                    index: bpf_func_id_BPF_FUNC_ringbuf_submit,
+                    name: RINGBUF_SUBMIT_NAME,
+                    function_pointer: Arc::new(bpf_ringbuf_submit),
+                    signature: FunctionSignature {
+                        args: vec![
+                            Type::ReleaseParameter { id: ring_buffer_reservation.clone() },
+                            Type::ScalarValueParameter,
+                        ],
+                        return_value: Type::default(),
+                        invalidate_array_bounds: false,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelper {
+                    index: bpf_func_id_BPF_FUNC_ringbuf_discard,
+                    name: RINGBUF_DISCARD_NAME,
+                    function_pointer: Arc::new(bpf_ringbuf_discard),
+                    signature: FunctionSignature {
+                        args: vec![
+                            Type::ReleaseParameter { id: ring_buffer_reservation.clone() },
+                            Type::ScalarValueParameter,
+                        ],
+                        return_value: Type::default(),
+                        invalidate_array_bounds: false,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelper {
+                    index: bpf_func_id_BPF_FUNC_skb_change_proto,
+                    name: SKB_CHANGE_PROTO_NAME,
+                    function_pointer: Arc::new(bpf_skb_change_proto),
+                    signature: FunctionSignature {
+                        args: vec![
+                            Type::StructParameter { id: sk_buf_id.clone() },
+                            Type::ScalarValueParameter,
+                            Type::ScalarValueParameter,
+                        ],
+                        return_value: Type::unknown_written_scalar_value(),
+                        invalidate_array_bounds: true,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelper {
+                    index: bpf_func_id_BPF_FUNC_csum_update,
+                    name: CSUM_UPDATE_NAME,
+                    function_pointer: Arc::new(bpf_csum_update),
+                    signature: FunctionSignature {
+                        args: vec![
+                            Type::StructParameter { id: sk_buf_id.clone() },
+                            Type::ScalarValueParameter,
+                        ],
+                        return_value: Type::unknown_written_scalar_value(),
+                        invalidate_array_bounds: false,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelper {
+                    index: bpf_func_id_BPF_FUNC_probe_read_str,
+                    name: PROBE_READ_STR_NAME,
+                    function_pointer: Arc::new(bpf_probe_read_str),
+                    signature: FunctionSignature {
+                        // TODO(347257215): Implement verifier feature
+                        args: vec![],
+                        return_value: Type::unknown_written_scalar_value(),
+                        invalidate_array_bounds: false,
+                    },
+                },
+            ),
+            (
+                vec![
+                    ProgramType::CgroupSkb,
+                    ProgramType::SchedAct,
+                    ProgramType::SchedCls,
+                    ProgramType::SocketFilter,
+                ]
+                .into(),
+                EbpfHelper {
+                    index: bpf_func_id_BPF_FUNC_get_socket_cookie,
+                    name: GET_SOCKET_COOKIE_NAME,
+                    function_pointer: Arc::new(bpf_get_socket_cookie_sk_buf),
+                    signature: FunctionSignature {
+                        args: vec![Type::StructParameter { id: sk_buf_id.clone() }],
+                        return_value: Type::unknown_written_scalar_value(),
+                        invalidate_array_bounds: false,
+                    },
+                },
+            ),
+            (
+                vec![ProgramType::CgroupSock].into(),
+                EbpfHelper {
+                    index: bpf_func_id_BPF_FUNC_get_socket_cookie,
+                    name: GET_SOCKET_COOKIE_NAME,
+                    function_pointer: Arc::new(bpf_get_socket_cookie_bpf_sock),
+                    signature: FunctionSignature {
+                        args: vec![Type::StructParameter { id: bpf_sock_id.clone() }],
+                        return_value: Type::unknown_written_scalar_value(),
+                        invalidate_array_bounds: false,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelper {
+                    index: bpf_func_id_BPF_FUNC_redirect,
+                    name: REDIRECT_NAME,
+                    function_pointer: Arc::new(bpf_redirect),
+                    signature: FunctionSignature {
+                        args: vec![Type::ScalarValueParameter, Type::ScalarValueParameter],
+                        return_value: Type::unknown_written_scalar_value(),
+                        invalidate_array_bounds: false,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelper {
+                    index: bpf_func_id_BPF_FUNC_skb_adjust_room,
+                    name: SKB_ADJUST_ROOM_NAME,
+                    function_pointer: Arc::new(bpf_skb_adjust_room),
+                    signature: FunctionSignature {
+                        args: vec![
+                            Type::StructParameter { id: sk_buf_id.clone() },
+                            Type::ScalarValueParameter,
+                            Type::ScalarValueParameter,
+                            Type::ScalarValueParameter,
+                        ],
+                        return_value: Type::unknown_written_scalar_value(),
+                        invalidate_array_bounds: true,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelper {
+                    index: bpf_func_id_BPF_FUNC_l3_csum_replace,
+                    name: L3_CSUM_REPLACE,
+                    function_pointer: Arc::new(bpf_l3_csum_replace),
+                    signature: FunctionSignature {
+                        args: vec![
+                            Type::StructParameter { id: sk_buf_id.clone() },
+                            Type::ScalarValueParameter,
+                            Type::ScalarValueParameter,
+                            Type::ScalarValueParameter,
+                            Type::ScalarValueParameter,
+                        ],
+                        return_value: Type::unknown_written_scalar_value(),
+                        invalidate_array_bounds: true,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelper {
+                    index: bpf_func_id_BPF_FUNC_l4_csum_replace,
+                    name: L4_CSUM_REPLACE,
+                    function_pointer: Arc::new(bpf_l4_csum_replace),
+                    signature: FunctionSignature {
+                        args: vec![
+                            Type::StructParameter { id: sk_buf_id.clone() },
+                            Type::ScalarValueParameter,
+                            Type::ScalarValueParameter,
+                            Type::ScalarValueParameter,
+                            Type::ScalarValueParameter,
+                        ],
+                        return_value: Type::unknown_written_scalar_value(),
+                        invalidate_array_bounds: true,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelper {
+                    index: bpf_func_id_BPF_FUNC_skb_store_bytes,
+                    name: SKB_STORE_BYTES,
+                    function_pointer: Arc::new(bpf_skb_store_bytes),
+                    signature: FunctionSignature {
+                        args: vec![
+                            Type::StructParameter { id: sk_buf_id.clone() },
+                            Type::ScalarValueParameter,
+                            Type::MemoryParameter {
+                                size: MemoryParameterSize::Reference { index: 3 },
+                                input: true,
+                                output: false,
+                            },
+                            Type::ScalarValueParameter,
+                            Type::ScalarValueParameter,
+                        ],
+                        return_value: Type::unknown_written_scalar_value(),
+                        invalidate_array_bounds: true,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelper {
+                    index: bpf_func_id_BPF_FUNC_skb_change_head,
+                    name: SKB_CHANGE_HEAD,
+                    function_pointer: Arc::new(bpf_skb_change_head),
+                    signature: FunctionSignature {
+                        args: vec![
+                            Type::StructParameter { id: sk_buf_id.clone() },
+                            Type::ScalarValueParameter,
+                            Type::ScalarValueParameter,
+                        ],
+                        return_value: Type::unknown_written_scalar_value(),
+                        invalidate_array_bounds: true,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelper {
+                    index: bpf_func_id_BPF_FUNC_skb_load_bytes_relative,
+                    name: SKB_LOAD_BYTES_RELATIVE_NAME,
+                    function_pointer: Arc::new(bpf_skb_load_bytes_relative),
+                    signature: FunctionSignature {
+                        args: vec![
+                            Type::StructParameter { id: sk_buf_id.clone() },
+                            Type::ScalarValueParameter,
+                            Type::MemoryParameter {
+                                size: MemoryParameterSize::Reference { index: 3 },
+                                input: false,
+                                output: true,
+                            },
+                            Type::ScalarValueParameter,
+                        ],
+                        return_value: Type::unknown_written_scalar_value(),
+                        invalidate_array_bounds: false,
+                    },
+                },
+            ),
+            (
+                BpfTypeFilter::default(),
+                EbpfHelper {
+                    index: bpf_func_id_BPF_FUNC_ktime_get_boot_ns,
+                    name: KTIME_GET_BOOT_NS_NAME,
+                    function_pointer: Arc::new(bpf_ktime_get_boot_ns),
+                    signature: FunctionSignature {
+                        args: vec![],
+                        return_value: Type::unknown_written_scalar_value(),
+                        invalidate_array_bounds: false,
+                    },
+                },
+            ),
+        ]
+    });
 
 #[derive(Debug, Default)]
 struct ArgBuilder {
@@ -734,6 +849,12 @@ impl ArgBuilder {
 
 fn build_bpf_args<T: AsBytes>() -> Vec<Type> {
     ArgBuilder::default().build::<T>()
+}
+
+fn build_bpf_args_with_id<T: AsBytes>(id: MemoryId) -> Vec<Type> {
+    let mut builder = ArgBuilder::default();
+    builder.set_id(id);
+    builder.build::<T>()
 }
 
 #[repr(C)]
@@ -777,8 +898,10 @@ struct SkBuf {
     pub data: uref<u8>,
     pub data_end: uref<u8>,
 }
-static SK_BUF_ID: Lazy<MemoryId> = Lazy::new(new_bpf_type_identifier);
+
 static RING_BUFFER_RESERVATION: Lazy<MemoryId> = Lazy::new(new_bpf_type_identifier);
+
+static SK_BUF_ID: Lazy<MemoryId> = Lazy::new(new_bpf_type_identifier);
 static SK_BUF_ARGS: Lazy<Vec<Type>> = Lazy::new(|| {
     let mut builder = ArgBuilder::default();
     // Set the id of the main struct.
@@ -844,9 +967,11 @@ static XDP_MD_ARGS: Lazy<Vec<Type>> = Lazy::new(|| {
 static BPF_USER_PT_REGS_T_ARGS: Lazy<Vec<Type>> =
     Lazy::new(|| build_bpf_args::<bpf_user_pt_regs_t>());
 
-static BPF_SOCK_ARGS: Lazy<Vec<Type>> = Lazy::new(|| build_bpf_args::<bpf_sock>());
+static BPF_SOCK_ID: Lazy<MemoryId> = Lazy::new(new_bpf_type_identifier);
+static BPF_SOCK_ARGS: Lazy<Vec<Type>> =
+    Lazy::new(|| build_bpf_args_with_id::<bpf_sock>(BPF_SOCK_ID.clone()));
 
-static BPF_SOCKOPT: Lazy<Vec<Type>> = Lazy::new(|| build_bpf_args::<bpf_sockopt>());
+static BPF_SOCKOPT_ARGS: Lazy<Vec<Type>> = Lazy::new(|| build_bpf_args::<bpf_sockopt>());
 
 static BPF_SOCK_ADDR_ARGS: Lazy<Vec<Type>> = Lazy::new(|| build_bpf_args::<bpf_sock_addr>());
 
@@ -872,7 +997,7 @@ struct TraceEvent {
 
 static BPF_TRACEPOINT_ARGS: Lazy<Vec<Type>> = Lazy::new(|| build_bpf_args::<TraceEvent>());
 
-pub fn get_bpf_args(program_type: &ProgramType) -> &'static [Type] {
+pub fn get_bpf_args(program_type: ProgramType) -> &'static [Type] {
     match program_type {
         ProgramType::CgroupSkb
         | ProgramType::SchedAct
@@ -882,7 +1007,7 @@ pub fn get_bpf_args(program_type: &ProgramType) -> &'static [Type] {
         ProgramType::KProbe => &BPF_USER_PT_REGS_T_ARGS,
         ProgramType::TracePoint => &BPF_TRACEPOINT_ARGS,
         ProgramType::CgroupSock => &BPF_SOCK_ARGS,
-        ProgramType::CgroupSockopt => &BPF_SOCKOPT,
+        ProgramType::CgroupSockopt => &BPF_SOCKOPT_ARGS,
         ProgramType::CgroupSockAddr => &BPF_SOCK_ADDR_ARGS,
         ProgramType::Unknown(_) => &[],
     }

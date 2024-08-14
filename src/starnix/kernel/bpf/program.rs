@@ -26,7 +26,7 @@ use starnix_uapi::{
 use zerocopy::{AsBytes, FromBytes, NoCell};
 
 /// The different type of BPF programs.
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum ProgramType {
     SocketFilter,
     KProbe,
@@ -103,10 +103,12 @@ impl Program {
         let vm = (|| {
             // TODO(https://fxbug.dev/323503929): Only register helper function associated with the
             // type of the bpf program.
-            for helper in BPF_HELPERS.iter() {
-                builder.register(helper)?;
+            for (filter, helper) in BPF_HELPERS.iter() {
+                if filter.accept(info.program_type) {
+                    builder.register(helper)?;
+                }
             }
-            builder.set_args(get_bpf_args(&info.program_type));
+            builder.set_args(get_bpf_args(info.program_type));
             let mut logger = BufferVeriferLogger::new(logger);
             builder.load(code, &mut logger)
         })()
