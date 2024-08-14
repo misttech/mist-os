@@ -385,7 +385,7 @@
             source_availability: "unknown",
         },
         {
-            dictionary: "tee-clients-capabilities",
+            dictionary: "tee-client-capabilities",
             from: "#tee-clients",
             to: "#session-manager",
             source_availability: "unknown",
