@@ -7,6 +7,7 @@
 #include <fuchsia/media/cpp/fidl.h>
 #include <lib/fzl/vmo-mapper.h>
 
+#include <cmath>
 #include <unordered_set>
 
 #include "src/media/audio/lib/test/test_fixture.h"

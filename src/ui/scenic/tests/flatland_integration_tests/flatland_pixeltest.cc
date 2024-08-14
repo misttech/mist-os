@@ -8,6 +8,7 @@
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
 
+#include <cmath>
 #include <cstdint>
 
 #include <zxtest/zxtest.h>

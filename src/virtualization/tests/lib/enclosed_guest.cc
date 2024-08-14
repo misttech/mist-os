@@ -31,6 +31,7 @@
 #include <zircon/status.h>
 
 #include <algorithm>
+#include <cmath>
 #include <memory>
 #include <optional>
 #include <string>

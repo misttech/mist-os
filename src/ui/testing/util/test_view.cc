@@ -10,6 +10,8 @@
 #include <lib/ui/scenic/cpp/view_identity.h>
 #include <zircon/status.h>
 
+#include <cmath>
+
 #include "sdk/lib/syslog/cpp/macros.h"
 #include "src/lib/fsl/handles/object_info.h"
 

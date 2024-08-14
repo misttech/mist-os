@@ -15,6 +15,8 @@
 #include <lib/fit/defer.h>
 #include <zircon/types.h>
 
+#include <cmath>
+
 #include "src/devices/lib/acpi/client.h"
 
 namespace intel_thermal {

@@ -13,6 +13,7 @@
 #include <zircon/errors.h>
 
 #include <cassert>
+#include <cmath>
 #include <memory>
 #include <unordered_map>
 #include <vector>

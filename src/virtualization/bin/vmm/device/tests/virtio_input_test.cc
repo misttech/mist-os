@@ -12,6 +12,8 @@
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/zx/result.h>
 
+#include <cmath>
+
 #include <virtio/input.h>
 
 #include "src/virtualization/bin/vmm/device/input.h"

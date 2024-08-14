@@ -11,6 +11,7 @@
 #include <lib/ui/scenic/cpp/view_ref_pair.h>
 #include <zircon/status.h>
 
+#include <cmath>
 #include <stack>
 
 #include <src/lib/fostr/fidl/fuchsia/ui/input/formatting.h>
