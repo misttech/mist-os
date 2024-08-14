@@ -124,8 +124,22 @@
         },
         {
             protocol: [ "fuchsia.boot.WriteOnlyLog" ],
-            from: "parent",
-            to: [ "#driver_manager" ],
+            from: "void",
+            to: [
+                "#driver-hosts",
+                "#driver_manager",
+            ],
+            availability: "optional",
+        },
+        {
+            protocol: [ "fuchsia.scheduler.RoleManager" ],
+            from: "void",
+            to: [
+                "#boot-drivers",
+                "#driver-hosts",
+                "#driver_manager",
+            ],
+            availability: "optional",
         },
         {
             protocol: [
@@ -136,6 +150,12 @@
             to: [ "#boot-drivers" ],
         },
         {
+            protocol: [ "fuchsia.boot.Arguments" ],
+            from: "void",
+            to: [ "#boot-drivers" ],
+            availability: "optional",
+        },
+        {
             protocol: [
                 "fuchsia.boot.Items",
                 "fuchsia.device.manager.SystemStateTransition",
@@ -143,6 +163,18 @@
             ],
             from: "parent",
             to: [ "#driver_manager" ],
+        },
+        {
+            protocol: [ "fuchsia.kernel.MexecResource" ],
+            from: "void",
+            to: [ "#driver_manager" ],
+            availability: "optional",
+        },
+        {
+            protocol: [ "fuchsia.kernel.IommuResource" ],
+            from: "void",
+            to: [ "#boot-drivers" ],
+            availability: "optional",
         },
         {
             protocol: [ "fuchsia.device.manager.SystemStateTransition" ],

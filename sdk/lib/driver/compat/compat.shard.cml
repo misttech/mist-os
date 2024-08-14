@@ -12,11 +12,15 @@
     use: [
         {
             protocol: [
-                "fuchsia.boot.Arguments",
                 "fuchsia.boot.Items",
                 "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.driver.framework.CompositeNodeManager",
             ],
+        },
+        {
+            // Not available in tests.
+            protocol: [ "fuchsia.boot.Arguments" ],
+            availability: "optional",
         },
         { service: "fuchsia.driver.compat.Service" },
     ],
