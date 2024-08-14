@@ -599,7 +599,6 @@ mod tests {
         ROUTE_LISTS_OVERLAP,
     };
     use crate::verify::route_sources::{RouteSourceError, Source, VerifyRouteSourcesResult};
-    use crate::verify::RouteSegment;
     use anyhow::Result;
     use cm_config::RuntimeConfig;
     use cm_fidl_analyzer::component_model::ModelBuilderForAnalyzer;
@@ -614,6 +613,7 @@ mod tests {
     use maplit::{hashmap, hashset};
     use moniker::Moniker;
     use routing::environment::RunnerRegistry;
+    use routing::mapper::RouteSegment;
     use scrutiny_collection::core::{Component, ComponentSource, Components};
     use scrutiny_collection::model::DataModel;
     use scrutiny_collection::v2_component_model::V2ComponentModel;

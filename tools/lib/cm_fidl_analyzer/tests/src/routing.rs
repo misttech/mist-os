@@ -15,7 +15,7 @@ use cm_fidl_analyzer::component_model::{
     AnalyzerModelError, ComponentModelForAnalyzer, ModelBuilderForAnalyzer,
 };
 use cm_fidl_analyzer::environment::{BOOT_RESOLVER_NAME, BOOT_SCHEME};
-use cm_fidl_analyzer::route::VerifyRouteResult;
+use cm_fidl_analyzer::route::{TargetDecl, VerifyRouteResult};
 use cm_rust::*;
 use cm_rust_testing::*;
 use cm_types::Url;
@@ -2005,6 +2005,7 @@ mod tests {
             directories,
             &vec![VerifyRouteResult {
                 using_node: Moniker::parse_str("b").unwrap(),
+                target_decl: TargetDecl::Use(use_directory_decl.clone()),
                 capability: Some("bar_data".parse().unwrap()),
                 error: None,
                 route: vec![
@@ -2036,6 +2037,11 @@ mod tests {
             runners,
             &vec![VerifyRouteResult {
                 using_node: Moniker::parse_str("b").unwrap(),
+                target_decl: TargetDecl::Use(UseDecl::Runner(UseRunnerDecl {
+                    source: UseSource::Environment,
+                    source_name: "dwarf".parse().unwrap(),
+                    source_dictionary: Default::default(),
+                })),
                 capability: Some("dwarf".parse().unwrap()),
                 error: None,
                 route: vec![
@@ -2064,6 +2070,7 @@ mod tests {
             resolvers,
             &vec![VerifyRouteResult {
                 using_node: Moniker::parse_str("b").unwrap(),
+                target_decl: TargetDecl::ResolverFromEnvironment("base".to_string()),
                 capability: Some("base_resolver".parse().unwrap()),
                 error: None,
                 route: vec![
@@ -2092,6 +2099,7 @@ mod tests {
             protocols,
             &vec![VerifyRouteResult {
                 using_node: Moniker::parse_str("b").unwrap(),
+                target_decl: TargetDecl::Expose(expose_protocol_decl.clone()),
                 capability: Some("bad_protocol".parse().unwrap()),
                 error: Some(AnalyzerModelError::RoutingError(
                     RoutingError::ExposeFromChildInstanceNotFound {
@@ -2211,6 +2219,7 @@ mod tests {
             protocols,
             &vec![VerifyRouteResult {
                 using_node: Moniker::root(),
+                target_decl: TargetDecl::Offer(offer_protocol_decl.clone()),
                 capability: Some("fuchsia.examples.Echo".parse().unwrap()),
                 error: Some(AnalyzerModelError::RoutingError(
                     RoutingError::OfferFromChildInstanceNotFound {

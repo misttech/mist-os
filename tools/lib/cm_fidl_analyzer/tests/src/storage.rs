@@ -4,7 +4,7 @@
 
 mod tests {
     use crate::routing::RoutingTestBuilderForAnalyzer;
-    use cm_fidl_analyzer::route::VerifyRouteResult;
+    use cm_fidl_analyzer::route::{TargetDecl, VerifyRouteResult};
     use cm_rust::{CapabilityDecl, CapabilityTypeName, OfferSource, StorageDirectorySource};
     use cm_rust_testing::*;
     use component_id_index::InstanceId;
@@ -313,12 +313,13 @@ mod tests {
             &vec![
                 VerifyRouteResult {
                     using_node: Moniker::parse_str("/storage_provider").unwrap(),
+                    target_decl: TargetDecl::Offer(offer_storage_decl.clone()),
                     capability: Some("cache".parse().unwrap()),
                     error: None,
                     route: vec![
                         RouteSegment::OfferBy {
                             moniker: Moniker::parse_str("/storage_provider").unwrap(),
-                            capability: offer_storage_decl,
+                            capability: offer_storage_decl.clone(),
                         },
                         RouteSegment::DeclareBy {
                             moniker: Moniker::parse_str("/storage_provider").unwrap(),
@@ -335,6 +336,7 @@ mod tests {
                 },
                 VerifyRouteResult {
                     using_node: Moniker::parse_str("/storage_provider").unwrap(),
+                    target_decl: TargetDecl::Offer(offer_storage_decl),
                     capability: Some("cache".parse().unwrap()),
                     error: None,
                     route: vec![
