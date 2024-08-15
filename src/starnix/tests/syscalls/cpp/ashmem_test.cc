@@ -449,7 +449,7 @@ TEST_F(AshmemTest, PinStatusOverlap) {
   void *addr = mmap(nullptr, 2 * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
-  ASSERT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin_left),
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin_left),
               SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_PIN_STATUS, &pin_total),
               SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
@@ -477,6 +477,96 @@ TEST_F(AshmemTest, PinUnsignedOverflow) {
   EXPECT_EQ(EFAULT, errno);
 
   ASSERT_THAT(munmap(addr, 4 * PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// Basic memory purge functionality
+TEST_F(AshmemTest, Purge) {
+  ashmem_pin pin = {.offset = 0, .len = PAGE_SIZE};
+  auto fd = CreateRegion(nullptr, PAGE_SIZE);
+  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin), SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_PURGE_ALL_CACHES, 0),
+              SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin), SyscallSucceedsWithValue(ASHMEM_WAS_PURGED));
+
+  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// Purge when no intervals are unpinned
+TEST_F(AshmemTest, PinAndPurge) {
+  ashmem_pin pin = {.offset = 0, .len = PAGE_SIZE};
+  auto fd = CreateRegion(nullptr, PAGE_SIZE);
+  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin), SyscallSucceedsWithValue(ASHMEM_NOT_PURGED));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_PURGE_ALL_CACHES, 0),
+              SyscallSucceedsWithValue(ASHMEM_IS_PINNED));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin), SyscallSucceedsWithValue(ASHMEM_NOT_PURGED));
+
+  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// Unpinning a purged region
+TEST_F(AshmemTest, PugeAndUnpin) {
+  ashmem_pin pin = {.offset = 0, .len = PAGE_SIZE};
+  auto fd = CreateRegion(nullptr, PAGE_SIZE);
+  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+
+  ASSERT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin), SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_PURGE_ALL_CACHES, 0),
+              SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin), SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
+
+  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// Purge a region, pin it, then try to purge it again
+TEST_F(AshmemTest, PurgeTwice) {
+  ashmem_pin pin = {.offset = 0, .len = PAGE_SIZE};
+  auto fd = CreateRegion(nullptr, PAGE_SIZE);
+  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+
+  ASSERT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin), SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_PURGE_ALL_CACHES, 0),
+              SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
+  ASSERT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin), SyscallSucceedsWithValue(ASHMEM_WAS_PURGED));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_PURGE_ALL_CACHES, 0),
+              SyscallSucceedsWithValue(ASHMEM_IS_PINNED));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin), SyscallSucceedsWithValue(ASHMEM_NOT_PURGED));
+
+  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// Purge a region which is half unpinned
+TEST_F(AshmemTest, PurgeOverlap) {
+  ashmem_pin pin_left = {.offset = 0, .len = PAGE_SIZE};
+  ashmem_pin pin_right = {.offset = PAGE_SIZE, .len = PAGE_SIZE};
+  ashmem_pin pin_total = {.offset = 0, .len = 2 * PAGE_SIZE};
+
+  auto fd = CreateRegion(nullptr, 2 * PAGE_SIZE);
+  void *addr = mmap(nullptr, 2 * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+
+  ASSERT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin_left),
+              SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
+  ASSERT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin_right), SyscallSucceedsWithValue(ASHMEM_NOT_PURGED));
+
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_PURGE_ALL_CACHES, 0),
+              SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin_total), SyscallSucceedsWithValue(ASHMEM_WAS_PURGED));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin_left), SyscallSucceedsWithValue(ASHMEM_NOT_PURGED));
+
+  ASSERT_THAT(munmap(addr, 2 * PAGE_SIZE), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 

@@ -19,7 +19,7 @@ use fuchsia_zircon as zx;
 use linux_uapi::{
     ASHMEM_GET_NAME, ASHMEM_GET_PIN_STATUS, ASHMEM_GET_PROT_MASK, ASHMEM_GET_SIZE,
     ASHMEM_IS_PINNED, ASHMEM_IS_UNPINNED, ASHMEM_NOT_PURGED, ASHMEM_PIN, ASHMEM_PURGE_ALL_CACHES,
-    ASHMEM_SET_NAME, ASHMEM_SET_PROT_MASK, ASHMEM_SET_SIZE, ASHMEM_UNPIN,
+    ASHMEM_SET_NAME, ASHMEM_SET_PROT_MASK, ASHMEM_SET_SIZE, ASHMEM_UNPIN, ASHMEM_WAS_PURGED,
 };
 use once_cell::sync::OnceCell;
 use range_map::RangeMap;
@@ -227,7 +227,12 @@ impl FileOps for Ashmem {
 
                 match request {
                     ASHMEM_PIN => {
-                        state.unpinned.remove(&(lo..hi));
+                        for is_purged in state.unpinned.remove(&(lo..hi)).iter() {
+                            if *is_purged {
+                                return Ok(ASHMEM_WAS_PURGED.into());
+                            }
+                        }
+
                         return Ok(ASHMEM_NOT_PURGED.into());
                     }
                     ASHMEM_UNPIN => {
@@ -245,8 +250,15 @@ impl FileOps for Ashmem {
                 }
             }
             ASHMEM_PURGE_ALL_CACHES => {
-                track_stub!(TODO("https://fxbug.dev/322873734"), "ASHMEM_PURGE_ALL_CACHES");
-                error!(ENOSYS)
+                let mut state = self.state.lock();
+
+                if state.unpinned.is_empty() {
+                    return Ok(ASHMEM_IS_PINNED.into());
+                }
+                for (_, is_purged) in state.unpinned.iter_mut() {
+                    *is_purged = true;
+                }
+                return Ok(ASHMEM_IS_UNPINNED.into());
             }
             ASHMEM_GET_FILE_ID => {
                 track_stub!(TODO("https://fxbug.dev/322873958"), "ASHMEM_GET_FILE_ID");

@@ -256,6 +256,10 @@ where
         removed_values
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.map.is_empty()
+    }
+
     /// Iterate over the ranges in the map.
     pub fn iter(&self) -> impl Iterator<Item = (&Range<K>, &V)> {
         self.map.iter().map(|(k, value)| (&k.range, value))
