@@ -80,7 +80,7 @@ fuchsia_cc_binary(
     bin_name = "bt_host",
     deps = [
         ":sources",
-        "//third_party/pigweed/backends/pw_log:syslog",
+        "//third_party/pigweed/backends/pw_log:log_sink",
     ],
 )
 

@@ -56,3 +56,15 @@ source_set("dfv2") {
     "//sdk/lib/driver/logging/cpp",
   ]
 }
+
+source_set("log_sink") {
+  public = [ "public/pw_log_sink/log_sink.h" ]
+  sources = [ "log_sink.cc" ]
+  deps = [
+    ":pw_log",
+    "//sdk/fidl/fuchsia.logger:fuchsia.logger_cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/syslog/structured_backend",
+    "//zircon/system/ulib/async:async-cpp",
+  ]
+}

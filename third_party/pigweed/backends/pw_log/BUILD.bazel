@@ -45,3 +45,17 @@ cc_library(
     srcs = ["log_printf.cc"],
     deps = [":pw_log"],
 )
+
+
+cc_library(
+    name = "log_sink",
+    hdrs = ["public/pw_log_sink/log_sink.h"],
+    srcs = ["log_sink.cc"],
+    deps = [
+        ":pw_log",
+        "@fuchsia_sdk//fidl/fuchsia.logger:fuchsia.logger_cpp",
+        "@fuchsia_sdk//pkg/syslog_structured_backend",
+        "@fuchsia_sdk//pkg/component_incoming_cpp",
+        "@fuchsia_sdk//pkg/async-cpp",
+    ],
+)
