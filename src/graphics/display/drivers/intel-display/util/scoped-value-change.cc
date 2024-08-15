@@ -7,10 +7,8 @@
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
 
-#include <set>
-
-#include <fbl/auto_lock.h>
-#include <fbl/mutex.h>
+#include <mutex>
+#include <unordered_set>
 
 namespace intel_display {
 
@@ -21,8 +19,8 @@ struct ChangeTracker {
     static ChangeTracker singleton;
     return singleton;
   }
-  fbl::Mutex mutex;
-  std::set<void*> variables __TA_GUARDED(mutex);
+  std::mutex mutex;
+  std::unordered_set<void*> variables __TA_GUARDED(mutex);
 };
 
 }  // namespace
@@ -30,21 +28,22 @@ struct ChangeTracker {
 // static
 void ScopedValueChange<void>::AddedChangeTo(void* variable) {
   ChangeTracker& change_tracker = ChangeTracker::Get();
-  change_tracker.mutex.Acquire();
-  auto [it, success] = change_tracker.variables.emplace(variable);
-  change_tracker.mutex.Release();
+  change_tracker.mutex.lock();
+  auto [it, inserted] = change_tracker.variables.emplace(variable);
+  change_tracker.mutex.unlock();
 
-  ZX_ASSERT_MSG(success, "Multiple ScopedValueChange instances created for the same variable");
+  ZX_DEBUG_ASSERT_MSG(inserted,
+                      "Multiple ScopedValueChange instances created for the same variable");
 }
 
 // static
 void ScopedValueChange<void>::RemovedChangeTo(void* variable) {
   ChangeTracker& change_tracker = ChangeTracker::Get();
-  change_tracker.mutex.Acquire();
+  change_tracker.mutex.lock();
   const size_t erase_count = change_tracker.variables.erase(variable);
-  change_tracker.mutex.Release();
+  change_tracker.mutex.unlock();
 
-  ZX_ASSERT_MSG(erase_count == 1, "Bug in ScopedValueChange lifecycle / reference counting");
+  ZX_DEBUG_ASSERT_MSG(erase_count == 1, "Bug in ScopedValueChange lifecycle / reference counting");
 }
 
 }  // namespace intel_display

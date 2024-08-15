@@ -24,7 +24,7 @@ namespace intel_display {
 // false.
 template <typename Lambda>
 bool PollUntil(Lambda predicate, zx::duration poll_interval, int max_intervals) {
-  ZX_ASSERT(max_intervals >= 0);
+  ZX_DEBUG_ASSERT(max_intervals >= 0);
 
   for (int sleeps_left = max_intervals; sleeps_left > 0; --sleeps_left) {
     if (predicate())
