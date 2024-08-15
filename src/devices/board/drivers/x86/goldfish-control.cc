@@ -13,6 +13,7 @@
 #include <bind/fuchsia/google/platform/cpp/bind.h>
 #include <bind/fuchsia/hardware/goldfish/cpp/bind.h>
 #include <bind/fuchsia/hardware/goldfish/pipe/cpp/bind.h>
+#include <bind/fuchsia/hardware/sysmem/cpp/bind.h>
 
 #include "src/devices/board/drivers/x86/x86.h"
 
@@ -65,12 +66,23 @@ const device_bind_prop_t kGoldfishSyncProperties[] = {
                       bind_fuchsia_hardware_goldfish::SYNCSERVICE_ZIRCONTRANSPORT),
 };
 
+const ddk::BindRule kSysmemRules[] = {
+    ddk::MakeAcceptBindRule(bind_fuchsia_hardware_sysmem::SERVICE,
+                            bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
+};
+
+const device_bind_prop_t kSysmemProperties[] = {
+    ddk::MakeProperty(bind_fuchsia_hardware_sysmem::SERVICE,
+                      bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
+};
+
 zx_status_t X86::GoldfishControlInit() {
   zx_status_t status = DdkAddCompositeNodeSpec(
       "goldfish-control-2",
       ddk::CompositeNodeSpec(kGoldfishPipeRules, kGoldfishPipeProperties)
           .AddParentSpec(kGoldfishAddressSpaceRules, kGoldfishAddressSpaceProperties)
-          .AddParentSpec(kGoldfishSyncRules, kGoldfishSyncProperties));
+          .AddParentSpec(kGoldfishSyncRules, kGoldfishSyncProperties)
+          .AddParentSpec(kSysmemRules, kSysmemProperties));
 
   if (status != ZX_OK) {
     zxlogf(ERROR, "goldfish-control-2: DdkAddCompositeNodeSpec failed: %s",

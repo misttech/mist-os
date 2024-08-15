@@ -16,6 +16,7 @@
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/hardware/amlogiccanvas/cpp/bind.h>
 #include <bind/fuchsia/hardware/clock/cpp/bind.h>
+#include <bind/fuchsia/hardware/sysmem/cpp/bind.h>
 #include <soc/aml-meson/g12b-clk.h>
 #include <soc/aml-t931/t931-hw.h>
 
@@ -59,6 +60,14 @@ static const std::vector<fpbus::Irq> sherlock_video_enc_irqs{
         .irq = T931_DOS_MBOX_2_IRQ,
         .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
     }},
+};
+
+const std::vector<fdf::BindRule> kSysmemRules = std::vector{fdf::MakeAcceptBindRule(
+    bind_fuchsia_hardware_sysmem::SERVICE, bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT)};
+
+const std::vector<fdf::NodeProperty> kSysmemProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia_hardware_sysmem::SERVICE,
+                      bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
 };
 
 const std::vector<fdf::BindRule> kCanvasRules = std::vector{
@@ -125,6 +134,7 @@ zx_status_t Sherlock::VideoEncInit() {
   fidl::Arena<> fidl_arena;
 
   std::vector<fdf::ParentSpec> kVideoEncParents = {
+      fdf::ParentSpec{{kSysmemRules, kSysmemProperties}},
       fdf::ParentSpec{{kCanvasRules, kCanvasProperties}},
       fdf::ParentSpec{{kClkDosHCodecRules, kClkDosHCodecProperties}},
       fdf::ParentSpec{{kClkDosRules, kClkDosProperties}}};

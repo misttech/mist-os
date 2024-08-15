@@ -23,6 +23,7 @@
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/i2c/cpp/bind.h>
 #include <bind/fuchsia/hardware/registers/cpp/bind.h>
+#include <bind/fuchsia/hardware/sysmem/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/isp/cpp/bind.h>
 #include <bind/fuchsia/register/cpp/bind.h>
@@ -517,6 +518,12 @@ zx_status_t Sherlock::CameraInit() {
 
   };
 
+  const ddk::BindRule kSysmemRules[] = {
+      ddk::MakeAcceptBindRule(bind_fuchsia_hardware_sysmem::SERVICE,
+                              bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
+
+  };
+
   const device_bind_prop_t kIspProperties[] = {
       ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_isp::BIND_PROTOCOL_DEVICE),
   };
@@ -529,9 +536,15 @@ zx_status_t Sherlock::CameraInit() {
       ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_camera::BIND_PROTOCOL_GE2D),
   };
 
+  const device_bind_prop_t kSysmemProperties[] = {
+      ddk::MakeProperty(bind_fuchsia_hardware_sysmem::SERVICE,
+                        bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
+  };
+
   auto node_group = ddk::CompositeNodeSpec(kIspRules, kIspProperties)
                         .AddParentSpec(kGdcRules, kGdcProperties)
-                        .AddParentSpec(kGe2dRules, kGe2dProperties);
+                        .AddParentSpec(kGe2dRules, kGe2dProperties)
+                        .AddParentSpec(kSysmemRules, kSysmemProperties);
 
   zx_status_t status = DdkAddCompositeNodeSpec("camera_controller", node_group);
   if (status != ZX_OK) {

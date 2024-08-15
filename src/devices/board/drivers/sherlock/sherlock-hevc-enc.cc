@@ -15,6 +15,7 @@
 #include <bind/fuchsia/clock/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/hardware/clock/cpp/bind.h>
+#include <bind/fuchsia/hardware/sysmem/cpp/bind.h>
 #include <soc/aml-meson/g12b-clk.h>
 #include <soc/aml-t931/t931-hw.h>
 
@@ -64,6 +65,14 @@ static const std::vector<fpbus::Irq> sherlock_hevc_enc_irqs{
     }},
 };
 
+const std::vector<fdf::BindRule> kSysmemRules = std::vector{fdf::MakeAcceptBindRule(
+    bind_fuchsia_hardware_sysmem::SERVICE, bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT)};
+
+const std::vector<fdf::NodeProperty> kSysmemProperties = std::vector{
+    fdf::MakeProperty(bind_fuchsia_hardware_sysmem::SERVICE,
+                      bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
+};
+
 const std::vector<fdf::BindRule> kClkDosRules = std::vector{
     fdf::MakeAcceptBindRule(bind_fuchsia_hardware_clock::SERVICE,
                             bind_fuchsia_hardware_clock::SERVICE_ZIRCONTRANSPORT),
@@ -92,6 +101,7 @@ zx_status_t Sherlock::HevcEncInit() {
   fidl::Arena<> fidl_arena;
 
   std::vector<fdf::ParentSpec> kHevcEncParents = {
+      fdf::ParentSpec{{kSysmemRules, kSysmemProperties}},
       fdf::ParentSpec{{kClkDosRules, kClkDosProperties}}};
   fdf::Arena arena('HEVC');
   auto composite_result = pbus_.buffer(arena)->AddCompositeNodeSpec(

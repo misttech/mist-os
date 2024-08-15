@@ -16,6 +16,7 @@
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/hardware/amlogiccanvas/cpp/bind.h>
 #include <bind/fuchsia/hardware/clock/cpp/bind.h>
+#include <bind/fuchsia/hardware/sysmem/cpp/bind.h>
 #include <bind/fuchsia/hardware/tee/cpp/bind.h>
 #include <soc/aml-meson/g12a-clk.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
@@ -103,6 +104,19 @@ zx_status_t Astro::VideoInit() {
   fidl::Arena<> fidl_arena;
   fdf::Arena arena('VIDE');
 
+  auto video_sysmem = fuchsia_driver_framework::ParentSpec{{
+      .bind_rules =
+          {
+              fdf::MakeAcceptBindRule(bind_fuchsia_hardware_sysmem::SERVICE,
+                                      bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
+          },
+      .properties =
+          {
+              fdf::MakeProperty(bind_fuchsia_hardware_sysmem::SERVICE,
+                                bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
+          },
+  }};
+
   auto video_canvas = fuchsia_driver_framework::ParentSpec{{
       .bind_rules =
           {
@@ -165,7 +179,7 @@ zx_status_t Astro::VideoInit() {
 
   auto video_spec = fuchsia_driver_framework::CompositeNodeSpec{{
       .name = "aml_video",
-      .parents = {{video_canvas, video_clock_dos_vdec, video_clock_dos, video_tee}},
+      .parents = {{video_sysmem, video_canvas, video_clock_dos_vdec, video_clock_dos, video_tee}},
   }};
 
   auto result = pbus_.buffer(arena)->AddCompositeNodeSpec(fidl::ToWire(fidl_arena, video_dev),

@@ -15,6 +15,7 @@
 
 #include <bind/fuchsia/amlogic/platform/cpp/bind.h>
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/hardware/sysmem/cpp/bind.h>
 #include <bind/fuchsia/hardware/tee/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 
@@ -49,6 +50,18 @@ zx_status_t Sherlock::SecureMemInit() {
   fdf::Arena arena('SECU');
 
   std::vector<fdf::ParentSpec> parents = {
+      {
+          {
+              {
+                  fdf::MakeAcceptBindRule(bind_fuchsia_hardware_sysmem::SERVICE,
+                                          bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
+              },
+              {
+                  fdf::MakeProperty(bind_fuchsia_hardware_sysmem::SERVICE,
+                                    bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
+              },
+          },
+      },
       {
           {
               {
