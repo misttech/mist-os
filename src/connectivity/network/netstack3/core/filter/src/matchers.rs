@@ -6,7 +6,7 @@ use alloc::string::String;
 use core::fmt::Debug;
 use core::num::NonZeroU64;
 use core::ops::RangeInclusive;
-use netstack3_base::InspectableValue;
+use netstack3_base::{DeviceWithName, InspectableValue};
 
 use derivative::Derivative;
 use net_types::ip::{IpAddress, Subnet};
@@ -61,12 +61,9 @@ impl<DeviceClass: Debug> InspectableValue for InterfaceMatcher<DeviceClass> {
 /// Allows filtering code to match on properties of an interface (ID, name, and
 /// device class) without Netstack3 Core (or Bindings, in the case of the device
 /// class) having to specifically expose that state.
-pub trait InterfaceProperties<DeviceClass> {
+pub trait InterfaceProperties<DeviceClass>: DeviceWithName {
     /// Returns whether the provided ID matches the interface.
     fn id_matches(&self, id: &NonZeroU64) -> bool;
-
-    /// Returns whether the provided name matches the interface.
-    fn name_matches(&self, name: &str) -> bool;
 
     /// Returns whether the provided device class matches the interface.
     fn device_class_matches(&self, device_class: &DeviceClass) -> bool;
@@ -261,13 +258,15 @@ pub(crate) mod testutil {
         }
     }
 
+    impl DeviceWithName for FakeDeviceId {
+        fn name_matches(&self, name: &str) -> bool {
+            &self.name == name
+        }
+    }
+
     impl InterfaceProperties<FakeDeviceClass> for FakeDeviceId {
         fn id_matches(&self, id: &NonZeroU64) -> bool {
             &self.id == id
-        }
-
-        fn name_matches(&self, name: &str) -> bool {
-            &self.name == name
         }
 
         fn device_class_matches(&self, class: &FakeDeviceClass) -> bool {
@@ -302,10 +301,6 @@ mod base_testutil {
             unimplemented!()
         }
 
-        fn name_matches(&self, _: &str) -> bool {
-            unimplemented!()
-        }
-
         fn device_class_matches(&self, _: &()) -> bool {
             unimplemented!()
         }
@@ -316,10 +311,6 @@ mod base_testutil {
             unimplemented!()
         }
 
-        fn name_matches(&self, _: &str) -> bool {
-            unimplemented!()
-        }
-
         fn device_class_matches(&self, _: &()) -> bool {
             unimplemented!()
         }
@@ -327,10 +318,6 @@ mod base_testutil {
 
     impl InterfaceProperties<()> for netstack3_base::testutil::MultipleDevicesId {
         fn id_matches(&self, _: &core::num::NonZeroU64) -> bool {
-            unimplemented!()
-        }
-
-        fn name_matches(&self, _: &str) -> bool {
             unimplemented!()
         }
 

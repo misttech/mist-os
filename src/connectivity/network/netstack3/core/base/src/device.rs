@@ -177,6 +177,12 @@ impl<S: StrongDeviceIdentifier<Weak = W>, W: WeakDeviceIdentifier<Strong = S>>
     }
 }
 
+/// Allows the user to match a device with a name.
+pub trait DeviceWithName {
+    /// Returns whether the provided name matches the interface.
+    fn name_matches(&self, name: &str) -> bool;
+}
+
 #[cfg(any(test, feature = "testutils"))]
 pub(crate) mod testutil {
     use alloc::sync::Arc;
@@ -217,6 +223,10 @@ pub(crate) mod testutil {
     #[derive(Copy, Clone, Debug, Eq, PartialEq, Hash, PartialOrd, Ord)]
     pub struct FakeDeviceId;
 
+    impl FakeDeviceId {
+        const FAKE_NAME: &'static str = "FakeDeviceId";
+    }
+
     impl StrongDeviceIdentifier for FakeDeviceId {
         type Weak = FakeWeakDeviceId<Self>;
 
@@ -228,6 +238,12 @@ pub(crate) mod testutil {
     impl DeviceIdentifier for FakeDeviceId {
         fn is_loopback(&self) -> bool {
             false
+        }
+    }
+
+    impl DeviceWithName for FakeDeviceId {
+        fn name_matches(&self, name: &str) -> bool {
+            name == Self::FAKE_NAME
         }
     }
 
@@ -287,6 +303,8 @@ pub(crate) mod testutil {
         pub fn mark_removed(&self) {
             self.removed.store(true, core::sync::atomic::Ordering::Relaxed);
         }
+
+        const FAKE_NAME: &'static str = "FakeReferencyDeviceId";
     }
 
     impl StrongDeviceIdentifier for FakeReferencyDeviceId {
@@ -300,6 +318,12 @@ pub(crate) mod testutil {
     impl DeviceIdentifier for FakeReferencyDeviceId {
         fn is_loopback(&self) -> bool {
             false
+        }
+    }
+
+    impl DeviceWithName for FakeReferencyDeviceId {
+        fn name_matches(&self, name: &str) -> bool {
+            name == Self::FAKE_NAME
         }
     }
 
@@ -341,11 +365,25 @@ pub(crate) mod testutil {
         pub fn all() -> [Self; 3] {
             [Self::A, Self::B, Self::C]
         }
+
+        fn fake_name(&self) -> &'static str {
+            match self {
+                MultipleDevicesId::A => "A",
+                MultipleDevicesId::B => "B",
+                MultipleDevicesId::C => "C",
+            }
+        }
     }
 
     impl DeviceIdentifier for MultipleDevicesId {
         fn is_loopback(&self) -> bool {
             false
+        }
+    }
+
+    impl DeviceWithName for MultipleDevicesId {
+        fn name_matches(&self, name: &str) -> bool {
+            self.fake_name() == name
         }
     }
 

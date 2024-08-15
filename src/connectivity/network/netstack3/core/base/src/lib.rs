@@ -38,8 +38,8 @@ pub use counters::{Counter, CounterContext, ResourceCounterContext};
 pub use data_structures::token_bucket::TokenBucket;
 pub use device::link::{LinkAddress, LinkDevice, LinkUnicastAddress};
 pub use device::{
-    AnyDevice, Device, DeviceIdAnyCompatContext, DeviceIdContext, DeviceIdentifier, EitherDeviceId,
-    StrongDeviceIdentifier, WeakDeviceIdentifier,
+    AnyDevice, Device, DeviceIdAnyCompatContext, DeviceIdContext, DeviceIdentifier, DeviceWithName,
+    EitherDeviceId, StrongDeviceIdentifier, WeakDeviceIdentifier,
 };
 pub use error::{
     AddressResolutionFailed, ErrorAndSerializer, ExistsError, LocalAddressError, NotFoundError,
