@@ -154,6 +154,8 @@ void lk_main(paddr_t handoff_paddr) {
   dprintf(SPEW, "creating bootstrap completion thread\n");
   Scheduler::SetCurrCpuActive(true);
   Thread* t = Thread::Create("bootstrap2", &bootstrap2, NULL, DEFAULT_PRIORITY);
+  // As this thread will initialize per-CPU state, ensure that it runs on the boot CPU.
+  t->SetCpuAffinity(cpu_num_to_mask(BOOT_CPU_ID));
   t->Detach();
   t->Resume();
 
@@ -163,9 +165,6 @@ void lk_main(paddr_t handoff_paddr) {
 
 static int bootstrap2(void*) {
   timeline_threading.Set(current_ticks());
-
-  // As this thread will initialize per-CPU state, ensure that it runs on the boot CPU.
-  Thread::Current::Get()->SetCpuAffinity(cpu_num_to_mask(BOOT_CPU_ID));
 
   dprintf(SPEW, "top of bootstrap2()\n");
 
