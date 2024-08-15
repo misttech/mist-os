@@ -164,9 +164,12 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
 
   // Typically called by OpenController/OpenVirtconController.  However, this is made public
   // for use by testing services which provide a fake display controller.
-  zx_status_t CreateClient(ClientPriority client_priority,
-                           fidl::ServerEnd<fuchsia_hardware_display::Coordinator> client,
-                           fit::function<void()> on_client_disconnected);
+  zx_status_t CreateClient(
+      ClientPriority client_priority,
+      fidl::ServerEnd<fuchsia_hardware_display::Coordinator> coordinator_server_end,
+      fidl::ClientEnd<fuchsia_hardware_display::CoordinatorListener>
+          coordinator_listener_client_end,
+      fit::function<void()> on_client_disconnected);
 
   display::DriverBufferCollectionId GetNextDriverBufferCollectionId();
 

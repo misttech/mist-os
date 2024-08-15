@@ -60,4 +60,58 @@ TEST(FakeDisplayCoordinatorConnector, ConnectToDevfs) {
       << open_coordinator_result.error_value().FormatDescription();
 }
 
+TEST(FakeDisplayCoordinatorConnector, ConnectToSvcWithListener) {
+  zx::result<fidl::ClientEnd<fuchsia_hardware_display::Provider>> provider_result =
+      component::Connect<fuchsia_hardware_display::Provider>();
+  ASSERT_OK(provider_result);
+
+  fidl::SyncClient<fuchsia_hardware_display::Provider> provider(std::move(provider_result).value());
+
+  auto [coordinator_client, coordinator_server] =
+      fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
+  auto [listener_client, listener_server] =
+      fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
+  fidl::Result open_coordinator_result = provider->OpenCoordinatorWithListenerForPrimary({{
+      .coordinator = std::move(coordinator_server),
+      .coordinator_listener = std::move(listener_client),
+  }});
+  EXPECT_TRUE(open_coordinator_result.is_ok())
+      << "Failed to open coordinator: "
+      << open_coordinator_result.error_value().FormatDescription();
+}
+
+TEST(FakeDisplayCoordinatorConnector, ConnectToDevfsWithListener) {
+  static constexpr std::string_view kDevfsDirectory = "/dev/class/display-coordinator";
+
+  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> devfs_directory_result =
+      component::OpenServiceRoot(kDevfsDirectory);
+  ASSERT_OK(devfs_directory_result);
+  fidl::ClientEnd<fuchsia_io::Directory> devfs_directory =
+      std::move(devfs_directory_result).value();
+
+  zx::result<std::string> service_filename_result =
+      device_watcher::WatchDirectoryForItems<std::string>(
+          devfs_directory, [&](std::string_view filename) { return std::string(filename); });
+  ASSERT_OK(service_filename_result);
+
+  std::string service_path = std::string(kDevfsDirectory) + "/" + service_filename_result.value();
+  zx::result<fidl::ClientEnd<fuchsia_hardware_display::Provider>> provider_result =
+      component::Connect<fuchsia_hardware_display::Provider>(service_path);
+  ASSERT_OK(provider_result);
+
+  fidl::SyncClient<fuchsia_hardware_display::Provider> provider(std::move(provider_result).value());
+
+  auto [coordinator_client, coordinator_server] =
+      fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
+  auto [listener_client, listener_server] =
+      fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
+  fidl::Result open_coordinator_result = provider->OpenCoordinatorWithListenerForPrimary({{
+      .coordinator = std::move(coordinator_server),
+      .coordinator_listener = std::move(listener_client),
+  }});
+  EXPECT_TRUE(open_coordinator_result.is_ok())
+      << "Failed to open coordinator: "
+      << open_coordinator_result.error_value().FormatDescription();
+}
+
 }  // namespace

@@ -1177,6 +1177,16 @@ fidl::Status Client::NotifyDisplayChanges(
       const_cast<fuchsia_hardware_display_types::wire::DisplayId*>(removed_display_ids.data()),
       removed_display_ids.size());
 
+  if (coordinator_listener_.is_valid()) {
+    fidl::OneWayStatus call_result = coordinator_listener_->OnDisplaysChanged(
+        fidl::VectorView<fuchsia_hardware_display::wire::Info>::FromExternal(
+            non_const_added_display_infos.data(), non_const_added_display_infos.size()),
+        fidl::VectorView<fuchsia_hardware_display_types::wire::DisplayId>::FromExternal(
+            non_const_removed_display_ids.data(), non_const_removed_display_ids.size()));
+    return call_result;
+  }
+
+  // Fallback to `Coordinator` protocol.
   fidl::OneWayStatus send_event_result = fidl::WireSendEvent(*binding_)->OnDisplaysChanged(
       fidl::VectorView<fuchsia_hardware_display::wire::Info>::FromExternal(
           non_const_added_display_infos.data(), non_const_added_display_infos.size()),
@@ -1186,6 +1196,13 @@ fidl::Status Client::NotifyDisplayChanges(
 }
 
 fidl::Status Client::NotifyOwnershipChange(bool client_has_ownership) {
+  if (coordinator_listener_.is_valid()) {
+    fidl::OneWayStatus call_result =
+        coordinator_listener_->OnClientOwnershipChange(client_has_ownership);
+    return call_result;
+  }
+
+  // Fallback to `Coordinator` protocol.
   fidl::OneWayStatus send_event_result =
       fidl::WireSendEvent(*binding_)->OnClientOwnershipChange(client_has_ownership);
   return send_event_result;
@@ -1193,6 +1210,14 @@ fidl::Status Client::NotifyOwnershipChange(bool client_has_ownership) {
 
 fidl::Status Client::NotifyVsync(DisplayId display_id, zx::time timestamp, ConfigStamp config_stamp,
                                  VsyncAckCookie vsync_ack_cookie) {
+  if (coordinator_listener_.is_valid()) {
+    fidl::OneWayStatus send_call_result = coordinator_listener_->OnVsync(
+        ToFidlDisplayId(display_id), timestamp.get(), ToFidlConfigStamp(config_stamp),
+        ToFidlVsyncAckCookie(vsync_ack_cookie));
+    return send_call_result;
+  }
+
+  // Fallback to `Coordinator` protocol.
   fidl::OneWayStatus send_event_result = fidl::WireSendEvent(*binding_)->OnVsync(
       ToFidlDisplayId(display_id), timestamp.get(), ToFidlConfigStamp(config_stamp),
       ToFidlVsyncAckCookieValue(vsync_ack_cookie));
@@ -1527,14 +1552,24 @@ zx_koid_t GetKoid(zx_handle_t handle) {
 }
 
 fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> Client::Bind(
-    fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end,
+    fidl::ServerEnd<fuchsia_hardware_display::Coordinator> coordinator_server_end,
+    fidl::ClientEnd<fuchsia_hardware_display::CoordinatorListener> coordinator_listener_client_end,
     fidl::OnUnboundFn<Client> unbound_callback) {
   ZX_DEBUG_ASSERT(!running_);
   running_ = true;
 
   // Keep a copy of fidl binding so we can safely unbind from it during shutdown
   binding_ = fidl::BindServer(controller_->client_dispatcher()->async_dispatcher(),
-                              std::move(server_end), this, std::move(unbound_callback));
+                              std::move(coordinator_server_end), this, std::move(unbound_callback));
+
+  // TODO(https://fxbug.dev/355334166): Require `coordinator_listener_client_end`
+  // to be valid once we remove the old `OpenCoordinatorForPrimary/Virtcon`
+  // methods.
+  if (coordinator_listener_client_end.is_valid()) {
+    coordinator_listener_.Bind(std::move(coordinator_listener_client_end),
+                               controller_->client_dispatcher()->async_dispatcher());
+  }
+
   return *binding_;
 }
 
@@ -1783,8 +1818,11 @@ void ClientProxy::CloseOnControllerLoop() {
       [_ = CallFromDestructor([this]() { handler_.TearDown(); })]() {});
 }
 
-zx_status_t ClientProxy::Init(inspect::Node* parent_node,
-                              fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) {
+zx_status_t ClientProxy::Init(
+    inspect::Node* parent_node,
+    fidl::ServerEnd<fuchsia_hardware_display::Coordinator> coordinator_server_end,
+    fidl::ClientEnd<fuchsia_hardware_display::CoordinatorListener>
+        coordinator_listener_client_end) {
   node_ =
       parent_node->CreateChild(fbl::StringPrintf("client-%" PRIu64, handler_.id().value()).c_str());
   node_.RecordString("priority", DebugStringFromClientPriority(handler_.priority()));
@@ -1805,19 +1843,23 @@ zx_status_t ClientProxy::Init(inspect::Node* parent_node,
       };
 
   [[maybe_unused]] fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> binding =
-      handler_.Bind(std::move(server_end), std::move(unbound_callback));
+      handler_.Bind(std::move(coordinator_server_end), std::move(coordinator_listener_client_end),
+                    std::move(unbound_callback));
   return ZX_OK;
 }
 
 zx::result<> ClientProxy::InitForTesting(
-    fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end) {
+    fidl::ServerEnd<fuchsia_hardware_display::Coordinator> coordinator_server_end,
+    fidl::ClientEnd<fuchsia_hardware_display::CoordinatorListener>
+        coordinator_listener_client_end) {
   // ClientProxy created by tests may not have a full-fledged display engine
   // associated. The production client teardown logic doesn't work here
   // so we replace it with a no-op unbound callback instead.
   fidl::OnUnboundFn<Client> unbound_callback =
       [](Client*, fidl::UnbindInfo, fidl::ServerEnd<fuchsia_hardware_display::Coordinator>) {};
   [[maybe_unused]] fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> binding =
-      handler_.Bind(std::move(server_end), std::move(unbound_callback));
+      handler_.Bind(std::move(coordinator_server_end), std::move(coordinator_listener_client_end),
+                    std::move(unbound_callback));
   return zx::ok();
 }
 

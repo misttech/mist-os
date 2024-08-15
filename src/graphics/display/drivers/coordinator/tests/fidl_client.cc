@@ -15,6 +15,7 @@
 #include <fbl/auto_lock.h>
 #include <gtest/gtest.h>
 
+#include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
 #include "src/graphics/display/lib/api-types-cpp/image-id.h"
@@ -49,28 +50,46 @@ TestFidlClient::Display::Display(const fhd::wire::Info& info) {
 
 DisplayId TestFidlClient::display_id() const { return displays_[0].id_; }
 
-bool TestFidlClient::CreateChannel(const fidl::WireSyncClient<fhd::Provider>& provider,
-                                   bool is_vc) {
+zx::result<> TestFidlClient::OpenCoordinator(const fidl::WireSyncClient<fhd::Provider>& provider,
+                                             ClientPriority client_priority,
+                                             async_dispatcher_t& coordinator_listener_dispatcher) {
   auto [dc_client, dc_server] = fidl::Endpoints<fhd::Coordinator>::Create();
+  auto [coordinator_listener_client, coordinator_listener_server] =
+      fidl::Endpoints<fhd::CoordinatorListener>::Create();
   FDF_LOG(INFO, "Opening coordinator");
-  if (is_vc) {
-    auto response = provider->OpenCoordinatorForVirtcon(std::move(dc_server));
+  if (client_priority == ClientPriority::kVirtcon) {
+    fidl::Arena arena;
+    auto request =
+        fidl::WireRequest<fhd::Provider::OpenCoordinatorWithListenerForVirtcon>::Builder(arena)
+            .coordinator(std::move(dc_server))
+            .coordinator_listener(std::move(coordinator_listener_client))
+            .Build();
+    auto response = provider->OpenCoordinatorWithListenerForVirtcon(std::move(request));
     if (!response.ok()) {
       FDF_LOG(ERROR, "Could not open Virtcon coordinator, error=%s",
               response.FormatDescription().c_str());
-      return false;
+      return zx::make_result(response.status());
     }
   } else {
-    auto response = provider->OpenCoordinatorForPrimary(std::move(dc_server));
+    ZX_DEBUG_ASSERT(client_priority == ClientPriority::kPrimary);
+    fidl::Arena arena;
+    auto request =
+        fidl::WireRequest<fhd::Provider::OpenCoordinatorWithListenerForPrimary>::Builder(arena)
+            .coordinator(std::move(dc_server))
+            .coordinator_listener(std::move(coordinator_listener_client))
+            .Build();
+    auto response = provider->OpenCoordinatorWithListenerForPrimary(std::move(request));
     if (!response.ok()) {
       FDF_LOG(ERROR, "Could not open coordinator, error=%s", response.FormatDescription().c_str());
-      return false;
+      return zx::make_result(response.status());
     }
   }
 
   fbl::AutoLock lock(mtx());
   dc_.Bind(std::move(dc_client));
-  return true;
+  coordinator_listener_.Bind(std::move(coordinator_listener_server),
+                             coordinator_listener_dispatcher);
+  return zx::ok();
 }
 
 zx::result<ImageId> TestFidlClient::CreateImage() {
@@ -135,130 +154,16 @@ zx::result<TestFidlClient::EventInfo> TestFidlClient::CreateEventLocked() {
   });
 }
 
-bool TestFidlClient::Bind(async_dispatcher_t* dispatcher) {
-  dispatcher_ = dispatcher;
-  while (displays_.is_empty() || !has_ownership_) {
-    fbl::AutoLock lock(mtx());
-    class EventHandler : public fidl::WireSyncEventHandler<fhd::Coordinator> {
-     public:
-      explicit EventHandler(TestFidlClient* client) : client_(client) {}
+bool TestFidlClient::HasOwnershipAndValidDisplay() const {
+  return has_ownership_ && !displays_.is_empty();
+}
 
-      bool ok() const { return ok_; }
-
-      void OnDisplaysChanged(fidl::WireEvent<fhd::Coordinator::OnDisplaysChanged>* event) override {
-        for (size_t i = 0; i < event->added.count(); i++) {
-          client_->displays_.push_back(Display(event->added[i]));
-        }
-      }
-
-      void OnVsync(fidl::WireEvent<fhd::Coordinator::OnVsync>* event) override { ok_ = false; }
-
-      void OnClientOwnershipChange(
-          fidl::WireEvent<fhd::Coordinator::OnClientOwnershipChange>* event) override {
-        client_->has_ownership_ = event->has_ownership;
-      }
-
-     private:
-      TestFidlClient* const client_;
-      bool ok_ = true;
-    };
-
-    EventHandler event_handler(this);
-    auto result = dc_.HandleOneEvent(event_handler);
-    if (!result.ok() || !event_handler.ok()) {
-      FDF_LOG(ERROR, "Got unexpected message");
-      return false;
-    }
-  }
-
+zx::result<> TestFidlClient::EnableVsync() {
   fbl::AutoLock lock(mtx());
-  EXPECT_TRUE(has_ownership_);
-  EXPECT_FALSE(displays_.is_empty());
-
-  event_msg_wait_event_.set_object(dc_.client_end().channel().get());
-  event_msg_wait_event_.set_trigger(ZX_CHANNEL_READABLE);
-  EXPECT_OK(event_msg_wait_event_.Begin(dispatcher));
-  return dc_->EnableVsync(true).ok();
+  return zx::make_result(dc_->EnableVsync(true).status());
 }
 
-void TestFidlClient::OnEventMsgAsync(async_dispatcher_t* dispatcher, async::WaitBase* self,
-                                     zx_status_t status, const zx_packet_signal_t* signal) {
-  if (status != ZX_OK) {
-    return;
-  }
-
-  if (!(signal->observed & ZX_CHANNEL_READABLE)) {
-    return;
-  }
-
-  fbl::AutoLock lock(mtx());
-  class EventHandler : public fidl::WireSyncEventHandler<fhd::Coordinator> {
-   public:
-    explicit EventHandler(TestFidlClient* client) : client_(client) {}
-
-    void OnDisplaysChanged(fidl::WireEvent<fhd::Coordinator::OnDisplaysChanged>* event) override {}
-
-    // The FIDL bindings do not know that the caller holds mtx(), so we can't TA_REQ(mtx()) here.
-    void OnVsync(fidl::WireEvent<fhd::Coordinator::OnVsync>* event) override
-        TA_NO_THREAD_SAFETY_ANALYSIS {
-      client_->vsync_count_++;
-      client_->recent_presented_config_stamp_ = event->applied_config_stamp;
-      VsyncAckCookie vsync_ack_cookie = ToVsyncAckCookie(event->cookie);
-      if (vsync_ack_cookie != kInvalidVsyncAckCookie) {
-        client_->vsync_ack_cookie_ = vsync_ack_cookie;
-      }
-    }
-
-    void OnClientOwnershipChange(
-        fidl::WireEvent<fhd::Coordinator::OnClientOwnershipChange>* message) override {}
-
-   private:
-    TestFidlClient* const client_;
-  };
-
-  EventHandler event_handler(this);
-  auto result = dc_.HandleOneEvent(event_handler);
-
-  if (!result.ok()) {
-    FDF_LOG(ERROR, "Failed to handle events: %s", result.FormatDescription().c_str());
-    return;
-  }
-
-  if (event_msg_wait_event_.object() == ZX_HANDLE_INVALID) {
-    return;
-  }
-  // Re-arm the wait.
-  self->Begin(dispatcher);
-}
-
-TestFidlClient::~TestFidlClient() {
-  if (dispatcher_) {
-    // Cancel must be issued from the dispatcher thread.
-    sync_completion_t done;
-    auto task = new async::Task();
-    task->set_handler(
-        [this, done_ptr = &done](async_dispatcher_t*, async::Task* task_ptr, zx_status_t) {
-          // Ensures that `task` gets deleted when the handler completes.
-          std::unique_ptr<async::Task> task(task_ptr);
-
-          event_msg_wait_event_.Cancel();
-          event_msg_wait_event_.set_object(ZX_HANDLE_INVALID);
-
-          sync_completion_signal(done_ptr);
-        });
-    if (task->Post(dispatcher_) != ZX_OK) {
-      delete task;
-      event_msg_wait_event_.Cancel();
-      event_msg_wait_event_.set_object(ZX_HANDLE_INVALID);
-    } else {
-      while (true) {
-        if (sync_completion_wait(&done, ZX_MSEC(10)) == ZX_OK) {
-          break;
-        }
-      }
-    }
-  }
-}
+TestFidlClient::~TestFidlClient() = default;
 
 zx_status_t TestFidlClient::PresentLayers(std::vector<PresentLayerInfo> present_layers) {
   fbl::AutoLock l(mtx());
@@ -477,6 +382,26 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
   // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
   (void)sysmem_collection->Release();
   return zx::ok(image_id);
+}
+
+void TestFidlClient::OnDisplaysChanged(
+    std::vector<fuchsia_hardware_display::wire::Info> added_displays,
+    std::vector<DisplayId> removed_display_ids) {
+  for (const fuchsia_hardware_display::wire::Info& added_display : added_displays) {
+    displays_.push_back(Display(added_display));
+  }
+}
+
+void TestFidlClient::OnClientOwnershipChange(bool has_ownership) { has_ownership_ = has_ownership; }
+
+void TestFidlClient::OnVsync(DisplayId display_id, zx::time timestamp,
+                             ConfigStamp applied_config_stamp, VsyncAckCookie vsync_ack_cookie) {
+  fbl::AutoLock lock(mtx());
+  vsync_count_++;
+  recent_presented_config_stamp_ = applied_config_stamp;
+  if (vsync_ack_cookie != kInvalidVsyncAckCookie) {
+    vsync_ack_cookie_ = vsync_ack_cookie;
+  }
 }
 
 }  // namespace display

@@ -720,6 +720,7 @@ void PrintChannelKoids(ClientPriority client_priority, const zx::channel& channe
 zx_status_t Controller::CreateClient(
     ClientPriority client_priority,
     fidl::ServerEnd<fidl_display::Coordinator> coordinator_server_end,
+    fidl::ClientEnd<fuchsia_hardware_display::CoordinatorListener> coordinator_listener_client_end,
     fit::function<void()> on_client_disconnected) {
   ZX_DEBUG_ASSERT(on_client_disconnected);
 
@@ -749,7 +750,8 @@ zx_status_t Controller::CreateClient(
   auto client = std::make_unique<ClientProxy>(this, client_priority, client_id,
                                               std::move(on_client_disconnected));
 
-  zx_status_t status = client->Init(&root_, std::move(coordinator_server_end));
+  zx_status_t status = client->Init(&root_, std::move(coordinator_server_end),
+                                    std::move(coordinator_listener_client_end));
   if (status != ZX_OK) {
     FDF_LOG(DEBUG, "Failed to init client %d", status);
     return status;
@@ -826,25 +828,47 @@ display::DriverBufferCollectionId Controller::GetNextDriverBufferCollectionId() 
 void Controller::OpenCoordinatorForVirtcon(OpenCoordinatorForVirtconRequestView request,
                                            OpenCoordinatorForVirtconCompleter::Sync& completer) {
   completer.Reply(CreateClient(ClientPriority::kVirtcon, std::move(request->coordinator),
+                               /*coordinator_listener_client_end=*/{},
                                /*on_client_disconnected=*/[] {}));
 }
 
 void Controller::OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequestView request,
                                            OpenCoordinatorForPrimaryCompleter::Sync& completer) {
   completer.Reply(CreateClient(ClientPriority::kPrimary, std::move(request->coordinator),
+                               /*coordinator_listener_client_end=*/{},
                                /*on_client_disconnected=*/[] {}));
 }
 
 void Controller::OpenCoordinatorWithListenerForVirtcon(
     OpenCoordinatorWithListenerForVirtconRequestView request,
     OpenCoordinatorWithListenerForVirtconCompleter::Sync& completer) {
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  ZX_DEBUG_ASSERT(request->has_coordinator());
+  ZX_DEBUG_ASSERT(request->has_coordinator_listener());
+  zx_status_t create_status =
+      CreateClient(ClientPriority::kVirtcon, std::move(request->coordinator()),
+                   std::move(request->coordinator_listener()),
+                   /*on_client_disconnected=*/[] {});
+  if (create_status == ZX_OK) {
+    completer.ReplySuccess();
+  } else {
+    completer.ReplyError(create_status);
+  }
 }
 
 void Controller::OpenCoordinatorWithListenerForPrimary(
     OpenCoordinatorWithListenerForPrimaryRequestView request,
     OpenCoordinatorWithListenerForPrimaryCompleter::Sync& completer) {
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
+  ZX_DEBUG_ASSERT(request->has_coordinator());
+  ZX_DEBUG_ASSERT(request->has_coordinator_listener());
+  zx_status_t create_status =
+      CreateClient(ClientPriority::kPrimary, std::move(request->coordinator()),
+                   std::move(request->coordinator_listener()),
+                   /*on_client_disconnected=*/[] {});
+  if (create_status == ZX_OK) {
+    completer.ReplySuccess();
+  } else {
+    completer.ReplyError(create_status);
+  }
 }
 
 ConfigStamp Controller::TEST_controller_stamp() const {

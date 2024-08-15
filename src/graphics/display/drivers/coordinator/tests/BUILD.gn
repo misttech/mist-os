@@ -46,6 +46,8 @@ static_library("base") {
     "base.h",
     "fidl_client.cc",
     "fidl_client.h",
+    "mock-coordinator-listener.cc",
+    "mock-coordinator-listener.h",
   ]
   deps = [
     "//src/devices/testing/mock-ddk",

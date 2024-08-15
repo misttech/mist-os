@@ -64,6 +64,16 @@ class DevFsCoordinatorFactory : public fidl::Server<fuchsia_hardware_display::Pr
       const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename,
       fidl::ServerEnd<fuchsia_hardware_display::Coordinator> coordinator_server);
 
+  // Opens fuchsia.hardware.display.Coordinator service for a primary client
+  // at service located at "dir/filename" using the server end channel
+  // `coordinator_server` and listener client end channel `listener_client`.
+  //
+  // Both `coordinator_server` and `listener_client` must be valid.
+  static zx_status_t OpenCoordinatorWithListenerForPrimaryOnDevice(
+      const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename,
+      fidl::ServerEnd<fuchsia_hardware_display::Coordinator> coordinator_server,
+      fidl::ClientEnd<fuchsia_hardware_display::CoordinatorListener> listener_client);
+
   // The dispatcher where all async tasks are dispatched onto by the
   // `DevFsCoordinatorFactory`.
   async_dispatcher_t* dispatcher_;

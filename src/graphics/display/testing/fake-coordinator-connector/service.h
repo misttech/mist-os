@@ -61,6 +61,7 @@ class FakeDisplayCoordinatorConnector : public fidl::Server<fuchsia_hardware_dis
   struct OpenCoordinatorRequest {
     bool is_virtcon;
     fidl::ServerEnd<fuchsia_hardware_display::Coordinator> coordinator_request;
+    fidl::ClientEnd<fuchsia_hardware_display::CoordinatorListener> coordinator_listener_client_end;
     fit::function<void(zx_status_t)> on_coordinator_opened;
   };
 

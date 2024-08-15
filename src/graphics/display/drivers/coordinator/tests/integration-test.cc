@@ -20,6 +20,7 @@
 #include <fbl/auto_lock.h>
 #include <gtest/gtest.h>
 
+#include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/drivers/coordinator/client.h"
 #include "src/graphics/display/drivers/coordinator/controller.h"
 #include "src/graphics/display/drivers/coordinator/tests/base.h"
@@ -100,6 +101,28 @@ class IntegrationTest : public TestBase, public testing::WithParamInterface<bool
 
   void SendDisplayVsync() { display()->SendVsync(); }
 
+  std::unique_ptr<TestFidlClient> OpenCoordinatorTestFidlClient(
+      const fidl::WireSyncClient<fuchsia_sysmem2::Allocator>& sysmem,
+      const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& provider,
+      ClientPriority client_priority) {
+    auto client = std::make_unique<TestFidlClient>(sysmem_);
+    zx::result<> open_coordinator_result =
+        client->OpenCoordinator(provider, client_priority, *dispatcher());
+    ZX_ASSERT_MSG(open_coordinator_result.is_ok(), "Failed to open coordinator: %s",
+                  open_coordinator_result.status_string());
+
+    bool poll_result = PollUntilOnLoop([&]() { return client->HasOwnershipAndValidDisplay(); });
+    ZX_ASSERT_MSG(poll_result,
+                  "Failed to wait until client has ownership of the coordinator "
+                  "and has a valid display");
+
+    zx::result<> enable_vsync_result = client->EnableVsync();
+    ZX_ASSERT_MSG(enable_vsync_result.is_ok(), "Failed to enable Vsync for client: %s",
+                  enable_vsync_result.status_string());
+
+    return client;
+  }
+
   // |TestBase|
   void SetUp() override {
     TestBase::SetUp();
@@ -133,26 +156,24 @@ TEST_F(IntegrationTest, DISABLED_ClientsCanBail) {
   for (size_t i = 0; i < 100; i++) {
     ASSERT_TRUE(PollUntilOnLoop([&]() { return !primary_client_connected(); }));
 
-    TestFidlClient client(sysmem_);
-    ASSERT_TRUE(client.CreateChannel(display_fidl(), false));
-    ASSERT_TRUE(client.Bind(dispatcher()));
+    std::unique_ptr<TestFidlClient> client =
+        OpenCoordinatorTestFidlClient(sysmem_, display_fidl(), ClientPriority::kPrimary);
   }
 }
 
 TEST_F(IntegrationTest, MustUseUniqueEventIDs) {
-  TestFidlClient client(sysmem_);
-  ASSERT_TRUE(client.CreateChannel(display_fidl(), false));
-  ASSERT_TRUE(client.Bind(dispatcher()));
+  std::unique_ptr<TestFidlClient> client =
+      OpenCoordinatorTestFidlClient(sysmem_, display_fidl(), ClientPriority::kPrimary);
   zx::event event_a, event_b, event_c;
   ASSERT_OK(zx::event::create(0, &event_a));
   ASSERT_OK(zx::event::create(0, &event_b));
   ASSERT_OK(zx::event::create(0, &event_c));
   {
-    fbl::AutoLock lock(client.mtx());
+    fbl::AutoLock lock(client->mtx());
     static constexpr EventId kEventId(123);
-    EXPECT_OK(client.dc_->ImportEvent(std::move(event_a), ToFidlEventId(kEventId)).status());
+    EXPECT_OK(client->dc_->ImportEvent(std::move(event_a), ToFidlEventId(kEventId)).status());
     // ImportEvent is one way. Expect the next call to fail.
-    EXPECT_OK(client.dc_->ImportEvent(std::move(event_b), ToFidlEventId(kEventId)).status());
+    EXPECT_OK(client->dc_->ImportEvent(std::move(event_b), ToFidlEventId(kEventId)).status());
     // This test passes if it closes without deadlocking.
   }
   // TODO: Use LLCPP epitaphs when available to detect ZX_ERR_PEER_CLOSED.
@@ -160,7 +181,7 @@ TEST_F(IntegrationTest, MustUseUniqueEventIDs) {
 
 TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
   TestFidlClient vc_client(sysmem_);
-  ASSERT_TRUE(vc_client.CreateChannel(display_fidl(), /*is_vc=*/true));
+  ASSERT_OK(vc_client.OpenCoordinator(display_fidl(), ClientPriority::kVirtcon, *dispatcher()));
   {
     fbl::AutoLock lock(vc_client.mtx());
     // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
@@ -170,9 +191,8 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
     EXPECT_OK(vc_client.dc_->ApplyConfig().status());
   }
 
-  auto primary_client = std::make_unique<TestFidlClient>(sysmem_);
-  ASSERT_TRUE(primary_client->CreateChannel(display_fidl(), /*is_vc=*/false));
-  ASSERT_TRUE(primary_client->Bind(dispatcher()));
+  std::unique_ptr<TestFidlClient> primary_client =
+      OpenCoordinatorTestFidlClient(sysmem_, display_fidl(), ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
 
   // Present an image
@@ -201,9 +221,7 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_dead(); }));
 
   // A new client connects
-  primary_client = std::make_unique<TestFidlClient>(sysmem_);
-  ASSERT_TRUE(primary_client->CreateChannel(display_fidl(), /*is_vc=*/false));
-  ASSERT_TRUE(primary_client->Bind(dispatcher()));
+  primary_client = OpenCoordinatorTestFidlClient(sysmem_, display_fidl(), ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
   // ... and presents before the previous client's empty vsync
   EXPECT_OK(primary_client->PresentLayers());
@@ -223,7 +241,7 @@ TEST_F(IntegrationTest, SendVsyncsAfterEmptyConfig) {
 
 TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
   TestFidlClient vc_client(sysmem_);
-  ASSERT_TRUE(vc_client.CreateChannel(display_fidl(), /*is_vc=*/true));
+  ASSERT_OK(vc_client.OpenCoordinator(display_fidl(), ClientPriority::kVirtcon, *dispatcher()));
   {
     fbl::AutoLock lock(vc_client.mtx());
     // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
@@ -233,9 +251,8 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
     EXPECT_OK(vc_client.dc_->ApplyConfig().status());
   }
 
-  auto primary_client = std::make_unique<TestFidlClient>(sysmem_);
-  ASSERT_TRUE(primary_client->CreateChannel(display_fidl(), /*is_vc=*/false));
-  ASSERT_TRUE(primary_client->Bind(dispatcher()));
+  std::unique_ptr<TestFidlClient> primary_client =
+      OpenCoordinatorTestFidlClient(sysmem_, display_fidl(), ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
 
   // Present an image
@@ -258,21 +275,18 @@ TEST_F(IntegrationTest, DISABLED_SendVsyncsAfterClientsBail) {
 }
 
 TEST_F(IntegrationTest, SendVsyncsAfterClientDies) {
-  auto primary_client = std::make_unique<TestFidlClient>(sysmem_);
-  ASSERT_TRUE(primary_client->CreateChannel(display_fidl(), /*is_vc=*/false));
-  ASSERT_TRUE(primary_client->Bind(dispatcher()));
+  std::unique_ptr<TestFidlClient> primary_client =
+      OpenCoordinatorTestFidlClient(sysmem_, display_fidl(), ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
   auto id = primary_client->display_id();
   SendVsyncAfterUnbind(std::move(primary_client), id);
 }
 
 TEST_F(IntegrationTest, AcknowledgeVsync) {
-  auto primary_client = std::make_unique<TestFidlClient>(sysmem_);
-  ASSERT_TRUE(primary_client->CreateChannel(display_fidl(), /*is_vc=*/false));
-  ASSERT_TRUE(primary_client->Bind(dispatcher()));
+  std::unique_ptr<TestFidlClient> primary_client =
+      OpenCoordinatorTestFidlClient(sysmem_, display_fidl(), ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
   EXPECT_EQ(0u, primary_client->vsync_count());
-  EXPECT_EQ(kInvalidVsyncAckCookie, primary_client->vsync_ack_cookie());
 
   // send vsyncs upto watermark level
   for (uint32_t i = 0; i < ClientProxy::kVsyncMessagesWatermark; i++) {
@@ -294,9 +308,8 @@ TEST_F(IntegrationTest, AcknowledgeVsync) {
 }
 
 TEST_F(IntegrationTest, AcknowledgeVsyncAfterQueueFull) {
-  auto primary_client = std::make_unique<TestFidlClient>(sysmem_);
-  ASSERT_TRUE(primary_client->CreateChannel(display_fidl(), /*is_vc=*/false));
-  ASSERT_TRUE(primary_client->Bind(dispatcher()));
+  std::unique_ptr<TestFidlClient> primary_client =
+      OpenCoordinatorTestFidlClient(sysmem_, display_fidl(), ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
 
   // send vsyncs until max vsync
@@ -340,9 +353,8 @@ TEST_F(IntegrationTest, AcknowledgeVsyncAfterQueueFull) {
 }
 
 TEST_F(IntegrationTest, AcknowledgeVsyncAfterLongTime) {
-  auto primary_client = std::make_unique<TestFidlClient>(sysmem_);
-  ASSERT_TRUE(primary_client->CreateChannel(display_fidl(), /*is_vc=*/false));
-  ASSERT_TRUE(primary_client->Bind(dispatcher()));
+  std::unique_ptr<TestFidlClient> primary_client =
+      OpenCoordinatorTestFidlClient(sysmem_, display_fidl(), ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
 
   // send vsyncs until max vsyncs
@@ -383,9 +395,8 @@ TEST_F(IntegrationTest, AcknowledgeVsyncAfterLongTime) {
 }
 
 TEST_F(IntegrationTest, InvalidVSyncCookie) {
-  auto primary_client = std::make_unique<TestFidlClient>(sysmem_);
-  ASSERT_TRUE(primary_client->CreateChannel(display_fidl(), /*is_vc=*/false));
-  ASSERT_TRUE(primary_client->Bind(dispatcher()));
+  std::unique_ptr<TestFidlClient> primary_client =
+      OpenCoordinatorTestFidlClient(sysmem_, display_fidl(), ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
 
   // send vsyncs until max vsync
@@ -443,9 +454,8 @@ TEST_F(IntegrationTest, InvalidVSyncCookie) {
 }
 
 TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
-  auto primary_client = std::make_unique<TestFidlClient>(sysmem_);
-  ASSERT_TRUE(primary_client->CreateChannel(display_fidl(), /*is_vc=*/false));
-  ASSERT_TRUE(primary_client->Bind(dispatcher()));
+  std::unique_ptr<TestFidlClient> primary_client =
+      OpenCoordinatorTestFidlClient(sysmem_, display_fidl(), ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
 
   // send vsyncs until max vsync
@@ -570,27 +580,25 @@ TEST_F(IntegrationTest, AcknowledgeVsyncWithOldCookie) {
 }
 
 TEST_F(IntegrationTest, CreateLayer) {
-  TestFidlClient client(sysmem_);
-  ASSERT_TRUE(client.CreateChannel(display_fidl(), /*is_vc=*/false));
-  ASSERT_TRUE(client.Bind(dispatcher()));
+  std::unique_ptr<TestFidlClient> client =
+      OpenCoordinatorTestFidlClient(sysmem_, display_fidl(), ClientPriority::kPrimary);
 
-  fbl::AutoLock lock(client.mtx());
-  auto create_layer_reply = client.dc_->CreateLayer();
+  fbl::AutoLock lock(client->mtx());
+  auto create_layer_reply = client->dc_->CreateLayer();
   ASSERT_OK(create_layer_reply.status());
   EXPECT_TRUE(create_layer_reply.value().is_ok());
 }
 
 TEST_F(IntegrationTest, ImportImageWithInvalidImageId) {
-  TestFidlClient client(sysmem_);
-  ASSERT_TRUE(client.CreateChannel(display_fidl(), /*is_vc=*/false));
-  ASSERT_TRUE(client.Bind(dispatcher()));
+  std::unique_ptr<TestFidlClient> client =
+      OpenCoordinatorTestFidlClient(sysmem_, display_fidl(), ClientPriority::kPrimary);
 
-  fbl::AutoLock lock(client.mtx());
+  fbl::AutoLock lock(client->mtx());
   constexpr ImageId image_id = kInvalidImageId;
   constexpr BufferCollectionId buffer_collection_id(0xffeeeedd);
   fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportImage> import_image_reply =
-      client.dc_->ImportImage(
-          client.displays_[0].image_metadata_,
+      client->dc_->ImportImage(
+          client->displays_[0].image_metadata_,
           fuchsia_hardware_display::wire::BufferId{
               .buffer_collection_id = ToFidlBufferCollectionId(buffer_collection_id),
               .buffer_index = 0,
@@ -601,16 +609,15 @@ TEST_F(IntegrationTest, ImportImageWithInvalidImageId) {
 }
 
 TEST_F(IntegrationTest, ImportImageWithNonExistentBufferCollectionId) {
-  TestFidlClient client(sysmem_);
-  ASSERT_TRUE(client.CreateChannel(display_fidl(), /*is_vc=*/false));
-  ASSERT_TRUE(client.Bind(dispatcher()));
+  std::unique_ptr<TestFidlClient> client =
+      OpenCoordinatorTestFidlClient(sysmem_, display_fidl(), ClientPriority::kPrimary);
 
-  fbl::AutoLock lock(client.mtx());
+  fbl::AutoLock lock(client->mtx());
   constexpr BufferCollectionId kNonExistentCollectionId(0xffeeeedd);
   constexpr ImageId image_id(1);
   fidl::WireResult<fuchsia_hardware_display::Coordinator::ImportImage> import_image_reply =
-      client.dc_->ImportImage(
-          client.displays_[0].image_metadata_,
+      client->dc_->ImportImage(
+          client->displays_[0].image_metadata_,
           fuchsia_hardware_display::wire::BufferId{
               .buffer_collection_id = ToFidlBufferCollectionId(kNonExistentCollectionId),
               .buffer_index = 0,
@@ -623,7 +630,7 @@ TEST_F(IntegrationTest, ImportImageWithNonExistentBufferCollectionId) {
 TEST_F(IntegrationTest, ClampRgb) {
   // Create vc client
   TestFidlClient vc_client(sysmem_);
-  ASSERT_TRUE(vc_client.CreateChannel(display_fidl(), /*is_vc=*/true));
+  ASSERT_OK(vc_client.OpenCoordinator(display_fidl(), ClientPriority::kVirtcon, *dispatcher()));
   {
     fbl::AutoLock lock(vc_client.mtx());
     // set mode to Fallback
@@ -637,9 +644,8 @@ TEST_F(IntegrationTest, ClampRgb) {
   }
 
   // Create a primary client
-  auto primary_client = std::make_unique<TestFidlClient>(sysmem_);
-  ASSERT_TRUE(primary_client->CreateChannel(display_fidl(), /*is_vc=*/false));
-  ASSERT_TRUE(primary_client->Bind(dispatcher()));
+  std::unique_ptr<TestFidlClient> primary_client =
+      OpenCoordinatorTestFidlClient(sysmem_, display_fidl(), ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
   {
     fbl::AutoLock lock(primary_client->mtx());
@@ -669,13 +675,12 @@ TEST_F(IntegrationTest, ClampRgb) {
 TEST_F(IntegrationTest, DISABLED_EmptyConfigIsNotApplied) {
   // Create and bind virtcon client.
   TestFidlClient vc_client(sysmem_);
-  ASSERT_TRUE(vc_client.CreateChannel(display_fidl(), /*is_vc=*/true));
+  ASSERT_OK(vc_client.OpenCoordinator(display_fidl(), ClientPriority::kVirtcon, *dispatcher()));
   {
     fbl::AutoLock lock(vc_client.mtx());
     EXPECT_OK(vc_client.dc_->SetVirtconMode(fuchsia_hardware_display::wire::VirtconMode::kFallback)
                   .status());
   }
-  ASSERT_TRUE(vc_client.Bind(dispatcher()));
   {
     fbl::AutoLock lock(vc_client.mtx());
     // TODO(https://fxbug.dev/42080252): Do not hardcode the display ID, read from
@@ -687,9 +692,8 @@ TEST_F(IntegrationTest, DISABLED_EmptyConfigIsNotApplied) {
   ASSERT_TRUE(PollUntilOnLoop([&]() { return virtcon_client_connected(); }));
 
   // Create and bind primary client.
-  auto primary_client = std::make_unique<TestFidlClient>(sysmem_);
-  ASSERT_TRUE(primary_client->CreateChannel(display_fidl(), /*is_vc=*/false));
-  ASSERT_TRUE(primary_client->Bind(dispatcher()));
+  std::unique_ptr<TestFidlClient> primary_client =
+      OpenCoordinatorTestFidlClient(sysmem_, display_fidl(), ClientPriority::kPrimary);
   ASSERT_TRUE(PollUntilOnLoop([&]() { return primary_client_connected(); }));
 
   // Virtcon client should remain active until primary client has set a config.
@@ -729,9 +733,8 @@ TEST_F(IntegrationTest, DISABLED_EmptyConfigIsNotApplied) {
 // Both images are ready at ApplyConfig() time, i.e. no fences are provided.
 TEST_F(IntegrationTest, VsyncEvent) {
   // Create and bind primary client.
-  auto primary_client = std::make_unique<TestFidlClient>(sysmem_);
-  ASSERT_TRUE(primary_client->CreateChannel(display_fidl(), /*is_vc=*/false));
-  ASSERT_TRUE(primary_client->Bind(dispatcher()));
+  std::unique_ptr<TestFidlClient> primary_client =
+      OpenCoordinatorTestFidlClient(sysmem_, display_fidl(), ClientPriority::kPrimary);
   // Apply a config for client to become active.
   {
     fbl::AutoLock lock(primary_client->mtx());
@@ -856,9 +859,8 @@ TEST_F(IntegrationTest, VsyncEvent) {
 //
 TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
   // Create and bind primary client.
-  auto primary_client = std::make_unique<TestFidlClient>(sysmem_);
-  ASSERT_TRUE(primary_client->CreateChannel(display_fidl(), /*is_vc=*/false));
-  ASSERT_TRUE(primary_client->Bind(dispatcher()));
+  std::unique_ptr<TestFidlClient> primary_client =
+      OpenCoordinatorTestFidlClient(sysmem_, display_fidl(), ClientPriority::kPrimary);
   // Apply a config for client to become active.
   {
     fbl::AutoLock lock(primary_client->mtx());
@@ -986,9 +988,8 @@ TEST_F(IntegrationTest, VsyncWaitForPendingImages) {
 //
 TEST_F(IntegrationTest, VsyncHidePendingLayer) {
   // Create and bind primary client.
-  auto primary_client = std::make_unique<TestFidlClient>(sysmem_);
-  ASSERT_TRUE(primary_client->CreateChannel(display_fidl(), /*is_vc=*/false));
-  ASSERT_TRUE(primary_client->Bind(dispatcher()));
+  std::unique_ptr<TestFidlClient> primary_client =
+      OpenCoordinatorTestFidlClient(sysmem_, display_fidl(), ClientPriority::kPrimary);
   // Apply a config for client to become active.
   {
     fbl::AutoLock lock(primary_client->mtx());
@@ -1131,9 +1132,8 @@ TEST_F(IntegrationTest, VsyncHidePendingLayer) {
 // Note that fence1 is never signaled.
 TEST_F(IntegrationTest, VsyncSkipOldPendingConfiguration) {
   // Create and bind primary client.
-  auto primary_client = std::make_unique<TestFidlClient>(sysmem_);
-  ASSERT_TRUE(primary_client->CreateChannel(display_fidl(), /*is_vc=*/false));
-  ASSERT_TRUE(primary_client->Bind(dispatcher()));
+  std::unique_ptr<TestFidlClient> primary_client =
+      OpenCoordinatorTestFidlClient(sysmem_, display_fidl(), ClientPriority::kPrimary);
 
   zx::result<LayerId> create_default_layer_result = primary_client->CreateLayer();
   zx::result<ImageId> create_image_0_result = primary_client->CreateImage();

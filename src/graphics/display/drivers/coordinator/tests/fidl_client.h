@@ -21,6 +21,8 @@
 #include <fbl/string.h>
 #include <fbl/vector.h>
 
+#include "src/graphics/display/drivers/coordinator/client-priority.h"
+#include "src/graphics/display/drivers/coordinator/tests/mock-coordinator-listener.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
@@ -47,20 +49,23 @@ class TestFidlClient {
     fuchsia_hardware_display_types::wire::ImageMetadata image_metadata_;
   };
 
+  struct EventInfo {
+    EventId id;
+    zx::event event;
+  };
+
   explicit TestFidlClient(const fidl::WireSyncClient<fuchsia_sysmem2::Allocator>& sysmem)
       : sysmem_(sysmem) {}
 
   ~TestFidlClient();
 
-  bool CreateChannel(const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& provider,
-                     bool is_vc);
-  // Enable vsync for a display and wait for events using |dispatcher|.
-  bool Bind(async_dispatcher_t* dispatcher) TA_EXCL(mtx());
+  zx::result<> OpenCoordinator(
+      const fidl::WireSyncClient<fuchsia_hardware_display::Provider>& provider,
+      ClientPriority client_priority, async_dispatcher_t& coordinator_listener_dispatcher);
 
-  struct EventInfo {
-    EventId id;
-    zx::event event = {};
-  };
+  bool HasOwnershipAndValidDisplay() const;
+
+  zx::result<> EnableVsync();
 
   zx::result<ImageId> ImportImageWithSysmem(
       const fuchsia_hardware_display_types::wire::ImageMetadata& image_metadata) TA_EXCL(mtx());
@@ -83,6 +88,14 @@ class TestFidlClient {
 
   zx_status_t PresentLayers(std::vector<PresentLayerInfo> layers);
 
+  void OnDisplaysChanged(std::vector<fuchsia_hardware_display::wire::Info> added_displays,
+                         std::vector<DisplayId> removed_display_ids);
+
+  void OnClientOwnershipChange(bool has_ownership);
+
+  void OnVsync(DisplayId display_id, zx::time timestamp, ConfigStamp applied_config_stamp,
+               VsyncAckCookie vsync_ack_cookie);
+
   DisplayId display_id() const;
 
   fbl::Vector<Display> displays_;
@@ -96,7 +109,7 @@ class TestFidlClient {
 
   ConfigStamp recent_presented_config_stamp() const {
     fbl::AutoLock lock(mtx());
-    return ToConfigStamp(recent_presented_config_stamp_);
+    return recent_presented_config_stamp_;
   }
 
   VsyncAckCookie vsync_ack_cookie() const { return vsync_ack_cookie_; }
@@ -105,21 +118,21 @@ class TestFidlClient {
 
  private:
   mutable fbl::Mutex mtx_;
-  async_dispatcher_t* dispatcher_ = nullptr;
   uint64_t vsync_count_ TA_GUARDED(mtx()) = 0;
   VsyncAckCookie vsync_ack_cookie_ = kInvalidVsyncAckCookie;
   ImageId next_image_id_ TA_GUARDED(mtx()) = ImageId(1);
-  fuchsia_hardware_display_types::wire::ConfigStamp recent_presented_config_stamp_;
+  ConfigStamp recent_presented_config_stamp_;
   const fidl::WireSyncClient<fuchsia_sysmem2::Allocator>& sysmem_;
+
+  MockCoordinatorListener coordinator_listener_{
+      fit::bind_member<&TestFidlClient::OnDisplaysChanged>(this),
+      fit::bind_member<&TestFidlClient::OnVsync>(this),
+      fit::bind_member<&TestFidlClient::OnClientOwnershipChange>(this)};
 
   zx::result<ImageId> ImportImageWithSysmemLocked(
       const fuchsia_hardware_display_types::wire::ImageMetadata& image_metadata) TA_REQ(mtx());
   zx::result<LayerId> CreateLayerLocked() TA_REQ(mtx());
   zx::result<EventInfo> CreateEventLocked() TA_REQ(mtx());
-
-  void OnEventMsgAsync(async_dispatcher_t* dispatcher, async::WaitBase* self, zx_status_t status,
-                       const zx_packet_signal_t* signal) TA_EXCL(mtx());
-  async::WaitMethod<TestFidlClient, &TestFidlClient::OnEventMsgAsync> event_msg_wait_event_{this};
 };
 
 }  // namespace display
