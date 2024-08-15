@@ -31,7 +31,8 @@ void init(int argc, const char** argv) {
   if (!fxl::SetLogSettingsFromCommandLine(command_line)) {
     exit(EXIT_FAILURE);
   }
-  fuchsia_logging::SetTags({"intl_services"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"intl_services"}).BuildAndInitialize();
 }
 
 }  // namespace
