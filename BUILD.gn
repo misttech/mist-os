@@ -561,11 +561,6 @@ group("checkout_artifacts.metadata") {
         path = rebase_path("//.jiri_root/update_history/latest", root_build_dir)
         type = "xml"
       },
-      {
-        name = "ssh_authorized_key"
-        path = rebase_path("//.ssh/authorized_keys", root_build_dir)
-        type = "txt"
-      },
     ]
   }
 }
