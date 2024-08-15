@@ -206,7 +206,10 @@ pub struct ReceiveIpPacketMeta<I: IpExt> {
     pub broadcast: Option<I::BroadcastMarker>,
 
     /// Destination overrides for the transparent proxy.
-    pub transport_override: Option<TransparentLocalDelivery<I>>,
+    pub transparent_override: Option<TransparentLocalDelivery<I>>,
+
+    /// DSCP and ECN values received in Traffic Class or TOS field.
+    pub dscp_and_ecn: DscpAndEcn,
 }
 
 /// The execution context provided by a transport layer protocol to the IP
@@ -2397,7 +2400,8 @@ pub fn receive_ipv4_packet<
             // to a transparent proxy.
             let meta = ReceiveIpPacketMeta {
                 broadcast: None,
-                transport_override: Some(TransparentLocalDelivery { addr, port }),
+                transparent_override: Some(TransparentLocalDelivery { addr, port }),
+                dscp_and_ecn: packet.dscp_and_ecn(),
             };
 
             // Short-circuit the routing process and override local demux, providing a local
@@ -2435,7 +2439,8 @@ pub fn receive_ipv4_packet<
             trace!("receive_ipv4_packet: delivering locally");
             let meta = ReceiveIpPacketMeta {
                 broadcast: address_status.to_broadcast_marker(),
-                transport_override: None,
+                transparent_override: None,
+                dscp_and_ecn: packet.dscp_and_ecn(),
             };
 
             dispatch_receive_ipv4_packet(
@@ -2784,7 +2789,8 @@ pub fn receive_ipv6_packet<
 
             let meta = ReceiveIpPacketMeta {
                 broadcast: None,
-                transport_override: Some(TransparentLocalDelivery { addr, port }),
+                transparent_override: Some(TransparentLocalDelivery { addr, port }),
+                dscp_and_ecn: packet.dscp_and_ecn(),
             };
 
             // Short-circuit the routing process and override local demux, providing a local

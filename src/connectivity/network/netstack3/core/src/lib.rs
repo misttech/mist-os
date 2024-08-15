@@ -210,8 +210,8 @@ pub mod types {
 /// Methods for dealing with UDP sockets.
 pub mod udp {
     pub use netstack3_udp::{
-        SendError, SendToError, UdpBindingsTypes, UdpReceiveBindingsContext, UdpRemotePort,
-        UdpSocketId,
+        SendError, SendToError, UdpBindingsTypes, UdpPacketMeta, UdpReceiveBindingsContext,
+        UdpRemotePort, UdpSocketId,
     };
 }
 

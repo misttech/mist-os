@@ -111,9 +111,10 @@ where
         remote_ip: I::RecvSrcAddr,
         local_ip: SpecifiedAddr<I::Addr>,
         mut buffer: B,
-        ReceiveIpPacketMeta { broadcast, transport_override }: ReceiveIpPacketMeta<I>,
+        meta: ReceiveIpPacketMeta<I>,
     ) -> Result<(), (B, TransportReceiveError)> {
-        if let Some(delivery) = transport_override {
+        let ReceiveIpPacketMeta { broadcast, transparent_override, dscp_and_ecn: _ } = meta;
+        if let Some(delivery) = transparent_override {
             warn!(
                 "TODO(https://fxbug.dev/337009139): transparent proxy not supported for TCP \
                 sockets; will not override dispatch to perform local delivery to {delivery:?}"

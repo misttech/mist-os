@@ -36,7 +36,7 @@ use std::convert::{Infallible as Never, TryFrom as _};
 use std::ffi::CStr;
 use std::fmt::Debug;
 use std::future::Future;
-use std::num::{NonZeroU16, TryFromIntError};
+use std::num::TryFromIntError;
 use std::ops::Deref;
 use std::pin::pin;
 use std::sync::Arc;
@@ -91,7 +91,9 @@ use netstack3_core::ip::{
 };
 use netstack3_core::routes::RawMetric;
 use netstack3_core::sync::{DynDebugReferences, RwLock as CoreRwLock};
-use netstack3_core::udp::{UdpBindingsTypes, UdpReceiveBindingsContext, UdpSocketId};
+use netstack3_core::udp::{
+    UdpBindingsTypes, UdpPacketMeta, UdpReceiveBindingsContext, UdpSocketId,
+};
 use netstack3_core::{
     neighbor, DeferredResourceRemovalContext, EventContext, InstantBindingsTypes, InstantContext,
     IpExt, ReferenceNotifiers, RngContext, StackState, TimerBindingsTypes, TimerContext, TimerId,
@@ -611,12 +613,11 @@ impl<I: IpExt> UdpReceiveBindingsContext<I, DeviceId<BindingsCtx>> for BindingsC
     fn receive_udp<B: BufferMut>(
         &mut self,
         id: &UdpSocketId<I, WeakDeviceId<BindingsCtx>, BindingsCtx>,
-        device: &DeviceId<BindingsCtx>,
-        dst_addr: (<I>::Addr, NonZeroU16),
-        src_addr: (<I>::Addr, Option<NonZeroU16>),
+        device_id: &DeviceId<BindingsCtx>,
+        meta: UdpPacketMeta<I>,
         body: &B,
     ) {
-        id.external_data().receive_udp(device, dst_addr, src_addr, body)
+        id.external_data().receive_udp(device_id, meta, body)
     }
 }
 

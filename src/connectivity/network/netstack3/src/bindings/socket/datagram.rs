@@ -35,6 +35,7 @@ use netstack3_core::socket::{
     SocketInfo,
 };
 use netstack3_core::sync::Mutex as CoreMutex;
+use netstack3_core::udp::UdpPacketMeta;
 use netstack3_core::{icmp, udp, IpExt};
 use packet::{Buf, BufferMut};
 use packet_formats::ip::DscpAndEcn;
@@ -616,10 +617,11 @@ impl<I: IpExt> DatagramSocketExternalData<I> {
     pub(crate) fn receive_udp<B: BufferMut>(
         &self,
         device_id: &DeviceId<BindingsCtx>,
-        (dst_ip, dst_port): (<I>::Addr, NonZeroU16),
-        (src_ip, src_port): (<I>::Addr, Option<NonZeroU16>),
+        meta: UdpPacketMeta<I>,
         body: &B,
     ) {
+        // TODO(https://fxbug.dev/326102014): Store `UdpPacketMeta` in `AvailableMessage`.
+        let UdpPacketMeta { src_ip, src_port, dst_ip, dst_port, .. } = meta;
         self.message_queue.lock().receive(AvailableMessage {
             interface_id: device_id.bindings_id().id,
             source_addr: src_ip,
