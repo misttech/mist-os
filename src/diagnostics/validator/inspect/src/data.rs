@@ -13,7 +13,6 @@ use diagnostics_hierarchy::{
 };
 use fidl_diagnostics_validate::{self as validate, Value};
 use inspect_format::{ArrayFormat, BlockIndex, LinkNodeDisposition};
-use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::Zero;
 use std::clone::Clone;
 use std::collections::{HashMap, HashSet};
@@ -1203,16 +1202,6 @@ impl Data {
     }
 }
 
-// There's no enum in fuchsia_inspect::format::block which contains only
-// values that are valid for an ArrayType.
-#[allow(dead_code)] // TODO(https://fxbug.dev/351850634)
-#[derive(Debug, PartialEq, Eq, FromPrimitive, ToPrimitive)]
-enum ArrayType {
-    Int = 4,
-    Uint = 5,
-    Double = 6,
-}
-
 impl From<DiagnosticsHierarchy> for Data {
     fn from(hierarchy: DiagnosticsHierarchy) -> Self {
         let mut nodes = HashMap::new();
@@ -1287,6 +1276,7 @@ mod tests {
     use fidl_diagnostics_validate::{ValueType, ROOT_ID};
     use fuchsia_inspect::reader::ArrayContent as iArrayContent;
     use inspect_format::BlockType;
+    use num_derive::{FromPrimitive, ToPrimitive};
 
     #[fuchsia::test]
     fn test_basic_data_strings() -> Result<(), Error> {
@@ -1319,6 +1309,15 @@ mod tests {
 > > > uint_a: GenericArray(["1", "2"])
 > > > uint_eh: GenericExponentialHistogram(["1", "1", "2", "1", "2", "3"])
 > > > uint_lh: GenericLinearHistogram(["1", "1", "1", "2", "3"])"#;
+
+    // There's no enum in fuchsia_inspect::format::block which contains only
+    // values that are valid for an ArrayType.
+    #[derive(Debug, PartialEq, Eq, FromPrimitive, ToPrimitive)]
+    enum ArrayType {
+        Int = 4,
+        Uint = 5,
+        Double = 6,
+    }
 
     #[fuchsia::test]
     fn test_parse_hierarchy() -> Result<(), Error> {
