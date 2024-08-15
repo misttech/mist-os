@@ -31,13 +31,9 @@ SystemMonitor::SystemMonitor() {
       fuchsia::diagnostics::ClientSelectorConfiguration::WithSelectAll(true));
 }
 
-void SystemMonitor::ConnectToArchiveAccessor(bool use_real_archive_accessor) {
+void SystemMonitor::ConnectToArchiveAccessor() {
   auto services = sys::ServiceDirectory::CreateFromNamespace();
-  if (use_real_archive_accessor) {
-    services->Connect(accessor_.NewRequest(), "fuchsia.diagnostics.RealArchiveAccessor");
-  } else {
-    services->Connect(accessor_.NewRequest());
-  }
+  services->Connect(accessor_.NewRequest());
 }
 
 void SystemMonitor::InitializeRenderer() { renderer_.Initialize(); }

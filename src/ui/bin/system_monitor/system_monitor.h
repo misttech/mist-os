@@ -21,7 +21,7 @@ class SystemMonitor {
   // These functions uses the iterator to access inspect diagnostic and turn
   // all the json format content into std::string and
   // returns a vector of strings.
-  void ConnectToArchiveAccessor(bool use_real_archive_accessor = false);
+  void ConnectToArchiveAccessor();
   void InitializeRenderer();
   void UpdateRecentDiagnostic();
   void PrintRecentDiagnostic();
