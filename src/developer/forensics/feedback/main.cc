@@ -30,7 +30,8 @@ namespace forensics::feedback {
 
 int main() {
   forensics::component::Component component;
-  fuchsia_logging::SetTags({"forensics", "feedback"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"forensics", "feedback"}).BuildAndInitialize();
 
   const std::optional<SnapshotConfig> snapshot_config = GetSnapshotConfig();
   if (!snapshot_config) {

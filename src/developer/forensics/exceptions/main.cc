@@ -28,7 +28,8 @@ void LogProcessLimboStatus(const ::forensics::exceptions::ProcessLimboManager& l
 
 int main() {
   forensics::component::Component component;
-  fuchsia_logging::SetTags({"forensics", "exception"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"forensics", "exception"}).BuildAndInitialize();
 
   const exceptions_config::Config config = exceptions_config::Config::TakeFromStartupHandle();
   auto broker =
