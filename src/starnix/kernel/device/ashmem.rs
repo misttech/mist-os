@@ -6,11 +6,14 @@ use crate::device::kobject::DeviceMetadata;
 use crate::device::DeviceMode;
 use crate::fs::sysfs::DeviceDirectory;
 use crate::mm::memory::MemoryObject;
-use crate::mm::{MemoryAccessor, MemoryAccessorExt};
+use crate::mm::{
+    DesiredAddress, MappingName, MappingOptions, MemoryAccessor, MemoryAccessorExt,
+    ProtectionFlags, PAGE_SIZE,
+};
 use crate::task::CurrentTask;
 use crate::vfs::{
     default_ioctl, fileops_impl_memory, fileops_impl_noop_sync, FileObject, FileOps,
-    FileSystemCreator, FsNode, FsString,
+    FileSystemCreator, FileWriteGuardRef, FsNode, FsString, NamespaceNode,
 };
 use fuchsia_zircon as zx;
 use linux_uapi::{
@@ -22,7 +25,9 @@ use starnix_logging::track_stub;
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::errors::Errno;
+use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::open_flags::OpenFlags;
+use starnix_uapi::user_address::UserAddress;
 use starnix_uapi::{device_type, errno, error, ASHMEM_GET_FILE_ID, ASHMEM_NAME_LEN};
 use std::sync::Arc;
 
@@ -53,10 +58,10 @@ pub struct Ashmem {
     state: Mutex<AshmemState>,
 }
 
-#[derive(Default)]
 struct AshmemState {
     size: usize,
     name: FsString,
+    prot_flags: ProtectionFlags,
 }
 
 impl Ashmem {
@@ -67,25 +72,80 @@ impl Ashmem {
         _node: &FsNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(Box::new(Ashmem { memory: OnceCell::new(), state: Mutex::default() }))
+        let state = AshmemState {
+            size: 0,
+            name: b"dev/ashmem\0".into(),
+            prot_flags: ProtectionFlags::all(),
+        };
+
+        let ashmem = Ashmem { memory: OnceCell::new(), state: Mutex::new(state) };
+
+        Ok(Box::new(ashmem))
     }
 
     fn memory(&self) -> Result<&Arc<MemoryObject>, Errno> {
-        let state = self.state.lock();
-        self.memory.get_or_try_init(|| {
-            if state.size == 0 {
-                return error!(EINVAL);
-            }
-            let memory =
-                MemoryObject::from(zx::Vmo::create(state.size as u64).map_err(|_| errno!(ENOMEM))?);
-            Ok(Arc::new(memory))
-        })
+        self.memory.get().ok_or_else(|| errno!(EINVAL))
+    }
+
+    fn is_mapped(&self) -> bool {
+        self.memory.get().is_some()
     }
 }
 
 impl FileOps for Ashmem {
     fileops_impl_memory!(self, self.memory()?);
     fileops_impl_noop_sync!();
+
+    fn mmap(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        current_task: &CurrentTask,
+        addr: DesiredAddress,
+        memory_offset: u64,
+        length: usize,
+        prot_flags: ProtectionFlags,
+        mapping_options: MappingOptions,
+        filename: NamespaceNode,
+    ) -> Result<UserAddress, Errno> {
+        let state = self.state.lock();
+        let size_paged_aligned = round_up_to_increment(state.size, *PAGE_SIZE as usize)?;
+
+        // Filter protections
+        if !state.prot_flags.contains(prot_flags) {
+            return error!(EINVAL);
+        }
+        // Filter size
+        if size_paged_aligned < length {
+            return error!(EINVAL);
+        }
+
+        let memory = self
+            .memory
+            .get_or_try_init(|| {
+                if size_paged_aligned == 0 {
+                    return error!(EINVAL);
+                }
+                // Round up to page boundary
+                let vmo = zx::Vmo::create(size_paged_aligned as u64).map_err(|_| errno!(ENOMEM))?;
+                let memory = MemoryObject::from(vmo);
+                Ok(Arc::new(memory))
+            })?
+            .clone();
+
+        let mapped_addr = current_task.mm().map_memory(
+            addr,
+            memory,
+            memory_offset,
+            length,
+            prot_flags,
+            mapping_options,
+            MappingName::File(filename.into_active()),
+            FileWriteGuardRef(None),
+        )?;
+
+        Ok(mapped_addr)
+    }
 
     fn ioctl(
         &self,
@@ -98,38 +158,48 @@ impl FileOps for Ashmem {
         match request {
             ASHMEM_SET_SIZE => {
                 let mut state = self.state.lock();
-                if self.memory.get().is_some() {
+
+                if self.is_mapped() {
                     return error!(EINVAL);
                 }
                 state.size = arg.into();
                 Ok(SUCCESS)
             }
             ASHMEM_GET_SIZE => Ok(self.state.lock().size.into()),
-
             ASHMEM_SET_NAME => {
-                let name =
+                let mut state = self.state.lock();
+                if self.is_mapped() {
+                    return error!(EINVAL);
+                }
+
+                let mut name =
                     current_task.read_c_string_to_vec(arg.into(), ASHMEM_NAME_LEN as usize)?;
-                self.state.lock().name = name;
+                name.push(0); // Add a null terminator
+
+                state.name = name.into();
                 Ok(SUCCESS)
             }
             ASHMEM_GET_NAME => {
                 let state = self.state.lock();
-                let mut name = &state.name[..];
-                if name.len() == 0 {
-                    name = b"";
-                }
+                let name = &state.name[..];
+
                 current_task.write_memory(arg.into(), name)?;
                 Ok(SUCCESS)
             }
-
             ASHMEM_SET_PROT_MASK => {
-                track_stub!(TODO("https://fxbug.dev/322874231"), "ASHMEM_SET_PROT_MASK");
-                error!(ENOSYS)
+                let prot_flags =
+                    ProtectionFlags::from_bits(arg.into()).ok_or_else(|| errno!(EINVAL))?;
+
+                let mut state = self.state.lock();
+                // Do not allow protections to be increased
+                if !state.prot_flags.contains(prot_flags) {
+                    return error!(EINVAL);
+                }
+
+                state.prot_flags = prot_flags;
+                Ok(SUCCESS)
             }
-            ASHMEM_GET_PROT_MASK => {
-                track_stub!(TODO("https://fxbug.dev/322874002"), "ASHMEM_GET_PROT_MASK");
-                error!(ENOSYS)
-            }
+            ASHMEM_GET_PROT_MASK => Ok(self.state.lock().prot_flags.bits().into()),
             ASHMEM_PIN => {
                 track_stub!(TODO("https://fxbug.dev/322873842"), "ASHMEM_PIN");
                 error!(ENOSYS)
