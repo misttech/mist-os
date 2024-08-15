@@ -20,7 +20,6 @@ executable("unittests") {
   deps = [
     ":mocks",
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
-    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_hlcpp",
     "//sdk/fidl/fuchsia.images2:fuchsia.images2_cpp",
     "//src/lib/fsl",
     "//src/lib/fxl/test:gtest_main",

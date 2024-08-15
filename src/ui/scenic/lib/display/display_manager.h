@@ -7,7 +7,6 @@
 
 #include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
-#include <fuchsia/hardware/display/cpp/fidl.h>
 #include <lib/fit/function.h>
 
 #include <optional>
@@ -52,8 +51,9 @@ class DisplayManager {
   // Only use this during Scenic initialization to pass a reference to FrameScheduler.
   std::shared_ptr<Display> default_display_shared() const { return default_display_; }
 
-  std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> default_display_coordinator() {
-    return hlcpp_default_display_coordinator_;
+  std::shared_ptr<fidl::SyncClient<fuchsia_hardware_display::Coordinator>>
+  default_display_coordinator() {
+    return default_display_coordinator_;
   }
 
   std::shared_ptr<display::DisplayCoordinatorListener> default_display_coordinator_listener() {
@@ -83,13 +83,9 @@ class DisplayManager {
                fuchsia_hardware_display::VsyncAckCookie cookie);
 
   // Must outlive `default_display_coordinator_`.
-  std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr>
-      hlcpp_default_display_coordinator_;
-  std::shared_ptr<display::DisplayCoordinatorListener> default_display_coordinator_listener_;
-
-  // Borrowed new C++ binding reference to `hlcpp_default_display_coordinator_`.
-  std::optional<fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator>>
+  std::shared_ptr<fidl::SyncClient<fuchsia_hardware_display::Coordinator>>
       default_display_coordinator_;
+  std::shared_ptr<display::DisplayCoordinatorListener> default_display_coordinator_listener_;
 
   std::shared_ptr<Display> default_display_;
 

@@ -5,7 +5,6 @@
 #include "src/ui/scenic/lib/flatland/engine/engine.h"
 
 #include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.display.types/cpp/hlcpp_conversion.h>
 #include <lib/async/cpp/time.h>
 #include <lib/syslog/cpp/macros.h>
 

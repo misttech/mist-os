@@ -4,10 +4,7 @@
 
 #include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.display/cpp/hlcpp_conversion.h>
 #include <fidl/fuchsia.math/cpp/fidl.h>
-#include <fuchsia/hardware/display/cpp/fidl.h>
-#include <fuchsia/hardware/display/types/cpp/fidl.h>
 #include <fuchsia/math/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/fidl/cpp/hlcpp_conversion.h>
@@ -136,8 +133,8 @@ class DisplayCompositorTest : public DisplayCompositorTestBase {
     completion.Wait();
 
     auto shared_display_coordinator =
-        std::make_shared<fuchsia::hardware::display::CoordinatorSyncPtr>();
-    shared_display_coordinator->Bind(std::move(coordinator_client).TakeChannel());
+        std::make_shared<fidl::SyncClient<fuchsia_hardware_display::Coordinator>>(
+            std::move(coordinator_client));
 
     display_compositor_ = std::make_shared<flatland::DisplayCompositor>(
         dispatcher(), std::move(shared_display_coordinator), renderer_,

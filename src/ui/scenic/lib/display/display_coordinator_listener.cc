@@ -4,7 +4,6 @@
 
 #include "src/ui/scenic/lib/display/display_coordinator_listener.h"
 
-#include <fidl/fuchsia.hardware.display/cpp/hlcpp_conversion.h>
 #include <lib/async/default.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/types.h>

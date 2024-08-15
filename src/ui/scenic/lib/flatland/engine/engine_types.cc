@@ -4,8 +4,8 @@
 
 #include "src/ui/scenic/lib/flatland/engine/engine_types.h"
 
-#include <fuchsia/hardware/display/types/cpp/fidl.h>
-#include <fuchsia/math/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
+#include <fidl/fuchsia.math/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 
 namespace {

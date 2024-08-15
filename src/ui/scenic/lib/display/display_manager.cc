@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
-#include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/ui/scenic/cpp/fidl.h>
 #include <lib/fit/function.h>
 #include <lib/syslog/cpp/macros.h>
@@ -65,19 +64,18 @@ DisplayManager::DisplayManager(
 void DisplayManager::BindDefaultDisplayCoordinator(
     fidl::ClientEnd<fuchsia_hardware_display::Coordinator> coordinator,
     fidl::ServerEnd<fuchsia_hardware_display::CoordinatorListener> coordinator_listener) {
-  FX_DCHECK(!hlcpp_default_display_coordinator_);
+  FX_DCHECK(!default_display_coordinator_);
   FX_DCHECK(coordinator.is_valid());
-  hlcpp_default_display_coordinator_ =
-      std::make_shared<fuchsia::hardware::display::CoordinatorSyncPtr>();
-  hlcpp_default_display_coordinator_->Bind(coordinator.TakeChannel());
-  default_display_coordinator_ = scenic_impl::GetUnowned(*hlcpp_default_display_coordinator_);
+  default_display_coordinator_ =
+      std::make_shared<fidl::SyncClient<fuchsia_hardware_display::Coordinator>>(
+          std::move(coordinator));
   default_display_coordinator_listener_ = std::make_shared<display::DisplayCoordinatorListener>(
       std::move(coordinator_listener), fit::bind_member<&DisplayManager::OnDisplaysChanged>(this),
       fit::bind_member<&DisplayManager::OnVsync>(this),
       fit::bind_member<&DisplayManager::OnClientOwnershipChange>(this));
 
   fit::result<fidl::OneWayStatus> enable_vsync_result =
-      fidl::Call(*default_display_coordinator_)->EnableVsync(true);
+      (*default_display_coordinator_)->EnableVsync(true);
   if (enable_vsync_result.is_error()) {
     FX_LOGS(ERROR) << "Failed to enable vsync, status: " << enable_vsync_result.error_value();
   }
@@ -120,13 +118,13 @@ void DisplayManager::OnDisplaysChanged(
 
       if (mode_index != 0) {
         [[maybe_unused]] fit::result<fidl::OneWayStatus> set_display_mode_result =
-            fidl::Call(*default_display_coordinator_)
+            (*default_display_coordinator_)
                 ->SetDisplayMode({{
                     .display_id = display.id(),
                     .mode = display.modes()[mode_index],
                 }});
         [[maybe_unused]] fit::result<fidl::OneWayStatus> apply_config_result =
-            fidl::Call(*default_display_coordinator_)->ApplyConfig();
+            (*default_display_coordinator_)->ApplyConfig();
       }
 
       const fuchsia_hardware_display::Mode& mode = display.modes()[mode_index];
@@ -178,7 +176,7 @@ void DisplayManager::OnVsync(fuchsia_hardware_display_types::DisplayId display_i
                              fuchsia_hardware_display::VsyncAckCookie cookie) {
   if (cookie.value() != fuchsia_hardware_display_types::kInvalidDispId) {
     [[maybe_unused]] fit::result<fidl::OneWayStatus> acknowledge_vsync_result =
-        fidl::Call(*default_display_coordinator_)->AcknowledgeVsync(cookie.value());
+        (*default_display_coordinator_)->AcknowledgeVsync(cookie.value());
   }
 
   if (vsync_callback_) {
