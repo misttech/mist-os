@@ -408,11 +408,18 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
             });
             break;
           }
+          case fuchsia_component_test::Capability::Tag::kConfig: {
+            const auto& offer_cap_config = offer_cap.config().value();
+            converted.emplace(Config{
+                offer_cap_config.name().value(),
+                offer_cap_config.as(),
+            });
+            break;
+          }
           case fuchsia_component_test::Capability::Tag::kDirectory:
           case fuchsia_component_test::Capability::Tag::kStorage:
           case fuchsia_component_test::Capability::Tag::kService:
           case fuchsia_component_test::Capability::Tag::kEventStream:
-          case fuchsia_component_test::Capability::Tag::kConfig:
           case fuchsia_component_test::Capability::Tag::kDictionary:
           default:
             FX_LOG_KV(WARNING, "Skipping unsupported offer capability.",
