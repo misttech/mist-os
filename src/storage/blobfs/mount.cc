@@ -4,11 +4,17 @@
 
 #include "src/storage/blobfs/mount.h"
 
+#include <fidl/fuchsia.device.manager/cpp/markers.h>
+#include <fidl/fuchsia.io/cpp/markers.h>
+#include <fidl/fuchsia.process.lifecycle/cpp/markers.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/trace-provider/provider.h>
+#include <lib/zx/resource.h>
+#include <lib/zx/result.h>
 
 #include <memory>
 #include <utility>

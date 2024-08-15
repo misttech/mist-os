@@ -5,17 +5,14 @@
 #ifndef SRC_STORAGE_BLOBFS_BLOB_LOADER_H_
 #define SRC_STORAGE_BLOBFS_BLOB_LOADER_H_
 
-#include <lib/fit/function.h>
-#include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
-#include <zircon/status.h>
+#include <zircon/types.h>
 
+#include <cstdint>
 #include <memory>
 
-#include <fbl/macros.h>
-#include <storage/buffer/owned_vmoid.h>
 #include <storage/buffer/resizeable_vmo_buffer.h>
 
 #include "src/storage/blobfs/blob_layout.h"

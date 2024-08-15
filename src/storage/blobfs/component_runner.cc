@@ -4,21 +4,47 @@
 
 #include "src/storage/blobfs/component_runner.h"
 
+#include <fidl/fuchsia.device.manager/cpp/markers.h>
+#include <fidl/fuchsia.device.manager/cpp/wire_messaging.h>
 #include <fidl/fuchsia.fs.startup/cpp/wire.h>
 #include <fidl/fuchsia.fs/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/markers.h>
+#include <fidl/fuchsia.process.lifecycle/cpp/markers.h>
 #include <fidl/fuchsia.update.verify/cpp/wire.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async/cpp/task.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fidl/cpp/wire/client.h>
+#include <lib/fidl/cpp/wire/connect_service.h>
+#include <lib/fit/function.h>
+#include <lib/inspect/component/cpp/component.h>
+#include <lib/inspect/component/cpp/tree_handler_settings.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/resource.h>
+#include <lib/zx/result.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
+
+#include <memory>
+#include <mutex>
+#include <utility>
 
 #include <fbl/ref_ptr.h>
 
+#include "src/storage/blobfs/blobfs.h"
 #include "src/storage/blobfs/mount.h"
+#include "src/storage/blobfs/page_loader.h"
 #include "src/storage/blobfs/service/admin.h"
 #include "src/storage/blobfs/service/health_check.h"
 #include "src/storage/blobfs/service/lifecycle.h"
 #include "src/storage/blobfs/service/startup.h"
 #include "src/storage/lib/trace/trace.h"
 #include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
+#include "src/storage/lib/vfs/cpp/managed_vfs.h"
+#include "src/storage/lib/vfs/cpp/paged_vfs.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/remote_dir.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace blobfs {
 
@@ -101,8 +127,7 @@ void ComponentRunner::Shutdown(fs::FuchsiaVfs::ShutdownCallback cb) {
     // If we failed to notify the driver stack about the impending shutdown, log a warning, but
     // continue the shutdown.
     if (status != ZX_OK) {
-      FX_LOGS(WARNING) << "failed to send shutdown signal to driver manager: "
-                       << zx_status_get_string(status);
+      FX_PLOGS(WARNING, status) << "failed to send shutdown signal to driver manager";
     }
     // Shutdown all external connections to blobfs.
     ManagedVfs::Shutdown([this, cb = std::move(cb)](zx_status_t status) mutable {
@@ -202,14 +227,13 @@ zx::result<> ComponentRunner::Configure(std::unique_ptr<BlockDevice> device,
   fbl::RefPtr<fs::Vnode> root;
   zx_status_t status = blobfs_->OpenRootNode(&root);
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "configure failed; could not get root blob: " << zx_status_get_string(status);
+    FX_PLOGS(ERROR, status) << "configure failed; could not get root blob";
     return zx::error(status);
   }
 
   status = ServeDirectory(std::move(root), std::move(root_server_end_));
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "configure failed; could not serve root directory: "
-                   << zx_status_get_string(status);
+    FX_PLOGS(ERROR, status) << "configure failed; could not serve root directory";
     return zx::error(status);
   }
 
@@ -238,7 +262,7 @@ zx::result<> ComponentRunner::Configure(std::unique_ptr<BlockDevice> device,
 
   status = ServeDirectory(std::move(svc_dir), std::move(svc_server_end_));
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "configure failed; could not serve svc dir: " << zx_status_get_string(status);
+    FX_PLOGS(ERROR, status) << "configure failed; could not serve svc dir";
     return zx::error(status);
   }
 

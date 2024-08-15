@@ -9,19 +9,17 @@
 #error Fuchsia-only Header
 #endif
 
-#include <lib/fit/function.h>
+#include <optional>
 
 #include <fbl/intrusive_wavl_tree.h>
-#include <fbl/mutex.h>
-#include <fbl/ref_ptr.h>
+#include <fbl/recycler.h>
 
-#include "src/lib/digest/digest.h"
 #include "src/storage/blobfs/cache_policy.h"
+#include "src/storage/blobfs/format.h"
+#include "src/storage/lib/vfs/cpp/paged_vfs.h"
 #include "src/storage/lib/vfs/cpp/paged_vnode.h"
 
 namespace blobfs {
-
-using digest::Digest;
 
 // Forward declared because CacheNode needs a mechanism for accessing the class when it runs out of
 // strong references.
@@ -32,7 +30,7 @@ class CacheNode : public fs::PagedVnode,
                   private fbl::Recyclable<CacheNode>,
                   public fbl::WAVLTreeContainable<CacheNode*> {
  public:
-  explicit CacheNode(fs::PagedVfs& vfs, const Digest& digest,
+  explicit CacheNode(fs::PagedVfs& vfs, Digest digest,
                      std::optional<CachePolicy> override_cache_policy = std::nullopt);
   virtual ~CacheNode() = default;
 
@@ -77,7 +75,7 @@ class CacheNode : public fs::PagedVnode,
   void RecycleNode() override;
 
  private:
-  digest::Digest digest_;
+  Digest digest_;
   std::optional<CachePolicy> overriden_cache_policy_;
 };
 

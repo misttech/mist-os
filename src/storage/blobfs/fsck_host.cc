@@ -4,10 +4,11 @@
 
 #include "src/storage/blobfs/fsck_host.h"
 
-#include <memory>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
 #include "src/storage/blobfs/blobfs_checker.h"
-#include "zircon/errors.h"
+#include "src/storage/blobfs/host.h"
 
 namespace blobfs {
 

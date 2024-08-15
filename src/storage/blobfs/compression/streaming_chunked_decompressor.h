@@ -13,13 +13,18 @@ static_assert(false, "Fuchsia only header");
 #include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
+#include <lib/zx/vmo.h>
+
+#include <cstddef>
+#include <cstdint>
+#include <memory>
 
 #include "src/lib/chunked-compression/chunked-archive.h"
 #include "src/storage/blobfs/compression/external_decompressor.h"
 
 namespace blobfs {
 
-// Streaming decompressor for the chunked format backed by an exernal seekable decompressor.
+// Streaming decompressor for the chunked format backed by an external seekable decompressor.
 // Data is streamed into the given callback function when it's available by decoding each
 // seek table in order. Once decompressed, unused ranges of the compressed data are decommitted.
 class StreamingChunkedDecompressor {

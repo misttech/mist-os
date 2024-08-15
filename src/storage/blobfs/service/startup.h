@@ -6,16 +6,20 @@
 #define SRC_STORAGE_BLOBFS_SERVICE_STARTUP_H_
 
 #include <fidl/fuchsia.fs.startup/cpp/wire.h>
+#include <lib/async/dispatcher.h>
 #include <lib/fit/function.h>
-#include <lib/zx/resource.h>
+#include <lib/zx/result.h>
+
+#include <memory>
 
 #include "src/storage/blobfs/mount.h"
+#include "src/storage/lib/block_client/cpp/block_device.h"
 #include "src/storage/lib/vfs/cpp/service.h"
 
 namespace blobfs {
 
 using ConfigureCallback =
-    fit::callback<zx::result<>(std::unique_ptr<BlockDevice>, const MountOptions&)>;
+    fit::callback<zx::result<>(std::unique_ptr<block_client::BlockDevice>, const MountOptions&)>;
 
 class StartupService final : public fidl::WireServer<fuchsia_fs_startup::Startup>,
                              public fs::Service {

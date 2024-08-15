@@ -27,10 +27,10 @@ zx::result<CompressionAlgorithm> AlgorithmForInode(const Inode& inode);
 
 // Return an Inode header flagset with the flags associated with |algorithm| set, and all other
 // flags are unset.
-uint16_t CompressionInodeHeaderFlags(const CompressionAlgorithm& algorithm);
+uint16_t CompressionInodeHeaderFlags(CompressionAlgorithm algorithm);
 
 // Clear any existing compression flags and apply the new one.
-void SetCompressionAlgorithm(Inode* inode, const CompressionAlgorithm algorithm);
+void SetCompressionAlgorithm(Inode* inode, CompressionAlgorithm algorithm);
 
 // Settings to configure compression behavior.
 struct CompressionSettings {

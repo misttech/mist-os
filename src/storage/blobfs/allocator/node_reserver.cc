@@ -5,13 +5,9 @@
 #include "src/storage/blobfs/allocator/node_reserver.h"
 
 #include <stdint.h>
-#include <zircon/types.h>
+#include <zircon/assert.h>
 
-#include <limits>
-
-#include <bitmap/rle-bitmap.h>
-
-#include "src/storage/blobfs/format.h"
+#include <utility>
 
 namespace blobfs {
 

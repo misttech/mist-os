@@ -5,7 +5,7 @@
 #ifndef SRC_STORAGE_BLOBFS_ITERATOR_ALLOCATED_EXTENT_ITERATOR_H_
 #define SRC_STORAGE_BLOBFS_ITERATOR_ALLOCATED_EXTENT_ITERATOR_H_
 
-#include <stdbool.h>
+#include <lib/zx/result.h>
 #include <stdint.h>
 #include <zircon/types.h>
 

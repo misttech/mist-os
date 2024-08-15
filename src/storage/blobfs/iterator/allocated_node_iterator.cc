@@ -7,8 +7,8 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/result.h>
 #include <stdint.h>
+#include <zircon/assert.h>
 #include <zircon/errors.h>
-#include <zircon/types.h>
 
 #include "src/storage/blobfs/format.h"
 #include "src/storage/blobfs/node_finder.h"

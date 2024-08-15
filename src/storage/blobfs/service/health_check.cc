@@ -6,15 +6,19 @@
 
 #include <fidl/fuchsia.update.verify/cpp/wire.h>
 #include <lib/async/dispatcher.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/syslog/cpp/macros.h>
-#include <lib/zx/channel.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
+
+#include <cstddef>
+#include <utility>
 
 #include <fbl/ref_ptr.h>
 
 #include "src/storage/blobfs/blob.h"
 #include "src/storage/blobfs/cache_node.h"
 #include "src/storage/lib/vfs/cpp/service.h"
-#include "zircon/errors.h"
 
 namespace fuv = fuchsia_update_verify;
 
@@ -41,7 +45,7 @@ void HealthCheckService::Verify(VerifyRequestView request, VerifyCompleter::Sync
       // Skip the null blob, or blobs which aren't in the readable state.
       return ZX_OK;
     }
-    // If we run multithreaded, the blob cound transition to deleted between the above
+    // If we run multithreaded, the blob could transition to deleted between the above
     // DeletionQueued() check and this Verify() call. That should be OK as it only means we check a
     // blob that we didn't need to. If we need 100% correctness, we'll need to add a
     // Blob::VerifyIfNotDeleted() function that can atomically check and verify.

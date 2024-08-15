@@ -5,31 +5,62 @@
 #include "src/storage/blobfs/blob_writer.h"
 
 #include <lib/fit/defer.h>
+#include <lib/fpromise/result.h>
+#include <lib/stdcompat/span.h>
 #include <lib/sync/completion.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/result.h>
+#include <zircon/assert.h>
 #include <zircon/errors.h>
+#include <zircon/status.h>
+#include <zircon/syscalls.h>
+#include <zircon/time.h>
+#include <zircon/types.h>
 
 #include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <iterator>
+#include <limits>
 #include <memory>
+#include <optional>
+#include <type_traits>
 #include <utility>
+#include <variant>
 #include <vector>
 
+#include <fbl/algorithm.h>
+#include <fbl/array.h>
 #include <fbl/ref_ptr.h>
+#include <safemath/checked_math.h>
+#include <safemath/safe_conversions.h>
+#include <storage/operation/operation.h>
+#include <storage/operation/unbuffered_operation.h>
 
+#include "src/lib/chunked-compression/chunked-archive.h"
+#include "src/lib/chunked-compression/status.h"
+#include "src/storage/blobfs/allocator/extent_reserver.h"
+#include "src/storage/blobfs/allocator/node_reserver.h"
+#include "src/storage/blobfs/blob.h"
 #include "src/storage/blobfs/blob_data_producer.h"
 #include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/blobfs.h"
 #include "src/storage/blobfs/common.h"
+#include "src/storage/blobfs/compression/external_decompressor.h"
 #include "src/storage/blobfs/compression/streaming_chunked_decompressor.h"
 #include "src/storage/blobfs/compression_settings.h"
+#include "src/storage/blobfs/delivery_blob.h"
+#include "src/storage/blobfs/delivery_blob_private.h"
 #include "src/storage/blobfs/format.h"
 #include "src/storage/blobfs/iterator/block_iterator.h"
-#include "src/storage/blobfs/iterator/extent_iterator.h"
 #include "src/storage/blobfs/iterator/node_populator.h"
 #include "src/storage/blobfs/iterator/vector_extent_iterator.h"
+#include "src/storage/blobfs/transaction.h"
 #include "src/storage/lib/trace/trace.h"
 #include "src/storage/lib/vfs/cpp/journal/data_streamer.h"
+#include "src/storage/lib/vfs/cpp/ticker.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace blobfs {
 
@@ -751,7 +782,7 @@ zx::result<> Blob::Writer::InitializeDecompressor() {
     return zx::error(ZX_ERR_IO_DATA_INTEGRITY);
   }
   if (seek_table_.Entries().empty()) {
-    return zx::ok();  // Archive is empty, no decompresison is required.
+    return zx::ok();  // Archive is empty, no decompression is required.
   }
 
   // The StreamingChunkedDecompressor decommits chunks as they are decompressed, so we just need to

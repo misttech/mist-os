@@ -10,17 +10,16 @@
 
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
-#include <zircon/compiler.h>
 
 #include <cstdint>
 #include <cstdlib>
 #include <optional>
+#include <string>
 #include <string_view>
-#include <vector>
 
 #include <fbl/array.h>
 
-#include "src/lib/digest/digest.h"
+#include "src/storage/blobfs/format.h"
 
 namespace blobfs {
 
@@ -85,7 +84,7 @@ zx::result<fbl::Array<uint8_t>> GenerateDeliveryBlobType1(cpp20::span<const uint
 // *WARNING*: Aside from checksum verification and basic validity checks provided by the
 // chunked_compression library, this function makes no security guarantees. Decompression is
 // performed in the thread/address space of the caller.
-zx::result<digest::Digest> CalculateDeliveryBlobDigest(cpp20::span<const uint8_t> data);
+zx::result<Digest> CalculateDeliveryBlobDigest(cpp20::span<const uint8_t> data);
 
 }  // namespace blobfs
 

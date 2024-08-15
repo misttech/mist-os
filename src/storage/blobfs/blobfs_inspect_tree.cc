@@ -4,9 +4,19 @@
 
 #include "src/storage/blobfs/blobfs_inspect_tree.h"
 
-#include <atomic>
+#include <lib/inspect/cpp/inspector.h>
+#include <lib/inspect/cpp/vmo/types.h>
+#include <lib/syslog/cpp/macros.h>
+#include <lib/zx/result.h>
+
+#include <mutex>
 
 #include "src/storage/blobfs/blobfs.h"
+#include "src/storage/blobfs/format.h"
+#include "src/storage/blobfs/metrics/compression_metrics.h"
+#include "src/storage/lib/block_client/cpp/block_device.h"
+#include "src/storage/lib/vfs/cpp/inspect/inspect_data.h"
+#include "src/storage/lib/vfs/cpp/inspect/inspect_tree.h"
 
 namespace {
 
@@ -14,8 +24,8 @@ inspect::Inspector CreateInspector() {
 #ifdef BLOBFS_ENABLE_LARGE_INSPECT_VMO
   // When recording page-in frequencies, a much larger Inspect VMO is required (>512KB).
   //
-  // TODO(https://fxbug.dev/42137068): Inspect should print warnings about overflowing the maximum size of a
-  // VMO.
+  // TODO(https://fxbug.dev/42137068): Inspect should print warnings about overflowing the maximum
+  // size of a VMO.
   const size_t kMaxInspectVmoSize = 2UL * 1024UL * 1024UL;
   return inspect::Inspector(inspect::InspectSettings{.maximum_size = kMaxInspectVmoSize});
 #else

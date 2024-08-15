@@ -11,37 +11,29 @@
 #error Host-only Header
 #endif
 
-#include <assert.h>
 #include <lib/fit/function.h>
 #include <lib/fpromise/result.h>
 #include <lib/stdcompat/span.h>
-#include <limits.h>
-#include <stdbool.h>
-#include <stdint.h>
-#include <sys/mman.h>
-#include <sys/stat.h>
+#include <lib/zx/result.h>
+#include <sys/types.h>
 #include <zircon/assert.h>
 #include <zircon/types.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <filesystem>
 #include <memory>
-#include <mutex>
-#include <optional>
+#include <string>
 #include <variant>
 #include <vector>
 
-#include <bitmap/raw-bitmap.h>
-#include <bitmap/storage.h>
-#include <fbl/algorithm.h>
+#include <fbl/array.h>
 #include <fbl/macros.h>
 #include <fbl/ref_counted.h>
-#include <fbl/ref_ptr.h>
-#include <fbl/string.h>
 #include <fbl/unique_fd.h>
 
 #include "src/lib/chunked-compression/multithreaded-chunked-compressor.h"
-#include "src/lib/digest/digest.h"
+#include "src/storage/blobfs/allocator/extent_reserver.h"
 #include "src/storage/blobfs/allocator/host_allocator.h"
 #include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/common.h"
@@ -98,7 +90,7 @@ class BlobInfo {
   // Returns true if the data returned by |GetData| is compressed.
   bool IsCompressed() const { return std::holds_alternative<CompressedBlobData>(blob_data_); }
 
-  const digest::Digest& GetDigest() const { return digest_; }
+  const Digest& GetDigest() const { return digest_; }
   cpp20::span<const uint8_t> GetMerkleTree() const {
     return cpp20::span<const uint8_t>(merkle_tree_);
   }
@@ -108,7 +100,7 @@ class BlobInfo {
  private:
   BlobInfo() = default;
 
-  digest::Digest digest_;
+  Digest digest_;
   std::vector<uint8_t> merkle_tree_;
   std::unique_ptr<BlobLayout> blob_layout_;
 

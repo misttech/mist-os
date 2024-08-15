@@ -4,6 +4,11 @@
 
 #include "src/storage/blobfs/metrics/compression_metrics.h"
 
+#include <lib/inspect/cpp/vmo/types.h>
+
+#include "src/storage/blobfs/format.h"
+#include "src/storage/blobfs/node_finder.h"
+
 namespace blobfs {
 
 void CompressionMetrics::Update(const InodePtr& inode) {

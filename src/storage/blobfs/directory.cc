@@ -4,24 +4,31 @@
 
 #include "src/storage/blobfs/directory.h"
 
-#include <fidl/fuchsia.device/cpp/wire.h>
-#include <lib/sync/completion.h>
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <lib/fdio/vfs.h>
+#include <lib/zx/result.h>
 #include <stdlib.h>
 #include <string.h>
-#include <zircon/status.h>
-#include <zircon/syscalls.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <cassert>
+#include <string>
 #include <string_view>
 #include <utility>
-#include <vector>
 
 #include <fbl/ref_ptr.h>
 
-#include "src/lib/digest/digest.h"
 #include "src/storage/blobfs/blob.h"
 #include "src/storage/blobfs/blobfs.h"
+#include "src/storage/blobfs/cache_node.h"
 #include "src/storage/blobfs/delivery_blob.h"
+#include "src/storage/blobfs/format.h"
 #include "src/storage/lib/trace/trace.h"
+#include "src/storage/lib/vfs/cpp/vfs.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace blobfs {
 

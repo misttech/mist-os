@@ -9,14 +9,16 @@
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
+#include <cstdint>
 #include <memory>
+#include <utility>
 
-#include <bitmap/raw-bitmap.h>
 #include <id_allocator/id_allocator.h>
 #include <safemath/safe_conversions.h>
 
 #include "src/storage/blobfs/allocator/base_allocator.h"
 #include "src/storage/blobfs/common.h"
+#include "src/storage/blobfs/format.h"
 #include "src/storage/blobfs/node_finder.h"
 
 namespace blobfs {

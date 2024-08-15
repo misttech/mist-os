@@ -9,24 +9,29 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
+#include <zircon/assert.h>
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
+#include <zircon/syscalls.h>
 #include <zircon/types.h>
 
+#include <cstddef>
 #include <cstdint>
 #include <memory>
 #include <mutex>
 #include <utility>
 #include <vector>
 
-#include <bitmap/raw-bitmap.h>
 #include <fbl/algorithm.h>
-#include <safemath/safe_conversions.h>
+#include <id_allocator/id_allocator.h>
 #include <storage/buffer/owned_vmoid.h>
+#include <storage/operation/operation.h>
 
 #include "src/storage/blobfs/allocator/base_allocator.h"
+#include "src/storage/blobfs/allocator/node_reserver.h"
 #include "src/storage/blobfs/common.h"
 #include "src/storage/blobfs/format.h"
+#include "src/storage/blobfs/node_finder.h"
 #include "src/storage/lib/trace/trace.h"
 #include "src/storage/lib/vfs/cpp/transaction/device_transaction_handler.h"
 

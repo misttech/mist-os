@@ -7,6 +7,10 @@
 #ifndef SRC_STORAGE_BLOBFS_FSCK_H_
 #define SRC_STORAGE_BLOBFS_FSCK_H_
 
+#include <zircon/types.h>
+
+#include <memory>
+
 #include "src/storage/blobfs/mount.h"
 #include "src/storage/lib/block_client/cpp/block_device.h"
 

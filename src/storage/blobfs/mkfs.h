@@ -5,6 +5,8 @@
 #ifndef SRC_STORAGE_BLOBFS_MKFS_H_
 #define SRC_STORAGE_BLOBFS_MKFS_H_
 
+#include <zircon/types.h>
+
 #include "src/storage/blobfs/common.h"
 #include "src/storage/lib/block_client/cpp/block_device.h"
 

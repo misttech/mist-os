@@ -32,7 +32,7 @@ class Decompressor {
   // value is `ZX_OK, then the number of bytes written is written to `uncompressed_buf` is stored in
   // `*uncompressed_size`.
   virtual zx_status_t Decompress(void* uncompressed_buf, size_t* uncompressed_size,
-                                 const void* compressed_buf, const size_t max_compressed_size) = 0;
+                                 const void* compressed_buf, size_t max_compressed_size) = 0;
 };
 
 }  // namespace blobfs

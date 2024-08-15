@@ -6,13 +6,9 @@
 #define SRC_STORAGE_BLOBFS_ALLOCATOR_NODE_RESERVER_H_
 
 #include <lib/zx/result.h>
-#include <stdbool.h>
 #include <stdint.h>
-#include <zircon/types.h>
 
-#include <bitmap/rle-bitmap.h>
-
-#include "src/storage/blobfs/format.h"
+#include <fbl/macros.h>
 
 namespace blobfs {
 

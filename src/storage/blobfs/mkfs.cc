@@ -2,23 +2,35 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "src/storage/blobfs/format.h"
+#include "src/storage/blobfs/mkfs.h"
 
-#include <lib/cksum.h>
+#include <fidl/fuchsia.hardware.block.volume/cpp/wire_types.h>
+#include <fidl/fuchsia.hardware.block/cpp/wire_types.h>
+#include <fuchsia/hardware/block/driver/c/banjo.h>
 #include <lib/stdcompat/span.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/result.h>
+#include <lib/zx/vmo.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
-#include <iterator>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <optional>
-#include <utility>
+#include <type_traits>
 
-#include <fbl/ref_ptr.h>
+#include <fbl/algorithm.h>
 #include <safemath/checked_math.h>
+#include <safemath/safe_conversions.h>
 #include <storage/buffer/owned_vmoid.h>
 
+#include "src/devices/block/drivers/core/block-fifo.h"
 #include "src/storage/blobfs/common.h"
-#include "src/storage/blobfs/mkfs.h"
+#include "src/storage/blobfs/format.h"
 #include "src/storage/fvm/client.h"
+#include "src/storage/lib/block_client/cpp/block_device.h"
 #include "src/storage/lib/vfs/cpp/journal/initializer.h"
 
 namespace blobfs {
@@ -132,7 +144,7 @@ zx::result<Superblock> FormatSuperblockFVM(
       superblock.journal_slices * superblock.slice_size / kBlobfsBlockSize);
 
   // Now that we've allocated some slices, re-query FVM for the number of blocks assigned to the
-  // partition. We'll use this as a sanity check in CheckSuperblock.
+  // partition. We'll use this to validate the superblock.
   fuchsia_hardware_block::wire::BlockInfo block_info = {};
   status = device->BlockGetInfo(&block_info);
   if (status != ZX_OK) {
@@ -180,13 +192,10 @@ zx_status_t WriteFilesystemToDisk(BlockDevice* device, const Superblock& superbl
   }
 
   // Write allocation bitmap.
-  for (uint64_t n = 0; n < blockmap_blocks; n++) {
-    uint64_t offset = kBlobfsBlockSize * (superblock_blocks + n);
-    uint64_t length = kBlobfsBlockSize;
-    status = vmo.write(GetRawBitmapData(block_bitmap, n), offset, length);
-    if (status != ZX_OK) {
-      return status;
-    }
+  status = vmo.write(block_bitmap.StorageUnsafe()->GetData(), superblock_blocks * kBlobfsBlockSize,
+                     blockmap_blocks * kBlobfsBlockSize);
+  if (status != ZX_OK) {
+    return status;
   }
 
   // Write node map.

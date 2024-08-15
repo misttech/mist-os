@@ -7,11 +7,9 @@
 
 #include <zircon/types.h>
 
-#include <memory>
+#include <cstddef>
 
 #include <fbl/macros.h>
-
-#include "src/storage/blobfs/compression_settings.h"
 
 namespace blobfs {
 

@@ -8,6 +8,12 @@
 #ifndef SRC_STORAGE_BLOBFS_DELIVERY_BLOB_PRIVATE_H_
 #define SRC_STORAGE_BLOBFS_DELIVERY_BLOB_PRIVATE_H_
 
+#include <lib/stdcompat/span.h>
+#include <lib/zx/result.h>
+
+#include <cstddef>
+#include <cstdint>
+
 #include "src/storage/blobfs/delivery_blob.h"
 
 namespace blobfs {

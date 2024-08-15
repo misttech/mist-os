@@ -8,10 +8,11 @@
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
-#include <zircon/types.h>
 
 #include <cstdint>
 #include <memory>
+
+#include <id_allocator/id_allocator.h>
 
 #include "src/storage/blobfs/allocator/base_allocator.h"
 #include "src/storage/blobfs/common.h"

@@ -6,14 +6,12 @@
 #define SRC_STORAGE_BLOBFS_ITERATOR_BLOCK_ITERATOR_H_
 
 #include <lib/fit/function.h>
-#include <stdbool.h>
 #include <stdint.h>
 #include <zircon/types.h>
 
 #include <memory>
 
 #include "src/storage/blobfs/format.h"
-#include "src/storage/blobfs/iterator/allocated_extent_iterator.h"
 #include "src/storage/blobfs/iterator/extent_iterator.h"
 
 namespace blobfs {

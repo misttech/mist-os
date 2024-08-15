@@ -12,15 +12,17 @@
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 
 #include <fbl/macros.h>
 #include <storage/buffer/owned_vmoid.h>
 
 #include "src/storage/blobfs/blobfs_metrics.h"
+#include "src/storage/blobfs/format.h"
 #include "src/storage/blobfs/iterator/block_iterator_provider.h"
 #include "src/storage/blobfs/loader_info.h"
-#include "src/storage/blobfs/node_finder.h"
 #include "src/storage/blobfs/transaction_manager.h"
 
 namespace blobfs {

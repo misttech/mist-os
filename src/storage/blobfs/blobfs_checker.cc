@@ -4,24 +4,27 @@
 
 #include "src/storage/blobfs/blobfs_checker.h"
 
-#include <inttypes.h>
 #include <lib/syslog/cpp/macros.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <cstddef>
+#include <cstdint>
+#include <ios>
 #include <iterator>
-#include <utility>
+
+#include "src/storage/blobfs/common.h"
+#include "src/storage/blobfs/format.h"
+#include "src/storage/blobfs/iterator/allocated_extent_iterator.h"
 
 #ifdef __Fuchsia__
-
 #include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
-#include <zircon/status.h>
 
+#include "src/storage/blobfs/blobfs.h"
 #else
-
 #include "src/storage/blobfs/host.h"
-
 #endif
-
-#include "src/storage/blobfs/iterator/allocated_extent_iterator.h"
 
 namespace blobfs {
 
@@ -205,7 +208,7 @@ zx_status_t CheckFvmConsistency(const Superblock* info, BlockDevice* device, boo
   fuchsia_hardware_block_volume::wire::VolumeInfo volume_info;
   zx_status_t status = device->VolumeGetInfo(&manager_info, &volume_info);
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Unable to query FVM, status: " << zx_status_get_string(status);
+    FX_PLOGS(ERROR, status) << "Unable to query FVM";
     return status;
   }
 
@@ -233,7 +236,7 @@ zx_status_t CheckFvmConsistency(const Superblock* info, BlockDevice* device, boo
   status = device->VolumeQuerySlices(start_slices, std::size(start_slices), ranges,
                                      &actual_ranges_count);
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Cannot query slices, status: " << zx_status_get_string(status);
+    FX_PLOGS(ERROR, status) << "Cannot query slices";
     return status;
   }
 
@@ -262,7 +265,7 @@ zx_status_t CheckFvmConsistency(const Superblock* info, BlockDevice* device, boo
       uint64_t length = fvm_count - blobfs_count;
       zx_status_t status = device->VolumeShrink(offset, length);
       if (status != ZX_OK) {
-        FX_LOGS(ERROR) << "Unable to shrink to expected size: " << zx_status_get_string(status);
+        FX_PLOGS(ERROR, status) << "Unable to shrink to expected size";
         return status;
       }
     }

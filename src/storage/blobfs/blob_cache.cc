@@ -5,17 +5,19 @@
 #include "src/storage/blobfs/blob_cache.h"
 
 #include <zircon/assert.h>
-#include <zircon/status.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
 #include <utility>
 
 #include <fbl/auto_lock.h>
+#include <fbl/ref_counted_upgradeable.h>
 #include <fbl/ref_ptr.h>
 
-#include "src/lib/digest/digest.h"
+#include "src/storage/blobfs/cache_node.h"
+#include "src/storage/blobfs/cache_policy.h"
+#include "src/storage/blobfs/format.h"
 #include "src/storage/lib/trace/trace.h"
-
-using digest::Digest;
 
 namespace blobfs {
 
@@ -125,7 +127,7 @@ zx_status_t BlobCache::Lookup(const Digest& digest, fbl::RefPtr<CacheNode>* out)
   return ZX_OK;
 }
 
-zx_status_t BlobCache::LookupLocked(const digest::Digest& key, fbl::RefPtr<CacheNode>* out) {
+zx_status_t BlobCache::LookupLocked(const Digest& key, fbl::RefPtr<CacheNode>* out) {
   ZX_DEBUG_ASSERT(out != nullptr);
 
   // Try to acquire the node from the open hash, if possible.
@@ -244,7 +246,7 @@ void BlobCache::Downgrade(CacheNode* raw_vnode) {
   [[maybe_unused]] auto leak = fbl::ExportToRawPtr(&vnode);
 }
 
-fbl::RefPtr<CacheNode> BlobCache::UpgradeLocked(const digest::Digest& key) {
+fbl::RefPtr<CacheNode> BlobCache::UpgradeLocked(const Digest& key) {
   ZX_DEBUG_ASSERT(open_hash_.find(key).CopyPointer() == nullptr);
   CacheNode* raw_vnode = closed_hash_.erase(key);
   if (raw_vnode == nullptr) {

@@ -12,6 +12,8 @@
 #include <fidl/fuchsia.update.verify/cpp/wire.h>
 #include <lib/async/dispatcher.h>
 
+#include <fbl/ref_ptr.h>
+
 #include "src/storage/blobfs/blobfs.h"
 #include "src/storage/lib/vfs/cpp/service.h"
 

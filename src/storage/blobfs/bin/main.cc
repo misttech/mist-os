@@ -2,15 +2,23 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.io/cpp/markers.h>
 #include <fidl/fuchsia.kernel/cpp/wire.h>
+#include <fidl/fuchsia.process.lifecycle/cpp/markers.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/resource.h>
 #include <lib/zx/result.h>
+#include <zircon/errors.h>
 #include <zircon/process.h>
 #include <zircon/processargs.h>
+#include <zircon/types.h>
+
+#include <cstdlib>
+#include <utility>
 
 #include "src/storage/blobfs/bin/blobfs_component_config.h"
 #include "src/storage/blobfs/mount.h"

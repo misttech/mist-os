@@ -4,40 +4,61 @@
 
 #include "src/storage/blobfs/blobfs.h"
 
-#include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
+#include <fidl/fuchsia.fs/cpp/common_types.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
-#include <inttypes.h>
-#include <lib/async/cpp/task.h>
-#include <lib/cksum.h>
+#include <fidl/fuchsia.io/cpp/wire_types.h>
+#include <lib/async/dispatcher.h>
+#include <lib/fdio/vfs.h>
 #include <lib/fit/defer.h>
+#include <lib/fit/function.h>
+#include <lib/fpromise/result.h>
+#include <lib/fzl/resizeable-vmo-mapper.h>
+#include <lib/inspect/cpp/inspector.h>
 #include <lib/sync/completion.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/event.h>
+#include <lib/zx/resource.h>
 #include <lib/zx/result.h>
-#include <stdarg.h>
+#include <lib/zx/vmo.h>
 #include <stdlib.h>
 #include <string.h>
-#include <zircon/compiler.h>
+#include <zircon/assert.h>
 #include <zircon/errors.h>
-#include <zircon/process.h>
-#include <zircon/status.h>
-#include <zircon/syscalls.h>
+#include <zircon/time.h>
 #include <zircon/types.h>
 
+#include <algorithm>
+#include <cstdint>
 #include <limits>
 #include <memory>
-#include <string_view>
+#include <mutex>
+#include <optional>
+#include <shared_mutex>
 #include <utility>
+#include <vector>
 
+#include <fbl/algorithm.h>
 #include <fbl/ref_ptr.h>
+#include <id_allocator/id_allocator.h>
 #include <safemath/safe_conversions.h>
+#include <storage/buffer/blocking_ring_buffer.h>
+#include <storage/buffer/vmoid_registry.h>
+#include <storage/operation/operation.h>
+#include <storage/operation/unbuffered_operation.h>
 
 #include "src/lib/digest/digest.h"
+#include "src/storage/blobfs/allocator/allocator.h"
 #include "src/storage/blobfs/allocator/extent_reserver.h"
 #include "src/storage/blobfs/blob.h"
+#include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/blob_loader.h"
 #include "src/storage/blobfs/blobfs_checker.h"
+#include "src/storage/blobfs/blobfs_inspect_tree.h"
+#include "src/storage/blobfs/blobfs_metrics.h"
+#include "src/storage/blobfs/cache_node.h"
+#include "src/storage/blobfs/cache_policy.h"
 #include "src/storage/blobfs/common.h"
+#include "src/storage/blobfs/compression/external_decompressor.h"
 #include "src/storage/blobfs/compression_settings.h"
 #include "src/storage/blobfs/directory.h"
 #include "src/storage/blobfs/format.h"
@@ -45,19 +66,30 @@
 #include "src/storage/blobfs/iterator/allocated_extent_iterator.h"
 #include "src/storage/blobfs/iterator/allocated_node_iterator.h"
 #include "src/storage/blobfs/iterator/block_iterator.h"
+#include "src/storage/blobfs/metrics/compression_metrics.h"
+#include "src/storage/blobfs/mount.h"
+#include "src/storage/blobfs/page_loader.h"
 #include "src/storage/blobfs/transaction.h"
+#include "src/storage/blobfs/transaction_manager.h"
 #include "src/storage/blobfs/transfer_buffer.h"
+#include "src/storage/lib/block_client/cpp/block_device.h"
 #include "src/storage/lib/block_client/cpp/pass_through_read_only_device.h"
 #include "src/storage/lib/block_client/cpp/reader.h"
 #include "src/storage/lib/trace/trace.h"
+#include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
+#include "src/storage/lib/vfs/cpp/inspect/inspect_data.h"
+#include "src/storage/lib/vfs/cpp/journal/format.h"
 #include "src/storage/lib/vfs/cpp/journal/journal.h"
 #include "src/storage/lib/vfs/cpp/journal/replay.h"
 #include "src/storage/lib/vfs/cpp/journal/superblock.h"
+#include "src/storage/lib/vfs/cpp/paged_vfs.h"
+#include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
+#include "src/storage/lib/vfs/cpp/vfs.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace blobfs {
 namespace {
 
-using ::digest::Digest;
 using ::fs::Journal;
 using ::fs::JournalSuperblock;
 using ::id_allocator::IdAllocator;
@@ -82,7 +114,7 @@ zx_status_t LoadSuperblock(const fuchsia_hardware_block::wire::BlockInfo& block_
   block_client::Reader reader(device);
   zx_status_t status = reader.Read(block_offset * kBlobfsBlockSize, kBlobfsBlockSize, block);
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "could not read info block: " << zx_status_get_string(status);
+    FX_PLOGS(ERROR, status) << "could not read info block";
     return status;
   }
   const Superblock* superblock = reinterpret_cast<Superblock*>(block);
@@ -273,34 +305,34 @@ zx::result<std::unique_ptr<Blobfs>> Blobfs::Create(async_dispatcher_t* dispatche
   std::unique_ptr<IdAllocator> nodes_bitmap = {};
   if (zx_status_t status = IdAllocator::Create(fs->info_.inode_count, &nodes_bitmap);
       status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to allocate bitmap for inodes: " << zx_status_get_string(status);
+    FX_PLOGS(ERROR, status) << "Failed to allocate bitmap for inodes";
     return zx::error(status);
   }
 
   fs->allocator_ = std::make_unique<Allocator>(fs.get(), std::move(block_map), std::move(node_map),
                                                std::move(nodes_bitmap));
   if (zx_status_t status = fs->allocator_->ResetFromStorage(*fs); status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to load bitmaps: " << zx_status_get_string(status);
+    FX_PLOGS(ERROR, status) << "Failed to load bitmaps";
     return zx::error(status);
   }
   if (zx_status_t status = fs->info_mapping_.CreateAndMap(kBlobfsBlockSize, "blobfs-superblock");
       status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to create info vmo: " << zx_status_get_string(status);
+    FX_PLOGS(ERROR, status) << "Failed to create info vmo";
     return zx::error(status);
   }
   if (zx_status_t status = fs->BlockAttachVmo(fs->info_mapping_.vmo(), &fs->info_vmoid_);
       status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to attach info vmo: " << zx_status_get_string(status);
+    FX_PLOGS(ERROR, status) << "Failed to attach info vmo";
     return zx::error(status);
   }
   if (zx_status_t status = fs->InitializeVnodes(); status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to initialize Vnodes: " << zx_status_get_string(status);
+    FX_PLOGS(ERROR, status) << "Failed to initialize Vnodes";
     return zx::error(status);
   }
   zx::result<std::unique_ptr<BlobLoader>> loader_or = BlobLoader::Create(
       fs_ptr, fs_ptr, fs->GetNodeFinder(), fs->GetMetrics(), fs->decompression_connector());
   if (loader_or.is_error()) {
-    FX_LOGS(ERROR) << "Failed to initialize loader: " << loader_or.status_string();
+    FX_PLOGS(ERROR, loader_or.status_value()) << "Failed to initialize loader";
     return loader_or.take_error();
   }
   fs->loader_ = *std::move(loader_or);
@@ -396,7 +428,7 @@ zx::result<std::unique_ptr<Journal>> Blobfs::InitializeJournal(
   zx_status_t status = BlockingRingBuffer::Create(registry, journal_entry_blocks, kBlobfsBlockSize,
                                                   "journal-writeback-buffer", &journal_buffer);
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Cannot create journal buffer: " << zx_status_get_string(status);
+    FX_PLOGS(ERROR, status) << "Cannot create journal buffer";
     return zx::error(status);
   }
 
@@ -404,7 +436,7 @@ zx::result<std::unique_ptr<Journal>> Blobfs::InitializeJournal(
   status = BlockingRingBuffer::Create(registry, WriteBufferBlockCount(), kBlobfsBlockSize,
                                       "data-writeback-buffer", &writeback_buffer);
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Cannot create writeback buffer: " << zx_status_get_string(status);
+    FX_PLOGS(ERROR, status) << "Cannot create writeback buffer";
     return zx::error(status);
   }
 
@@ -627,7 +659,7 @@ zx_status_t Blobfs::Readdir(fs::VdirCookie* cookie, void* dirents, size_t len, s
 zx_status_t Blobfs::BlockAttachVmo(const zx::vmo& vmo, storage::Vmoid* out) {
   zx_status_t status = Device()->BlockAttachVmo(vmo, out);
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to attach blob VMO: " << zx_status_get_string(status);
+    FX_PLOGS(ERROR, status) << "Failed to attach blob VMO";
     return status;
   }
   return ZX_OK;
@@ -651,7 +683,7 @@ zx_status_t Blobfs::AddInodes(Allocator* allocator) {
   bool failed_to_extend = (status != ZX_OK);
   inspect_tree_.UpdateFvmData(*Device(), failed_to_extend);
   if (failed_to_extend) {
-    FX_LOGS(ERROR) << ":AddInodes fvm_extend failure: " << zx_status_get_string(status);
+    FX_PLOGS(ERROR, status) << ":AddInodes fvm_extend failure";
     return status;
   }
 
@@ -728,7 +760,7 @@ zx_status_t Blobfs::AddBlocks(size_t nblocks, RawBitmap* block_map) {
   bool failed_to_extend = (status != ZX_OK);
   inspect_tree_.UpdateFvmData(*Device(), failed_to_extend);
   if (failed_to_extend) {
-    FX_LOGS(ERROR) << ":AddBlocks FVM Extend failure: " << zx_status_get_string(status);
+    FX_PLOGS(ERROR, status) << ":AddBlocks FVM Extend failure";
     return status;
   }
 

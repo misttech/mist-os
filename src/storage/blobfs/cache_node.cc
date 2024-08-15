@@ -4,14 +4,24 @@
 
 #include "src/storage/blobfs/cache_node.h"
 
-#include "src/lib/digest/digest.h"
+#include <zircon/assert.h>
+
+#include <optional>
+#include <utility>
+
 #include "src/storage/blobfs/blob_cache.h"
+#include "src/storage/blobfs/cache_policy.h"
+#include "src/storage/blobfs/format.h"
+#include "src/storage/lib/vfs/cpp/paged_vfs.h"
+#include "src/storage/lib/vfs/cpp/paged_vnode.h"
 
 namespace blobfs {
 
-CacheNode::CacheNode(fs::PagedVfs& vfs, const digest::Digest& digest,
+CacheNode::CacheNode(fs::PagedVfs& vfs, Digest digest,
                      std::optional<CachePolicy> override_cache_policy)
-    : fs::PagedVnode(vfs), digest_(digest), overriden_cache_policy_(override_cache_policy) {}
+    : fs::PagedVnode(vfs),
+      digest_(std::move(digest)),
+      overriden_cache_policy_(override_cache_policy) {}
 
 void CacheNode::RecycleNode() {
   if (ShouldCache()) {

@@ -13,6 +13,8 @@
 #include <gtest/gtest.h>
 
 #include "src/storage/blobfs/allocator/allocator.h"
+#include "src/storage/blobfs/blobfs_metrics.h"
+#include "src/storage/blobfs/compression_settings.h"
 #include "src/storage/blobfs/transaction_manager.h"
 #include "src/storage/lib/block_client/cpp/block_device.h"
 

@@ -2,27 +2,25 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <inttypes.h>
+#include "src/storage/blobfs/common.h"
+
 #include <lib/syslog/cpp/macros.h>
-#include <stdarg.h>
 #include <stdlib.h>
 #include <string.h>
-#include <zircon/assert.h>
+#include <zircon/compiler.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <cstdint>
 #include <iomanip>
+#include <ios>
 #include <limits>
+#include <ostream>
 
-#include <safemath/checked_math.h>
+#include <fbl/algorithm.h>
 
 #include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/format.h"
-
-#ifdef __Fuchsia__
-#include <fidl/fuchsia.hardware.block.volume/cpp/wire.h>
-#include <fidl/fuchsia.hardware.block/cpp/wire.h>
-#endif
-
-#include "src/storage/blobfs/common.h"
 
 namespace blobfs {
 namespace {
@@ -259,7 +257,7 @@ constexpr char kBlobVmoNamePrefix[] = "blob";
 constexpr char kInactiveBlobVmoNamePrefix[] = "inactive-blob";
 constexpr char kWritingBlobVmoNamePrefix[] = "writing-blob";
 
-VmoNameBuffer FormatVmoName(const digest::Digest& digest, const char* prefix) {
+VmoNameBuffer FormatVmoName(const Digest& digest, const char* prefix) {
   VmoNameBuffer buff = {};
   buff.AppendPrintf("%s-%.8s", prefix, digest.ToString().c_str());
   return buff;
@@ -267,15 +265,15 @@ VmoNameBuffer FormatVmoName(const digest::Digest& digest, const char* prefix) {
 
 }  // namespace
 
-VmoNameBuffer FormatBlobDataVmoName(const digest::Digest& digest) {
+VmoNameBuffer FormatBlobDataVmoName(const Digest& digest) {
   return FormatVmoName(digest, kBlobVmoNamePrefix);
 }
 
-VmoNameBuffer FormatInactiveBlobDataVmoName(const digest::Digest& digest) {
+VmoNameBuffer FormatInactiveBlobDataVmoName(const Digest& digest) {
   return FormatVmoName(digest, kInactiveBlobVmoNamePrefix);
 }
 
-VmoNameBuffer FormatWritingBlobDataVmoName(const digest::Digest& digest) {
+VmoNameBuffer FormatWritingBlobDataVmoName(const Digest& digest) {
   return FormatVmoName(digest, kWritingBlobVmoNamePrefix);
 }
 

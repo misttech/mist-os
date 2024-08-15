@@ -5,17 +5,20 @@
 #ifndef SRC_STORAGE_BLOBFS_BLOBFS_INSPECT_TREE_H_
 #define SRC_STORAGE_BLOBFS_BLOBFS_INSPECT_TREE_H_
 
-#include <lib/syslog/cpp/macros.h>
-#include <zircon/system/public/zircon/compiler.h>
+#include <lib/inspect/cpp/inspector.h>
+#include <lib/inspect/cpp/vmo/types.h>
+#include <zircon/compiler.h>
 
-#include <memory>
 #include <mutex>
 
 #include "src/storage/blobfs/format.h"
 #include "src/storage/blobfs/metrics/compression_metrics.h"
 #include "src/storage/blobfs/metrics/fragmentation_metrics.h"
+#include "src/storage/lib/block_client/cpp/block_device.h"
+#include "src/storage/lib/vfs/cpp/inspect/inspect_data.h"
 #include "src/storage/lib/vfs/cpp/inspect/inspect_tree.h"
 #include "src/storage/lib/vfs/cpp/inspect/node_operations.h"
+
 namespace blobfs {
 
 class Blobfs;
@@ -57,13 +60,13 @@ class BlobfsInspectTree final {
   // Generic fs_inspect Properties
   //
 
-  mutable std::mutex info_mutex_{};
+  mutable std::mutex info_mutex_;
   fs_inspect::InfoData info_ __TA_GUARDED(info_mutex_){};
 
-  mutable std::mutex usage_mutex_{};
+  mutable std::mutex usage_mutex_;
   fs_inspect::UsageData usage_ __TA_GUARDED(usage_mutex_){};
 
-  mutable std::mutex fvm_mutex_{};
+  mutable std::mutex fvm_mutex_;
   fs_inspect::FvmData fvm_ __TA_GUARDED(fvm_mutex_){};
 
   // The Inspector to which the tree is attached.

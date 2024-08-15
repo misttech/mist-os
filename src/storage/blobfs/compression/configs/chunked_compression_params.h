@@ -5,7 +5,9 @@
 #ifndef SRC_STORAGE_BLOBFS_COMPRESSION_CONFIGS_CHUNKED_COMPRESSION_PARAMS_H_
 #define SRC_STORAGE_BLOBFS_COMPRESSION_CONFIGS_CHUNKED_COMPRESSION_PARAMS_H_
 
-#include "src/lib/chunked-compression/chunked-compressor.h"
+#include <cstddef>
+
+#include "src/lib/chunked-compression/compression-params.h"
 namespace blobfs {
 
 // Returns the default chunked compression params based on |input_size| which

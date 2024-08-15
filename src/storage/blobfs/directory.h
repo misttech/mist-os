@@ -7,12 +7,18 @@
 #ifndef SRC_STORAGE_BLOBFS_DIRECTORY_H_
 #define SRC_STORAGE_BLOBFS_DIRECTORY_H_
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <lib/zx/result.h>
+#include <zircon/types.h>
+
+#include <cstddef>
+#include <string>
 #include <string_view>
 
-#include <fbl/algorithm.h>
 #include <fbl/ref_ptr.h>
 
 #include "src/storage/lib/vfs/cpp/vfs.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace blobfs {

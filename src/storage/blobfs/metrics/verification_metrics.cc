@@ -4,6 +4,11 @@
 
 #include "src/storage/blobfs/metrics/verification_metrics.h"
 
+#include <cstdint>
+#include <mutex>
+
+#include "src/storage/lib/vfs/cpp/ticker.h"
+
 namespace blobfs {
 
 void VerificationMetrics::Increment(uint64_t data_size, uint64_t merkle_size,

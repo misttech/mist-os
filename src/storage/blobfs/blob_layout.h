@@ -5,11 +5,9 @@
 #define SRC_STORAGE_BLOBFS_BLOB_LAYOUT_H_
 
 #include <lib/zx/result.h>
-#include <zircon/types.h>
 
-#include <type_traits>
-
-#include <safemath/safe_conversions.h>
+#include <cstdint>
+#include <memory>
 
 #include "src/storage/blobfs/format.h"
 

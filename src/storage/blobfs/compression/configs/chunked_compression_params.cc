@@ -4,7 +4,9 @@
 
 #include "src/storage/blobfs/compression/configs/chunked_compression_params.h"
 
-#include "src/lib/chunked-compression/chunked-compressor.h"
+#include <cstddef>
+
+#include "src/lib/chunked-compression/compression-params.h"
 
 namespace blobfs {
 
@@ -12,7 +14,7 @@ namespace {
 using ::chunked_compression::CompressionParams;
 
 constexpr int kDefaultLevel = 14;
-constexpr int kTargetFrameSize = 32 * 1024;
+constexpr size_t kTargetFrameSize = 32ul * 1024;
 }  // namespace
 
 CompressionParams GetDefaultChunkedCompressionParams(const size_t input_size) {

@@ -4,32 +4,54 @@
 
 #include "src/storage/blobfs/blob.h"
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <lib/sync/completion.h>
+#include <lib/fdio/vfs.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/event.h>
+#include <lib/zx/resource.h>
 #include <lib/zx/result.h>
+#include <lib/zx/vmo.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
+#include <zircon/rights.h>
 #include <zircon/status.h>
+#include <zircon/syscalls/object.h>
+#include <zircon/types.h>
 
-#include <algorithm>
-#include <iterator>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
+#include <mutex>
+#include <optional>
+#include <string>
 #include <utility>
 
+#include <fbl/ref_ptr.h>
+
+#include "src/storage/blobfs/blob_cache.h"
 #include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/blob_verifier.h"
 #include "src/storage/blobfs/blob_writer.h"
 #include "src/storage/blobfs/blobfs.h"
+#include "src/storage/blobfs/cache_node.h"
+#include "src/storage/blobfs/cache_policy.h"
 #include "src/storage/blobfs/common.h"
 #include "src/storage/blobfs/format.h"
 #include "src/storage/blobfs/format_assertions.h"
+#include "src/storage/blobfs/loader_info.h"
+#include "src/storage/blobfs/page_loader.h"
 #include "src/storage/blobfs/transaction.h"
 #include "src/storage/lib/trace/trace.h"
+#include "src/storage/lib/vfs/cpp/paged_vfs.h"
+#include "src/storage/lib/vfs/cpp/shared_mutex.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace blobfs {
 
-zx::result<> VerifyNullBlob(Blobfs& blobfs, const digest::Digest& digest) {
+zx::result<> VerifyNullBlob(Blobfs& blobfs, const Digest& digest) {
   zx::result verifier = BlobVerifier::CreateWithoutTree(digest, blobfs.GetMetrics(), 0);
   if (verifier.is_error()) {
     return verifier.take_error();
@@ -47,13 +69,13 @@ uint64_t Blob::FileSize() const {
   return 0;
 }
 
-Blob::Blob(Blobfs& blobfs, const digest::Digest& digest, bool is_delivery_blob)
+Blob::Blob(Blobfs& blobfs, const Digest& digest, bool is_delivery_blob)
     : CacheNode(*blobfs.vfs(), digest), blobfs_(blobfs) {
   writer_ = std::make_unique<Blob::Writer>(*this, is_delivery_blob);
 }
 
 Blob::Blob(Blobfs& blobfs, uint32_t node_index, const Inode& inode)
-    : CacheNode(*blobfs.vfs(), digest::Digest(inode.merkle_root_hash)),
+    : CacheNode(*blobfs.vfs(), Digest(inode.merkle_root_hash)),
       blobfs_(blobfs),
       state_(BlobState::kReadable),
       syncing_state_(SyncingState::kDone),

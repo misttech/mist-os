@@ -2,8 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <lib/inspect/cpp/inspect.h>
+#include <lib/inspect/cpp/vmo/types.h>
 
+#include <cstddef>
+#include <cstdint>
 #include <map>
 
 #ifndef SRC_STORAGE_BLOBFS_METRICS_FRAGMENTATION_METRICS_H_
@@ -44,9 +46,9 @@ struct FragmentationStats {
   uint64_t total_nodes = {};
   uint64_t files_in_use = {};
   uint64_t extent_containers_in_use = {};
-  std::map<size_t, uint64_t> extents_per_file = {};
-  std::map<size_t, uint64_t> free_fragments = {};
-  std::map<size_t, uint64_t> in_use_fragments = {};
+  std::map<size_t, uint64_t> extents_per_file;
+  std::map<size_t, uint64_t> free_fragments;
+  std::map<size_t, uint64_t> in_use_fragments;
 };
 
 }  // namespace blobfs

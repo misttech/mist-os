@@ -10,10 +10,8 @@
 #endif
 
 #include "src/storage/blobfs/allocator/allocator.h"
-#include "src/storage/blobfs/blobfs_metrics.h"
 #include "src/storage/lib/vfs/cpp/journal/journal.h"
 #include "src/storage/lib/vfs/cpp/transaction/device_transaction_handler.h"
-#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace blobfs {
 

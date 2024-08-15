@@ -7,11 +7,15 @@
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/result.h>
 #include <stdint.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
 #include <zircon/types.h>
+
+#include <utility>
 
 #include "src/storage/blobfs/format.h"
 #include "src/storage/blobfs/iterator/allocated_node_iterator.h"
-#include "src/storage/blobfs/iterator/extent_iterator.h"
+#include "src/storage/blobfs/node_finder.h"
 
 namespace blobfs {
 
@@ -93,7 +97,7 @@ zx_status_t AllocatedExtentIterator::VerifyIteration(NodeFinder* finder, uint32_
       return ZX_ERR_BAD_STATE;
     }
 
-    // Advance the slow pointer to detct cycles.
+    // Advance the slow pointer to detect cycles.
     if (++container_count % 2 == 0) {
       zx::result<ExtentContainer*> status = slow.Next();
       if (status.is_error()) {

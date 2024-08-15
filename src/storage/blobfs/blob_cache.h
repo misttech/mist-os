@@ -10,20 +10,20 @@
 #endif
 
 #include <lib/fit/function.h>
+#include <zircon/compiler.h>
+#include <zircon/types.h>
 
 #include <fbl/condition_variable.h>
 #include <fbl/intrusive_wavl_tree.h>
+#include <fbl/macros.h>
 #include <fbl/mutex.h>
 #include <fbl/ref_ptr.h>
 
-#include "src/lib/digest/digest.h"
 #include "src/storage/blobfs/cache_node.h"
 #include "src/storage/blobfs/cache_policy.h"
-#include "src/storage/lib/vfs/cpp/vnode.h"
+#include "src/storage/blobfs/format.h"
 
 namespace blobfs {
-
-using digest::Digest;
 
 // BlobCache contains a collection of weak pointers to vnodes.
 //
@@ -110,14 +110,14 @@ class BlobCache {
   //
   // Returns ZX_OK if the node is found and returned.
   // Returns ZX_ERR_NOT_FOUND if the node doesn't exist in the cache.
-  zx_status_t LookupLocked(const digest::Digest& key, fbl::RefPtr<CacheNode>* out)
+  zx_status_t LookupLocked(const Digest& key, fbl::RefPtr<CacheNode>* out)
       __TA_REQUIRES(hash_lock_);
 
   // Upgrades a Vnode which exists in the |closed_hash_| into |open_hash_|, and acquire the strong
   // reference the Vnode which was leaked by |Downgrade()|, if it exists.
   //
   // Precondition: The Vnode must not exist in |open_hash_|.
-  fbl::RefPtr<CacheNode> UpgradeLocked(const digest::Digest& key) __TA_REQUIRES(hash_lock_);
+  fbl::RefPtr<CacheNode> UpgradeLocked(const Digest& key) __TA_REQUIRES(hash_lock_);
 
   // Resets the cache by deleting all members |closed_hash_|.
   void ResetLocked() __TA_REQUIRES(hash_lock_);
@@ -125,24 +125,24 @@ class BlobCache {
   // We need to define this structure to allow the CacheNodes to be indexable by a key which is
   // larger than a primitive type: the keys are 'digest::kSha256Length' bytes long.
   struct MerkleRootTraits {
-    static const digest::Digest& GetKey(const CacheNode& obj) { return obj.digest(); }
-    static bool LessThan(const digest::Digest& d1, const digest::Digest& d2) { return d1 < d2; }
-    static bool EqualTo(const digest::Digest& d1, const digest::Digest& d2) { return d1 == d2; }
+    static const Digest& GetKey(const CacheNode& obj) { return obj.digest(); }
+    static bool LessThan(const Digest& d1, const Digest& d2) { return d1 < d2; }
+    static bool EqualTo(const Digest& d1, const Digest& d2) { return d1 == d2; }
   };
 
   // CacheNodes exist in the WAVLTree as long as one or more reference exists; when the Vnode is
   // deleted, it is immediately removed from the WAVL tree.
-  using WAVLTreeByMerkle = fbl::WAVLTree<const digest::Digest&, CacheNode*, MerkleRootTraits>;
+  using WAVLTreeByMerkle = fbl::WAVLTree<const Digest&, CacheNode*, MerkleRootTraits>;
 
   CachePolicy cache_policy_ = CachePolicy::EvictImmediately;
 
-  fbl::Mutex hash_lock_{};
+  fbl::Mutex hash_lock_;
 
   // All 'in use' blobs.
-  WAVLTreeByMerkle open_hash_ __TA_GUARDED(hash_lock_){};
+  WAVLTreeByMerkle open_hash_ __TA_GUARDED(hash_lock_);
 
   // All 'closed' blobs.
-  WAVLTreeByMerkle closed_hash_ __TA_GUARDED(hash_lock_){};
+  WAVLTreeByMerkle closed_hash_ __TA_GUARDED(hash_lock_);
 
   // A condition variable which is signalled whenever a CacheNode has been removed from the
   // |open_hash_|. When a CacheNode runs out of references, it exists in the |open_hash_| with no

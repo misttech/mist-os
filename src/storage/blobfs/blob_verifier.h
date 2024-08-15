@@ -5,18 +5,19 @@
 #ifndef SRC_STORAGE_BLOBFS_BLOB_VERIFIER_H_
 #define SRC_STORAGE_BLOBFS_BLOB_VERIFIER_H_
 
-#include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
-#include <zircon/status.h>
 #include <zircon/types.h>
 
-#include <fbl/macros.h>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <mutex>
 
-#include "src/lib/digest/digest.h"
 #include "src/lib/digest/merkle-tree.h"
 #include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/blobfs_metrics.h"
+#include "src/storage/blobfs/format.h"
 
 namespace blobfs {
 
@@ -33,14 +34,14 @@ class BlobVerifier {
   // Returns an error if the merkle tree's root does not match |digest|, or if the required tree
   // size for |data_size| bytes is bigger than |merkle_size|.
   [[nodiscard]] static zx::result<std::unique_ptr<BlobVerifier>> Create(
-      digest::Digest digest, std::shared_ptr<BlobfsMetrics> metrics,
+      Digest digest, std::shared_ptr<BlobfsMetrics> metrics,
       cpp20::span<const uint8_t> merkle_data_blocks, const BlobLayout& layout);
 
   // Creates an instance of BlobVerifier for blobs named |digest|, which are small enough to not
   // have a stored merkle tree (i.e. MerkleTreeBytes(data_size) == 0). The passed-in BlobfsMetrics
   // will be updated when this class runs.
   [[nodiscard]] static zx::result<std::unique_ptr<BlobVerifier>> CreateWithoutTree(
-      digest::Digest digest, std::shared_ptr<BlobfsMetrics> metrics, size_t data_size);
+      Digest digest, std::shared_ptr<BlobfsMetrics> metrics, size_t data_size);
 
   // Verifies the entire contents of a blob. |buffer_size| is the total size of the buffer and the
   // buffer must be zeroed from |data_size| to |buffer_size|.
@@ -51,7 +52,7 @@ class BlobVerifier {
   // IMPORTANT: |data| is expected to be a pointer to the blob's contents at |data_offset|, not the
   // absolute start of the blob's data. (This facilitates partial verification when the blob is only
   // partially mapped in.) |buffer_size| is the total size of the buffer (relative to |data|) and
-  // the buffer must be zerored from |data_size| to |buffer_size|.
+  // the buffer must be zeroed from |data_size| to |buffer_size|.
   // TODO(https://fxbug.dev/42121983): Make const if MerkleTreeVerifier::Verify becomes const
   [[nodiscard]] zx_status_t VerifyPartial(const void* data, size_t length, size_t data_offset,
                                           size_t buffer_size);
@@ -69,14 +70,14 @@ class BlobVerifier {
 
  private:
   // Use |Create| or |CreateWithoutTree| to construct.
-  explicit BlobVerifier(digest::Digest digest, std::shared_ptr<BlobfsMetrics> metrics);
+  explicit BlobVerifier(Digest digest, std::shared_ptr<BlobfsMetrics> metrics);
 
   BlobVerifier(const BlobVerifier&) = delete;
   BlobVerifier& operator=(const BlobVerifier&) = delete;
 
   std::unique_ptr<uint8_t[]> merkle_data_;
 
-  const digest::Digest digest_;
+  const Digest digest_;
 
   // The verification lock is to be used whenever calling Verify() on the |tree_verifier_| since
   // the call mutates internal state variables which makes the call not thread-safe. The member is

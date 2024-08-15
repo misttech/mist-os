@@ -6,12 +6,10 @@
 #define SRC_STORAGE_BLOBFS_ITERATOR_EXTENT_ITERATOR_H_
 
 #include <lib/zx/result.h>
-#include <stdbool.h>
 #include <stdint.h>
 #include <zircon/types.h>
 
 #include "src/storage/blobfs/format.h"
-#include "src/storage/blobfs/node_finder.h"
 
 namespace blobfs {
 

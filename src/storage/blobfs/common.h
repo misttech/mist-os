@@ -8,9 +8,6 @@
 #ifndef SRC_STORAGE_BLOBFS_COMMON_H_
 #define SRC_STORAGE_BLOBFS_COMMON_H_
 
-#include <assert.h>
-#include <limits.h>
-#include <stdbool.h>
 #include <stdint.h>
 #include <zircon/types.h>
 
@@ -18,13 +15,10 @@
 
 #include <bitmap/raw-bitmap.h>
 #include <bitmap/storage.h>
-#include <fbl/algorithm.h>
-#include <fbl/macros.h>
 #include <fbl/string_buffer.h>
 
 #include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/format.h"
-#include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
 
 namespace blobfs {
 
@@ -74,13 +68,6 @@ void InitializeSuperblockOptions(const FilesystemOptions& options, Superblock* i
 zx_status_t InitializeSuperblock(uint64_t block_count, const FilesystemOptions& options,
                                  Superblock* info);
 
-// Get a pointer to the nth block of the bitmap.
-inline void* GetRawBitmapData(const RawBitmap& bm, uint64_t n) {
-  assert(n * kBlobfsBlockSize < bm.size());                // Accessing beyond end of bitmap
-  assert(kBlobfsBlockSize <= (n + 1) * kBlobfsBlockSize);  // Avoid overflow
-  return fs::GetBlock(kBlobfsBlockSize, bm.StorageUnsafe()->GetData(), n);
-}
-
 // Returns the blob layout format used in |info|. Panics if the blob layout format is invalid.
 // |CheckSuperblock| should be used to validate |info| before trying to access the blob layout
 // format.
@@ -91,9 +78,9 @@ BlobLayoutFormat GetBlobLayoutFormat(const Superblock& info);
 
 using VmoNameBuffer = fbl::StringBuffer<ZX_MAX_NAME_LEN>;
 
-VmoNameBuffer FormatBlobDataVmoName(const digest::Digest& digest);
-VmoNameBuffer FormatInactiveBlobDataVmoName(const digest::Digest& digest);
-VmoNameBuffer FormatWritingBlobDataVmoName(const digest::Digest& digest);
+VmoNameBuffer FormatBlobDataVmoName(const Digest& digest);
+VmoNameBuffer FormatInactiveBlobDataVmoName(const Digest& digest);
+VmoNameBuffer FormatWritingBlobDataVmoName(const Digest& digest);
 
 // Pretty-print formatter for Blobfs Superblock fields.
 std::ostream& operator<<(std::ostream& stream, const Superblock& info);

@@ -110,7 +110,7 @@ class ExternalSeekableDecompressor {
   DISALLOW_COPY_ASSIGN_AND_MOVE(ExternalSeekableDecompressor);
 
   // Decompresses one region by sending a request to the provided client. The range specified must
-  // be one or more entire completeable chunks. `compressed_offset` is the offset into the
+  // be one or more entire completable chunks. `compressed_offset` is the offset into the
   // `compressed_vmo_` to start decompressing from.
   zx_status_t DecompressRange(size_t compressed_offset, size_t compressed_size,
                               size_t uncompressed_size);

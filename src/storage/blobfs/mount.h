@@ -7,21 +7,17 @@
 
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <fidl/fuchsia.process.lifecycle/cpp/wire.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
-#include <lib/fit/function.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/zx/resource.h>
+#include <lib/zx/result.h>
 
 #include <optional>
 
 #include "src/storage/blobfs/cache_policy.h"
 #include "src/storage/blobfs/compression/external_decompressor.h"
 #include "src/storage/blobfs/compression_settings.h"
-#include "src/storage/lib/block_client/cpp/block_device.h"
 
 namespace blobfs {
-
-using block_client::BlockDevice;
 
 enum class Writability {
   // Do not write to persistent storage under any circumstances whatsoever.

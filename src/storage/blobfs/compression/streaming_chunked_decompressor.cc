@@ -4,9 +4,26 @@
 
 #include "src/storage/blobfs/compression/streaming_chunked_decompressor.h"
 
-#include <algorithm>
+#include <lib/fzl/owned-vmo-mapper.h>
+#include <lib/stdcompat/span.h>
+#include <lib/zx/result.h>
+#include <lib/zx/vmo.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/syscalls.h>
+#include <zircon/types.h>
 
-#include "src/storage/blobfs/compression/chunked.h"
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <utility>
+
+#include <fbl/algorithm.h>
+
+#include "src/lib/chunked-compression/chunked-archive.h"
+#include "src/storage/blobfs/compression/external_decompressor.h"
+#include "src/storage/blobfs/compression_settings.h"
 
 namespace {
 

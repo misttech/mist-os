@@ -5,8 +5,15 @@
 #ifndef SRC_STORAGE_BLOBFS_TRANSACTION_H_
 #define SRC_STORAGE_BLOBFS_TRANSACTION_H_
 
+#include <lib/fit/function.h>
+#include <lib/fpromise/promise.h>
+#include <zircon/types.h>
+
+#include <utility>
 #include <vector>
 
+#include <storage/operation/operation.h>
+#include <storage/operation/unbuffered_operation.h>
 #include <storage/operation/unbuffered_operations_builder.h>
 
 #include "src/storage/blobfs/allocator/extent_reserver.h"

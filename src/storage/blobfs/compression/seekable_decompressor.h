@@ -9,9 +9,6 @@
 #include <stddef.h>
 #include <zircon/types.h>
 
-#include <memory>
-#include <optional>
-
 #include <fbl/macros.h>
 
 #include "src/storage/blobfs/compression_settings.h"

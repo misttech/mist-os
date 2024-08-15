@@ -5,11 +5,11 @@
 #ifndef SRC_STORAGE_BLOBFS_METRICS_READ_METRICS_H_
 #define SRC_STORAGE_BLOBFS_METRICS_READ_METRICS_H_
 
-#include <lib/inspect/cpp/inspect.h>
-#include <lib/zx/time.h>
+#include <lib/inspect/cpp/vmo/types.h>
 #include <zircon/compiler.h>
 #include <zircon/time.h>
 
+#include <cstdint>
 #include <mutex>
 
 #include "src/storage/blobfs/compression_settings.h"

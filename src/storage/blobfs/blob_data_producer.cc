@@ -4,11 +4,27 @@
 
 #include "src/storage/blobfs/blob_data_producer.h"
 
-#include <lib/syslog/cpp/macros.h>
+#include <lib/stdcompat/span.h>
+#include <lib/zx/result.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
+
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <limits>
+#include <memory>
+#include <utility>
+
+#include <fbl/algorithm.h>
 
 #include "src/storage/blobfs/compression/blob_compressor.h"
 #include "src/storage/blobfs/compression/chunked.h"
 #include "src/storage/blobfs/compression/seekable_decompressor.h"
+#include "src/storage/blobfs/compression_settings.h"
+#include "src/storage/blobfs/format.h"
 
 namespace blobfs {
 

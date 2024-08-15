@@ -5,7 +5,9 @@
 #ifndef SRC_STORAGE_BLOBFS_METRICS_COMPRESSION_METRICS_H_
 #define SRC_STORAGE_BLOBFS_METRICS_COMPRESSION_METRICS_H_
 
-#include <lib/inspect/cpp/inspect.h>
+#include <lib/inspect/cpp/vmo/types.h>
+
+#include <cstdint>
 
 #include "src/storage/blobfs/node_finder.h"
 

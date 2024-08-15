@@ -7,19 +7,20 @@
 #ifndef SRC_STORAGE_BLOBFS_BLOBFS_METRICS_H_
 #define SRC_STORAGE_BLOBFS_BLOBFS_METRICS_H_
 
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
-#include <lib/inspect/cpp/inspect.h>
+#include <lib/inspect/cpp/inspector.h>
+#include <lib/inspect/cpp/vmo/types.h>
 #include <lib/zx/time.h>
+#include <zircon/compiler.h>
 
+#include <cstdint>
+#include <map>
 #include <mutex>
 
-#include "src/storage/blobfs/format.h"
+#include <fbl/string.h>
+
 #include "src/storage/blobfs/metrics/read_metrics.h"
 #include "src/storage/blobfs/metrics/verification_metrics.h"
-#include "src/storage/blobfs/mount.h"
 #include "src/storage/lib/vfs/cpp/ticker.h"
-#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace blobfs {
 
@@ -31,10 +32,10 @@ struct BlobPageInFrequencies {
 
 // Encapsulates Blobfs-specific metrics available via Inspect.
 //
-// TODO(https://fxbug.dev/42160612): Make this properly thread-safe.  IncrementPageIn(), paged_read_metrics(),
-// unpaged_read_metrics(), and verification_metrics() are not thread safe.
-// TODO(https://fxbug.dev/42160612): Make this class encapsulate all Blobfs-specific metrics, and have
-// BlobfsInspectTree take ownership of it.
+// TODO(https://fxbug.dev/42160612): Make this properly thread-safe.  IncrementPageIn(),
+// paged_read_metrics(), unpaged_read_metrics(), and verification_metrics() are not thread safe.
+// TODO(https://fxbug.dev/42160612): Make this class encapsulate all Blobfs-specific metrics, and
+// have BlobfsInspectTree take ownership of it.
 class BlobfsMetrics final {
  public:
   explicit BlobfsMetrics(bool should_record_page_in, inspect::Inspector inspector = {});
@@ -81,15 +82,15 @@ class BlobfsMetrics final {
   uint64_t blobs_created_ = 0;
   // Measured by space allocated with "Truncate".
   uint64_t blobs_created_total_size_ = 0;
-  zx::ticks total_allocation_time_ticks_ = {};
+  zx::ticks total_allocation_time_ticks_;
 
   // WRITEBACK STATS
-  // Measurements, from the client's perspective, of writing and enqueing
+  // Measurements, from the client's perspective, of writing and enqueuing
   // data that will later be written to disk.
   uint64_t data_bytes_written_ = 0;
   uint64_t merkle_bytes_written_ = 0;
-  zx::ticks total_write_enqueue_time_ticks_ = {};
-  zx::ticks total_merkle_generation_time_ticks_ = {};
+  zx::ticks total_write_enqueue_time_ticks_;
+  zx::ticks total_merkle_generation_time_ticks_;
 
   // LOOKUP STATS
   // Opened via "LookupBlob".

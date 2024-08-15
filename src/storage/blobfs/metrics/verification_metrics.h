@@ -7,7 +7,9 @@
 
 #include <lib/zx/time.h>
 #include <zircon/compiler.h>
+#include <zircon/time.h>
 
+#include <cstdint>
 #include <mutex>
 
 #include "src/storage/lib/vfs/cpp/ticker.h"
@@ -42,7 +44,7 @@ class VerificationMetrics {
   uint64_t blobs_verified_ __TA_GUARDED(mutex_) = {};
   uint64_t blobs_verified_total_size_data_ __TA_GUARDED(mutex_) = {};
   uint64_t blobs_verified_total_size_merkle_ __TA_GUARDED(mutex_) = {};
-  zx::ticks total_verification_time_ticks_ __TA_GUARDED(mutex_) = {};
+  zx::ticks total_verification_time_ticks_ __TA_GUARDED(mutex_);
 
   mutable std::mutex mutex_;
 };
