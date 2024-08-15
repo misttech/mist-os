@@ -88,6 +88,8 @@ group("image_pipe_swapchain_layer") {
 
 source_set("display") {
   sources = [
+    "display_coordinator_listener.cc",
+    "display_coordinator_listener.h",
     "fuchsia_platform_event.cc",
     "image_pipe_surface_display.cc",
     "image_pipe_surface_display.h",
@@ -97,7 +99,8 @@ source_set("display") {
   deps = [
     ":layer_common",
     ":surface_header",
-    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
+    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp_hlcpp_conversion",
+    "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp",
     "//sdk/fidl/fuchsia.images2:fuchsia.images2_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_hlcpp",
     "//sdk/lib/fdio",
@@ -108,7 +111,9 @@ source_set("display") {
     "//zircon/system/ulib/fzl",
   ]
   public_deps = [
+    "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_hlcpp",
+    "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp",
     "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_hlcpp",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",

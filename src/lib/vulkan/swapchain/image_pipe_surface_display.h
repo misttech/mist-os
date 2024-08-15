@@ -13,7 +13,8 @@
 
 #include <unordered_set>
 
-#include "image_pipe_surface.h"
+#include "src/lib/vulkan/swapchain/display_coordinator_listener.h"
+#include "src/lib/vulkan/swapchain/image_pipe_surface.h"
 
 namespace image_pipe_swapchain {
 
@@ -43,8 +44,8 @@ class ImagePipeSurfaceDisplay : public ImagePipeSurface {
 
  private:
   void ControllerError(zx_status_t status);
-  void ControllerOnDisplaysChanged(std::vector<fuchsia::hardware::display::Info>,
-                                   std::vector<fuchsia::hardware::display::types::DisplayId>);
+  void ControllerOnDisplaysChanged(std::vector<fuchsia_hardware_display::Info>,
+                                   std::vector<fuchsia_hardware_display_types::DisplayId>);
 
   bool WaitForAsyncMessage();
 
@@ -62,6 +63,7 @@ class ImagePipeSurfaceDisplay : public ImagePipeSurface {
       .value = fuchsia::hardware::display::types::INVALID_DISP_ID};
   fuchsia::hardware::display::LayerId layer_id_{fuchsia::hardware::display::types::INVALID_DISP_ID};
   fuchsia::hardware::display::CoordinatorPtr display_coordinator_;
+  std::unique_ptr<DisplayCoordinatorListener> display_coordinator_listener_;
   fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator_;
   SupportedImageProperties supported_image_properties_;
 };
