@@ -4,7 +4,7 @@
 // found in the LICENSE file.
 
 use anyhow::{anyhow, Error};
-use selinux::security_server;
+use selinux_core::security_server;
 use starnix_core::task::{CurrentTask, KernelFeatures};
 use starnix_logging::log_error;
 use starnix_sync::{Locked, Unlocked};

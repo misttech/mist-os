@@ -3,35 +3,34 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::{parse_features, run_container_features, Features};
+use crate::{
+    create_filesystem_from_spec, parse_features, parse_numbered_handles, run_container_features,
+    Features,
+};
 use anyhow::{anyhow, bail, Error};
 use bstr::BString;
 use fidl::AsyncChannel;
-use fidl_fuchsia_scheduler::RoleManagerSynchronousProxy;
 use fuchsia_async::DurationExt;
 use fuchsia_zircon::{
     Task as _, {self as zx},
 };
 use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt};
-use selinux::security_server::SecurityServer;
 use starnix_core::device::init_common_devices;
-use starnix_core::execution::{
-    create_filesystem_from_spec, create_remotefs_filesystem, execute_task_with_prerun_result,
-    parse_numbered_handles,
-};
+use starnix_core::execution::execute_task_with_prerun_result;
+use starnix_core::fs::fuchsia::create_remotefs_filesystem;
 use starnix_core::fs::layeredfs::LayeredFs;
 use starnix_core::fs::overlayfs::OverlayFs;
 use starnix_core::fs::tmpfs::TmpFs;
+use starnix_core::security;
 use starnix_core::task::{CurrentTask, ExitStatus, Kernel, Task};
-use starnix_core::vfs::{FileSystemOptions, FsContext, LookupContext, WhatToMount};
+use starnix_core::vfs::{FileSystemOptions, FsContext, LookupContext, Namespace, WhatToMount};
 use starnix_lite_kernel_config::Config;
 use starnix_logging::{
     log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
 };
 use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::errors::{SourceContext, ENOENT};
-use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
 use starnix_uapi::{errno, rlimit};
@@ -156,6 +155,7 @@ pub async fn create_container_from_config(
             format!("creating container \"{}\"", &config_wrapper.config.name)
         })?;
     let service_config = ContainerServiceConfig { receiver };
+
     return Ok((container, service_config));
 }
 
@@ -185,23 +185,17 @@ async fn create_container(
 
     let kernel_cmdline = BString::from(config.kernel_cmdline.as_bytes());
 
-    // Check whether we actually have access to a role manager by trying to set our own
-    // thread's role.
-    let role_manager: Option<RoleManagerSynchronousProxy> = None;
-
     let node = inspect::component::inspector().root().create_child("container");
-    let security_server = match features.selinux {
-        Some(mode) => Some(SecurityServer::new(mode)),
-        _ => None,
-    };
+    let security_state = security::kernel_init_security(features.selinux);
     let kernel = Kernel::new(
         kernel_cmdline,
         features.kernel,
         svc_dir,
         data_dir,
-        role_manager,
+        None,
+        None,
         node.create_child("kernel"),
-        security_server,
+        security_state,
     )
     .with_source_context(|| format!("creating Kernel: {}", &config.name))?;
     let fs_context = create_fs_context(
@@ -331,13 +325,13 @@ where
     // point doesn't exist in a previous mount. The root must be first so other mounts can be
     // applied on top of it.
     let mut mounts_iter = config.mounts.iter();
-    let (root_point, mut root_fs) = create_filesystem_from_spec(
+    let mut root = create_filesystem_from_spec(
         locked,
         kernel,
         pkg_dir_proxy,
         mounts_iter.next().ok_or_else(|| anyhow!("Mounts list is empty"))?,
     )?;
-    if root_point != "/" {
+    if root.path != "/" {
         anyhow::bail!("First mount in mounts list is not the root");
     }
 
@@ -353,12 +347,15 @@ where
             create_remotefs_filesystem(
                 kernel,
                 pkg_dir_proxy,
-                rights,
                 FileSystemOptions { source: "data".into(), ..Default::default() },
+                rights,
             )?,
             BTreeMap::from([("component".into(), TmpFs::new_fs(kernel))]),
         );
         mappings.push(("container".into(), container_fs));
+    }
+    if features.custom_artifacts {
+        mappings.push(("custom_artifacts".into(), TmpFs::new_fs(kernel)));
     }
     if features.test_data {
         mappings.push(("test_data".into(), TmpFs::new_fs(kernel)));
@@ -367,12 +364,12 @@ where
     if !mappings.is_empty() {
         // If this container has enabled any features that mount directories that might not exist
         // in the root file system, we add a LayeredFs to hold these mappings.
-        root_fs = LayeredFs::new_fs(kernel, root_fs, mappings.into_iter().collect());
+        root.fs = LayeredFs::new_fs(kernel, root.fs, mappings.into_iter().collect());
     }
     if features.rootfs_rw {
-        root_fs = OverlayFs::wrap_fs_in_writable_layer(kernel, root_fs)?;
+        root.fs = OverlayFs::wrap_fs_in_writable_layer(kernel, root.fs)?;
     }
-    Ok(FsContext::new(root_fs))
+    Ok(FsContext::new(Namespace::new_with_flags(root.fs, root.flags)))
 }
 
 pub fn set_rlimits(task: &Task, rlimits: &[String]) -> Result<(), Error> {
@@ -426,15 +423,12 @@ where
     // Skip the first mount, that was used to create the root filesystem.
     let _ = mounts_iter.next();
     for mount_spec in mounts_iter {
-        let (mount_point, child_fs) =
-            create_filesystem_from_spec(locked, system_task, pkg_dir_proxy, mount_spec)
-                .with_source_context(|| {
-                    format!("creating filesystem from spec: {}", &mount_spec)
-                })?;
+        let action = create_filesystem_from_spec(locked, system_task, pkg_dir_proxy, mount_spec)
+            .with_source_context(|| format!("creating filesystem from spec: {}", &mount_spec))?;
         let mount_point = system_task
-            .lookup_path_from_root(mount_point)
-            .with_source_context(|| format!("lookup path from root: {mount_point}"))?;
-        mount_point.mount(WhatToMount::Fs(child_fs), MountFlags::empty())?;
+            .lookup_path_from_root(action.path.as_ref())
+            .with_source_context(|| format!("lookup path from root: {}", action.path))?;
+        mount_point.mount(WhatToMount::Fs(action.fs), action.flags)?;
     }
     Ok(())
 }
@@ -464,7 +458,7 @@ mod test {
     use futures::{SinkExt, StreamExt};
     use starnix_core::testing::create_kernel_task_and_unlocked;
     use starnix_core::vfs::FdNumber;
-    use starnix_uapi::file_mode::FileMode;
+    use starnix_uapi::file_mode::{AccessCheck, FileMode};
     use starnix_uapi::open_flags::OpenFlags;
     use starnix_uapi::signals::SIGCHLD;
     use starnix_uapi::vfs::ResolveFlags;
@@ -484,6 +478,7 @@ mod test {
                 OpenFlags::CREAT,
                 FileMode::default(),
                 ResolveFlags::empty(),
+                AccessCheck::default(),
             )
             .expect("Failed to create file");
 
@@ -525,6 +520,7 @@ mod test {
                 OpenFlags::CREAT,
                 FileMode::default(),
                 ResolveFlags::empty(),
+                AccessCheck::default(),
             )
             .expect("Failed to create file");
 

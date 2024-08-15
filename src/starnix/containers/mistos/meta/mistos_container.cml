@@ -2,19 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
-    include: ["//src/starnix/containers/container.shard.cml"],
+    include: [ "//src/starnix/containers/container.shard.cml" ],
     program: {
         runner: "starnix",
         features: [ "container" ],
         init: [],
+        init_user: "root:x:0:0",
         kernel_cmdline: "",
         mounts: [
-            "/:remotefs",
-            "/dev:devtmpfs",
-            "/dev/pts:devpts",
-            "/dev/shm:tmpfs",
-            "/proc:proc",
-            "/sys:sysfs",
+            "/:remote_bundle:data/system:nosuid,nodev,relatime",
+            "/dev:devtmpfs::nosuid,relatime",
+            "/dev/pts:devpts::nosuid,noexec,relatime",
+            "/dev/shm:tmpfs::nosuid,nodev",
+            "/proc:proc::nosuid,nodev,noexec,relatime",
+            "/sys:sysfs::nosuid,nodev,noexec,relatime",
             "/tmp:tmpfs",
         ],
         name: "mistos",

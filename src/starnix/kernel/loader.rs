@@ -1,14 +1,22 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2021 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
 use crate::mm::memory::MemoryObject;
+#[cfg(feature = "starnix_lite")]
+use crate::mm::{
+    DesiredAddress, MappingName, MappingOptions, MemoryAccessor, MemoryManager, ProtectionFlags,
+    PAGE_SIZE,
+};
+#[cfg(not(feature = "starnix_lite"))]
 use crate::mm::{
     DesiredAddress, MappingName, MappingOptions, MemoryAccessor, MemoryManager, ProtectionFlags,
     PAGE_SIZE, VMEX_RESOURCE,
 };
 use crate::security;
 use crate::task::CurrentTask;
+#[cfg(not(feature = "starnix_lite"))]
 use crate::vdso::vdso_loader::ZX_TIME_VALUES_MEMORY;
 use crate::vfs::{FdNumber, FileHandle, FileWriteGuardMode, FileWriteGuardRef};
 use fuchsia_zircon::{
@@ -507,63 +515,67 @@ pub fn load_executable(
         entry_elf.headers.file_header().entry.wrapping_add(entry_elf.vaddr_bias),
     );
 
-    let vdso_memory = &current_task.kernel().vdso.memory;
-    let vvar_memory = current_task.kernel().vdso.vvar_readonly.clone();
+    let vdso_base = UserAddress::default();
+    #[cfg(not(feature = "starnix_lite"))]
+    {
+        let vdso_memory = &current_task.kernel().vdso.memory;
+        let vvar_memory = current_task.kernel().vdso.vvar_readonly.clone();
 
-    let vdso_size = vdso_memory.get_size();
-    const VDSO_PROT_FLAGS: ProtectionFlags = ProtectionFlags::READ.union(ProtectionFlags::EXEC);
+        let vdso_size = vdso_memory.get_size();
+        const VDSO_PROT_FLAGS: ProtectionFlags = ProtectionFlags::READ.union(ProtectionFlags::EXEC);
 
-    let vvar_size = vvar_memory.get_size();
-    const VVAR_PROT_FLAGS: ProtectionFlags = ProtectionFlags::READ;
+        let vvar_size = vvar_memory.get_size();
+        const VVAR_PROT_FLAGS: ProtectionFlags = ProtectionFlags::READ;
 
-    // Map the time values VMO used by libfasttime. We map this right behind the vvar so that
-    // userspace sees this as one big vvar block in memory.
-    let time_values_size = ZX_TIME_VALUES_MEMORY.get_size();
-    let time_values_map_result = current_task.mm().map_memory(
-        DesiredAddress::Any,
-        ZX_TIME_VALUES_MEMORY.clone(),
-        0,
-        (time_values_size as usize) + (vvar_size as usize) + (vdso_size as usize),
-        VVAR_PROT_FLAGS,
-        MappingOptions::empty(),
-        MappingName::Vvar,
-        FileWriteGuardRef(None),
-    )?;
+        // Map the time values VMO used by libfasttime. We map this right behind the vvar so that
+        // userspace sees this as one big vvar block in memory.
+        let time_values_size = ZX_TIME_VALUES_MEMORY.get_size();
+        let time_values_map_result = current_task.mm().map_memory(
+            DesiredAddress::Any,
+            ZX_TIME_VALUES_MEMORY.clone(),
+            0,
+            (time_values_size as usize) + (vvar_size as usize) + (vdso_size as usize),
+            VVAR_PROT_FLAGS,
+            MappingOptions::empty(),
+            MappingName::Vvar,
+            FileWriteGuardRef(None),
+        )?;
 
-    // Create a private clone of the starnix kernel vDSO.
-    let vdso_clone = vdso_memory
-        .create_child(zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE, 0, vdso_size)
-        .map_err(|status| from_status_like_fdio!(status))?;
+        // Create a private clone of the starnix kernel vDSO.
+        let vdso_clone = vdso_memory
+            .create_child(zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE, 0, vdso_size)
+            .map_err(|status| from_status_like_fdio!(status))?;
 
-    let vdso_executable = Arc::new(
-        vdso_clone
-            .replace_as_executable(&VMEX_RESOURCE)
-            .map_err(|status| from_status_like_fdio!(status))?,
-    );
+        let vdso_executable = Arc::new(
+            vdso_clone
+                .replace_as_executable(&VMEX_RESOURCE)
+                .map_err(|status| from_status_like_fdio!(status))?,
+        );
 
-    // Overwrite the second part of the vvar mapping with starnix's vvar.
-    let vvar_map_result = current_task.mm().map_memory(
-        DesiredAddress::FixedOverwrite(time_values_map_result + time_values_size),
-        vvar_memory,
-        0,
-        vvar_size as usize,
-        VVAR_PROT_FLAGS,
-        MappingOptions::empty(),
-        MappingName::Vvar,
-        FileWriteGuardRef(None),
-    )?;
+        // Overwrite the second part of the vvar mapping with starnix's vvar.
+        let vvar_map_result = current_task.mm().map_memory(
+            DesiredAddress::FixedOverwrite(time_values_map_result + time_values_size),
+            vvar_memory,
+            0,
+            vvar_size as usize,
+            VVAR_PROT_FLAGS,
+            MappingOptions::empty(),
+            MappingName::Vvar,
+            FileWriteGuardRef(None),
+        )?;
 
-    // Overwrite the third part of the vvar mapping to contain the vDSO clone.
-    let vdso_base = current_task.mm().map_memory(
-        DesiredAddress::FixedOverwrite(vvar_map_result + vvar_size),
-        vdso_executable,
-        0,
-        vdso_size as usize,
-        VDSO_PROT_FLAGS,
-        MappingOptions::DONT_SPLIT,
-        MappingName::Vdso,
-        FileWriteGuardRef(None),
-    )?;
+        // Overwrite the third part of the vvar mapping to contain the vDSO clone.
+        vdso_base = current_task.mm().map_memory(
+            DesiredAddress::FixedOverwrite(vvar_map_result + vvar_size),
+            vdso_executable,
+            0,
+            vdso_size as usize,
+            VDSO_PROT_FLAGS,
+            MappingOptions::DONT_SPLIT,
+            MappingName::Vdso,
+            FileWriteGuardRef(None),
+        )?;
+    }
 
     let auxv = {
         let creds = current_task.creds();

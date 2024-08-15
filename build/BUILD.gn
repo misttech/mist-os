@@ -82,6 +82,7 @@ group("non_hermetic_deps") {
   # TODO(b/314016615): tar_to_pkg() template is not hermetic
   visibility += [
     "//src/starnix/containers/alpine/*",
+    "//src/starnix/containers/mistos/*",
     "//src/starnix/containers/stardev/*",
   ]
 

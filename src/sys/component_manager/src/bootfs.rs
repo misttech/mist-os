@@ -49,6 +49,7 @@ const BOOTFS_EXECUTABLE_DIRECTORIES: &[&str] = &["bin", "lib", "test", "data"];
 #[cfg(not(feature = "starnix_lite"))]
 #[cfg(mistos)]
 const BOOTFS_EXECUTABLE_DIRECTORIES: &[&str] = &["bin", "driver", "lib", "test", "blob", "data"];
+#[cfg(not(feature = "starnix_lite"))]
 #[cfg(not(mistos))]
 const BOOTFS_EXECUTABLE_DIRECTORIES: &[&str] = &["bin", "driver", "lib", "test", "blob"];
 

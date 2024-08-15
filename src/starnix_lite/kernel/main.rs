@@ -95,15 +95,16 @@ fn main() -> Result<(), Error> {
 
     let config = Config {
         features: vec!["container".to_owned()],
-        init: vec!["/bin/nolibc-test".to_owned()],
+        init: vec!["/container/coremark".to_owned()],
+        //init: vec!["/container/sqlite-bench-uk".to_owned()],
         kernel_cmdline: Default::default(),
         mounts: vec![
-            "/:remotefs".to_owned(),
-            "/dev:devtmpfs".to_owned(),
-            "/dev/pts:devpts".to_owned(),
-            "/dev/shm:tmpfs".to_owned(),
-            "/proc:proc".to_owned(),
-            "/sys:sysfs".to_owned(),
+            "/:remote_bundle:data/system:nosuid,nodev,relatime".to_owned(),
+            "/dev:devtmpfs::nosuid,relatime".to_owned(),
+            "/dev/pts:devpts::nosuid,noexec,relatime".to_owned(),
+            "/dev/shm:tmpfs::nosuid,nodev".to_owned(),
+            "/proc:proc::nosuid,nodev,noexec,relatime".to_owned(),
+            "/sys:sysfs::nosuid,nodev,noexec,relatime".to_owned(),
             "/tmp:tmpfs".to_owned(),
         ],
 
@@ -177,9 +178,7 @@ async fn async_main(config: Config) -> Result<(), Error> {
     let bootfs_svc = bootfs_svc
         .unwrap()
         .ingest_bootfs_vmo_with_system_resource(&system_resource_handle)
-        .expect("Failed to ingest bootfs")
-        .publish_kernel_vmos(HandleType::KernelFileVmo, 0)
-        .expect("Failed publish_kernel_vmos HandleType::KernelFileVmo");
+        .expect("Failed to ingest bootfs");
 
     let _ = bootfs_svc.create_and_bind_vfs().expect("failed to bind");
 

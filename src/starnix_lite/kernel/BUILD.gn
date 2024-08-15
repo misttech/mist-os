@@ -117,7 +117,6 @@ rustc_library("starnix_lite_core") {
     "arch/${current_cpu}/signal_handling.rs",
     "arch/${current_cpu}/syscalls.rs",
     "arch/${current_cpu}/task.rs",
-    "arch/${current_cpu}/vdso.rs",
     "arch/mod.rs",
     "device/device_init.rs",
     "device/device_mapper.rs",
@@ -132,9 +131,9 @@ rustc_library("starnix_lite_core") {
     "device/tun.rs",
     "device/zram.rs",
     "dynamic_thread_spawner.rs",
+    "execution/crash_reporter.rs",
+    "execution/executor.rs",
     "execution/mod.rs",
-    "execution/restricted_executor.rs",
-    "execution/shared.rs",
     "fs/devpts.rs",
     "fs/devtmpfs.rs",
     "fs/ext4/mod.rs",
@@ -196,6 +195,8 @@ rustc_library("starnix_lite_core") {
     "security/mod.rs",
     "security/selinux_hooks/fs.rs",
     "security/selinux_hooks/mod.rs",
+    "security/selinux_hooks/task.rs",
+    "security/selinux_hooks/testing.rs",
     "signals/mod.rs",
     "signals/signal_handling.rs",
     "signals/signalfd.rs",
@@ -232,8 +233,6 @@ rustc_library("starnix_lite_core") {
     "time/mod.rs",
     "time/utc.rs",
     "timer/mod.rs",
-    "vdso/mod.rs",
-    "vdso/vdso_loader.rs",
     "vfs/aio.rs",
     "vfs/anon_node.rs",
     "vfs/buffers/io_buffers.rs",
@@ -295,6 +294,7 @@ rustc_library("starnix_lite_core") {
   deps = [
     "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_rust",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
+    "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_rust",
     "//sdk/fidl/fuchsia.fs:fuchsia.fs_rust",
     "//sdk/fidl/fuchsia.hardware.adb:fuchsia.hardware.adb_rust",
     "//sdk/fidl/fuchsia.hardware.hrtimer:fuchsia.hardware.hrtimer_rust",
@@ -307,13 +307,13 @@ rustc_library("starnix_lite_core") {
     "//sdk/fidl/fuchsia.net.filter:fuchsia.net.filter_rust",
     "//sdk/fidl/fuchsia.net.interfaces.admin:fuchsia.net.interfaces.admin_rust",
     "//sdk/fidl/fuchsia.net.tun:fuchsia.net.tun_rust",
+    "//sdk/fidl/fuchsia.netpol.socketproxy:fuchsia.netpol.socketproxy_rust",
     "//sdk/fidl/fuchsia.posix.socket:fuchsia.posix.socket_rust",
     "//sdk/fidl/fuchsia.posix.socket.packet:fuchsia.posix.socket.packet_rust",
     "//sdk/fidl/fuchsia.posix.socket.raw:fuchsia.posix.socket.raw_rust",
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
     "//sdk/fidl/fuchsia.power.suspend:fuchsia.power.suspend_rust",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
-    "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_rust",
     "//sdk/fidl/fuchsia.session.power:fuchsia.session.power_rust",
     "//sdk/fidl/fuchsia.sysinfo:fuchsia.sysinfo_rust",
@@ -330,7 +330,6 @@ rustc_library("starnix_lite_core") {
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",
-    "//src/lib/fuchsia-fs",
     "//src/lib/fuchsia-runtime",
     "//src/lib/mundane",
     "//src/lib/network/fidl_fuchsia_net_filter_ext",
@@ -339,20 +338,22 @@ rustc_library("starnix_lite_core") {
     "//src/lib/trace/rust:trace",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/performance/memory/attribution/server",
-    "//src/starnix/kernel:starnix_lifecycle",
     "//src/starnix/kernel:starnix_logging",
     "//src/starnix/kernel:starnix_sync",
-    "//src/starnix/kernel:vdso-data($bionic_linux_toolchain)",
     "//src/starnix/lib/extended_pstate:lib",
     "//src/starnix/lib/filter_methods_macro",
     "//src/starnix/lib/linux_uapi",
     "//src/starnix/lib/range_map",
-    "//src/starnix/lib/selinux/common",
+    "//src/starnix/lib/selinux",
     "//src/starnix/lib/selinux/core",
-    "//src/starnix/lib/selinux/policy",
+    "//src/starnix/lib/starnix-lifecycle",
     "//src/starnix/lib/starnix-syscalls",
     "//src/starnix/lib/starnix-uapi",
     "//src/starnix/lib/syncio",
+    "//src/starnix/lib/third_party/rust_netlink/netlink_packet_core",
+    "//src/starnix/lib/third_party/rust_netlink/netlink_packet_generic",
+    "//src/starnix/lib/third_party/rust_netlink/netlink_packet_route",
+    "//src/starnix/lib/third_party/rust_netlink/netlink_packet_utils",
     "//src/starnix/lib/usercopy",
     "//src/storage/ext4/lib/metadata",
     "//src/storage/ext4/read-only:ext4-read-only",
@@ -377,10 +378,6 @@ rustc_library("starnix_lite_core") {
     "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:memchr",
     "//third_party/rust_crates:memoffset",
-    "//third_party/rust_crates:netlink-packet-core",
-    "//third_party/rust_crates:netlink-packet-generic",
-    "//third_party/rust_crates:netlink-packet-route",
-    "//third_party/rust_crates:netlink-packet-utils",
     "//third_party/rust_crates:nom",
     "//third_party/rust_crates:num-derive",
     "//third_party/rust_crates:num-traits",
@@ -429,9 +426,12 @@ rustc_library("starnix_lite_core") {
   if (starnix_enable_alternate_anon_allocs) {
     features += [ "alternate_anon_allocs" ]
   }
-
-  inputs = [ "//src/starnix_lite/lib/selinux/testdata/micro_policies/hooks_tests_policy.pp" ]
+  inputs = [
+    "//src/starnix/lib/selinux/testdata/micro_policies/hooks_tests_policy.pp",
+    "//src/starnix/lib/selinux/testdata/composite_policies/compiled/bounded_transition_policy.pp",
+  ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
+
   if (is_asan) {
     # At least for ASan, remote execution requires machine with more memory.
     _concurrent_jobs = concurrent_jobs.rust_highmem
@@ -456,16 +456,18 @@ rustc_library("starnix_lite_kernel_runner") {
   configs += [ "//build/config/mistos:mistos_config" ]
 
   sources = [
+    "standalone_runner/component_runner.rs",
     "standalone_runner/container.rs",
     "standalone_runner/features.rs",
     "standalone_runner/lib.rs",
+    "standalone_runner/mounts.rs",
   ]
 
   deps = [
     ":starnix_lite_core",
     ":starnix_lite_kernel_config",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//sdk/fidl/fuchsia.scheduler:fuchsia.scheduler_rust",
+    "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//src/lib/diagnostics/inspect/contrib/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/fdio/rust:fdio",
@@ -520,11 +522,11 @@ zbi("starnix_lite_kernel_zbi") {
     ":starnix_lite-zbi-cmdline",
     ":starnix_lite_kernel_bin",
     "//build/info/bootfs:minimum_utc_stamp",
-    "//src/starnix/containers/mistos:container_resources",
+    "//examples/mistos_linux_bench:coremark",
+    "//examples/mistos_linux_bench:libc-bench",
+    "//examples/mistos_linux_bench:sqlite-bench-uk",
+    "//src/starnix/containers/mistos:mistos_container_resources",
     "//src/starnix/containers/nolibc-test_container:linux-bin",
-
-    #VDSO
-    "//src/starnix/kernel:vdso-data($bionic_linux_toolchain)",
   ]
 
   output_name = "starnix_lite_kernel"

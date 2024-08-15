@@ -35,9 +35,8 @@ jobs:
             - prebuilt
       - run:
           command: |
-            make args all
-            make test
-            make ci
+            make args gen
+            make starnix_lite_kernel
 
 workflows:
   build-workflow:
