@@ -106,7 +106,8 @@ class CalculatorServerImpl : public fidl::Server<fuchsia_examples_calculator::Ca
 };
 
 int main(int argc, const char** argv) {
-  fuchsia_logging::SetTags({"calculator_server"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"calculator_server"}).BuildAndInitialize();
   // The event loop is used to asynchronously listen for incoming connections
   // and requests from the client. The following initializes the loop, and
   // obtains the dispatcher, which will be used when binding the server
