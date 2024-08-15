@@ -6,10 +6,11 @@ use crate::framebuffer::{DetectResult, DisplayInfo, Framebuffer};
 use anyhow::{Context, Error};
 use fidl::endpoints;
 use fidl_fuchsia_hardware_display::{
-    CoordinatorEvent, CoordinatorMarker, CoordinatorSynchronousProxy, Info,
-    ProviderSynchronousProxy,
+    CoordinatorListenerMarker, CoordinatorMarker, Info, ProviderSynchronousProxy,
 };
 use fuchsia_zircon as zx;
+use futures::executor::block_on;
+use futures::{future, TryStreamExt};
 use serde_json::json;
 
 fn get_display_coordinator_path() -> anyhow::Result<String> {
@@ -33,7 +34,7 @@ fn convert_info(info: &Info) -> DisplayInfo {
     }
 }
 
-fn read_info() -> Result<DetectResult, Error> {
+async fn read_info() -> Result<DetectResult, Error> {
     // Connect to the display coordinator.
     let provider = {
         let (client_end, server_end) = zx::Channel::create();
@@ -45,19 +46,33 @@ fn read_info() -> Result<DetectResult, Error> {
         )?;
         ProviderSynchronousProxy::new(client_end)
     };
-    let coordinator = {
-        let (dc_client, dc_server) = endpoints::create_endpoints::<CoordinatorMarker>();
-        provider.open_coordinator_for_primary(dc_server, zx::Time::INFINITE)?;
-        CoordinatorSynchronousProxy::new(dc_client.into_channel())
+
+    let (_coordinator, listener_requests) = {
+        let (dc_proxy, dc_server) = endpoints::create_sync_proxy::<CoordinatorMarker>();
+        let (listener_client, listener_requests) =
+            endpoints::create_request_stream::<CoordinatorListenerMarker>()?;
+        let payload =
+            fidl_fuchsia_hardware_display::ProviderOpenCoordinatorWithListenerForPrimaryRequest {
+                coordinator: Some(dc_server),
+                coordinator_listener: Some(listener_client),
+                __source_breaking: fidl::marker::SourceBreaking,
+            };
+        provider
+            .open_coordinator_with_listener_for_primary(payload, zx::Time::INFINITE)?
+            .map_err(zx::Status::from_raw)?;
+        (dc_proxy, listener_requests)
     };
 
-    // Wait for the 'OnDisplaysChanged' event.
-    let displays = loop {
-        match coordinator.wait_for_event(zx::Time::INFINITE)? {
-            CoordinatorEvent::OnDisplaysChanged { added, .. } => break added,
-            _ => {}
-        }
-    };
+    let mut stream = listener_requests.try_filter_map(|event| match event {
+        fidl_fuchsia_hardware_display::CoordinatorListenerRequest::OnDisplaysChanged {
+            added,
+            removed: _,
+            control_handle: _,
+        } => future::ok(Some(added)),
+        _ => future::ok(None),
+    });
+    let displays = &mut stream.try_next().await?.context("failed to get display streams")?;
+
     Ok(DetectResult {
         displays: displays.iter().map(convert_info).collect(),
         details: json!(format!("{:#?}", displays)),
@@ -66,7 +81,7 @@ fn read_info() -> Result<DetectResult, Error> {
 }
 
 fn read_info_from_display_coordinator() -> DetectResult {
-    read_info().unwrap_or_else(DetectResult::from_error)
+    block_on(read_info()).unwrap_or_else(DetectResult::from_error)
 }
 
 pub struct ZirconFramebuffer;
