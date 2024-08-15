@@ -170,9 +170,6 @@ def collect_debug_symbols(*targets_or_providers):
         ]).to_list()
     })
 
-def get_build_id_dirs(debug_symbol_info):
-    return flatten([depset.to_list() for depset in debug_symbol_info.build_id_dirs.values()])
-
 def _fuchsia_unstripped_binary_impl(ctx):
     return FuchsiaUnstrippedBinaryInfo(
         dest = ctx.attr.dest,
@@ -226,7 +223,7 @@ def _collect_unstripped_binaries_info(*targets_or_providers):
     """Merge any number of unstripped binary info providers or targets.
 
     Args:
-       targets_or_providers: the list of arguments will be flattened, and items that
+       *targets_or_providers: the list of arguments will be flattened, and items that
             are FuchsiaCollectedUnstrippedBinariesInfo providers, or targets that provide
             such values will be used as direct inputs for the merge. Items that
             are FuchsiaUnstrippedBinaryInfo or targets that provide such values will
@@ -355,4 +352,63 @@ find_and_process_unstripped_binaries = rule(
             aspects = [_fuchsia_collect_unstripped_binaries_aspect],
         ),
     } | FUCHSIA_DEBUG_SYMBOLS_ATTRS,
+)
+
+_FuchsiaCollectedDebugSymbolsInfo = provider(
+    "Contains a collection of debug symbols that were collected through an aspect",
+    fields = {
+        "collected_symbols": "A depset containing the direct and transitive symbols",
+    },
+)
+
+def transform_collected_debug_symbols_infos(*targets):
+    """ Transforms a list targets which into a FuchsiaDebugSymbolsInfo
+
+    Given a list of targets which have had the fuchsia_collect_all_debug_symbols_infos_aspect
+    run against them, collect all the debug symbols into a single FuchsiaDebugSymbolsInfo.
+
+    Args:
+      *targets: A list of targets. It is ok to passs a list that contains None values
+
+    Returns:
+      A FuchsiaDebugSymbolsInfo provider.
+    """
+    valid_targets = []
+    for t in targets:
+        if t and _FuchsiaCollectedDebugSymbolsInfo in t:
+            valid_targets.append(t)
+
+    return collect_debug_symbols(
+        flatten([
+            t[_FuchsiaCollectedDebugSymbolsInfo].collected_symbols.to_list()
+            for t in valid_targets
+        ]),
+    )
+
+def _fuchsia_collect_all_debug_symbols_infos_aspect_impl(target, ctx):
+    if _FuchsiaCollectedDebugSymbolsInfo in target:
+        return []
+
+    return _FuchsiaCollectedDebugSymbolsInfo(
+        collected_symbols = depset(
+            direct = [target[FuchsiaDebugSymbolInfo]] if FuchsiaDebugSymbolInfo in target else [],
+            transitive = [t[_FuchsiaCollectedDebugSymbolsInfo].collected_symbols for t in get_target_deps_from_attributes(
+                ctx.rule.attr,
+                ctx.rule.kind,
+            ) if _FuchsiaCollectedDebugSymbolsInfo in t],
+        ),
+    )
+
+fuchsia_collect_all_debug_symbols_infos_aspect = aspect(
+    doc = """Collects all of the FuchsiaDebugSymbolInfo providers in the graph.
+
+    This aspect will walk the dependency tree finding all of the targets that
+    expose the FuchsiaDebugSymbolInfo provider and collect them into a top top
+    level provider.
+
+    To convert the collected resources back into a FuchsiaDebugSymbolInfo object
+    call the transform_collected_debug_symbols_infos method with the teop
+    """,
+    implementation = _fuchsia_collect_all_debug_symbols_infos_aspect_impl,
+    attr_aspects = ["*"],
 )

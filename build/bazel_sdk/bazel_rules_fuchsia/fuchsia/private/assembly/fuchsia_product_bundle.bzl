@@ -11,6 +11,11 @@ load(
     "product_bundles_help_executable",
 )
 load(
+    "//fuchsia/private:fuchsia_debug_symbols.bzl",
+    "fuchsia_collect_all_debug_symbols_infos_aspect",
+    "transform_collected_debug_symbols_infos",
+)
+load(
     ":providers.bzl",
     "FuchsiaPartitionsConfigInfo",
     "FuchsiaProductBundleInfo",
@@ -718,6 +723,11 @@ def _build_fuchsia_product_bundle_impl(ctx):
         recovery_scrutiny_config = ctx.attr.recovery_scrutiny_config[FuchsiaScrutinyConfigInfo]
         deps += _scrutiny_validation(ctx, ffx_tool, ffx_scrutiny_inputs, pb_out_dir, recovery_scrutiny_config, platform_scrutiny_config, True)
 
+    fuchsia_debug_symbols_infos = transform_collected_debug_symbols_infos(
+        ctx.attr.main,
+        ctx.attr.recovery,
+    )
+
     return [
         DefaultInfo(
             executable = product_bundles_help_executable(ctx),
@@ -733,8 +743,9 @@ def _build_fuchsia_product_bundle_impl(ctx):
         FuchsiaSizeCheckerInfo(
             size_report = size_report,
         ),
+        fuchsia_debug_symbols_infos,
         OutputGroupInfo(
-            build_id_dirs = depset(transitive = build_id_dirs),
+            build_id_dirs = depset(transitive = fuchsia_debug_symbols_infos.build_id_dirs.values()),
         ),
     ]
 
@@ -766,10 +777,12 @@ _build_fuchsia_product_bundle = rule(
         "main": attr.label(
             doc = "fuchsia_product target to put in slot A.",
             providers = [FuchsiaProductImageInfo],
+            aspects = [fuchsia_collect_all_debug_symbols_infos_aspect],
         ),
         "recovery": attr.label(
             doc = "fuchsia_product target to put in slot R.",
             providers = [FuchsiaProductImageInfo],
+            aspects = [fuchsia_collect_all_debug_symbols_infos_aspect],
         ),
         "repository_keys": attr.label(
             doc = "A fuchsia_repository_keys target, which must be specified when update_version_file is specified.",
