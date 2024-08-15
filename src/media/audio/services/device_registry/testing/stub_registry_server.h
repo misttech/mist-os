@@ -6,6 +6,7 @@
 #define SRC_MEDIA_AUDIO_SERVICES_DEVICE_REGISTRY_TESTING_STUB_REGISTRY_SERVER_H_
 
 #include <fidl/fuchsia.audio.device/cpp/fidl.h>
+#include <fidl/fuchsia.audio.device/cpp/natural_types.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/syslog/cpp/macros.h>
 
@@ -30,6 +31,15 @@ class StubRegistryServer
 
   // fuchsia.audio.device.Registry implementation
   void WatchDevicesAdded(WatchDevicesAddedCompleter::Sync& completer) final {
+    if (!responded_to_initial_watch_devices_added_) {
+      FX_LOGS(INFO) << kClassName << "::" << __FUNCTION__ << " initial call; returning empty list";
+      completer.Reply(fit::success(fuchsia_audio_device::RegistryWatchDevicesAddedResponse{{
+          .devices = std::vector<fuchsia_audio_device::Info>{},
+      }}));
+      responded_to_initial_watch_devices_added_ = true;
+      return;
+    }
+
     if (watch_devices_added_completer_.has_value()) {
       FX_LOGS(WARNING) << kClassName << "::" << __FUNCTION__
                        << ": previous request has not yet completed";
@@ -37,7 +47,8 @@ class StubRegistryServer
           fuchsia_audio_device::RegistryWatchDevicesAddedError::kAlreadyPending));
       return;
     }
-    FX_LOGS(INFO) << kClassName << "::" << __FUNCTION__;
+
+    FX_LOGS(INFO) << kClassName << "::" << __FUNCTION__ << " pending indefinitely";
     watch_devices_added_completer_ = completer.ToAsync();
   }
 
@@ -67,6 +78,7 @@ class StubRegistryServer
 
   StubRegistryServer() = default;
 
+  bool responded_to_initial_watch_devices_added_ = false;
   std::optional<WatchDevicesAddedCompleter::Async> watch_devices_added_completer_;
   std::optional<WatchDeviceRemovedCompleter::Async> watch_device_removed_completer_;
 };

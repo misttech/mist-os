@@ -28,20 +28,34 @@ class RegistryServerStreamConfigWarningTest : public RegistryServerWarningTest {
 TEST_F(RegistryServerWarningTest, WatchDevicesAddedWhilePending) {
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
-  bool received_callback_1 = false, received_callback_2 = false;
+  bool received_callback_0 = false, received_callback_1 = false, received_callback_2 = false;
 
-  // The first `WatchDevicesAdded` call should pend indefinitely (even after the second one fails).
+  // The first `WatchDevicesAdded` call should complete immediately, even without devices.
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback_0](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices().has_value());
+        EXPECT_TRUE(result->devices()->empty())
+            << "Unexpectedly returned " << result->devices()->size() << " devices";
+        received_callback_0 = true;
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback_0);
+
+  // Following the initial completion, the next `WatchDevicesAdded` should pend indefinitely
+  // (and should continue to, even after a subsequent `WatchDevicesAdded` call fails).
   registry->client()->WatchDevicesAdded().Then(
       [&received_callback_1](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
         received_callback_1 = true;
-        ADD_FAILURE() << "Unexpected completion for initial WatchDevicesAdded call";
+        ADD_FAILURE() << "Unexpected completion for WatchDevicesAdded; should pend indefinitely";
       });
 
   RunLoopUntilIdle();
   ASSERT_FALSE(received_callback_1);
 
-  // The second `WatchDevicesAdded` call should fail immediately with domain error
-  // ALREADY_PENDING, since the first call has not yet completed.
+  // The next `WatchDevicesAdded` call should fail immediately with domain error
+  // ALREADY_PENDING, since the previous call has not yet completed.
   registry->client()->WatchDevicesAdded().Then(
       [&received_callback_2](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
         received_callback_2 = true;

@@ -83,10 +83,11 @@ void RegistryServer::ReplyWithAddedDevices() {
     ADR_LOG_METHOD(kLogRegistryServerMethods) << "no pending completer; just adding to our list";
     return;
   }
-  if (devices_added_since_notify_.empty()) {
+  if (devices_added_since_notify_.empty() && responded_to_initial_watch_devices_added_) {
     ADR_LOG_METHOD(kLogRegistryServerMethods) << "devices_added_since_notify_ is empty";
     return;
   }
+  responded_to_initial_watch_devices_added_ = true;
 
   auto completer = *std::move(watch_devices_added_completer_);
   watch_devices_added_completer_.reset();

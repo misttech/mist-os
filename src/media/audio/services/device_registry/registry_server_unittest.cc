@@ -43,6 +43,26 @@ TEST_F(RegistryServerTest, CleanServerShutdown) {
   registry->server().Shutdown(ZX_ERR_PEER_CLOSED);
 }
 
+// On a system without devices, the initial call to WatchDevicesAdded should complete.
+TEST_F(RegistryServerTest, InitialWatchDevicesAddedWithoutDevicesComplete) {
+  auto registry = CreateTestRegistryServer();
+  ASSERT_EQ(RegistryServer::count(), 1u);
+  bool received_callback = false;
+
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices().has_value());
+        EXPECT_TRUE(result->devices()->empty());
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  EXPECT_TRUE(received_callback);
+  EXPECT_EQ(RegistryServer::count(), 1u);
+  EXPECT_FALSE(registry_fidl_error_status().has_value()) << *registry_fidl_error_status();
+}
+
 /////////////////////
 // Codec tests
 //
@@ -82,6 +102,18 @@ TEST_F(RegistryServerCodecTest, WatchAddsThenDeviceAdd) {
   ASSERT_EQ(adr_service()->devices().size(), 0u);
   ASSERT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   auto received_callback = false;
+
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        EXPECT_TRUE(result->devices()->empty());
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+  received_callback = false;
 
   registry->client()->WatchDevicesAdded().Then(
       [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
@@ -243,6 +275,19 @@ TEST_F(RegistryServerCodecTest, DeviceRemoveThenWatchRemoves) {
 TEST_F(RegistryServerCodecTest, DeviceAddRemoveThenWatches) {
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
+
+  bool received_callback = false;
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        EXPECT_TRUE(result->devices()->empty());
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+
   auto fake_driver = CreateFakeCodecInput();
   adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test codec name",
                                           fad::DeviceType::kCodec,
@@ -434,6 +479,18 @@ TEST_F(RegistryServerCompositeTest, WatchAddsThenDeviceAdd) {
 
   registry->client()->WatchDevicesAdded().Then(
       [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        EXPECT_TRUE(result->devices()->empty());
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+  received_callback = false;
+
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
@@ -592,6 +649,19 @@ TEST_F(RegistryServerCompositeTest, DeviceRemoveThenWatchRemoves) {
 TEST_F(RegistryServerCompositeTest, DeviceAddRemoveThenWatches) {
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
+
+  bool received_callback = false;
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        EXPECT_TRUE(result->devices()->empty());
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+
   auto fake_driver = CreateFakeComposite();
   adr_service()->AddDevice(Device::Create(adr_service(), dispatcher(), "Test composite name",
                                           fad::DeviceType::kComposite,
@@ -783,6 +853,18 @@ TEST_F(RegistryServerStreamConfigTest, WatchAddsThenDeviceAdd) {
 
   registry->client()->WatchDevicesAdded().Then(
       [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        EXPECT_TRUE(result->devices()->empty());
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+  received_callback = false;
+
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
         received_callback = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
@@ -941,6 +1023,19 @@ TEST_F(RegistryServerStreamConfigTest, DeviceRemoveThenWatchRemoves) {
 TEST_F(RegistryServerStreamConfigTest, DeviceAddRemoveThenWatches) {
   auto registry = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
+
+  bool received_callback = false;
+  registry->client()->WatchDevicesAdded().Then(
+      [&received_callback](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        EXPECT_TRUE(result->devices()->empty());
+        received_callback = true;
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback);
+
   auto fake_driver = CreateFakeStreamConfigInput();
   adr_service()->AddDevice(
       Device::Create(adr_service(), dispatcher(), "Test input name", fad::DeviceType::kInput,
