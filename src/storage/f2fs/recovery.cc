@@ -209,7 +209,7 @@ void F2fs::DoRecoverData(VnodeF2fs &vnode, NodePage &page) {
   }
   vnode.IncBlocks(path_or->num_new_nodes);
   LockedPage dnode_page = std::move(*page_or);
-  dnode_page->WaitOnWriteback();
+  dnode_page.WaitOnWriteback();
 
   GetNodeManager().GetNodeInfo(dnode_page.GetPage<NodePage>().NidOfNode(), ni);
   ZX_DEBUG_ASSERT(ni.ino == page.InoOfNode());
@@ -225,7 +225,7 @@ void F2fs::DoRecoverData(VnodeF2fs &vnode, NodePage &page) {
 
     if (src != dest && dest != kNewAddr && dest != kNullAddr) {
       if (src == kNullAddr) {
-        ZX_ASSERT(vnode.ReserveNewBlock(dnode_page.GetPage<NodePage>(), offset_in_dnode) == ZX_OK);
+        ZX_ASSERT(vnode.ReserveNewBlock(dnode_page, offset_in_dnode) == ZX_OK);
       }
 
       // Check the previous node page having this index
@@ -235,7 +235,9 @@ void F2fs::DoRecoverData(VnodeF2fs &vnode, NodePage &page) {
 
       // Write dummy data page
       GetSegmentManager().RecoverDataPage(sum, src, dest);
+      dnode_page.WaitOnWriteback();
       dnode_page.GetPage<NodePage>().SetDataBlkaddr(offset_in_dnode, dest);
+      dnode_page.SetDirty();
       vnode.UpdateExtentCache(page.StartBidxOfNode(vnode.GetAddrsPerInode()) + offset_in_dnode,
                               dest);
     }

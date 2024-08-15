@@ -12,7 +12,7 @@ zx_status_t F2fs::GrabMetaPage(pgoff_t index, LockedPage *out) {
     return ret;
   }
   // We wait writeback only inside GrabMetaPage()
-  (*out)->WaitOnWriteback();
+  (*out).WaitOnWriteback();
   (*out)->SetUptodate();
   return ZX_OK;
 }

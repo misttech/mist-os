@@ -43,6 +43,7 @@ class Writer final {
   // writeback pages that StorageOperations conveys. In addition, it signals |completion| if
   // it is not null.
   fpromise::promise<> GetTaskForWriteIO(sync_completion_t *completion);
+  // TODO(b/354796037): need to handle larger I/Os
   StorageOperations MakeStorageOperations(PageList &to_submit) __TA_EXCLUDES(mutex_);
 
   std::mutex mutex_;

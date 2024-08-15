@@ -15,60 +15,32 @@ namespace {
 
 using FileCacheTest = SingleFileTest;
 
-TEST_F(FileCacheTest, WaitOnLock) {
-  LockedPage page = GetPage(0);
-  ASSERT_EQ(page->TryLock(), true);
-
-  fbl::RefPtr<Page> unlocked_page = page.release();
-  ASSERT_EQ(unlocked_page->TryLock(), false);
-
-  std::thread thread([&]() { unlocked_page->Unlock(); });
-  // Wait for |thread| to unlock |page|.
-  page = LockedPage(unlocked_page);
-  thread.join();
-}
-
 TEST_F(FileCacheTest, WaitOnWriteback) {
-  LockedPage page = GetPage(0);
-  page->SetWriteback();
-  std::thread thread([&]() {
-    page->ClearWriteback();
-    page->Lock();
-    ASSERT_EQ(page->IsWriteback(), true);
-    page->ClearWriteback();
-  });
+  char buf[kPageSize];
+  FileTester::AppendToFile(&vnode<File>(), buf, kPageSize);
 
-  // Wait for |thread| to run.
-  page->WaitOnWriteback();
-  page->SetWriteback();
-  ASSERT_EQ(page->IsWriteback(), true);
-  page->Unlock();
-  // Wait for |thread| to clear kPageWriteback.
-  page->WaitOnWriteback();
-  ASSERT_EQ(page->IsWriteback(), false);
-  thread.join();
+  WritebackOperation op = {.bSync = false};
+  vnode<File>().Writeback(op);
+  LockedPage page = GetPage(0);
+  ASSERT_TRUE(page->IsWriteback());
+  page.WaitOnWriteback();
+  ASSERT_FALSE(page->IsWriteback());
 }
 
 TEST_F(FileCacheTest, Map) {
-  Page *raw_ptr;
+  constexpr size_t kNum = 0xAA00AA00AA00AA00;
+  size_t *base = nullptr;
   {
-    LockedPage page = GetPage(0);
-    // Set kPageUptodate to keep |page| in FileCache.
-    page->SetUptodate();
-    // Since FileCache hold the last reference to |page|, it is safe to use |raw_ptr| here.
-    raw_ptr = page.get();
-    // If kDirtyPage is set, FileCache keeps the mapping of |page| since writeback will use it soon.
-    // Otherwise, |page| is unmapped when there is no reference except for FileCache.
+    // Get discardable backed page
+    LockedPage page;
+    ASSERT_EQ(fs_->GetMetaPage(0, &page), ZX_OK);
+    // Set dirty to keep |page| and its mapping in FileCache.
+    page.SetDirty();
+    base = page->GetAddress<size_t>();
+    *base = kNum;
   }
-
-  // Even after LockedPage is destructed, the mapping is maintained
-  // since VmoManager keeps the mapping of VmoNode as long as its vnode is active.
-  ASSERT_EQ(raw_ptr->IsLocked(), false);
-
-  {
-    LockedPage page = GetPage(0);
-    ASSERT_EQ(page->IsLocked(), true);
-  }
+  // Even after LockedPage is destructed, the mapping should be maintained.
+  ASSERT_EQ(*base, kNum);
 }
 
 TEST_F(FileCacheTest, EvictActivePages) {
@@ -225,9 +197,10 @@ TEST_F(FileCacheTest, Recycle) {
   fbl::RefPtr<Page> page = fbl::ImportFromRawPtr(raw_page);
   ASSERT_EQ(page->IsLastReference(), true);
   raw_page = fbl::ExportToRawPtr(&page);
+
   FileCache &cache = raw_page->GetFileCache();
 
-  raw_page->Lock();
+  LockedPage locked_page = GetPage(0);
   // Test FileCache::GetPage() and FileCache::Downgrade() with multiple threads
   std::thread thread1([&]() {
     int i = 1000;
@@ -244,14 +217,15 @@ TEST_F(FileCacheTest, Recycle) {
       ASSERT_EQ(page.get(), raw_page);
     }
   });
-  // Start threads.
-  raw_page->Unlock();
+  // Start the execution of threads.
+  locked_page.reset();
+
   thread1.join();
   thread2.join();
 
   cache.InvalidatePages();
 
-  // Test FileCache::Downgrade() and FileCache::Reset() with multiple threads.
+  // Run FileCache::Downgrade() and FileCache::Reset() on different threads.
   std::thread thread_get_page([&]() {
     bool bStop = false;
     std::thread thread_reset([&]() {
@@ -331,7 +305,6 @@ TEST_F(FileCacheTest, Basic) {
     ASSERT_EQ(page->IsUptodate(), false);
     ASSERT_EQ(page->IsDirty(), false);
     ASSERT_EQ(page->IsWriteback(), false);
-    ASSERT_EQ(page->IsLocked(), true);
   }
 
   // Append |nblocks| * |kPageSize|.
@@ -423,39 +396,41 @@ TEST_F(FileCacheTest, Truncate) TA_NO_THREAD_SAFETY_ANALYSIS {
   }
 }
 
-TEST_F(FileCacheTest, LockedPageBasic) {
-  auto &file = vnode<File>();
-  {
-    LockedPage page;
-    ASSERT_EQ(page, nullptr);
-    page = GetPage(0);
-    ASSERT_NE(page, nullptr);
-  }
-
-  fbl::RefPtr<Page> page;
-  ASSERT_EQ(file.FindPage(0, &page), ZX_OK);
-  {
-    LockedPage locked_page(page);
-    ASSERT_TRUE(page->IsLocked());
-  }
-  ASSERT_FALSE(page->IsLocked());
-}
-
 TEST_F(FileCacheTest, LockedPageRelease) {
   auto &file = vnode<File>();
-  {
-    LockedPage page = GetPage(0);
-  }
+  GetPage(0);
 
   fbl::RefPtr<Page> page;
   ASSERT_EQ(file.FindPage(0, &page), ZX_OK);
 
+  // Lock and unlock page
   LockedPage locked_page(page);
-  ASSERT_TRUE(page->IsLocked());
   fbl::RefPtr<Page> released_page = locked_page.release();
-  ASSERT_FALSE(released_page->IsLocked());
-
+  ASSERT_FALSE(locked_page);
+  // Check its lock is free
+  locked_page = LockedPage(released_page);
   ASSERT_EQ(page, released_page);
+}
+
+TEST_F(FileCacheTest, Redirty) {
+  char buf[kPageSize];
+  FileTester::AppendToFile(&vnode<File>(), buf, kPageSize);
+  fbl::RefPtr<Page> page;
+  ASSERT_EQ(vnode<File>().FindPage(0, &page), ZX_OK);
+  ASSERT_TRUE(page->IsDirty());
+  WritebackOperation op = {.bSync = true};
+  vnode<File>().Writeback(op);
+  ASSERT_FALSE(page->IsDirty());
+  auto hook = [](const block_fifo_request_t &_req, const zx::vmo *_vmo) { return ZX_ERR_IO; };
+  LockedPage(page).SetDirty();
+  ASSERT_TRUE(page->IsDirty());
+  DeviceTester::SetHook(fs_.get(), hook);
+  vnode<File>().Writeback(op);
+  ASSERT_TRUE(page->IsDirty());
+  DeviceTester::SetHook(fs_.get(), nullptr);
+  vnode<File>().Writeback(op);
+  ASSERT_FALSE(page->IsDirty());
+  ASSERT_FALSE(fs_->GetSuperblockInfo().TestCpFlags(CpFlag::kCpErrorFlag));
 }
 
 }  // namespace

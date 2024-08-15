@@ -21,16 +21,16 @@ namespace f2fs {
 class F2fs;
 class VnodeF2fs;
 class FileCache;
+class LockedPage;
 
 enum class PageFlag {
   kPageUptodate =
       0,       // It is uptodate. No need to read blocks from disk if the backing page is present.
   kPageDirty,  // It needs to be written out.
   kPageWriteback,  // It is under writeback.
-  kPageLocked,     // It is locked. Wait for it to be unlocked.
-  kPageVmoLocked,  // Its vmo is locked to prevent mm from reclaiming it.
-  kPageActive,     // It is being referenced.
-  kPageColdData,   // It is under garbage collecting. It must not be inplace updated.
+  kPageVmoLocked,  // Its vmo is locked. It should not be subject to reclaim.
+  kPageActive,     // Its reference count > 0
+  kPageColdData,   // It is subject to gc.
   kPageCommit,     // It is logged with pre-flush and flush.
   kPageSync,       // It is logged with flush.
   kPageFlagSize,
@@ -105,7 +105,6 @@ class Page : public PageRefCounted<Page>,
   bool IsUptodate() const;
   bool IsDirty() const { return TestFlag(PageFlag::kPageDirty); }
   bool IsWriteback() const { return TestFlag(PageFlag::kPageWriteback); }
-  bool IsLocked() const { return TestFlag(PageFlag::kPageLocked); }
   bool IsVmoLocked() const { return TestFlag(PageFlag::kPageVmoLocked); }
   bool IsActive() const { return TestFlag(PageFlag::kPageActive); }
   bool IsColdData() const { return TestFlag(PageFlag::kPageColdData); }
@@ -118,27 +117,7 @@ class Page : public PageRefCounted<Page>,
   // It is called after the last reference is destroyed in FileCache::Downgrade().
   void ClearActive() { ClearFlag(PageFlag::kPageActive); }
 
-  void Lock() {
-    while (flags_[static_cast<uint8_t>(PageFlag::kPageLocked)].test_and_set(
-        std::memory_order_acquire)) {
-      flags_[static_cast<uint8_t>(PageFlag::kPageLocked)].wait(true, std::memory_order_relaxed);
-    }
-  }
-  bool TryLock() {
-    return flags_[static_cast<uint8_t>(PageFlag::kPageLocked)].test_and_set(
-        std::memory_order_acquire);
-  }
-  void Unlock() {
-    if (IsLocked()) {
-      ClearFlag(PageFlag::kPageLocked);
-      WakeupFlag(PageFlag::kPageLocked);
-    }
-  }
-
-  // It ensures that |this| is written to disk if IsDirty() is true.
-  void WaitOnWriteback();
-  bool SetWriteback();
-  void ClearWriteback();
+  void ClearWriteback(bool redirty = false);
 
   bool SetUptodate();
   void ClearUptodate();
@@ -149,22 +128,16 @@ class Page : public PageRefCounted<Page>,
   bool SetSync();
   void ClearSync();
 
-  // Set its dirty flag and increase the corresponding count of its type.
-  bool SetDirty();
-  bool ClearDirtyForIo();
-
   void SetColdData();
   bool ClearColdData();
 
-  // It invalidates |this| for truncate and punch-a-hole operations.
-  // It clears PageFlag::kPageUptodate and PageFlag::kPageDirty. If a caller invalidates
-  // |this| that is under writeback, writeback keeps going. So, it is recommended to invalidate
-  // its block address in a dnode or nat entry first.
-  void Invalidate();
-
   static constexpr uint32_t Size() { return kPageSize; }
-  block_t GetBlockAddr() const { return block_addr_; }
-  zx::result<> SetBlockAddr(block_t addr);
+  block_t GetBlockAddr() const {
+    if (TestFlag(PageFlag::kPageWriteback)) {
+      return block_addr_;
+    }
+    return kNullAddr;
+  }
 
   // Check that |this| Page exists in FileCache.
   bool InTreeContainer() const { return fbl::WAVLTreeContainable<Page *>::InContainer(); }
@@ -183,24 +156,13 @@ class Page : public PageRefCounted<Page>,
   void RecyclePage();
 
  private:
+  bool SetDirty();
   zx_status_t Map();
-  void WaitOnFlag(PageFlag flag) {
-    while (flags_[static_cast<uint8_t>(flag)].test(std::memory_order_acquire)) {
-      flags_[static_cast<uint8_t>(flag)].wait(true, std::memory_order_relaxed);
-    }
-  }
   bool TestFlag(PageFlag flag) const {
     return flags_[static_cast<uint8_t>(flag)].test(std::memory_order_acquire);
   }
   void ClearFlag(PageFlag flag) {
     flags_[static_cast<uint8_t>(flag)].clear(std::memory_order_relaxed);
-  }
-  void WakeupFlag(PageFlag flag) {
-    if (flag == PageFlag::kPageLocked) {
-      flags_[static_cast<uint8_t>(flag)].notify_one();
-    } else {
-      flags_[static_cast<uint8_t>(flag)].notify_all();
-    }
   }
   bool SetFlag(PageFlag flag) {
     return flags_[static_cast<uint8_t>(flag)].test_and_set(std::memory_order_acquire);
@@ -218,6 +180,8 @@ class Page : public PageRefCounted<Page>,
   // node id. For meta vnode, it points to the block address to which the metadata is written.
   const pgoff_t index_;
   block_t block_addr_ = kNullAddr;
+  friend class LockedPage;
+  std::mutex mutex_;
 };
 
 // LockedPage is a wrapper class for f2fs::Page lock management.
@@ -242,29 +206,38 @@ class LockedPage final {
 
   LockedPage(LockedPage &&p) noexcept {
     page_ = std::move(p.page_);
+    lock_ = std::move(p.lock_);
     p.page_ = nullptr;
   }
+
   LockedPage &operator=(LockedPage &&p) noexcept {
     reset();
     page_ = std::move(p.page_);
+    lock_ = std::move(p.lock_);
     p.page_ = nullptr;
     return *this;
   }
 
-  explicit LockedPage(fbl::RefPtr<Page> page, bool try_lock = true) {
-    page_ = std::move(page);
-    if (try_lock) {
-      page_->Lock();
+  // If it fails to acquire |page->mutex_|, it doesn't own |page|, and LockedPage::bool returns
+  // false.
+  explicit LockedPage(fbl::RefPtr<Page> page, std::try_to_lock_t t) {
+    lock_ = std::unique_lock<std::mutex>(page->mutex_, t);
+    if (lock_.owns_lock()) {
+      page_ = std::move(page);
     }
-    ZX_ASSERT(page_->IsLocked());
+  }
+
+  explicit LockedPage(fbl::RefPtr<Page> page) {
+    page_ = std::move(page);
+    lock_ = std::unique_lock<std::mutex>(page_->mutex_);
   }
 
   ~LockedPage() { reset(); }
 
   void reset() {
     if (page_ != nullptr) {
-      ZX_DEBUG_ASSERT(page_->IsLocked());
-      page_->Unlock();
+      lock_.unlock();
+      lock_.release();
       page_.reset();
     }
   }
@@ -275,21 +248,28 @@ class LockedPage final {
   // caller have to supply a vmo.
   zx::result<> SetVmoDirty();
 
+  bool ClearDirtyForIo();
   bool SetDirty();
   void Zero(size_t start = 0, size_t end = Page::Size()) const;
+  // It invalidates |this| for truncate and punch-a-hole operations.
+  // It clears PageFlag::kPageUptodate and PageFlag::kPageDirty. If a caller invalidates
+  // |this| that is under writeback, writeback keeps going. So, it is recommended to invalidate
+  // its block address in a dnode or nat entry first.
+  void Invalidate();
+  // It waits for the writeback flag of |page_| to be cleared without other changes on |page_|.
+  void WaitOnWriteback();
+  bool SetWriteback(block_t addr = kNullAddr);
 
-  // release() returns the unlocked page without changing its ref_count.
-  // After release() is called, the LockedPage instance no longer has the ownership of the Page.
-  // Therefore, the LockedPage instance should no longer be referenced.
-  fbl::RefPtr<Page> release(bool unlock = true) {
-    if (page_ != nullptr && unlock) {
-      page_->Unlock();
+  // It returns the ownership of unlocked |page_|.
+  fbl::RefPtr<Page> release() {
+    if (page_) {
+      lock_.unlock();
+      lock_.release();
     }
     return fbl::RefPtr<Page>(std::move(page_));
   }
 
-  // CopyRefPtr() returns copied RefPtr, so that increases ref_count of page.
-  // The page remains locked, and still managed by the LockedPage instance.
+  // CopyRefPtr() returns a RefPtr of locked |page_|.
   fbl::RefPtr<Page> CopyRefPtr() const { return page_; }
 
   template <typename T = Page>
@@ -309,6 +289,7 @@ class LockedPage final {
  private:
   static constexpr std::array<uint8_t, Page::Size()> kZeroBuffer_ = {0};
   fbl::RefPtr<Page> page_ = nullptr;
+  std::unique_lock<std::mutex> lock_;
 };
 
 class FileCache {
@@ -372,14 +353,20 @@ class FileCache {
   // It evicts every clean, inactive  page.
   void EvictCleanPages() __TA_EXCLUDES(tree_lock_);
 
+  // TODO(b/357147873): Use LockedPage::lock_ instead of flag_lock_
+  // It provides wait() and notify() for atomic flags of Page.
+  void WaitOnFlag(std::atomic_flag &flag, bool expect) __TA_EXCLUDES(flag_lock_) {
+    fs::SharedLock lock(flag_lock_);
+    flag_cvar_.wait(lock, [&]() { return flag.test(std::memory_order_acquire) == expect; });
+  }
+  void NotifyFlag() { flag_cvar_.notify_all(); }
+
  private:
-  // If |page| is unlocked, it returns a locked |page|. If |page| is already locked,
-  // it returns ZX_ERR_UNAVAILABLE after waiting for |page| to be unlocked. While waiting,
-  // |tree_lock_| keeps unlocked to prevent a deadlock problem that would occur when two threads
-  // try to call FileCache::GetPage() for Pages in a duplicate range. When the locked
-  // |page| is unlocked, it acquires |tree_lock_| again and returns ZX_ERR_UNAVAILABLE since
-  // it is not allowed to acquire |tree_lock_| with |page| locked. Then, a caller may retry it
-  // with the same |page|.
+  // Unless |page| is locked, it returns a locked |page|. If |page| is already locked,
+  // it waits for |page| to be unlocked. While waiting, |tree_lock_| keeps unlocked to avoid
+  // possible deadlock problems and to allow other page requests. When it gets the locked |page|, it
+  // acquires |tree_lock_| again and returns the locked |page| if |page| still belongs to
+  // |page_tree_|;
   zx::result<LockedPage> GetLockedPage(fbl::RefPtr<Page> page) __TA_REQUIRES(tree_lock_);
   zx::result<LockedPage> GetLockedPageFromRawUnsafe(Page *raw_page) __TA_REQUIRES(tree_lock_);
   zx::result<LockedPage> GetPageUnsafe(const pgoff_t index) __TA_REQUIRES(tree_lock_);
@@ -404,10 +391,17 @@ class FileCache {
   using PageTreeTraits = fbl::DefaultKeyedObjectTraits<pgoff_t, Page>;
   using PageTree = fbl::WAVLTree<pgoff_t, Page *, PageTreeTraits>;
 
+  // |tree_lock_| should be acquired before |flag_lock_| to avoid deadlock.
   std::shared_mutex tree_lock_;
+
   // If its file is orphaned, set it to prevent further dirty Pages.
   std::atomic_flag is_orphan_ = ATOMIC_FLAG_INIT;
   std::condition_variable_any recycle_cvar_;
+
+  // |flag_lock_| is used to protect atomic flags of Page.
+  std::shared_mutex flag_lock_;
+
+  std::condition_variable_any flag_cvar_;
   PageTree page_tree_ __TA_GUARDED(tree_lock_);
   VnodeF2fs *vnode_;
   VmoManager *vmo_manager_;

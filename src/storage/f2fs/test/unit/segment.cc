@@ -674,7 +674,7 @@ TEST(SegmentManagerExceptionTest, BuildSitEntriesDiskFail) TA_NO_THREAD_SAFETY_A
   // Invalidate sit page to read from disk
   LockedPage sit_page;
   ASSERT_EQ(fs->GetMetaPage(target_addr / kDefaultSectorsPerBlock, &sit_page), ZX_OK);
-  sit_page->Invalidate();
+  sit_page.Invalidate();
   sit_page.reset();
 
   // Expect fail in BuildSitEntries()

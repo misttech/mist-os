@@ -8,7 +8,7 @@
 
 namespace f2fs {
 
-zx_status_t VnodeF2fs::ReserveNewBlock(NodePage &node_page, size_t ofs_in_node) {
+zx_status_t VnodeF2fs::ReserveNewBlock(LockedPage &node_page, size_t ofs_in_node) {
   if (TestFlag(InodeInfoFlag::kNoAlloc)) {
     return ZX_ERR_ACCESS_DENIED;
   }
@@ -20,7 +20,9 @@ zx_status_t VnodeF2fs::ReserveNewBlock(NodePage &node_page, size_t ofs_in_node) 
   }
 
   IncBlocks(1);
-  node_page.SetDataBlkaddr(ofs_in_node, kNewAddr);
+  node_page.WaitOnWriteback();
+  node_page.GetPage<NodePage>().SetDataBlkaddr(ofs_in_node, kNewAddr);
+  node_page.SetDirty();
   SetDirty();
   return ZX_OK;
 }
@@ -196,8 +198,7 @@ zx_status_t VnodeF2fs::GetNewDataPage(pgoff_t index, bool new_i_size, LockedPage
     size_t ofs_in_dnode = GetOfsInDnode(*path_or);
     data_blkaddr = dnode_page.GetPage<NodePage>().GetBlockAddr(ofs_in_dnode);
     if (data_blkaddr == kNullAddr) {
-      if (zx_status_t ret = ReserveNewBlock(dnode_page.GetPage<NodePage>(), ofs_in_dnode);
-          ret != ZX_OK) {
+      if (zx_status_t ret = ReserveNewBlock(dnode_page, ofs_in_dnode); ret != ZX_OK) {
         return ret;
       }
       data_blkaddr = kNewAddr;
@@ -291,12 +292,11 @@ zx_status_t VnodeF2fs::GetNewDataPage(pgoff_t index, bool new_i_size, LockedPage
 
 block_t VnodeF2fs::GetBlockAddr(LockedPage &page) {
   ZX_DEBUG_ASSERT(page->IsUptodate());
-  if (!page->ClearDirtyForIo()) {
+  if (!page.ClearDirtyForIo()) {
     return kNullAddr;
   }
   if (IsMeta()) {
     block_t addr = safemath::checked_cast<block_t>(page->GetIndex());
-    ZX_ASSERT(page->SetBlockAddr(addr).is_ok());
     return addr;
   }
   ZX_DEBUG_ASSERT(IsNode());
@@ -319,7 +319,6 @@ block_t VnodeF2fs::GetBlockAddr(LockedPage &page) {
   ZX_DEBUG_ASSERT(new_addr != kNullAddr && new_addr != kNewAddr && new_addr != old_addr);
 
   fs_->GetNodeManager().SetNodeAddr(ni, new_addr);
-  ZX_ASSERT(page->SetBlockAddr(new_addr).is_ok());
   return new_addr;
 }
 
@@ -327,7 +326,7 @@ block_t VnodeF2fs::GetBlockAddrOnDataSegment(LockedPage &page) {
   ZX_DEBUG_ASSERT(page->IsUptodate());
   ZX_DEBUG_ASSERT(!IsMeta());
   ZX_DEBUG_ASSERT(!IsNode());
-  if (!page->ClearDirtyForIo()) {
+  if (!page.ClearDirtyForIo()) {
     return kNullAddr;
   }
   const pgoff_t end_index = GetSize() / kPageSize;
@@ -375,10 +374,11 @@ block_t VnodeF2fs::GetBlockAddrOnDataSegment(LockedPage &page) {
       fs_->GetSegmentManager().GetBlockAddrOnSegment(page, old_addr, &sum, PageType::kData);
   ZX_DEBUG_ASSERT(new_addr != kNullAddr && new_addr != kNewAddr && new_addr != old_addr);
 
+  (*dnode_page_or).WaitOnWriteback();
   (*dnode_page_or).GetPage<NodePage>().SetDataBlkaddr(ofs_in_dnode, new_addr);
+  (*dnode_page_or).SetDirty();
   UpdateExtentCache(page->GetIndex(), new_addr);
   UpdateVersion(superblock_info_.GetCheckpointVer());
-  ZX_ASSERT(page->SetBlockAddr(new_addr).is_ok());
   return new_addr;
 }
 
@@ -400,7 +400,7 @@ zx::result<std::vector<LockedPage>> VnodeF2fs::WriteBegin(const size_t offset, c
   }
   data_pages = std::move(pages_or.value());
   for (auto &page : data_pages) {
-    page->WaitOnWriteback();
+    page.WaitOnWriteback();
     page.SetDirty();
   }
   std::vector<block_t> data_block_addresses;
@@ -457,8 +457,7 @@ zx::result<std::vector<block_t>> VnodeF2fs::GetDataBlockAddresses(
     block_t data_blkaddr = dnode_page.GetPage<NodePage>().GetBlockAddr(ofs_in_dnode);
 
     if (!read_only && data_blkaddr == kNullAddr) {
-      if (zx_status_t err = ReserveNewBlock(dnode_page.GetPage<NodePage>(), ofs_in_dnode);
-          err != ZX_OK) {
+      if (zx_status_t err = ReserveNewBlock(dnode_page, ofs_in_dnode); err != ZX_OK) {
         return zx::error(err);
       }
       data_blkaddr = kNewAddr;

@@ -380,7 +380,7 @@ struct f2fs_iget_args {
 #endif
 
 void VnodeF2fs::UpdateInodePage(LockedPage &inode_page, bool update_size) {
-  inode_page->WaitOnWriteback();
+  inode_page.WaitOnWriteback();
   Inode &inode = inode_page->GetAddress<Node>()->i;
   std::lock_guard lock(mutex_);
   uint64_t content_size = GetSize();
@@ -868,7 +868,7 @@ void VnodeF2fs::TruncateNode(LockedPage &page) {
     DecBlocks(1);
     SetDirty();
   }
-  page->Invalidate();
+  page.Invalidate();
   superblock_info_.SetDirty();
 }
 
@@ -880,6 +880,7 @@ block_t VnodeF2fs::TruncateDnodeAddrs(LockedPage &dnode, size_t offset, size_t c
     if (blkaddr == kNullAddr) {
       continue;
     }
+    dnode.WaitOnWriteback();
     node.SetDataBlkaddr(offset, kNullAddr);
     UpdateExtentCache(node.StartBidxOfNode(GetAddrsPerInode()) + offset, kNullAddr);
     ++nr_free;
@@ -890,7 +891,7 @@ block_t VnodeF2fs::TruncateDnodeAddrs(LockedPage &dnode, size_t offset, size_t c
   if (nr_free) {
     fs()->GetSuperblockInfo().DecValidBlockCount(nr_free);
     DecBlocks(nr_free);
-    node.SetDirty();
+    dnode.SetDirty();
     SetDirty();
   }
   return nr_free;
@@ -952,6 +953,7 @@ zx::result<size_t> VnodeF2fs::TruncateNodes(nid_t start_nid, size_t nofs, size_t
         return ret;
       }
       ZX_ASSERT(!page.GetPage<NodePage>().IsInode());
+      page.WaitOnWriteback();
       page.GetPage<NodePage>().SetNid(i, 0);
       page.SetDirty();
     }
@@ -965,6 +967,7 @@ zx::result<size_t> VnodeF2fs::TruncateNodes(nid_t start_nid, size_t nofs, size_t
       }
       ZX_DEBUG_ASSERT(*freed_or == kInvalidatedNids);
       ZX_DEBUG_ASSERT(!page.GetPage<NodePage>().IsInode());
+      page.WaitOnWriteback();
       page.GetPage<NodePage>().SetNid(i, 0);
       page.SetDirty();
       child_nofs += kInvalidatedNids;
@@ -1007,6 +1010,7 @@ zx_status_t VnodeF2fs::TruncatePartialNodes(const Inode &inode, const size_t (&o
       return ret.error_value();
     }
     ZX_ASSERT(!pages[idx].GetPage<NodePage>().IsInode());
+    pages[idx].WaitOnWriteback();
     pages[idx].GetPage<NodePage>().SetNid(i, 0);
     pages[idx].SetDirty();
   }
@@ -1033,7 +1037,7 @@ zx_status_t VnodeF2fs::TruncateInodeBlocks(pgoff_t from) {
   if (zx_status_t ret = fs()->GetNodeManager().GetNodePage(Ino(), &locked_ipage); ret != ZX_OK) {
     return ret;
   }
-  locked_ipage->WaitOnWriteback();
+  locked_ipage.WaitOnWriteback();
   Inode &inode = locked_ipage->GetAddress<Node>()->i;
   switch (level) {
     case 0:
@@ -1155,14 +1159,14 @@ pgoff_t VnodeF2fs::Writeback(WritebackOperation &operation) {
   std::vector<LockedPage> pages = file_cache_->GetLockedDirtyPages(operation);
   PageList pages_to_disk;
   for (auto &page : pages) {
-    page->WaitOnWriteback();
+    page.WaitOnWriteback();
     block_t addr = GetBlockAddr(page);
     ZX_DEBUG_ASSERT(addr != kNewAddr);
     if (addr == kNullAddr) {
       page.release();
       continue;
     }
-    page->SetWriteback();
+    page.SetWriteback(addr);
     if (operation.page_cb) {
       // |page_cb| conducts additional process for the last page of node and meta vnodes.
       operation.page_cb(page.CopyRefPtr(), page.get() == pages.back().get());

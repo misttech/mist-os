@@ -53,35 +53,32 @@ fpromise::promise<> Writer::GetTaskForWriteIO(sync_completion_t *completion) {
       if (operations.IsEmpty()) {
         break;
       }
-      // No need to release vmo buffers of |operations| in the same order they are reserved in
-      // StorageBuffer.
       zx_status_t io_status = bcache_mapper_->RunRequests(operations.TakeOperations());
       if (auto ret = operations.Completion(
               io_status,
               [pages = std::move(pages)](const StorageOperations &operation,
                                          zx_status_t io_status) mutable {
+                // Do not try to acquire page lock, which can cause deadlock problems.
                 while (!pages.is_empty()) {
+                  bool redirty = false;
                   auto page = pages.pop_front();
                   if (io_status != ZX_OK) {
-                    LockedPage locked_page(page);
-                    if (locked_page->IsUptodate()) {
-                      if (locked_page->GetVnode().IsMeta() || io_status == ZX_ERR_UNAVAILABLE ||
-                          io_status == ZX_ERR_PEER_CLOSED) {
-                        // When it fails to write metadata or the block device is not available,
-                        // set kCpErrorFlag to enter read-only mode.
-                        locked_page->fs()->GetSuperblockInfo().SetCpFlags(CpFlag::kCpErrorFlag);
-                      } else {
-                        // When IO errors occur with node and data Pages, just set a dirty flag
-                        // to retry it with another LBA.
-                        locked_page.SetDirty();
-                      }
+                    if (page->GetVnode().IsMeta() || io_status == ZX_ERR_UNAVAILABLE ||
+                        io_status == ZX_ERR_PEER_CLOSED) {
+                      // When it fails to write metadata or the block device is not available,
+                      // set kCpErrorFlag to enter read-only mode.
+                      page->fs()->GetSuperblockInfo().SetCpFlags(CpFlag::kCpErrorFlag);
+                    } else {
+                      // When IO errors occur with node and data Pages, just set a dirty flag
+                      // to retry it with another LBA.
+                      redirty = true;
                     }
                   }
                   if (page->GetVnode().IsNode()) {
                     fbl::RefPtr<NodePage>::Downcast(page)->SetFsyncMark(false);
                   }
                   page->ClearColdData();
-                  page->ClearWriteback();
+                  page->ClearWriteback(redirty);
                 }
               });
           ret != ZX_OK) {
