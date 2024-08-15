@@ -9,8 +9,9 @@ source_set("web_app_base") {
     "web-app-base.h",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_cpp",
+    "//sdk/fidl/fuchsia.element:fuchsia.element_cpp",
     "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_cpp",
+    "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_cpp",
     "//sdk/fidl/fuchsia.web:fuchsia.web_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",

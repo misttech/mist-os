@@ -5,7 +5,8 @@
 #ifndef SRC_UI_TESTS_INTEGRATION_INPUT_TESTS_WEB_TEST_BASE_WEB_APP_BASE_H_
 #define SRC_UI_TESTS_INTEGRATION_INPUT_TESTS_WEB_TEST_BASE_WEB_APP_BASE_H_
 
-#include <fidl/fuchsia.ui.app/cpp/fidl.h>
+#include <fidl/fuchsia.element/cpp/fidl.h>
+#include <fidl/fuchsia.ui.views/cpp/fidl.h>
 #include <fidl/fuchsia.web/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
@@ -40,15 +41,9 @@ class NavListener : public fidl::Server<fuchsia_web::NavigationEventListener> {
 // application running within a Fuchsia web frame. It allows sub-class to
 // inject JavaScript, and use message port communication between this class and
 // the web app.
-class WebAppBase : public fidl::Server<fuchsia_ui_app::ViewProvider> {
+class WebAppBase {
  public:
   WebAppBase();
-
-  // |fuchsia_ui_app::ViewProvider|
-  void CreateViewWithViewRef(CreateViewWithViewRefRequest& request,
-                             CreateViewWithViewRefCompleter::Sync& completer) override;
-  // |fuchsia_ui_app::ViewProvider|
-  void CreateView2(CreateView2Request& req, CreateView2Completer::Sync& completer) override;
 
  protected:
   // Parameters:
@@ -76,7 +71,7 @@ class WebAppBase : public fidl::Server<fuchsia_ui_app::ViewProvider> {
  private:
   void SetupWebEngine(const std::string& web_app_name,
                       fuchsia_web::ContextFeatureFlags context_feature_flags);
-  void SetupViewProvider();
+  void PresentView();
   void SetupWebPage(const std::string& js_code);
   void SendMessageToWebPage(fidl::ServerEnd<fuchsia_web::MessagePort> message_port,
                             const std::string& message);
@@ -84,11 +79,10 @@ class WebAppBase : public fidl::Server<fuchsia_ui_app::ViewProvider> {
   async::Loop loop_;
   component::OutgoingDirectory outgoing_directory_;
   fidl::ServerBindingGroup<fuchsia_web::NavigationEventListener> nav_listener_bindings_;
-  fidl::ServerBindingGroup<fuchsia_ui_app::ViewProvider> view_provider_bindings_;
   fidl::SyncClient<fuchsia_web::ContextProvider> web_context_provider_;
   fidl::SyncClient<fuchsia_web::Context> web_context_;
   fidl::SyncClient<fuchsia_web::Frame> web_frame_;
-  bool create_view2_called_ = false;
+  fidl::Client<fuchsia_element::GraphicalPresenter> presenter_;
 };
 
 }  // namespace integration_tests

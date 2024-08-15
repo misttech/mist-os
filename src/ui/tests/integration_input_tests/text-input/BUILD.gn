@@ -33,6 +33,7 @@ executable("text-input-test-bin") {
     "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_cpp",
     "//sdk/fidl/fuchsia.cobalt:fuchsia.cobalt_cpp",
     "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
+    "//sdk/fidl/fuchsia.element:fuchsia.element_cpp",
     "//sdk/fidl/fuchsia.feedback:fuchsia.feedback_cpp",
     "//sdk/fidl/fuchsia.fonts:fuchsia.fonts_cpp",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",

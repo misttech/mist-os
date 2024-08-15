@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.cobalt/cpp/fidl.h>
 #include <fidl/fuchsia.component.decl/cpp/hlcpp_conversion.h>
 #include <fidl/fuchsia.component/cpp/fidl.h>
+#include <fidl/fuchsia.element/cpp/fidl.h>
 #include <fidl/fuchsia.feedback/cpp/fidl.h>
 #include <fidl/fuchsia.fonts/cpp/fidl.h>
 #include <fidl/fuchsia.intl/cpp/fidl.h>
@@ -23,7 +24,6 @@
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fidl/fuchsia.tracing.provider/cpp/fidl.h>
-#include <fidl/fuchsia.ui.app/cpp/fidl.h>
 #include <fidl/fuchsia.ui.input/cpp/fidl.h>
 #include <fidl/fuchsia.ui.input3/cpp/fidl.h>
 #include <fidl/fuchsia.ui.test.input/cpp/fidl.h>
@@ -72,16 +72,6 @@ using ChildName = std::string;
 // Max timeout in failure cases.
 // Set this as low as you can that still works across all test platforms.
 constexpr zx::duration kTimeout = zx::min(5);
-
-// Combines all vectors in `vecs` into one.
-template <typename T>
-std::vector<T> merge(std::initializer_list<std::vector<T>> vecs) {
-  std::vector<T> result;
-  for (auto v : vecs) {
-    result.insert(result.end(), v.begin(), v.end());
-  }
-  return result;
-}
 
 // Externalized test specific keyboard input state.
 //
@@ -261,9 +251,14 @@ class ChromiumInputTest : public ChromiumInputBase {
   static constexpr auto kIntl = "intl";
   static constexpr auto kIntlUrl = "#meta/intl_property_manager.cm";
 
-  std::vector<std::pair<ChildName, std::string>> GetTestComponents() override {
+  std::vector<std::pair<ChildName, std::string>> GetEagerTestComponents() override {
     return {
         std::make_pair(kTextInputChromium, kTextInputChromiumUrl),
+    };
+  }
+
+  std::vector<std::pair<ChildName, std::string>> GetTestComponents() override {
+    return {
         std::make_pair(kBuildInfoProvider, kBuildInfoProviderUrl),
         std::make_pair(kMemoryPressureProvider, kMemoryPressureProviderUrl),
         std::make_pair(kNetstack, kNetstackUrl),
@@ -275,13 +270,7 @@ class ChromiumInputTest : public ChromiumInputBase {
   }
 
   std::vector<Route> GetTestRoutes() override {
-    return merge({GetChromiumRoutes(ChildRef{kTextInputChromium}),
-                  {
-                      {.capabilities = {Protocol{
-                           fidl::DiscoverableProtocolName<fuchsia_ui_app::ViewProvider>}},
-                       .source = ChildRef{kTextInputChromium},
-                       .targets = {ParentRef()}},
-                  }});
+    return GetChromiumRoutes(ChildRef{kTextInputChromium});
   }
 
   // Routes needed to setup Chromium client.
@@ -307,6 +296,7 @@ class ChromiumInputTest : public ChromiumInputBase {
              {
                  Protocol{fidl::DiscoverableProtocolName<
                      fuchsia_accessibility_semantics::SemanticsManager>},
+                 Protocol{fidl::DiscoverableProtocolName<fuchsia_element::GraphicalPresenter>},
                  Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Allocator>},
                  Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Flatland>},
              },
@@ -417,7 +407,7 @@ class ChromiumInputTest : public ChromiumInputBase {
   }
 
   void LaunchWebEngineClient() {
-    LaunchClient();
+    WaitForViewPresentation();
 
     FX_LOGS(INFO) << "Waiting on app ready to handle input events";
     RunLoopUntil([this]() { return keyboard_input_state_->IsReadyForInput(); });
