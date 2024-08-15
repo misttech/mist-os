@@ -11,7 +11,6 @@
 #include <bind/fuchsia/hardware/i2c/cpp/bind.h>
 #include <bind/fuchsia/hardware/interrupt/cpp/bind.h>
 #include <bind/fuchsia/hardware/spi/cpp/bind.h>
-#include <bind/fuchsia/hardware/sysmem/cpp/bind.h>
 #include <bind/fuchsia/pci/cpp/bind.h>
 #include <fbl/string_printf.h>
 
@@ -27,11 +26,6 @@
 
 namespace acpi {
 namespace {
-const std::vector<ddk::BindRule> kSysmemBindRules = {ddk::MakeAcceptBindRule(
-    bind_fuchsia_hardware_sysmem::SERVICE, bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT)};
-
-const std::vector<device_bind_prop_t> kSysmemProperties = {ddk::MakeProperty(
-    bind_fuchsia_hardware_sysmem::SERVICE, bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT)};
 
 device_bind_prop_t MakeProperty(zx_device_str_prop_t str_prop) {
   switch (str_prop.property_value.data_type) {
@@ -328,8 +322,7 @@ zx::result<> DeviceBuilder::BuildComposite(acpi::Manager* manager,
   for (const auto& str_prop : str_props) {
     acpi_properties.emplace_back(MakeProperty(str_prop));
   }
-  auto composite_node_spec = ddk::CompositeNodeSpec(acpi_bind_rules, acpi_properties)
-                                 .AddParentSpec(kSysmemBindRules, kSysmemProperties);
+  auto composite_node_spec = ddk::CompositeNodeSpec(acpi_bind_rules, acpi_properties);
 
   // Generate composite node spec parent for every device we use.
   for (auto& pair : buses_) {
