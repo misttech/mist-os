@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use core::fmt;
+
 use crate::utils::{self, on_off_to_bool};
 use anyhow::{bail, Context as _, Error};
 use argh::FromArgs;
@@ -40,10 +42,17 @@ struct DisplayProviderClient {
 }
 
 /// The second stage in the process of connecting to the display driver system.
-///
-#[derive(Debug)]
 struct DisplayCoordinatorClient {
     coordinator: display::CoordinatorProxy,
+    listener_requests: display::CoordinatorListenerRequestStream,
+}
+
+impl fmt::Debug for DisplayCoordinatorClient {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("DisplayCoordinatorClient")
+            .field("coordinator", &self.coordinator)
+            .finish_non_exhaustive()
+    }
 }
 
 /// The final stage in the process of connecting to the display driver system.
@@ -67,13 +76,23 @@ impl DisplayProviderClient {
         let (display_coordinator, coordinator_server) =
             fidl::endpoints::create_proxy::<display::CoordinatorMarker>()
                 .context("Failed to create fuchsia.hardware.display.Coordinator proxy")?;
+        let (listener_client, listener_requests) = fidl::endpoints::create_request_stream::<
+            display::CoordinatorListenerMarker,
+        >()
+        .context("Failed to create fuchsia.hardware.display.CoordinatorListener request stream")?;
 
-        utils::flatten_zx_status(
-            self.provider.open_coordinator_for_primary(coordinator_server).await,
+        let payload = display::ProviderOpenCoordinatorWithListenerForPrimaryRequest {
+            coordinator: Some(coordinator_server),
+            coordinator_listener: Some(listener_client),
+            __source_breaking: fidl::marker::SourceBreaking,
+        };
+
+        let () = utils::flatten_zx_error(
+            self.provider.open_coordinator_with_listener_for_primary(payload).await,
         )
         .context("Failed to get display Coordinator from Provider")?;
 
-        Ok(DisplayCoordinatorClient { coordinator: display_coordinator })
+        Ok(DisplayCoordinatorClient { coordinator: display_coordinator, listener_requests })
     }
 }
 
@@ -82,22 +101,17 @@ impl DisplayCoordinatorClient {
     async fn wait_for_display_infos(&mut self) -> Result<Vec<display::Info>, Error> {
         tracing::trace!("Waiting for events from the display coordinator");
 
-        let event_stream: display::CoordinatorEventStream = self.coordinator.take_event_stream();
-
-        let display_infos = event_stream
-            .try_filter_map(|event| {
-                futures::future::ok(match event {
-                    display::CoordinatorEvent::OnDisplaysChanged {
-                        added: display_infos, ..
-                    } => Some(display_infos),
-                    _ => None,
-                })
-            })
-            .next()
-            .await
-            .context("Failed to get events from fuchsia.hardware.display.Coordinator")??;
-
-        return Ok(display_infos);
+        let listener_requests = &mut self.listener_requests;
+        let mut stream = listener_requests.try_filter_map(|event| match event {
+            display::CoordinatorListenerRequest::OnDisplaysChanged {
+                added,
+                removed: _,
+                control_handle: _,
+            } => future::ok(Some(added)),
+            _ => future::ok(None),
+        });
+        let displays = stream.try_next().await?.context("failed to get display streams")?;
+        return Ok(displays);
     }
 
     async fn into_display_client(mut self) -> Result<DisplayClient, Error> {
@@ -166,18 +180,24 @@ mod tests {
         };
 
         let provider_service_future = async move {
-            let coordinator_server = match provider_request_stream.next().await.unwrap() {
-                Ok(display::ProviderRequest::OpenCoordinatorForPrimary {
-                    coordinator: coordinator_server,
-                    responder,
-                }) => {
-                    responder.send(zx::sys::ZX_OK).unwrap();
-                    coordinator_server
-                }
-                request => panic!("Unexpected request to Provider: {:?}", request),
-            };
+            let (coordinator_server, coordinator_listener_client) =
+                match provider_request_stream.next().await.unwrap() {
+                    Ok(display::ProviderRequest::OpenCoordinatorWithListenerForPrimary {
+                        payload:
+                            display::ProviderOpenCoordinatorWithListenerForPrimaryRequest {
+                                coordinator: Some(coordinator_server),
+                                coordinator_listener: Some(coordinator_listener_client),
+                                ..
+                            },
+                        responder,
+                    }) => {
+                        responder.send(Ok(())).unwrap();
+                        (coordinator_server, coordinator_listener_client)
+                    }
+                    request => panic!("Unexpected request to Provider: {:?}", request),
+                };
 
-            let (mut coordinator_request_stream, coordinator_control) =
+            let (mut coordinator_request_stream, _) =
                 coordinator_server.into_stream_and_control_handle().unwrap();
 
             let added_displays = &[display::Info {
@@ -191,7 +211,8 @@ mod tests {
                 vertical_size_mm: 0,
                 using_fallback_size: false,
             }];
-            coordinator_control.send_on_displays_changed(added_displays, &[]).unwrap();
+            let coordinator_listener_proxy = coordinator_listener_client.into_proxy().unwrap();
+            coordinator_listener_proxy.on_displays_changed(added_displays, &[]).unwrap();
 
             match coordinator_request_stream.next().await.unwrap() {
                 Ok(display::CoordinatorRequest::SetDisplayPower {
@@ -226,20 +247,25 @@ mod tests {
         };
 
         let provider_service_future = async move {
-            let coordinator_server = match provider_request_stream.next().await.unwrap() {
-                Ok(display::ProviderRequest::OpenCoordinatorForPrimary {
-                    coordinator: coordinator_server,
-                    responder,
-                }) => {
-                    responder.send(zx::sys::ZX_OK).unwrap();
-                    coordinator_server
-                }
-                request => panic!("Unexpected request to Provider: {:?}", request),
-            };
+            let (_coordinator_server, coordinator_listener_client) =
+                match provider_request_stream.next().await.unwrap() {
+                    Ok(display::ProviderRequest::OpenCoordinatorWithListenerForPrimary {
+                        payload:
+                            display::ProviderOpenCoordinatorWithListenerForPrimaryRequest {
+                                coordinator: Some(coordinator_server),
+                                coordinator_listener: Some(coordinator_listener_client),
+                                ..
+                            },
+                        responder,
+                    }) => {
+                        responder.send(Ok(())).unwrap();
+                        (coordinator_server, coordinator_listener_client)
+                    }
+                    request => panic!("Unexpected request to Provider: {:?}", request),
+                };
 
-            let (_, coordinator_control) =
-                coordinator_server.into_stream_and_control_handle().unwrap();
-            coordinator_control.send_on_displays_changed(&[], &[]).unwrap();
+            let coordinator_listener_proxy = coordinator_listener_client.into_proxy().unwrap();
+            coordinator_listener_proxy.on_displays_changed(&[], &[]).unwrap();
         };
         futures::join!(test_future, provider_service_future);
     }
@@ -261,8 +287,11 @@ mod tests {
 
         let provider_service_future = async move {
             match provider_request_stream.next().await.unwrap() {
-                Ok(display::ProviderRequest::OpenCoordinatorForPrimary { responder, .. }) => {
-                    responder.send(zx::sys::ZX_ERR_NOT_SUPPORTED).unwrap();
+                Ok(display::ProviderRequest::OpenCoordinatorWithListenerForPrimary {
+                    responder,
+                    ..
+                }) => {
+                    responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED)).unwrap();
                 }
                 request => panic!("Unexpected request to Provider: {:?}", request),
             };
@@ -282,14 +311,17 @@ mod tests {
             assert_matches!(into_display_client_result, Err(_));
             assert_eq!(
                 into_display_client_result.unwrap_err().to_string(),
-                "Failed to get events from fuchsia.hardware.display.Coordinator"
+                "failed to get display streams"
             );
         };
 
         let provider_service_future = async move {
             match provider_request_stream.next().await.unwrap() {
-                Ok(display::ProviderRequest::OpenCoordinatorForPrimary { responder, .. }) => {
-                    responder.send(zx::sys::ZX_OK).unwrap();
+                Ok(display::ProviderRequest::OpenCoordinatorWithListenerForPrimary {
+                    responder,
+                    ..
+                }) => {
+                    responder.send(Ok(())).unwrap();
                 }
                 request => panic!("Unexpected request to Provider: {:?}", request),
             };
