@@ -1382,6 +1382,7 @@ BrEdrConnectionManager::OnLinkKeyRequest(const hci::EmbossEventPacket& event) {
     // are initialized in |PairingStateManager|'s constructor.
     std::unique_ptr<LegacyPairingState> legacy_pairing_state =
         std::make_unique<LegacyPairingState>(peer->GetWeakPtr(),
+                                             std::move(pairing_delegate_),
                                              outgoing_connection);
 
     connection_req.value()->set_legacy_pairing_state(
@@ -1729,12 +1730,9 @@ BrEdrConnectionManager::OnPinCodeRequest(const hci::EmbossEventPacket& event) {
       // |status_cb| are not created yet. After the connection is complete, they
       // are initialized in |PairingStateManager|'s constructor.
       std::unique_ptr<LegacyPairingState> legacy_pairing_state =
-          std::make_unique<LegacyPairingState>(
-              peer->GetWeakPtr(),
-              /*link=*/hci::BrEdrConnection::WeakPtr(),
-              outgoing_connection,
-              /*auth_cb=*/nullptr,
-              /*status_cb=*/nullptr);
+          std::make_unique<LegacyPairingState>(peer->GetWeakPtr(),
+                                               std::move(pairing_delegate_),
+                                               outgoing_connection);
 
       connection_req.value()->set_legacy_pairing_state(
           std::move(legacy_pairing_state));
