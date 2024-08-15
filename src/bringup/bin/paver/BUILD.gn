@@ -4,48 +4,41 @@
 
 import("//build/components.gni")
 
-template("paver_template") {
-  not_needed(invoker, [ "*" ])
-  _target_name = target_name
+_boards = [
+  "astro",
+  "luis",
+  "nelson",
+  "sherlock",
+  "vim3",
+  "x64",
+]
 
-  executable("paver-${target_name}") {
-    defines = [ "${_target_name}" ]
+foreach(board_name, _boards) {
+  executable("paver-${board_name}") {
+    defines = [ "${board_name}" ]
     sources = [ "paver.cc" ]
     deps = [
       "//sdk/fidl/fuchsia.paver:fuchsia.paver_cpp",
       "//sdk/fidl/fuchsia.process.lifecycle:fuchsia.process.lifecycle_cpp",
       "//sdk/lib/component/outgoing/cpp",
       "//sdk/lib/fdio",
-      "//src/storage/lib/paver:${_target_name}",
+      "//src/storage/lib/paver:${board_name}",
       "//src/sys/lib/stdout-to-debuglog/cpp",
       "//zircon/system/ulib/async-loop:async-loop-cpp",
       "//zircon/system/ulib/async-loop:async-loop-default",
     ]
   }
 
-  fuchsia_component("component-${target_name}") {
+  fuchsia_component("component-${board_name}") {
     component_name = "paver"
-    manifest = "meta/paver-${_target_name}.cml"
-    deps = [ ":paver-${_target_name}" ]
+    manifest = "meta/paver-${board_name}.cml"
+    deps = [ ":paver-${board_name}" ]
   }
 
-  fuchsia_package("package-${target_name}") {
+  fuchsia_package("package-${board_name}") {
     package_name = "paver"
-    deps = [ ":component-${_target_name}" ]
+    deps = [ ":component-${board_name}" ]
   }
-}
-
-paver_template("astro") {
-}
-paver_template("luis") {
-}
-paver_template("nelson") {
-}
-paver_template("sherlock") {
-}
-paver_template("vim3") {
-}
-paver_template("x64") {
 }
 
 # Legacy targets to be deleted.

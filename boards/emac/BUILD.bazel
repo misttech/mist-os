@@ -29,11 +29,17 @@ fuchsia_board_input_bundle(
     ],
 )
 
+fuchsia_board_input_bundle(
+    name = "paver",
+    bootfs_packages = ["//src/bringup/bin/paver:package-vim3"],
+)
+
 fuchsia_board_configuration(
     name = "emac",
     board_input_bundles = [
         ":board_driver",
         ":main_bundle",
+        ":paver",
     ],
     board_name = "emac",
     devicetree = "@gn_targets//src/devices/board/drivers/vim3-devicetree:vim3-dtb",
@@ -55,7 +61,7 @@ fuchsia_board_configuration(
         },
     },
     provided_features = [
-        "fuchsia::driver_framework_v2_support",
+        "fuchsia::paver",
         "fuchsia::usb_peripheral_support",
     ],
 )

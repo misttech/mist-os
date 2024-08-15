@@ -16,9 +16,9 @@ common_board_configuration = {
   provided_features = [
     "fuchsia::bt_transport_uart",
     "fuchsia::bus_pci",
-    "fuchsia::driver_framework_v2_support",
     "fuchsia::fan",
     "fuchsia::mali_gpu",
+    "fuchsia::paver",
     "fuchsia::pmm_checker",
     "fuchsia::real_time_clock",
     "fuchsia::usb_peripheral_support",
@@ -28,6 +28,7 @@ common_board_configuration = {
   input_bundles = [
     ":devicetree_board_driver",
     ":main_bundle",
+    ":paver",
     ":vulkan_arm_mali",
     ":rtc_driver",
   ]
@@ -368,6 +369,10 @@ board_input_bundle("rtc_driver") {
       driver_components = [ "meta/pcf8563.cm" ]
     },
   ]
+}
+
+board_input_bundle("paver") {
+  bootfs_packages = [ "//src/bringup/bin/paver:package-vim3" ]
 }
 
 # Note: This group contains bazel built drivers that are defined in individual bazel_actions.
