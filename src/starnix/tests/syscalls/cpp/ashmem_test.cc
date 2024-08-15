@@ -677,12 +677,15 @@ TEST_F(AshmemTest, IgnoreGetterInput) {
   ASSERT_THAT(ioctl(fd.get(), ASHMEM_SET_PROT_MASK, PROT_WRITE), SyscallSucceeds());
   ASSERT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin), SyscallSucceeds());
 
+  // Protections
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_PROT_MASK, 10), SyscallSucceedsWithValue(PROT_WRITE));
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_PROT_MASK, "hello"), SyscallSucceedsWithValue(PROT_WRITE));
 
+  // Size
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_SIZE, 10), SyscallSucceedsWithValue(PAGE_SIZE));
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_SIZE, "hello"), SyscallSucceedsWithValue(PAGE_SIZE));
 
+  // Purge
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_PURGE_ALL_CACHES, 10),
               SyscallSucceedsWithValue(ASHMEM_IS_PINNED));
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_PURGE_ALL_CACHES, "hello"),
@@ -780,6 +783,71 @@ TEST_F(AshmemTest, ForkProt) {
   EXPECT_TRUE(addr_r != MAP_FAILED && addr_r != nullptr);
   ASSERT_THAT(munmap(addr_r, 2 * PAGE_SIZE), SyscallSucceeds());
 
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// Ashmem regions are backed by independent VMOs
+TEST_F(AshmemTest, DistinctAshmemVMO) {
+  auto fd_1 = CreateRegion(nullptr, PAGE_SIZE);
+  void *addr_1 = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd_1.get(), 0);
+  ASSERT_TRUE(addr_1 != MAP_FAILED && addr_1 != nullptr);
+  int *data_1 = (int *)addr_1;
+
+  auto fd_2 = CreateRegion(nullptr, PAGE_SIZE);
+  void *addr_2 = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd_2.get(), 0);
+  ASSERT_TRUE(addr_2 != MAP_FAILED && addr_1 != nullptr);
+  int *data_2 = (int *)addr_2;
+
+  *data_1 = 1;
+  *data_2 = 2;
+
+  EXPECT_EQ(1, *data_1);
+  EXPECT_EQ(2, *data_2);
+
+  ASSERT_THAT(munmap(addr_1, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr_2, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd_1.get()), SyscallSucceeds());
+  ASSERT_THAT(close(fd_2.get()), SyscallSucceeds());
+}
+
+// Ashmem inode number is hidden from fstat()
+TEST_F(AshmemTest, HiddenInos) {
+  auto fd_1 = Open();
+  auto fd_2 = Open();
+
+  struct stat st_1;
+  struct stat st_2;
+
+  ASSERT_THAT(fstat(fd_1.get(), &st_1), SyscallSucceeds());
+  ASSERT_THAT(fstat(fd_2.get(), &st_2), SyscallSucceeds());
+
+  EXPECT_EQ(st_1.st_ino, st_2.st_ino);
+
+  ASSERT_THAT(close(fd_1.get()), SyscallSucceeds());
+  ASSERT_THAT(close(fd_2.get()), SyscallSucceeds());
+}
+
+TEST_F(AshmemTest, DistinctFileIDs) {
+  auto fd_1 = Open();
+  auto fd_2 = Open();
+
+  long ino_1;
+  long ino_2;
+
+  ASSERT_THAT(ioctl(fd_1.get(), ASHMEM_GET_FILE_ID, &ino_1), SyscallSucceeds());
+  ASSERT_THAT(ioctl(fd_2.get(), ASHMEM_GET_FILE_ID, &ino_2), SyscallSucceeds());
+
+  EXPECT_NE(ino_1, ino_2);
+
+  ASSERT_THAT(close(fd_1.get()), SyscallSucceeds());
+  ASSERT_THAT(close(fd_2.get()), SyscallSucceeds());
+}
+
+TEST_F(AshmemTest, MalformedFileIDs) {
+  auto fd = Open();
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_FILE_ID, 0), SyscallFailsWithErrno(EFAULT));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_FILE_ID, 10), SyscallFailsWithErrno(EFAULT));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_FILE_ID, "hello"), SyscallFailsWithErrno(EFAULT));
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 

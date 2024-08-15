@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::device::kobject::DeviceMetadata;
-use crate::device::DeviceMode;
+use crate::device::{DeviceMode, DeviceOps};
 use crate::fs::sysfs::DeviceDirectory;
 use crate::mm::memory::MemoryObject;
 use crate::mm::{
@@ -23,7 +23,7 @@ use linux_uapi::{
 };
 use once_cell::sync::OnceCell;
 use range_map::RangeMap;
-use starnix_logging::track_stub;
+use starnix_lifecycle::AtomicU32Counter;
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::errors::Errno;
@@ -43,7 +43,7 @@ where
 
     let misc_class = registry.get_or_create_class("misc".into(), registry.virtual_bus());
     let ashmem_device =
-        registry.register_dyn_chrdev(Ashmem::open).expect("ashmem device register failed.");
+        registry.register_dyn_chrdev(AshmemDevice::new()).expect("ashmem device register failed.");
 
     registry.add_device(
         locked,
@@ -55,35 +55,55 @@ where
     );
 }
 
+#[derive(Clone)]
+pub struct AshmemDevice {
+    pub next_id: Arc<AtomicU32Counter>,
+}
+
 pub struct Ashmem {
     memory: OnceCell<Arc<MemoryObject>>,
     state: Mutex<AshmemState>,
 }
+
 struct AshmemState {
     size: usize,
     name: FsString,
     prot_flags: ProtectionFlags,
     unpinned: RangeMap<u32, bool>,
+    id: u32,
 }
 
-impl Ashmem {
-    pub fn open(
+impl AshmemDevice {
+    pub fn new() -> AshmemDevice {
+        AshmemDevice { next_id: Arc::new(AtomicU32Counter::new(1)) }
+    }
+}
+
+impl DeviceOps for AshmemDevice {
+    fn open(
+        &self,
         _locked: &mut Locked<'_, DeviceOpen>,
         _current_task: &CurrentTask,
         _id: device_type::DeviceType,
         _node: &FsNode,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
+        let ashmem = Ashmem::new(self.next_id.next());
+        Ok(Box::new(ashmem))
+    }
+}
+
+impl Ashmem {
+    fn new(id: u32) -> Ashmem {
         let state = AshmemState {
             size: 0,
             name: b"dev/ashmem\0".into(),
             prot_flags: ProtectionFlags::all(),
             unpinned: RangeMap::<u32, bool>::new(),
+            id: id,
         };
 
-        let ashmem = Ashmem { memory: OnceCell::new(), state: Mutex::new(state) };
-
-        Ok(Box::new(ashmem))
+        Ashmem { memory: OnceCell::new(), state: Mutex::new(state) }
     }
 
     fn memory(&self) -> Result<&Arc<MemoryObject>, Errno> {
@@ -261,8 +281,9 @@ impl FileOps for Ashmem {
                 return Ok(ASHMEM_IS_UNPINNED.into());
             }
             ASHMEM_GET_FILE_ID => {
-                track_stub!(TODO("https://fxbug.dev/322873958"), "ASHMEM_GET_FILE_ID");
-                error!(ENOSYS)
+                let state = self.state.lock();
+                current_task.write_object(arg.into(), &(state.id))?;
+                Ok(SUCCESS)
             }
             _ => default_ioctl(file, locked, current_task, request, arg),
         }
