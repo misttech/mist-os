@@ -16,6 +16,12 @@
 
 namespace {
 
+struct ashmem_pin_op {
+  ashmem_pin range;
+  unsigned int op;
+  unsigned int expected;
+};
+
 const unsigned PAGE_SIZE = getpagesize();
 const unsigned long long LARGE_NUMBER_OF_PAGES = PAGE_SIZE * 1000 * 1000;
 
@@ -440,6 +446,96 @@ TEST_F(AshmemTest, NoPinMisaligned) {
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
+// Overlap a bunch of pins and unpins
+//
+//  (3)   [   U   ]                  [   U   ]                           [U]
+//  (2)         [             ]         [                   ]
+//  (1)   [ ][ ][ ][ ][U][U][U][U][U][U][U][U][U][ ][ ][ ][U][ ][ ][ ][ ][ ][ ][ ][ ]
+//         0           4              9             14              19             24
+//
+//  --->  [   U   ][          ][       U     ][                         ][U][       ]
+//
+TEST_F(AshmemTest, MessyPinning) {
+  // Data corresponding to ioctl command arguments of each round
+  ashmem_pin_op rounds[] = {
+      // Round #1
+      {.range = {.offset = 0, .len = 4 * PAGE_SIZE},
+       .op = ASHMEM_PIN,
+       .expected = ASHMEM_NOT_PURGED},
+      {.range = {.offset = 4 * PAGE_SIZE, .len = 9 * PAGE_SIZE},
+       .op = ASHMEM_UNPIN,
+       .expected = ASHMEM_IS_UNPINNED},
+      {.range = {.offset = 13 * PAGE_SIZE, .len = 3 * PAGE_SIZE},
+       .op = ASHMEM_PIN,
+       .expected = ASHMEM_NOT_PURGED},
+      {.range = {.offset = 16 * PAGE_SIZE, .len = PAGE_SIZE},
+       .op = ASHMEM_UNPIN,
+       .expected = ASHMEM_IS_UNPINNED},
+      {.range = {.offset = 17 * PAGE_SIZE, .len = 8 * PAGE_SIZE},
+       .op = ASHMEM_PIN,
+       .expected = ASHMEM_NOT_PURGED},
+
+      // Round #2
+      {.range = {.offset = 2 * PAGE_SIZE, .len = 5 * PAGE_SIZE},
+       .op = ASHMEM_PIN,
+       .expected = ASHMEM_NOT_PURGED},
+      {.range = {.offset = 10 * PAGE_SIZE, .len = 7 * PAGE_SIZE},
+       .op = ASHMEM_PIN,
+       .expected = ASHMEM_NOT_PURGED},
+
+      // Round #3
+      {.range = {.offset = 0, .len = 3 * PAGE_SIZE},
+       .op = ASHMEM_UNPIN,
+       .expected = ASHMEM_IS_UNPINNED},
+      {.range = {.offset = 9 * PAGE_SIZE, .len = 3 * PAGE_SIZE},
+       .op = ASHMEM_UNPIN,
+       .expected = ASHMEM_IS_UNPINNED},
+      {.range = {.offset = 21 * PAGE_SIZE, .len = PAGE_SIZE},
+       .op = ASHMEM_UNPIN,
+       .expected = ASHMEM_IS_UNPINNED},
+  };
+
+  ashmem_pin_op verify[] = {
+      {.range = {.offset = 0, .len = 3 * PAGE_SIZE},
+       .op = ASHMEM_GET_PIN_STATUS,
+       .expected = ASHMEM_IS_UNPINNED},
+      {.range = {.offset = 3 * PAGE_SIZE, .len = 4 * PAGE_SIZE},
+       .op = ASHMEM_GET_PIN_STATUS,
+       .expected = ASHMEM_IS_PINNED},
+      {.range = {.offset = 7 * PAGE_SIZE, .len = 5 * PAGE_SIZE},
+       .op = ASHMEM_GET_PIN_STATUS,
+       .expected = ASHMEM_IS_UNPINNED},
+      {.range = {.offset = 12 * PAGE_SIZE, .len = 9 * PAGE_SIZE},
+       .op = ASHMEM_GET_PIN_STATUS,
+       .expected = ASHMEM_IS_PINNED},
+      {.range = {.offset = 21 * PAGE_SIZE, .len = PAGE_SIZE},
+       .op = ASHMEM_GET_PIN_STATUS,
+       .expected = ASHMEM_IS_UNPINNED},
+      {.range = {.offset = 22 * PAGE_SIZE, .len = 3 * PAGE_SIZE},
+       .op = ASHMEM_GET_PIN_STATUS,
+       .expected = ASHMEM_IS_PINNED},
+  };
+
+  auto fd = CreateRegion(nullptr, 25 * PAGE_SIZE);
+  void *addr = mmap(nullptr, 25 * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+
+  // Apply pins and unpins
+  for (const auto &operation : rounds) {
+    ASSERT_THAT(ioctl(fd.get(), operation.op, &operation.range),
+                SyscallSucceedsWithValue(operation.expected));
+  }
+
+  // Verify all ranges
+  for (const auto &operation : verify) {
+    EXPECT_THAT(ioctl(fd.get(), operation.op, &operation.range),
+                SyscallSucceedsWithValue(operation.expected));
+  }
+
+  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
 // ASHMEM_GET_PIN_STATUS is sensitive to overlap
 TEST_F(AshmemTest, PinStatusOverlap) {
   ashmem_pin pin_left = {.offset = 0, .len = PAGE_SIZE};
@@ -567,6 +663,123 @@ TEST_F(AshmemTest, PurgeOverlap) {
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin_left), SyscallSucceedsWithValue(ASHMEM_NOT_PURGED));
 
   ASSERT_THAT(munmap(addr, 2 * PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// Input to a getter command is ignored
+TEST_F(AshmemTest, IgnoreGetterInput) {
+  ashmem_pin pin = {.offset = 0, .len = PAGE_SIZE};
+
+  auto fd = CreateRegion(nullptr, PAGE_SIZE);
+  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+
+  ASSERT_THAT(ioctl(fd.get(), ASHMEM_SET_PROT_MASK, PROT_WRITE), SyscallSucceeds());
+  ASSERT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin), SyscallSucceeds());
+
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_PROT_MASK, 10), SyscallSucceedsWithValue(PROT_WRITE));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_PROT_MASK, "hello"), SyscallSucceedsWithValue(PROT_WRITE));
+
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_SIZE, 10), SyscallSucceedsWithValue(PAGE_SIZE));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_SIZE, "hello"), SyscallSucceedsWithValue(PAGE_SIZE));
+
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_PURGE_ALL_CACHES, 10),
+              SyscallSucceedsWithValue(ASHMEM_IS_PINNED));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_PURGE_ALL_CACHES, "hello"),
+              SyscallSucceedsWithValue(ASHMEM_IS_PINNED));
+
+  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// Fork, child writes data, parent reads
+TEST_F(AshmemTest, Fork) {
+  char input[] = "hello world!";
+  auto fd = CreateRegion(nullptr, PAGE_SIZE);
+  void *parent_map = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(parent_map != MAP_FAILED && parent_map != nullptr);
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    void *child_map = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+    ASSERT_TRUE(child_map != MAP_FAILED && child_map != nullptr);
+    char *shared_msg = (char *)child_map;
+    strcpy(shared_msg, input);
+    shared_msg[sizeof(input)] = 0;
+    ASSERT_THAT(munmap(child_map, PAGE_SIZE), SyscallSucceeds());
+  });
+
+  ASSERT_TRUE(helper.WaitForChildren());
+  EXPECT_STREQ((char *)parent_map, input);
+  ASSERT_THAT(munmap(parent_map, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// Fork, fail to set size in parent after child maps the region
+TEST_F(AshmemTest, ForkSetSize) {
+  auto fd = Open();
+  ASSERT_TRUE(fd.is_valid());
+  ASSERT_THAT(ioctl(fd.get(), ASHMEM_SET_SIZE, PAGE_SIZE), SyscallSucceeds());
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    ASSERT_THAT(ioctl(fd.get(), ASHMEM_SET_SIZE, 2 * PAGE_SIZE), SyscallSucceeds());
+    void *addr = mmap(nullptr, 2 * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+    ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+    ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  });
+
+  ASSERT_TRUE(helper.WaitForChildren());
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_SET_SIZE, 3 * PAGE_SIZE), SyscallFailsWithErrno(EINVAL));
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// Fork, child purges memory, parent can see it has been purged
+TEST_F(AshmemTest, ForkPurge) {
+  ashmem_pin pin_left = {.offset = 0, .len = PAGE_SIZE};
+  ashmem_pin pin_right = {.offset = PAGE_SIZE, .len = PAGE_SIZE};
+
+  auto fd = CreateRegion(nullptr, 2 * PAGE_SIZE);
+  void *parent_map = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(parent_map != MAP_FAILED && parent_map != nullptr);
+  ASSERT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin_left),
+              SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] {
+    ASSERT_THAT(ioctl(fd.get(), ASHMEM_PURGE_ALL_CACHES, 0),
+                SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
+  });
+
+  ASSERT_TRUE(helper.WaitForChildren());
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin_left), SyscallSucceedsWithValue(ASHMEM_WAS_PURGED));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin_right), SyscallSucceedsWithValue(ASHMEM_NOT_PURGED));
+  ASSERT_THAT(munmap(parent_map, 2 * PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// Fork, child reduces permissions, parent is affected
+TEST_F(AshmemTest, ForkProt) {
+  auto fd = CreateRegion(0, PAGE_SIZE);
+  void *addr_rw = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  EXPECT_TRUE(addr_rw != MAP_FAILED && addr_rw != nullptr);
+  ASSERT_THAT(munmap(addr_rw, 2 * PAGE_SIZE), SyscallSucceeds());
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess(
+      [&] { ASSERT_THAT(ioctl(fd.get(), ASHMEM_SET_PROT_MASK, PROT_READ), SyscallSucceeds()); });
+
+  ASSERT_TRUE(helper.WaitForChildren());
+
+  // Another map fails
+  addr_rw = mmap(nullptr, 2 * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  EXPECT_TRUE(addr_rw == MAP_FAILED);
+
+  // Reduced prot map succeeds
+  void *addr_r = mmap(nullptr, PAGE_SIZE, PROT_READ, MAP_SHARED, fd.get(), 0);
+  EXPECT_TRUE(addr_r != MAP_FAILED && addr_r != nullptr);
+  ASSERT_THAT(munmap(addr_r, 2 * PAGE_SIZE), SyscallSucceeds());
+
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
