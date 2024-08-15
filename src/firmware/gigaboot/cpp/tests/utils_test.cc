@@ -9,9 +9,12 @@
 #include <efi/types.h>
 #include <gtest/gtest.h>
 
+#include "efi/boot-services.h"
+#include "efi/protocol/loaded-image.h"
 #include "gmock/gmock.h"
 #include "gpt.h"
 #include "mock_boot_service.h"
+#include "phys/efi/main.h"
 
 using ::testing::ContainerEq;
 
@@ -71,6 +74,65 @@ TEST(GigabootTest, IsSecureBootOn) {
 
 EFIAPI efi_status test_get_secureboot_fail(char16_t*, efi_guid*, uint32_t*, size_t*, void*) {
   return EFI_NOT_FOUND;
+}
+
+TEST(GigabootTest, GetCommandlineRebootModeDefault) {
+  MockStubService stub_service;
+  Device image_device({});
+  auto cleanup = SetupEfiGlobalState(stub_service, image_device);
+  char16_t args[] = u"foo bar=baz";
+  gEfiLoadedImage->LoadOptions = args;
+  gEfiLoadedImage->LoadOptionsSize = sizeof(args);
+
+  ASSERT_EQ(GetCommandlineRebootMode(), std::nullopt);
+}
+
+TEST(GigabootTest, GetCommandlineRebootModeFastboot) {
+  MockStubService stub_service;
+  Device image_device({});
+  auto cleanup = SetupEfiGlobalState(stub_service, image_device);
+  char16_t args[] = u"foo bar=baz boot_mode=fastboot 123abc";
+  gEfiLoadedImage->LoadOptions = args;
+  gEfiLoadedImage->LoadOptionsSize = sizeof(args);
+
+  ASSERT_EQ(GetCommandlineRebootMode(), std::optional(RebootMode::kBootloader));
+}
+
+TEST(GigabootTest, GetCommandlineRebootModeNoLoadedImage) {
+  gEfiLoadedImage = nullptr;
+
+  ASSERT_EQ(GetCommandlineRebootMode(), std::nullopt);
+}
+
+TEST(GigabootTest, GetCommandlineRebootModeNoLoadOptions) {
+  MockStubService stub_service;
+  Device image_device({});
+  auto cleanup = SetupEfiGlobalState(stub_service, image_device);
+  gEfiLoadedImage->LoadOptions = nullptr;
+
+  ASSERT_EQ(GetCommandlineRebootMode(), std::nullopt);
+}
+
+TEST(GigabootTest, GetCommandlineRebootModeNotUcs2Alignment) {
+  MockStubService stub_service;
+  Device image_device({});
+  auto cleanup = SetupEfiGlobalState(stub_service, image_device);
+  char16_t args[] = u"abc";
+  gEfiLoadedImage->LoadOptions = reinterpret_cast<uint8_t*>(args) + 1;
+  gEfiLoadedImage->LoadOptionsSize = sizeof(args) - 1;
+
+  ASSERT_EQ(GetCommandlineRebootMode(), std::nullopt);
+}
+
+TEST(GigabootTest, GetCommandlineRebootModeNotUcs2Contents) {
+  MockStubService stub_service;
+  Device image_device({});
+  auto cleanup = SetupEfiGlobalState(stub_service, image_device);
+  char16_t args[] = u"abc";
+  gEfiLoadedImage->LoadOptions = args;
+  gEfiLoadedImage->LoadOptionsSize = 3;  // 3 bytes is never a valid UCS-2 length.
+
+  ASSERT_EQ(GetCommandlineRebootMode(), std::nullopt);
 }
 
 TEST(GigabootTest, IsSecureBootOnReturnsFalseOnError) {

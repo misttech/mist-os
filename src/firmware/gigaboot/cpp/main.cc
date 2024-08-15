@@ -7,6 +7,9 @@
 #include <lib/abr/abr.h>
 #include <stdio.h>
 
+#include <optional>
+#include <string_view>
+
 #include <phys/stdio.h>
 
 #include "backends.h"
@@ -72,7 +75,6 @@ void SetSerial() {
   SetEfiStdout(gEfiSystemTable);
   gEfiSystemTable->ConOut = conn_out;
 }
-}  // namespace
 
 // TODO(b/285053546) 'BootByte' usage should be removed in favour of ABR Metadata
 bool ResetRebootMode(gigaboot::RebootMode reboot_mode, const AbrOps& abr_ops) {
@@ -84,6 +86,45 @@ bool ResetRebootMode(gigaboot::RebootMode reboot_mode, const AbrOps& abr_ops) {
 
   return true;
 }
+
+// Loads the desired reboot mode.
+//
+// The priority order is:
+// 1. UEFI commandline arguments
+// 2. One-shot flags
+// 3. Default to normal boot
+//
+// If any one-shot flags are used, they are also reset by this function.
+gigaboot::RebootMode LoadRebootMode() {
+  if (auto reboot_mode = gigaboot::GetCommandlineRebootMode(); reboot_mode.has_value()) {
+    return reboot_mode.value();
+  }
+
+  // Print OneShotFlags from ABR
+  AbrDataOneShotFlags one_shot_flags;
+  ZirconBootOps zb_ops = gigaboot::GetZirconBootOps();
+  AbrOps abr_ops = GetAbrOpsFromZirconBootOps(&zb_ops);
+  AbrResult abr_res = AbrGetAndClearOneShotFlags(&abr_ops, &one_shot_flags);
+  if (abr_res != kAbrResultOk) {
+    printf("Warning: failed to get one shot flags from ABR; booting normally\n");
+    return gigaboot::RebootMode::kNormal;
+  }
+  printf("abr.one_shot_flags = 0x%02x\n", one_shot_flags);
+
+  gigaboot::RebootMode reboot_mode =
+      gigaboot::GetOneShotRebootMode(one_shot_flags).value_or(gigaboot::RebootMode::kNormal);
+
+  // TODO(b/285053546) 'BootByte' usage should be removed in favour of ABR Metadata
+  // Reset previous reboot mode immediately to prevent it from being sticky.
+  if (!ResetRebootMode(reboot_mode, abr_ops)) {
+    printf("Error: failed to reset reboot mode\n");
+    return gigaboot::RebootMode::kNormal;
+  }
+
+  return reboot_mode;
+}
+
+}  // namespace
 
 int main(int argc, char** argv) {
   SetSerial();
@@ -107,26 +148,7 @@ int main(int argc, char** argv) {
            gigaboot::EfiStatusToString(res));
   }
 
-  // Print OneShotFlags from ABR
-  AbrDataOneShotFlags one_shot_flags;
-  ZirconBootOps zb_ops = gigaboot::GetZirconBootOps();
-  AbrOps abr_ops = GetAbrOpsFromZirconBootOps(&zb_ops);
-  AbrResult abr_res = AbrGetAndClearOneShotFlags(&abr_ops, &one_shot_flags);
-  if (abr_res != kAbrResultOk) {
-    printf("Failed to get one shot flags from ABR\n");
-    return 1;
-  }
-  printf("abr.one_shot_flags = 0x%02x\n", one_shot_flags);
-
-  gigaboot::RebootMode reboot_mode =
-      gigaboot::GetRebootMode(one_shot_flags).value_or(gigaboot::RebootMode::kNormal);
-
-  // TODO(b/285053546) 'BootByte' usage should be removed in favour of ABR Metadata
-  // Reset previous reboot mode immediately to prevent it from being sticky.
-  if (!ResetRebootMode(reboot_mode, abr_ops)) {
-    printf("Failed to reset reboot mode\n");
-    return 1;
-  }
+  gigaboot::RebootMode reboot_mode = LoadRebootMode();
 
   bool enter_fastboot = reboot_mode == gigaboot::RebootMode::kBootloader;
   if (enter_fastboot) {
