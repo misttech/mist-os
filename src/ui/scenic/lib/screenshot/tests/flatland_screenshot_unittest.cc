@@ -4,8 +4,8 @@
 
 #include "src/ui/scenic/lib/screenshot/flatland_screenshot.h"
 
+#include <fidl/fuchsia.ui.composition/cpp/fidl.h>
 #include <fidl/fuchsia.ui.compression.internal/cpp/fidl.h>
-#include <fuchsia/ui/composition/cpp/fidl.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
 
 #include <functional>
@@ -14,6 +14,7 @@
 
 #include <gtest/gtest.h>
 
+#include "lib/fidl/cpp/hlcpp_conversion.h"
 #include "src/lib/fsl/vmo/sized_vmo.h"
 #include "src/lib/fsl/vmo/vector.h"
 #include "src/lib/testing/loop_fixture/real_loop_fixture.h"
@@ -25,10 +26,10 @@
 #include "src/ui/scenic/lib/screenshot/tests/mock_image_compression.h"
 
 using allocation::BufferCollectionImporter;
-using fuchsia::ui::composition::ScreenshotFormat;
-using fuchsia::ui::composition::ScreenshotTakeFileResponse;
-using fuchsia::ui::composition::ScreenshotTakeResponse;
 using fuchsia::ui::compression::internal::ImageCompressorEncodePngRequest;
+using fuchsia_ui_composition::ScreenshotFormat;
+using fuchsia_ui_composition::ScreenshotTakeFileResponse;
+using fuchsia_ui_composition::ScreenshotTakeResponse;
 using screen_capture::ScreenCaptureBufferCollectionImporter;
 
 namespace screenshot {
@@ -69,7 +70,7 @@ fidl::Endpoints<fuchsia_ui_compression_internal::ImageCompressor> CreateImageCom
 
 class FlatlandScreenshotTest : public gtest::RealLoopFixture,
                                public ::testing::WithParamInterface<
-                                   std::tuple<fuchsia::ui::composition::ScreenshotFormat, int>> {
+                                   std::tuple<fuchsia_ui_composition::ScreenshotFormat, int>> {
  public:
   FlatlandScreenshotTest() = default;
   void SetUp() override {
@@ -124,8 +125,8 @@ class FlatlandScreenshotTest : public gtest::RealLoopFixture,
   }
 
   ScreenshotTakeFileResponse TakeFile(ScreenshotFormat format) {
-    fuchsia::ui::composition::ScreenshotTakeFileRequest request;
-    request.set_format(format);
+    fuchsia_ui_composition::ScreenshotTakeFileRequest request;
+    request.format(format);
 
     ScreenshotTakeFileResponse take_file_response;
     bool done = false;
@@ -155,53 +156,53 @@ class FlatlandScreenshotTest : public gtest::RealLoopFixture,
 
 INSTANTIATE_TEST_SUITE_P(
     ParameterizedFlatlandScreenshotTest, FlatlandScreenshotTest,
-    ::testing::Combine(::testing::Values(fuchsia::ui::composition::ScreenshotFormat::BGRA_RAW,
-                                         fuchsia::ui::composition::ScreenshotFormat::PNG),
+    ::testing::Combine(::testing::Values(fuchsia_ui_composition::ScreenshotFormat::kBgraRaw,
+                                         fuchsia_ui_composition::ScreenshotFormat::kPng),
                        ::testing::Values(0, 90, 180, 270)));
 
 TEST_P(FlatlandScreenshotTest, SimpleTest) {
   const auto& [format, rotation] = GetParam();
-  if (format == fuchsia::ui::composition::ScreenshotFormat::PNG) {
+  if (format == fuchsia_ui_composition::ScreenshotFormat::kPng) {
     EXPECT_CALL(mock_compressor_, EncodePng(testing::_, testing::_))
         .Times(1)
         .WillOnce(kResolveEncodePng);
   }
 
-  fuchsia::ui::composition::ScreenshotTakeRequest request;
-  request.set_format(format);
+  fuchsia_ui_composition::ScreenshotTakeRequest request;
+  request.format() = format;
 
-  fuchsia::ui::composition::ScreenshotTakeResponse take_response;
+  fuchsia_ui_composition::ScreenshotTakeResponse take_response;
   bool done = false;
 
   EXPECT_EQ(NumCurrentServedScreenshots(), 0u);
   flatland_screenshotter_->Take(
       std::move(request),
-      [&take_response, &done](fuchsia::ui::composition::ScreenshotTakeResponse response) {
+      [&take_response, &done](fuchsia_ui_composition::ScreenshotTakeResponse response) {
         take_response = std::move(response);
         done = true;
       });
 
   RunLoopUntil([&done] { return done; });
 
-  EXPECT_TRUE(take_response.has_vmo());
-  EXPECT_TRUE(take_response.has_size());
+  EXPECT_TRUE(take_response.vmo().has_value());
+  EXPECT_TRUE(take_response.size().has_value());
   EXPECT_EQ(NumCurrentServedScreenshots(), 0u);
 
   // Width and height are flipped when the display is rotated by 90 or 270 degrees.
   if (rotation == 90 || rotation == 270) {
-    EXPECT_EQ(take_response.size().width, kDisplayHeight);
-    EXPECT_EQ(take_response.size().height, kDisplayWidth);
+    EXPECT_EQ(take_response.size()->width(), kDisplayHeight);
+    EXPECT_EQ(take_response.size()->height(), kDisplayWidth);
 
   } else {
-    EXPECT_EQ(take_response.size().width, kDisplayWidth);
-    EXPECT_EQ(take_response.size().height, kDisplayHeight);
+    EXPECT_EQ(take_response.size()->width(), kDisplayWidth);
+    EXPECT_EQ(take_response.size()->height(), kDisplayHeight);
   }
   EXPECT_NE(take_response.vmo(), 0u);
 }
 
 TEST_P(FlatlandScreenshotTest, SimpleTakeFileTest) {
   const auto& [format, _] = GetParam();
-  if (format == fuchsia::ui::composition::ScreenshotFormat::PNG) {
+  if (format == fuchsia_ui_composition::ScreenshotFormat::kPng) {
     EXPECT_CALL(mock_compressor_, EncodePng(testing::_, testing::_))
         .Times(1)
         .WillOnce(kResolveEncodePng);
@@ -213,12 +214,12 @@ TEST_P(FlatlandScreenshotTest, SimpleTakeFileTest) {
 
   EXPECT_EQ(NumCurrentServedScreenshots(), 1u);
 
-  EXPECT_TRUE(takefile_response.has_size());
+  EXPECT_TRUE(takefile_response.size().has_value());
 
-  fidl::InterfaceHandle<::fuchsia::io::File>* file = takefile_response.mutable_file();
-  EXPECT_TRUE(file->is_valid());
+  auto file = fidl::NaturalToHLCPP(takefile_response.file().value());
+  EXPECT_TRUE(file.is_valid());
   {
-    fuchsia::io::FilePtr screenshot = file->Bind();
+    fuchsia::io::FilePtr screenshot = file.Bind();
     // Get screenshot attributes.
     uint64_t screenshot_size;
     screenshot->GetAttr(
@@ -247,7 +248,7 @@ TEST_P(FlatlandScreenshotTest, SimpleTakeFileTest) {
 
 TEST_P(FlatlandScreenshotTest, GetMultipleScreenshotsViaChannel) {
   const auto& [format, _] = GetParam();
-  if (format == fuchsia::ui::composition::ScreenshotFormat::PNG) {
+  if (format == fuchsia_ui_composition::ScreenshotFormat::kPng) {
     EXPECT_CALL(mock_compressor_, EncodePng(testing::_, testing::_))
         .Times(3)
         .WillRepeatedly(kResolveEncodePng);
@@ -259,17 +260,17 @@ TEST_P(FlatlandScreenshotTest, GetMultipleScreenshotsViaChannel) {
 
   auto response1 = TakeFile(format);
   RunLoopUntilIdle();
-  fidl::InterfaceHandle<::fuchsia::io::File>* file1 = response1.mutable_file();
+  auto& file1 = response1.file();
   EXPECT_EQ(NumCurrentServedScreenshots(), 1u);
 
   auto response2 = TakeFile(format);
   RunLoopUntilIdle();
-  fidl::InterfaceHandle<::fuchsia::io::File>* file2 = response2.mutable_file();
+  auto& file2 = response2.file();
   EXPECT_EQ(NumCurrentServedScreenshots(), 2u);
 
   auto response3 = TakeFile(format);
   RunLoopUntilIdle();
-  fidl::InterfaceHandle<::fuchsia::io::File>* file3 = response3.mutable_file();
+  auto& file3 = response3.file();
   EXPECT_EQ(NumCurrentServedScreenshots(), 3u);
 
   // Close clients.
