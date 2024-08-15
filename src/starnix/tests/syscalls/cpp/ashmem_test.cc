@@ -171,6 +171,20 @@ TEST_F(AshmemTest, NoChangeSizeAfterMap) {
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
+TEST_F(AshmemTest, NoChangeSizeAfterMunmap) {
+  auto fd = CreateRegion(nullptr, 2 * PAGE_SIZE);
+  ASSERT_THAT(ioctl(fd.get(), ASHMEM_SET_SIZE, PAGE_SIZE), SyscallSucceeds());
+
+  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_SET_SIZE, PAGE_SIZE), SyscallFailsWithErrno(EINVAL));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_SET_SIZE, 3 * PAGE_SIZE), SyscallFailsWithErrno(EINVAL));
+
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
 // Mmap() arguments must not be out of bounds
 TEST_F(AshmemTest, MapOutOfBounds) {
   auto fd = CreateRegion(nullptr, 3 * PAGE_SIZE);
@@ -226,6 +240,22 @@ TEST_F(AshmemTest, NoChangeNameAfterMap) {
   EXPECT_STREQ("hello world!", buf);
 
   ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+TEST_F(AshmemTest, NoChangeNameAfterMunmap) {
+  char name[] = "hello world!";
+  char buf[256];
+  auto fd = CreateRegion(name, PAGE_SIZE);
+
+  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+
+  ASSERT_THAT(ioctl(fd.get(), ASHMEM_SET_NAME, "goodbye"), SyscallFailsWithErrno(EINVAL));
+  ASSERT_THAT(ioctl(fd.get(), ASHMEM_GET_NAME, buf), SyscallSucceeds());
+  EXPECT_STREQ("hello world!", buf);
+
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
@@ -508,6 +538,22 @@ TEST_F(AshmemTest, NoPinBeforeMap) {
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin), SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
 
   ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// Ashmem regions can still be pinned & unpinned even when not mapped
+TEST_F(AshmemTest, PinAfterMunmap) {
+  ashmem_pin pin = {.offset = 0, .len = PAGE_SIZE};
+  auto fd = CreateRegion(nullptr, PAGE_SIZE);
+  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin), SyscallSucceedsWithValue(ASHMEM_NOT_PURGED));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin), SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_PIN_STATUS, &pin),
+              SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
+
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
