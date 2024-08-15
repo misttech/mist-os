@@ -16,7 +16,8 @@ TEST(DdkFirmwaretest, DriverWasLoaded) {
 }
 
 int main(int argc, char **argv) {
-  fuchsia_logging::SetTags({"driver_test_realm_test"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"driver_test_realm_test"}).BuildAndInitialize();
 
   // Connect to DriverTestRealm.
   auto client_end = component::Connect<fuchsia_driver_test::Realm>();

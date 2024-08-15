@@ -53,7 +53,8 @@ class DevNullVnode : public fs::Vnode {
 }  // namespace
 
 int main(int argc, const char** argv) {
-  fuchsia_logging::SetTags({"sshd-host"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"sshd-host"}).BuildAndInitialize();
 
   FX_LOG_KV(INFO, "sshd-host starting up");
 

@@ -14,7 +14,8 @@ int main(int argc, const char** argv) {
   // component::Outgoing() which can currently only construct using
   // async_get_default_dispatcher().
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  fuchsia_logging::SetTags({"sysmem_connector"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"sysmem_connector"}).BuildAndInitialize();
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher());
   App app(loop.dispatcher());
   loop.Run();

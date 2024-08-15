@@ -12,7 +12,8 @@
 #include <fbl/unique_fd.h>
 
 int main() {
-  fuchsia_logging::SetTags({"simple_driver_test_realm"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"simple_driver_test_realm"}).BuildAndInitialize();
 
   auto client_end = component::Connect<fuchsia_driver_test::Realm>();
   if (!client_end.is_ok()) {
