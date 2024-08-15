@@ -23,11 +23,7 @@ pub async fn register_migration_status(root: &fuchsia_inspect::Node, status: zx:
     }
 }
 
-pub async fn register_stats(
-    root: &fuchsia_inspect::Node,
-    data_dir: DirectoryProxy,
-    tree_stats: bool,
-) {
+pub async fn register_stats(root: &fuchsia_inspect::Node, data_dir: DirectoryProxy) {
     root.record_lazy_child("data_stats", move || {
         let data_dir = Clone::clone(&data_dir);
         async move {
@@ -39,12 +35,10 @@ pub async fn register_stats(
             record_filesystem_info(&stats_node, &data_dir).await?;
             root.record(stats_node);
 
-            if tree_stats {
-                // Tree size stats
-                let tree_size_node = root.create_child("data");
-                record_tree_size(tree_size_node.clone_weak(), data_dir).await?;
-                root.record(tree_size_node);
-            }
+            // Tree size stats
+            let tree_size_node = root.create_child("data");
+            record_tree_size(tree_size_node.clone_weak(), data_dir).await?;
+            root.record(tree_size_node);
 
             Ok(inspector)
         }

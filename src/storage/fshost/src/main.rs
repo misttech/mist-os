@@ -91,9 +91,8 @@ async fn main() -> Result<(), Error> {
     );
 
     let launcher = env.launcher();
-    // Records inspect metrics. Too expensive to build the tree data in newer fxfs environments.
-    register_stats(inspector.root(), env.data_root()?, config.data_filesystem_format != "fxfs")
-        .await;
+    // Records inspect metrics
+    register_stats(inspector.root(), env.data_root()?).await;
     let blob_exposed_dir = env.blobfs_exposed_dir()?;
     let data_exposed_dir = env.data_exposed_dir()?;
     let env: Arc<Mutex<dyn Environment>> = Arc::new(Mutex::new(env));
