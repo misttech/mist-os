@@ -10,8 +10,10 @@
 #include <fidl/fuchsia.images2/cpp/hlcpp_conversion.h>
 #include <fidl/fuchsia.sysmem/cpp/hlcpp_conversion.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
+#include <fidl/fuchsia.ui.composition/cpp/hlcpp_conversion.h>
 #include <lib/async/default.h>
 #include <lib/fdio/directory.h>
+#include <lib/fidl/cpp/hlcpp_conversion.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/trace/event.h>
 #include <zircon/status.h>
@@ -19,6 +21,7 @@
 #include <cstdint>
 #include <vector>
 
+#include "fidl/fuchsia.hardware.display.types/cpp/common_types.h"
 #include "lib/fidl/cpp/hlcpp_conversion.h"
 #include "lib/fidl/cpp/wire/status.h"
 #include "src/lib/fsl/handles/object_info.h"
@@ -57,13 +60,13 @@ uint32_t BufferCollectionPixelFormatToImageTilingType(
 }
 
 fuchsia_hardware_display_types::AlphaMode GetAlphaMode(
-    const fuchsia::ui::composition::BlendMode& blend_mode) {
+    const fuchsia_ui_composition::BlendMode& blend_mode) {
   fuchsia_hardware_display_types::AlphaMode alpha_mode;
   switch (blend_mode) {
-    case fuchsia::ui::composition::BlendMode::SRC:
+    case fuchsia_ui_composition::BlendMode::kSrc:
       alpha_mode = fuchsia_hardware_display_types::AlphaMode::kDisable;
       break;
-    case fuchsia::ui::composition::BlendMode::SRC_OVER:
+    case fuchsia_ui_composition::BlendMode::kSrcOver:
       alpha_mode = fuchsia_hardware_display_types::AlphaMode::kPremultiplied;
       break;
   }
@@ -598,9 +601,9 @@ bool DisplayCompositor::SetRenderDataOnDisplay(const RenderData& data) {
   return true;
 }
 
-void DisplayCompositor::ApplyLayerColor(const fuchsia_hardware_display::LayerId layer_id,
-                                        const ImageRect rectangle,
-                                        const allocation::ImageMetadata image) {
+void DisplayCompositor::ApplyLayerColor(const fuchsia_hardware_display::LayerId& layer_id,
+                                        const ImageRect& rectangle,
+                                        const allocation::ImageMetadata& image) {
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   FX_DCHECK(display_coordinator_.is_valid());
 
@@ -659,11 +662,11 @@ void DisplayCompositor::ApplyLayerColor(const fuchsia_hardware_display::LayerId 
 #endif
 }
 
-void DisplayCompositor::ApplyLayerImage(const fuchsia_hardware_display::LayerId layer_id,
-                                        const ImageRect rectangle,
-                                        const allocation::ImageMetadata image,
-                                        const scenic_impl::DisplayEventId wait_id,
-                                        const scenic_impl::DisplayEventId signal_id) {
+void DisplayCompositor::ApplyLayerImage(const fuchsia_hardware_display::LayerId& layer_id,
+                                        const ImageRect& rectangle,
+                                        const allocation::ImageMetadata& image,
+                                        const scenic_impl::DisplayEventId& wait_id,
+                                        const scenic_impl::DisplayEventId& signal_id) {
   TRACE_DURATION("gfx", "flatland::DisplayCompositor::ApplyLayerImage");
   FX_DCHECK(main_dispatcher_ == async_get_default_dispatcher());
   FX_DCHECK(display_coordinator_.is_valid());

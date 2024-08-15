@@ -4,6 +4,8 @@
 
 #include "src/ui/scenic/lib/screenshot/flatland_screenshot.h"
 
+#include <fidl/fuchsia.ui.composition/cpp/fidl.h>
+#include <fidl/fuchsia.ui.composition/cpp/hlcpp_conversion.h>
 #include <lib/fdio/directory.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/errors.h>
@@ -11,7 +13,6 @@
 
 #include <optional>
 
-#include "fuchsia/ui/composition/cpp/fidl.h"
 #include "src/ui/scenic/lib/allocation/allocator.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
@@ -111,17 +112,14 @@ FlatlandScreenshot::FlatlandScreenshot(
   buffer_collection->SetName(std::move(set_name_request));
 
   // Initialize Flatland allocator state.
-  fuchsia::ui::composition::RegisterBufferCollectionArgs args = {};
-  args.set_export_token(std::move(ref_pair.export_token));
-  args.set_buffer_collection_token(fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
-      dup_token.Unbind().TakeChannel()));
-  args.set_usages(fuchsia::ui::composition::RegisterBufferCollectionUsages::SCREENSHOT);
+  fuchsia_ui_composition::RegisterBufferCollectionArgs args;
+  args.export_token(fidl::HLCPPToNatural(std::move(ref_pair.export_token)));
+  args.buffer_collection_token(
+      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(dup_token.Unbind().TakeChannel()));
+  args.usages(fuchsia_ui_composition::RegisterBufferCollectionUsages::kScreenshot);
 
-  flatland_allocator_->RegisterBufferCollection(
-      std::move(args),
-      [](fuchsia::ui::composition::Allocator_RegisterBufferCollection_Result result) {
-        FX_DCHECK(!result.is_err());
-      });
+  flatland_allocator_->RegisterBufferCollection(std::move(args),
+                                                [](auto result) { FX_DCHECK(!result.is_error()); });
 
   ScreenCaptureConfig sc_args;
   sc_args.set_import_token(std::move(ref_pair.import_token));

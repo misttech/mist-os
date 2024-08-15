@@ -10,8 +10,8 @@
 
 namespace {
 
-using fuchsia::ui::composition::ImageFlip;
 using fuchsia::ui::composition::Orientation;
+using fuchsia_ui_composition::ImageFlip;
 
 }  // namespace
 namespace flatland {
@@ -42,47 +42,47 @@ fuchsia_hardware_display_types::CoordinateTransformation GetDisplayTransformFrom
   switch (orientation) {
     case Orientation::CCW_0_DEGREES:
       switch (image_flip) {
-        case ImageFlip::NONE:
+        case ImageFlip::kNone:
           return fuchsia_hardware_display_types::CoordinateTransformation::kIdentity;
-        case ImageFlip::LEFT_RIGHT:
+        case ImageFlip::kLeftRight:
           return fuchsia_hardware_display_types::CoordinateTransformation::kReflectY;
-        case ImageFlip::UP_DOWN:
+        case ImageFlip::kUpDown:
           return fuchsia_hardware_display_types::CoordinateTransformation::kReflectX;
       }
 
     case Orientation::CCW_90_DEGREES:
       switch (image_flip) {
-        case ImageFlip::NONE:
+        case ImageFlip::kNone:
           return fuchsia_hardware_display_types::CoordinateTransformation::kRotateCcw90;
-        case ImageFlip::LEFT_RIGHT:
+        case ImageFlip::kLeftRight:
           // Left-right flip + 90Ccw is equivalent to 90Ccw + up-down flip.
           return fuchsia_hardware_display_types::CoordinateTransformation::kRotateCcw90ReflectX;
-        case ImageFlip::UP_DOWN:
+        case ImageFlip::kUpDown:
           // Up-down flip + 90Ccw is equivalent to 90Ccw + left-right flip.
           return fuchsia_hardware_display_types::CoordinateTransformation::kRotateCcw90ReflectY;
       }
 
     case Orientation::CCW_180_DEGREES:
       switch (image_flip) {
-        case ImageFlip::NONE:
+        case ImageFlip::kNone:
           return fuchsia_hardware_display_types::CoordinateTransformation::kRotateCcw180;
-        case ImageFlip::LEFT_RIGHT:
+        case ImageFlip::kLeftRight:
           // Left-right flip + 180 degree rotation is equivalent to up-down flip.
           return fuchsia_hardware_display_types::CoordinateTransformation::kReflectX;
-        case ImageFlip::UP_DOWN:
+        case ImageFlip::kUpDown:
           // Up-down flip + 180 degree rotation is equivalent to left-right flip.
           return fuchsia_hardware_display_types::CoordinateTransformation::kReflectY;
       }
 
     case Orientation::CCW_270_DEGREES:
       switch (image_flip) {
-        case ImageFlip::NONE:
+        case ImageFlip::kNone:
           return fuchsia_hardware_display_types::CoordinateTransformation::kRotateCcw270;
-        case ImageFlip::LEFT_RIGHT:
+        case ImageFlip::kLeftRight:
           // Left-right flip + 270Ccw is equivalent to 270Ccw + up-down flip, which in turn is
           // equivalent to 90Ccw + left-right flip.
           return fuchsia_hardware_display_types::CoordinateTransformation::kRotateCcw90ReflectY;
-        case ImageFlip::UP_DOWN:
+        case ImageFlip::kUpDown:
           // Up-down flip + 270Ccw is equivalent to 270Ccw + left-right flip, which in turn is
           // equivalent to 90Ccw + up-down flip.
           return fuchsia_hardware_display_types::CoordinateTransformation::kRotateCcw90ReflectX;

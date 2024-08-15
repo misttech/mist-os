@@ -36,6 +36,7 @@ template("engine_library") {
       "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp",
       "//sdk/fidl/fuchsia.math:fuchsia.math_cpp",
       "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_cpp_hlcpp_conversion",
+      "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_cpp_hlcpp_conversion",
       "//sdk/lib/inspect/component/cpp",
       "//src/lib/fxl",
       "//src/ui/scenic/lib/display",

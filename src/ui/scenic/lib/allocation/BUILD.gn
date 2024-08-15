@@ -18,7 +18,7 @@ source_set("allocation") {
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
     "//sdk/fidl/fuchsia.hardware.display.types:fuchsia.hardware.display.types_cpp",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_hlcpp",
-    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_cpp",
     "//src/lib/fxl",
   ]
 

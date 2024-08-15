@@ -5,6 +5,7 @@
 #include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <fidl/fuchsia.math/cpp/fidl.h>
+#include <fidl/fuchsia.ui.composition/cpp/fidl.h>
 #include <fuchsia/math/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/fidl/cpp/hlcpp_conversion.h>
@@ -42,11 +43,12 @@ using flatland::UberStructSystem;
 using fuchsia::sysmem::BufferUsage;
 using fuchsia::ui::composition::ChildViewStatus;
 using fuchsia::ui::composition::ChildViewWatcher;
-using fuchsia::ui::composition::ImageFlip;
 using fuchsia::ui::composition::LayoutInfo;
 using fuchsia::ui::composition::ParentViewportWatcher;
 using fuchsia::ui::views::ViewCreationToken;
 using fuchsia::ui::views::ViewportCreationToken;
+using fuchsia_ui_composition::BlendMode;
+using fuchsia_ui_composition::ImageFlip;
 
 namespace flatland::test {
 
@@ -717,7 +719,7 @@ TEST_F(DisplayCompositorTest, ImageIsValidAfterReleaseBufferCollection) {
       .vmo_index = 0,
       .width = 128,
       .height = 256,
-      .blend_mode = fuchsia::ui::composition::BlendMode::SRC,
+      .blend_mode = BlendMode::kSrc,
   };
   EXPECT_CALL(*mock_display_coordinator_,
               ImportImage(MatchRequestField(ImportImage, buffer_id,
@@ -818,7 +820,7 @@ TEST_F(DisplayCompositorTest, ImportImageErrorCases) {
       .vmo_index = kVmoIdx,
       .width = 20,
       .height = 30,
-      .blend_mode = fuchsia::ui::composition::BlendMode::SRC,
+      .blend_mode = BlendMode::kSrc,
   };
 
   // Make sure that the engine returns true if the display coordinator returns true.
@@ -1033,7 +1035,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
       .vmo_index = 0,
       .width = 128,
       .height = 256,
-      .blend_mode = fuchsia::ui::composition::BlendMode::SRC,
+      .blend_mode = BlendMode::kSrc,
   };
   parent_struct->images[parent_image_handle] = parent_image_metadata;
 
@@ -1055,7 +1057,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessTest) {
       .vmo_index = 1,
       .width = 512,
       .height = 1024,
-      .blend_mode = fuchsia::ui::composition::BlendMode::SRC,
+      .blend_mode = BlendMode::kSrc,
   };
   child_struct->images[child_image_handle] = child_image_metadata;
   child_struct->local_matrices[child_image_handle] =
@@ -1304,7 +1306,7 @@ void DisplayCompositorTest::HardwareFrameCorrectnessWithRotationTester(
       .vmo_index = 0,
       .width = 128,
       .height = 256,
-      .blend_mode = fuchsia::ui::composition::BlendMode::SRC,
+      .blend_mode = BlendMode::kSrc,
       .flip = image_flip,
   };
   parent_struct->images[parent_image_handle] = parent_image_metadata;
@@ -1509,7 +1511,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWith90DegreeRotationTest) 
   const fuchsia_math::RectU expected_dst = {{.x = 0u, .y = 0u, .width = 20u, .height = 10u}};
 
   HardwareFrameCorrectnessWithRotationTester(
-      matrix, ImageFlip::NONE, expected_dst,
+      matrix, ImageFlip::kNone, expected_dst,
       fuchsia_hardware_display_types::CoordinateTransformation::kRotateCcw90);
 }
 
@@ -1523,7 +1525,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWith180DegreeRotationTest)
   const fuchsia_math::RectU expected_dst = {{.x = 0u, .y = 0u, .width = 10u, .height = 20u}};
 
   HardwareFrameCorrectnessWithRotationTester(
-      matrix, ImageFlip::NONE, expected_dst,
+      matrix, ImageFlip::kNone, expected_dst,
       fuchsia_hardware_display_types::CoordinateTransformation::kRotateCcw180);
 }
 
@@ -1537,7 +1539,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWith270DegreeRotationTest)
   const fuchsia_math::RectU expected_dst = {{.x = 0u, .y = 0u, .width = 20u, .height = 10u}};
 
   HardwareFrameCorrectnessWithRotationTester(
-      matrix, ImageFlip::NONE, expected_dst,
+      matrix, ImageFlip::kNone, expected_dst,
       fuchsia_hardware_display_types::CoordinateTransformation::kRotateCcw270);
 }
 
@@ -1547,7 +1549,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithLeftRightFlipTest) {
   const fuchsia_math::RectU expected_dst = {{.x = 0u, .y = 0u, .width = 10u, .height = 20u}};
 
   HardwareFrameCorrectnessWithRotationTester(
-      matrix, ImageFlip::LEFT_RIGHT, expected_dst,
+      matrix, ImageFlip::kLeftRight, expected_dst,
       fuchsia_hardware_display_types::CoordinateTransformation::kReflectY);
 }
 
@@ -1557,7 +1559,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithUpDownFlipTest) {
   const fuchsia_math::RectU expected_dst = {{.x = 0u, .y = 0u, .width = 10u, .height = 20u}};
 
   HardwareFrameCorrectnessWithRotationTester(
-      matrix, ImageFlip::UP_DOWN, expected_dst,
+      matrix, ImageFlip::kUpDown, expected_dst,
       fuchsia_hardware_display_types::CoordinateTransformation::kReflectX);
 }
 
@@ -1572,7 +1574,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithLeftRightFlip90DegreeR
 
   // The expected display coordinator transform performs rotation before reflection.
   HardwareFrameCorrectnessWithRotationTester(
-      matrix, ImageFlip::LEFT_RIGHT, expected_dst,
+      matrix, ImageFlip::kLeftRight, expected_dst,
       fuchsia_hardware_display_types::CoordinateTransformation::kRotateCcw90ReflectX);
 }
 
@@ -1587,7 +1589,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithUpDownFlip90DegreeRota
 
   // The expected display coordinator transform performs rotation before reflection.
   HardwareFrameCorrectnessWithRotationTester(
-      matrix, ImageFlip::UP_DOWN, expected_dst,
+      matrix, ImageFlip::kUpDown, expected_dst,
       fuchsia_hardware_display_types::CoordinateTransformation::kRotateCcw90ReflectY);
 }
 
@@ -1602,7 +1604,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithLeftRightFlip180Degree
 
   // The expected display coordinator transform performs rotation before reflection.
   HardwareFrameCorrectnessWithRotationTester(
-      matrix, ImageFlip::LEFT_RIGHT, expected_dst,
+      matrix, ImageFlip::kLeftRight, expected_dst,
       fuchsia_hardware_display_types::CoordinateTransformation::kReflectX);
 }
 
@@ -1617,7 +1619,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithUpDownFlip180DegreeRot
 
   // The expected display coordinator transform performs rotation before reflection.
   HardwareFrameCorrectnessWithRotationTester(
-      matrix, ImageFlip::UP_DOWN, expected_dst,
+      matrix, ImageFlip::kUpDown, expected_dst,
       fuchsia_hardware_display_types::CoordinateTransformation::kReflectY);
 }
 
@@ -1632,7 +1634,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithLeftRightFlip270Degree
 
   // The expected display coordinator transform performs rotation before reflection.
   HardwareFrameCorrectnessWithRotationTester(
-      matrix, ImageFlip::LEFT_RIGHT, expected_dst,
+      matrix, ImageFlip::kLeftRight, expected_dst,
       fuchsia_hardware_display_types::CoordinateTransformation::kRotateCcw90ReflectY);
 }
 
@@ -1647,7 +1649,7 @@ TEST_F(DisplayCompositorTest, HardwareFrameCorrectnessWithUpDownFlip270DegreeRot
 
   // The expected display coordinator transform performs rotation before reflection.
   HardwareFrameCorrectnessWithRotationTester(
-      matrix, ImageFlip::UP_DOWN, expected_dst,
+      matrix, ImageFlip::kUpDown, expected_dst,
       fuchsia_hardware_display_types::CoordinateTransformation::kRotateCcw90ReflectX);
 }
 
@@ -1673,7 +1675,7 @@ TEST_F(DisplayCompositorTest, ChecksDisplayImageSignalFences) {
       .vmo_index = 0,
       .width = 128,
       .height = 256,
-      .blend_mode = fuchsia::ui::composition::BlendMode::SRC,
+      .blend_mode = BlendMode::kSrc,
   };
   uber_struct->images[image_handle] = image_metadata;
   uber_struct->local_matrices[image_handle] =

@@ -244,13 +244,16 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
       FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Takes a solid color rectangle and directly composites it to a hardware layer on the display.
-  void ApplyLayerColor(fuchsia_hardware_display::LayerId layer_id, ImageRect rectangle,
-                       allocation::ImageMetadata image) FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  void ApplyLayerColor(const fuchsia_hardware_display::LayerId& layer_id,
+                       const ImageRect& rectangle, const allocation::ImageMetadata& image)
+      FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Takes an image and directly composites it to a hardware layer on the display.
-  void ApplyLayerImage(fuchsia_hardware_display::LayerId layer_id, ImageRect rectangle,
-                       allocation::ImageMetadata image, scenic_impl::DisplayEventId wait_id,
-                       scenic_impl::DisplayEventId signal_id) FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  void ApplyLayerImage(const fuchsia_hardware_display::LayerId& layer_id,
+                       const ImageRect& rectangle, const allocation::ImageMetadata& image,
+                       const scenic_impl::DisplayEventId& wait_id,
+                       const scenic_impl::DisplayEventId& signal_id)
+      FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Checks if the display coordinator is capable of applying the configuration settings that
   // have been set up until that point.

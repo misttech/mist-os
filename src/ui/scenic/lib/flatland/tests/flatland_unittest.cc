@@ -69,7 +69,6 @@ using flatland::TransformGraph;
 using flatland::TransformHandle;
 using flatland::UberStruct;
 using flatland::UberStructSystem;
-using fuchsia::ui::composition::Allocator_RegisterBufferCollection_Result;
 using fuchsia_math::SizeU;
 using fuchsia_ui_composition::BufferCollectionExportToken;
 using fuchsia_ui_composition::BufferCollectionImportToken;
@@ -202,10 +201,10 @@ struct BufferCollectionImportExportTokensNatural {
     PRESENT_WITH_ARGS(flatland, PresentArgs(), expect_success); \
   }
 
-#define REGISTER_BUFFER_COLLECTION(allocator, export_token, token, expect_success)               \
+#define REGISTER_BUFFER_COLLECTION(allocator, bc_export_token, token, expect_success)            \
   if (expect_success) {                                                                          \
     EXPECT_CALL(*mock_buffer_collection_importer_,                                               \
-                ImportBufferCollection(fsl::GetKoid(export_token.value().get()), _, _, _, _))    \
+                ImportBufferCollection(fsl::GetKoid(bc_export_token.value().get()), _, _, _, _)) \
         .WillOnce(testing::Invoke(                                                               \
             [](allocation::GlobalBufferCollectionId, fuchsia::sysmem2::Allocator_Sync*,          \
                fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>,                   \
@@ -213,15 +212,14 @@ struct BufferCollectionImportExportTokensNatural {
                std::optional<fuchsia::math::SizeU>) { return true; }));                          \
   }                                                                                              \
   bool processed_callback = false;                                                               \
-  fuchsia::ui::composition::RegisterBufferCollectionArgs args;                                   \
-  args.set_export_token(fidl::NaturalToHLCPP(export_token));                                     \
-  args.set_buffer_collection_token(                                                              \
-      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(token.TakeChannel()));       \
-  allocator->RegisterBufferCollection(                                                           \
-      std::move(args), [&processed_callback](Allocator_RegisterBufferCollection_Result result) { \
-        EXPECT_EQ(!expect_success, result.is_err());                                             \
-        processed_callback = true;                                                               \
-      });                                                                                        \
+  fuchsia_ui_composition::RegisterBufferCollectionArgs args;                                     \
+  args.export_token(std::move(bc_export_token));                                                 \
+  args.buffer_collection_token(                                                                  \
+      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(token.TakeChannel()));              \
+  allocator->RegisterBufferCollection(std::move(args), [&processed_callback](auto result) {      \
+    EXPECT_EQ(expect_success, result.is_ok());                                                   \
+    processed_callback = true;                                                                   \
+  });                                                                                            \
   EXPECT_TRUE(processed_callback);
 
 // This macro searches for a local matrix associated with a specific TransformHandle.
@@ -1753,8 +1751,8 @@ TEST_F(FlatlandTest, SetImageBlendFunctionUberstructTest) {
   EXPECT_NE(image_2_kv, uber_struct->images.end());
 
   // Make sure the opacity fields are set properly.
-  EXPECT_TRUE(image_1_kv->second.blend_mode == fuchsia::ui::composition::BlendMode::SRC);
-  EXPECT_TRUE(image_2_kv->second.blend_mode == fuchsia::ui::composition::BlendMode::SRC_OVER);
+  EXPECT_TRUE(image_1_kv->second.blend_mode == fuchsia_ui_composition::BlendMode::kSrc);
+  EXPECT_TRUE(image_2_kv->second.blend_mode == fuchsia_ui_composition::BlendMode::kSrcOver);
 }
 
 TEST_F(FlatlandTest, SetImageFlipErrorCases) {
@@ -1852,8 +1850,8 @@ TEST_F(FlatlandTest, SetImageFlipUberstructTest) {
   EXPECT_NE(image_2_kv, uber_struct->images.end());
 
   // Make sure the flip fields are set properly.
-  EXPECT_TRUE(image_1_kv->second.flip == fuchsia::ui::composition::ImageFlip::NONE);
-  EXPECT_TRUE(image_2_kv->second.flip == fuchsia::ui::composition::ImageFlip::UP_DOWN);
+  EXPECT_TRUE(image_1_kv->second.flip == fuchsia_ui_composition::ImageFlip::kNone);
+  EXPECT_TRUE(image_2_kv->second.flip == fuchsia_ui_composition::ImageFlip::kUpDown);
 }
 
 // Test that changing geometric transform properties affects the local matrix of Transforms.

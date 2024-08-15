@@ -129,7 +129,8 @@ fuchsia::math::RectF MatrixMultiplyRectF(const glm::mat3& matrix, fuchsia::math:
 }
 
 ImageRect CreateImageRect(const glm::mat3& matrix, const TransformClipRegion& clip,
-                          const std::array<glm::ivec2, 4>& texel_uvs, ImageFlip image_flip) {
+                          const std::array<glm::ivec2, 4>& texel_uvs,
+                          const fuchsia_ui_composition::ImageFlip image_flip) {
   // The local space of the renderable has its top-left origin point at (0,0) and grows
   // downward and to the right, so that the bottom-right point is at (1,1). We apply
   // the matrix to the four points that represent this unit square to get the points in
@@ -224,15 +225,15 @@ ImageRect CreateImageRect(const glm::mat3& matrix, const TransformClipRegion& cl
   std::array<glm::ivec2, 4> flipped_uvs;
   std::array<int, 4> flip_idx;
   switch (image_flip) {
-    case ImageFlip::NONE:
+    case fuchsia_ui_composition::ImageFlip::kNone:
       flip_idx = {0, 1, 2, 3};
       flipped_uvs = {texel_uvs[0], texel_uvs[1], texel_uvs[2], texel_uvs[3]};
       break;
-    case ImageFlip::LEFT_RIGHT:
+    case fuchsia_ui_composition::ImageFlip::kLeftRight:
       flip_idx = {1, 0, 3, 2};
       flipped_uvs = {texel_uvs[1], texel_uvs[0], texel_uvs[3], texel_uvs[2]};
       break;
-    case ImageFlip::UP_DOWN:
+    case fuchsia_ui_composition::ImageFlip::kUpDown:
       flip_idx = {3, 2, 1, 0};
       flipped_uvs = {texel_uvs[3], texel_uvs[2], texel_uvs[1], texel_uvs[0]};
       break;
@@ -504,7 +505,7 @@ void CullRectangles(GlobalRectangleVector* rectangles_in_out, GlobalImageVector*
                          const ImageRect& rectangle,
                          const allocation::ImageMetadata& image) -> bool {
     // Only cull if the rect is opaque.
-    auto is_opaque = image.blend_mode == fuchsia::ui::composition::BlendMode::SRC;
+    auto is_opaque = image.blend_mode == fuchsia_ui_composition::BlendMode::kSrc;
 
     // If the rect is full screen (or larger), and opaque, clear the output vectors.
     return (is_opaque && rectangle.origin.x <= 0 && rectangle.origin.y <= 0 &&

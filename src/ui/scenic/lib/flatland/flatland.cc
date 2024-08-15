@@ -1225,7 +1225,7 @@ void Flatland::CreateImage(ContentId image_id,
   metadata.vmo_index = vmo_index;
   metadata.width = properties.size()->width();
   metadata.height = properties.size()->height();
-  metadata.blend_mode = fuchsia::ui::composition::BlendMode::SRC;
+  metadata.blend_mode = fuchsia_ui_composition::BlendMode::kSrc;
 
   for (uint32_t i = 0; i < buffer_collection_importers_.size(); i++) {
     auto& importer = buffer_collection_importers_[i];
@@ -1383,7 +1383,7 @@ void Flatland::SetImageBlendingFunction(ContentId image_identifier,
     return;
   }
 
-  image_kv->second.blend_mode = fidl::NaturalToHLCPP(blend_mode);
+  image_kv->second.blend_mode = blend_mode;
 }
 
 void Flatland::SetImageFlip(SetImageFlipRequest& request, SetImageFlipCompleter::Sync& completer) {
@@ -1413,7 +1413,7 @@ void Flatland::SetImageFlip(ContentId image_identifier, fuchsia_ui_composition::
     return;
   }
 
-  image_kv->second.flip = fidl::NaturalToHLCPP(flip);
+  image_kv->second.flip = flip;
 }
 
 void Flatland::CreateFilledRect(CreateFilledRectRequest& request,
@@ -1440,7 +1440,7 @@ void Flatland::CreateFilledRect(ContentId rect_identifier) {
   // allocation::kInvalidImageId is overloaded in the renderer to signal that a
   // default 1x1 white texture should be applied to this rectangle.
   metadata.identifier = allocation::kInvalidImageId;
-  metadata.blend_mode = fuchsia::ui::composition::BlendMode::SRC;
+  metadata.blend_mode = fuchsia_ui_composition::BlendMode::kSrc;
 
   // Now that we've successfully been able to import the image into the importers,
   // we can now create a handle for it in the transform graph, and add the metadata
@@ -1489,8 +1489,8 @@ void Flatland::SetSolidFill(ContentId rect_identifier, fuchsia_ui_composition::C
     return;
   }
 
-  image_kv->second.blend_mode = color.alpha() < 1.f ? fuchsia::ui::composition::BlendMode::SRC_OVER
-                                                    : fuchsia::ui::composition::BlendMode::SRC;
+  image_kv->second.blend_mode = color.alpha() < 1.f ? fuchsia_ui_composition::BlendMode::kSrcOver
+                                                    : fuchsia_ui_composition::BlendMode::kSrc;
   image_kv->second.collection_id = allocation::kInvalidId;
   image_kv->second.identifier = allocation::kInvalidImageId;
   image_kv->second.multiply_color = {color.red(), color.green(), color.blue(), color.alpha()};

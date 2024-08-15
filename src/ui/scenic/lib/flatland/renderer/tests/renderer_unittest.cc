@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.ui.composition/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <lib/async-testing/test_loop.h>
 #include <lib/async/cpp/wait.h>
@@ -42,8 +43,9 @@ fuchsia::sysmem2::BufferUsage get_cpu_usage_read() {
 
 using allocation::BufferCollectionUsage;
 using allocation::ImageMetadata;
-using fuchsia::ui::composition::ImageFlip;
 using fuchsia::ui::composition::Orientation;
+using fuchsia_ui_composition::BlendMode;
+using fuchsia_ui_composition::ImageFlip;
 
 // TODO(https://fxbug.dev/42129956): Move common functions to testing::WithParamInterface instead of
 // function calls.
@@ -1337,7 +1339,7 @@ VK_TEST_F(VulkanRendererTest, FlipLeftRightAndRotate90RenderTest) {
                                       .vmo_index = 0,
                                       .width = static_cast<uint32_t>(kTextureWidth),
                                       .height = static_cast<uint32_t>(kTextureHeight),
-                                      .flip = ImageFlip::LEFT_RIGHT};
+                                      .flip = ImageFlip::kLeftRight};
 
   auto import_res = renderer.ImportBufferImage(render_target, BufferCollectionUsage::kRenderTarget);
   EXPECT_TRUE(import_res);
@@ -1514,7 +1516,7 @@ VK_TEST_F(VulkanRendererTest, FlipUpDownAndRotate90RenderTest) {
                                       .vmo_index = 0,
                                       .width = static_cast<uint32_t>(w),
                                       .height = static_cast<uint32_t>(h),
-                                      .flip = ImageFlip::UP_DOWN};
+                                      .flip = ImageFlip::kUpDown};
 
   auto import_res = renderer.ImportBufferImage(render_target, BufferCollectionUsage::kRenderTarget);
   EXPECT_TRUE(import_res);
@@ -1623,10 +1625,9 @@ VK_TEST_F(VulkanRendererTest, SolidColorTest) {
                                  .height = kTargetHeight};
 
   // Create the image meta data for the solid color renderable.
-  ImageMetadata renderable_image_data = {
-      .identifier = allocation::kInvalidImageId,
-      .multiply_color = {1.f, 0.4f, 0.f, 1.f},
-      .blend_mode = fuchsia::ui::composition::BlendMode::SRC_OVER};
+  ImageMetadata renderable_image_data = {.identifier = allocation::kInvalidImageId,
+                                         .multiply_color = {1.f, 0.4f, 0.f, 1.f},
+                                         .blend_mode = BlendMode::kSrcOver};
 
   renderer->ImportBufferImage(render_target, BufferCollectionUsage::kRenderTarget);
 
@@ -1694,10 +1695,9 @@ VK_TEST_F(VulkanRendererTest, ColorCorrectionTest) {
                                  .height = kTargetHeight};
 
   // Create the image meta data for the solid color renderable.
-  ImageMetadata renderable_image_data = {
-      .identifier = allocation::kInvalidImageId,
-      .multiply_color = {1, 0, 0, 1},
-      .blend_mode = fuchsia::ui::composition::BlendMode::SRC_OVER};
+  ImageMetadata renderable_image_data = {.identifier = allocation::kInvalidImageId,
+                                         .multiply_color = {1, 0, 0, 1},
+                                         .blend_mode = BlendMode::kSrcOver};
 
   renderer->ImportBufferImage(render_target, BufferCollectionUsage::kRenderTarget);
 
@@ -1777,16 +1777,14 @@ VK_TEST_F(VulkanRendererTest, MultipleSolidColorTest) {
                                  .height = kTargetHeight};
 
   // Create the image meta data for the solid color renderable - red.
-  ImageMetadata renderable_image_data = {
-      .identifier = allocation::kInvalidImageId,
-      .multiply_color = {1, 0, 0, 1},
-      .blend_mode = fuchsia::ui::composition::BlendMode::SRC_OVER};
+  ImageMetadata renderable_image_data = {.identifier = allocation::kInvalidImageId,
+                                         .multiply_color = {1, 0, 0, 1},
+                                         .blend_mode = BlendMode::kSrcOver};
 
   // Create the image meta data for the other solid color renderable - blue.
-  ImageMetadata renderable_image_data_2 = {
-      .identifier = allocation::kInvalidImageId,
-      .multiply_color = {0, 0, 1, 1},
-      .blend_mode = fuchsia::ui::composition::BlendMode::SRC_OVER};
+  ImageMetadata renderable_image_data_2 = {.identifier = allocation::kInvalidImageId,
+                                           .multiply_color = {0, 0, 1, 1},
+                                           .blend_mode = BlendMode::kSrcOver};
 
   renderer->ImportBufferImage(render_target, BufferCollectionUsage::kRenderTarget);
 
@@ -1862,10 +1860,9 @@ VK_TEST_F(VulkanRendererTest, MixSolidColorAndImageTest) {
                                  .height = kTargetHeight};
 
   // Create the image meta data for the solid color renderable - green.
-  ImageMetadata renderable_image_data = {
-      .identifier = allocation::kInvalidImageId,
-      .multiply_color = {0, 1, 0, 1},
-      .blend_mode = fuchsia::ui::composition::BlendMode::SRC_OVER};
+  ImageMetadata renderable_image_data = {.identifier = allocation::kInvalidImageId,
+                                         .multiply_color = {0, 1, 0, 1},
+                                         .blend_mode = BlendMode::kSrcOver};
 
   // Create the image meta data for the image backed renderable - red.
   ImageMetadata renderable_image_data_2 = {.collection_id = collection_id,
@@ -1981,7 +1978,7 @@ VK_TEST_F(VulkanRendererTest, TransparencyTest) {
                                        .vmo_index = 1,
                                        .width = 1,
                                        .height = 1,
-                                       .blend_mode = fuchsia::ui::composition::BlendMode::SRC_OVER};
+                                       .blend_mode = BlendMode::kSrcOver};
 
   // Import all the images.
   renderer->ImportBufferImage(render_target, BufferCollectionUsage::kRenderTarget);
@@ -2099,7 +2096,7 @@ VK_TEST_F(VulkanRendererTest, MultiplyColorTest) {
                                       .width = 1,
                                       .height = 1,
                                       .multiply_color = {1, 0, 0, 1},
-                                      .blend_mode = fuchsia::ui::composition::BlendMode::SRC_OVER};
+                                      .blend_mode = BlendMode::kSrcOver};
 
   // Create the texture that will go on the transparent renderable.
   ImageMetadata transparent_texture = {.collection_id = collection_id,
@@ -2108,7 +2105,7 @@ VK_TEST_F(VulkanRendererTest, MultiplyColorTest) {
                                        .width = 1,
                                        .height = 1,
                                        .multiply_color = {0, 1, 0, 0.5},
-                                       .blend_mode = fuchsia::ui::composition::BlendMode::SRC_OVER};
+                                       .blend_mode = BlendMode::kSrcOver};
 
   // Import all the images.
   renderer->ImportBufferImage(render_target, BufferCollectionUsage::kRenderTarget);
@@ -2511,10 +2508,9 @@ VK_TEST_F(VulkanRendererTest, ReadbackTest) {
   ASSERT_TRUE(result);
 
   // Create the image metadata for the solid color renderable.
-  ImageMetadata renderable_image_data = {
-      .identifier = allocation::kInvalidImageId,
-      .multiply_color = {1.f, 0.4f, 0.f, 1.f},
-      .blend_mode = fuchsia::ui::composition::BlendMode::SRC_OVER};
+  ImageMetadata renderable_image_data = {.identifier = allocation::kInvalidImageId,
+                                         .multiply_color = {1.f, 0.4f, 0.f, 1.f},
+                                         .blend_mode = BlendMode::kSrcOver};
   ImageRect renderable(glm::vec2(0, 0), glm::vec2(kTargetWidth, kTargetHeight));
 
   // Render the renderable to the render target.

@@ -24,15 +24,15 @@ namespace test {
 
 namespace {
 
-using fuchsia::ui::composition::ImageFlip;
 using fuchsia::ui::composition::Orientation;
+using fuchsia_ui_composition::ImageFlip;
 
 constexpr int kImageWidth = 1000;
 constexpr int kImageHeight = 500;
 
 // Helper function to generate an ImageRect from a glm::mat3 for tests that are strictly testing the
 // conversion math.
-ImageRect GetImageRectForMatrix(const glm::mat3& matrix, ImageFlip image_flip = ImageFlip::NONE) {
+ImageRect GetImageRectForMatrix(const glm::mat3& matrix, ImageFlip image_flip = ImageFlip::kNone) {
   // Compute the global rectangle vector and return the first entry.
   allocation::ImageMetadata image = {
       .width = kImageWidth, .height = kImageHeight, .flip = image_flip};
@@ -45,7 +45,7 @@ ImageRect GetImageRectForMatrix(const glm::mat3& matrix, ImageFlip image_flip = 
 // Helper function to generate an ImageRect from a glm::mat3 for tests that are strictly testing the
 // conversion math.
 ImageRect GetImageRectForMatrixAndClip(const glm::mat3& matrix, const TransformClipRegion& clip,
-                                       ImageFlip image_flip = ImageFlip::NONE) {
+                                       ImageFlip image_flip = ImageFlip::kNone) {
   // Compute the global rectangle vector and return the first entry.
   allocation::ImageMetadata image = {
       .width = kImageWidth, .height = kImageHeight, .flip = image_flip};
@@ -399,7 +399,7 @@ TEST(ImageRectTest, ScaleAndFlipHorizontal) {
        glm::vec2(0, kImageHeight)},
       Orientation::CCW_0_DEGREES);
 
-  const auto rectangle = GetImageRectForMatrix(matrix, ImageFlip::LEFT_RIGHT);
+  const auto rectangle = GetImageRectForMatrix(matrix, ImageFlip::kLeftRight);
   EXPECT_EQ(rectangle, expected_rectangle);
 }
 
@@ -415,7 +415,7 @@ TEST(ImageRectTest, ScaleRotate90DegreesAndFlipHorizontal) {
        glm::vec2(0, kImageHeight)},
       Orientation::CCW_90_DEGREES);
 
-  const auto rectangle = GetImageRectForMatrix(matrix, ImageFlip::LEFT_RIGHT);
+  const auto rectangle = GetImageRectForMatrix(matrix, ImageFlip::kLeftRight);
   EXPECT_EQ(rectangle, expected_rectangle);
 }
 
@@ -431,7 +431,7 @@ TEST(ImageRectTest, ScaleRotate180DegreesAndFlipHorizontal) {
        glm::vec2(0, kImageHeight)},
       Orientation::CCW_180_DEGREES);
 
-  const auto rectangle = GetImageRectForMatrix(matrix, ImageFlip::LEFT_RIGHT);
+  const auto rectangle = GetImageRectForMatrix(matrix, ImageFlip::kLeftRight);
   EXPECT_EQ(rectangle, expected_rectangle);
 }
 
@@ -447,7 +447,7 @@ TEST(ImageRectTest, ScaleRotate270DegreesAndFlipHorizontal) {
        glm::vec2(0, kImageHeight)},
       Orientation::CCW_270_DEGREES);
 
-  const auto rectangle = GetImageRectForMatrix(matrix, ImageFlip::LEFT_RIGHT);
+  const auto rectangle = GetImageRectForMatrix(matrix, ImageFlip::kLeftRight);
   EXPECT_EQ(rectangle, expected_rectangle);
 }
 
@@ -461,7 +461,7 @@ TEST(ImageRectTest, ScaleAndFlipVertical) {
        glm::vec2(0, kImageHeight)},
       Orientation::CCW_0_DEGREES);
 
-  const auto rectangle = GetImageRectForMatrix(matrix, ImageFlip::UP_DOWN);
+  const auto rectangle = GetImageRectForMatrix(matrix, ImageFlip::kUpDown);
   EXPECT_EQ(rectangle, expected_rectangle);
 }
 
@@ -477,7 +477,7 @@ TEST(ImageRectTest, ScaleRotate90DegreesAndFlipVertical) {
        glm::vec2(0, kImageHeight)},
       Orientation::CCW_90_DEGREES);
 
-  const auto rectangle = GetImageRectForMatrix(matrix, ImageFlip::UP_DOWN);
+  const auto rectangle = GetImageRectForMatrix(matrix, ImageFlip::kUpDown);
   EXPECT_EQ(rectangle, expected_rectangle);
 }
 
@@ -493,7 +493,7 @@ TEST(ImageRectTest, ScaleRotate180DegreesAndFlipVertical) {
        glm::vec2(0, kImageHeight)},
       Orientation::CCW_180_DEGREES);
 
-  const auto rectangle = GetImageRectForMatrix(matrix, ImageFlip::UP_DOWN);
+  const auto rectangle = GetImageRectForMatrix(matrix, ImageFlip::kUpDown);
   EXPECT_EQ(rectangle, expected_rectangle);
 }
 
@@ -509,7 +509,7 @@ TEST(ImageRectTest, ScaleRotate270DegreesAndFlipVertical) {
        glm::vec2(0, kImageHeight)},
       Orientation::CCW_270_DEGREES);
 
-  const auto rectangle = GetImageRectForMatrix(matrix, ImageFlip::UP_DOWN);
+  const auto rectangle = GetImageRectForMatrix(matrix, ImageFlip::kUpDown);
   EXPECT_EQ(rectangle, expected_rectangle);
 }
 
@@ -527,7 +527,7 @@ TEST(ImageRectTest, ChildCompletelyBiggerThanParentClipFlipLeftRightTest) {
       {glm::vec2(450, 167), glm::vec2(800, 167), glm::vec2(800, 389), glm::vec2(450, 389)},
       Orientation::CCW_0_DEGREES);
 
-  const auto rectangle = GetImageRectForMatrixAndClip(matrix, clip, ImageFlip::LEFT_RIGHT);
+  const auto rectangle = GetImageRectForMatrixAndClip(matrix, clip, ImageFlip::kLeftRight);
   EXPECT_EQ(rectangle, expected_rectangle);
 }
 
@@ -554,7 +554,7 @@ TEST(ImageRectTest, ChildCompletelyBiggerThanParentClipFlipLeftRightRotatedBy90T
       {glm::vec2(300, 111), glm::vec2(700, 111), glm::vec2(700, 306), glm::vec2(300, 306)},
       Orientation::CCW_90_DEGREES);
 
-  const auto rectangle = GetImageRectForMatrixAndClip(matrix, clip, ImageFlip::LEFT_RIGHT);
+  const auto rectangle = GetImageRectForMatrixAndClip(matrix, clip, ImageFlip::kLeftRight);
   EXPECT_EQ(rectangle, expected_rectangle);
 }
 
@@ -580,7 +580,7 @@ TEST(ImageRectTest, ChildCompletelyBiggerThanParentClipFlipLeftRightRotatedBy180
       {glm::vec2(200, 111), glm::vec2(550, 111), glm::vec2(550, 333), glm::vec2(200, 333)},
       Orientation::CCW_180_DEGREES);
 
-  const auto rectangle = GetImageRectForMatrixAndClip(matrix, clip, ImageFlip::LEFT_RIGHT);
+  const auto rectangle = GetImageRectForMatrixAndClip(matrix, clip, ImageFlip::kLeftRight);
   EXPECT_EQ(rectangle, expected_rectangle);
 }
 
@@ -625,7 +625,7 @@ TEST(ImageRectTest, ChildCompletelyBiggerThanParentClipFlipUpDownTest) {
       {glm::vec2(200, 111), glm::vec2(550, 111), glm::vec2(550, 333), glm::vec2(200, 333)},
       Orientation::CCW_0_DEGREES);
 
-  const auto rectangle = GetImageRectForMatrixAndClip(matrix, clip, ImageFlip::UP_DOWN);
+  const auto rectangle = GetImageRectForMatrixAndClip(matrix, clip, ImageFlip::kUpDown);
   EXPECT_EQ(rectangle, expected_rectangle);
 }
 
@@ -652,7 +652,7 @@ TEST(ImageRectTest, ChildCompletelyBiggerThanParentClipFlipUpDownRotatedBy90Test
       {glm::vec2(300, 194), glm::vec2(700, 194), glm::vec2(700, 389), glm::vec2(300, 389)},
       Orientation::CCW_90_DEGREES);
 
-  const auto rectangle = GetImageRectForMatrixAndClip(matrix, clip, ImageFlip::UP_DOWN);
+  const auto rectangle = GetImageRectForMatrixAndClip(matrix, clip, ImageFlip::kUpDown);
   EXPECT_EQ(rectangle, expected_rectangle);
 }
 
@@ -678,7 +678,7 @@ TEST(ImageRectTest, ChildCompletelyBiggerThanParentClipFlipUpDownRotatedBy180Tes
       {glm::vec2(450, 167), glm::vec2(800, 167), glm::vec2(800, 389), glm::vec2(450, 389)},
       Orientation::CCW_180_DEGREES);
 
-  const auto rectangle = GetImageRectForMatrixAndClip(matrix, clip, ImageFlip::UP_DOWN);
+  const auto rectangle = GetImageRectForMatrixAndClip(matrix, clip, ImageFlip::kUpDown);
   EXPECT_EQ(rectangle, expected_rectangle);
 }
 
@@ -705,7 +705,7 @@ TEST(ImageRectTest, ChildCompletelyBiggerThanParentClipFlipUpDownRotatedBy270Tes
       {glm::vec2(300, 111), glm::vec2(700, 111), glm::vec2(700, 306), glm::vec2(300, 306)},
       Orientation::CCW_270_DEGREES);
 
-  const auto rectangle = GetImageRectForMatrixAndClip(matrix, clip, ImageFlip::UP_DOWN);
+  const auto rectangle = GetImageRectForMatrixAndClip(matrix, clip, ImageFlip::kUpDown);
   EXPECT_EQ(rectangle, expected_rectangle);
 }
 
@@ -1471,7 +1471,7 @@ TEST(GlobalCullRectanglesTest, MultipleFullScreenRectsWithTransparency) {
   uint64_t display_height = 500;
 
   auto transparent_image_data = allocation::ImageMetadata();
-  transparent_image_data.blend_mode = fuchsia::ui::composition::BlendMode::SRC_OVER;
+  transparent_image_data.blend_mode = fuchsia_ui_composition::BlendMode::kSrcOver;
 
   // There are full screen rects at indices [1, 3, and 6]. Indices 3 and 6 are transparent,
   // but 1 is not. So we should ultimately only cull the rect at index 0, leaving 7 output
@@ -1523,10 +1523,10 @@ TEST(GlobalCullRectanglesTest, MultipleFullScreenRectsWithTransparency) {
 // matrices, where child values are the product of their local values and their
 // ancestors' values.
 //
-// TODO(https://fxbug.dev/42153097): Since the logic between matrices and opacity is very similar, in the
-// future we may want to consolidate |ComputeGlobalMatrices| and |ComputeGlobalOpacityValues| into a
-// single (potentially templated) function, which would allow us to consolidate these tests into
-// one. But for now, we have to keep them separate.
+// TODO(https://fxbug.dev/42153097): Since the logic between matrices and opacity is very similar,
+// in the future we may want to consolidate |ComputeGlobalMatrices| and |ComputeGlobalOpacityValues|
+// into a single (potentially templated) function, which would allow us to consolidate these tests
+// into one. But for now, we have to keep them separate.
 
 TEST(GlobalImageDataTest, EmptyTopologyReturnsEmptyOpacityValues) {
   UberStruct::InstanceMap uber_structs;

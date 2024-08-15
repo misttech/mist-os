@@ -29,6 +29,7 @@ source_set("smoketest_lib") {
   ]
 
   public_deps = [
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_cpp",
     "//sdk/lib/ui/scenic/cpp:cpp",
     "//src/graphics/display/lib/coordinator-getter:client",
     "//src/lib/fsl:fsl",

@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
+#include <fidl/fuchsia.ui.composition/cpp/fidl.h>
 #include <lib/fit/defer.h>
 #include <lib/zircon-internal/align.h>
 
@@ -199,7 +200,7 @@ VK_TEST_P(DisplayCompositorParameterizedSmokeTest, FullscreenRectangleTest) {
                                       .vmo_index = 0,
                                       .width = kTextureWidth,
                                       .height = kTextureHeight,
-                                      .blend_mode = fuchsia::ui::composition::BlendMode::SRC};
+                                      .blend_mode = fuchsia_ui_composition::BlendMode::kSrc};
   auto result =
       display_compositor->ImportBufferImage(image_metadata, BufferCollectionUsage::kClientImage);
   EXPECT_TRUE(result);

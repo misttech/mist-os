@@ -5,6 +5,7 @@
 #include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
+#include <fidl/fuchsia.ui.composition/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <lib/fit/defer.h>
 #include <lib/image-format/image_format.h>
@@ -51,6 +52,7 @@ using fuchsia::ui::composition::ParentViewportWatcher;
 using fuchsia::ui::composition::ViewportProperties;
 using fuchsia::ui::views::ViewCreationToken;
 using fuchsia::ui::views::ViewportCreationToken;
+using fuchsia_ui_composition::BlendMode;
 
 namespace flatland {
 namespace test {
@@ -1008,7 +1010,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, ColorConversionTest) {
   // unnormalized uint8 value in the range [0,255] will be 51U.
   auto image_metadata = ImageMetadata{.identifier = allocation::kInvalidImageId,
                                       .multiply_color = {0, 1.0f, 0, 1},
-                                      .blend_mode = fuchsia::ui::composition::BlendMode::SRC};
+                                      .blend_mode = BlendMode::kSrc};
 
   // We cannot send to display because it is not supported in allocations.
   if (!IsDisplaySupported(display_compositor.get(), kCompareCollectionId)) {
@@ -1113,7 +1115,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, FullscreenSolidColorRectangle
   // unnormalized uint8 value in the range [0,255] will be 51U.
   auto image_metadata = ImageMetadata{.identifier = allocation::kInvalidImageId,
                                       .multiply_color = {0, 0.2f, 0, 1},
-                                      .blend_mode = fuchsia::ui::composition::BlendMode::SRC};
+                                      .blend_mode = BlendMode::kSrc};
 
   // We cannot send to display because it is not supported in allocations.
   if (!IsDisplaySupported(display_compositor.get(), kCompareCollectionId)) {
@@ -1230,7 +1232,7 @@ VK_TEST_P(DisplayCompositorParameterizedPixelTest, SetMinimumRGBTest) {
   /// black rectangle will be clamped to the minimum allowed value.
   auto image_metadata = ImageMetadata{.identifier = allocation::kInvalidImageId,
                                       .multiply_color = {0, 0, 0, 0},
-                                      .blend_mode = fuchsia::ui::composition::BlendMode::SRC};
+                                      .blend_mode = BlendMode::kSrc};
 
   // We cannot send to display because it is not supported in allocations.
   if (!IsDisplaySupported(display_compositor.get(), kCompareCollectionId)) {
@@ -1324,7 +1326,7 @@ VK_TEST_P(DisplayCompositorFallbackParameterizedPixelTest, SoftwareRenderingTest
                           .vmo_index = i,
                           .width = kTextureWidth,
                           .height = kTextureHeight,
-                          .blend_mode = fuchsia::ui::composition::BlendMode::SRC};
+                          .blend_mode = BlendMode::kSrc};
   }
 
   // Use the VK renderer here so we can make use of software rendering.
@@ -1502,8 +1504,7 @@ VK_TEST_F(DisplayCompositorPixelTest, OverlappingTransparencyTest) {
   // Create the image metadatas.
   ImageMetadata image_metadatas[2];
   for (uint32_t i = 0; i < 2; i++) {
-    auto blend_mode = (i != 1) ? fuchsia::ui::composition::BlendMode::SRC
-                               : fuchsia::ui::composition::BlendMode::SRC_OVER;
+    auto blend_mode = (i != 1) ? BlendMode::kSrc : BlendMode::kSrcOver;
     image_metadatas[i] = {.collection_id = kTextureCollectionId,
                           .identifier = allocation::GenerateUniqueImageId(),
                           .vmo_index = i,
@@ -1714,7 +1715,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, MultipleParentPixelTest) {
                                   .vmo_index = 0,
                                   .width = kTextureWidth,
                                   .height = kTextureHeight,
-                                  .blend_mode = fuchsia::ui::composition::BlendMode::SRC};
+                                  .blend_mode = BlendMode::kSrc};
 
   auto texture_collection =
       SetupClientTextures(display_compositor.get(), kTextureCollectionId, GetParam(), 60, 40,
@@ -1963,7 +1964,7 @@ VK_TEST_P(DisplayCompositorParameterizedTest, ImageFlipRotate180DegreesPixelTest
                                   .vmo_index = 0,
                                   .width = kTextureWidth,
                                   .height = kTextureHeight,
-                                  .flip = fuchsia::ui::composition::ImageFlip::UP_DOWN};
+                                  .flip = fuchsia_ui_composition::ImageFlip::kUpDown};
 
   auto texture_collection =
       SetupClientTextures(display_compositor.get(), kTextureCollectionId, GetParam(), 60, 40,
@@ -2178,7 +2179,7 @@ VK_TEST_F(DisplayCompositorPixelTest, SwitchDisplayMode) {
                           .vmo_index = i,
                           .width = kTextureWidth,
                           .height = kTextureHeight,
-                          .blend_mode = fuchsia::ui::composition::BlendMode::SRC};
+                          .blend_mode = BlendMode::kSrc};
   }
 
   auto& blue_image_metadata = image_metadatas[0];

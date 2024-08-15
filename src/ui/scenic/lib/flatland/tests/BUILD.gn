@@ -29,6 +29,7 @@ executable("unittests") {
   public_deps = [ "//third_party/glm" ]
 
   deps = [
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_cpp",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp/testing:unit",
     "//sdk/lib/ui/scenic/cpp:cpp",
