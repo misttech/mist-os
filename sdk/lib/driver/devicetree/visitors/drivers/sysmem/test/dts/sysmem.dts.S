@@ -19,9 +19,4 @@
 			contiguous-size = <0x00 TEST_CONTIGUOUS_SIZE>;
 			protected-size = <0x00 TEST_PROTECTED_SIZE>;
 		};
-
-		vdec {
-			compatible = "test,vdec";
-			fuchsia,sysmem = <&sysmem>;
-		};
 };

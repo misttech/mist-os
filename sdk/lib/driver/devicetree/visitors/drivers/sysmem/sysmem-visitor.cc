@@ -5,12 +5,9 @@
 #include "sysmem-visitor.h"
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
-#include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/devicetree/visitors/registration.h>
 #include <lib/driver/logging/cpp/logger.h>
-
-#include <bind/fuchsia/hardware/sysmem/cpp/bind.h>
 
 #include "lib/driver/devicetree/visitors/property-parser.h"
 
@@ -69,29 +66,8 @@ zx::result<> SysmemVisitor::DriverVisit(fdf_devicetree::Node& node,
   return node.ChangePublishOrder(1u);
 }
 
-zx::result<> SysmemVisitor::AddChildNodeSpec(fdf_devicetree::Node& child) {
-  std::vector bind_rules = {
-      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_sysmem::SERVICE,
-                              bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT)};
-
-  std::vector bind_properties = {
-      fdf::MakeProperty(bind_fuchsia_hardware_sysmem::SERVICE,
-                        bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT)};
-
-  auto sysmem_node = fuchsia_driver_framework::ParentSpec{{bind_rules, bind_properties}};
-
-  child.AddNodeSpec(sysmem_node);
-  FDF_LOG(DEBUG, "Added sysmem node spec to '%s'.", child.name().c_str());
-
-  return zx::ok();
-}
-
 zx::result<> SysmemVisitor::Visit(fdf_devicetree::Node& node,
                                   const devicetree::PropertyDecoder& decoder) {
-  if (node.properties().find(kSysmemReference) != node.properties().end()) {
-    return AddChildNodeSpec(node);
-  }
-
   if (is_match(node.properties())) {
     return DriverVisit(node, decoder);
   }

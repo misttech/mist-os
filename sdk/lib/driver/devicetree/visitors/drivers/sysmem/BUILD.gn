@@ -22,7 +22,6 @@ source_set("sysmem-visitor-impl") {
     "sysmem-visitor.h",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
     "//sdk/lib/driver/component/cpp:cpp",
     "//sdk/lib/driver/devicetree/manager",
@@ -36,7 +35,6 @@ test("sysmem-visitor-test-bin") {
   sources = [ "test/sysmem-visitor-test.cc" ]
   deps = [
     ":sysmem-visitor-impl",
-    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib_cpp",
     "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_cpp",
     "//sdk/lib/driver/devicetree/testing:visitor-test-helper",
     "//sdk/lib/driver/devicetree/visitors:registry",

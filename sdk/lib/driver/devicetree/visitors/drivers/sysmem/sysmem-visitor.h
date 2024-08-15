@@ -12,7 +12,6 @@ namespace sysmem_dt {
 
 class SysmemVisitor : public fdf_devicetree::DriverVisitor {
  public:
-  static constexpr char kSysmemReference[] = "fuchsia,sysmem";
   static constexpr char kVid[] = "vid";
   static constexpr char kPid[] = "pid";
   static constexpr char kContiguousSize[] = "contiguous-size";
@@ -26,8 +25,6 @@ class SysmemVisitor : public fdf_devicetree::DriverVisitor {
                      const devicetree::PropertyDecoder& decoder) override;
 
  private:
-  zx::result<> AddChildNodeSpec(fdf_devicetree::Node& child);
-
   std::unique_ptr<fdf_devicetree::PropertyParser> parser_;
 };
 
