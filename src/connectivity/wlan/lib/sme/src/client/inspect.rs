@@ -193,6 +193,7 @@ impl ClientSmeStatusNode {
         let status_str = match new_status {
             ClientSmeStatus::Connected(_) => "connected",
             ClientSmeStatus::Connecting(_) => "connecting",
+            ClientSmeStatus::Roaming(_) => "roaming",
             ClientSmeStatus::Idle => IDLE_STR,
         };
         self.status_str.set(status_str);
@@ -221,7 +222,9 @@ impl ClientSmeStatusNode {
                     ));
                 }
             },
-            ClientSmeStatus::Connecting(_) | ClientSmeStatus::Idle => {
+            ClientSmeStatus::Connecting(_)
+            | ClientSmeStatus::Roaming(_)
+            | ClientSmeStatus::Idle => {
                 self.connected_to = None;
             }
         }
@@ -234,7 +237,7 @@ impl ClientSmeStatusNode {
                         Some(ConnectingToNode::new(self.node.create_child("connecting_to"), &ssid));
                 }
             },
-            ClientSmeStatus::Connected(_) | ClientSmeStatus::Idle => {
+            ClientSmeStatus::Connected(_) | ClientSmeStatus::Roaming(_) | ClientSmeStatus::Idle => {
                 self.connecting_to = None;
             }
         }

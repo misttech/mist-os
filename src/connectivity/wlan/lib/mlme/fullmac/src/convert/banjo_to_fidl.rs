@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use std::slice;
-use tracing::warn;
+use tracing::{error, warn};
 use {
     banjo_fuchsia_wlan_common as banjo_wlan_common,
     banjo_fuchsia_wlan_fullmac as banjo_wlan_fullmac,
@@ -131,13 +131,74 @@ pub fn convert_connect_confirm(
     }
 }
 
-pub fn convert_roam_confirm(
-    conf: banjo_wlan_fullmac::WlanFullmacRoamConfirm,
-) -> fidl_mlme::RoamConfirm {
-    fidl_mlme::RoamConfirm {
-        target_bssid: conf.target_bssid,
-        result_code: convert_status_code(conf.result_code),
-        selected_bss: convert_bss_description(conf.selected_bss),
+pub fn convert_roam_start_indication(
+    selected_bssid: *const u8,
+    selected_bss: banjo_wlan_internal::BssDescription,
+    original_association_maintained: bool,
+) -> fidl_mlme::RoamStartIndication {
+    let bssid_as_slice = unsafe {
+        std::slice::from_raw_parts(selected_bssid, banjo_wlan_ieee80211::MAC_ADDR_LEN as usize)
+    };
+    let fidl_selected_bssid = match bssid_as_slice.try_into() {
+        Ok(bssid) => bssid,
+        Err(e) => {
+            // Fullmac sets selected_bssid, and currently Fullmac will crash if the field cannot be
+            // populated; so this conversion is not expected to fail. But handle that possibility,
+            // just in case.
+            warn!("selected_bssid conversion failed in RoamStartIndication: {}. Substituting all zeros.", e);
+            [0 as u8; banjo_wlan_ieee80211::MAC_ADDR_LEN as usize]
+        }
+    };
+    fidl_mlme::RoamStartIndication {
+        selected_bssid: fidl_selected_bssid,
+        selected_bss: convert_bss_description(selected_bss),
+        original_association_maintained,
+    }
+}
+
+pub fn convert_roam_result_indication(
+    selected_bssid: *const u8,
+    status_code: banjo_wlan_ieee80211::StatusCode,
+    original_association_maintained: bool,
+    target_bss_authenticated: bool,
+    association_id: u16,
+    association_ies_list: *const u8,
+    association_ies_count: usize,
+) -> fidl_mlme::RoamResultIndication {
+    let bssid_as_slice = unsafe {
+        std::slice::from_raw_parts(selected_bssid, banjo_wlan_ieee80211::MAC_ADDR_LEN as usize)
+    };
+    let association_ies = match status_code {
+        banjo_wlan_ieee80211::StatusCode::SUCCESS => {
+            unsafe_slice_to_vec(association_ies_list, association_ies_count)
+        }
+        _ => Vec::new(),
+    };
+
+    let mut fidl_status_code = convert_status_code(status_code);
+    let fidl_selected_bssid = match bssid_as_slice.try_into() {
+        Ok(bssid) => bssid,
+        Err(e) => {
+            // As above in convert_roam_start_indication, this conversion is not expected to fail.
+            warn!("selected_bssid conversion failed in RoamResultIndication: {}. Substituting all zeros.", e);
+            // Though it's very unlikely, if the roam start and the roam result have both failed
+            // selected_bssid conversion, then MLME could propagate a roam success upward with an
+            // incorrect (all zero) BSSID. To guard against that, override a success status to
+            // canceled here so SME will fail the roam attempt.
+            if fidl_status_code == fidl_ieee80211::StatusCode::Success {
+                error!("RoamResultIndication reports success, but is malformed. Overriding status to canceled.");
+                fidl_status_code = fidl_ieee80211::StatusCode::Canceled;
+            }
+            [0 as u8; banjo_wlan_ieee80211::MAC_ADDR_LEN as usize]
+        }
+    };
+    fidl_mlme::RoamResultIndication {
+        selected_bssid: fidl_selected_bssid,
+        original_association_maintained,
+        target_bss_authenticated,
+        status_code: fidl_status_code,
+        association_id,
+        association_ies,
     }
 }
 

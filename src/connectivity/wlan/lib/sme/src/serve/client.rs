@@ -4,14 +4,17 @@
 
 use crate::client::{
     self as client_sme, ConnectResult, ConnectTransactionEvent, ConnectTransactionStream,
+    RoamResult,
 };
 use crate::{MlmeEventStream, MlmeSink, MlmeStream};
 use fidl::endpoints::{RequestStream, ServerEnd};
+use fidl_fuchsia_wlan_internal::BssDescription as BssDescriptionFidl;
 use fidl_fuchsia_wlan_sme::{self as fidl_sme, ClientSmeRequest, TelemetryRequest};
 use fuchsia_inspect_contrib::auto_persist;
 use futures::channel::mpsc;
 use futures::prelude::*;
 use futures::select;
+use ieee80211::MacAddrBytes;
 use std::pin::pin;
 use std::sync::{Arc, Mutex};
 use tracing::error;
@@ -199,6 +202,10 @@ async fn serve_connect_txn_stream(
                         let connect_result = convert_connect_result(&result, is_reconnect);
                         handle.send_on_connect_result(&connect_result)
                     }
+                    ConnectTransactionEvent::OnRoamResult { result } => {
+                        let roam_result = convert_roam_result(&result);
+                        handle.send_on_roam_result(&roam_result)
+                    }
                     ConnectTransactionEvent::OnDisconnect { info } => {
                         handle.send_on_disconnect(&info)
                     }
@@ -250,6 +257,39 @@ fn convert_connect_result(result: &ConnectResult, is_reconnect: bool) -> fidl_sm
         }
     };
     fidl_sme::ConnectResult { code, is_credential_rejected, is_reconnect }
+}
+
+fn convert_roam_result(result: &RoamResult) -> fidl_sme::RoamResult {
+    match result {
+        RoamResult::Success(bss) => {
+            let bss_description = Some(Box::new(BssDescriptionFidl::from(*bss.clone())));
+            fidl_sme::RoamResult {
+                bssid: bss.bssid.to_array(),
+                status_code: fidl_ieee80211::StatusCode::Success,
+                // Must always be false on roam success.
+                original_association_maintained: false,
+                bss_description,
+                disconnect_info: None,
+                is_credential_rejected: false,
+            }
+        }
+        RoamResult::Failed(failure) => {
+            fidl_sme::RoamResult {
+                bssid: failure.selected_bssid().to_array(),
+                status_code: failure.status_code(),
+                // Current implementation assumes that all roam attempts incur disassociation from the
+                // original BSS. When this changes (e.g. due to Fast BSS Transition support), this
+                // hard-coded field should be set from the RoamResult enum.
+                original_association_maintained: false,
+                bss_description: match failure.selected_bss() {
+                    Some(bss) => Some(Box::new(bss.clone().into())),
+                    None => None,
+                },
+                disconnect_info: Some(Box::new(failure.disconnect_info())),
+                is_credential_rejected: failure.likely_due_to_credential_rejected(),
+            }
+        }
+    }
 }
 
 #[cfg(test)]

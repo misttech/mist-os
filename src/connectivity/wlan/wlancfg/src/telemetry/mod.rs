@@ -261,6 +261,14 @@ pub enum TelemetryEvent {
         ap_state: client::types::ApState,
         network_is_likely_hidden: bool,
     },
+    /// Notify the telemetry event loop of roam result.
+    /// If roam result is unsuccessful, telemetry will move its internal state to
+    /// disconnected.
+    RoamResult {
+        iface_id: u16,
+        result: fidl_sme::RoamResult,
+        ap_state: client::types::ApState,
+    },
     /// Notify the telemetry event loop that the client has disconnected.
     /// Subsequently, the telemetry event loop will increment the downtime counters periodically
     /// if TelemetrySender has requested downtime to be tracked via `track_subsequent_downtime`
@@ -1238,6 +1246,46 @@ impl Telemetry {
                         self.stats_logger
                             .log_post_recovery_result(recovery_reason, RecoveryOutcome::Failure)
                             .await
+                    }
+                }
+            }
+            TelemetryEvent::RoamResult { iface_id, result, ap_state } => {
+                match &self.connection_state {
+                    ConnectionState::Connected(state) => {
+                        if result.status_code == fidl_ieee80211::StatusCode::Success {
+                            self.connection_state = ConnectionState::Connected(ConnectedState {
+                                iface_id,
+                                new_connect_start_time: None,
+                                prev_counters: None,
+                                multiple_bss_candidates: state.multiple_bss_candidates,
+                                ap_state,
+                                network_is_likely_hidden: state.network_is_likely_hidden,
+
+                                // We have not received a signal report yet, but since this is used as
+                                // indicator for whether driver is still responsive, set it to the
+                                // connection start time for now.
+                                last_signal_report: now,
+                                num_consecutive_get_counter_stats_failures: InspectableU64::new(
+                                    0,
+                                    &self.inspect_node,
+                                    "num_consecutive_get_counter_stats_failures",
+                                ),
+                                is_driver_unresponsive: InspectableBool::new(
+                                    false,
+                                    &self.inspect_node,
+                                    "is_driver_unresponsive",
+                                ),
+
+                                telemetry_proxy: state.telemetry_proxy.clone(),
+                            });
+                            self.last_checked_connection_state = now;
+                            // TODO(https://fxbug.dev/135975) Log roam success to Cobalt and Inspect.
+                        } else {
+                            // TODO(https://fxbug.dev/135975) Log roam failure to Cobalt and Inspect.
+                        }
+                    }
+                    _ => {
+                        warn!("Received roam event while not connected. Metric may not be logged");
                     }
                 }
             }

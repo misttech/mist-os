@@ -26,6 +26,7 @@
 #include "convert.h"
 #include "debug.h"
 #include "fidl/fuchsia.wlan.fullmac/cpp/wire_types.h"
+#include "fidl/fuchsia.wlan.ieee80211/cpp/common_types.h"
 #include "fuchsia/wlan/common/c/banjo.h"
 #include "zircon/system/public/zircon/assert.h"
 
@@ -117,7 +118,8 @@ zx_status_t Device::StartFullmacIfcServer(const rust_wlan_fullmac_ifc_protocol_c
       .on_scan_result = ifc->ops->on_scan_result,
       .on_scan_end = ifc->ops->on_scan_end,
       .connect_conf = ifc->ops->connect_conf,
-      .roam_conf = ifc->ops->roam_conf,
+      .roam_start_ind = ifc->ops->roam_start_ind,
+      .roam_result_ind = ifc->ops->roam_result_ind,
       .auth_ind = ifc->ops->auth_ind,
       .deauth_conf = ifc->ops->deauth_conf,
       .deauth_ind = ifc->ops->deauth_ind,
@@ -197,13 +199,58 @@ void Device::ConnectConf(ConnectConfRequestView request, ConnectConfCompleter::S
   completer.Reply();
 }
 
-void Device::RoamConf(RoamConfRequestView request, RoamConfCompleter::Sync& completer) {
+void Device::RoamStartInd(RoamStartIndRequestView request, RoamStartIndCompleter::Sync& completer) {
+  // TODO(https://fxbug.dev/357134611) Reduce or eliminate these fatal assertions.
+  ZX_ASSERT(request->has_selected_bssid());
+  ZX_ASSERT(request->selected_bssid().size() == ETH_ALEN);
+
+  // It is possible that a roam attempt can fail because a Fullmac driver cannot obtain
+  // the BSS description, or the BSS description is malformed.
+  // In spite of this, we still want Fullmac to notify SME that a roam
+  // attempt started, and this is why we don't assert on missing BSS description here.
+  bss_description_t selected_bss;
+  memset(&selected_bss, 0, sizeof(bss_description_t));
+  if (request->has_selected_bss()) {
+    ConvertBssDescription(request->selected_bss(), &selected_bss);
+  }
+  const auto original_association_maintained = request->has_original_association_maintained()
+                                                   ? request->original_association_maintained()
+                                                   : false;
+
   std::lock_guard guard(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
   if (wlan_fullmac_impl_ifc_banjo_protocol_ != nullptr) {
-    wlan_fullmac_roam_confirm_t roam_conf;
-    ConvertRoamConfirm(request->resp, &roam_conf);
-    wlan_fullmac_impl_ifc_banjo_protocol_ops_->roam_conf(wlan_fullmac_impl_ifc_banjo_protocol_->ctx,
-                                                         &roam_conf);
+    wlan_fullmac_impl_ifc_banjo_protocol_ops_->roam_start_ind(
+        wlan_fullmac_impl_ifc_banjo_protocol_->ctx, request->selected_bssid().data(), &selected_bss,
+        original_association_maintained);
+  }
+  completer.Reply();
+}
+
+void Device::RoamResultInd(RoamResultIndRequestView request,
+                           RoamResultIndCompleter::Sync& completer) {
+  ZX_ASSERT(request->has_selected_bssid());
+  ZX_ASSERT(request->selected_bssid().size() == ETH_ALEN);
+  const auto status_code = request->has_status_code()
+                               ? request->status_code()
+                               : fuchsia_wlan_ieee80211::StatusCode::kRefusedReasonUnspecified;
+
+  const auto original_association_maintained = request->has_original_association_maintained()
+                                                   ? request->original_association_maintained()
+                                                   : false;
+  const auto target_bss_authenticated =
+      request->has_target_bss_authenticated() ? request->target_bss_authenticated() : false;
+  const auto association_id = request->has_association_id() ? request->association_id() : 0;
+  const auto association_ies =
+      request->has_association_ies() ? request->association_ies().data() : nullptr;
+  const size_t association_ies_count =
+      request->has_association_ies() ? request->association_ies().count() : 0;
+
+  std::lock_guard guard(wlan_fullmac_impl_ifc_banjo_protocol_lock_);
+  if (wlan_fullmac_impl_ifc_banjo_protocol_ != nullptr) {
+    wlan_fullmac_impl_ifc_banjo_protocol_ops_->roam_result_ind(
+        wlan_fullmac_impl_ifc_banjo_protocol_->ctx, request->selected_bssid().data(),
+        static_cast<status_code_t>(status_code), original_association_maintained,
+        target_bss_authenticated, association_id, association_ies, association_ies_count);
   }
   completer.Reply();
 }

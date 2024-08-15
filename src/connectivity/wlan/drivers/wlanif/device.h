@@ -56,7 +56,10 @@ class Device final : public fdf::DriverBase,
                     OnScanResultCompleter::Sync& completer) override;
   void OnScanEnd(OnScanEndRequestView request, OnScanEndCompleter::Sync& completer) override;
   void ConnectConf(ConnectConfRequestView request, ConnectConfCompleter::Sync& completer) override;
-  void RoamConf(RoamConfRequestView request, RoamConfCompleter::Sync& completer) override;
+  void RoamStartInd(RoamStartIndRequestView request,
+                    RoamStartIndCompleter::Sync& completer) override;
+  void RoamResultInd(RoamResultIndRequestView request,
+                     RoamResultIndCompleter::Sync& completer) override;
   void AuthInd(AuthIndRequestView request, AuthIndCompleter::Sync& completer) override;
   void DeauthConf(DeauthConfRequestView request, DeauthConfCompleter::Sync& completer) override;
   void DeauthInd(DeauthIndRequestView request, DeauthIndCompleter::Sync& completer) override;

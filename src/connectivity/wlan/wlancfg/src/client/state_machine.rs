@@ -333,6 +333,7 @@ fn notify_once_disconnected(
 fn connect_txn_event_name(event: &fidl_sme::ConnectTransactionEvent) -> &'static str {
     match event {
         fidl_sme::ConnectTransactionEvent::OnConnectResult { .. } => "OnConnectResult",
+        fidl_sme::ConnectTransactionEvent::OnRoamResult { .. } => "OnRoamResult",
         fidl_sme::ConnectTransactionEvent::OnDisconnect { .. } => "OnDisconnect",
         fidl_sme::ConnectTransactionEvent::OnSignalReport { .. } => "OnSignalReport",
         fidl_sme::ConnectTransactionEvent::OnChannelSwitched { .. } => "OnChannelSwitched",
@@ -654,6 +655,62 @@ async fn connected_state(
 
                             notify_when_reconnect_detected(&common_options, &options, result);
 
+                            !connected
+                        }
+                        // TODO(https://fxrev.dev/352787006): Update state after a successful roam.
+                        fidl_sme::ConnectTransactionEvent::OnRoamResult { result } => {
+                            let roam_succeeded = result.status_code == fidl_ieee80211::StatusCode::Success;
+                            let connected = roam_succeeded || result.original_association_maintained;
+                            if roam_succeeded {
+                                // Successful roam indicates connection to a different AP, so reset the connect
+                                // start time to track as a new connection.
+                                connect_start_time = fasync::Time::now();
+
+                                let bss_description = match result.bss_description {
+                                    Some(ref bss_description) => bss_description,
+                                    None => return Err(ExitReason(Err(format_err!("RoamResult is missing BSS description from FIDL"),),)),
+                                };
+                                let ap_state = types::ApState::from(
+                                    BssDescription::try_from(*bss_description.clone()).map_err(|error| {
+                                        // This only occurs if an invalid `BssDescription` is received from SME, which should
+                                        // never happen.
+                                        ExitReason(Err(
+                                            format_err!("Failed to convert BSS description from FIDL: {:?}", error,),
+                                        ))
+                                    })?,
+                                );
+
+                                *options.ap_state = ap_state;
+                                info!("Roam succeeded");
+                            }
+                            common_options.telemetry_sender.send(TelemetryEvent::RoamResult {
+                                iface_id: common_options.iface_id,
+                                result: result.clone(),
+                                ap_state: (*options.ap_state).clone(),
+                            });
+                            if !connected {
+                                warn!("Roam attempt failed, original association not maintained, disconnecting");
+
+                                let now = fasync::Time::now();
+                                let disconnect_source = match result.disconnect_info {
+                                    Some(info) => info.disconnect_source,
+                                    // RoamResult should always have a source if roam failed, but
+                                    // this check is here in case it is somehow omitted.
+                                    None => fidl_sme::DisconnectSource::Mlme(fidl_sme::DisconnectCause {
+                                        reason_code: fidl_ieee80211::ReasonCode::UnspecifiedReason,
+                                        mlme_event_name: fidl_sme::DisconnectMlmeEventName::RoamResultIndication,
+                                    }),
+                                };
+                                let info = DisconnectInfo {
+                                    connected_duration: now - connect_start_time,
+                                    is_sme_reconnecting: false,
+                                    disconnect_source,
+                                    previous_connect_reason: options.currently_fulfilled_connection.reason,
+                                    ap_state: (*options.ap_state).clone(),
+                                    signals: past_signals.clone(),
+                                };
+                                common_options.telemetry_sender.send(TelemetryEvent::Disconnected { track_subsequent_downtime: true, info });
+                            }
                             !connected
                         }
                         fidl_sme::ConnectTransactionEvent::OnSignalReport { ind } => {

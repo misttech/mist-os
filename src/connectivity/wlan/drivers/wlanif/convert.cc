@@ -742,13 +742,6 @@ void ConvertConnectConfirm(const fuchsia_wlan_fullmac::wire::WlanFullmacConnectC
   out->association_ies_count = in.association_ies.count();
 }
 
-void ConvertRoamConfirm(const fuchsia_wlan_fullmac::wire::WlanFullmacRoamConfirm& in,
-                        wlan_fullmac_roam_confirm_t* out) {
-  memcpy(out->target_bssid, in.target_bssid.data(), fuchsia_wlan_ieee80211::wire::kMacAddrLen);
-  out->result_code = ConvertStatusCode(in.result_code);
-  ConvertBssDescription(in.selected_bss, &out->selected_bss);
-}
-
 wlan_auth_type_t ConvertWlanAuthType(const fuchsia_wlan_fullmac::wire::WlanAuthType in) {
   switch (in) {
     case fuchsia_wlan_fullmac::wire::WlanAuthType::kOpenSystem:

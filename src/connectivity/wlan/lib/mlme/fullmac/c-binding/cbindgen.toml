@@ -76,7 +76,6 @@ exclude = [
 "WlanFullmacQueryInfo" = "wlan_fullmac_query_info_t"
 "WlanFullmacImplReconnectRequest" = "wlan_fullmac_impl_reconnect_request_t"
 "WlanFullmacImplResetRequest" = "wlan_fullmac_impl_reset_request_t"
-"WlanFullmacRoamConfirm" = "wlan_fullmac_roam_confirm_t"
 "WlanFullmacSaeFrame" = "wlan_fullmac_sae_frame_t"
 "WlanFullmacSaeHandshakeInd" = "wlan_fullmac_sae_handshake_ind_t"
 "WlanFullmacSaeHandshakeResp" = "wlan_fullmac_sae_handshake_resp_t"

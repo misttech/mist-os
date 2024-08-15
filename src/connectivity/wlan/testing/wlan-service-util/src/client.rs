@@ -203,7 +203,9 @@ pub async fn connect(
                 true
             }
         }
-        fidl_sme::ClientStatusResponse::Connecting(_) | fidl_sme::ClientStatusResponse::Idle(_) => {
+        fidl_sme::ClientStatusResponse::Connecting(_)
+        | fidl_sme::ClientStatusResponse::Roaming(_)
+        | fidl_sme::ClientStatusResponse::Idle(_) => {
             tracing::error!(
                 "Unexpected status {:?} after {:?}",
                 client_status_response,
@@ -252,7 +254,8 @@ pub async fn disconnect(iface_sme_proxy: &fidl_sme::ClientSmeProxy) -> Result<()
         iface_sme_proxy.status().await.context("failed to check status from sme_proxy")?;
     match client_status_response {
         fidl_sme::ClientStatusResponse::Connected(_)
-        | fidl_sme::ClientStatusResponse::Connecting(_) => {
+        | fidl_sme::ClientStatusResponse::Connecting(_)
+        | fidl_sme::ClientStatusResponse::Roaming(_) => {
             Err(format_err!("Disconnect confirmation failed: {:?}", client_status_response))
         }
         fidl_sme::ClientStatusResponse::Idle(_) => Ok(()),

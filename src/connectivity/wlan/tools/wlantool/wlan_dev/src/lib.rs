@@ -442,6 +442,9 @@ async fn print_iface_status(iface_id: u16, monitor_proxy: DeviceMonitor) -> Resu
                 fidl_sme::ClientStatusResponse::Connecting(ssid) => {
                     println!("Connecting to '{}'", String::from_utf8_lossy(&ssid));
                 }
+                fidl_sme::ClientStatusResponse::Roaming(bssid) => {
+                    println!("Roaming to '{}'", String::from_utf8_lossy(&bssid));
+                }
                 fidl_sme::ClientStatusResponse::Idle(_) => {
                     println!("Iface {}: Not connected to a network", iface_id)
                 }

@@ -212,7 +212,8 @@ zx_status_t brcmf_check_scan_status(unsigned long scan_status, std::string* out_
   X(AUTHENTICATION_FAILED)        \
   X(ASSOC_REQ_FAILED)             \
   X(REASSOC_REQ_FAILED)           \
-  X(ROAM_INTERRUPTED)
+  X(ROAM_INTERRUPTED)             \
+  X(INTERNAL_ERROR)
 
 #define X(CONNECT_STATUS) CONNECT_STATUS,
 enum class brcmf_connect_status_t : uint8_t { BRCMF_CONNECT_STATUS_LIST };
@@ -451,6 +452,8 @@ enum class brcmf_disconnect_request_bit_t : uint8_t { BRCMF_DISCONNECT_REQUEST_L
  * @capability: BSS description capability field.
  * @target_bss_info_buf: BSS description for target BSS during a roam attempt.
  * @target_bssid: BSSID that firmware is attempting to roam to (if any).
+ * @target_bss_authenticated: whether authentication succeeded in current roam attempt (if any).
+ * @roam_start_sent: tracks whether the roam start indication has been sent yet.
  */
 struct brcmf_cfg80211_info {
   struct brcmf_cfg80211_conf* conf;
@@ -497,6 +500,10 @@ struct brcmf_cfg80211_info {
   uint8_t* target_bss_info_buf;
   // Target BSSID is recorded when a roam attempt starts, and is cleared at end of attempt.
   std::optional<std::array<uint8_t, ETH_ALEN>> target_bssid;
+  // Whether authentication succeeded in current roam attempt (if any).
+  bool target_bss_authenticated;
+  // Tracks whether the roam start indication has been sent yet.
+  bool roam_start_sent;
 };
 
 /**

@@ -10,7 +10,6 @@
 #include <fuchsia/wlan/mlme/cpp/fidl_test_base.h>
 #include <fuchsia/wlan/sme/cpp/fidl.h>
 #include <fuchsia/wlan/sme/cpp/fidl_test_base.h>
-#include <lib/async/cpp/task.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/driver/incoming/cpp/namespace.h>
@@ -33,8 +32,9 @@
 
 #include <gtest/gtest.h>
 
+#include "fidl/fuchsia.wlan.common/cpp/wire_types.h"
 #include "fidl/fuchsia.wlan.fullmac/cpp/wire_types.h"
-#include "fuchsia/wlan/fullmac/c/banjo.h"
+#include "fidl/fuchsia.wlan.internal/cpp/wire_types.h"
 #include "src/connectivity/wlan/drivers/wlanif/test/test_bss.h"
 #include "src/connectivity/wlan/lib/common/cpp/include/wlan/common/macaddr.h"
 #include "src/connectivity/wlan/lib/mlme/fullmac/c-binding/testing/bindings_stubs.h"
@@ -43,6 +43,7 @@ constexpr zx::duration kWaitForCallbackDuration = zx::msec(1000);
 namespace {
 
 constexpr uint8_t kPeerStaAddress[ETH_ALEN] = {0xba, 0xbe, 0xfa, 0xce, 0x00, 0x00};
+constexpr uint8_t kSelectedBssid[ETH_ALEN] = {0x1a, 0x2b, 0x3a, 0x4d, 0x5e, 0x6f};
 
 std::pair<zx::channel, zx::channel> make_channel() {
   zx::channel local;
@@ -56,7 +57,6 @@ rust_wlan_fullmac_ifc_protocol_ops_copy_t EmptyRustProtoOps() {
       .on_scan_result = [](void* ctx, const wlan_fullmac_scan_result_t* result) {},
       .on_scan_end = [](void* ctx, const wlan_fullmac_scan_end_t* end) {},
       .connect_conf = [](void* ctx, const wlan_fullmac_connect_confirm_t* resp) {},
-      .roam_conf = [](void* ctx, const wlan_fullmac_roam_confirm_t* resp) {},
       .auth_ind = [](void* ctx, const wlan_fullmac_auth_ind_t* ind) {},
       .deauth_conf = [](void* ctx, const uint8_t peer_sta_address[ETH_ALEN]) {},
       .deauth_ind = [](void* ctx, const wlan_fullmac_deauth_indication_t* ind) {},
@@ -83,7 +83,10 @@ class FakeFullmacParent : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFull
     fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(server_end),
                      this);
   }
-  FakeFullmacParent() { memcpy(peer_sta_addr_, kPeerStaAddress, ETH_ALEN); }
+  FakeFullmacParent() {
+    memcpy(peer_sta_addr_, kPeerStaAddress, ETH_ALEN);
+    memcpy(selected_bssid_, kSelectedBssid, ETH_ALEN);
+  }
   void Start(StartRequestView request, StartCompleter::Sync& completer) override {
     client_ =
         fidl::WireSyncClient<fuchsia_wlan_fullmac::WlanFullmacImplIfc>(std::move(request->ifc));
@@ -228,14 +231,51 @@ class FakeFullmacParent : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFull
     return client_.buffer(arena_)->ConnectConf(conf);
   }
 
-  auto SendRoamConf() {
-    fuchsia_wlan_fullmac::wire::WlanFullmacRoamConfirm conf = {};
-    conf.result_code = fuchsia_wlan_ieee80211::wire::StatusCode::kSuccess;
-    conf.selected_bss.bss_type = fuchsia_wlan_common::wire::BssType::kInfrastructure;
-    conf.selected_bss.channel.primary = 9;
-    conf.selected_bss.channel.cbw = fuchsia_wlan_common::wire::ChannelBandwidth::kCbw20;
-    conf.selected_bss.channel.cbw = fuchsia_wlan_common::wire::ChannelBandwidth::kCbw20;
-    return client_.buffer(arena_)->RoamConf(conf);
+  auto SendRoamStartInd() {
+    fidl::Array<uint8_t, ETH_ALEN> selected_bssid;
+    memcpy(selected_bssid.data(), selected_bssid_, ETH_ALEN);
+    // Provide a very minimal BSS Description.
+    fuchsia_wlan_internal::wire::BssDescription selected_bss{
+        .bss_type = fuchsia_wlan_common::wire::BssType::kInfrastructure,
+        .beacon_period = 100,
+        .channel = fuchsia_wlan_common::wire::WlanChannel{
+            .primary = 1,
+            .cbw = fuchsia_wlan_common::wire::ChannelBandwidth::kCbw20,
+        }};
+    memcpy(selected_bss.bssid.data(), selected_bssid_, ETH_ALEN);
+
+    auto req = fuchsia_wlan_fullmac::wire::WlanFullmacImplIfcRoamStartIndRequest::Builder(arena_)
+                   .selected_bssid(selected_bssid)
+                   .selected_bss(selected_bss)
+                   .original_association_maintained(false)
+                   .Build();
+
+    return client_.buffer(arena_)->RoamStartInd(req);
+  }
+
+  auto SendRoamStartIndWithMissingSelectedBss() {
+    fidl::Array<uint8_t, ETH_ALEN> selected_bssid;
+    memcpy(selected_bssid.data(), selected_bssid_, ETH_ALEN);
+    auto req = fuchsia_wlan_fullmac::wire::WlanFullmacImplIfcRoamStartIndRequest::Builder(arena_)
+                   .selected_bssid(selected_bssid)
+                   // Note: selected_bss is not included here, to check that MLME will not crash
+                   // when it is missing.
+                   .original_association_maintained(false)
+                   .Build();
+
+    return client_.buffer(arena_)->RoamStartInd(req);
+  }
+
+  auto SendRoamResultInd() {
+    fidl::Array<uint8_t, ETH_ALEN> selected_bssid;
+    memcpy(selected_bssid.data(), selected_bssid_, ETH_ALEN);
+    auto req = fuchsia_wlan_fullmac::wire::WlanFullmacImplIfcRoamResultIndRequest::Builder(arena_)
+                   .status_code(fuchsia_wlan_ieee80211::wire::StatusCode::kSuccess)
+                   .selected_bssid(selected_bssid)
+                   .original_association_maintained(false)
+                   .target_bss_authenticated(true)
+                   .Build();
+    return client_.buffer(arena_)->RoamResultInd(req);
   }
 
   auto SendAuthInd() {
@@ -335,6 +375,7 @@ class FakeFullmacParent : public fidl::WireServer<fuchsia_wlan_fullmac::WlanFull
  private:
   fdf::Arena arena_ = fdf::Arena::Create(0, 0).value();
   uint8_t peer_sta_addr_[ETH_ALEN];
+  uint8_t selected_bssid_[ETH_ALEN];
 };
 
 using fdf_testing::TestEnvironment;
@@ -445,7 +486,11 @@ TEST_F(WlanifDeviceTestNoStopOnTeardown, CheckRustProtoOpsCannotBeCalledAfterMlm
   ops.on_scan_result = [](void* ctx, const wlan_fullmac_scan_result_t* result) { ADD_FAILURE(); };
   ops.on_scan_end = [](void* ctx, const wlan_fullmac_scan_end_t* end) { ADD_FAILURE(); };
   ops.connect_conf = [](void* ctx, const wlan_fullmac_connect_confirm_t* resp) { ADD_FAILURE(); };
-  ops.roam_conf = [](void* ctx, const wlan_fullmac_roam_confirm_t* resp) { ADD_FAILURE(); };
+  ops.roam_start_ind = [](void* ctx, const unsigned char*, const bss_description*, bool) {
+    ADD_FAILURE();
+  };
+  ops.roam_result_ind = [](void* ctx, const unsigned char*, uint16_t, bool, bool, uint16_t,
+                           const unsigned char*, uint64_t) -> void { ADD_FAILURE(); };
   ops.auth_ind = [](void* ctx, const wlan_fullmac_auth_ind_t* ind) { ADD_FAILURE(); };
   ops.deauth_ind = [](void* ctx, const wlan_fullmac_deauth_indication_t* ind) { ADD_FAILURE(); };
   ops.assoc_ind = [](void* ctx, const wlan_fullmac_assoc_ind_t* ind) { ADD_FAILURE(); };
@@ -481,7 +526,11 @@ TEST_F(WlanifDeviceTestNoStopOnTeardown, CheckRustProtoOpsCannotBeCalledAfterMlm
     EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendScanResult).ok());
     EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendScanEnd).ok());
     EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendConnectConf).ok());
-    EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendRoamConf).ok());
+    EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendRoamStartInd).ok());
+    EXPECT_TRUE(fake_wlanfullmac_parent_
+                    .SyncCall(&FakeFullmacParent::SendRoamStartIndWithMissingSelectedBss)
+                    .ok());
+    EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendRoamResultInd).ok());
     EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendAuthInd).ok());
     EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendDeauthInd).ok());
     EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendAssocInd).ok());
@@ -536,11 +585,20 @@ TEST_F(WlanifDeviceTest, CheckCallbacks) {
     libsync::Completion* signal = static_cast<libsync::Completion*>(ctx);
     signal->Signal();
   };
-  ops.roam_conf = [](void* ctx, const wlan_fullmac_roam_confirm_t* resp) {
+
+  ops.roam_start_ind = [](void* ctx, const unsigned char*, const bss_description*, bool) {
     EXPECT_NE(ctx, nullptr);
     libsync::Completion* signal = static_cast<libsync::Completion*>(ctx);
     signal->Signal();
   };
+
+  ops.roam_result_ind = [](void* ctx, const unsigned char*, uint16_t, bool, bool, uint16_t,
+                           const unsigned char*, uint64_t) {
+    EXPECT_NE(ctx, nullptr);
+    libsync::Completion* signal = static_cast<libsync::Completion*>(ctx);
+    signal->Signal();
+  };
+
   ops.auth_ind = [](void* ctx, const wlan_fullmac_auth_ind_t* ind) {
     EXPECT_NE(ctx, nullptr);
     libsync::Completion* signal = static_cast<libsync::Completion*>(ctx);
@@ -584,7 +642,12 @@ TEST_F(WlanifDeviceTest, CheckCallbacks) {
   EXPECT_EQ(status, ZX_OK);
   signal.Reset();
 
-  EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendRoamConf).ok());
+  EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendRoamStartInd).ok());
+  status = signal.Wait(kWaitForCallbackDuration);
+  EXPECT_EQ(status, ZX_OK);
+  signal.Reset();
+
+  EXPECT_TRUE(fake_wlanfullmac_parent_.SyncCall(&FakeFullmacParent::SendRoamResultInd).ok());
   status = signal.Wait(kWaitForCallbackDuration);
   EXPECT_EQ(status, ZX_OK);
   signal.Reset();

@@ -165,13 +165,21 @@ void SimInterface::ConnectConf(ConnectConfRequestView request,
   completer.Reply();
 }
 
-void SimInterface::RoamConf(RoamConfRequestView request, RoamConfCompleter::Sync& completer) {
-  auto& resp = request->resp;
+void SimInterface::RoamStartInd(RoamStartIndRequestView request,
+                                RoamStartIndCompleter::Sync& completer) {
   ZX_ASSERT(assoc_ctx_.state == AssocContext::kAssociated);
+  completer.Reply();
+}
 
-  if (resp.result_code == wlan_ieee80211::StatusCode::kSuccess) {
-    std::memcpy(assoc_ctx_.bssid.byte, resp.target_bssid.data(), ETH_ALEN);
+void SimInterface::RoamResultInd(RoamResultIndRequestView request,
+                                 RoamResultIndCompleter::Sync& completer) {
+  ZX_ASSERT(assoc_ctx_.state == AssocContext::kAssociated);
+  ZX_ASSERT(request->has_status_code());
+  if (request->status_code() == wlan_ieee80211::StatusCode::kSuccess) {
     stats_.connect_successes++;
+    ZX_ASSERT(request->has_selected_bssid());
+    ZX_ASSERT(request->selected_bssid().size() == ETH_ALEN);
+    memcpy(assoc_ctx_.bssid.byte, request->selected_bssid().data(), ETH_ALEN);
   } else {
     assoc_ctx_.state = AssocContext::kNone;
   }

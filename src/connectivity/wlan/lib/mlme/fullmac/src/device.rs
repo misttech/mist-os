@@ -9,7 +9,9 @@ use fidl::HandleBased;
 use std::ffi::c_void;
 use {
     banjo_fuchsia_wlan_common as banjo_wlan_common,
-    banjo_fuchsia_wlan_fullmac as banjo_wlan_fullmac, fidl_fuchsia_wlan_common as fidl_common,
+    banjo_fuchsia_wlan_fullmac as banjo_wlan_fullmac,
+    banjo_fuchsia_wlan_ieee80211 as banjo_wlan_ieee80211,
+    banjo_fuchsia_wlan_internal as banjo_wlan_internal, fidl_fuchsia_wlan_common as fidl_common,
     fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_mlme as fidl_mlme,
     fuchsia_zircon as zx,
 };
@@ -39,9 +41,21 @@ pub struct WlanFullmacIfcProtocolOps {
         ctx: &mut FullmacDriverEventSink,
         resp: *const banjo_wlan_fullmac::WlanFullmacConnectConfirm,
     ),
-    pub(crate) roam_conf: extern "C" fn(
+    pub(crate) roam_start_ind: extern "C" fn(
         ctx: &mut FullmacDriverEventSink,
-        resp: *const banjo_wlan_fullmac::WlanFullmacRoamConfirm,
+        selected_bssid: *const u8,
+        selected_bss: *const banjo_wlan_internal::BssDescription,
+        original_association_maintained: bool,
+    ),
+    pub(crate) roam_result_ind: extern "C" fn(
+        ctx: &mut FullmacDriverEventSink,
+        selected_bssid: *const u8,
+        status_code: banjo_wlan_ieee80211::StatusCode,
+        original_association_maintained: bool,
+        target_bss_authenticated: bool,
+        association_id: u16,
+        association_ies_list: *const u8,
+        association_ies_count: usize,
     ),
     pub(crate) auth_ind: extern "C" fn(
         ctx: &mut FullmacDriverEventSink,
@@ -135,12 +149,40 @@ extern "C" fn connect_conf(
     ctx.0.send(FullmacDriverEvent::ConnectConf { resp });
 }
 #[no_mangle]
-extern "C" fn roam_conf(
+extern "C" fn roam_start_ind(
     ctx: &mut FullmacDriverEventSink,
-    resp: *const banjo_wlan_fullmac::WlanFullmacRoamConfirm,
+    selected_bssid: *const u8,
+    selected_bss: *const banjo_wlan_internal::BssDescription,
+    original_association_maintained: bool,
 ) {
-    let resp = banjo_to_fidl::convert_roam_confirm(unsafe { *resp });
-    ctx.0.send(FullmacDriverEvent::RoamConf { resp });
+    let ind = banjo_to_fidl::convert_roam_start_indication(
+        selected_bssid,
+        unsafe { *selected_bss },
+        original_association_maintained,
+    );
+    ctx.0.send(FullmacDriverEvent::RoamStartInd { ind });
+}
+#[no_mangle]
+extern "C" fn roam_result_ind(
+    ctx: &mut FullmacDriverEventSink,
+    selected_bssid: *const u8,
+    status_code: banjo_wlan_ieee80211::StatusCode,
+    original_association_maintained: bool,
+    target_bss_authenticated: bool,
+    association_id: u16,
+    association_ies_list: *const u8,
+    association_ies_count: usize,
+) {
+    let ind = banjo_to_fidl::convert_roam_result_indication(
+        selected_bssid,
+        status_code,
+        original_association_maintained,
+        target_bss_authenticated,
+        association_id,
+        association_ies_list,
+        association_ies_count,
+    );
+    ctx.0.send(FullmacDriverEvent::RoamResultInd { ind });
 }
 #[no_mangle]
 extern "C" fn auth_ind(
@@ -275,7 +317,8 @@ const PROTOCOL_OPS: WlanFullmacIfcProtocolOps = WlanFullmacIfcProtocolOps {
     on_scan_result: on_scan_result,
     on_scan_end: on_scan_end,
     connect_conf: connect_conf,
-    roam_conf: roam_conf,
+    roam_start_ind: roam_start_ind,
+    roam_result_ind: roam_result_ind,
     auth_ind: auth_ind,
     deauth_conf: deauth_conf,
     deauth_ind: deauth_ind,

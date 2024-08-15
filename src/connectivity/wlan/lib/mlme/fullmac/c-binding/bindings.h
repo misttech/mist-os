@@ -10,6 +10,8 @@
 // Do not modify this file manually.
 
 #include <fuchsia/wlan/fullmac/c/banjo.h>
+#include <fuchsia/wlan/ieee80211/c/banjo.h>
+#include <fuchsia/wlan/internal/c/banjo.h>
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -21,7 +23,13 @@ typedef struct {
   void (*on_scan_result)(void *ctx, const wlan_fullmac_scan_result_t *result);
   void (*on_scan_end)(void *ctx, const wlan_fullmac_scan_end_t *end);
   void (*connect_conf)(void *ctx, const wlan_fullmac_connect_confirm_t *resp);
-  void (*roam_conf)(void *ctx, const wlan_fullmac_roam_confirm_t *resp);
+  void (*roam_start_ind)(void *ctx, const uint8_t *selected_bssid,
+                         const bss_description_t *selected_bss,
+                         bool original_association_maintained);
+  void (*roam_result_ind)(void *ctx, const uint8_t *selected_bssid, status_code_t status_code,
+                          bool original_association_maintained, bool target_bss_authenticated,
+                          uint16_t association_id, const uint8_t *association_ies_list,
+                          uintptr_t association_ies_count);
   void (*auth_ind)(void *ctx, const wlan_fullmac_auth_ind_t *ind);
   void (*deauth_conf)(void *ctx, const uint8_t *peer_sta_address);
   void (*deauth_ind)(void *ctx, const wlan_fullmac_deauth_indication_t *ind);
