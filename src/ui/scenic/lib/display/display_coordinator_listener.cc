@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.hardware.display/cpp/hlcpp_conversion.h>
 #include <lib/async/default.h>
-#include <lib/fidl/cpp/hlcpp_conversion.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/types.h>
 
@@ -28,23 +27,15 @@ DisplayCoordinatorListener::~DisplayCoordinatorListener() {}
 void DisplayCoordinatorListener::OnDisplaysChanged(OnDisplaysChangedRequest& request,
                                                    OnDisplaysChangedCompleter::Sync& completer) {
   if (on_displays_changed_) {
-    std::vector<fuchsia::hardware::display::Info> added = fidl::NaturalToHLCPP(request.added());
-    std::vector<fuchsia::hardware::display::types::DisplayId> removed =
-        fidl::NaturalToHLCPP(request.removed());
-    on_displays_changed_(std::move(added), std::move(removed));
+    on_displays_changed_(std::move(request.added()), std::move(request.removed()));
   }
 }
 
 void DisplayCoordinatorListener::OnVsync(OnVsyncRequest& request,
                                          OnVsyncCompleter::Sync& completer) {
   if (on_vsync_) {
-    fuchsia::hardware::display::types::DisplayId display_id =
-        fidl::NaturalToHLCPP(request.display_id());
-    uint64_t timestamp = static_cast<uint64_t>(request.timestamp());
-    fuchsia::hardware::display::types::ConfigStamp config_stamp =
-        fidl::NaturalToHLCPP(request.applied_config_stamp());
-    uint64_t cookie = request.cookie().value();
-    on_vsync_(display_id, timestamp, config_stamp, cookie);
+    on_vsync_(request.display_id(), zx::time(request.timestamp()), request.applied_config_stamp(),
+              request.cookie());
   }
 }
 

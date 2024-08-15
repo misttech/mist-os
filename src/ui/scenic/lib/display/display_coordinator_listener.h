@@ -5,9 +5,8 @@
 #ifndef SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_COORDINATOR_LISTENER_H_
 #define SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_COORDINATOR_LISTENER_H_
 
+#include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
-#include <fuchsia/hardware/display/cpp/fidl.h>
-#include <fuchsia/hardware/display/types/cpp/fidl.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/fit/function.h>
 #include <lib/zx/channel.h>
@@ -21,12 +20,13 @@ class DisplayCoordinatorListener final
     : public fidl::Server<fuchsia_hardware_display::CoordinatorListener> {
  public:
   using OnDisplaysChangedCallback =
-      std::function<void(std::vector<fuchsia::hardware::display::Info> added,
-                         std::vector<fuchsia::hardware::display::types::DisplayId> removed)>;
+      std::function<void(std::vector<fuchsia_hardware_display::Info> added,
+                         std::vector<fuchsia_hardware_display_types::DisplayId> removed)>;
   using OnClientOwnershipChangeCallback = std::function<void(bool has_ownership)>;
-  using OnVsyncCallback = std::function<void(
-      fuchsia::hardware::display::types::DisplayId display_id, uint64_t timestamp,
-      fuchsia::hardware::display::types::ConfigStamp applied_config_stamp, uint64_t cookie)>;
+  using OnVsyncCallback =
+      std::function<void(fuchsia_hardware_display_types::DisplayId display_id, zx::time timestamp,
+                         fuchsia_hardware_display_types::ConfigStamp applied_config_stamp,
+                         fuchsia_hardware_display::VsyncAckCookie cookie)>;
 
   // `coordinator_listener_server` must be valid.
   explicit DisplayCoordinatorListener(

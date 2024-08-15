@@ -35,7 +35,7 @@ class DisplayManager {
   // |display_available_cb| is a one-shot callback that is triggered when the first display is
   // observed, and cleared immediately afterward.
   explicit DisplayManager(fit::closure display_available_cb);
-  DisplayManager(std::optional<fuchsia::hardware::display::types::DisplayId> i_can_haz_display_id,
+  DisplayManager(std::optional<fuchsia_hardware_display_types::DisplayId> i_can_haz_display_id,
                  std::optional<size_t> display_mode_index_override,
                  DisplayModeConstraints display_mode_constraints,
                  fit::closure display_available_cb);
@@ -53,7 +53,7 @@ class DisplayManager {
   std::shared_ptr<Display> default_display_shared() const { return default_display_; }
 
   std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> default_display_coordinator() {
-    return default_display_coordinator_;
+    return hlcpp_default_display_coordinator_;
   }
 
   std::shared_ptr<display::DisplayCoordinatorListener> default_display_coordinator_listener() {
@@ -67,29 +67,35 @@ class DisplayManager {
 
   // TODO(https://fxbug.dev/42156567): we may want to have multiple clients of this, so a single
   // setter that stomps previous callbacks may not be what we want.
-  using VsyncCallback = fit::function<void(
-      fuchsia::hardware::display::types::DisplayId display_id, zx::time timestamp,
-      fuchsia::hardware::display::types::ConfigStamp applied_config_stamp)>;
+  using VsyncCallback =
+      fit::function<void(fuchsia_hardware_display_types::DisplayId display_id, zx::time timestamp,
+                         fuchsia_hardware_display_types::ConfigStamp applied_config_stamp)>;
   void SetVsyncCallback(VsyncCallback callback);
 
  private:
   VsyncCallback vsync_callback_;
 
-  void OnDisplaysChanged(std::vector<fuchsia::hardware::display::Info> added,
-                         std::vector<fuchsia::hardware::display::types::DisplayId> removed);
+  void OnDisplaysChanged(std::vector<fuchsia_hardware_display::Info> added,
+                         std::vector<fuchsia_hardware_display_types::DisplayId> removed);
   void OnClientOwnershipChange(bool has_ownership);
-  void OnVsync(fuchsia::hardware::display::types::DisplayId display_id, uint64_t timestamp,
-               fuchsia::hardware::display::types::ConfigStamp applied_config_stamp,
-               uint64_t cookie);
+  void OnVsync(fuchsia_hardware_display_types::DisplayId display_id, zx::time timestamp,
+               fuchsia_hardware_display_types::ConfigStamp applied_config_stamp,
+               fuchsia_hardware_display::VsyncAckCookie cookie);
 
-  std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> default_display_coordinator_;
+  // Must outlive `default_display_coordinator_`.
+  std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr>
+      hlcpp_default_display_coordinator_;
   std::shared_ptr<display::DisplayCoordinatorListener> default_display_coordinator_listener_;
+
+  // Borrowed new C++ binding reference to `hlcpp_default_display_coordinator_`.
+  std::optional<fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator>>
+      default_display_coordinator_;
 
   std::shared_ptr<Display> default_display_;
 
   // When new displays are detected, ignore all displays which don't match this ID.
   // TODO(https://fxbug.dev/42156949): Remove this when we have proper multi-display support.
-  const std::optional<fuchsia::hardware::display::types::DisplayId> i_can_haz_display_id_;
+  const std::optional<fuchsia_hardware_display_types::DisplayId> i_can_haz_display_id_;
 
   // When a new display is picked, use display mode with this index.
   // TODO(https://fxbug.dev/42156949): Remove this when we have proper multi-display support.

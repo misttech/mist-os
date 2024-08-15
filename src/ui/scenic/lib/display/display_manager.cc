@@ -5,15 +5,13 @@
 #include "src/ui/scenic/lib/display/display_manager.h"
 
 #include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.display.types/cpp/hlcpp_conversion.h>
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.display/cpp/hlcpp_conversion.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/ui/scenic/cpp/fidl.h>
-#include <lib/fidl/cpp/comparison.h>
-#include <lib/fidl/cpp/hlcpp_conversion.h>
 #include <lib/fit/function.h>
 #include <lib/syslog/cpp/macros.h>
+
+#include "src/ui/scenic/lib/display/util.h"
 
 namespace scenic_impl {
 namespace display {
@@ -56,7 +54,7 @@ DisplayManager::DisplayManager(fit::closure display_available_cb)
                      std::move(display_available_cb)) {}
 
 DisplayManager::DisplayManager(
-    std::optional<fuchsia::hardware::display::types::DisplayId> i_can_haz_display_id,
+    std::optional<fuchsia_hardware_display_types::DisplayId> i_can_haz_display_id,
     std::optional<size_t> display_mode_index_override,
     DisplayModeConstraints display_mode_constraints, fit::closure display_available_cb)
     : i_can_haz_display_id_(i_can_haz_display_id),
@@ -67,28 +65,32 @@ DisplayManager::DisplayManager(
 void DisplayManager::BindDefaultDisplayCoordinator(
     fidl::ClientEnd<fuchsia_hardware_display::Coordinator> coordinator,
     fidl::ServerEnd<fuchsia_hardware_display::CoordinatorListener> coordinator_listener) {
-  FX_DCHECK(!default_display_coordinator_);
+  FX_DCHECK(!hlcpp_default_display_coordinator_);
   FX_DCHECK(coordinator.is_valid());
-  default_display_coordinator_ = std::make_shared<fuchsia::hardware::display::CoordinatorSyncPtr>();
-  default_display_coordinator_->Bind(coordinator.TakeChannel());
+  hlcpp_default_display_coordinator_ =
+      std::make_shared<fuchsia::hardware::display::CoordinatorSyncPtr>();
+  hlcpp_default_display_coordinator_->Bind(coordinator.TakeChannel());
+  default_display_coordinator_ = scenic_impl::GetUnowned(*hlcpp_default_display_coordinator_);
   default_display_coordinator_listener_ = std::make_shared<display::DisplayCoordinatorListener>(
       std::move(coordinator_listener), fit::bind_member<&DisplayManager::OnDisplaysChanged>(this),
       fit::bind_member<&DisplayManager::OnVsync>(this),
       fit::bind_member<&DisplayManager::OnClientOwnershipChange>(this));
-  zx_status_t vsync_status = (*default_display_coordinator_)->EnableVsync(true);
-  if (vsync_status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to enable vsync, status: " << vsync_status;
+
+  fit::result<fidl::OneWayStatus> enable_vsync_result =
+      fidl::Call(*default_display_coordinator_)->EnableVsync(true);
+  if (enable_vsync_result.is_error()) {
+    FX_LOGS(ERROR) << "Failed to enable vsync, status: " << enable_vsync_result.error_value();
   }
 }
 
 void DisplayManager::OnDisplaysChanged(
-    std::vector<fuchsia::hardware::display::Info> added,
-    std::vector<fuchsia::hardware::display::types::DisplayId> removed) {
-  for (auto& display : added) {
+    std::vector<fuchsia_hardware_display::Info> added,
+    std::vector<fuchsia_hardware_display_types::DisplayId> removed) {
+  for (fuchsia_hardware_display::Info& display : added) {
     // Ignore display if |i_can_haz_display_id| is set and it doesn't match ID.
-    if (i_can_haz_display_id_.has_value() && !fidl::Equals(display.id, *i_can_haz_display_id_)) {
-      FX_LOGS(INFO) << "Ignoring display with id=" << display.id.value
-                    << " ... waiting for display with id=" << i_can_haz_display_id_->value;
+    if (i_can_haz_display_id_.has_value() && display.id() != *i_can_haz_display_id_) {
+      FX_LOGS(INFO) << "Ignoring display with id=" << display.id().value()
+                    << " ... waiting for display with id=" << i_can_haz_display_id_->value();
       continue;
     }
 
@@ -97,42 +99,41 @@ void DisplayManager::OnDisplaysChanged(
 
       // Set display mode if requested.
       if (display_mode_index_override_.has_value()) {
-        if (*display_mode_index_override_ < display.modes.size()) {
+        if (*display_mode_index_override_ < display.modes().size()) {
           mode_index = *display_mode_index_override_;
         } else {
           FX_LOGS(ERROR) << "Requested display mode=" << *display_mode_index_override_
-                         << " doesn't exist for display with id=" << display.id.value;
+                         << " doesn't exist for display with id=" << display.id().value();
         }
       } else {
-        std::vector<fuchsia_hardware_display::Mode> natural_modes =
-            fidl::HLCPPToNatural(display.modes);
         std::optional<size_t> mode_index_satisfying_constraints =
-            PickFirstDisplayModeSatisfyingConstraints(natural_modes, display_mode_constraints_);
+            PickFirstDisplayModeSatisfyingConstraints(display.modes(), display_mode_constraints_);
 
         // TODO(https://fxbug.dev/42097581): handle this more robustly.
         FX_CHECK(mode_index_satisfying_constraints.has_value())
             << "Failed to find a display mode satisfying all display constraints for "
                "display with id="
-            << display.id.value;
+            << display.id().value();
 
         mode_index = *mode_index_satisfying_constraints;
       }
 
       if (mode_index != 0) {
-        (*default_display_coordinator_)
-            ->SetDisplayMode(
-                fuchsia::hardware::display::types::DisplayId{.value = display.id.value},
-                display.modes[mode_index]);
-        (*default_display_coordinator_)->ApplyConfig();
+        [[maybe_unused]] fit::result<fidl::OneWayStatus> set_display_mode_result =
+            fidl::Call(*default_display_coordinator_)
+                ->SetDisplayMode({{
+                    .display_id = display.id(),
+                    .mode = display.modes()[mode_index],
+                }});
+        [[maybe_unused]] fit::result<fidl::OneWayStatus> apply_config_result =
+            fidl::Call(*default_display_coordinator_)->ApplyConfig();
       }
 
-      std::vector<fuchsia_images2::PixelFormat> pixel_formats =
-          fidl::HLCPPToNatural(display.pixel_format);
-      const fuchsia::hardware::display::Mode& mode = display.modes[mode_index];
+      const fuchsia_hardware_display::Mode& mode = display.modes()[mode_index];
       default_display_ = std::make_unique<Display>(
-          fidl::HLCPPToNatural(display.id), mode.horizontal_resolution, mode.vertical_resolution,
-          display.horizontal_size_mm, display.vertical_size_mm, std::move(pixel_formats),
-          mode.refresh_rate_e2 * kMillihertzPerCentihertz);
+          display.id(), mode.horizontal_resolution(), mode.vertical_resolution(),
+          display.horizontal_size_mm(), display.vertical_size_mm(), display.pixel_format(),
+          mode.refresh_rate_e2() * kMillihertzPerCentihertz);
       OnClientOwnershipChange(owns_display_coordinator_);
 
       if (display_available_cb_) {
@@ -142,8 +143,8 @@ void DisplayManager::OnDisplaysChanged(
     }
   }
 
-  for (fuchsia::hardware::display::types::DisplayId id : removed) {
-    if (default_display_ && default_display_->display_id() == fidl::HLCPPToNatural(id)) {
+  for (const fuchsia_hardware_display_types::DisplayId& id : removed) {
+    if (default_display_ && default_display_->display_id() == id) {
       // TODO(https://fxbug.dev/42097581): handle this more robustly.
       FX_CHECK(false) << "Display disconnected";
       return;
@@ -171,25 +172,26 @@ void DisplayManager::SetVsyncCallback(VsyncCallback callback) {
   vsync_callback_ = std::move(callback);
 }
 
-void DisplayManager::OnVsync(fuchsia::hardware::display::types::DisplayId display_id,
-                             uint64_t timestamp,
-                             fuchsia::hardware::display::types::ConfigStamp applied_config_stamp,
-                             uint64_t cookie) {
-  if (cookie) {
-    (*default_display_coordinator_)->AcknowledgeVsync(cookie);
+void DisplayManager::OnVsync(fuchsia_hardware_display_types::DisplayId display_id,
+                             zx::time timestamp,
+                             fuchsia_hardware_display_types::ConfigStamp applied_config_stamp,
+                             fuchsia_hardware_display::VsyncAckCookie cookie) {
+  if (cookie.value() != fuchsia_hardware_display_types::kInvalidDispId) {
+    [[maybe_unused]] fit::result<fidl::OneWayStatus> acknowledge_vsync_result =
+        fidl::Call(*default_display_coordinator_)->AcknowledgeVsync(cookie.value());
   }
 
   if (vsync_callback_) {
-    vsync_callback_(display_id, zx::time(timestamp), applied_config_stamp);
+    vsync_callback_(display_id, timestamp, applied_config_stamp);
   }
 
   if (!default_display_) {
     return;
   }
-  if (default_display_->display_id() != fidl::HLCPPToNatural(display_id)) {
+  if (default_display_->display_id() != display_id) {
     return;
   }
-  default_display_->OnVsync(zx::time(timestamp), fidl::HLCPPToNatural(applied_config_stamp));
+  default_display_->OnVsync(timestamp, applied_config_stamp);
 }
 
 }  // namespace display
