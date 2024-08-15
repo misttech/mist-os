@@ -65,19 +65,19 @@ bool FuchsiaPowerManager::Initialize(ParentDevice* parent_device, inspect::Node&
       return false;
     }
 
-    assertive_power_dep_tokens_.push_back(std::move(description.assertive_token_));
-    opportunistic_power_dep_tokens_.push_back(std::move(description.opportunistic_token_));
+    assertive_power_dep_tokens_.push_back(std::move(description.assertive_token));
+    opportunistic_power_dep_tokens_.push_back(std::move(description.opportunistic_token));
 
     if (config.element().name().get() == kHardwarePowerElementName) {
       hardware_power_element_control_client_end_ =
-          std::move(description.element_control_client_.value());
+          std::move(description.element_control_client.value());
       hardware_power_lessor_client_ = fidl::WireSyncClient<fuchsia_power_broker::Lessor>(
-          std::move(description.lessor_client_.value()));
+          std::move(description.lessor_client.value()));
       hardware_power_current_level_client_ =
           fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel>(
-              std::move(description.current_level_client_.value()));
+              std::move(description.current_level_client.value()));
       hardware_power_required_level_client_ = fidl::WireClient<fuchsia_power_broker::RequiredLevel>(
-          std::move(description.required_level_client_.value()),
+          std::move(description.required_level_client.value()),
           fdf::Dispatcher::GetCurrent()->async_dispatcher());
 
     } else {

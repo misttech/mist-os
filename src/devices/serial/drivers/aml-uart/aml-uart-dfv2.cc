@@ -170,10 +170,10 @@ zx_status_t AmlUartV2::GetPowerConfiguration(
     return ZX_ERR_INTERNAL;
   }
 
-  element_control_client_end_ = std::move(*description.element_control_client_);
-  lessor_client_end_ = std::move(*description.lessor_client_);
-  current_level_client_end_ = std::move(*description.current_level_client_);
-  required_level_client_end_ = std::move(*description.required_level_client_);
+  element_control_client_end_ = std::move(*description.element_control_client);
+  lessor_client_end_ = std::move(*description.lessor_client);
+  current_level_client_end_ = std::move(*description.current_level_client);
+  required_level_client_end_ = std::move(*description.required_level_client);
   return ZX_OK;
 }
 

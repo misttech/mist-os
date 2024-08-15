@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.component.runner/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/markers.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
@@ -11,6 +12,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async/default.h>
+#include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/power/cpp/element-description-builder.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/fidl/cpp/wire/arena.h>
@@ -19,6 +21,7 @@
 #include <lib/fidl/cpp/wire/status.h>
 #include <lib/fidl/cpp/wire/string_view.h>
 #include <lib/fidl/cpp/wire_natural_conversions.h>
+#include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/zx/event.h>
 #include <zircon/errors.h>
 #include <zircon/rights.h>
@@ -34,8 +37,6 @@
 #include <src/storage/lib/vfs/cpp/service.h>
 #include <src/storage/lib/vfs/cpp/synchronous_vfs.h>
 
-#include "fidl/fuchsia.power.broker/cpp/common_types.h"
-#include "lib/sys/component/cpp/testing/realm_builder_types.h"
 #include "sdk/lib/driver/power/cpp/power-support.h"
 
 namespace power_lib_test {
@@ -262,8 +263,8 @@ TEST_F(PowerLibTest, TestLeaseHelper) {
 
   // Now run the created element with an element runner
   fdf_power::ElementRunner element_runner(
-      std::move(description.required_level_client_.value()),
-      std::move(description.current_level_client_.value()),
+      std::move(description.required_level_client.value()),
+      std::move(description.current_level_client.value()),
       [level_rose = &level_rose, lease_acquired = &lease_acquired,
        quit = QuitLoopClosure()](uint8_t new_level) {
         if (new_level == 1) {
@@ -284,7 +285,7 @@ TEST_F(PowerLibTest, TestLeaseHelper) {
   std::vector<fdf_power::LeaseDependency> deps;
   deps.push_back(fdf_power::LeaseDependency{
       .levels_by_preference = {1},
-      .token = std::move(description.assertive_token_),
+      .token = std::move(description.assertive_token),
       .type = fuchsia_power_broker::DependencyType::kAssertive,
   });
 
@@ -1171,6 +1172,152 @@ TEST_F(PowerLibTest, GetTokensTwoDepTwoLevels) {
   loop.JoinThreads();
 }
 
+/// This tests the fdf_power::ApplyPowerConfiguration function. The validates
+/// that the function calls appropriate token providers and makes a dependency
+/// between the retrieved tokens and the element it adds.
+///
+/// The test creates fake token providers and a fake Topology service.
+/// Then the test creates a power element configuration with dependencies on
+/// two parent elements. The test gives the configuration and the fakes to the
+/// function under test. The test then validates that the topology server was
+/// passed an element configuration with the rght number of dependencies and
+/// tokens for these dependencies match the ones given to the fake token
+/// servers.
+TEST_F(PowerLibTest, ApplyPowerConfiguration) {
+  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
+  loop.StartThread();
+  // Create the dependency configuration
+  fuchsia_hardware_power::ParentElement parent_name_first =
+      fuchsia_hardware_power::ParentElement::WithInstanceName("element_first_parent");
+  fuchsia_hardware_power::ParentElement parent_name_second =
+      fuchsia_hardware_power::ParentElement::WithInstanceName("element_second_parent");
+  fuchsia_hardware_power::PowerLevel one = {{.level = 0, .name = "one", .transitions = {}}};
+  fuchsia_hardware_power::PowerLevel two = {{.level = 1, .name = "two", .transitions = {}}};
+  fuchsia_hardware_power::PowerLevel three = {{.level = 2, .name = "three", .transitions = {}}};
+
+  fuchsia_hardware_power::PowerElement pe = {{
+      .name = "the_element",
+      .levels = {{one, two, three}},
+  }};
+
+  fuchsia_hardware_power::LevelTuple one_to_one = {{
+      .child_level = 1,
+      .parent_level = 1,
+  }};
+
+  fuchsia_hardware_power::PowerDependency power_dep_one = {{
+      .child = "the_element",
+      .parent = parent_name_first,
+      .level_deps = {{one_to_one}},
+      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
+  }};
+
+  fuchsia_hardware_power::LevelTuple three_to_two = {{
+      .child_level = 3,
+      .parent_level = 2,
+  }};
+
+  fuchsia_hardware_power::PowerDependency power_dep_two = {{
+      .child = "the_element",
+      .parent = parent_name_second,
+      .level_deps = {{three_to_two}},
+      .strength = fuchsia_hardware_power::RequirementType::kAssertive,
+  }};
+
+  fuchsia_hardware_power::PowerElementConfiguration df_config = {
+      {.element = pe, .dependencies = {{power_dep_one, power_dep_two}}}};
+
+  // Create service token instances
+  fidl::ServerBindingGroup<fuchsia_hardware_power::PowerTokenProvider> token_bindings;
+  fbl::RefPtr<fs::PseudoDir> power_token_service = fbl::MakeRefCounted<fs::PseudoDir>();
+
+  AddInstanceResult instance_one_data = AddServiceInstance(loop.dispatcher(), &token_bindings);
+  AddInstanceResult instance_two_data = AddServiceInstance(loop.dispatcher(), &token_bindings);
+
+  // Place the services instances in a Service (ie. a directory)
+  fbl::RefPtr<fs::PseudoDir> svc_instances_dir = fbl::MakeRefCounted<fs::PseudoDir>();
+  ASSERT_EQ(svc_instances_dir->AddEntry("element_first_parent", instance_two_data.service_instance),
+            ZX_OK);
+  ASSERT_EQ(
+      svc_instances_dir->AddEntry("element_second_parent", instance_one_data.service_instance),
+      ZX_OK);
+
+  // Make the fake power broker
+  std::unique_ptr<TopologyServer> fake_power_broker = std::make_unique<TopologyServer>();
+
+  fidl::ServerBindingGroup<fuchsia_power_broker::Topology> topo_bindings;
+  fbl::RefPtr<fs::Service> topology = fbl::MakeRefCounted<fs::Service>(
+      [&topo_bindings, &fake_power_broker, &loop, &instance_one_data,
+       &instance_two_data](fidl::ServerEnd<fuchsia_power_broker::Topology> chan) -> int {
+        topo_bindings.AddBinding(
+            loop.dispatcher(), std::move(chan), &*fake_power_broker,
+            [&instance_one_data, &instance_two_data](TopologyServer* impl,
+                                                     fidl::UnbindInfo info) mutable {
+              // Validate that we got a call with two dependencies
+              ASSERT_EQ(impl->received_deps_.size(), static_cast<size_t>(2));
+
+              // Get handle info for the dependency tokens of the service instances
+              zx_info_handle_basic_t dep_token_one_info, dep_token_two_info;
+              instance_one_data.token->get_info(ZX_INFO_HANDLE_BASIC, &dep_token_one_info,
+                                                sizeof(zx_info_handle_basic_t), nullptr, nullptr);
+              instance_two_data.token->get_info(ZX_INFO_HANDLE_BASIC, &dep_token_two_info,
+                                                sizeof(zx_info_handle_basic_t), nullptr, nullptr);
+
+              // Get handle info for the dependency tokens sent to the topology server
+              zx_info_handle_basic_t received_token_one_info, received_token_two_info;
+              impl->received_deps_.at(0).requires_token().get_info(
+                  ZX_INFO_HANDLE_BASIC, &received_token_one_info, sizeof(zx_info_handle_basic_t),
+                  nullptr, nullptr);
+              impl->received_deps_.at(1).requires_token().get_info(
+                  ZX_INFO_HANDLE_BASIC, &received_token_two_info, sizeof(zx_info_handle_basic_t),
+                  nullptr, nullptr);
+
+              // Check that the two dep tokens weren't the same token
+              ASSERT_NE(dep_token_one_info.koid, dep_token_two_info.koid);
+
+              // Check that the first service instance token is the same as one
+              // of the received tokens
+              if (dep_token_one_info.koid != received_token_one_info.koid &&
+                  dep_token_one_info.koid != received_token_two_info.koid) {
+                FAIL() << "created dependency token ONE was not received";
+              }
+
+              // Check that the second service instance token is the same as
+              // one of the received otkens
+              if (dep_token_two_info.koid != received_token_one_info.koid &&
+                  dep_token_two_info.koid != received_token_two_info.koid) {
+                FAIL() << "created dependency token TWO was not received";
+              }
+            });
+        return ZX_OK;
+      });
+
+  // Add the topology server to services
+  fbl::RefPtr<fs::PseudoDir> svcs_dir = fbl::MakeRefCounted<fs::PseudoDir>();
+  svcs_dir->AddEntry("fuchsia.power.broker.Topology", topology);
+  svcs_dir->AddEntry(fuchsia_hardware_power::PowerTokenService::Name, svc_instances_dir);
+
+  // Create the namespace
+  fs::SynchronousVfs vfs(loop.dispatcher());
+  fidl::Endpoints<fuchsia_io::Directory> dir_endpoints =
+      fidl::CreateEndpoints<fuchsia_io::Directory>().value();
+  vfs.ServeDirectory(std::move(svcs_dir), std::move(dir_endpoints.server));
+  std::vector<fuchsia_component_runner::ComponentNamespaceEntry> namespace_entries;
+  namespace_entries.emplace_back(fuchsia_component_runner::ComponentNamespaceEntry{
+      {.path = "/svc", .directory = std::move(dir_endpoints.client)}});
+  fdf::Namespace ns = fdf::Namespace::Create(namespace_entries).value();
+
+  fidl::Arena arena;
+  fidl::VectorView<fuchsia_hardware_power::wire::PowerElementConfiguration> configs;
+  configs.Allocate(arena, 1);
+  configs.at(0) = fidl::ToWire(arena, df_config);
+
+  // Now we've done all that, do the call and check that we get one thing back
+  ASSERT_EQ(fdf_power::ApplyPowerConfiguration(ns, configs).value().size(), static_cast<size_t>(1));
+  loop.Shutdown();
+  loop.JoinThreads();
+}
+
 /// Check GetTokens with a power elements with a single level which depends
 /// on two different parent power elements.
 TEST_F(PowerLibTest, GetTokensOneLevelTwoDeps) {
@@ -1341,6 +1488,10 @@ TEST_F(PowerLibTest, TestSagElements) {
   fidl::Endpoints<fuchsia_io::Directory> dir_endpoints =
       fidl::CreateEndpoints<fuchsia_io::Directory>().value();
   vfs.ServeDirectory(std::move(svcs_dir), std::move(dir_endpoints.server));
+  std::vector<fuchsia_component_runner::ComponentNamespaceEntry> namespace_entries;
+  namespace_entries.emplace_back(fuchsia_component_runner::ComponentNamespaceEntry{
+      {.path = "/svc", .directory = std::move(dir_endpoints.client)}});
+  fdf::Namespace ns = fdf::Namespace::Create(namespace_entries).value();
 
   fuchsia_hardware_power::ParentElement parent = fuchsia_hardware_power::ParentElement::WithSag(
       fuchsia_hardware_power::SagElement::kExecutionState);
@@ -1377,8 +1528,8 @@ TEST_F(PowerLibTest, TestSagElements) {
       {.element = pe, .dependencies = {{power_dep}}}};
 
   fidl::Arena test;
-  fit::result<fdf_power::Error, fdf_power::TokenMap> call_result = fdf_power::GetDependencyTokens(
-      fidl::ToWire(test, df_config), std::move(dir_endpoints.client));
+  fit::result<fdf_power::Error, fdf_power::TokenMap> call_result =
+      fdf_power::GetDependencyTokens(ns, fidl::ToWire(test, df_config));
 
   EXPECT_TRUE(call_result.is_ok());
   loop.Shutdown();

@@ -5,6 +5,7 @@
 #include "sdk/lib/driver/power/cpp/power-support.h"
 
 #include <dirent.h>
+#include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/fidl.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
@@ -576,11 +577,11 @@ fit::result<Error> AddElement(
 
 fit::result<Error> AddElement(fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker,
                               ElementDesc& description) {
-  return AddElement(
-      power_broker, description.element_config_, std::move(description.tokens_),
-      description.assertive_token_.borrow(), description.opportunistic_token_.borrow(),
-      std::move(description.level_control_servers_), std::move(description.lessor_server_),
-      std::move(description.element_control_server_));
+  return AddElement(power_broker, description.element_config_, std::move(description.tokens),
+                    description.assertive_token.borrow(), description.opportunistic_token.borrow(),
+                    std::move(description.level_control_servers),
+                    std::move(description.lessor_server),
+                    std::move(description.element_control_server));
 }
 
 void LeaseHelper::AcquireLease(
@@ -646,6 +647,53 @@ CreateLeaseHelper(const fidl::ClientEnd<fuchsia_power_broker::Topology>& topolog
       std::move(element_control.client), std::move(lessor.client), std::move(required_level.client),
       std::move(current_level.client), dispatcher, std::move(error_callback));
   return fit::success(std::move(helper));
+}
+
+fit::result<Error, std::vector<ElementDesc>> ApplyPowerConfiguration(
+    const fdf::Namespace& ns,
+    fidl::VectorView<fuchsia_hardware_power::wire::PowerElementConfiguration> power_configs) {
+  if (power_configs.empty()) {
+    return fit::success(std::vector<ElementDesc>{});
+  }
+
+  zx::result<fidl::ClientEnd<fuchsia_power_broker::Topology>> topology_connection =
+      ns.Connect<fuchsia_power_broker::Topology>();
+  if (topology_connection.is_error() || !topology_connection->is_valid()) {
+    return fit::error(Error::TOPOLOGY_UNAVAILABLE);
+  }
+
+  std::vector<ElementDesc> descriptions{};
+  for (const fuchsia_hardware_power::wire::PowerElementConfiguration config : power_configs) {
+    fit::result<Error, TokenMap> token_request = GetDependencyTokens(ns, config);
+    if (token_request.is_error()) {
+      return fit::error(token_request.error_value());
+    }
+    ElementDesc description = ElementDescBuilder(config, std::move(token_request.value())).Build();
+    fit::result<Error> add_result = AddElement(topology_connection.value(), description);
+    if (add_result.is_error()) {
+      return fit::error(add_result.error_value());
+    }
+    descriptions.emplace_back(std::move(description));
+  }
+  return fit::success(std::move(descriptions));
+}
+
+fit::result<Error, std::vector<ElementDesc>> GetAndApplyPowerConfiguration(
+    const fdf::Namespace& ns,
+    const fidl::ClientEnd<fuchsia_hardware_platform_device::Device>& dev) {
+  fidl::WireResult<fuchsia_hardware_platform_device::Device::GetPowerConfiguration> result =
+      fidl::WireCall(dev)->GetPowerConfiguration();
+
+  if (!result.ok() || !result->is_ok()) {
+    return fit::error(Error::CONFIGURATION_UNAVAILABLE);
+  }
+
+  std::vector<ElementDesc> descriptions{};
+  if (result->value()->config.empty()) {
+    return fit::success(std::move(descriptions));
+  }
+
+  return ApplyPowerConfiguration(ns, result->value()->config);
 }
 
 }  // namespace fdf_power

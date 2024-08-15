@@ -13,6 +13,8 @@
 #include <lib/zx/event.h>
 #include <lib/zx/handle.h>
 
+#include "sdk/lib/driver/power/cpp/element-description-builder.h"
+
 /// Collection of helpers for driver authors working with the power framework.
 /// The basic usage model is
 ///   * use `fuchsia.hardware.platform.device/Device.GetPowerConfiguration` to
@@ -51,6 +53,10 @@ enum class Error : uint8_t {
   ACTIVITY_GOVERNOR_UNAVAILABLE,
   /// Request to System Activity Governor returned an error.
   ACTIVITY_GOVERNOR_REQUEST,
+  /// fuchsia.power.broker/Topology could not be connected to.
+  TOPOLOGY_UNAVAILABLE,
+  /// The power configuration could not be retrieved.
+  CONFIGURATION_UNAVAILABLE,
 };
 
 enum class ElementRunnerError : uint8_t {
@@ -78,37 +84,6 @@ enum class ElementRunnerError : uint8_t {
   CURRENT_LEVEL_TRANSPORT_OTHER,
   /// The level change callback returned an error
   LEVEL_CHANGE_CALLBACK,
-};
-
-class ParentElementHasher final {
- public:
-  /// Make a unique string as our hash key.
-  size_t operator()(const fuchsia_hardware_power::ParentElement& element) const;
-};
-
-using TokenMap =
-    std::unordered_map<fuchsia_hardware_power::ParentElement, zx::event, ParentElementHasher>;
-
-using ElementDependencyMap =
-    std::unordered_map<fuchsia_hardware_power::ParentElement,
-                       std::vector<fuchsia_power_broker::LevelDependency>, ParentElementHasher>;
-
-struct ElementDesc {
-  fuchsia_hardware_power::wire::PowerElementConfiguration element_config_;
-  TokenMap tokens_;
-  zx::event assertive_token_;
-  zx::event opportunistic_token_;
-  std::pair<fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>,
-            fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>>
-      level_control_servers_;
-  fidl::ServerEnd<fuchsia_power_broker::Lessor> lessor_server_;
-  fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control_server_;
-
-  // The below are created if the caller did not supply their corresponding server end
-  std::optional<fidl::ClientEnd<fuchsia_power_broker::CurrentLevel>> current_level_client_;
-  std::optional<fidl::ClientEnd<fuchsia_power_broker::RequiredLevel>> required_level_client_;
-  std::optional<fidl::ClientEnd<fuchsia_power_broker::Lessor>> lessor_client_;
-  std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control_client_;
 };
 
 /// Runs a power element.
@@ -232,6 +207,30 @@ class LeaseDependency {
   fuchsia_power_broker::DependencyToken token;
   fuchsia_power_broker::DependencyType type;
 };
+
+/// Uses the provided namespace to add the power elements described in
+/// |power_configs| to the power topology and returns corresponding
+/// `ElementDesc` instances.
+/// This function:
+///     * Retrieves the tokens of any dependencies via
+///       `fuchsia.hardware.power/PowerTokenProvider` instances
+///     * Adds the power element via `fuchsia.power.broker/Topology`
+///
+/// In effect, this function converts the provided |power_configs| into their
+/// corresponding `ElementDesc` objects and returns them.
+fit::result<Error, std::vector<ElementDesc>> ApplyPowerConfiguration(
+    const fdf::Namespace& ns,
+    fidl::VectorView<fuchsia_hardware_power::wire::PowerElementConfiguration> power_configs);
+
+/// Uses the provided namespace and platform device instance to get a power
+/// configuration, add corresponding power elements to the power topology, and
+/// return `ElementDesc` objects equivalent to the power configuration.
+///
+/// This function retrieves the config via |dev| and then calls
+/// `ApplyPowerConfiguration`, see its documentation for additional
+/// information.
+fit::result<Error, std::vector<ElementDesc>> GetAndApplyPowerConfiguration(
+    const fdf::Namespace& ns, const fidl::ClientEnd<fuchsia_hardware_platform_device::Device>& dev);
 
 /// Create a lease based on the set of dependencies represented by
 /// |dependencies|. When the lease is fulfilled those dependencies will be at
