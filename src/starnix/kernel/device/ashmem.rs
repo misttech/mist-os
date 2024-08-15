@@ -17,18 +17,20 @@ use crate::vfs::{
 };
 use fuchsia_zircon as zx;
 use linux_uapi::{
-    ASHMEM_GET_NAME, ASHMEM_GET_PIN_STATUS, ASHMEM_GET_PROT_MASK, ASHMEM_GET_SIZE, ASHMEM_PIN,
-    ASHMEM_PURGE_ALL_CACHES, ASHMEM_SET_NAME, ASHMEM_SET_PROT_MASK, ASHMEM_SET_SIZE, ASHMEM_UNPIN,
+    ASHMEM_GET_NAME, ASHMEM_GET_PIN_STATUS, ASHMEM_GET_PROT_MASK, ASHMEM_GET_SIZE,
+    ASHMEM_IS_PINNED, ASHMEM_IS_UNPINNED, ASHMEM_NOT_PURGED, ASHMEM_PIN, ASHMEM_PURGE_ALL_CACHES,
+    ASHMEM_SET_NAME, ASHMEM_SET_PROT_MASK, ASHMEM_SET_SIZE, ASHMEM_UNPIN,
 };
 use once_cell::sync::OnceCell;
+use range_map::RangeMap;
 use starnix_logging::track_stub;
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::open_flags::OpenFlags;
-use starnix_uapi::user_address::UserAddress;
-use starnix_uapi::{device_type, errno, error, ASHMEM_GET_FILE_ID, ASHMEM_NAME_LEN};
+use starnix_uapi::user_address::{UserAddress, UserRef};
+use starnix_uapi::{ashmem_pin, device_type, errno, error, ASHMEM_GET_FILE_ID, ASHMEM_NAME_LEN};
 use std::sync::Arc;
 
 /// Initializes the ashmem device.
@@ -57,11 +59,11 @@ pub struct Ashmem {
     memory: OnceCell<Arc<MemoryObject>>,
     state: Mutex<AshmemState>,
 }
-
 struct AshmemState {
     size: usize,
     name: FsString,
     prot_flags: ProtectionFlags,
+    unpinned: RangeMap<u32, bool>,
 }
 
 impl Ashmem {
@@ -76,6 +78,7 @@ impl Ashmem {
             size: 0,
             name: b"dev/ashmem\0".into(),
             prot_flags: ProtectionFlags::all(),
+            unpinned: RangeMap::<u32, bool>::new(),
         };
 
         let ashmem = Ashmem { memory: OnceCell::new(), state: Mutex::new(state) };
@@ -168,10 +171,10 @@ impl FileOps for Ashmem {
             ASHMEM_GET_SIZE => Ok(self.state.lock().size.into()),
             ASHMEM_SET_NAME => {
                 let mut state = self.state.lock();
+
                 if self.is_mapped() {
                     return error!(EINVAL);
                 }
-
                 let mut name =
                     current_task.read_c_string_to_vec(arg.into(), ASHMEM_NAME_LEN as usize)?;
                 name.push(0); // Add a null terminator
@@ -187,10 +190,11 @@ impl FileOps for Ashmem {
                 Ok(SUCCESS)
             }
             ASHMEM_SET_PROT_MASK => {
+                let mut state = self.state.lock();
+
                 let prot_flags =
                     ProtectionFlags::from_bits(arg.into()).ok_or_else(|| errno!(EINVAL))?;
 
-                let mut state = self.state.lock();
                 // Do not allow protections to be increased
                 if !state.prot_flags.contains(prot_flags) {
                     return error!(EINVAL);
@@ -200,17 +204,35 @@ impl FileOps for Ashmem {
                 Ok(SUCCESS)
             }
             ASHMEM_GET_PROT_MASK => Ok(self.state.lock().prot_flags.bits().into()),
-            ASHMEM_PIN => {
-                track_stub!(TODO("https://fxbug.dev/322873842"), "ASHMEM_PIN");
-                error!(ENOSYS)
-            }
-            ASHMEM_UNPIN => {
-                track_stub!(TODO("https://fxbug.dev/322874326"), "ASHMEM_UNPIN");
-                error!(ENOSYS)
-            }
-            ASHMEM_GET_PIN_STATUS => {
-                track_stub!(TODO("https://fxbug.dev/322873280"), "ASHMEM_GET_PIN_STATUS");
-                error!(ENOSYS)
+            ASHMEM_PIN | ASHMEM_UNPIN | ASHMEM_GET_PIN_STATUS => {
+                let mut state = self.state.lock();
+
+                if !self.is_mapped() {
+                    return error!(EINVAL);
+                }
+
+                let user_ref = UserRef::<ashmem_pin>::new(arg.into());
+                let pin = current_task.read_object(user_ref)?;
+                let (lo, hi) = (pin.offset, pin.offset + pin.len);
+
+                match request {
+                    ASHMEM_PIN => {
+                        state.unpinned.remove(&(lo..hi));
+                        return Ok(ASHMEM_NOT_PURGED.into());
+                    }
+                    ASHMEM_UNPIN => {
+                        state.unpinned.insert(lo..hi, false);
+                        return Ok(ASHMEM_IS_UNPINNED.into());
+                    }
+                    ASHMEM_GET_PIN_STATUS => {
+                        let mut intervals = state.unpinned.intersection(lo..hi);
+                        return match intervals.next() {
+                            Some(_) => Ok(ASHMEM_IS_UNPINNED.into()),
+                            None => Ok(ASHMEM_IS_PINNED.into()),
+                        };
+                    }
+                    _ => unreachable!(),
+                }
             }
             ASHMEM_PURGE_ALL_CACHES => {
                 track_stub!(TODO("https://fxbug.dev/322873734"), "ASHMEM_PURGE_ALL_CACHES");

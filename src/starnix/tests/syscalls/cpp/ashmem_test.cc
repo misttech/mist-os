@@ -341,4 +341,64 @@ TEST_F(AshmemTest, MapPrivate) {
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
+// No pinning permitted unless previously mapped
+TEST_F(AshmemTest, NoPinBeforeMap) {
+  ashmem_pin pin = {.offset = 0, .len = (uint32_t)PAGE_SIZE};
+
+  auto fd = CreateRegion(nullptr, PAGE_SIZE);
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin), SyscallFailsWithErrno(EINVAL));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin), SyscallFailsWithErrno(EINVAL));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_PIN_STATUS, &pin), SyscallFailsWithErrno(EINVAL));
+
+  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin), SyscallSucceeds());
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin), SyscallSucceeds());
+
+  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// Ashmem regions are pinned by default
+TEST_F(AshmemTest, DefaultPin) {
+  ashmem_pin pin = {.offset = 0, .len = (uint32_t)PAGE_SIZE};
+  auto fd = CreateRegion(nullptr, PAGE_SIZE);
+
+  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_PIN_STATUS, &pin),
+              SyscallSucceedsWithValue(ASHMEM_IS_PINNED));
+
+  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// Create a region with two unpinned sub-regions and verify the state
+//      [  Unpin   ][        Pin        ][  Unpin   ]
+TEST_F(AshmemTest, BasicPinBehavior) {
+  ashmem_pin pin_left = {.offset = 0, .len = (uint32_t)PAGE_SIZE};
+  ashmem_pin pin_right = {.offset = 3 * (uint32_t)PAGE_SIZE, .len = (uint32_t)PAGE_SIZE};
+  ashmem_pin pin_middle = {.offset = (uint32_t)PAGE_SIZE, .len = 2 * (uint32_t)PAGE_SIZE};
+
+  auto fd = CreateRegion(nullptr, 4 * PAGE_SIZE);
+
+  void *addr = mmap(nullptr, 4 * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+
+  ASSERT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin_left), SyscallSucceeds());
+  ASSERT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin_right), SyscallSucceeds());
+
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_PIN_STATUS, &pin_left),
+              SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_PIN_STATUS, &pin_middle),
+              SyscallSucceedsWithValue(ASHMEM_IS_PINNED));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_PIN_STATUS, &pin_right),
+              SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
+
+  ASSERT_THAT(munmap(addr, 4 * PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
 }  // namespace
