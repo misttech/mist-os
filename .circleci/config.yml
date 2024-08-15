@@ -35,7 +35,7 @@ jobs:
             - prebuilt
       - run:
           command: |
-            make args all
+            make args gen
             make test
             make ci
 
