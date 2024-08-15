@@ -459,7 +459,11 @@ impl<DirectoryType: Directory> Representation for BaseConnection<DirectoryType> 
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::Representation, Status> {
         Ok(fio::Representation::Directory(fio::DirectoryInfo {
-            attributes: Some(self.directory.get_attributes(requested_attributes).await?),
+            attributes: if requested_attributes.is_empty() {
+                None
+            } else {
+                Some(self.directory.get_attributes(requested_attributes).await?)
+            },
             ..Default::default()
         }))
     }
