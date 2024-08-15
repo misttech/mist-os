@@ -6,9 +6,8 @@ import("//build/components.gni")
 
 # Pre compiled linux binary see build.sh
 resource("linux-bin") {
-  allow_binary_output_dir = true
   sources = [ "nolibc-test.linux" ]
-  outputs = [ "bin/nolibc-test" ]
+  outputs = [ "data/nolibc-test" ]
 }
 
 fuchsia_package_with_single_component("nolibc_container") {

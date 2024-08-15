@@ -211,6 +211,9 @@ if (is_mistos) {
       # Containers
 
       ## Mistos Container
+      "//examples/mistos_linux_bench:coremark",
+      "//examples/mistos_linux_bench:libc-bench",
+      "//examples/mistos_linux_bench:sqlite-bench-uk",
       "//src/starnix/containers/mistos:mistos_container",
       "//src/starnix/containers/mistos:mistos_container_resources",
 

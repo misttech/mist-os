@@ -11,17 +11,8 @@ resource("linux-bin") {
   outputs = [ "bin/toybox" ]
 }
 
-resource("coremark") {
-  allow_binary_output_dir = true
-  sources = [ "coremark.exe" ]
-  outputs = [ "bin/coremark" ]
-}
-
 fuchsia_package_with_single_component("toybox") {
   component_name = "toybox"
   manifest = "meta/toybox.cml"
-  deps = [
-    ":coremark",
-    ":linux-bin",
-  ]
+  deps = [ ":linux-bin" ]
 }

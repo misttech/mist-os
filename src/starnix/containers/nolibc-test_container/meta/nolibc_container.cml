@@ -6,7 +6,7 @@
     program: {
         runner: "starnix",
         features: [ "container" ],
-        init: [ "bin/nolibc-test" ],
+        init: [ "container/nolibc-test" ],
         kernel_cmdline: "",
         mounts: [ "/:remotefs" ],
         name: "nolibc_test_container",

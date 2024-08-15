@@ -1,0 +1,22 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/dist/resource.gni")
+
+# Linux pre compiled binary 
+# GCC11.4.0 -O2 -DMULTITHREAD=1     -DUSE_SOCKET -DPERFORMANCE_RUN=1     -static       -lrt / Heap
+resource("coremark") {
+  sources = [ "coremark.exe" ]
+  outputs = [ "data/coremark" ]
+}
+
+resource("libc-bench") {
+  sources = [ "libc-bench-nofork" ]
+  outputs = [ "data/libc-bench" ]
+}
+
+resource("sqlite-bench-uk") {
+  sources = [ "sqlite-bench-uk" ]
+  outputs = [ "data/sqlite-bench-uk" ]
+}

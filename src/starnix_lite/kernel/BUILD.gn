@@ -522,8 +522,11 @@ zbi("starnix_lite_kernel_zbi") {
     ":starnix_lite-zbi-cmdline",
     ":starnix_lite_kernel_bin",
     "//build/info/bootfs:minimum_utc_stamp",
-    "//examples/toybox:coremark",
+    "//examples/mistos_linux_bench:coremark",
+    "//examples/mistos_linux_bench:libc-bench",
+    "//examples/mistos_linux_bench:sqlite-bench-uk",
     "//src/starnix/containers/mistos:mistos_container_resources",
+    "//src/starnix/containers/nolibc-test_container:linux-bin",
   ]
 
   output_name = "starnix_lite_kernel"
