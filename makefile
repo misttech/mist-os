@@ -87,6 +87,7 @@ rain: ## Run qemu with precompiled images (do not rebuild)
 test: host_test gen info ## Run test kernel-unittests-boot-test.zbi
 	$(NOECHO)$(NINJA) -C $(OUTPUT) multiboot.bin kernel_x64/kernel.zbi kernel-unittests-boot-test
 	$(NOECHO)$(MISTOSROOT)/zircon/scripts/run-zircon-x64 -q $(MISTOSROOT)/prebuilt/third_party/qemu/$(HOST_OS)-$(HOST_ARCH)/bin \
+	-s 1 \
 	-t $(OUTPUT)/multiboot.bin \
 	-z $(OUTPUT)/obj/zircon/kernel/kernel-unittests-boot-test.zbi \
 	-- -no-reboot || ([ $$? -eq 31 ] && echo "Success!")
@@ -95,11 +96,22 @@ test: host_test gen info ## Run test kernel-unittests-boot-test.zbi
 ci: debug kasan info gen ## Run test kernel-zxtest.zbi with kasan
 	$(NOECHO)$(NINJA) -C $(OUTPUT) multiboot.bin kernel_x64/kernel.zbi
 	$(NOECHO)$(MISTOSROOT)/zircon/scripts/run-zircon-x64 -q $(MISTOSROOT)/prebuilt/third_party/qemu/$(HOST_OS)-$(HOST_ARCH)/bin \
+	-s 1 \
 	-t $(OUTPUT)/multiboot.bin \
 	-z $(OUTPUT)/obj/zircon/kernel/kernel-unittests-boot-test.zbi \
 	-c "kernel.bypass-debuglog=true" \
 	-- -no-reboot || ([ $$? -eq 31 ] && echo "Success!")
 .PHONY: ci
+
+starnix_lite_kernel: info gen
+	$(NOECHO)$(NINJA) -C $(OUTPUT) multiboot.bin starnix_lite_kernel_zbi
+	$(NOECHO)$(MISTOSROOT)/zircon/scripts/run-zircon-x64 -q $(MISTOSROOT)/prebuilt/third_party/qemu/$(HOST_OS)-$(HOST_ARCH)/bin \
+	-s 1 \
+	-t $(OUTPUT)/multiboot.bin \
+	-z $(OUTPUT)/starnix_lite_kernel.zbi \
+	-c "kernel.bypass-debuglog=false kernel.vdso.always_use_next=true" \
+	-- -no-reboot || ([ $$? -eq 31 ] && echo "Success!")
+.PHONY: starnix_lite_kernel
 
 %: ## Make any ninja target
 	$(NOECHO)$(NINJA) -C $(OUTPUT) $@
