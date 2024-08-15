@@ -142,6 +142,10 @@ pub struct BoardProvidedConfig {
     #[file_relative_paths]
     pub power_metrics_recorder: Option<FileRelativePathBuf>,
 
+    /// System power modes configuration
+    #[file_relative_paths]
+    pub system_power_mode: Option<FileRelativePathBuf>,
+
     /// Thermal configuration for the power-manager service
     #[file_relative_paths]
     pub thermal: Option<FileRelativePathBuf>,

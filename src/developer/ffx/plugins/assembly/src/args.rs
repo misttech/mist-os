@@ -394,6 +394,10 @@ pub struct BoardInputBundleArgs {
     #[argh(option)]
     pub power_metrics_recorder_config: Option<Utf8PathBuf>,
 
+    /// system power modes configuration
+    #[argh(option)]
+    pub system_power_mode_config: Option<Utf8PathBuf>,
+
     /// thermal management configuration
     #[argh(option)]
     pub thermal_config: Option<Utf8PathBuf>,

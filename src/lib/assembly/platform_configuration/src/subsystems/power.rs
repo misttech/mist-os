@@ -36,6 +36,17 @@ impl DefineSubsystemConfiguration<PowerConfig> for PowerManagementSubsystem {
                 .context("Adding power_manager config file")?;
         }
 
+        if let Some(system_power_mode_config) = &context.board_info.configuration.system_power_mode
+        {
+            builder
+                .bootfs()
+                .file(FileEntry {
+                    source: system_power_mode_config.as_utf8_pathbuf().into(),
+                    destination: BootfsDestination::SystemPowerModeConfig,
+                })
+                .context("Adding system power mode configuration file")?;
+        }
+
         if let Some(thermal_config) = &context.board_info.configuration.thermal {
             builder
                 .bootfs()

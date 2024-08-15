@@ -25,6 +25,7 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
         bootfs_packages,
         kernel_boot_args,
         power_manager_config,
+        system_power_mode_config,
         cpu_manager_config,
         thermal_config,
         thread_roles,
@@ -75,6 +76,11 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
         copy_optional_config_file(&cpu_manager_config, "cpu_manager.json5", &config_files_dir)?;
     let power_manager_config =
         copy_optional_config_file(&power_manager_config, "power_manager.json5", &config_files_dir)?;
+    let system_power_mode_config = copy_optional_config_file(
+        &system_power_mode_config,
+        "system_power_mode_config.json5",
+        &config_files_dir,
+    )?;
     let power_metrics_recorder_config = copy_optional_config_file(
         &power_metrics_recorder_config,
         "power_metrics_recorder_config.json",
@@ -145,17 +151,19 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
         drivers,
         packages,
         kernel_boot_args: kernel_boot_args.into_iter().collect(),
-        configuration: if power_manager_config.is_some()
-            || cpu_manager_config.is_some()
-            || thermal_config.is_some()
+        configuration: if cpu_manager_config.is_some()
+            || power_manager_config.is_some()
             || power_metrics_recorder_config.is_some()
+            || system_power_mode_config.is_some()
+            || thermal_config.is_some()
             || !thread_roles.is_empty()
         {
             Some(BoardProvidedConfig {
-                power_manager: power_manager_config,
                 cpu_manager: cpu_manager_config,
-                thermal: thermal_config,
+                power_manager: power_manager_config,
                 power_metrics_recorder: power_metrics_recorder_config,
+                system_power_mode: system_power_mode_config,
+                thermal: thermal_config,
                 thread_roles: thread_roles_config,
             })
         } else {

@@ -60,6 +60,7 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #    - cpu_manager: configuration for the cpu_manager system.
 #    - power_manager: configuration for the power_manager system.
 #    - power_metrics_recorder: configuration for power_metrics_recorder system.
+#    - system_power_mode: configuration of the system power modes.
 #    - thermal: configuration of the thermal management system.
 #    - thread_roles: files defining thread roles
 #
@@ -268,6 +269,14 @@ template("board_input_bundle") {
       creation_args += [
         "--power-metrics-recorder-config",
         rebase_path(configuration.power_metrics_recorder, root_build_dir),
+      ]
+    }
+
+    if (defined(configuration.system_power_mode)) {
+      creation_inputs += [ configuration.system_power_mode ]
+      creation_args += [
+        "--system-power-mode-config",
+        rebase_path(configuration.system_power_mode, root_build_dir),
       ]
     }
 

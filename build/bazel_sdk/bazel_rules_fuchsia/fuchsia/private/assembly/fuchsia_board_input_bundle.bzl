@@ -47,6 +47,7 @@ def _fuchsia_board_input_bundle_impl(ctx):
         ("--cpu-manager-config", "cpu_manager_config"),
         ("--power-manager-config", "power_manager_config"),
         ("--power-metrics-recorder-config", "power_metrics_recorder_config"),
+        ("--system-power-mode-config", "system_power_mode_config"),
         ("--thermal-config", "thermal_config"),
     ]:
         config_file = getattr(ctx.file, file)
@@ -162,6 +163,10 @@ fuchsia_board_input_bundle = rule(
         ),
         "power_metrics_recorder_config": attr.label(
             doc = "Path to power_metrics_recorder configuration",
+            allow_single_file = True,
+        ),
+        "system_power_mode_config": attr.label(
+            doc = "Path to system power mode configuration",
             allow_single_file = True,
         ),
         "thermal_config": attr.label(

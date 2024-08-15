@@ -122,6 +122,18 @@
     {
       "kind": {
         "Option": {
+          "arg_name": "system-power-mode-config"
+        }
+      },
+      "optionality": "optional",
+      "long": "--system-power-mode-config",
+      "short": null,
+      "description": "system power modes configuration",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
           "arg_name": "thermal-config"
         }
       },

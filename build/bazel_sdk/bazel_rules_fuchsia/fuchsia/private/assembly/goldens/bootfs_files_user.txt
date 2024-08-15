@@ -5,6 +5,7 @@ config/build_info/minimum_utc_stamp
 ?config/component_manager
 ?config/cpu_manager/node_config.json
 ?config/power_manager/node_config.json
+?config/power_manager/system_power_mode_config.json
 ?config/power_manager/thermal_config.json
 ?config/profiles/*
 config/profiles/bringup.profiles
