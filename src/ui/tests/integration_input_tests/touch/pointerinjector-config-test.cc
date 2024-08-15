@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.element/cpp/fidl.h>
 #include <fidl/fuchsia.input.injection/cpp/fidl.h>
-#include <fidl/fuchsia.ui.app/cpp/fidl.h>
 #include <fidl/fuchsia.ui.composition/cpp/fidl.h>
 #include <fidl/fuchsia.ui.test.input/cpp/fidl.h>
 #include <fidl/test.accessibility/cpp/fidl.h>
@@ -238,8 +238,8 @@ class PointerInjectorConfigTest
     FX_LOGS(INFO) << "Registering input injection device";
     RegisterTouchScreen();
 
-    // Launch client view, and wait until it's rendering to proceed with the test.
-    LaunchClient();
+    // Wait until eager client view is rendering to proceed with the test.
+    WaitForViewPresentation();
 
     auto magnifier_connect = realm_root()->component().Connect<test_accessibility::Magnifier>();
     ZX_ASSERT_OK(magnifier_connect);
@@ -329,6 +329,10 @@ class PointerInjectorConfigTest
   static constexpr auto kCppFlatlandClient = "touch-flatland-client";
 
  private:
+  std::vector<std::pair<ChildName, std::string>> GetEagerTestComponents() override {
+    return {std::make_pair(kCppFlatlandClient, kCppFlatlandClientUrl)};
+  }
+
   void ExtendRealm() override {
     // Key part of service setup: have this test component vend the
     // |ResponseListener| service in the constructed realm.
@@ -337,12 +341,6 @@ class PointerInjectorConfigTest
                                     return std::make_unique<ResponseListenerServer>(d, s);
                                   });
 
-    realm_builder().AddChild(kCppFlatlandClient, kCppFlatlandClientUrl);
-
-    realm_builder().AddRoute(
-        {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_app::ViewProvider>}},
-         .source = ChildRef{kCppFlatlandClient},
-         .targets = {ParentRef()}});
     realm_builder().AddRoute(
         {.capabilities =
              {
@@ -355,7 +353,8 @@ class PointerInjectorConfigTest
          .targets = {ChildRef{kCppFlatlandClient}}});
     realm_builder().AddRoute(
         {.capabilities =
-             {Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Allocator>},
+             {Protocol{fidl::DiscoverableProtocolName<fuchsia_element::GraphicalPresenter>},
+              Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Allocator>},
               Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Flatland>}},
          .source = ui_testing::PortableUITest::kTestUIStackRef,
          .targets = {ChildRef{kCppFlatlandClient}}});

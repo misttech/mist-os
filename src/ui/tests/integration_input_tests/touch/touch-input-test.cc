@@ -5,6 +5,7 @@
 #include <fidl/fuchsia.accessibility.semantics/cpp/fidl.h>
 #include <fidl/fuchsia.buildinfo/cpp/fidl.h>
 #include <fidl/fuchsia.component/cpp/fidl.h>
+#include <fidl/fuchsia.element/cpp/fidl.h>
 #include <fidl/fuchsia.fonts/cpp/fidl.h>
 #include <fidl/fuchsia.input.injection/cpp/fidl.h>
 #include <fidl/fuchsia.intl/cpp/fidl.h>
@@ -17,7 +18,6 @@
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.tracing.provider/cpp/fidl.h>
-#include <fidl/fuchsia.ui.app/cpp/fidl.h>
 #include <fidl/fuchsia.ui.input/cpp/fidl.h>
 #include <fidl/fuchsia.ui.pointer/cpp/fidl.h>
 #include <fidl/fuchsia.ui.scenic/cpp/fidl.h>
@@ -45,8 +45,9 @@
 #include <src/ui/testing/util/fidl_cpp_helpers.h>
 #include <src/ui/testing/util/portable_ui_test.h>
 
-// This test exercises the touch input dispatch path from Input Pipeline to a Scenic client. It is a
-// multi-component test, and carefully avoids sleeping or polling for component coordination.
+// This test exercises the touch input dispatch path from Input Pipeline to a Scenic client. It
+// is a multi-component test, and carefully avoids sleeping or polling for component
+// coordination.
 // - It runs real Scene Manager and Scenic components.
 // - It uses a fake display controller; the physical device is unused.
 //
@@ -63,11 +64,15 @@
 // - The test sets up this view hierarchy:
 //   - Top level scene, owned by Scene Manager.
 //   - Child view, owned by the ui client.
-// - The test waits for a Scenic event that verifies the child has UI content in the scene graph.
+// - The test waits for a Scenic event that verifies the child has UI content in the scene
+// graph.
 // - The test injects input into Input Pipeline, emulating a display's touch report.
-// - Input Pipeline dispatches the touch event to Scenic, which in turn dispatches it to the child.
-// - The child receives the touch event and reports back to the test over a custom test-only FIDL.
-// - Test waits for the child to report a touch; when the test receives the report, the test quits
+// - Input Pipeline dispatches the touch event to Scenic, which in turn dispatches it to the
+// child.
+// - The child receives the touch event and reports back to the test over a custom test-only
+// FIDL.
+// - Test waits for the child to report a touch; when the test receives the report, the test
+// quits
 //   successfully.
 //
 // This test uses the realm_builder library to construct the topology of components
@@ -122,7 +127,8 @@ constexpr auto kMoveEventCount = 5;
 // between any two tap events present in the response to a swipe event.
 // Note: These values are currently hard coded in the fake display and should be changed
 // accordingly.
-// TODO(https://fxbug.dev/42062819): Remove the dependency of the tests on these hard coded values.
+// TODO(https://fxbug.dev/42062819): Remove the dependency of the tests on these hard coded
+// values.
 constexpr auto kDisplayWidth = 1280;
 constexpr auto kDisplayHeight = 800;
 
@@ -179,16 +185,6 @@ struct InjectSwipeParams {
   int begin_x = 0, begin_y = 0;
   std::vector<ExpectedSwipeEvent> expected_events;
 };
-
-// Combines all vectors in `vecs` into one.
-template <typename T>
-std::vector<T> merge(std::initializer_list<std::vector<T>> vecs) {
-  std::vector<T> result;
-  for (auto v : vecs) {
-    result.insert(result.end(), v.begin(), v.end());
-  }
-  return result;
-}
 
 // Checks whether all the coordinates in |expected_events| are contained in |actual_events|.
 void AssertSwipeEvents(
@@ -423,7 +419,9 @@ class TouchInputBase : public ui_testing::PortableUITest,
     FX_LOGS(INFO) << "Registering input injection device";
     RegisterTouchScreen();
 
-    LaunchClient();
+    // Wait until eager client view is rendering to proceed with the test.
+    FX_LOGS(INFO) << "Wait for view presentation";
+    WaitForViewPresentation();
 
     FX_LOGS(INFO) << "Wait for test app status: kHandlersRegistered";
     RunLoopUntil([&]() { return response_state()->ready_to_inject(); });
@@ -528,16 +526,15 @@ class TouchInputBase : public ui_testing::PortableUITest,
 template <typename... Ts>
 class CppInputTestBase : public TouchInputBase<Ts...> {
  protected:
-  std::vector<std::pair<ChildName, std::string>> GetTestComponents() override {
+  static constexpr auto kCppFlatlandClient = "touch-flatland-client";
+
+ private:
+  std::vector<std::pair<ChildName, std::string>> GetEagerTestComponents() override {
     return {std::make_pair(kCppFlatlandClient, kCppFlatlandClientUrl)};
   }
 
   std::vector<Route> GetTestRoutes() override {
-    const std::string_view view_provider = kCppFlatlandClient;
     return {
-        {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_app::ViewProvider>}},
-         .source = ChildRef{view_provider},
-         .targets = {ParentRef()}},
         {.capabilities =
              {Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_test_input::TouchInputListener>},
               Protocol{
@@ -545,16 +542,14 @@ class CppInputTestBase : public TouchInputBase<Ts...> {
          .source = ChildRef{kMockResponseListener},
          .targets = {ChildRef{kCppFlatlandClient}}},
         {.capabilities =
-             {Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Flatland>},
+             {Protocol{fidl::DiscoverableProtocolName<fuchsia_element::GraphicalPresenter>},
+              Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Flatland>},
               Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Allocator>}},
          .source = ui_testing::PortableUITest::kTestUIStackRef,
          .targets = {ChildRef{kCppFlatlandClient}}},
     };
   }
 
-  static constexpr auto kCppFlatlandClient = "touch-flatland-client";
-
- private:
   static constexpr auto kCppFlatlandClientUrl = "#meta/touch-flatland-client.cm";
 };
 

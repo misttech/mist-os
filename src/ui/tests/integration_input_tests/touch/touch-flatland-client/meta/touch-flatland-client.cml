@@ -7,25 +7,15 @@
         runner: "elf",
         binary: "bin/touch-flatland-client",
     },
-    capabilities: [
-        {
-            protocol: [ "fuchsia.ui.app.ViewProvider" ],
-        },
-    ],
     use: [
         {
             protocol: [
+                "fuchsia.element.GraphicalPresenter",
                 "fuchsia.ui.composition.Allocator",
                 "fuchsia.ui.composition.Flatland",
                 "fuchsia.ui.test.input.TestAppStatusListener",
                 "fuchsia.ui.test.input.TouchInputListener",
             ],
-        },
-    ],
-    expose: [
-        {
-            protocol: [ "fuchsia.ui.app.ViewProvider" ],
-            from: "self",
         },
     ],
 }
