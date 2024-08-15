@@ -67,7 +67,7 @@ pub(crate) trait AppStrategy {
     async fn handle_new_display_coordinator(&mut self, _display_path: PathBuf) {}
     async fn handle_display_coordinator_event(
         &mut self,
-        _event: fidl_fuchsia_hardware_display::CoordinatorEvent,
+        _event: fidl_fuchsia_hardware_display::CoordinatorListenerRequest,
     ) {
     }
     fn set_virtcon_mode(&mut self, _virtcon_mode: VirtconMode) {}

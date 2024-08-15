@@ -11,17 +11,19 @@ use crate::input::{self, listen_for_user_input, DeviceId};
 use crate::view::strategies::base::{DisplayDirectParams, ViewStrategyParams, ViewStrategyPtr};
 use crate::view::strategies::display_direct::DisplayDirectViewStrategy;
 use crate::view::ViewKey;
-use anyhow::{bail, ensure, Context, Error};
+use anyhow::{bail, Context, Error};
 use async_trait::async_trait;
 use euclid::size2;
 use fidl::endpoints::{self};
 use fidl_fuchsia_hardware_display::{
-    CoordinatorEvent, CoordinatorMarker, CoordinatorProxy, ProviderMarker, VirtconMode,
+    CoordinatorListenerMarker, CoordinatorListenerRequest, CoordinatorMarker, CoordinatorProxy,
+    ProviderMarker, ProviderOpenCoordinatorWithListenerForPrimaryRequest,
+    ProviderOpenCoordinatorWithListenerForVirtconRequest, VirtconMode,
 };
 use fidl_fuchsia_input_report as hid_input_report;
 use fuchsia_async::{self as fasync};
 use fuchsia_fs::{directory as vfs_watcher, OpenFlags};
-use fuchsia_zircon::{self as zx, Status};
+use fuchsia_zircon::Status;
 use futures::channel::mpsc::UnboundedSender;
 use futures::{StreamExt, TryFutureExt, TryStreamExt};
 use keymaps::Keymap;
@@ -135,30 +137,47 @@ impl DisplayCoordinator {
         let provider =
             fuchsia_component::client::connect_to_protocol_at_path::<ProviderMarker>(path)
                 .context("while opening device file")?;
-        let (coordinator, server) = endpoints::create_proxy::<CoordinatorMarker>()?;
-        let status = if virtcon_mode.is_some() {
-            provider.open_coordinator_for_virtcon(server).await
+        let (coordinator, coordinator_server) = endpoints::create_proxy::<CoordinatorMarker>()?;
+        let (listener_client, mut listener_requests) =
+            endpoints::create_request_stream::<CoordinatorListenerMarker>()?;
+        let () = if virtcon_mode.is_some() {
+            provider
+                .open_coordinator_with_listener_for_virtcon(
+                    ProviderOpenCoordinatorWithListenerForVirtconRequest {
+                        coordinator: Some(coordinator_server),
+                        coordinator_listener: Some(listener_client),
+                        __source_breaking: fidl::marker::SourceBreaking,
+                    },
+                )
+                .await
         } else {
-            provider.open_coordinator_for_primary(server).await
-        }?;
-        ensure!(
-            status == zx::sys::ZX_OK,
-            "Failed to open display coordinator {}",
-            Status::from_raw(status)
-        );
+            provider
+                .open_coordinator_with_listener_for_primary(
+                    ProviderOpenCoordinatorWithListenerForPrimaryRequest {
+                        coordinator: Some(coordinator_server),
+                        coordinator_listener: Some(listener_client),
+                        __source_breaking: fidl::marker::SourceBreaking,
+                    },
+                )
+                .await
+        }
+        .context("failed to perform FIDL call")?
+        .map_err(Status::from_raw)
+        .context("failed to open display coordinator")?;
 
         if let Some(virtcon_mode) = virtcon_mode {
             coordinator.set_virtcon_mode(*virtcon_mode)?;
         }
 
-        let mut event_stream = coordinator.take_event_stream();
         let app_sender = app_sender.clone();
         let f = async move {
             loop {
-                if let Some(event) = event_stream.next().await {
-                    if let Ok(event) = event {
+                if let Some(listener_request) = listener_requests.next().await {
+                    if let Ok(listener_request) = listener_request {
                         app_sender
-                            .unbounded_send(MessageInternal::DisplayCoordinatorEvent(event))
+                            .unbounded_send(MessageInternal::DisplayCoordinatorListenerRequest(
+                                listener_request,
+                            ))
                             .expect("unbounded_send");
                     }
                 }
@@ -365,21 +384,27 @@ impl<'a> AppStrategy for DisplayDirectAppStrategy<'a> {
         }
     }
 
-    async fn handle_display_coordinator_event(&mut self, event: CoordinatorEvent) {
+    async fn handle_display_coordinator_event(&mut self, event: CoordinatorListenerRequest) {
         match event {
-            CoordinatorEvent::OnDisplaysChanged { added, removed } => {
+            CoordinatorListenerRequest::OnDisplaysChanged { added, removed, control_handle: _ } => {
                 self.handle_displays_changed(added, removed)
                     .await
                     .expect("handle_displays_changed");
             }
-            CoordinatorEvent::OnClientOwnershipChange { has_ownership } => {
+            CoordinatorListenerRequest::OnClientOwnershipChange {
+                has_ownership,
+                control_handle: _,
+            } => {
                 self.owned = has_ownership;
                 self.app_sender
                     .unbounded_send(MessageInternal::OwnershipChanged(has_ownership))
                     .expect("unbounded_send");
             }
-            CoordinatorEvent::OnVsync { .. } => {
+            CoordinatorListenerRequest::OnVsync { .. } => {
                 panic!("App strategy should not see vsync events");
+            }
+            CoordinatorListenerRequest::_UnknownMethod { ordinal, .. } => {
+                panic!("Unknown method #{:}", ordinal);
             }
         }
     }

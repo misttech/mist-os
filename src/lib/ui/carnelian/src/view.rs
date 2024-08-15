@@ -640,11 +640,11 @@ impl ViewController {
         self.strategy.handle_on_next_frame_begin(info);
     }
 
-    pub async fn handle_display_coordinator_event(
+    pub async fn handle_display_coordinator_listener_request(
         &mut self,
-        event: fidl_fuchsia_hardware_display::CoordinatorEvent,
+        event: fidl_fuchsia_hardware_display::CoordinatorListenerRequest,
     ) {
-        self.strategy.handle_display_coordinator_event(event).await;
+        self.strategy.handle_display_coordinator_listener_request(event).await;
     }
 
     pub fn is_hosted_on_display(&self, display_id: DisplayId) -> bool {

@@ -20,8 +20,8 @@ use display_utils::{
 };
 use euclid::size2;
 use fidl::endpoints::ClientEnd;
-use fidl_fuchsia_hardware_display::{CoordinatorEvent, CoordinatorProxy};
-use fidl_fuchsia_hardware_display_types::{ImageBufferUsage, ImageMetadata};
+use fidl_fuchsia_hardware_display::{CoordinatorListenerRequest, CoordinatorProxy};
+use fidl_fuchsia_hardware_display_types::{ImageBufferUsage, ImageMetadata, INVALID_DISP_ID};
 use fuchsia_async::{self as fasync, OnSignals};
 use fuchsia_framebuffer::sysmem::BufferCollectionAllocator;
 use fuchsia_framebuffer::{FrameSet, FrameUsage, ImageId};
@@ -693,9 +693,12 @@ impl ViewStrategy for DisplayDirectViewStrategy {
         }
     }
 
-    async fn handle_display_coordinator_event(&mut self, event: CoordinatorEvent) {
+    async fn handle_display_coordinator_listener_request(
+        &mut self,
+        event: CoordinatorListenerRequest,
+    ) {
         match event {
-            CoordinatorEvent::OnVsync { timestamp, cookie, .. } => {
+            CoordinatorListenerRequest::OnVsync { timestamp, cookie, .. } => {
                 duration!(c"gfx", c"DisplayDirectViewStrategy::OnVsync");
                 let vsync_interval = Duration::from_nanos(
                     100_000_000_000 / self.display.info.modes[0].refresh_rate_e2 as i64,
@@ -704,8 +707,11 @@ impl ViewStrategy for DisplayDirectViewStrategy {
                     Time::from_nanos(timestamp as i64),
                     vsync_interval,
                 );
-                if cookie != 0 {
-                    self.display.coordinator.acknowledge_vsync(cookie).expect("acknowledge_vsync");
+                if cookie.value != INVALID_DISP_ID {
+                    self.display
+                        .coordinator
+                        .acknowledge_vsync(cookie.value)
+                        .expect("acknowledge_vsync");
                 }
                 self.app_sender
                     .unbounded_send(MessageInternal::Render(self.key))
