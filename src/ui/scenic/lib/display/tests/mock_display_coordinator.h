@@ -21,14 +21,6 @@ namespace test {
 
 class MockDisplayCoordinator;
 
-struct DisplayCoordinatorObjects {
-  std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> interface_ptr;
-  std::unique_ptr<MockDisplayCoordinator> mock;
-  std::unique_ptr<DisplayCoordinatorListener> listener;
-};
-
-DisplayCoordinatorObjects CreateMockDisplayCoordinator();
-
 class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coordinator_TestBase {
  public:
   using CheckConfigFn =
@@ -58,10 +50,13 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
 
   void WaitForMessage() { binding_.WaitForMessage(); }
 
-  void Bind(zx::channel coordinator_channel, async_dispatcher_t* dispatcher = nullptr) {
+  void Bind(zx::channel coordinator_channel,
+            fidl::ClientEnd<fuchsia_hardware_display::CoordinatorListener> listener_client,
+            async_dispatcher_t* dispatcher = nullptr) {
     binding_.Bind(fidl::InterfaceRequest<fuchsia::hardware::display::Coordinator>(
                       std::move(coordinator_channel)),
                   dispatcher);
+    listener_ = fidl::SyncClient(std::move(listener_client));
   }
 
   void set_import_event_fn(ImportEventFn fn) { import_event_fn_ = fn; }
@@ -182,13 +177,13 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
   void SetDisplayMode(fuchsia::hardware::display::types::DisplayId display_id,
                       fuchsia::hardware::display::Mode mode) override;
 
-  // Sends an `OnDisplayChanged()` event to the display coordinator client
+  // Sends an `OnDisplayChanged()` event to the display CoordinatorListener server
   // with the default display being added.
   //
   // Must be called only after the MockDisplayCoordinator is bound to a channel.
-  void SendOnDisplayChangedEvent();
+  void SendOnDisplayChangedRequest();
 
-  EventSender_& events() { return binding_.events(); }
+  fidl::SyncClient<fuchsia_hardware_display::CoordinatorListener>& listener() { return listener_; }
 
   void ResetCoordinatorBinding() { binding_.Close(ZX_ERR_INTERNAL); }
 
@@ -232,6 +227,7 @@ class MockDisplayCoordinator : public fuchsia::hardware::display::testing::Coord
   const fuchsia::hardware::display::Info display_info_;
 
   fidl::Binding<fuchsia::hardware::display::Coordinator> binding_;
+  fidl::SyncClient<fuchsia_hardware_display::CoordinatorListener> listener_;
 };
 
 }  // namespace test

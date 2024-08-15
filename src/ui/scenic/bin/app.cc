@@ -179,7 +179,7 @@ fuchsia::math::SizeU DisplayInfoDelegate::GetDisplayDimensions() {
 }
 
 App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspect_node,
-         fpromise::promise<::display::CoordinatorClientEnd, zx_status_t> dc_handles_promise,
+         fpromise::promise<::display::CoordinatorClientChannels, zx_status_t> dc_handles_promise,
          fit::closure quit_callback)
     : executor_(async_get_default_dispatcher()),
       app_context_(std::move(app_context)),
@@ -282,10 +282,12 @@ App::App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspe
                              completer.complete_ok(display_manager_->default_display_shared());
                            });
   executor_.schedule_task(dc_handles_promise.then(
-      [this](fpromise::result<::display::CoordinatorClientEnd, zx_status_t>& handles) {
-        FX_CHECK(handles.is_ok()) << "Failed to get display coordinator:"
-                                  << zx_status_get_string(handles.error());
-        display_manager_->BindDefaultDisplayCoordinator(std::move(handles.value()));
+      [this](fpromise::result<::display::CoordinatorClientChannels, zx_status_t>& client_channels) {
+        FX_CHECK(client_channels.is_ok()) << "Failed to get display coordinator:"
+                                          << zx_status_get_string(client_channels.error());
+        auto [coordinator_client, listener_server] = std::move(client_channels.value());
+        display_manager_->BindDefaultDisplayCoordinator(std::move(coordinator_client),
+                                                        std::move(listener_server));
       }));
 
   // Schedule a task to finish initialization once all promises have been completed.

@@ -73,10 +73,12 @@ class DisplayCompositorSmokeTest : public DisplayCompositorTestBase {
     // here.
     auto hdc_promise = display::GetCoordinator();
     executor_->schedule_task(hdc_promise.then(
-        [this](fpromise::result<display::CoordinatorClientEnd, zx_status_t>& handles) {
-          ASSERT_TRUE(handles.is_ok())
-              << "Failed to get display coordinator:" << zx_status_get_string(handles.error());
-          display_manager_->BindDefaultDisplayCoordinator(std::move(handles.value()));
+        [this](fpromise::result<display::CoordinatorClientChannels, zx_status_t>& client_channels) {
+          ASSERT_TRUE(client_channels.is_ok()) << "Failed to get display coordinator:"
+                                               << zx_status_get_string(client_channels.error());
+          auto [coordinator_client, listener_server] = std::move(client_channels.value());
+          display_manager_->BindDefaultDisplayCoordinator(std::move(coordinator_client),
+                                                          std::move(listener_server));
         }));
 
     RunLoopUntil([this] { return display_manager_->default_display() != nullptr; });

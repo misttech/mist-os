@@ -20,12 +20,12 @@ class GetHardwareDisplayCoordinatorWithProviderServiceTest : public gtest::RealL
 
 // FIDL and Async executor should be able to run on a single dispatcher.
 TEST_F(GetHardwareDisplayCoordinatorWithProviderServiceTest, SingleDispatcher) {
-  std::optional<fpromise::result<CoordinatorClientEnd, zx_status_t>> coordinator;
+  std::optional<fpromise::result<CoordinatorClientChannels, zx_status_t>> coordinator;
   async::Executor executor(dispatcher());
 
   executor.schedule_task(
       GetCoordinator(dispatcher())
-          .then([&coordinator](fpromise::result<CoordinatorClientEnd, zx_status_t>& result) {
+          .then([&coordinator](fpromise::result<CoordinatorClientChannels, zx_status_t>& result) {
             coordinator = std::move(result);
           }));
 
@@ -35,7 +35,8 @@ TEST_F(GetHardwareDisplayCoordinatorWithProviderServiceTest, SingleDispatcher) {
   RunLoopUntil([&] { return coordinator.has_value(); });
   ASSERT_TRUE(coordinator.value().is_ok()) << "Failed to get coordinator client end: "
                                            << zx_status_get_string(coordinator.value().error());
-  EXPECT_TRUE(coordinator.value().value().is_valid());
+  EXPECT_TRUE(coordinator.value().value().coordinator_client_end.is_valid());
+  EXPECT_TRUE(coordinator.value().value().coordinator_listener_server_end.is_valid());
 }
 
 // FIDL and Async executor should be able to run on separate dispatchers.
@@ -43,19 +44,20 @@ TEST_F(GetHardwareDisplayCoordinatorWithProviderServiceTest, SeparateDispatchers
   async::Loop fidl_loop(&kAsyncLoopConfigNeverAttachToThread);
   fidl_loop.StartThread("fidl-loop");
 
-  std::optional<fpromise::result<CoordinatorClientEnd, zx_status_t>> coordinator;
+  std::optional<fpromise::result<CoordinatorClientChannels, zx_status_t>> coordinator;
   async::Executor executor(dispatcher());
 
   executor.schedule_task(
       GetCoordinator(fidl_loop.dispatcher())
-          .then([&coordinator](fpromise::result<CoordinatorClientEnd, zx_status_t>& result) {
+          .then([&coordinator](fpromise::result<CoordinatorClientChannels, zx_status_t>& result) {
             coordinator = std::move(result);
           }));
 
   RunLoopUntil([&] { return coordinator.has_value(); });
   ASSERT_TRUE(coordinator.value().is_ok()) << "Failed to get coordinator client end: "
                                            << zx_status_get_string(coordinator.value().error());
-  EXPECT_TRUE(coordinator.value().value().is_valid());
+  EXPECT_TRUE(coordinator.value().value().coordinator_client_end.is_valid());
+  EXPECT_TRUE(coordinator.value().value().coordinator_listener_server_end.is_valid());
 
   fidl_loop.Shutdown();
 }

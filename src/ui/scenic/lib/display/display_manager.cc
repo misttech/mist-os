@@ -65,20 +65,16 @@ DisplayManager::DisplayManager(
       display_available_cb_(std::move(display_available_cb)) {}
 
 void DisplayManager::BindDefaultDisplayCoordinator(
-    fidl::ClientEnd<fuchsia_hardware_display::Coordinator> coordinator) {
+    fidl::ClientEnd<fuchsia_hardware_display::Coordinator> coordinator,
+    fidl::ServerEnd<fuchsia_hardware_display::CoordinatorListener> coordinator_listener) {
   FX_DCHECK(!default_display_coordinator_);
   FX_DCHECK(coordinator.is_valid());
   default_display_coordinator_ = std::make_shared<fuchsia::hardware::display::CoordinatorSyncPtr>();
   default_display_coordinator_->Bind(coordinator.TakeChannel());
-  default_display_coordinator_listener_ =
-      std::make_shared<display::DisplayCoordinatorListener>(default_display_coordinator_);
-  default_display_coordinator_listener_->InitializeCallbacks(
-      fit::bind_member<&DisplayManager::OnDisplaysChanged>(this),
+  default_display_coordinator_listener_ = std::make_shared<display::DisplayCoordinatorListener>(
+      std::move(coordinator_listener), fit::bind_member<&DisplayManager::OnDisplaysChanged>(this),
+      fit::bind_member<&DisplayManager::OnVsync>(this),
       fit::bind_member<&DisplayManager::OnClientOwnershipChange>(this));
-
-  // Set up callback to handle Vsync notifications, and ask coordinator to send these notifications.
-  default_display_coordinator_listener_->SetOnVsyncCallback(
-      fit::bind_member<&DisplayManager::OnVsync>(this));
   zx_status_t vsync_status = (*default_display_coordinator_)->EnableVsync(true);
   if (vsync_status != ZX_OK) {
     FX_LOGS(ERROR) << "Failed to enable vsync, status: " << vsync_status;

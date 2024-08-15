@@ -4,6 +4,8 @@
 
 #include "src/ui/scenic/lib/display/display_manager.h"
 
+#include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.display.types/cpp/hlcpp_conversion.h>
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.display/cpp/hlcpp_conversion.h>
 #include <fidl/fuchsia.images2/cpp/fidl.h>
@@ -76,15 +78,19 @@ TEST_F(DisplayManagerMockTest, DisplayVsyncCallback) {
   size_t num_vsync_acknowledgement = 0;
 
   auto coordinator_channel = CreateCoordinatorEndpoints();
+  auto [listener_client, listener_server] =
+      fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
 
-  display_manager()->BindDefaultDisplayCoordinator(std::move(coordinator_channel.client));
+  display_manager()->BindDefaultDisplayCoordinator(std::move(coordinator_channel.client),
+                                                   std::move(listener_server));
 
   display_manager()->SetDefaultDisplayForTests(
       std::make_shared<display::Display>(kNaturalDisplayId, kDisplayWidth, kDisplayHeight));
 
   display::test::MockDisplayCoordinator mock_display_coordinator(
       fuchsia::hardware::display::Info{});
-  mock_display_coordinator.Bind(coordinator_channel.server.TakeChannel());
+  mock_display_coordinator.Bind(coordinator_channel.server.TakeChannel(),
+                                std::move(listener_client));
   mock_display_coordinator.set_acknowledge_vsync_fn(
       [&cookies_sent, &num_vsync_acknowledgement](uint64_t cookie) {
         ASSERT_TRUE(cookies_sent.find(cookie) != cookies_sent.end());
@@ -102,8 +108,12 @@ TEST_F(DisplayManagerMockTest, DisplayVsyncCallback) {
     uint64_t cookie = (vsync_id % kAcknowledgeRate == 0) ? vsync_id : 0;
 
     test_loop().AdvanceTimeByEpsilon();
-    mock_display_coordinator.events().OnVsync(kDisplayId, /* timestamp */ test_loop().Now().get(),
-                                              {.value = 1u}, cookie);
+    fit::result<fidl::OneWayStatus> result =
+        mock_display_coordinator.listener()->OnVsync({{.display_id = kDisplayId.value,
+                                                       .timestamp = test_loop().Now().get(),
+                                                       .applied_config_stamp = 1u,
+                                                       .cookie = cookie}});
+    ASSERT_TRUE(result.is_ok());
     if (cookie) {
       cookies_sent.insert(cookie);
     }
@@ -129,7 +139,11 @@ TEST_F(DisplayManagerMockTest, OnDisplayAdded) {
   };
 
   auto coordinator_channel = CreateCoordinatorEndpoints();
-  display_manager()->BindDefaultDisplayCoordinator(std::move(coordinator_channel.client));
+  auto [listener_client, listener_server] =
+      fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
+
+  display_manager()->BindDefaultDisplayCoordinator(std::move(coordinator_channel.client),
+                                                   std::move(listener_server));
 
   const fuchsia::hardware::display::Info kDisplayInfo = {
       .id = kDisplayId,
@@ -150,8 +164,9 @@ TEST_F(DisplayManagerMockTest, OnDisplayAdded) {
       .using_fallback_size = false,
   };
   display::test::MockDisplayCoordinator mock_display_coordinator(kDisplayInfo);
-  mock_display_coordinator.Bind(coordinator_channel.server.TakeChannel());
-  mock_display_coordinator.SendOnDisplayChangedEvent();
+  mock_display_coordinator.Bind(coordinator_channel.server.TakeChannel(),
+                                std::move(listener_client));
+  mock_display_coordinator.SendOnDisplayChangedRequest();
 
   EXPECT_TRUE(RunLoopUntilIdle());
 
@@ -185,7 +200,10 @@ TEST_F(DisplayManagerMockTest, SelectPreferredMode) {
   };
 
   auto coordinator_channel = CreateCoordinatorEndpoints();
-  display_manager()->BindDefaultDisplayCoordinator(std::move(coordinator_channel.client));
+  auto [listener_client, listener_server] =
+      fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
+  display_manager()->BindDefaultDisplayCoordinator(std::move(coordinator_channel.client),
+                                                   std::move(listener_server));
 
   const fuchsia::hardware::display::Info kDisplayInfo = {
       .id = kDisplayId,
@@ -204,8 +222,9 @@ TEST_F(DisplayManagerMockTest, SelectPreferredMode) {
   };
 
   display::test::MockDisplayCoordinator mock_display_coordinator(kDisplayInfo);
-  mock_display_coordinator.Bind(coordinator_channel.server.TakeChannel());
-  mock_display_coordinator.SendOnDisplayChangedEvent();
+  mock_display_coordinator.Bind(coordinator_channel.server.TakeChannel(),
+                                std::move(listener_client));
+  mock_display_coordinator.SendOnDisplayChangedRequest();
 
   EXPECT_TRUE(RunLoopUntilIdle());
 
@@ -257,16 +276,20 @@ TEST(DisplayManager, ICanHazDisplayMode) {
   };
 
   auto coordinator_channel = CreateCoordinatorEndpoints();
+  auto [listener_client, listener_server] =
+      fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
   display::test::MockDisplayCoordinator mock_display_coordinator(kDisplayInfo);
-  mock_display_coordinator.Bind(coordinator_channel.server.TakeChannel());
+  mock_display_coordinator.Bind(coordinator_channel.server.TakeChannel(),
+                                std::move(listener_client));
 
   display::DisplayManager display_manager(/*i_can_haz_display_id=*/std::nullopt,
                                           /*display_mode_index_override=*/std::make_optional(1),
                                           display::DisplayModeConstraints{},
                                           /*display_available_cb=*/[]() {});
-  display_manager.BindDefaultDisplayCoordinator(std::move(coordinator_channel.client));
+  display_manager.BindDefaultDisplayCoordinator(std::move(coordinator_channel.client),
+                                                std::move(listener_server));
 
-  mock_display_coordinator.SendOnDisplayChangedEvent();
+  mock_display_coordinator.SendOnDisplayChangedRequest();
 
   EXPECT_TRUE(loop.RunUntilIdle());
 
@@ -322,16 +345,21 @@ TEST(DisplayManager, DisplayModeConstraintsHorizontalResolution) {
   };
 
   auto coordinator_channel = CreateCoordinatorEndpoints();
+  auto [listener_client, listener_server] =
+      fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
+
   display::test::MockDisplayCoordinator mock_display_coordinator(kDisplayInfo);
-  mock_display_coordinator.Bind(coordinator_channel.server.TakeChannel());
+  mock_display_coordinator.Bind(coordinator_channel.server.TakeChannel(),
+                                std::move(listener_client));
 
   display::DisplayManager display_manager(/*i_can_haz_display_id=*/std::nullopt,
                                           /*display_mode_index_override=*/std::nullopt,
                                           kDisplayModeConstraints,
                                           /*display_available_cb=*/[]() {});
-  display_manager.BindDefaultDisplayCoordinator(std::move(coordinator_channel.client));
+  display_manager.BindDefaultDisplayCoordinator(std::move(coordinator_channel.client),
+                                                std::move(listener_server));
 
-  mock_display_coordinator.SendOnDisplayChangedEvent();
+  mock_display_coordinator.SendOnDisplayChangedRequest();
 
   EXPECT_TRUE(loop.RunUntilIdle());
 
@@ -387,16 +415,21 @@ TEST(DisplayManager, DisplayModeConstraintsVerticalResolution) {
   };
 
   auto coordinator_channel = CreateCoordinatorEndpoints();
+  auto [listener_client, listener_server] =
+      fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
+
   display::test::MockDisplayCoordinator mock_display_coordinator(kDisplayInfo);
-  mock_display_coordinator.Bind(coordinator_channel.server.TakeChannel());
+  mock_display_coordinator.Bind(coordinator_channel.server.TakeChannel(),
+                                std::move(listener_client));
 
   display::DisplayManager display_manager(/*i_can_haz_display_id=*/std::nullopt,
                                           /*display_mode_index_override=*/std::nullopt,
                                           kDisplayModeConstraints,
                                           /*display_available_cb=*/[]() {});
-  display_manager.BindDefaultDisplayCoordinator(std::move(coordinator_channel.client));
+  display_manager.BindDefaultDisplayCoordinator(std::move(coordinator_channel.client),
+                                                std::move(listener_server));
 
-  mock_display_coordinator.SendOnDisplayChangedEvent();
+  mock_display_coordinator.SendOnDisplayChangedRequest();
 
   EXPECT_TRUE(loop.RunUntilIdle());
 
@@ -452,16 +485,21 @@ TEST(DisplayManager, DisplayModeConstraintsRefreshRateLimit) {
   };
 
   auto coordinator_channel = CreateCoordinatorEndpoints();
+  auto [listener_client, listener_server] =
+      fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
+
   display::test::MockDisplayCoordinator mock_display_coordinator(kDisplayInfo);
-  mock_display_coordinator.Bind(coordinator_channel.server.TakeChannel());
+  mock_display_coordinator.Bind(coordinator_channel.server.TakeChannel(),
+                                std::move(listener_client));
 
   display::DisplayManager display_manager(/*i_can_haz_display_id=*/std::nullopt,
                                           /*display_mode_index_override=*/std::nullopt,
                                           kDisplayModeConstraints,
                                           /*display_available_cb=*/[]() {});
-  display_manager.BindDefaultDisplayCoordinator(std::move(coordinator_channel.client));
+  display_manager.BindDefaultDisplayCoordinator(std::move(coordinator_channel.client),
+                                                std::move(listener_server));
 
-  mock_display_coordinator.SendOnDisplayChangedEvent();
+  mock_display_coordinator.SendOnDisplayChangedRequest();
 
   EXPECT_TRUE(loop.RunUntilIdle());
 
@@ -523,16 +561,21 @@ TEST(DisplayManager, DisplayModeConstraintsOverriddenByModeIndex) {
   };
 
   auto coordinator_channel = CreateCoordinatorEndpoints();
+  auto [listener_client, listener_server] =
+      fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
+
   display::test::MockDisplayCoordinator mock_display_coordinator(kDisplayInfo);
-  mock_display_coordinator.Bind(coordinator_channel.server.TakeChannel());
+  mock_display_coordinator.Bind(coordinator_channel.server.TakeChannel(),
+                                std::move(listener_client));
 
   display::DisplayManager display_manager(/*i_can_haz_display_id=*/std::nullopt,
                                           /*display_mode_index_override=*/std::make_optional(2),
                                           kDisplayModeConstraints,
                                           /*display_available_cb=*/[]() {});
-  display_manager.BindDefaultDisplayCoordinator(std::move(coordinator_channel.client));
+  display_manager.BindDefaultDisplayCoordinator(std::move(coordinator_channel.client),
+                                                std::move(listener_server));
 
-  mock_display_coordinator.SendOnDisplayChangedEvent();
+  mock_display_coordinator.SendOnDisplayChangedRequest();
 
   EXPECT_TRUE(loop.RunUntilIdle());
 

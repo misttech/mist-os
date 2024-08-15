@@ -42,7 +42,8 @@ class DisplayManager {
   ~DisplayManager() = default;
 
   void BindDefaultDisplayCoordinator(
-      fidl::ClientEnd<fuchsia_hardware_display::Coordinator> coordinator);
+      fidl::ClientEnd<fuchsia_hardware_display::Coordinator> coordinator,
+      fidl::ServerEnd<fuchsia_hardware_display::CoordinatorListener> coordinator_listener);
 
   // Gets information about the default display.
   // May return null if there isn't one.

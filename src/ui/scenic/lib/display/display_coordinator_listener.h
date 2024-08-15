@@ -5,6 +5,7 @@
 #ifndef SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_COORDINATOR_LISTENER_H_
 #define SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_COORDINATOR_LISTENER_H_
 
+#include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/hardware/display/types/cpp/fidl.h>
 #include <lib/async/cpp/wait.h>
@@ -12,14 +13,12 @@
 #include <lib/zx/channel.h>
 #include <lib/zx/event.h>
 
-#include "lib/fidl/cpp/synchronous_interface_ptr.h"
+namespace scenic_impl::display {
 
-namespace scenic_impl {
-namespace display {
-
-// DisplayCoordinatorListener wraps a |fuchsia::hardware::display::Coordinator| interface, allowing
-// registering for event callbacks.
-class DisplayCoordinatorListener {
+// Implements a [`fuchsia.hardware.display/CoordinatorListener`] server and
+// allows registration for display events callbacks.
+class DisplayCoordinatorListener final
+    : public fidl::Server<fuchsia_hardware_display::CoordinatorListener> {
  public:
   using OnDisplaysChangedCallback =
       std::function<void(std::vector<fuchsia::hardware::display::Info> added,
@@ -29,47 +28,37 @@ class DisplayCoordinatorListener {
       fuchsia::hardware::display::types::DisplayId display_id, uint64_t timestamp,
       fuchsia::hardware::display::types::ConfigStamp applied_config_stamp, uint64_t cookie)>;
 
-  // Creates a DisplayCoordinatorListener binding to a
-  // [`fuchsia.hardware.display/Coordinator`] client.
-  //
-  // `coordinator` must be valid and bound to a channel.
+  // `coordinator_listener_server` must be valid.
   explicit DisplayCoordinatorListener(
-      std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> coordinator);
-  ~DisplayCoordinatorListener();
+      fidl::ServerEnd<fuchsia_hardware_display::CoordinatorListener> coordinator_listener_server,
+      OnDisplaysChangedCallback on_displays_changed, OnVsyncCallback on_vsync,
+      OnClientOwnershipChangeCallback on_client_ownership_change);
 
-  // If any of the channels gets disconnected, |on_invalid| is invoked and this object becomes
-  // invalid.
-  void InitializeCallbacks(OnDisplaysChangedCallback on_displays_changed_cb,
-                           OnClientOwnershipChangeCallback on_client_ownership_change_cb);
+  ~DisplayCoordinatorListener() override;
 
-  // Removes all callbacks. Once this is done, there is no way to re-initialize the callbacks.
-  void ClearCallbacks();
+  DisplayCoordinatorListener(const DisplayCoordinatorListener&) = delete;
+  DisplayCoordinatorListener(DisplayCoordinatorListener&&) = delete;
+  DisplayCoordinatorListener& operator=(const DisplayCoordinatorListener&) = delete;
+  DisplayCoordinatorListener& operator=(DisplayCoordinatorListener&&) = delete;
 
-  void SetOnVsyncCallback(OnVsyncCallback vsync_callback);
+  // fidl::Server<fuchsia_hardware_display::CoordinatorListener>:
+  void OnDisplaysChanged(OnDisplaysChangedRequest& request,
+                         OnDisplaysChangedCompleter::Sync& completer) override;
+  void OnVsync(OnVsyncRequest& request, OnVsyncCompleter::Sync& completer) override;
+  void OnClientOwnershipChange(OnClientOwnershipChangeRequest& request,
+                               OnClientOwnershipChangeCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_display::CoordinatorListener> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
 
  private:
-  void OnEventMsgAsync(async_dispatcher_t* dispatcher, async::WaitBase* self, zx_status_t status,
-                       const zx_packet_signal_t* signal);
+  const OnDisplaysChangedCallback on_displays_changed_;
+  const OnVsyncCallback on_vsync_;
+  const OnClientOwnershipChangeCallback on_client_ownership_change_;
 
-  // The display coordinator driver binding.
-  std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> coordinator_;
-
-  // |coordinator_| owns |coordinator_channel_handle_|, but save its handle here for use.
-  zx_handle_t coordinator_channel_handle_ = 0;
-
-  // True if InitializeCallbacks was called; it can only be called once.
-  bool initialized_callbacks_ = false;
-
-  // Waits for a ZX_CHANNEL_READABLE signal.
-  async::WaitMethod<DisplayCoordinatorListener, &DisplayCoordinatorListener::OnEventMsgAsync>
-      wait_event_msg_{this};
-
-  // Used for dispatching events that we receive over the coordinator channel.
-  // TODO(https://fxbug.dev/42154967): Resolve this hack when synchronous interfaces support events.
-  fidl::InterfacePtr<fuchsia::hardware::display::Coordinator> event_dispatcher_;
+  fidl::ServerBindingRef<fuchsia_hardware_display::CoordinatorListener> binding_;
 };
 
-}  // namespace display
-}  // namespace scenic_impl
+}  // namespace scenic_impl::display
 
 #endif  // SRC_UI_SCENIC_LIB_DISPLAY_DISPLAY_COORDINATOR_LISTENER_H_

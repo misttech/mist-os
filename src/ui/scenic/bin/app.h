@@ -66,7 +66,7 @@ enum class RendererType : uint8_t {
 class App {
  public:
   App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspect_node,
-      fpromise::promise<::display::CoordinatorClientEnd, zx_status_t> dc_handles_promise,
+      fpromise::promise<::display::CoordinatorClientChannels, zx_status_t> dc_handles_promise,
       fit::closure quit_callback);
 
   ~App();
