@@ -9,10 +9,6 @@ declare_args() {
   build_only_labels = []
 }
 
-group("bootfs") {
-  deps = [ "board:bootfs_labels" ]
-}
-
 group("build_only") {
   testonly = true
   deps = build_only_labels

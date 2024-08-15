@@ -120,7 +120,6 @@ if (is_fuchsia) {
     board_config_label = ":board_config"
 
     # Needed for scrutiny to find root.cm and other component config.
-    bootfs_labels = [ "//build/input:bootfs" ]
     base_packages = [ ":package" ]
 
     generate_image_metadata = false

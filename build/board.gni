@@ -28,9 +28,6 @@ declare_args() {
   # board definition rather than the product definition.
   board_recovery_package_labels = []
 
-  # A list of binary labels to include in the ZBI.
-  board_bootfs_labels = []
-
   # Core realm shards specific to this board. See //src/sys/core for more
   # context.
   board_core_realm_shards = []
