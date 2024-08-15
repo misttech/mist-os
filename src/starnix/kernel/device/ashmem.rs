@@ -12,8 +12,8 @@ use crate::mm::{
 };
 use crate::task::CurrentTask;
 use crate::vfs::{
-    default_ioctl, fileops_impl_memory, fileops_impl_noop_sync, FileObject, FileOps,
-    FileSystemCreator, FileWriteGuardRef, FsNode, FsString, NamespaceNode,
+    default_ioctl, default_seek, fileops_impl_noop_sync, FileObject, FileOps, FileSystemCreator,
+    FileWriteGuardRef, FsNode, FsString, InputBuffer, NamespaceNode, OutputBuffer, SeekTarget,
 };
 use fuchsia_zircon as zx;
 use linux_uapi::{
@@ -30,7 +30,9 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::math::round_up_to_increment;
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::user_address::{UserAddress, UserRef};
-use starnix_uapi::{ashmem_pin, device_type, errno, error, ASHMEM_GET_FILE_ID, ASHMEM_NAME_LEN};
+use starnix_uapi::{
+    ashmem_pin, device_type, errno, error, off_t, ASHMEM_GET_FILE_ID, ASHMEM_NAME_LEN,
+};
 use std::sync::Arc;
 
 /// Initializes the ashmem device.
@@ -116,8 +118,64 @@ impl Ashmem {
 }
 
 impl FileOps for Ashmem {
-    fileops_impl_memory!(self, self.memory()?);
     fileops_impl_noop_sync!();
+
+    fn is_seekable(&self) -> bool {
+        true
+    }
+
+    fn seek(
+        &self,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        current_offset: off_t,
+        target: SeekTarget,
+    ) -> Result<off_t, Errno> {
+        if !self.is_mapped() {
+            return error!(EBADF);
+        }
+        let eof_offset = self.state.lock().size;
+        default_seek(current_offset, target, |offset| {
+            offset.checked_add(eof_offset.try_into().unwrap()).ok_or_else(|| errno!(EINVAL))
+        })
+    }
+
+    fn read(
+        &self,
+        _locked: &mut starnix_sync::Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        offset: usize,
+        data: &mut dyn OutputBuffer,
+    ) -> Result<usize, Errno> {
+        let memory = self.memory().map_err(|_| errno!(EBADF))?;
+        let file_length = self.state.lock().size;
+        let actual = {
+            let want_read = data.available();
+            if offset < file_length {
+                let to_read =
+                    if file_length < offset + want_read { file_length - offset } else { want_read };
+                let buf =
+                    memory.read_to_vec(offset as u64, to_read as u64).map_err(|_| errno!(EIO))?;
+                data.write_all(&buf[..])?;
+                to_read
+            } else {
+                0
+            }
+        };
+        Ok(actual)
+    }
+
+    fn write(
+        &self,
+        _locked: &mut Locked<'_, FileOpsCore>,
+        _file: &FileObject,
+        _current_task: &CurrentTask,
+        _offset: usize,
+        _data: &mut dyn InputBuffer,
+    ) -> Result<usize, Errno> {
+        error!(EINVAL)
+    }
 
     fn mmap(
         &self,
@@ -211,7 +269,6 @@ impl FileOps for Ashmem {
             }
             ASHMEM_SET_PROT_MASK => {
                 let mut state = self.state.lock();
-
                 let prot_flags =
                     ProtectionFlags::from_bits(arg.into()).ok_or_else(|| errno!(EINVAL))?;
 

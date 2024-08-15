@@ -347,6 +347,148 @@ TEST_F(AshmemTest, MapPrivate) {
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
+// No fileops are allowed until after the region has been mapped
+TEST_F(AshmemTest, NoFileOpBeforeMap) {
+  char in[] = "hello world!";
+  char out[256];
+  auto fd = CreateRegion(nullptr, PAGE_SIZE);
+
+  EXPECT_THAT(write(fd.get(), in, sizeof(in)), SyscallFailsWithErrno(EINVAL));
+  EXPECT_THAT(read(fd.get(), out, sizeof(in)), SyscallFailsWithErrno(EBADF));
+  EXPECT_THAT(lseek(fd.get(), 0, SEEK_SET), SyscallFailsWithErrno(EBADF));
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// Writing fails no matter what
+TEST_F(AshmemTest, WriteFileOp) {
+  char in[] = "hello world!";
+  auto fd = CreateRegion(nullptr, PAGE_SIZE);
+  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+
+  EXPECT_THAT(write(fd.get(), in, sizeof(in)), SyscallFailsWithErrno(EINVAL));
+  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// Read() is okay after mapping
+TEST_F(AshmemTest, ReadFileOp) {
+  char in[] = "hello world!";
+  char out[256] = {0};
+  auto fd = CreateRegion(nullptr, PAGE_SIZE);
+
+  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+
+  strcpy((char *)addr, in);
+
+  EXPECT_THAT(read(fd.get(), out, sizeof(in)), SyscallSucceedsWithValue(sizeof(in)));
+  EXPECT_STREQ(out, in);
+
+  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// Lseek()-- adapted from android KernelLibcutilsTest
+// [   Zero   ][       Data        ][   Zero   ]
+TEST_F(AshmemTest, LseekFileOp) {
+  auto fd = CreateRegion(nullptr, 4 * PAGE_SIZE);
+
+  void *addr = mmap(nullptr, 4 * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  uint8_t *data = (uint8_t *)addr;
+
+  // Initialize ashmem
+
+  memset(data, 0, PAGE_SIZE);
+  memset(data + PAGE_SIZE, 1, 2 * PAGE_SIZE);
+  memset(data + 3 * PAGE_SIZE, 0, PAGE_SIZE);
+
+  EXPECT_THAT(lseek(fd.get(), 99, SEEK_SET), SyscallSucceedsWithValue(99));
+  EXPECT_THAT(lseek(fd.get(), PAGE_SIZE, SEEK_CUR), SyscallSucceedsWithValue(PAGE_SIZE + 99));
+  // 0, SEEK_DATA
+  EXPECT_THAT(lseek(fd.get(), -99, SEEK_CUR), SyscallSucceedsWithValue(PAGE_SIZE));
+  // PAGE_SIZE, SEEK_HOLE
+  EXPECT_THAT(lseek(fd.get(), 2 * PAGE_SIZE, SEEK_CUR), SyscallSucceedsWithValue(3 * PAGE_SIZE));
+  EXPECT_THAT(lseek(fd.get(), -99, SEEK_END), SyscallSucceedsWithValue(4 * PAGE_SIZE - 99));
+  EXPECT_THAT(lseek(fd.get(), -(int)PAGE_SIZE, SEEK_CUR),
+              SyscallSucceedsWithValue(3 * PAGE_SIZE - 99));
+
+  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// Can read() without PROT_READ
+TEST_F(AshmemTest, ReadFileOpProt) {
+  char in[] = "hello world!";
+  char out[256] = {0};
+  auto fd = CreateRegion(nullptr, PAGE_SIZE);
+
+  int status = ioctl(fd.get(), ASHMEM_SET_PROT_MASK, PROT_WRITE | PROT_EXEC);
+  ASSERT_EQ(0, status);
+
+  void *addr = mmap(nullptr, PAGE_SIZE, PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+
+  strcpy((char *)addr, in);
+
+  EXPECT_THAT(read(fd.get(), out, sizeof(in)), SyscallSucceedsWithValue(sizeof(in)));
+  EXPECT_STREQ(out, in);
+
+  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// File offset for read and lseek is local per ashmem region
+TEST_F(AshmemTest, FileOffsetLocal) {
+  char in[] = "hello world!";
+  char out_1[256] = {0};
+  char out_2[256] = {0};
+  auto fd_1 = CreateRegion(nullptr, PAGE_SIZE);
+  auto fd_2 = CreateRegion(nullptr, PAGE_SIZE);
+
+  void *addr_1 = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd_1.get(), 0);
+  ASSERT_TRUE(addr_1 != MAP_FAILED && addr_1 != nullptr);
+  void *addr_2 = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd_2.get(), 0);
+  ASSERT_TRUE(addr_2 != MAP_FAILED && addr_2 != nullptr);
+
+  strcpy((char *)addr_1, in);
+  strcpy((char *)addr_2, in);
+
+  // 1) "hello world"
+  //          ^
+  // 2) "hello world"
+  //     ^
+  ASSERT_THAT(lseek(fd_1.get(), 6, SEEK_CUR), SyscallSucceedsWithValue(6));
+
+  // Read and fill output buffers
+  ASSERT_THAT(read(fd_2.get(), out_2, 5), SyscallSucceedsWithValue(5));
+  ASSERT_THAT(read(fd_1.get(), out_1, 5), SyscallSucceedsWithValue(5));
+
+  EXPECT_STREQ(out_1, "world");
+  EXPECT_STREQ(out_2, "hello");
+
+  ASSERT_THAT(munmap(addr_1, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(munmap(addr_2, PAGE_SIZE), SyscallSucceeds());
+
+  ASSERT_THAT(close(fd_1.get()), SyscallSucceeds());
+  ASSERT_THAT(close(fd_2.get()), SyscallSucceeds());
+}
+
+// fstat() reports zero size for an ashmem region no matter what
+TEST_F(AshmemTest, StSizeAlwaysZero) {
+  struct stat st;
+  auto fd = CreateRegion(nullptr, PAGE_SIZE);
+
+  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+
+  ASSERT_THAT(fstat(fd.get(), &st), SyscallSucceeds());
+  EXPECT_EQ(0, st.st_size);
+
+  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
 // No pinning permitted unless previously mapped
 TEST_F(AshmemTest, NoPinBeforeMap) {
   ashmem_pin pin = {.offset = 0, .len = (uint32_t)PAGE_SIZE};
