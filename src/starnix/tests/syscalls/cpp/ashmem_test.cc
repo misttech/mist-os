@@ -353,8 +353,8 @@ TEST_F(AshmemTest, NoPinBeforeMap) {
   void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
-  EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin), SyscallSucceeds());
-  EXPECT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin), SyscallSucceeds());
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin), SyscallSucceedsWithValue(ASHMEM_NOT_PURGED));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin), SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
 
   ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
@@ -363,8 +363,8 @@ TEST_F(AshmemTest, NoPinBeforeMap) {
 // Ashmem regions are pinned by default
 TEST_F(AshmemTest, DefaultPin) {
   ashmem_pin pin = {.offset = 0, .len = (uint32_t)PAGE_SIZE};
-  auto fd = CreateRegion(nullptr, PAGE_SIZE);
 
+  auto fd = CreateRegion(nullptr, PAGE_SIZE);
   void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
@@ -383,12 +383,13 @@ TEST_F(AshmemTest, BasicPinBehavior) {
   ashmem_pin pin_middle = {.offset = (uint32_t)PAGE_SIZE, .len = 2 * (uint32_t)PAGE_SIZE};
 
   auto fd = CreateRegion(nullptr, 4 * PAGE_SIZE);
-
   void *addr = mmap(nullptr, 4 * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
   ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
 
-  ASSERT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin_left), SyscallSucceeds());
-  ASSERT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin_right), SyscallSucceeds());
+  ASSERT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin_left),
+              SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
+  ASSERT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin_right),
+              SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
 
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_PIN_STATUS, &pin_left),
               SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
@@ -396,6 +397,84 @@ TEST_F(AshmemTest, BasicPinBehavior) {
               SyscallSucceedsWithValue(ASHMEM_IS_PINNED));
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_PIN_STATUS, &pin_right),
               SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
+
+  ASSERT_THAT(munmap(addr, 4 * PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// Fail to pin, unpin, and get the state of a region out of bounds
+TEST_F(AshmemTest, NoPinOutOfBounds) {
+  ashmem_pin pin_out_of_bounds = {.offset = 2 * PAGE_SIZE, .len = PAGE_SIZE};
+  ashmem_pin pin_overflow = {.offset = 0, .len = 2 * PAGE_SIZE};
+
+  auto fd = CreateRegion(nullptr, PAGE_SIZE);
+  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin_out_of_bounds), SyscallFailsWithErrno(EINVAL));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin_out_of_bounds), SyscallFailsWithErrno(EINVAL));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_PIN_STATUS, &pin_out_of_bounds),
+              SyscallFailsWithErrno(EINVAL));
+
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin_overflow), SyscallFailsWithErrno(EINVAL));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin_overflow), SyscallFailsWithErrno(EINVAL));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_PIN_STATUS, &pin_overflow), SyscallFailsWithErrno(EINVAL));
+
+  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// Fail to pin, unpin, and get the state of a misaligned region
+TEST_F(AshmemTest, NoPinMisaligned) {
+  ashmem_pin pin = {.offset = 1, .len = PAGE_SIZE};
+
+  auto fd = CreateRegion(nullptr, 2 * PAGE_SIZE);
+  void *addr = mmap(nullptr, 2 * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin), SyscallFailsWithErrno(EINVAL));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_PIN, &pin), SyscallFailsWithErrno(EINVAL));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_PIN_STATUS, &pin), SyscallFailsWithErrno(EINVAL));
+
+  ASSERT_THAT(munmap(addr, 2 * PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// ASHMEM_GET_PIN_STATUS is sensitive to overlap
+TEST_F(AshmemTest, PinStatusOverlap) {
+  ashmem_pin pin_left = {.offset = 0, .len = PAGE_SIZE};
+  ashmem_pin pin_total = {.offset = 0, .len = 2 * PAGE_SIZE};
+
+  auto fd = CreateRegion(nullptr, 2 * PAGE_SIZE);
+  void *addr = mmap(nullptr, 2 * PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+
+  ASSERT_THAT(ioctl(fd.get(), ASHMEM_UNPIN, &pin_left),
+              SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
+  EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_PIN_STATUS, &pin_total),
+              SyscallSucceedsWithValue(ASHMEM_IS_UNPINNED));
+
+  ASSERT_THAT(munmap(addr, 2 * PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// Unsigned integer overflow with pin logic
+TEST_F(AshmemTest, PinUnsignedOverflow) {
+  ashmem_pin pin = {.offset = 2 * PAGE_SIZE, .len = (uint32_t)1048575 * PAGE_SIZE};
+
+  auto fd = CreateRegion(nullptr, 4 * PAGE_SIZE);
+  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+
+  int status = ioctl(fd.get(), ASHMEM_PIN, pin);
+  EXPECT_EQ(-1, status);
+  EXPECT_EQ(EFAULT, errno);
+  status = ioctl(fd.get(), ASHMEM_UNPIN, pin);
+  EXPECT_EQ(-1, status);
+  EXPECT_EQ(EFAULT, errno);
+  status = ioctl(fd.get(), ASHMEM_GET_PIN_STATUS, pin);
+  EXPECT_EQ(-1, status);
+  EXPECT_EQ(EFAULT, errno);
 
   ASSERT_THAT(munmap(addr, 4 * PAGE_SIZE), SyscallSucceeds());
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
