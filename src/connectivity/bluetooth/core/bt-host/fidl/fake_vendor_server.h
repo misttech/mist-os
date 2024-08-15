@@ -18,11 +18,7 @@ class FakeVendorServer final : public ::fidl::Server<fuchsia_hardware_bluetooth:
   FakeVendorServer(::fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> server_end,
                    async_dispatcher_t* dispatcher)
       : binding_(::fidl::BindServer(dispatcher, std::move(server_end), this)),
-        dispatcher_(dispatcher) {
-    fuchsia_hardware_bluetooth::VendorFeatures features;
-    features.acl_priority_command(true);
-    BT_ASSERT(::fidl::SendEvent(binding_)->OnFeatures(features).is_ok());
-  }
+        dispatcher_(dispatcher) {}
 
   void Unbind() { binding_.Unbind(); }
 
@@ -31,6 +27,12 @@ class FakeVendorServer final : public ::fidl::Server<fuchsia_hardware_bluetooth:
   void set_open_hci_error(bool val) { open_hci_error_ = val; }
 
  private:
+  void GetFeatures(GetFeaturesCompleter::Sync& completer) override {
+    fuchsia_hardware_bluetooth::VendorFeatures features;
+    features.acl_priority_command(true);
+    completer.Reply(features);
+  }
+
   void EncodeCommand(EncodeCommandRequest& request,
                      EncodeCommandCompleter::Sync& completer) override {
     BT_ASSERT(request.set_acl_priority()->priority().has_value());

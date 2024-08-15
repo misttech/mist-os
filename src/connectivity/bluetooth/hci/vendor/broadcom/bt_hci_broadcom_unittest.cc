@@ -267,27 +267,17 @@ class BtHciBroadcomTest : public ::testing::Test {
   }
 
   void OpenVendor() {
-    class EventHandler : public fidl::WireSyncEventHandler<fhbt::Vendor> {
-     public:
-      void OnFeatures(fidl::WireEvent<fhbt::Vendor::OnFeatures>* event) override {
-        EXPECT_TRUE(event->acl_priority_command());
-        on_vendor_connect_handled_ = true;
-      }
-
-      void handle_unknown_event(fidl::UnknownEventMetadata<fhbt::Vendor> metadata) override {}
-
-      bool on_vendor_connect_handled_ = false;
-    };
-
-    EventHandler event_handler;
     // Connect to Vendor protocol through devfs, get the channel handle from node server.
     zx::result connect_result = driver_test().ConnectThroughDevfs<fhbt::Vendor>("bt-hci-broadcom");
     ASSERT_EQ(ZX_OK, connect_result.status_value());
 
     // Bind the channel to a Vendor client end.
     vendor_client_.Bind(std::move(connect_result.value()));
-    EXPECT_TRUE(vendor_client_.HandleOneEvent(event_handler).ok());
-    EXPECT_TRUE(event_handler.on_vendor_connect_handled_);
+
+    // Verify features & ensure driver responds to requests.
+    fidl::WireResult<fhbt::Vendor::GetFeatures> features = vendor_client_->GetFeatures();
+    ASSERT_TRUE(features.ok());
+    EXPECT_TRUE(features.value().acl_priority_command());
   }
 
   void OpenVendorWithHciClient() {

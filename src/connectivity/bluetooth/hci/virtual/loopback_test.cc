@@ -14,7 +14,6 @@ namespace fhb = fuchsia_hardware_bluetooth;
 namespace bt_hci_virtual {
 
 class LoopbackTest : public ::testing::Test,
-                     public fidl::AsyncEventHandler<fhb::Vendor>,
                      public fidl::AsyncEventHandler<fhb::HciTransport>,
                      public fidl::AsyncEventHandler<fhb::Snoop> {
  public:
@@ -81,12 +80,6 @@ class LoopbackTest : public ::testing::Test,
   }
   void handle_unknown_event(fidl::UnknownEventMetadata<fhb::HciTransport> metadata) override {}
 
-  // fidl::AsyncEventHandler<fhb::Vendor> overrides:
-  void OnFeatures(fidl::Event<fhb::Vendor::OnFeatures>& event) override {
-    on_features_ = std::move(event);
-  }
-  void handle_unknown_event(fidl::UnknownEventMetadata<fhb::Vendor> metadata) override {}
-
   // fidl::AsyncEventHandler<fhb::Snoop> overrides:
   void OnObservePacket(fidl::Event<fhb::Snoop::OnObservePacket>& event) override {
     snoop_packets_.emplace_back(std::move(event));
@@ -99,11 +92,17 @@ class LoopbackTest : public ::testing::Test,
   void OpenHciTransport() {
     auto vendor_endpoints = fidl::CreateEndpoints<fhb::Vendor>();
     loopback_device_.Connect(std::move(vendor_endpoints->server));
-    vendor_client_.Bind(std::move(vendor_endpoints->client), dispatcher(), /*event_handler=*/this);
+    vendor_client_.Bind(std::move(vendor_endpoints->client), dispatcher());
 
     fdf_testing_run_until_idle();
-    ASSERT_TRUE(on_features_.has_value());
-    EXPECT_TRUE(on_features_->IsEmpty());
+    std::optional<fidl::Result<fhb::Vendor::GetFeatures>> features;
+    vendor_client_->GetFeatures().Then([&features](fidl::Result<fhb::Vendor::GetFeatures>& result) {
+      features = std::move(result);
+    });
+    fdf_testing_run_until_idle();
+    ASSERT_TRUE(features.has_value());
+    ASSERT_TRUE(features->is_ok());
+    EXPECT_EQ(features->value(), fhb::VendorFeatures());
 
     vendor_client_->OpenHciTransport().Then(
         [this](fidl::Result<fhb::Vendor::OpenHciTransport>& result) {
@@ -191,7 +190,6 @@ class LoopbackTest : public ::testing::Test,
   LoopbackDevice loopback_device_;
 
   fidl::Client<fhb::Vendor> vendor_client_;
-  std::optional<fidl::Event<fhb::Vendor::OnFeatures>> on_features_;
   fidl::Client<fhb::HciTransport> hci_client_;
 
   fidl::Client<fhb::Vendor> snoop_vendor_client_;
@@ -215,7 +213,6 @@ TEST_F(LoopbackTest, SendManyCommandPackets) {
   fdf_testing_run_until_idle();
   EXPECT_EQ(send_cb_count, 10);
 
-  FDF_LOG(INFO, "TEST: before failure");
   ASSERT_EQ(sent_packets().size(), 10u);
   for (uint8_t i = 0; i < 10; i++) {
     auto& packet = sent_packets()[i];

@@ -45,6 +45,7 @@ class Device : public fdf::DriverBase,
 
  private:
   // fuchsia_hardware_bluetooth::Vendor protocol interface implementations
+  void GetFeatures(GetFeaturesCompleter::Sync& completer) override;
   void EncodeCommand(EncodeCommandRequestView request,
                      EncodeCommandCompleter::Sync& completer) override;
   void OpenHci(OpenHciCompleter::Sync& completer) override;

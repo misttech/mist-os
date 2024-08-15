@@ -250,6 +250,10 @@ void EmulatorDevice::handle_unknown_method(fidl::UnknownMethodMetadata<fhbt::Emu
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
+void EmulatorDevice::GetFeatures(GetFeaturesCompleter::Sync& completer) {
+  completer.Reply(fuchsia_hardware_bluetooth::wire::VendorFeatures());
+}
+
 void EmulatorDevice::EncodeCommand(EncodeCommandRequestView request,
                                    EncodeCommandCompleter::Sync& completer) {
   completer.ReplyError(ZX_ERR_INVALID_ARGS);
@@ -414,17 +418,6 @@ void EmulatorDevice::ConnectEmulator(fidl::ServerEnd<fhbt::Emulator> request) {
 void EmulatorDevice::ConnectVendor(fidl::ServerEnd<fhbt::Vendor> request) {
   vendor_binding_group_.AddBinding(fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                                    std::move(request), this, fidl::kIgnoreBindingClosure);
-
-  vendor_binding_group_.ForEachBinding([](const fidl::ServerBinding<fhbt::Vendor>& binding) {
-    fidl::Arena arena;
-    auto builder = fhbt::wire::VendorFeatures::Builder(arena);
-    builder.acl_priority_command(true);
-    fidl::Status status = fidl::WireSendEvent(binding)->OnFeatures(builder.Build());
-
-    if (status.status() != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to send vendor features to bt-host: %s", status.status_string());
-    }
-  });
 }
 
 zx_status_t EmulatorDevice::AddHciDeviceChildNode() {
