@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/components.gni")
+import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_test.gni")
 import("//build/testing/host_test.gni")
 import("//src/starnix/kernel/starnix.gni")
@@ -22,11 +23,17 @@ group("tests") {
 
 _common_sources = [
   "src/device_mapper_test.rs",
+  "src/fscrypt_shared.rs",
+  "src/fscrypt_test.rs",
   "src/lib.rs",
 ]
 _common_deps = [
   "//src/starnix/lib/linux_uapi",
+  "//third_party/rust_crates:hex",
   "//third_party/rust_crates:libc",
+  "//third_party/rust_crates:rand",
+  "//third_party/rust_crates:serde",
+  "//third_party/rust_crates:serde_json",
   "//third_party/rust_crates:serial_test",
   "//third_party/rust_crates:test-case",
   "//third_party/rust_crates:zerocopy",
@@ -37,6 +44,7 @@ if (is_host) {
     source_root = "src/lib.rs"
     sources = _common_sources
     deps = _common_deps
+    deps += [ ":fscrypt_test_bin" ]
   }
 }
 
@@ -50,6 +58,29 @@ rustc_test("syscalls_rust_test_bin") {
   exclude_toolchain_tags = [ "asan" ]
 }
 
+rustc_binary("fscrypt_test_bin") {
+  name = "fscrypt_test"
+  edition = "2021"
+  emit_tool_path = false
+
+  deps = [
+    "//src/starnix/lib/linux_uapi",
+    "//third_party/rust_crates:argh",
+    "//third_party/rust_crates:hex",
+    "//third_party/rust_crates:libc",
+    "//third_party/rust_crates:rand",
+    "//third_party/rust_crates:serde",
+    "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:zerocopy",
+  ]
+
+  source_root = "src/fscrypt_child.rs"
+  sources = [
+    "src/fscrypt_shared.rs",
+    source_root,
+  ]
+}
+
 resource("simple_ext4_image") {
   sources = [
     "data/corrupted_hashtree.txt",
@@ -60,6 +91,16 @@ resource("simple_ext4_image") {
     "data/valid_image_with_hashtree.txt",
   ]
   outputs = [ "data/{{source_file_part}}" ]
+}
+
+_fscrypt_bin_label = ":fscrypt_test_bin($target_linux_toolchain)"
+_fscrypt_binary_path =
+    get_label_info(_fscrypt_bin_label, "root_out_dir") + "/fscrypt_test"
+
+resource("fscrypt_test_resource") {
+  deps = [ _fscrypt_bin_label ]
+  sources = [ _fscrypt_binary_path ]
+  outputs = [ "data/tests/fscrypt_test" ]
 }
 
 starnix_linux_test_component("syscalls_rust_test") {
@@ -75,5 +116,8 @@ fuchsia_test_package("starnix_syscalls_rust_tests") {
   subpackages = starnix_test_subpackages
   subpackages += [ "//src/starnix/containers/debian:debian_package" ]
 
-  deps = [ "//src/lib/testing/expectation:expectation_comparer" ]
+  deps = [
+    ":fscrypt_test_resource",
+    "//src/lib/testing/expectation:expectation_comparer",
+  ]
 }
