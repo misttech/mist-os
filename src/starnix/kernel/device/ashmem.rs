@@ -187,7 +187,7 @@ impl FileOps for Ashmem {
         length: usize,
         prot_flags: ProtectionFlags,
         mapping_options: MappingOptions,
-        filename: NamespaceNode,
+        _filename: NamespaceNode,
     ) -> Result<UserAddress, Errno> {
         let state = self.state.lock();
         let size_paged_aligned = round_up_to_increment(state.size, *PAGE_SIZE as usize)?;
@@ -221,7 +221,7 @@ impl FileOps for Ashmem {
             length,
             prot_flags,
             mapping_options,
-            MappingName::File(filename.into_active()),
+            MappingName::Ashmem(state.name.clone()),
             FileWriteGuardRef(None),
         )?;
 

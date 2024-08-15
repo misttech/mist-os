@@ -7,6 +7,9 @@
 #include <sys/mman.h>
 #include <unistd.h>
 
+#include <fstream>
+#include <string>
+
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 #include <linux/ashmem.h>
@@ -964,6 +967,48 @@ TEST_F(AshmemTest, ForkProt) {
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
 }
 
+// Fork, child lseeks, parent is affected
+TEST_F(AshmemTest, ForkLseek) {
+  char in[] = "hello world";
+  char out[256] = {0};
+  auto fd = CreateRegion(0, PAGE_SIZE);
+  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+
+  strcpy((char *)addr, in);
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] { ASSERT_THAT(lseek(fd.get(), 6, SEEK_CUR), SyscallSucceeds()); });
+
+  ASSERT_TRUE(helper.WaitForChildren());
+  ASSERT_THAT(read(fd.get(), out, 5), SyscallSucceedsWithValue(5));
+
+  EXPECT_STREQ("world", out);
+
+  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// Fork, child writes, parent calls read()
+TEST_F(AshmemTest, ForkRead) {
+  char in[] = "hello world";
+  char out[256] = {0};
+  auto fd = CreateRegion(0, PAGE_SIZE);
+  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+
+  test_helper::ForkHelper helper;
+  helper.RunInForkedProcess([&] { strcpy((char *)addr, in); });
+
+  ASSERT_TRUE(helper.WaitForChildren());
+  ASSERT_THAT(read(fd.get(), out, 5), SyscallSucceedsWithValue(5));
+
+  EXPECT_STREQ("hello", out);
+
+  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
 // Ashmem regions are backed by independent VMOs
 TEST_F(AshmemTest, DistinctAshmemVMO) {
   auto fd_1 = CreateRegion(nullptr, PAGE_SIZE);
@@ -1027,6 +1072,32 @@ TEST_F(AshmemTest, MalformedFileIDs) {
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_FILE_ID, 10), SyscallFailsWithErrno(EFAULT));
   EXPECT_THAT(ioctl(fd.get(), ASHMEM_GET_FILE_ID, "hello"), SyscallFailsWithErrno(EFAULT));
   ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+}
+
+// Ashmem region name written as entry to /proc/<pid>/maps
+TEST_F(AshmemTest, ProcMaps) {
+  char name[] = "hello";
+  auto fd = CreateRegion(name, PAGE_SIZE);
+  void *addr = mmap(nullptr, PAGE_SIZE, PROT_READ | PROT_WRITE, MAP_SHARED, fd.get(), 0);
+  ASSERT_TRUE(addr != MAP_FAILED && addr != nullptr);
+  std::ifstream proc_maps("/proc/self/maps", std::ios::in);
+  ASSERT_TRUE(proc_maps.good());
+
+  std::string line;
+  bool has_ashmap = false;
+
+  while (getline(proc_maps, line)) {
+    if (line.find("/dev/ashmem/hello") != std::string::npos) {
+      has_ashmap = true;
+      break;
+    }
+  }
+
+  EXPECT_TRUE(has_ashmap);
+
+  ASSERT_THAT(munmap(addr, PAGE_SIZE), SyscallSucceeds());
+  ASSERT_THAT(close(fd.get()), SyscallSucceeds());
+  proc_maps.close();
 }
 
 }  // namespace

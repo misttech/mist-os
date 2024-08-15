@@ -274,6 +274,10 @@ pub enum MappingName {
     /// name and can be reset to the unnamed state by passing NULL to
     /// prctl(PR_SET_VMA, PR_SET_VMA_ANON_NAME, ...).
     Vma(FsString),
+
+    /// The name associated with the mapping of an ashmem region.  Set by ioctl(fd, ASHMEM_SET_NAME, ...).
+    /// By default "dev/ashmem".
+    Ashmem(FsString),
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -3770,6 +3774,11 @@ fn write_map(
             sink.write(b"[anon:");
             sink.write(name.as_bytes());
             sink.write(b"]");
+        }
+        MappingName::Ashmem(name) => {
+            fill_to_name(sink);
+            sink.write(b"/dev/ashmem/");
+            sink.write(name.as_bytes());
         }
     }
     sink.write(b"\n");
