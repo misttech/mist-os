@@ -15,36 +15,21 @@
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 #include "src/ui/scenic/lib/display/tests/mock_display_coordinator.h"
 
-namespace scenic_impl {
-namespace display {
-namespace test {
+namespace scenic_impl::display::test {
 
 namespace {
-
-struct ChannelPair {
-  zx::channel server;
-  zx::channel client;
-};
-
-ChannelPair CreateChannelPair() {
-  ChannelPair c;
-  FX_CHECK(ZX_OK == zx::channel::create(0, &c.server, &c.client));
-  return c;
-}
-
-}  // namespace
 
 class DisplayCoordinatorListenerTest : public gtest::TestLoopFixture {
  public:
   void SetUp() override {
-    ChannelPair coordinator_channel = CreateChannelPair();
+    auto [coordinator_client, coordinator_server] =
+        fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
     auto [listener_client, listener_server] =
         fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
 
     mock_display_coordinator_ =
-        std::make_unique<MockDisplayCoordinator>(fuchsia::hardware::display::Info{});
-    mock_display_coordinator_->Bind(std::move(coordinator_channel.server),
-                                    std::move(listener_client));
+        std::make_unique<MockDisplayCoordinator>(fuchsia_hardware_display::Info{});
+    mock_display_coordinator_->Bind(std::move(coordinator_server), std::move(listener_client));
 
     listener_server_end_ = std::move(listener_server);
   }
@@ -184,6 +169,6 @@ TEST_F(DisplayCoordinatorListenerTest, OnVsyncCallback) {
   RunLoopUntilIdle();
 }
 
-}  // namespace test
-}  // namespace display
-}  // namespace scenic_impl
+}  // namespace
+
+}  // namespace scenic_impl::display::test
