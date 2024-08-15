@@ -6,8 +6,12 @@
 
 //! Unit test utilities for clients of the `fuchsia.hardware.display` FIDL API.
 
-use fidl::endpoints::{RequestStream, ServerEnd};
-use fidl_fuchsia_hardware_display::{self as display, CoordinatorMarker, CoordinatorRequestStream};
+use display_types::INVALID_DISP_ID;
+use fidl::endpoints::{ClientEnd, ServerEnd};
+use fidl_fuchsia_hardware_display::{
+    self as display, CoordinatorListenerMarker, CoordinatorListenerProxy, CoordinatorMarker,
+    CoordinatorRequestStream, VsyncAckCookie,
+};
 use itertools::Itertools;
 use std::collections::HashMap;
 use thiserror::Error;
@@ -34,8 +38,8 @@ pub type Result<T> = std::result::Result<T, MockCoordinatorError>;
 /// FIDL messages in a predictable and configurable manner.
 pub struct MockCoordinator {
     #[allow(unused)]
-    stream: CoordinatorRequestStream,
-    control_handle: <CoordinatorRequestStream as RequestStream>::ControlHandle,
+    coordinator_stream: CoordinatorRequestStream,
+    listener_proxy: CoordinatorListenerProxy,
 
     displays: HashMap<DisplayId, display::Info>,
 }
@@ -47,9 +51,13 @@ struct DisplayId(u64);
 
 impl MockCoordinator {
     /// Bind a new `MockCoordinator` to the server end of a FIDL channel.
-    pub fn new(server_end: ServerEnd<CoordinatorMarker>) -> Result<MockCoordinator> {
-        let (stream, control_handle) = server_end.into_stream_and_control_handle()?;
-        Ok(MockCoordinator { stream, control_handle, displays: HashMap::new() })
+    pub fn new(
+        coordinator_server_end: ServerEnd<CoordinatorMarker>,
+        listener_client_end: ClientEnd<CoordinatorListenerMarker>,
+    ) -> Result<MockCoordinator> {
+        let coordinator_stream = coordinator_server_end.into_stream()?;
+        let listener_proxy = listener_client_end.into_proxy()?;
+        Ok(MockCoordinator { coordinator_stream, listener_proxy, displays: HashMap::new() })
     }
 
     /// Replace the list of available display devices with the given collection and send a
@@ -73,7 +81,7 @@ impl MockCoordinator {
         let removed: Vec<display_types::DisplayId> =
             self.displays.iter().map(|(_, info)| info.id).collect();
         self.displays = map;
-        self.control_handle.send_on_displays_changed(&added, &removed)?;
+        self.listener_proxy.on_displays_changed(&added, &removed)?;
         Ok(())
     }
 
@@ -88,12 +96,12 @@ impl MockCoordinator {
         display_id_value: u64,
         stamp: display_types::ConfigStamp,
     ) -> Result<()> {
-        self.control_handle
-            .send_on_vsync(
+        self.listener_proxy
+            .on_vsync(
                 &display_types::DisplayId { value: display_id_value },
-                zx::Time::get_monotonic().into_nanos() as u64,
+                zx::Time::get_monotonic().into_nanos(),
                 &stamp,
-                0,
+                &VsyncAckCookie { value: INVALID_DISP_ID },
             )
             .map_err(MockCoordinatorError::from)
     }
@@ -104,9 +112,18 @@ impl MockCoordinator {
 ///
 /// NOTE: This function instantiates FIDL bindings and thus requires a fuchsia-async executor to
 /// have been created beforehand.
-pub fn create_proxy_and_mock() -> Result<(display::CoordinatorProxy, MockCoordinator)> {
-    let (proxy, server) = fidl::endpoints::create_proxy::<CoordinatorMarker>()?;
-    Ok((proxy, MockCoordinator::new(server)?))
+pub fn create_proxy_and_mock(
+) -> Result<(display::CoordinatorProxy, display::CoordinatorListenerRequestStream, MockCoordinator)>
+{
+    let (coordinator_proxy, coordinator_server) =
+        fidl::endpoints::create_proxy::<CoordinatorMarker>()?;
+    let (listener_client, listener_requests) =
+        fidl::endpoints::create_request_stream::<CoordinatorListenerMarker>()?;
+    Ok((
+        coordinator_proxy,
+        listener_requests,
+        MockCoordinator::new(coordinator_server, listener_client)?,
+    ))
 }
 
 #[cfg(test)]
@@ -117,15 +134,17 @@ mod tests {
     use futures::{future, TryStreamExt};
 
     async fn wait_for_displays_changed_event(
-        events: &mut display::CoordinatorEventStream,
+        listener_requests: &mut display::CoordinatorListenerRequestStream,
     ) -> Result<(Vec<display::Info>, Vec<display_types::DisplayId>)> {
-        let mut stream = events.try_filter_map(|event| match event {
-            display::CoordinatorEvent::OnDisplaysChanged { added, removed } => {
-                future::ok(Some((added, removed)))
-            }
+        let mut stream = listener_requests.try_filter_map(|event| match event {
+            display::CoordinatorListenerRequest::OnDisplaysChanged {
+                added,
+                removed,
+                control_handle: _,
+            } => future::ok(Some((added, removed))),
             _ => future::ok(None),
         });
-        stream.try_next().await?.context("failed to listen to coordinator events")
+        stream.try_next().await?.context("failed to listen to coordinator listener requests")
     }
 
     #[fuchsia::test]
@@ -155,7 +174,8 @@ mod tests {
             },
         ];
 
-        let (_proxy, mut mock) = create_proxy_and_mock().expect("failed to create MockCoordinator");
+        let (_proxy, _listener_requests, mut mock) =
+            create_proxy_and_mock().expect("failed to create MockCoordinator");
         let result = mock.assign_displays(displays);
         assert!(result.is_err());
     }
@@ -187,11 +207,11 @@ mod tests {
             },
         ];
 
-        let (proxy, mut mock) = create_proxy_and_mock().expect("failed to create MockCoordinator");
+        let (_proxy, mut listener_requests, mut mock) =
+            create_proxy_and_mock().expect("failed to create MockCoordinator");
         mock.assign_displays(displays.clone())?;
 
-        let mut events = proxy.take_event_stream();
-        let (added, removed) = wait_for_displays_changed_event(&mut events).await?;
+        let (added, removed) = wait_for_displays_changed_event(&mut listener_requests).await?;
         assert_eq!(added, displays);
         assert_eq!(removed, vec![]);
 
@@ -212,15 +232,15 @@ mod tests {
             using_fallback_size: false,
         }];
 
-        let (proxy, mut mock) = create_proxy_and_mock().expect("failed to create MockCoordinator");
+        let (_proxy, mut listener_requests, mut mock) =
+            create_proxy_and_mock().expect("failed to create MockCoordinator");
         mock.assign_displays(displays)?;
 
-        let mut events = proxy.take_event_stream();
-        let _ = wait_for_displays_changed_event(&mut events).await?;
+        let _ = wait_for_displays_changed_event(&mut listener_requests).await?;
 
         // Remove all displays.
         mock.assign_displays(vec![])?;
-        let (added, removed) = wait_for_displays_changed_event(&mut events).await?;
+        let (added, removed) = wait_for_displays_changed_event(&mut listener_requests).await?;
         assert_eq!(added, vec![]);
         assert_eq!(removed, vec![display_types::DisplayId { value: 1 }]);
 

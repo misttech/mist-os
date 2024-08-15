@@ -5,7 +5,9 @@
 use display_types::IMAGE_TILING_TYPE_LINEAR;
 
 use fidl::endpoints::ClientEnd;
-use fidl_fuchsia_hardware_display::{self as display, CoordinatorEvent, LayerId as FidlLayerId};
+use fidl_fuchsia_hardware_display::{
+    self as display, CoordinatorListenerRequest, LayerId as FidlLayerId,
+};
 use fidl_fuchsia_hardware_display_types::{self as display_types};
 use fidl_fuchsia_io as fio;
 use fuchsia_async::{DurationExt as _, TimeoutExt as _};
@@ -39,7 +41,7 @@ pub struct Coordinator {
 struct CoordinatorInner {
     displays: Vec<DisplayInfo>,
     proxy: display::CoordinatorProxy,
-    events: Option<display::CoordinatorEventStream>,
+    listener_requests: Option<display::CoordinatorListenerRequestStream>,
 
     // All subscribed vsync listeners and their optional ID filters.
     vsync_listeners: Vec<(mpsc::UnboundedSender<VsyncEvent>, Option<DisplayId>)>,
@@ -89,27 +91,42 @@ impl Coordinator {
 
         let (coordinator_proxy, coordinator_server_end) =
             fidl::endpoints::create_proxy::<display::CoordinatorMarker>()?;
+        let (coordinator_listener_client_end, coordinator_listener_requests) =
+            fidl::endpoints::create_request_stream::<display::CoordinatorListenerMarker>()?;
 
         // TODO(https://fxbug.dev/42075865): Consider supporting virtcon client
         // connections.
-        let () = zx::Status::ok(
-            provider_proxy.open_coordinator_for_primary(coordinator_server_end).await?,
-        )?;
+        let payload = display::ProviderOpenCoordinatorWithListenerForPrimaryRequest {
+            coordinator: Some(coordinator_server_end),
+            coordinator_listener: Some(coordinator_listener_client_end),
+            __source_breaking: fidl::marker::SourceBreaking,
+        };
+        let () = provider_proxy
+            .open_coordinator_with_listener_for_primary(payload)
+            .await?
+            .map_err(zx::Status::from_raw)?;
 
-        Self::init_with_proxy(coordinator_proxy).await
+        Self::init_with_proxy_and_listener_requests(
+            coordinator_proxy,
+            coordinator_listener_requests,
+        )
+        .await
     }
 
-    /// Initialize a `Coordinator` instance from a pre-established channel.
+    /// Initialize a `Coordinator` instance from pre-established Coordinator and
+    /// CoordinatorListener channels.
     ///
     /// Returns an error if
     /// - An initial OnDisplaysChanged event is not received from the display driver within
     ///   `TIMEOUT` seconds.
-    // TODO(https://fxbug.dev/42168593): This will currently result in an error if no displays are present on
-    // the system (or if one is not attached within `TIMEOUT`). It wouldn't be neceesary to rely on
-    // a timeout if the display driver sent en event with no displays.
-    pub async fn init_with_proxy(proxy: display::CoordinatorProxy) -> Result<Coordinator> {
-        let mut events = proxy.take_event_stream();
-        let displays = wait_for_initial_displays(&mut events)
+    // TODO(https://fxbug.dev/42168593): This will currently result in an error if no displays are
+    // present on the system (or if one is not attached within `TIMEOUT`). It wouldn't be neceesary
+    // to rely on a timeout if the display driver sent en event with no displays.
+    pub async fn init_with_proxy_and_listener_requests(
+        coordinator_proxy: display::CoordinatorProxy,
+        mut listener_requests: display::CoordinatorListenerRequestStream,
+    ) -> Result<Coordinator> {
+        let displays = wait_for_initial_displays(&mut listener_requests)
             .on_timeout(TIMEOUT.after_now(), || Err(Error::NoDisplays))
             .await?
             .into_iter()
@@ -117,8 +134,8 @@ impl Coordinator {
             .collect::<Vec<_>>();
         Ok(Coordinator {
             inner: Arc::new(RwLock::new(CoordinatorInner {
-                proxy,
-                events: Some(events),
+                proxy: coordinator_proxy,
+                listener_requests: Some(listener_requests),
                 displays,
                 vsync_listeners: Vec::new(),
                 id_counter: 0,
@@ -159,23 +176,28 @@ impl Coordinator {
     /// This task can be scheduled safely on any thread.
     pub async fn handle_events(&self) -> Result<()> {
         let inner = self.inner.clone();
-        let mut events = inner.write().events.take().ok_or(Error::AlreadyRequested)?;
+        let mut events = inner.write().listener_requests.take().ok_or(Error::AlreadyRequested)?;
         while let Some(msg) = events.try_next().await? {
             match msg {
-                CoordinatorEvent::OnDisplaysChanged { added, removed } => {
+                CoordinatorListenerRequest::OnDisplaysChanged {
+                    added,
+                    removed,
+                    control_handle: _,
+                } => {
                     let removed =
                         removed.into_iter().map(|id| id.into()).collect::<Vec<DisplayId>>();
                     inner.read().handle_displays_changed(added, removed);
                 }
-                CoordinatorEvent::OnVsync {
+                CoordinatorListenerRequest::OnVsync {
                     display_id,
                     timestamp,
                     applied_config_stamp,
                     cookie,
+                    control_handle: _,
                 } => {
                     inner.write().handle_vsync(
                         display_id.into(),
-                        timestamp,
+                        zx::Time::from_nanos(timestamp),
                         applied_config_stamp,
                         cookie,
                     )?;
@@ -334,11 +356,11 @@ impl CoordinatorInner {
     fn handle_vsync(
         &mut self,
         display_id: DisplayId,
-        timestamp: u64,
+        timestamp: zx::Time,
         applied_config_stamp: display_types::ConfigStamp,
-        cookie: u64,
+        cookie: display::VsyncAckCookie,
     ) -> Result<()> {
-        self.proxy.acknowledge_vsync(cookie)?;
+        self.proxy.acknowledge_vsync(cookie.value)?;
 
         let mut listeners_to_remove = Vec::new();
         for (pos, (sender, filter)) in self.vsync_listeners.iter().enumerate() {
@@ -346,11 +368,7 @@ impl CoordinatorInner {
             if filter.as_ref().map_or(false, |id| *id != display_id) {
                 continue;
             }
-            let payload = VsyncEvent {
-                id: display_id,
-                timestamp: zx::Time::from_nanos(timestamp as i64),
-                config: applied_config_stamp,
-            };
+            let payload = VsyncEvent { id: display_id, timestamp, config: applied_config_stamp };
             if let Err(e) = sender.unbounded_send(payload) {
                 if e.is_disconnected() {
                     listeners_to_remove.push(pos);
@@ -395,10 +413,12 @@ async fn watch_first_file(path: &str) -> Result<PathBuf> {
 // connection if any displays are present. If no displays are present, then the returned Future
 // will not resolve until a display is plugged in.
 async fn wait_for_initial_displays(
-    events: &mut display::CoordinatorEventStream,
+    listener_requests: &mut display::CoordinatorListenerRequestStream,
 ) -> Result<Vec<display::Info>> {
-    let mut stream = events.try_filter_map(|event| match event {
-        CoordinatorEvent::OnDisplaysChanged { added, removed: _ } => future::ok(Some(added)),
+    let mut stream = listener_requests.try_filter_map(|event| match event {
+        CoordinatorListenerRequest::OnDisplaysChanged { added, removed: _, control_handle: _ } => {
+            future::ok(Some(added))
+        }
         _ => future::ok(None),
     });
     stream.try_next().await?.ok_or(Error::NoDisplays)
@@ -418,8 +438,13 @@ mod tests {
         fidl_fuchsia_hardware_display_types as display_types,
     };
 
-    async fn init_with_proxy(proxy: display::CoordinatorProxy) -> Result<Coordinator> {
-        Coordinator::init_with_proxy(proxy).await.context("failed to initialize Coordinator")
+    async fn init_with_proxy_and_listener_requests(
+        coordinator_proxy: display::CoordinatorProxy,
+        listener_requests: display::CoordinatorListenerRequestStream,
+    ) -> Result<Coordinator> {
+        Coordinator::init_with_proxy_and_listener_requests(coordinator_proxy, listener_requests)
+            .await
+            .context("failed to initialize Coordinator")
     }
 
     // Returns a Coordinator and a connected mock FIDL server. This function sets up the initial
@@ -428,10 +453,13 @@ mod tests {
     async fn init_with_displays(
         displays: &[display::Info],
     ) -> Result<(Coordinator, MockCoordinator)> {
-        let (proxy, mut mock) = create_proxy_and_mock()?;
+        let (coordinator_proxy, listener_requests, mut mock) = create_proxy_and_mock()?;
         mock.assign_displays(displays.to_vec())?;
 
-        Ok((init_with_proxy(proxy).await?, mock))
+        Ok((
+            init_with_proxy_and_listener_requests(coordinator_proxy, listener_requests).await?,
+            mock,
+        ))
     }
 
     #[fuchsia::test]
@@ -442,10 +470,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_init_with_no_displays() -> Result<()> {
-        let (proxy, mut mock) = create_proxy_and_mock()?;
+        let (coordinator_proxy, listener_requests, mut mock) = create_proxy_and_mock()?;
         mock.assign_displays([].to_vec())?;
 
-        let coordinator = init_with_proxy(proxy).await?;
+        let coordinator =
+            init_with_proxy_and_listener_requests(coordinator_proxy, listener_requests).await?;
         assert!(coordinator.displays().is_empty());
 
         Ok(())
@@ -481,10 +510,11 @@ mod tests {
             },
         ]
         .to_vec();
-        let (proxy, mut mock) = create_proxy_and_mock()?;
+        let (coordinator_proxy, listener_requests, mut mock) = create_proxy_and_mock()?;
         mock.assign_displays(displays.clone())?;
 
-        let coordinator = init_with_proxy(proxy).await?;
+        let coordinator =
+            init_with_proxy_and_listener_requests(coordinator_proxy, listener_requests).await?;
         assert_eq!(coordinator.displays().len(), 2);
         assert_eq!(coordinator.displays()[0].0, displays[0]);
         assert_eq!(coordinator.displays()[1].0, displays[1]);
