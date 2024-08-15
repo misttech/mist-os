@@ -421,6 +421,7 @@ rustc_library("starnix_core") {
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing-mutex",
     "//third_party/rust_crates:utf8parse",
+    "//third_party/rust_crates:uuid",
     "//third_party/rust_crates:zerocopy",
   ]
 

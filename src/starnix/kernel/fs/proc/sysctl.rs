@@ -19,6 +19,7 @@ use starnix_uapi::file_mode::mode;
 use starnix_uapi::{errno, error};
 use std::borrow::Cow;
 use std::sync::atomic::{AtomicI32, AtomicUsize, Ordering};
+use uuid::Uuid;
 
 pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> FsNodeHandle {
     let mode = mode!(IFREG, 0o644);
@@ -307,13 +308,12 @@ pub fn sysctl_directory(current_task: &CurrentTask, fs: &FileSystemHandle) -> Fs
             ),
         );
         dir.subdir(current_task, "random", 0o555, |dir| {
+            // Generate random UUID
+            let boot_id = Uuid::new_v4().hyphenated().to_string();
             dir.entry(
                 current_task,
                 "boot_id",
-                StubSysctl::new_node(
-                    "/proc/sys/kernel/random/boot_id",
-                    bug_ref!("https://fxbug.dev/322874139"),
-                ),
+                BytesFile::new_node(boot_id.as_bytes().to_vec()),
                 mode,
             );
             dir.entry(
