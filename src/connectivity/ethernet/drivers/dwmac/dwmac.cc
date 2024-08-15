@@ -4,6 +4,7 @@
 
 #include "dwmac.h"
 
+#include <fidl/fuchsia.hardware.network/cpp/wire.h>
 #include <fuchsia/hardware/ethernet/mac/c/banjo.h>
 #include <lib/ddk/binding_driver.h>
 #include <lib/ddk/debug.h>
@@ -58,23 +59,34 @@ int DWMacDevice::Thread() {
       zxlogf(ERROR, "dwmac: Interrupt error");
       break;
     }
-    uint32_t stat = mmio_->Read32(DW_MAC_DMA_STATUS);
-    mmio_->Write32(stat, DW_MAC_DMA_STATUS);
+    uint32_t stat = 0;
+    {
+      network::SharedAutoLock lock(&state_lock_);  // Note: limited scope of autolock
+      if (!started_) {
+        // Spurious IRQ.
+        continue;
+      }
+      stat = mmio_->Read32(DW_MAC_DMA_STATUS);
+      mmio_->Write32(stat, DW_MAC_DMA_STATUS);
 
-    if (stat & DMA_STATUS_GLPII) {
-      // Read the LPI status to clear the GLPII bit and prevent re-interrupting.
-      (void)mmio_->Read32(DW_MAC_MAC_LPICONTROL);
+      if (stat & DMA_STATUS_GLPII) {
+        // Read the LPI status to clear the GLPII bit and prevent re-interrupting.
+        (void)mmio_->Read32(DW_MAC_MAC_LPICONTROL);
+      }
+
+      if (stat & DMA_STATUS_RI) {
+        ProcRxBuffer(stat);
+      }
+      if (stat & DMA_STATUS_TI) {
+        ProcTxBuffer();
+      }
     }
-
     if (stat & DMA_STATUS_GLI) {
-      fbl::AutoLock lock(&lock_);  // Note: limited scope of autolock
+      fbl::AutoLock lock(&state_lock_);  // Note: limited scope of autolock
       UpdateLinkStatus();
     }
-    if (stat & DMA_STATUS_RI) {
-      ProcRxBuffer(stat);
-    }
     if (stat & DMA_STATUS_AIS) {
-      bus_errors_++;
+      bus_errors_.fetch_add(1, std::memory_order_relaxed);
       zxlogf(ERROR, "dwmac: abnormal interrupt. status = 0x%08x", stat);
     }
   }
@@ -89,9 +101,10 @@ int DWMacDevice::WorkerThread() {
   sync_completion_wait(&cb_registered_signal_, ZX_TIME_INFINITE);
 
   // Configure the phy.
-  cbs_.config_phy(cbs_.ctx, mac_);
-
-  InitDevice();
+  {
+    fbl::AutoLock lock(&state_lock_);
+    cbs_.config_phy(cbs_.ctx, mac_.data());
+  }
 
   auto thunk = [](void* arg) -> int { return reinterpret_cast<DWMacDevice*>(arg)->Thread(); };
 
@@ -100,13 +113,14 @@ int DWMacDevice::WorkerThread() {
   ZX_DEBUG_ASSERT(ret == thrd_success);
 
   fbl::AllocChecker ac;
-  std::unique_ptr<EthPhyFunction> phy_function(new (&ac) EthPhyFunction(zxdev(), this));
+  std::unique_ptr<NetworkFunction> network_function(new (&ac) NetworkFunction(zxdev(), this));
   if (!ac.check()) {
     DdkAsyncRemove();
     return ZX_ERR_NO_MEMORY;
   }
 
-  auto status = phy_function->DdkAdd("Designware-MAC");
+  auto status = network_function->DdkAdd(
+      ddk::DeviceAddArgs("Designware-MAC").set_proto_id(ZX_PROTOCOL_NETWORK_DEVICE_IMPL));
   if (status != ZX_OK) {
     zxlogf(ERROR, "dwmac: Could not create eth device: %d", status);
     DdkAsyncRemove();
@@ -114,8 +128,22 @@ int DWMacDevice::WorkerThread() {
   } else {
     zxlogf(INFO, "dwmac: Added dwMac device");
   }
-  phy_function_ = phy_function.release();
-  return status;
+  network_function_ = network_function.release();
+
+  return ZX_OK;
+}
+
+void DWMacDevice::SendPortStatus() {
+  if (netdevice_.is_valid()) {
+    port_status_t port_status = {
+        .flags = online_ ? STATUS_FLAGS_ONLINE : 0,
+        .mtu = 1500,
+    };
+    zxlogf(ERROR, "Communicating port status of %d", (int)online_);
+    netdevice_.PortStatusChanged(kPortId, &port_status);
+  } else {
+    zxlogf(WARNING, "dwmac: System not ready");
+  }
 }
 
 void DWMacDevice::UpdateLinkStatus() {
@@ -123,11 +151,7 @@ void DWMacDevice::UpdateLinkStatus() {
 
   if (temp != online_) {
     online_ = temp;
-    if (ethernet_client_.is_valid()) {
-      ethernet_client_.Status(online_ ? ETHERNET_STATUS_ONLINE : 0u);
-    } else {
-      zxlogf(WARNING, "dwmac: System not ready");
-    }
+    SendPortStatus();
   }
   if (online_) {
     mmio_->SetBits32((GMAC_CONF_TE | GMAC_CONF_RE), DW_MAC_MAC_CONF);
@@ -152,13 +176,6 @@ zx_status_t DWMacDevice::InitPdev() {
     return status;
   }
 
-  // Get our bti.
-  status = pdev_.GetBti(0, &bti_);
-  if (status != ZX_OK) {
-    zxlogf(ERROR, "dwmac: could not obtain bti: %d", status);
-    return status;
-  }
-
   // Get ETH_BOARD protocol.
   if (!eth_board_.is_valid()) {
     zxlogf(ERROR, "dwmac: could not obtain ETH_BOARD protocol: %d", status);
@@ -175,6 +192,14 @@ zx_status_t DWMacDevice::Create(void* ctx, zx_device_t* device) {
     return ZX_ERR_NO_RESOURCES;
   }
 
+  // Get our bti.
+  zx::bti bti;
+  zx_status_t status = pdev.GetBti(0, &bti);
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "dwmac: could not obtain bti: %d", status);
+    return status;
+  }
+
   zx::result client =
       DdkConnectFragmentFidlProtocol<fuchsia_hardware_ethernet_board::Service::Device>(device,
                                                                                        "eth-board");
@@ -183,11 +208,20 @@ zx_status_t DWMacDevice::Create(void* ctx, zx_device_t* device) {
            zx_status_get_string(client.error_value()));
     return client.error_value();
   }
-  auto mac_device = std::make_unique<DWMacDevice>(device, std::move(pdev), std::move(*client));
+  auto mac_device =
+      std::make_unique<DWMacDevice>(device, std::move(pdev), std::move(bti), std::move(*client));
 
-  zx_status_t status = mac_device->InitPdev();
+  status = mac_device->InitPdev();
   if (status != ZX_OK) {
     return status;
+  }
+
+  {
+    fbl::AutoLock lock(&mac_device->state_lock_);
+    if (zx_status_t status = mac_device->vmo_store_.Reserve(MAX_VMOS); status != ZX_OK) {
+      zxlogf(ERROR, "failed to initialize vmo store: %s", zx_status_get_string(status));
+      return status;
+    }
   }
 
   // Reset the phy.
@@ -212,13 +246,21 @@ zx_status_t DWMacDevice::Create(void* ctx, zx_device_t* device) {
   }
 
   // Mac address register was erased by the reset; set it!
-  mac_device->mmio_->Write32((mac_device->mac_[5] << 8) | (mac_device->mac_[4] << 0),
-                             DW_MAC_MAC_MACADDR0HI);
-  mac_device->mmio_->Write32((mac_device->mac_[3] << 24) | (mac_device->mac_[2] << 16) |
-                                 (mac_device->mac_[1] << 8) | (mac_device->mac_[0] << 0),
-                             DW_MAC_MAC_MACADDR0LO);
+  {
+    fbl::AutoLock lock(&mac_device->state_lock_);
+    mac_device->mmio_->Write32((mac_device->mac_[5] << 8) | (mac_device->mac_[4] << 0),
+                               DW_MAC_MAC_MACADDR0HI);
+    mac_device->mmio_->Write32((mac_device->mac_[3] << 24) | (mac_device->mac_[2] << 16) |
+                                   (mac_device->mac_[1] << 8) | (mac_device->mac_[0] << 0),
+                               DW_MAC_MAC_MACADDR0LO);
+  }
 
   auto cleanup = fit::defer([&]() { mac_device->ShutDown(); });
+
+  status = mac_device->AllocateBuffers();
+  if (status != ZX_OK) {
+    return status;
+  }
 
   status = mac_device->InitBuffers();
   if (status != ZX_OK)
@@ -262,22 +304,23 @@ zx_status_t DWMacDevice::Create(void* ctx, zx_device_t* device) {
   return ZX_OK;
 }  // namespace eth
 
-zx_status_t DWMacDevice::InitBuffers() {
-  constexpr size_t kDescSize = ZX_ROUNDUP(2 * kNumDesc * sizeof(dw_dmadescr_t), PAGE_SIZE);
+zx_status_t DWMacDevice::AllocateBuffers() {
+  std::lock_guard rx_lock(rx_lock_);
+  std::lock_guard tx_lock(tx_lock_);
+  constexpr size_t kDescSize = ZX_ROUNDUP(2ul * kNumDesc * sizeof(dw_dmadescr_t), PAGE_SIZE);
 
-  constexpr size_t kBufSize = 2 * kNumDesc * kTxnBufSize;
-
-  txn_buffer_ = PinnedBuffer::Create(kBufSize, bti_, ZX_CACHE_POLICY_CACHED);
   desc_buffer_ = PinnedBuffer::Create(kDescSize, bti_, ZX_CACHE_POLICY_UNCACHED);
-
-  tx_buffer_ = static_cast<uint8_t*>(txn_buffer_->GetBaseAddress());
-  zx_cache_flush(tx_buffer_, kBufSize, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
-  // rx buffer right after tx
-  rx_buffer_ = &tx_buffer_[kBufSize / 2];
 
   tx_descriptors_ = static_cast<dw_dmadescr_t*>(desc_buffer_->GetBaseAddress());
   // rx descriptors right after tx
   rx_descriptors_ = &tx_descriptors_[kNumDesc];
+
+  return ZX_OK;
+}
+
+zx_status_t DWMacDevice::InitBuffers() {
+  std::lock_guard rx_lock(rx_lock_);
+  std::lock_guard tx_lock(tx_lock_);
 
   zx_paddr_t tmpaddr;
 
@@ -286,21 +329,25 @@ zx_status_t DWMacDevice::InitBuffers() {
     desc_buffer_->LookupPhys(((i + 1) % kNumDesc) * sizeof(dw_dmadescr_t), &tmpaddr);
     tx_descriptors_[i].dmamac_next = static_cast<uint32_t>(tmpaddr);
 
-    txn_buffer_->LookupPhys(i * kTxnBufSize, &tmpaddr);
-    tx_descriptors_[i].dmamac_addr = static_cast<uint32_t>(tmpaddr);
     tx_descriptors_[i].txrx_status = 0;
     tx_descriptors_[i].dmamac_cntl = DESC_TXCTRL_TXCHAIN;
 
     desc_buffer_->LookupPhys((((i + 1) % kNumDesc) + kNumDesc) * sizeof(dw_dmadescr_t), &tmpaddr);
     rx_descriptors_[i].dmamac_next = static_cast<uint32_t>(tmpaddr);
 
-    txn_buffer_->LookupPhys((i + kNumDesc) * kTxnBufSize, &tmpaddr);
-    rx_descriptors_[i].dmamac_addr = static_cast<uint32_t>(tmpaddr);
     rx_descriptors_[i].dmamac_cntl =
         (MAC_MAX_FRAME_SZ & DESC_RXCTRL_SIZE1MASK) | DESC_RXCTRL_RXCHAIN;
 
-    rx_descriptors_[i].txrx_status = DESC_RXSTS_OWNBYDMA;
+    rx_descriptors_[i].txrx_status = 0;
   }
+
+  tx_head_ = 0;
+  tx_tail_ = 0;
+  rx_head_ = 0;
+  rx_tail_ = 0;
+  rx_queued_ = 0;
+
+  hw_wmb();
 
   desc_buffer_->LookupPhys(0, &tmpaddr);
   mmio_->Write32(static_cast<uint32_t>(tmpaddr), DW_MAC_DMA_TXDESCLISTADDR);
@@ -310,8 +357,6 @@ zx_status_t DWMacDevice::InitBuffers() {
 
   return ZX_OK;
 }
-
-void DWMacDevice::EthernetImplGetBti(zx::bti* bti) { bti_.duplicate(ZX_RIGHT_SAME_RIGHTS, bti); }
 
 zx_status_t DWMacDevice::EthMacMdioWrite(uint32_t reg, uint32_t val) {
   mmio_->Write32(val, DW_MAC_MAC_MIIDATA);
@@ -357,17 +402,28 @@ zx_status_t DWMacDevice::EthMacRegisterCallbacks(const eth_mac_callbacks_t* cbs)
   return ZX_OK;
 }
 
-DWMacDevice::DWMacDevice(zx_device_t* device, ddk::PDevFidl pdev,
+DWMacDevice::DWMacDevice(zx_device_t* device, ddk::PDevFidl pdev, zx::bti bti,
                          fidl::ClientEnd<fuchsia_hardware_ethernet_board::EthBoard> eth_board)
     : ddk::Device<DWMacDevice, ddk::Unbindable, ddk::Suspendable>(device),
+      bti_(std::move(bti)),
       pdev_(std::move(pdev)),
-      eth_board_(fidl::WireSyncClient(std::move(eth_board))) {}
+      eth_board_(fidl::WireSyncClient(std::move(eth_board))),
+      vmo_store_({
+          .map =
+              vmo_store::MapOptions{
+                  .vm_option = ZX_VM_PERM_READ | ZX_VM_PERM_WRITE | ZX_VM_REQUIRE_NON_RESIZABLE,
+                  .vmar = nullptr,
+              },
+          .pin =
+              vmo_store::PinOptions{
+                  .bti = zx::unowned_bti(bti_),
+                  .bti_pin_options = ZX_BTI_PERM_READ | ZX_BTI_PERM_WRITE,
+                  .index = true,
+              },
+      }) {}
 
 void DWMacDevice::ReleaseBuffers() {
   // Unpin the memory used for the dma buffers
-  if (txn_buffer_->UnPin() != ZX_OK) {
-    zxlogf(ERROR, "dwmac: Error unpinning transaction buffers");
-  }
   if (desc_buffer_->UnPin() != ZX_OK) {
     zxlogf(ERROR, "dwmac: Error unpinning description buffers");
   }
@@ -375,7 +431,7 @@ void DWMacDevice::ReleaseBuffers() {
 
 void DWMacDevice::DdkRelease() {
   zxlogf(INFO, "Ethernet release...");
-  ZX_ASSERT(phy_function_ == nullptr);
+  ZX_ASSERT(network_function_ == nullptr);
   ZX_ASSERT(mac_function_ == nullptr);
   delete this;
 }
@@ -399,9 +455,9 @@ zx_status_t DWMacDevice::ShutDown() {
     dma_irq_.destroy();
     thrd_join(thread_, NULL);
   }
-  fbl::AutoLock lock(&lock_);
+  fbl::AutoLock lock(&state_lock_);
   online_ = false;
-  ethernet_client_.clear();
+  netdevice_.clear();
   DeInitDevice();
   ReleaseBuffers();
   return ZX_OK;
@@ -431,40 +487,37 @@ zx_status_t DWMacDevice::GetMAC(zx_device_t* dev) {
 
   zxlogf(INFO, "dwmac: MAC address %02x:%02x:%02x:%02x:%02x:%02x", buffer[0], buffer[1], buffer[2],
          buffer[3], buffer[4], buffer[5]);
-  memcpy(mac_, buffer, sizeof mac_);
+  fbl::AutoLock lock(&state_lock_);
+  memcpy(mac_.data(), buffer, sizeof mac_);
   return ZX_OK;
 }
 
-zx_status_t DWMacDevice::EthernetImplQuery(uint32_t options, ethernet_info_t* info) {
-  memset(info, 0, sizeof(*info));
-  info->features = ETHERNET_FEATURE_DMA;
-  info->mtu = 1500;
-  memcpy(info->mac, mac_, sizeof info->mac);
-  info->netbuf_size = eth::BorrowedOperation<>::OperationSize(sizeof(ethernet_netbuf_t));
-  return ZX_OK;
-}
-
-void DWMacDevice::EthernetImplStop() {
-  zxlogf(INFO, "Stopping Ethermac");
-  fbl::AutoLock lock(&lock_);
-  ethernet_client_.clear();
-}
-
-zx_status_t DWMacDevice::EthernetImplStart(const ethernet_ifc_protocol_t* ifc) {
-  fbl::AutoLock lock(&lock_);
-
-  if (ethernet_client_.is_valid()) {
-    zxlogf(ERROR, "dwmac:  Already bound!!!");
-    return ZX_ERR_ALREADY_BOUND;
-  } else {
-    ethernet_client_ = ddk::EthernetIfcProtocolClient(ifc);
-    // Notify of online status immediately.
-    ethernet_client_.Status(online_ ? ETHERNET_STATUS_ONLINE : 0u);
-    zxlogf(INFO, "dwmac: Started");
+void DWMacDevice::NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface,
+                                        network_device_impl_init_callback callback, void* cookie) {
+  fbl::AutoLock lock(&state_lock_);
+  if (netdevice_.is_valid()) {
+    callback(cookie, ZX_ERR_ALREADY_BOUND);
+    return;
   }
-  return ZX_OK;
-}
+  netdevice_ = ddk::NetworkDeviceIfcProtocolClient(iface);
 
+  using Context = std::pair<network_device_impl_init_callback, void*>;
+
+  std::unique_ptr context = std::make_unique<Context>(callback, cookie);
+  netdevice_.AddPort(
+      kPortId, network_function_, &network_function_->network_port_protocol_ops_,
+      [](void* ctx, zx_status_t status) {
+        std::unique_ptr<Context> context(static_cast<Context*>(ctx));
+        auto [callback, cookie] = *context;
+        if (status != ZX_OK) {
+          zxlogf(ERROR, "failed to add port: %s", zx_status_get_string(status));
+          callback(cookie, status);
+          return;
+        }
+        callback(cookie, ZX_OK);
+      },
+      context.release());
+}
 zx_status_t DWMacDevice::InitDevice() {
   mmio_->Write32(0, DW_MAC_DMA_INTENABLE);
 
@@ -483,7 +536,7 @@ zx_status_t DWMacDevice::InitDevice() {
 
   // Enable Interrupts
   mmio_->Write32(DMA_INT_NIE | DMA_INT_AIE | DMA_INT_FBE | DMA_INT_RIE | DMA_INT_RUE | DMA_INT_OVE |
-                     DMA_INT_UNE | DMA_INT_TSE | DMA_INT_RSE,
+                     DMA_INT_UNE | DMA_INT_TSE | DMA_INT_RSE | DMA_INT_TIE,
                  DW_MAC_DMA_INTENABLE);
 
   mmio_->Write32(0, DW_MAC_MAC_MACADDR0HI);
@@ -512,7 +565,7 @@ zx_status_t DWMacDevice::DeInitDevice() {
   // reset the phy (hold in reset)
   // gpio_write(&gpios_[PHY_RESET], 0);
 
-  // transmit and receive are not disables, safe to null descriptor list ptrs
+  // transmit and receive are now disabled, safe to null descriptor list ptrs
   mmio_->Write32(0, DW_MAC_DMA_TXDESCLISTADDR);
   mmio_->Write32(0, DW_MAC_DMA_RXDESCLISTADDR);
 
@@ -524,91 +577,427 @@ uint32_t DWMacDevice::DmaRxStatus() {
 }
 
 void DWMacDevice::ProcRxBuffer(uint32_t int_status) {
-  while (true) {
-    uint32_t pkt_stat = rx_descriptors_[curr_rx_buf_].txrx_status;
+  if (!started_) {
+    return;
+  }
+
+  std::lock_guard lock(rx_lock_);
+
+  // Batch completions.
+  constexpr size_t kBatchRxBufs = 64;
+  __UNINITIALIZED rx_buffer_part_t rx_buffer_parts[kBatchRxBufs];
+  __UNINITIALIZED rx_buffer_t rx_buffer[kBatchRxBufs];
+  size_t num_rx_completed = 0;
+  while (rx_queued_ > 0) {
+    uint32_t pkt_stat = rx_descriptors_[rx_tail_].txrx_status;
 
     if (pkt_stat & DESC_RXSTS_OWNBYDMA) {
-      return;
+      break;
     }
     size_t fr_len = (pkt_stat & DESC_RXSTS_FRMLENMSK) >> DESC_RXSTS_FRMLENSHFT;
-    if (fr_len > kTxnBufSize) {
+    if (fr_len > kMtu) {
       zxlogf(ERROR, "dwmac: unsupported packet size received");
       return;
     }
 
-    uint8_t* temptr = &rx_buffer_[curr_rx_buf_ * kTxnBufSize];
+    auto [id, addr] = rx_in_flight_buffer_ids_[rx_tail_];
 
-    zx_cache_flush(temptr, kTxnBufSize, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
+    zx_cache_flush(addr, kMtu, ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
 
-    {  // limit scope of autolock
-      fbl::AutoLock lock(&lock_);
-      if ((ethernet_client_.is_valid())) {
-        ethernet_client_.Recv(temptr, fr_len, 0);
-
-      } else {
-        zxlogf(TRACE, "System not ready to receive");
-      }
+    rx_buffer_parts[num_rx_completed] = rx_buffer_part_t{
+        .id = id,
+        .offset = 0,
+        .length = static_cast<uint32_t>(fr_len),
+    };
+    rx_buffer[num_rx_completed] = rx_buffer_t{
+        .meta = {.port = kPortId,
+                 .info_type = 0,
+                 .flags = 0,
+                 .frame_type =
+                     static_cast<uint8_t>(fuchsia_hardware_network::FrameType::kEthernet)},
+        .data_list = &rx_buffer_parts[num_rx_completed],
+        .data_count = 1,
     };
 
-    rx_descriptors_[curr_rx_buf_].txrx_status = DESC_RXSTS_OWNBYDMA;
-    rx_packet_++;
+    rx_packet_.fetch_add(1, std::memory_order_relaxed);
 
-    curr_rx_buf_ = (curr_rx_buf_ + 1) % kNumDesc;
-    if (curr_rx_buf_ == 0) {
-      loop_count_++;
+    rx_tail_ = (rx_tail_ + 1) % kNumDesc;
+    if (rx_tail_ == 0) {
+      loop_count_.fetch_add(1, std::memory_order_relaxed);
     }
-    hw_mb();
-    mmio_->Write32(~0, DW_MAC_DMA_RXPOLLDEMAND);
+    num_rx_completed++;
+    rx_queued_--;
+    if (num_rx_completed == kBatchRxBufs) {
+      netdevice_.CompleteRx(rx_buffer, num_rx_completed);
+      num_rx_completed = 0;
+    }
+  }
+  if (num_rx_completed != 0) {
+    netdevice_.CompleteRx(rx_buffer, num_rx_completed);
   }
 }
 
-void DWMacDevice::EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
-                                      ethernet_impl_queue_tx_callback completion_cb, void* cookie) {
-  eth::BorrowedOperation<> op(netbuf, completion_cb, cookie, sizeof(ethernet_netbuf_t));
+void DWMacDevice::ProcTxBuffer() {
+  if (!started_) {
+    return;
+  }
+  ZX_DEBUG_ASSERT(netdevice_.is_valid());
 
-  {  // Check to make sure we are ready to accept packets
-    fbl::AutoLock lock(&lock_);
-    if (!online_) {
-      op.Complete(ZX_ERR_UNAVAILABLE);
+  std::lock_guard lock(tx_lock_);
+
+  size_t tx_complete = 0;
+  uint32_t tx_complete_start = tx_tail_;
+
+  while (true) {
+    if (!tx_in_flight_active_[tx_tail_]) {
+      break;
+    }
+    uint32_t pkt_stat = tx_descriptors_[tx_tail_].txrx_status;
+
+    if (pkt_stat & DESC_TXSTS_OWNBYDMA) {
+      break;
+    }
+
+    tx_in_flight_active_[tx_tail_] = false;
+    tx_in_flight_buffer_ids_[tx_tail_].status = ZX_OK;
+    tx_complete++;
+
+    tx_tail_ = (tx_tail_ + 1) % kNumDesc;
+    if (tx_tail_ == 0) {
+      netdevice_.CompleteTx(&tx_in_flight_buffer_ids_[tx_complete_start], tx_complete);
+      tx_complete_start = 0;
+      tx_complete = 0;
+    }
+  }
+
+  if (tx_complete > 0) {
+    netdevice_.CompleteTx(&tx_in_flight_buffer_ids_[tx_complete_start], tx_complete);
+  }
+}
+
+void DWMacDevice::NetworkDeviceImplStart(network_device_impl_start_callback callback,
+                                         void* cookie) {
+  zx_status_t result = ZX_OK;
+  {
+    fbl::AutoLock lock(&state_lock_);
+    if (started_) {
+      zxlogf(WARNING, "device already started");
+      result = ZX_ERR_ALREADY_BOUND;
+    } else {
+      result = InitBuffers();
+      if (result == ZX_OK) {
+        result = InitDevice();
+      }
+      if (result == ZX_OK) {
+        started_ = true;
+      }
+    }
+    SendPortStatus();
+  }
+  callback(cookie, result);
+}
+
+void DWMacDevice::NetworkDeviceImplStop(network_device_impl_stop_callback callback, void* cookie) {
+  {
+    fbl::AutoLock lock(&state_lock_);
+    // Disable TX and RX.
+    DeInitDevice();
+    hw_mb();
+    // Can now return any buffers.
+    {
+      std::lock_guard tx_lock{tx_lock_};
+      while (tx_in_flight_active_[tx_tail_]) {
+        tx_in_flight_buffer_ids_[tx_tail_].status = ZX_ERR_UNAVAILABLE;
+        netdevice_.CompleteTx(&tx_in_flight_buffer_ids_[tx_tail_], 1);
+        tx_in_flight_active_[tx_tail_] = false;
+        tx_tail_ = (tx_tail_ + 1) % kNumDesc;
+      }
+    }
+    {
+      std::lock_guard rx_lock{rx_lock_};
+      while (rx_queued_ > 0) {
+        auto [id, addr] = rx_in_flight_buffer_ids_[rx_tail_];
+        rx_buffer_part_t part = {
+            .id = id,
+            .length = 0,
+        };
+        rx_buffer_t buf = {
+            .meta = {.frame_type =
+                         static_cast<uint8_t>(fuchsia_hardware_network::FrameType::kEthernet)},
+            .data_list = &part,
+            .data_count = 1,
+        };
+        netdevice_.CompleteRx(&buf, 1);
+        rx_tail_ = (rx_tail_ + 1) % kNumDesc;
+        rx_queued_--;
+      }
+    }
+    started_ = false;
+  }
+  callback(cookie);
+}
+
+void DWMacDevice::NetworkDeviceImplGetInfo(device_impl_info_t* out_info) {
+  *out_info = device_impl_info_t{
+      .tx_depth = kNumDesc,
+      .rx_depth = kNumDesc,
+      .rx_threshold = kNumDesc / 2,
+      // Ensures clients do not use scatter-gather.
+      .max_buffer_parts = 1,
+      // Per fuchsia.hardware.network.driver banjo API:
+      // "Devices that do not support scatter-gather DMA may set this to a value smaller than
+      // a page size to guarantee compatibility."
+      .max_buffer_length = 2048,
+      // 2k alignment ensures, given our 1500 mtu, that every packet is on its own page.
+      .buffer_alignment = 2048,
+      // Ensures that an rx buffer will always be large enough to the ethernet MTU.
+      .min_rx_buffer_length = kMtu,
+  };
+}
+
+void DWMacDevice::NetworkDeviceImplQueueTx(const tx_buffer_t* buffers_list, size_t buffers_count) {
+  network::SharedAutoLock state_lock(&state_lock_);
+
+  auto return_buffers = [&](size_t first_buffer, zx_status_t code)
+                            __TA_REQUIRES_SHARED(state_lock_) {
+                              for (size_t i = first_buffer; i < buffers_count; i++) {
+                                tx_result_t ret = {.id = buffers_list[i].id, .status = code};
+                                netdevice_.CompleteTx(&ret, 1);
+                              }
+                            };
+
+  if (!started_) {
+    zxlogf(ERROR, "tx buffers queued before start call");
+    return_buffers(0, ZX_ERR_UNAVAILABLE);
+    return;
+  }
+
+  std::lock_guard lock{tx_lock_};
+
+  for (size_t i = 0; i < buffers_count; i++) {
+    const tx_buffer_t& buffer = buffers_list[i];
+
+    if (buffer.data_count != 1) {
+      zxlogf(ERROR, "received unsupported scatter gather buffer");
+      return_buffers(i, ZX_ERR_INVALID_ARGS);
+      DdkAsyncRemove();
       return;
     }
+    const buffer_region_t& data = buffer.data_list[0];
+
+    if (data.length > kMtu) {
+      zxlogf(ERROR, "tx buffer length is too large");
+      return_buffers(i, ZX_ERR_INVALID_ARGS);
+      DdkAsyncRemove();
+      return;
+    }
+
+    if (tx_in_flight_active_[tx_head_]) {
+      zxlogf(ERROR, "tx buffers exceeded published depth");
+      return_buffers(i, ZX_ERR_INTERNAL);
+      DdkAsyncRemove();
+      return;
+    }
+
+    ZX_DEBUG_ASSERT(!(tx_descriptors_[tx_head_].txrx_status & DESC_TXSTS_OWNBYDMA));
+
+    VmoStore::StoredVmo* stored_vmo = vmo_store_.GetVmo(data.vmo);
+    ZX_ASSERT_MSG(stored_vmo != nullptr, "invalid VMO id %d", data.vmo);
+
+    tx_in_flight_buffer_ids_[tx_head_].id = buffer.id;
+    tx_in_flight_active_[tx_head_] = true;
+
+    // Clean the cache.
+    auto mapped_span = stored_vmo->data().subspan(data.offset, data.length);
+    zx_status_t status =
+        zx_cache_flush(mapped_span.data(), mapped_span.size(), ZX_CACHE_FLUSH_DATA);
+    ZX_DEBUG_ASSERT(status == ZX_OK);
+
+    // Lookup the physical address. Based on our specified alignment and sizes it should be an error
+    // for this to span more than one physical address.
+    fzl::PinnedVmo::Region region;
+    size_t actual_regions = 0;
+    status = stored_vmo->GetPinnedRegions(data.offset, data.length, &region, 1, &actual_regions);
+    ZX_ASSERT_MSG(status == ZX_OK && actual_regions == 1,
+                  "failed to retrieve pinned region %s (actual=%zu)", zx_status_get_string(status),
+                  actual_regions);
+
+    // Check if this is the last buffer in the list, and place the TX interrupt on it if so.
+    const bool last = (i + 1) == buffers_count;
+
+    // Setup the length, control fields and address.
+    tx_descriptors_[tx_head_].dmamac_addr = static_cast<uint32_t>(region.phys_addr);
+    tx_descriptors_[tx_head_].dmamac_cntl =
+        (last ? DESC_TXCTRL_TXINT : 0) | DESC_TXCTRL_TXLAST | DESC_TXCTRL_TXFIRST |
+        DESC_TXCTRL_TXCHAIN | (static_cast<uint32_t>(data.length) & DESC_TXCTRL_SIZE1MASK);
+    // Ensure our descriptor updates can be seen prior to the device observing that it owns the
+    // buffer.
+    hw_wmb();
+    tx_descriptors_[tx_head_].txrx_status = DESC_TXSTS_OWNBYDMA;
+    tx_head_ = (tx_head_ + 1) % kNumDesc;
+
+    tx_counter_.fetch_add(1, std::memory_order_relaxed);
   }
-
-  if (op.operation()->data_size > kTxnBufSize) {
-    op.Complete(ZX_ERR_INVALID_ARGS);
-    return;
-  }
-  if (tx_descriptors_[curr_tx_buf_].txrx_status & DESC_TXSTS_OWNBYDMA) {
-    zxlogf(ERROR, "dwmac: TX buffer overrun@ %u", curr_tx_buf_);
-    op.Complete(ZX_ERR_UNAVAILABLE);
-    return;
-  }
-  uint8_t* temptr = &tx_buffer_[curr_tx_buf_ * kTxnBufSize];
-
-  memcpy(temptr, op.operation()->data_buffer, op.operation()->data_size);
-  hw_mb();
-
-  zx_cache_flush(temptr, netbuf->data_size, ZX_CACHE_FLUSH_DATA);
-
-  // Descriptors are pre-iniitialized with the paddr of their corresponding
-  // buffers, only need to setup the control and status fields.
-  tx_descriptors_[curr_tx_buf_].dmamac_cntl = DESC_TXCTRL_TXINT | DESC_TXCTRL_TXLAST |
-                                              DESC_TXCTRL_TXFIRST | DESC_TXCTRL_TXCHAIN |
-                                              ((uint32_t)netbuf->data_size & DESC_TXCTRL_SIZE1MASK);
-
-  tx_descriptors_[curr_tx_buf_].txrx_status = DESC_TXSTS_OWNBYDMA;
-  curr_tx_buf_ = (curr_tx_buf_ + 1) % kNumDesc;
-
-  hw_mb();
+  // Ensure the descriptor status is seen prior to notifying the device.
+  hw_wmb();
   mmio_->Write32(~0, DW_MAC_DMA_TXPOLLDEMAND);
-  tx_counter_++;
-  op.Complete(ZX_OK);
 }
 
-zx_status_t DWMacDevice::EthernetImplSetParam(uint32_t param, int32_t value, const uint8_t* data,
-                                              size_t data_size) {
-  zxlogf(INFO, "dwmac: SetParam called  %x  %x", param, value);
-  return ZX_OK;
+void DWMacDevice::NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buffers_list,
+                                                size_t buffers_count) {
+  network::SharedAutoLock state_lock(&state_lock_);
+
+  auto return_buffers = [&](size_t first_buffer,
+                            zx_status_t code) __TA_REQUIRES_SHARED(state_lock_) {
+    for (size_t i = first_buffer; i < buffers_count; i++) {
+      rx_buffer_part_t part = {.id = buffers_list[i].id, .length = 0};
+      rx_buffer_t buf = {
+          .meta = {.frame_type =
+                       static_cast<uint8_t>(fuchsia_hardware_network::FrameType::kEthernet)},
+          .data_list = &part,
+          .data_count = 1,
+      };
+      netdevice_.CompleteRx(&buf, 1);
+    }
+  };
+
+  if (!started_) {
+    zxlogf(ERROR, "rx buffers queued before start call");
+    return_buffers(0, ZX_ERR_UNAVAILABLE);
+    return;
+  }
+
+  std::lock_guard lock{rx_lock_};
+
+  for (size_t i = 0; i < buffers_count; i++) {
+    const rx_space_buffer_t& buffer = buffers_list[i];
+
+    if (rx_queued_ == kNumDesc) {
+      zxlogf(ERROR, "Too many rx buffers queued");
+      return_buffers(i, ZX_ERR_INTERNAL);
+      DdkAsyncRemove();
+      return;
+    }
+    ZX_DEBUG_ASSERT(!(rx_descriptors_[rx_head_].txrx_status & DESC_RXSTS_OWNBYDMA));
+
+    const buffer_region_t& data = buffer.region;
+
+    if (data.length < kMtu) {
+      zxlogf(ERROR, "rx buffer queued with length below mtu");
+      return_buffers(i, ZX_ERR_INVALID_ARGS);
+      DdkAsyncRemove();
+      return;
+    }
+    // Limit the length to the MTU to ensure we do not spuriously fail the GetPinnedRegions lookup
+    // later.
+
+    VmoStore::StoredVmo* stored_vmo = vmo_store_.GetVmo(data.vmo);
+    ZX_ASSERT_MSG(stored_vmo != nullptr, "invalid VMO id %d", data.vmo);
+
+    // Clean the buffer as we do not trust the client to have done so.
+    auto mapped_span = stored_vmo->data().subspan(data.offset, kMtu);
+    zx_status_t status = zx_cache_flush(mapped_span.data(), mapped_span.size(),
+                                        ZX_CACHE_FLUSH_DATA | ZX_CACHE_FLUSH_INVALIDATE);
+    ZX_DEBUG_ASSERT(status == ZX_OK);
+
+    rx_in_flight_buffer_ids_[rx_head_] = {buffer.id, mapped_span.data()};
+
+    // Lookup the physical address. Based on our specified alignment and sizes it should be an error
+    // for this to span more than one physical address.
+    fzl::PinnedVmo::Region region;
+    size_t actual_regions = 0;
+    status = stored_vmo->GetPinnedRegions(data.offset, kMtu, &region, 1, &actual_regions);
+    ZX_ASSERT_MSG(status == ZX_OK && actual_regions == 1,
+                  "failed to retrieve pinned region %s (actual=%zu)", zx_status_get_string(status),
+                  actual_regions);
+
+    rx_descriptors_[rx_head_].dmamac_addr = static_cast<uint32_t>(region.phys_addr);
+    hw_wmb();
+    rx_descriptors_[rx_head_].txrx_status = DESC_RXSTS_OWNBYDMA;
+
+    rx_head_ = (rx_head_ + 1) % kNumDesc;
+    rx_queued_++;
+  }
+  hw_wmb();
+  mmio_->Write32(~0, DW_MAC_DMA_RXPOLLDEMAND);
+}
+
+void DWMacDevice::NetworkDeviceImplPrepareVmo(uint8_t id, zx::vmo vmo,
+                                              network_device_impl_prepare_vmo_callback callback,
+                                              void* cookie) {
+  zx_status_t status;
+  {
+    fbl::AutoLock lock(&state_lock_);
+    status = vmo_store_.RegisterWithKey(id, std::move(vmo));
+  }
+  if (status != ZX_OK) {
+    zxlogf(ERROR, "failed to register vmo id = %d: %s", id, zx_status_get_string(status));
+  }
+  callback(cookie, status);
+}
+
+void DWMacDevice::NetworkDeviceImplReleaseVmo(uint8_t id) {
+  fbl::AutoLock lock(&state_lock_);
+  if (zx::result<zx::vmo> status = vmo_store_.Unregister(id); status.status_value() != ZX_OK) {
+    // A failure here may be the result of a failed call to register the vmo, in which case the
+    // driver is queued for removal from device manager. Accordingly, we must not panic lest we
+    // disrupt the orderly shutdown of the driver: a log statement is the best we can do.
+    zxlogf(ERROR, "failed to release vmo id = %d: %s", id, status.status_string());
+  }
+}
+
+void DWMacDevice::NetworkDeviceImplSetSnoop(bool snoop) {}
+
+void DWMacDevice::NetworkPortGetInfo(port_base_info_t* out_info) {
+  static constexpr uint8_t kRxTypesList[] = {
+      static_cast<uint8_t>(fuchsia_hardware_network::wire::FrameType::kEthernet)};
+  static constexpr frame_type_support_t kTxTypesList[] = {{
+      .type = static_cast<uint8_t>(fuchsia_hardware_network::wire::FrameType::kEthernet),
+      .features = fuchsia_hardware_network::wire::kFrameFeaturesRaw,
+  }};
+  *out_info = {
+      .port_class = static_cast<uint16_t>(fuchsia_hardware_network::wire::PortClass::kEthernet),
+      .rx_types_list = kRxTypesList,
+      .rx_types_count = std::size(kRxTypesList),
+      .tx_types_list = kTxTypesList,
+      .tx_types_count = std::size(kTxTypesList),
+  };
+}
+
+void DWMacDevice::NetworkPortGetStatus(port_status_t* out_status) {
+  network::SharedAutoLock lock{&state_lock_};
+  *out_status = port_status_t{
+      .flags = online_ ? STATUS_FLAGS_ONLINE : 0,
+      .mtu = 1500,
+  };
+}
+
+void DWMacDevice::NetworkPortSetActive(bool active) {}
+
+void DWMacDevice::NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc) {
+  if (out_mac_ifc) {
+    *out_mac_ifc = &network_function_->mac_addr_proto_;
+  }
+}
+
+void DWMacDevice::NetworkPortRemoved() { zxlogf(INFO, "removed event for port %d", kPortId); }
+
+void DWMacDevice::MacAddrGetAddress(mac_address_t* out_mac) {
+  static_assert(sizeof(mac_) == sizeof(out_mac->octets));
+  network::SharedAutoLock lock{&state_lock_};
+  std::copy(mac_.begin(), mac_.end(), out_mac->octets);
+}
+
+void DWMacDevice::MacAddrGetFeatures(features_t* out_features) {
+  *out_features = {
+      .multicast_filter_count = 0,
+      .supported_modes = SUPPORTED_MAC_FILTER_MODE_PROMISCUOUS,
+  };
+}
+
+void DWMacDevice::MacAddrSetMode(mac_filter_mode_t mode, const mac_address_t* multicast_macs_list,
+                                 size_t multicast_macs_count) {
+  zxlogf(INFO, "Ignoring request to set mac mode");
 }
 
 static constexpr zx_driver_ops_t driver_ops = []() {
