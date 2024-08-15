@@ -3181,7 +3181,7 @@ From //zircon/vdso/vdso.gni:9
 ### experimental_cxx_version
 
 **NOTE:** This is for **experimentation only** and should not normally be
-changed.  Set the version of the C++ standard to compile for, 17 or 20.
+changed.  Set the version of the C++ standard to compile for: 17, 20, 23.
 Note also that GN code should never use this variable directly, but always
 instead use the `fuchsia_cxx_version` variable.
 
