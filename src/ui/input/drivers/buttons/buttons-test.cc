@@ -5,6 +5,7 @@
 #include "buttons.h"
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire_test_base.h>
+#include <fidl/fuchsia.input.interaction.observation/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/testing/cpp/driver_test.h>
@@ -128,6 +129,30 @@ class LocalFakeGpio : public fake_gpio::FakeGpio {
   uint32_t expected_interrupt_flags_ = ZX_INTERRUPT_MODE_EDGE_HIGH;
 };
 
+class FakeAggregator : public fidl::Server<fuchsia_input_interaction_observation::Aggregator> {
+ public:
+  fidl::ProtocolHandler<fuchsia_input_interaction_observation::Aggregator> CreateHandler() {
+    return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->async_dispatcher(),
+                                   fidl::kIgnoreBindingClosure);
+  }
+
+  void ReportDiscreteActivity(ReportDiscreteActivityRequest& request,
+                              ReportDiscreteActivityCompleter::Sync& completer) override {
+    FDF_LOG(ERROR, "unexpected call to ReportDiscreteActivity");
+  }
+
+  void HandoffWake(HandoffWakeCompleter::Sync& completer) override {
+    num_handoff_wake_calls_++;
+    completer.Reply(zx::ok());
+  }
+
+  size_t GetNumHandoffWakeCalls() const { return num_handoff_wake_calls_; }
+
+ private:
+  fidl::ServerBindingGroup<fuchsia_input_interaction_observation::Aggregator> bindings_;
+  size_t num_handoff_wake_calls_ = 0;
+};
+
 class ButtonsTestEnvironment : public fdf_testing::Environment {
  public:
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
@@ -153,10 +178,19 @@ class ButtonsTestEnvironment : public fdf_testing::Environment {
       fake_gpio_servers_[i].SetDefaultReadResponse(zx::ok(uint8_t{0u}));
     }
 
+    // Serve fake aggregator.
+    if (serve_aggregator_) {
+      return to_driver_vfs.component()
+          .AddUnmanagedProtocol<fuchsia_input_interaction_observation::Aggregator>(
+              fake_aggregator_.CreateHandler());
+    }
+
     return zx::ok();
   }
 
-  void Init(MetadataVersion metadata_version) {
+  void Init(MetadataVersion metadata_version, bool serve_aggregator) {
+    serve_aggregator_ = serve_aggregator;
+
     // Serve metadata.
     cpp20::span<const buttons_button_config_t> buttons;
     switch (metadata_version) {
@@ -216,11 +250,13 @@ class ButtonsTestEnvironment : public fdf_testing::Environment {
 
   zx::interrupt fake_gpio_interrupts_[kMaxGpioServers];
   LocalFakeGpio fake_gpio_servers_[kMaxGpioServers];
+  FakeAggregator fake_aggregator_;
 
  private:
   compat::DeviceServer device_server_;
   std::vector<std::string> buttons_names_;
   cpp20::span<const buttons_gpio_config_t> gpios_;
+  bool serve_aggregator_;
 };
 
 class ButtonsTestConfig final {
@@ -236,11 +272,18 @@ class ButtonsTest : public ::testing::Test {
     ASSERT_EQ(ZX_OK, result.status_value());
   }
 
-  zx::result<> Init(MetadataVersion metadata_version) {
+  zx::result<> Init(MetadataVersion metadata_version, bool suspend_enabled,
+                    bool serve_aggregator = true) {
     driver_test().RunInEnvironmentTypeContext(
-        [metadata_version](ButtonsTestEnvironment& env) { env.Init(metadata_version); });
+        [metadata_version, serve_aggregator](ButtonsTestEnvironment& env) {
+          env.Init(metadata_version, serve_aggregator);
+        });
 
-    return driver_test().StartDriver();
+    return driver_test().StartDriverWithCustomStartArgs([&](fdf::DriverStartArgs& start_args) {
+      buttons_config::Config fake_config;
+      fake_config.suspend_enabled() = suspend_enabled;
+      start_args.config(fake_config.ToVmo());
+    });
   }
 
   fidl::ClientEnd<fuchsia_input_report::InputDevice> GetClient() {
@@ -288,13 +331,18 @@ class ButtonsTest : public ::testing::Test {
   fdf_testing::BackgroundDriverTest<ButtonsTestConfig> driver_test_;
 };
 
-TEST_F(ButtonsTest, DirectButtonInit) {
-  auto result = Init(kMetadataSingleButtonDirect);
+class ParameterizedButtonsTest : public ButtonsTest, public ::testing::WithParamInterface<bool> {};
+
+INSTANTIATE_TEST_SUITE_P(ParameterizedButtonsTest, ParameterizedButtonsTest,
+                         ::testing::Values(true, false));
+
+TEST_P(ParameterizedButtonsTest, DirectButtonInit) {
+  auto result = Init(kMetadataSingleButtonDirect, /* suspend_enabled */ GetParam());
   ASSERT_TRUE(result.is_ok());
 }
 
-TEST_F(ButtonsTest, DirectButtonPush) {
-  auto result = Init(kMetadataSingleButtonDirect);
+TEST_P(ParameterizedButtonsTest, DirectButtonPush) {
+  auto result = Init(kMetadataSingleButtonDirect, /* suspend_enabled */ GetParam());
   ASSERT_TRUE(result.is_ok());
 
   driver_test().RunInEnvironmentTypeContext([](ButtonsTestEnvironment& env) {
@@ -302,8 +350,81 @@ TEST_F(ButtonsTest, DirectButtonPush) {
   });
 }
 
-TEST_F(ButtonsTest, DirectButtonPushReleaseReport) {
-  auto result = Init(kMetadataSingleButtonDirect);
+TEST_P(ParameterizedButtonsTest, DirectButtonPushReleaseReport) {
+  bool suspend_enabled = GetParam();
+  auto result = Init(kMetadataSingleButtonDirect, suspend_enabled);
+  ASSERT_TRUE(result.is_ok());
+
+  auto reader = GetReader();
+  size_t num_reports_so_far = 0;
+
+  // Push.
+  driver_test().RunInEnvironmentTypeContext([](ButtonsTestEnvironment& env) {
+    env.SetDefaultGpioReadResponse(0, 1);
+
+    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
+  });
+
+  {
+    auto result = reader->ReadInputReports();
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    auto& reports = result->value()->reports;
+
+    ASSERT_EQ(reports.count(), 1U);
+    num_reports_so_far += reports.count();
+    auto& report = reports[0];
+
+    ASSERT_TRUE(report.has_event_time());
+    ASSERT_TRUE(report.has_consumer_control());
+    auto& consumer_control = report.consumer_control();
+
+    ASSERT_TRUE(consumer_control.has_pressed_buttons());
+    ASSERT_EQ(consumer_control.pressed_buttons().count(), 1U);
+    EXPECT_EQ(consumer_control.pressed_buttons()[0],
+              fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
+
+    driver_test().RunInEnvironmentTypeContext(
+        [suspend_enabled, num_reports_so_far](ButtonsTestEnvironment& env) {
+          EXPECT_EQ(env.fake_aggregator_.GetNumHandoffWakeCalls(),
+                    suspend_enabled ? num_reports_so_far : 0);
+        });
+  }
+
+  // Release.
+  driver_test().RunInEnvironmentTypeContext([](ButtonsTestEnvironment& env) {
+    env.SetDefaultGpioReadResponse(0, 0);
+    env.fake_gpio_interrupts_[0].trigger(0, zx::clock::get_monotonic());
+  });
+
+  {
+    auto result = reader->ReadInputReports();
+    ASSERT_TRUE(result.ok());
+    ASSERT_TRUE(result->is_ok());
+    auto& reports = result->value()->reports;
+
+    ASSERT_EQ(reports.count(), 1U);
+    num_reports_so_far += reports.count();
+    auto& report = reports[0];
+
+    ASSERT_TRUE(report.has_event_time());
+    ASSERT_TRUE(report.has_consumer_control());
+    auto& consumer_control = report.consumer_control();
+
+    ASSERT_TRUE(consumer_control.has_pressed_buttons());
+    ASSERT_EQ(consumer_control.pressed_buttons().count(), 0U);
+
+    driver_test().RunInEnvironmentTypeContext(
+        [suspend_enabled, num_reports_so_far](ButtonsTestEnvironment& env) {
+          EXPECT_EQ(env.fake_aggregator_.GetNumHandoffWakeCalls(),
+                    suspend_enabled ? num_reports_so_far : 0);
+        });
+  }
+}
+
+TEST_P(ParameterizedButtonsTest, DirectButtonPushReleaseReportWithoutAggregator) {
+  bool suspend_enabled = GetParam();
+  auto result = Init(kMetadataSingleButtonDirect, suspend_enabled, /* serve_aggregator= */ false);
   ASSERT_TRUE(result.is_ok());
 
   auto reader = GetReader();
@@ -358,8 +479,8 @@ TEST_F(ButtonsTest, DirectButtonPushReleaseReport) {
   }
 }
 
-TEST_F(ButtonsTest, DirectButtonPushReleasePush) {
-  auto result = Init(kMetadataSingleButtonDirect);
+TEST_P(ParameterizedButtonsTest, DirectButtonPushReleasePush) {
+  auto result = Init(kMetadataSingleButtonDirect, /* suspend_enabled */ GetParam());
   ASSERT_TRUE(result.is_ok());
 
   driver_test().RunInEnvironmentTypeContext([](ButtonsTestEnvironment& env) {
@@ -374,8 +495,8 @@ TEST_F(ButtonsTest, DirectButtonPushReleasePush) {
   });
 }
 
-TEST_F(ButtonsTest, DirectButtonFlaky) {
-  auto init_result = Init(kMetadataSingleButtonDirect);
+TEST_P(ParameterizedButtonsTest, DirectButtonFlaky) {
+  auto init_result = Init(kMetadataSingleButtonDirect, /* suspend_enabled */ GetParam());
   ASSERT_TRUE(init_result.is_ok());
 
   driver_test().RunInEnvironmentTypeContext([](ButtonsTestEnvironment& env) {
@@ -405,13 +526,13 @@ TEST_F(ButtonsTest, DirectButtonFlaky) {
             fuchsia_input_report::wire::ConsumerControlButton::kVolumeUp);
 }
 
-TEST_F(ButtonsTest, MatrixButtonInit) {
-  auto result = Init(kMetadataMatrix);
+TEST_P(ParameterizedButtonsTest, MatrixButtonInit) {
+  auto result = Init(kMetadataMatrix, /* suspend_enabled */ GetParam());
   ASSERT_TRUE(result.is_ok());
 }
 
-TEST_F(ButtonsTest, MatrixButtonPush) {
-  auto init_result = Init(kMetadataMatrix);
+TEST_P(ParameterizedButtonsTest, MatrixButtonPush) {
+  auto init_result = Init(kMetadataMatrix, /* suspend_enabled */ GetParam());
   ASSERT_TRUE(init_result.is_ok());
 
   auto reader = GetReader();
@@ -473,8 +594,8 @@ TEST_F(ButtonsTest, MatrixButtonPush) {
   });
 }
 
-TEST_F(ButtonsTest, DuplicateReports) {
-  auto result = Init(kMetadataDuplicate);
+TEST_P(ParameterizedButtonsTest, DuplicateReports) {
+  auto result = Init(kMetadataDuplicate, /* suspend_enabled */ GetParam());
   ASSERT_TRUE(result.is_ok());
 
   auto reader = GetReader();
@@ -569,8 +690,8 @@ TEST_F(ButtonsTest, DuplicateReports) {
   });
 }
 
-TEST_F(ButtonsTest, CamMute) {
-  auto result = Init(kMetadataMultiple);
+TEST_P(ParameterizedButtonsTest, CamMute) {
+  auto result = Init(kMetadataMultiple, /* suspend_enabled */ GetParam());
   ASSERT_TRUE(result.is_ok());
 
   auto reader = GetReader();
@@ -638,12 +759,12 @@ TEST_F(ButtonsTest, CamMute) {
   }
 }
 
-TEST_F(ButtonsTest, DirectButtonWakeable) {
+TEST_P(ParameterizedButtonsTest, DirectButtonWakeable) {
   driver_test().RunInEnvironmentTypeContext([](ButtonsTestEnvironment& env) {
     env.SetExpectedInterruptFlags(ZX_INTERRUPT_MODE_EDGE_HIGH | ZX_INTERRUPT_WAKE_VECTOR);
   });
 
-  auto result = Init(kMetadataWakeable);
+  auto result = Init(kMetadataWakeable, /* suspend_enabled */ GetParam());
   ASSERT_TRUE(result.is_ok());
 
   auto reader = GetReader();
@@ -698,8 +819,8 @@ TEST_F(ButtonsTest, DirectButtonWakeable) {
   }
 }
 
-TEST_F(ButtonsTest, PollOneButton) {
-  auto result = Init(kMetadataPolled);
+TEST_P(ParameterizedButtonsTest, PollOneButton) {
+  auto result = Init(kMetadataPolled, /* suspend_enabled */ GetParam());
   ASSERT_TRUE(result.is_ok());
 
   auto reader = GetReader();
