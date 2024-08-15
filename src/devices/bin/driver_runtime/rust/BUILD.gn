@@ -23,6 +23,7 @@ rustc_library("fdf_rust_lib") {
 
   sources = [
     "src/arena.rs",
+    "src/channel.rs",
     "src/dispatcher.rs",
     "src/fdf_sys.rs",
     "src/handle.rs",

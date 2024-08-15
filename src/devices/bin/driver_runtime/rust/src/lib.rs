@@ -6,12 +6,14 @@
 #![deny(unsafe_op_in_unsafe_fn)]
 
 mod arena;
+mod channel;
 mod dispatcher;
 mod fdf_sys;
 mod handle;
 mod message;
 
 pub use arena::*;
+pub use channel::*;
 pub use dispatcher::*;
 pub use handle::*;
 pub use message::*;
