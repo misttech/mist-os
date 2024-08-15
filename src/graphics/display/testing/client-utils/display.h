@@ -58,12 +58,12 @@ class Display {
   bool grayscale_ = false;
 
   display::DisplayId id_;
-  fbl::Vector<fuchsia_images2::wire::PixelFormat> pixel_formats_;
-  fbl::Vector<fuchsia_hardware_display::wire::Mode> modes_;
+  std::vector<fuchsia_images2::wire::PixelFormat> pixel_formats_;
+  std::vector<fuchsia_hardware_display::wire::Mode> modes_;
 
-  fbl::String manufacturer_name_;
-  fbl::String monitor_name_;
-  fbl::String monitor_serial_;
+  std::string manufacturer_name_;
+  std::string monitor_name_;
+  std::string monitor_serial_;
 
   // Display physical dimension in millimiters
   uint32_t horizontal_size_mm_;
