@@ -5,7 +5,6 @@
 #include "src/devices/usb/drivers/usb-peripheral/usb-function.h"
 
 #include <fidl/fuchsia.hardware.usb.endpoint/cpp/wire.h>
-
 #include <lib/ddk/debug.h>
 
 #include <fbl/array.h>
@@ -96,16 +95,18 @@ zx_status_t UsbFunction::UsbFunctionConfigEp(const usb_endpoint_descriptor_t* ep
     fss_comp_desc.w_bytes_per_interval = ss_comp_desc->w_bytes_per_interval;
   }
 
-  auto result = peripheral_->dci_new().buffer(arena)->ConfigureEndpoint(fep_desc, fss_comp_desc);
+  if (peripheral_->dci_new_valid()) {
+    auto result = peripheral_->dci_new().buffer(arena)->ConfigureEndpoint(fep_desc, fss_comp_desc);
 
-  if (!result.ok()) {
-    zxlogf(DEBUG, "(framework) ConfigureEndpoint(): %s", result.status_string());
-  } else if (result->is_error() && result->error_value() == ZX_ERR_NOT_SUPPORTED) {
-    zxlogf(DEBUG, "ConfigureEndpoint(): %s", result.status_string());
-  } else if (result->is_error() && result->error_value() != ZX_ERR_NOT_SUPPORTED) {
-    return result->error_value();
-  } else {
-    return ZX_OK;
+    if (!result.ok()) {
+      zxlogf(DEBUG, "(framework) ConfigureEndpoint(): %s", result.status_string());
+    } else if (result->is_error() && result->error_value() == ZX_ERR_NOT_SUPPORTED) {
+      zxlogf(DEBUG, "ConfigureEndpoint(): %s", result.status_string());
+    } else if (result->is_error() && result->error_value() != ZX_ERR_NOT_SUPPORTED) {
+      return result->error_value();
+    } else {
+      return ZX_OK;
+    }
   }
 
   zxlogf(DEBUG, "could not ConfigureEndpoint() over FIDL, falling back to banjo");

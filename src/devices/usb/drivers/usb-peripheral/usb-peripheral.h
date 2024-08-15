@@ -142,6 +142,9 @@ class UsbPeripheral : public UsbPeripheralType,
   inline const fidl::WireSyncClient<fuchsia_hardware_usb_dci::UsbDci>& dci_new() const {
     return dci_new_;
   }
+  inline bool dci_new_valid() const {
+    return dci_new_valid_;
+  }
 
   inline size_t ParentRequestSize() const { return parent_request_size_; }
   void UsbPeripheralRequestQueue(usb_request_t* usb_request,
@@ -211,6 +214,7 @@ class UsbPeripheral : public UsbPeripheralType,
 
   // Our parent's DCI protocol.
   const ddk::UsbDciProtocolClient dci_;
+  bool dci_new_valid_ = true;
   fidl::WireSyncClient<fuchsia_hardware_usb_dci::UsbDci> dci_new_;
   // USB device descriptor set via ioctl_usb_peripheral_set_device_desc()
   usb_device_descriptor_t device_desc_ = {};

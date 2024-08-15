@@ -22,9 +22,7 @@
     expose: [
         {
             service: [
-                // TODO(http://fxbug.dev/359903817): Add this once it no longer
-                // breaks the ftdi test.
-                // #"fuchsia.hardware.usb.dci.UsbDciService",
+                "fuchsia.hardware.usb.dci.UsbDciService",
                 "fuchsia.hardware.usb.hci.UsbHciService",
             ],
             from: "self",
