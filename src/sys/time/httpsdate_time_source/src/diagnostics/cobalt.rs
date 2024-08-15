@@ -175,25 +175,12 @@ mod test {
     const RTT_BUCKET_SIZE: zx::Duration =
         zx::Duration::from_micros(HTTPSDATE_POLL_LATENCY_MIGRATED_INT_BUCKETS_STEP_SIZE as i64);
 
-    #[allow(dead_code)] // TODO(https://fxbug.dev/351850665)
-    const POLL_OFFSET_RTT_BUCKET_SIZE: zx::Duration = zx::Duration::from_micros(10000);
-    #[allow(dead_code)] // TODO(https://fxbug.dev/351850665)
-    const POLL_OFFSET_RTT_FLOOR: zx::Duration = zx::Duration::from_micros(0);
-
     lazy_static! {
         static ref TEST_INITIAL_PHASE_COBALT: CobaltPhase = TEST_INITIAL_PHASE.into();
         static ref TEST_RTT: zx::Duration =
             RTT_BUCKET_FLOOR + RTT_BUCKET_SIZE * TEST_RTT_BUCKET - ONE_MICROS;
         static ref TEST_RTT_2: zx::Duration =
             RTT_BUCKET_FLOOR + RTT_BUCKET_SIZE * TEST_RTT_2_BUCKET - ONE_MICROS;
-        static ref TEST_RTT_OFFSET_BUCKET: u32 = ((*TEST_RTT - POLL_OFFSET_RTT_FLOOR).into_nanos()
-            / POLL_OFFSET_RTT_BUCKET_SIZE.into_nanos())
-            as u32
-            + 1;
-        static ref TEST_RTT_2_OFFSET_BUCKET: u32 =
-            ((*TEST_RTT_2 - POLL_OFFSET_RTT_FLOOR).into_nanos()
-                / POLL_OFFSET_RTT_BUCKET_SIZE.into_nanos()) as u32
-                + 1;
     }
 
     /// Create a `CobaltDiagnostics` and a receiver to inspect events it produces.
