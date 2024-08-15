@@ -15,7 +15,6 @@
 #include <bind/fuchsia/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/amlogiccanvas/cpp/bind.h>
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
-#include <bind/fuchsia/hardware/sysmem/cpp/bind.h>
 #include <soc/aml-s905d2/s905d2-gpio.h>
 #include <soc/aml-s905d2/s905d2-hw.h>
 
@@ -141,16 +140,6 @@ zx::result<> PostInit::InitDisplay() {
       fdf::MakeProperty(bind_fuchsia_gpio::FUNCTION, bind_fuchsia_gpio::FUNCTION_LCD_RESET),
   };
 
-  std::vector<fuchsia_driver_framework::BindRule> sysmem_bind_rules = std::vector{
-      fdf::MakeAcceptBindRule(bind_fuchsia_hardware_sysmem::SERVICE,
-                              bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
-  };
-
-  std::vector<fuchsia_driver_framework::NodeProperty> sysmem_properties = std::vector{
-      fdf::MakeProperty(bind_fuchsia_hardware_sysmem::SERVICE,
-                        bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
-  };
-
   std::vector<fuchsia_driver_framework::BindRule> canvas_bind_rules{
       fdf::MakeAcceptBindRule(bind_fuchsia_hardware_amlogiccanvas::SERVICE,
                               bind_fuchsia_hardware_amlogiccanvas::SERVICE_ZIRCONTRANSPORT),
@@ -165,10 +154,6 @@ zx::result<> PostInit::InitDisplay() {
       {{
           .bind_rules = gpio_bind_rules,
           .properties = gpio_properties,
-      }},
-      {{
-          .bind_rules = sysmem_bind_rules,
-          .properties = sysmem_properties,
       }},
       {{
           .bind_rules = canvas_bind_rules,
