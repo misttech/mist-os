@@ -12,7 +12,8 @@
 
 int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  fuchsia_logging::SetTags({"mdns"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"mdns"}).BuildAndInitialize();
 
   std::unique_ptr<sys::ComponentContext> component_context =
       sys::ComponentContext::CreateAndServeOutgoingDirectory();
