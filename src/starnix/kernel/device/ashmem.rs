@@ -328,12 +328,15 @@ impl FileOps for Ashmem {
             }
             ASHMEM_PURGE_ALL_CACHES => {
                 let mut state = self.state.lock();
+                let memory = self.memory.get().ok_or_else(|| errno!(EINVAL))?;
 
                 if state.unpinned.is_empty() {
                     return Ok(ASHMEM_IS_PINNED.into());
                 }
-                for (_, is_purged) in state.unpinned.iter_mut() {
+                for (range, is_purged) in state.unpinned.iter_mut() {
+                    let (lo, hi) = (range.start as u64, range.end as u64);
                     *is_purged = true;
+                    memory.op_range(zx::VmoOp::ZERO, lo, hi - lo).unwrap_or(());
                 }
                 return Ok(ASHMEM_IS_UNPINNED.into());
             }
