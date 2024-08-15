@@ -15,6 +15,44 @@ import fidl.fuchsia_wlan_internal as f_wlan_internal
 import fidl.fuchsia_wlan_sme as f_wlan_sme
 
 
+@dataclass(frozen=True)
+class MacAddress:
+    """MAC address following the EUI-48 identifier format.
+
+    Used by IEEE 802 networks as unique identifiers assigned to network
+    interface controllers.
+    """
+
+    mac: str
+    """MAC address in the form "xx:xx:xx:xx:xx:xx"."""
+
+    def __str__(self) -> str:
+        """Return MAC address in the form "xx:xx:xx:xx:xx:xx"."""
+        return self.mac
+
+    def bytes(self) -> bytes:
+        """Convert MAC into a byte array.
+
+        Returns:
+            Byte array of the MAC address.
+
+        Raises:
+            ValueError: Invalid MAC address
+        """
+        try:
+            mac = bytes([int(a, 16) for a in self.mac.split(":", 5)])
+            for i, octet in enumerate(mac):
+                if octet > 255:
+                    raise ValueError(
+                        f"Invalid octet at index {i}: larger than 8 bits"
+                    )
+            if len(mac) != 6:
+                raise ValueError(f"Expected 6 bytes, got {len(mac)}")
+            return mac
+        except ValueError as e:
+            raise ValueError("Invalid MAC address") from e
+
+
 # pylint: disable=line-too-long
 # TODO(http://b/299995309): Add lint if change presubmit checks to keep enums and fidl
 # definitions consistent.
@@ -103,7 +141,7 @@ class WlanMacRole(enum.StrEnum):
             case 3:
                 return WlanMacRole.MESH
             case _:
-                raise TypeError(f"Unknown WlanMacRole: {fidl.role}")
+                raise TypeError(f"Unknown WlanMacRole: {fidl}")
 
     def to_fidl(self) -> f_wlan_common.WlanMacRole:
         match self:

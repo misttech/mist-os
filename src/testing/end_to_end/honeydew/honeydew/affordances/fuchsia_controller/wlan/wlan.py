@@ -5,7 +5,6 @@
 
 import asyncio
 import logging
-from dataclasses import dataclass
 
 import fidl.fuchsia_location_namedplace as f_location_namedplace
 import fidl.fuchsia_wlan_device_service as f_wlan_device_service
@@ -22,6 +21,7 @@ from honeydew.typing.wlan import (
     BssDescription,
     ClientStatusResponse,
     CountryCode,
+    MacAddress,
     QueryIfaceResponse,
     WlanMacRole,
 )
@@ -460,37 +460,3 @@ class Wlan(wlan.Wlan):
             ) from status
 
         return ClientStatusResponse.from_fidl(resp.resp)
-
-
-@dataclass(frozen=True)
-class MacAddress:
-    """MAC address following the EUI-48 identifier format.
-
-    Used by IEEE 802 networks as unique identifiers assigned to network
-    interface controllers.
-    """
-
-    mac: str
-    """MAC address in the form "xx:xx:xx:xx:xx:xx"."""
-
-    def bytes(self) -> bytes:
-        """Convert MAC into a byte array.
-
-        Returns:
-            Byte array of the MAC address.
-
-        Raises:
-            ValueError: Invalid MAC address
-        """
-        try:
-            mac = bytes([int(a, 16) for a in self.mac.split(":", 5)])
-            for i, octet in enumerate(mac):
-                if octet > 255:
-                    raise ValueError(
-                        f"Invalid octet at index {i}: larger than 8 bits"
-                    )
-            if len(mac) != 6:
-                raise ValueError(f"Expected 6 bytes, got {len(mac)}")
-            return mac
-        except ValueError as e:
-            raise ValueError("Invalid MAC address") from e
