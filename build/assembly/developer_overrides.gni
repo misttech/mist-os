@@ -21,6 +21,10 @@ import("//build/python/python_action.gni")
 #       all platform-defined universe packages (such as shell commands) are as
 #       well.
 #
+#     netboot_mode (optional; default=false)
+#       [bool] If set to true, assembly tool will create a netbootable image.
+#       This is mostly used during the bringup process.
+#
 #   platform
 #     [scope] This is a set of values to override / overlay onto the platform
 #     configuration.

@@ -57,6 +57,7 @@ class ImageAssemblyConfig:
     bootfs_packages: Set[FilePath] = field(default_factory=set)
     board_driver_arguments: Optional[BoardDriverArguments] = None
     devicetree: Optional[FilePath] = None
+    netboot_mode: bool = False
 
     # TODO:  Flesh out the images_config with the actual types, if it's needed.
     images_config: Dict[str, List[str]] = field(default_factory=dict)

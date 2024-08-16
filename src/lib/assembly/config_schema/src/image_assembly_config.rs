@@ -67,6 +67,10 @@ pub struct ImageAssemblyConfig {
 
     /// Devicetree binary to be added to zbi
     pub devicetree: Option<Utf8PathBuf>,
+
+    /// Whether to create netbootable image
+    #[serde(default)]
+    pub netboot_mode: bool,
 }
 
 impl ImageAssemblyConfig {
@@ -86,6 +90,7 @@ impl ImageAssemblyConfig {
             images_config: ImagesConfig::default(),
             board_driver_arguments: None,
             devicetree: Some("path/to/devicetree/binary".into()),
+            netboot_mode: false,
         }
     }
 }
