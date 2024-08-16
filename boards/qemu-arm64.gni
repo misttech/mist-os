@@ -28,7 +28,6 @@ add_qemu_to_build_archives = true
 
 # Supports only virtual devices.
 board_is_emu = true
-board_is_phys = false
 
 partitions_config_label = "//boards/partitions:default"
 

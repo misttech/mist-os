@@ -75,4 +75,3 @@ assembly_generate_fvm_fastboot = true
 
 # Supports only physical devices.
 board_is_emu = false
-board_is_phys = true

@@ -29,7 +29,6 @@ board_description = "A generic emulated arm64 device."
 
 # Supports only virtual devices.
 board_is_emu = true
-board_is_phys = false
 
 # Build a UEFI image for virtualized platforms.
 build_uefi_disk = true

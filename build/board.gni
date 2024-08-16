@@ -50,11 +50,10 @@ declare_args() {
   # The label for the board configuration target to use with Product Assembly
   board_configuration_label = false
 
-  # Whether or not the board supports emulator/physical devices.
+  # Whether or not the board supports emulator devices.
   # This is used to determine if product bundle metadata should generate a
-  # physical/virtual device spec or both.
+  # virtual device spec or both.
   board_is_emu = false
-  board_is_phys = true
 
   # The partitions config information used to create an update package and
   # product bundle.
