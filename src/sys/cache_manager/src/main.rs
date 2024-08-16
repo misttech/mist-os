@@ -146,7 +146,7 @@ async fn monitor_storage(
 
         let mut unconditional_success = true;
 
-        if storage_state.percent_used() > config.cache_clearing_threshold {
+        if storage_state_after.percent_used() > config.cache_clearing_threshold {
             warn!("storage usage still exceeds threshold after cache clearing, used_bytes={} total_bytes={}", storage_state.used_bytes, storage_state.total_bytes);
             unconditional_success = false;
         }
@@ -446,7 +446,7 @@ mod tests {
         assert_eq!(cobalt_metrics[0].metric_id, metrics::CACHE_EVICTION_METRIC_ID);
         assert_eq!(
             cobalt_metrics[0].event_codes,
-            vec![metrics::CacheEvictionMetricDimensionResult::SuccessWithCaveats as u32]
+            vec![metrics::CacheEvictionMetricDimensionResult::Success as u32]
         );
         assert_eq!(cobalt_metrics[0].payload, MetricEventPayload::Count(1));
 
