@@ -5537,7 +5537,7 @@ From //out/not-default/args.gn:26
 
 **Overridden from the default:** `[]`
 
-From //build/assembly/developer_overrides.gni:372
+From //build/assembly/developer_overrides.gni:376
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -5545,7 +5545,7 @@ From //out/not-default/args.gn:26
 
 **Overridden from the default:** `[]`
 
-From //build/assembly/developer_overrides.gni:372
+From //build/assembly/developer_overrides.gni:376
 
 ### product_bootfs_packages
 
