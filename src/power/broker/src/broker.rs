@@ -1512,6 +1512,7 @@ impl ClaimLookup {
     }
 
     fn remove(&mut self, id: &ClaimID) -> Option<Claim> {
+        self.remove_from_claims_to_deactivate(id);
         let Some(claim) = self.claims.remove(id) else {
             return None;
         };
@@ -1529,7 +1530,6 @@ impl ClaimLookup {
                 self.claims_by_lease.remove(&claim.lease_id);
             }
         }
-        self.remove_from_claims_to_deactivate(id);
         Some(claim)
     }
 
@@ -1905,6 +1905,28 @@ mod tests {
             },
             &LeaseID::new(),
         )
+    }
+
+    #[fuchsia::test]
+    fn test_claim_lookup_add_remove() {
+        let mut lookup = ClaimLookup::new();
+
+        let claim_a_1_b_1 = create_test_claim("A".into(), 1, "B".into(), 1);
+        let claim_a_2_b_2 = create_test_claim("A".into(), 2, "B".into(), 2);
+
+        lookup.add(claim_a_1_b_1.clone());
+        lookup.add(claim_a_2_b_2.clone());
+
+        lookup.mark_to_deactivate(&claim_a_2_b_2.id);
+
+        assert_eq!(lookup.remove(&claim_a_1_b_1.id), Some(claim_a_1_b_1.clone()));
+        assert_eq!(lookup.remove(&claim_a_2_b_2.id), Some(claim_a_2_b_2.clone()));
+        assert_eq!(lookup.remove(&claim_a_2_b_2.id), None);
+
+        assert_eq!(lookup.claims.len(), 0);
+        assert_eq!(lookup.claims_by_required_element_id.len(), 0);
+        assert_eq!(lookup.claims_by_lease.len(), 0);
+        assert_eq!(lookup.claims_to_deactivate_by_element_id.len(), 0);
     }
 
     #[fuchsia::test]
