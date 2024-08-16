@@ -226,9 +226,10 @@ pub use internal::base::{
 };
 pub use internal::path_mtu::{PmtuCache, PmtuContext};
 pub use internal::reassembly::{FragmentContext, FragmentTimerId, IpPacketFragmentCache};
+pub use internal::routing::rules::RulesTable;
 pub use internal::routing::{
     request_context_add_route, request_context_del_routes, AddRouteError, IpRoutingDeviceContext,
-    RoutingTable, RulesTable,
+    RoutingTable,
 };
 pub use internal::types::{
     AddableEntry, AddableEntryEither, AddableMetric, Destination, Entry, EntryEither, Generation,

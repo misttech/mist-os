@@ -73,9 +73,8 @@ use crate::internal::reassembly::{
     FragmentBindingsTypes, FragmentHandler, FragmentProcessingState, FragmentTimerId,
     FragmentablePacket, IpPacketFragmentCache,
 };
-use crate::internal::routing::{
-    IpRoutingDeviceContext, RoutingTable, Rule, RuleAction, RulesTable,
-};
+use crate::internal::routing::rules::{Rule, RuleAction, RulesTable};
+use crate::internal::routing::{IpRoutingDeviceContext, RoutingTable};
 use crate::internal::socket::{IpSocketBindingsContext, IpSocketContext, IpSocketHandler};
 use crate::internal::types::{self, Destination, NextHop, ResolvedRoute, RoutableIpAddr};
 use crate::internal::{ipv6, multicast_forwarding};
