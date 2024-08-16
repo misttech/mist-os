@@ -372,6 +372,12 @@ SECTIONS
                "kcounters_arena size mismatch");
 
         *(SORT_BY_ALIGNMENT(.bss*))
+
+        /*
+         * Keep the .bss size aligned to 16 so the zeroing code can do
+         * store 16 bytes at a time without worrying about rounding.
+         */
+        . = ALIGN(16);
     }
 
     /*
