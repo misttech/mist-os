@@ -23,21 +23,14 @@
 # but each entry needs a ticket assigned to the assembly team with an agreed
 # upon solution for how to address the tech-debt.
 
+fuchsia_product_assembly_config_label = "//products/core"
+zedboot_product_assembly_config_label = "//products/zedboot"
+
 include_shell_commands_package = true
 
-legacy_base_package_labels = []
-legacy_cache_package_labels = []
-core_realm_shards = []
-
-legacy_cache_package_labels += [
+legacy_cache_package_labels = [
   "//src/media/codec/bundles:services",
   "//src/media/sessions/bundles:services",
 ]
 
 discoverable_package_labels = [ "//bundles/tools" ]
-
-# Use the product assembly config target to specify the product configuration.
-#
-# NOTE: This should be overridden by products which inherit from core.
-fuchsia_product_assembly_config_label = "//products/core"
-zedboot_product_assembly_config_label = "//products/zedboot"

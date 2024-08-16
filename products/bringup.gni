@@ -26,10 +26,4 @@
 use_bringup_assembly = true
 bootfs_only = true
 
-base_package_labels = []
-cache_package_labels = []
-universe_package_labels = []
-
-sdk_archive_labels = []
-
 zedboot_product_assembly_config_label = "//products/zedboot"
