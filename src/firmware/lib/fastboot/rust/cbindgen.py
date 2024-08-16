@@ -1,14 +1,16 @@
-#!/usr/bin/env python3
-# allow-non-vendored-python
-#
-# TODO(b/295039695): we use the host python3 here intentionally; this script
-# calls out into tools such as cbindgen that are not part of the Fuchsia repo
-# and must be installed to the local host so we cannot use the hermetic Fuchsia
-# python.
-
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+
+# This script intentionally does not have a shebang; it uses tools that are not
+# available in the Fuchsia repo and must be installed to the local host, so we
+# cannot use the hermetic Fuchsia Python. Since this script is rarely used, it's
+# also not worth the effort to import the tools and all the maintenance costs
+# that would come along with it (b/295039695).
+#
+# In order to avoid confusion, we remove the shebang to force the user to call
+# the script explicitly through a host Python installation; see README.md for
+# usage.
 
 import logging
 import os
