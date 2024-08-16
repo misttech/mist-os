@@ -9,3 +9,11 @@ group("tests") {
     "rust:tests",
   ]
 }
+
+group("ctf-tests") {
+  testonly = true
+  deps = [
+    "cc:ctf-tests",
+    "rust:ctf-tests",
+  ]
+}

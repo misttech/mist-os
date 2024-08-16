@@ -11,6 +11,11 @@ group("tests") {
   deps = [ ":fuchsia-examples-rust-tests-package" ]
 }
 
+group("ctf-tests") {
+  testonly = true
+  deps = [ ":fuchsia-examples-rust-tests_archive" ]
+}
+
 rustc_test("bin") {
   edition = "2021"
   source_root = "src/main.rs"

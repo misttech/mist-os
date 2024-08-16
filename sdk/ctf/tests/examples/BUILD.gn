@@ -17,7 +17,7 @@ group("tests") {
 
 group("ctf-tests") {
   testonly = true
-  deps = [ ":tests" ]
+  deps = [ "fidl:ctf-tests" ]
 }
 
 group("e2e_tests") {
