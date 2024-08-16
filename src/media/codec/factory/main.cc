@@ -14,7 +14,8 @@
 
 int main(int argc, char* argv[]) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  fuchsia_logging::SetTags({"codec_factory"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"codec_factory"}).BuildAndInitialize();
 
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher(), "codec_factory trace provider");
 

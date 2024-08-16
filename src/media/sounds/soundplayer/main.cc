@@ -11,7 +11,8 @@
 #include "src/media/sounds/soundplayer/sound_player_impl.h"
 
 int main(int argc, const char** argv) {
-  fuchsia_logging::SetTags({"soundplayer"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"soundplayer"}).BuildAndInitialize();
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
