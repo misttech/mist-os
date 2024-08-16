@@ -4,10 +4,13 @@
 
 use anyhow::{format_err, Context, Error};
 use cache_manager_config_lib::Config;
-use fuchsia_component::client as fclient;
+use fuchsia_component::{self, client as fclient};
 use std::process;
 use tracing::*;
-use {fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync};
+use {
+    component_framework_cache_metrics_registry as metrics, fidl_fuchsia_metrics,
+    fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
+};
 
 #[fuchsia::main(logging_tags=["cache_manager"])]
 async fn main() -> Result<(), Error> {
@@ -29,7 +32,10 @@ async fn main() -> Result<(), Error> {
     let storage_admin = fclient::connect_to_protocol::<fsys::StorageAdminMarker>()
         .context("failed opening storage admin")?;
 
-    monitor_storage(&storage_admin, config).await;
+    // Setup telemetry module
+    let cobalt_logger = setup_cobalt_proxy().await;
+
+    monitor_storage(&storage_admin, config, cobalt_logger).await;
     Ok(())
 }
 
@@ -49,7 +55,11 @@ impl StorageState {
     }
 }
 
-async fn monitor_storage(storage_admin: &fsys::StorageAdminProxy, config: Config) {
+async fn monitor_storage(
+    storage_admin: &fsys::StorageAdminProxy,
+    config: Config,
+    cobalt_logger: Option<fidl_fuchsia_metrics::MetricEventLoggerProxy>,
+) {
     // Sleep for the check interval, then see if we're over the clearing threshold.
     // If we are over the threshold, clear the cache. This panics if we lose the
     // connect to the StorageAdminProtocol.
@@ -97,6 +107,14 @@ async fn monitor_storage(storage_admin: &fsys::StorageAdminProxy, config: Config
         match clear_cache_storage(&storage_admin).await {
             Err(e) => match e.downcast_ref::<fidl::Error>() {
                 Some(fidl::Error::ClientChannelClosed { .. }) => {
+                    log_cobalt_occurence(
+                        &cobalt_logger,
+                        metrics::CACHE_EVICTION_METRIC_ID,
+                        &vec![
+                            metrics::CacheEvictionMetricDimensionResult::FailedChannelClosed as u32,
+                        ],
+                    )
+                    .await;
                     panic!(
                         "cache manager's storage admin channel closed while clearing storage \
                         is component manager dead?"
@@ -126,13 +144,25 @@ async fn monitor_storage(storage_admin: &fsys::StorageAdminProxy, config: Config
             Ok(u) => u,
         };
 
+        let mut unconditional_success = true;
+
         if storage_state.percent_used() > config.cache_clearing_threshold {
             warn!("storage usage still exceeds threshold after cache clearing, used_bytes={} total_bytes={}", storage_state.used_bytes, storage_state.total_bytes);
+            unconditional_success = false;
         }
 
         if storage_state_after.percent_used() >= storage_state.percent_used() {
             warn!("cache manager did not reduce storage pressure");
+            unconditional_success = false;
         }
+
+        let metric_dimensions = if unconditional_success {
+            vec![metrics::CacheEvictionMetricDimensionResult::Success as u32]
+        } else {
+            vec![metrics::CacheEvictionMetricDimensionResult::SuccessWithCaveats as u32]
+        };
+        log_cobalt_occurence(&cobalt_logger, metrics::CACHE_EVICTION_METRIC_ID, &metric_dimensions)
+            .await;
     }
 }
 
@@ -167,18 +197,67 @@ async fn clear_cache_storage(storage_admin: &fsys::StorageAdminProxy) -> Result<
         .map_err(|err| format_err!("protocol error clearing cache: {:?}", err))
 }
 
+async fn setup_cobalt_proxy() -> Option<fidl_fuchsia_metrics::MetricEventLoggerProxy> {
+    async fn setup_proxy_internal() -> Result<fidl_fuchsia_metrics::MetricEventLoggerProxy, Error> {
+        let cobalt_1dot1_svc = fuchsia_component::client::connect_to_protocol::<
+            fidl_fuchsia_metrics::MetricEventLoggerFactoryMarker,
+        >()
+        .context("failed to connect to metrics service")?;
+
+        let (cobalt_1dot1_proxy, cobalt_1dot1_server) =
+            fidl::endpoints::create_proxy::<fidl_fuchsia_metrics::MetricEventLoggerMarker>()
+                .context("failed to create MetricEventLoggerMarker endponts")?;
+
+        let project_spec = fidl_fuchsia_metrics::ProjectSpec {
+            customer_id: Some(metrics::CUSTOMER_ID),
+            project_id: Some(metrics::PROJECT_ID),
+            ..Default::default()
+        };
+
+        match cobalt_1dot1_svc.create_metric_event_logger(&project_spec, cobalt_1dot1_server).await
+        {
+            Ok(_) => Ok(cobalt_1dot1_proxy),
+            Err(err) => Err(format_err!("failed to create metrics event logger: {:?}", err)),
+        }
+    }
+
+    match setup_proxy_internal().await {
+        Ok(proxy) => Some(proxy),
+        Err(err) => {
+            warn!("Cobalt service unavailable, will discard all metrics: {}", err);
+            // This will only happen if Cobalt is very broken in some way. Using the disconnected
+            // proxy will result metrics failing to send, but it's preferable to run rather than
+            // panicking here.
+            None
+        }
+    }
+}
+
+async fn log_cobalt_occurence(
+    cobalt_logger: &Option<fidl_fuchsia_metrics::MetricEventLoggerProxy>,
+    metric_id: u32,
+    event_codes: &[u32],
+) {
+    if let Some(ref c) = cobalt_logger {
+        if let Err(e) = c.log_occurrence(metric_id, 1, event_codes).await {
+            warn!("Failed to log metrics: {:?}", e)
+        }
+    };
+}
+
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::monitor_storage;
     use cache_manager_config_lib::Config;
     use fidl::endpoints::{ClientEnd, ServerEnd};
+    use fidl_fuchsia_metrics::{MetricEvent, MetricEventLoggerRequest, MetricEventPayload};
     use fidl_fuchsia_sys2 as fsys;
     use fuchsia_async::{self as fasync, Duration, TestExecutor};
     use futures::channel::mpsc::{self as mpsc, UnboundedReceiver};
-    use futures::TryStreamExt;
+    use futures::{StreamExt, TryStreamExt};
     use std::future::Future;
     use std::pin::Pin;
-
     struct FakeStorageServer {
         storage_statuses: Vec<fsys::StorageStatus>,
         chan: ServerEnd<fsys::StorageAdminMarker>,
@@ -224,8 +303,15 @@ mod tests {
     fn common_setup(
         server: Option<FakeStorageServer>,
         client: ClientEnd<fsys::StorageAdminMarker>,
-    ) -> (UnboundedReceiver<CallType>, TestExecutor, Duration, fsys::StorageAdminProxy, Config)
-    {
+    ) -> (
+        UnboundedReceiver<CallType>,
+        TestExecutor,
+        Duration,
+        fsys::StorageAdminProxy,
+        Config,
+        fidl_fuchsia_metrics::MetricEventLoggerProxy,
+        fidl_fuchsia_metrics::MetricEventLoggerRequestStream,
+    ) {
         let (calls_tx, calls_rx) = futures::channel::mpsc::unbounded::<CallType>();
         let exec = TestExecutor::new_with_fake_time();
         let time_step = Duration::from_millis(5000);
@@ -237,7 +323,11 @@ mod tests {
             fasync::Task::spawn(server.run_server(calls_tx)).detach();
         }
         let client = client.into_proxy().unwrap();
-        (calls_rx, exec, time_step, client, config)
+        let (cobalt_client, cobalt_events) = fidl::endpoints::create_proxy_and_stream::<
+            fidl_fuchsia_metrics::MetricEventLoggerMarker,
+        >()
+        .unwrap();
+        (calls_rx, exec, time_step, client, config, cobalt_client, cobalt_events)
     }
 
     /// Advance the TestExecutor by |time_step| and wake expired timers.
@@ -246,6 +336,44 @@ mod tests {
             fasync::Time::from_nanos(exec.now().into_nanos() + time_step.clone().into_nanos());
         exec.set_fake_time(new_time);
         exec.wake_expired_timers();
+    }
+
+    /// Continually execute the future and respond to any incoming Cobalt request with Ok, returning
+    /// any logged Cobalt events.
+    fn drain_cobalt_events(
+        exec: &mut TestExecutor,
+        main_fut: &mut (impl Future + Unpin),
+        cobalt_stream: &mut fidl_fuchsia_metrics::MetricEventLoggerRequestStream,
+    ) -> Vec<MetricEvent> {
+        let mut cobalt_events = vec![];
+        let mut made_progress = true;
+        while made_progress {
+            let _result = exec.run_until_stalled(main_fut);
+            made_progress = false;
+            while let std::task::Poll::Ready(Some(Ok(req))) =
+                exec.run_until_stalled(&mut cobalt_stream.next())
+            {
+                match req {
+                    MetricEventLoggerRequest::LogOccurrence {
+                        metric_id,
+                        count,
+                        event_codes,
+                        responder,
+                    } => {
+                        assert!(responder.send(Ok(())).is_ok());
+                        cobalt_events.push(MetricEvent {
+                            metric_id,
+                            event_codes,
+                            payload: MetricEventPayload::Count(count),
+                        })
+                    }
+                    _ => panic!("unexpcted metric type"),
+                };
+
+                made_progress = true;
+            }
+        }
+        cobalt_events
     }
 
     #[test]
@@ -281,9 +409,9 @@ mod tests {
             chan: server_end,
         };
 
-        let (mut calls_rx, mut exec, time_step, client, config) =
+        let (mut calls_rx, mut exec, time_step, client, config, cobalt_client, mut cobalt_stream) =
             common_setup(Some(server), client_end);
-        let mut monitor = Box::pin(monitor_storage(&client, config));
+        let mut monitor = Box::pin(monitor_storage(&client, config, Some(cobalt_client)));
         let _ = exec.run_until_stalled(&mut monitor);
 
         // We expect no query sent to the capability provider since it sleeps first
@@ -311,6 +439,16 @@ mod tests {
 
         // Monitor checks after clearing storage
         assert_eq!(calls_rx.try_next().map_err(|_| ()), Ok(Some(CallType::Status)));
+
+        // Check for the Cobalt metrics
+        let cobalt_metrics = drain_cobalt_events(&mut exec, &mut monitor, &mut cobalt_stream);
+        assert_eq!(cobalt_metrics.len(), 1);
+        assert_eq!(cobalt_metrics[0].metric_id, metrics::CACHE_EVICTION_METRIC_ID);
+        assert_eq!(
+            cobalt_metrics[0].event_codes,
+            vec![metrics::CacheEvictionMetricDimensionResult::SuccessWithCaveats as u32]
+        );
+        assert_eq!(cobalt_metrics[0].payload, MetricEventPayload::Count(1));
 
         // No call is expected until the timer goes off
         assert_eq!(calls_rx.try_next().map_err(|_| ()), Err(()));
@@ -366,9 +504,9 @@ mod tests {
             chan: server_end,
         };
 
-        let (mut calls_rx, mut exec, time_step, client, config) =
+        let (mut calls_rx, mut exec, time_step, client, config, cobalt_client, mut cobalt_stream) =
             common_setup(Some(server), client_end);
-        let mut monitor = Box::pin(monitor_storage(&client, config));
+        let mut monitor = Box::pin(monitor_storage(&client, config, Some(cobalt_client)));
         let _ = exec.run_until_stalled(&mut monitor);
 
         // We expect no query sent to the capability provider since it sleeps first
@@ -397,6 +535,16 @@ mod tests {
         // Monitor checks after clearing storage
         assert_eq!(calls_rx.try_next().map_err(|_| ()), Ok(Some(CallType::Status)));
 
+        // Check for the Cobalt metrics
+        let cobalt_metrics = drain_cobalt_events(&mut exec, &mut monitor, &mut cobalt_stream);
+        assert_eq!(cobalt_metrics.len(), 1);
+        assert_eq!(cobalt_metrics[0].metric_id, metrics::CACHE_EVICTION_METRIC_ID);
+        assert_eq!(
+            cobalt_metrics[0].event_codes,
+            vec![metrics::CacheEvictionMetricDimensionResult::SuccessWithCaveats as u32]
+        );
+        assert_eq!(cobalt_metrics[0].payload, MetricEventPayload::Count(1));
+
         // No call is expected until the timer goes off
         assert_eq!(calls_rx.try_next().map_err(|_| ()), Err(()));
 
@@ -423,8 +571,9 @@ mod tests {
         let (client_end, server_end) =
             fidl::endpoints::create_endpoints::<fsys::StorageAdminMarker>();
 
-        let (mut _calls_rx, mut exec, time_step, client, config) = common_setup(None, client_end);
-        let mut monitor = Box::pin(monitor_storage(&client, config));
+        let (mut _calls_rx, mut exec, time_step, client, config, cobalt_client, mut _cobalt_stream) =
+            common_setup(None, client_end);
+        let mut monitor = Box::pin(monitor_storage(&client, config, Some(cobalt_client)));
         let _ = exec.run_until_stalled(&mut monitor);
 
         drop(server_end);

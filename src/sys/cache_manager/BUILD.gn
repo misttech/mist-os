@@ -5,6 +5,7 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 import("//src/sys/core/build/core_shard.gni")
+import("//third_party/cobalt/metrics_registry.gni")
 
 group("tests") {
   testonly = true
@@ -18,6 +19,8 @@ rustc_binary("bin") {
 
   deps = [
     ":cache_manager_config_lib",
+    ":component_framework_cache_metrics_registry_rustlib",
+    "//sdk/fidl/fuchsia.metrics:fuchsia.metrics_rust",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_rust",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
@@ -28,11 +31,19 @@ rustc_binary("bin") {
   ]
 
   test_deps = [
+    "//src/cobalt/bin/testing/mock_cobalt",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:futures",
   ]
 
   sources = [ "src/main.rs" ]
+}
+
+metrics_registry("component_framework_cache_metrics_registry") {
+  # This must match the ID of our Cobalt project as specified in:
+  # //third_party/cobalt_config/projects.yaml
+  project_id = 21
+  generate_rust = true  # Generates a rust target with '_rustlib' appended
 }
 
 fuchsia_component_manifest("cache_manager_component_manifest") {
