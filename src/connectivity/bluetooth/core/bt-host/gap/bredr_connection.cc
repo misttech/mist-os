@@ -11,7 +11,7 @@ namespace bt::gap {
 namespace {
 
 const char* const kInspectPeerIdPropertyName = "peer_id";
-const char* const kInspectPairingStateNodeName = "pairing_state_manager";
+const char* const kInspectPairingStateNodeName = "secure_simple_pairing_state";
 
 }  // namespace
 
@@ -103,15 +103,6 @@ void BrEdrConnection::AddRequestCallback(
 
   BT_ASSERT(request_);
   request_->AddCallback(std::move(cb));
-}
-
-void BrEdrConnection::CreateOrUpdatePairingState(
-    PairingStateManager::PairingStateType type,
-    const PairingDelegate::WeakPtr& pairing_delegate,
-    BrEdrSecurityMode security_mode) {
-  BT_ASSERT(pairing_state_manager_);
-  pairing_state_manager_->CreateOrUpdatePairingState(type, pairing_delegate);
-  set_security_mode(security_mode);
 }
 
 void BrEdrConnection::OpenL2capChannel(l2cap::Psm psm,
