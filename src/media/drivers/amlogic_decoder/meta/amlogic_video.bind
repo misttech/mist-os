@@ -10,7 +10,6 @@ using fuchsia.hardware.amlogiccanvas;
 using fuchsia.hardware.clock;
 using fuchsia.hardware.tee;
 using fuchsia.platform;
-using fuchsia.hardware.sysmem;
 using fuchsia.devicetree;
 
 primary node "pdev" {
@@ -31,10 +30,6 @@ primary node "pdev" {
       fuchsia.amlogic.platform.BIND_PLATFORM_DEV_PID.S905D3,
     }
   }
-}
-
-optional node "sysmem" {
-  fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }
 
 node "canvas" {

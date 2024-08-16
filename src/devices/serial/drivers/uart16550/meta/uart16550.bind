@@ -6,7 +6,6 @@ composite uart16550;
 
 using fuchsia.acpi;
 using fuchsia.hardware.interrupt;
-using fuchsia.hardware.sysmem;
 
 primary node "acpi" {
   fuchsia.BIND_PROTOCOL == fuchsia.acpi.BIND_PROTOCOL.DEVICE;
@@ -15,8 +14,4 @@ primary node "acpi" {
 
 node "irq000" {
   fuchsia.hardware.interrupt.Service == fuchsia.hardware.interrupt.Service.ZirconTransport;
-}
-
-optional node "sysmem" {
-  fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }

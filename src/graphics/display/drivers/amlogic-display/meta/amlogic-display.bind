@@ -9,7 +9,6 @@ using fuchsia.hardware.gpio;
 using fuchsia.gpio;
 using fuchsia.platform;
 using fuchsia.display;
-using fuchsia.hardware.sysmem;
 using fuchsia.amlogic.platform;
 using fuchsia.devicetree;
 
@@ -37,10 +36,6 @@ node "gpio-lcd-reset" {
 optional node "gpio-hdmi-hotplug-detect" {
   fuchsia.hardware.gpio.Service == fuchsia.hardware.gpio.Service.ZirconTransport;
   fuchsia.gpio.FUNCTION == fuchsia.gpio.FUNCTION.HDMI_HOTPLUG_DETECT;
-}
-
-optional node "sysmem" {
-  fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }
 
 node "canvas" {

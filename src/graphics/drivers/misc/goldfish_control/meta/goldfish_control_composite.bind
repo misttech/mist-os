@@ -7,7 +7,6 @@ composite goldfish_control_2;
 using fuchsia.google.platform;
 using fuchsia.hardware.goldfish;
 using fuchsia.hardware.goldfish.pipe;
-using fuchsia.hardware.sysmem;
 
 primary node "goldfish-pipe" {
     fuchsia.hardware.goldfish.pipe.Service == fuchsia.hardware.goldfish.pipe.Service.ZirconTransport;
@@ -22,8 +21,4 @@ node "goldfish-address-space" {
 
 node "goldfish-sync" {
     fuchsia.hardware.goldfish.SyncService == fuchsia.hardware.goldfish.SyncService.ZirconTransport;
-}
-
-optional node "sysmem" {
-    fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }

@@ -2,14 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-composite gizmo_sysmem;
+composite gizmo_pci;
 
+using fuchsia.hardware.pci;
 using fuchsia.hardware.tee;
 using fuchsia.platform;
-using fuchsia.sysmem;
 
-primary node "sysmem" {
-  fuchsia.BIND_PROTOCOL == fuchsia.sysmem.BIND_PROTOCOL.DEVICE;
+primary node "pci" {
+  fuchsia.hardware.pci.Service == fuchsia.hardware.pci.Service.ZirconTransport;
 }
 
 node "tee" {

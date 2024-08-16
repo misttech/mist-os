@@ -6,7 +6,6 @@ composite max98373;
 
 using fuchsia.acpi;
 using fuchsia.hardware.interrupt;
-using fuchsia.hardware.sysmem;
 using fuchsia.maxim.platform;
 
 primary node "acpi" {
@@ -21,8 +20,4 @@ primary node "acpi" {
 
 node "irq000" {
   fuchsia.hardware.interrupt.Service == fuchsia.hardware.interrupt.Service.ZirconTransport;
-}
-
-optional node "sysmem" {
-  fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }

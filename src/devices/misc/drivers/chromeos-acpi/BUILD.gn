@@ -25,7 +25,6 @@ driver_bind_rules("chromeos_acpi_bind") {
   tests = "meta/bind-tests.json"
   deps = [
     "//sdk/fidl/fuchsia.hardware.interrupt:fuchsia.hardware.interrupt_bindlib",
-    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
     "//src/devices/bind/fuchsia.acpi",
   ]
 }

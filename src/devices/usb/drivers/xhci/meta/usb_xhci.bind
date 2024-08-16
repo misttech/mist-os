@@ -12,7 +12,6 @@ using fuchsia.pci;
 using fuchsia.pci.serial;
 using fuchsia.pci.serial.usb;
 using fuchsia.platform;
-using fuchsia.hardware.sysmem;
 using fuchsia.usb.phy;
 using fuchsia.devicetree;
 
@@ -60,10 +59,6 @@ optional node "xhci-phy" {
   } else {
     false;
   }
-}
-
-optional node "sysmem" {
-  fuchsia.hardware.sysmem.Service == fuchsia.hardware.sysmem.Service.ZirconTransport;
 }
 
 optional node "acpi" {
