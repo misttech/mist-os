@@ -50,15 +50,4 @@ const char* EncryptionStatusToString(
   return "(Unknown)";
 }
 
-const char* PairingStateTypeToString(PairingStateType type) {
-  switch (type) {
-    case PairingStateType::kSecureSimplePairing:
-      return "SecureSimplePairing";
-    case PairingStateType::kLegacyPairing:
-      return "LegacyPairing";
-    case PairingStateType::kUnknown:
-      return "Unknown";
-  };
-}
-
 }  // namespace bt::gap
