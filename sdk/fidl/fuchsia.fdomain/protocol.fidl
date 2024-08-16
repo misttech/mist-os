@@ -23,6 +23,11 @@ type HandleInfo = struct {
     rights Rights;
 };
 
+// A return value indicating asynchronous IO has stopped, optionally with an error.
+type AioStopped = struct {
+    error Error:optional;
+};
+
 type Error = flexible union {
     // An error produced by interacting with the handle itself. Value should
     // translate to a zx.Status.

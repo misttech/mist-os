@@ -389,60 +389,64 @@ impl ClientInner {
                     header, data,
                 )?;
                 if let Entry::Occupied(mut o) = self.socket_read_subscriptions.entry(msg.handle) {
-                    let failed_send = match msg.socket_message {
+                    match msg.socket_message {
                         proto::SocketMessage::Data(data) => {
-                            o.get_mut().unbounded_send(Ok(data.clone())).is_err()
+                            if o.get_mut().unbounded_send(Ok(data.clone())).is_err() {
+                                let _ = o.remove();
+                                self.request(
+                                    ordinals::READ_SOCKET_STREAMING_STOP,
+                                    proto::SocketReadSocketStreamingStopRequest {
+                                        handle: msg.handle,
+                                    },
+                                    Responder::Ignore,
+                                )?;
+                            }
+                            Ok(())
                         }
-                        proto::SocketMessage::Error(e) => {
-                            o.get_mut().unbounded_send(Err(e)).is_err()
+                        proto::SocketMessage::Stopped(proto::AioStopped { error }) => {
+                            let o = o.remove();
+                            if let Some(error) = error {
+                                let _ = o.unbounded_send(Err(*error));
+                            }
+                            Ok(())
                         }
-                        proto::SocketMessage::SocketReadStopped(_) => {
-                            let _ = o.remove();
-                            return Ok(());
-                        }
-                        _ => return Err(InnerError::ProtocolStreamEventIncompatible),
-                    };
-
-                    if failed_send {
-                        let _ = o.remove();
-                        self.request(
-                            ordinals::READ_SOCKET_STREAMING_STOP,
-                            proto::SocketReadSocketStreamingStopRequest { handle: msg.handle },
-                            Responder::Ignore,
-                        )?;
+                        _ => Err(InnerError::ProtocolStreamEventIncompatible),
                     }
+                } else {
+                    Ok(())
                 }
-                Ok(())
             }
             ordinals::ON_CHANNEL_STREAMING_DATA => {
                 let msg = fidl_message::decode_message::<
                     proto::ChannelOnChannelStreamingDataRequest,
                 >(header, data)?;
                 if let Entry::Occupied(mut o) = self.channel_read_subscriptions.entry(msg.handle) {
-                    let failed_send = match msg.channel_sent {
+                    match msg.channel_sent {
                         proto::ChannelSent::Message(data) => {
-                            o.get_mut().unbounded_send(Ok(data.clone())).is_err()
+                            if o.get_mut().unbounded_send(Ok(data.clone())).is_err() {
+                                let _ = o.remove();
+                                self.request(
+                                    ordinals::READ_CHANNEL_STREAMING_STOP,
+                                    proto::ChannelReadChannelStreamingStopRequest {
+                                        handle: msg.handle,
+                                    },
+                                    Responder::Ignore,
+                                )?;
+                            }
+                            Ok(())
                         }
-                        proto::ChannelSent::ReadError(e) => {
-                            o.get_mut().unbounded_send(Err(e)).is_err()
+                        proto::ChannelSent::Stopped(proto::AioStopped { error }) => {
+                            let o = o.remove();
+                            if let Some(error) = error {
+                                let _ = o.unbounded_send(Err(*error));
+                            }
+                            Ok(())
                         }
-                        proto::ChannelSent::ChannelReadStopped(_) => {
-                            let _ = o.remove();
-                            return Ok(());
-                        }
-                        _ => return Err(InnerError::ProtocolStreamEventIncompatible),
-                    };
-
-                    if failed_send {
-                        let _ = o.remove();
-                        self.request(
-                            ordinals::READ_CHANNEL_STREAMING_STOP,
-                            proto::ChannelReadChannelStreamingStopRequest { handle: msg.handle },
-                            Responder::Ignore,
-                        )?;
+                        _ => Err(InnerError::ProtocolStreamEventIncompatible),
                     }
+                } else {
+                    Ok(())
                 }
-                Ok(())
             }
             _ => Err(::fidl::Error::UnknownOrdinal {
                 ordinal: header.ordinal,

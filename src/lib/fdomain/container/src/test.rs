@@ -1127,21 +1127,12 @@ async fn socket_async_read_detect_close() {
 
     let FDomainEvent::SocketStreamingData(proto::SocketOnSocketStreamingDataRequest {
         handle: got_handle,
-        socket_message: proto::SocketMessage::Error(proto::Error::TargetError(err)),
+        socket_message: proto::SocketMessage::Stopped(proto::AioStopped { error: Some(err) }),
     }) = fdomain.next().await.unwrap()
     else {
         panic!()
     };
-    assert_eq!(err, zx::Status::PEER_CLOSED.into_raw());
-    assert_eq!(hid_b, got_handle);
-
-    let FDomainEvent::SocketStreamingData(proto::SocketOnSocketStreamingDataRequest {
-        handle: got_handle,
-        socket_message: proto::SocketMessage::SocketReadStopped(proto::SocketReadStopped),
-    }) = fdomain.next().await.unwrap()
-    else {
-        panic!()
-    };
+    assert_eq!(*err, proto::Error::TargetError(zx::Status::PEER_CLOSED.into_raw()));
     assert_eq!(hid_b, got_handle);
 }
 
@@ -1397,21 +1388,12 @@ async fn channel_async_read_detect_close() {
 
     let FDomainEvent::ChannelStreamingData(proto::ChannelOnChannelStreamingDataRequest {
         handle: got_handle,
-        channel_sent: proto::ChannelSent::ReadError(proto::Error::TargetError(err)),
+        channel_sent: proto::ChannelSent::Stopped(proto::AioStopped { error: Some(err) }),
     }) = fdomain.next().await.unwrap()
     else {
         panic!()
     };
-    assert_eq!(err, zx::Status::PEER_CLOSED.into_raw());
-    assert_eq!(hid_b, got_handle);
-
-    let FDomainEvent::ChannelStreamingData(proto::ChannelOnChannelStreamingDataRequest {
-        handle: got_handle,
-        channel_sent: proto::ChannelSent::ChannelReadStopped(proto::ChannelReadStopped),
-    }) = fdomain.next().await.unwrap()
-    else {
-        panic!()
-    };
+    assert_eq!(*err, proto::Error::TargetError(zx::Status::PEER_CLOSED.into_raw()));
     assert_eq!(hid_b, got_handle);
 }
 
