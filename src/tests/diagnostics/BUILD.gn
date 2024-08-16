@@ -45,6 +45,7 @@ group("tests") {
 
 fuchsia_unittest_package("fshost-metrics-tests") {
   manifest = "meta/fshost_metrics_tests.cml"
+  test_type = "system"
 
   test_specs = {
     environments = [
@@ -60,6 +61,7 @@ fuchsia_unittest_package("fshost-metrics-tests") {
 
 fuchsia_unittest_package("fshost-blobfs-metrics-tests") {
   manifest = "meta/fshost_blobfs_metrics_tests.cml"
+  test_type = "system"
 
   test_specs = {
     environments = [
@@ -75,6 +77,7 @@ fuchsia_unittest_package("fshost-blobfs-metrics-tests") {
 
 fuchsia_unittest_package("fshost-fxfs-metrics-tests") {
   manifest = "meta/fshost_fxfs_metrics_tests.cml"
+  test_type = "system"
 
   test_specs = {
     environments = [
@@ -90,6 +93,7 @@ fuchsia_unittest_package("fshost-fxfs-metrics-tests") {
 
 fuchsia_unittest_package("fshost-minfs-metrics-tests") {
   manifest = "meta/fshost_minfs_metrics_tests.cml"
+  test_type = "system"
 
   test_specs = {
     environments = [
@@ -105,6 +109,7 @@ fuchsia_unittest_package("fshost-minfs-metrics-tests") {
 
 fuchsia_unittest_package("component-manager-status-tests") {
   manifest = "meta/component_manager_status_tests.cml"
+  test_type = "system"
 
   test_specs = {
     environments = [
@@ -120,6 +125,7 @@ fuchsia_unittest_package("component-manager-status-tests") {
 
 fuchsia_unittest_package("component-manager-cpu-stats-tests") {
   manifest = "meta/component_manager_cpu_stats_tests.cml"
+  test_type = "system"
 
   test_specs = {
     environments = [
@@ -135,6 +141,7 @@ fuchsia_unittest_package("component-manager-cpu-stats-tests") {
 
 fuchsia_unittest_package("archivist-feedback-health-tests") {
   manifest = "meta/archivist_feedback_health_tests.cml"
+  test_type = "system"
 
   test_specs = {
     environments = [
@@ -150,6 +157,7 @@ fuchsia_unittest_package("archivist-feedback-health-tests") {
 
 fuchsia_unittest_package("archivist-pipeline-metrics-tests") {
   manifest = "meta/archivist_pipeline_metrics_tests.cml"
+  test_type = "system"
 
   test_specs = {
     environments = [
@@ -165,6 +173,7 @@ fuchsia_unittest_package("archivist-pipeline-metrics-tests") {
 
 fuchsia_unittest_package("archivist-sampler-metrics-tests") {
   manifest = "meta/archivist_sampler_metrics_tests.cml"
+  test_type = "system"
 
   test_specs = {
     environments = [
@@ -180,6 +189,7 @@ fuchsia_unittest_package("archivist-sampler-metrics-tests") {
 
 fuchsia_unittest_package("legacy-metrics-tests") {
   manifest = "meta/legacy_metrics_tests.cml"
+  test_type = "system"
 
   test_specs = {
     environments = [
@@ -194,6 +204,7 @@ fuchsia_unittest_package("legacy-metrics-tests") {
 
 fuchsia_unittest_package("diagnostics-kcounter-inspect-tests") {
   manifest = "meta/diagnostics_kcounter_inspect_tests.cml"
+  test_type = "system"
 
   test_specs = {
     environments = [
@@ -209,6 +220,7 @@ fuchsia_unittest_package("diagnostics-kcounter-inspect-tests") {
 
 fuchsia_unittest_package("diagnostics-persistence-inspect-tests") {
   manifest = "meta/persistence_tests.cml"
+  test_type = "system"
 
   test_specs = {
     environments = [
@@ -224,6 +236,7 @@ fuchsia_unittest_package("diagnostics-persistence-inspect-tests") {
 
 fuchsia_unittest_package("netstack-inspect-tests") {
   manifest = "meta/netstack_tests.cml"
+  test_type = "system"
 
   test_specs = {
     environments = all_fuchsia_envs
@@ -232,6 +245,7 @@ fuchsia_unittest_package("netstack-inspect-tests") {
 
 fuchsia_unittest_package("netstack-feedback-inspect-tests") {
   manifest = "meta/netstack_feedback_tests.cml"
+  test_type = "system"
 
   test_specs = {
     environments = [
