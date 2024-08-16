@@ -8,6 +8,19 @@ import("//build/fidl/fidl.gni")
 import("//build/rust/rustc_binary.gni")
 import("//sdk/ctf/build/ctf.gni")
 
+group("tests") {
+  testonly = true
+  deps = [
+    ":ctf-tests",
+    ":fuchsia-intl-tests-latest",
+  ]
+}
+
+group("ctf-tests") {
+  testonly = true
+  deps = [ ":fuchsia-intl-tests_archive" ]
+}
+
 rustc_test("bin") {
   edition = "2021"
   source_root = "src/main.rs"
@@ -50,13 +63,5 @@ fuchsia_test_package("fuchsia-intl-tests-latest") {
   subpackages = [
     "testing/realm-factory",
     ":fuchsia-intl-tests",
-  ]
-}
-
-group("tests") {
-  testonly = true
-  deps = [
-    ":fuchsia-intl-tests-latest",
-    ":fuchsia-intl-tests_archive",
   ]
 }

@@ -8,9 +8,14 @@ import("//sdk/ctf/build/ctf.gni")
 group("tests") {
   testonly = true
   deps = [
+    ":ctf-tests",
     ":fuchsia-driver-test_tests-package",
-    ":fuchsia-driver-test_tests_archive",
   ]
+}
+
+group("ctf-tests") {
+  testonly = true
+  deps = [ ":fuchsia-driver-test_tests_archive" ]
 }
 
 executable("bin") {

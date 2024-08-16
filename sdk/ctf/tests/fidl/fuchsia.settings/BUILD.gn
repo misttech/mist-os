@@ -4,6 +4,19 @@
 
 import("//sdk/ctf/build/ctf.gni")
 
+group("tests") {
+  testonly = true
+  deps = [
+    ":ctf-tests",
+    ":fuchsia-settings-tests-package",
+  ]
+}
+
+group("ctf-tests") {
+  testonly = true
+  deps = [ ":fuchsia-settings-tests_archive" ]
+}
+
 executable("settings_test_bin") {
   testonly = true
 
@@ -45,13 +58,5 @@ fuchsia_test_package("fuchsia-settings-tests-package") {
   subpackages = [
     ":fuchsia-settings-tests",
     "testing/realm-factory",
-  ]
-}
-
-group("tests") {
-  testonly = true
-  deps = [
-    ":fuchsia-settings-tests-package",
-    ":fuchsia-settings-tests_archive",
   ]
 }

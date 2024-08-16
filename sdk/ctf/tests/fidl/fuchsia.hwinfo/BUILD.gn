@@ -5,6 +5,19 @@
 import("//build/components.gni")
 import("//sdk/ctf/build/ctf.gni")
 
+group("tests") {
+  testonly = true
+  deps = [
+    ":ctf-tests",
+    ":fuchsia-hwinfo-tests-package",
+  ]
+}
+
+group("ctf-tests") {
+  testonly = true
+  deps = [ ":fuchsia-hwinfo-tests_archive" ]
+}
+
 executable("hwinfo-test-bin") {
   output_name = "hwinfo-test"
   testonly = true
@@ -46,12 +59,4 @@ fuchsia_test_package("fuchsia-hwinfo-tests-package") {
       max_severity = "ERROR"
     }
   }
-}
-
-group("tests") {
-  testonly = true
-  deps = [
-    ":fuchsia-hwinfo-tests-package",
-    ":fuchsia-hwinfo-tests_archive",
-  ]
 }

@@ -18,5 +18,13 @@ group("tests") {
 
 group("ctf-tests") {
   testonly = true
-  deps = [ ":tests" ]
+  deps = [
+    "fuchsia.diagnostics:ctf-tests",
+    "fuchsia.driver.test:ctf-tests",
+    "fuchsia.element:ctf-tests",
+    "fuchsia.hwinfo:ctf-tests",
+    "fuchsia.intl:ctf-tests",
+    "fuchsia.settings:ctf-tests",
+    "fuchsia.ui.composition:ctf-tests",
+  ]
 }

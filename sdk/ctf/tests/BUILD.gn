@@ -32,7 +32,8 @@ group("ctf-tests") {
   # further changes.
   deps = [
     "examples:ctf-tests",
-    # "fidl:ctf-tests",
+    "fidl:ctf-tests",
+
     # "pkg:ctf-tests",
     # # Tests defined outside of //sdk/ctf
     # "//src/connectivity/wlan/testing/hw-sim/test:ctf-tests",

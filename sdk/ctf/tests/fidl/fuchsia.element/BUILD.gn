@@ -5,6 +5,19 @@
 import("//build/components.gni")
 import("//sdk/ctf/build/ctf.gni")
 
+group("tests") {
+  testonly = true
+  deps = [
+    ":ctf-tests",
+    ":fuchsia-element-tests-latest",
+  ]
+}
+
+group("ctf-tests") {
+  testonly = true
+  deps = [ ":fuchsia-element-tests_archive" ]
+}
+
 executable("element-manager-test-bin") {
   output_name = "element-manager-test"
   testonly = true
@@ -43,13 +56,5 @@ fuchsia_test_package("fuchsia-element-tests-latest") {
   subpackages = [
     "testing/realm-factory",
     ":fuchsia-element-tests",
-  ]
-}
-
-group("tests") {
-  testonly = true
-  deps = [
-    ":fuchsia-element-tests-latest",
-    ":fuchsia-element-tests_archive",
   ]
 }
