@@ -40,7 +40,6 @@ pub trait SenderReceiverProvider {
 pub(crate) mod testutil {
     use super::*;
     use futures::{FutureExt as _, StreamExt as _};
-    use std::marker::PhantomData;
 
     #[derive(Clone, Debug, PartialEq, Eq)]
     pub(crate) struct SentMessage<M> {
@@ -96,25 +95,5 @@ pub(crate) mod testutil {
     pub(crate) fn fake_sender_with_sink<M>() -> (FakeSender<M>, FakeSenderSink<M>) {
         let (sender, receiver) = futures::channel::mpsc::unbounded();
         (FakeSender { sender }, FakeSenderSink { receiver })
-    }
-
-    #[allow(dead_code)] // TODO(https://fxbug.dev/351850689)
-    #[derive(Debug)]
-    pub(crate) struct FakeReceiver<M>(PhantomData<M>);
-
-    impl<M> Default for FakeReceiver<M> {
-        fn default() -> Self {
-            FakeReceiver(PhantomData)
-        }
-    }
-
-    impl<M> Stream for FakeReceiver<M> {
-        type Item = NetlinkMessage<M>;
-        fn poll_next(
-            self: std::pin::Pin<&mut Self>,
-            _cx: &mut std::task::Context<'_>,
-        ) -> std::task::Poll<Option<Self::Item>> {
-            std::task::Poll::Ready(None)
-        }
     }
 }
