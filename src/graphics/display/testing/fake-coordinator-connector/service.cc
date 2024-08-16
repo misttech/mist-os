@@ -35,32 +35,6 @@ FakeDisplayCoordinatorConnector::~FakeDisplayCoordinatorConnector() {
   state_->fake_display_stack->SyncShutdown();
 }
 
-void FakeDisplayCoordinatorConnector::OpenCoordinatorForPrimary(
-    OpenCoordinatorForPrimaryRequest& request,
-    OpenCoordinatorForPrimaryCompleter::Sync& completer) {
-  ConnectOrDeferClient(OpenCoordinatorRequest{
-      .is_virtcon = false,
-      .coordinator_request = std::move(request.coordinator()),
-      .coordinator_listener_client_end = {},
-      .on_coordinator_opened =
-          [async_completer = completer.ToAsync()](zx_status_t status) mutable {
-            async_completer.Reply({{.s = status}});
-          },
-  });
-}
-
-void FakeDisplayCoordinatorConnector::OpenCoordinatorForVirtcon(
-    OpenCoordinatorForVirtconRequest& request,
-    OpenCoordinatorForVirtconCompleter::Sync& completer) {
-  ConnectOrDeferClient(OpenCoordinatorRequest{
-      .is_virtcon = true,
-      .coordinator_request = std::move(request.coordinator()),
-      .coordinator_listener_client_end = {},
-      .on_coordinator_opened = [async_completer = completer.ToAsync()](zx_status_t status) mutable {
-        async_completer.Reply({{.s = status}});
-      }});
-}
-
 void FakeDisplayCoordinatorConnector::OpenCoordinatorWithListenerForPrimary(
     OpenCoordinatorWithListenerForPrimaryRequest& request,
     OpenCoordinatorWithListenerForPrimaryCompleter::Sync& completer) {

@@ -113,14 +113,9 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
   // Binds the `Client` to the server-side channel of the `Coordinator`
   // protocol.
   //
-  // If `coordinator_listener_client_end` is valid, display events will be
-  // emitted by the `CoordinatorListener` client. Otherwise, events are
-  // emitted by the `Coordinator` server.
-  //
   // Must be called exactly once in production code.
   //
-  // TODO(https://fxbug.dev/355334166): Require `coordinator_listener_client_end`
-  // to be valid once all clients are migrated to use `CoordinatorListener`.
+  // `coordinator_server_end` and `coordinator_listener_client_end` must be valid.
   fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> Bind(
       fidl::ServerEnd<fuchsia_hardware_display::Coordinator> coordinator_server_end,
       fidl::ClientEnd<fuchsia_hardware_display::CoordinatorListener>

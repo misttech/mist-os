@@ -825,20 +825,6 @@ display::DriverBufferCollectionId Controller::GetNextDriverBufferCollectionId() 
   return next_driver_buffer_collection_id_++;
 }
 
-void Controller::OpenCoordinatorForVirtcon(OpenCoordinatorForVirtconRequestView request,
-                                           OpenCoordinatorForVirtconCompleter::Sync& completer) {
-  completer.Reply(CreateClient(ClientPriority::kVirtcon, std::move(request->coordinator),
-                               /*coordinator_listener_client_end=*/{},
-                               /*on_client_disconnected=*/[] {}));
-}
-
-void Controller::OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequestView request,
-                                           OpenCoordinatorForPrimaryCompleter::Sync& completer) {
-  completer.Reply(CreateClient(ClientPriority::kPrimary, std::move(request->coordinator),
-                               /*coordinator_listener_client_end=*/{},
-                               /*on_client_disconnected=*/[] {}));
-}
-
 void Controller::OpenCoordinatorWithListenerForVirtcon(
     OpenCoordinatorWithListenerForVirtconRequestView request,
     OpenCoordinatorWithListenerForVirtconCompleter::Sync& completer) {

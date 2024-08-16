@@ -1556,19 +1556,16 @@ fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> Client::Bind(
     fidl::ClientEnd<fuchsia_hardware_display::CoordinatorListener> coordinator_listener_client_end,
     fidl::OnUnboundFn<Client> unbound_callback) {
   ZX_DEBUG_ASSERT(!running_);
+  ZX_DEBUG_ASSERT(coordinator_server_end.is_valid());
+  ZX_DEBUG_ASSERT(coordinator_listener_client_end.is_valid());
   running_ = true;
 
   // Keep a copy of fidl binding so we can safely unbind from it during shutdown
   binding_ = fidl::BindServer(controller_->client_dispatcher()->async_dispatcher(),
                               std::move(coordinator_server_end), this, std::move(unbound_callback));
 
-  // TODO(https://fxbug.dev/355334166): Require `coordinator_listener_client_end`
-  // to be valid once we remove the old `OpenCoordinatorForPrimary/Virtcon`
-  // methods.
-  if (coordinator_listener_client_end.is_valid()) {
-    coordinator_listener_.Bind(std::move(coordinator_listener_client_end),
-                               controller_->client_dispatcher()->async_dispatcher());
-  }
+  coordinator_listener_.Bind(std::move(coordinator_listener_client_end),
+                             controller_->client_dispatcher()->async_dispatcher());
 
   return *binding_;
 }

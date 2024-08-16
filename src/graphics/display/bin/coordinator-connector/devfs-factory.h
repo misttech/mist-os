@@ -45,10 +45,6 @@ class DevFsCoordinatorFactory : public fidl::Server<fuchsia_hardware_display::Pr
   DevFsCoordinatorFactory& operator=(DevFsCoordinatorFactory&&) = delete;
 
   // `fidl::Server<fuchsia_hardware_display::Provider>`
-  void OpenCoordinatorForVirtcon(OpenCoordinatorForVirtconRequest& request,
-                                 OpenCoordinatorForVirtconCompleter::Sync& completer) override;
-  void OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequest& request,
-                                 OpenCoordinatorForPrimaryCompleter::Sync& completer) override;
   void OpenCoordinatorWithListenerForVirtcon(
       OpenCoordinatorWithListenerForVirtconRequest& request,
       OpenCoordinatorWithListenerForVirtconCompleter::Sync& completer) override;
@@ -57,13 +53,6 @@ class DevFsCoordinatorFactory : public fidl::Server<fuchsia_hardware_display::Pr
       OpenCoordinatorWithListenerForPrimaryCompleter::Sync& completer) override;
 
  private:
-  // Opens fuchsia.hardware.display.Coordinator service for a primary client
-  // at service located at "dir/filename" using the server end channel
-  // `coordinator_server`.
-  static zx_status_t OpenCoordinatorForPrimaryOnDevice(
-      const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename,
-      fidl::ServerEnd<fuchsia_hardware_display::Coordinator> coordinator_server);
-
   // Opens fuchsia.hardware.display.Coordinator service for a primary client
   // at service located at "dir/filename" using the server end channel
   // `coordinator_server` and listener client end channel `listener_client`.

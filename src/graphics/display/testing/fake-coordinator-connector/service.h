@@ -41,10 +41,6 @@ class FakeDisplayCoordinatorConnector : public fidl::Server<fuchsia_hardware_dis
   FakeDisplayCoordinatorConnector operator=(FakeDisplayCoordinatorConnector&&) = delete;
 
   // `fidl::Server<fuchsia_hardware_display::Provider>`
-  void OpenCoordinatorForVirtcon(OpenCoordinatorForVirtconRequest& request,
-                                 OpenCoordinatorForVirtconCompleter::Sync& completer) override;
-  void OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequest& request,
-                                 OpenCoordinatorForPrimaryCompleter::Sync& completer) override;
   void OpenCoordinatorWithListenerForVirtcon(
       OpenCoordinatorWithListenerForVirtconRequest& request,
       OpenCoordinatorWithListenerForVirtconCompleter::Sync& completer) override;

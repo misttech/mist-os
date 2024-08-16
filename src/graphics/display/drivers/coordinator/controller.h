@@ -173,10 +173,7 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
 
   display::DriverBufferCollectionId GetNextDriverBufferCollectionId();
 
-  void OpenCoordinatorForVirtcon(OpenCoordinatorForVirtconRequestView request,
-                                 OpenCoordinatorForVirtconCompleter::Sync& completer) override;
-  void OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequestView request,
-                                 OpenCoordinatorForPrimaryCompleter::Sync& completer) override;
+  // `fidl::WireServer<fuchsia_hardware_display::Provider>`:
   void OpenCoordinatorWithListenerForVirtcon(
       OpenCoordinatorWithListenerForVirtconRequestView request,
       OpenCoordinatorWithListenerForVirtconCompleter::Sync& completer) override;
