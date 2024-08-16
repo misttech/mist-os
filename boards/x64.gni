@@ -48,7 +48,6 @@ board_package_labels += [
 platform_enable_user_pci = true
 
 partitions_config_label = "//boards/partitions:x64"
-partitions_config_contents = [ "$root_build_dir/fuchsia.esp.blk" ]
 
 use_vbmeta = true
 avb_key =

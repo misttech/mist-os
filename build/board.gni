@@ -59,7 +59,6 @@ declare_args() {
   # The partitions config information used to create an update package and
   # product bundle.
   partitions_config_label = false
-  partitions_config_contents = []
 }
 
 declare_args() {
