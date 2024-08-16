@@ -36,6 +36,9 @@ void ContentSizeManager::Operation::ShrinkSizeLocked(uint64_t new_size) {
   // This function may only be called on expanding content write operations.
   ASSERT(type_ == OperationType::Append || type_ == OperationType::Write);
   ASSERT(new_size <= size_);
+#if DEBUG_ASSERT_IMPLEMENTED
+  DEBUG_ASSERT(new_size >= committed_content_size_);
+#endif
 
   size_ = new_size;
 }
@@ -48,6 +51,9 @@ void ContentSizeManager::Operation::CommitLocked() {
 
 void ContentSizeManager::Operation::CancelLocked() {
   DEBUG_ASSERT(IsValid());
+#if DEBUG_ASSERT_IMPLEMENTED
+  DEBUG_ASSERT(committed_content_size_ == 0);
+#endif
 
   parent()->DequeueOperationLocked(this);
 }
@@ -57,6 +63,9 @@ void ContentSizeManager::Operation::UpdateContentSizeFromProgress(uint64_t new_c
   DEBUG_ASSERT(type_ == OperationType::Write || type_ == OperationType::Append);
   DEBUG_ASSERT(new_content_size <= size_);
   DEBUG_ASSERT(new_content_size > parent_->GetContentSize());
+#if DEBUG_ASSERT_IMPLEMENTED
+  committed_content_size_ = new_content_size;
+#endif
 
   parent_->SetContentSize(new_content_size);
 }

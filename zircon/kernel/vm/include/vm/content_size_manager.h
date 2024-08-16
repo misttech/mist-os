@@ -128,7 +128,9 @@ class ContentSizeManager : public fbl::RefCounted<ContentSizeManager> {
     //  * This must only be called when holding the parent `ContentSizeManager` lock.
     void CancelLocked() TA_REQ(parent()->lock());
 
-    // Updates the content size when progress is made from the operation.
+    // Updates the content size when progress is made from the operation. Once this has been called
+    // it is invalid to call CancelLocked or to call ShrinkSizeLocked with a size less than the
+    // content size provided here.
     //
     // Note:
     //  * This may only be called on a valid `Append` or `Write` operation.
@@ -151,6 +153,12 @@ class ContentSizeManager : public fbl::RefCounted<ContentSizeManager> {
     // Holds the target size. For appends, this will only be valid once the operation is at the head
     // of the queue.
     uint64_t size_;
+
+    // Tracks any content size updated this operation performed. This is used to ensure that an
+    // operation is not cancelled or shrunk beyond any published content size updates.
+#if DEBUG_ASSERT_IMPLEMENTED
+    uint64_t committed_content_size_ = 0;
+#endif
 
     Event ready_event_;
   };
