@@ -2396,32 +2396,6 @@ mod tests {
         EmptyBuf.shrink_front(0);
         EmptyBuf.shrink_back(0);
 
-        #[allow(dead_code)] // TODO(https://fxbug.dev/351850199)
-        struct DummyParsablePacket;
-        impl<B: ByteSlice> ParsablePacket<B, ()> for DummyParsablePacket {
-            type Error = Never;
-
-            fn parse<BV: BufferView<B>>(buffer: BV, _args: ()) -> Result<Self, Self::Error> {
-                assert_eq!(buffer.as_ref(), []);
-                Ok(DummyParsablePacket)
-            }
-
-            fn parse_mut<BV: BufferViewMut<B>>(
-                mut buffer: BV,
-                _args: (),
-            ) -> Result<Self, Self::Error>
-            where
-                B: ByteSliceMut,
-            {
-                assert_eq!(buffer.as_mut(), []);
-                Ok(DummyParsablePacket)
-            }
-
-            fn parse_metadata(&self) -> ParseMetadata {
-                unimplemented!()
-            }
-        }
-
         // Test Buffer impl
 
         assert_eq!(EmptyBuf.prefix_len(), 0);
