@@ -154,12 +154,6 @@ assembly_input_bundle("embeddable") {
       package_target = "//src/devices/bus/drivers/platform:package"
       driver_components = [ "meta/platform-bus.cm" ]
     },
-
-    # TODO: Move this to bootstrap after fixing pci to not depend on it.
-    {
-      package_target = "//src/devices/sysmem/drivers/sysmem:package"
-      driver_components = [ "meta/sysmem.cm" ]
-    },
   ]
 }
 
@@ -287,6 +281,10 @@ assembly_input_bundle("bootstrap") {
     {
       package_target = "//src/devices/spi/drivers/spi:package"
       driver_components = [ "meta/spi.cm" ]
+    },
+    {
+      package_target = "//src/devices/sysmem/drivers/sysmem:package"
+      driver_components = [ "meta/sysmem.cm" ]
     },
     {
       package_target = "//src/devices/usb/drivers/usb-bus:package"
