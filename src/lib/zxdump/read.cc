@@ -620,6 +620,10 @@ class TaskHolder::JobTree {
   static constexpr auto kDuplicate =
       fit::error(Error{"duplicate job KOID", ZX_ERR_IO_DATA_INTEGRITY});
 
+  template <>
+  constexpr fit::error<Error> kDuplicate<Process> =
+      fit::error(Error{"duplicate process KOID", ZX_ERR_IO_DATA_INTEGRITY});
+
   static constexpr auto kChildNotFound = fit::error{Error{"zx_object_get_child", ZX_ERR_NOT_FOUND}};
 
   static constexpr auto kWrongType =
@@ -628,8 +632,20 @@ class TaskHolder::JobTree {
   template <class Child>
   static constexpr zx_rights_t kGetChildRights = kChildRights;
 
+  template <>
+  constexpr zx_rights_t kGetChildRights<Thread> = kThreadRights;
+
   template <class ObjectType>
   static constexpr zx_obj_type_t kObjType = ZX_OBJ_TYPE_NONE;
+
+  template <>
+  constexpr zx_obj_type_t kObjType<Job> = ZX_OBJ_TYPE_JOB;
+
+  template <>
+  constexpr zx_obj_type_t kObjType<Process> = ZX_OBJ_TYPE_PROCESS;
+
+  template <>
+  constexpr zx_obj_type_t kObjType<Thread> = ZX_OBJ_TYPE_THREAD;
 
   // This is the actual reader, implemented below.
   fit::result<Error> Read(DumpFile& file, bool read_memory, FileRange where, time_t date = 0);
@@ -765,26 +781,6 @@ class TaskHolder::JobTree {
   // Shared cache of pages read from process memory (see live-memory-cache.h).
   LiveMemoryCache live_memory_cache_;
 };
-
-// TODO(https://fxbug.dev/348057670): Move these back inline to the class definitions (but with
-// constexpr and *without* static) after clang rolls past
-// https://github.com/llvm/llvm-project/pull/93873.
-
-template <>
-const auto TaskHolder::JobTree::kDuplicate<Process> =
-    fit::error(Error{"duplicate process KOID", ZX_ERR_IO_DATA_INTEGRITY});
-
-template <>
-const zx_rights_t TaskHolder::JobTree::kGetChildRights<Thread> = kThreadRights;
-
-template <>
-const zx_obj_type_t TaskHolder::JobTree::kObjType<Job> = ZX_OBJ_TYPE_JOB;
-
-template <>
-const zx_obj_type_t TaskHolder::JobTree::kObjType<Process> = ZX_OBJ_TYPE_PROCESS;
-
-template <>
-const zx_obj_type_t TaskHolder::JobTree::kObjType<Thread> = ZX_OBJ_TYPE_THREAD;
 
 // JobTree is an incomplete type outside this translation unit.  Some methods
 // on TaskHolder et al need to access tree_, so they are defined here.
