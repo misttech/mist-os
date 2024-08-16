@@ -14,6 +14,7 @@
             matchers: [
                 // TODO(https://fxbug.dev/323052525): Support Multicast Routing.
                 "multiple_multicast_controllers_v6_ns3",
+                "multiple_multicast_controllers_v4_ns3",
             ],
         },
         {
@@ -102,7 +103,6 @@
                 "multicast_forwarding_v6_ns3::ttl_same_as_route_min_ttl",
                 "watch_routing_events_dropped_events_v6_ns3",
                 "watch_routing_events_hanging_v6_ns3",
-                "multiple_multicast_controllers_v4_ns3",
                 "overwrite_multicast_route_v4_ns3",
                 "overwrite_multicast_route_v6_ns3",
             ],
