@@ -13,12 +13,16 @@ if (is_fuchsia) {
     testonly = true
     edition = "2018"
     sources = [
+      "src/daemon_work.rs",
       "src/main.rs",
-      "src/work.rs",
+      "src/sag_work.rs",
     ]
     deps = [
+      "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
       "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
+      "//sdk/fidl/fuchsia.power.topology.test:fuchsia.power.topology.test_rust",
       "//src/developer/fuchsia-criterion",
+      "//src/lib/fidl/rust/fidl",
       "//src/lib/fuchsia-component",
       "//src/lib/zircon/rust:fuchsia-zircon",
       "//third_party/rust_crates:anyhow",
@@ -34,6 +38,7 @@ if (is_fuchsia) {
       ":power-framework-benchmarks",
       "//src/power/broker:component",
       "//src/power/system-activity-governor:component",
+      "//src/power/topology-test-daemon:component",
     ]
     testonly = true
     manifest = "meta/power-framework-microbenchmarks.cml"
@@ -45,17 +50,22 @@ rustc_test("bin") {
   edition = "2021"
 
   deps = [
+    "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_rust",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_rust",
+    "//sdk/fidl/fuchsia.power.topology.test:fuchsia.power.topology.test_rust",
+    "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia",
     "//src/lib/fuchsia-component",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
+    "//third_party/rust_crates:argh",
     "//third_party/rust_crates:criterion",
   ]
 
   sources = [
+    "src/daemon_work.rs",
     "src/lib.rs",
-    "src/work.rs",
+    "src/sag_work.rs",
   ]
 }
 
@@ -77,6 +87,7 @@ fuchsia_test_package("package") {
   deps = [
     "//src/power/broker:component",
     "//src/power/system-activity-governor:component",
+    "//src/power/topology-test-daemon:component",
   ]
 }
 
@@ -89,7 +100,8 @@ if (is_host) {
   fuchsia_component_perf_test("power_framework_microbenchmarks") {
     package = ":power_framework_microbenchmarks"
     component_name = "power_framework_microbenchmarks"
-    expected_metric_names_filepath = "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.power.sag.txt"
+    expected_metric_names_filepath =
+        "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.power.txt"
   }
 }
 

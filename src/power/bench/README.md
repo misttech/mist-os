@@ -1,13 +1,14 @@
-# SystemActivityGovernor (SAG) Benchmarks
+# Power Framework Benchmarks
 
-SAG currently has microbenchmarks exercising the TakeWakeLease call,
-but in the future this may be expanded to include both the Bindings and the
-public API surface. SAG benchmarks are based on the
+Power Framework currently has microbenchmarks exercising the TakeWakeLease call
+from the System Activity Governor (SAG), and the Lease operation fidls from the
+Topology Test Daemon. These benchmarks are based on the
 [Criterion](https://docs.rs/criterion/latest/criterion/) benchmark
-infrastructure. Benchmark functions are declared in work.rs and can be run
-either as standard integration tests or to profile the performance of the
-SAG TakeWakeLease fidl. Power Broker and SAG instances are instantiated for the
-test in a hermetic environment and the benchmark reuses the same SAG channel.
+infrastructure. Benchmark functions and fidl proxy obtaining functions are
+separately declared in each some_work.rs and can be run either as standard
+integration tests or to profile the performance of the corresponding fidl.
+The integration tests run in CQ and can verify the correctness of the
+implementations of the same function for fidl proxy creation and benchmarks.
 
 ## Running the Benchmarks
 
@@ -17,7 +18,7 @@ test in a hermetic environment and the benchmark reuses the same SAG channel.
 
     ```
     fx set terminal.x64 --with //src/tests/end_to_end/perf:test --release
-      --with-test //src/power/system-activity-governor:tests #integration test
+      --with-test //src/power:tests #integration test will be included
     ```
 
 2. Build Fuchsia
@@ -42,6 +43,7 @@ test in a hermetic environment and the benchmark reuses the same SAG channel.
 
     ```
     fx test --e2e takewakelease_benchmarks -o
+    fx test --e2e power_framework_microbenchmarks -o
     ```
 
 After completing, the tests will print the name of the

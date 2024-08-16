@@ -1,0 +1,2 @@
+fuchsia.power.sag: TakeWakeLease
+fuchsia.power.daemon: ToggleLease

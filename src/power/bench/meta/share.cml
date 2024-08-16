@@ -12,6 +12,10 @@
             name: "test-system-activity-governor",
             url: "#meta/system-activity-governor.cm",
         },
+        {
+            name: "test-topology-test-daemon",
+            url: "#meta/topology-test-daemon.cm",
+        },
     ],
     use: [
         {
@@ -22,12 +26,21 @@
             protocol: [ "fuchsia.power.system.ActivityGovernor" ],
             from: "#test-system-activity-governor",
         },
+        {
+            protocol: [ "fuchsia.power.topology.test.TopologyControl" ],
+            from: "#test-topology-test-daemon",
+        },
     ],
     offer: [
         {
             protocol: "fuchsia.power.broker.Topology",
             from: "#test-power-broker",
             to: [ "#test-system-activity-governor" ],
+        },
+        {
+            protocol: "fuchsia.power.broker.Topology",
+            from: "#test-power-broker",
+            to: [ "#test-topology-test-daemon" ],
         },
     ],
 }

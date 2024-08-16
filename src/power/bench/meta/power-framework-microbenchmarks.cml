@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/power/system-activity-governor/bench/meta/share.cml",
+        "//src/power/bench/meta/share.cml",
         "sys/testing/elf_test_runner.shard.cml",
     ],
     program: {
