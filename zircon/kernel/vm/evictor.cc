@@ -321,9 +321,8 @@ Evictor::EvictedPageCounts Evictor::EvictPageQueues(uint64_t target_pages,
     // to use cursors to iterate the queues instead of peeking the tail each time.
     if (ktl::optional<PageQueues::VmoBacklink> backlink =
             page_queues_->PeekReclaim(lowest_evict_queue)) {
-      if (!backlink->cow) {
-        continue;
-      }
+      // A valid backlink always has a valid cow
+      DEBUG_ASSERT(backlink->cow);
 
       // The expectation is that the only reason not to have all kinds of eviction enabled is if
       // running a unittest and so have an efficient pre-check.
