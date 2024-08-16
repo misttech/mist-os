@@ -2,10 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{bail, Context, Result};
+use crate::constants::DAEMON_LOG_BASENAME;
+use anyhow::{anyhow, bail, Context, Result};
 use daemonize::daemonize;
 use errors::{ffx_error, FfxError};
-use ffx_config::logging::LogDirHandling;
 use ffx_config::EnvironmentContext;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use fidl_fuchsia_developer_ffx::{DaemonMarker, DaemonProxy};
@@ -16,7 +16,6 @@ use nix::sys::signal;
 use std::io::ErrorKind;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
-use std::process::{Child, Command};
 use std::sync::Arc;
 use std::time::{Duration, SystemTime};
 
@@ -218,63 +217,65 @@ pub async fn find_and_connect(
         .context("connecting to the ffx daemon")
 }
 
-// We have both spawn_daemon(), and run_daemon() below, because we want
-// the daemon to be handled in two different ways. "Real" invocations use
-// spawn_daemon(), because it daemonizes the process, disconnecting it from the
-// controlling terminal, etc.  "Test" invocations uses run_daemon(), because
-// they want to have control of the child process, running wait(), etc.
+async fn daemon_args(context: &EnvironmentContext) -> Result<Vec<String>> {
+    let socket_path = context.get_ascendd_path().await.context("No socket path configured")?;
+    Ok(vec!["daemon".into(), "start".into(), "--path".into(), socket_path.to_str().unwrap().into()])
+}
+
+// This daemonizes the process, disconnecting it from the controlling terminal, etc.
 #[tracing::instrument]
 pub async fn spawn_daemon(context: &EnvironmentContext) -> Result<()> {
-    let mut cmd = daemon_cmd(context).await?;
-    tracing::info!("Starting new background ffx daemon from {:?}", &cmd.get_program());
-    daemonize(&mut cmd)
-        .spawn()
-        .context("spawning daemon start")?
-        .wait()
-        .map(|_| ())
-        .context("waiting for daemon start")
+    // daemonize the given command, and do not keep the current directory for the new process
+    // (start) the daemon in the  / directory.
+    daemonize(
+        daemon_args(context).await?.as_slice(),
+        DAEMON_LOG_BASENAME.into(),
+        context.clone(),
+        false,
+    )
+    .await
+    .map_err(|e| anyhow!(e))
 }
 
-// See the above comment for spawn_daemon(). This function is only used by the
-// "ffx self-test" function `test_config_flag()`.
+// This function is only used by isolate dir implementations. This allows cleaning up the daemon process
+// when the isolate is dropped.
 #[tracing::instrument]
-pub async fn run_daemon(context: &EnvironmentContext) -> Result<Child> {
-    let mut cmd = daemon_cmd(context).await?;
-    tracing::info!("Starting new ffx daemon from {:?}", &cmd.get_program());
-    let child = cmd.spawn().context("running daemon start")?;
-    Ok(child)
-}
-
-#[tracing::instrument]
-async fn daemon_cmd(context: &EnvironmentContext) -> Result<Command> {
-    use std::process::Stdio;
-
+pub async fn run_daemon(context: &EnvironmentContext) -> Result<std::process::Child> {
     let mut cmd = context.rerun_prefix().await?;
-    let socket_path = context.get_ascendd_path().await.context("No socket path configured")?;
-
-    let mut stdout = Stdio::null();
-    let mut stderr = Stdio::null();
+    let mut stdout = std::process::Stdio::null();
+    let mut stderr = std::process::Stdio::null();
 
     if ffx_config::logging::is_enabled(context).await {
         let file = PathBuf::from(DAEMON_LOG_FILENAME);
-        stdout = Stdio::from(
-            ffx_config::logging::log_file(context, &file, LogDirHandling::WithDirWithRotate)
-                .await?,
+        stdout = std::process::Stdio::from(
+            ffx_config::logging::log_file(
+                context,
+                &file,
+                ffx_config::logging::LogDirHandling::WithDirWithRotate,
+            )
+            .await?,
         );
         // Third argument says not to rotate the logs.  We rotated the logs once
         // for the call above, we shouldn't do it again.
-        stderr = Stdio::from(
-            ffx_config::logging::log_file(context, &file, LogDirHandling::WithDirWithoutRotate)
-                .await?,
+        stderr = std::process::Stdio::from(
+            ffx_config::logging::log_file(
+                context,
+                &file,
+                ffx_config::logging::LogDirHandling::WithDirWithoutRotate,
+            )
+            .await?,
         );
     }
 
-    cmd.stdin(Stdio::null()).stdout(stdout).stderr(stderr).env("RUST_BACKTRACE", "full");
-    // Note: daemon start produces output on stdout by default -- see ffx_command::run()
-    cmd.arg("daemon");
-    cmd.arg("start");
-    cmd.arg("--path").arg(socket_path);
-    Ok(cmd)
+    cmd.stdin(std::process::Stdio::null())
+        .stdout(stdout)
+        .stderr(stderr)
+        .env("RUST_BACKTRACE", "full");
+    cmd.args(daemon_args(context).await?.as_slice());
+
+    tracing::info!("Starting new ffx daemon from {:?}", &cmd.get_program());
+    let child = cmd.spawn().context("running daemon start")?;
+    Ok(child)
 }
 
 // Time between polling to see if process has exited
