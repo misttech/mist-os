@@ -20,54 +20,54 @@ namespace syslog_runtime {
 
 struct LogBuffer;
 
-namespace internal {
-// A null-safe wrapper around cpp17::optional<cpp17::string_view>
-//
-// This class is used to represent a string that may be nullptr. It is used
-// to avoid the need to check for nullptr before passing a string to the
-// syslog macros.
-//
-// This class is implicitly convertible to cpp17::optional<cpp17::string_view>.
-// NOLINT is used as implicit conversions are intentional here.
-class NullSafeStringView final {
+/// Constructs a LogBuffer
+class LogBufferBuilder {
  public:
-  //  Constructs a NullSafeStringView from a cpp17::string_view.
-  constexpr NullSafeStringView(cpp17::string_view string_view)
-      : string_view_(string_view) {}  // NOLINT
+  explicit LogBufferBuilder(fuchsia_logging::LogSeverity severity) : severity_(severity) {}
 
-  // Constructs a NullSafeStringView from a nullptr.
-  constexpr NullSafeStringView(std::nullptr_t) : string_view_(cpp17::nullopt) {}  // NOLINT
-
-  constexpr NullSafeStringView(const NullSafeStringView&) = default;
-
-  // Constructs a NullSafeStringView from a const char* which may be nullptr.
-  // string Nullable string to construct from.
-  constexpr NullSafeStringView(const char* input) {  // NOLINT
-    if (!input) {
-      string_view_ = cpp17::nullopt;
-    } else {
-      string_view_ = cpp17::string_view(input);
-    }
+  /// Sets the file name and line number for the log message
+  LogBufferBuilder& WithFile(cpp17::string_view file, unsigned int line) {
+    file_name_ = file;
+    line_ = line;
+    return *this;
   }
 
-  // Creates a NullSafeStringView fro, an optional<cpp17::string_view>.
-  // This is not a constructor to prevent accidental misuse.
-  static NullSafeStringView CreateFromOptional(cpp17::optional<cpp17::string_view> string_view) {
-    if (!string_view) {
-      return NullSafeStringView(nullptr);
-    }
-    return NullSafeStringView(*string_view);
+  /// Sets the condition for the log message
+  /// This is used by test frameworks that want
+  /// to print an assertion message when a test fails.
+  /// This prepends the string "Check failed: "<<condition<<". "
+  /// to whatever message the user passes.
+  LogBufferBuilder& WithCondition(cpp17::string_view condition) {
+    condition_ = condition;
+    return *this;
   }
 
-  // Constructs a NullSafeStringView from an std::string.
-  constexpr NullSafeStringView(const std::string& input) : string_view_(input) {}  // NOLINT
+  /// Sets the message for the log message
+  LogBufferBuilder& WithMsg(cpp17::string_view msg) {
+    msg_ = msg;
+    return *this;
+  }
 
-  // Converts this NullSafeStringView to a cpp17::optional<cpp17::string_view>.
-  constexpr operator cpp17::optional<cpp17::string_view>() const { return string_view_; }  // NOLINT
+#ifdef __Fuchsia__
+  /// Sets the socket for the log message
+  LogBufferBuilder& WithSocket(zx_handle_t socket) {
+    socket_ = socket;
+    return *this;
+  }
+#endif
+  /// Builds the LogBuffer
+  LogBuffer Build();
+
  private:
-  cpp17::optional<cpp17::string_view> string_view_;
+  cpp17::optional<cpp17::string_view> file_name_;
+  unsigned int line_ = 0;
+  cpp17::optional<cpp17::string_view> msg_;
+  cpp17::optional<cpp17::string_view> condition_;
+#ifdef __Fuchsia__
+  zx_handle_t socket_ = ZX_HANDLE_INVALID;
+#endif
+  fuchsia_logging::LogSeverity severity_;
 };
-}  // namespace internal
 
 template <typename Key, typename Value>
 struct KeyValue final {
@@ -190,55 +190,69 @@ struct LogBuffer final {
   bool Flush();
 };
 
-/// Constructs a LogBuffer
-class LogBufferBuilder {
+namespace internal {
+// A null-safe wrapper around cpp17::optional<cpp17::string_view>
+//
+// This class is used to represent a string that may be nullptr. It is used
+// to avoid the need to check for nullptr before passing a string to the
+// syslog macros.
+//
+// This class is implicitly convertible to cpp17::optional<cpp17::string_view>.
+// NOLINT is used as implicit conversions are intentional here.
+class NullSafeStringView final {
  public:
-  explicit LogBufferBuilder(fuchsia_logging::LogSeverity severity) : severity_(severity) {}
+  //  Constructs a NullSafeStringView from a cpp17::string_view.
+  constexpr NullSafeStringView(cpp17::string_view string_view)
+      : string_view_(string_view) {}  // NOLINT
 
-  /// Sets the file name and line number for the log message
-  LogBufferBuilder& WithFile(cpp17::string_view file, unsigned int line) {
-    file_name_ = file;
-    line_ = line;
-    return *this;
+  // Constructs a NullSafeStringView from a nullptr.
+  constexpr NullSafeStringView(std::nullptr_t) : string_view_(cpp17::nullopt) {}  // NOLINT
+
+  constexpr NullSafeStringView(const NullSafeStringView&) = default;
+
+  // Constructs a NullSafeStringView from a const char* which may be nullptr.
+  // string Nullable string to construct from.
+  constexpr NullSafeStringView(const char* input) {  // NOLINT
+    if (!input) {
+      string_view_ = cpp17::nullopt;
+    } else {
+      string_view_ = cpp17::string_view(input);
+    }
   }
 
-  /// Sets the condition for the log message
-  /// This is used by test frameworks that want
-  /// to print an assertion message when a test fails.
-  /// This prepends the string "Check failed: "<<condition<<". "
-  /// to whatever message the user passes.
-  LogBufferBuilder& WithCondition(cpp17::string_view condition) {
-    condition_ = condition;
-    return *this;
+  // Creates a NullSafeStringView fro, an optional<cpp17::string_view>.
+  // This is not a constructor to prevent accidental misuse.
+  static NullSafeStringView CreateFromOptional(cpp17::optional<cpp17::string_view> string_view) {
+    if (!string_view) {
+      return NullSafeStringView(nullptr);
+    }
+    return NullSafeStringView(*string_view);
   }
 
-  /// Sets the message for the log message
-  LogBufferBuilder& WithMsg(cpp17::string_view msg) {
-    msg_ = msg;
-    return *this;
-  }
+  // Constructs a NullSafeStringView from an std::string.
+  constexpr NullSafeStringView(const std::string& input) : string_view_(input) {}  // NOLINT
 
-#ifdef __Fuchsia__
-  /// Sets the socket for the log message
-  LogBufferBuilder& WithSocket(zx_handle_t socket) {
-    socket_ = socket;
-    return *this;
-  }
-#endif
-  /// Builds the LogBuffer
-  LogBuffer Build();
-
+  // Converts this NullSafeStringView to a cpp17::optional<cpp17::string_view>.
+  constexpr operator cpp17::optional<cpp17::string_view>() const { return string_view_; }  // NOLINT
  private:
-  cpp17::optional<cpp17::string_view> file_name_;
-  unsigned int line_ = 0;
-  cpp17::optional<cpp17::string_view> msg_;
-  cpp17::optional<cpp17::string_view> condition_;
-#ifdef __Fuchsia__
-  zx_handle_t socket_ = ZX_HANDLE_INVALID;
-#endif
-  fuchsia_logging::LogSeverity severity_;
+  cpp17::optional<cpp17::string_view> string_view_;
 };
 
+template <typename Msg, typename... Args>
+void WriteStructuredLog(fuchsia_logging::LogSeverity severity, const char* file, int line, Msg msg,
+                        Args... args) {
+  syslog_runtime::LogBufferBuilder builder(severity);
+  if (file) {
+    builder.WithFile(file, line);
+  }
+  if (msg != nullptr) {
+    builder.WithMsg(msg);
+  }
+  auto buffer = builder.Build();
+  (void)std::initializer_list<int>{(buffer.Encode(args), 0)...};
+  buffer.Flush();
+}
+}  // namespace internal
 }  // namespace syslog_runtime
 
 namespace fuchsia_logging {
@@ -369,26 +383,18 @@ bool IsSeverityEnabled(LogSeverity severity);
 
 #define FX_NOTIMPLEMENTED() FX_LOGS(ERROR) << "Not implemented in: " << __PRETTY_FUNCTION__
 
+// TODO(b/299996898): Remove when no longer used.
 template <typename Msg, typename... Args>
 void fx_slog_internal(fuchsia_logging::LogSeverity severity, const char* file, int line, Msg msg,
                       Args... args) {
-  syslog_runtime::LogBufferBuilder builder(severity);
-  if (file) {
-    builder.WithFile(file, line);
-  }
-  if (msg != nullptr) {
-    builder.WithMsg(msg);
-  }
-  auto buffer = builder.Build();
-  (void)std::initializer_list<int>{(buffer.Encode(args), 0)...};
-  buffer.Flush();
+  syslog_runtime::internal::WriteStructuredLog(severity, __FILE__, __LINE__, msg, args...);
 }
 
-#define FX_LOG_KV_ETC(severity, args...)                    \
-  do {                                                      \
-    if (::fuchsia_logging::IsSeverityEnabled(severity)) {   \
-      fx_slog_internal(severity, __FILE__, __LINE__, args); \
-    }                                                       \
+#define FX_LOG_KV_ETC(severity, args...)                                                \
+  do {                                                                                  \
+    if (::fuchsia_logging::IsSeverityEnabled(severity)) {                               \
+      syslog_runtime::internal::WriteStructuredLog(severity, __FILE__, __LINE__, args); \
+    }                                                                                   \
   } while (0)
 
 #define FX_LOG_KV(severity, msg...) FX_LOG_KV_ETC(::fuchsia_logging::LOG_##severity, msg)
