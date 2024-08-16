@@ -516,6 +516,14 @@
                 "notes": [
                     "Skip third party chre directory that doesn't contain a license file."
                 ]
+            },
+            {
+                "paths": [
+                    "src/lib/android/aidl/generated-files"
+                ],
+                "notes": [
+                    "Checked in generated code based on AOSP code. See https://fxbug.dev/42068556"
+                ]
             }
         ]
     }

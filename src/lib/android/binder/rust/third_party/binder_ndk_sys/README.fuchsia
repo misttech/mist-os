@@ -1,0 +1,11 @@
+Name: binder_ndk_sys
+URL: https://android.googlesource.com/platform/frameworks/native/+/refs/heads/main/libs/binder/rust/sys/BinderBindings.hpp
+Upstream Git: https://android.googlesource.com/platform/frameworks/native/
+License: Apache 2.0
+License File: LICENSE
+Security Critical: Yes
+Description: Output of bindgen tool on Android binder headers
+
+This directory contains a checked in copy of bindgen's output on the Binder
+library. Fuchsia does not have support for running bindgen as part of the build
+process.

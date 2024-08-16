@@ -1,0 +1,7 @@
+# Copyright 2024 The Fuchsia Authors
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# Set to true to use the build rules in //src/lib/android for Android tools and libraries.
+# TODO(https://fxbug.dev/357857883): Remove once the other copy of these build rules are removed.
+use_src_lib_android_rules = false
