@@ -1,7 +1,7 @@
 # Copyright 2023 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
-"""Unit tests for honeydew.affordances.sl4f.wlan.py."""
+"""Unit tests for honeydew.affordances.fuchsia_controller.wlan.wlan."""
 
 import unittest
 from collections.abc import Iterator
@@ -148,7 +148,7 @@ async def _async_error(err: Exception) -> None:
 
 # pylint: disable=protected-access
 class WlanFCTests(unittest.TestCase):
-    """Unit tests for honeydew.affordances.fuchsia_controller.wlan.wlan.py."""
+    """Unit tests for honeydew.affordances.fuchsia_controller.wlan.wlan."""
 
     def setUp(self) -> None:
         super().setUp()
