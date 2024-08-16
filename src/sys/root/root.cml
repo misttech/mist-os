@@ -220,6 +220,7 @@
                 "fuchsia.feedback.ComponentDataRegister",
                 "fuchsia.feedback.CrashReporter",
                 "fuchsia.feedback.DataProvider",
+                "fuchsia.input.interaction.observation.Aggregator",
                 "fuchsia.metrics.MetricEventLoggerFactory",
                 "fuchsia.pkg.PackageResolver",
                 "fuchsia.pkg.RepositoryManager",
