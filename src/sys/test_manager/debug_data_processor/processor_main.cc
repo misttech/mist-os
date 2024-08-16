@@ -18,7 +18,8 @@
 namespace ftest_debug = fuchsia::test::debug;
 
 int main(int argc, const char** argv) {
-  fuchsia_logging::SetTags({"debug_data_processor"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"debug_data_processor"}).BuildAndInitialize();
   FX_LOGS(INFO) << "Started debug data processor";
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   auto dispatcher = loop.dispatcher();

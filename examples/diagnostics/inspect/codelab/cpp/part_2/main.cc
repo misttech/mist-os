@@ -15,7 +15,8 @@
 #include "reverser.h"
 
 int main(int argc, char** argv) {
-  fuchsia_logging::SetTags({"inspect_cpp_codelab", "part2"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"inspect_cpp_codelab", "part2"}).BuildAndInitialize();
 
   FX_LOGS(INFO) << "Starting up...";
 

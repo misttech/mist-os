@@ -17,7 +17,8 @@
 const char* TAG = "integration_test";
 
 void WriteLogs() {
-  fuchsia_logging::SetTags({TAG});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({TAG}).BuildAndInitialize();
   // WARNING: Test is sensitive to line numbers and file name.
   // These log lines are added to the top of the file to prevent changes to the test below from
   // changing the expected outputs.
@@ -85,7 +86,7 @@ TEST(Accessor2Logger, ConversionWorks) {
   EXPECT_GT(logs[0].time, 0u);
   EXPECT_GT(logs[0].pid, 0u);
   EXPECT_GT(logs[0].tid, 0u);
-  EXPECT_EQ(logs[0].msg, "[test.cc(24)] Hello info");
+  EXPECT_EQ(logs[0].msg, "[test.cc(25)] Hello info");
   ASSERT_EQ(logs[0].tags.size(), 1u);
   EXPECT_EQ(logs[0].tags[0], TAG);
   EXPECT_EQ(logs[0].severity, static_cast<int8_t>(fuchsia::logger::LogLevelFilter::INFO));
@@ -94,7 +95,7 @@ TEST(Accessor2Logger, ConversionWorks) {
   EXPECT_GT(logs[1].pid, 0u);
   EXPECT_GT(logs[1].tid, 0u);
   EXPECT_EQ(logs[1].msg,
-            "[src/lib/diagnostics/accessor2logger/integration/test.cc(25)] Hello warning");
+            "[src/lib/diagnostics/accessor2logger/integration/test.cc(26)] Hello warning");
   ASSERT_EQ(logs[1].tags.size(), 1u);
   EXPECT_EQ(logs[1].tags[0], TAG);
   EXPECT_EQ(logs[1].severity, static_cast<int8_t>(fuchsia::logger::LogLevelFilter::WARN));
@@ -103,7 +104,7 @@ TEST(Accessor2Logger, ConversionWorks) {
   EXPECT_GT(logs[2].pid, 0u);
   EXPECT_GT(logs[2].tid, 0u);
   EXPECT_EQ(logs[2].msg,
-            "[src/lib/diagnostics/accessor2logger/integration/test.cc(26)] Hello error");
+            "[src/lib/diagnostics/accessor2logger/integration/test.cc(27)] Hello error");
   ASSERT_EQ(logs[2].tags.size(), 1u);
   EXPECT_EQ(logs[2].tags[0], TAG);
   EXPECT_EQ(logs[2].severity, static_cast<int8_t>(fuchsia::logger::LogLevelFilter::ERROR));
