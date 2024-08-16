@@ -70,7 +70,7 @@ impl CobaltExt for MetricEventLoggerRequest {
 }
 
 pub struct TestHelper {
-    inspector: Inspector,
+    pub inspector: Inspector,
     pub inspect_node: InspectNode,
     pub inspect_metadata_node: InspectNode,
 

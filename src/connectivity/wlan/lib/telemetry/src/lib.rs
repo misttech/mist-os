@@ -112,14 +112,15 @@ pub fn serve_telemetry(
     // Create and initialize modules
     let (connect_disconnect, connect_disconnect_time_series) =
         processors::connect_disconnect::ConnectDisconnectLogger::new(
-            cobalt_1dot1_proxy,
+            cobalt_1dot1_proxy.clone(),
             &inspect_node,
             &inspect_metadata_node,
             persistence_req_sender,
         );
     time_series.push(connect_disconnect_time_series);
 
-    let mut toggle_logger = processors::toggle_events::ToggleLogger::new(&inspect_node);
+    let mut toggle_logger =
+        processors::toggle_events::ToggleLogger::new(cobalt_1dot1_proxy, &inspect_node);
 
     // Attach time series properties lazily onto the Inspect time_series node
     for i in 0..time_series.len() {
@@ -153,7 +154,7 @@ pub fn serve_telemetry(
                             connect_disconnect.log_disconnect(&info).await;
                         }
                         ClientConnectionsToggle { event } => {
-                            toggle_logger.log_toggle_event(event);
+                            toggle_logger.log_toggle_event(event).await;
                         }
                     }
                 }
