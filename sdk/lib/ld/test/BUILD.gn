@@ -96,7 +96,14 @@ source_set("load-tests") {
   sources = [
     "ld-load-tests-base.cc",
     "ld-load-tests-base.h",
-    "load-tests.cc",
+    "load-tests-abi.cc",
+    "load-tests-basic.cc",
+    "load-tests-deps.cc",
+    "load-tests-failure.cc",
+    "load-tests-reloc.cc",
+    "load-tests-symbolizer.cc",
+    "load-tests-tls.cc",
+    "load-tests.h",
   ]
   deps = [
     ":load-test-modules-info",
