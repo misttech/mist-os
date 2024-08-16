@@ -6,6 +6,9 @@ import("//build/sdk/sdk_component_manifests.gni")
 
 sdk_component_manifests("vulkan") {
   name = "vulkan"
-  manifests = [ "client.shard.cml" ]
+  manifests = [
+    "client.shard.cml",
+    "offer.shard.cml",
+  ]
   category = "partner"
 }
