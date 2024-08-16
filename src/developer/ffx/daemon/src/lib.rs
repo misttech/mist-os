@@ -101,8 +101,10 @@ pub async fn run_single_ascendd_link(
         }
     };
 
+    tracing::debug!("Got socket connection; splitting into read/write channels");
     let (mut rx, mut tx) = unix_socket.split();
 
+    tracing::debug!("Running the connection with the channels");
     run_ascendd_connection(node, &mut rx, &mut tx).await
 }
 
