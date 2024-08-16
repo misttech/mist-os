@@ -11,6 +11,7 @@ test_suite(
         ":cpp_variants_tests",
         ":licenses_tests",
         "//fuchsia/api_levels:tests",
+        "//fuchsia/debug_symbols:tests",
         "//fuchsia/drivers:tests",
         "//fuchsia/packaging:tests",
         "//fuchsia/utils:tests",

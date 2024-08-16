@@ -374,9 +374,10 @@ def transform_collected_debug_symbols_infos(*targets):
       A FuchsiaDebugSymbolsInfo provider.
     """
     valid_targets = []
-    for t in targets:
-        if t and _FuchsiaCollectedDebugSymbolsInfo in t:
-            valid_targets.append(t)
+    for target_or_list in targets:
+        for t in (target_or_list if type(target_or_list) == "list" else [target_or_list]):
+            if t and _FuchsiaCollectedDebugSymbolsInfo in t:
+                valid_targets.append(t)
 
     return collect_debug_symbols(
         flatten([
@@ -386,9 +387,6 @@ def transform_collected_debug_symbols_infos(*targets):
     )
 
 def _fuchsia_collect_all_debug_symbols_infos_aspect_impl(target, ctx):
-    if _FuchsiaCollectedDebugSymbolsInfo in target:
-        return []
-
     return _FuchsiaCollectedDebugSymbolsInfo(
         collected_symbols = depset(
             direct = [target[FuchsiaDebugSymbolInfo]] if FuchsiaDebugSymbolInfo in target else [],
