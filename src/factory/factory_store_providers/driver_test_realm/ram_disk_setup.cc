@@ -63,11 +63,6 @@ int main() {
     return 1;
   }
 
-  zx::result channel = device_watcher::RecursiveWaitForFile("/dev/sys/platform/ram-disk/ramctl");
-  if (channel.is_error()) {
-    FX_LOG_KV(ERROR, "Failed to wait for ramctl", FX_KV("status", channel.status_value()));
-  }
-
   auto result = MakeRamdisk();
   // Keep the ramdisk until the test finishes.
   exit(0);

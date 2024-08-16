@@ -108,14 +108,6 @@ class FakeDev {
         devmgr_integration_test::IsolatedDevmgr::Create(std::move(args), dispatcher);
     ASSERT_OK(devmgr.status_value());
     devmgr_ = std::move(devmgr.value());
-    // TODO(https://fxbug.dev/42161201): Stop requiring this recursive wait.
-    ASSERT_OK(device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(),
-                                                   "sys/platform/ram-disk/ramctl")
-                  .status_value());
-    // Wait for pt so that quickly finishing tests do not tear down dtr before this loads. Otherwise
-    // there is an error logged that will fail the test.
-    ASSERT_OK(device_watcher::RecursiveWaitForFile(devmgr_.devfs_root().get(), "sys/platform/pt")
-                  .status_value());
   }
 
   devmgr_integration_test::IsolatedDevmgr devmgr_;

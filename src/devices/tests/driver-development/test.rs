@@ -153,13 +153,6 @@ async fn set_up_test_driver_realm() -> Result<(RealmInstance, fdd::ManagerProxy)
     instance.driver_test_realm_start(realm_args).await?;
 
     let driver_dev = instance.root.connect_to_protocol_at_exposed_dir::<fdd::ManagerMarker>()?;
-
-    // Make sure we wait until all the drivers are bound before returning.
-    let dev = instance.driver_test_realm_connect_to_dev()?;
-    device_watcher::recursive_wait(&dev, "sys/test/sample_driver")
-        .await
-        .expect("recursive wait failed");
-
     Ok((instance, driver_dev))
 }
 
