@@ -8,9 +8,12 @@
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/fidl.h>
 #include <fuchsia/hardware/pciroot/c/banjo.h>
+#include <lib/async/cpp/task.h>
 #include <lib/ddk/debug.h>
 #include <lib/ddk/driver.h>
 #include <lib/ddk/platform-defs.h>
+#include <lib/fit/defer.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
 #include <stdint.h>
@@ -51,7 +54,29 @@ constexpr McfgAllocation kVirtPcieMcfg = {
 }  // namespace
 
 zx_status_t QemuRiscv64Pciroot::PcirootGetBti(uint32_t bdf, uint32_t index, zx::bti* bti) {
-  return iommu_.GetBti(/*iommu_index=*/index, /*bti_id=*/bdf, /*out_handle=*/bti);
+  zx_status_t status = ZX_ERR_NOT_FOUND;
+  libsync::Completion completion;
+  async::PostTask(dispatcher_, [this, &status, &completion, &bti, bdf, index]() {
+    auto complete = fit::defer([&completion]() { completion.Signal(); });
+    fdf::Arena arena('pcir');
+    fdf::WireUnownedResult result =
+        fdf::WireCall(iommu_).buffer(arena)->GetBti(/*iommu_index=*/index, /*bti_id=*/bdf);
+    if (!result.ok()) {
+      zxlogf(ERROR, "GetBti failed, transport error %s",
+             result.error().FormatDescription().c_str());
+      status = result.error().status();
+      return;
+    }
+    if (result->is_error()) {
+      zxlogf(ERROR, "GetBti failed, domain error %s", zx_status_get_string(result->error_value()));
+      status = result->error_value();
+      return;
+    }
+    *bti = std::move(result->value()->bti);
+    status = ZX_OK;
+  });
+  completion.Wait();
+  return status;
 }
 
 zx_status_t QemuRiscv64Pciroot::PcirootGetPciPlatformInfo(pci_platform_info_t* info) {
@@ -76,8 +101,14 @@ zx_status_t QemuRiscv64Pciroot::PcirootGetPciPlatformInfo(pci_platform_info_t* i
 
 zx::result<> QemuRiscv64Pciroot::Create(PciRootHost* root_host, QemuRiscv64Pciroot::Context ctx,
                                         zx_device_t* parent, const char* name) {
+  zx::result iommu =
+      ddk::Device<void>::DdkConnectRuntimeProtocol<fuchsia_hardware_platform_bus::Service::Iommu>(
+          parent);
+  if (iommu.is_error()) {
+    return iommu.take_error();
+  }
   auto pciroot = std::unique_ptr<QemuRiscv64Pciroot>(
-      new QemuRiscv64Pciroot(root_host, std::move(ctx), parent, name));
+      new QemuRiscv64Pciroot(root_host, std::move(ctx), parent, name, std::move(*iommu)));
   if (auto result = pciroot->CreateInterrupts(); result.is_error()) {
     return result.take_error();
   }

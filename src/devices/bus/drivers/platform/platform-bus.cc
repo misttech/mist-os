@@ -54,6 +54,8 @@ zx_status_t AddProtocolPassthrough(const char* name, cpp20::span<const zx_device
   fuchsia_hardware_platform_bus::Service::InstanceHandler handler({
       .platform_bus = parent->bindings().CreateHandler(parent, fdf::Dispatcher::GetCurrent()->get(),
                                                        fidl::kIgnoreBindingClosure),
+      .iommu = parent->iommu_bindings().CreateHandler(parent, fdf::Dispatcher::GetCurrent()->get(),
+                                                      fidl::kIgnoreBindingClosure),
   });
 
   auto status =
@@ -432,6 +434,19 @@ void PlatformBus::AddCompositeNodeSpec(AddCompositeNodeSpecRequestView request, 
   [[maybe_unused]] auto* dev_ptr = dev.release();
 
   completer.buffer(arena).ReplySuccess();
+}
+
+void PlatformBus::GetBti(GetBtiRequestView request, fdf::Arena& arena,
+                         GetBtiCompleter::Sync& completer) {
+  zx::bti bti;
+  zx_status_t status = IommuGetBti(request->iommu_index, request->bti_id, &bti);
+
+  if (status != ZX_OK) {
+    completer.buffer(arena).ReplyError(status);
+    return;
+  }
+
+  completer.buffer(arena).ReplySuccess(std::move(bti));
 }
 
 void PlatformBus::handle_unknown_method(

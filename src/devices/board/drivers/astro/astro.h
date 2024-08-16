@@ -9,7 +9,6 @@
 #include <fidl/fuchsia.hardware.gpioimpl/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/markers.h>
-#include <fuchsia/hardware/iommu/cpp/banjo.h>
 #include <lib/ddk/device.h>
 #include <threads.h>
 
@@ -56,11 +55,9 @@ using AstroType = ddk::Device<Astro>;
 class Astro : public AstroType {
  public:
   explicit Astro(zx_device_t* parent,
-                 fdf::ClientEnd<fuchsia_hardware_platform_bus::PlatformBus> pbus,
-                 iommu_protocol_t* iommu)
+                 fdf::ClientEnd<fuchsia_hardware_platform_bus::PlatformBus> pbus)
       : AstroType(parent),
         pbus_(std::move(pbus)),
-        iommu_(iommu),
         outgoing_(fdf::Dispatcher::GetCurrent()->get()) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
@@ -160,7 +157,6 @@ class Astro : public AstroType {
   }
 
   fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
-  ddk::IommuProtocolClient iommu_;
   fidl::Arena<> init_arena_;
   std::vector<fuchsia_hardware_gpioimpl::InitStep> gpio_init_steps_;
   std::vector<fuchsia_hardware_clockimpl::wire::InitStep> clock_init_steps_;

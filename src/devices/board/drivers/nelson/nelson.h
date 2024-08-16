@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.clockimpl/cpp/wire.h>
 #include <fidl/fuchsia.hardware.gpioimpl/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
-#include <fuchsia/hardware/iommu/cpp/banjo.h>
 #include <lib/ddk/device.h>
 #include <threads.h>
 
@@ -80,11 +79,9 @@ using NelsonType = ddk::Device<Nelson>;
 class Nelson : public NelsonType {
  public:
   explicit Nelson(zx_device_t* parent,
-                  fdf::ClientEnd<fuchsia_hardware_platform_bus::PlatformBus> pbus,
-                  iommu_protocol_t* iommu)
+                  fdf::ClientEnd<fuchsia_hardware_platform_bus::PlatformBus> pbus)
       : NelsonType(parent),
         pbus_(std::move(pbus)),
-        iommu_(iommu),
         outgoing_(fdf::Dispatcher::GetCurrent()->get()) {}
 
   static zx_status_t Create(void* ctx, zx_device_t* parent);
@@ -192,7 +189,6 @@ class Nelson : public NelsonType {
 
   // TODO(https://fxbug.dev/42059490): Switch to fdf::SyncClient when it is available.
   fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
-  ddk::IommuProtocolClient iommu_;
   fidl::Arena<> init_arena_;
   std::vector<fuchsia_hardware_gpioimpl::InitStep> gpio_init_steps_;
   std::vector<fuchsia_hardware_clockimpl::wire::InitStep> clock_init_steps_;

@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.boot/cpp/wire.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fidl/fuchsia.sysinfo/cpp/wire.h>
-#include <fuchsia/hardware/iommu/cpp/banjo.h>
 #include <lib/async/cpp/task.h>
 #include <lib/ddk/device.h>
 #include <lib/fdf/cpp/channel.h>
@@ -39,7 +38,7 @@ using PlatformBusType =
 // This is the main class for the platform bus driver.
 class PlatformBus : public PlatformBusType,
                     public fdf::WireServer<fuchsia_hardware_platform_bus::PlatformBus>,
-                    public ddk::IommuProtocol<PlatformBus, ddk::base_protocol> {
+                    public fdf::WireServer<fuchsia_hardware_platform_bus::Iommu> {
  public:
   static zx_status_t Create(zx_device_t* parent, const char* name, zx::channel items_svc);
 
@@ -65,6 +64,10 @@ class PlatformBus : public PlatformBusType,
   void handle_unknown_method(
       fidl::UnknownMethodMetadata<fuchsia_hardware_platform_bus::PlatformBus> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override;
+
+  // fuchsia.hardware.platform.bus.PlatformBus implementation.
+  void GetBti(GetBtiRequestView request, fdf::Arena& arena,
+              GetBtiCompleter::Sync& completer) override;
 
   // SysInfo protocol implementation.
   void GetBoardName(GetBoardNameCompleter::Sync& completer) override;
@@ -111,6 +114,10 @@ class PlatformBus : public PlatformBusType,
     return bindings_;
   }
 
+  fdf::ServerBindingGroup<fuchsia_hardware_platform_bus::Iommu>& iommu_bindings() {
+    return iommu_bindings_;
+  }
+
  private:
   fidl::WireClient<fuchsia_hardware_platform_bus::SysSuspend> suspend_cb_;
 
@@ -148,6 +155,7 @@ class PlatformBus : public PlatformBusType,
   zx_device_t* protocol_passthrough_ = nullptr;
   fdf::OutgoingDirectory outgoing_;
   fdf::ServerBindingGroup<fuchsia_hardware_platform_bus::PlatformBus> bindings_;
+  fdf::ServerBindingGroup<fuchsia_hardware_platform_bus::Iommu> iommu_bindings_;
   fdf::UnownedDispatcher dispatcher_;
   std::optional<inspect::ComponentInspector> inspector_;
 };

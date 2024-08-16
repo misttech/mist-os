@@ -201,6 +201,18 @@ open protocol PlatformBus {
     }) -> () error zx.Status;
 };
 
+@discoverable
+@transport("Driver")
+closed protocol Iommu {
+    strict GetBti(struct {
+        iommu_index uint32;
+        bti_id uint32;
+    }) -> (resource struct {
+        bti zx.Handle:BTI;
+    }) error zx.Status;
+};
+
 service Service {
     platform_bus client_end:PlatformBus;
+    iommu client_end:Iommu;
 };
