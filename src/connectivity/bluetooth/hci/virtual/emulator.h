@@ -30,7 +30,6 @@ class EmulatorDevice : public fidl::WireAsyncEventHandler<fuchsia_driver_framewo
                        public fidl::WireAsyncEventHandler<fuchsia_driver_framework::Node>,
                        public fidl::Server<fuchsia_hardware_bluetooth::Emulator>,
                        public fidl::Server<fuchsia_hardware_bluetooth::HciTransport>,
-                       public fidl::WireServer<fuchsia_hardware_bluetooth::Hci>,
                        public fidl::WireServer<fuchsia_hardware_bluetooth::Vendor> {
  public:
   explicit EmulatorDevice();
@@ -49,8 +48,6 @@ class EmulatorDevice : public fidl::WireAsyncEventHandler<fuchsia_driver_framewo
   zx_status_t Initialize(std::string_view name, AddChildCallback callback,
                          ShutdownCallback shutdown);
   void Shutdown();
-
-  zx_status_t OpenChannel(ChannelType chan_type, zx_handle_t chan);
 
   void set_emulator_ptr(std::unique_ptr<EmulatorDevice> ptr) { emulator_ptr_ = std::move(ptr); }
 
@@ -79,7 +76,7 @@ class EmulatorDevice : public fidl::WireAsyncEventHandler<fuchsia_driver_framewo
   void GetFeatures(GetFeaturesCompleter::Sync& completer) override;
   void EncodeCommand(EncodeCommandRequestView request,
                      EncodeCommandCompleter::Sync& completer) override;
-  void OpenHci(OpenHciCompleter::Sync& completer) override;
+  void OpenHci(OpenHciCompleter::Sync& completer) override {}
   void OpenHciTransport(OpenHciTransportCompleter::Sync& completer) override;
   void OpenSnoop(OpenSnoopCompleter::Sync& completer) override;
   void handle_unknown_method(
@@ -96,24 +93,6 @@ class EmulatorDevice : public fidl::WireAsyncEventHandler<fuchsia_driver_framewo
   void handle_unknown_method(
       ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::HciTransport> metadata,
       ::fidl::UnknownMethodCompleter::Sync& completer) override;
-
-  // fuchsia_hardware_bluetooth::Hci overrides:
-  void OpenCommandChannel(OpenCommandChannelRequestView request,
-                          OpenCommandChannelCompleter::Sync& completer) override;
-  void OpenAclDataChannel(OpenAclDataChannelRequestView request,
-                          OpenAclDataChannelCompleter::Sync& completer) override;
-  void OpenScoDataChannel(OpenScoDataChannelRequestView request,
-                          OpenScoDataChannelCompleter::Sync& completer) override;
-  void ConfigureSco(ConfigureScoRequestView request,
-                    fidl::WireServer<fuchsia_hardware_bluetooth::Hci>::ConfigureScoCompleter::Sync&
-                        completer) override;
-  void ResetSco(ResetScoCompleter::Sync& completer) override;
-  void OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
-                          OpenIsoDataChannelCompleter::Sync& completer) override;
-  void OpenSnoopChannel(OpenSnoopChannelRequestView request,
-                        OpenSnoopChannelCompleter::Sync& completer) override;
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::Hci> metadata,
-                             fidl::UnknownMethodCompleter::Sync& completer) override;
 
   void ConnectEmulator(fidl::ServerEnd<fuchsia_hardware_bluetooth::Emulator> request);
   void ConnectVendor(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request);
@@ -138,33 +117,9 @@ class EmulatorDevice : public fidl::WireAsyncEventHandler<fuchsia_driver_framewo
                                     bt::hci_spec::ConnectionHandle handle, bool connected,
                                     bool canceled);
 
-  // Starts listening for command/event packets on the given channel.
-  // Returns false if already listening on a command channel.
-  bool StartCmdChannel(zx::channel chan);
-
-  // Starts listening for ACL packets on the given channel.
-  // Returns false if already listening on a ACL channel
-  bool StartAclChannel(zx::channel chan);
-
-  // Starts listening for ISO packets on the given channel.
-  // Return false if already listening on an ISO channel.
-  bool StartIsoChannel(zx::channel chan);
-
-  void CloseCommandChannel();
-  void CloseAclDataChannel();
-  void CloseIsoDataChannel();
-
   void SendEventToHost(pw::span<const std::byte> buffer);
   void SendAclPacketToHost(pw::span<const std::byte> buffer);
   void SendIsoPacketToHost(pw::span<const std::byte> buffer);
-
-  // Read and handle packets received over the channels
-  void HandleCommandPacket(async_dispatcher_t* dispatcher, async::WaitBase* wait,
-                           zx_status_t wait_status, const zx_packet_signal_t* signal);
-  void HandleAclPacket(async_dispatcher_t* dispatcher, async::WaitBase* wait,
-                       zx_status_t wait_status, const zx_packet_signal_t* signal);
-  void HandleIsoPacket(async_dispatcher_t* dispatcher, async::WaitBase* wait,
-                       zx_status_t wait_status, const zx_packet_signal_t* signal);
 
   pw_random_zircon::ZirconRandomGenerator rng_;
 
@@ -183,14 +138,6 @@ class EmulatorDevice : public fidl::WireAsyncEventHandler<fuchsia_driver_framewo
 
   std::vector<fuchsia_hardware_bluetooth::LegacyAdvertisingState> legacy_adv_states_;
   std::queue<WatchLegacyAdvertisingStatesCompleter::Async> legacy_adv_states_completers_;
-
-  zx::channel cmd_channel_;
-  zx::channel acl_channel_;
-  zx::channel iso_channel_;
-
-  async::WaitMethod<EmulatorDevice, &EmulatorDevice::HandleCommandPacket> cmd_channel_wait_{this};
-  async::WaitMethod<EmulatorDevice, &EmulatorDevice::HandleAclPacket> acl_channel_wait_{this};
-  async::WaitMethod<EmulatorDevice, &EmulatorDevice::HandleIsoPacket> iso_channel_wait_{this};
 
   // HciTransport protocol
   fidl::ServerBindingGroup<fuchsia_hardware_bluetooth::HciTransport> hci_transport_bindings_;

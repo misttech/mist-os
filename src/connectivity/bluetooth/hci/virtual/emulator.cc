@@ -23,21 +23,6 @@ namespace bt_hci_virtual {
 
 namespace {
 
-const char* ChannelTypeToString(ChannelType chan_type) {
-  switch (chan_type) {
-    case ChannelType::ACL:
-      return "ACL";
-    case ChannelType::EMULATOR:
-      return "EMULATOR";
-    case ChannelType::COMMAND:
-      return "COMMAND";
-    case ChannelType::ISO:
-      return "ISO";
-    case ChannelType::SNOOP:
-      return "SNOOP";
-  }
-}
-
 FakeController::Settings SettingsFromFidl(const fhbt::EmulatorSettings& input) {
   FakeController::Settings settings;
   if (input.hci_config().has_value() && input.hci_config().value() == fhbt::HciConfig::kLeOnly) {
@@ -165,23 +150,6 @@ void EmulatorDevice::Shutdown() {
   }
 }
 
-zx_status_t EmulatorDevice::OpenChannel(ChannelType chan_type, zx_handle_t chan) {
-  FDF_LOG(TRACE, "Opening %s HCI channel", ChannelTypeToString(chan_type));
-
-  zx::channel in(chan);
-
-  if (chan_type == ChannelType::COMMAND) {
-    StartCmdChannel(std::move(in));
-  } else if (chan_type == ChannelType::ACL) {
-    StartAclChannel(std::move(in));
-  } else if (chan_type == ChannelType::ISO) {
-    StartIsoChannel(std::move(in));
-  } else {
-    return ZX_ERR_NOT_SUPPORTED;
-  }
-  return ZX_OK;
-}
-
 void EmulatorDevice::Publish(PublishRequest& request, PublishCompleter::Sync& completer) {
   if (hci_node_controller_.is_valid()) {
     FDF_LOG(INFO, "bt-hci-device is already published");
@@ -259,18 +227,6 @@ void EmulatorDevice::EncodeCommand(EncodeCommandRequestView request,
   completer.ReplyError(ZX_ERR_INVALID_ARGS);
 }
 
-void EmulatorDevice::OpenHci(OpenHciCompleter::Sync& completer) {
-  auto endpoints = fidl::CreateEndpoints<fhbt::Hci>();
-  if (endpoints.is_error()) {
-    FDF_LOG(ERROR, "Failed to create endpoints: %s", zx_status_get_string(endpoints.error_value()));
-    completer.ReplyError(endpoints.error_value());
-    return;
-  }
-  fidl::BindServer(fdf::Dispatcher::GetCurrent()->async_dispatcher(), std::move(endpoints->server),
-                   this);
-  completer.ReplySuccess(std::move(endpoints->client));
-}
-
 void EmulatorDevice::OpenHciTransport(OpenHciTransportCompleter::Sync& completer) {
   // Sets FakeController to respond with event, ACL, and ISO packet types when it receives an
   // incoming packet of the appropriate type
@@ -343,70 +299,6 @@ void EmulatorDevice::handle_unknown_method(
     ::fidl::UnknownMethodMetadata<fuchsia_hardware_bluetooth::HciTransport> metadata,
     ::fidl::UnknownMethodCompleter::Sync& completer) {
   FDF_LOG(ERROR, "Unknown method in HciTransport request, closing with ZX_ERR_NOT_SUPPORTED");
-  completer.Close(ZX_ERR_NOT_SUPPORTED);
-}
-
-void EmulatorDevice::OpenCommandChannel(OpenCommandChannelRequestView request,
-                                        OpenCommandChannelCompleter::Sync& completer) {
-  if (zx_status_t status = OpenChannel(ChannelType::COMMAND, request->channel.release());
-      status != ZX_OK) {
-    completer.ReplyError(status);
-    return;
-  }
-  completer.ReplySuccess();
-}
-
-void EmulatorDevice::OpenAclDataChannel(OpenAclDataChannelRequestView request,
-                                        OpenAclDataChannelCompleter::Sync& completer) {
-  if (zx_status_t status = OpenChannel(ChannelType::ACL, request->channel.release());
-      status != ZX_OK) {
-    completer.ReplyError(status);
-    return;
-  }
-  completer.ReplySuccess();
-}
-
-void EmulatorDevice::OpenScoDataChannel(OpenScoDataChannelRequestView request,
-                                        OpenScoDataChannelCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-
-void EmulatorDevice::ConfigureSco(
-    ConfigureScoRequestView request,
-    fidl::WireServer<fuchsia_hardware_bluetooth::Hci>::ConfigureScoCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-
-void EmulatorDevice::ResetSco(ResetScoCompleter::Sync& completer) {
-  // This interface is not implemented.
-  completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
-}
-
-void EmulatorDevice::OpenIsoDataChannel(OpenIsoDataChannelRequestView request,
-                                        OpenIsoDataChannelCompleter::Sync& completer) {
-  if (zx_status_t status = OpenChannel(ChannelType::ISO, request->channel.release());
-      status != ZX_OK) {
-    completer.ReplyError(status);
-    return;
-  }
-  completer.ReplySuccess();
-}
-
-void EmulatorDevice::OpenSnoopChannel(OpenSnoopChannelRequestView request,
-                                      OpenSnoopChannelCompleter::Sync& completer) {
-  if (zx_status_t status = OpenChannel(ChannelType::SNOOP, request->channel.release());
-      status != ZX_OK) {
-    completer.ReplyError(status);
-    return;
-  }
-  completer.ReplySuccess();
-}
-
-void EmulatorDevice::handle_unknown_method(fidl::UnknownMethodMetadata<fhbt::Hci> metadata,
-                                           fidl::UnknownMethodCompleter::Sync& completer) {
-  FDF_LOG(ERROR, "Unknown method in Hci request, closing with ZX_ERR_NOT_SUPPORTED");
   completer.Close(ZX_ERR_NOT_SUPPORTED);
 }
 
@@ -590,102 +482,7 @@ void EmulatorDevice::UnpublishHci() {
   }
 }
 
-bool EmulatorDevice::StartCmdChannel(zx::channel chan) {
-  if (cmd_channel_.is_valid()) {
-    return false;
-  }
-
-  fake_device_.SetEventFunction(fit::bind_member<&EmulatorDevice::SendEventToHost>(this));
-
-  cmd_channel_ = std::move(chan);
-  cmd_channel_wait_.set_object(cmd_channel_.get());
-  cmd_channel_wait_.set_trigger(ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED);
-  zx_status_t status = cmd_channel_wait_.Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher());
-  if (status != ZX_OK) {
-    cmd_channel_.reset();
-    FDF_LOG(ERROR, "failed to start command channel: %s", zx_status_get_string(status));
-    return false;
-  }
-  return true;
-}
-
-bool EmulatorDevice::StartAclChannel(zx::channel chan) {
-  if (acl_channel_.is_valid()) {
-    return false;
-  }
-
-  // Enable FakeController to send packets to bt-host.
-  fake_device_.SetReceiveAclFunction(fit::bind_member<&EmulatorDevice::SendAclPacketToHost>(this));
-
-  // Enable bt-host to send packets to FakeController.
-  acl_channel_ = std::move(chan);
-  acl_channel_wait_.set_object(acl_channel_.get());
-  acl_channel_wait_.set_trigger(ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED);
-  zx_status_t status = acl_channel_wait_.Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher());
-  if (status != ZX_OK) {
-    acl_channel_.reset();
-    FDF_LOG(ERROR, "failed to start ACL channel: %s", zx_status_get_string(status));
-    return false;
-  }
-  return true;
-}
-
-bool EmulatorDevice::StartIsoChannel(zx::channel chan) {
-  if (iso_channel_.is_valid()) {
-    return false;
-  }
-
-  // Enable FakeController to send packets to bt-host.
-  fake_device_.SetReceiveIsoFunction(fit::bind_member<&EmulatorDevice::SendIsoPacketToHost>(this));
-
-  // Enable bt-host to send packets to FakeController.
-  iso_channel_ = std::move(chan);
-  iso_channel_wait_.set_object(iso_channel_.get());
-  iso_channel_wait_.set_trigger(ZX_CHANNEL_READABLE | ZX_CHANNEL_PEER_CLOSED);
-  zx_status_t status = iso_channel_wait_.Begin(fdf::Dispatcher::GetCurrent()->async_dispatcher());
-  if (status != ZX_OK) {
-    iso_channel_.reset();
-    FDF_LOG(ERROR, "failed to start ISO channel: %s", zx_status_get_string(status));
-    return false;
-  }
-  return true;
-}
-
-void EmulatorDevice::CloseCommandChannel() {
-  if (cmd_channel_.is_valid()) {
-    cmd_channel_wait_.Cancel();
-    cmd_channel_.reset();
-  }
-  fake_device_.Stop();
-}
-
-void EmulatorDevice::CloseAclDataChannel() {
-  if (acl_channel_.is_valid()) {
-    acl_channel_wait_.Cancel();
-    acl_channel_.reset();
-  }
-  fake_device_.Stop();
-}
-
-void EmulatorDevice::CloseIsoDataChannel() {
-  if (iso_channel_.is_valid()) {
-    iso_channel_wait_.Cancel();
-    iso_channel_.reset();
-  }
-  fake_device_.Stop();
-}
-
 void EmulatorDevice::SendEventToHost(pw::span<const std::byte> buffer) {
-  // Using Hci protocol
-  if (cmd_channel_.is_valid()) {
-    zx_status_t status = cmd_channel_.write(/*flags=*/0, buffer.data(), buffer.size(),
-                                            /*handles=*/nullptr, /*num_handles=*/0);
-    if (status != ZX_OK) {
-      FDF_LOG(WARNING, "failed to write event");
-    }
-    return;
-  }
-
   if (hci_transport_bindings_.size() == 0) {
     FDF_LOG(ERROR, "No HciTransport bindings");
     return;
@@ -705,16 +502,6 @@ void EmulatorDevice::SendEventToHost(pw::span<const std::byte> buffer) {
 }
 
 void EmulatorDevice::SendAclPacketToHost(pw::span<const std::byte> buffer) {
-  // Using Hci protocol
-  if (acl_channel_.is_valid()) {
-    zx_status_t status = acl_channel_.write(/*flags=*/0, buffer.data(), buffer.size(),
-                                            /*handles=*/nullptr, /*num_handles=*/0);
-    if (status != ZX_OK) {
-      FDF_LOG(WARNING, "failed to write ACL packet");
-    }
-    return;
-  }
-
   if (hci_transport_bindings_.size() == 0) {
     FDF_LOG(ERROR, "No HciTransport bindings");
     return;
@@ -734,16 +521,6 @@ void EmulatorDevice::SendAclPacketToHost(pw::span<const std::byte> buffer) {
 }
 
 void EmulatorDevice::SendIsoPacketToHost(pw::span<const std::byte> buffer) {
-  // Using Hci protocol
-  if (iso_channel_.is_valid()) {
-    zx_status_t status = iso_channel_.write(/*flags=*/0, buffer.data(), buffer.size(),
-                                            /*handles=*/nullptr, /*num_handles=*/0);
-    if (status != ZX_OK) {
-      FDF_LOG(WARNING, "failed to write ISO packet");
-    }
-    return;
-  }
-
   if (hci_transport_bindings_.size() == 0) {
     FDF_LOG(ERROR, "No HciTransport bindings");
     return;
@@ -760,102 +537,6 @@ void EmulatorDevice::SendIsoPacketToHost(pw::span<const std::byte> buffer) {
                   status.error_value().status_string());
         }
       });
-}
-
-void EmulatorDevice::HandleCommandPacket(async_dispatcher_t* dispatcher, async::WaitBase* wait,
-                                         zx_status_t wait_status,
-                                         const zx_packet_signal_t* signal) {
-  std::array<std::byte,
-             bt::hci_spec::kMaxCommandPacketPayloadSize + sizeof(bt::hci_spec::CommandHeader)>
-      buffer;
-
-  uint32_t read_size;
-  zx_status_t status =
-      cmd_channel_.read(0u, buffer.data(), /*handles=*/nullptr, buffer.size(), 0, &read_size,
-                        /*actual_handles=*/nullptr);
-  ZX_DEBUG_ASSERT(status == ZX_OK || status == ZX_ERR_PEER_CLOSED);
-  if (status < 0) {
-    if (status == ZX_ERR_PEER_CLOSED) {
-      FDF_LOG(INFO, "command channel was closed");
-    } else {
-      FDF_LOG(ERROR, "failed to read on cmd channel: %s", zx_status_get_string(status));
-    }
-    CloseCommandChannel();
-    return;
-  }
-
-  fake_device_.SendCommand(buffer);
-
-  status = wait->Begin(dispatcher);
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "failed to wait on cmd channel: %s", zx_status_get_string(status));
-    CloseCommandChannel();
-  }
-}
-
-void EmulatorDevice::HandleAclPacket(async_dispatcher_t* dispatcher, async::WaitBase* wait,
-                                     zx_status_t wait_status, const zx_packet_signal_t* signal) {
-  std::array<std::byte, bt::hci_spec::kMaxACLPayloadSize + sizeof(bt::hci_spec::ACLDataHeader)>
-      buffer;
-  uint32_t read_size;
-  zx_status_t status = acl_channel_.read(0u, buffer.data(), /*handles=*/nullptr, buffer.size(), 0,
-                                         &read_size, /*actual_handles=*/nullptr);
-  ZX_DEBUG_ASSERT(status == ZX_OK || status == ZX_ERR_PEER_CLOSED);
-  if (status < 0) {
-    if (status == ZX_ERR_PEER_CLOSED) {
-      FDF_LOG(INFO, "ACL channel was closed");
-    } else {
-      FDF_LOG(ERROR, "failed to read on ACL channel: %s", zx_status_get_string(status));
-    }
-
-    CloseAclDataChannel();
-    return;
-  }
-
-  if (read_size < sizeof(bt::hci_spec::ACLDataHeader)) {
-    FDF_LOG(ERROR, "malformed ACL packet received");
-  } else {
-    fake_device_.SendAclData(buffer);
-  }
-
-  status = wait->Begin(dispatcher);
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "failed to wait on ACL channel: %s", zx_status_get_string(status));
-    CloseAclDataChannel();
-  }
-}
-
-void EmulatorDevice::HandleIsoPacket(async_dispatcher_t* dispatcher, async::WaitBase* wait,
-                                     zx_status_t wait_status, const zx_packet_signal_t* signal) {
-  std::array<std::byte, bt::hci_spec::kMaxIsochronousDataPacketPayloadSize +
-                            sizeof(bt::hci_spec::IsoDataHeader)>
-      buffer;
-  uint32_t read_size;
-  zx_status_t status = iso_channel_.read(0u, buffer.data(), /*handles=*/nullptr, buffer.size(), 0,
-                                         &read_size, /*actual_handles=*/nullptr);
-  ZX_DEBUG_ASSERT(status == ZX_OK || status == ZX_ERR_PEER_CLOSED);
-  if (status < 0) {
-    if (status == ZX_ERR_PEER_CLOSED) {
-      FDF_LOG(INFO, "ISO channel was closed");
-    } else {
-      FDF_LOG(ERROR, "failed to read on ISO channel: %s", zx_status_get_string(status));
-    }
-
-    CloseIsoDataChannel();
-    return;
-  }
-
-  if (read_size < sizeof(bt::hci_spec::IsoDataHeader)) {
-    FDF_LOG(ERROR, "malformed ISO packet received");
-  } else {
-    fake_device_.SendIsoData(buffer);
-  }
-
-  status = wait->Begin(dispatcher);
-  if (status != ZX_OK) {
-    FDF_LOG(ERROR, "failed to wait on ISO channel: %s", zx_status_get_string(status));
-    CloseIsoDataChannel();
-  }
 }
 
 }  // namespace bt_hci_virtual
