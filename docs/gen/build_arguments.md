@@ -226,7 +226,7 @@ AVB metadata which will be used to validate public key
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/android/platform/external/avb/test/data/atx_metadata.bin"`
 
-From //boards/arm64.gni:39
+From //boards/arm64.gni:38
 
 **Overridden from the default:** `""`
 
@@ -234,7 +234,7 @@ From //build/images/vbmeta.gni:23
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/atx_metadata.bin"`
 
-From //boards/x64.gni:57
+From //boards/x64.gni:56
 
 **Overridden from the default:** `""`
 
@@ -246,7 +246,7 @@ a key which will be used to sign VBMETA and images for AVB
 
 **Current value for `target_cpu = "arm64"`:** `"//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"`
 
-From //boards/arm64.gni:41
+From //boards/arm64.gni:40
 
 **Overridden from the default:** `""`
 
@@ -254,7 +254,7 @@ From //build/images/vbmeta.gni:20
 
 **Current value for `target_cpu = "x64"`:** `"//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"`
 
-From //boards/x64.gni:55
+From //boards/x64.gni:54
 
 **Overridden from the default:** `""`
 
@@ -456,7 +456,7 @@ False means no limit.
 
 **Current value for `target_cpu = "arm64"`:** `10485760000`
 
-From //boards/arm64.gni:46
+From //boards/arm64.gni:44
 
 **Overridden from the default:** `false`
 
@@ -464,7 +464,7 @@ From //build/images/filesystem_limits.gni:17
 
 **Current value for `target_cpu = "x64"`:** `10485760000`
 
-From //boards/x64.gni:59
+From //boards/x64.gni:58
 
 **Overridden from the default:** `false`
 
@@ -590,9 +590,9 @@ From //build/board.gni:37
 
 ### board_is_emu
 
-Whether or not the board supports emulator/physical devices.
+Whether or not the board supports emulator devices.
 This is used to determine if product bundle metadata should generate a
-physical/virtual device spec or both.
+virtual device spec or both.
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
@@ -609,20 +609,6 @@ From //boards/x64.gni:31
 **Overridden from the default:** `false`
 
 From //build/board.gni:56
-
-### board_is_phys
-
-**Current value for `target_cpu = "arm64"`:** `false`
-
-From //boards/arm64.gni:32
-
-**Overridden from the default:** `true`
-
-From //build/board.gni:57
-
-**Current value (from the default):** `true`
-
-From //build/board.gni:57
 
 ### board_name
 
@@ -821,7 +807,7 @@ Generate a UEFI disk image
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //boards/arm64.gni:35
+From //boards/arm64.gni:34
 
 **Overridden from the default:** `false`
 
@@ -829,7 +815,7 @@ From //build/images/args.gni:30
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:63
+From //boards/x64.gni:62
 
 **Overridden from the default:** `false`
 
@@ -4570,7 +4556,7 @@ of how they are stored).
 
 **Current value for `target_cpu = "arm64"`:** `5216665600`
 
-From //boards/arm64.gni:48
+From //boards/arm64.gni:46
 
 **Overridden from the default:** `false`
 
@@ -4578,7 +4564,7 @@ From //build/images/filesystem_limits.gni:12
 
 **Current value for `target_cpu = "x64"`:** `5216665600`
 
-From //boards/x64.gni:61
+From //boards/x64.gni:60
 
 **Overridden from the default:** `false`
 
@@ -5366,24 +5352,6 @@ package flavors.
 
 From //build/packages/prebuilt_package_with_flavors.gni:29
 
-### partitions_config_contents
-
-**Current value for `target_cpu = "arm64"`:** `["//out/not-default/fuchsia.esp.blk"]`
-
-From //boards/arm64.gni:44
-
-**Overridden from the default:** `[]`
-
-From //build/board.gni:62
-
-**Current value for `target_cpu = "x64"`:** `["//out/not-default/fuchsia.esp.blk"]`
-
-From //boards/x64.gni:51
-
-**Overridden from the default:** `[]`
-
-From //build/board.gni:62
-
 ### partitions_config_label
 
 The partitions config information used to create an update package and
@@ -5391,11 +5359,11 @@ product bundle.
 
 **Current value for `target_cpu = "arm64"`:** `"//boards/partitions:arm64"`
 
-From //boards/arm64.gni:43
+From //boards/arm64.gni:42
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:61
+From //build/board.gni:60
 
 **Current value for `target_cpu = "x64"`:** `"//boards/partitions:x64"`
 
@@ -5403,7 +5371,7 @@ From //boards/x64.gni:50
 
 **Overridden from the default:** `false`
 
-From //build/board.gni:61
+From //build/board.gni:60
 
 ### perfetto_build_with_android
 
@@ -7097,7 +7065,7 @@ provided value for 'board_configuration_label'
 
 **Current value (from the default):** `"//boards/arm64"`
 
-From //build/board.gni:71
+From //build/board.gni:69
 
 ### recovery_label
 
@@ -7509,19 +7477,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:82
 Extra idk_archive() labels to be uploaded to the artifacts store. This is an
 extension mechanism for IDK bits outside of the main repository.
 
-**Current value for `target_cpu = "arm64"`:** `[]`
-
-From //products/bringup.gni:33
-
-**Overridden from the default:** `[]`
-
-From //BUILD.gn:126
-
-**Current value for `target_cpu = "x64"`:** `[]`
-
-From //products/bringup.gni:33
-
-**Overridden from the default:** `[]`
+**Current value (from the default):** `[]`
 
 From //BUILD.gn:126
 
@@ -8398,7 +8354,7 @@ Build the gigaboot bootloader.
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //boards/arm64.gni:36
+From //boards/arm64.gni:35
 
 **Overridden from the default:** `false`
 
@@ -8406,7 +8362,7 @@ From //build/images/args.gni:27
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:64
+From //boards/x64.gni:63
 
 **Overridden from the default:** `false`
 
@@ -8536,7 +8492,7 @@ LINT.IfChange
 
 **Current value for `target_cpu = "arm64"`:** `true`
 
-From //boards/arm64.gni:37
+From //boards/arm64.gni:36
 
 **Overridden from the default:** `false`
 
@@ -8544,7 +8500,7 @@ From //build/images/vbmeta.gni:15
 
 **Current value for `target_cpu = "x64"`:** `true`
 
-From //boards/x64.gni:53
+From //boards/x64.gni:52
 
 **Overridden from the default:** `false`
 
@@ -8793,7 +8749,7 @@ The product assembly config used to configure the Zedboot image.
 
 **Current value for `target_cpu = "arm64"`:** `"//products/zedboot"`
 
-From //products/bringup.gni:35
+From //products/bringup.gni:29
 
 **Overridden from the default:** `false`
 
@@ -8801,7 +8757,7 @@ From //build/product.gni:38
 
 **Current value for `target_cpu = "x64"`:** `"//products/zedboot"`
 
-From //products/bringup.gni:35
+From //products/bringup.gni:29
 
 **Overridden from the default:** `false`
 
