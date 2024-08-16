@@ -39,6 +39,8 @@ class RelaxedAtomic {
   T operator&=(T value) noexcept { return fetch_and(value) & value; }
   T operator|=(T value) noexcept { return fetch_or(value) | value; }
 
+  static constexpr bool is_always_lock_free = ktl::atomic<T>::is_always_lock_free;
+
  private:
   ktl::atomic<T> wrapped_;
 };
