@@ -4,22 +4,6 @@
 
 use assembly_util::{impl_path_type_marker, PathTypeMarker, TypedPathBuf};
 use schemars::JsonSchema;
-use serde::{Deserialize, Serialize};
-
-#[allow(dead_code)] // TODO(https://fxbug.dev/351850417)
-/// PackageIdentity is an opaque type that allows for the string that's used as
-/// a package's identity to be evolved over time, compared with other instances,
-/// and used as a key in maps / sets.
-#[derive(Debug, Clone, PartialEq, PartialOrd, Serialize, Deserialize, JsonSchema)]
-struct PackageIdentity(String);
-
-impl std::str::FromStr for PackageIdentity {
-    type Err = String;
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(Self(s.to_owned()))
-    }
-}
 
 /// The marker trait for paths within a package
 #[derive(JsonSchema)]
