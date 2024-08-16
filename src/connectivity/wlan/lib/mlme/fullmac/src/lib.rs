@@ -439,7 +439,7 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
         Ok(())
     }
 
-    fn handle_mlme_scan_request(&mut self, req: fidl_mlme::ScanRequest) -> anyhow::Result<()> {
+    fn handle_mlme_scan_request(&self, req: fidl_mlme::ScanRequest) -> anyhow::Result<()> {
         use convert::mlme_to_fullmac::convert_scan_request;
 
         if req.channel_list.is_empty() {
@@ -454,10 +454,7 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
         Ok(())
     }
 
-    fn handle_mlme_set_keys_request(
-        &mut self,
-        req: fidl_mlme::SetKeysRequest,
-    ) -> anyhow::Result<()> {
+    fn handle_mlme_set_keys_request(&self, req: fidl_mlme::SetKeysRequest) -> anyhow::Result<()> {
         use convert::mlme_to_fullmac::*;
 
         let fullmac_req = convert_set_keys_request(&req)?;
@@ -602,7 +599,7 @@ enum DriverState {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::device::test_utils::{FakeFullmacDevice, FakeFullmacDeviceMocks};
+    use crate::device::test_utils::{DriverCall, FakeFullmacDevice, FakeFullmacDeviceMocks};
     use fuchsia_async as fasync;
     use futures::task::Poll;
     use futures::Future;
@@ -762,6 +759,7 @@ mod tests {
         _usme_bootstrap_result: Option<fidl::client::QueryResponseFut<zx::Vmo>>,
         generic_sme_proxy: fidl_sme::GenericSmeProxy,
         startup_receiver: oneshot::Receiver<Result<(), FullmacMlmeError>>,
+        _driver_calls: mpsc::UnboundedReceiver<DriverCall>,
         exec: fasync::TestExecutor,
     }
 
@@ -776,7 +774,7 @@ mod tests {
         ) -> (Self, Pin<Box<impl Future<Output = ()>>>) {
             let exec = fasync::TestExecutor::new();
 
-            let mut fake_device = FakeFullmacDevice::new();
+            let (mut fake_device, _driver_calls) = FakeFullmacDevice::new();
             let usme_bootstrap_proxy = fake_device
                 .usme_bootstrap_client_end
                 .take()
@@ -819,6 +817,7 @@ mod tests {
                 _usme_bootstrap_result: usme_bootstrap_result,
                 generic_sme_proxy,
                 startup_receiver,
+                _driver_calls,
                 exec,
             };
             (test_helper, test_fut)
@@ -853,10 +852,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-        let driver_req =
-            assert_variant!(driver_calls.next(), Some(DriverCall::StartScan { req }) => req);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::StartScan { req })) => req);
         assert_eq!(driver_req.txn_id, Some(1));
         assert_eq!(driver_req.scan_type, Some(fidl_fullmac::WlanScanType::Passive));
         assert_eq!(driver_req.channels, Some(vec![2]));
@@ -883,10 +879,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-        let driver_req =
-            assert_variant!(driver_calls.next(), Some(DriverCall::StartScan { req }) => req);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::StartScan { req })) => req);
         assert_eq!(driver_req.scan_type, Some(fidl_fullmac::WlanScanType::Active));
         assert!(driver_req.ssids.as_ref().unwrap().is_empty());
     }
@@ -906,9 +899,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-        assert_variant!(driver_calls.next(), None);
+        assert_variant!(h.driver_calls.try_next(), Err(_));
         let scan_end = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(fidl_mlme::MlmeEvent::OnScanEnd { end })) => end);
         assert_eq!(
             scan_end,
@@ -954,13 +945,11 @@ mod handle_mlme_request_tests {
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
         assert!(h.mlme.is_bss_protected);
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
         assert_variant!(
-            driver_calls.next(),
-            Some(DriverCall::OnLinkStateChanged { online: false })
+            h.driver_calls.try_next(),
+            Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
         );
-        assert_variant!(driver_calls.next(), Some(DriverCall::ConnectReq { req }) => {
+        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::ConnectReq { req })) => {
             let selected_bss = req.selected_bss.clone().unwrap();
             assert_eq!(selected_bss.bssid, [100u8; 6]);
             assert_eq!(selected_bss.bss_type, fidl_common::BssType::Infrastructure);
@@ -1004,12 +993,9 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-        let driver_req =
-            assert_variant!(driver_calls.next(), Some(DriverCall::ReconnectReq { req }) => req);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::ReconnectReq { req })) => req);
         assert_eq!(
-            *driver_req,
+            driver_req,
             fidl_fullmac::WlanFullmacImplReconnectRequest {
                 peer_sta_address: Some([1u8; 6]),
                 ..Default::default()
@@ -1027,12 +1013,9 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-        let driver_req =
-            assert_variant!(driver_calls.next(), Some(DriverCall::AuthResp { resp }) => resp);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::AuthResp { resp })) => resp);
         assert_eq!(
-            *driver_req,
+            driver_req,
             fidl_fullmac::WlanFullmacImplAuthRespRequest {
                 peer_sta_address: Some([1u8; 6]),
                 result_code: Some(fidl_fullmac::WlanAuthResult::Success),
@@ -1051,14 +1034,11 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
         assert_variant!(
-            driver_calls.next(),
-            Some(DriverCall::OnLinkStateChanged { online: false })
+            h.driver_calls.try_next(),
+            Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
         );
-        let driver_req =
-            assert_variant!(driver_calls.next(), Some(DriverCall::DeauthReq { req }) => req);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::DeauthReq { req })) => req);
         assert_eq!(driver_req.peer_sta_address, Some([1u8; 6]));
         assert_eq!(driver_req.reason_code, Some(fidl_ieee80211::ReasonCode::LeavingNetworkDeauth));
     }
@@ -1076,10 +1056,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-        let driver_req =
-            assert_variant!(driver_calls.next(), Some(DriverCall::AssocResp { resp }) => resp);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::AssocResp { resp })) => resp);
         assert_eq!(driver_req.peer_sta_address, Some([1u8; 6]));
         assert_eq!(driver_req.result_code, Some(fidl_fullmac::WlanAssocResult::Success));
         assert_eq!(driver_req.association_id, Some(2));
@@ -1095,15 +1072,12 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
         assert_variant!(
-            driver_calls.next(),
-            Some(DriverCall::OnLinkStateChanged { online: false })
+            h.driver_calls.try_next(),
+            Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
         );
 
-        let driver_req =
-            assert_variant!(driver_calls.next(), Some(DriverCall::Disassoc{ req }) => req);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::Disassoc{ req })) => req);
         assert_eq!(driver_req.peer_sta_address, Some([1u8; 6]));
         assert_eq!(
             driver_req.reason_code,
@@ -1121,17 +1095,15 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
         assert_variant!(
-            driver_calls.next(),
-            Some(DriverCall::OnLinkStateChanged { online: false })
+            h.driver_calls.try_next(),
+            Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
         );
 
         let driver_req =
-            assert_variant!(driver_calls.next(), Some(DriverCall::Reset { req }) => req);
+            assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::Reset { req })) => req);
         assert_eq!(
-            *driver_req,
+            driver_req,
             fidl_fullmac::WlanFullmacImplResetRequest {
                 sta_address: Some([1u8; 6]),
                 set_default_mib: Some(true),
@@ -1162,11 +1134,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-
-        let driver_req =
-            assert_variant!(driver_calls.next(), Some(DriverCall::StartBss { req }) => req);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::StartBss { req })) => req);
 
         assert_eq!(driver_req.ssid.as_ref().unwrap().len as usize, SSID_LEN);
         assert_eq!(driver_req.ssid.as_ref().unwrap().data[..SSID_LEN], [1u8; SSID_LEN][..]);
@@ -1187,11 +1155,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-
-        let driver_req =
-            assert_variant!(driver_calls.next(), Some(DriverCall::StopBss { req }) => req);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::StopBss { req })) => req);
         assert_eq!(driver_req.ssid.as_ref().unwrap().len as usize, SSID_LEN);
         assert_eq!(driver_req.ssid.as_ref().unwrap().data[..SSID_LEN], [1u8; SSID_LEN][..]);
     }
@@ -1215,11 +1179,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-
-        let driver_req =
-            assert_variant!(driver_calls.next(), Some(DriverCall::SetKeysReq { req }) => req);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SetKeysReq { req })) => req);
         assert_eq!(driver_req.num_keys, 1);
         // assert_eq!(driver_req_keys[0], vec![5u8, 6]);
         assert_eq!(driver_req.keylist[0].key_idx, Some(7));
@@ -1267,11 +1227,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-
-        let driver_req =
-            assert_variant!(driver_calls.next(), Some(DriverCall::SetKeysReq { req }) => req);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SetKeysReq { req })) => req);
         assert_eq!(driver_req.num_keys, NUM_KEYS as u64);
         for i in 0..NUM_KEYS {
             assert_eq!(driver_req.keylist[i].key_idx, Some(i as u8));
@@ -1308,11 +1264,8 @@ mod handle_mlme_request_tests {
 
         assert!(h.mlme.handle_mlme_request(fidl_req).is_err());
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-
         // No SetKeysReq and SetKeysResp
-        assert_variant!(driver_calls.next(), None);
+        assert_variant!(h.driver_calls.try_next(), Err(_));
         assert_variant!(h.mlme_event_receiver.try_next(), Err(_));
     }
 
@@ -1338,10 +1291,7 @@ mod handle_mlme_request_tests {
         // An error is expected when converting the response
         assert!(h.mlme.handle_mlme_request(fidl_req).is_err());
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-
-        assert_variant!(driver_calls.next(), Some(DriverCall::SetKeysReq { .. }));
+        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SetKeysReq { .. })));
         // No SetKeysConf MLME event because the SetKeysResp from driver has different number of
         // keys.
         assert_variant!(h.mlme_event_receiver.try_next(), Err(_));
@@ -1360,11 +1310,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-
-        let driver_req =
-            assert_variant!(driver_calls.next(), Some(DriverCall::DelKeysReq { req }) => req);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::DelKeysReq { req })) => req);
         assert_eq!(driver_req.num_keys, 1);
         assert_eq!(driver_req.keylist[0].key_id, 1);
         assert_eq!(driver_req.keylist[0].key_type, fidl_common::WlanKeyType::Peer);
@@ -1382,11 +1328,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-
-        let driver_req =
-            assert_variant!(driver_calls.next(), Some(DriverCall::EapolTx { req }) => req);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::EapolTx { req })) => req);
         assert_eq!(driver_req.src_addr, Some([1u8; 6]));
         assert_eq!(driver_req.dst_addr, Some([2u8; 6]));
         assert_eq!(driver_req.data, Some(vec![3u8; 4]));
@@ -1412,11 +1354,8 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-
-        assert_variant!(driver_calls.next(), Some(DriverCall::OnLinkStateChanged { online }) => {
-            assert_eq!(*online, expected_link_state);
+        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::OnLinkStateChanged { online })) => {
+            assert_eq!(online, expected_link_state);
         });
     }
 
@@ -1440,10 +1379,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-
-        assert_variant!(driver_calls.next(), Some(DriverCall::GetIfaceCounterStats));
+        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::GetIfaceCounterStats)));
         let stats = assert_variant!(stats_receiver.try_recv(), Ok(Some(stats)) => stats);
         let stats =
             assert_variant!(stats, fidl_mlme::GetIfaceCounterStatsResponse::Stats(stats) => stats);
@@ -1529,10 +1465,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-
-        assert_variant!(driver_calls.next(), Some(DriverCall::GetIfaceHistogramStats));
+        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::GetIfaceHistogramStats)));
         let stats = assert_variant!(stats_receiver.try_recv(), Ok(Some(stats)) => stats);
         let stats = assert_variant!(stats, fidl_mlme::GetIfaceHistogramStatsResponse::Stats(stats) => stats);
         assert_eq!(
@@ -1588,10 +1521,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-
-        let driver_req = assert_variant!(driver_calls.next(), Some(DriverCall::SaeHandshakeResp { resp }) => resp);
+        let driver_req = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SaeHandshakeResp { resp })) => resp);
         assert_eq!(driver_req.peer_sta_address, [1u8; 6]);
         assert_eq!(driver_req.status_code, fidl_ieee80211::StatusCode::AntiCloggingTokenRequired);
     }
@@ -1608,11 +1538,7 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-
-        let driver_frame =
-            assert_variant!(driver_calls.next(), Some(DriverCall::SaeFrameTx { frame }) => frame);
+        let driver_frame = assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::SaeFrameTx { frame })) => frame);
         assert_eq!(driver_frame.peer_sta_address, [1u8; 6]);
         assert_eq!(driver_frame.status_code, fidl_ieee80211::StatusCode::Success);
         assert_eq!(driver_frame.seq_num, 2);
@@ -1626,23 +1552,21 @@ mod handle_mlme_request_tests {
 
         h.mlme.handle_mlme_request(fidl_req).unwrap();
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-
-        assert_variant!(driver_calls.next(), Some(DriverCall::WmmStatusReq));
+        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::WmmStatusReq)));
     }
 
     pub struct TestHelper {
         fake_device: Arc<Mutex<FakeFullmacDeviceMocks>>,
         mlme: FullmacMlme<FakeFullmacDevice>,
         mlme_event_receiver: mpsc::UnboundedReceiver<fidl_mlme::MlmeEvent>,
+        driver_calls: mpsc::UnboundedReceiver<DriverCall>,
         _mlme_request_sender: mpsc::UnboundedSender<wlan_sme::MlmeRequest>,
         _driver_event_sender: mpsc::UnboundedSender<FullmacDriverEvent>,
     }
 
     impl TestHelper {
         pub fn set_up_with_link_state(device_link_state: fidl_mlme::ControlledPortState) -> Self {
-            let fake_device = FakeFullmacDevice::new();
+            let (fake_device, driver_calls) = FakeFullmacDevice::new();
             let (mlme_request_sender, mlme_request_stream) = mpsc::unbounded();
             let (mlme_event_sender, mlme_event_receiver) = mpsc::unbounded();
             let mlme_event_sink = UnboundedSink::new(mlme_event_sender);
@@ -1662,6 +1586,7 @@ mod handle_mlme_request_tests {
                 fake_device: mocks,
                 mlme,
                 mlme_event_receiver,
+                driver_calls,
                 _mlme_request_sender: mlme_request_sender,
                 _driver_event_sender: driver_event_sender,
             }
@@ -1870,21 +1795,18 @@ mod handle_driver_event_tests {
         }
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-
         assert_variant!(
-            driver_calls.next(),
-            Some(DriverCall::OnLinkStateChanged { online: false })
+            h.driver_calls.try_next(),
+            Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
         );
-        assert_variant!(driver_calls.next(), Some(DriverCall::ConnectReq { .. }));
+        assert_variant!(h.driver_calls.try_next(), Ok(Some(DriverCall::ConnectReq { .. })));
         if expected_online {
             assert_variant!(
-                driver_calls.next(),
-                Some(DriverCall::OnLinkStateChanged { online: true })
+                h.driver_calls.try_next(),
+                Ok(Some(DriverCall::OnLinkStateChanged { online: true }))
             );
         } else {
-            assert_variant!(driver_calls.next(), None);
+            assert_variant!(h.driver_calls.try_next(), Err(_));
         }
     }
 
@@ -1931,16 +1853,13 @@ mod handle_driver_event_tests {
         }
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-
         if mac_role == fidl_common::WlanMacRole::Client {
             assert_variant!(
-                driver_calls.next(),
-                Some(DriverCall::OnLinkStateChanged { online: false })
+                h.driver_calls.try_next(),
+                Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
             );
         } else {
-            assert_variant!(driver_calls.next(), None);
+            assert_variant!(h.driver_calls.try_next(), Err(_));
         }
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
@@ -1971,16 +1890,13 @@ mod handle_driver_event_tests {
         }
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-
         if mac_role == fidl_common::WlanMacRole::Client {
             assert_variant!(
-                driver_calls.next(),
-                Some(DriverCall::OnLinkStateChanged { online: false })
+                h.driver_calls.try_next(),
+                Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
             );
         } else {
-            assert_variant!(driver_calls.next(), None);
+            assert_variant!(h.driver_calls.try_next(), Err(_));
         }
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
@@ -2050,16 +1966,13 @@ mod handle_driver_event_tests {
         }
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-
         if mac_role == fidl_common::WlanMacRole::Client {
             assert_variant!(
-                driver_calls.next(),
-                Some(DriverCall::OnLinkStateChanged { online: false })
+                h.driver_calls.try_next(),
+                Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
             );
         } else {
-            assert_variant!(driver_calls.next(), None);
+            assert_variant!(h.driver_calls.try_next(), Err(_));
         }
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
@@ -2089,16 +2002,13 @@ mod handle_driver_event_tests {
         }
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-
         if mac_role == fidl_common::WlanMacRole::Client {
             assert_variant!(
-                driver_calls.next(),
-                Some(DriverCall::OnLinkStateChanged { online: false })
+                h.driver_calls.try_next(),
+                Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
             );
         } else {
-            assert_variant!(driver_calls.next(), None);
+            assert_variant!(h.driver_calls.try_next(), Err(_));
         }
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
@@ -2133,16 +2043,13 @@ mod handle_driver_event_tests {
         }
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-
         if expected_link_state_changed {
             assert_variant!(
-                driver_calls.next(),
-                Some(DriverCall::OnLinkStateChanged { online: true })
+                h.driver_calls.try_next(),
+                Ok(Some(DriverCall::OnLinkStateChanged { online: true }))
             );
         } else {
-            assert_variant!(driver_calls.next(), None);
+            assert_variant!(h.driver_calls.try_next(), Err(_));
         }
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
@@ -2240,13 +2147,10 @@ mod handle_driver_event_tests {
         }
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-
         // Receipt of a roam start causes MLME to close the controlled port.
         assert_variant!(
-            driver_calls.next(),
-            Some(DriverCall::OnLinkStateChanged { online: false })
+            h.driver_calls.try_next(),
+            Ok(Some(DriverCall::OnLinkStateChanged { online: false }))
         );
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
@@ -2287,11 +2191,11 @@ mod handle_driver_event_tests {
         }
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let binding = h.fake_device.lock().unwrap();
-        let mut driver_calls = binding.captured_driver_calls.iter();
-
         // Receipt of a roam result success causes MLME to open the controlled port on an open network.
-        assert_variant!(driver_calls.next(), Some(DriverCall::OnLinkStateChanged { online: true }));
+        assert_variant!(
+            h.driver_calls.try_next(),
+            Ok(Some(DriverCall::OnLinkStateChanged { online: true }))
+        );
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
         let ind = assert_variant!(event, fidl_mlme::MlmeEvent::RoamResultInd { ind } => ind);
@@ -2532,6 +2436,7 @@ mod handle_driver_event_tests {
         mlme_request_sender: mpsc::UnboundedSender<wlan_sme::MlmeRequest>,
         driver_event_protocol: WlanFullmacIfcProtocol,
         mlme_event_receiver: mpsc::UnboundedReceiver<fidl_mlme::MlmeEvent>,
+        driver_calls: mpsc::UnboundedReceiver<DriverCall>,
         exec: fasync::TestExecutor,
     }
 
@@ -2548,7 +2453,7 @@ mod handle_driver_event_tests {
         ) -> (Self, Pin<Box<impl Future<Output = Result<(), anyhow::Error>>>>) {
             let exec = fasync::TestExecutor::new();
 
-            let fake_device = FakeFullmacDevice::new();
+            let (fake_device, driver_call_receiver) = FakeFullmacDevice::new();
             let (mlme_request_sender, mlme_request_stream) = mpsc::unbounded();
             let (mlme_event_sender, mlme_event_receiver) = mpsc::unbounded();
             let mlme_event_sink = UnboundedSink::new(mlme_event_sender);
@@ -2573,6 +2478,7 @@ mod handle_driver_event_tests {
                 mlme_request_sender,
                 driver_event_protocol: ifc,
                 mlme_event_receiver,
+                driver_calls: driver_call_receiver,
                 exec,
             };
             (test_helper, test_fut)
