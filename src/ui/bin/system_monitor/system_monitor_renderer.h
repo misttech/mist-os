@@ -10,6 +10,8 @@
 #include <fidl/fuchsia.ui.views/cpp/fidl.h>
 #include <lib/component/incoming/cpp/protocol.h>
 
+#include <string>
+
 #include "src/lib/fxl/memory/ref_counted.h"
 #include "src/ui/lib/escher/debug/debug_font.h"
 #include "src/ui/lib/escher/escher.h"
@@ -25,7 +27,7 @@ namespace system_monitor {
 class SystemMonitorRenderer {
  public:
   void Initialize();
-  void RenderFrame();
+  void RenderFrame(std::string cpu_string);
 
  private:
   fxl::RefPtr<escher::VulkanInstance> instance_;

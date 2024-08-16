@@ -22,6 +22,7 @@ source_set("lib") {
     "//sdk/lib/sys/cpp",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fsl",
+    "//src/lib/json_parser",
     "//src/lib/vulkan:vulkan_validation_layers",
     "//src/lib/vulkan/swapchain:image_pipe_swapchain_layer",
     "//src/ui/lib/escher",
