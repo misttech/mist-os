@@ -28,12 +28,21 @@ if (is_host) {
     main_callable = "unittest.main"
     extra_args = [ "-v" ]
   }
+
+  python_host_test("mac_address_test") {
+    enable_mypy = true
+    main_source = "mac_address_test.py"
+    libraries = [ "//src/testing/end_to_end/honeydew" ]
+    main_callable = "unittest.main"
+    extra_args = [ "-v" ]
+  }
 }
 
 group("tests") {
   testonly = true
   public_deps = [
     ":custom_types_test($host_toolchain)",
+    ":mac_address_test($host_toolchain)",
     ":screenshot_image_test($host_toolchain)",
   ]
 }
