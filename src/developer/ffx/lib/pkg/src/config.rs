@@ -203,6 +203,7 @@ pub async fn get_repository(repo_name: &str) -> Result<Option<RepositorySpec>> {
 
 /// Read all the repositories from the config. This will log, but otherwise ignore invalid entries.
 pub async fn get_repositories() -> BTreeMap<String, RepositorySpec> {
+    #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336157)
     let value = match ffx_config::get::<Option<Value>, _>(CONFIG_KEY_REPOSITORIES).await {
         Ok(Some(value)) => value,
         Ok(None) => {
@@ -274,6 +275,7 @@ pub async fn get_registration(
 }
 
 pub async fn get_registrations() -> BTreeMap<String, BTreeMap<String, RepositoryTarget>> {
+    #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336157)
     let value = match ffx_config::get::<Option<Value>, _>(CONFIG_KEY_REGISTRATIONS).await {
         Ok(Some(value)) => value,
         Ok(None) => {
@@ -311,6 +313,7 @@ pub async fn get_registrations() -> BTreeMap<String, BTreeMap<String, Repository
 }
 
 pub async fn get_repository_registrations(repo_name: &str) -> BTreeMap<String, RepositoryTarget> {
+    #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336157)
     let targets = match ffx_config::get(&repository_registrations_query(repo_name)).await {
         Ok(Some(targets)) => targets,
         Ok(None) => {
