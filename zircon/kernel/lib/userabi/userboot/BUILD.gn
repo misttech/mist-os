@@ -1,4 +1,3 @@
-# Copyright 2024 Mist Tecnologia LTDA
 # Copyright 2019 The Fuchsia Authors
 #
 # Use of this source code is governed by a MIT-style
@@ -28,11 +27,7 @@ if (current_toolchain == default_toolchain) {
   foreach(cpu, standard_fuchsia_cpus) {
     zircon_toolchain_suite("userboot_$cpu") {
       cpu = cpu
-      if (is_mistos) {
-        os = "mistos"
-      } else {
-        os = "fuchsia"
-      }
+      os = "fuchsia"
       environment = "userboot"
       configs = [
         "//zircon/kernel/lib/userabi/userboot:userboot_config",
@@ -109,9 +104,6 @@ if (toolchain_environment == "userboot") {
       "zx_panic.cc",
     ]
     defines = [ "BOOT_TEST_SUCCESS_STRING=\"$boot_test_success_string\"" ]
-    if (is_mistos) {
-      defines += [ "__mist_os__" ]
-    }
     ldflags = [
       "-Wl,-e,_start",
       "-nostartfiles",
