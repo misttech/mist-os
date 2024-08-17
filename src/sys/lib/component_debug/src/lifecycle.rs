@@ -166,6 +166,7 @@ pub async fn start_instance(
         })?;
     let stop_future = async move {
         let mut event_stream = client.take_event_stream();
+        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336921)
         match event_stream.next().await {
             Some(Err(e)) => return Err(e),
             None => return Ok(()),
@@ -200,6 +201,7 @@ pub async fn start_instance_with_args(
         })?;
     let stop_future = async move {
         let mut event_stream = client.take_event_stream();
+        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336921)
         match event_stream.next().await {
             Some(Err(e)) => return Err(e),
             None => return Ok(()),
