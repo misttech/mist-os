@@ -110,7 +110,7 @@ void lk_main(paddr_t handoff_paddr) {
 
   // At this point, the kernel command line and serial are set up.
 
-#if _KERNEL_MISTOS
+#if __mist_os__
   dprintf(INFO, "\nwelcome to Zircon/mist-os kernel\n\n");
 #else
   dprintf(INFO, "\nwelcome to Zircon\n\n");
