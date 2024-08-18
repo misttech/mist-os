@@ -32,6 +32,7 @@ if (toolchain_environment == "user.basic") {
   loadable_module("liblinux") {
     visibility = [ ":*" ]
 
+    #ldflags = [ "-Wl,-soname=linux-vdso.so.1" ]
     ldflags = [ "-Wl,-soname=liblinux.so" ]
 
     configs += [ "//build/config/zircon:rodso" ]
@@ -42,20 +43,34 @@ if (toolchain_environment == "user.basic") {
 
       # The vDSO cannot have a writable segment.
       "needs-writable-globals",
+
+      # The vDSO can't usefully wire up a custom runtime.
+      "custom-runtime",
     ]
 
-    # FIXME (Herrera) Temporary disable file compilation 
-    # (need to fix zither legacy_syscall_cdecl and c backends)
-    # to work as in the mistos backend (c.go).
-    #sources = [ "syscall-wrappers.cc" ]
+    sources = [
+      "data.S",
+      "syscall-wrappers.cc",
+      "zx_system_get_page_size.cc",
+      "zx_ticks_get.cc",
+    ]
 
-    public_deps = [ "//zircon/kernel/lib/mistos/vdso:public" ]
+    #public_deps = [ "//zircon/kernel/lib/mistos/vdso:public" ]
     deps = [
       ":syscall-asm",
+      "//zircon/kernel/lib/arch:headers",
+      "//zircon/kernel/lib/fasttime:headers",
       "//zircon/kernel/lib/mistos/userabi:headers",
       "//zircon/kernel/lib/mistos/vdso:private",
       "//zircon/system/ulib/affine",
     ]
+
+    # Instruct the linker to preserve the hidden alternate entry points.
+    # Note, "./" makes GN realize this is a file rather than a -l switch.
+    libs = [ "./alternates.ld" ]
+
+    # Set e_entry so _zx_process_exit is easy to find without reading .dynsym.
+    #ldflags += [ "-Wl,-e,_zx_process_exit" ]
 
     # This ensures that the vDSO is never installed into filesystem images
     # since it's materialized at runtime by the kernel.
@@ -63,13 +78,19 @@ if (toolchain_environment == "user.basic") {
       distribution_entries_barrier = []
       distribution_entries = []
     }
+
+    # workaround for b/349448459 to remote-link successfully
+    configs += [ "//build/config:remote_link_scandeps_workaround" ]
   }
 
   source_set("syscall-asm") {
     visibility = [ ":*" ]
 
     sources = [ "syscalls-$zircon_cpu.S" ]
-    deps = [ "//zircon/kernel/lib/mistos/vdso:private" ]
+    deps = [
+      "//zircon/kernel/lib/mistos/userabi:headers",
+      "//zircon/kernel/lib/mistos/vdso:private",
+    ]
   }
 
   # Make sure the vDSO that goes into the kernel matches the ABI

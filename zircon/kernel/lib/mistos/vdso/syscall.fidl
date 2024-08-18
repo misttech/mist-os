@@ -1211,4 +1211,15 @@ closed protocol Syscall {
     strict CompatPreadv2() -> () error int64;
     ///STUB 547
     strict CompatPwritev2() -> () error int64;
+
+    @vdsocall
+    strict TicksGet() -> (@wrapped_return struct {
+        ticks int64;
+    });
+
+    @const
+    @vdsocall
+    strict SystemGetPageSize() -> (@wrapped_return struct {
+        size uint32;
+    });
 };

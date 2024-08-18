@@ -24,5 +24,6 @@
 
 #define INTERNAL_SYSCALL(...) KERNEL_SYSCALL(__VA_ARGS__)
 #define BLOCKING_SYSCALL(...) KERNEL_SYSCALL(__VA_ARGS__)
+#define VDSO_SYSCALL(...) KERNEL_SYSCALL(__VA_ARGS__)
 
 #include <lib/syscalls/kernel.inc>

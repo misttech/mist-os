@@ -515,8 +515,10 @@ Symbols:
   - { Name: _zx_sysfs, Type: Func }
   - { Name: _zx_sysinfo, Type: Func }
   - { Name: _zx_syslog, Type: Func }
+  - { Name: _zx_system_get_page_size, Type: Func }
   - { Name: _zx_tee, Type: Func }
   - { Name: _zx_tgkill, Type: Func }
+  - { Name: _zx_ticks_get, Type: Func }
   - { Name: _zx_time, Type: Func }
   - { Name: _zx_timer_create, Type: Func }
   - { Name: _zx_timer_delete, Type: Func }
@@ -1063,8 +1065,10 @@ Symbols:
   - { Name: zx_sysfs, Type: Func, Weak: true }
   - { Name: zx_sysinfo, Type: Func, Weak: true }
   - { Name: zx_syslog, Type: Func, Weak: true }
+  - { Name: zx_system_get_page_size, Type: Func, Weak: true }
   - { Name: zx_tee, Type: Func, Weak: true }
   - { Name: zx_tgkill, Type: Func, Weak: true }
+  - { Name: zx_ticks_get, Type: Func, Weak: true }
   - { Name: zx_time, Type: Func, Weak: true }
   - { Name: zx_timer_create, Type: Func, Weak: true }
   - { Name: zx_timer_delete, Type: Func, Weak: true }
