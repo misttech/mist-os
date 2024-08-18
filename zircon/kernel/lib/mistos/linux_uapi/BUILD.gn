@@ -31,7 +31,8 @@ config("headers.after") {
 }
 
 # Run generate_uapi_headers.sh manually and commit the headers save some build time
-# ./generate_uapi_headers.sh --download-kernel --branch $linux_kernel_version --out-dir uapi/$linux_kernel_version/
+# mkdir -p uapi/$linux_kernel_version
+# ./generate_uapi_headers.sh --download-kernel --branch $linux_kernel_version --out-dir uapi/$linux_kernel_version
 # cd uapi/$linux_kernel_version/uapi
 # mv $zircon_cpu ../
 
