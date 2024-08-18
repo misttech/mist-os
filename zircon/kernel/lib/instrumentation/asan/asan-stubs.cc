@@ -25,7 +25,7 @@
 // (see llvm/lib/Transforms/Instrumentation/AddressSanitizer.cpp and
 // compiler-rt/lib/asan/*).
 
-#if _KERNEL_MISTOS
+#if __mist_os__
 constexpr size_t kAsanMaxGlobalsRegions = 900;
 #else
 constexpr size_t kAsanMaxGlobalsRegions = 450;

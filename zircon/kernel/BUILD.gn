@@ -363,6 +363,10 @@ if (is_kernel) {
       defines += [ "KERNEL_NO_USERABI" ]
     }
 
+    if (is_mistos) {
+      configs += [ "//build/config/mistos:mistos_define" ]
+    }
+
     cflags = [ "-fpie" ]
   }
 

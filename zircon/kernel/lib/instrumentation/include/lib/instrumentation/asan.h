@@ -97,7 +97,7 @@ inline constexpr uint8_t kAsanInternalHeapMagic = 0xf0;
 inline constexpr uint8_t kAsanGlobalRedzoneMagic = 0xf9;
 inline constexpr uint8_t kAsanHeapLeftRedzoneMagic = 0xfa;
 inline constexpr uint8_t kAsanPmmFreeMagic = 0xfb;
-#if _KERNEL_MISTOS
+#if __mist_os__
 inline constexpr uint8_t kAsanContiguousContainerOOBMagic = 0xfc;
 #else
 inline constexpr uint8_t kAsanQuarantineMagic = 0xfc;
