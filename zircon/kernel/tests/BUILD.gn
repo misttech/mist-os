@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA
 # Copyright 2019 The Fuchsia Authors
 #
 # Use of this source code is governed by a MIT-style
@@ -135,6 +136,11 @@ if (toolchain_environment == "kernel") {
     if (!kernel_no_userabi) {
       sources += [ "userboot_tests.cc" ]
       deps += [ "//zircon/kernel/lib/userabi" ]
+      if (is_mistos) {
+        sources -= [ "userboot_tests.cc" ]
+        deps -= [ "//zircon/kernel/lib/userabi" ]
+        deps += [ "//zircon/kernel/lib/mistos/userabi" ]
+      }
     }
     public_deps = [ "//zircon/system/ulib/zx:headers" ]
   }

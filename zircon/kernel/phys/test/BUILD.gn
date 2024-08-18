@@ -532,6 +532,11 @@ if (current_toolchain != default_toolchain) {
       ":elf-physboot-test-zircon",
       "//zircon/system/utest/core:core-tests-standalone($default_toolchain)",
     ]
+    if (is_mistos) {
+      deps -= [
+        "//zircon/system/utest/core:core-tests-standalone($default_toolchain)",
+      ]
+    }
   }
 
   kernel_elf_binary("physboot-elf-kernel-hello-world-test") {
@@ -637,6 +642,9 @@ if (current_toolchain != default_toolchain) {
         ":elf-physboot-core-tests",
         ":zbi-chain-load-core-tests",
       ]
+      if (is_mistos) {
+        deps -= [ ":zbi-chain-load-core-tests" ]
+      }
     }
 
     if (have_devicetree) {

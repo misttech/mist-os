@@ -15,6 +15,9 @@ source_set("hypervisor") {
     "vmx.S",
     "vmx_cpu_state.cc",
   ]
+  if (is_mistos) {
+    sources -= [ "vmcall.cc" ]
+  }
   deps = [
     ":tests",
     "//zircon/kernel/arch/x86:headers",
