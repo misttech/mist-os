@@ -2919,7 +2919,7 @@ mod tests {
     fn test_broker_lease_transitive() {
         // Create a topology of a child element with two chained transitive
         // dependencies.
-        // C -> P -> GP
+        // C => P => GP
         let inspect = fuchsia_inspect::component::inspector();
         let inspect_node = inspect.root().create_child("test");
         let mut broker = Broker::new(inspect_node);
@@ -3043,17 +3043,17 @@ mod tests {
     fn test_broker_lease_shared() {
         // Create a topology of two child elements with a shared
         // parent and grandparent
-        // C1 \
-        //     > P -> GP
-        // C2 /
+        // C1 \\
+        //      > P => GP
+        // C2 //
         // Child 1 requires Parent at 50 to support its own level of 5.
         // Parent requires Grandparent at 200 to support its own level of 50.
-        // C1 -> P -> GP
-        //  5 -> 50 -> 200
+        // C1 => P => GP
+        //  5 => 50 => 200
         // Child 2 requires Parent at 30 to support its own level of 3.
         // Parent requires Grandparent at 90 to support its own level of 30.
-        // C2 -> P -> GP
-        //  3 -> 30 -> 90
+        // C2 =>  P => GP
+        //  3 => 30 => 90
         // Grandparent has a minimum required level of 10.
         // All other elements have a minimum of 0.
         let inspect = fuchsia_inspect::component::inspector();
@@ -6361,8 +6361,8 @@ mod tests {
         // Storage's Hardware (HW) and Wake-on-request (WOR) elements, and
         // System Activity Governor's Wake Handling (WH) and Execution State
         // elements.
-        // HW has a passive dep on Execution State: Wake Handling (1)
-        // WOR has an active dep on Wake Handling: Active, which has an active dep on ES: WH
+        // HW has an opportunistic dep on Execution State: Wake Handling (1)
+        // WOR has an assertive dep on Wake Handling: Active, which has an assertive dep on ES: WH
         // A persistent lease is held on HW that should be activated whenever ES is at WH or higher.
         // HW -> ES(WH)
         // WOR => WH(A)
