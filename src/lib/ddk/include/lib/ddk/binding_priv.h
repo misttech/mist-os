@@ -36,10 +36,10 @@ __BEGIN_CDECLS
 // flags are initially zero, may be set/cleared with SET/CLEAR
 // flags may be tested by comparison against BIND_FLAGS
 
-#define BINDINST(c, o, a, b, v)                                                             \
-  {                                                                                         \
-    (((c) & 0xF) << 28) | (((o) & 0xF) << 24) | (((a) & 0xFF) << 16) | ((b) & 0xFFFF), (v), \
-        0 /* debug */                                                                       \
+#define BINDINST(c, o, a, b, v)                                                               \
+  {                                                                                           \
+      (((c) & 0xF) << 28) | (((o) & 0xF) << 24) | (((a) & 0xFF) << 16) | ((b) & 0xFFFF), (v), \
+      0 /* debug */                                                                           \
   }
 
 #define BINDINST_CC(n) ((n) >> 28)
@@ -94,7 +94,7 @@ __BEGIN_CDECLS
 #define BIND_PLATFORM_DEV_INTERRUPT_ID 0x0305
 
 // ACPI binding variables at 0x04XX
-#define BIND_ACPI_BUS_TYPE 0x0400
+// BIND_ACPI_BUS_TYPE was 0x0400
 // Internal use only.
 #define BIND_ACPI_ID 0x0401
 
@@ -138,8 +138,8 @@ __BEGIN_CDECLS
 #define BIND_CLOCK_ID 0x0A30
 
 // SPI binding variables at 0x0A4X
-#define BIND_SPI_BUS_ID 0x0A41
-#define BIND_SPI_CHIP_SELECT 0x0A42
+// BIND_SPI_BUS_ID was 0x0A41
+// BIND_SPI_CHIP_SELECT was 0x0A42
 
 // PWM binding variables at 0x0A5X
 #define BIND_PWM_ID 0x0A50
@@ -192,11 +192,12 @@ typedef struct {
   char name[(sizeof(ZIRCON_NOTE_NAME) + 3) & -4];
 } zircon_driver_note_header_t;
 
-#define ZIRCON_DRIVER_NOTE_HEADER_INIT(object)                                  \
-  {                                                                             \
-    /* .namesz = */ sizeof(ZIRCON_NOTE_NAME),                                   \
-        /* .descsz = */ (sizeof(object) - sizeof(zircon_driver_note_header_t)), \
-        /* .type = */ ZIRCON_NOTE_DRIVER, /* .name = */ ZIRCON_NOTE_NAME,       \
+#define ZIRCON_DRIVER_NOTE_HEADER_INIT(object)                                \
+  {                                                                           \
+      /* .namesz = */ sizeof(ZIRCON_NOTE_NAME),                               \
+      /* .descsz = */ (sizeof(object) - sizeof(zircon_driver_note_header_t)), \
+      /* .type = */ ZIRCON_NOTE_DRIVER,                                       \
+      /* .name = */ ZIRCON_NOTE_NAME,                                         \
   }
 
 typedef struct {
@@ -217,10 +218,13 @@ typedef struct {
 // devhost that supports the ASan runtime.
 #define ZIRCON_DRIVER_NOTE_FLAG_ASAN (1u << 0)
 
-#define ZIRCON_DRIVER_NOTE_PAYLOAD_INIT(Driver, VendorName, Version)                      \
-  {                                                                                       \
-    /* .flags = */ ZIRCON_DRIVER_NOTE_FLAGS, /* .reserved0 = */ 0, /* .name = */ #Driver, \
-        /* .vendor = */ VendorName, /* .version = */ Version,                             \
+#define ZIRCON_DRIVER_NOTE_PAYLOAD_INIT(Driver, VendorName, Version) \
+  {                                                                  \
+      /* .flags = */ ZIRCON_DRIVER_NOTE_FLAGS,                       \
+      /* .reserved0 = */ 0,                                          \
+      /* .name = */ #Driver,                                         \
+      /* .vendor = */ VendorName,                                    \
+      /* .version = */ Version,                                      \
   }
 
 #define ZIRCON_DRIVER_NOTE_FLAGS \

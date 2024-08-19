@@ -54,8 +54,6 @@ const char* BindParamName(uint32_t param_num) {
       return "PlatDev.PID";
     case BIND_PLATFORM_DEV_DID:
       return "PlatDev.DID";
-    case BIND_ACPI_BUS_TYPE:
-      return "ACPI.BusType";
     case BIND_IHDA_CODEC_VID:
       return "IHDA.Codec.VID";
     case BIND_IHDA_CODEC_DID:

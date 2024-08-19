@@ -40,7 +40,6 @@
 #define BIND_PLATFORM_DEV_INTERRUPT_ID 0x0305
 
 // ACPI binding variables at 0x04XX
-#define BIND_ACPI_BUS_TYPE 0x0400
 // Internal use only.
 #define BIND_ACPI_ID 0x0401
 
@@ -82,10 +81,6 @@
 
 // POWER binding variables at 0x0A3X
 #define BIND_CLOCK_ID 0x0A30
-
-// SPI binding variables at 0x0A4X
-#define BIND_SPI_BUS_ID 0x0A41
-#define BIND_SPI_CHIP_SELECT 0x0A42
 
 // PWM binding variables at 0x0A5X
 #define BIND_PWM_ID 0x0A50
