@@ -10,6 +10,23 @@ group("integration") {
   public_deps = [ ":msd_arm_mali_integration_tests" ]
 }
 
+source_set("mali_utils") {
+  testonly = true
+  sources = [
+    "mali_utils.cc",
+    "mali_utils.h",
+  ]
+  public_deps = [
+    "../../include",
+    "//sdk/lib/magma_client:magma_headers",
+    "//src/graphics/lib/magma/src/libmagma",
+    "//src/graphics/magma/lib/magma/util:macros",
+    "//src/graphics/magma/lib/magma/util:short_macros",
+    "//src/graphics/magma/lib/magma_client/test_util:magma_map_cpu",
+    "//src/graphics/magma/lib/magma_client/test_util:test_device_helper",
+  ]
+}
+
 executable("msd_arm_mali_integration_tests") {
   testonly = true
 
@@ -20,8 +37,6 @@ executable("msd_arm_mali_integration_tests") {
 
   sources = [
     "driver_registry.h",
-    "mali_utils.cc",
-    "mali_utils.h",
     "run_unit_tests.cc",
     "test_fault_recovery.cc",
     "test_icd_list.cc",
@@ -51,5 +66,8 @@ executable("msd_arm_mali_integration_tests") {
     "//zircon/system/ulib/zx",
   ]
 
-  deps = [ "../../include" ]
+  deps = [
+    ":mali_utils",
+    "../../include",
+  ]
 }
