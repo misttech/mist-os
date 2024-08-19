@@ -402,12 +402,18 @@ ProfileServer::AudioOffloadExt::AudioOffloadConfigFromFidl(
   std::unique_ptr<bt::l2cap::A2dpOffloadManager::Configuration> config =
       std::make_unique<bt::l2cap::A2dpOffloadManager::Configuration>();
 
+  std::optional<android_emb::A2dpSamplingFrequency> sampling_frequency =
+      fidl_helpers::FidlToSamplingFrequency(audio_offload_configuration.sampling_frequency());
+  if (!sampling_frequency.has_value()) {
+    bt_log(WARN, "fidl", "Invalid sampling frequency");
+    return nullptr;
+  }
+
   config->codec = codec.value();
   config->max_latency = audio_offload_configuration.max_latency();
   config->scms_t_enable =
       fidl_helpers::FidlToScmsTEnable(audio_offload_configuration.scms_t_enable());
-  config->sampling_frequency =
-      fidl_helpers::FidlToSamplingFrequency(audio_offload_configuration.sampling_frequency());
+  config->sampling_frequency = sampling_frequency.value();
   config->bits_per_sample =
       fidl_helpers::FidlToBitsPerSample(audio_offload_configuration.bits_per_sample());
   config->channel_mode =

@@ -109,7 +109,7 @@ type AudioOffloadFeatures = flexible union {
     2: aac AudioAacSupport;
 };
 
-type AudioSamplingFrequency = strict enum : uint8 {
+type AudioSamplingFrequency = flexible enum : uint8 {
     HZ_44100 = 1;
     HZ_48000 = 2;
     HZ_88200 = 3;

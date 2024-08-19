@@ -78,7 +78,7 @@ bt::StaticPacket<android_emb::A2dpScmsTEnableWriter> FidlToScmsTEnable(bool scms
   return scms_t_enable_struct;
 }
 
-android_emb::A2dpSamplingFrequency FidlToSamplingFrequency(
+std::optional<android_emb::A2dpSamplingFrequency> FidlToSamplingFrequency(
     fbredr::AudioSamplingFrequency sampling_frequency) {
   switch (sampling_frequency) {
     case fbredr::AudioSamplingFrequency::HZ_44100:
@@ -89,6 +89,8 @@ android_emb::A2dpSamplingFrequency FidlToSamplingFrequency(
       return android_emb::A2dpSamplingFrequency::HZ_88200;
     case fbredr::AudioSamplingFrequency::HZ_96000:
       return android_emb::A2dpSamplingFrequency::HZ_96000;
+    default:
+      return std::nullopt;
   }
 }
 
