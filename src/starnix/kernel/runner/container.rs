@@ -34,7 +34,6 @@ use starnix_core::security;
 use starnix_core::task::{set_thread_role, CurrentTask, ExitStatus, Kernel, Task};
 use starnix_core::time::utc::update_utc_clock;
 use starnix_core::vfs::{FileSystemOptions, FsContext, LookupContext, Namespace, WhatToMount};
-use starnix_kernel_config::Config;
 use starnix_logging::{
     log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
 };
@@ -54,14 +53,30 @@ use {
     fuchsia_inspect as inspect, fuchsia_runtime as fruntime,
 };
 
-/// A temporary wrapper struct that contains both a `Config` for the container, as well as optional
-/// handles for the container's component controller and `/pkg` directory.
-///
-/// When using structured_config, the `component_controller` handle will not be set. When all
-/// containers are run as components, by starnix_runner, the `component_controller` will always
-/// exist.
-struct ConfigWrapper {
-    config: Config,
+struct Config {
+    /// The features enabled for this container.
+    features: Vec<String>,
+
+    /// The command line for the initial process for this container.
+    init: Vec<String>,
+
+    /// The command line for the kernel.
+    kernel_cmdline: String,
+
+    /// The specifications for the file system mounts for this container.
+    mounts: Vec<String>,
+
+    /// The resource limits to apply to this container.
+    rlimits: Vec<String>,
+
+    /// The name of this container.
+    name: String,
+
+    /// The path that the container will wait until exists before considering itself to have started.
+    startup_file_path: String,
+
+    /// The remote block devices to use for the container.
+    remote_block_devices: Vec<String>,
 
     /// The `/pkg` directory of the container.
     pkg_dir: Option<zx::Channel>,
@@ -78,13 +93,6 @@ struct ConfigWrapper {
     data_dir: Option<zx::Channel>,
 }
 
-impl std::ops::Deref for ConfigWrapper {
-    type Target = Config;
-    fn deref(&self) -> &Self::Target {
-        &self.config
-    }
-}
-
 fn get_ns_entry(
     ns: &mut Option<Vec<frunner::ComponentNamespaceEntry>>,
     entry_name: &str,
@@ -97,9 +105,7 @@ fn get_ns_entry(
     })
 }
 
-fn get_config_from_component_start_info(
-    mut start_info: frunner::ComponentStartInfo,
-) -> ConfigWrapper {
+fn get_config_from_component_start_info(mut start_info: frunner::ComponentStartInfo) -> Config {
     let get_strvec = |key| {
         get_program_strvec(&start_info, key)
             .unwrap_or_default()
@@ -124,17 +130,15 @@ fn get_config_from_component_start_info(
     let data_dir = get_ns_entry(&mut ns, "/data");
     let outgoing_dir = start_info.outgoing_dir.take().map(|dir| dir.into_channel());
 
-    ConfigWrapper {
-        config: Config {
-            features,
-            init,
-            kernel_cmdline,
-            mounts,
-            rlimits,
-            name,
-            startup_file_path,
-            remote_block_devices,
-        },
+    Config {
+        features,
+        init,
+        kernel_cmdline,
+        mounts,
+        rlimits,
+        name,
+        startup_file_path,
+        remote_block_devices,
         pkg_dir,
         outgoing_dir,
         svc_dir,
@@ -149,7 +153,7 @@ fn to_cstr(str: &str) -> CString {
 
 #[must_use = "The container must run serve on this config"]
 pub struct ContainerServiceConfig {
-    config: ConfigWrapper,
+    config: Config,
     request_stream: frunner::ComponentControllerRequestStream,
     receiver: oneshot::Receiver<Result<ExitStatus, Error>>,
 }
@@ -287,10 +291,9 @@ pub async fn create_component_from_stream(
                 let request_stream = controller.into_stream()?;
                 let mut config = get_config_from_component_start_info(start_info);
                 let (sender, receiver) = oneshot::channel::<TaskResult>();
-                let container =
-                    create_container(&mut config, sender).await.with_source_context(|| {
-                        format!("creating container \"{}\"", &config.config.name)
-                    })?;
+                let container = create_container(&mut config, sender)
+                    .await
+                    .with_source_context(|| format!("creating container \"{}\"", &config.name))?;
                 let service_config = ContainerServiceConfig { config, request_stream, receiver };
 
                 container.kernel.kthreads.spawn_future({
@@ -315,7 +318,7 @@ pub async fn create_component_from_stream(
 }
 
 async fn create_container(
-    config: &mut ConfigWrapper,
+    config: &mut Config,
     task_complete: oneshot::Sender<TaskResult>,
 ) -> Result<Container, Error> {
     trace_duration!(CATEGORY_STARNIX, NAME_CREATE_CONTAINER);
@@ -502,7 +505,7 @@ fn create_fs_context<L>(
     locked: &mut Locked<'_, L>,
     kernel: &Arc<Kernel>,
     features: &Features,
-    config: &ConfigWrapper,
+    config: &Config,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
 ) -> Result<Arc<FsContext>, Error>
 where
@@ -600,7 +603,7 @@ fn parse_rlimits(rlimits: &[String]) -> Result<Vec<(Resource, u64)>, Error> {
 fn mount_filesystems<L>(
     locked: &mut Locked<'_, L>,
     system_task: &CurrentTask,
-    config: &ConfigWrapper,
+    config: &Config,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
 ) -> Result<(), Error>
 where
@@ -625,7 +628,7 @@ where
 fn init_remote_block_devices<L>(
     locked: &mut Locked<'_, L>,
     system_task: &CurrentTask,
-    config: &ConfigWrapper,
+    config: &Config,
 ) -> Result<(), Error>
 where
     L: LockBefore<FileOpsCore>,

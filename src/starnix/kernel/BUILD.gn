@@ -491,7 +491,6 @@ rustc_library("starnix_kernel_runner") {
 
   deps = [
     ":starnix_core",
-    ":starnix_kernel_config",
     ":starnix_logging",
     ":starnix_sync",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
@@ -721,11 +720,6 @@ fuchsia_component_manifest("starnix_kernel_manifest") {
   component_name = "starnix_kernel"
 }
 
-# The starnix kernel configuration library, used by the Rust binary to parse configuration.
-fuchsia_structured_config_rust_lib("starnix_kernel_config") {
-  cm_label = ":starnix_kernel_manifest"
-}
-
 gzip("gzip_android_5.10_kernel_config") {
   input = "data/config"
   output = "$target_gen_dir/config.gz"
@@ -742,17 +736,11 @@ fuchsia_component("starnix_kernel") {
   deps = [ ":starnix_kernel_bin" ]
 }
 
-fuchsia_structured_config_values("kernel_config") {
-  cm_label = ":starnix_kernel_manifest"
-  values_source = "//src/starnix/kernel/meta/config.json5"
-}
-
 # Packages
 
 fuchsia_package("starnix_kernel_package") {
   package_name = "starnix_kernel"
   deps = [
-    ":kernel_config",
     ":starnix_kernel",
     ":starnix_kernel_manifest",
     "//src/starnix/containers:default_init",
