@@ -20,6 +20,7 @@ load(
 load(
     "//fuchsia/private/assembly:fuchsia_board_configuration.bzl",
     _fuchsia_board_configuration = "fuchsia_board_configuration",
+    _fuchsia_hybrid_board_configuration = "fuchsia_hybrid_board_configuration",
     _fuchsia_prebuilt_board_configuration = "fuchsia_prebuilt_board_configuration",
 )
 load(
@@ -140,6 +141,7 @@ fuchsia_board_configuration = _fuchsia_board_configuration
 fuchsia_board_input_bundle = _fuchsia_board_input_bundle
 fuchsia_prebuilt_board_input_bundle = _fuchsia_prebuilt_board_input_bundle
 fuchsia_prebuilt_board_configuration = _fuchsia_prebuilt_board_configuration
+fuchsia_hybrid_board_configuration = _fuchsia_hybrid_board_configuration
 fuchsia_product = _fuchsia_product
 fuchsia_partitions_configuration = _fuchsia_partitions_configuration
 fuchsia_prebuilt_partitions_configuration = _fuchsia_prebuilt_partitions_configuration
