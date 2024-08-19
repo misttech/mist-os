@@ -62,7 +62,7 @@ open protocol Channel {
 ///
 /// For a description of each mode, see Bluetooth Spec v5.4, Vol 3, Part A, Sec 2.4.
 @available(added=HEAD)
-type ChannelMode = strict enum {
+type ChannelMode = flexible enum {
     /// BR/EDR only.
     BASIC = 1;
     /// BR/EDR only.
