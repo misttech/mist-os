@@ -71,6 +71,10 @@ pub struct Id(u64);
 impl Id {
     /// Creates a new `Id`. `Id`s created by separate calls to `new` in the same process are
     /// guaranteed to be distinct.
+    ///
+    /// WARNING: `Id::new` is likely to hit the UI bug where UIs group async
+    /// durations with the same trace id but different process ids. Use
+    /// `Id::random` instead. (Until https://fxbug.dev/42054669 is fixed.)
     pub fn new() -> Self {
         // Trivial no-argument function that cannot race.
         Self(unsafe { sys::trace_generate_nonce() })
