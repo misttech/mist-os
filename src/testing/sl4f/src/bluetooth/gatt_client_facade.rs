@@ -186,6 +186,7 @@ impl GattClientFacade {
     ) {
         let tag = "GattClientFacade::active_remote_service_event_task";
         while let Some(event) = event_stream.next().await {
+            #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336801)
             match event {
                 Ok(_) => {} // There are no events
                 Err(e) => {
