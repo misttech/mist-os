@@ -2,14 +2,10 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//src/lib/android/android.gni")
-
 group("tests") {
   testonly = true
 
-  if (use_src_lib_android_rules) {
-    deps = [ "binder:tests" ]
-  }
+  deps = [ "binder:tests" ]
 }
 
 # Some Android libraries fail to build with thread safety analysis but we do not
