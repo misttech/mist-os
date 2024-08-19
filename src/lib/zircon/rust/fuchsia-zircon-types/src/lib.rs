@@ -2209,7 +2209,7 @@ multiconst!(zx_processor_power_control_t, [
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct zx_processor_power_level_t {
     pub options: zx_processor_power_level_options_t,
-    pub procesing_rate: u64,
+    pub processing_rate: u64,
     pub power_coefficient_nw: u64,
     pub control_interface: zx_processor_power_control_t,
     pub control_argument: u64,
@@ -2220,10 +2220,11 @@ pub struct zx_processor_power_level_t {
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct zx_processor_power_level_transition_t {
-    pub from: u32,
-    pub to: u32,
+    pub from: u8,
+    pub to: u8,
     pub latency: zx_duration_t,
     pub energy: u64,
+    pub padding: [u8; 6],
 }
 
 #[repr(C)]

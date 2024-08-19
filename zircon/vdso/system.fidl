@@ -11,9 +11,17 @@ type CpuSet = struct {
     mask array<uint64, 8>;
 };
 
-type ProcessorPowerLevelOptions = flexible bits : uint64 {};
+type ProcessorPowerLevelOptions = flexible bits : uint64 {
+    PROCESSOR_POWER_LEVEL_OPTIONS_DOMAIN_INDEPENDENT = 1;
+};
 
-type ProcessorPowerControl = flexible enum : uint64 {};
+type ProcessorPowerControl = flexible enum : uint64 {
+    PROCESSOR_POWER_CONTROL_CPU_DRIVER = 0;
+    PROCESSOR_POWER_CONTROL_ARM_PSCI = 1;
+    PROCESSOR_POWER_CONTROL_ARM_WFI = 2;
+    PROCESSOR_POWER_CONTROL_RISCV_SBI = 3;
+    PROCESSOR_POWER_CONTROL_RISCV_WFI = 4;
+};
 
 type ProcessorPowerLevel = struct {
     options ProcessorPowerLevelOptions;
@@ -928,6 +936,7 @@ closed protocol System {
     ///     zx_handle_t resource,
     ///     uint64_t options,
     ///     const zx_cpu_set_t* cpus,
+    ///     uint64_t power_domain_id,
     ///     const zx_processor_power_level_t* power_levels,
     ///     size_t num_power_levels,
     ///     const zx_processor_power_level_transition_t* transitions,
@@ -999,7 +1008,8 @@ closed protocol System {
     ///
     /// zx_status_t zx_system_create_processor_power_level_transition_handler(
     ///     zx_handle_t resource,
-    ///     uint64_t options,
+    ///     uint32_t options,
+    ///     zx_processor_power_control_t control,
     ///     zx_handle_t* out_port);
     /// ```
     ///
@@ -1024,8 +1034,8 @@ closed protocol System {
     ///
     /// `options` must be 0.
     ///
-    /// `control_interface` tells the scheduler that this OPP trasition handler will execute requests
-    ///                     for that interface.
+    /// `control` specifies which power level control interface this handler services.
+    ///           Must be `PROCESSOR_POWER_CONTROL_CPU_DRIVER`.
     ///
     /// `out_port` must ve a valid pointer. On success provides
     ///
