@@ -105,12 +105,15 @@ android_emb::A2dpBitsPerSample FidlToBitsPerSample(fbredr::AudioBitsPerSample bi
   }
 }
 
-android_emb::A2dpChannelMode FidlToChannelMode(fbredr::AudioChannelMode channel_mode) {
+std::optional<android_emb::A2dpChannelMode> FidlToChannelMode(
+    fbredr::AudioChannelMode channel_mode) {
   switch (channel_mode) {
     case fbredr::AudioChannelMode::MONO:
       return android_emb::A2dpChannelMode::MONO;
     case fbredr::AudioChannelMode::STEREO:
       return android_emb::A2dpChannelMode::STEREO;
+    default:
+      return std::nullopt;
   }
 }
 

@@ -409,6 +409,13 @@ ProfileServer::AudioOffloadExt::AudioOffloadConfigFromFidl(
     return nullptr;
   }
 
+  std::optional<android_emb::A2dpChannelMode> audio_channel_mode =
+      fidl_helpers::FidlToChannelMode(audio_offload_configuration.channel_mode());
+  if (!audio_channel_mode.has_value()) {
+    bt_log(WARN, "fidl", "Invalid channel mode");
+    return nullptr;
+  }
+
   config->codec = codec.value();
   config->max_latency = audio_offload_configuration.max_latency();
   config->scms_t_enable =
@@ -416,8 +423,7 @@ ProfileServer::AudioOffloadExt::AudioOffloadConfigFromFidl(
   config->sampling_frequency = sampling_frequency.value();
   config->bits_per_sample =
       fidl_helpers::FidlToBitsPerSample(audio_offload_configuration.bits_per_sample());
-  config->channel_mode =
-      fidl_helpers::FidlToChannelMode(audio_offload_configuration.channel_mode());
+  config->channel_mode = audio_channel_mode.value();
   config->encoded_audio_bit_rate = audio_offload_configuration.encoded_bit_rate();
 
   if (audio_offload_configuration.encoder_settings().is_sbc()) {

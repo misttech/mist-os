@@ -122,7 +122,7 @@ type AudioBitsPerSample = strict enum : uint8 {
     BPS_32 = 3;
 };
 
-type AudioChannelMode = strict enum : uint8 {
+type AudioChannelMode = flexible enum : uint8 {
     MONO = 0;
     STEREO = 1;
 };
