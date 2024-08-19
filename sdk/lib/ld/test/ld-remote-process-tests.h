@@ -33,6 +33,7 @@ namespace ld::testing {
 class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessTestsBase {
  public:
   static constexpr bool kCanCollectLog = false;
+  static constexpr bool kRunsLdStartup = false;
 
   inline static const size_t kPageSize = zx_system_get_page_size();
 
@@ -58,7 +59,7 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
     ASSERT_NO_FATAL_FAILURE(Load(diag, executable_name, false));
   }
 
-  void Start(zx::channel bootstrap_receiver);
+  void Start();
 
   int64_t Run();
 
@@ -69,6 +70,8 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
   }
 
   zx::vmo TakeStubLdVmo() { return std::move(stub_ld_vmo_); }
+
+  zx::channel& bootstrap_sender() { return bootstrap_sender_; }
 
  protected:
   using Linker = RemoteDynamicLinker<>;
@@ -115,6 +118,8 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
   void set_stack_size(std::optional<size_t> stack_size) { stack_size_ = stack_size; }
 
  private:
+  void MakeBootstrapChannel(zx::channel& bootstrap_receiver);
+
   template <class Diagnostics>
   void Load(Diagnostics& diag, std::string_view executable_name, bool should_fail) {
     Linker linker;
@@ -216,6 +221,7 @@ class LdRemoteProcessTests : public ::testing::Test, public LdLoadZirconProcessT
   zx::vmo stub_ld_vmo_;
   zx::vmar root_vmar_;
   zx::thread thread_;
+  zx::channel bootstrap_sender_;
   MockLoaderServiceForTest mock_loader_;
 };
 

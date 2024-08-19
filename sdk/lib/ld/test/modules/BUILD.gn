@@ -53,6 +53,7 @@ executables = [
 ]
 
 if (is_fuchsia) {
+  in_process_executables += [ ":llvm-profdata" ]
   executables += [ ":second-session" ]
 }
 
@@ -1201,4 +1202,13 @@ foreach(suffix, per_test_suffices) {
       ":bar-v2$suffix",
     ]
   }
+}
+
+test_executable("llvm-profdata") {
+  can_be_in_process = true
+  sources = [ "llvm-profdata.cc" ]
+  deps = [
+    "//src/lib/llvm-profdata",
+    "//zircon/system/ulib/zx",
+  ]
 }

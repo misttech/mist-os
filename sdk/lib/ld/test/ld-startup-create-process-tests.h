@@ -37,6 +37,8 @@ class LdStartupCreateProcessTestsBase : public LdLoadZirconProcessTestsBase {
 
   TestProcessArgs& bootstrap() { return procargs_; }
 
+  zx::channel& bootstrap_sender() { return procargs_.bootstrap_sender(); }
+
  protected:
   const zx::vmar& root_vmar() { return root_vmar_; }
 

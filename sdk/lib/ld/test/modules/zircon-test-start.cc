@@ -6,8 +6,8 @@
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
-extern "C" int64_t TestStart(zx_handle_t bootstrap, void* vdso);
+extern "C" int64_t TestStart(zx_handle_t bootstrap, void* vdso, zx_handle_t svc_server_end);
 
-extern "C" [[noreturn]] void _start(zx_handle_t bootstrap, void* vdso) {
-  zx_process_exit(TestStart(bootstrap, vdso));
+extern "C" [[noreturn]] void _start(zx_handle_t bootstrap, void* vdso, zx_handle_t svc_server_end) {
+  zx_process_exit(TestStart(bootstrap, vdso, svc_server_end));
 }

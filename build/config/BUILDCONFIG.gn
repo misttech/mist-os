@@ -1677,10 +1677,11 @@ declare_args() {
     {
       configs = [ "//build/config/profile:coverage-rust" ]
       tags = [
+        # Note this does not incluhde "llvm-profdata" because that is only
+        # actually used to check if C++ code will use such instrumentation.
         "coverage",
         "debugdata",
         "instrumented",
-        "llvm-profdata",
         "needs-writable-globals",
       ]
     },
