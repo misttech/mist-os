@@ -591,16 +591,9 @@ void BtTransportUart::HciHandleUartReadEvents(const uint8_t* buf, size_t length)
 }
 
 void BtTransportUart::OnAckReceive() {
-  if (unacked_receive_packet_number_ == 0) {
-    FDF_LOG(ERROR, "Receiving a packet ack when no received packet is pending ack.");
-    return;
-  }
-  unacked_receive_packet_number_--;
-  if (unacked_receive_packet_number_ == (kUnackedReceivePacketLimit / 2) && read_stopped_) {
-    // Resume reading data from the uart data buffer if half of the unacked packets are acked.
-    queue_read_task_.Post(dispatcher_);
-    read_stopped_ = false;
-  }
+  // Read the next packet from the bus if the last one is acked.
+  read_stopped_ = false;
+  queue_read_task_.Post(dispatcher_);
 }
 
 void BtTransportUart::ProcessNextUartPacketFromReadBuffer(
@@ -700,9 +693,9 @@ void BtTransportUart::ProcessNextUartPacketFromReadBuffer(
         FDF_LOG(ERROR, "Unsupported packet type received");
       }
     }
-
-    unacked_receive_packet_number_++;
   }
+  // One complete packet has been sent up to the host, stop reading from the bus until an ack.
+  read_stopped_ = true;
 
   fhbt::SnoopPacket::Tag type = fhbt::SnoopPacket::Tag::kIso;
   if (snoop_type == BT_HCI_SNOOP_TYPE_ACL) {
@@ -733,16 +726,13 @@ void BtTransportUart::HciReadComplete(zx_status_t status, const uint8_t* buffer,
 
   if (status == ZX_OK) {
     HciHandleUartReadEvents(buffer, length);
-    if (unacked_receive_packet_number_ >= kUnackedReceivePacketLimit) {
-      FDF_LOG(
-          WARNING,
-          "Too many unacked packets sent to the host, stop fetching data from the bus temporarily.");
-      // Stop reading data from the uart buffer if there are too many unacked packets sent to the
-      // host.
-      read_stopped_ = true;
-      return;
+    // Don't apply flow control logic when the driver is serving Hci Protocol. In flow control, stop
+    // reading data from the bus when |read_stopped_| is set to true. Note that the driver could
+    // read more than one time to complete one packet so we need |read_stopped_| to mark whether a
+    // complete packet has been sent up.
+    if ((hci_binding_.size() > 0) || !read_stopped_) {
+      queue_read_task_.Post(dispatcher_);
     }
-    queue_read_task_.Post(dispatcher_);
   } else {
     // There is not much we can do in the event of a UART read error.  Do not
     // queue a read job and start the process of shutting down.

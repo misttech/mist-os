@@ -293,14 +293,9 @@ class BtTransportUart
   // Must only be used in the UART read callback (HciHandleUartReadEvents).
   size_t sco_buffer_offset_ = 0;
 
-  static constexpr size_t kUnackedReceivePacketLimit = 20;
   // Mark the read state of the driver, when the value is set to true, it means that the driver has
   // stopped reading data from the bus.
   bool read_stopped_ = false;
-
-  // This number is to keep track of the number of packets that were sent through
-  // |OnReceive| event but haven't received their ack from |AckReceive|s yet.
-  size_t unacked_receive_packet_number_ = 0;
 
   // for sending outbound packets to the UART
   // fuchsia_hardware_bluetooth::kAclPacketMax is the largest frame size sent.
