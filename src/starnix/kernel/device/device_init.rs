@@ -13,13 +13,10 @@ use crate::fs::devpts::tty_device_init;
 use crate::fs::sysfs::DeviceDirectory;
 use crate::task::CurrentTask;
 use crate::vfs::fuse::open_fuse_device;
-use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked};
+use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::device_type::DeviceType;
 
-pub fn misc_device_init<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask)
-where
-    L: LockBefore<FileOpsCore>,
-{
+fn misc_device_init(locked: &mut Locked<'_, Unlocked>, current_task: &CurrentTask) {
     let kernel = current_task.kernel();
     let registry = &kernel.device_registry;
     let misc_class = registry.get_or_create_class("misc".into(), registry.virtual_bus());
