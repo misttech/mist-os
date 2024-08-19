@@ -288,7 +288,9 @@ def get_fidl_ir_map() -> Mapping[str, str]:
             if root_dir := find_jiri_root(os.curdir):
                 with open(os.path.join(root_dir, ".fx-build-dir"), "r") as f:
                     build_dir = f.readlines()[0].strip()
-                    default_ir_path = os.path.join(build_dir, ir_root_relpath)
+                    default_ir_path = os.path.join(
+                        root_dir, build_dir, ir_root_relpath
+                    )
             else:
                 # TODO(b/311250297): Remove last resort backstop for
                 # unconfigured in-tree build config
