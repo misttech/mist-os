@@ -223,9 +223,6 @@ class BtTransportUartHciTransportProtocolTest
     hci_transport_client_.Bind(std::move(hci_transport_result.value()),
                                fdf::Dispatcher::GetCurrent()->async_dispatcher(), this);
 
-    auto wait_hci_transport = driver_test().RunInDriverContext<fit::function<void(void)>>(
-        [](BtTransportUart& driver) { return driver.WaitforHciTransportCallback(); });
-    wait_hci_transport();
     // Open SCO connection.
     auto [sco_client_end, sco_server_end] = fidl::CreateEndpoints<fhbt::ScoConnection>().value();
 
@@ -238,13 +235,17 @@ class BtTransportUartHciTransportProtocolTest
     sco_client_.Bind(std::move(sco_client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher(),
                      this);
 
+    auto wait_sco = driver_test().RunInDriverContext<fit::function<void(void)>>(
+        [](BtTransportUart& driver) { return driver.WaitForScoConnectionCallback(); });
+    wait_sco();
+
     zx::result snoop_result = driver_test().Connect<fhbt::HciService::Snoop>();
     ASSERT_EQ(ZX_OK, snoop_result.status_value());
     snoop_client_.Bind(std::move(snoop_result.value()),
                        fdf::Dispatcher::GetCurrent()->async_dispatcher(), this);
 
     auto wait_snoop = driver_test().RunInDriverContext<fit::function<void(void)>>(
-        [](BtTransportUart& driver) { return driver.WaitforSnoopCallback(); });
+        [](BtTransportUart& driver) { return driver.WaitForSnoopCallback(); });
     wait_snoop();
   }
 
@@ -352,7 +353,6 @@ class BtTransportUartHciTransportProtocolTest
     std::vector<uint8_t> received;
     received.assign(packet->packet.begin(), packet->packet.end());
     received_sco_packets_.push_back(received);
-
     if (!manual_ack_receive_) {
       AckReceive();
     }
@@ -436,7 +436,7 @@ class BtTransportUartHciProtocolTest : public BtTransportUartTest,
                        fdf::Dispatcher::GetCurrent()->async_dispatcher(), this);
 
     auto wait_snoop = driver_test().RunInDriverContext<fit::function<void(void)>>(
-        [](BtTransportUart& driver) { return driver.WaitforSnoopCallback(); });
+        [](BtTransportUart& driver) { return driver.WaitForSnoopCallback(); });
     wait_snoop();
 
     zx::channel cmd_chan_driver_end;
@@ -1639,6 +1639,7 @@ TEST_F(BtTransportUartHciTransportProtocolTest, ReceiveScoPacketsIn2Parts) {
 
   driver_test().runtime().RunUntil(
       [&]() { return snoop_received_sco_packets().size() == kNumPackets; });
+
   for (uint8_t i = 0; i < kNumPackets; i++) {
     EXPECT_EQ(snoop_received_sco_packets()[i], kScoBuffer);
   }
