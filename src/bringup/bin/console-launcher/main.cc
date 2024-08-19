@@ -18,6 +18,7 @@
 #include <lib/fdio/spawn.h>
 #include <lib/fit/defer.h>
 #include <lib/stdcompat/string_view.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/debuglog.h>
@@ -29,7 +30,6 @@
 
 #include <algorithm>
 #include <future>
-#include <latch>
 #include <utility>
 
 #include <fbl/ref_ptr.h>
@@ -357,8 +357,8 @@ int main(int argv, char** argc) {
               return;
             }
             // Must run on the dispatcher thread to avoid racing with VFS dispatch.
-            std::latch mounted(1);
-            async::PostTask(dispatcher, [&mounted, &root, path,
+            libsync::Completion completion;
+            async::PostTask(dispatcher, [&completion, &root, path,
                                          client_end = std::move(client_end)]() mutable {
               const std::vector components = fxl::SplitString(path, "/", fxl::kKeepWhitespace,
                                                               fxl::SplitResult::kSplitWantNonEmpty);
@@ -398,9 +398,9 @@ int main(int argv, char** argc) {
                 current = next;
               }
               FX_LOGS(INFO) << "mounted '" << path << "'";
-              mounted.count_down();
+              completion.Signal();
             });
-            mounted.wait();
+            completion.Wait();
           },
           [&](fidl::WireEvent<fuchsia_io::Directory::OnRepresentation>* event) {
             FX_PLOGS(FATAL, ZX_ERR_NOT_SUPPORTED) << "unexpected OnRepresentation";
