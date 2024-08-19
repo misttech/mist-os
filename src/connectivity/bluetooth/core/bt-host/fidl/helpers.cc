@@ -94,7 +94,8 @@ std::optional<android_emb::A2dpSamplingFrequency> FidlToSamplingFrequency(
   }
 }
 
-android_emb::A2dpBitsPerSample FidlToBitsPerSample(fbredr::AudioBitsPerSample bits_per_sample) {
+std::optional<android_emb::A2dpBitsPerSample> FidlToBitsPerSample(
+    fbredr::AudioBitsPerSample bits_per_sample) {
   switch (bits_per_sample) {
     case fbredr::AudioBitsPerSample::BPS_16:
       return android_emb::A2dpBitsPerSample::BITS_PER_SAMPLE_16;
@@ -102,6 +103,8 @@ android_emb::A2dpBitsPerSample FidlToBitsPerSample(fbredr::AudioBitsPerSample bi
       return android_emb::A2dpBitsPerSample::BITS_PER_SAMPLE_24;
     case fbredr::AudioBitsPerSample::BPS_32:
       return android_emb::A2dpBitsPerSample::BITS_PER_SAMPLE_32;
+    default:
+      return std::nullopt;
   }
 }
 

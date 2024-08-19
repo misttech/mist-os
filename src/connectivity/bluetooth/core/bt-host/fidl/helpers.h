@@ -239,7 +239,7 @@ bt::StaticPacket<android_emb::A2dpScmsTEnableWriter> FidlToScmsTEnable(bool scms
 std::optional<android_emb::A2dpSamplingFrequency> FidlToSamplingFrequency(
     fuchsia::bluetooth::bredr::AudioSamplingFrequency sampling_frequency);
 
-android_emb::A2dpBitsPerSample FidlToBitsPerSample(
+std::optional<android_emb::A2dpBitsPerSample> FidlToBitsPerSample(
     fuchsia::bluetooth::bredr::AudioBitsPerSample bits_per_sample);
 
 std::optional<android_emb::A2dpChannelMode> FidlToChannelMode(

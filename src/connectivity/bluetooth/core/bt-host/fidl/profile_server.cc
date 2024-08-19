@@ -409,6 +409,13 @@ ProfileServer::AudioOffloadExt::AudioOffloadConfigFromFidl(
     return nullptr;
   }
 
+  std::optional<android_emb::A2dpBitsPerSample> audio_bits_per_sample =
+      fidl_helpers::FidlToBitsPerSample(audio_offload_configuration.bits_per_sample());
+  if (!audio_bits_per_sample.has_value()) {
+    bt_log(WARN, "fidl", "Invalid audio bits per sample");
+    return nullptr;
+  }
+
   std::optional<android_emb::A2dpChannelMode> audio_channel_mode =
       fidl_helpers::FidlToChannelMode(audio_offload_configuration.channel_mode());
   if (!audio_channel_mode.has_value()) {
@@ -421,8 +428,7 @@ ProfileServer::AudioOffloadExt::AudioOffloadConfigFromFidl(
   config->scms_t_enable =
       fidl_helpers::FidlToScmsTEnable(audio_offload_configuration.scms_t_enable());
   config->sampling_frequency = sampling_frequency.value();
-  config->bits_per_sample =
-      fidl_helpers::FidlToBitsPerSample(audio_offload_configuration.bits_per_sample());
+  config->bits_per_sample = audio_bits_per_sample.value();
   config->channel_mode = audio_channel_mode.value();
   config->encoded_audio_bit_rate = audio_offload_configuration.encoded_bit_rate();
 

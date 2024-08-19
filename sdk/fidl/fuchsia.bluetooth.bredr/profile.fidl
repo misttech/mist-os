@@ -116,7 +116,7 @@ type AudioSamplingFrequency = flexible enum : uint8 {
     HZ_96000 = 4;
 };
 
-type AudioBitsPerSample = strict enum : uint8 {
+type AudioBitsPerSample = flexible enum : uint8 {
     BPS_16 = 1;
     BPS_24 = 2;
     BPS_32 = 3;
