@@ -29,7 +29,6 @@ group("tests") {
     "fidl-service:tests",
     "fx-logger:tests",
     "isolateddevmgr:tests",
-    "libdriver-integration-test",
     "multibind-composite-test:tests",
 
     # TODO(b/319724687): Re-enable once the flake is fixed.
