@@ -2313,12 +2313,14 @@ impl Releasable for FsNode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::device::mem::mem_device_init;
     use crate::testing::*;
     use crate::vfs::buffers::VecOutputBuffer;
 
     #[::fuchsia::test]
     async fn open_device_file() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        mem_device_init(&mut locked, &current_task);
 
         // Create a device file that points to the `zero` device (which is automatically
         // registered in the kernel).

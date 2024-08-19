@@ -915,6 +915,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::fs::devpts::tty_device_init;
     use crate::fs::tmpfs::TmpFs;
     use crate::testing::*;
     use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
@@ -1073,6 +1074,7 @@ mod tests {
     #[::fuchsia::test]
     async fn test_open_tty() {
         let (_kernel, task, mut locked) = create_kernel_task_and_unlocked();
+        tty_device_init(&mut locked, &task);
         let fs = dev_pts_fs(&task, Default::default());
         let devfs = crate::fs::devtmpfs::dev_tmp_fs(&mut locked, &task);
 

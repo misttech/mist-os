@@ -3,13 +3,11 @@
 // found in the LICENSE file.
 
 mod binder;
-mod device_init;
 mod framebuffer_server;
 mod registry;
 mod remote_binder;
 
 pub use binder::*;
-pub use device_init::*;
 pub use registry::*;
 
 pub mod android;

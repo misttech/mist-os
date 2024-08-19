@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::init_common_devices;
 use crate::fs::fuchsia::RemoteFs;
 use crate::fs::tmpfs::TmpFs;
 use crate::mm::syscalls::{do_mmap, sys_mremap};
@@ -115,8 +114,6 @@ fn create_kernel_task_and_unlocked_with_fs_and_selinux<'l>(
     let system_task =
         CurrentTask::create_system_task(&mut locked, &kernel, fs).expect("create system task");
     kernel.kthreads.init(system_task).expect("failed to initialize kthreads");
-
-    init_common_devices(&mut locked, &kernel.kthreads.system_task());
 
     // Take the lock on thread group and task in the correct order to ensure any wrong ordering
     // will trigger the tracing-mutex at the right call site.

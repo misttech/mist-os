@@ -2,17 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::device_mapper::{create_device_mapper, device_mapper_init};
-use crate::device::kobject::DeviceMetadata;
-use crate::device::loop_device::{create_loop_control_device, loop_device_init};
-use crate::device::mem::{mem_device_init, DevRandom};
-use crate::device::tun::DevTun;
-use crate::device::zram::zram_device_init;
-use crate::device::{simple_device_ops, DeviceMode};
-use crate::fs::devpts::tty_device_init;
-use crate::fs::sysfs::DeviceDirectory;
-use crate::task::CurrentTask;
-use crate::vfs::fuse::open_fuse_device;
+use starnix_core::device::device_mapper::{create_device_mapper, device_mapper_init};
+use starnix_core::device::kobject::DeviceMetadata;
+use starnix_core::device::loop_device::{create_loop_control_device, loop_device_init};
+use starnix_core::device::mem::{mem_device_init, DevRandom};
+use starnix_core::device::tun::DevTun;
+use starnix_core::device::zram::zram_device_init;
+use starnix_core::device::{simple_device_ops, DeviceMode};
+use starnix_core::fs::devpts::tty_device_init;
+use starnix_core::fs::sysfs::DeviceDirectory;
+use starnix_core::task::CurrentTask;
+use starnix_core::vfs::fuse::open_fuse_device;
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::device_type::DeviceType;
 
