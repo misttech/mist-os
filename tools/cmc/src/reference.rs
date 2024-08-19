@@ -7,6 +7,9 @@ use crate::util;
 use std::fs;
 use std::path::PathBuf;
 
+// Allow a size difference between these enum variants: the difference is small (~300 bytes), and
+// this tool is only used at compile time, so optimizing a few hundred bytes isn't a priority.
+#[allow(clippy::large_enum_variant)]
 enum ComponentManifest {
     Cml(cml::Document),
     Cm(cm_rust::ComponentDecl),
