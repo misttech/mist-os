@@ -31,8 +31,8 @@ core_realm_shards = []
 
 # Add UI packages on terminal.
 legacy_cache_package_labels += [
-  "//src/media/codec/bundles:services",
-  "//src/media/sessions/bundles:services",
+  "//src/media/codec:codec_factory",
+  "//src/media/sessions:mediasession",
 
   "//src/fonts/collections:small-open-fonts-collection",
   "//src/ui/bin/terminal",

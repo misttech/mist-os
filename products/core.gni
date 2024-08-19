@@ -29,8 +29,8 @@ zedboot_product_assembly_config_label = "//products/zedboot"
 include_shell_commands_package = true
 
 legacy_cache_package_labels = [
-  "//src/media/codec/bundles:services",
-  "//src/media/sessions/bundles:services",
+  "//src/media/codec:codec_factory",
+  "//src/media/sessions:mediasession",
 ]
 
 discoverable_package_labels = [ "//bundles/tools" ]

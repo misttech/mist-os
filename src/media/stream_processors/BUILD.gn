@@ -20,8 +20,5 @@ group("tests") {
 
 group("hw_dependent_tests") {
   testonly = true
-  deps = [
-    "test",
-    "//src/media/codec/bundles:services",
-  ]
+  deps = [ "test" ]
 }
