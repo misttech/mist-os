@@ -33,13 +33,52 @@ use {
     starnix_uapi as uapi,
 };
 
+// Add a fuchsia-specific vendor ID. 0xf1ca is currently not allocated
+// to any vendor in the USB spec.
+//
+// May not be zero, see below.
+const FUCHSIA_VENDOR_ID: u16 = 0xf1ca;
+
+// May not be zero, see below.
+const FUCHSIA_TOUCH_PRODUCT_ID: u16 = 0x2;
+
+// May not be zero, see below.
+const FUCHSIA_KEYBOARD_PRODUCT_ID: u16 = 0x1;
+
 // Touch and keyboard input IDs should be distinct.
 // Per https://www.linuxjournal.com/article/6429, the bus type should be populated with a
 // sensible value, but other fields may not be.
-const TOUCH_INPUT_ID: input_id =
-    input_id { bustype: BUS_VIRTUAL as u16, product: 0, vendor: 0, version: 0 };
-const KEYBOARD_INPUT_ID: input_id =
-    input_id { bustype: BUS_VIRTUAL as u16, product: 1, vendor: 1, version: 1 };
+//
+// While this may be the case for Linux itself, Android is not so relaxed.
+// Devices with apparently-invalid vendor or product IDs don't get extra
+// device configuration.  So we must make a minimum effort to present
+// sensibly-looking product and vendor IDs.  Zero version only means that
+// version-specific config files will not be applied.
+//
+// For background, see:
+//
+// * Allowable file locations:
+//   https://source.android.com/docs/core/interaction/input/input-device-configuration-files#location
+// * Android configuration selection code:
+//   https://source.corp.google.com/h/googleplex-android/platform/superproject/main/+/main:frameworks/native/libs/input/InputDevice.cpp;l=60;drc=285211e60bff87fc5a9c9b4105a4b4ccb7edffaf
+const TOUCH_INPUT_ID: input_id = input_id {
+    bustype: BUS_VIRTUAL as u16,
+    // Make sure that vendor ID and product ID at least seem plausible.  See
+    // above for details.
+    vendor: FUCHSIA_VENDOR_ID,
+    product: FUCHSIA_TOUCH_PRODUCT_ID,
+    // Version is OK to be zero, but config files named `Product_yyyy_Vendor_zzzz_Version_ttt.*`
+    // will not work.
+    version: 0,
+};
+const KEYBOARD_INPUT_ID: input_id = input_id {
+    bustype: BUS_VIRTUAL as u16,
+    // Make sure that vendor ID and product ID at least seem plausible.  See
+    // above for details.
+    vendor: FUCHSIA_VENDOR_ID,
+    product: FUCHSIA_KEYBOARD_PRODUCT_ID,
+    version: 1,
+};
 
 #[derive(Clone)]
 enum InputDeviceType {
