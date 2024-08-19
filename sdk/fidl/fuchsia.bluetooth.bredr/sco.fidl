@@ -6,7 +6,7 @@ library fuchsia.bluetooth.bredr;
 using fuchsia.hardware.audio;
 using fuchsia.bluetooth;
 
-type ScoErrorCode = strict enum {
+type ScoErrorCode = flexible enum {
     FAILURE = 1;
     CANCELLED = 2;
     INVALID_ARGUMENTS = 3;
