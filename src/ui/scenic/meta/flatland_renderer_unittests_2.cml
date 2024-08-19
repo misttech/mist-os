@@ -25,7 +25,7 @@
     ],
     use: [
         {
-            protocol: [ "fuchsia.media.ProfileProvider" ],
+            protocol: [ "fuchsia.scheduler.RoleManager" ],
         },
         {
             protocol: [ "fuchsia.hardware.display.Provider" ],

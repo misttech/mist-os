@@ -11,6 +11,6 @@
         binary: "bin/vkpriority",
     },
     use: [
-        { protocol: "fuchsia.media.ProfileProvider" },
+        { protocol: "fuchsia.scheduler.RoleManager" },
     ],
 }
