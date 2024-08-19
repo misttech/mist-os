@@ -135,6 +135,8 @@ impl TestHelper {
         }
     }
 
+    // TODO(339221340): remove these allows once the skeleton has a few uses
+    #[allow(unused)]
     pub fn create_inspect_node(&mut self, name: &str) -> InspectNode {
         self.inspector.root().create_child(name)
     }

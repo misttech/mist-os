@@ -41,6 +41,7 @@ impl Key {
 }
 
 #[derive(Debug, PartialEq)]
+#[allow(clippy::large_enum_variant)]
 pub enum Method {
     FourWayHandshake(Fourway),
     GroupKeyHandshake(GroupKey),
