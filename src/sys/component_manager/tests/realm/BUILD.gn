@@ -63,6 +63,9 @@ template("ctf_or_integration_test") {
   DEPS = [
     ":no_program",
     "//src/sys/component_manager/testing/echo_server",
+
+    # https://fxbug.dev/42052321: Dep included for affected tests presubmit
+    "//src/sys/component_manager:component-manager-realm-builder-cmp",
   ]
   if (defined(invoker.ctf) && invoker.ctf) {
     ctf_fuchsia_package(target_name) {
@@ -77,10 +80,7 @@ template("ctf_or_integration_test") {
     }
   } else {
     fuchsia_test_package(target_name) {
-      deps = DEPS + [
-               # https://fxbug.dev/42052321: Dep included for affected tests presubmit
-               "//src/sys/component_manager:component-manager-realm-builder-cmp",
-             ]
+      deps = DEPS
       test_components = []
       foreach(fuchsia_test_name, FUCHSIA_TEST_NAMES) {
         test_components += [ ":${fuchsia_test_name}" ]
