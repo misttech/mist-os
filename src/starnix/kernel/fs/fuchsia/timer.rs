@@ -26,12 +26,12 @@ use starnix_uapi::{error, from_status_like_fdio, itimerspec, TFD_TIMER_ABSTIME};
 use std::sync::{Arc, Weak};
 use zerocopy::AsBytes;
 
-struct ZxTimer {
+pub struct ZxTimer {
     timer: Arc<zx::Timer>,
 }
 
 impl ZxTimer {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self { timer: Arc::new(zx::Timer::create()) }
     }
 }

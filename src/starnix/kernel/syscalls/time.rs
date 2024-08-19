@@ -6,13 +6,14 @@ use crate::mm::MemoryAccessorExt;
 use crate::signals::{RunState, SignalEvent};
 use crate::task::{ClockId, CurrentTask, TimerId};
 use crate::time::utc::utc_now;
-use crate::timer::Timeline;
+use crate::timer::{Timeline, TimerWakeup};
 use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon::{
     Task, {self as zx},
 };
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{InterruptibleEvent, Locked, Unlocked, WakeReason};
+use starnix_uapi::auth::CAP_WAKE_ALARM;
 use starnix_uapi::errors::{Errno, EINTR};
 use starnix_uapi::time::{
     duration_from_timespec, duration_to_scheduler_clock, time_from_timespec,
@@ -394,14 +395,8 @@ pub fn sys_timer_create(
         CLOCK_REALTIME => Timeline::RealTime,
         CLOCK_MONOTONIC => Timeline::Monotonic,
         CLOCK_BOOTTIME => Timeline::BootTime,
-        CLOCK_REALTIME_ALARM => {
-            track_stub!(TODO("https://fxbug.dev/349190823"), "timers w/ CLOCK_REALTIME_ALARM");
-            return error!(ENOTSUP);
-        }
-        CLOCK_BOOTTIME_ALARM => {
-            track_stub!(TODO("https://fxbug.dev/349191846"), "timers w/ CLOCK_BOOTTIME_ALARM");
-            return error!(ENOTSUP);
-        }
+        CLOCK_REALTIME_ALARM => Timeline::RealTime,
+        CLOCK_BOOTTIME_ALARM => Timeline::BootTime,
         CLOCK_TAI => {
             track_stub!(TODO("https://fxbug.dev/349191834"), "timers w/ TAI");
             return error!(ENOTSUP);
@@ -419,8 +414,17 @@ pub fn sys_timer_create(
             return error!(ENOTSUP);
         }
     };
+    let timer_wakeup = match clock_id as u32 {
+        CLOCK_BOOTTIME_ALARM | CLOCK_REALTIME_ALARM => {
+            if !current_task.creds().has_capability(CAP_WAKE_ALARM) {
+                return error!(EPERM);
+            }
+            TimerWakeup::Alarm
+        }
+        _ => TimerWakeup::Regular,
+    };
 
-    let id = &thread_group.timers.create(timeline, checked_signal_event)?;
+    let id = &thread_group.timers.create(timeline, timer_wakeup, checked_signal_event)?;
     current_task.write_object(timerid, &id)?;
     Ok(())
 }
@@ -431,7 +435,7 @@ pub fn sys_timer_delete(
     id: uapi::__kernel_timer_t,
 ) -> Result<(), Errno> {
     let timers = &current_task.thread_group.read().timers;
-    timers.delete(id)
+    timers.delete(current_task, id)
 }
 
 pub fn sys_timer_gettime(
@@ -500,7 +504,7 @@ pub fn sys_setitimer(
 ) -> Result<(), Errno> {
     let new_value = current_task.read_object(user_new_value)?;
 
-    let old_value = current_task.thread_group.set_itimer(which, new_value)?;
+    let old_value = current_task.thread_group.set_itimer(current_task, which, new_value)?;
 
     if !user_old_value.is_null() {
         current_task.write_object(user_old_value, &old_value)?;

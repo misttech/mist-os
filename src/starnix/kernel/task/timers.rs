@@ -5,10 +5,9 @@
 use crate::signals::{SignalEvent, SignalEventNotify, SignalEventValue};
 use crate::task::interval_timer::{IntervalTimer, IntervalTimerHandle};
 use crate::task::CurrentTask;
-use crate::timer::Timeline;
+use crate::timer::{Timeline, TimerWakeup};
 use starnix_sync::Mutex;
 use starnix_uapi::errors::Errno;
-use starnix_uapi::ownership::OwnedRef;
 use starnix_uapi::signals::SIGALRM;
 use starnix_uapi::{__kernel_timer_t, error, itimerspec, uapi, TIMER_ABSTIME};
 use std::collections::HashMap;
@@ -32,8 +31,9 @@ impl Default for TimerTableMutableState {
     fn default() -> Self {
         let signal_event =
             SignalEvent::new(SignalEventValue(0), SIGALRM, SignalEventNotify::Signal);
-        let itimer_real = IntervalTimer::new(0, Timeline::RealTime, signal_event)
-            .expect("Failed to create itimer_real");
+        let itimer_real =
+            IntervalTimer::new(0, Timeline::RealTime, TimerWakeup::Regular, signal_event)
+                .expect("Failed to create itimer_real");
         TimerTableMutableState {
             itimer_real,
             timers: Default::default(),
@@ -52,6 +52,7 @@ impl TimerTable {
     pub fn create(
         &self,
         timeline: Timeline,
+        wakeup_type: TimerWakeup,
         signal_event: Option<SignalEvent>,
     ) -> Result<TimerId, Errno> {
         let mut state = self.state.lock();
@@ -80,6 +81,7 @@ impl TimerTable {
             IntervalTimer::new(
                 timer_id,
                 timeline,
+                wakeup_type,
                 signal_event.unwrap_or(SignalEvent::new(
                     SignalEventValue(timer_id as u64),
                     SIGALRM,
@@ -96,13 +98,10 @@ impl TimerTable {
     }
 
     /// Disarms and deletes a timer.
-    pub fn delete(&self, id: TimerId) -> Result<(), Errno> {
+    pub fn delete(&self, current_task: &CurrentTask, id: TimerId) -> Result<(), Errno> {
         let mut state = self.state.lock();
         match state.timers.remove_entry(&id) {
-            Some(entry) => {
-                entry.1.disarm();
-                Ok(())
-            }
+            Some(entry) => entry.1.disarm(current_task),
             None => error!(EINVAL),
         }
     }
@@ -132,14 +131,9 @@ impl TimerTable {
         let old_value: itimerspec = itimer.time_remaining().into();
         if new_value.it_value.tv_sec != 0 || new_value.it_value.tv_nsec != 0 {
             let is_absolute = flags == TIMER_ABSTIME as i32;
-            itimer.arm(
-                &current_task.kernel(),
-                OwnedRef::downgrade(&current_task.thread_group),
-                new_value,
-                is_absolute,
-            )?;
+            itimer.arm(current_task, new_value, is_absolute)?;
         } else {
-            itimer.disarm();
+            itimer.disarm(current_task)?;
         }
 
         Ok(old_value)
