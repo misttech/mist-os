@@ -101,9 +101,7 @@ impl TryFrom<u8> for NetstackThreadCount {
 
 impl Default for NetstackThreadCount {
     fn default() -> Self {
-        // TODO(https://fxbug.dev/316616750): Update this default once
-        // multithreading is stabilized.
-        Self(NonZeroU8::new(1).unwrap())
+        Self(NonZeroU8::new(4).unwrap())
     }
 }
 
