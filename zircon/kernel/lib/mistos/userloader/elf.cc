@@ -33,9 +33,7 @@
 
 #include <ktl/enforce.h>
 
-// clang-format off
 #include <linux/auxvec.h>
-// clang-format on
 
 namespace {
 

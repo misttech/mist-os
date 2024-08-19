@@ -104,6 +104,7 @@ group("default") {
     "//:host",
     "//:tests",
     "//bundles/boot_tests",
+    "//zircon/kernel/lib/mistos/userloader/example:hello_zbi",
 
     #
     "//zircon/tools:tests",

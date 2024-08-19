@@ -32,6 +32,8 @@
 #include <lib/crypto/entropy/quality_test.h>
 #endif
 
+#include <ktl/byte.h>
+
 #include <ktl/enforce.h>
 
 namespace userloader {
@@ -87,9 +89,9 @@ class VmoBuffer {
   fbl::RefPtr<VmObjectPaged> vmo_;
 };
 
+// constexpr const char kStackVmoName[] = "userboot-initial-stack";
 // constexpr const char kCrashlogVmoName[] = "crashlog";
 // constexpr const char kBootOptionsVmoname[] = "boot-options.txt";
-constexpr const char kZbiVmoName[] = "zbi";
 
 // KCOUNTER(timeline_userboot, "boot.timeline.userboot")
 // KCOUNTER(init_time, "init.userboot.time.msec")
@@ -98,6 +100,7 @@ constexpr const char kZbiVmoName[] = "zbi";
 // memory always remains valid, even if userspace closes the last handle.
 fbl::RefPtr<VmObject> kcounters_vmo_ref;
 
+#if 0
 // Get a handle to a VM object, with full rights except perhaps for writing.
 zx_status_t get_vmo_handle(fbl::RefPtr<VmObject> vmo, bool readonly, uint64_t content_size,
                            fbl::RefPtr<VmObjectDispatcher>* disp_ptr, Handle** ptr) {
@@ -119,6 +122,7 @@ zx_status_t get_vmo_handle(fbl::RefPtr<VmObject> vmo, bool readonly, uint64_t co
   }
   return result;
 }
+#endif
 
 #if 0
 // Converts platform crashlog into a VMO
@@ -162,11 +166,6 @@ zx_status_t crashlog_to_vmo(fbl::RefPtr<VmObject>* out, size_t* out_size) {
 #endif
 
 void bootstrap_vmos(ktl::array<Handle*, userloader::kHandleCount>& handles) {
-  ktl::span<ktl::byte> zbi = ZbiInPhysmap(true);
-  void* rbase = zbi.data();
-  size_t rsize = ROUNDUP_PAGE_SIZE(zbi.size_bytes());
-  dprintf(INFO, "userloader: ramdisk %#15zx @ %p\n", rsize, rbase);
-
 #if 0
   // The instrumentation VMOs need to be created prior to the rootfs as the information for these
   // vmos is in the phys handoff region, which becomes inaccessible once the rootfs is created.
@@ -174,19 +173,12 @@ void bootstrap_vmos(ktl::array<Handle*, userloader::kHandleCount>& handles) {
   ASSERT(status == ZX_OK);
 #endif
 
-  // The ZBI.
-  fbl::RefPtr<VmObjectPaged> rootfs_vmo;
-  zx_status_t status = VmObjectPaged::CreateFromWiredPages(rbase, rsize, true, &rootfs_vmo);
-  ASSERT(status == ZX_OK);
-  rootfs_vmo->set_name(kZbiVmoName, sizeof(kZbiVmoName) - 1);
-  status =
-      get_vmo_handle(rootfs_vmo, false, rsize, nullptr, &userloader::gHandles[userloader::kZbi]);
-  ASSERT(status == ZX_OK);
-  // The rootfs vmo was created with exclusive=true, which means that the VMO is sole owner of those
-  // pages. gPhysHandoff represents a pointer to the previous physmap location of the data, but the
-  // VMO is free to move and use different pages to represent the data, as such attempting to use
-  // this old reference is essentially a use-after-free.
-  gPhysHandoff = nullptr;
+  HandoffEnd end = EndHandoff();
+
+  ktl::copy(end.phys_vmos.begin(), end.phys_vmos.end(),
+            &userloader::gHandles[userloader::kFirstPhysVmo]);
+
+  userloader::gHandles[userloader::kZbi] = end.zbi;
 
 #if 0
   // Crashlog.

@@ -1,3 +1,4 @@
+# Copyright 2024 Mist Tecnologia LTDA
 # Copyright 2019 The Fuchsia Authors
 #
 # Use of this source code is governed by a MIT-style
@@ -38,6 +39,9 @@ source_set("top") {
   ]
   if (is_mistos) {
     deps -= [ "//zircon/kernel/lib/userabi" ]
-    deps += [ "//zircon/kernel/lib/mistos/userabi" ]
+    deps += [
+      "//zircon/kernel/lib/mistos/userabi",
+      "//zircon/kernel/lib/mistos/userloader",
+    ]
   }
 }

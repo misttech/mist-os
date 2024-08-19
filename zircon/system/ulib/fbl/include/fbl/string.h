@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2017 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -91,6 +92,10 @@ class __OWNER(char) String {
   // Gets the character at the specified index.
   // Position must be greater than or equal to 0 and less than |length()|.
   const char& operator[](size_t pos) const { return data()[pos]; }
+
+#if __mist_os__
+  String& operator+=(const String& other);
+#endif
 
   // Performs a lexicographical character by character comparison.
   // Returns a negative value if |*this| comes before |other| in lexicographical order.

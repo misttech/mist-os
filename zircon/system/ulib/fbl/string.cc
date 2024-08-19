@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
 // Copyright 2017 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
@@ -9,6 +10,9 @@
 #include <new>
 
 #include <fbl/algorithm.h>
+#if __mist_os__
+#include <fbl/alloc_checker.h>
+#endif
 #include <fbl/string.h>
 
 namespace fbl {
@@ -74,6 +78,14 @@ String& String::operator=(String&& other) noexcept {
   return *this;
 }
 
+#if __mist_os__
+String& String::operator+=(const String& other) {
+  String tmp = String::Concat({*this, other});
+  Set(tmp.data(), tmp.length());
+  return *this;
+}
+#endif
+
 void String::Set(const char* data, size_t length) {
   char* temp_data = data_;
   Init(data, length);
@@ -124,7 +136,13 @@ void String::InitWithEmpty() {
 }
 
 char* String::AllocData(size_t length) {
+#if __mist_os__
+  AllocChecker ac;
+  void* buffer = operator new(buffer_size(length), ac);
+  ZX_ASSERT(ac.check());
+#else
   void* buffer = operator new(buffer_size(length));
+#endif
   return InitData(buffer, length);
 }
 

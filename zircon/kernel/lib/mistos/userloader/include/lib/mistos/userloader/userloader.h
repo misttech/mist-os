@@ -16,8 +16,14 @@
 #include <cstdint>
 
 #include <ktl/array.h>
+#include <phys/handoff.h>
 
 namespace userloader {
+
+// This is only here for the count.  No userboot code cares which is which
+// except that the stable (default) variant is first and that kLastVdso (below)
+// is correct.
+enum class VdsoVariant { STABLE, NEXT, TEST1, TEST2, COUNT };
 
 // The handles in the bootstrap message are as follows:
 enum HandleIndex : uint32_t {
@@ -27,7 +33,6 @@ enum HandleIndex : uint32_t {
 
   // Essential job and resource handles.
   kRootJob,
-  kRootResource,
   kMmioResource,
   kIrqResource,
 #if __x86_64__
@@ -40,8 +45,11 @@ enum HandleIndex : uint32_t {
   // Essential VMO handles.
   kZbi,
 
+  kFirstVdso,
+  kLastVdso = kFirstVdso + static_cast<uint32_t>(VdsoVariant::COUNT) - 1,
+
   // These get passed along to userland to be recognized by ZX_PROP_NAME.
-  // The remainder are VMO handles that userloader doesn't care about.
+  // The remainder are VMO handles that userboot doesn't care about.
   kCrashlog,
   kFirstKernelFile = kCrashlog,
 
@@ -49,12 +57,15 @@ enum HandleIndex : uint32_t {
 
   kCounterNames,
   kCounters,
+
+  kTimeValues,
 #if ENABLE_ENTROPY_COLLECTOR_TEST
   kEntropyTestData,
 #endif
 
   kFirstInstrumentationData,
-  kHandleCount = kFirstInstrumentationData + InstrumentationData::vmo_count()
+  kFirstPhysVmo = kFirstInstrumentationData + InstrumentationData::vmo_count(),
+  kHandleCount = kFirstPhysVmo + PhysVmo::kMaxHandoffPhysVmos,
 };
 
 // Max number of bytes allowed for arguments to the userboot.next binary. This is an arbitrary

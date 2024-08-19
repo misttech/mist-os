@@ -18,7 +18,7 @@
 
 namespace elfldltl {
 
-#if _KERNEL_MISTOS
+#if __mist_os__
 using off_t = int64_t;
 #endif
 

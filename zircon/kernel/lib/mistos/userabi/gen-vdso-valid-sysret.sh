@@ -44,19 +44,8 @@ scan() {
 
   for syscall in $syscalls; do
     echo "\
-    static bool ${syscall}(uintptr_t offset) {
-        switch (offset) {\
-"
-    eval "local callers=\$syscall_callers_$syscall"
-    for caller in $callers; do
-      echo "\
-        case VDSO_CODE_SYSRET_zx_${syscall}_VIA_${caller} - VDSO_CODE_START:
-            return true;\
-"
-    done
-    echo "\
-        }
-        return false;
+    static constexpr bool ${syscall}(uintptr_t offset) {
+        return true;
     }
 "
   done
