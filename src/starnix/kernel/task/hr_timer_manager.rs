@@ -259,7 +259,6 @@ impl HrTimerManager {
     }
 }
 
-#[derive(Debug)]
 pub struct HrTimer {
     event: Arc<zx::Event>,
 }

@@ -4,17 +4,16 @@
 
 use crate::signals::{send_signal, SignalDetail, SignalEvent, SignalEventNotify, SignalInfo};
 use crate::task::timers::TimerId;
-use crate::task::{CurrentTask, HrTimer, HrTimerHandle, ThreadGroup};
+use crate::task::{Kernel, ThreadGroup};
 use crate::time::utc;
-use crate::timer::{Timeline, TimerOps, TimerWakeup};
+use crate::timer::Timeline;
 use futures::stream::AbortHandle;
-use starnix_logging::{log_error, log_trace, log_warn, track_stub};
+use starnix_logging::{log_trace, log_warn, track_stub};
 use starnix_sync::Mutex;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::ownership::{TempRef, WeakRef};
 use starnix_uapi::time::{duration_from_timespec, time_from_timespec, timespec_from_duration};
 use starnix_uapi::{itimerspec, SI_TIMER};
-use std::fmt::Debug;
 use std::sync::Arc;
 use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
@@ -38,9 +37,6 @@ impl From<TimerRemaining> for itimerspec {
 #[derive(Debug)]
 pub struct IntervalTimer {
     pub timer_id: TimerId,
-
-    /// HrTimer to trigger wakeup
-    hr_timer: Option<HrTimerHandle>,
 
     timeline: Timeline,
 
@@ -87,14 +83,9 @@ impl IntervalTimer {
     pub fn new(
         timer_id: TimerId,
         timeline: Timeline,
-        wakeup_type: TimerWakeup,
         signal_event: SignalEvent,
     ) -> Result<IntervalTimerHandle, Errno> {
-        let hr_timer = match wakeup_type {
-            TimerWakeup::Regular => None,
-            TimerWakeup::Alarm => Some(HrTimer::new()),
-        };
-        Ok(Arc::new(Self { timer_id, hr_timer, timeline, signal_event, state: Default::default() }))
+        Ok(Arc::new(Self { timer_id, timeline, signal_event, state: Default::default() }))
     }
 
     fn signal_info(self: &IntervalTimerHandle) -> Option<SignalInfo> {
@@ -102,11 +93,7 @@ impl IntervalTimer {
         Some(SignalInfo::new(self.signal_event.signo?, SI_TIMER, signal_detail))
     }
 
-    async fn start_timer_loop(
-        self: &IntervalTimerHandle,
-        system_task: &CurrentTask,
-        timer_thread_group: WeakRef<ThreadGroup>,
-    ) {
+    async fn start_timer_loop(self: &IntervalTimerHandle, thread_group: WeakRef<ThreadGroup>) {
         loop {
             let target_monotonic = loop {
                 // We may have to issue multiple sleeps if the target time in the timer is
@@ -120,11 +107,6 @@ impl IntervalTimer {
                 };
                 if zx::Time::get_monotonic() >= target_monotonic {
                     break target_monotonic;
-                }
-                if let Some(hr_timer) = &self.hr_timer {
-                    if let Err(e) = hr_timer.start(system_task, None, target_monotonic) {
-                        log_error!("Failed to start the HrTimer to trigger wakeup: {e}");
-                    }
                 }
                 fasync::Timer::new(target_monotonic).await;
             };
@@ -150,16 +132,16 @@ impl IntervalTimer {
             }
 
             // Check on notify enum to determine the signal target.
-            if let Some(timer_thread_group) = timer_thread_group.upgrade() {
+            if let Some(thread_group) = thread_group.upgrade() {
                 match self.signal_event.notify {
                     SignalEventNotify::Signal => {
                         if let Some(signal_info) = self.signal_info() {
                             log_trace!(
                                 signal = signal_info.signal.number(),
-                                pid = timer_thread_group.leader,
+                                pid = thread_group.leader,
                                 "sending signal for timer"
                             );
-                            timer_thread_group.write().send_signal(signal_info);
+                            thread_group.write().send_signal(signal_info);
                         }
                     }
                     SignalEventNotify::None => {}
@@ -168,20 +150,18 @@ impl IntervalTimer {
                     }
                     SignalEventNotify::ThreadId(tid) => {
                         // Check if the target thread exists in the thread group.
-                        timer_thread_group.read().get_task(tid).map(TempRef::into_static).map(
-                            |target| {
-                                if let Some(signal_info) = self.signal_info() {
-                                    log_trace!(
-                                        signal = signal_info.signal.number(),
-                                        tid,
-                                        "sending signal for timer"
-                                    );
-                                    send_signal(&target, signal_info).unwrap_or_else(|e| {
-                                        log_warn!("Failed to queue timer signal: {}", e)
-                                    });
-                                }
-                            },
-                        );
+                        thread_group.read().get_task(tid).map(TempRef::into_static).map(|target| {
+                            if let Some(signal_info) = self.signal_info() {
+                                log_trace!(
+                                    signal = signal_info.signal.number(),
+                                    tid,
+                                    "sending signal for timer"
+                                );
+                                send_signal(&target, signal_info).unwrap_or_else(|e| {
+                                    log_warn!("Failed to queue timer signal: {}", e)
+                                });
+                            }
+                        });
                     }
                 }
             }
@@ -206,7 +186,8 @@ impl IntervalTimer {
 
     pub fn arm(
         self: &IntervalTimerHandle,
-        current_task: &CurrentTask,
+        kernel: &Kernel,
+        thread_group: WeakRef<ThreadGroup>,
         new_value: itimerspec,
         is_absolute: bool,
     ) -> Result<(), Errno> {
@@ -231,10 +212,8 @@ impl IntervalTimer {
         guard.interval = interval;
         guard.on_setting_changed();
 
-        let kernel_ref = current_task.kernel().clone();
         let self_ref = self.clone();
-        let thread_group = current_task.thread_group.weak_thread_group.clone();
-        current_task.kernel().kthreads.spawn_future(async move {
+        kernel.kthreads.spawn_future(async move {
             let _ = {
                 // 1. Lock the state to update `abort_handle` when the timer is still armed.
                 // 2. MutexGuard needs to be dropped before calling await on the future task.
@@ -245,9 +224,8 @@ impl IntervalTimer {
                     return;
                 }
 
-                let (abortable_future, abort_handle) = futures::future::abortable(
-                    self_ref.start_timer_loop(kernel_ref.kthreads.system_task(), thread_group),
-                );
+                let (abortable_future, abort_handle) =
+                    futures::future::abortable(self_ref.start_timer_loop(thread_group));
                 guard.abort_handle = Some(abort_handle);
                 abortable_future
             }
@@ -257,14 +235,10 @@ impl IntervalTimer {
         Ok(())
     }
 
-    pub fn disarm(&self, current_task: &CurrentTask) -> Result<(), Errno> {
+    pub fn disarm(&self) {
         let mut guard = self.state.lock();
         guard.disarm();
         guard.on_setting_changed();
-        if let Some(hr_timer) = &self.hr_timer {
-            hr_timer.stop(current_task)?;
-        }
-        Ok(())
     }
 
     pub fn time_remaining(&self) -> TimerRemaining {
