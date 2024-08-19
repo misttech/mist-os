@@ -495,8 +495,10 @@ impl Mount {
     }
 
     pub fn unmount(&self, flags: UnmountFlags, propagate: bool) -> Result<(), Errno> {
-        if !flags.contains(UnmountFlags::DETACH) && self.active_clients() > 0 {
-            return error!(EBUSY);
+        if !flags.contains(UnmountFlags::DETACH) {
+            if self.active_clients() > 0 || !self.state.read().submounts.is_empty() {
+                return error!(EBUSY);
+            }
         }
         let mountpoint = self.mountpoint().ok_or_else(|| errno!(EINVAL))?;
         let parent_mount = mountpoint.mount.as_ref().expect("a mountpoint must be part of a mount");
