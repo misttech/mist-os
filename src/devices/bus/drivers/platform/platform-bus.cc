@@ -498,7 +498,7 @@ static void sys_device_suspend(void* ctx, uint8_t requested_state, bool enable_w
   if (pbus != nullptr) {
     auto& suspend_cb = pbus->suspend_cb();
     if (suspend_cb.is_valid()) {
-      suspend_cb->Callback(requested_state, enable_wake, suspend_reason)
+      suspend_cb->Callback(enable_wake, suspend_reason)
           .ThenExactlyOnce(
               [sys_root = p->sys_root](
                   fidl::WireUnownedResult<fuchsia_hardware_platform_bus::SysSuspend::Callback>&
@@ -507,7 +507,7 @@ static void sys_device_suspend(void* ctx, uint8_t requested_state, bool enable_w
                   device_suspend_reply(sys_root, status.status(), DEV_POWER_STATE_D0);
                   return;
                 }
-                device_suspend_reply(sys_root, status->out_status, status->out_state);
+                device_suspend_reply(sys_root, status->out_status, DEV_POWER_STATE_D0);
               });
       return;
     }

@@ -103,6 +103,7 @@ type BoardInfo = table {
 };
 
 /// Bootloader information set by the board driver.
+@available(added=HEAD)
 type BootloaderInfo = table {
     1: vendor string:MAX_INFO_STRING_LENGTH;
 };
@@ -154,17 +155,16 @@ type TemporaryBoardInfo = struct {
     board_revision uint32;
 };
 
-// Servers that implement this protocol can be registered to the platform
-// bus to receive callbacks on why the platform bus is suspending.
+/// Servers that implement this protocol can be registered to the platform
+/// bus to receive callbacks on why the platform bus is suspending.
+@available(added=HEAD)
 closed protocol SysSuspend {
-    // Invoked by the platform bus when its suspend hook is called.
+    /// Invoked by the platform bus when its suspend hook is called.
     strict Callback(struct {
-        requested_state uint8;
         enable_wake bool;
         suspend_reason uint8;
     }) -> (struct {
         out_status zx.Status;
-        out_state uint8;
     });
 };
 
@@ -190,11 +190,13 @@ open protocol PlatformBus {
     }) -> () error zx.Status;
 
     /// Board drivers may use this to set information about the bootloader.
+    @available(added=HEAD)
     strict SetBootloaderInfo(struct {
         info BootloaderInfo;
     }) -> () error zx.Status;
 
     /// Registers a callback that's invoked by the platform bus when it's suspending.
+    @available(added=HEAD)
     strict RegisterSysSuspendCallback(resource struct {
         suspend_cb client_end:SysSuspend;
     }) -> () error zx.Status;
