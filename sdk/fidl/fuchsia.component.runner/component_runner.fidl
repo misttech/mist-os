@@ -24,7 +24,7 @@ const MAX_HANDLE_COUNT uint32 = 128;
 ///
 /// Note: The component manager is the only intended direct client of this
 /// interface.
-@discoverable
+@discoverable(client="platform")
 closed protocol ComponentRunner {
     /// Start running a component instance described by `start_info`.
     ///

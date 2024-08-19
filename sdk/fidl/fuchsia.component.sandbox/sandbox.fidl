@@ -105,7 +105,7 @@ type DictionaryError = flexible enum {
     NOT_CLONEABLE = 5;
 };
 
-@discoverable
+@discoverable(server="platform")
 @available(added=20)
 open protocol Dictionary {};
 
@@ -155,7 +155,7 @@ alias WrappedNewCapabilityId = WrappedCapabilityId;
 /// A note about semantics: the [CapabilityStore] APIs do not return [CapabilityId]s, because
 /// [CapabilityId]s are assigned by the client. Instead, when a method would semantically return
 /// a capability, this is expressed by taking the destination [CapabilityId] as an output parameter.
-@discoverable
+@discoverable(server="platform")
 @available(added=HEAD)
 open protocol CapabilityStore {
     /// Duplicates the capability with `id` to `dest_id`.
@@ -505,9 +505,9 @@ open protocol Router {
     }) error RouterError;
 };
 
-/// A receiver is served by clients and allows them to receive channels
+/// A receiver is served by components and allows them to receive channels
 /// from the framework.
-@discoverable
+@discoverable(client="platform")
 @available(added=HEAD)
 open protocol Receiver {
     /// Sends a channel to this receiver.
