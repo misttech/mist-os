@@ -60,23 +60,23 @@ static const std::vector<fpbus::Bti> nelson_video_btis{
 static const std::vector<fpbus::Irq> nelson_video_irqs{
     {{
         .irq = S905D3_DEMUX_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
     {{
         .irq = S905D3_PARSER_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
     {{
         .irq = S905D3_DOS_MBOX_0_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
     {{
         .irq = S905D3_DOS_MBOX_1_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
     {{
         .irq = S905D3_DOS_MBOX_2_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
 };
 

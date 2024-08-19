@@ -11,6 +11,17 @@ using fuchsia.hardware.power;
 const MAX_INFO_STRING_LENGTH uint32 = 32;
 const MAX_POWER_CONFIGS uint32 = 32;
 
+/// Mode for creating zircon interrupts. In sync with ZX_INTERRUPT_MODE_* values
+/// from //zircon/system/public/zircon/types.h.
+type ZirconInterruptMode = strict enum : uint32 {
+    DEFAULT = 0x0;
+    EDGE_LOW = 0x2;
+    EDGE_HIGH = 0x4;
+    LEVEL_LOW = 0x6;
+    LEVEL_HIGH = 0x8;
+    EDGE_BOTH = 0xA;
+};
+
 /// Definition of a MMIO resource for a platform device node.
 type Mmio = table {
     /// Physical address of MMIO region. Does not need to be page aligned.
@@ -26,8 +37,9 @@ type Mmio = table {
 
 type Irq = table {
     1: irq uint32;
-    /// `ZX_INTERRUPT_MODE_*` flags
-    2: mode uint32;
+
+    /// Bit flag for setting the interrupt mode.
+    2: mode ZirconInterruptMode;
 
     /// Properties for this interrupt's fragment. Only used in DFv2.
     3: properties

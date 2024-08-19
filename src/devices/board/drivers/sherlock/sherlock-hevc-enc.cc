@@ -60,7 +60,7 @@ static const std::vector<fpbus::Bti> sherlock_hevc_enc_btis{
 static const std::vector<fpbus::Irq> sherlock_hevc_enc_irqs{
     {{
         .irq = T931_WAVE420L_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
 };
 

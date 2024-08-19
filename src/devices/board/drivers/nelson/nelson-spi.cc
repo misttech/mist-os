@@ -143,7 +143,7 @@ zx_status_t Nelson::Spi0Init() {
   static const std::vector<fpbus::Irq> spi_0_irqs{
       {{
           .irq = S905D3_SPICC0_IRQ,
-          .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+          .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
       }},
   };
 
@@ -248,7 +248,7 @@ zx_status_t Nelson::Spi1Init() {
   static const std::vector<fpbus::Irq> spi_1_irqs{
       {{
           .irq = S905D3_SPICC1_IRQ,
-          .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+          .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
       }},
   };
 

@@ -23,7 +23,7 @@ static const std::vector<fpbus::Mmio> sherlock_ram_ctl_mmios{
 static const std::vector<fpbus::Irq> sherlock_ram_ctl_irqs{
     {{
         .irq = T931_DMC_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
 };
 

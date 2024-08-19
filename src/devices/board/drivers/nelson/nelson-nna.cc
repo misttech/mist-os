@@ -49,7 +49,7 @@ static const std::vector<fpbus::Bti> nna_btis{
 static const std::vector<fpbus::Irq> nna_irqs{
     {{
         .irq = S905D3_NNA_IRQ,
-        .mode = ZX_INTERRUPT_MODE_LEVEL_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kLevelHigh,
     }},
 };
 

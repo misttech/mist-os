@@ -48,7 +48,7 @@ static const std::vector<fpbus::Mmio> dwc2_mmios{
 static const std::vector<fpbus::Irq> dwc2_irqs{
     {{
         .irq = T931_USB1_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
 };
 
@@ -106,7 +106,7 @@ static const std::vector<fpbus::Mmio> xhci_mmios{
 static const std::vector<fpbus::Irq> xhci_irqs{
     {{
         .irq = T931_USB0_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
 };
 
@@ -128,7 +128,7 @@ static const std::vector<fpbus::Mmio> usb_phy_mmios{
 static const std::vector<fpbus::Irq> usb_phy_irqs{
     {{
         .irq = T931_USB_IDDIG_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
 };
 

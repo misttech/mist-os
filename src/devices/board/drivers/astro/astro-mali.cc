@@ -48,15 +48,15 @@ static const std::vector<fpbus::Mmio> mali_mmios{
 static const std::vector<fpbus::Irq> mali_irqs{
     {{
         .irq = S905D2_MALI_IRQ_PP,
-        .mode = ZX_INTERRUPT_MODE_LEVEL_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kLevelHigh,
     }},
     {{
         .irq = S905D2_MALI_IRQ_GPMMU,
-        .mode = ZX_INTERRUPT_MODE_LEVEL_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kLevelHigh,
     }},
     {{
         .irq = S905D2_MALI_IRQ_GP,
-        .mode = ZX_INTERRUPT_MODE_LEVEL_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kLevelHigh,
     }},
 };
 

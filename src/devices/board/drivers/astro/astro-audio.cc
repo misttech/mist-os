@@ -55,13 +55,13 @@ static const std::vector<fpbus::Mmio> audio_mmios{
 static const std::vector<fpbus::Irq> frddr_b_irqs{
     {{
         .irq = S905D2_AUDIO_FRDDR_B,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
 };
 static const std::vector<fpbus::Irq> toddr_b_irqs{
     {{
         .irq = S905D2_AUDIO_TODDR_B,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
 };
 

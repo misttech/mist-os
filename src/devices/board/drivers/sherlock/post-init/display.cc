@@ -74,15 +74,15 @@ static const std::vector<fpbus::Mmio> display_mmios{
 static const std::vector<fpbus::Irq> display_irqs{
     {{
         .irq = T931_VIU1_VSYNC_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
     {{
         .irq = T931_RDMA_DONE,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
     {{
         .irq = T931_VID1_WR,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
 };
 
