@@ -316,6 +316,7 @@ impl IfaceManagerService {
         // Spawn the AP state machine.
         let (sender, receiver) = mpsc::channel(1);
         let state_machine = ap_fsm::AccessPoint::new(sender);
+        let (publisher, _reader) = status_publisher_and_reader::<ap_fsm::Status>();
 
         let event_stream = sme_proxy.take_event_stream();
         let state_machine_fut = ap_fsm::serve(
@@ -326,6 +327,7 @@ impl IfaceManagerService {
             self.ap_update_sender.clone(),
             self.telemetry_sender.clone(),
             self.defect_sender.clone(),
+            publisher,
         )
         .boxed();
 

@@ -9,7 +9,7 @@ use crate::util::listener::Message::NotifyListeners;
 use crate::util::listener::{
     ApListenerMessageSender, ApStateUpdate, ApStatesUpdate, ConnectedClientInformation,
 };
-use crate::util::state_machine::{self, ExitReason, IntoStateExt};
+use crate::util::state_machine::{self, ExitReason, IntoStateExt, StateMachineStatusPublisher};
 use anyhow::format_err;
 use fidl_fuchsia_wlan_sme as fidl_sme;
 use fuchsia_async::{self as fasync, DurationExt};
@@ -20,6 +20,7 @@ use futures::future::FutureExt;
 use futures::select;
 use futures::stream::{self, Fuse, FuturesUnordered, StreamExt, TryStreamExt};
 use std::convert::Infallible;
+use std::fmt::Debug;
 use std::sync::Arc;
 use tracing::{info, warn};
 use wlan_common::channel::{Cbw, Channel};
@@ -89,6 +90,45 @@ pub enum ManualRequest {
     Start((ApConfig, oneshot::Sender<()>)),
     Stop(oneshot::Sender<()>),
     Exit(oneshot::Sender<()>),
+}
+
+// Status artifact to be reported when recovery occurs.  This status is intended to be updated on
+// state transitions and SME status updates.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub enum Status {
+    Stopping,
+    #[default]
+    Stopped,
+    Starting,
+    Started {
+        band: types::OperatingBand,
+        channel: u8,
+        mode: types::ConnectivityMode,
+        num_clients: u16,
+        security_type: types::SecurityType,
+    },
+}
+
+impl Status {
+    fn started_from_config(config: &ApConfig) -> Self {
+        Status::Started {
+            band: config.band,
+            channel: config.radio_config.channel.primary,
+            mode: config.mode,
+            num_clients: 0,
+            security_type: config.id.security_type,
+        }
+    }
+
+    fn started_from_sme_update(update: &fidl_sme::Ap, config: &ApConfig) -> Self {
+        Status::Started {
+            band: config.band,
+            channel: update.channel,
+            mode: config.mode,
+            num_clients: update.num_clients,
+            security_type: config.id.security_type,
+        }
+    }
 }
 
 // To avoid printing PII, only allow Debug in tests, runtime logging should use Display
@@ -206,6 +246,7 @@ struct CommonStateDependencies {
     state_tracker: Arc<ApStateTracker>,
     telemetry_sender: TelemetrySender,
     defect_sender: mpsc::UnboundedSender<Defect>,
+    status_publisher: StateMachineStatusPublisher<Status>,
 }
 
 pub async fn serve(
@@ -216,6 +257,7 @@ pub async fn serve(
     message_sender: ApListenerMessageSender,
     telemetry_sender: TelemetrySender,
     defect_sender: mpsc::UnboundedSender<Defect>,
+    status_publisher: StateMachineStatusPublisher<Status>,
 ) {
     let state_tracker = Arc::new(ApStateTracker::new(message_sender));
     let deps = CommonStateDependencies {
@@ -225,6 +267,7 @@ pub async fn serve(
         state_tracker: state_tracker.clone(),
         telemetry_sender,
         defect_sender,
+        status_publisher: status_publisher.clone(),
     };
     let state_machine = stopped_state(deps).into_state_machine();
     let removal_watcher = sme_event_stream.map_ok(|_| ()).try_collect::<()>();
@@ -254,6 +297,8 @@ pub async fn serve(
             let _ = state_tracker.update_operating_state(types::OperatingState::Failed);
         }
     }
+
+    status_publisher.publish_status(Status::Stopped);
 }
 
 fn perform_manual_request(
@@ -318,6 +363,8 @@ async fn starting_state(
     remaining_retries: u16,
     responder: Option<oneshot::Sender<()>>,
 ) -> Result<State, ExitReason> {
+    deps.status_publisher.publish_status(Status::Starting);
+
     // Send a stop request to ensure that the AP begins in an unstarting state.
     let stop_result = match deps.proxy.stop().await {
         Ok(fidl_sme::StopApResultCode::Success) => Ok(()),
@@ -377,11 +424,12 @@ async fn starting_state(
             // may succeed.
             if remaining_retries > 0 {
                 let retry_timer = fasync::Timer::new(AP_START_RETRY_INTERVAL.seconds().after_now());
+                let mut retry_timer = retry_timer.fuse();
 
                 // To ensure that the state machine remains responsive, process any incoming
                 // requests while waiting for the timer to expire.
                 select! {
-                    () = retry_timer.fuse() => {
+                    () = retry_timer => {
                         return transition_to_starting(
                             deps,
                             req,
@@ -394,10 +442,7 @@ async fn starting_state(
                         deps.state_tracker
                             .set_stopped_state()
                             .map_err(|e| ExitReason(Err(e)))?;
-                        return perform_manual_request(
-                            deps,
-                            req,
-                        );
+                        return perform_manual_request(deps, req)
                     }
                 }
             }
@@ -451,6 +496,8 @@ async fn stopping_state(
     deps: CommonStateDependencies,
     responder: oneshot::Sender<()>,
 ) -> Result<State, ExitReason> {
+    deps.status_publisher.publish_status(Status::Stopping);
+
     let result = match deps.proxy.stop().await {
         Ok(fidl_sme::StopApResultCode::Success) => Ok(()),
         Ok(code) => Err(format_err!("Unexpected StopApResultCode: {:?}", code)),
@@ -470,6 +517,8 @@ async fn stopping_state(
 }
 
 async fn stopped_state(mut deps: CommonStateDependencies) -> Result<State, ExitReason> {
+    deps.status_publisher.publish_status(Status::Stopped);
+
     // Wait for the next request from the caller
     loop {
         let req = deps.req_stream.next().await;
@@ -488,6 +537,8 @@ async fn started_state(
     mut deps: CommonStateDependencies,
     req: ApConfig,
 ) -> Result<State, ExitReason> {
+    deps.status_publisher.publish_status(Status::started_from_config(&req));
+
     // Holds a pending status request.  Request status immediately upon entering the started state.
     let mut pending_status_req = FuturesUnordered::new();
     pending_status_req.push(deps.proxy.status());
@@ -515,6 +566,8 @@ async fn started_state(
 
                 match status_response.running_ap {
                     Some(sme_state) => {
+                        deps.status_publisher
+                            .publish_status(Status::started_from_sme_update(&sme_state, &req));
                         deps.state_tracker.consume_sme_status_update(cbw, *sme_state)
                             .map_err(|e| { ExitReason(Err(e)) })?;
                     }
@@ -536,11 +589,8 @@ async fn started_state(
                     pending_status_req.push(deps.proxy.clone().status());
                 }
             },
-            req = deps.req_stream.next() => {
-                return perform_manual_request(
-                    deps,
-                    req,
-                );
+            manual_req = deps.req_stream.next() => {
+                return perform_manual_request(deps, manual_req)
             },
             complete => {
                 panic!("AP state machine terminated unexpectedly");
@@ -553,6 +603,7 @@ async fn started_state(
 mod tests {
     use super::*;
     use crate::util::listener;
+    use crate::util::state_machine::{status_publisher_and_reader, StateMachineStatusReader};
     use fidl::endpoints::create_proxy;
     use fidl_fuchsia_wlan_common as fidl_common;
     use futures::stream::StreamFuture;
@@ -568,6 +619,7 @@ mod tests {
         update_receiver: mpsc::UnboundedReceiver<listener::ApMessage>,
         telemetry_receiver: mpsc::Receiver<TelemetryEvent>,
         defect_receiver: mpsc::UnboundedReceiver<Defect>,
+        status_reader: StateMachineStatusReader<Status>,
     }
 
     fn test_setup() -> TestValues {
@@ -579,6 +631,7 @@ mod tests {
         let (telemetry_sender, telemetry_receiver) = mpsc::channel(100);
         let telemetry_sender = TelemetrySender::new(telemetry_sender);
         let (defect_sender, defect_receiver) = mpsc::unbounded();
+        let (status_publisher, status_reader) = status_publisher_and_reader::<Status>();
 
         let deps = CommonStateDependencies {
             iface_id: 123,
@@ -587,6 +640,7 @@ mod tests {
             state_tracker: Arc::new(ApStateTracker::new(update_sender)),
             telemetry_sender,
             defect_sender,
+            status_publisher,
         };
 
         TestValues {
@@ -596,6 +650,7 @@ mod tests {
             update_receiver,
             telemetry_receiver,
             defect_receiver,
+            status_reader,
         }
     }
 
@@ -903,20 +958,33 @@ mod tests {
             test_values.deps.state_tracker.inner.lock().state = Some(state);
         }
 
-        // Run the started state and send back an identical status.
+        // Run the started state.
         let fut = started_state(test_values.deps, req);
         let fut = run_state_machine(fut);
         let mut fut = pin!(fut);
 
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
+        // Verify the initial status report.
+        assert_variant!(
+            test_values.status_reader.read_status(),
+            Ok(Status::Started {
+                band: types::OperatingBand::Any,
+                channel: 6,
+                mode: types::ConnectivityMode::Unrestricted,
+                num_clients: 0,
+                security_type: types::SecurityType::None,
+            })
+        );
+
+        // Send an SME status update.
         let sme_fut = test_values.sme_req_stream.into_future();
         let mut sme_fut = pin!(sme_fut);
 
         assert_variant!(
             poll_sme_req(&mut exec, &mut sme_fut),
             Poll::Ready(fidl_sme::ApSmeRequest::Status{ responder }) => {
-                let ap_info = fidl_sme::Ap { ssid: vec![], channel: 0, num_clients: 1 };
+                let ap_info = fidl_sme::Ap { ssid: vec![], channel: 1, num_clients: 1 };
                 let response = fidl_sme::ApStatusResponse {
                     running_ap: Some(Box::new(ap_info))
                 };
@@ -931,6 +999,18 @@ mod tests {
             Poll::Ready((Some(listener::Message::NotifyListeners(updates)), _)) => {
                 assert!(!updates.access_points.is_empty());
         });
+
+        // Verify that the status has been updated.
+        assert_variant!(
+            test_values.status_reader.read_status(),
+            Ok(Status::Started {
+                band: types::OperatingBand::Any,
+                channel: 1,
+                mode: types::ConnectivityMode::Unrestricted,
+                num_clients: 1,
+                security_type: types::SecurityType::None,
+            })
+        );
     }
 
     #[fuchsia::test]
@@ -2097,8 +2177,8 @@ mod tests {
         let (start_response_sender, _) = oneshot::channel();
         let manual_request = ManualRequest::Start((requested_config, start_response_sender));
 
-        let fut = async move { perform_manual_request(test_values.deps, Some(manual_request)) };
-        let fut = run_state_machine(fut);
+        let fut = perform_manual_request(test_values.deps, Some(manual_request));
+        let fut = run_state_machine(async move { fut });
         let mut fut = pin!(fut);
         assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
 
@@ -2150,6 +2230,7 @@ mod tests {
             update_sender,
             test_values.deps.telemetry_sender,
             test_values.deps.defect_sender,
+            test_values.deps.status_publisher,
         );
         let mut fut = pin!(fut);
 
@@ -2165,6 +2246,9 @@ mod tests {
         let sme_event_stream = test_values.deps.proxy.take_event_stream();
         let update_sender = test_values.deps.state_tracker.inner.lock().sender.clone();
 
+        // Set the initial state to Starting to verify that it is changed on exit.
+        test_values.deps.status_publisher.publish_status(Status::Starting);
+
         let fut = serve(
             0,
             test_values.deps.proxy,
@@ -2173,6 +2257,7 @@ mod tests {
             update_sender,
             test_values.deps.telemetry_sender,
             test_values.deps.defect_sender,
+            test_values.deps.status_publisher.clone(),
         );
         let mut fut = pin!(fut);
 
@@ -2187,6 +2272,9 @@ mod tests {
             exec.run_until_stalled(&mut test_values.update_receiver.into_future()),
             Poll::Pending
         );
+
+        // Verify that the state has been set to stopped on exit.
+        assert_variant!(test_values.status_reader.read_status(), Ok(Status::Stopped));
     }
 
     #[fuchsia::test]
@@ -2205,6 +2293,7 @@ mod tests {
             update_sender,
             test_values.deps.telemetry_sender,
             test_values.deps.defect_sender,
+            test_values.deps.status_publisher,
         );
         let mut fut = pin!(fut);
 
@@ -2530,5 +2619,86 @@ mod tests {
             )
             .expect_err("unexpectedly able to update SME status");
         let _ = state.set_stopped_state().expect_err("unexpectedly able to set stopped state");
+    }
+
+    #[fuchsia::test]
+    fn test_state_when_stopping() {
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+
+        // Run the stopping state.
+        let (stop_sender, _) = oneshot::channel();
+        let fut = stopping_state(test_values.deps, stop_sender);
+        let fut = run_state_machine(fut);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify that the state has been set to Stopping.
+        assert_variant!(test_values.status_reader.read_status(), Ok(Status::Stopping));
+    }
+
+    #[fuchsia::test]
+    fn test_state_when_stopped() {
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+
+        // Set the initial state to Starting to verify that it is changed in the stopped state.
+        test_values.deps.status_publisher.publish_status(Status::Starting);
+
+        // Run the stopping state.
+        let fut = stopped_state(test_values.deps);
+        let fut = run_state_machine(fut);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify that the state has been set to Stopped.
+        assert_variant!(test_values.status_reader.read_status(), Ok(Status::Stopped));
+    }
+
+    #[fuchsia::test]
+    fn test_state_when_starting() {
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+
+        // Run the starting state.
+        let (start_sender, _) = oneshot::channel();
+        let radio_config = RadioConfig::new(fidl_common::WlanPhyType::Ht, Cbw::Cbw20, 6);
+        let req = ApConfig {
+            id: create_network_id(),
+            credential: vec![],
+            radio_config,
+            mode: types::ConnectivityMode::Unrestricted,
+            band: types::OperatingBand::Any,
+        };
+        let fut = starting_state(test_values.deps, req, 0, Some(start_sender));
+        let fut = run_state_machine(fut);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify that the state has been set to Starting.
+        assert_variant!(test_values.status_reader.read_status(), Ok(Status::Starting));
+    }
+
+    #[fuchsia::test]
+    fn test_state_when_started() {
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+
+        // Run the started state.
+        let radio_config = RadioConfig::new(fidl_common::WlanPhyType::Ht, Cbw::Cbw20, 6);
+        let req = ApConfig {
+            id: create_network_id(),
+            credential: vec![],
+            radio_config,
+            mode: types::ConnectivityMode::Unrestricted,
+            band: types::OperatingBand::Any,
+        };
+        let fut = started_state(test_values.deps, req);
+        let fut = run_state_machine(fut);
+        let mut fut = pin!(fut);
+        assert_variant!(exec.run_until_stalled(&mut fut), Poll::Pending);
+
+        // Verify that the state has been set to Started.
+        assert_variant!(test_values.status_reader.read_status(), Ok(Status::Started { .. }));
     }
 }
