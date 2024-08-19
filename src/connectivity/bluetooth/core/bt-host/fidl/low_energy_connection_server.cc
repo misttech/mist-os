@@ -174,4 +174,11 @@ void LowEnergyConnectionServer::GetCodecLocalDelayRange(
       });
 }
 
+void LowEnergyConnectionServer::ConnectL2cap(
+    fuchsia::bluetooth::le::ConnectionConnectL2capRequest parameters) {
+  // Temporarily log and close the binding until implemented.
+  bt_log(WARN, "fidl", "ConnectL2cap not implemented");
+  binding()->Close(ZX_ERR_NOT_SUPPORTED);
+}
+
 }  // namespace bthost

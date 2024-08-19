@@ -1,0 +1,68 @@
+// Copyright 2024 The Fuchsia Authors. All rights reserved.
+// Use of this source code is governed by a BSD-style license that can be
+// found in the LICENSE file.
+library fuchsia.bluetooth.le;
+
+using fuchsia.bluetooth as bt;
+using zx;
+
+/// The set of parameters for accepting a channel when listening for new channel
+/// connections.
+///
+/// See [`ChannelListenerRegistry/ListenL2cap`].
+@available(added=HEAD)
+type AcceptedChannelParameters = table {
+    /// All channel modes that should be accepted while listening. Must contain
+    /// at least one channel mode or the call will fail with
+    /// `ZX_ERR_INVALID_ARGS`.
+    /// Required.
+    1: accepted_channel_modes vector<bt.ChannelMode>:MAX;
+    /// Maximum supported packet size for receiving.
+    /// Optional. If not provided, the size will be determined by the Bluetooth
+    /// system. No guarantees are given regarding the size selected.
+    2: max_packet_size uint16;
+};
+
+/// Represents a service or protocol that accepts incoming channel requests.
+/// Incoming channel requests for the associated PSM will be connected via this
+/// protocol. Closing this protocol will also cease accepting any incoming
+/// channel requests, but existing established channels will not be affected.
+/// Additionally, once this protocol is closed the implementation is free to
+/// reuse the PSM that was previously assigned for this instance.
+@available(added=HEAD)
+open protocol ChannelListener {
+    flexible Accept(resource struct {
+        channel client_end:bt.Channel;
+    }) -> ();
+};
+
+/// An identifier for a service that accepts connection-oriented channel
+/// connections. Referred to as a (simplified) protocol/service multiplexer
+/// in the Bluetooth specification.
+@available(added=HEAD)
+alias Psm = uint16;
+
+/// Represents the ability to register and accept incoming connections on
+/// connection oriented channels.
+@available(added=HEAD)
+closed protocol ChannelListenerRegistry {
+    /// Register a listener for incoming channels. The registry will assign a
+    /// PSM value that is unique for the local device, as well as open a
+    /// [`ChannelListener`] for accepting incoming channels. In the unlikely
+    /// event that all PSMs have been assigned, this call will fail with
+    /// `ZX_ERR_NO_RESOURCES`.
+    ///
+    /// Note that the method of service discovery or advertising is defined by
+    /// the service or protocol, so it is the responsibility of the caller to
+    /// communicate the assigned PSM to any clients.
+    strict ListenL2cap(resource table {
+        /// Accepted parameters for the local side of the channel.
+        1: parameters AcceptedChannelParameters;
+        /// The channel listener protocol to open.
+        2: listener client_end:ChannelListener;
+    }) -> (table {
+        /// PSM assigned by the registry. Guaranteed to be in the `DYNAMIC`
+        /// range of PSM values.
+        1: psm Psm;
+    }) error zx.Status;
+};

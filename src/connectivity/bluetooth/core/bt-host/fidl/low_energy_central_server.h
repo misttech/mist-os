@@ -122,6 +122,10 @@ class LowEnergyCentralServer : public AdapterServerBase<fuchsia::bluetooth::le::
   void DisconnectPeripheral(::std::string identifier,
                             DisconnectPeripheralCallback callback) override;
 
+  // fuchsia::bluetooth::le::ChannelListenerRegistry overrides:
+  void ListenL2cap(fuchsia::bluetooth::le::ChannelListenerRegistryListenL2capRequest request,
+                   ListenL2capCallback callback) override;
+
   // Called by |scan_session_| when a device is discovered.
   void OnScanResult(const bt::gap::Peer& peer);
 

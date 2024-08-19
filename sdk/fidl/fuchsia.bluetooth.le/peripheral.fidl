@@ -138,6 +138,11 @@ closed protocol AdvertisedPeripheral {
 
 @discoverable(server="platform")
 closed protocol Peripheral {
+    /// A [`Peripheral`] may reserve L2CAP connection-oriented channels for
+    /// receiving connections from peers.
+    @available(added=HEAD)
+    compose ChannelListenerRegistry;
+
     /// Start advertising continuously as a LE peripheral. If advertising cannot
     /// be initiated then `advertised_peripheral` will be closed and an error
     /// will be returned.

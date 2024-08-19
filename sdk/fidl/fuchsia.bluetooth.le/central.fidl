@@ -91,6 +91,11 @@ closed protocol ScanResultWatcher {
 
 @discoverable(server="platform")
 closed protocol Central {
+    /// A [`Central`] may reserve L2CAP connection-oriented channels for
+    /// receiving connections from peers.
+    @available(added=HEAD)
+    compose ChannelListenerRegistry;
+
     /// Scans for nearby LE peripherals and broadcasters. If the scan cannot be
     /// initiated, then `result_watcher` will be closed with an epitaph.
     ///

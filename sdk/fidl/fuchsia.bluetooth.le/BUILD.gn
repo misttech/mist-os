@@ -16,6 +16,7 @@ fidl("fuchsia.bluetooth.le") {
     "codec_delay.fidl",
     "connection_options.fidl",
     "iso.fidl",
+    "l2cap.fidl",
     "overview.fidl",
     "peer.fidl",
     "peripheral.fidl",

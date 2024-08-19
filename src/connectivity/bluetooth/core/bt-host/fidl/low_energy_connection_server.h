@@ -40,6 +40,7 @@ class LowEnergyConnectionServer : public ServerBase<fuchsia::bluetooth::le::Conn
   void GetCodecLocalDelayRange(::fuchsia::bluetooth::le::CodecDelayGetCodecLocalDelayRangeRequest
                                    CodecDelayGetCodecLocalDelayRangeRequest,
                                GetCodecLocalDelayRangeCallback callback) override;
+  void ConnectL2cap(fuchsia::bluetooth::le::ConnectionConnectL2capRequest parameters) override;
 
   std::unique_ptr<bt::gap::LowEnergyConnectionHandle> conn_;
   fit::callback<void()> closed_handler_;
