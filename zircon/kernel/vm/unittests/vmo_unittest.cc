@@ -18,7 +18,8 @@ namespace {
 uint64_t reclaim_page(fbl::RefPtr<VmCowPages> vmo, vm_page_t* page, uint64_t offset,
                       VmCowPages::EvictionHintAction hint_action, VmCompressor* compressor) {
   list_node freed_list = LIST_INITIAL_VALUE(freed_list);
-  const uint64_t count = vmo->ReclaimPage(page, offset, hint_action, &freed_list, compressor);
+  const uint64_t count =
+      vmo->ReclaimPage(page, offset, hint_action, &freed_list, compressor).Total();
   ASSERT(list_length(&freed_list) == count);
   if (count > 0) {
     pmm_free(&freed_list);

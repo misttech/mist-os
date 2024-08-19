@@ -463,8 +463,16 @@ class VmCowPages final : public VmHierarchyBase,
   //
   // The actual number of pages reclaimed is returned and ownership of the pages is given by
   // appending to the passed in |freed_list|.
-  uint64_t ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintAction hint_action,
-                       list_node* freed_list, VmCompressor* compressor);
+  struct ReclaimCounts {
+    uint64_t evicted_non_loaned = 0;
+    uint64_t evicted_loaned = 0;
+    uint64_t discarded = 0;
+    uint64_t compressed = 0;
+
+    uint64_t Total() const { return compressed + discarded + evicted_non_loaned + evicted_loaned; }
+  };
+  ReclaimCounts ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintAction hint_action,
+                            list_node* freed_list, VmCompressor* compressor);
 
   // If any pages in the specified range are loaned pages, replaces them with non-loaned pages
   // (which requires providing a |page_request|). The specified range should be fully committed

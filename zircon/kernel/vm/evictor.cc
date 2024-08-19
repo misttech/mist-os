@@ -348,26 +348,12 @@ Evictor::EvictedPageCounts Evictor::EvictPageQueues(uint64_t target_pages,
       }
       list_node_t reclaim_list;
       list_initialize(&reclaim_list);
-      if (uint64_t count = backlink->cow->ReclaimPage(backlink->page, backlink->offset, hint_action,
-                                                      &reclaim_list, compression_instance);
-          count > 0) {
-        if (backlink->cow->can_evict()) {
-          vm_page_t* page;
-          list_for_every_entry (&reclaim_list, page, vm_page_t, queue_node) {
-            if (page->is_loaned()) {
-              counts.pager_backed_loaned++;
-            } else {
-              counts.pager_backed++;
-            }
-          }
-        } else if (backlink->cow->is_discardable()) {
-          counts.discardable += count;
-        } else {
-          // If the cow wasn't evictable, then the reclamation must have succeeded due to
-          // compression.
-          counts.compressed += count;
-        }
-      }
+      VmCowPages::ReclaimCounts reclaimed = backlink->cow->ReclaimPage(
+          backlink->page, backlink->offset, hint_action, &reclaim_list, compression_instance);
+      counts.pager_backed_loaned += reclaimed.evicted_loaned;
+      counts.pager_backed += reclaimed.evicted_non_loaned;
+      counts.compressed += reclaimed.compressed;
+      counts.discardable += reclaimed.discarded;
       list_splice_after(&reclaim_list, &freed_list);
     } else {
       break;

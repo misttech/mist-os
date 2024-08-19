@@ -6576,8 +6576,9 @@ bool VmCowPages::RemovePageForCompressionLocked(vm_page_t* page, uint64_t offset
   return page != nullptr;
 }
 
-uint64_t VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintAction hint_action,
-                                 list_node* freed_list, VmCompressor* compressor) {
+VmCowPages::ReclaimCounts VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offset,
+                                                  EvictionHintAction hint_action,
+                                                  list_node* freed_list, VmCompressor* compressor) {
   DEBUG_ASSERT(freed_list);
   canary_.Assert();
 
@@ -6585,35 +6586,43 @@ uint64_t VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintA
   // Check this page is still a part of this VMO.
   const VmPageOrMarker* page_or_marker = page_list_.Lookup(offset);
   if (!page_or_marker || !page_or_marker->IsPage() || page_or_marker->Page() != page) {
-    return 0;
+    return ReclaimCounts{};
   }
 
   // Pinned pages could be in use by DMA so we cannot safely reclaim them.
   if (page->object.pin_count != 0) {
-    return 0;
+    return ReclaimCounts{};
   }
 
   if (high_priority_count_ != 0) {
     // Not allowed to reclaim. To avoid this page remaining in a reclamation list we simulate an
     // access.
     pmm_page_queues()->MarkAccessed(page);
-    return 0;
+    return ReclaimCounts{};
   }
 
   auto single_page_wrapper = [&](bool reclaimed) {
     if (reclaimed) {
       DEBUG_ASSERT(!list_in_list(&page->queue_node));
       list_add_tail(freed_list, &page->queue_node);
-      return 1;
+      return 1u;
     }
-    return 0;
+    return 0u;
   };
 
   // See if we can reclaim by eviction.
   if (can_evict()) {
-    return single_page_wrapper(RemovePageForEvictionLocked(page, offset, hint_action));
+    const bool loaned = page->is_loaned();
+    const uint count = single_page_wrapper(RemovePageForEvictionLocked(page, offset, hint_action));
+    return ReclaimCounts{
+        .evicted_non_loaned = loaned ? 0u : count,
+        .evicted_loaned = loaned ? count : 0u,
+    };
   } else if (compressor && !page_source_ && !discardable_tracker_) {
-    return single_page_wrapper(RemovePageForCompressionLocked(page, offset, compressor, guard));
+    return ReclaimCounts{
+        .compressed =
+            single_page_wrapper(RemovePageForCompressionLocked(page, offset, compressor, guard)),
+    };
   } else if (discardable_tracker_) {
     // On any errors touch the page so we stop trying to reclaim it. In particular for discardable
     // reclamation attempts, if the page we are passing is not the first page in the discardable
@@ -6623,9 +6632,9 @@ uint64_t VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintA
     if (result.is_error()) {
       pmm_page_queues()->MarkAccessed(page);
       vm_vmo_discardable_failed_reclaim.Add(1);
-      return 0;
+      return ReclaimCounts{};
     }
-    return *result;
+    return ReclaimCounts{.discarded = *result};
   }
   // No other reclamation strategies, so to avoid this page remaining in a reclamation list we
   // simulate an access. Do not want to place it in the ReclaimFailed queue since our failure was
@@ -6633,7 +6642,7 @@ uint64_t VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintA
   pmm_page_queues()->MarkAccessed(page);
   // Keep a count as having no reclamation strategy is probably a sign of miss-configuration.
   vm_vmo_no_reclamation_strategy.Add(1);
-  return 0;
+  return ReclaimCounts{};
 }
 
 void VmCowPages::SwapPageLocked(uint64_t offset, vm_page_t* old_page, vm_page_t* new_page) {
