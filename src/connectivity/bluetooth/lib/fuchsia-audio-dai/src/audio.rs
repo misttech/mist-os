@@ -87,6 +87,10 @@ impl DaiAudioDevice {
         Ok(proxy.add_device_by_channel(name, self.is_input, client)?)
     }
 
+    pub fn dai_formats(&self) -> &Vec<DaiSupportedFormats> {
+        &self.dai_formats
+    }
+
     /// Stop the device, removing it from the system. This method is idempotent, and the device
     /// can be started again with the same parameters.
     pub fn stop(&mut self) {

@@ -52,15 +52,15 @@ impl DaiAudioControl {
             };
             let dai_input = props.is_input.ok_or(AudioError::DiscoveryFailed)?;
             if input_dai.is_none() && dai_input {
-                let dai_device = DaiAudioDevice::build(device).await.or_else(|e| {
-                    warn!("Couldn't build a dai audio device: {:?}", e);
-                    Err(AudioError::DiscoveryFailed)
+                let dai_device = DaiAudioDevice::build(device).await.map_err(|e| {
+                    warn!("Couldn't build a DAI input audio device: {e:?}");
+                    AudioError::DiscoveryFailed
                 })?;
                 input_dai = Some(dai_device);
             } else if output_dai.is_none() && !dai_input {
-                let dai_device = DaiAudioDevice::build(device).await.or_else(|e| {
-                    warn!("Couldn't build a dai audio device: {:?}", e);
-                    Err(AudioError::DiscoveryFailed)
+                let dai_device = DaiAudioDevice::build(device).await.map_err(|e| {
+                    warn!("Couldn't build a DAI output audio device: {e:?}");
+                    AudioError::DiscoveryFailed
                 })?;
                 output_dai = Some(dai_device);
             }
@@ -88,7 +88,6 @@ impl DaiAudioControl {
         &mut self,
         peer_id: &PeerId,
         input: bool,
-        dai_format: DaiFormat,
         pcm_format: PcmFormat,
     ) -> Result<(), anyhow::Error> {
         let (uuid, dev) = if input {
@@ -96,7 +95,24 @@ impl DaiAudioControl {
         } else {
             (HF_OUTPUT_UUID, &mut self.output)
         };
-
+        // TODO(b/358666067): make dai-device choose this format
+        // Use the first supported format for now.
+        let missing_err = format_err!("Couldn't find DAI frame format");
+        let Some(supported) = dev.dai_formats().first() else {
+            return Err(missing_err);
+        };
+        let Some(frame_format) = supported.frame_formats.first().cloned() else {
+            return Err(missing_err);
+        };
+        let dai_format = DaiFormat {
+            number_of_channels: 1,
+            channels_to_use_bitmask: 0x1,
+            sample_format: audio::DaiSampleFormat::PcmSigned,
+            frame_format,
+            frame_rate: pcm_format.frame_rate,
+            bits_per_slot: 16,
+            bits_per_sample: 16,
+        };
         let dev_id = peer_audio_stream_id(*peer_id, uuid);
         dev.config(dai_format, pcm_format)?;
         dev.start(self.audio_core.clone(), "HFP Audio", dev_id, "Fuchsia", "Sapphire HFP Headset")
@@ -125,17 +141,6 @@ impl AudioControl for DaiAudioControl {
                 })
             }
         };
-        let dai_format = DaiFormat {
-            number_of_channels: 1,
-            channels_to_use_bitmask: 0x1,
-            sample_format: audio::DaiSampleFormat::PcmSigned,
-            frame_format: audio::DaiFrameFormat::FrameFormatStandard(
-                audio::DaiFrameFormatStandard::Tdm1,
-            ),
-            frame_rate,
-            bits_per_slot: 16,
-            bits_per_sample: 16,
-        };
         let pcm_format = PcmFormat {
             number_of_channels: 1,
             sample_format: audio::SampleFormat::PcmSigned,
@@ -143,9 +148,8 @@ impl AudioControl for DaiAudioControl {
             valid_bits_per_sample: 16,
             frame_rate,
         };
-        self.start_device(&id, true, dai_format.clone(), pcm_format.clone())
-            .map_err(AudioError::audio_core)?;
-        if let Err(e) = self.start_device(&id, false, dai_format, pcm_format) {
+        self.start_device(&id, true, pcm_format.clone()).map_err(AudioError::audio_core)?;
+        if let Err(e) = self.start_device(&id, false, pcm_format) {
             // Stop the input device, so we have only two states: started and not started.
             self.input.stop();
             return Err(AudioError::audio_core(e));
