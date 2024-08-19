@@ -371,7 +371,8 @@ class RunnerServer : public fidl::Server<fidl_serversuite::Runner> {
 }  // namespace
 
 int main(int argc, const char** argv) {
-  fuchsia_logging::SetTags({"cpp"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"cpp"}).BuildAndInitialize();
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   auto outgoing = component::OutgoingDirectory(loop.dispatcher());
   ZX_ASSERT(outgoing.ServeFromStartupInfo().is_ok());

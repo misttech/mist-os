@@ -19,7 +19,8 @@
 #include <src/lib/fxl/command_line.h>
 
 int main(int argc, const char** argv) {
-  fuchsia_logging::SetTags({"workshop", "reader"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"workshop", "reader"}).BuildAndInitialize();
 
   if (argc < 3) {
     FX_LOGS(FATAL) << "required args: "

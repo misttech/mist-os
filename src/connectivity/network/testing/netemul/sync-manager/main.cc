@@ -12,7 +12,8 @@
 
 int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  fuchsia_logging::SetTags({"sync-manager"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"sync-manager"}).BuildAndInitialize();
   FX_LOGS(INFO) << "started";
 
   std::unique_ptr context = sys::ComponentContext::CreateAndServeOutgoingDirectory();

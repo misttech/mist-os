@@ -45,7 +45,8 @@ class LifecycleHandler : public fuchsia::process::lifecycle::Lifecycle {
 // [END lifecycle_handler]
 
 int main(int argc, const char** argv) {
-  fuchsia_logging::SetTags({"lifecycle", "example"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"lifecycle", "example"}).BuildAndInitialize();
 
   // Create the main async event loop.
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);

@@ -124,7 +124,8 @@ class TestHarness : public fidl::Server<fio_test::Io1Harness> {
 };
 
 int main(int argc, const char** argv) {
-  fuchsia_logging::SetTags({"io_conformance_harness_cppvfs"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"io_conformance_harness_cppvfs"}).BuildAndInitialize();
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   component::OutgoingDirectory outgoing = component::OutgoingDirectory(loop.dispatcher());

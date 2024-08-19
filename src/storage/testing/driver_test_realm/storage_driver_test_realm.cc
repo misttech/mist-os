@@ -10,7 +10,8 @@
 #include <lib/syslog/cpp/macros.h>
 
 int main() {
-  fuchsia_logging::SetTags({"platform_driver_test_realm"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"platform_driver_test_realm"}).BuildAndInitialize();
 
   auto client_end = component::Connect<fuchsia_driver_test::Realm>();
   if (!client_end.is_ok()) {

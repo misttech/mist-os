@@ -534,6 +534,7 @@ TEST(AgisDisconnect, Main) {
 
 int main(int argc, char **argv) {
   ::testing::InitGoogleTest(&argc, argv);
-  fuchsia_logging::SetTags({"agis-test"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"agis-test"}).BuildAndInitialize();
   return RUN_ALL_TESTS();
 }

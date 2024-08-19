@@ -40,7 +40,8 @@ zx::result<storage::RamDisk> MakeRamdisk() {
 }
 
 int main() {
-  fuchsia_logging::SetTags({"factory_driver_test_realm"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"factory_driver_test_realm"}).BuildAndInitialize();
 
   auto client_end = component::Connect<fuchsia_driver_test::Realm>();
   if (!client_end.is_ok()) {

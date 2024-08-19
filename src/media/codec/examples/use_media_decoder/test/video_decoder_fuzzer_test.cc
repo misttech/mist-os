@@ -145,7 +145,8 @@ int run_fuzzer_test_instance(std::string input_file_path, UseVideoDecoderFunctio
 
 int video_fuzzer_test(std::string input_file_path, UseVideoDecoderFunction use_video_decoder,
                       uint32_t iteration_count, fxl::CommandLine command_line) {
-  fuchsia_logging::SetTags({"video_decoder_fuzzer_test"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"video_decoder_fuzzer_test"}).BuildAndInitialize();
 
   // Default seed.
   std::mt19937 gen;

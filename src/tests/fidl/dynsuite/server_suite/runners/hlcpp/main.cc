@@ -382,7 +382,8 @@ class RunnerServer : public fidl::serversuite::Runner {
 }  // namespace
 
 int main(int argc, const char** argv) {
-  fuchsia_logging::SetTags({"hlcpp"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"hlcpp"}).BuildAndInitialize();
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
   fidl::InterfaceRequestHandler<fidl::serversuite::Runner> handler =
       [&](fidl::InterfaceRequest<fidl::serversuite::Runner> server_end) {
