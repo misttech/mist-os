@@ -61,6 +61,10 @@ pub struct SuspendResumeManager {
     /// | Standby           | 2     |
     /// | Suspend-to-RAM    | 1     |
     /// | Suspend-to-Disk   | 0     |
+    ///
+    /// Note that this `PowerElement` only represents the desires of user-space. The Starnix Kernel
+    /// itself may hold wake leases which prevent System Activity Governor from suspending the
+    /// system, despite this `PowerElement` lowering its level below `On`.
     power_mode: OnceCell<PowerElement>,
 
     // The mutable state of [SuspendResumeManager].
@@ -387,14 +391,14 @@ impl SuspendResumeManager {
 
     /// Notify all waiters of the suspension `result`.
     pub(super) fn notify_suspension(&self, result: SuspendResult) {
-        let waiters = std::mem::take(&mut self.lock().suspend_waiter);
-        for waiter in waiters.into_iter() {
+        let waiter = std::mem::take(&mut self.lock().suspend_waiter);
+        waiter.map(|waiter| {
             let mut guard = waiter.result.lock().unwrap();
             let prev = guard.replace(result);
             debug_assert_eq!(prev, None, "waiter should only be notified once");
             // We should only have a single thread blocked per waiter.
             waiter.cond_var.notify_one();
-        }
+        });
     }
 
     /// Executed on suspend.
@@ -410,6 +414,8 @@ impl SuspendResumeManager {
         debug_assert!(prev.is_none(), "Should not have concurrent suspend attempts");
 
         self.update_power_level(state.into()).inspect_err(|_| {
+            // If `update_power_level()` fails, drop the `suspend_waiter`,
+            // to indicate that there is no longer a suspend in progress.
             self.lock().suspend_waiter.take();
         })?;
 
