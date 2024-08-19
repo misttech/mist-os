@@ -58,7 +58,8 @@ open protocol Vendor {
 
     /// Encode the vendor HCI command and return the encoded command.
     /// See `VendorCommand` for possible commands and parameters.
-    /// Returns an error status if the command is not supported or paramaters cannot be encoded.
+    /// * error `ZX_ERR_NOT_SUPPORTED` The command is not supported.
+    /// * error `ZX_ERR_INVALID_ARGS` The parameters of the command are invalid.
     flexible EncodeCommand(VendorCommand) -> (struct {
         encoded vector<uint8>:BT_VENDOR_MAX_COMMAND_BUFFER_LEN;
     }) error zx.Status;
