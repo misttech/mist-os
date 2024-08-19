@@ -57,6 +57,7 @@ pub enum CommandEnum {
     Log(Log),
     Neigh(Neigh),
     Route(Route),
+    Rule(Rule),
     Dhcp(Dhcp),
     Dhcpd(dhcpd::Dhcpd),
     Dns(dns::Dns),
@@ -615,7 +616,7 @@ fn subnet_mask_to_prefix_length(addr: std::net::IpAddr) -> u8 {
 
 #[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand, name = "list")]
-/// lists devices (supports ffx machine output)
+/// lists routes (supports ffx machine output)
 pub struct RouteList {}
 
 macro_rules! route_struct {
@@ -671,6 +672,25 @@ macro_rules! route_struct {
 // TODO(https://github.com/google/argh/issues/48): do this more sanely.
 route_struct!(RouteAdd, "add", "adds a route to the route table");
 route_struct!(RouteDel, "del", "deletes a route from the route table");
+
+#[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand, name = "rule")]
+/// commands for policy-based-routing rules
+pub struct Rule {
+    #[argh(subcommand)]
+    pub rule_cmd: RuleEnum,
+}
+
+#[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand)]
+pub enum RuleEnum {
+    List(RuleList),
+}
+
+#[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
+#[argh(subcommand, name = "list")]
+/// lists rules (supports ffx machine output)
+pub struct RuleList {}
 
 #[derive(ArgsInfo, FromArgs, Clone, Debug, PartialEq)]
 #[argh(subcommand, name = "dhcp")]

@@ -1,6 +1,6 @@
 {
   "name": "list",
-  "description": "lists routes (supports ffx machine output)",
+  "description": "lists rules (supports ffx machine output)",
   "examples": [],
   "flags": [
     {

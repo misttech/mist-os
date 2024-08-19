@@ -1,6 +1,6 @@
 {
-  "name": "list",
-  "description": "lists routes (supports ffx machine output)",
+  "name": "rule",
+  "description": "commands for policy-based-routing rules",
   "examples": [],
   "flags": [
     {

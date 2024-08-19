@@ -7,7 +7,7 @@
 use std::fmt::Debug;
 use std::ops::RangeInclusive;
 
-use async_utils::stream;
+use async_utils::{fold, stream};
 use fidl::endpoints::{DiscoverableProtocolMarker, ProtocolMarker, Proxy as _};
 use fidl_fuchsia_net_ext::{IntoExt as _, TryIntoExt as _};
 use futures::future::Either;
@@ -1036,6 +1036,61 @@ pub fn rule_event_stream_from_watcher<I: FidlRuleIpExt>(
         // Flatten the stream of event streams into a single event stream.
         .try_flatten(),
     ))
+}
+
+/// Errors returned by [`collect_rules_until_idle`].
+#[derive(Clone, Debug, Error)]
+pub enum CollectRulesUntilIdleError<I: FidlRuleIpExt> {
+    /// There was an error in the event stream.
+    #[error("there was an error in the event stream: {0}")]
+    ErrorInStream(RuleWatchError),
+    /// There was an unexpected event in the event stream. Only `existing` or
+    /// `idle` events are expected.
+    #[error("there was an unexpected event in the event stream: {0:?}")]
+    UnexpectedEvent(RuleEvent<I>),
+    /// The event stream unexpectedly ended.
+    #[error("the event stream unexpectedly ended")]
+    StreamEnded,
+}
+
+/// Collects all `existing` events from the stream, stopping once the `idle`
+/// event is observed.
+pub async fn collect_rules_until_idle<I: FidlRuleIpExt, C: Extend<InstalledRule<I>> + Default>(
+    event_stream: impl futures::Stream<Item = Result<RuleEvent<I>, RuleWatchError>> + Unpin,
+) -> Result<C, CollectRulesUntilIdleError<I>> {
+    fold::fold_while(
+        event_stream,
+        Ok(C::default()),
+        |existing_rules: Result<C, CollectRulesUntilIdleError<I>>, event| {
+            futures::future::ready(match existing_rules {
+                Err(_) => {
+                    unreachable!("`existing_rules` must be `Ok`, because we stop folding on err")
+                }
+                Ok(mut existing_rules) => match event {
+                    Err(e) => {
+                        fold::FoldWhile::Done(Err(CollectRulesUntilIdleError::ErrorInStream(e)))
+                    }
+                    Ok(e) => match e {
+                        RuleEvent::Existing(e) => {
+                            existing_rules.extend([e]);
+                            fold::FoldWhile::Continue(Ok(existing_rules))
+                        }
+                        RuleEvent::Idle => fold::FoldWhile::Done(Ok(existing_rules)),
+                        e @ RuleEvent::Added(_) | e @ RuleEvent::Removed(_) => {
+                            fold::FoldWhile::Done(Err(CollectRulesUntilIdleError::UnexpectedEvent(
+                                e,
+                            )))
+                        }
+                    },
+                },
+            })
+        },
+    )
+    .await
+    .short_circuited()
+    .map_err(|_accumulated_thus_far: Result<C, CollectRulesUntilIdleError<I>>| {
+        CollectRulesUntilIdleError::StreamEnded
+    })?
 }
 
 #[cfg(test)]

@@ -219,3 +219,5 @@ ffx/net/route.golden
 ffx/net/route/add.golden
 ffx/net/route/del.golden
 ffx/net/route/list.golden
+ffx/net/rule.golden
+ffx/net/rule/list.golden
