@@ -45,8 +45,9 @@ fuchsia_unittest_package("starnix-selinux-unit-tests") {
 }
 
 if (is_host) {
-  # Host-only build of `selinux` crate enabled test-only features used in `selinux_host_tests`.
-  rustc_library("selinux_for_host_tests") {
+  # Host-only build of `selinux` crate enabled test-only features used in
+  # `starnix-selinux-host-tests`.
+  rustc_library("selinux-for-host") {
     name = "selinux"
     testonly = true
     with_unit_tests = false
@@ -126,12 +127,12 @@ if (is_host) {
     rustenv = [ "TESTDATA_DIR=" + rebase_path(testdata_dir, root_build_dir) ]
   }
 
-  rustc_test("starnix_selinux_host_tests") {
+  rustc_test("starnix-selinux-host-tests") {
     edition = "2021"
     source_root = "host_tests/lib.rs"
     sources = [ "host_tests/lib.rs" ]
     deps = [
-      ":selinux_for_host_tests",
+      ":selinux-for-host",
       ":testdata_composite_policies",
       ":testdata_expectations",
       ":testdata_micro_policies",
@@ -148,10 +149,10 @@ if (is_host) {
 group("host_tests") {
   testonly = true
 
-  # Build both `selinux_host_tests` and `selinux` unit tests for host.
+  # Build both `starnix-selinux-host-tests` and `selinux` unit tests for host.
   deps = [
     ":selinux_test($host_toolchain)",
-    ":starnix_selinux_host_tests($host_toolchain)",
+    ":starnix-selinux-host-tests($host_toolchain)",
   ]
 }
 
