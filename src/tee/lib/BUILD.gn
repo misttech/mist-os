@@ -4,13 +4,5 @@
 
 group("tests") {
   testonly = true
-  deps = [
-    "lib:tests",
-    "manager:tests",
-    "runtime:tests",
-    "ta:tests",
-    "tee_internal_api:tests",
-    "testing:tests",
-    "tests",
-  ]
+  deps = [ "dev_urandom_compat:tests" ]
 }
