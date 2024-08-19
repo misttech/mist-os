@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{ensure, Error};
 use async_trait::async_trait;
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_hardware_block::BlockProxy;
@@ -36,6 +35,13 @@ pub mod cache;
 const TEMP_VMO_SIZE: usize = 65536;
 
 pub use block_driver::{BlockIoFlag, BlockOpcode};
+
+fn fidl_to_status(error: fidl::Error) -> zx::Status {
+    match error {
+        fidl::Error::ClientChannelClosed { status, .. } => status,
+        _ => zx::Status::INTERNAL,
+    }
+}
 
 fn opcode_str(opcode: u8) -> &'static str {
     match BlockOpcode::from_primitive(opcode) {
@@ -252,33 +258,33 @@ impl Hash for VmoId {
 #[async_trait]
 pub trait BlockClient: Send + Sync {
     /// Wraps AttachVmo from fuchsia.hardware.block::Block.
-    async fn attach_vmo(&self, vmo: &zx::Vmo) -> Result<VmoId, Error>;
+    async fn attach_vmo(&self, vmo: &zx::Vmo) -> Result<VmoId, zx::Status>;
 
     /// Detaches the given vmo-id from the device.
-    async fn detach_vmo(&self, vmo_id: VmoId) -> Result<(), Error>;
+    async fn detach_vmo(&self, vmo_id: VmoId) -> Result<(), zx::Status>;
 
     /// Reads from the device at |device_offset| into the given buffer slice.
     async fn read_at(
         &self,
         buffer_slice: MutableBufferSlice<'_>,
         device_offset: u64,
-    ) -> Result<(), Error>;
+    ) -> Result<(), zx::Status>;
 
     /// Writes the data in |buffer_slice| to the device.
     async fn write_at(
         &self,
         buffer_slice: BufferSlice<'_>,
         device_offset: u64,
-    ) -> Result<(), Error>;
+    ) -> Result<(), zx::Status>;
 
     /// Trims the given range on the block device.
-    async fn trim(&self, device_range: Range<u64>) -> Result<(), Error>;
+    async fn trim(&self, device_range: Range<u64>) -> Result<(), zx::Status>;
 
     /// Sends a flush request to the underlying block device.
-    async fn flush(&self) -> Result<(), Error>;
+    async fn flush(&self) -> Result<(), zx::Status>;
 
     /// Closes the fifo.
-    async fn close(&self) -> Result<(), Error>;
+    async fn close(&self) -> Result<(), zx::Status>;
 
     /// Returns the block size of the device.
     fn block_size(&self) -> u32;
@@ -303,13 +309,16 @@ struct Common {
 }
 
 impl Common {
-    fn to_blocks(&self, bytes: u64) -> Result<u64, Error> {
-        ensure!(bytes % self.block_size as u64 == 0, "bad alignment");
-        Ok(bytes / self.block_size as u64)
+    fn to_blocks(&self, bytes: u64) -> Result<u64, zx::Status> {
+        if bytes % self.block_size as u64 != 0 {
+            Err(zx::Status::INVALID_ARGS)
+        } else {
+            Ok(bytes / self.block_size as u64)
+        }
     }
 
     // Sends the request and waits for the response.
-    async fn send(&self, mut request: BlockFifoRequest) -> Result<(), Error> {
+    async fn send(&self, mut request: BlockFifoRequest) -> Result<(), zx::Status> {
         let trace_args = storage_trace::trace_future_args!(
             c"storage",
             c"BlockOp",
@@ -320,7 +329,7 @@ impl Common {
                 let mut state = self.fifo_state.lock().unwrap();
                 if state.fifo.is_none() {
                     // Fifo has been closed.
-                    return Err(zx::Status::CANCELED.into());
+                    return Err(zx::Status::CANCELED);
                 }
                 trace::duration!(c"storage", c"BlockOp::start");
                 let request_id = state.next_request_id;
@@ -368,7 +377,7 @@ impl Common {
         }
     }
 
-    async fn detach_vmo(&self, vmo_id: VmoId) -> Result<(), Error> {
+    async fn detach_vmo(&self, vmo_id: VmoId) -> Result<(), zx::Status> {
         self.send(BlockFifoRequest {
             command: BlockFifoCommand {
                 opcode: BlockOpcode::CloseVmo.into_primitive(),
@@ -385,7 +394,7 @@ impl Common {
         &self,
         buffer_slice: MutableBufferSlice<'_>,
         device_offset: u64,
-    ) -> Result<(), Error> {
+    ) -> Result<(), zx::Status> {
         match buffer_slice {
             MutableBufferSlice::VmoId { vmo_id, offset, length } => {
                 self.send(BlockFifoRequest {
@@ -395,7 +404,10 @@ impl Common {
                         ..Default::default()
                     },
                     vmoid: vmo_id.id(),
-                    length: self.to_blocks(length)?.try_into()?,
+                    length: self
+                        .to_blocks(length)?
+                        .try_into()
+                        .map_err(|_| zx::Status::INVALID_ARGS)?,
                     vmo_offset: self.to_blocks(offset)?,
                     dev_offset: self.to_blocks(device_offset)?,
                     ..Default::default()
@@ -437,7 +449,7 @@ impl Common {
         &self,
         buffer_slice: BufferSlice<'_>,
         device_offset: u64,
-    ) -> Result<(), Error> {
+    ) -> Result<(), zx::Status> {
         match buffer_slice {
             BufferSlice::VmoId { vmo_id, offset, length } => {
                 self.send(BlockFifoRequest {
@@ -447,7 +459,10 @@ impl Common {
                         ..Default::default()
                     },
                     vmoid: vmo_id.id(),
-                    length: self.to_blocks(length)?.try_into()?,
+                    length: self
+                        .to_blocks(length)?
+                        .try_into()
+                        .map_err(|_| zx::Status::INVALID_ARGS)?,
                     vmo_offset: self.to_blocks(offset)?,
                     dev_offset: self.to_blocks(device_offset)?,
                     ..Default::default()
@@ -485,7 +500,7 @@ impl Common {
         Ok(())
     }
 
-    async fn trim(&self, device_range: Range<u64>) -> Result<(), Error> {
+    async fn trim(&self, device_range: Range<u64>) -> Result<(), zx::Status> {
         let length = self.to_blocks(device_range.end - device_range.start)? as u32;
         let dev_offset = self.to_blocks(device_range.start)?;
         self.send(BlockFifoRequest {
@@ -502,7 +517,7 @@ impl Common {
         .await
     }
 
-    async fn flush(&self) -> Result<(), Error> {
+    async fn flush(&self) -> Result<(), zx::Status> {
         self.send(BlockFifoRequest {
             command: BlockFifoCommand {
                 opcode: BlockOpcode::Flush.into_primitive(),
@@ -585,15 +600,18 @@ impl_as_block_proxy!(VolumeProxy);
 
 impl RemoteBlockClient {
     /// Returns a connection to a remote block device via the given channel.
-    pub async fn new(remote: impl AsBlockProxy) -> Result<Self, Error> {
-        let info = remote.get_info().await?.map_err(zx::Status::from_raw)?;
-        let (session, server) = fidl::endpoints::create_proxy()?;
-        let () = remote.open_session(server)?;
-        let fifo = session.get_fifo().await?.map_err(zx::Status::from_raw)?;
+    pub async fn new(remote: impl AsBlockProxy) -> Result<Self, zx::Status> {
+        let info =
+            remote.get_info().await.map_err(fidl_to_status)?.map_err(zx::Status::from_raw)?;
+        let (session, server) = fidl::endpoints::create_proxy().map_err(fidl_to_status)?;
+        let () = remote.open_session(server).map_err(fidl_to_status)?;
+        let fifo =
+            session.get_fifo().await.map_err(fidl_to_status)?.map_err(zx::Status::from_raw)?;
         let fifo = fasync::Fifo::from_fifo(fifo);
         let temp_vmo = zx::Vmo::create(TEMP_VMO_SIZE as u64)?;
         let dup = temp_vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?;
-        let vmo_id = session.attach_vmo(dup).await?.map_err(zx::Status::from_raw)?;
+        let vmo_id =
+            session.attach_vmo(dup).await.map_err(fidl_to_status)?.map_err(zx::Status::from_raw)?;
         let vmo_id = VmoId::new(vmo_id.id);
         Ok(RemoteBlockClient { session, common: Common::new(fifo, &info, temp_vmo, vmo_id) })
     }
@@ -601,13 +619,18 @@ impl RemoteBlockClient {
 
 #[async_trait]
 impl BlockClient for RemoteBlockClient {
-    async fn attach_vmo(&self, vmo: &zx::Vmo) -> Result<VmoId, Error> {
+    async fn attach_vmo(&self, vmo: &zx::Vmo) -> Result<VmoId, zx::Status> {
         let dup = vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?;
-        let vmo_id = self.session.attach_vmo(dup).await?.map_err(zx::Status::from_raw)?;
+        let vmo_id = self
+            .session
+            .attach_vmo(dup)
+            .await
+            .map_err(fidl_to_status)?
+            .map_err(zx::Status::from_raw)?;
         Ok(VmoId::new(vmo_id.id))
     }
 
-    async fn detach_vmo(&self, vmo_id: VmoId) -> Result<(), Error> {
+    async fn detach_vmo(&self, vmo_id: VmoId) -> Result<(), zx::Status> {
         self.common.detach_vmo(vmo_id).await
     }
 
@@ -615,7 +638,7 @@ impl BlockClient for RemoteBlockClient {
         &self,
         buffer_slice: MutableBufferSlice<'_>,
         device_offset: u64,
-    ) -> Result<(), Error> {
+    ) -> Result<(), zx::Status> {
         self.common.read_at(buffer_slice, device_offset).await
     }
 
@@ -623,20 +646,21 @@ impl BlockClient for RemoteBlockClient {
         &self,
         buffer_slice: BufferSlice<'_>,
         device_offset: u64,
-    ) -> Result<(), Error> {
+    ) -> Result<(), zx::Status> {
         self.common.write_at(buffer_slice, device_offset).await
     }
 
-    async fn trim(&self, range: Range<u64>) -> Result<(), Error> {
+    async fn trim(&self, range: Range<u64>) -> Result<(), zx::Status> {
         self.common.trim(range).await
     }
 
-    async fn flush(&self) -> Result<(), Error> {
+    async fn flush(&self) -> Result<(), zx::Status> {
         self.common.flush().await
     }
 
-    async fn close(&self) -> Result<(), Error> {
-        let () = self.session.close().await?.map_err(zx::Status::from_raw)?;
+    async fn close(&self) -> Result<(), zx::Status> {
+        let () =
+            self.session.close().await.map_err(fidl_to_status)?.map_err(zx::Status::from_raw)?;
         Ok(())
     }
 
@@ -666,21 +690,32 @@ impl RemoteBlockClientSync {
     /// Returns a connection to a remote block device via the given channel, but spawns a separate
     /// thread for polling the fifo which makes it work in cases where no executor is configured for
     /// the calling thread.
-    pub fn new(client_end: fidl::endpoints::ClientEnd<block::BlockMarker>) -> Result<Self, Error> {
+    pub fn new(
+        client_end: fidl::endpoints::ClientEnd<block::BlockMarker>,
+    ) -> Result<Self, zx::Status> {
         let remote = block::BlockSynchronousProxy::new(client_end.into_channel());
-        let info = remote.get_info(zx::Time::INFINITE)?.map_err(zx::Status::from_raw)?;
+        let info = remote
+            .get_info(zx::Time::INFINITE)
+            .map_err(fidl_to_status)?
+            .map_err(zx::Status::from_raw)?;
         let (client, server) = fidl::endpoints::create_endpoints();
-        let () = remote.open_session(server)?;
+        let () = remote.open_session(server).map_err(fidl_to_status)?;
         let session = block::SessionSynchronousProxy::new(client.into_channel());
-        let fifo = session.get_fifo(zx::Time::INFINITE)?.map_err(zx::Status::from_raw)?;
+        let fifo = session
+            .get_fifo(zx::Time::INFINITE)
+            .map_err(fidl_to_status)?
+            .map_err(zx::Status::from_raw)?;
         let temp_vmo = zx::Vmo::create(TEMP_VMO_SIZE as u64)?;
         let dup = temp_vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?;
-        let vmo_id = session.attach_vmo(dup, zx::Time::INFINITE)?.map_err(zx::Status::from_raw)?;
+        let vmo_id = session
+            .attach_vmo(dup, zx::Time::INFINITE)
+            .map_err(fidl_to_status)?
+            .map_err(zx::Status::from_raw)?;
         let vmo_id = VmoId::new(vmo_id.id);
 
         // The fifo needs to be instantiated from the thread that has the executor as that's where
         // the fifo registers for notifications to be delivered.
-        let (sender, receiver) = oneshot::channel::<Result<Self, Error>>();
+        let (sender, receiver) = oneshot::channel::<Result<Self, zx::Status>>();
         std::thread::spawn(move || {
             let mut executor = fasync::LocalExecutor::new();
             let fifo = fasync::Fifo::from_fifo(fifo);
@@ -689,17 +724,20 @@ impl RemoteBlockClientSync {
             let _ = sender.send(Ok(RemoteBlockClientSync { session, common }));
             executor.run_singlethreaded(FifoPoller { fifo_state });
         });
-        block_on(receiver)?
+        block_on(receiver).map_err(|_| zx::Status::CANCELED)?
     }
 
-    pub fn attach_vmo(&self, vmo: &zx::Vmo) -> Result<VmoId, Error> {
+    pub fn attach_vmo(&self, vmo: &zx::Vmo) -> Result<VmoId, zx::Status> {
         let dup = vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?;
-        let vmo_id =
-            self.session.attach_vmo(dup, zx::Time::INFINITE)?.map_err(zx::Status::from_raw)?;
+        let vmo_id = self
+            .session
+            .attach_vmo(dup, zx::Time::INFINITE)
+            .map_err(fidl_to_status)?
+            .map_err(zx::Status::from_raw)?;
         Ok(VmoId::new(vmo_id.id))
     }
 
-    pub fn detach_vmo(&self, vmo_id: VmoId) -> Result<(), Error> {
+    pub fn detach_vmo(&self, vmo_id: VmoId) -> Result<(), zx::Status> {
         block_on(self.common.detach_vmo(vmo_id))
     }
 
@@ -707,20 +745,28 @@ impl RemoteBlockClientSync {
         &self,
         buffer_slice: MutableBufferSlice<'_>,
         device_offset: u64,
-    ) -> Result<(), Error> {
+    ) -> Result<(), zx::Status> {
         block_on(self.common.read_at(buffer_slice, device_offset))
     }
 
-    pub fn write_at(&self, buffer_slice: BufferSlice<'_>, device_offset: u64) -> Result<(), Error> {
+    pub fn write_at(
+        &self,
+        buffer_slice: BufferSlice<'_>,
+        device_offset: u64,
+    ) -> Result<(), zx::Status> {
         block_on(self.common.write_at(buffer_slice, device_offset))
     }
 
-    pub fn flush(&self) -> Result<(), Error> {
+    pub fn flush(&self) -> Result<(), zx::Status> {
         block_on(self.common.flush())
     }
 
-    pub fn close(&self) -> Result<(), Error> {
-        let () = self.session.close(zx::Time::INFINITE)?.map_err(zx::Status::from_raw)?;
+    pub fn close(&self) -> Result<(), zx::Status> {
+        let () = self
+            .session
+            .close(zx::Time::INFINITE)
+            .map_err(fidl_to_status)?
+            .map_err(zx::Status::from_raw)?;
         Ok(())
     }
 

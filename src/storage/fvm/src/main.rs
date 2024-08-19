@@ -1135,7 +1135,7 @@ async fn main() -> Result<(), Error> {
 
 #[cfg(test)]
 mod tests {
-    use super::{map_to_status, Component, MAX_SLICE_COUNT};
+    use super::{Component, MAX_SLICE_COUNT};
     use assert_matches::assert_matches;
     use block_client::{BlockClient, BufferSlice, MutableBufferSlice, RemoteBlockClient};
     use fake_block_server::FakeServer;
@@ -1253,12 +1253,10 @@ mod tests {
 
         // Reading from a slice that's not allocated should fail.
         assert_eq!(
-            map_to_status(
-                client
-                    .read_at(MutableBufferSlice::Memory(&mut buf), 32768)
-                    .await
-                    .expect_err("Read from slice #2 should fail")
-            ),
+            client
+                .read_at(MutableBufferSlice::Memory(&mut buf), 32768)
+                .await
+                .expect_err("Read from slice #2 should fail"),
             zx::Status::OUT_OF_RANGE
         );
 

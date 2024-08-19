@@ -58,13 +58,11 @@ impl GptPartition {
     }
 
     pub async fn attach_vmo(&self, vmo: &zx::Vmo) -> Result<VmoId, zx::Status> {
-        // TODO(https://fxbug.dev/355660116): Properly translate errors
-        self.block_client.attach_vmo(vmo).await.map_err(|_| zx::Status::BAD_STATE)
+        self.block_client.attach_vmo(vmo).await
     }
 
     pub async fn detach_vmo(&self, vmoid: VmoId) -> Result<(), zx::Status> {
-        // TODO(https://fxbug.dev/355660116): Properly translate errors
-        self.block_client.detach_vmo(vmoid).await.map_err(|_| zx::Status::BAD_STATE)
+        self.block_client.detach_vmo(vmoid).await
     }
 
     pub async fn read(
@@ -76,18 +74,13 @@ impl GptPartition {
     ) -> Result<(), zx::Status> {
         let dev_offset = self
             .absolute_offset(device_block_offset, block_count)
-            .map(|offset| offset * self.block_size() as u64)
-            .map_err(|_| zx::Status::OUT_OF_RANGE)?;
+            .map(|offset| offset * self.block_size() as u64)?;
         let buffer = MutableBufferSlice::new_with_vmo_id(
             vmo_id,
             vmo_offset,
             (block_count * self.block_size()) as u64,
         );
-        // TODO(https://fxbug.dev/355660116): Properly translate errors
-        self.block_client.read_at(buffer, dev_offset).await.map_err(|e| {
-            tracing::warn!(?e, "Failed to read");
-            zx::Status::BAD_STATE
-        })
+        self.block_client.read_at(buffer, dev_offset).await
     }
 
     pub async fn write(
@@ -99,23 +92,17 @@ impl GptPartition {
     ) -> Result<(), zx::Status> {
         let dev_offset = self
             .absolute_offset(device_block_offset, block_count)
-            .map(|offset| offset * self.block_size() as u64)
-            .map_err(|_| zx::Status::OUT_OF_RANGE)?;
+            .map(|offset| offset * self.block_size() as u64)?;
         let buffer = BufferSlice::new_with_vmo_id(
             vmo_id,
             vmo_offset,
             (block_count * self.block_size()) as u64,
         );
-        // TODO(https://fxbug.dev/355660116): Properly translate errors
-        self.block_client.write_at(buffer, dev_offset).await.map_err(|e| {
-            tracing::warn!(?e, "Failed to write");
-            zx::Status::BAD_STATE
-        })
+        self.block_client.write_at(buffer, dev_offset).await
     }
 
     pub async fn flush(&self) -> Result<(), zx::Status> {
-        // TODO(https://fxbug.dev/355660116): Properly translate errors
-        self.block_client.flush().await.map_err(|_| zx::Status::BAD_STATE)
+        self.block_client.flush().await
     }
 
     pub async fn trim(
@@ -123,14 +110,8 @@ impl GptPartition {
         mut device_block_offset: u64,
         block_count: u32,
     ) -> Result<(), zx::Status> {
-        device_block_offset = self
-            .absolute_offset(device_block_offset, block_count)
-            .map_err(|_| zx::Status::OUT_OF_RANGE)?;
-        // TODO(https://fxbug.dev/355660116): Properly translate errors
-        self.block_client
-            .trim(device_block_offset..device_block_offset + block_count as u64)
-            .await
-            .map_err(|_| zx::Status::BAD_STATE)
+        device_block_offset = self.absolute_offset(device_block_offset, block_count)?;
+        self.block_client.trim(device_block_offset..device_block_offset + block_count as u64).await
     }
 
     fn start_offset(&self) -> u64 {
@@ -142,14 +123,16 @@ impl GptPartition {
     }
 
     // Converts a relative range specified by [offset, offset+len) into an absolute offset in the
-    // GPT device, performing bounds checking within the partition.
-    fn absolute_offset(&self, mut offset: u64, len: u32) -> Result<u64, Error> {
-        offset = offset.checked_add(self.start_offset()).ok_or(anyhow!("Overflow, {offset}"))?;
-        let end = offset.checked_add(len as u64).ok_or(anyhow!("Overflow, {offset} + {len}"))?;
+    // GPT device, performing bounds checking within the partition.  Returns ZX_ERR_OUT_OF_RANGE for
+    // an invalid offset/len.
+    fn absolute_offset(&self, mut offset: u64, len: u32) -> Result<u64, zx::Status> {
+        offset = offset.checked_add(self.start_offset()).ok_or(zx::Status::OUT_OF_RANGE)?;
+        let end = offset.checked_add(len as u64).ok_or(zx::Status::OUT_OF_RANGE)?;
         if end > self.end_offset() {
-            return Err(anyhow!("{offset} is out of range"));
+            Err(zx::Status::OUT_OF_RANGE)
+        } else {
+            Ok(offset)
         }
-        Ok(offset)
     }
 }
 
@@ -261,7 +244,7 @@ impl GptManager {
 
     async fn create_session(&self) -> Result<RemoteBlockClient, Error> {
         let block = self.block_connector.connect_block()?.into_proxy()?;
-        RemoteBlockClient::new(block).await
+        Ok(RemoteBlockClient::new(block).await?)
     }
 
     async fn load_partitions(

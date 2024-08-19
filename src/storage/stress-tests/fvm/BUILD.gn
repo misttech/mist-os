@@ -21,7 +21,6 @@ rustc_test("stressor-bin") {
     "//src/storage/lib/block_client/rust",
     "//src/storage/stress-tests/utils",
     "//src/sys/lib/stress-test",
-    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:argh",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",

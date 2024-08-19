@@ -195,7 +195,7 @@ impl Cache {
     }
 
     pub fn flush_device(&self) -> Result<(), Error> {
-        self.device.flush()
+        Ok(self.device.flush()?)
     }
 }
 
@@ -208,7 +208,7 @@ impl Drop for Cache {
     }
 }
 
-fn into_io_error(error: Error) -> std::io::Error {
+fn into_io_error<E: Into<Box<dyn std::error::Error + Send + Sync>>>(error: E) -> std::io::Error {
     std::io::Error::new(std::io::ErrorKind::Other, error)
 }
 
