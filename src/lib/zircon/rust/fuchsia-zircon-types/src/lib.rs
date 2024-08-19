@@ -2119,8 +2119,8 @@ pub struct zx_smc_result_t {
     pub arg6: u64,
 }
 
-const ZX_CPU_SET_MAX_CPUS: usize = 512;
-const ZX_CPU_SET_BITS_PER_WORD: usize = 64;
+pub const ZX_CPU_SET_MAX_CPUS: usize = 512;
+pub const ZX_CPU_SET_BITS_PER_WORD: usize = 64;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
