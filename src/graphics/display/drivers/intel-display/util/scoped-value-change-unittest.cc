@@ -10,13 +10,13 @@ namespace intel_display {
 
 namespace {
 
-TEST(ScopedValueChange, ConstructorChangesVariable) {
+TEST(ScopedValueChangeTest, ConstructorChangesVariable) {
   int variable = 100;
   ScopedValueChange value_change(variable, 200);
   EXPECT_EQ(200, variable);
 }
 
-TEST(ScopedValueChange, DestructorRestoresVariable) {
+TEST(ScopedValueChangeTest, DestructorRestoresVariable) {
   int variable = 100;
   {
     ScopedValueChange value_change(variable, 200);
@@ -24,7 +24,7 @@ TEST(ScopedValueChange, DestructorRestoresVariable) {
   EXPECT_EQ(100, variable);
 }
 
-TEST(ScopedValueChange, MoveConstructorPopulatesDestination) {
+TEST(ScopedValueChangeTest, MoveConstructorPopulatesDestination) {
   int variable = 100;
   {
     ScopedValueChange move_source_change(variable, 200);
@@ -36,7 +36,7 @@ TEST(ScopedValueChange, MoveConstructorPopulatesDestination) {
   }
 }
 
-TEST(ScopedValueChange, MoveConstructorDoesNotModifyVariable) {
+TEST(ScopedValueChangeTest, MoveConstructorDoesNotModifyVariable) {
   int variable = 100;
   {
     ScopedValueChange move_source_change(variable, 200);
@@ -48,7 +48,7 @@ TEST(ScopedValueChange, MoveConstructorDoesNotModifyVariable) {
   }
 }
 
-TEST(ScopedValueChange, MoveConstructorInvalidatesMoveSource) {
+TEST(ScopedValueChangeTest, MoveConstructorInvalidatesMoveSource) {
   int variable = 100;
   {
     ScopedValueChange move_source_change(variable, 200);
@@ -62,7 +62,7 @@ TEST(ScopedValueChange, MoveConstructorInvalidatesMoveSource) {
   EXPECT_EQ(300, variable) << "`move_source_change` destruction restored the variable";
 }
 
-TEST(ScopedValueChange, MoveAssignmentPopulatesDestination) {
+TEST(ScopedValueChangeTest, MoveAssignmentPopulatesDestination) {
   int variable1 = 101;
   int variable2 = 102;
   {
@@ -76,7 +76,7 @@ TEST(ScopedValueChange, MoveAssignmentPopulatesDestination) {
   }
 }
 
-TEST(ScopedValueChange, MoveAssignmentDoesNotModifyVariables) {
+TEST(ScopedValueChangeTest, MoveAssignmentDoesNotModifyVariables) {
   int variable1 = 101;
   int variable2 = 102;
   {
@@ -93,7 +93,7 @@ TEST(ScopedValueChange, MoveAssignmentDoesNotModifyVariables) {
   }
 }
 
-TEST(ScopedValueChange, MoveAssignmentDoesNotDropDestinationState) {
+TEST(ScopedValueChangeTest, MoveAssignmentDoesNotDropDestinationState) {
   int variable1 = 101;
   int variable2 = 102;
   {
@@ -106,23 +106,27 @@ TEST(ScopedValueChange, MoveAssignmentDoesNotDropDestinationState) {
   EXPECT_EQ(102, variable2) << "Move assignment dropped the moved-to state";
 }
 
-TEST(ScopedValueChange, MultipleChangesForSameVariable) {
+TEST(ScopedValueChangeDeathTest, MultipleChangesForSameVariable) {
   int variable = 100;
   ScopedValueChange change(variable, 200);
+
+#if !ZX_DEBUG_ASSERT_IMPLEMENTED
+  GTEST_SKIP() << "ScopedValueChange only crashes on duplicates when debug assertions are enabled";
+#endif  // !ZX_DEBUG_ASSERT_IMPLEMENTED
 
   EXPECT_DEATH(
       { ScopedValueChange change2(variable, 300); },
       "Multiple ScopedValueChange instances created");
 }
 
-TEST(ScopedValueChange, ResetRestoresOriginalValue) {
+TEST(ScopedValueChangeTest, ResetRestoresOriginalValue) {
   int variable = 100;
   ScopedValueChange change(variable, 200);
   change.reset();
   EXPECT_EQ(100, variable) << "reset() did not restore the variable";
 }
 
-TEST(ScopedValueChange, ResetInvalidatesChange) {
+TEST(ScopedValueChangeTest, ResetInvalidatesChange) {
   int variable = 100;
   {
     ScopedValueChange change(variable, 200);
@@ -132,7 +136,7 @@ TEST(ScopedValueChange, ResetInvalidatesChange) {
   EXPECT_EQ(300, variable) << "Reset `change` destruction restored the variable";
 }
 
-TEST(ScopedValueChange, MoveAssignmentPopulatesResetDestination) {
+TEST(ScopedValueChangeTest, MoveAssignmentPopulatesResetDestination) {
   int variable1 = 101;
   int variable2 = 102;
   {
@@ -148,7 +152,7 @@ TEST(ScopedValueChange, MoveAssignmentPopulatesResetDestination) {
   }
 }
 
-TEST(ScopedValueChange, MoveAssignmentToResetDestinationDoesNotModifyVariables) {
+TEST(ScopedValueChangeTest, MoveAssignmentToResetDestinationDoesNotModifyVariables) {
   int variable1 = 101;
   int variable2 = 102;
   {
@@ -166,7 +170,7 @@ TEST(ScopedValueChange, MoveAssignmentToResetDestinationDoesNotModifyVariables) 
   }
 }
 
-TEST(ScopedValueChange, MoveAssignmentDoesRestoreResetDestination) {
+TEST(ScopedValueChangeTest, MoveAssignmentDoesRestoreResetDestination) {
   int variable1 = 101;
   int variable2 = 102;
   {
