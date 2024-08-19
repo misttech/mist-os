@@ -49,6 +49,7 @@ python_library("honeydew_no_testonly") {
     "affordances/fuchsia_controller/ui/user_input.py",
     "affordances/fuchsia_controller/wlan/__init__.py",
     "affordances/fuchsia_controller/wlan/wlan.py",
+    "affordances/fuchsia_controller/wlan/wlan_policy.py",
     "affordances/sl4f/__init__.py",
     "affordances/sl4f/bluetooth/__init__.py",
     "affordances/sl4f/bluetooth/bluetooth_common.py",
@@ -157,6 +158,7 @@ group("honeydew_fidl_ir_and_deps") {
     "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller_host_test_data(${toolchain_variant.base})",
     "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_host_test_data(${toolchain_variant.base})",
     "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service_host_test_data(${toolchain_variant.base})",
+    "//sdk/fidl/fuchsia.wlan.policy:fuchsia.wlan.policy_host_test_data(${toolchain_variant.base})",
 
     # Required by Fuchsia Controller itself.
     "//src/developer/ffx/lib/fuchsia-controller/tests:fuchsia_controller_test_data",

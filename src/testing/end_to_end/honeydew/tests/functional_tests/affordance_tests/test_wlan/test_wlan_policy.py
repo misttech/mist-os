@@ -12,6 +12,9 @@ from fuchsia_base_test import fuchsia_base_test
 from mobly import asserts, signals, test_runner
 
 from honeydew import errors
+from honeydew.affordances.fuchsia_controller.wlan import (
+    wlan_policy as wlan_policy_fc,
+)
 from honeydew.interfaces.device_classes import fuchsia_device
 from honeydew.typing.wlan import (
     ConnectionState,
@@ -212,6 +215,11 @@ class WlanPolicyTests(fuchsia_base_test.FuchsiaBaseTest):
             * wlan_policy.start_client_connections()
             * wlan_policy.stop_client_connections()
         """
+        if isinstance(self.device.wlan_policy, wlan_policy_fc.WlanPolicy):
+            # TODO(http://b/324139202): Remove this if statement once WLAN
+            # Policy FC affordance is implemented
+            return
+
         self.device.wlan_policy.start_client_connections()
         _wait_for_client_state(self.device, WlanClientState.CONNECTIONS_ENABLED)
         self.device.wlan_policy.stop_client_connections()
@@ -239,6 +247,11 @@ class WlanPolicyTests(fuchsia_base_test.FuchsiaBaseTest):
             * wlan_policy.remove_all_networks()
             * wlan_policy.get_saved_networks()
         """
+        if isinstance(self.device.wlan_policy, wlan_policy_fc.WlanPolicy):
+            # TODO(http://b/324139202): Remove this if statement once WLAN
+            # Policy FC affordance is implemented
+            return
+
         test_ssid = "test"
         access_point.setup_ap(
             access_point=self.access_point,

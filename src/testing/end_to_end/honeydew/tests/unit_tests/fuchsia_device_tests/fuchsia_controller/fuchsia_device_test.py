@@ -32,6 +32,9 @@ from honeydew.affordances.fuchsia_controller.ui import (
     user_input as user_input_fc,
 )
 from honeydew.affordances.fuchsia_controller.wlan import wlan as wlan_fc
+from honeydew.affordances.fuchsia_controller.wlan import (
+    wlan_policy as wlan_policy_fc,
+)
 from honeydew.affordances.starnix import (
     system_power_state_controller as system_power_state_controller_starnix,
 )
@@ -343,19 +346,55 @@ class FuchsiaDeviceFCTests(unittest.TestCase):
             reboot_affordance=self.fd_obj,
         )
 
-    def test_wlan_policy(self) -> None:
-        """Test case to make sure fc_fuchsia_device does not support
-        wlan_policy affordance."""
-        with self.assertRaises(NotImplementedError):
-            self.fd_obj.wlan_policy  # pylint: disable=pointless-statement
+    @mock.patch.object(
+        ffx_transport.FFX,
+        "run",
+        return_value="".join(wlan_policy_fc._REQUIRED_CAPABILITIES),
+        autospec=True,
+    )
+    @mock.patch.object(
+        wlan_policy_fc.WlanPolicy,
+        "__init__",
+        autospec=True,
+        return_value=None,
+    )
+    def test_wlan_policy(
+        self,
+        wlan_policy_fc_init: mock.Mock,
+        # pylint: disable-next=unused-argument
+        mock_ffx_run: mock.Mock,
+    ) -> None:
+        """Test case to make sure fc_fuchsia_device supports wlan_policy affordance."""
+        self.assertIsInstance(
+            self.fd_obj.wlan_policy,
+            wlan_policy_fc.WlanPolicy,
+        )
+        wlan_policy_fc_init.assert_called_once_with(
+            self.fd_obj.wlan_policy,
+            device_name=self.fd_obj._device_info.name,
+            ffx=self.fd_obj.ffx,
+            fuchsia_controller=self.fd_obj.fuchsia_controller,
+            reboot_affordance=self.fd_obj,
+        )
 
+    @mock.patch.object(
+        ffx_transport.FFX,
+        "run",
+        return_value="".join(wlan_fc._REQUIRED_CAPABILITIES),
+        autospec=True,
+    )
     @mock.patch.object(
         wlan_fc.Wlan,
         "__init__",
         autospec=True,
         return_value=None,
     )
-    def test_wlan(self, wlan_fc_init: mock.Mock) -> None:
+    def test_wlan(
+        self,
+        wlan_fc_init: mock.Mock,
+        # pylint: disable-next=unused-argument
+        mock_ffx_run: mock.Mock,
+    ) -> None:
         """Test case to make sure fc_fuchsia_device supports wlan affordance."""
         self.assertIsInstance(
             self.fd_obj.wlan,
