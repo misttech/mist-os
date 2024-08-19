@@ -7,8 +7,8 @@ visualize diagnostic information from Fuchsia components.
 
 If you're new to tracing, see [Tutorial on Fuchsia tracing][tracing-tutorial].
 
-This tutorial provides the steps necessary to add tracing to your Fuchsia
-components.
+This tutorial provides a high level overview of tracing and the steps necessary to add tracing to
+your Fuchsia components.
 
 ## Advanced guides
 
