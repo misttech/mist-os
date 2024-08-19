@@ -35,6 +35,7 @@ jobs:
             - prebuilt
       - run:
           command: |
+            echo -n "submodules=false" > build/checkout.gni
             make args gen
             make test
 
