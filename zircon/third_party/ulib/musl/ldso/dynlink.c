@@ -1400,6 +1400,13 @@ LIBC_NO_SAFESTACK static zx_status_t load_library(const char* name, int rtld_mod
   if (*loaded != NULL)
     return ZX_OK;
 
+  // The file is not already loaded. Check for RTLD_NOLOAD before
+  // proceeding to fetch the file and load it.
+  if (rtld_mode & RTLD_NOLOAD) {
+    *loaded = NULL;
+    return ZX_OK;
+  }
+
   zx_handle_t vmo;
   zx_status_t status = get_library_vmo(name, &vmo);
   if (status == ZX_OK) {

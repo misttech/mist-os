@@ -31,9 +31,6 @@ class DlSystemTests : public DlSystemLoadTestsBase {
   // Fuchsia's musl implementation of dlopen does not validate flag values for
   // the mode argument.
   static constexpr bool kCanValidateMode = false;
-  // TODO(https://fxbug.dev/348722959): Musl shouldn't retrieve file w/
-  // RTLD_NOLOAD.
-  static constexpr bool kRetrievesFileWithNoLoad = true;
   // Fuchsia's musl will emit a "symbol not found" error for scenarios where
   // glibc or libdl will emit an "undefined symbol" error.
   static constexpr bool kEmitsSymbolNotFound = true;
