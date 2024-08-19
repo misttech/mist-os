@@ -588,6 +588,7 @@ impl<I: Instant, R: ReceiveBuffer, S: SendBuffer, ActiveOpen> From<SynRcvd<I, In
             snd_wnd_scale,
         }: SynRcvd<I, Infallible>,
     ) -> Self {
+        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
         match simultaneous_open {
             None => State::SynRcvd(SynRcvd {
                 iss,
@@ -1729,6 +1730,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                                 snd_wnd_scale,
                             },
                         ) => {
+                            #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
                             match simultaneous_open {
                                 None => {
                                     self.transition_to_state(
@@ -1752,7 +1754,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                         }
                         ListenOnSegmentDisposition::SendRst(rst) => Some(rst),
                         ListenOnSegmentDisposition::Ignore => None,
-                    }
+                    };
                 }
                 State::SynSent(synsent) => {
                     return match synsent.on_segment(incoming, now) {

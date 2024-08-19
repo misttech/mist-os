@@ -352,6 +352,7 @@ fn arbitrary_packet<P: FuzzablePacket + std::fmt::Debug>(
     let mut buffer = vec![0; body_len + constraints.header_len() + constraints.footer_len()];
     u.fill_buffer(&mut buffer[constraints.header_len()..(constraints.header_len() + body_len)])?;
 
+    #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
     let bytes = packet
         .serialize(Buf::new(
             buffer,

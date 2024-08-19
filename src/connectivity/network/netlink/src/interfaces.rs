@@ -1539,6 +1539,7 @@ pub(crate) mod testutil {
                         unreachable!()
                     },
                 };
+                #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336606)
                 match event_loop_result {
                     Ok(never) => match never {},
                     Err(e) => {
