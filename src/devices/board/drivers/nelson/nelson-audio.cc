@@ -175,9 +175,7 @@ zx_status_t Nelson::AudioInit() {
   };
 
   auto sleep = [](zx::duration delay) {
-    return fuchsia_hardware_gpioimpl::InitStep{{
-        .call = fuchsia_hardware_gpioimpl::InitCall::WithDelay(delay.get()),
-    }};
+    return fuchsia_hardware_pinimpl::InitStep::WithDelay(delay.get());
   };
 
   // TDM pin assignments.
@@ -267,7 +265,7 @@ zx_status_t Nelson::AudioInit() {
 
   // CODEC pin assignments.
   gpio_init_steps_.push_back(GpioFunction(GPIO_INRUSH_EN_SOC, 0));   // BOOST_EN_SOC as GPIO.
-  gpio_init_steps_.push_back(GpioConfigOut(GPIO_INRUSH_EN_SOC, 1));  // BOOST_EN_SOC to high.
+  gpio_init_steps_.push_back(GpioOutput(GPIO_INRUSH_EN_SOC, true));  // BOOST_EN_SOC to high.
   // From the TAS5805m codec reference manual:
   // "9.5.3.1 Startup Procedures
   // 1. Configure ADR/FAULT pin with proper settings for I2C device address.
@@ -280,7 +278,7 @@ zx_status_t Nelson::AudioInit() {
   // state.
   // 6. The device is now in normal operation."
   // Step 3 PDN setup and 5ms delay is executed below.
-  gpio_init_steps_.push_back(GpioConfigOut(GPIO_SOC_AUDIO_EN, 1));  // Set PDN_N to high.
+  gpio_init_steps_.push_back(GpioOutput(GPIO_SOC_AUDIO_EN, true));  // Set PDN_N to high.
   gpio_init_steps_.push_back(sleep(zx::msec(5)));
   // I2S clocks are configured by the controller and the rest of the initialization is done
   // in the codec itself.

@@ -106,7 +106,7 @@ static const gpio_pin_t gpio_pins[] = {
 };
 
 zx_status_t Astro::GpioInit() {
-  fuchsia_hardware_gpioimpl::InitMetadata metadata{{std::move(gpio_init_steps_)}};
+  fuchsia_hardware_pinimpl::Metadata metadata{{std::move(gpio_init_steps_)}};
   gpio_init_steps_.clear();
 
   const fit::result encoded_metadata = fidl::Persist(metadata);

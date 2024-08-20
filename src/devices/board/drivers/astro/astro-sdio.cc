@@ -190,7 +190,7 @@ zx_status_t Astro::SdEmmcConfigurePortB() {
   gpio_init_steps_.push_back(GpioFunction(S905D2_GPIOC(5), 0));
 
   // Enable output from SDMMC port B on GPIOX_4.
-  gpio_init_steps_.push_back(GpioConfigOut(S905D2_WIFI_SDIO_CLK, 1));
+  gpio_init_steps_.push_back(GpioOutput(S905D2_WIFI_SDIO_CLK, true));
 
   gpio_init_steps_.push_back(GpioDriveStrength(S905D2_WIFI_SDIO_D0, 4'000));
   gpio_init_steps_.push_back(GpioDriveStrength(S905D2_WIFI_SDIO_D1, 4'000));

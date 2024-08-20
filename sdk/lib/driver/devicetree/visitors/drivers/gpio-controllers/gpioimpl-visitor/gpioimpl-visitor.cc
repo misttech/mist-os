@@ -4,7 +4,7 @@
 
 #include "gpioimpl-visitor.h"
 
-#include <fidl/fuchsia.hardware.gpioimpl/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.pinimpl/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
@@ -27,10 +27,10 @@
 namespace gpio_impl_dt {
 
 namespace {
-using fuchsia_hardware_gpio::GpioFlags;
-using fuchsia_hardware_gpioimpl::InitCall;
-using fuchsia_hardware_gpioimpl::InitMetadata;
-using fuchsia_hardware_gpioimpl::InitStep;
+using fuchsia_hardware_gpio::BufferMode;
+using fuchsia_hardware_pin::Pull;
+using fuchsia_hardware_pinimpl::InitCall;
+using fuchsia_hardware_pinimpl::Metadata;
 
 class GpioCells {
  public:
@@ -40,14 +40,14 @@ class GpioCells {
   uint32_t pin() { return static_cast<uint32_t>(*gpio_cells_[0][0]); }
 
   // 2nd cell represents GpioFlags. This is only used in gpio init hog nodes and ignored elsewhere.
-  zx::result<GpioFlags> flags() {
+  zx::result<Pull> flags() {
     switch (static_cast<uint32_t>(*gpio_cells_[0][1])) {
       case 0:
-        return zx::ok(GpioFlags::kPullDown);
+        return zx::ok(Pull::kDown);
       case 1:
-        return zx::ok(GpioFlags::kPullUp);
+        return zx::ok(Pull::kUp);
       case 2:
-        return zx::ok(GpioFlags::kNoPull);
+        return zx::ok(Pull::kNone);
       default:
         return zx::error(ZX_ERR_INVALID_ARGS);
     };
@@ -222,11 +222,11 @@ zx::result<> GpioImplVisitor::ParsePinCtrlCfg(fdf_devicetree::Node& child,
 
   if (cfg_node.properties().find(kPinInputEnable) != cfg_node.properties().end()) {
     if (cfg_node.properties().find(kPinBiasPullDown) != cfg_node.properties().end()) {
-      init_calls.emplace_back(InitCall::WithInputFlags(GpioFlags::kPullDown));
+      init_calls.emplace_back(InitCall::WithPinConfig({{.pull = Pull::kDown}}));
     } else if (cfg_node.properties().find(kPinBiasPullUp) != cfg_node.properties().end()) {
-      init_calls.emplace_back(InitCall::WithInputFlags(GpioFlags::kPullUp));
+      init_calls.emplace_back(InitCall::WithPinConfig({{.pull = Pull::kUp}}));
     } else if (cfg_node.properties().find(kPinBiasDisable) != cfg_node.properties().end()) {
-      init_calls.emplace_back(InitCall::WithInputFlags(GpioFlags::kNoPull));
+      init_calls.emplace_back(InitCall::WithPinConfig({{.pull = Pull::kNone}}));
     } else {
       FDF_LOG(ERROR, "Pin controller config '%s' has unsupported input config.",
               cfg_node.name().c_str());
@@ -235,11 +235,11 @@ zx::result<> GpioImplVisitor::ParsePinCtrlCfg(fdf_devicetree::Node& child,
   }
 
   if (cfg_node.properties().find(kPinOutputLow) != cfg_node.properties().end()) {
-    init_calls.emplace_back(InitCall::WithOutputValue(0));
+    init_calls.emplace_back(InitCall::WithBufferMode(BufferMode::kOutputLow));
   }
 
   if (cfg_node.properties().find(kPinOutputHigh) != cfg_node.properties().end()) {
-    init_calls.emplace_back(InitCall::WithOutputValue(1));
+    init_calls.emplace_back(InitCall::WithBufferMode(BufferMode::kOutputHigh));
   }
 
   if (cfg_node.properties().find(kPinFunction) != cfg_node.properties().end()) {
@@ -248,7 +248,7 @@ zx::result<> GpioImplVisitor::ParsePinCtrlCfg(fdf_devicetree::Node& child,
       FDF_LOG(ERROR, "Pin controller config '%s' has invalid function.", cfg_node.name().c_str());
       return zx::error(ZX_ERR_INVALID_ARGS);
     }
-    init_calls.emplace_back(InitCall::WithAltFunction(*function));
+    init_calls.emplace_back(InitCall::WithPinConfig({{.function = *function}}));
   }
 
   if (cfg_node.properties().find(kPinDriveStrengthUa) != cfg_node.properties().end()) {
@@ -258,7 +258,7 @@ zx::result<> GpioImplVisitor::ParsePinCtrlCfg(fdf_devicetree::Node& child,
               cfg_node.name().c_str());
       return zx::error(ZX_ERR_INVALID_ARGS);
     }
-    init_calls.emplace_back(InitCall::WithDriveStrengthUa(*drive_strength_ua));
+    init_calls.emplace_back(InitCall::WithPinConfig({{.drive_strength_ua = *drive_strength_ua}}));
   }
 
   if (init_calls.empty()) {
@@ -273,8 +273,8 @@ zx::result<> GpioImplVisitor::ParsePinCtrlCfg(fdf_devicetree::Node& child,
             "Gpio init steps (count: %zu) for child '%s' (pin 0x%x) added to controller '%s'",
             init_calls.size(), child.name().c_str(), pins[i], gpio_node.name().c_str());
     for (auto& init_call : init_calls) {
-      fuchsia_hardware_gpioimpl::InitStep step = {{pins[i], init_call}};
-      controller.init_steps.steps().emplace_back(step);
+      auto step = fuchsia_hardware_pinimpl::InitStep::WithCall({{pins[i], init_call}});
+      controller.metadata.init_steps()->emplace_back(step);
     }
   }
 
@@ -299,7 +299,7 @@ zx::result<> GpioImplVisitor::ParseGpioHogChild(fdf_devicetree::Node& child) {
 
   if (child.properties().find("input") != child.properties().end()) {
     // Setting a temporary flag value which is updated per pin below while parsing the gpio cells.
-    init_call = InitCall::WithInputFlags(static_cast<GpioFlags>(0));
+    init_call = InitCall::WithPinConfig({{.pull = static_cast<Pull>(0)}});
   }
   if (child.properties().find("output-low") != child.properties().end()) {
     if (init_call) {
@@ -309,7 +309,7 @@ zx::result<> GpioImplVisitor::ParseGpioHogChild(fdf_devicetree::Node& child) {
           child.name().c_str());
       return zx::error(ZX_ERR_ALREADY_EXISTS);
     }
-    init_call = InitCall::WithOutputValue(0);
+    init_call = InitCall::WithBufferMode(BufferMode::kOutputLow);
   }
 
   if (child.properties().find("output-high") != child.properties().end()) {
@@ -320,7 +320,7 @@ zx::result<> GpioImplVisitor::ParseGpioHogChild(fdf_devicetree::Node& child) {
           child.name().c_str());
       return zx::error(ZX_ERR_ALREADY_EXISTS);
     }
-    init_call = InitCall::WithOutputValue(1);
+    init_call = InitCall::WithBufferMode(BufferMode::kOutputHigh);
   }
 
   if (!init_call) {
@@ -357,21 +357,21 @@ zx::result<> GpioImplVisitor::ParseGpioHogChild(fdf_devicetree::Node& child) {
     auto gpio = GpioCells(gpios->second.AsBytes().subspan(byte_idx, entry_size));
 
     // Update flags for InputFlag type.
-    if (init_call->Which() == InitCall::Tag::kInputFlags) {
+    if (init_call->Which() == InitCall::Tag::kPinConfig) {
       zx::result flags = gpio.flags();
       if (flags.is_error()) {
         FDF_LOG(ERROR, "Failed to get input flags for gpio init hog '%s' with gpio pin %d : %s",
                 child.name().c_str(), gpio.pin(), flags.status_string());
         return flags.take_error();
       }
-      init_call = InitCall::WithInputFlags(*flags);
+      init_call = InitCall::WithPinConfig({{.pull = *flags}});
     }
 
     FDF_LOG(DEBUG, "Gpio init step (pin 0x%x) added to controller '%s'", gpio.pin(),
             parent.name().c_str());
 
-    fuchsia_hardware_gpioimpl::InitStep step = {{gpio.pin(), *init_call}};
-    controller.init_steps.steps().emplace_back(step);
+    auto step = fuchsia_hardware_pinimpl::InitStep::WithCall({{gpio.pin(), *init_call}});
+    controller.metadata.init_steps()->emplace_back(step);
   }
 
   return zx::ok();
@@ -435,7 +435,7 @@ zx::result<> GpioImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
   }
 
   {
-    fuchsia_hardware_gpioimpl::ControllerMetadata metadata = {{.id = controller->first}};
+    fuchsia_hardware_pinimpl::ControllerMetadata metadata = {{.id = controller->first}};
     const fit::result encoded_controller_metadata = fidl::Persist(metadata);
     if (!encoded_controller_metadata.is_ok()) {
       FDF_LOG(ERROR, "Failed to encode GPIO controller metadata for node %s: %s",
@@ -451,8 +451,8 @@ zx::result<> GpioImplVisitor::FinalizeNode(fdf_devicetree::Node& node) {
     FDF_LOG(DEBUG, "Gpio controller metadata added to node '%s'", node.name().c_str());
   }
 
-  if (!controller->second.init_steps.steps().empty()) {
-    const fit::result encoded_init_steps = fidl::Persist(controller->second.init_steps);
+  if (!controller->second.metadata.init_steps()->empty()) {
+    const fit::result encoded_init_steps = fidl::Persist(controller->second.metadata);
     if (!encoded_init_steps.is_ok()) {
       FDF_LOG(ERROR, "Failed to encode GPIO init metadata for node %s: %s", node.name().c_str(),
               encoded_init_steps.error_value().FormatDescription().c_str());

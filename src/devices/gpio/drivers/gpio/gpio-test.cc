@@ -5,6 +5,7 @@
 #include "gpio.h"
 
 #include <fidl/fuchsia.hardware.gpioimpl/cpp/driver/fidl.h>
+#include <fidl/fuchsia.hardware.pinimpl/cpp/driver/fidl.h>
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
@@ -422,7 +423,8 @@ TEST_F(GpioTest, ValidateGpioNameGeneration) {
 
 TEST_F(GpioTest, Init) {
   namespace fhgpio = fuchsia_hardware_gpio;
-  namespace fhgpioimpl = fuchsia_hardware_gpioimpl;
+  namespace fhpin = fuchsia_hardware_pin;
+  namespace fhpinimpl = fuchsia_hardware_pinimpl;
 
   constexpr gpio_pin_t kGpioPins[] = {
       DECL_GPIO_PIN(1),
@@ -430,28 +432,37 @@ TEST_F(GpioTest, Init) {
       DECL_GPIO_PIN(3),
   };
 
-  std::vector<fhgpioimpl::InitStep> steps;
+  auto mode = [](uint32_t pin, fhgpio::BufferMode buffer_mode) {
+    return fhpinimpl::InitStep::WithCall({{pin, fhpinimpl::InitCall::WithBufferMode(buffer_mode)}});
+  };
 
-  steps.push_back({{1, fhgpioimpl::InitCall::WithInputFlags(fhgpio::GpioFlags::kPullDown)}});
-  steps.push_back({{1, fhgpioimpl::InitCall::WithOutputValue(1)}});
-  steps.push_back({{1, fhgpioimpl::InitCall::WithDriveStrengthUa(4000)}});
-  steps.push_back({{2, fhgpioimpl::InitCall::WithInputFlags(fhgpio::GpioFlags::kNoPull)}});
-  steps.push_back({{2, fhgpioimpl::InitCall::WithAltFunction(5)}});
-  steps.push_back({{2, fhgpioimpl::InitCall::WithDriveStrengthUa(2000)}});
-  steps.push_back({{3, fhgpioimpl::InitCall::WithOutputValue(0)}});
-  steps.push_back({{3, fhgpioimpl::InitCall::WithOutputValue(1)}});
-  steps.push_back({{3, fhgpioimpl::InitCall::WithInputFlags(fhgpio::GpioFlags::kPullUp)}});
-  steps.push_back({{2, fhgpioimpl::InitCall::WithAltFunction(0)}});
-  steps.push_back({{2, fhgpioimpl::InitCall::WithDriveStrengthUa(1000)}});
-  steps.push_back({{2, fhgpioimpl::InitCall::WithOutputValue(1)}});
-  steps.push_back({{1, fhgpioimpl::InitCall::WithInputFlags(fhgpio::GpioFlags::kPullUp)}});
-  steps.push_back({{1, fhgpioimpl::InitCall::WithAltFunction(0)}});
-  steps.push_back({{1, fhgpioimpl::InitCall::WithDriveStrengthUa(4000)}});
-  steps.push_back({{1, fhgpioimpl::InitCall::WithOutputValue(1)}});
-  steps.push_back({{3, fhgpioimpl::InitCall::WithAltFunction(3)}});
-  steps.push_back({{3, fhgpioimpl::InitCall::WithDriveStrengthUa(2000)}});
+  auto config = [](uint32_t pin, fhpin::Configuration config) {
+    return fhpinimpl::InitStep::WithCall(
+        {{pin, fhpinimpl::InitCall::WithPinConfig(std::move(config))}});
+  };
 
-  fhgpioimpl::InitMetadata metadata{{std::move(steps)}};
+  std::vector<fhpinimpl::InitStep> steps;
+
+  steps.push_back(config(1, fhpin::Configuration{{.pull = fhpin::Pull::kDown}}));
+  steps.push_back(mode(1, fhgpio::BufferMode::kOutputHigh));
+  steps.push_back(config(1, fhpin::Configuration{{.drive_strength_ua = 4000}}));
+  steps.push_back(config(2, fhpin::Configuration{{.pull = fhpin::Pull::kNone}}));
+  steps.push_back(config(2, fhpin::Configuration{{.function = 5}}));
+  steps.push_back(config(2, fhpin::Configuration{{.drive_strength_ua = 2000}}));
+  steps.push_back(mode(3, fhgpio::BufferMode::kOutputLow));
+  steps.push_back(mode(3, fhgpio::BufferMode::kOutputHigh));
+  steps.push_back(config(3, fhpin::Configuration{{.pull = fhpin::Pull::kUp}}));
+  steps.push_back(config(2, fhpin::Configuration{{.function = 0}}));
+  steps.push_back(config(2, fhpin::Configuration{{.drive_strength_ua = 1000}}));
+  steps.push_back(mode(2, fhgpio::BufferMode::kOutputHigh));
+  steps.push_back(config(1, fhpin::Configuration{{.pull = fhpin::Pull::kUp}}));
+  steps.push_back(config(1, fhpin::Configuration{{.function = 0}}));
+  steps.push_back(config(1, fhpin::Configuration{{.drive_strength_ua = 4000}}));
+  steps.push_back(mode(1, fhgpio::BufferMode::kOutputHigh));
+  steps.push_back(config(3, fhpin::Configuration{{.function = 3}}));
+  steps.push_back(config(3, fhpin::Configuration{{.drive_strength_ua = 2000}}));
+
+  fhpinimpl::Metadata metadata{{std::move(steps)}};
   fit::result encoded = fidl::Persist(metadata);
   ASSERT_TRUE(encoded.is_ok());
 
@@ -487,13 +498,14 @@ TEST_F(GpioTest, Init) {
 }
 
 TEST_F(GpioTest, InitWithoutPins) {
-  namespace fhgpio = fuchsia_hardware_gpio;
-  namespace fhgpioimpl = fuchsia_hardware_gpioimpl;
+  namespace fhpin = fuchsia_hardware_pin;
+  namespace fhpinimpl = fuchsia_hardware_pinimpl;
 
-  std::vector<fhgpioimpl::InitStep> steps;
-  steps.push_back({{1, fhgpioimpl::InitCall::WithInputFlags(fhgpio::GpioFlags::kPullDown)}});
+  std::vector<fhpinimpl::InitStep> steps;
+  steps.push_back(fhpinimpl::InitStep::WithCall(
+      {{1, fhpinimpl::InitCall::WithPinConfig({{.pull = fhpin::Pull::kDown}})}}));
 
-  fhgpioimpl::InitMetadata metadata{{std::move(steps)}};
+  fhpinimpl::Metadata metadata{{std::move(steps)}};
   fit::result encoded = fidl::Persist(metadata);
   ASSERT_TRUE(encoded.is_ok());
 
@@ -516,7 +528,8 @@ TEST_F(GpioTest, InitWithoutPins) {
 
 TEST_F(GpioTest, InitErrorHandling) {
   namespace fhgpio = fuchsia_hardware_gpio;
-  namespace fhgpioimpl = fuchsia_hardware_gpioimpl;
+  namespace fhpin = fuchsia_hardware_pin;
+  namespace fhpinimpl = fuchsia_hardware_pinimpl;
 
   constexpr gpio_pin_t kGpioPins[] = {
       DECL_GPIO_PIN(1),
@@ -524,25 +537,33 @@ TEST_F(GpioTest, InitErrorHandling) {
       DECL_GPIO_PIN(3),
   };
 
-  std::vector<fhgpioimpl::InitStep> steps;
+  auto mode = [](uint32_t pin, fhgpio::BufferMode buffer_mode) {
+    return fhpinimpl::InitStep::WithCall({{pin, fhpinimpl::InitCall::WithBufferMode(buffer_mode)}});
+  };
 
-  steps.push_back({{4, fhgpioimpl::InitCall::WithInputFlags(fhgpio::GpioFlags::kPullDown)}});
-  steps.push_back({{4, fhgpioimpl::InitCall::WithOutputValue(1)}});
-  steps.push_back({{4, fhgpioimpl::InitCall::WithDriveStrengthUa(4000)}});
-  steps.push_back({{2, fhgpioimpl::InitCall::WithInputFlags(fhgpio::GpioFlags::kNoPull)}});
-  steps.push_back({{2, fhgpioimpl::InitCall::WithAltFunction(5)}});
-  steps.push_back({{2, fhgpioimpl::InitCall::WithDriveStrengthUa(2000)}});
+  auto config = [](uint32_t pin, fhpin::Configuration config) {
+    return fhpinimpl::InitStep::WithCall(
+        {{pin, fhpinimpl::InitCall::WithPinConfig(std::move(config))}});
+  };
 
-  // Using an index of 11 should cause the fake gpioimpl device to return an error.
-  steps.push_back(
-      {{MockGpioImpl::kMaxInitStepPinIndex + 1, fhgpioimpl::InitCall::WithOutputValue(0)}});
+  std::vector<fhpinimpl::InitStep> steps;
+
+  steps.push_back(config(4, fhpin::Configuration{{.pull = fhpin::Pull::kDown}}));
+  steps.push_back(mode(4, fhgpio::BufferMode::kOutputHigh));
+  steps.push_back(config(4, fhpin::Configuration{{.drive_strength_ua = 4000}}));
+  steps.push_back(config(2, fhpin::Configuration{{.pull = fhpin::Pull::kNone}}));
+  steps.push_back(config(2, fhpin::Configuration{{.function = 5}}));
+  steps.push_back(config(2, fhpin::Configuration{{.drive_strength_ua = 2000}}));
+
+  // Using an index of 11 should cause the fake pinimpl device to return an error.
+  steps.push_back(mode(MockGpioImpl::kMaxInitStepPinIndex + 1, fhgpio::BufferMode::kOutputLow));
 
   // Processing should not continue after the above error.
 
-  steps.push_back({{2, fhgpioimpl::InitCall::WithAltFunction(0)}});
-  steps.push_back({{2, fhgpioimpl::InitCall::WithDriveStrengthUa(1000)}});
+  steps.push_back(config(2, fhpin::Configuration{{.function = 0}}));
+  steps.push_back(config(2, fhpin::Configuration{{.drive_strength_ua = 1000}}));
 
-  fhgpioimpl::InitMetadata metadata{{std::move(steps)}};
+  fhpinimpl::Metadata metadata{{std::move(steps)}};
   fit::result encoded = fidl::Persist(metadata);
   ASSERT_TRUE(encoded.is_ok());
 
@@ -583,7 +604,7 @@ TEST_F(GpioTest, ControllerId) {
       DECL_GPIO_PIN(2),
   };
 
-  fuchsia_hardware_gpioimpl::wire::ControllerMetadata controller_metadata = {.id = kController};
+  fuchsia_hardware_pinimpl::wire::ControllerMetadata controller_metadata = {.id = kController};
   const fit::result encoded_controller_metadata = fidl::Persist(controller_metadata);
   ASSERT_TRUE(encoded_controller_metadata.is_ok());
 

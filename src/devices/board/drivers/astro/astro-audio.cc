@@ -160,9 +160,7 @@ zx_status_t Astro::AudioInit() {
   clock_init_steps_.push_back(ClockEnable(g12a_clk::CLK_HIFI_PLL));
 
   auto sleep = [](zx::duration delay) {
-    return fuchsia_hardware_gpioimpl::InitStep{{
-        .call = fuchsia_hardware_gpioimpl::InitCall::WithDelay(delay.get()),
-    }};
+    return fuchsia_hardware_pinimpl::InitStep::WithDelay(delay.get());
   };
 
   // TDM pin assignments
@@ -191,9 +189,9 @@ zx_status_t Astro::AudioInit() {
   gpio_init_steps_.push_back(GpioFunction(S905D2_GPIOA(8), S905D2_GPIOA_8_PDM_DIN0_FN));
 
   // Hardware Reset of the codec.
-  gpio_init_steps_.push_back(GpioConfigOut(S905D2_GPIOA(5), 0));
+  gpio_init_steps_.push_back(GpioOutput(S905D2_GPIOA(5), false));
   gpio_init_steps_.push_back(sleep(zx::msec(1)));
-  gpio_init_steps_.push_back(GpioConfigOut(S905D2_GPIOA(5), 1));
+  gpio_init_steps_.push_back(GpioOutput(S905D2_GPIOA(5), true));
 
   // Output devices.
 #ifdef ENABLE_BT

@@ -6,7 +6,7 @@
 #define SRC_DEVICES_BOARD_DRIVERS_SHERLOCK_SHERLOCK_H_
 
 #include <fidl/fuchsia.hardware.clockimpl/cpp/wire.h>
-#include <fidl/fuchsia.hardware.gpioimpl/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.pinimpl/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <lib/ddk/device.h>
 #include <zircon/types.h>
@@ -99,33 +99,38 @@ class Sherlock : public SherlockType {
 
   zx_status_t EnableWifi32K(void);
 
-  static fuchsia_hardware_gpioimpl::InitStep GpioConfigIn(uint32_t index,
-                                                          fuchsia_hardware_gpio::GpioFlags flags) {
-    return fuchsia_hardware_gpioimpl::InitStep{{
+  static fuchsia_hardware_pinimpl::InitStep GpioPull(uint32_t index,
+                                                     fuchsia_hardware_pin::Pull pull) {
+    return fuchsia_hardware_pinimpl::InitStep::WithCall({{
         index,
-        fuchsia_hardware_gpioimpl::InitCall::WithInputFlags(flags),
-    }};
+        fuchsia_hardware_pinimpl::InitCall::WithPinConfig(
+            fuchsia_hardware_pin::Configuration{{.pull = pull}}),
+    }});
   }
 
-  static fuchsia_hardware_gpioimpl::InitStep GpioConfigOut(uint32_t index, uint8_t initial_value) {
-    return fuchsia_hardware_gpioimpl::InitStep{{
+  static fuchsia_hardware_pinimpl::InitStep GpioOutput(uint32_t index, bool value) {
+    return fuchsia_hardware_pinimpl::InitStep::WithCall({{
         index,
-        fuchsia_hardware_gpioimpl::InitCall::WithOutputValue(initial_value),
-    }};
+        fuchsia_hardware_pinimpl::InitCall::WithBufferMode(
+            value ? fuchsia_hardware_gpio::BufferMode::kOutputHigh
+                  : fuchsia_hardware_gpio::BufferMode::kOutputLow),
+    }});
   }
 
-  static fuchsia_hardware_gpioimpl::InitStep GpioFunction(uint32_t index, uint64_t function) {
-    return fuchsia_hardware_gpioimpl::InitStep{{
+  static fuchsia_hardware_pinimpl::InitStep GpioFunction(uint32_t index, uint64_t function) {
+    return fuchsia_hardware_pinimpl::InitStep::WithCall({{
         index,
-        fuchsia_hardware_gpioimpl::InitCall::WithAltFunction(function),
-    }};
+        fuchsia_hardware_pinimpl::InitCall::WithPinConfig(
+            fuchsia_hardware_pin::Configuration{{.function = function}}),
+    }});
   }
 
-  static fuchsia_hardware_gpioimpl::InitStep GpioDriveStrength(uint32_t index, uint64_t ds_ua) {
-    return fuchsia_hardware_gpioimpl::InitStep{{
+  static fuchsia_hardware_pinimpl::InitStep GpioDriveStrength(uint32_t index, uint64_t ds_ua) {
+    return fuchsia_hardware_pinimpl::InitStep::WithCall({{
         index,
-        fuchsia_hardware_gpioimpl::InitCall::WithDriveStrengthUa(ds_ua),
-    }};
+        fuchsia_hardware_pinimpl::InitCall::WithPinConfig(
+            fuchsia_hardware_pin::Configuration{{.drive_strength_ua = ds_ua}}),
+    }});
   }
 
   fuchsia_hardware_clockimpl::wire::InitStep ClockDisable(uint32_t id) {
@@ -151,7 +156,7 @@ class Sherlock : public SherlockType {
 
   fdf::WireSyncClient<fuchsia_hardware_platform_bus::PlatformBus> pbus_;
   fidl::Arena<> init_arena_;
-  std::vector<fuchsia_hardware_gpioimpl::InitStep> gpio_init_steps_;
+  std::vector<fuchsia_hardware_pinimpl::InitStep> gpio_init_steps_;
   std::vector<fuchsia_hardware_clockimpl::wire::InitStep> clock_init_steps_;
 
   fdf::OutgoingDirectory outgoing_;

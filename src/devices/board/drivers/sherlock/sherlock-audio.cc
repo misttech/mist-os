@@ -247,7 +247,7 @@ zx_status_t Sherlock::AudioInit() {
 
   // Add TDM OUT to the codecs.
   {
-    gpio_init_steps_.push_back(GpioConfigOut(T931_GPIOH(7), 1));  // SOC_AUDIO_EN.
+    gpio_init_steps_.push_back(GpioOutput(T931_GPIOH(7), true));  // SOC_AUDIO_EN.
 
     constexpr uint32_t woofer_instance_count = 1;
     zx_status_t status = AddTas5720Device(pbus_, "audio-tas5720-woofer", woofer_instance_count,

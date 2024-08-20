@@ -50,20 +50,16 @@ static const buttons_gpio_config_t gpios[] = {
 };
 
 zx_status_t Sherlock::ButtonsInit() {
-  gpio_init_steps_.push_back(
-      GpioConfigIn(GPIO_VOLUME_UP, fuchsia_hardware_gpio::GpioFlags::kPullUp));
+  gpio_init_steps_.push_back(GpioPull(GPIO_VOLUME_UP, fuchsia_hardware_pin::Pull::kUp));
   gpio_init_steps_.push_back(GpioFunction(GPIO_VOLUME_UP, 0));
 
-  gpio_init_steps_.push_back(
-      GpioConfigIn(GPIO_VOLUME_DOWN, fuchsia_hardware_gpio::GpioFlags::kPullUp));
+  gpio_init_steps_.push_back(GpioPull(GPIO_VOLUME_DOWN, fuchsia_hardware_pin::Pull::kUp));
   gpio_init_steps_.push_back(GpioFunction(GPIO_VOLUME_DOWN, 0));
 
-  gpio_init_steps_.push_back(
-      GpioConfigIn(GPIO_VOLUME_BOTH, fuchsia_hardware_gpio::GpioFlags::kNoPull));
+  gpio_init_steps_.push_back(GpioPull(GPIO_VOLUME_BOTH, fuchsia_hardware_pin::Pull::kNone));
   gpio_init_steps_.push_back(GpioFunction(GPIO_VOLUME_BOTH, 0));
 
-  gpio_init_steps_.push_back(
-      GpioConfigIn(GPIO_MIC_PRIVACY, fuchsia_hardware_gpio::GpioFlags::kNoPull));
+  gpio_init_steps_.push_back(GpioPull(GPIO_MIC_PRIVACY, fuchsia_hardware_pin::Pull::kNone));
   gpio_init_steps_.push_back(GpioFunction(GPIO_MIC_PRIVACY, 0));
 
   fidl::Arena<> fidl_arena;

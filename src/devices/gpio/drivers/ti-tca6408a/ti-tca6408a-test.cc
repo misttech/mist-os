@@ -4,6 +4,7 @@
 
 #include "ti-tca6408a.h"
 
+#include <fidl/fuchsia.hardware.pinimpl/cpp/driver/fidl.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
@@ -108,7 +109,7 @@ class TiTca6408aTest : public zxtest::Test {
 
       incoming->device_server_.Init("pdev", "");
 
-      fuchsia_hardware_gpioimpl::ControllerMetadata controller_metadata = {{.id = kControllerID}};
+      fuchsia_hardware_pinimpl::ControllerMetadata controller_metadata = {{.id = kControllerID}};
       const fit::result encoded_controller_metadata = fidl::Persist(controller_metadata);
       ASSERT_TRUE(encoded_controller_metadata.is_ok());
 
