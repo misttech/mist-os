@@ -11,7 +11,6 @@ pub use binder::*;
 pub use registry::*;
 
 pub mod android;
-pub mod ashmem;
 pub mod device_mapper;
 pub mod framebuffer;
 pub mod kobject;

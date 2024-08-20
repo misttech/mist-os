@@ -218,7 +218,7 @@ once_cell_visibility = [
   "//src/security/lib/scrutiny/testing:*",
   "//src/security/lib/scrutiny/utils:*",
   "//src/starnix/kernel:*",
-  "//src/starnix/modules/input:*",
+  "//src/starnix/modules/*:*",
   "//src/starnix/lib/extended_pstate:*",
   "//src/starnix/lib/selinux/core:*",
   "//src/starnix/lib/starnix-uapi:*",

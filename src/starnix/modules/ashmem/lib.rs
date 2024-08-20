@@ -2,19 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::kobject::DeviceMetadata;
-use crate::device::{DeviceMode, DeviceOps};
-use crate::fs::sysfs::DeviceDirectory;
-use crate::mm::memory::MemoryObject;
-use crate::mm::{
-    DesiredAddress, MappingName, MappingOptions, MemoryAccessor, MemoryAccessorExt,
-    ProtectionFlags, PAGE_SIZE,
-};
-use crate::task::CurrentTask;
-use crate::vfs::{
-    default_ioctl, default_seek, fileops_impl_noop_sync, FileObject, FileOps, FileSystemCreator,
-    FileWriteGuardRef, FsNode, FsString, InputBuffer, NamespaceNode, OutputBuffer, SeekTarget,
-};
 use fuchsia_zircon as zx;
 use linux_uapi::{
     ASHMEM_GET_NAME, ASHMEM_GET_PIN_STATUS, ASHMEM_GET_PROT_MASK, ASHMEM_GET_SIZE,
@@ -23,8 +10,21 @@ use linux_uapi::{
 };
 use once_cell::sync::OnceCell;
 use range_map::RangeMap;
+use starnix_core::device::kobject::DeviceMetadata;
+use starnix_core::device::{DeviceMode, DeviceOps};
+use starnix_core::fs::sysfs::DeviceDirectory;
+use starnix_core::mm::memory::MemoryObject;
+use starnix_core::mm::{
+    DesiredAddress, MappingName, MappingOptions, MemoryAccessor, MemoryAccessorExt,
+    ProtectionFlags, PAGE_SIZE,
+};
+use starnix_core::task::CurrentTask;
+use starnix_core::vfs::{
+    default_ioctl, default_seek, fileops_impl_noop_sync, FileObject, FileOps, FileSystemCreator,
+    FileWriteGuardRef, FsNode, FsString, InputBuffer, NamespaceNode, OutputBuffer, SeekTarget,
+};
 use starnix_lifecycle::AtomicU32Counter;
-use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
+use starnix_sync::{DeviceOpen, FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::math::round_up_to_increment;
@@ -36,10 +36,7 @@ use starnix_uapi::{
 use std::sync::Arc;
 
 /// Initializes the ashmem device.
-pub fn ashmem_device_init<L>(locked: &mut Locked<'_, L>, system_task: &CurrentTask)
-where
-    L: LockBefore<FileOpsCore>,
-{
+pub fn ashmem_device_init(locked: &mut Locked<'_, Unlocked>, system_task: &CurrentTask) {
     let kernel = system_task.kernel();
     let registry = &kernel.device_registry;
 
