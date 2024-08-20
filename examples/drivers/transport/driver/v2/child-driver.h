@@ -20,12 +20,16 @@ class ChildTransportDriver : public fdf::DriverBase {
 
   zx::result<> Start() override;
 
+  void SetBitrate(uint32_t bitrate);
+
   size_t max_transfer_size() const { return max_transfer_size_; }
 
  private:
-  zx::result<> QueryParent(fdf::ClientEnd<fuchsia_hardware_i2cimpl::Device> client_end);
+  zx::result<> QueryInfo();
 
   size_t max_transfer_size_;
+
+  fdf::WireClient<fuchsia_hardware_i2cimpl::Device> i2c_impl_client_;
 
   fidl::WireClient<fuchsia_driver_framework::NodeController> controller_;
 };

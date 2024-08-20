@@ -17,7 +17,9 @@ zx::result<> ChildTransportDriver::Start() {
     return connect_result.take_error();
   }
 
-  auto result = QueryParent(std::move(connect_result.value()));
+  i2c_impl_client_.Bind(std::move(connect_result.value()), driver_dispatcher()->get());
+
+  auto result = QueryInfo();
   if (result.is_error()) {
     return result.take_error();
   }
@@ -41,40 +43,40 @@ zx::result<> ChildTransportDriver::Start() {
   return zx::ok();
 }
 
-zx::result<> ChildTransportDriver::QueryParent(
-    fdf::ClientEnd<fuchsia_hardware_i2cimpl::Device> client_end) {
-  fdf::Arena arena('GIZM');
+void ChildTransportDriver::SetBitrate(uint32_t bitrate) {
+  // Since we sealed synchronous calls at the end of the Start() function, all future calls
+  // over the driver transport must be asynchronous.
+  fdf::Arena arena('I2CI');
+  i2c_impl_client_.buffer(arena)->SetBitrate(bitrate).Then(
+      [bitrate](fdf::WireUnownedResult<fuchsia_hardware_i2cimpl::Device::SetBitrate>& result) {
+        if (!result.ok()) {
+          FDF_SLOG(ERROR, "Failed to set the bitrate.", KV("status", result.status_string()));
+        }
+        if (result->is_error()) {
+          FDF_SLOG(ERROR, "Bitrate request returned an error.",
+                   KV("status", result->error_value()));
+        }
+        FDF_LOG(INFO, "Successfully set the bitrate to %u", bitrate);
+      });
+}
 
-  // Query and store the hardware ID.
-  auto max_transfer_sz_result = fdf::WireCall(client_end).buffer(arena)->GetMaxTransferSize();
+zx::result<> ChildTransportDriver::QueryInfo() {
+  // Query and store the max transfer size.
+  fdf::Arena arena('I2CI');
+  auto max_transfer_sz_result = i2c_impl_client_.sync().buffer(arena)->GetMaxTransferSize();
   if (!max_transfer_sz_result.ok()) {
     FDF_SLOG(ERROR, "Failed to request max transfer size.",
              KV("status", max_transfer_sz_result.status_string()));
     return zx::error(max_transfer_sz_result.status());
   }
   if (max_transfer_sz_result->is_error()) {
-    FDF_SLOG(ERROR, "Hardware ID request returned an error.",
+    FDF_SLOG(ERROR, "GetMaxTransferSize request returned an error.",
              KV("status", max_transfer_sz_result->error_value()));
     return max_transfer_sz_result->take_error();
   }
 
   max_transfer_size_ = max_transfer_sz_result.value()->size;
   FDF_LOG(INFO, "Max transfer size: %zu", max_transfer_size_);
-
-  // Set the bitrate.
-  constexpr uint32_t kBitrate = 5;
-  auto bitrate_result = fdf::WireCall(client_end).buffer(arena)->SetBitrate(kBitrate);
-  if (!bitrate_result.ok()) {
-    FDF_SLOG(ERROR, "Failed to set the bitrate.", KV("status", bitrate_result.status_string()));
-    return zx::error(bitrate_result.status());
-  }
-  if (bitrate_result->is_error()) {
-    FDF_SLOG(ERROR, "Bitrate request returned an error.",
-             KV("status", bitrate_result->error_value()));
-    return bitrate_result->take_error();
-  }
-  FDF_LOG(INFO, "Successfully set the bitrate to %u", kBitrate);
-
   return zx::ok();
 }
 
