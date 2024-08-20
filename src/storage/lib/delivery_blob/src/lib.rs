@@ -105,6 +105,19 @@ pub fn decompress(delivery_blob: &[u8]) -> Result<Vec<u8>, DecompressError> {
     }
 }
 
+/// Decompress a delivery blob in `delivery_blob`, and write the decompressed blob to `writer`,
+/// delivery blob type is auto detected.
+pub fn decompress_to(
+    delivery_blob: &[u8],
+    writer: impl std::io::Write,
+) -> Result<(), DecompressError> {
+    let header = DeliveryBlobHeader::parse(delivery_blob)?.ok_or(DecompressError::NeedMoreData)?;
+    match header.delivery_type {
+        DeliveryBlobType::Type1 => Type1Blob::decompress_to(delivery_blob, writer),
+        _ => Err(DecompressError::DeliveryBlob(DeliveryBlobError::InvalidType)),
+    }
+}
+
 /// Calculate the merkle root digest of the decompressed `delivery_blob`, delivery blob type is auto
 /// detected.
 pub fn calculate_digest(delivery_blob: &[u8]) -> Result<fuchsia_merkle::Hash, DecompressError> {

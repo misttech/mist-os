@@ -11,6 +11,7 @@ ffx_plugin("ffx_package") {
   with_unit_tests = true
   plugin_deps = [
     "archive:ffx_package_archive",
+    "blob:ffx_package_blob",
     "build:ffx_package_build",
     "far:ffx_package_far",
     "file-hash:ffx_package_file_hash",
