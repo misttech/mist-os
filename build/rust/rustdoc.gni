@@ -1,0 +1,167 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+import("//build/config/current_target_tuple.gni")
+import("//build/rust/config.gni")
+
+# This template builds docs for a given rust target. It does not recursively
+# build docs for the dependencies of the target. Only for internal build system
+# use. This template is included in all target types in BUILDCONFIG.gn that
+# wish to support docs. For a given rust target, this template will depend on
+# the rust target's dependencies. This target is included in the build system
+# by a `gen_deps` dependency in BUILDCONFIG.gn (conditional on
+# disable_rustdoc), and a `data_deps` dependency (conditional on the
+# `include_rustdoc` arg).
+template("rustdoc") {
+  _rebased_target_gen_dir = rebase_path(target_gen_dir, root_build_dir)
+
+  forward_variables_from(invoker,
+                         [
+                           "invoker_deps",
+                           "actual_name",
+                           "aliased_deps",
+                         ])
+
+  transdeps_file = "$target_name.transdeps"
+  deps_file = "$target_name.deps"
+
+  generated_file(deps_file) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "public_deps",
+                             "data_deps",
+                           ])
+    deps = invoker_deps
+    visibility = [ ":*" ]
+    outputs = [ "$target_gen_dir/$target_name" ]
+    data_keys = [ "rlib" ]
+    walk_keys = [ "rust_barrier" ]
+  }
+
+  generated_file(transdeps_file) {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "public_deps",
+                             "data_deps",
+                           ])
+    deps = invoker_deps
+    visibility = [ ":*" ]
+    outputs = [ "$target_gen_dir/$target_name" ]
+    data_keys = [ "searchdir" ]
+  }
+
+  action(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "configs",
+                             "crate_name",
+                             "crate_root",
+                             "data_deps",
+                             "metadata",
+                             "public_deps",
+                             "quiet_rustdoc",
+                             "rustdoc_args",
+                             "rustdoc_crate_type",
+                             "rustdoc_out_dir",
+                             "rustenv",
+                             "testonly",
+                             "rustdoc_token_output",
+                             "visibility",
+                             "zip_rustdoc_to",
+                           ])
+    script = "//build/rust/rustdoc_wrapper.py"
+    mnemonic = "DOC"
+    deps = invoker_deps + [
+             ":$deps_file",
+             ":$transdeps_file",
+           ]
+
+    if (defined(invoker.non_rust_deps)) {
+      deps += invoker.non_rust_deps
+    }
+
+    configs -= [ "//build/config/rust:cap_lints" ]
+
+    # TODO: consider moving this to cap_lints_warn, or cap_lints_deny on a
+    # per-target, user-configurable, (opt-in?) basis. There are
+    # rustdoc-specific lints that should be acted upon to improve doc quality
+    # (https://doc.rust-lang.org/rustdoc/lints.html).
+    configs += [ "//build/config/rust:cap_lints_allow" ]
+
+    if (!defined(quiet_rustdoc)) {
+      quiet_rustdoc = false
+    }
+
+    if (defined(visibility)) {
+      visibility += [ ":$actual_name" ]
+    } else {
+      not_needed([ "actual_name" ])
+    }
+
+    outputs = [ rustdoc_token_output ]
+    if (defined(zip_rustdoc_to)) {
+      outputs += [ zip_rustdoc_to ]
+    }
+
+    args = [
+      "--touch",
+      rebase_path(rustdoc_token_output, root_build_dir),
+      "@$_rebased_target_gen_dir/$deps_file",
+      "--extern-html-root-url=$rustdoc_extern_html_root_url",
+    ]
+    if (defined(aliased_deps)) {
+      _aliased_deps_map = "$target_gen_dir/$target_name.aliased-deps"
+      write_file(_aliased_deps_map, aliased_deps, "json")
+      args += [
+        "--aliased-deps-map",
+        rebase_path(_aliased_deps_map, root_build_dir),
+      ]
+    }
+    if (quiet_rustdoc) {
+      _dir = rebase_path("$target_gen_dir/$target_name", root_build_dir)
+      args += [
+        "--stdout-path=$_dir.stdout",
+        "--stderr-path=$_dir.stderr",
+        "--no-fail",
+      ]
+    }
+    if (defined(zip_rustdoc_to)) {
+      assert(testonly, "zip_rustdoc_to is only used by rustdoc tests")
+      args += [
+        "--zip-from",
+        rebase_path(rustdoc_out_dir, root_build_dir),
+        "--zip-to",
+        rebase_path(zip_rustdoc_to, root_build_dir),
+      ]
+    }
+    args += [
+      "--",
+      "env",
+      "{{rustenv}}",
+    ]
+    if (defined(invoker.rustenv)) {
+      args += invoker.rustenv
+    }
+    args += [
+      "$rebased_rustc_prefix/bin/rustdoc",
+
+      # rustdoc will receive remaining arguments
+      rebase_path(crate_root, root_build_dir),
+      "-Zunstable-options",
+      "--out-dir",
+      rebase_path(rustdoc_out_dir, root_build_dir),
+      "@$_rebased_target_gen_dir/$transdeps_file",
+      "--sysroot=$rebased_rustc_prefix",
+      "--crate-type=$rustdoc_crate_type",
+      "--crate-name=$crate_name",
+      "{{rustflags}}",
+      "--error-format=json",
+    ]
+    args += invoker.rustflags
+    if (defined(rustdoc_args)) {
+      args += rustdoc_args
+    }
+  }
+}
