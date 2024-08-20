@@ -42,4 +42,43 @@ fuchsia::ui::views::ViewHolderToken ToViewHolderToken(zx::eventpair raw_token) {
   });
 }
 
+namespace cpp {
+
+ViewTokenPair ViewTokenPair::New() {
+  ViewTokenPair token_pair;
+
+  auto status = zx::eventpair::create(0u, &token_pair.view_token.value(),
+                                      &token_pair.view_holder_token.value());
+  // Assert even in non-debug builds, because eventpair creation can fail under
+  // normal operation.  Failure can occur for example, if the job creation
+  // policy governing this process forbids eventpair creation.
+  //
+  // It is unlikely that a well-behaved Scenic client would crash here; if you
+  // hit this, it means something is very abnormal.
+  ZX_ASSERT(status == ZX_OK);
+
+  return token_pair;
+}
+
+ViewTokenStdPair NewViewTokenPair() {
+  auto token_pair = ViewTokenPair::New();
+
+  return ViewTokenStdPair(std::move(token_pair.view_token),
+                          std::move(token_pair.view_holder_token));
+}
+
+fuchsia_ui_views::ViewToken ToViewToken(zx::eventpair raw_token) {
+  return fuchsia_ui_views::ViewToken({
+      .value = std::move(raw_token),
+  });
+}
+
+fuchsia_ui_views::ViewHolderToken ToViewHolderToken(zx::eventpair raw_token) {
+  return fuchsia_ui_views::ViewHolderToken({
+      .value = std::move(raw_token),
+  });
+}
+
+}  // namespace cpp
+
 }  // namespace scenic
