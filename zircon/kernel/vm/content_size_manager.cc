@@ -73,9 +73,9 @@ void ContentSizeManager::Operation::UpdateContentSizeFromProgress(uint64_t new_c
 void ContentSizeManager::Operation::Initialize(ContentSizeManager* parent, uint64_t size,
                                                OperationType type) {
   DEBUG_ASSERT(!IsValid());
-  DEBUG_ASSERT(parent != nullptr);
+  DEBUG_ASSERT(parent_ == parent);
 
-  parent_ = parent;
+  valid_ = true;
   size_ = size;
   type_ = type;
 }

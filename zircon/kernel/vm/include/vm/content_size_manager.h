@@ -70,7 +70,10 @@ class ContentSizeManager : public fbl::RefCounted<ContentSizeManager> {
                         fbl::TaggedDoublyLinkedListable<Operation*, WriteQueueTag>,
                         fbl::TaggedDoublyLinkedListable<Operation*, ReadQueueTag>> {
    public:
-    Operation() = default;
+    // An operation must be initialized with the ContentSizeManager it will later be used with.
+    // Passing this here allows for easier locking as AliasedLock acquisitions can be used to
+    // satisfy the analysis.
+    explicit Operation(ContentSizeManager* parent) : parent_(parent) {}
 
     ~Operation() {
       DEBUG_ASSERT_MSG(!IsValid(), "Operation destructed without cancelling or committing!");
@@ -82,24 +85,14 @@ class ContentSizeManager : public fbl::RefCounted<ContentSizeManager> {
     Operation(Operation&&) = delete;
     Operation& operator=(Operation&&) = delete;
 
-    ContentSizeManager* parent() const { return parent_; }
-
-    OperationType GetType() const { return type_; }
-
-    // This function exists to satisfy Clang thread safety analysis since there are many
-    // circumstances where the parent lock is not acquired through the parent pointer
-    // (i.e. initialization). As of writing, Clang is unable to follow pointer aliasing.
-    void AssertParentLockHeld() const TA_ASSERT(parent()->lock()) {
-      DEBUG_ASSERT(IsValid());
-      parent()->lock()->capability().AssertHeld();
-    }
+    Lock<Mutex>* lock() const TA_RET_CAP(parent()->lock()) { return parent()->lock(); }
 
     // Gets the content size that the operation will expand to once it is completed.
     //
     // Note:
     //  * This may only be called on a valid operation.
     //  * This must only be called when holding the parent `ContentSizeManager` lock.
-    uint64_t GetSizeLocked() const TA_REQ(parent()->lock());
+    uint64_t GetSizeLocked() const TA_REQ(lock());
 
     // Shrinks the size of the operation.
     //
@@ -112,21 +105,21 @@ class ContentSizeManager : public fbl::RefCounted<ContentSizeManager> {
     //  * The `new_size` passed in must be greater than 0.
     //  * The `new_size` passed in must be less than or equal to the current size.
     //  * This must only be called for `OperationType::Append` and `OperationType::Write` ops.
-    void ShrinkSizeLocked(uint64_t new_size) TA_REQ(parent()->lock());
+    void ShrinkSizeLocked(uint64_t new_size) TA_REQ(lock());
 
     // Commits the operation's effects on the content size.
     //
     // Note:
     //  * This may only be called on a valid operation.
     //  * This must only be called when holding the parent `ContentSizeManager` lock.
-    void CommitLocked() TA_REQ(parent()->lock());
+    void CommitLocked() TA_REQ(lock());
 
     // Cancels the operation and does not commit any changes to the content size.
     //
     // Note:
     //  * This may only be called on a valid operation.
     //  * This must only be called when holding the parent `ContentSizeManager` lock.
-    void CancelLocked() TA_REQ(parent()->lock());
+    void CancelLocked() TA_REQ(lock());
 
     // Updates the content size when progress is made from the operation. Once this has been called
     // it is invalid to call CancelLocked or to call ShrinkSizeLocked with a size less than the
@@ -141,13 +134,28 @@ class ContentSizeManager : public fbl::RefCounted<ContentSizeManager> {
     friend class ContentSizeManager;
 
     // Indicates whether the operation is valid.
-    bool IsValid() const { return parent_ != nullptr; }
+    bool IsValid() const { return valid_; }
 
-    void Reset() { parent_ = nullptr; }
+    // Resets validity of the operation. This operation is private as it is assumed to only be
+    // called when it is correct to do so by the ContentSizeManager.
+    void Reset() { valid_ = false; }
 
     void Initialize(ContentSizeManager* parent, uint64_t size, OperationType type);
 
-    ContentSizeManager* parent_ = nullptr;
+    OperationType GetType() const { return type_; }
+
+    ContentSizeManager* parent() const { return parent_; }
+
+    // This function exists to satisfy Clang thread safety analysis since there are many
+    // circumstances where the parent lock is not acquired through the parent pointer
+    // (i.e. initialization). As of writing, Clang is unable to follow pointer aliasing.
+    void AssertParentLockHeld() const TA_ASSERT(parent()->lock()) {
+      DEBUG_ASSERT(IsValid());
+      parent()->lock()->capability().AssertHeld();
+    }
+
+    ContentSizeManager* const parent_ = nullptr;
+    bool valid_ = false;
     OperationType type_;
 
     // Holds the target size. For appends, this will only be valid once the operation is at the head

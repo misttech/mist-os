@@ -176,22 +176,20 @@ zx_status_t VmObjectDispatcher::Write(
 zx_status_t VmObjectDispatcher::SetSize(uint64_t size) {
   canary_.Assert();
 
-  ContentSizeManager::Operation op;
-  Guard<Mutex> guard{content_size_mgr_->lock()};
+  ContentSizeManager::Operation op(content_size_mgr_.get());
+  Guard<Mutex> guard{AliasedLock, content_size_mgr_->lock(), op.lock()};
 
   content_size_mgr_->BeginSetContentSizeLocked(size, &op, &guard);
 
   uint64_t size_aligned = ROUNDUP(size, PAGE_SIZE);
   // Check for overflow when rounding up.
   if (size_aligned < size) {
-    op.AssertParentLockHeld();
     op.CancelLocked();
     return ZX_ERR_OUT_OF_RANGE;
   }
 
   zx_status_t status = vmo_->Resize(size_aligned);
   if (status != ZX_OK) {
-    op.AssertParentLockHeld();
     op.CancelLocked();
     return status;
   }
@@ -206,7 +204,6 @@ zx_status_t VmObjectDispatcher::SetSize(uint64_t size) {
     guard.CallUnlocked([&] { vmo_->ZeroRange(size, remaining); });
   }
 
-  op.AssertParentLockHeld();
   op.CommitLocked();
   return status;
 }
@@ -276,8 +273,8 @@ zx_info_vmo_t VmObjectDispatcher::GetVmoInfo(zx_rights_t rights) {
 zx_status_t VmObjectDispatcher::SetContentSize(uint64_t content_size) {
   canary_.Assert();
 
-  ContentSizeManager::Operation op;
-  Guard<Mutex> guard{content_size_mgr_->lock()};
+  ContentSizeManager::Operation op(content_size_mgr_.get());
+  Guard<Mutex> guard{AliasedLock, content_size_mgr_->lock(), op.lock()};
   content_size_mgr_->BeginSetContentSizeLocked(content_size, &op, &guard);
 
   uint64_t vmo_size = vmo_->size();
@@ -290,7 +287,6 @@ zx_status_t VmObjectDispatcher::SetContentSize(uint64_t content_size) {
     guard.CallUnlocked([&] { vmo_->ZeroRange(content_size, vmo_size - content_size); });
   }
 
-  op.AssertParentLockHeld();
   op.CommitLocked();
   return ZX_OK;
 }
@@ -298,8 +294,8 @@ zx_status_t VmObjectDispatcher::SetContentSize(uint64_t content_size) {
 zx_status_t VmObjectDispatcher::SetStreamSize(uint64_t stream_size) {
   canary_.Assert();
 
-  ContentSizeManager::Operation op;
-  Guard<Mutex> guard{content_size_mgr_->lock()};
+  ContentSizeManager::Operation op(content_size_mgr_.get());
+  Guard<Mutex> guard{AliasedLock, content_size_mgr_->lock(), op.lock()};
 
   uint64_t vmo_size = vmo_->size();
   uint64_t old_stream_size = GetContentSize();
@@ -323,11 +319,8 @@ zx_status_t VmObjectDispatcher::SetStreamSize(uint64_t stream_size) {
   zx_status_t status;
   guard.CallUnlocked([&] { status = vmo_->ZeroRange(zero_start, zero_len); });
 
-  op.AssertParentLockHeld();
-
   // Undo this operation of ZeroRange fails.
   if (status != ZX_OK) {
-    op.AssertParentLockHeld();
     op.CancelLocked();
     return status;
   }
