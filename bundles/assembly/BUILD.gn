@@ -1970,10 +1970,7 @@ assembly_input_bundle("input_group_one") {
 }
 
 assembly_input_bundle("input_group_two") {
-  flexible_packages = [
-    "//src/connectivity/location/emergency",
-    "//src/media/sessions:mediasession",
-  ]
+  flexible_packages = [ "//src/media/sessions:mediasession" ]
   if (current_cpu != "riscv64") {
     flexible_packages += [ "//src/media/codec:codec_factory" ]
   }
@@ -1984,7 +1981,6 @@ assembly_input_bundle("input_group_two") {
         {
           component_name = "core"
           shards = [
-            "//src/connectivity/location/emergency/meta/emergency.core_shard.cml",
             "//src/media/codec/factory/meta/codec_factory.core_shard.cml",
             "//src/media/sessions/meta/mediasession.core_shard.cml",
           ]
@@ -3250,6 +3246,25 @@ assembly_input_bundle("wlan_wlanix") {
           component_name = "core"
           shards =
               [ "//src/connectivity/wlan/wlanix/meta/wlanix.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
+# Emergency Location provider
+#
+# feature_set_levels: standard
+# build-types: all
+assembly_input_bundle("location_emergency") {
+  flexible_packages = [ "//src/connectivity/location/emergency" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/connectivity/location/emergency/meta/emergency.core_shard.cml" ]
         },
       ]
     },
