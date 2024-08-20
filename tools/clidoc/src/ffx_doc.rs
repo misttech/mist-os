@@ -81,14 +81,19 @@ fn write_command(
     let mut sorted_commands = command.commands.clone();
     sorted_commands.sort_by(|a, b| a.name.cmp(&b.name));
     let heading_level = "#".repeat(level);
-    writeln!(output_writer, "{heading_level} {}\n", command.name.to_lowercase())?;
+    let anchor = build_anchor(parent_cmd, &command.name.to_lowercase());
+    writeln!(output_writer, "{heading_level} {} {{#{anchor}}}\n", command.name.to_lowercase())?;
     writeln!(output_writer, "{}\n", escape_text(&command.description))?;
     writeln!(output_writer, "{code_block_start}\n")?;
     writeln!(output_writer, "Usage: {}\n", build_usage_string(parent_cmd, &command)?)?;
     writeln!(output_writer, "```\n")?;
 
     write_flags(output_writer, &command.flags)?;
-    write_subcommand_list(output_writer, &sorted_commands)?;
+    write_subcommand_list(
+        output_writer,
+        &format!("{parent_cmd} {}", command.name.to_lowercase()),
+        &sorted_commands,
+    )?;
     write_examples(output_writer, &command.examples)?;
     write_notes(output_writer, &command.notes)?;
     write_errors(output_writer, &command.error_codes)?;
@@ -231,8 +236,9 @@ fn write_errors(output_writer: &mut BufWriter<File>, errors: &Vec<ErrorCodeInfo>
     Ok(())
 }
 
-fn write_subcommand_list(
-    output_writer: &mut BufWriter<File>,
+fn write_subcommand_list<W: Write>(
+    output_writer: &mut BufWriter<W>,
+    parent_cmd: &str,
     commands: &Vec<SubCommandInfo>,
 ) -> Result<()> {
     if commands.is_empty() {
@@ -243,11 +249,22 @@ fn write_subcommand_list(
     writeln!(output_writer, "----------- | ------")?;
 
     for cmd in commands {
+        let anchor = build_anchor(parent_cmd, &cmd.name);
         let first_line = cmd.command.description.lines().next().unwrap_or(&cmd.command.description);
-        writeln!(output_writer, "| [{}](#{}) | {}", cmd.name, cmd.name, escape_text(first_line))?;
+        writeln!(output_writer, "| [{}](#{anchor}) | {}", cmd.name, escape_text(first_line))?;
     }
     writeln!(output_writer, "\n")?;
     Ok(())
+}
+
+fn build_anchor(parent_cmd: &str, cmd: &str) -> String {
+    let suffix = cmd.trim();
+    let prefix = parent_cmd.trim();
+    if prefix.is_empty() {
+        suffix.replace(" ", "_")
+    } else {
+        format!("{prefix}_{cmd}").replace(" ", "_")
+    }
 }
 
 #[cfg(test)]
@@ -256,7 +273,24 @@ mod tests {
     use ffx_command::{Optionality, PositionalInfo};
 
     #[test]
-    fn test_write_subcommand_list() {}
+    fn test_write_subcommand_list() {
+        let buf = Vec::<u8>::new();
+        let mut writer = BufWriter::new(buf);
+
+        let parent_cmd = "ffx something";
+        let commands = vec![
+            SubCommandInfo { name: "one".into(), command: CliArgsInfo::default() },
+            SubCommandInfo { name: "two".into(), command: CliArgsInfo::default() },
+        ];
+
+        write_subcommand_list(&mut writer, parent_cmd, &commands).expect("subcommands written");
+        writer.flush().expect("flush buffer");
+        let actual = String::from_utf8(writer.get_ref().to_vec()).expect("string from utf8");
+
+        let expected = "__Subcommands__ | &nbsp;\n----------- | ------\n| [one](#ffx_something_one) | \n| [two](#ffx_something_two) | \n\n\n";
+
+        assert_eq!(actual, expected);
+    }
     #[test]
     fn test_write_errors() {}
 
