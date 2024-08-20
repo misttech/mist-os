@@ -1970,7 +1970,6 @@ assembly_input_bundle("input_group_one") {
 }
 
 assembly_input_bundle("input_group_two") {
-  kernel_cmdline = [ "kernel.render-dlog-to-crashlog=true" ]
   flexible_packages = [
     "//src/connectivity/location/emergency",
     "//src/media/sessions:mediasession",
@@ -4106,6 +4105,10 @@ assembly_input_bundle("kernel_anonymous_memory_compression_eager_lru") {
 # level changes.
 assembly_input_bundle("kernel_evict_continuous") {
   kernel_cmdline = [ "kernel.oom.evict-continuous=true" ]
+}
+
+assembly_input_bundle("kernel_logs_in_reboot_info") {
+  kernel_cmdline = [ "kernel.render-dlog-to-crashlog=true" ]
 }
 
 # Assembly selects whether to include this AIB or not.
