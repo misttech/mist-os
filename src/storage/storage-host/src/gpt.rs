@@ -36,8 +36,8 @@ impl GptPartition {
     }
 
     pub async fn terminate(&self) {
-        if let Err(e) = self.block_client.close().await {
-            tracing::warn!(?e, "Failed to close block client");
+        if let Err(error) = self.block_client.close().await {
+            tracing::warn!(?error, "Failed to close block client");
         }
     }
 
@@ -188,6 +188,20 @@ impl std::fmt::Debug for GptManager {
     }
 }
 
+enum WhichHeader {
+    Primary,
+    Backup,
+}
+
+impl WhichHeader {
+    fn offset(&self, block_size: u64, block_count: u64) -> u64 {
+        match self {
+            Self::Primary => block_size,
+            Self::Backup => (block_count - 1) * block_size,
+        }
+    }
+}
+
 impl GptManager {
     pub async fn new(
         block_connector: Arc<dyn BlockConnector>,
@@ -199,7 +213,7 @@ impl GptManager {
         let block_size = client.block_size();
         let block_count = client.block_count();
         let partition_table =
-            Self::load_partitions(client).await.context("Failed to load partition table")?;
+            Self::load_partitions(&client).await.context("Failed to load partition table")?;
 
         let this = Arc::new(Self {
             block_connector,
@@ -247,35 +261,44 @@ impl GptManager {
         Ok(RemoteBlockClient::new(block).await?)
     }
 
-    async fn load_partitions(
-        client: RemoteBlockClient,
+    async fn try_load_partitions(
+        client: &RemoteBlockClient,
+        which: WhichHeader,
     ) -> Result<BTreeMap<u32, PartitionInfo>, Error> {
         let bs = client.block_size() as usize;
-        let mut header_block = vec![0u8; bs];
-        // First, read the primary and secondary headers.  Note the primary header is at block 1,
-        // not block 0 (which is a protective MBR header).
+        let mut header_block = vec![0u8; client.block_size() as usize];
         client
-            .read_at(MutableBufferSlice::Memory(&mut header_block[..]), bs as u64)
+            .read_at(
+                MutableBufferSlice::Memory(&mut header_block[..]),
+                which.offset(bs as u64, client.block_count() as u64),
+            )
             .await
-            .context("Read primary header")?;
+            .context("Read header")?;
         let header = format::Header::ref_from_prefix(&header_block[..])
-            .ok_or(anyhow!("Failed to parse primary header"))?;
-
-        // TODO(https://fxbug.dev/339491886): Should we best-effort look at secondary header?
-        header.ensure_integrity().context("GPT primary header invalid!")?;
-
-        // TODO(https://fxbug.dev/339491886): Do we need to read in chunks?
-        let partition_table_size = ((header.num_parts * header.part_size) as usize)
+            .ok_or(anyhow!("Header has invalid size"))?;
+        header.ensure_integrity(client.block_count(), client.block_size() as u64)?;
+        let partition_table_offset = header.part_start * bs as u64;
+        let partition_table_size = (header.num_parts * header.part_size) as usize;
+        let partition_table_size_rounded = partition_table_size
             .checked_next_multiple_of(bs)
             .ok_or(anyhow!("Overflow when rounding up partition table size "))?;
-
         let mut partition_table = BTreeMap::new();
         if header.num_parts > 0 {
-            let mut partition_table_blocks = vec![0u8; partition_table_size];
+            let mut partition_table_blocks = vec![0u8; partition_table_size_rounded];
             client
-                .read_at(MutableBufferSlice::Memory(&mut partition_table_blocks[..]), 2 * bs as u64)
+                .read_at(
+                    MutableBufferSlice::Memory(&mut partition_table_blocks[..]),
+                    partition_table_offset,
+                )
                 .await
-                .context("Failed to read partition table")?;
+                .with_context(|| {
+                    format!(
+                        "Failed to read partition table (sz {}) from offset {}",
+                        partition_table_size, partition_table_offset
+                    )
+                })?;
+            let crc = crc::crc32::checksum_ieee(&partition_table_blocks[..partition_table_size]);
+            anyhow::ensure!(header.crc32_parts == crc, "Invalid partition table checksum");
 
             for i in 0..header.num_parts as usize {
                 let entry_raw = &partition_table_blocks
@@ -291,6 +314,20 @@ impl GptManager {
             }
         }
         Ok(partition_table)
+    }
+
+    async fn load_partitions(
+        client: &RemoteBlockClient,
+    ) -> Result<BTreeMap<u32, PartitionInfo>, Error> {
+        match Self::try_load_partitions(&client, WhichHeader::Primary).await {
+            Ok(partitions) => Ok(partitions),
+            Err(error) => {
+                tracing::warn!(?error, "Failed to load primary metadata; falling back to backup");
+                Self::try_load_partitions(&client, WhichHeader::Backup)
+                    .await
+                    .context("Failed to load backup metadata")
+            }
+        }
     }
 }
 
@@ -572,5 +609,107 @@ mod tests {
         let mut buf = vec![0u8; 512];
         vmo_child.read(&mut buf[..], 2048).unwrap();
         assert_eq!(&buf[..], &[0xabu8; 512]);
+    }
+
+    #[fuchsia::test]
+    async fn load_formatted_gpt_with_invalid_primary_header() {
+        const PART_TYPE_GUID: [u8; 16] = [2u8; 16];
+        const PART_INSTANCE_1_GUID: [u8; 16] = [2u8; 16];
+        const PART_INSTANCE_2_GUID: [u8; 16] = [3u8; 16];
+        const PART_1_NAME: &str = "part1";
+        const PART_2_NAME: &str = "part2";
+
+        let vmo = zx::Vmo::create(4096).unwrap();
+        format_gpt(
+            &vmo,
+            512,
+            vec![
+                PartitionDescriptor {
+                    label: PART_1_NAME.to_string(),
+                    type_guid: uuid::Uuid::from_bytes(PART_TYPE_GUID),
+                    instance_guid: uuid::Uuid::from_bytes(PART_INSTANCE_1_GUID),
+                    start_block: 4,
+                    num_blocks: 1,
+                },
+                PartitionDescriptor {
+                    label: PART_2_NAME.to_string(),
+                    type_guid: uuid::Uuid::from_bytes(PART_TYPE_GUID),
+                    instance_guid: uuid::Uuid::from_bytes(PART_INSTANCE_2_GUID),
+                    start_block: 4,
+                    num_blocks: 1,
+                },
+            ],
+        );
+        // Clobber the primary header.  The backup should allow the GPT to be used.
+        vmo.write(&[0xffu8; 512], 512).unwrap();
+
+        let (block_device, shutdown, partitions_dir) = setup(vmo, 512);
+        let block_device_clone = block_device.clone() as Arc<dyn BlockConnector>;
+
+        futures::join!(
+            async {
+                block_device.run_until_shutdown().await;
+            },
+            async {
+                let runner = GptManager::new(block_device_clone, partitions_dir.clone())
+                    .await
+                    .expect("load should succeed");
+                partitions_dir.get_entry("part-0").expect("No entry found");
+                partitions_dir.get_entry("part-1").expect("No entry found");
+                runner.shutdown().await;
+                shutdown.notify(usize::MAX);
+            },
+        );
+    }
+
+    #[fuchsia::test]
+    async fn load_formatted_gpt_with_invalid_primary_partition_table() {
+        const PART_TYPE_GUID: [u8; 16] = [2u8; 16];
+        const PART_INSTANCE_1_GUID: [u8; 16] = [2u8; 16];
+        const PART_INSTANCE_2_GUID: [u8; 16] = [3u8; 16];
+        const PART_1_NAME: &str = "part1";
+        const PART_2_NAME: &str = "part2";
+
+        let vmo = zx::Vmo::create(4096).unwrap();
+        format_gpt(
+            &vmo,
+            512,
+            vec![
+                PartitionDescriptor {
+                    label: PART_1_NAME.to_string(),
+                    type_guid: uuid::Uuid::from_bytes(PART_TYPE_GUID),
+                    instance_guid: uuid::Uuid::from_bytes(PART_INSTANCE_1_GUID),
+                    start_block: 4,
+                    num_blocks: 1,
+                },
+                PartitionDescriptor {
+                    label: PART_2_NAME.to_string(),
+                    type_guid: uuid::Uuid::from_bytes(PART_TYPE_GUID),
+                    instance_guid: uuid::Uuid::from_bytes(PART_INSTANCE_2_GUID),
+                    start_block: 4,
+                    num_blocks: 1,
+                },
+            ],
+        );
+        // Clobber the primary partition table.  The backup should allow the GPT to be used.
+        vmo.write(&[0xffu8; 512], 1024).unwrap();
+
+        let (block_device, shutdown, partitions_dir) = setup(vmo, 512);
+        let block_device_clone = block_device.clone() as Arc<dyn BlockConnector>;
+
+        futures::join!(
+            async {
+                block_device.run_until_shutdown().await;
+            },
+            async {
+                let runner = GptManager::new(block_device_clone, partitions_dir.clone())
+                    .await
+                    .expect("load should succeed");
+                partitions_dir.get_entry("part-0").expect("No entry found");
+                partitions_dir.get_entry("part-1").expect("No entry found");
+                runner.shutdown().await;
+                shutdown.notify(usize::MAX);
+            },
+        );
     }
 }
