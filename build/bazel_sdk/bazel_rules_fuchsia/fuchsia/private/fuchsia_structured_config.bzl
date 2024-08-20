@@ -8,7 +8,6 @@
 //build/components/fuchsia_structured_config.gni.)
 """
 
-load(":fuchsia_fidl_bind_library.bzl", "fuchsia_fidl_bind_library")
 load(":fuchsia_fidl_cc_library.bzl", "fuchsia_fidl_cc_library")
 load(":fuchsia_fidl_library.bzl", "fuchsia_fidl_library")
 load(":fuchsia_package_resource.bzl", "fuchsia_package_resource")
@@ -296,12 +295,6 @@ def fuchsia_structured_config_cpp_elf_lib(
         srcs = [fidl_source_target],
         library = fidl_library_name,
         cc_bindings = ["cpp"],
-    )
-
-    fuchsia_fidl_bind_library(
-        name = "%s_bindlib" % fidl_library_name,
-        library = ":" + fidl_library_target,
-        target_compatible_with = ["@platforms//os:fuchsia"],
     )
 
     cc_bind_target = "%s_bindlib_cc" % fidl_library_name
