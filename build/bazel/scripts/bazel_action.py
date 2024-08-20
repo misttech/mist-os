@@ -293,7 +293,15 @@ def copy_file_if_changed(
         if not is_src_readonly:
             try:
                 os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-                os.link(src_path, dst_path)
+                # Get realpath of src_path to avoid symlink chains, which
+                # os.link does not handle properly even follow_symlinks=True.
+                #
+                # NOTE: it is important to link to the final real file because
+                # intermediate links can be temporary. For example, the
+                # gn_targets repository is repopulated in every bazel_action, so
+                # any links pointing to symlinks in gn_targets can be
+                # invalidated during the build.
+                os.link(os.path.realpath(src_path), dst_path)
                 # Update timestamp to avoid Ninja no-op failures that can
                 # happen because Bazel does not maintain consistent timestamps
                 # in the execroot when sandboxing or remote builds are enabled.
