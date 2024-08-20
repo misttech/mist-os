@@ -9,6 +9,8 @@
 #include <lib/ddk/metadata.h>
 #include <lib/fit/defer.h>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/serial/cpp/bind.h>
 #include <ddktl/metadata.h>
 #include <fbl/alloc_checker.h>
 
@@ -93,9 +95,10 @@ zx_status_t AmlUartV1::Init(ddk::PDevFidl pdev,
                                       fuchsia_hardware_serialimpl::kSerialStopBits1 |
                                       fuchsia_hardware_serialimpl::kSerialParityNone;
   aml_uart_->Config(kDefaultBaudRate, kDefaultConfig);
-  zx_device_prop_t props[] = {
-      {BIND_PROTOCOL, 0, ZX_PROTOCOL_SERIAL_IMPL_ASYNC},
-      {BIND_SERIAL_CLASS, 0, static_cast<uint8_t>(aml_uart_->serial_port_info().serial_class)},
+  zx_device_str_prop_t props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_serial::BIND_PROTOCOL_IMPL_ASYNC),
+      ddk::MakeStrProperty(bind_fuchsia::SERIAL_CLASS,
+                           static_cast<uint32_t>(aml_uart_->serial_port_info().serial_class)),
   };
 
   fuchsia_hardware_serialimpl::Service::InstanceHandler handler({
@@ -132,7 +135,7 @@ zx_status_t AmlUartV1::Init(ddk::PDevFidl pdev,
   };
 
   auto status = DdkAdd(ddk::DeviceAddArgs("aml-uart")
-                           .set_props(props)
+                           .set_str_props(props)
                            .set_runtime_service_offers(offers)
                            .set_outgoing_dir(endpoints->client.TakeChannel())
                            .forward_metadata(parent(), DEVICE_METADATA_MAC_ADDRESS));

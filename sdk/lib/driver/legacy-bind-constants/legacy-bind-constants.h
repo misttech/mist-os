@@ -51,11 +51,6 @@
 #define BIND_IHDA_CODEC_VENDOR_REV 0x0504
 #define BIND_IHDA_CODEC_VENDOR_STEP 0x0505
 
-// Serial binding variables at 0x06XX
-#define BIND_SERIAL_CLASS 0x0600
-#define BIND_SERIAL_VID 0x0601
-#define BIND_SERIAL_PID 0x0602
-
 // NAND binding variables at 0x07XX
 #define BIND_NAND_CLASS 0x0700
 
