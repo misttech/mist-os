@@ -124,6 +124,10 @@ impl Config {
         self.source_config.utc_start_at_startup
     }
 
+    fn get_utc_start_at_startup_when_invalid_rtc(&self) -> bool {
+        self.source_config.utc_start_at_startup_when_invalid_rtc
+    }
+
     fn get_early_exit(&self) -> bool {
         self.source_config.early_exit
     }
@@ -331,14 +335,22 @@ fn initial_clock_state(utc_clock: &zx::Clock) -> (InitialClockState, zx::ClockDe
 
 /// Attempts to initialize a userspace clock from the current value of the real time clock.
 /// sending progress to diagnostics as appropriate.
+///
+/// Args:
+/// - `force_start`: if set, the clock will be force-started, even though RTC
+///   is present.  However, if the RTC reading shows a timestamp before backstop,
+///   we will be snapped to backstop before setting the UTC clock. This way,
+///   RTC setting remains broken, but UTC does not get set to time before
+///   backstop.
 async fn set_clock_from_rtc<R: Rtc, D: Diagnostics>(
     rtc: &R,
     clock: &zx::Clock,
     diagnostics: Arc<D>,
+    force_start: bool,
 ) {
     info!("reading initial RTC time.");
     let mono_before = zx::Time::get_monotonic();
-    let rtc_time = match rtc.get().await {
+    let mut rtc_time = match rtc.get().await {
         Err(err) => {
             error!("failed to read RTC time: {}", err);
             diagnostics.record(Event::InitializeRtc {
@@ -352,7 +364,7 @@ async fn set_clock_from_rtc<R: Rtc, D: Diagnostics>(
     let mono_after = zx::Time::get_monotonic();
     let mono_time = mono_before + (mono_after - mono_before) / 2;
 
-    let rtc_chrono = Utc.timestamp_nanos(rtc_time.into_nanos());
+    let mut rtc_chrono = Utc.timestamp_nanos(rtc_time.into_nanos());
     let backstop = clock.get_details().expect("failed to get UTC clock details").backstop;
     let backstop_chrono = Utc.timestamp_nanos(backstop.into_nanos());
     if rtc_time < backstop {
@@ -361,7 +373,16 @@ async fn set_clock_from_rtc<R: Rtc, D: Diagnostics>(
             outcome: InitializeRtcOutcome::InvalidBeforeBackstop,
             time: Some(rtc_time),
         });
-        return;
+        if force_start {
+            // If we must start the clock from RTC when we know RTC is before
+            // backstop, we snap the RTC reading to backstop before starting
+            // the clock. We leave the RTC reading update for later.
+            info!("Snapping RTC reading (but not RTC content) to backstop: {}", backstop_chrono);
+            rtc_time = backstop;
+            rtc_chrono = backstop_chrono;
+        } else {
+            return;
+        }
     } else {
         debug!("RTC time {} is ahead of backstop {}, as expected", rtc_chrono, backstop_chrono);
     }
@@ -414,7 +435,13 @@ async fn maintain_utc<R: 'static, D: 'static>(
     if let Some(rtc) = optional_rtc.as_ref() {
         match initial_clock_state {
             InitialClockState::NotSet => {
-                set_clock_from_rtc(rtc, &primary.clock, Arc::clone(&diagnostics)).await;
+                set_clock_from_rtc(
+                    rtc,
+                    &primary.clock,
+                    Arc::clone(&diagnostics),
+                    config.get_utc_start_at_startup_when_invalid_rtc(),
+                )
+                .await;
             }
             InitialClockState::PreviouslySet => {
                 diagnostics.record(Event::InitializeRtc {
@@ -552,7 +579,11 @@ mod tests {
         (Arc::new(clock), initial_update_ticks)
     }
 
-    pub fn make_test_config_with_params(delay: i64, serve_test_protocols: bool) -> Arc<Config> {
+    pub fn make_test_config_with_params(
+        delay: i64,
+        serve_test_protocols: bool,
+        force_start: bool,
+    ) -> Arc<Config> {
         Arc::new(Config::from(timekeeper_config::Config {
             disable_delays: true,
             oscillator_error_std_dev_ppm: 15,
@@ -564,7 +595,8 @@ mod tests {
             first_sampling_delay_sec: delay,
             monitor_time_source_url: "".to_string(),
             primary_uses_pull: false,
-            utc_start_at_startup: false,
+            utc_start_at_startup: force_start,
+            utc_start_at_startup_when_invalid_rtc: force_start,
             early_exit: false,
             power_topology_integration_enabled: false,
             serve_test_protocols,
@@ -573,7 +605,9 @@ mod tests {
     }
 
     pub fn make_test_config_with_delay(delay: i64) -> Arc<Config> {
-        make_test_config_with_params(delay, /*serve_test_protocols=*/ false)
+        make_test_config_with_params(
+            delay, /*serve_test_protocols=*/ false, /*force_start=*/ false,
+        )
     }
 
     pub fn make_test_config() -> Arc<Config> {
@@ -581,7 +615,15 @@ mod tests {
     }
 
     pub fn make_test_config_with_test_protocols() -> Arc<Config> {
-        make_test_config_with_params(/*delay=*/ 0, /*serve_test_protocols=*/ true)
+        make_test_config_with_params(
+            /*delay=*/ 0, /*serve_test_protocols=*/ true, /*force_start=*/ false,
+        )
+    }
+
+    pub fn make_test_config_with_force_start() -> Arc<Config> {
+        make_test_config_with_params(
+            /*delay=*/ 0, /*serve_test_protocols=*/ true, /* force_start=*/ true,
+        )
     }
 
     #[fuchsia::test]
@@ -839,6 +881,63 @@ mod tests {
                 outcome: InitializeRtcOutcome::InvalidBeforeBackstop,
                 time: Some(INVALID_RTC_TIME),
             },
+            Event::TimeSourceStatus { role: Role::Primary, status: ftexternal::Status::Network },
+        ]);
+    }
+
+    #[fuchsia::test]
+    fn no_update_invalid_rtc_force_start() {
+        let mut executor = fasync::TestExecutor::new();
+        let (clock, initial_update_ticks) = create_clock();
+        let rtc = FakeRtc::valid(INVALID_RTC_TIME);
+        let diagnostics = Arc::new(FakeDiagnostics::new());
+
+        // Force start from backstop even if RTC is present.
+        let config = make_test_config_with_force_start();
+
+        let time_source = FakePushTimeSource::events(vec![TimeSourceEvent::StatusChange {
+            status: ftexternal::Status::Network,
+        }])
+        .into();
+        let (s, r) = mpsc::channel(1);
+
+        // Maintain UTC until no more work remains
+        let mut fut = maintain_utc(
+            PrimaryTrack { clock: Arc::clone(&clock), time_source },
+            None,
+            Some(rtc.clone()),
+            Arc::clone(&diagnostics),
+            Arc::clone(&config),
+            s,
+            r,
+        )
+        .boxed();
+        let _ = executor.run_until_stalled(&mut fut);
+
+        // Checking that the clock has not been updated yet
+        let last_value_update_ticks = clock.get_details().unwrap().last_value_update_ticks;
+        assert!(
+            initial_update_ticks < last_value_update_ticks,
+            "initial_update_ticks={}, last_value_update_ticks={}",
+            initial_update_ticks,
+            last_value_update_ticks
+        );
+        assert_eq!(rtc.last_set(), None);
+
+        // Checking that the correct diagnostic events were logged.
+        diagnostics.assert_events(&[
+            Event::Initialized { clock_state: InitialClockState::NotSet },
+            // RTC time was invalid...
+            Event::InitializeRtc {
+                outcome: InitializeRtcOutcome::InvalidBeforeBackstop,
+                time: Some(INVALID_RTC_TIME),
+            },
+            // ...But we initialized from backstop.
+            Event::InitializeRtc {
+                outcome: InitializeRtcOutcome::Succeeded,
+                time: Some(BACKSTOP_TIME),
+            },
+            Event::StartClock { track: Track::Primary, source: StartClockSource::Rtc },
             Event::TimeSourceStatus { role: Role::Primary, status: ftexternal::Status::Network },
         ]);
     }

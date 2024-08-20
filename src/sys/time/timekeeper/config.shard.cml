@@ -58,6 +58,10 @@
         // use it to measure time durations.
         utc_start_at_startup: { type: "bool" },
 
+        // Similar to the above, except the clock is started even if there is
+        // a RTC reading that is known to be invalid.
+        utc_start_at_startup_when_invalid_rtc: { type: "bool" },
+
         // If set, timekeeper will exit early without managing the clock.
         early_exit: { type: "bool" },
 

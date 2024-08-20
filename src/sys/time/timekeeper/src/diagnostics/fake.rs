@@ -41,7 +41,7 @@ impl FakeDiagnostics {
         if !expected.eq_with_any(&events_lock[..len]) {
             // If we failed to match considering sentinels we are guaranteed to fail without
             // considering them; use the standard assert_eq to generate a nicely formatted error.
-            assert_eq!(*events_lock, expected);
+            assert_eq!(*events_lock, expected, "left=actual; right=expected");
         }
     }
 
