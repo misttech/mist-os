@@ -726,7 +726,45 @@ bool AttachTokenSucceedsV2(
     EXPECT_NE(allocator_2.value().client_end().channel().get(), ZX_HANDLE_INVALID);
     EXPECT_NE(token_client_3.channel().get(), ZX_HANDLE_INVALID);
     IF_FAILURES_RETURN();
-    collection_3 = {};
+
+    if (collection_3.is_valid()) {
+      // TODO(b/360987653): Instead of the code in this block, switch to the mechanism provided by
+      // the fix to b/360987653 which will provide a nicer way to achieve this.
+      //
+      // As a workaround for now until b/360987653 is fixed, we can detect when the server has fully
+      // finished cleaning up collection_3 by attaching a child token, closing collection_3 client
+      // side, and noticing when the child token sees PEER_CLOSED.
+      //
+      // This way we avoid the old collection_3 still having "dibs" on any buffers, which would
+      // otherwise potentially cause the new logical allocation to fail.
+      //
+      // It wouldn't work to intentionally trigger failure using an intentionally broken request via
+      // collection_3 and notice when collection_3 sees PEER_CLOSED, because of the way fidl server
+      // binding error handlers work (the channel server_end closes before the error handler runs
+      // when the close is initiated server-side during fidl request handling).
+      //
+      // In contrast, the fix for b/360987653 will provide a way to know when the server has fully
+      // cleaned up its context for collection_3 without relying on any server impl details or
+      // caring about fidl server binding implementation details.
+      auto [tmp_attached_client, tmp_attached_server] =
+          fidl::Endpoints<fuchsia_sysmem2::BufferCollectionToken>::Create();
+      fuchsia_sysmem2::BufferCollectionAttachTokenRequest attach_request;
+      attach_request.rights_attenuation_mask() = ZX_RIGHT_SAME_RIGHTS;
+      attach_request.token_request() = std::move(tmp_attached_server);
+      auto attach_token_result = collection_3->AttachToken(std::move(attach_request));
+      EXPECT_TRUE(attach_token_result.is_ok());
+      IF_FAILURES_RETURN();
+      // This will async trigger the server to clean up both collection_3 and tmp_attached without
+      // returning to its dispatcher in between. Detecting via tmp_attached_client works but relies
+      // on this server impl detail (see TODO above).
+      collection_3 = {};
+      zx_signals_t pending = 0;
+      auto wait_status = tmp_attached_client.channel().wait_one(ZX_CHANNEL_PEER_CLOSED,
+                                                                zx::time::infinite(), &pending);
+      EXPECT_OK(wait_status);
+      IF_FAILURES_RETURN();
+      // now we know that the old collection_3 has been fully torn down server-side
+    }
     ZX_DEBUG_ASSERT(!collection_3.is_valid());
 
     auto [collection_client_3, collection_server_3] =
