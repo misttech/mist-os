@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::selinux_hooks::fs::selinux_fs;
+use super::selinux_hooks::selinuxfs;
 use super::{selinux_hooks, FileSystemState, ResolvedElfState, TaskState};
 use crate::security::KernelState;
 use crate::task::{CurrentTask, Task};
@@ -86,7 +86,7 @@ pub fn new_selinux_fs(
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
     if current_task.kernel().security_state.server.is_some() {
-        Ok(selinux_fs(current_task, options).clone())
+        Ok(selinuxfs::new_fs(current_task, options).clone())
     } else {
         error!(ENODEV, "selinuxfs")
     }

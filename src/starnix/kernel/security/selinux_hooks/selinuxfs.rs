@@ -669,7 +669,7 @@ impl FsNodeOps for Arc<SeLinuxPermsDirectory> {
 /// # Panics
 ///
 /// Will panic if the supplied `kern` is not configured with SELinux enabled.
-pub fn selinux_fs(current_task: &CurrentTask, options: FileSystemOptions) -> &FileSystemHandle {
+pub fn new_fs(current_task: &CurrentTask, options: FileSystemOptions) -> &FileSystemHandle {
     current_task.kernel().selinux_fs.get_or_init(|| {
         SeLinuxFs::new_fs(current_task, options).expect("failed to construct selinuxfs")
     })
