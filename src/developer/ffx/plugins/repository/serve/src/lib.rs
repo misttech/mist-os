@@ -39,13 +39,18 @@ use std::time::Duration;
 use timeout::timeout;
 use tuf::metadata::RawSignedMetadata;
 
+/// Default name used for package repositories in ffx. It is expected that there is no need to
+/// change this constant. But in case this is changed, ensure that it is consistent with the ffx
+/// developer documentation :
+/// https://cs.opensource.google/search?q=devhost&sq=&ss=fuchsia%2Ffuchsia:src%2Fdeveloper%2Fffx%2F
+pub const DEFAULT_REPO_NAME: &str = "devhost";
+
 const REPO_CONNECT_TIMEOUT_CONFIG: &str = "repository.connect_timeout_secs";
 const DEFAULT_CONNECTION_TIMEOUT_SECS: u64 = 120;
 const MAX_CONSECUTIVE_CONNECT_ATTEMPTS: u8 = 10;
 const REPO_BACKGROUND_FEATURE_FLAG: &str = "repository.server.enabled";
 const REPOSITORY_MANAGER_MONIKER: &str = "/core/pkg-resolver";
 const ENGINE_MONIKER: &str = "/core/pkg-resolver";
-const DEFAULT_REPO_NAME: &str = "devhost";
 const REPO_PATH_RELATIVE_TO_BUILD_DIR: &str = "amber-files";
 
 #[derive(FfxTool)]

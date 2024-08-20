@@ -4,6 +4,7 @@
 
 use async_trait::async_trait;
 use ffx_config::EnvironmentContext;
+use ffx_repository_serve::DEFAULT_REPO_NAME;
 use ffx_repository_server_start_args::StartCommand;
 use ffx_target::TargetProxy;
 use fho::{
@@ -93,9 +94,10 @@ impl FfxMain for ServerStartTool {
             // Daemon based servers are logged with ffx.daemon.log.
             (true, _) | (false, false) => return None,
             _ => {
-                //TODO(https://fxbug.dev/359534719): Move devhost usages to a constant.
-                let basename =
-                    format!("repo_{}", self.cmd.repository.clone().unwrap_or("devhost".into()));
+                let basename = format!(
+                    "repo_{}",
+                    self.cmd.repository.clone().unwrap_or(DEFAULT_REPO_NAME.into())
+                );
                 Some(basename)
             }
         }
