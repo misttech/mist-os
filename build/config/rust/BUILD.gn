@@ -185,19 +185,8 @@ config("target") {
   rustflags = [
     "--target",
     rust_target,
+    "--cap-lints=$rust_cap_lints",
   ]
-}
-
-config("cap_lints") {
-  rustflags = [ "--cap-lints=$rust_cap_lints" ]
-}
-
-config("cap_lints_warn") {
-  rustflags = [ "--cap-lints=warn" ]
-}
-
-config("cap_lints_allow") {
-  rustflags = [ "--cap-lints=allow" ]
 }
 
 config("panic_abort") {

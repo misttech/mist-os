@@ -219,8 +219,6 @@ build_api_module("api") {
     ":product_bundles",
     ":product_size_checker_output",
     ":rbe_config",
-    ":rust_searchdir",
-    ":rust_target_mapping",
     ":sdk_archives",
     ":test_components",
     ":test_durations",
@@ -1425,22 +1423,6 @@ build_api_module("clippy_target_mapping") {
   testonly = true
   data_keys = [ "rust_source_map" ]
   walk_keys = [ "clippy_barrier" ]
-  deps = [ "//:default" ]
-}
-
-# List of all rustdoc targets, and some info about them.
-# See //build/rust/rustdoc.gni and the rustdoc link step in
-# //tools/devshell/contrib/lib/rust/rustdoc-link
-build_api_module("rust_target_mapping") {
-  testonly = true
-  data_keys = [ "rust_target_mapping" ]
-  deps = [ "//:default" ]
-}
-
-# Used by `fx rustdoc-link` command. Includes all search directories for all rust targets.
-build_api_module("rust_searchdir") {
-  testonly = true
-  data_keys = [ "searchdir" ]
   deps = [ "//:default" ]
 }
 

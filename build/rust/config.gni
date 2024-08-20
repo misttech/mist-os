@@ -4,7 +4,6 @@
 
 import("//build/config/clang/clang.gni")
 import("//build/config/compiler.gni")
-import("//build/config/current_target_tuple.gni")
 import("//build/config/sysroot.gni")
 import("//build/fidl/toolchain.gni")
 
@@ -76,15 +75,6 @@ declare_args() {
   # will still emit rustc diagnostics alongside clippy lints, they just wont show
   # up in ninja's stderr
   clippy_ignore_rustc = false
-
-  # Opt-in switch for .rustdoc subtargets. If `true`, respect per-target `disable_rustdoc` setting.
-  # If `false`, do not define any rustdoc subtargets.
-  include_rustdoc = false
-
-  # Final destination of docs generated with `fx rustdoc-link`, as a URL. May
-  # use the file:/// scheme for local testing. Rustdoc will generate links
-  # relative to this path.
-  rustdoc_extern_html_root_url = "https://fuchsia-docs.firebaseapp.com/rust/rustdoc_index/$current_target_tuple/"
 }
 
 if (rustc_prefix == default_rustc_prefix &&

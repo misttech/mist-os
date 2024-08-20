@@ -532,12 +532,7 @@ rustflags = [ "--cfg=fn_like_proc_macro" ]
 # generator has not gone through a thorough safety review yet, and needs to be
 # re-reviewed before it can be used outside of tests.
 [gn.package.generator."0.7.5"]
-visibility = [
-  ":loom-v0_7_1",
-  ":loom-v0_7_1.rustdoc",
-  ":loom-v0_7_1.rustdoc.deps",
-  ":loom-v0_7_1.rustdoc.transdeps",
-]
+visibility = [ ":loom-v0_7_1" ]
 testonly = true
 deps = [
   "//build/validate:non_production_tag",
@@ -729,28 +724,6 @@ visibility = [
   ":trust-dns-proto-v0_21_2",
   ":tuf-v0_3_0-beta12",
   ":webpki-v0_21_0",
-
-  ":ring.rustdoc",
-  ":rustls-v0_19_1.rustdoc",
-  ":sct-v0_6_0.rustdoc",
-  ":trust-dns-proto-v0_21_2.rustdoc",
-  ":tuf-v0_3_0-beta12.rustdoc",
-  ":webpki-v0_21_0.rustdoc",
-
-  ":ring.rustdoc.deps",
-  ":rustls-v0_19_1.rustdoc.deps",
-  ":sct-v0_6_0.rustdoc.deps",
-  ":trust-dns-proto-v0_21_2.rustdoc.deps",
-  ":tuf-v0_3_0-beta12.rustdoc.deps",
-  ":webpki-v0_21_0.rustdoc.deps",
-
-  ":ring.rustdoc.transdeps",
-  ":rustls-v0_19_1.rustdoc.transdeps",
-  ":sct-v0_6_0.rustdoc.transdeps",
-  ":trust-dns-proto-v0_21_2.rustdoc.transdeps",
-  ":tuf-v0_3_0-beta12.rustdoc.transdeps",
-  ":webpki-v0_21_0.rustdoc.transdeps",
-
 ]
 deps = [ "//third_party/rust_crates/compat/ring:ring-core" ]
 
@@ -800,13 +773,7 @@ rustflags = ["--cfg=std_atomic64", "--cfg=std_atomic"]
 # re-reviewed before it can be used outside of tests.
 [gn.package.scoped-tls."1.0.1"]
 deps = [ "//build/validate:non_production_tag" ]
-visibility = [
-  ":loom-v0_7_1",
-  ":loom-v0_7_1",
-  ":loom-v0_7_1.rustdoc",
-  ":loom-v0_7_1.rustdoc.deps",
-  ":loom-v0_7_1.rustdoc.transdeps",
-]
+visibility = [ ":loom-v0_7_1" ]
 testonly = true
 
 # We always want to optimize scrypt for speed, because a single key derivation

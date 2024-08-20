@@ -887,8 +887,6 @@ def main():
         # Because the clippy linter is effectively the same as the rust compiler,
         # and we don't enforce hemeticity on rustc, we also exempt clippy.
         "clippy_wrapper.sh",
-        # rustdoc writes and reads from an arbitrary tree of files.
-        "rustdoc_wrapper.py",
         "copy_crimes.sh",
         # When recursively copying a directory, shutil.copy_tree first recursively
         # deletes the old files. It has to read directories to delete all the files
