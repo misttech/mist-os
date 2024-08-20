@@ -185,6 +185,20 @@ pub struct BoardKernelConfig {
     /// Disable printing to the console during early boot (ie, make it quiet)
     #[serde(default)]
     pub quiet_early_boot: bool,
+
+    /// This controls what serial port is used.  If provided, it overrides the
+    /// serial port described by the system's bootdata.  The kernel debug serial
+    /// port is a reserved resource and may not be used outside of the kernel.
+    ///
+    /// If set to "none", the kernel debug serial port will be disabled and will
+    /// not be reserved, allowing the default serial port to be used outside the
+    /// kernel.
+    #[serde(default)]
+    pub serial: Option<String>,
+
+    /// The system will halt on a kernel panic instead of rebooting.
+    #[serde(default)]
+    pub halt_on_panic: bool,
 }
 
 /// This struct defines platform configurations specified by board.
@@ -336,6 +350,8 @@ mod test {
                 contiguous_physical_pages: true,
                 serial_mode: SerialMode::NoOutput,
                 quiet_early_boot: false,
+                serial: None,
+                halt_on_panic: false,
             },
             platform: PlatformConfig {
                 connectivity: ConnectivityConfig::default(),

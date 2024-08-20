@@ -81,6 +81,23 @@ impl DefineSubsystemConfiguration<PlatformKernelConfig> for KernelSubsystem {
             builder.kernel_arg("kernel.phys.verbose=false".to_owned())
         }
 
+        if let Some(serial) = &context.board_info.kernel.serial {
+            anyhow::ensure!(
+                context.build_type == &BuildType::Eng,
+                "'kernel.serial' can only be enabled in 'eng' builds"
+            );
+            let arg = format!("kernel.serial={}", serial);
+            builder.kernel_arg(arg);
+        }
+
+        if context.board_info.kernel.halt_on_panic {
+            anyhow::ensure!(
+                context.build_type == &BuildType::Eng,
+                "'kernel.halt-on-panic' can only be enabled in 'eng' builds"
+            );
+            builder.kernel_arg("kernel.halt-on-panic=true".to_owned())
+        }
+
         if let Some(aslr_entropy_bits) = kernel_config.aslr_entropy_bits {
             let kernel_arg = format!("aslr.entropy_bits={}", aslr_entropy_bits);
             builder.kernel_arg(kernel_arg);
