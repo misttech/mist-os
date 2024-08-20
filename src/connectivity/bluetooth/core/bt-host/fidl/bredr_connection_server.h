@@ -17,12 +17,8 @@ namespace bthost {
 // a corresponding L2CAP channel.
 class BrEdrConnectionServer : public ServerBase<fuchsia::bluetooth::Channel> {
  public:
-  // Limit unacknowledged OnReceive() events to 10, which should be small enough to avoid filling
-  // FIDL channel.
-  static constexpr uint8_t kDefaultReceiveCredits = 10;
-
-  // The number of inbound packets to queue in this class when there are 0 receive credits left.
-  static constexpr size_t kDefaultReceiveQueueLimit = 2;
+  // The number of inbound packets to queue in this class.
+  static constexpr size_t kDefaultReceiveQueueLimit = 20;
 
   // `channel` is the Channel that this Connection corresponds to. BrEdrConnection server will
   // activate and manage the lifetime of this chanel. `closed_callback` will be called when either
@@ -46,8 +42,8 @@ class BrEdrConnectionServer : public ServerBase<fuchsia::bluetooth::Channel> {
                         bt::l2cap::Channel::WeakPtr channel, fit::callback<void()> closed_callback);
 
   // fuchsia::bluetooth::Channel overrides:
-  void Send(std::vector<uint8_t> packet, SendCallback callback) override;
-  void AckReceive() override;
+  void Send(std::vector<::fuchsia::bluetooth::Packet> packets, SendCallback callback) override;
+  void Receive(ReceiveCallback callback) override;
   void WatchChannelParameters(WatchChannelParametersCallback callback) override;
   void handle_unknown_method(uint64_t ordinal, bool method_has_response) override;
 
@@ -73,8 +69,8 @@ class BrEdrConnectionServer : public ServerBase<fuchsia::bluetooth::Channel> {
   // Client callback called when either FIDL protocol closes or L2CAP channel closes.
   fit::callback<void()> closed_cb_;
 
-  // The maximum number of unacknowledged packets to send to the FIDL client at a time.
-  uint8_t receive_credits_ = kDefaultReceiveCredits;
+  // Callback for pending Channel::Receive() call.
+  ReceiveCallback receive_cb_ = nullptr;
 
   // Pending callback for a WatchChannelParameters call.
   std::optional<WatchChannelParametersCallback> pending_watch_channel_parameters_;

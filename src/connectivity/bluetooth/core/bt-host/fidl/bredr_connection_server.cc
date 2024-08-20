@@ -27,23 +27,24 @@ BrEdrConnectionServer::~BrEdrConnectionServer() {
   }
 }
 
-void BrEdrConnectionServer::Send(std::vector<uint8_t> packet, SendCallback callback) {
-  if (packet.size() > channel_->max_tx_sdu_size()) {
-    bt_log(TRACE, "fidl", "Dropping %zu bytes for channel %u as max TX SDU is %u ", packet.size(),
-           channel_->id(), channel_->max_tx_sdu_size());
-    fidlbt::Channel_Send_Response response;
-    // NOLINTNEXTLINE(performance-move-const-arg)
-    callback(fidlbt::Channel_Send_Result::WithResponse(std::move(response)));
-    return;
-  }
+void BrEdrConnectionServer::Send(std::vector<::fuchsia::bluetooth::Packet> packets,
+                                 SendCallback callback) {
+  for (auto& fidl_packet : packets) {
+    std::vector<uint8_t>& packet = fidl_packet.packet;
+    if (packet.size() > channel_->max_tx_sdu_size()) {
+      bt_log(TRACE, "fidl", "Dropping %zu bytes for channel %u as max TX SDU is %u ", packet.size(),
+             channel_->id(), channel_->max_tx_sdu_size());
+      continue;
+    }
 
-  // TODO(https://fxbug.dev/349653544): Avoid making a copy of `packet`, possibly by making
-  // DynamicByteBuffer wrap a std::vector.
-  auto buffer = std::make_unique<bt::DynamicByteBuffer>(bt::BufferView(packet));
-  bool write_success = channel_->Send(std::move(buffer));
-  if (!write_success) {
-    bt_log(TRACE, "fidl", "Failed to write %zu bytes to channel %u", buffer->size(),
-           channel_->id());
+    // TODO(https://fxbug.dev/349653544): Avoid making a copy of `packet`, possibly by making
+    // DynamicByteBuffer wrap a std::vector.
+    auto buffer = std::make_unique<bt::DynamicByteBuffer>(bt::BufferView(packet));
+    bool write_success = channel_->Send(std::move(buffer));
+    if (!write_success) {
+      bt_log(TRACE, "fidl", "Failed to write %zu bytes to channel %u", buffer->size(),
+             channel_->id());
+    }
   }
 
   fidlbt::Channel_Send_Response response;
@@ -51,8 +52,13 @@ void BrEdrConnectionServer::Send(std::vector<uint8_t> packet, SendCallback callb
   callback(fidlbt::Channel_Send_Result::WithResponse(std::move(response)));
 }
 
-void BrEdrConnectionServer::AckReceive() {
-  receive_credits_ = std::min(static_cast<uint8_t>(receive_credits_ + 1), kDefaultReceiveCredits);
+void BrEdrConnectionServer::Receive(ReceiveCallback callback) {
+  if (receive_cb_) {
+    binding()->Close(ZX_ERR_BAD_STATE);
+    OnProtocolClosed();
+    return;
+  }
+  receive_cb_ = std::move(callback);
   ServiceReceiveQueue();
 }
 
@@ -162,12 +168,15 @@ void BrEdrConnectionServer::DeactivateAndRequestDestruction() {
 }
 
 void BrEdrConnectionServer::ServiceReceiveQueue() {
-  while (!receive_queue_.empty() && receive_credits_ != 0) {
-    std::vector<uint8_t> vec = receive_queue_.front()->ToVector();
-    receive_queue_.pop_front();
-    binding()->events().OnReceive(std::move(vec));
-    receive_credits_--;
+  if (!receive_cb_ || receive_queue_.empty()) {
+    return;
   }
+  std::vector<uint8_t> buffer = receive_queue_.front()->ToVector();
+  receive_queue_.pop_front();
+
+  ::fuchsia::bluetooth::Channel_Receive_Response response({fidlbt::Packet{std::move(buffer)}});
+  receive_cb_(fidlbt::Channel_Receive_Result::WithResponse(std::move(response)));
+  receive_cb_ = nullptr;
 }
 
 std::unique_ptr<BrEdrConnectionServer> BrEdrConnectionServer::Create(
