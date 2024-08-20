@@ -1796,8 +1796,9 @@ impl FuseMutableState {
             _ => {}
         }
         let header: uapi::fuse_out_header = data.read_to_object()?;
-        let payload_size =
-            (header.len as usize).saturating_sub(std::mem::size_of::<uapi::fuse_out_header>());
+        let payload_size = (header.len as usize)
+            .checked_sub(std::mem::size_of::<uapi::fuse_out_header>())
+            .ok_or_else(|| errno!(EINVAL))?;
         if payload_size > data.available() {
             return error!(EINVAL);
         }
