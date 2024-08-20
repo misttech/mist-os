@@ -3,45 +3,55 @@
 // found in the LICENSE file.
 #include "src/developer/vsock-sshd-host/data_dir.h"
 
-#include <fidl/fuchsia.io/cpp/fidl.h>
-#include <lib/fdio/namespace.h>
 #include <lib/syslog/cpp/macros.h>
-#include <sys/stat.h>
+#include <lib/zx/vmo.h>
 #include <zircon/errors.h>
+#include <zircon/status.h>
+
+#include <fbl/ref_ptr.h>
 
 #include "src/lib/files/file.h"
-#include "src/storage/memfs/memfs.h"
-#include "src/storage/memfs/vnode_dir.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
+#include "src/storage/lib/vfs/cpp/vmo_file.h"
 
 extern "C" {
 // clang-format off
 #include "third_party/openssh-portable/authfile.h"
 #include "third_party/openssh-portable/includes.h"
+#include "third_party/openssh-portable/sshbuf.h"
 #include "third_party/openssh-portable/ssherr.h"
 #include "third_party/openssh-portable/sshkey.h"
 // clang-format on
 }
 
 namespace {
-void CopyAuthorizedKeys() {
-  constexpr char kSshDir[] = "/tmp/ssh";
+
+fbl::RefPtr<fs::VmoFile> CreateVmoFile(const void* data, size_t len) {
+  zx::vmo vmo;
+  if (zx_status_t status = zx::vmo::create(len, 0, &vmo); status != ZX_OK) {
+    FX_LOGS(FATAL) << "Failed to create vmo: " << zx_status_get_string(status);
+  }
+  if (zx_status_t status = vmo.write(data, 0, len); status != ZX_OK) {
+    FX_LOGS(FATAL) << "Failed to write file contents to vmo: " << zx_status_get_string(status);
+  }
+  return fbl::MakeRefCounted<fs::VmoFile>(std::move(vmo), len);
+}
+
+fbl::RefPtr<fs::VmoFile> CopyAuthorizedKeys() {
   constexpr char kAuthorizeKeysPath[] = "/data/ssh/authorized_keys";
-  constexpr char kNewAuthorizeKeysPath[] = "/tmp/ssh/authorized_keys";
 
-  // ignore errors, if the dir already exists, this is benign, if it does not
-  // and this fails, the write will fail.
-  mkdir(kSshDir, 0700);
+  std::vector<uint8_t> contents;
+  FX_CHECK(files::ReadFileToVector(kAuthorizeKeysPath, &contents))
+      << "Failed to read authorized_keys file";
 
-  std::string str;
-  ZX_ASSERT(files::ReadFileToString(kAuthorizeKeysPath, &str) == true);
-  ZX_ASSERT(files::WriteFile(kNewAuthorizeKeysPath, str) == true);
+  return CreateVmoFile(contents.data(), contents.size());
 }
 
 void sshkey_auto_free(struct sshkey** key) { sshkey_free(*key); }
+void sshbuf_auto_free(struct sshbuf** key) { sshbuf_free(*key); }
 
-void GenerateHostKeys() {
+fbl::RefPtr<fs::VmoFile> GenerateHostKeys() {
   constexpr char key_type[] = "ed25519";
-  constexpr char kPath[] = "/tmp/ssh/ssh_host_ed25519_key";
 
   __attribute__((cleanup(sshkey_auto_free))) struct sshkey* private_key = nullptr;
   __attribute__((cleanup(sshkey_auto_free))) struct sshkey* public_key = nullptr;
@@ -56,43 +66,25 @@ void GenerateHostKeys() {
     FX_LOGS(FATAL) << "sshkey_from_private failed: " << ssh_err(r);
   }
 
-  if (int r = sshkey_save_private(private_key, kPath, "", "", 1, nullptr, 0); r != 0) {
-    FX_LOGS(FATAL) << "Saving key " << kPath << "failed: " << ssh_err(r);
+  __attribute__((cleanup(sshbuf_auto_free))) struct sshbuf* private_key_blob = sshbuf_new();
+  if (private_key_blob == nullptr) {
+    FX_LOGS(FATAL) << "sshbuf_new failed";
   }
+
+  if (int r = sshkey_private_to_fileblob(private_key, private_key_blob, "", "", 1, nullptr, 0);
+      r != 0) {
+    FX_LOGS(FATAL) << "Serializing key failed: " << ssh_err(r);
+  }
+
+  return CreateVmoFile(sshbuf_ptr(private_key_blob), sshbuf_len(private_key_blob));
 }
 }  // namespace
 
-zx::result<> BuildDataDir(async::Loop& loop, memfs::Memfs* memfs,
-                          fbl::RefPtr<memfs::VnodeDir> data_dir) {
-  auto [client, server] = fidl::Endpoints<fuchsia_io::Directory>::Create();
-  if (zx_status_t status = memfs->ServeDirectory(std::move(data_dir), std::move(server));
-      status != ZX_OK) {
-    FX_LOGS(ERROR) << "Serve failed";
-    return zx::error(status);
-  }
-
-  fdio_ns_t* ns;
-  if (zx_status_t status = fdio_ns_get_installed(&ns); status != ZX_OK) {
-    FX_LOGS(ERROR) << "fdio_ns_get_installed failed";
-    return zx::error(status);
-  }
-  constexpr char kPath[] = "/tmp";
-  if (zx_status_t status = fdio_ns_bind(ns, kPath, client.TakeChannel().release());
-      status != ZX_OK) {
-    FX_LOGS(ERROR) << "fdio_ns_bind failed";
-    return zx::error(status);
-  }
-  auto unbind_cleanup = fit::defer(
-      [&ns, &kPath]() { [[maybe_unused]] zx_status_t status = fdio_ns_unbind(ns, kPath); });
-
-  std::thread t([&loop]() {
-    CopyAuthorizedKeys();
-    GenerateHostKeys();
-    loop.Quit();
-  });
-  loop.Run();
-  t.join();
-  loop.ResetQuit();
-
-  return zx::ok();
+fbl::RefPtr<fs::PseudoDir> BuildDataDir() {
+  auto ssh_dir = fbl::MakeRefCounted<fs::PseudoDir>();
+  ssh_dir->AddEntry("authorized_key", CopyAuthorizedKeys());
+  ssh_dir->AddEntry("ssh_host_ed25519_key", GenerateHostKeys());
+  auto data_dir = fbl::MakeRefCounted<fs::PseudoDir>();
+  data_dir->AddEntry("ssh", ssh_dir);
+  return data_dir;
 }

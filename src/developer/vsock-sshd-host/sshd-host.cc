@@ -16,6 +16,7 @@
 
 #include "src/developer/vsock-sshd-host/data_dir.h"
 #include "src/developer/vsock-sshd-host/service.h"
+#include "src/storage/lib/vfs/cpp/managed_vfs.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 #include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
@@ -59,22 +60,10 @@ int main(int argc, const char** argv) {
   FX_LOG_KV(INFO, "sshd-host starting up");
 
   async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
-
-  zx::result result = memfs::Memfs::Create(loop.dispatcher(), "data");
-  if (result.is_error()) {
-    FX_LOGS(FATAL) << "Failed to create memfs with error " << result.status_string();
-  }
-  auto& [memfs, data_dir] = result.value();
-
-  {
-    auto result = BuildDataDir(loop, memfs.get(), data_dir);
-    if (result.is_error()) {
-      FX_LOGS(FATAL) << "Failed to create build data dir with error " << result.status_string();
-    }
-  }
+  fs::ManagedVfs vfs(loop.dispatcher());
 
   auto root = fbl::MakeRefCounted<fs::PseudoDir>();
-  root->AddEntry("data", std::move(data_dir));
+  root->AddEntry("data", BuildDataDir());
   auto dev = fbl::MakeRefCounted<fs::PseudoDir>();
   dev->AddEntry("null", fbl::MakeRefCounted<DevNullVnode>());
   root->AddEntry("dev", std::move(dev));
@@ -82,7 +71,7 @@ int main(int argc, const char** argv) {
   // Serve outgoing directory
   auto outgoing_request = fidl::ServerEnd<fuchsia_io::Directory>(
       zx::channel((zx_take_startup_handle(PA_DIRECTORY_REQUEST))));
-  if (zx_status_t status = memfs->ServeDirectory(std::move(root), std::move(outgoing_request));
+  if (zx_status_t status = vfs.ServeDirectory(std::move(root), std::move(outgoing_request));
       status != ZX_OK) {
     FX_LOGS(FATAL) << "Failed to host outgoing directory " << status;
   }
