@@ -141,6 +141,34 @@ type Filter = struct {
 };
 
 @available(added=HEAD)
+type MinidumpError = flexible enum {
+    /// No processes were yielded to the iterator. This could mean that the
+    /// supplied filter did not match any attached processes, or DebugAgent is
+    /// not attached to any processes.
+    NO_PROCESSES = 1;
+    /// An error occurred while generating the minidump. These errors are opaque
+    /// to DebugAgent.
+    INTERNAL_ERROR = 2;
+};
+
+/// An iterator that collects and returns a minidump for a set of processes. An
+/// empty VMO will be returned when there are no more processes.
+@available(added=HEAD)
+closed protocol MinidumpIterator {
+    strict GetNext() -> (resource struct {
+        minidump zx.Handle:VMO;
+    }) error MinidumpError;
+};
+
+@available(added=HEAD)
+type MinidumpOptions = table {
+    /// This will not install any new filters and will not cause new processes
+    /// to be attached. Rather, this filter will be applied to already attached
+    /// processes.
+    1: filter Filter;
+};
+
+@available(added=HEAD)
 type GetProcessInfoOptions = table {
     /// A filter that will reduce the number of processes that are iterated
     /// over. This will not install any new filters and will not cause new
@@ -209,6 +237,15 @@ open protocol DebugAgent {
     flexible GetProcessInfo(resource struct {
         options GetProcessInfoOptions;
         iterator server_end:ProcessInfoIterator;
+    }) -> () error FilterError;
+
+    /// Collect minidumps for all attached processes. |options| may contain a
+    /// filter to reduce the number of minidumps that are yielded by the
+    /// iterator.
+    @available(added=HEAD)
+    flexible GetMinidumps(resource struct {
+        options MinidumpOptions;
+        iterator server_end:MinidumpIterator;
     }) -> () error FilterError;
 
     /// Report exceptions to clients. If no debug_ipc clients are connected, the
