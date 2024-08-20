@@ -3,5 +3,11 @@
 // found in the LICENSE file.
 {
     children: [],
-    expose: [],
+    expose: [
+        {
+            protocol: [ "fuchsia.netpol.socketproxy.StarnixNetworks" ],
+            from: "void",
+            availability: "optional",
+        },
+    ],
 }

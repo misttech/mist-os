@@ -8,5 +8,11 @@
             url: "fuchsia-pkg://fuchsia.com/network-socket-proxy#meta/network-socket-proxy.cm",
         },
     ],
-    expose: [],
+    expose: [
+        {
+            protocol: [ "fuchsia.netpol.socketproxy.StarnixNetworks" ],
+            from: "#socket-proxy",
+            availability: "optional",
+        },
+    ],
 }

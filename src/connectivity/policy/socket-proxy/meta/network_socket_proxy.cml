@@ -11,4 +11,15 @@
         binary: "bin/socket_proxy",
         lifecycle: { stop_event: "notify" },
     },
+    capabilities: [
+        {
+            protocol: [ "fuchsia.netpol.socketproxy.StarnixNetworks" ],
+        },
+    ],
+    expose: [
+        {
+            protocol: [ "fuchsia.netpol.socketproxy.StarnixNetworks" ],
+            from: "self",
+        },
+    ],
 }
