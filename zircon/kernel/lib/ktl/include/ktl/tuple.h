@@ -12,6 +12,7 @@
 namespace ktl {
 
 using std::ignore;
+using std::tuple;
 
 }  // namespace ktl
 
