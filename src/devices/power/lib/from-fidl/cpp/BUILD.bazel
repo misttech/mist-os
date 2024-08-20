@@ -1,0 +1,20 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+# power library that eventually should go into SDK
+
+package(default_visibility = ["//visibility:public"])
+
+cc_library(
+    name = "cpp",
+    srcs = [
+        "from-fidl.cc",
+        "from-fidl.h",
+    ],
+    target_compatible_with = ["@platforms//os:fuchsia"],
+    deps = [
+        "//sdk/lib/driver/power/cpp",
+        "@internal_sdk//fidl/fuchsia.hardware.power:fuchsia.hardware.power_cpp",
+    ],
+)
