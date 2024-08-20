@@ -28,6 +28,8 @@ pub struct PlatformConnectivityConfig {
     pub weave: WeaveConfig,
     #[serde(default)]
     pub netpol: NetpolConfig,
+    #[serde(default)]
+    pub location: LocationConfig,
 }
 
 /// Platform configuration options for the network area.
@@ -246,4 +248,12 @@ pub struct NetpolConfig {
     /// Whether to include network-socket-proxy.
     #[serde(default)]
     pub include_socket_proxy: bool,
+}
+
+/// Platform configuration options for the location services
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct LocationConfig {
+    #[serde(default)]
+    pub enable_emergency_location_provider: bool,
 }
