@@ -88,7 +88,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2119
+From //build/config/BUILDCONFIG.gn:2120
 
 ### allow_tear_off_abi_breakage
 
@@ -1039,7 +1039,7 @@ Makes clippy targets fail to build when any "deny" lints are found
 
 **Current value (from the default):** `true`
 
-From //build/rust/config.gni:64
+From //build/rust/config.gni:65
 
 ### clippy_force_warn_all
 
@@ -1049,7 +1049,7 @@ should only be used to collect stats about clippy lints in our source tree.
 
 **Current value (from the default):** `false`
 
-From //build/rust/config.gni:61
+From //build/rust/config.gni:62
 
 ### clippy_ignore_rustc
 
@@ -1062,7 +1062,7 @@ up in ninja's stderr
 
 **Current value (from the default):** `false`
 
-From //build/rust/config.gni:77
+From //build/rust/config.gni:78
 
 ### clippy_warn_all
 
@@ -1071,7 +1071,7 @@ Note: setting lint levels in source takes precedence over this.
 
 **Current value (from the default):** `false`
 
-From //build/rust/config.gni:56
+From //build/rust/config.gni:57
 
 ### cobalt_environment
 
@@ -1093,7 +1093,7 @@ from infra builds, and later inspection.
 
 **Current value (from the default):** `"//out/not-default/comparison-reports"`
 
-From //build/toolchain/rbe.gni:211
+From //build/toolchain/rbe.gni:221
 
 ### compilation_mode
 
@@ -1326,7 +1326,7 @@ and not restricted environments that lack direct network access.
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:218
+From //build/toolchain/rbe.gni:228
 
 ### cxx_rbe_enable
 
@@ -1359,6 +1359,21 @@ One of:
 **Current value (from the default):** `"remote_local_fallback"`
 
 From //build/toolchain/rbe.gni:182
+
+### cxx_rbe_full_toolchain
+
+reclient owns the logic for deciding what inputs are needed for
+remote compilation, but in some cases, it may fall behind
+upstream toolchain development.
+This option forces the *entire* toolchain directory to be included
+as an input, which is generally guaranteed to work as it bears
+no assumptions about how the toolchain works, but it comes at the
+cost of performance overhead.
+Use this primarily for debugging and as an emergency workaround.
+
+**Current value (from the default):** `false`
+
+From //build/toolchain/rbe.gni:216
 
 ### cxx_rbe_minimalist_wrapper
 
@@ -3268,7 +3283,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1841
+From //build/config/BUILDCONFIG.gn:1842
 
 ### extra_vbmeta_descriptors
 
@@ -3962,7 +3977,7 @@ causes clippy targets to get included in the build. This gets enabled by default
 
 **Current value (from the default):** `false`
 
-From //build/rust/config.gni:69
+From //build/rust/config.gni:70
 
 ### include_internal_fonts
 
@@ -3971,6 +3986,15 @@ Set to true to include internal fonts in the build.
 **Current value (from the default):** `false`
 
 From //src/fonts/build/font_args.gni:7
+
+### include_rustdoc
+
+Opt-in switch for .rustdoc subtargets. If `true`, respect per-target `disable_rustdoc` setting.
+If `false`, do not define any rustdoc subtargets.
+
+**Current value (from the default):** `false`
+
+From //build/rust/config.gni:82
 
 ### include_shell_commands_package
 
@@ -4387,7 +4411,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1649
+From //build/config/BUILDCONFIG.gn:1650
 
 ### legacy_base_package_labels
 
@@ -4424,13 +4448,13 @@ One of:
 
 **Current value (from the default):** `"none"`
 
-From //build/toolchain/rbe.gni:265
+From //build/toolchain/rbe.gni:275
 
 ### link_rbe_download_unstripped_outputs
 
 **Current value (from the default):** `true`
 
-From //build/toolchain/rbe.gni:271
+From //build/toolchain/rbe.gni:291
 
 ### link_rbe_enable
 
@@ -4440,7 +4464,7 @@ linkers like `lld`.
 
 **Current value (from the default):** `false`
 
-From //build/toolchain/rbe.gni:227
+From //build/toolchain/rbe.gni:237
 
 ### link_rbe_exec_strategy
 
@@ -4463,7 +4487,22 @@ One of:
 
 **Current value (from the default):** `"remote_local_fallback"`
 
-From //build/toolchain/rbe.gni:245
+From //build/toolchain/rbe.gni:255
+
+### link_rbe_full_toolchain
+
+reclient owns the logic for deciding what inputs are needed for
+remote linking, but in some cases, it may fall behind
+upstream toolchain development.
+This option forces the *entire* toolchain directory to be included
+as an input, which is generally guaranteed to work as it bears
+no assumptions about how the toolchain works, but it comes at the
+cost of performance overhead.
+Use this primarily for debugging and as an emergency workaround.
+
+**Current value (from the default):** `false`
+
+From //build/toolchain/rbe.gni:285
 
 ### llvm_prefix
 
@@ -7186,7 +7225,7 @@ ignore warnings.
 
 **Current value (from the default):** `"deny"`
 
-From //build/rust/config.gni:52
+From //build/rust/config.gni:53
 
 ### rust_debug_assertions
 
@@ -7222,7 +7261,7 @@ Sets the default LTO type for rustc builds.
 
 **Current value (from the default):** `""`
 
-From //build/rust/config.gni:47
+From //build/rust/config.gni:48
 
 ### rust_one_rlib_per_dir
 
@@ -7344,7 +7383,7 @@ This can be used to test custom Rust toolchains.
 
 **Current value (from the default):** `"//prebuilt/third_party/rust/linux-x64"`
 
-From //build/rust/config.gni:19
+From //build/rust/config.gni:20
 
 ### rustc_timeout
 
@@ -7375,7 +7414,7 @@ e.g., clang_version_description = read_file("$_rustc_lib_dir/VERSION")
 
 **Current value (from the default):** `""`
 
-From //build/rust/config.gni:44
+From //build/rust/config.gni:45
 
 ### rustc_version_string
 
@@ -7388,7 +7427,17 @@ prebuilt is used.
 
 **Current value (from the default):** `"TDzgN1kRRXjyDbYULfxtDph_5Ac5A7g_9mKTNg3eNIAC"`
 
-From //build/rust/config.gni:38
+From //build/rust/config.gni:39
+
+### rustdoc_extern_html_root_url
+
+Final destination of docs generated with `fx rustdoc-link`, as a URL. May
+use the file:/// scheme for local testing. Rustdoc will generate links
+relative to this path.
+
+**Current value (from the default):** `"https://fuchsia-docs.firebaseapp.com/rust/rustdoc_index/aarch64-unknown-fuchsia/"`
+
+From //build/rust/config.gni:87
 
 ### scenic_enable_vulkan_validation
 
@@ -7646,7 +7695,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2109
+From //build/config/BUILDCONFIG.gn:2110
 
 ### select_variant_canonical
 
@@ -7656,7 +7705,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2114
+From //build/config/BUILDCONFIG.gn:2115
 
 ### select_variant_shortcuts
 
@@ -7715,7 +7764,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1887
+From //build/config/BUILDCONFIG.gn:1888
 
 ### size_checker_input
 
@@ -8206,7 +8255,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1871
+From //build/config/BUILDCONFIG.gn:1872
 
 ### universe_package_labels
 
