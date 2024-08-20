@@ -83,7 +83,7 @@ FramebufferDisplayDriver::CreateAndInitializeFramebufferDisplay() {
   fidl::WireSyncClient hardware_sysmem{std::move(hardware_sysmem_result).value()};
 
   zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> sysmem_result =
-      incoming()->Connect<fuchsia_hardware_sysmem::Service::AllocatorV2>("sysmem");
+      incoming()->Connect<fuchsia_sysmem2::Allocator>();
   if (sysmem_result.is_error()) {
     FDF_LOG(ERROR, "Failed to get fuchsia.sysmem2.Allocator protocol: %s",
             sysmem_result.status_string());
