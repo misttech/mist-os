@@ -5,9 +5,8 @@
 #ifndef SRC_UI_SCENIC_LIB_DISPLAY_SINGLETON_DISPLAY_SERVICE_H_
 #define SRC_UI_SCENIC_LIB_DISPLAY_SINGLETON_DISPLAY_SERVICE_H_
 
-#include <fuchsia/ui/composition/internal/cpp/fidl.h>
-#include <fuchsia/ui/display/singleton/cpp/fidl.h>
-#include <lib/fidl/cpp/binding_set.h>
+#include <fidl/fuchsia.ui.composition.internal/cpp/fidl.h>
+#include <fidl/fuchsia.ui.display.singleton/cpp/fidl.h>
 #include <lib/sys/cpp/outgoing_directory.h>
 
 #include <memory>
@@ -18,17 +17,22 @@ namespace scenic_impl::display {
 
 // Implements the fuchsia.ui.display.singleton.Info and
 // fuchsia.ui.composition.internal.DisplayOwnership FIDL services.
-class SingletonDisplayService : public fuchsia::ui::display::singleton::Info,
-                                public fuchsia::ui::composition::internal::DisplayOwnership {
+class SingletonDisplayService
+    : public fidl::Server<fuchsia_ui_display_singleton::Info>,
+      public fidl::Server<fuchsia_ui_composition_internal::DisplayOwnership> {
  public:
   explicit SingletonDisplayService(std::shared_ptr<display::Display> display);
 
-  // |fuchsia::ui::display::singleton::Info|
-  void GetMetrics(fuchsia::ui::display::singleton::Info::GetMetricsCallback callback) override;
+  // |fuchsia_ui_display_singleton::Info|
+  void GetMetrics(GetMetricsCompleter::Sync& completer) override;
+  void GetMetrics(
+      fit::function<void(fuchsia_ui_display_singleton::InfoGetMetricsResponse)> callback);
 
-  // |fuchsia::ui::composition::internal::DisplayOwnership|
+  // |fuchsia_ui_composition_internal::DisplayOwnership|
+  void GetEvent(GetEventCompleter::Sync& completer) override;
   void GetEvent(
-      fuchsia::ui::composition::internal::DisplayOwnership::GetEventCallback callback) override;
+      fit::function<void(fuchsia_ui_composition_internal::DisplayOwnershipGetEventResponse)>
+          callback);
 
   // Registers this service impl in |outgoing_directory|.  This service impl object must then live
   // for as long as it is possible for any service requests to be made.
@@ -36,8 +40,8 @@ class SingletonDisplayService : public fuchsia::ui::display::singleton::Info,
 
  private:
   const std::shared_ptr<display::Display> display_ = nullptr;
-  fidl::BindingSet<fuchsia::ui::display::singleton::Info> info_bindings_;
-  fidl::BindingSet<fuchsia::ui::composition::internal::DisplayOwnership> ownership_bindings_;
+  fidl::ServerBindingGroup<fuchsia_ui_display_singleton::Info> info_bindings_;
+  fidl::ServerBindingGroup<fuchsia_ui_composition_internal::DisplayOwnership> ownership_bindings_;
 };
 
 }  // namespace scenic_impl::display

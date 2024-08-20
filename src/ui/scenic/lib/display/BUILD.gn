@@ -58,8 +58,9 @@ source_set("singleton_display_service") {
 
   public_deps = [
     ":display",
-    "//sdk/fidl/fuchsia.ui.composition.internal:fuchsia.ui.composition.internal_hlcpp",
-    "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
+    "//sdk/fidl/fuchsia.math:fuchsia.math_cpp",
+    "//sdk/fidl/fuchsia.ui.composition.internal:fuchsia.ui.composition.internal_cpp",
+    "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_cpp",
     "//sdk/lib/sys/cpp",
   ]
 }
