@@ -37,7 +37,7 @@ use {
 // to any vendor in the USB spec.
 //
 // May not be zero, see below.
-const FUCHSIA_VENDOR_ID: u16 = 0xf1ca;
+const FUCHSIA_VENDOR_ID: u16 = 0xfc1a;
 
 // May not be zero, see below.
 const FUCHSIA_TOUCH_PRODUCT_ID: u16 = 0x2;
