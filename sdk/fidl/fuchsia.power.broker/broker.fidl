@@ -32,7 +32,7 @@ type DependencyType = flexible enum {
     OPPORTUNISTIC = 2;
 };
 
-const MAX_ELEMENT_NAME_LEN uint16 = 1024;
+const MAX_ELEMENT_NAME_LEN uint8 = 64;
 
 /// A token that represents the right to add a dependency upon another
 /// element. Should first be registered with Power Broker via
