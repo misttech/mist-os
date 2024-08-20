@@ -6,6 +6,7 @@
 #define LIB_LD_MUTABLE_ABI_H_
 
 #include <lib/ld/abi.h>
+#include <lib/ld/tls.h>
 
 namespace ld {
 
