@@ -4,6 +4,7 @@
 library linux;
 
 type statx = struct {};
+type timespec = struct {};
 
 @no_protocol_prefix
 @transport("Syscall")
@@ -183,7 +184,7 @@ closed protocol Syscall {
 
     // #58, SYSCALL_DEFINE0(vfork)
     strict Vfork() -> () error int64;
-    
+
     ///STUB 59
     strict Execve() -> () error int64;
 
@@ -554,8 +555,15 @@ closed protocol Syscall {
     strict TimerDelete() -> () error int64;
     ///STUB 227
     strict ClockSettime() -> () error int64;
-    ///STUB 228
-    strict ClockGettime() -> () error int64;
+
+    // #228, SYSCALL_DEFINE2(clock_gettime, const clockid_t, which_clock, struct __kernel_timespec __user *, tp)
+    strict ClockGettime(resource struct {
+        @const
+        which_clock int32;
+        @out
+        tp experimental_pointer<timespec>;
+    }) -> () error int64;
+
     ///STUB 229
     strict ClockGetres() -> () error int64;
     ///STUB 230

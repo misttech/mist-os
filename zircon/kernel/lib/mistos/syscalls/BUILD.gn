@@ -38,6 +38,7 @@ source_set("impl") {
     "kernel/fork.cc",
     "kernel/sched/core.cc",
     "kernel/sys.cc",
+    "kernel/time/posix-timers.cc",
     "mm/mmap.cc",
     "mm/mprotect.cc",
     "not_implemented.cc",
