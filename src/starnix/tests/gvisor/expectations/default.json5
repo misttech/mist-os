@@ -554,6 +554,7 @@
 
                 // tcp_socket_test
                 "AllInetTests/TcpSocketTest.SetPMTUD/*",
+                "AllInetTests/SimpleTcpSocketTest.SetUnsupportedPMTUDISC/*",
 
                 // packet_socket_test
                 "AllPacketSocketTests/PacketSocketTest.GetSockName/*",
