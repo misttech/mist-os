@@ -121,7 +121,6 @@ rustc_library("starnix_core") {
     "device/remote_block_device.rs",
     "device/terminal.rs",
     "device/tun.rs",
-    "device/zram.rs",
     "dynamic_thread_spawner.rs",
     "execution/crash_reporter.rs",
     "execution/executor.rs",

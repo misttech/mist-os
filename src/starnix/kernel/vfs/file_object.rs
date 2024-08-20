@@ -632,9 +632,9 @@ macro_rules! fileops_impl_delegate_read_and_seek {
             &$self,
             locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
             file: &FileObject,
-            current_task: &crate::task::CurrentTask,
+            current_task: &starnix_core::task::CurrentTask,
             offset: usize,
-            data: &mut dyn crate::vfs::buffers::OutputBuffer,
+            data: &mut dyn starnix_core::vfs::buffers::OutputBuffer,
         ) -> Result<usize, starnix_uapi::errors::Errno> {
             $delegate.read(locked, file, current_task, offset, data)
         }
@@ -642,9 +642,9 @@ macro_rules! fileops_impl_delegate_read_and_seek {
         fn seek(
             &$self,
             file: &FileObject,
-            current_task: &crate::task::CurrentTask,
+            current_task: &starnix_core::task::CurrentTask,
             current_offset: starnix_uapi::off_t,
-            target: crate::vfs::SeekTarget,
+            target: starnix_core::vfs::SeekTarget,
         ) -> Result<starnix_uapi::off_t, starnix_uapi::errors::Errno> {
             $delegate.seek(file, current_task, current_offset, target)
         }
@@ -661,13 +661,13 @@ macro_rules! fileops_impl_seekable {
 
         fn seek(
             &self,
-            file: &$crate::vfs::FileObject,
-            current_task: &$crate::task::CurrentTask,
+            file: &starnix_core::vfs::FileObject,
+            current_task: &starnix_core::task::CurrentTask,
             current_offset: starnix_uapi::off_t,
-            target: $crate::vfs::SeekTarget,
+            target: starnix_core::vfs::SeekTarget,
         ) -> Result<starnix_uapi::off_t, starnix_uapi::errors::Errno> {
-            $crate::vfs::default_seek(current_offset, target, |offset| {
-                let eof_offset = $crate::vfs::default_eof_offset(file, current_task)?;
+            starnix_core::vfs::default_seek(current_offset, target, |offset| {
+                let eof_offset = starnix_core::vfs::default_eof_offset(file, current_task)?;
                 offset.checked_add(eof_offset).ok_or_else(|| starnix_uapi::errno!(EINVAL))
             })
         }
@@ -684,10 +684,10 @@ macro_rules! fileops_impl_nonseekable {
 
         fn seek(
             &self,
-            _file: &$crate::vfs::FileObject,
-            _current_task: &$crate::task::CurrentTask,
+            _file: &starnix_core::vfs::FileObject,
+            _current_task: &starnix_core::task::CurrentTask,
             _current_offset: starnix_uapi::off_t,
-            _target: $crate::vfs::SeekTarget,
+            _target: starnix_core::vfs::SeekTarget,
         ) -> Result<starnix_uapi::off_t, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(ESPIPE)
         }
@@ -709,10 +709,10 @@ macro_rules! fileops_impl_seekless {
 
         fn seek(
             &self,
-            _file: &$crate::vfs::FileObject,
-            _current_task: &$crate::task::CurrentTask,
+            _file: &starnix_core::vfs::FileObject,
+            _current_task: &starnix_core::task::CurrentTask,
             _current_offset: starnix_uapi::off_t,
-            _target: $crate::vfs::SeekTarget,
+            _target: starnix_core::vfs::SeekTarget,
         ) -> Result<starnix_uapi::off_t, starnix_uapi::errors::Errno> {
             Ok(0)
         }
@@ -725,10 +725,10 @@ macro_rules! fileops_impl_dataless {
         fn write(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _file: &crate::vfs::FileObject,
-            _current_task: &crate::task::CurrentTask,
+            _file: &starnix_core::vfs::FileObject,
+            _current_task: &starnix_core::task::CurrentTask,
             _offset: usize,
-            _data: &mut dyn crate::vfs::buffers::InputBuffer,
+            _data: &mut dyn starnix_core::vfs::buffers::InputBuffer,
         ) -> Result<usize, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(EINVAL)
         }
@@ -736,10 +736,10 @@ macro_rules! fileops_impl_dataless {
         fn read(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _file: &crate::vfs::FileObject,
-            _current_task: &crate::task::CurrentTask,
+            _file: &starnix_core::vfs::FileObject,
+            _current_task: &starnix_core::task::CurrentTask,
             _offset: usize,
-            _data: &mut dyn crate::vfs::buffers::OutputBuffer,
+            _data: &mut dyn starnix_core::vfs::buffers::OutputBuffer,
         ) -> Result<usize, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(EINVAL)
         }
@@ -758,10 +758,10 @@ macro_rules! fileops_impl_directory {
         fn read(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _file: &crate::vfs::FileObject,
-            _current_task: &crate::task::CurrentTask,
+            _file: &starnix_core::vfs::FileObject,
+            _current_task: &starnix_core::task::CurrentTask,
             _offset: usize,
-            _data: &mut dyn crate::vfs::buffers::OutputBuffer,
+            _data: &mut dyn starnix_core::vfs::buffers::OutputBuffer,
         ) -> Result<usize, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(EISDIR)
         }
@@ -769,10 +769,10 @@ macro_rules! fileops_impl_directory {
         fn write(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _file: &crate::vfs::FileObject,
-            _current_task: &crate::task::CurrentTask,
+            _file: &starnix_core::vfs::FileObject,
+            _current_task: &starnix_core::task::CurrentTask,
             _offset: usize,
-            _data: &mut dyn crate::vfs::buffers::InputBuffer,
+            _data: &mut dyn starnix_core::vfs::buffers::InputBuffer,
         ) -> Result<usize, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(EISDIR)
         }
@@ -784,8 +784,8 @@ macro_rules! fileops_impl_noop_sync {
     () => {
         fn sync(
             &self,
-            file: &$crate::vfs::FileObject,
-            _current_task: &$crate::task::CurrentTask,
+            file: &starnix_core::vfs::FileObject,
+            _current_task: &starnix_core::task::CurrentTask,
         ) -> Result<(), starnix_uapi::errors::Errno> {
             if !file.node().is_reg() && !file.node().is_dir() {
                 return starnix_uapi::error!(EINVAL);

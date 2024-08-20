@@ -2,17 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::kobject::{Device, DeviceMetadata, KObjectHandle};
-use crate::device::{DeviceMode, DeviceOps};
-use crate::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo, DeviceSysfsOps, SysfsOps};
-use crate::task::{CurrentTask, KernelStats};
-use crate::vfs::{
+use fuchsia_zircon as zx;
+use starnix_core::device::kobject::{Device, DeviceMetadata, KObjectHandle};
+use starnix_core::device::{DeviceMode, DeviceOps};
+use starnix_core::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo, DeviceSysfsOps, SysfsOps};
+use starnix_core::task::{CurrentTask, KernelStats};
+use starnix_core::vfs::{
     fileops_impl_dataless, fileops_impl_noop_sync, fileops_impl_seekless,
     fs_node_impl_dir_readonly, DirectoryEntryType, DynamicFile, DynamicFileBuf, DynamicFileSource,
     FileOps, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, StubEmptyFile, VecDirectory,
     VecDirectoryEntry,
 };
-use fuchsia_zircon as zx;
 use starnix_logging::{bug_ref, log_error};
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::auth::FsCred;
@@ -23,7 +23,7 @@ use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
 use std::sync::{Arc, Weak};
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct ZramDevice {
     kernel_stats: Arc<KernelStats>,
 }
@@ -37,7 +37,7 @@ impl ZramDevice {
     }
 }
 
-impl DeviceOps for Arc<ZramDevice> {
+impl DeviceOps for ZramDevice {
     fn open(
         &self,
         _locked: &mut Locked<'_, DeviceOpen>,

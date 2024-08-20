@@ -19,4 +19,3 @@ pub mod mem;
 pub mod remote_block_device;
 pub mod terminal;
 pub mod tun;
-pub mod zram;
