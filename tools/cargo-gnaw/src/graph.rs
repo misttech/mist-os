@@ -7,6 +7,7 @@ use crate::types::*;
 use anyhow::{anyhow, Context as _, Result};
 use cargo_metadata::{DependencyKind, Metadata, Package, PackageId};
 use std::collections::{HashMap, HashSet};
+use std::convert::TryFrom;
 
 pub struct GnBuildGraph<'a> {
     metadata: &'a Metadata,
