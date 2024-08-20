@@ -50,9 +50,7 @@ using TaskComplete = std::function<void()>;
 void execute_task_with_prerun_result(TaskBuilder task_builder, PreRun pre_run,
                                      TaskComplete task_complete);
 
-void execute_task(TaskBuilder task_builder, PreRun pre_run,
-                                     TaskComplete task_complete/*,
-                  std::optional<PtraceCoreState> ptrace_state*/);
+void execute_task(TaskBuilder task_builder, PreRun pre_run, TaskComplete task_complete);
 
 }  // namespace starnix
 

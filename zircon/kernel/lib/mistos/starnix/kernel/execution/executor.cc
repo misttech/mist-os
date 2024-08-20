@@ -219,7 +219,7 @@ void execute_task_with_prerun_result(TaskBuilder task_builder, PreRun pre_run,
   LTRACE;
   execute_task(
       task_builder,
-      [pre_run = ktl::move(pre_run)](CurrentTask& init_task) -> fit::result<Errno> {
+      [&pre_run](CurrentTask& init_task) -> fit::result<Errno> {
         if (auto pre_run_result = pre_run(init_task); pre_run_result.is_error()) {
           return pre_run_result.take_error();
         }
@@ -228,9 +228,7 @@ void execute_task_with_prerun_result(TaskBuilder task_builder, PreRun pre_run,
       ktl::move(task_complete));
 }
 
-void execute_task(TaskBuilder task_builder, PreRun pre_run,
-                                     TaskComplete task_complete/*,
-                  std::optional<PtraceCoreState> ptrace_state*/) {
+void execute_task(TaskBuilder task_builder, PreRun pre_run, TaskComplete task_complete) {
   LTRACE;
   // Set the process handle to the new task's process, so the new thread is spawned in that
   // process.

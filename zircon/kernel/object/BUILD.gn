@@ -117,6 +117,13 @@ zx_library("object") {
     # <object/clock_dispatcher.h> has #include <lib/affine/transform.h>.
     "//zircon/system/ulib/affine",
   ]
+
+  if (is_mistos) {
+    # <object/thread_dispatcher.h> has #include <lib/mistos/starnix/kernel/zircon/task_dispatcher.h>.
+    # But this is a circular dependency, so we can't use its :headers in deps.
+    public_configs =
+        [ "//zircon/kernel/lib/mistos/starnix/kernel:headers.config" ]
+  }
 }
 
 source_set("tests") {

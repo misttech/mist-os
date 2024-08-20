@@ -22,6 +22,7 @@ zx_library("userloader") {
     # <lib/userabi/userboot.h> has #include <lib/instrumentation/vmo.h>.
     "//zircon/kernel/lib/instrumentation:headers",
     "//zircon/kernel/lib/mistos/zbi_parser",
+    "//zircon/kernel/phys:handoff",
   ]
 
   defines = [ "BOOT_TEST_SUCCESS_STRING=\"$boot_test_success_string\"" ]
@@ -39,8 +40,6 @@ zx_library("userloader") {
     "//zircon/kernel/lib/mistos/zbitl",
     "//zircon/kernel/lib/mistos/zx_syscalls",
     "//zircon/kernel/lib/persistent-debuglog",
-    "//zircon/kernel/phys:handoff",
-    "//zircon/kernel/vm",
     "//zircon/system/ulib/region-alloc",
     "//zircon/system/ulib/zircon-internal",
   ]

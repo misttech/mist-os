@@ -25,6 +25,5 @@ zx_library("zx") {
   deps = [
     "//zircon/kernel/lib/debuglog",
     "//zircon/kernel/lib/mistos/zx_syscalls",
-    "//zircon/kernel/vm",
   ]
 }

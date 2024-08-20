@@ -11,7 +11,8 @@ zx_library("kernel") {
     "debugcommands.cc",
     "execution/executor.cc",
     "fs/mistos/syslog.cc",
-    "fs/tmpfs.cc",
+
+    #"fs/tmpfs.cc",
     "loader.cc",
     "logging/logging.cc",
     "mm/memory_accessor.cc",
@@ -42,7 +43,8 @@ zx_library("kernel") {
     "vfs/module.cc",
     "vfs/namespace.cc",
     "vfs/syscalls.cc",
-    "vfs/vmo_file.cc",
+
+    #"vfs/vmo_file.cc",
     "vfs/xattr.cc",
     "zircon/task_dispatcher.cc",
   ]

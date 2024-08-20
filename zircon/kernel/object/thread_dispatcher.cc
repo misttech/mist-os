@@ -9,6 +9,9 @@
 #include <assert.h>
 #include <inttypes.h>
 #include <lib/counters.h>
+#if __mist_os__
+#include <lib/mistos/starnix/kernel/zircon/task_dispatcher.h>
+#endif
 #include <platform.h>
 #include <string.h>
 #include <trace.h>
@@ -23,6 +26,7 @@
 #include <arch/vm.h>
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
+#include <fbl/auto_lock.h>
 #include <kernel/thread.h>
 #include <object/exception_dispatcher.h>
 #include <object/handle.h>
@@ -911,3 +915,16 @@ zx_koid_t ThreadDispatcher::get_related_koid() const {
 
   return process_->get_koid();
 }
+
+#if __mist_os__
+void ThreadDispatcher::SetTask(fbl::RefPtr<TaskDispatcher> task) {
+  canary_.Assert();
+  ASSERT(!task_);
+  task_ = ktl::move(task);
+}
+
+const fbl::RefPtr<TaskDispatcher> ThreadDispatcher::task() const {
+  ASSERT(task_);
+  return task_;
+}
+#endif

@@ -23,8 +23,6 @@
 #include <trace.h>
 #include <zircon/assert.h>
 
-#include <vector>
-
 #include <fbl/ref_ptr.h>
 #include <fbl/string.h>
 #include <ktl/algorithm.h>
@@ -44,12 +42,12 @@ fit::result<Errno, Container> create_container(const ConfigWrapper& config) {
   ASSERT_MSG(kernel, "creating Kernel: %s\n", config->name.data());
 
   fbl::RefPtr<FsContext> fs_context;
-  if (auto result = create_fs_context(kernel, config); result.is_error()) {
+  /*if (auto result = create_fs_context(kernel, config); result.is_error()) {
     LTRACEF("creating FsContext: %d\n", result.error_value());
     return fit::error(errno(from_status_like_fdio(result.error_value())));
   } else {
     fs_context = result.value();
-  }
+  }*/
 
   auto init_pid = kernel->pids.Write()->allocate_pid();
   ASSERT(init_pid == 1);

@@ -474,7 +474,10 @@ typedef uint32_t zx_obj_type_t;
 #define ZX_OBJ_TYPE_STREAM          ((zx_obj_type_t)31u)
 #define ZX_OBJ_TYPE_MSI             ((zx_obj_type_t)32u)
 #define ZX_OBJ_TYPE_IOB             ((zx_obj_type_t)33u)
+
+#if __mist_os__
 #define ZX_OBJ_TYPE_STRANIX_TASK    ((zx_obj_type_t)34u)
+#endif
 
 // For backwards compatibility.
 #define ZX_OBJ_TYPE_LOG             ZX_OBJ_TYPE_DEBUGLOG

@@ -77,6 +77,10 @@ DECLARE_DISPTAG(StreamDispatcher, ZX_OBJ_TYPE_STREAM, "STRM")
 DECLARE_DISPTAG(MsiDispatcher, ZX_OBJ_TYPE_MSI, "MSID")
 DECLARE_DISPTAG(IoBufferDispatcher, ZX_OBJ_TYPE_IOB, "IOBD")
 
+#if __mist_os__
+DECLARE_DISPTAG(TaskDispatcher, ZX_OBJ_TYPE_STRANIX_TASK, "STSK")
+#endif
+
 #undef DECLARE_DISPTAG
 
 // Base class for all kernel objects that can be exposed to user-mode via

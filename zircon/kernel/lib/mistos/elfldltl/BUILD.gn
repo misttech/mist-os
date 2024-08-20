@@ -13,7 +13,6 @@ zx_library("elfldltl") {
   public_deps = [
     "//src/lib/elfldltl:headers",
     "//zircon/kernel/lib/mistos/zx",
-    "//zircon/kernel/vm",
   ]
 }
 
