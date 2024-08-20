@@ -9,7 +9,9 @@ pub(super) mod testing;
 use super::{FsNodeSecurityXattr, FsNodeState, ResolvedElfState};
 use crate::task::CurrentTask;
 use crate::vfs::fs_args::MountParams;
-use crate::vfs::{FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp};
+use crate::vfs::{
+    FileSystem, FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp,
+};
 use linux_uapi::XATTR_NAME_SELINUX;
 use selinux::{ClassPermission, InitialSid, Permission, ProcessPermission};
 use selinux_core::permission_check::PermissionCheck;
@@ -20,6 +22,7 @@ use starnix_uapi::error;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::unmount_flags::UnmountFlags;
+use std::sync::OnceLock;
 
 /// Maximum supported size for the extended attribute value used to store SELinux security
 /// contexts in a filesystem node extended attributes.
@@ -73,9 +76,50 @@ pub(super) fn sb_umount(
     Ok(())
 }
 
+// Returns the labeling scheme to use for `fs`.
+// Must not be called until a policy has been loaded.
+fn ensure_fs_label<'a>(
+    security_server: &SecurityServer,
+    fs: &'a FileSystem,
+) -> &'a FileSystemLabel {
+    assert!(security_server.has_policy());
+    fs.security_state.state.label.get_or_init(|| {
+        let mount_options = &fs.security_state.state.mount_options;
+        if let Some(context) = &mount_options.context {
+            let sid = security_server
+                .security_context_to_sid((&context).into())
+                .ok()
+                .unwrap_or(SecurityId::initial(InitialSid::Unlabeled));
+            return FileSystemLabel { sid, scheme: FileSystemLabelingScheme::Mountpoint };
+        }
+        let fs_sid = mount_options
+            .fs_context
+            .as_ref()
+            .and_then(|context| security_server.security_context_to_sid((&context).into()).ok())
+            .unwrap_or(SecurityId::initial(InitialSid::Unlabeled));
+        let root_sid = mount_options
+            .root_context
+            .as_ref()
+            .and_then(|context| security_server.security_context_to_sid((&context).into()).ok())
+            .unwrap_or(fs_sid);
+        let def_sid = mount_options
+            .def_context
+            .as_ref()
+            .and_then(|context| security_server.security_context_to_sid((&context).into()).ok())
+            .unwrap_or(SecurityId::initial(InitialSid::File));
+
+        FileSystemLabel {
+            sid: fs_sid,
+            // TODO: https://fxbug.dev/355628002 - Determine labeling scheme from policy.
+            scheme: FileSystemLabelingScheme::FsUse { def_sid, root_sid },
+        }
+    })
+}
+
 /// Returns the security attribute to label a newly created inode with, if any.
 pub(super) fn fs_node_init_security_and_xattr(
     _security_server: &SecurityServer,
+    _current_task: &CurrentTask,
     _new_node: &FsNodeHandle,
     _parent: Option<&FsNodeHandle>,
 ) -> Result<Option<FsNodeSecurityXattr>, Errno> {
@@ -164,34 +208,29 @@ fn fs_node_resolve_security_label(
         return Some(sid);
     }
 
-    // TODO: fxbug.dev/349800754 - Replace with a switch based on the file-system labelling scheme and
-    // configuration, when available.
-    let sid = if let Some(context) = &fs_node.fs().security_state.state.context {
+    let fs = fs_node.fs();
+    let label = ensure_fs_label(security_server, &fs);
+    let sid = match label.scheme {
         // mountpoint-labelling labels every node from the "context=" mount option.
-        security_server.security_context_to_sid(context.as_slice().into()).ok()
-    } else {
-        // fs_use_xattr-labelling defers to the security attribute on the file node, otherwise uses a
-        // default value specified via mount option, or from the policy.
-        let attr = fs_node.ops().get_xattr(
-            fs_node,
-            current_task,
-            XATTR_NAME_SELINUX.to_bytes().into(),
-            SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE,
-        );
-        match attr {
-            Ok(ValueOrSize::Value(security_context)) => {
-                security_server.security_context_to_sid((&security_context).into()).ok()
-            }
-            _ => {
-                // TODO: fxbug.dev/334094811 - Determine how to handle errors besides `ENODATA` (no such xattr).
-                // TODO: https://fxbug.dev/349800754 - Update this to use pre-resolved default SID when available.
-                let fs = fs_node.fs();
-                let def_context = fs.security_state.state.def_context.as_ref();
-                let def_sid = def_context.and_then(|def_context| {
-                    let def_context = def_context.as_slice().into();
-                    security_server.security_context_to_sid(def_context).ok()
-                });
-                Some(def_sid.unwrap_or_else(|| SecurityId::initial(InitialSid::File)))
+        FileSystemLabelingScheme::Mountpoint => Some(label.sid),
+        FileSystemLabelingScheme::FsUse { def_sid, .. } => {
+            // fs_use_xattr-labelling defers to the security attribute on the file node, otherwise uses a
+            // default value specified via mount option, or from the policy.
+            let attr = fs_node.ops().get_xattr(
+                fs_node,
+                current_task,
+                XATTR_NAME_SELINUX.to_bytes().into(),
+                SECURITY_SELINUX_XATTR_VALUE_MAX_SIZE,
+            );
+            match attr {
+                Ok(ValueOrSize::Value(security_context)) => {
+                    security_server.security_context_to_sid((&security_context).into()).ok()
+                }
+                _ => {
+                    // TODO: https://fxbug.dev/334094811 - Determine how to handle errors besides
+                    // `ENODATA` (no such xattr).
+                    Some(def_sid)
+                }
             }
         }
     };
@@ -250,7 +289,9 @@ pub fn file_system_init_security(
         return error!(EINVAL);
     }
 
-    Ok(FileSystemState { context, def_context, fs_context, root_context })
+    let mount_options = FileSystemMountOptions { context, def_context, fs_context, root_context };
+
+    Ok(FileSystemState { mount_options, label: OnceLock::new() })
 }
 
 /// The SELinux security structure for `ThreadGroup`.
@@ -299,11 +340,38 @@ impl TaskAttrs {
     }
 }
 
+/// Security state for a [`crate::vfs::FileSystem`] instance. This holds the security fields
+/// parsed from the mount options and the selected labeling scheme.
+#[derive(Clone, Debug, PartialEq)]
+pub(super) struct FileSystemState {
+    // TODO: https://fxbug.dev/349800754 - Investigate whether the mount options
+    // need to be retained after the file system has been labeled.
+    mount_options: FileSystemMountOptions,
+    label: OnceLock<FileSystemLabel>,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+struct FileSystemLabel {
+    sid: SecurityId,
+    scheme: FileSystemLabelingScheme,
+}
+
+#[derive(Clone, Debug, PartialEq)]
+enum FileSystemLabelingScheme {
+    /// This filesystem was mounted with "context=".
+    Mountpoint,
+    /// This filesystem has an "fs_use_xattr", "fs_use_task", or "fs_use_trans" entry in the
+    /// policy. `root_sid` identifies the context for the root of the filesystem and `def_sid`
+    /// identifies the context to use for unlabeled files in the filesystem (the "default
+    /// context").
+    FsUse { def_sid: SecurityId, root_sid: SecurityId },
+}
+
 /// SELinux security context-related filesystem mount options. These options are documented in the
 /// `context=context, fscontext=context, defcontext=context, and rootcontext=context` section of
 /// the `mount(8)` manpage.
 #[derive(Clone, Debug, PartialEq)]
-pub(super) struct FileSystemState {
+struct FileSystemMountOptions {
     /// Specifies the effective security context to use for all nodes in the filesystem, and the
     /// filesystem itself. If the filesystem already contains security attributes then these are
     /// ignored. May not be combined with any of the other options.
@@ -336,25 +404,11 @@ fn clear_cached_sid(fs_node: &FsNode) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::testing::{create_kernel_task_and_unlocked_with_selinux, AutoReleasableTask};
-    use crate::vfs::{NamespaceNode, XattrOp};
-    use starnix_sync::{Locked, Unlocked};
-    use starnix_uapi::device_type::DeviceType;
+    use crate::testing::create_kernel_task_and_unlocked_with_selinux;
+    use crate::vfs::XattrOp;
     use starnix_uapi::errno;
-    use starnix_uapi::file_mode::FileMode;
 
     const VALID_SECURITY_CONTEXT: &[u8] = b"u:object_r:test_valid_t:s0";
-
-    fn create_test_file(
-        locked: &mut Locked<'_, Unlocked>,
-        current_task: &AutoReleasableTask,
-    ) -> NamespaceNode {
-        current_task
-            .fs()
-            .root()
-            .create_node(locked, &current_task, "file".into(), FileMode::IFREG, DeviceType::NONE)
-            .expect("create_node(file)")
-    }
 
     #[fuchsia::test]
     async fn fs_node_resolved_and_effective_sids_for_missing_xattr() {
@@ -362,7 +416,7 @@ mod tests {
         security_server.set_enforcing(true);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server.clone());
-        let node = &create_test_file(&mut locked, &current_task).entry.node;
+        let node = &testing::create_test_file(&mut locked, &current_task).entry.node;
 
         // Remove the "security.selinux" label, if any.
         let _ = node.ops().remove_xattr(node, &current_task, XATTR_NAME_SELINUX.to_bytes().into());
@@ -400,7 +454,7 @@ mod tests {
         security_server.set_enforcing(true);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server.clone());
-        let node = &create_test_file(&mut locked, &current_task).entry.node;
+        let node = &testing::create_test_file(&mut locked, &current_task).entry.node;
 
         const INVALID_CONTEXT: &[u8] = b"invalid context!";
 
@@ -446,7 +500,7 @@ mod tests {
         security_server.set_enforcing(true);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server.clone());
-        let node = &create_test_file(&mut locked, &current_task).entry.node;
+        let node = &testing::create_test_file(&mut locked, &current_task).entry.node;
 
         // Store a valid Security Context in the attribute, and ensure any label cached on the `FsNode`
         // is removed, to force the effective-SID query to resolve the label again.
@@ -489,10 +543,12 @@ mod tests {
     #[fuchsia::test]
     async fn setxattr_set_sid() {
         let security_server = testing::security_server_with_policy();
+        let expected_sid = security_server
+            .security_context_to_sid(VALID_SECURITY_CONTEXT.into())
+            .expect("no SID for VALID_SECURITY_CONTEXT");
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
-        let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, testing::get_cached_sid(node));
+        let node = &testing::create_unlabeled_test_file(&mut locked, &current_task).entry.node;
 
         node.set_xattr(
             current_task.as_ref(),
@@ -503,6 +559,7 @@ mod tests {
         )
         .expect("setxattr");
 
-        assert!(testing::get_cached_sid(node).is_some());
+        // Verify that the SID now cached on the node corresponds to VALID_SECURITY_CONTEXT.
+        assert_eq!(Some(expected_sid), testing::get_cached_sid(node));
     }
 }

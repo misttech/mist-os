@@ -108,17 +108,24 @@ pub struct FsNodeSecurityXattr {
 }
 
 /// Returns the security attribute to label a newly created inode with.
-/// This is analgous to the `inode_init_security()` hook.
+/// This is analogous to the `inode_init_security()` hook.
 pub fn fs_node_init_security_and_xattr(
     current_task: &CurrentTask,
     new_node: &FsNodeHandle,
     parent: Option<&FsNodeHandle>,
 ) -> Result<Option<FsNodeSecurityXattr>, Errno> {
-    if let Some(security_server) = current_task.kernel().security_state.server.as_ref() {
-        selinux_hooks::fs_node_init_security_and_xattr(security_server, new_node, parent)
-    } else {
-        Ok(None)
-    }
+    run_if_selinux_else(
+        current_task,
+        |security_server| {
+            selinux_hooks::fs_node_init_security_and_xattr(
+                security_server,
+                current_task,
+                new_node,
+                parent,
+            )
+        },
+        || Ok(None),
+    )
 }
 
 /// Return the default initial `TaskState` for kernel tasks.
@@ -475,19 +482,16 @@ pub mod testing {
 mod tests {
     use super::*;
     use crate::security::selinux_hooks::testing;
+    use crate::security::selinux_hooks::testing::{create_test_file, create_unlabeled_test_file};
     use crate::testing::{
         create_kernel_and_task, create_kernel_and_task_with_selinux,
         create_kernel_task_and_unlocked, create_kernel_task_and_unlocked_with_selinux, create_task,
         AutoReleasableTask,
     };
-    use crate::vfs::NamespaceNode;
     use linux_uapi::XATTR_NAME_SELINUX;
     use selinux_core::security_server::Mode;
     use selinux_core::{InitialSid, SecurityId};
-    use starnix_sync::{Locked, Unlocked};
-    use starnix_uapi::device_type::DeviceType;
     use starnix_uapi::error;
-    use starnix_uapi::file_mode::FileMode;
     use starnix_uapi::signals::SIGTERM;
 
     const VALID_SECURITY_CONTEXT: &[u8] = b"u:object_r:test_valid_t:s0";
@@ -531,17 +535,6 @@ mod tests {
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let another_task = create_task(&mut locked, &kernel, "another-task");
         (current_task, another_task)
-    }
-
-    fn create_test_file(
-        locked: &mut Locked<'_, Unlocked>,
-        current_task: &AutoReleasableTask,
-    ) -> NamespaceNode {
-        current_task
-            .fs()
-            .root()
-            .create_node(locked, &current_task, "file".into(), FileMode::IFREG, DeviceType::NONE)
-            .expect("create_node(file)")
     }
 
     #[derive(Default, Debug, PartialEq)]
@@ -633,7 +626,7 @@ mod tests {
     async fn exec_access_allowed_for_selinux_disabled() {
         let (kernel, task, mut locked) = create_kernel_task_and_unlocked();
         assert!(kernel.security_state.server.is_none());
-        let executable_node = &create_test_file(&mut locked, &task).entry.node;
+        let executable_node = &testing::create_test_file(&mut locked, &task).entry.node;
         assert_eq!(check_exec_access(&task, executable_node), Ok(ResolvedElfState { sid: None }));
     }
 
@@ -642,7 +635,7 @@ mod tests {
         let security_server = security_server_with_policy(Mode::Fake);
         let (_kernel, task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
-        let executable_node = &create_test_file(&mut locked, &task).entry.node;
+        let executable_node = &testing::create_test_file(&mut locked, &task).entry.node;
         // Expect that access is granted, and a `SecurityId` is returned in the `ResolvedElfState`.
         let result = check_exec_access(&task, executable_node);
         assert!(result.expect("Exec check should succeed").sid.is_some());
@@ -654,7 +647,7 @@ mod tests {
         security_server.set_enforcing(false);
         let (_kernel, task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
-        let executable_node = &create_test_file(&mut locked, &task).entry.node;
+        let executable_node = &testing::create_test_file(&mut locked, &task).entry.node;
         // Expect that access is granted, and a `SecurityId` is returned in the `ResolvedElfState`.
         let result = check_exec_access(&task, executable_node);
         assert!(result.expect("Exec check should succeed").sid.is_some());
@@ -888,8 +881,7 @@ mod tests {
     #[fuchsia::test]
     async fn fs_node_setsecurity_noop_selinux_disabled() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
-        let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, testing::get_cached_sid(node));
+        let node = &create_unlabeled_test_file(&mut locked, &current_task).entry.node;
 
         fs_node_setsecurity(
             &current_task,
@@ -908,8 +900,7 @@ mod tests {
         let security_server = SecurityServer::new(Mode::Enable);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
-        let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, testing::get_cached_sid(node));
+        let node = &create_unlabeled_test_file(&mut locked, &current_task).entry.node;
 
         fs_node_setsecurity(
             &current_task,
@@ -928,8 +919,7 @@ mod tests {
         let security_server = security_server_with_policy(Mode::Fake);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
-        let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, testing::get_cached_sid(node));
+        let node = &create_unlabeled_test_file(&mut locked, &current_task).entry.node;
 
         fs_node_setsecurity(
             &current_task,
@@ -947,10 +937,12 @@ mod tests {
     async fn fs_node_setsecurity_selinux_permissive() {
         let security_server = security_server_with_policy(Mode::Enable);
         security_server.set_enforcing(false);
+        let expected_sid = security_server
+            .security_context_to_sid(VALID_SECURITY_CONTEXT.into())
+            .expect("no SID for VALID_SECURITY_CONTEXT");
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
-        let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, testing::get_cached_sid(node));
+        let node = &create_unlabeled_test_file(&mut locked, &current_task).entry.node;
 
         fs_node_setsecurity(
             &current_task,
@@ -961,17 +953,26 @@ mod tests {
         )
         .expect("set_xattr(security.selinux) failed");
 
-        assert!(testing::get_cached_sid(node).is_some());
+        // Verify that the SID now cached on the node is that SID
+        // corresponding to VALID_SECURITY_CONTEXT.
+        assert_eq!(Some(expected_sid), testing::get_cached_sid(node));
     }
 
     #[fuchsia::test]
     async fn fs_node_setsecurity_not_selinux_is_noop() {
         let security_server = security_server_with_policy(Mode::Enable);
         security_server.set_enforcing(true);
+        let valid_security_context_sid = security_server
+            .security_context_to_sid(VALID_SECURITY_CONTEXT.into())
+            .expect("no SID for VALID_SECURITY_CONTEXT");
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
         let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, testing::get_cached_sid(node));
+        // The label assigned to the test file on creation must differ from
+        // VALID_SECURITY_CONTEXT, otherwise this test may return a false
+        // positive.
+        let whatever_sid = testing::get_cached_sid(node);
+        assert_ne!(Some(valid_security_context_sid), whatever_sid);
 
         fs_node_setsecurity(
             &current_task,
@@ -982,7 +983,8 @@ mod tests {
         )
         .expect("set_xattr(security.selinux) failed");
 
-        assert_eq!(None, testing::get_cached_sid(node));
+        // Verify that the node's SID (whatever it was) has not changed.
+        assert_eq!(whatever_sid, testing::get_cached_sid(node));
     }
 
     #[fuchsia::test]
@@ -1020,8 +1022,7 @@ mod tests {
         security_server.set_enforcing(true);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
-        let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, testing::get_cached_sid(node));
+        let node = &create_unlabeled_test_file(&mut locked, &current_task).entry.node;
 
         fs_node_setsecurity(
             &current_task,
@@ -1041,8 +1042,7 @@ mod tests {
         security_server.set_enforcing(true);
         let (_kernel, current_task, mut locked) =
             create_kernel_task_and_unlocked_with_selinux(security_server);
-        let node = &create_test_file(&mut locked, &current_task).entry.node;
-        assert_eq!(None, testing::get_cached_sid(node));
+        let node = &create_unlabeled_test_file(&mut locked, &current_task).entry.node;
 
         fs_node_setsecurity(
             &current_task,
