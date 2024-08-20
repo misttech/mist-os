@@ -16,7 +16,6 @@ pub mod framebuffer;
 pub mod kobject;
 pub mod loop_device;
 pub mod mem;
-pub mod perfetto_consumer;
 pub mod remote_block_device;
 pub mod sync_file;
 pub mod terminal;

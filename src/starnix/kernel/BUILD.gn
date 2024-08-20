@@ -10,7 +10,6 @@ import("//build/toolchain/concurrent_jobs.gni")
 import("//src/starnix/kernel/starnix.gni")
 import("//src/starnix/lib/gzip/gzip.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
-import("//tools/protobuf/rust_proto_library.gni")
 import("args.gni")
 
 group("kernel") {
@@ -117,7 +116,6 @@ rustc_library("starnix_core") {
     "device/loop_device.rs",
     "device/mem.rs",
     "device/mod.rs",
-    "device/perfetto_consumer.rs",
     "device/registry.rs",
     "device/remote_binder.rs",
     "device/remote_block_device.rs",
@@ -291,7 +289,6 @@ rustc_library("starnix_core") {
   ]
 
   deps = [
-    ":perfetto_consumer_proto",
     ":starnix_logging",
     ":starnix_sync",
     ":vdso-data($bionic_linux_toolchain)",
@@ -353,7 +350,6 @@ rustc_library("starnix_core") {
     "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
     "//src/lib/process_builder",
     "//src/lib/trace/rust:trace",
-    "//src/lib/trace/rust:trace-observer",
     "//src/lib/ui/flatland-frame-scheduling:flatland-frame-scheduling-lib",
     "//src/lib/ui/fuchsia-framebuffer",
     "//src/lib/ui/fuchsia-scenic",
@@ -405,7 +401,6 @@ rustc_library("starnix_core") {
     "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:paste",
     "//third_party/rust_crates:pin-project",
-    "//third_party/rust_crates:prost",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:ref-cast",
     "//third_party/rust_crates:regex",
@@ -521,6 +516,7 @@ rustc_library("starnix_kernel_runner") {
     "//src/starnix/modules/gralloc",
     "//src/starnix/modules/input",
     "//src/starnix/modules/magma",
+    "//src/starnix/modules/perfetto-consumer",
     "//src/sys/lib/runner",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bstr",
@@ -619,15 +615,6 @@ rustc_library("starnix_sync") {
   ]
 
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
-}
-
-rust_proto_library("perfetto_consumer_proto") {
-  sources = [
-    "//third_party/perfetto/protos/perfetto/ipc/consumer_port.proto",
-    "//third_party/perfetto/protos/perfetto/ipc/wire_protocol.proto",
-  ]
-  packages = [ "perfetto.protos" ]
-  include_dirs = [ "//third_party/perfetto" ]
 }
 
 static_library("restricted_trampoline") {

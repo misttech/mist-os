@@ -2,13 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::{CurrentTask, EventHandler, Kernel, Waiter};
-use crate::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
-use crate::vfs::socket::{
-    new_socket_file, resolve_unix_socket_address, SocketDomain, SocketPeer, SocketProtocol,
-    SocketType,
-};
-use crate::vfs::{FileHandle, FsStr, FsString};
 use once_cell::sync::OnceCell;
 use perfetto_consumer_proto::perfetto::protos::trace_config::buffer_config::FillPolicy;
 use perfetto_consumer_proto::perfetto::protos::trace_config::{BufferConfig, DataSource};
@@ -17,6 +10,13 @@ use perfetto_consumer_proto::perfetto::protos::{
     FtraceConfig, IpcFrame, ReadBuffersRequest, ReadBuffersResponse, TraceConfig,
 };
 use prost::Message;
+use starnix_core::task::{CurrentTask, EventHandler, Kernel, Waiter};
+use starnix_core::vfs::buffers::{VecInputBuffer, VecOutputBuffer};
+use starnix_core::vfs::socket::{
+    new_socket_file, resolve_unix_socket_address, SocketDomain, SocketPeer, SocketProtocol,
+    SocketType,
+};
+use starnix_core::vfs::{FileHandle, FsStr, FsString};
 use starnix_logging::{log_error, CATEGORY_ATRACE, NAME_PERFETTO_BLOB};
 use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked};
 use starnix_uapi::errno;
