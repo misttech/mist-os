@@ -16,7 +16,10 @@ config("arm64") {
   # rustc --target=aarch64-unknown-fuchsia --print target-features
   # `armv8a` and `simd` features are assumed by the target triple
   # `aarch64-unknown-fuchsia`.
-  rustflags = [ "-Ctarget-feature=+crc,+aes,+sha2" ]
+  rustflags = [
+    "-Ctarget-feature=+crc,+aes,+sha2",
+    "-Zsanitizer=shadow-call-stack",
+  ]
 }
 
 config("cortex-a53") {
