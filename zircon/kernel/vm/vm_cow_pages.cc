@@ -3373,28 +3373,17 @@ zx_status_t VmCowPages::DecommitRangeLocked(uint64_t offset, uint64_t len) {
     return ZX_ERR_INVALID_ARGS;
   }
 
-  list_node_t freed_list;
-  list_initialize(&freed_list);
-  zx_status_t status = UnmapAndRemovePagesLocked(offset, len, &freed_list);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  // We were successfully able to remove pages. Increment the gen count.
+  // Assume we will free some pages and increment the gen count.
   IncrementHierarchyGenerationCountLocked();
 
-  FreePagesLocked(&freed_list, /*freeing_owned_pages=*/true);
-
-  return status;
+  return UnmapAndFreePagesLocked(offset, len).status_value();
 }
 
-zx_status_t VmCowPages::UnmapAndRemovePagesLocked(uint64_t offset, uint64_t len,
-                                                  list_node_t* freed_list,
-                                                  uint64_t* pages_freed_out) {
+zx::result<uint64_t> VmCowPages::UnmapAndFreePagesLocked(uint64_t offset, uint64_t len) {
   canary_.Assert();
 
   if (AnyPagesPinnedLocked(offset, len)) {
-    return ZX_ERR_BAD_STATE;
+    return zx::error(ZX_ERR_BAD_STATE);
   }
 
   LTRACEF("start offset %#" PRIx64 ", end %#" PRIx64 "\n", offset, offset + len);
@@ -3413,18 +3402,19 @@ zx_status_t VmCowPages::UnmapAndRemovePagesLocked(uint64_t offset, uint64_t len,
   // unmap all of the pages in this range on all the mapping regions
   RangeChangeUpdateLocked(offset, len, RangeChangeOp::Unmap);
 
-  __UNINITIALIZED BatchPQRemove page_remover(freed_list);
+  list_node_t freed_list;
+  list_initialize(&freed_list);
+  __UNINITIALIZED BatchPQRemove page_remover(&freed_list);
 
   page_list_.RemovePages(page_remover.RemovePagesCallback(), offset, offset + len);
   page_remover.Flush();
-
-  if (pages_freed_out) {
-    *pages_freed_out = page_remover.freed_count();
+  if (!list_is_empty(&freed_list)) {
+    FreePagesLocked(&freed_list, /*freeing_owned_pages=*/true);
   }
 
   VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-  return ZX_OK;
+  return zx::ok(page_remover.freed_count());
 }
 
 bool VmCowPages::PageWouldReadZeroLocked(uint64_t page_offset) {
@@ -6197,7 +6187,7 @@ void VmCowPages::DetachSourceLocked() {
   DEBUG_ASSERT(page_source_);
   page_source_->Detach();
 
-  // We stack-own loaned pages from UnmapAndRemovePagesLocked() to FreePagesLocked().
+  // We stack-own loaned pages from RemovePages() to FreePagesLocked().
   __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
 
   list_node_t freed_list;
@@ -6374,7 +6364,7 @@ void VmCowPages::RangeChangeUpdateLocked(uint64_t offset, uint64_t len, RangeCha
   RangeChangeUpdateListLocked(&list, op);
 }
 
-bool VmCowPages::RemovePageForEviction(vm_page_t* page, uint64_t offset) {
+bool VmCowPages::ReclaimPageForEviction(vm_page_t* page, uint64_t offset) {
   canary_.Assert();
 
   Guard<CriticalMutex> guard{lock()};
@@ -6389,14 +6379,14 @@ bool VmCowPages::RemovePageForEviction(vm_page_t* page, uint64_t offset) {
   ASSERT(page->object.pin_count == 0);
 
   // Ignore any hints, we were asked directly to evict.
-  return RemovePageForEvictionLocked(page, offset, EvictionHintAction::Ignore);
+  return ReclaimPageForEvictionLocked(page, offset, EvictionHintAction::Ignore).Total() != 0;
 }
 
-bool VmCowPages::RemovePageForEvictionLocked(vm_page_t* page, uint64_t offset,
-                                             EvictionHintAction hint_action) {
+VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForEvictionLocked(vm_page_t* page, uint64_t offset,
+                                                                   EvictionHintAction hint_action) {
   // Without a page source to bring the page back in we cannot even think about eviction.
   if (!can_evict()) {
-    return false;
+    return ReclaimCounts{};
   }
 
   // We can assume this page is in the VMO.
@@ -6415,7 +6405,7 @@ bool VmCowPages::RemovePageForEvictionLocked(vm_page_t* page, uint64_t offset,
   // moved to the dirty page queue.
   if (!is_page_clean(page)) {
     DEBUG_ASSERT(!page->is_loaned());
-    return false;
+    return ReclaimCounts{};
   }
 
   // Do not evict if the |always_need| hint is set, unless we are told to ignore the eviction hint.
@@ -6433,29 +6423,35 @@ bool VmCowPages::RemovePageForEvictionLocked(vm_page_t* page, uint64_t offset,
     // Pages in the queue are considered for eviction pre-OOM, but ignored otherwise.
     pmm_page_queues()->MarkAccessed(page);
     vm_vmo_always_need_skipped_reclaim.Add(1);
-    return false;
+    return ReclaimCounts{};
   }
 
   // Remove any mappings to this page before we remove it.
   RangeChangeUpdateLocked(offset, PAGE_SIZE, RangeChangeOp::Unmap);
 
+  __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
   // Use RemovePage over just writing to page_or_marker so that the page list has the opportunity
   // to release any now empty intermediate nodes.
   vm_page_t* p = page_list_.RemoveContent(offset).ReleasePage();
   DEBUG_ASSERT(p == page);
   pmm_page_queues()->Remove(page);
+  const bool loaned = page->is_loaned();
+  FreePageLocked(page, true);
 
   reclamation_event_count_++;
   IncrementHierarchyGenerationCountLocked();
   VMO_VALIDATION_ASSERT(DebugValidatePageSplitsHierarchyLocked());
   VMO_FRUGAL_VALIDATION_ASSERT(DebugValidateVmoPageBorrowingLocked());
-  // |page| is now owned by the caller.
-  return true;
+  return ReclaimCounts{
+      .evicted_non_loaned = loaned ? 0u : 1u,
+      .evicted_loaned = loaned ? 1u : 0u,
+  };
 }
 
-bool VmCowPages::RemovePageForCompressionLocked(vm_page_t* page, uint64_t offset,
-                                                VmCompressor* compressor,
-                                                Guard<CriticalMutex>& guard) {
+VmCowPages::ReclaimCounts VmCowPages::ReclaimPageForCompressionLocked(vm_page_t* page,
+                                                                      uint64_t offset,
+                                                                      VmCompressor* compressor,
+                                                                      Guard<CriticalMutex>& guard) {
   DEBUG_ASSERT(compressor);
   DEBUG_ASSERT(!page_source_);
   ASSERT(page->object.pin_count == 0);
@@ -6469,9 +6465,12 @@ bool VmCowPages::RemovePageForCompressionLocked(vm_page_t* page, uint64_t offset
       // Cannot compress uncached mappings. To avoid this page remaining in the reclamation list we
       // simulate an access.
       pmm_page_queues()->MarkAccessed(page);
-      return false;
+      return ReclaimCounts{};
     }
   }
+
+  // Track whether we should tell the caller we reclaimed a page or not.
+  bool reclaimed = false;
 
   // Use a sub-scope as the page_or_marker will become invalid as we will drop the lock later.
   {
@@ -6517,6 +6516,7 @@ bool VmCowPages::RemovePageForCompressionLocked(vm_page_t* page, uint64_t offset
       // Compression succeeded, put the new reference in.
       old_ref = VmPageOrMarkerRef(slot).ChangeReferenceValue(*ref);
       reclamation_event_count_++;
+      reclaimed = true;
     } else if (ktl::holds_alternative<VmCompressor::FailTag>(compression_result)) {
       // Compression failed, but the page back in.
       old_ref = VmPageOrMarkerRef(slot).SwapReferenceForPage(page);
@@ -6548,6 +6548,7 @@ bool VmCowPages::RemovePageForCompressionLocked(vm_page_t* page, uint64_t offset
         vm_vmo_compression_marker.Add(1);
       }
       reclamation_event_count_++;
+      reclaimed = true;
     }
     // Temporary reference has been replaced, can return it to the compressor.
     compressor->ReturnTempReference(old_ref);
@@ -6560,26 +6561,27 @@ bool VmCowPages::RemovePageForCompressionLocked(vm_page_t* page, uint64_t offset
             ktl::get_if<VmPageOrMarker::ReferenceValue>(&compression_result)) {
       compressor->Free(*ref);
     }
-    // To avoid claiming that |page| got reclaimed when it didn't, separately free it.
-    FreePageLocked(page, true);
-    page = nullptr;
     // If the slot is allocated, but empty, then make sure we properly return it.
     if (slot && slot->IsEmpty()) {
       page_list_.ReturnEmptySlot(offset);
     }
+    // In this case we are still going to free the page, but it doesn't count as a reclamation as
+    // there is now something new in the slot we were trying to free.
   }
   // One way or another the temporary reference has been returned, and so we can finalize.
   compressor->Finalize();
 
-  // Return whether we ended up reclaiming the page or not. That is, whether we currently own it and
-  // it needs to be freed.
-  return page != nullptr;
+  if (page) {
+    FreePageLocked(page, true);
+    page = nullptr;
+  }
+
+  return VmCowPages::ReclaimCounts{.compressed = reclaimed ? 1u : 0u};
 }
 
 VmCowPages::ReclaimCounts VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offset,
                                                   EvictionHintAction hint_action,
-                                                  list_node* freed_list, VmCompressor* compressor) {
-  DEBUG_ASSERT(freed_list);
+                                                  VmCompressor* compressor) {
   canary_.Assert();
 
   Guard<CriticalMutex> guard{lock()};
@@ -6601,34 +6603,17 @@ VmCowPages::ReclaimCounts VmCowPages::ReclaimPage(vm_page_t* page, uint64_t offs
     return ReclaimCounts{};
   }
 
-  auto single_page_wrapper = [&](bool reclaimed) {
-    if (reclaimed) {
-      DEBUG_ASSERT(!list_in_list(&page->queue_node));
-      list_add_tail(freed_list, &page->queue_node);
-      return 1u;
-    }
-    return 0u;
-  };
-
   // See if we can reclaim by eviction.
   if (can_evict()) {
-    const bool loaned = page->is_loaned();
-    const uint count = single_page_wrapper(RemovePageForEvictionLocked(page, offset, hint_action));
-    return ReclaimCounts{
-        .evicted_non_loaned = loaned ? 0u : count,
-        .evicted_loaned = loaned ? count : 0u,
-    };
+    return ReclaimPageForEvictionLocked(page, offset, hint_action);
   } else if (compressor && !page_source_ && !discardable_tracker_) {
-    return ReclaimCounts{
-        .compressed =
-            single_page_wrapper(RemovePageForCompressionLocked(page, offset, compressor, guard)),
-    };
+    return ReclaimPageForCompressionLocked(page, offset, compressor, guard);
   } else if (discardable_tracker_) {
     // On any errors touch the page so we stop trying to reclaim it. In particular for discardable
     // reclamation attempts, if the page we are passing is not the first page in the discardable
     // VMO then the discard will fail, so touching it will stop us from continuously trying to
     // trigger a discard with it.
-    auto result = ReclaimDiscardableLocked(page, offset, freed_list);
+    auto result = ReclaimDiscardableLocked(page, offset);
     if (result.is_error()) {
       pmm_page_queues()->MarkAccessed(page);
       vm_vmo_discardable_failed_reclaim.Add(1);
@@ -7409,15 +7394,15 @@ VmCowPages::DiscardablePageCounts VmCowPages::DebugGetDiscardablePageCounts() co
   return counts;
 }
 
-uint64_t VmCowPages::DiscardPages(list_node_t* freed_list) {
+uint64_t VmCowPages::DiscardPages() {
   canary_.Assert();
 
   Guard<CriticalMutex> guard{lock()};
   // Discard any errors and overlap a 0 return value for errors.
-  return DiscardPagesLocked(freed_list).value_or(0);
+  return DiscardPagesLocked().value_or(0);
 }
 
-zx::result<uint64_t> VmCowPages::DiscardPagesLocked(list_node_t* freed_list) {
+zx::result<uint64_t> VmCowPages::DiscardPagesLocked() {
   // Not a discardable VMO.
   if (!discardable_tracker_) {
     return zx::error(ZX_ERR_BAD_STATE);
@@ -7429,25 +7414,19 @@ zx::result<uint64_t> VmCowPages::DiscardPagesLocked(list_node_t* freed_list) {
   }
 
   // Remove all pages.
-  uint64_t pages_freed = 0;
-  zx_status_t status = UnmapAndRemovePagesLocked(0, size_, freed_list, &pages_freed);
+  zx::result<uint64_t> result = UnmapAndFreePagesLocked(0, size_);
 
-  if (status != ZX_OK) {
-    ASSERT(pages_freed == 0);
-    return zx::error(status);
+  if (result.is_ok()) {
+    reclamation_event_count_++;
+    IncrementHierarchyGenerationCountLocked();
+
+    // Set state to discarded.
+    discardable_tracker_->SetDiscardedLocked();
   }
-
-  reclamation_event_count_++;
-  IncrementHierarchyGenerationCountLocked();
-
-  // Set state to discarded.
-  discardable_tracker_->SetDiscardedLocked();
-
-  return zx::ok(pages_freed);
+  return result;
 }
 
-zx::result<uint64_t> VmCowPages::ReclaimDiscardableLocked(vm_page_t* page, uint64_t offset,
-                                                          list_node_t* freed_list) {
+zx::result<uint64_t> VmCowPages::ReclaimDiscardableLocked(vm_page_t* page, uint64_t offset) {
   DEBUG_ASSERT(discardable_tracker_);
   // Check if this is the first page.
   bool first = false;
@@ -7462,7 +7441,7 @@ zx::result<uint64_t> VmCowPages::ReclaimDiscardableLocked(vm_page_t* page, uint6
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
 
-  return DiscardPagesLocked(freed_list);
+  return DiscardPagesLocked();
 }
 
 void VmCowPages::CopyPageForReplacementLocked(vm_page_t* dst_page, vm_page_t* src_page) {

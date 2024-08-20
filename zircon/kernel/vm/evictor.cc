@@ -71,16 +71,9 @@ ktl::optional<Evictor::EvictedPageCounts> ReclaimFromGlobalPageQueues(
         return ktl::nullopt;
       }
     }
-    // We stack-own loaned pages from ReclaimPage() to pmm_free() below.
-    __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
-    list_node_t reclaim_list;
-    list_initialize(&reclaim_list);
     VmCowPages::ReclaimCounts reclaimed = backlink->cow->ReclaimPage(
-        backlink->page, backlink->offset, hint_action, &reclaim_list, compression_instance);
+        backlink->page, backlink->offset, hint_action, compression_instance);
 
-    if (!list_is_empty(&reclaim_list)) {
-      pmm_free(&reclaim_list);
-    }
     return Evictor::EvictedPageCounts{
         .pager_backed = reclaimed.evicted_non_loaned,
         .pager_backed_loaned = reclaimed.evicted_loaned,
