@@ -8,7 +8,6 @@
 //! Exposes fuchsia.netpol.socketproxy.StarnixNetworks and
 //! fuchsia.netpol.socketproxy.DnsServerWatcher.
 
-use fidl_fuchsia_netpol_socketproxy as fnp_socketproxy;
 use fidl_fuchsia_posix_socket::{self as fposix_socket, OptionalUint32};
 use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_inspect::health::Reporter;
@@ -19,6 +18,7 @@ use futures::StreamExt as _;
 use std::sync::Arc;
 use tracing::error;
 
+mod dns_watcher;
 mod registry;
 
 struct SocketMarks {
@@ -39,22 +39,23 @@ impl Default for SocketMarks {
 #[derive(Inspect)]
 struct SocketProxy {
     registry: registry::Registry,
-
-    #[inspect(skip)]
-    _dns_rx: Arc<Mutex<mpsc::Receiver<Vec<fnp_socketproxy::DnsServerList>>>>,
+    dns_watcher: dns_watcher::DnsServerWatcher,
 }
 
 impl SocketProxy {
     fn new() -> Self {
         let mark = Arc::new(Mutex::new(SocketMarks::default()));
         let (dns_tx, dns_rx) = mpsc::channel(1);
-        let _dns_rx = Arc::new(Mutex::new(dns_rx));
-        Self { registry: registry::Registry::new(mark.clone(), dns_tx), _dns_rx }
+        Self {
+            registry: registry::Registry::new(mark.clone(), dns_tx),
+            dns_watcher: dns_watcher::DnsServerWatcher::new(Arc::new(Mutex::new(dns_rx))),
+        }
     }
 }
 
 enum IncomingService {
     StarnixNetworks(fidl_fuchsia_netpol_socketproxy::StarnixNetworksRequestStream),
+    DnsServerWatcher(fidl_fuchsia_netpol_socketproxy::DnsServerWatcherRequestStream),
 }
 
 /// Main entry point for the network socket proxy.
@@ -69,8 +70,10 @@ pub async fn main() -> Result<(), anyhow::Error> {
     let proxy = SocketProxy::new().with_inspect(inspector.root(), "root")?;
 
     let mut fs = ServiceFs::new_local();
-    let _: &mut ServiceFsDir<'_, _> =
-        fs.dir("svc").add_fidl_service(IncomingService::StarnixNetworks);
+    let _: &mut ServiceFsDir<'_, _> = fs
+        .dir("svc")
+        .add_fidl_service(IncomingService::StarnixNetworks)
+        .add_fidl_service(IncomingService::DnsServerWatcher);
 
     let _: &mut ServiceFs<_> = fs.take_and_serve_directory_handle()?;
 
@@ -78,9 +81,9 @@ pub async fn main() -> Result<(), anyhow::Error> {
 
     fs.for_each_concurrent(100, |service| async {
         match service {
-            IncomingService::StarnixNetworks(stream) => proxy.registry.run_starnix(stream),
+            IncomingService::StarnixNetworks(stream) => proxy.registry.run_starnix(stream).await,
+            IncomingService::DnsServerWatcher(stream) => proxy.dns_watcher.run(stream).await,
         }
-        .await
         .unwrap_or_else(|e| error!("{e:?}"))
     })
     .await;

@@ -13,12 +13,18 @@
     },
     capabilities: [
         {
-            protocol: [ "fuchsia.netpol.socketproxy.StarnixNetworks" ],
+            protocol: [
+                "fuchsia.netpol.socketproxy.DnsServerWatcher",
+                "fuchsia.netpol.socketproxy.StarnixNetworks",
+            ],
         },
     ],
     expose: [
         {
-            protocol: [ "fuchsia.netpol.socketproxy.StarnixNetworks" ],
+            protocol: [
+                "fuchsia.netpol.socketproxy.DnsServerWatcher",
+                "fuchsia.netpol.socketproxy.StarnixNetworks",
+            ],
             from: "self",
         },
     ],
