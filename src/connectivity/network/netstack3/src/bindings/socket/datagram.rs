@@ -2470,7 +2470,7 @@ mod tests {
             .build()
             .await;
 
-        let (proxy, event) = get_socket_and_event::<A>(t.get(0), proto).await;
+        let (proxy, event) = get_socket_and_event::<A>(t.get_mut(0), proto).await;
         (t, proxy, event)
     }
 
@@ -2655,7 +2655,7 @@ mod tests {
     #[fixture::teardown(TestSetup::shutdown)]
     async fn bind<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol) {
         let (mut t, socket, _event) = prepare_test::<A>(proto).await;
-        let stack = t.get(0);
+        let stack = t.get_mut(0);
         // Can bind to local address.
         let () = socket.bind(&A::create(A::LOCAL_ADDR, 200)).await.unwrap().expect("bind succeeds");
 
@@ -2812,7 +2812,7 @@ mod tests {
             .build()
             .await;
 
-        let alice = t.get(0);
+        let alice = t.get_mut(0);
         let (alice_socket, alice_events) = get_socket_and_event::<A>(alice, proto).await;
 
         // Verify that Alice has no local or peer addresses bound
@@ -2863,7 +2863,7 @@ mod tests {
 
         // Setup Bob as a client, bound to REMOTE_ADDR:300
         println!("Configuring bob...");
-        let bob = t.get(1);
+        let bob = t.get_mut(1);
         let (bob_socket, bob_events) = get_socket_and_event::<A>(bob, proto).await;
         let () = bob_socket
             .bind(&A::create(A::REMOTE_ADDR, 300))
@@ -2983,7 +2983,7 @@ mod tests {
         domain: fposix_socket::Domain,
         proto: fposix_socket::DatagramSocketProtocol,
     ) {
-        let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await;
+        let t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await;
         let test_stack = t.get(0);
         let socket_provider = test_stack.connect_socket_provider();
         let response = socket_provider
@@ -3021,7 +3021,7 @@ mod tests {
         domain: fposix_socket::Domain,
         proto: fposix_socket::DatagramSocketProtocol,
     ) {
-        let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await;
+        let t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await;
         let test_stack = t.get(0);
         let socket_provider = test_stack.connect_socket_provider();
         let response = socket_provider
@@ -3078,7 +3078,7 @@ mod tests {
             .build()
             .await;
 
-        let (alice_socket, alice_events) = get_socket_and_event::<A>(t.get(0), proto).await;
+        let (alice_socket, alice_events) = get_socket_and_event::<A>(t.get_mut(0), proto).await;
         let alice_cloned = socket_clone(&alice_socket);
         let fposix_socket::SynchronousDatagramSocketDescribeResponse { event: alice_event, .. } =
             alice_cloned.describe().await.expect("Describe call succeeds");
@@ -3095,7 +3095,7 @@ mod tests {
             A::create(A::LOCAL_ADDR, 200)
         );
 
-        let (bob_socket, bob_events) = get_socket_and_event::<A>(t.get(1), proto).await;
+        let (bob_socket, bob_events) = get_socket_and_event::<A>(t.get_mut(1), proto).await;
         let bob_cloned = socket_clone(&bob_socket);
         let () = bob_cloned
             .bind(&A::create(A::REMOTE_ADDR, 200))
@@ -3210,7 +3210,7 @@ mod tests {
 
                 // Make sure the sockets are still in the stack.
                 for i in 0..2 {
-                    t.get(i).with_ctx(|ctx| {
+                    t.get_mut(i).with_ctx(|ctx| {
                         assert_matches!(
                             &<T as Transport<IpFromSockAddr<A>>>::collect_all_sockets(ctx)[..],
                             [_]
@@ -3233,7 +3233,7 @@ mod tests {
 
                 // But the sockets should have gone here.
                 for i in 0..2 {
-                    t.get(i).with_ctx(|ctx| {
+                    t.get_mut(i).with_ctx(|ctx| {
                         assert_matches!(
                             &<T as Transport<IpFromSockAddr<A>>>::collect_all_sockets(ctx)[..],
                             []
@@ -3266,7 +3266,7 @@ mod tests {
         // Make sure we cannot close twice from the same channel so that we
         // maintain the correct refcount.
         let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await;
-        let test_stack = t.get(0);
+        let test_stack = t.get_mut(0);
         let socket = get_socket::<A>(test_stack, proto).await;
         let cloned = socket_clone(&socket);
         let () = socket
@@ -3312,7 +3312,7 @@ mod tests {
         T: Transport<<A::AddrType as IpAddress>::Version>,
     {
         let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await;
-        let test_stack = t.get(0);
+        let test_stack = t.get_mut(0);
         let cloned = {
             let socket = get_socket::<A>(test_stack, proto).await;
             socket_clone(&socket)
@@ -3343,7 +3343,7 @@ mod tests {
         T: Transport<<A::AddrType as IpAddress>::Version>,
     {
         let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await;
-        let test_stack = t.get(0);
+        let test_stack = t.get_mut(0);
         let socket = get_socket::<A>(test_stack, proto).await;
         let () = socket
             .close()
@@ -3373,7 +3373,7 @@ mod tests {
             .build()
             .await;
 
-        let (socket, events) = get_socket_and_event::<A>(t.get(0), proto).await;
+        let (socket, events) = get_socket_and_event::<A>(t.get_mut(0), proto).await;
         let local = A::create(A::LOCAL_ADDR, 200);
         let remote = A::create(A::REMOTE_ADDR, 300);
         assert_eq!(
@@ -3496,7 +3496,7 @@ mod tests {
     {
         let mut t = TestSetupBuilder::new().add_stack(StackSetupBuilder::new()).build().await;
 
-        let (socket, _events) = get_socket_and_event::<A>(t.get(0), proto).await;
+        let (socket, _events) = get_socket_and_event::<A>(t.get_mut(0), proto).await;
         let addr =
             A::create(<<A::AddrType as IpAddress>::Version as Ip>::LOOPBACK_ADDRESS.get(), 200);
         socket.bind(&addr).await.unwrap().expect("bind should succeed");
@@ -3523,7 +3523,7 @@ mod tests {
         }
 
         // Wait for all packets to be delivered before changing the buffer size.
-        let stack = t.get(0);
+        let stack = t.get_mut(0);
         let has_all_delivered = |messages: &MessageQueue<_>| {
             messages.available_messages().len() == usize::from(SENT_PACKETS)
         };
@@ -3670,7 +3670,7 @@ mod tests {
     async fn multicast_join_receive<A: TestSockAddr, T>(
         proto: fposix_socket::DatagramSocketProtocol,
     ) {
-        let (mut t, proxy, event) = prepare_test::<A>(proto).await;
+        let (t, proxy, event) = prepare_test::<A>(proto).await;
 
         let mcast_addr = <<A::AddrType as IpAddress>::Version as Ip>::MULTICAST_SUBNET.network();
         let id = t.get(0).get_endpoint_id(1);
@@ -3899,7 +3899,7 @@ mod tests {
             .build()
             .await;
 
-        let alice = t.get(0);
+        let alice = t.get_mut(0);
         let (alice_socket, alice_events) = get_socket_and_event::<A>(alice, proto).await;
 
         // Setup Alice as a server, bound to LOCAL_ADDR:200
@@ -3912,7 +3912,7 @@ mod tests {
 
         // Setup Bob as a client, bound to REMOTE_ADDR:300
         println!("Configuring bob...");
-        let bob = t.get(1);
+        let bob = t.get_mut(1);
         let bob_socket = get_socket::<A>(bob, proto).await;
         let () = bob_socket
             .bind(&A::create(A::REMOTE_ADDR, 300))

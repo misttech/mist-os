@@ -1154,7 +1154,7 @@ mod tests {
     #[fasync::run_singlethreaded(test)]
     async fn table_added_in_both_core_and_bindings<I: IpExt>() {
         set_logger_for_test();
-        let mut t = TestSetupBuilder::new()
+        let t = TestSetupBuilder::new()
             .add_endpoint()
             .add_stack(StackSetupBuilder::new().add_endpoint(1, None))
             .build()

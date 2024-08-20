@@ -1341,6 +1341,55 @@ impl IntoFidl<fnet_interfaces_admin::ArpConfiguration> for ArpConfiguration {
 }
 
 #[cfg(test)]
+pub(crate) mod testutils {
+    use crate::bindings::integration_tests::{StackSetupBuilder, TestSetup, TestSetupBuilder};
+    use const_unwrap::const_unwrap_option;
+
+    use super::*;
+
+    pub(crate) const BINDING_ID1: BindingId = const_unwrap_option(NonZeroU64::new(1));
+    pub(crate) const BINDING_ID2: BindingId = const_unwrap_option(NonZeroU64::new(2));
+    pub(crate) const INVALID_BINDING_ID: BindingId = const_unwrap_option(NonZeroU64::new(3));
+
+    pub(crate) struct FakeConversionContext {
+        test_setup: TestSetup,
+    }
+
+    impl FakeConversionContext {
+        pub(crate) async fn shutdown(self) {
+            let Self { test_setup } = self;
+            test_setup.shutdown().await
+        }
+
+        pub(crate) async fn new() -> Self {
+            // Create a `TestStack` with two interfaces. Loopback implicitly
+            // exists, so we only need to actually install one endpoint.
+            let mut test_setup = TestSetupBuilder::new()
+                .add_endpoint()
+                .add_stack(StackSetupBuilder::new().add_endpoint(1, None))
+                .build()
+                .await;
+
+            let test_stack = test_setup.get_mut(0);
+            test_stack.wait_for_interface_online(BINDING_ID1).await;
+            test_stack.wait_for_interface_online(BINDING_ID2).await;
+
+            Self { test_setup }
+        }
+    }
+
+    impl ConversionContext for FakeConversionContext {
+        fn get_core_id(&self, binding_id: BindingId) -> Option<DeviceId<BindingsCtx>> {
+            self.test_setup.get(0).ctx().bindings_ctx().get_core_id(binding_id)
+        }
+
+        fn get_binding_id(&self, core_id: DeviceId<BindingsCtx>) -> BindingId {
+            core_id.bindings_id().id
+        }
+    }
+}
+
+#[cfg(test)]
 mod tests {
     use fidl_fuchsia_net as fidl_net;
     use fidl_fuchsia_net_ext::IntoExt;
@@ -1348,47 +1397,11 @@ mod tests {
     use net_declare::{net_ip_v4, net_ip_v6};
     use test_case::test_case;
 
-    use crate::bindings::integration_tests::TestStack;
+    use crate::bindings::util::testutils::{
+        FakeConversionContext, BINDING_ID1, INVALID_BINDING_ID,
+    };
 
     use super::*;
-
-    struct FakeConversionContext {
-        binding: BindingId,
-        core: DeviceId<BindingsCtx>,
-        test_stack: TestStack,
-    }
-
-    impl FakeConversionContext {
-        async fn shutdown(self) {
-            let Self { binding, core, test_stack } = self;
-            std::mem::drop((binding, core));
-            test_stack.shutdown().await
-        }
-
-        async fn new() -> Self {
-            // Create a test stack to get a valid device ID.
-            let mut test_stack = TestStack::new(None);
-            let binding = BindingId::MIN;
-            test_stack.wait_for_interface_online(binding).await;
-            let ctx = test_stack.ctx();
-            let core = ctx.bindings_ctx().get_core_id(binding).expect("should get core ID");
-            Self { binding, core, test_stack }
-        }
-    }
-
-    impl ConversionContext for FakeConversionContext {
-        fn get_core_id(&self, binding_id: BindingId) -> Option<DeviceId<BindingsCtx>> {
-            if binding_id == self.binding {
-                Some(self.core.clone())
-            } else {
-                None
-            }
-        }
-
-        fn get_binding_id(&self, core_id: DeviceId<BindingsCtx>) -> BindingId {
-            core_id.bindings_id().id
-        }
-    }
 
     fn create_addr_v4(bytes: [u8; 4]) -> (IpAddr, fidl_net::IpAddress) {
         let core = IpAddr::V4(Ipv4Addr::from(bytes));
@@ -1496,7 +1509,7 @@ mod tests {
         fidl_net::Ipv6SocketAddress {
             address: net_ip_v6!("fe80::1").into_ext(),
             port: 8080,
-            zone_index: 2
+            zone_index: INVALID_BINDING_ID.into(),
         },
         SocketAddressError::Device(DeviceNotFoundError);
         "IPv6 specified invalid zone")]
@@ -1547,7 +1560,7 @@ mod tests {
         fidl_net::Ipv6SocketAddress {
             address: net_ip_v6!("fe80::1").into_ext(),
             port: 8080,
-            zone_index: 1
+            zone_index: BINDING_ID1.into()
         },
         (Some(
             ZonedAddr::Zoned(AddrAndZone::new(SpecifiedAddr::new(net_ip_v6!("fe80::1")).unwrap(), ReplaceWithCoreId).unwrap())
@@ -1569,9 +1582,10 @@ mod tests {
         let ctx = FakeConversionContext::new().await;
         let zoned = zoned.map(|z| match z {
             ZonedAddr::Unzoned(z) => ZonedAddr::Unzoned(z).into(),
-            ZonedAddr::Zoned(z) => {
-                ZonedAddr::Zoned(z.map_zone(|ReplaceWithCoreId| ctx.core.clone())).into()
-            }
+            ZonedAddr::Zoned(z) => ZonedAddr::Zoned(
+                z.map_zone(|ReplaceWithCoreId| ctx.get_core_id(BINDING_ID1).unwrap()),
+            )
+            .into(),
         });
 
         let result: (Option<ZonedAddr<_, _>>, _) =
@@ -1625,12 +1639,14 @@ mod tests {
     #[fuchsia_async::run_singlethreaded(test)]
     async fn device_id_from_bindings_id() {
         let ctx = FakeConversionContext::new().await;
-        let id = ctx.binding;
-        let device_id: DeviceId<_> = id.try_into_core_with_ctx(&ctx).unwrap();
-        assert_eq!(device_id, ctx.core);
+        let device_id: DeviceId<_> = BINDING_ID1.try_into_core_with_ctx(&ctx).unwrap();
+        let core = ctx.get_core_id(BINDING_ID1).unwrap();
+        assert_eq!(device_id, core);
 
-        let bad_id = id.checked_add(1).unwrap();
-        assert_eq!(bad_id.try_into_core_with_ctx(&ctx), Err::<DeviceId<_>, _>(DeviceNotFoundError));
+        assert_eq!(
+            INVALID_BINDING_ID.try_into_core_with_ctx(&ctx),
+            Err::<DeviceId<_>, _>(DeviceNotFoundError)
+        );
         ctx
     }
 
