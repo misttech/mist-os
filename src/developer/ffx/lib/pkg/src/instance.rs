@@ -284,6 +284,9 @@ pub async fn write_instance_info(
         pid: process::id(),
     };
     if let Some(existing) = mgr.get_instance(name.into())? {
+        if existing.pid != info.pid {
+            bail!("Cannot overrite running server with same name and a different pid: {name} existing pid: {} new pid: {}", existing.pid, info.pid);
+        }
         let message = format!("WARNING: Overwriting server info for {name}: {existing:?}");
         tracing::error!("{message}");
     }

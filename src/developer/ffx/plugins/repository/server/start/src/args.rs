@@ -26,15 +26,25 @@ pub struct StartCommand {
     #[argh(option)]
     pub address: Option<SocketAddr>,
 
+    /// run server as a background process. This is mutually
+    /// exclusive with --daemon and --foreground.
+    #[argh(switch)]
+    pub background: bool,
+
     /// run server in as part of the ffx daemon. This is the
     /// default mode. This switch is mutually exclusive with
-    /// --foreground.
+    /// --background and --foreground.
     #[argh(switch)]
     pub daemon: bool,
 
-    /// run server in as a foreground process.
+    /// run server as a foreground process. This is mutually
+    /// exclusive with --daemon and --background.
     #[argh(switch)]
     pub foreground: bool,
+
+    /// option used to indicate running as a detached process. Hidden from help.
+    #[argh(switch, hidden_help)]
+    pub disconnected: bool,
 
     #[argh(option, short = 'r')]
     /// register this repository.
