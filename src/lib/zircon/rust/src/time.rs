@@ -10,16 +10,49 @@ use std::{ops, time as stdtime};
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(transparent)]
-pub struct Duration(sys::zx_duration_t);
-
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-#[repr(transparent)]
 pub struct Time(sys::zx_time_t);
 
-impl From<stdtime::Duration> for Duration {
-    fn from(dur: stdtime::Duration) -> Self {
-        Duration::from_seconds(dur.as_secs() as i64)
-            + Duration::from_nanos(dur.subsec_nanos() as i64)
+impl Time {
+    pub const INFINITE: Time = Time(sys::ZX_TIME_INFINITE);
+    pub const INFINITE_PAST: Time = Time(sys::ZX_TIME_INFINITE_PAST);
+    pub const ZERO: Time = Time(0);
+
+    /// Get the current monotonic time.
+    ///
+    /// Wraps the
+    /// [zx_clock_get_monotonic](https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_get_monotonic.md)
+    /// syscall.
+    pub fn get_monotonic() -> Time {
+        unsafe { Time(sys::zx_clock_get_monotonic()) }
+    }
+
+    /// Compute a deadline for the time in the future that is the given `Duration` away.
+    ///
+    /// Wraps the
+    /// [zx_deadline_after](https://fuchsia.dev/fuchsia-src/reference/syscalls/deadline_after.md)
+    /// syscall.
+    pub fn after(duration: Duration) -> Time {
+        unsafe { Time(sys::zx_deadline_after(duration.0)) }
+    }
+
+    /// Sleep until the given time.
+    ///
+    /// Wraps the
+    /// [zx_nanosleep](https://fuchsia.dev/fuchsia-src/reference/syscalls/nanosleep.md)
+    /// syscall.
+    pub fn sleep(self) {
+        unsafe {
+            sys::zx_nanosleep(self.0);
+        }
+    }
+
+    /// Returns the number of nanoseconds since the epoch contained by this `Time`.
+    pub const fn into_nanos(self) -> i64 {
+        self.0
+    }
+
+    pub const fn from_nanos(nanos: i64) -> Self {
+        Time(nanos)
     }
 }
 
@@ -27,6 +60,43 @@ impl ops::Add<Duration> for Time {
     type Output = Time;
     fn add(self, dur: Duration) -> Time {
         Time::from_nanos(dur.into_nanos().saturating_add(self.into_nanos()))
+    }
+}
+
+impl ops::Sub<Duration> for Time {
+    type Output = Time;
+    fn sub(self, dur: Duration) -> Time {
+        Time::from_nanos(self.into_nanos().saturating_sub(dur.into_nanos()))
+    }
+}
+
+impl ops::Sub<Time> for Time {
+    type Output = Duration;
+    fn sub(self, other: Time) -> Duration {
+        Duration::from_nanos(self.into_nanos().saturating_sub(other.into_nanos()))
+    }
+}
+
+impl ops::AddAssign<Duration> for Time {
+    fn add_assign(&mut self, dur: Duration) {
+        self.0 = self.0.saturating_add(dur.into_nanos());
+    }
+}
+
+impl ops::SubAssign<Duration> for Time {
+    fn sub_assign(&mut self, dur: Duration) {
+        self.0 = self.0.saturating_sub(dur.into_nanos());
+    }
+}
+
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[repr(transparent)]
+pub struct Duration(sys::zx_duration_t);
+
+impl From<stdtime::Duration> for Duration {
+    fn from(dur: stdtime::Duration) -> Self {
+        Duration::from_seconds(dur.as_secs() as i64)
+            + Duration::from_nanos(dur.subsec_nanos() as i64)
     }
 }
 
@@ -51,20 +121,6 @@ impl ops::Sub for Duration {
     }
 }
 
-impl ops::Sub<Duration> for Time {
-    type Output = Time;
-    fn sub(self, dur: Duration) -> Time {
-        Time::from_nanos(self.into_nanos().saturating_sub(dur.into_nanos()))
-    }
-}
-
-impl ops::Sub<Time> for Time {
-    type Output = Duration;
-    fn sub(self, other: Time) -> Duration {
-        Duration::from_nanos(self.into_nanos().saturating_sub(other.into_nanos()))
-    }
-}
-
 impl ops::AddAssign for Duration {
     fn add_assign(&mut self, dur: Duration) {
         self.0 = self.0.saturating_add(dur.into_nanos());
@@ -72,18 +128,6 @@ impl ops::AddAssign for Duration {
 }
 
 impl ops::SubAssign for Duration {
-    fn sub_assign(&mut self, dur: Duration) {
-        self.0 = self.0.saturating_sub(dur.into_nanos());
-    }
-}
-
-impl ops::AddAssign<Duration> for Time {
-    fn add_assign(&mut self, dur: Duration) {
-        self.0 = self.0.saturating_add(dur.into_nanos());
-    }
-}
-
-impl ops::SubAssign<Duration> for Time {
     fn sub_assign(&mut self, dur: Duration) {
         self.0 = self.0.saturating_sub(dur.into_nanos());
     }
@@ -268,50 +312,6 @@ impl DurationNum for i64 {
 
     fn hours(self) -> Duration {
         Duration::from_hours(self)
-    }
-}
-
-impl Time {
-    pub const INFINITE: Time = Time(sys::ZX_TIME_INFINITE);
-    pub const INFINITE_PAST: Time = Time(sys::ZX_TIME_INFINITE_PAST);
-    pub const ZERO: Time = Time(0);
-
-    /// Get the current monotonic time.
-    ///
-    /// Wraps the
-    /// [zx_clock_get_monotonic](https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_get_monotonic.md)
-    /// syscall.
-    pub fn get_monotonic() -> Time {
-        unsafe { Time(sys::zx_clock_get_monotonic()) }
-    }
-
-    /// Compute a deadline for the time in the future that is the given `Duration` away.
-    ///
-    /// Wraps the
-    /// [zx_deadline_after](https://fuchsia.dev/fuchsia-src/reference/syscalls/deadline_after.md)
-    /// syscall.
-    pub fn after(duration: Duration) -> Time {
-        unsafe { Time(sys::zx_deadline_after(duration.0)) }
-    }
-
-    /// Sleep until the given time.
-    ///
-    /// Wraps the
-    /// [zx_nanosleep](https://fuchsia.dev/fuchsia-src/reference/syscalls/nanosleep.md)
-    /// syscall.
-    pub fn sleep(self) {
-        unsafe {
-            sys::zx_nanosleep(self.0);
-        }
-    }
-
-    /// Returns the number of nanoseconds since the epoch contained by this `Time`.
-    pub const fn into_nanos(self) -> i64 {
-        self.0
-    }
-
-    pub const fn from_nanos(nanos: i64) -> Self {
-        Time(nanos)
     }
 }
 
