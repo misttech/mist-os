@@ -10,58 +10,9 @@ load(
 
 package(default_visibility = [
     "//build/bazel/assembly:__subpackages__",
-    "//products:__subpackages__",
-    "//vendor/google:__subpackages__",
 ])
 
 py_binary(
     name = "diff_json",
     srcs = ["diff_json.py"],
-)
-
-# TODO(b/294853608): Remove once clients have moved to //products/zedboot.
-fuchsia_product_configuration(
-    name = "zedboot",
-    product_config_json = {
-        "platform": {
-            "build_type": BUILD_TYPES.ENG,
-            "feature_set_level": "bootstrap",
-            "storage": {
-                "filesystems": {
-                    "image_name": "zedboot",
-                    "image_mode": "no_image",
-                    "volume": {
-                        "fvm": {
-                            "blob": {
-                            },
-                            "data": {
-                            },
-                        },
-                    },
-                },
-            },
-        },
-    },
-)
-
-fuchsia_product_configuration(
-    name = "default",
-    product_config_json = {
-        "platform": {
-            "build_type": BUILD_TYPES.ENG,
-            "feature_set_level": "bootstrap",
-            "storage": {
-                "filesystems": {
-                    "volume": {
-                        "fvm": {
-                            "data": {
-                            },
-                            "blob": {
-                            },
-                        },
-                    },
-                },
-            },
-        },
-    },
 )
