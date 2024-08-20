@@ -8,6 +8,8 @@
 #include <lib/ddk/platform-defs.h>
 #include <lib/zx/clock.h>
 
+#include <bind/fuchsia/cpp/bind.h>
+
 #include "src/devices/lib/acpi/client.h"
 
 namespace audio::da7219 {
@@ -83,12 +85,13 @@ zx_status_t Driver::Bind(void* ctx, zx_device_t* parent) {
   }
 
   auto output_driver = std::make_unique<Driver>(parent, core, false);
-  zx_device_prop_t output_props[] = {
-      {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_DIALOG},
-      {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_DIALOG_DA7219},
-      {BIND_CODEC_INSTANCE, 0, 1},
+  zx_device_str_prop_t output_props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID, static_cast<uint32_t>(PDEV_VID_DIALOG)),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                           static_cast<uint32_t>(PDEV_DID_DIALOG_DA7219)),
+      ddk::MakeStrProperty(bind_fuchsia::CODEC_INSTANCE, 1u),
   };
-  status = output_driver->DdkAdd(ddk::DeviceAddArgs("DA7219-output").set_props(output_props));
+  status = output_driver->DdkAdd(ddk::DeviceAddArgs("DA7219-output").set_str_props(output_props));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not add to DDK");
     return status;
@@ -96,12 +99,13 @@ zx_status_t Driver::Bind(void* ctx, zx_device_t* parent) {
   output_driver.release();
 
   auto input_driver = std::make_unique<Driver>(parent, core, true);
-  zx_device_prop_t input_props[] = {
-      {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_DIALOG},
-      {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_DIALOG_DA7219},
-      {BIND_CODEC_INSTANCE, 0, 2},
+  zx_device_str_prop_t input_props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID, static_cast<uint32_t>(PDEV_VID_DIALOG)),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                           static_cast<uint32_t>(PDEV_DID_DIALOG_DA7219)),
+      ddk::MakeStrProperty(bind_fuchsia::CODEC_INSTANCE, 2u),
   };
-  status = input_driver->DdkAdd(ddk::DeviceAddArgs("DA7219-input").set_props(input_props));
+  status = input_driver->DdkAdd(ddk::DeviceAddArgs("DA7219-input").set_str_props(input_props));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not add to DDK");
     return status;

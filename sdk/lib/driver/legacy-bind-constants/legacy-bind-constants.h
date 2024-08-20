@@ -79,20 +79,6 @@
 #define BIND_POWER_DOMAIN 0x0A20
 #define BIND_POWER_DOMAIN_COMPOSITE 0x0A21
 
-// POWER binding variables at 0x0A3X
-#define BIND_CLOCK_ID 0x0A30
-
-// PWM binding variables at 0x0A5X
-#define BIND_PWM_ID 0x0A50
-
-// Init Step binding variables at 0x0A6X
-#define BIND_INIT_STEP 0x0A60
-
-// Codec binding variables at 0x0A7X
-#define BIND_CODEC_INSTANCE 0x0A70
-
-// Power sensor binding variables at 0x0A9X
-#define BIND_POWER_SENSOR_DOMAIN 0x0A90
 // LINT.ThenChange(/src/lib/ddk/include/lib/ddk/binding_priv.h)
 
 #endif  // LIB_DRIVER_LEGACY_BIND_CONSTANTS_LEGACY_BIND_CONSTANTS_H_

@@ -51,6 +51,7 @@ source_set("common-dfv1") {
     ":bind",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
     "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/lib/acpi",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",

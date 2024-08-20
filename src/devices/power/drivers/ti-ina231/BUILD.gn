@@ -15,6 +15,7 @@ group("common") {
   public_deps = [
     ":bind",
     "//sdk/fidl/fuchsia.hardware.power.sensor:fuchsia.hardware.power.sensor_cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/i2c/lib/device-protocol-i2c-channel",
     "//src/devices/lib/driver",
     "//src/lib/ddk",

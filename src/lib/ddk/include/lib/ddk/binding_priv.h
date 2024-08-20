@@ -135,25 +135,25 @@ __BEGIN_CDECLS
 #define BIND_POWER_DOMAIN_COMPOSITE 0x0A21
 
 // POWER binding variables at 0x0A3X
-#define BIND_CLOCK_ID 0x0A30
+// BIND_CLOCK_ID was 0x0A30
 
 // SPI binding variables at 0x0A4X
 // BIND_SPI_BUS_ID was 0x0A41
 // BIND_SPI_CHIP_SELECT was 0x0A42
 
 // PWM binding variables at 0x0A5X
-#define BIND_PWM_ID 0x0A50
+// BIND_PWM_ID was 0x0A50
 
 // Init Step binding variables at 0x0A6X
-#define BIND_INIT_STEP 0x0A60
+// BIND_INIT_STEP was 0x0A60
 
 // Codec binding variables at 0x0A7X
-#define BIND_CODEC_INSTANCE 0x0A70
+// BIND_CODEC_INSTANCE was 0x0A70
 
 // 0x0A80 was BIND_REGISTER_ID which is now deprecated.
 
 // Power sensor binding variables at 0x0A9X
-#define BIND_POWER_SENSOR_DOMAIN 0x0A90
+// BIND_POWER_SENSOR_DOMAIN was 0x0A90
 // LINT.ThenChange(/sdk/lib/driver/legacy-bind-constants/legacy-bind-constants.h)
 
 typedef struct zx_bind_inst {

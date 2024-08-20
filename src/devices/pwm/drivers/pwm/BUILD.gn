@@ -63,6 +63,7 @@ group("common") {
     "//sdk/banjo/fuchsia.hardware.pwm:fuchsia.hardware.pwm_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_cpp",
     "//sdk/lib/component/outgoing/cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/lib/amlogic",
     "//src/devices/lib/driver:driver_runtime",
     "//src/lib/ddk",
