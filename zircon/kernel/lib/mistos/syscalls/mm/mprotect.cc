@@ -25,11 +25,13 @@ using namespace starnix_syscalls;
 
 long sys_mprotect(unsigned long start, size_t len, unsigned long prot) {
   LTRACEF_LEVEL(2, "start=0x%lx len=%ld prot=0x%lx\n", start, len, prot);
+#if 0
   auto ut = ThreadDispatcher::GetCurrent();
   auto syscall_ret = sys_mprotect(CurrentTask::From(TaskBuilder(ut->task()->task())),
                                   UserAddress(start), len, static_cast<uint32_t>(prot));
   if (syscall_ret.is_error()) {
     return syscall_ret.error_value().return_value();
   }
+#endif
   return SyscallResult::From(0).value();
 }
