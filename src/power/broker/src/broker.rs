@@ -152,6 +152,7 @@ impl Broker {
         let permissions = match dependency_type {
             DependencyType::Assertive => Permissions::MODIFY_ASSERTIVE_DEPENDENT,
             DependencyType::Opportunistic => Permissions::MODIFY_OPPORTUNISTIC_DEPENDENT,
+            _ => todo!("Support other dependency types"),
         };
         match self
             .credentials
@@ -1062,6 +1063,7 @@ impl Broker {
                 }
                 self.catalog.topology.add_opportunistic_dependency(&dependency)
             }
+            _ => todo!("Support other dependency types"),
         }
     }
 }

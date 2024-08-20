@@ -27,7 +27,7 @@ type BinaryPowerLevel = strict enum : PowerLevel {
 ///
 /// See https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0250_power_topology#dependency_types
 /// for more details on these definitions.
-type DependencyType = strict enum {
+type DependencyType = flexible enum {
     ASSERTIVE = 1;
     OPPORTUNISTIC = 2;
 };
