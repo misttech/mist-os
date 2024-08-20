@@ -98,9 +98,7 @@ minimum contains one content-addressed `BLOB` named [`meta.far`](#meta-far).
 Note: For more information on the Fuchsia archive format (FAR), see
 [Fuchsia archive format (FAR)](/docs/development/source_code/archive_format.md).
 
-In Fuchsia, you build a package with the `ffx package build` command or the
-legacy `pm` tool, which both exist in the `//tools/` directory of the
-Fuchsia IDK.
+In Fuchsia, you build a package with the `ffx package build` command.
 
 Essentially, a package is a tree of zero or more content-addressed items.
 A package contains the following:
@@ -127,9 +125,9 @@ The `meta/` directory of a package contains at minimum two files:
 
 * `meta/contents`
 
-   The contents file. This file is created by the `ffx package build` command,
-   (or the legacy `pm update` and `pm build` commands). This file maps the
-   user-facing file names of a package to the Merkle root of those files.
+   The contents file. This file is created by the `ffx package build` command.
+   This file maps the user-facing file names of a package to the Merkle root
+   of those files.
 
 If the package declares subpackages, the `meta/` directory also contains:
 
@@ -174,8 +172,8 @@ requiring any additional context, and looks like the following:
 fuchsia-pkg://{{ '<var>' }}repository{{ '</var>' }}/{{ '<var>' }}package-name{{ '</var>' }}?hash={{ '<var>' }}package-hash{{ '</var>' }}#{{ '<var>' }}resource-path{{ '</var>' }}
 ```
 
-Fuchsia has different intereprations of `fuchsia-pkg` URL depending on which parts of the URL are
-present.
+Fuchsia has different interpretations of `fuchsia-pkg` URL depending on which
+parts of the URL are present:
 
  * If the repository, package, and resource parts are present, then the URL
    identifies the indicated resource within the package.
