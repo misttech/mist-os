@@ -8,6 +8,7 @@ use crate::environment::{Environment, FshostEnvironment};
 use crate::inspect::register_stats;
 use anyhow::{format_err, Error};
 use fidl::prelude::*;
+use fuchsia_component::directory::AsRefDirectory;
 use fuchsia_runtime::{take_startup_handle, HandleType};
 use fuchsia_zircon::sys::zx_debug_write;
 use futures::channel::mpsc;
@@ -96,6 +97,7 @@ async fn main() -> Result<(), Error> {
         .await;
     let blob_exposed_dir = env.blobfs_exposed_dir()?;
     let data_exposed_dir = env.data_exposed_dir()?;
+    let crypt_service_exposed_dir = env.crypt_service_exposed_dir()?;
     let env: Arc<Mutex<dyn Environment>> = Arc::new(Mutex::new(env));
     let export = vfs::pseudo_directory! {
         "fs" => vfs::pseudo_directory! {
@@ -121,6 +123,23 @@ async fn main() -> Result<(), Error> {
             .add_entry(
                 fidl_fuchsia_update_verify::BlobfsVerifierMarker::PROTOCOL_NAME,
                 fxblob::blobfs_verifier_service(),
+            )
+            .unwrap();
+    }
+    if config.data_filesystem_format == "fxfs" {
+        svc_dir
+            .add_entry(
+                fidl_fuchsia_fxfs::CryptManagementMarker::PROTOCOL_NAME,
+                vfs::service::endpoint(move |_scope, server_end| {
+                    crypt_service_exposed_dir
+                        .as_ref_directory()
+                        .open(
+                            fidl_fuchsia_fxfs::CryptManagementMarker::PROTOCOL_NAME,
+                            fio::OpenFlags::empty(),
+                            server_end.into(),
+                        )
+                        .unwrap();
+                }),
             )
             .unwrap();
     }

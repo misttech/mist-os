@@ -120,6 +120,11 @@
             protocol: "fuchsia.update.verify.BlobfsVerifier",
             from: "#fshost",
         },
+        {
+            protocol: "fuchsia.fxfs.CryptManagement",
+            from: "#fshost",
+            availability: "optional",
+        },
     ],
     environments: [
         {
