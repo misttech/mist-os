@@ -4,8 +4,8 @@
 
 use anyhow::{format_err, Error};
 use fidl_fuchsia_tracing_controller::{
-    ProvisionerMarker, ProvisionerProxy, SessionMarker, SessionProxy,
-    StartErrorCode, StartOptions, StopOptions, TerminateOptions, TraceConfig,
+    ProvisionerMarker, ProvisionerProxy, SessionMarker, SessionProxy, StartErrorCode, StartOptions,
+    StopOptions, TerminateOptions, TraceConfig,
 };
 use fuchsia_component::{self as app};
 use fuchsia_sync::RwLock;
@@ -118,7 +118,7 @@ impl SingleSessionTrace {
     pub async fn terminate(&self) -> Result<(), Error> {
         // Tracing gets terminated when the controller is closed. Drain the socket to get
         // everything that was written until the last stop and destroy the existing controller.
-        let controller = match self.status.write().controller.take();
+        let controller = self.status.write().controller.take();
         let data_socket = self.status.write().data_socket.take();
         let drain_result = drain_socket(data_socket).await?;
 
