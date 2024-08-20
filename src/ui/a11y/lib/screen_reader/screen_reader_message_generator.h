@@ -109,7 +109,7 @@ class ScreenReaderMessageGenerator {
                            std::vector<UtteranceAndContext>& description);
 
   // Helper method to describe button nodes. The description will be:
-  // <selected*> <label> button <toggled*> <actionable>
+  // <selected*> <label> button <toggled*> <disabled*> <actionable>
   //
   // * = if applicable
   void DescribeButton(const fuchsia::accessibility::semantics::Node* node,
@@ -193,11 +193,16 @@ class ScreenReaderMessageGenerator {
       const fuchsia::accessibility::semantics::Node* node,
       std::vector<ScreenReaderMessageGenerator::UtteranceAndContext>* description);
 
+  // Describe the node as "disabled" if the node is disabled.
+  //
+  // We do NOT described enabled nodes as "enabled," as this is not generally a useful property.
+  void MaybeAddDisabledDescriptor(const fuchsia::accessibility::semantics::Node* node,
+                                  std::vector<UtteranceAndContext>& description);
+
   // Add the "double-tap to activate" hint to |description| if |node| has a
-  // DEFAULT action.
-  void MaybeAddDoubleTapHint(
-      const fuchsia::accessibility::semantics::Node* node,
-      std::vector<ScreenReaderMessageGenerator::UtteranceAndContext>& description);
+  // DEFAULT action and is not disabled.
+  void MaybeAddDoubleTapHint(const fuchsia::accessibility::semantics::Node* node,
+                             std::vector<UtteranceAndContext>& description);
 
   std::unique_ptr<i18n::MessageFormatter> message_formatter_;
 

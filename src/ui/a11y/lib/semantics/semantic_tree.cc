@@ -705,6 +705,20 @@ std::string checkedStateToString(
   }
 }
 
+std::string enabledStateToString(
+    const fuchsia::accessibility::semantics::EnabledState& enabled_state) {
+  switch (enabled_state) {
+    case fuchsia::accessibility::semantics::EnabledState::ENABLED:
+      return "ENABLED";
+    case fuchsia::accessibility::semantics::EnabledState::DISABLED:
+      return "DISABLED";
+    case fuchsia::accessibility::semantics::EnabledState::INDETERMINATE:
+      return "INDETERMINATE";
+    default:
+      return "No enabled state found";
+  }
+}
+
 std::string toggledStateToString(
     const fuchsia::accessibility::semantics::ToggledState& toggled_state) {
   switch (toggled_state) {
@@ -757,6 +771,11 @@ void SemanticTree::FillInspectTree(inspect::Node inspect_node,
       if (node_states.has_checked_state()) {
         inspect_node.CreateString("checked_state",
                                   checkedStateToString(node_states.checked_state()), inspector);
+      }
+
+      if (node_states.has_enabled_state()) {
+        inspect_node.CreateString("enabled_state",
+                                  enabledStateToString(node_states.enabled_state()), inspector);
       }
 
       if (node_states.has_selected()) {
