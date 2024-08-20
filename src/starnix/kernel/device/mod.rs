@@ -17,7 +17,6 @@ pub mod kobject;
 pub mod loop_device;
 pub mod mem;
 pub mod remote_block_device;
-pub mod sync_file;
 pub mod terminal;
 pub mod touch_power_policy_device;
 pub mod tun;

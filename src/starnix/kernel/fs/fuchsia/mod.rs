@@ -13,6 +13,7 @@ mod remote_bundle;
 mod syslog;
 mod timer;
 
+pub mod sync_file;
 pub mod zxio;
 
 pub use remote::*;

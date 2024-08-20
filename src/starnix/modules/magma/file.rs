@@ -130,8 +130,8 @@ use magma::{
     MAGMA_POLL_TYPE_SEMAPHORE, MAGMA_STATUS_INVALID_ARGS, MAGMA_STATUS_MEMORY_ERROR,
     MAGMA_STATUS_OK, MAGMA_STATUS_TIMED_OUT,
 };
-use starnix_core::device::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline};
 use starnix_core::fileops_impl_nonseekable;
+use starnix_core::fs::fuchsia::sync_file::{SyncFence, SyncFile, SyncPoint, Timeline};
 use starnix_core::fs::fuchsia::RemoteFileObject;
 use starnix_core::mm::memory::MemoryObject;
 use starnix_core::mm::{MemoryAccessorExt, ProtectionFlags};
