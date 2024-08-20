@@ -605,6 +605,9 @@ fn get_ipv6_address_from_addr(addr: fnet::IpAddress) -> fnet::Ipv6Address {
     assert_matches!(addr, fnet::IpAddress::Ipv6(ipv6) => ipv6)
 }
 
+// TODO(https://fxbug.dev/361052435): Deduplicate the error types with
+// `fuchsia_net_multicast_ext`.
+
 #[derive(thiserror::Error, Debug, PartialEq, multicast_forwarding_macros::FromIdenticalEnums)]
 #[identical_enums(
     fnet_multicast_admin::Ipv4RoutingTableControllerAddRouteError,
@@ -619,6 +622,8 @@ enum AddRouteError {
     InterfaceNotFound,
     #[error("Input cannot be output")]
     InputCannotBeOutput,
+    #[error("Duplicate output")]
+    DuplicateOutput,
 }
 
 #[derive(thiserror::Error, Debug, PartialEq, multicast_forwarding_macros::FromIdenticalEnums)]
@@ -1253,12 +1258,8 @@ enum RouterInterface {
 
 /// Configuration for a `fnet_multicast_admin::Action`.
 enum RouteAction {
-    /// A `fnet_multicast_admin::Action::OutgoingInterfaces` action with an
-    /// empty vector of outgoing interfaces.
-    EmptyOutgoingInterfaces,
-    /// A `fnet_multicast_admin::Action::OutgoingInterfaces` action with a
-    /// single outgoing interface that corresponds to the `RouterInterface`.
-    OutgoingInterface(RouterInterface),
+    /// A `fnet_multicast_admin::Action::OutgoingInterfaces` action.
+    OutgoingInterfaces(Vec<RouterInterface>),
 }
 
 /// Defaultable options for configuring a multicast route in an add multicast
@@ -1269,7 +1270,7 @@ struct AddMulticastRouteTestOptions {
     #[derivative(Default(value = "Some(RouterInterface::Server(Server::A))"))]
     input_interface: Option<RouterInterface>,
     #[derivative(Default(
-        value = "Some(RouteAction::OutgoingInterface(RouterInterface::Client(Client::A)))"
+        value = "Some(RouteAction::OutgoingInterfaces(vec![RouterInterface::Client(Client::A)]))"
     ))]
     action: Option<RouteAction>,
     #[derivative(Default(value = "DeviceAddress::Server(Server::A)"))]
@@ -1332,7 +1333,7 @@ struct AddMulticastRouteTestOptions {
     Err(AddRouteError::InterfaceNotFound),
     vec![Server::A],
     AddMulticastRouteTestOptions {
-        action: Some(RouteAction::OutgoingInterface(RouterInterface::Other(1000))),
+        action: Some(RouteAction::OutgoingInterfaces(vec![RouterInterface::Other(1000)])),
         ..AddMulticastRouteTestOptions::default()
     };
     "unknown output interface"
@@ -1347,10 +1348,27 @@ struct AddMulticastRouteTestOptions {
     vec![Server::A],
     AddMulticastRouteTestOptions {
         input_interface: Some(RouterInterface::Server(Server::A)),
-        action: Some(RouteAction::OutgoingInterface(RouterInterface::Server(Server::A))),
+        action: Some(RouteAction::OutgoingInterfaces(vec![RouterInterface::Server(Server::A)])),
         ..AddMulticastRouteTestOptions::default()
     };
     "input interface matches output interface"
+)]
+#[test_case(
+    "duplicate_output_interface",
+    ClientConfig {
+        route_min_ttl: 1,
+        expect_forwarded_packet: false,
+    },
+    Err(AddRouteError::DuplicateOutput),
+    vec![Server::A],
+    AddMulticastRouteTestOptions {
+        input_interface: Some(RouterInterface::Client(Client::A)),
+        action: Some(RouteAction::OutgoingInterfaces(vec![
+            RouterInterface::Server(Server::A),
+            RouterInterface::Server(Server::A)])),
+        ..AddMulticastRouteTestOptions::default()
+    };
+    "duplicate output interface"
 )]
 #[test_case(
     "no_outgoing_interfaces",
@@ -1361,7 +1379,7 @@ struct AddMulticastRouteTestOptions {
     Err(AddRouteError::RequiredRouteFieldsMissing),
     vec![Server::A],
     AddMulticastRouteTestOptions {
-        action: Some(RouteAction::EmptyOutgoingInterfaces),
+        action: Some(RouteAction::OutgoingInterfaces(vec![])),
         ..AddMulticastRouteTestOptions::default()
     };
     "no outgoing interfaces"
@@ -1523,13 +1541,13 @@ async fn add_multicast_route<I: Ip, N: Netstack>(
 
     let route_action = action.and_then(|action| {
         let outgoing_interfaces = match action {
-            RouteAction::EmptyOutgoingInterfaces => vec![],
-            RouteAction::OutgoingInterface(interface) => {
-                vec![fnet_multicast_admin::OutgoingInterfaces {
+            RouteAction::OutgoingInterfaces(interfaces) => interfaces
+                .into_iter()
+                .map(|interface| fnet_multicast_admin::OutgoingInterfaces {
                     id: get_interface_id(interface),
                     min_ttl: client.route_min_ttl,
-                }]
-            }
+                })
+                .collect(),
         };
         Some(fnet_multicast_admin::Action::OutgoingInterfaces(outgoing_interfaces))
     });

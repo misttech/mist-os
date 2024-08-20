@@ -54,6 +54,10 @@ closed protocol Ipv4RoutingTableController {
         /// Indicates that the route's set of output interfaces contains the
         /// input interface.
         INPUT_CANNOT_BE_OUTPUT = 4;
+
+        /// Indicates that the same output interface was specified multiple
+        /// times, regardless of provided minimum TTLs.
+        DUPLICATE_OUTPUT = 5;
     };
 
     /// Delete a route.

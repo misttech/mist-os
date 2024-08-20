@@ -105,6 +105,10 @@ func (m *multicastIpv4RoutingTableControllerImpl) AddRoute(_ fidl.Context, addre
 		return admin.Ipv4RoutingTableControllerAddRouteResultWithErr(admin.Ipv4RoutingTableControllerAddRouteErrorRequiredRouteFieldsMissing), nil
 	}
 
+	if MulticastRouteHasDuplicateOutputs(&multicastRoute) {
+		return admin.Ipv4RoutingTableControllerAddRouteResultWithErr(admin.Ipv4RoutingTableControllerAddRouteErrorDuplicateOutput), nil
+	}
+
 	stackAddresses := toStackUnicastSourceAndMulticastDestination(addresses)
 	switch err := m.stack.AddMulticastRoute(ipv4.ProtocolNumber, stackAddresses, multicastRoute); err.(type) {
 	case nil:
