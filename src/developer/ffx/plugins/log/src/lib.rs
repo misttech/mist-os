@@ -661,7 +661,7 @@ ffx log --force-select.
             LogCommand {
                 since: Some(parse_time("1980-01-01T00:00:01").unwrap()),
                 until: Some(parse_time("1980-01-01T00:00:05").unwrap()),
-                clock: TimeFormat::Utc,
+                clock: TimeFormat::Local,
                 ..LogCommand::default()
             },
             "[1980-01-01 00:00:03.000][ffx] INFO: Hello world!\u{1b}[m\n",
