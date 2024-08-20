@@ -10,8 +10,8 @@ group("tests") {
   deps = [ ":starnix-input-tests" ]
 }
 
-rustc_library("input-device") {
-  name = "input-device"
+rustc_library("input") {
+  name = "starnix-modules-input"
   edition = "2021"
   version = "0.1.0"
   source_root = "lib.rs"
@@ -72,7 +72,7 @@ rustc_library("input-device") {
 
 fuchsia_unittest_package("starnix-input-tests") {
   manifest = "meta/starnix-input-tests.cml"
-  deps = [ ":input-device_test" ]
+  deps = [ ":input_test" ]
   test_specs = {
     log_settings = {
       # Tests exercise failure cases, so ERROR logs are expected.

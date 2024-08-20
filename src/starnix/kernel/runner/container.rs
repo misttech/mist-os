@@ -22,7 +22,6 @@ use fuchsia_zircon::{
 };
 use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt, TryStreamExt};
-use magma_device::get_magma_params;
 use runner::{get_program_string, get_program_strvec};
 use starnix_core::execution::execute_task_with_prerun_result;
 use starnix_core::fs::fuchsia::create_remotefs_filesystem;
@@ -37,6 +36,7 @@ use starnix_logging::{
     log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
 };
 use starnix_modules::init_common_devices;
+use starnix_modules_magma::get_magma_params;
 use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::errors::{SourceContext, ENOENT};
 use starnix_uapi::open_flags::OpenFlags;

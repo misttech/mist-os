@@ -26,7 +26,6 @@ group("tests") {
     ":starnix_kernel_runner-tests",
     ":starnix_logging-tests",
     ":starnix_sync-tests",
-    "device/input:tests",
   ]
 }
 
@@ -515,13 +514,13 @@ rustc_library("starnix_kernel_runner") {
     "//src/lib/fuchsia-runtime",
     "//src/lib/ui/fuchsia-scenic",
     "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/starnix/kernel/device/gpu",
-    "//src/starnix/kernel/device/gralloc",
-    "//src/starnix/kernel/device/input:input-device",
-    "//src/starnix/kernel/device/magma:magma-device",
     "//src/starnix/lib/selinux/core",
     "//src/starnix/lib/starnix-uapi",
     "//src/starnix/modules",
+    "//src/starnix/modules/gpu",
+    "//src/starnix/modules/gralloc",
+    "//src/starnix/modules/input",
+    "//src/starnix/modules/magma",
     "//src/sys/lib/runner",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bstr",

@@ -5,8 +5,8 @@
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
-rustc_library("magma-device") {
-  name = "magma-device"
+rustc_library("magma") {
+  name = "starnix-modules-magma"
   edition = "2021"
   version = "0.1.0"
   source_root = "lib.rs"
