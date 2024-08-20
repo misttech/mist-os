@@ -479,12 +479,10 @@ type InstanceToken = resource struct {
 /// A request for a route.
 @available(added=HEAD)
 type RouteRequest = resource table {
-    /// The requested availability for this capability.
-    1: availability Availability;
     /// The component that is requesting the capability.
-    2: requesting InstanceToken;
+    1: requesting InstanceToken;
     /// Metadata associated with this capability request.
-    3: metadata DictionaryRef;
+    2: metadata DictionaryRef;
 };
 
 @available(added=HEAD)

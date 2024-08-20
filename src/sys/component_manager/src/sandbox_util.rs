@@ -313,6 +313,7 @@ pub mod tests {
     use fuchsia_async::TestExecutor;
     use moniker::Moniker;
     use router_error::DowncastErrorForTest;
+    use routing::availability::AvailabilityMetadata;
     use routing::bedrock::structured_dict::ComponentInput;
     use routing::{DictExt, LazyGet};
     use sandbox::{Data, Dict, RemotableCapability, WeakInstanceToken};
@@ -394,16 +395,13 @@ pub mod tests {
             .insert_capability(&RelativePath::new("foo").unwrap(), foo_router.into())
             .is_ok());
 
+        let metadata = Dict::new();
+        metadata.set_availability(Availability::Required);
         let cap = dict
             .get_with_request(
                 Moniker::root(),
                 &RelativePath::new("foo/bar/data").unwrap(),
-                Request {
-                    availability: Availability::Required,
-                    target: WeakInstanceToken::invalid(),
-                    debug: false,
-                    metadata: Dict::new(),
-                },
+                Request { target: WeakInstanceToken::invalid(), debug: false, metadata },
             )
             .await;
         assert_matches!(
@@ -418,16 +416,13 @@ pub mod tests {
         let foo =
             Router::new_error(RoutingError::SourceCapabilityIsVoid { moniker: Moniker::root() });
         assert!(dict.insert_capability(&RelativePath::new("foo").unwrap(), foo.into()).is_ok());
+        let metadata = Dict::new();
+        metadata.set_availability(Availability::Required);
         let cap = dict
             .get_with_request(
                 Moniker::root(),
                 &RelativePath::new("foo/bar").unwrap(),
-                Request {
-                    availability: Availability::Required,
-                    target: WeakInstanceToken::invalid(),
-                    debug: false,
-                    metadata: Dict::new(),
-                },
+                Request { target: WeakInstanceToken::invalid(), debug: false, metadata },
             )
             .await;
         assert_matches!(
@@ -443,16 +438,13 @@ pub mod tests {
     #[fuchsia::test]
     async fn get_with_request_missing() {
         let dict = Dict::new();
+        let metadata = Dict::new();
+        metadata.set_availability(Availability::Required);
         let cap = dict
             .get_with_request(
                 Moniker::root(),
                 &RelativePath::new("foo/bar").unwrap(),
-                Request {
-                    availability: Availability::Required,
-                    target: WeakInstanceToken::invalid(),
-                    debug: false,
-                    metadata: Dict::new(),
-                },
+                Request { target: WeakInstanceToken::invalid(), debug: false, metadata },
             )
             .await;
         assert_matches!(cap, Ok(None));
@@ -466,30 +458,24 @@ pub mod tests {
         let foo = Router::new_ok(foo);
         assert!(dict.insert_capability(&RelativePath::new("foo").unwrap(), foo.into()).is_ok());
 
+        let metadata = Dict::new();
+        metadata.set_availability(Availability::Required);
         let cap = dict
             .get_with_request(
                 Moniker::root(),
                 &RelativePath::new("foo").unwrap(),
-                Request {
-                    availability: Availability::Required,
-                    target: WeakInstanceToken::invalid(),
-                    debug: false,
-                    metadata: Dict::new(),
-                },
+                Request { target: WeakInstanceToken::invalid(), debug: false, metadata },
             )
             .await;
         assert_matches!(cap, Ok(Some(Capability::Dictionary(_))));
 
+        let metadata = Dict::new();
+        metadata.set_availability(Availability::Required);
         let cap = dict
             .get_with_request(
                 Moniker::root(),
                 &RelativePath::new("foo/bar").unwrap(),
-                Request {
-                    availability: Availability::Required,
-                    target: WeakInstanceToken::invalid(),
-                    debug: false,
-                    metadata: Dict::new(),
-                },
+                Request { target: WeakInstanceToken::invalid(), debug: false, metadata },
             )
             .await;
         assert_matches!(cap, Ok(None));
@@ -539,12 +525,13 @@ pub mod tests {
             "test:///root".parse().unwrap(),
         )
         .await;
+        let metadata = Dict::new();
+        metadata.set_availability(Availability::Required);
         let capability = router
             .route(Request {
-                availability: Availability::Required,
                 target: WeakInstanceToken::new_component(component.as_weak()),
                 debug: false,
-                metadata: Dict::new(),
+                metadata,
             })
             .await
             .unwrap();
@@ -593,12 +580,13 @@ pub mod tests {
             "test:///root".parse().unwrap(),
         )
         .await;
+        let metadata = Dict::new();
+        metadata.set_availability(Availability::Required);
         let capability = router
             .route(Request {
-                availability: Availability::Required,
                 target: WeakInstanceToken::new_component(component.as_weak()),
                 debug: false,
-                metadata: Dict::new(),
+                metadata,
             })
             .await
             .unwrap();
@@ -657,12 +645,13 @@ pub mod tests {
             "test:///target".parse().unwrap(),
         )
         .await;
+        let metadata = Dict::new();
+        metadata.set_availability(Availability::Required);
         let capability = router
             .route(Request {
-                availability: Availability::Required,
                 target: WeakInstanceToken::new_component(target.as_weak()),
                 debug: true,
-                metadata: Dict::new(),
+                metadata,
             })
             .await
             .unwrap();
@@ -684,13 +673,10 @@ pub mod tests {
             RoutingError::BedrockMemberAccessUnsupported { moniker: Moniker::root().into() },
         );
 
+        let metadata = Dict::new();
+        metadata.set_availability(Availability::Optional);
         let capability = downscoped_router
-            .route(Request {
-                availability: Availability::Optional,
-                target: WeakInstanceToken::invalid(),
-                debug: false,
-                metadata: Dict::new(),
-            })
+            .route(Request { target: WeakInstanceToken::invalid(), debug: false, metadata })
             .await
             .unwrap();
         let capability = match capability {
@@ -724,13 +710,10 @@ pub mod tests {
             RoutingError::BedrockMemberAccessUnsupported { moniker: Moniker::root().into() },
         );
 
+        let metadata = Dict::new();
+        metadata.set_availability(Availability::Optional);
         let capability = downscoped_router
-            .route(Request {
-                availability: Availability::Optional,
-                target: WeakInstanceToken::invalid(),
-                debug: false,
-                metadata: Dict::new(),
-            })
+            .route(Request { target: WeakInstanceToken::invalid(), debug: false, metadata })
             .await
             .unwrap();
         let capability = match capability {

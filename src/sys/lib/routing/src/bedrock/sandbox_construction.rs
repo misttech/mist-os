@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::availability::AvailabilityMetadata;
 use crate::bedrock::structured_dict::{ComponentEnvironment, ComponentInput, StructuredDictMap};
 use crate::bedrock::with_porcelain_type::WithPorcelainType as _;
 use crate::capability_source::{CapabilitySource, InternalCapability, VoidSource};
@@ -838,7 +839,8 @@ impl<C: ComponentInstanceInterface + 'static> sandbox::Routable for UnitRouter<C
             .try_into()
             .expect("failed to convert capability source to dictionary"));
         }
-        match request.availability {
+        let availability = request.metadata.get_availability().ok_or(RouterError::InvalidArgs)?;
+        match availability {
             cm_rust::Availability::Required | cm_rust::Availability::SameAsTarget => {
                 Err(RoutingError::SourceCapabilityIsVoid {
                     moniker: self.component.moniker.clone(),

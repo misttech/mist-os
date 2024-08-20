@@ -327,8 +327,7 @@ where
             route_capability_inner(
                 &target.component_sandbox().await?.component_output_dict,
                 &expose_protocol_decl.target_name,
-                expose_protocol_decl.availability,
-                protocol_metadata(),
+                protocol_metadata(expose_protocol_decl.availability),
                 target,
             )
             .await
@@ -366,8 +365,7 @@ where
             route_capability_inner(
                 &target.component_sandbox().await?.program_input.namespace,
                 &use_protocol_decl.target_path,
-                use_protocol_decl.availability,
-                protocol_metadata(),
+                protocol_metadata(use_protocol_decl.availability),
                 target,
             )
             .await
@@ -438,7 +436,7 @@ where
                 }
                 cm_rust::OfferTarget::Capability(_) => unimplemented!(),
             };
-            let metadata = protocol_metadata();
+            let metadata = protocol_metadata(offer_protocol_decl.availability);
             metadata
                 .insert(
                     Name::new(crate::bedrock::with_policy_check::SKIP_POLICY_CHECKS).unwrap(),
@@ -448,7 +446,6 @@ where
             route_capability_inner(
                 &target_dictionary,
                 &offer_protocol_decl.target_name,
-                offer_protocol_decl.availability,
                 metadata,
                 target,
             )
@@ -481,7 +478,6 @@ pub enum Never {}
 async fn route_capability_inner<C>(
     dictionary: &Dict,
     path: &impl IterablePath,
-    availability: Availability,
     metadata: Dict,
     target: &Arc<C>,
 ) -> Result<RouteSource, RoutingError>
@@ -494,7 +490,6 @@ where
             name: path.iter_segments().join("/"),
         })?;
     let request = Request {
-        availability,
         target: WeakComponentInstanceInterface::new(target).into(),
         debug: true,
         metadata,

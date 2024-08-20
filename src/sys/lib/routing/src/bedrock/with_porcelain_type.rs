@@ -75,6 +75,7 @@ impl WithPorcelainType for Router {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::availability::AvailabilityMetadata;
     use crate::bedrock::request_metadata::{protocol_metadata, METADATA_KEY_TYPE};
     use assert_matches::assert_matches;
     use cm_rust::Availability;
@@ -103,13 +104,9 @@ mod tests {
         let source: Capability = Data::String("hello".to_string()).into();
         let base = Router::new(source);
         let proxy = base.with_porcelain_type(CapabilityTypeName::Protocol, Moniker::root());
+        let metadata = protocol_metadata(Availability::Optional);
         let capability = proxy
-            .route(Request {
-                availability: Availability::Optional,
-                target: FakeInstanceToken::new(),
-                debug: false,
-                metadata: protocol_metadata(),
-            })
+            .route(Request { target: FakeInstanceToken::new(), debug: false, metadata })
             .await
             .unwrap();
         let capability = match capability {
@@ -131,13 +128,9 @@ mod tests {
                 Capability::Data(Data::String(String::from("directory"))),
             )
             .unwrap();
+        metadata.set_availability(Availability::Optional);
         let error = proxy
-            .route(Request {
-                availability: Availability::Optional,
-                target: FakeInstanceToken::new(),
-                debug: false,
-                metadata,
-            })
+            .route(Request { target: FakeInstanceToken::new(), debug: false, metadata })
             .await
             .unwrap_err();
         assert_matches!(

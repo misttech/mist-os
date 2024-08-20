@@ -1,7 +1,6 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
 use crate::{Capability, Request, Router};
 use fidl::handle::{AsHandleRef, EventPair};
 use fidl_fuchsia_component_sandbox as fsandbox;
@@ -10,11 +9,9 @@ use futures::TryStreamExt;
 
 impl From<Request> for fsandbox::RouteRequest {
     fn from(request: Request) -> Self {
-        let availability = from_cm_type(request.availability);
         let (token, server) = EventPair::create();
         request.target.register(token.get_koid().unwrap(), server);
         fsandbox::RouteRequest {
-            availability: Some(availability),
             requesting: Some(fsandbox::InstanceToken { token }),
             metadata: Some(request.metadata.into()),
             ..Default::default()
@@ -43,9 +40,6 @@ impl Router {
             router: &Router,
             payload: fsandbox::RouteRequest,
         ) -> Result<fsandbox::Capability, fsandbox::RouterError> {
-            let Some(availability) = payload.availability else {
-                return Err(fsandbox::RouterError::InvalidArgs);
-            };
             let Some(token) = payload.requesting else {
                 return Err(fsandbox::RouterError::InvalidArgs);
             };
@@ -64,12 +58,7 @@ impl Router {
             else {
                 return Err(fsandbox::RouterError::InvalidArgs);
             };
-            let request = Request {
-                availability: to_cm_type(availability),
-                target: component,
-                debug: false,
-                metadata,
-            };
+            let request = Request { target: component, debug: false, metadata };
             let cap = router.route(request).await?;
             Ok(cap.into())
         }
@@ -98,29 +87,12 @@ impl Router {
     }
 }
 
-fn to_cm_type(value: fsandbox::Availability) -> cm_types::Availability {
-    match value {
-        fsandbox::Availability::Required => cm_types::Availability::Required,
-        fsandbox::Availability::Optional => cm_types::Availability::Optional,
-        fsandbox::Availability::SameAsTarget => cm_types::Availability::SameAsTarget,
-        fsandbox::Availability::Transitional => cm_types::Availability::Transitional,
-    }
-}
-
-fn from_cm_type(value: cm_types::Availability) -> fsandbox::Availability {
-    match value {
-        cm_types::Availability::Required => fsandbox::Availability::Required,
-        cm_types::Availability::Optional => fsandbox::Availability::Optional,
-        cm_types::Availability::SameAsTarget => fsandbox::Availability::SameAsTarget,
-        cm_types::Availability::Transitional => fsandbox::Availability::Transitional,
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Connector, Dict, WeakInstanceToken};
+    use crate::{Connector, Data, Dict, DictKey, WeakInstanceToken};
     use assert_matches::assert_matches;
+    use cm_types::Availability;
     use std::sync::Arc;
 
     #[derive(Debug)]
@@ -151,11 +123,15 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fsandbox::RouterMarker>().unwrap();
         let _stream = fuchsia_async::Task::spawn(router.serve_router(stream));
 
+        let metadata = Dict::new();
+        let key = DictKey::new("availability").expect("dict key creation failed unexpectedly");
+        metadata
+            .insert(key, Capability::Data(Data::String(Availability::Required.to_string())))
+            .unwrap();
         let capability = client
             .route(fsandbox::RouteRequest {
-                availability: Some(fsandbox::Availability::Required),
                 requesting: Some(fsandbox::InstanceToken { token: component_client }),
-                metadata: Some(Dict::new().into()),
+                metadata: Some(metadata.into()),
                 ..Default::default()
             })
             .await
@@ -172,11 +148,18 @@ mod tests {
             fidl::endpoints::create_proxy_and_stream::<fsandbox::RouterMarker>().unwrap();
         let _stream = fuchsia_async::Task::spawn(router.serve_router(stream));
 
+        let metadata = Dict::new();
+        metadata
+            .insert(
+                DictKey::new("availability").unwrap(),
+                Capability::Data(Data::String(Availability::Required.to_string())),
+            )
+            .unwrap();
         // Check with no component token.
         let capability = client
             .route(fsandbox::RouteRequest {
-                availability: Some(fsandbox::Availability::Required),
                 requesting: None,
+                metadata: Some(metadata.into()),
                 ..Default::default()
             })
             .await
@@ -191,7 +174,6 @@ mod tests {
         // Check with no availability.
         let capability = client
             .route(fsandbox::RouteRequest {
-                availability: None,
                 requesting: Some(fsandbox::InstanceToken { token: component_client }),
                 ..Default::default()
             })
@@ -211,10 +193,17 @@ mod tests {
         // Create the client but don't register it.
         let (component_client, _server) = EventPair::create();
 
+        let metadata = Dict::new();
+        metadata
+            .insert(
+                DictKey::new("availability").unwrap(),
+                Capability::Data(Data::String(String::from("required"))),
+            )
+            .unwrap();
         let capability = client
             .route(fsandbox::RouteRequest {
-                availability: Some(fsandbox::Availability::Required),
                 requesting: Some(fsandbox::InstanceToken { token: component_client }),
+                metadata: Some(metadata.into()),
                 ..Default::default()
             })
             .await

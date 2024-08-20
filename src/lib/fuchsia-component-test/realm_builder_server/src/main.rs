@@ -1555,7 +1555,11 @@ fn get_offer_availability(availability: &Option<fcdecl::Availability>) -> cm_rus
     match availability {
         Some(fcdecl::Availability::Optional) => cm_rust::Availability::Optional,
         Some(fcdecl::Availability::SameAsTarget) => cm_rust::Availability::SameAsTarget,
-        _ => cm_rust::Availability::Required,
+        Some(fcdecl::Availability::Required) => cm_rust::Availability::Required,
+        _ => {
+            tracing::warn!("unspecified availability in realm builder offer decl creation");
+            cm_rust::Availability::Required
+        }
     }
 }
 

@@ -3259,10 +3259,9 @@ async fn source_component_stopping_when_routing() {
             .get_capability(&RelativePath::new("foo").unwrap())
             .unwrap()
             .route(sandbox::Request {
-                availability: Availability::Required,
                 target: WeakInstanceToken::new_component(root.as_weak()),
                 debug: false,
-                metadata: protocol_metadata(),
+                metadata: protocol_metadata(Availability::Required),
             })
             .await
             .unwrap();
@@ -3325,10 +3324,9 @@ async fn source_component_stopped_after_routing_before_open() {
         .get_capability(&RelativePath::new("foo").unwrap())
         .unwrap()
         .route(sandbox::Request {
-            availability: Availability::Required,
             target: WeakInstanceToken::new_component(root.as_weak()),
             debug: false,
-            metadata: protocol_metadata(),
+            metadata: protocol_metadata(Availability::Required),
         })
         .await
         .unwrap();
@@ -3396,10 +3394,9 @@ async fn source_component_shutdown_after_routing_before_open() {
         .get_capability(&RelativePath::new("foo").unwrap())
         .unwrap()
         .route(sandbox::Request {
-            availability: Availability::Required,
             target: WeakInstanceToken::new_component(root.as_weak()),
             debug: false,
-            metadata: protocol_metadata(),
+            metadata: protocol_metadata(Availability::Required),
         })
         .await
         .unwrap();
