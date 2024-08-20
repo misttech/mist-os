@@ -10,8 +10,8 @@ use fuchsia_component_test::RealmBuilder;
 use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
 use fuchsia_zircon::DurationNum;
 use {
-    fidl_fuchsia_crashdriver_test as fcdt, fidl_fuchsia_driver_development as fdd,
-    fidl_fuchsia_driver_test as fdt,
+    fidl_fuchsia_component_test as ftest, fidl_fuchsia_crashdriver_test as fcdt,
+    fidl_fuchsia_driver_development as fdd, fidl_fuchsia_driver_test as fdt,
 };
 
 fn send_get_device_info_request(
@@ -70,22 +70,22 @@ async fn wait_for_instance(realm: &fuchsia_component_test::RealmInstance) -> Res
 
 #[fasync::run_singlethreaded(test)]
 async fn test_restart_on_crash() -> Result<()> {
+    let exposes = vec![ftest::Capability::Service(ftest::Service {
+        name: Some(fcdt::DeviceMarker::SERVICE_NAME.to_string()),
+        ..Default::default()
+    })];
+
     // Create the RealmBuilder.
     let builder = RealmBuilder::new().await?;
     builder.driver_test_realm_setup().await?;
-    builder.driver_test_realm_add_expose::<fcdt::DeviceMarker>().await?;
+    builder.driver_test_realm_add_dtr_exposes(&exposes).await?;
     // Build the Realm.
     let realm = builder.build().await?;
-
-    let exposes = vec![fdt::Expose {
-        service_name: fcdt::DeviceMarker::SERVICE_NAME.to_string(),
-        collection: fdt::Collection::PackageDrivers,
-    }];
 
     // Start the DriverTestRealm.
     let args = fdt::RealmArgs {
         root_driver: Some("#meta/crasher.cm".to_string()),
-        exposes: Some(exposes),
+        dtr_exposes: Some(exposes),
         ..Default::default()
     };
     realm.driver_test_realm_start(args).await?;

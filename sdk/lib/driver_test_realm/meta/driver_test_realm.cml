@@ -2,11 +2,18 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
+    //
+    // Ensure to keep the realm_builder libraries up to date with anything needed from "parent"
+    // in |includes|.
+    //
+    // LINT.IfChange
     include: [
         "sys/component/realm_builder.shard.cml",
         "syslog/client.shard.cml",
         "trace/client.shard.cml",
     ],
+
+    // LINT.ThenChange(/sdk/lib/driver_test_realm/realm_builder/rust/src/lib.rs)
     program: {
         runner: "elf",
         binary: "bin/driver_test_realm",
@@ -72,6 +79,11 @@
             path: "/pkg_drivers",
         },
     ],
+
+    //
+    // Ensure to keep the realm_builder libraries up to date with anything added in |use|.
+    //
+    // LINT.IfChange
     use: [
         // Provided by the parent when it wants to override the DTR
         // implementation. Config |tunnel_boot_items| needs to be set.
@@ -81,6 +93,8 @@
             availability: "optional",
         },
     ],
+
+    // LINT.ThenChange(/sdk/lib/driver_test_realm/realm_builder/rust/src/lib.rs)
     offer: [
         {
             protocol: [
@@ -102,6 +116,11 @@
             to: "#realm_builder",
         },
     ],
+
+    //
+    // Ensure to keep the realm_builder libraries up to date with anything added in |expose|.
+    //
+    // LINT.IfChange
     expose: [
         {
             directory: [
@@ -116,7 +135,6 @@
                 "fuchsia.driver.development.Manager",
                 "fuchsia.driver.registrar.DriverRegistrar",
                 "fuchsia.driver.test.Realm",
-                "fuchsia.inspect.InspectSink",
             ],
             from: "self",
         },
@@ -125,6 +143,8 @@
             from: "self",
         },
     ],
+
+    // LINT.ThenChange(/sdk/lib/driver_test_realm/realm_builder/rust/src/lib.rs)
     config: {
         tunnel_boot_items: {
             type: "bool",

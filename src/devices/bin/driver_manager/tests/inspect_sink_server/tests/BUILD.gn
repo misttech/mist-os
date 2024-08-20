@@ -9,7 +9,8 @@ import("//build/rust/rustc_binary.gni")
 
 group("tests") {
   testonly = true
-  deps = [ ":driver-manager-inspect-sink-test" ]
+  # Disabling this test until the revert at https://fxrev.dev/1099978 can go in.
+  # deps = [ ":driver-manager-inspect-sink-test" ]
 }
 
 rustc_test("bin") {
