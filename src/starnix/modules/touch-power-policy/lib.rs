@@ -2,12 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::kobject::DeviceMetadata;
-use crate::device::{DeviceMode, DeviceOps};
-use crate::fs::sysfs::DeviceDirectory;
-use crate::task::{CurrentTask, Kernel};
-use crate::vfs::buffers::{InputBuffer, OutputBuffer};
-use crate::vfs::{
+use starnix_core::device::kobject::DeviceMetadata;
+use starnix_core::device::{DeviceMode, DeviceOps};
+use starnix_core::fs::sysfs::DeviceDirectory;
+use starnix_core::task::{CurrentTask, Kernel};
+use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
+use starnix_core::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, FileObject, FileOps, FsNode, FsString,
 };
 use starnix_logging::{log_error, log_info};
