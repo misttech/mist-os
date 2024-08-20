@@ -2,9 +2,10 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "screen_capture.h"
+#include "src/ui/scenic/lib/screen_capture/screen_capture.h"
 
-#include <lib/fpromise/result.h>
+#include <fidl/fuchsia.ui.composition/cpp/hlcpp_conversion.h>
+#include <lib/fit/result.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/syscalls.h>
 
@@ -12,14 +13,13 @@
 
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
-#include "src/ui/scenic/lib/flatland/engine/engine.h"
 #include "src/ui/scenic/lib/flatland/renderer/renderer.h"
 
 using flatland::ImageRect;
-using fuchsia::ui::composition::FrameInfo;
-using fuchsia::ui::composition::Orientation;
-using fuchsia::ui::composition::ScreenCaptureConfig;
-using fuchsia::ui::composition::ScreenCaptureError;
+using fuchsia_ui_composition::FrameInfo;
+using fuchsia_ui_composition::Orientation;
+using fuchsia_ui_composition::ScreenCaptureConfig;
+using fuchsia_ui_composition::ScreenCaptureError;
 using std::vector;
 
 namespace {
@@ -51,29 +51,36 @@ ScreenCapture::ScreenCapture(const vector<std::shared_ptr<allocation::BufferColl
 
 ScreenCapture::~ScreenCapture() { ClearImages(); }
 
-void ScreenCapture::Configure(ScreenCaptureConfig args, ConfigureCallback callback) {
+void ScreenCapture::Configure(ConfigureRequest& request, ConfigureCompleter::Sync& completer) {
+  Configure(std::move(request), [completer = completer.ToAsync()](auto result) mutable {
+    completer.Reply(std::move(result));
+  });
+}
+
+void ScreenCapture::Configure(
+    fuchsia_ui_composition::ScreenCaptureConfig args,
+    fit::function<void(fit::result<fuchsia_ui_composition::ScreenCaptureError>)> callback) {
   // Check for missing args.
-  if (!args.has_import_token() || !args.has_size() || !args.size().width || !args.size().height ||
-      !args.has_buffer_count()) {
+  if (!args.import_token().has_value() || !args.size().has_value() || !args.size()->width() ||
+      !args.size()->height() || !args.buffer_count().has_value()) {
     FX_LOGS(WARNING) << "ScreenCapture::Configure: Missing arguments.";
-    callback(fpromise::error(ScreenCaptureError::MISSING_ARGS));
+    callback(fit::error(ScreenCaptureError::kMissingArgs));
     return;
   }
 
   // Check for invalid args.
   if (args.buffer_count() < 1) {
     FX_LOGS(WARNING) << "ScreenCapture::Configure: There must be at least one buffer.";
-    callback(fpromise::error(ScreenCaptureError::INVALID_ARGS));
+    callback(fit::error(ScreenCaptureError::kInvalidArgs));
     return;
   }
 
-  auto import_token = args.mutable_import_token();
-  const zx_koid_t global_collection_id = fsl::GetRelatedKoid(import_token->value.get());
+  const zx_koid_t global_collection_id = fsl::GetRelatedKoid(args.import_token()->value().get());
 
   // Event pair ID must be valid.
   if (global_collection_id == ZX_KOID_INVALID) {
     FX_LOGS(WARNING) << "ScreenCapture::Configure: Event pair ID must be valid.";
-    callback(fpromise::error(ScreenCaptureError::INVALID_ARGS));
+    callback(fit::error(ScreenCaptureError::kInvalidArgs));
     return;
   }
 
@@ -84,11 +91,11 @@ void ScreenCapture::Configure(ScreenCaptureConfig args, ConfigureCallback callba
   // parameters.
   allocation::ImageMetadata metadata;
   metadata.collection_id = global_collection_id;
-  metadata.width = args.size().width;
-  metadata.height = args.size().height;
+  metadata.width = args.size()->width();
+  metadata.height = args.size()->height();
 
-  stream_rotation_ =
-      args.has_rotation() ? args.rotation() : fuchsia::ui::composition::Rotation::CW_0_DEGREES;
+  stream_rotation_ = args.rotation().has_value() ? args.rotation().value()
+                                                 : fuchsia_ui_composition::Rotation::kCw0Degrees;
 
   // For each buffer in the collection, add the image to our importers.
   for (uint32_t i = 0; i < args.buffer_count(); i++) {
@@ -109,7 +116,7 @@ void ScreenCapture::Configure(ScreenCaptureConfig args, ConfigureCallback callba
         ClearImages();
 
         FX_LOGS(WARNING) << "ScreenCapture::Configure: Failed to import BufferImage.";
-        callback(fpromise::error(ScreenCaptureError::BAD_OPERATION));
+        callback(fit::error(ScreenCaptureError::kBadOperation));
         return;
       }
     }
@@ -117,27 +124,37 @@ void ScreenCapture::Configure(ScreenCaptureConfig args, ConfigureCallback callba
     available_buffers_.push_back(i);
   }
   // Everything was successful!
-  callback(fpromise::ok());
+  callback(fit::ok());
 }
 
-void ScreenCapture::GetNextFrame(fuchsia::ui::composition::GetNextFrameArgs args,
-                                 ScreenCapture::GetNextFrameCallback callback) {
+void ScreenCapture::GetNextFrame(GetNextFrameRequest& request,
+                                 GetNextFrameCompleter::Sync& completer) {
+  GetNextFrame(std::move(request), [completer = completer.ToAsync()](auto result) mutable {
+    completer.Reply(std::move(result));
+  });
+}
+
+void ScreenCapture::GetNextFrame(
+    fuchsia_ui_composition::GetNextFrameArgs args,
+    fit::function<void(
+        fit::result<fuchsia_ui_composition::ScreenCaptureError, fuchsia_ui_composition::FrameInfo>)>
+        callback) {
   // Check that we have an available buffer that we can render.
   if (available_buffers_.empty()) {
     if (image_ids_.empty()) {
       FX_LOGS(ERROR)
           << "ScreenCapture::GetNextFrame: No buffers configured. Was Configure called previously?";
-      callback(fpromise::error(ScreenCaptureError::BAD_OPERATION));
+      callback(fit::error(ScreenCaptureError::kBadOperation));
       return;
     }
     FX_LOGS(WARNING) << "ScreenCapture::GetNextFrame: No buffers available.";
-    callback(fpromise::error(ScreenCaptureError::BUFFER_FULL));
+    callback(fit::error(ScreenCaptureError::kBufferFull));
     return;
   }
 
-  if (!args.has_event()) {
+  if (!args.event().has_value()) {
     FX_LOGS(WARNING) << "ScreenCapture::GetNextFrame: Missing arguments.";
-    callback(fpromise::error(ScreenCaptureError::MISSING_ARGS));
+    callback(fit::error(ScreenCaptureError::kMissingArgs));
     return;
   }
 
@@ -157,23 +174,32 @@ void ScreenCapture::GetNextFrame(fuchsia::ui::composition::GetNextFrameArgs args
   const auto& rotated_rects = RotateRenderables(rects, stream_rotation_, image_width, image_height);
 
   std::vector<zx::event> events;
-  events.emplace_back(args.mutable_event()->release());
+  events.emplace_back(args.event()->release());
 
   // Render content into user-provided buffer, which will signal the user-provided event.
   renderer_->Render(metadata, rotated_rects, image_metadatas, events);
 
   FrameInfo frame_info;
-  frame_info.set_buffer_id(buffer_id);
+  frame_info.buffer_id(buffer_id);
 
   available_buffers_.pop_front();
-  callback(fpromise::ok(std::move(frame_info)));
+  callback(fit::ok(std::move(frame_info)));
 }
 
-void ScreenCapture::ReleaseFrame(uint32_t buffer_id, ReleaseFrameCallback callback) {
+void ScreenCapture::ReleaseFrame(ReleaseFrameRequest& request,
+                                 ReleaseFrameCompleter::Sync& completer) {
+  ReleaseFrame(request.buffer_id(), [completer = completer.ToAsync()](auto result) mutable {
+    completer.Reply(std::move(result));
+  });
+}
+
+void ScreenCapture::ReleaseFrame(
+    uint32_t buffer_id,
+    fit::function<void(fit::result<fuchsia_ui_composition::ScreenCaptureError>)> callback) {
   // Check that the buffer index is in range.
   if (image_ids_.find(buffer_id) == image_ids_.end()) {
     FX_LOGS(WARNING) << "ScreenCapture::ReleaseFrame: Buffer ID does not exist.";
-    callback(fpromise::error(ScreenCaptureError::INVALID_ARGS));
+    callback(fit::error(ScreenCaptureError::kInvalidArgs));
     return;
   }
 
@@ -181,12 +207,12 @@ void ScreenCapture::ReleaseFrame(uint32_t buffer_id, ReleaseFrameCallback callba
   if (find(available_buffers_.begin(), available_buffers_.end(), buffer_id) !=
       available_buffers_.end()) {
     FX_LOGS(WARNING) << "ScreenCapture::ReleaseFrame: Buffer ID already available.";
-    callback(fpromise::error(ScreenCaptureError::INVALID_ARGS));
+    callback(fit::error(ScreenCaptureError::kInvalidArgs));
     return;
   }
 
   available_buffers_.push_back(buffer_id);
-  callback(fpromise::ok());
+  callback(fit::ok());
 }
 
 void ScreenCapture::ClearImages() {
@@ -201,10 +227,10 @@ void ScreenCapture::ClearImages() {
 }
 
 std::vector<ImageRect> ScreenCapture::RotateRenderables(const std::vector<ImageRect>& rects,
-                                                        fuchsia::ui::composition::Rotation rotation,
+                                                        fuchsia_ui_composition::Rotation rotation,
                                                         uint32_t image_width,
                                                         uint32_t image_height) {
-  if (rotation == fuchsia::ui::composition::Rotation::CW_0_DEGREES)
+  if (rotation == fuchsia_ui_composition::Rotation::kCw0Degrees)
     return rects;
 
   std::vector<ImageRect> final_rects;
@@ -213,7 +239,8 @@ std::vector<ImageRect> ScreenCapture::RotateRenderables(const std::vector<ImageR
     auto origin = rect.origin;
     auto extent = rect.extent;
     auto texel_uvs = rect.texel_uvs;
-    auto orientation = rect.orientation;
+    auto orientation = fidl::HLCPPToNatural(
+        *const_cast<fuchsia::ui::composition::Orientation*>(&rect.orientation));
 
     // (x,y) is the origin pre-rotation. (0,0) is the top-left of the image.
     auto x = origin[0];
@@ -231,32 +258,33 @@ std::vector<ImageRect> ScreenCapture::RotateRenderables(const std::vector<ImageR
     Orientation new_orientation;
 
     switch (rotation) {
-      case fuchsia::ui::composition::Rotation::CW_90_DEGREES:
+      case fuchsia_ui_composition::Rotation::kCw90Degrees:
         new_origin = {static_cast<float>(image_width) - y - h, x};
         new_extent = {h, w};
         // The renderer requires counter-clockwise rotation instead of clockwise as used by screen
         // capture. 90 clockwise is equivalent to 270 counter-clockwise.
-        new_orientation = GetNewOrientation(Orientation::CCW_270_DEGREES, orientation);
+        new_orientation = GetNewOrientation(Orientation::kCcw270Degrees, orientation);
         break;
-      case fuchsia::ui::composition::Rotation::CW_180_DEGREES:
+      case fuchsia_ui_composition::Rotation::kCw180Degrees:
         new_origin = {static_cast<float>(image_width) - x - w,
                       static_cast<float>(image_height) - y - h};
         new_extent = {w, h};
-        new_orientation = GetNewOrientation(Orientation::CCW_180_DEGREES, orientation);
+        new_orientation = GetNewOrientation(Orientation::kCcw180Degrees, orientation);
         break;
-      case fuchsia::ui::composition::Rotation::CW_270_DEGREES:
+      case fuchsia_ui_composition::Rotation::kCw270Degrees:
         new_origin = {y, static_cast<float>(image_height) - x - w};
         new_extent = {h, w};
         // The renderer requires counter-clockwise rotation instead of clockwise as used by screen
         // capture. 270 clockwise is equivalent to 90 counter-clockwise.
-        new_orientation = GetNewOrientation(Orientation::CCW_90_DEGREES, orientation);
+        new_orientation = GetNewOrientation(Orientation::kCcw90Degrees, orientation);
         break;
       default:
         FX_DCHECK(false);
         break;
     }
 
-    final_rects.emplace_back(new_origin, new_extent, texel_uvs, new_orientation);
+    final_rects.emplace_back(new_origin, new_extent, texel_uvs,
+                             fidl::NaturalToHLCPP(new_orientation));
   }
 
   return final_rects;

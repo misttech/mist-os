@@ -12,8 +12,9 @@
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
+#include "lib/fidl/cpp/hlcpp_conversion.h"
+#include "lib/fit/result.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
-#include "src/ui/scenic/lib/allocation/allocator.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/allocation/mock_buffer_collection_importer.h"
 #include "src/ui/scenic/lib/flatland/renderer/mock_renderer.h"
@@ -21,10 +22,10 @@
 
 using allocation::BufferCollectionImporter;
 using flatland::ImageRect;
-using fuchsia::ui::composition::FrameInfo;
-using fuchsia::ui::composition::GetNextFrameArgs;
-using fuchsia::ui::composition::ScreenCaptureConfig;
-using fuchsia::ui::composition::ScreenCaptureError;
+using fuchsia_ui_composition::FrameInfo;
+using fuchsia_ui_composition::GetNextFrameArgs;
+using fuchsia_ui_composition::ScreenCaptureConfig;
+using fuchsia_ui_composition::ScreenCaptureError;
 using testing::_;
 
 namespace screen_capture::test {
@@ -51,20 +52,19 @@ class ScreenCaptureTest : public gtest::TestLoopFixture {
 
   void TearDown() override { RunLoopUntilIdle(); }
 
-  fpromise::result<FrameInfo, ScreenCaptureError> CaptureScreen(screen_capture::ScreenCapture& sc) {
+  fit::result<ScreenCaptureError, FrameInfo> CaptureScreen(screen_capture::ScreenCapture& sc) {
     GetNextFrameArgs frame_args;
     zx::event event;
     zx::event::create(0, &event);
-    frame_args.set_event(std::move(event));
+    frame_args.event(std::move(event));
 
-    fpromise::result<FrameInfo, ScreenCaptureError> response;
+    fit::result<ScreenCaptureError, FrameInfo> response =
+        fit::error(ScreenCaptureError::kBadOperation);
     bool alloc_result = false;
-    sc.GetNextFrame(
-        std::move(frame_args),
-        [&response, &alloc_result](fpromise::result<FrameInfo, ScreenCaptureError> result) {
-          response = std::move(result);
-          alloc_result = true;
-        });
+    sc.GetNextFrame(std::move(frame_args), [&response, &alloc_result](auto result) {
+      response = std::move(result);
+      alloc_result = true;
+    });
     RunLoopUntilIdle();
     EXPECT_TRUE(alloc_result);
     return response;
@@ -93,15 +93,15 @@ TEST_F(ScreenCaptureTest, ConfigureSingleImporterSuccess) {
   allocation::BufferCollectionImportExportTokens ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
   ScreenCaptureConfig args;
-  args.set_import_token(std::move(ref_pair.import_token));
-  args.set_size({1, 1});
-  args.set_buffer_count(1);
+  args.import_token(fidl::HLCPPToNatural(std::move(ref_pair.import_token)));
+  args.size(fuchsia_math::SizeU{1, 1});
+  args.buffer_count(1);
 
   EXPECT_CALL(*mock_buffer_collection_importer_, ImportBufferImage(_, _))
       .WillRepeatedly(testing::Return(true));
 
   bool configure = false;
-  sc.Configure(std::move(args), [&configure](fpromise::result<void, ScreenCaptureError> result) {
+  sc.Configure(std::move(args), [&configure](auto result) {
     EXPECT_FALSE(result.is_error());
     configure = true;
   });
@@ -121,20 +121,20 @@ TEST_F(ScreenCaptureTest, ConfigureSingleImporterFailure) {
   allocation::BufferCollectionImportExportTokens ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
   ScreenCaptureConfig args;
-  args.set_import_token(std::move(ref_pair.import_token));
-  args.set_size({1, 1});
-  args.set_buffer_count(1);
+  args.import_token(fidl::HLCPPToNatural(std::move(ref_pair.import_token)));
+  args.size(fuchsia_math::SizeU{1, 1});
+  args.buffer_count(1);
 
   EXPECT_CALL(*mock_buffer_collection_importer_, ImportBufferImage(_, _))
       .WillRepeatedly(testing::Return(false));
 
   ScreenCaptureError error;
-  sc.Configure(std::move(args), [&error](fpromise::result<void, ScreenCaptureError> result) {
+  sc.Configure(std::move(args), [&error](auto result) {
     EXPECT_TRUE(result.is_error());
-    error = result.error();
+    error = result.error_value();
   });
   RunLoopUntilIdle();
-  EXPECT_EQ(error, ScreenCaptureError::BAD_OPERATION);
+  EXPECT_EQ(error, ScreenCaptureError::kBadOperation);
 }
 
 TEST_F(ScreenCaptureTest, ConfigureMultipleImportersSuccess) {
@@ -152,9 +152,9 @@ TEST_F(ScreenCaptureTest, ConfigureMultipleImportersSuccess) {
   allocation::BufferCollectionImportExportTokens ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
   ScreenCaptureConfig args;
-  args.set_import_token(std::move(ref_pair.import_token));
-  args.set_size({1, 1});
-  args.set_buffer_count(1);
+  args.import_token(fidl::HLCPPToNatural(std::move(ref_pair.import_token)));
+  args.size(fuchsia_math::SizeU{1, 1});
+  args.buffer_count(1);
 
   EXPECT_CALL(*mock_buffer_collection_importer_, ImportBufferImage(_, _))
       .WillRepeatedly(testing::Return(true));
@@ -162,7 +162,7 @@ TEST_F(ScreenCaptureTest, ConfigureMultipleImportersSuccess) {
       .WillRepeatedly(testing::Return(true));
 
   bool configure = false;
-  sc.Configure(std::move(args), [&configure](fpromise::result<void, ScreenCaptureError> result) {
+  sc.Configure(std::move(args), [&configure](auto result) {
     EXPECT_FALSE(result.is_error());
     configure = true;
   });
@@ -189,9 +189,9 @@ TEST_F(ScreenCaptureTest, ConfigureMultipleImportersImportFailure) {
   allocation::BufferCollectionImportExportTokens ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
   ScreenCaptureConfig args;
-  args.set_import_token(std::move(ref_pair.import_token));
-  args.set_size({1, 1});
-  args.set_buffer_count(3);
+  args.import_token(fidl::HLCPPToNatural(std::move(ref_pair.import_token)));
+  args.size(fuchsia_math::SizeU{1, 1});
+  args.buffer_count(3);
 
   EXPECT_CALL(*mock_buffer_collection_importer_, ImportBufferImage(_, _))
       .WillOnce(testing::Return(true))
@@ -205,12 +205,12 @@ TEST_F(ScreenCaptureTest, ConfigureMultipleImportersImportFailure) {
   EXPECT_CALL(*mock_buffer_collection_importer2, ReleaseBufferImage(_)).Times(1);
 
   ScreenCaptureError error;
-  sc.Configure(std::move(args), [&error](fpromise::result<void, ScreenCaptureError> result) {
+  sc.Configure(std::move(args), [&error](auto result) {
     EXPECT_TRUE(result.is_error());
-    error = result.error();
+    error = result.error_value();
   });
   RunLoopUntilIdle();
-  EXPECT_EQ(error, ScreenCaptureError::BAD_OPERATION);
+  EXPECT_EQ(error, ScreenCaptureError::kBadOperation);
 
   // We expect that all buffer images up to the failure will be released.
   EXPECT_CALL(*mock_buffer_collection_importer_, ReleaseBufferImage(_)).Times(testing::Exactly(0));
@@ -219,9 +219,9 @@ TEST_F(ScreenCaptureTest, ConfigureMultipleImportersImportFailure) {
 
 TEST_F(ScreenCaptureTest, ConfigureWithMissingArguments) {
   screen_capture::ScreenCapture sc({}, nullptr, [this]() { return this->GetRenderables(); });
-  sc.Configure({}, [](fpromise::result<void, ScreenCaptureError> result) {
+  sc.Configure({}, [](auto result) {
     EXPECT_TRUE(result.is_error());
-    EXPECT_EQ(result.error(), ScreenCaptureError::MISSING_ARGS);
+    EXPECT_EQ(result.error_value(), ScreenCaptureError::kMissingArgs);
   });
   RunLoopUntilIdle();
 }
@@ -235,16 +235,16 @@ TEST_F(ScreenCaptureTest, ConfigureNoBuffers) {
   allocation::BufferCollectionImportExportTokens ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
   ScreenCaptureConfig args;
-  args.set_import_token(std::move(ref_pair.import_token));
-  args.set_size({1, 1});
-  args.set_buffer_count(0);
+  args.import_token(fidl::HLCPPToNatural(std::move(ref_pair.import_token)));
+  args.size(fuchsia_math::SizeU{1, 1});
+  args.buffer_count(0);
 
   EXPECT_CALL(*mock_buffer_collection_importer_, ImportBufferImage(_, _))
       .WillRepeatedly(testing::Return(true));
 
-  sc.Configure(std::move(args), [](fpromise::result<void, ScreenCaptureError> result) {
+  sc.Configure(std::move(args), [](auto result) {
     EXPECT_TRUE(result.is_error());
-    EXPECT_EQ(result.error(), ScreenCaptureError::INVALID_ARGS);
+    EXPECT_EQ(result.error_value(), ScreenCaptureError::kInvalidArgs);
   });
   RunLoopUntilIdle();
 }
@@ -259,19 +259,18 @@ TEST_F(ScreenCaptureTest, ConfigureTwice) {
   allocation::BufferCollectionImportExportTokens ref_pair1 =
       allocation::BufferCollectionImportExportTokens::New();
   ScreenCaptureConfig args1;
-  args1.set_import_token(std::move(ref_pair1.import_token));
-  args1.set_size({1, 1});
-  args1.set_buffer_count(2);
+  args1.import_token(fidl::HLCPPToNatural(std::move(ref_pair1.import_token)));
+  args1.size(fuchsia_math::SizeU{1, 1});
+  args1.buffer_count(2);
 
   EXPECT_CALL(*mock_buffer_collection_importer_, ImportBufferImage(_, _))
       .WillRepeatedly(testing::Return(true));
 
   bool alloc_result = false;
-  sc.Configure(std::move(args1),
-               [&alloc_result](fpromise::result<void, ScreenCaptureError> result) {
-                 EXPECT_FALSE(result.is_error());
-                 alloc_result = true;
-               });
+  sc.Configure(std::move(args1), [&alloc_result](auto result) {
+    EXPECT_FALSE(result.is_error());
+    alloc_result = true;
+  });
   RunLoopUntilIdle();
   EXPECT_TRUE(alloc_result);
 
@@ -287,9 +286,9 @@ TEST_F(ScreenCaptureTest, ConfigureTwice) {
   allocation::BufferCollectionImportExportTokens ref_pair2 =
       allocation::BufferCollectionImportExportTokens::New();
   ScreenCaptureConfig args2;
-  args2.set_import_token(std::move(ref_pair2.import_token));
-  args2.set_size({1, 1});
-  args2.set_buffer_count(1);
+  args2.import_token(fidl::HLCPPToNatural(std::move(ref_pair2.import_token)));
+  args2.size(fuchsia_math::SizeU{1, 1});
+  args2.buffer_count(1);
 
   // We expect that the two images created for the buffer collection will be released when we
   // configure our new buffer collection.
@@ -299,11 +298,10 @@ TEST_F(ScreenCaptureTest, ConfigureTwice) {
       .WillRepeatedly(testing::Return(true));
 
   alloc_result = false;
-  sc.Configure(std::move(args2),
-               [&alloc_result](fpromise::result<void, ScreenCaptureError> result) {
-                 EXPECT_FALSE(result.is_error());
-                 alloc_result = true;
-               });
+  sc.Configure(std::move(args2), [&alloc_result](auto result) {
+    EXPECT_FALSE(result.is_error());
+    alloc_result = true;
+  });
   RunLoopUntilIdle();
   EXPECT_TRUE(alloc_result);
 
@@ -318,7 +316,7 @@ TEST_F(ScreenCaptureTest, ConfigureTwice) {
   // when we request another frame without freeing the first one we got.
   const auto& response2_buffer2 = CaptureScreen(sc);
   EXPECT_TRUE(response2_buffer2.is_error());
-  EXPECT_EQ(response2_buffer2.error(), ScreenCaptureError::BUFFER_FULL);
+  EXPECT_EQ(response2_buffer2.error_value(), ScreenCaptureError::kBufferFull);
 
   // Ensure that the buffer image is released.
   EXPECT_CALL(*mock_buffer_collection_importer_, ReleaseBufferImage(_)).Times(1);
@@ -333,7 +331,7 @@ TEST_F(ScreenCaptureTest, GetNextFrameNoBuffers) {
   // Request a frame without configuring the buffers.
   const auto& result = CaptureScreen(sc);
   EXPECT_TRUE(result.is_error());
-  EXPECT_EQ(result.error(), ScreenCaptureError::BAD_OPERATION);
+  EXPECT_EQ(result.error_value(), ScreenCaptureError::kBadOperation);
 }
 
 TEST_F(ScreenCaptureTest, GetNextFrameSuccess) {
@@ -345,15 +343,15 @@ TEST_F(ScreenCaptureTest, GetNextFrameSuccess) {
   allocation::BufferCollectionImportExportTokens ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
   ScreenCaptureConfig args;
-  args.set_import_token(std::move(ref_pair.import_token));
-  args.set_size({1, 1});
-  args.set_buffer_count(1);
+  args.import_token(fidl::HLCPPToNatural(std::move(ref_pair.import_token)));
+  args.size(fuchsia_math::SizeU{1, 1});
+  args.buffer_count(1);
 
   EXPECT_CALL(*mock_buffer_collection_importer_, ImportBufferImage(_, _))
       .WillRepeatedly(testing::Return(true));
 
   bool configure = false;
-  sc.Configure(std::move(args), [&configure](fpromise::result<void, ScreenCaptureError> result) {
+  sc.Configure(std::move(args), [&configure](auto result) {
     EXPECT_FALSE(result.is_error());
     configure = true;
   });
@@ -379,15 +377,15 @@ TEST_F(ScreenCaptureTest, GetNextFrameBufferFullError) {
   allocation::BufferCollectionImportExportTokens ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
   ScreenCaptureConfig args;
-  args.set_import_token(std::move(ref_pair.import_token));
-  args.set_size({1, 1});
-  args.set_buffer_count(1);
+  args.import_token(fidl::HLCPPToNatural(std::move(ref_pair.import_token)));
+  args.size(fuchsia_math::SizeU{1, 1});
+  args.buffer_count(1);
 
   EXPECT_CALL(*mock_buffer_collection_importer_, ImportBufferImage(_, _))
       .WillRepeatedly(testing::Return(true));
 
   bool configure = false;
-  sc.Configure(std::move(args), [&configure](fpromise::result<void, ScreenCaptureError> result) {
+  sc.Configure(std::move(args), [&configure](auto result) {
     EXPECT_FALSE(result.is_error());
     configure = true;
   });
@@ -404,7 +402,7 @@ TEST_F(ScreenCaptureTest, GetNextFrameBufferFullError) {
   // Request another frame. This should cause a buffer full error.
   const auto& result2 = CaptureScreen(sc);
   EXPECT_TRUE(result2.is_error());
-  EXPECT_EQ(result2.error(), ScreenCaptureError::BUFFER_FULL);
+  EXPECT_EQ(result2.error_value(), ScreenCaptureError::kBufferFull);
 
   // Ensure that the buffer image is released.
   EXPECT_CALL(*mock_buffer_collection_importer_, ReleaseBufferImage(_)).Times(1);
@@ -419,15 +417,15 @@ TEST_F(ScreenCaptureTest, GetNextFrameMultipleBuffers) {
   allocation::BufferCollectionImportExportTokens ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
   ScreenCaptureConfig args;
-  args.set_import_token(std::move(ref_pair.import_token));
-  args.set_size({1, 1});
-  args.set_buffer_count(2);
+  args.import_token(fidl::HLCPPToNatural(std::move(ref_pair.import_token)));
+  args.size(fuchsia_math::SizeU{1, 1});
+  args.buffer_count(2);
 
   EXPECT_CALL(*mock_buffer_collection_importer_, ImportBufferImage(_, _))
       .WillRepeatedly(testing::Return(true));
 
   bool configure = false;
-  sc.Configure(std::move(args), [&configure](fpromise::result<void, ScreenCaptureError> result) {
+  sc.Configure(std::move(args), [&configure](auto result) {
     EXPECT_FALSE(result.is_error());
     configure = true;
   });
@@ -462,15 +460,15 @@ TEST_F(ScreenCaptureTest, GetNextFrameMissingArgs) {
   allocation::BufferCollectionImportExportTokens ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
   ScreenCaptureConfig args;
-  args.set_import_token(std::move(ref_pair.import_token));
-  args.set_size({1, 1});
-  args.set_buffer_count(1);
+  args.import_token(fidl::HLCPPToNatural(std::move(ref_pair.import_token)));
+  args.size(fuchsia_math::SizeU{1, 1});
+  args.buffer_count(1);
 
   EXPECT_CALL(*mock_buffer_collection_importer_, ImportBufferImage(_, _))
       .WillRepeatedly(testing::Return(true));
 
   bool configure = false;
-  sc.Configure(std::move(args), [&configure](fpromise::result<void, ScreenCaptureError> result) {
+  sc.Configure(std::move(args), [&configure](auto result) {
     EXPECT_FALSE(result.is_error());
     configure = true;
   });
@@ -481,12 +479,11 @@ TEST_F(ScreenCaptureTest, GetNextFrameMissingArgs) {
 
   // Request a frame. We have not set the frame args so we expect an error.
   bool alloc_result = false;
-  sc.GetNextFrame(std::move(frame_args),
-                  [&alloc_result](fpromise::result<FrameInfo, ScreenCaptureError> result) {
-                    EXPECT_TRUE(result.is_error());
-                    EXPECT_EQ(result.error(), ScreenCaptureError::MISSING_ARGS);
-                    alloc_result = true;
-                  });
+  sc.GetNextFrame(std::move(frame_args), [&alloc_result](auto result) {
+    EXPECT_TRUE(result.is_error());
+    EXPECT_EQ(result.error_value(), ScreenCaptureError::kMissingArgs);
+    alloc_result = true;
+  });
   RunLoopUntilIdle();
   EXPECT_TRUE(alloc_result);
 
@@ -503,15 +500,15 @@ TEST_F(ScreenCaptureTest, ReleaseAvailableFrame) {
   allocation::BufferCollectionImportExportTokens ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
   ScreenCaptureConfig args;
-  args.set_import_token(std::move(ref_pair.import_token));
-  args.set_size({1, 1});
-  args.set_buffer_count(1);
+  args.import_token(fidl::HLCPPToNatural(std::move(ref_pair.import_token)));
+  args.size(fuchsia_math::SizeU{1, 1});
+  args.buffer_count(1);
 
   EXPECT_CALL(*mock_buffer_collection_importer_, ImportBufferImage(_, _))
       .WillRepeatedly(testing::Return(true));
 
   bool alloc_result = false;
-  sc.Configure(std::move(args), [&alloc_result](fpromise::result<void, ScreenCaptureError> result) {
+  sc.Configure(std::move(args), [&alloc_result](auto result) {
     EXPECT_FALSE(result.is_error());
     alloc_result = true;
   });
@@ -520,12 +517,11 @@ TEST_F(ScreenCaptureTest, ReleaseAvailableFrame) {
 
   // Attempt to release a frame that is not used.
   alloc_result = false;
-  sc.ReleaseFrame(/*buffer_id=*/0,
-                  [&alloc_result](fpromise::result<void, ScreenCaptureError> result) {
-                    EXPECT_TRUE(result.is_error());
-                    EXPECT_EQ(result.error(), ScreenCaptureError::INVALID_ARGS);
-                    alloc_result = true;
-                  });
+  sc.ReleaseFrame(/*buffer_id=*/0, [&alloc_result](auto result) {
+    EXPECT_TRUE(result.is_error());
+    EXPECT_EQ(result.error_value(), ScreenCaptureError::kInvalidArgs);
+    alloc_result = true;
+  });
   RunLoopUntilIdle();
   EXPECT_TRUE(alloc_result);
 
@@ -542,15 +538,15 @@ TEST_F(ScreenCaptureTest, ReleaseOutOfRangeFrame) {
   allocation::BufferCollectionImportExportTokens ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
   ScreenCaptureConfig args;
-  args.set_import_token(std::move(ref_pair.import_token));
-  args.set_size({1, 1});
-  args.set_buffer_count(1);
+  args.import_token(fidl::HLCPPToNatural(std::move(ref_pair.import_token)));
+  args.size(fuchsia_math::SizeU{1, 1});
+  args.buffer_count(1);
 
   EXPECT_CALL(*mock_buffer_collection_importer_, ImportBufferImage(_, _))
       .WillRepeatedly(testing::Return(true));
 
   bool alloc_result = false;
-  sc.Configure(std::move(args), [&alloc_result](fpromise::result<void, ScreenCaptureError> result) {
+  sc.Configure(std::move(args), [&alloc_result](auto result) {
     EXPECT_FALSE(result.is_error());
     alloc_result = true;
   });
@@ -560,12 +556,11 @@ TEST_F(ScreenCaptureTest, ReleaseOutOfRangeFrame) {
   // Attempt to release an index that is not within the range of valid indices for the buffer
   // collection.
   alloc_result = false;
-  sc.ReleaseFrame(/*buffer_id=*/1,
-                  [&alloc_result](fpromise::result<void, ScreenCaptureError> result) {
-                    EXPECT_TRUE(result.is_error());
-                    EXPECT_EQ(result.error(), ScreenCaptureError::INVALID_ARGS);
-                    alloc_result = true;
-                  });
+  sc.ReleaseFrame(/*buffer_id=*/1, [&alloc_result](auto result) {
+    EXPECT_TRUE(result.is_error());
+    EXPECT_EQ(result.error_value(), ScreenCaptureError::kInvalidArgs);
+    alloc_result = true;
+  });
   RunLoopUntilIdle();
   EXPECT_TRUE(alloc_result);
 
@@ -584,15 +579,15 @@ TEST_F(ScreenCaptureTest, ReleaseFrameFromFullBuffer) {
   allocation::BufferCollectionImportExportTokens ref_pair =
       allocation::BufferCollectionImportExportTokens::New();
   ScreenCaptureConfig args;
-  args.set_import_token(std::move(ref_pair.import_token));
-  args.set_size({1, 1});
-  args.set_buffer_count(kNumBuffers);
+  args.import_token(fidl::HLCPPToNatural(std::move(ref_pair.import_token)));
+  args.size(fuchsia_math::SizeU{1, 1});
+  args.buffer_count(kNumBuffers);
 
   EXPECT_CALL(*mock_buffer_collection_importer_, ImportBufferImage(_, _))
       .WillRepeatedly(testing::Return(true));
 
   bool configure = false;
-  sc.Configure(std::move(args), [&configure](fpromise::result<void, ScreenCaptureError> result) {
+  sc.Configure(std::move(args), [&configure](auto result) {
     EXPECT_FALSE(result.is_error());
     configure = true;
   });
@@ -610,16 +605,15 @@ TEST_F(ScreenCaptureTest, ReleaseFrameFromFullBuffer) {
   // Capture screen again without freeing a buffer. This should cause an error.
   const auto& result_full = CaptureScreen(sc);
   EXPECT_TRUE(result_full.is_error());
-  EXPECT_EQ(result_full.error(), ScreenCaptureError::BUFFER_FULL);
+  EXPECT_EQ(result_full.error_value(), ScreenCaptureError::kBufferFull);
 
   // Release a buffer. After this we can call GetNextFrame() successfully again, and it should
   // fill the buffer we released.
   bool alloc_result = false;
-  sc.ReleaseFrame(/*buffer_id=*/kFreedBufferId,
-                  [&alloc_result](fpromise::result<void, ScreenCaptureError> result) {
-                    EXPECT_TRUE(result.is_ok());
-                    alloc_result = true;
-                  });
+  sc.ReleaseFrame(/*buffer_id=*/kFreedBufferId, [&alloc_result](auto result) {
+    EXPECT_TRUE(result.is_ok());
+    alloc_result = true;
+  });
   RunLoopUntilIdle();
   EXPECT_TRUE(alloc_result);
 

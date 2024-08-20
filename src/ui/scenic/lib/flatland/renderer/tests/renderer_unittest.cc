@@ -1149,7 +1149,7 @@ VK_TEST_F(VulkanRendererTest, RotationRenderTest) {
 
   // Now let's update the renderable so it is rotated 90 deg.
   auto renderables_90deg = screen_capture::ScreenCapture::RotateRenderables(
-      {renderable}, fuchsia::ui::composition::Rotation::CW_90_DEGREES, kTargetWidthFlipped,
+      {renderable}, fuchsia_ui_composition::Rotation::kCw90Degrees, kTargetWidthFlipped,
       kTargetHeightFlipped);
   // Render the renderable to the render target.
   renderer->Render(render_target_flipped, std::move(renderables_90deg), {renderable_texture});
@@ -1188,7 +1188,7 @@ VK_TEST_F(VulkanRendererTest, RotationRenderTest) {
 
   // Now let's update the renderable so it is rotated 180 deg.
   auto renderables_180deg = screen_capture::ScreenCapture::RotateRenderables(
-      {renderable}, fuchsia::ui::composition::Rotation::CW_180_DEGREES, 16, 8);
+      {renderable}, fuchsia_ui_composition::Rotation::kCw180Degrees, 16, 8);
   // Render the renderable to the render target.
   renderer->Render(render_target, std::move(renderables_180deg), {renderable_texture});
   renderer->WaitIdle();
@@ -1225,7 +1225,7 @@ VK_TEST_F(VulkanRendererTest, RotationRenderTest) {
 
   // Now let's update the renderable so it is rotated 270 deg.
   auto renderables_270deg = screen_capture::ScreenCapture::RotateRenderables(
-      {renderable}, fuchsia::ui::composition::Rotation::CW_270_DEGREES, kTargetWidthFlipped,
+      {renderable}, fuchsia_ui_composition::Rotation::kCw270Degrees, kTargetWidthFlipped,
       kTargetHeightFlipped);
   // Render the renderable to the render target.
   renderer->Render(render_target_flipped, std::move(renderables_270deg), {renderable_texture});
@@ -1413,7 +1413,7 @@ VK_TEST_F(VulkanRendererTest, FlipLeftRightAndRotate90RenderTest) {
 
   // Now let's update the renderable so it is rotated 90 deg.
   auto renderables_90deg = screen_capture::ScreenCapture::RotateRenderables(
-      {renderable}, fuchsia::ui::composition::Rotation::CW_90_DEGREES, kTargetWidthFlipped,
+      {renderable}, fuchsia_ui_composition::Rotation::kCw90Degrees, kTargetWidthFlipped,
       kTargetHeightFlipped);
   // Render the renderable to the render target.
   renderer.Render(render_target_flipped, std::move(renderables_90deg), {renderable_texture});
@@ -1575,7 +1575,7 @@ VK_TEST_F(VulkanRendererTest, FlipUpDownAndRotate90RenderTest) {
 
   // Now let's update the renderable so it is rotated 90 deg.
   auto renderables_90deg = screen_capture::ScreenCapture::RotateRenderables(
-      {renderable}, fuchsia::ui::composition::Rotation::CW_90_DEGREES, kTargetWidthFlipped,
+      {renderable}, fuchsia_ui_composition::Rotation::kCw90Degrees, kTargetWidthFlipped,
       kTargetHeightFlipped);
   // Render the renderable to the render target.
   renderer.Render(render_target_flipped, std::move(renderables_90deg), {renderable_texture});

@@ -156,16 +156,14 @@ FlatlandScreenshot::FlatlandScreenshot(
             std::move(*wait_result.response().mutable_buffer_collection_info());
         buffer_collection->Release();
 
-        weak_ptr->screen_capturer_->Configure(
-            fidl::NaturalToHLCPP(std::move(sc_args)),
-            [weak_ptr = std::move(weak_ptr)](
-                fpromise::result<void, fuchsia::ui::composition::ScreenCaptureError> result) {
-              FX_DCHECK(!result.is_error());
-              if (!weak_ptr) {
-                return;
-              }
-              weak_ptr->init_event_.signal(0u, ZX_EVENT_SIGNALED);
-            });
+        weak_ptr->screen_capturer_->Configure(std::move(sc_args),
+                                              [weak_ptr = std::move(weak_ptr)](auto result) {
+                                                FX_DCHECK(!result.is_error());
+                                                if (!weak_ptr) {
+                                                  return;
+                                                }
+                                                weak_ptr->init_event_.signal(0u, ZX_EVENT_SIGNALED);
+                                              });
       });
 }
 
@@ -363,9 +361,12 @@ void FlatlandScreenshot::GetNextFrame() {
 
   GetNextFrameArgs frame_args;
   frame_args.event(std::move(dup));
-
   FX_LOGS(INFO) << "Capturing next frame for screenshot.";
-  screen_capturer_->GetNextFrame(fidl::NaturalToHLCPP(std::move(frame_args)), [](auto result) {});
+  screen_capturer_->GetNextFrame(std::move(frame_args), [](auto result) {
+    if (result.is_error()) {
+      FX_LOGS(ERROR) << "Error in GetNextFrame.";
+    }
+  });
 }
 
 void FlatlandScreenshot::TakeFile(TakeFileRequest& request, TakeFileCompleter::Sync& completer) {

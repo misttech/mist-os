@@ -5,13 +5,8 @@
 #ifndef SRC_UI_SCENIC_LIB_SCREEN_CAPTURE_SCREEN_CAPTURE_MANAGER_H_
 #define SRC_UI_SCENIC_LIB_SCREEN_CAPTURE_SCREEN_CAPTURE_MANAGER_H_
 
-#include <fuchsia/ui/composition/cpp/fidl.h>
-#include <lib/fidl/cpp/binding_set.h>
+#include <fidl/fuchsia.ui.composition/cpp/fidl.h>
 
-#include <unordered_map>
-
-#include "screen_capture.h"
-#include "screen_capture_buffer_collection_importer.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 #include "src/ui/scenic/lib/flatland/engine/engine.h"
 #include "src/ui/scenic/lib/flatland/renderer/renderer.h"
@@ -37,8 +32,7 @@ class ScreenCaptureManager {
   std::shared_ptr<flatland::FlatlandManager> flatland_manager_;
   std::vector<std::shared_ptr<allocation::BufferCollectionImporter>> buffer_collection_importers_;
 
-  fidl::BindingSet<fuchsia::ui::composition::ScreenCapture, std::unique_ptr<ScreenCapture>>
-      bindings_;
+  fidl::ServerBindingGroup<fuchsia_ui_composition::ScreenCapture> bindings_;
 };
 
 }  // namespace screen_capture

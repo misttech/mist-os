@@ -2,14 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "screen_capture_manager.h"
+#include "src/ui/scenic/lib/screen_capture/screen_capture_manager.h"
 
 #include <lib/syslog/cpp/macros.h>
 
-#include "rapidjson/document.h"
 #include "screen_capture.h"
-#include "src/lib/files/file.h"
-#include "src/lib/fsl/handles/object_info.h"
 #include "src/ui/scenic/lib/flatland/engine/engine.h"
 #include "src/ui/scenic/lib/flatland/renderer/renderer.h"
 
@@ -29,23 +26,25 @@ ScreenCaptureManager::ScreenCaptureManager(
 
 void ScreenCaptureManager::CreateClient(
     fidl::InterfaceRequest<fuchsia::ui::composition::ScreenCapture> request) {
-  bindings_.AddBinding(
-      std::make_unique<ScreenCapture>(
-          buffer_collection_importers_, renderer_,
-          [this]() {
-            FX_DCHECK(flatland_manager_);
-            FX_DCHECK(engine_);
+  auto impl = std::make_unique<screen_capture::ScreenCapture>(
+      buffer_collection_importers_, renderer_, [this]() {
+        FX_DCHECK(flatland_manager_);
+        FX_DCHECK(engine_);
 
-            auto display = flatland_manager_->GetPrimaryFlatlandDisplayForRendering();
-            if (!display) {
-              FX_LOGS(WARNING)
-                  << "No FlatlandDisplay attached at root. Returning an empty screenshot.";
-              return flatland::Renderables();
-            }
+        auto display = flatland_manager_->GetPrimaryFlatlandDisplayForRendering();
+        if (!display) {
+          FX_LOGS(WARNING) << "No FlatlandDisplay attached at root. Returning an empty screenshot.";
+          return flatland::Renderables();
+        }
 
-            return engine_->GetRenderables(*display);
-          }),
-      std::move(request));
+        return engine_->GetRenderables(*display);
+      });
+  screen_capture::ScreenCapture* impl_ptr = impl.get();
+  auto close_handler = [impl = std::move(impl)](fidl::UnbindInfo info) {
+    // Let |impl| fall out of scope.
+  };
+  bindings_.AddBinding(async_get_default_dispatcher(), fidl::HLCPPToNatural(std::move(request)),
+                       impl_ptr, std::move(close_handler));
 }
 
 }  // namespace screen_capture
