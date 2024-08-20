@@ -158,6 +158,12 @@ template("zircon_toolchain") {
 
   assert(defined(invoker.environment), "'environment' argument is required!")
 
+  if (cxx_rbe_full_toolchain || link_rbe_full_toolchain) {
+    if (clang_tool_dir != "") {
+      _tool_root_dir = string_replace(clang_tool_dir, "/bin", "")
+    }
+  }
+
   # Cached and distributed wrappers just go on the front of compiler commands.
   compiler_prefix_list = []
   if (defined(invoker.cxx_rbe_enable)) {
@@ -254,6 +260,22 @@ template("zircon_toolchain") {
     if (restat_cc) {
       # re-client has built-in support for write-if-changed behavior
       compiler_prefix_list += [ "--preserve_unchanged_output_mtime" ]
+    }
+
+    # When debugging or working around unexpected differences between
+    # local and remote execution, upload the entire toolchain to see
+    # if differences are resolved.
+    if (cxx_rbe_full_toolchain && defined(_tool_root_dir)) {
+      if (cxx_rbe_minimalist_wrapper) {  # rewrapper expects paths relative to
+                                         # exec_root, which is the source dir
+        _toolchain_dir_arg = rebase_path(_tool_root_dir, "//", root_build_dir)
+      } else {  # The python wrapper already adjusts paths accordingly.
+        _toolchain_dir_arg = _tool_root_dir
+      }
+      compiler_prefix_list += [
+        "--inputs",
+        _toolchain_dir_arg,
+      ]
     }
     compiler_prefix_list += [ "--" ]
   } else {
@@ -592,6 +614,13 @@ template("zircon_toolchain") {
           # The remote link wrapper will download everything except the main output.
         }
 
+        if (link_rbe_full_toolchain && defined(_tool_root_dir)) {
+          _linker_prefix_list += [
+            "--inputs",
+            _tool_root_dir,
+          ]
+        }
+
         _linker_prefix_list += [
           "--preserve_unchanged_output_mtime",
           "--",
@@ -741,9 +770,13 @@ template("zircon_toolchain") {
           _linker_prefix_list += _link_rbe_exec_strategy_flags
           _link_concurrent_jobs = concurrent_jobs.remote
         }
+        _linker_input_args = [ "\"$rspfile\"" ]
+        if (link_rbe_full_toolchain && defined(_tool_root_dir)) {
+          _linker_input_args += [ _tool_root_dir ]
+        }
         _linker_prefix_list += [
           "--inputs",
-          "\"$rspfile\"",
+          string_join(",", _linker_input_args),
           "--input_list_paths",
           "\"$rspfile\"",
           "--output_files",
