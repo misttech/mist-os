@@ -6,7 +6,6 @@ use crate::util::cobalt_logger::log_cobalt_1dot1;
 use fuchsia_inspect::Node as InspectNode;
 use fuchsia_inspect_contrib::inspect_log;
 use fuchsia_inspect_contrib::nodes::BoundedListNode;
-use tracing::info;
 use {fuchsia_async as fasync, wlan_legacy_metrics_registry as metrics};
 
 pub const INSPECT_TOGGLE_EVENTS_LIMIT: usize = 20;

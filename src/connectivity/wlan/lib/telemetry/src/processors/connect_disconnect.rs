@@ -15,7 +15,7 @@ use fuchsia_inspect_contrib::{inspect_insert, inspect_log};
 use fuchsia_inspect_derive::Unit;
 use fuchsia_sync::Mutex;
 use std::sync::Arc;
-use tracing::{info, warn};
+use tracing::warn;
 use windowed_stats::experimental::clock::{TimedSample, Timestamp};
 use windowed_stats::experimental::series::interpolation::Constant;
 use windowed_stats::experimental::series::statistic::Union;
