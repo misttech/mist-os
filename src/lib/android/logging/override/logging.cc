@@ -60,10 +60,12 @@ void __android_log_write_log_message(__android_log_message* log_message) {
   fuchsia_logging::LogSeverity severity = GetSeverity(log_message->priority);
   if (::fuchsia_logging::IsSeverityEnabled(severity)) {
     if (log_message->tag) {
-      fx_slog_internal(severity, log_message->file, log_message->line, log_message->message,
-                       FX_KV("tag", log_message->tag));
+      syslog_runtime::internal::WriteStructuredLog(severity, log_message->file, log_message->line,
+                                                   log_message->message,
+                                                   FX_KV("tag", log_message->tag));
     } else {
-      fx_slog_internal(severity, log_message->file, log_message->line, log_message->message);
+      syslog_runtime::internal::WriteStructuredLog(severity, log_message->file, log_message->line,
+                                                   log_message->message);
     }
   }
 }
