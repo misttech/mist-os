@@ -139,7 +139,9 @@ config("no-lto") {
 variant("lto") {
   configs = [
     ":lto-clang",
-    ":lto-rust",
+    # https://fxbug.dev/360894857 LTO for rust is disabled due to an incompatibility with the LLD version
+    # from the clang toolchain. Once we have a new LLD we should be able to turn it back on
+    # ":lto-rust",
   ]
 }
 
@@ -207,6 +209,8 @@ config("thinlto-rust") {
 variant("thinlto") {
   configs = [
     ":thinlto-clang",
-    ":thinlto-rust",
+    # https://fxbug.dev/360894857 LTO for rust is disabled due to an incompatibility with the LLD version
+    # from the clang toolchain. Once we have a new LLD we should be able to turn it back on
+    #":thinlto-rust",
   ]
 }
