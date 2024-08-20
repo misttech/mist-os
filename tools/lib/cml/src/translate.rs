@@ -842,6 +842,10 @@ fn translate_offer(
                     target: Some(target),
                     target_name: Some(target_name.into()),
                     availability: Some(availability),
+                    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                    dependency_type: Some(
+                        offer.dependency.clone().unwrap_or(cm::DependencyType::Strong).into(),
+                    ),
                     ..Default::default()
                 }));
             }
@@ -4068,6 +4072,7 @@ mod tests {
                         "service": "fuchsia.sys2.FromDictService",
                         "from": [ "parent/in/dict"],
                         "to": "#modular",
+                        "dependency": "weak",
                     },
                     {
                         "directory": "assets",
@@ -4279,6 +4284,7 @@ mod tests {
                             })),
                             target_name: Some("svc".into()),
                             availability: Some(fdecl::Availability::Required),
+                            dependency_type: Some(fdecl::DependencyType::Strong),
                             ..Default::default()
                         }
                     ),
@@ -4292,6 +4298,7 @@ mod tests {
                             })),
                             target_name: Some("svc".into()),
                             availability: Some(fdecl::Availability::Required),
+                            dependency_type: Some(fdecl::DependencyType::Strong),
                             ..Default::default()
                         }
                     ),
@@ -4308,6 +4315,7 @@ mod tests {
                             })),
                             target_name: Some("svc".into()),
                             availability: Some(fdecl::Availability::Required),
+                            dependency_type: Some(fdecl::DependencyType::Strong),
                             ..Default::default()
                         }
                     ),
@@ -4323,6 +4331,7 @@ mod tests {
                             })),
                             target_name: Some("svc".into()),
                             availability: Some(fdecl::Availability::Required),
+                            dependency_type: Some(fdecl::DependencyType::Strong),
                             ..Default::default()
                         }
                     ),
@@ -4337,6 +4346,7 @@ mod tests {
                             })),
                             target_name: Some("fuchsia.sys2.FromDictService".to_string()),
                             availability: Some(fdecl::Availability::Required),
+                            dependency_type: Some(fdecl::DependencyType::Weak),
                             ..Default::default()
                         }
                     ),
@@ -4768,6 +4778,7 @@ mod tests {
                             })),
                             target_name: Some("C".into()),
                             availability: Some(fdecl::Availability::Required),
+                            dependency_type: Some(fdecl::DependencyType::Strong),
                             ..Default::default()
                         }
                     ),

@@ -1663,6 +1663,7 @@ mod tests {
                 source_instance_filter: None,
                 renamed_instances: None,
                 availability: Availability::Required,
+                dependency_type: Default::default(),
             })
             .collect();
         let collection_offer = OfferServiceDecl {
@@ -1674,6 +1675,7 @@ mod tests {
             source_instance_filter: None,
             renamed_instances: None,
             availability: Availability::Required,
+            dependency_type: Default::default(),
         };
         assert_matches!(
             RouteBundle::from_offer(parent_offers[0].clone()),

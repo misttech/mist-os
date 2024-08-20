@@ -553,6 +553,9 @@ pub struct OfferServiceDecl {
     pub renamed_instances: Option<Vec<NameMapping>>,
     #[fidl_decl(default)]
     pub availability: Availability,
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    #[fidl_decl(default)]
+    pub dependency_type: DependencyType,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -1933,6 +1936,12 @@ pub enum DependencyType {
     Weak,
 }
 
+impl Default for DependencyType {
+    fn default() -> Self {
+        Self::Strong
+    }
+}
+
 fidl_translations_symmetrical_enums!(fdecl::DependencyType, DependencyType, Strong, Weak);
 
 impl UseDecl {
@@ -3123,6 +3132,7 @@ mod tests {
                         )),
                         target_name: Some("mynetstack1".to_string()),
                         availability: Some(fdecl::Availability::Required),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
                         ..Default::default()
                     }),
                     fdecl::Offer::Service(fdecl::OfferService {
@@ -3137,6 +3147,7 @@ mod tests {
                         )),
                         target_name: Some("mynetstack2".to_string()),
                         availability: Some(fdecl::Availability::Optional),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
                         ..Default::default()
                     }),
                     fdecl::Offer::Service(fdecl::OfferService {
@@ -3153,6 +3164,7 @@ mod tests {
                         source_instance_filter: Some(vec!["allowedinstance".to_string()]),
                         renamed_instances: Some(vec![fdecl::NameMapping{source_name: "default".to_string(), target_name: "allowedinstance".to_string()}]),
                         availability: Some(fdecl::Availability::Required),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
                         ..Default::default()
                     }),
                     fdecl::Offer::Dictionary(fdecl::OfferDictionary {
@@ -3541,6 +3553,7 @@ mod tests {
                             target: offer_target_static_child("echo"),
                             target_name: "mynetstack1".parse().unwrap(),
                             availability: Availability::Required,
+                            dependency_type: Default::default(),
                         }),
                         OfferDecl::Service(OfferServiceDecl {
                             source: OfferSource::Parent,
@@ -3551,6 +3564,7 @@ mod tests {
                             target: offer_target_static_child("echo"),
                             target_name: "mynetstack2".parse().unwrap(),
                             availability: Availability::Optional,
+                            dependency_type: Default::default(),
                         }),
                         OfferDecl::Service(OfferServiceDecl {
                             source: OfferSource::Parent,
@@ -3561,6 +3575,7 @@ mod tests {
                             target: offer_target_static_child("echo"),
                             target_name: "mynetstack3".parse().unwrap(),
                             availability: Availability::Required,
+                            dependency_type: Default::default(),
                         }),
                         OfferDecl::Dictionary(OfferDictionaryDecl {
                             source: OfferSource::Parent,

@@ -143,6 +143,12 @@ type OfferService = table {
     /// The `same_as_target` value causes this offer's availability to match the
     /// availability set in the target.
     7: availability Availability;
+
+    /// (Optional, defaults to `STRONG`) The dependency type this offer represents.
+    /// A component which receives a weak offer must support the offered capability being
+    /// unavailable at any point.
+    @available(added=HEAD)
+    9: dependency_type DependencyType;
 };
 
 /// Declares a protocol offered by a component to one of its children,

@@ -1265,6 +1265,7 @@ impl OfferBuilder {
                 source_instance_filter: self.source_instance_filter,
                 renamed_instances: self.renamed_instances,
                 availability: self.availability,
+                dependency_type: Default::default(),
             }),
             CapabilityTypeName::Directory => {
                 cm_rust::OfferDecl::Directory(cm_rust::OfferDirectoryDecl {

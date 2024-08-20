@@ -2115,6 +2115,9 @@ impl<'a> ValidationContext<'a> {
                     get_source_dictionary!(o),
                     o.target.as_ref(),
                     o.target_name.as_ref(),
+                    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                    Some(o.dependency_type.as_ref().unwrap_or(&fdecl::DependencyType::Strong)),
+                    #[cfg(fuchsia_api_level_less_than = "HEAD")]
                     Some(&fdecl::DependencyType::Strong),
                     o.availability.as_ref(),
                     offer_type,
@@ -10994,6 +10997,17 @@ mod tests {
                 rights: Some(fio::Operations::CONNECT),
                 subdir: None,
                 dependency_type: None,  // Filled by macro
+                ..Default::default()
+            },
+        },
+        (test_validate_offers_service_weak_dependency_cycle) => {
+            ty = fdecl::Offer::Service,
+            offer_decl = fdecl::OfferService {
+                source: None,  // Filled by macro
+                target: None,  // Filled by macro
+                source_name: Some(format!("thing")),
+                target_name: Some(format!("thing")),
+                dependency_type: None, // Filled by macro
                 ..Default::default()
             },
         },

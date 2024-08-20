@@ -632,7 +632,12 @@ fn get_dependency_from_offer(
             target,
             ..
         })
-        | OfferDecl::Service(OfferServiceDecl { source, target, .. })
+        | OfferDecl::Service(OfferServiceDecl {
+            dependency_type: DependencyType::Strong,
+            source,
+            target,
+            ..
+        })
         | OfferDecl::Config(OfferConfigurationDecl { source, target, .. })
         | OfferDecl::Runner(OfferRunnerDecl { source, target, .. })
         | OfferDecl::Resolver(OfferResolverDecl { source, target, .. })
@@ -650,6 +655,7 @@ fn get_dependency_from_offer(
         OfferDecl::Protocol(OfferProtocolDecl {
             dependency_type: DependencyType::Weak, ..
         })
+        | OfferDecl::Service(OfferServiceDecl { dependency_type: DependencyType::Weak, .. })
         | OfferDecl::Directory(OfferDirectoryDecl {
             dependency_type: DependencyType::Weak, ..
         })

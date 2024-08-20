@@ -1634,6 +1634,8 @@ fn create_offer_decl(
                 source_instance_filter: None,
                 renamed_instances: None,
                 availability,
+                #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                dependency_type: Default::default(),
             })
         }
         ftest::Capability::EventStream(event_stream) => {
