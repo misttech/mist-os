@@ -14,7 +14,7 @@ use std::sync::{Arc, Weak};
 
 use crate::power::OnWakeOps;
 use crate::task::{CurrentTask, HandleWaitCanceler, WaitCanceler};
-use crate::timer::TimerOps;
+use crate::vfs::timer::TimerOps;
 
 const HRTIMER_DIRECTORY: &str = "/dev/class/hrtimer";
 const HRTIMER_DEFAULT_ID: u64 = 6;

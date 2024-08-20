@@ -4,8 +4,7 @@
 
 use crate::signals::{SignalEvent, SignalEventNotify, SignalEventValue};
 use crate::task::interval_timer::{IntervalTimer, IntervalTimerHandle};
-use crate::task::CurrentTask;
-use crate::timer::Timeline;
+use crate::task::{CurrentTask, Timeline};
 use starnix_sync::Mutex;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::ownership::OwnedRef;

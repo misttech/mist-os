@@ -3,10 +3,8 @@
 // found in the LICENSE file.
 
 use crate::signals::{send_signal, SignalDetail, SignalEvent, SignalEventNotify, SignalInfo};
-use crate::task::timers::TimerId;
-use crate::task::{Kernel, ThreadGroup};
+use crate::task::{Kernel, ThreadGroup, Timeline, TimerId};
 use crate::time::utc;
-use crate::timer::Timeline;
 use futures::stream::AbortHandle;
 use starnix_logging::{log_trace, log_warn, track_stub};
 use starnix_sync::Mutex;

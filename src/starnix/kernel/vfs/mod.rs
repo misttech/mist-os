@@ -41,6 +41,7 @@ pub mod pipe;
 pub mod rw_queue;
 pub mod socket;
 pub mod syscalls;
+pub mod timer;
 
 pub use aio::*;
 pub use anon_node::*;

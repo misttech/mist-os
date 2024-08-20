@@ -2,13 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::fuchsia::TimerFile;
 use crate::mm::{MemoryAccessor, MemoryAccessorExt, TaskMemoryAccessor, PAGE_SIZE};
 use crate::security;
 use crate::task::{
-    CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Waiter,
+    CurrentTask, EnqueueEventHandler, EventHandler, ReadyItem, ReadyItemKey, Task, Timeline,
+    TimerWakeup, Waiter,
 };
-use crate::timer::{Timeline, TimerWakeup};
 use crate::vfs::buffers::{UserBuffersInputBuffer, UserBuffersOutputBuffer};
 use crate::vfs::eventfd::{new_eventfd, EventFdFileObject, EventFdType};
 use crate::vfs::fs_args::MountParams;
@@ -16,6 +15,7 @@ use crate::vfs::inotify::InotifyFileObject;
 use crate::vfs::namespace::FileSystemCreator;
 use crate::vfs::pidfd::new_pidfd;
 use crate::vfs::pipe::{new_pipe, PipeFileObject};
+use crate::vfs::timer::TimerFile;
 use crate::vfs::{
     checked_add_offset_and_length, new_memfd, splice, AioContext, CheckAccessReason, DirentSink64,
     EpollFileObject, FallocMode, FdFlags, FdNumber, FileAsyncOwner, FileHandle, FileSystemOptions,

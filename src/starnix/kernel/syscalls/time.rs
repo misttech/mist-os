@@ -4,9 +4,8 @@
 
 use crate::mm::MemoryAccessorExt;
 use crate::signals::{RunState, SignalEvent};
-use crate::task::{ClockId, CurrentTask, TimerId};
+use crate::task::{ClockId, CurrentTask, Timeline, TimerId};
 use crate::time::utc::utc_now;
-use crate::timer::Timeline;
 use fuchsia_inspect_contrib::profile_duration;
 use fuchsia_zircon::{
     Task, {self as zx},
