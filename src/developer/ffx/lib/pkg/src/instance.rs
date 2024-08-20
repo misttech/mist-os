@@ -667,10 +667,10 @@ mod tests {
         let tmp = tempfile::TempDir::new().expect("temp dir");
         let fake_server = tmp.path().join(format!("fake_server.sh"));
         const FAKE_SERVER_CONTENTS: &str = r#"#!/bin/bash
-        while sleep 1s
+        while sleep 1s; do
           echo "."
         done
-     "#;
+        "#;
 
         // write out the shell script
         fs::write(&fake_server, FAKE_SERVER_CONTENTS).expect("writing fake server");
@@ -692,6 +692,12 @@ mod tests {
             registration_aliases: vec![],
             registration_storage_type: RepoStorageType::Ephemeral,
         };
+        // There is race condition in which the fake server process could crash (e.g. if the bash
+        // has a syntax error and spawning the process is slow) in between the is_running check and
+        // the call to terminate, which results in this not actually testing that terminate
+        // terminates. This sleep makes it much more likely that such a crash would occur before the
+        // is_running check.
+        std::thread::sleep(std::time::Duration::from_secs(1));
         assert!(info.is_running(), "expect server process to be running");
         info.terminate(Duration::from_secs(10)).await.expect("terminate success");
     }
