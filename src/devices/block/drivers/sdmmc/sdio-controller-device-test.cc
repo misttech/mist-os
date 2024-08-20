@@ -18,6 +18,8 @@
 
 #include <memory>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/sdio/cpp/bind.h>
 #include <zxtest/zxtest.h>
 
 #include "fake-sdmmc-device.h"
@@ -1265,30 +1267,30 @@ TEST_F(SdioControllerDeviceTest, DifferentManufacturerProductIds) {
 
   ASSERT_OK(StartDriver());
 
-  constexpr std::pair<uint32_t, uint32_t> kExpectedProps[4][4] = {
+  const std::pair<std::string, uint32_t> kExpectedProps[4][4] = {
       {
-          {BIND_PROTOCOL, ZX_PROTOCOL_SDIO},
-          {BIND_SDIO_VID, 0x317b},
-          {BIND_SDIO_PID, 0xa88f},
-          {BIND_SDIO_FUNCTION, 1},
+          {bind_fuchsia::PROTOCOL, bind_fuchsia_sdio::BIND_PROTOCOL_DEVICE},
+          {bind_fuchsia::SDIO_VID, 0x317b},
+          {bind_fuchsia::SDIO_PID, 0xa88f},
+          {bind_fuchsia::SDIO_FUNCTION, 1},
       },
       {
-          {BIND_PROTOCOL, ZX_PROTOCOL_SDIO},
-          {BIND_SDIO_VID, 0x6dbd},
-          {BIND_SDIO_PID, 0x240d},
-          {BIND_SDIO_FUNCTION, 2},
+          {bind_fuchsia::PROTOCOL, bind_fuchsia_sdio::BIND_PROTOCOL_DEVICE},
+          {bind_fuchsia::SDIO_VID, 0x6dbd},
+          {bind_fuchsia::SDIO_PID, 0x240d},
+          {bind_fuchsia::SDIO_FUNCTION, 2},
       },
       {
-          {BIND_PROTOCOL, ZX_PROTOCOL_SDIO},
-          {BIND_SDIO_VID, 0xb8ca},
-          {BIND_SDIO_PID, 0x9852},
-          {BIND_SDIO_FUNCTION, 3},
+          {bind_fuchsia::PROTOCOL, bind_fuchsia_sdio::BIND_PROTOCOL_DEVICE},
+          {bind_fuchsia::SDIO_VID, 0xb8ca},
+          {bind_fuchsia::SDIO_PID, 0x9852},
+          {bind_fuchsia::SDIO_FUNCTION, 3},
       },
       {
-          {BIND_PROTOCOL, ZX_PROTOCOL_SDIO},
-          {BIND_SDIO_VID, 0xf5ee},
-          {BIND_SDIO_PID, 0x30de},
-          {BIND_SDIO_FUNCTION, 4},
+          {bind_fuchsia::PROTOCOL, bind_fuchsia_sdio::BIND_PROTOCOL_DEVICE},
+          {bind_fuchsia::SDIO_VID, 0xf5ee},
+          {bind_fuchsia::SDIO_PID, 0x30de},
+          {bind_fuchsia::SDIO_FUNCTION, 4},
       },
   };
 
@@ -1305,7 +1307,7 @@ TEST_F(SdioControllerDeviceTest, DifferentManufacturerProductIds) {
       ASSERT_GE(properties.size(), std::size(kExpectedProps[0]));
       for (size_t j = 0; j < std::size(kExpectedProps[0]); j++) {
         const fuchsia_driver_framework::NodeProperty& prop = properties[j];
-        EXPECT_EQ(prop.key().int_value().value(), kExpectedProps[i][j].first);
+        EXPECT_EQ(prop.key().string_value().value(), kExpectedProps[i][j].first);
         EXPECT_EQ(prop.value().int_value().value(), kExpectedProps[i][j].second);
       }
     }

@@ -115,9 +115,9 @@ __BEGIN_CDECLS
 #define BIND_NAND_CLASS 0x0700
 
 // SDIO binding variables at 0x09XX
-#define BIND_SDIO_VID 0x0900
-#define BIND_SDIO_PID 0x0901
-#define BIND_SDIO_FUNCTION 0x0902
+// BIND_SDIO_VID was 0x0900
+// BIND_SDIO_PID was 0x0901
+// BIND_SDIO_FUNCTION was 0x0902
 
 // I2C binding variables at 0x0A0X
 #define BIND_I2C_CLASS 0x0A00

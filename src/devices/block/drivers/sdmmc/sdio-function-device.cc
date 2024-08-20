@@ -7,6 +7,8 @@
 #include <lib/ddk/binding_driver.h>
 #include <lib/driver/compat/cpp/compat.h>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/sdio/cpp/bind.h>
 #include <fbl/alloc_checker.h>
 
 #include "sdio-controller-device.h"
@@ -33,7 +35,7 @@ zx_status_t SdioFunctionDevice::AddDevice(const sdio_func_hw_info_t& hw_info) {
     const std::string path_from_parent = std::string(sdio_parent_->parent()->driver_name()) + "/" +
                                          std::string(sdio_parent_->kDeviceName) + "/";
     compat::DeviceServer::BanjoConfig banjo_config;
-    banjo_config.callbacks[ZX_PROTOCOL_SDIO] = sdio_server_.callback();
+    banjo_config.callbacks[bind_fuchsia_sdio::BIND_PROTOCOL_DEVICE] = sdio_server_.callback();
 
     auto result = compat_server_.Initialize(
         sdio_parent_->parent()->driver_incoming(), sdio_parent_->parent()->driver_outgoing(),
@@ -97,10 +99,12 @@ zx_status_t SdioFunctionDevice::AddDevice(const sdio_func_hw_info_t& hw_info) {
                    .Build();
 
   fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 4);
-  properties[0] = fdf::MakeProperty(arena, BIND_PROTOCOL, ZX_PROTOCOL_SDIO);
-  properties[1] = fdf::MakeProperty(arena, BIND_SDIO_VID, hw_info.manufacturer_id);
-  properties[2] = fdf::MakeProperty(arena, BIND_SDIO_PID, hw_info.product_id);
-  properties[3] = fdf::MakeProperty(arena, BIND_SDIO_FUNCTION, function_);
+  properties[0] =
+      fdf::MakeProperty(arena, bind_fuchsia::PROTOCOL, bind_fuchsia_sdio::BIND_PROTOCOL_DEVICE);
+  properties[1] = fdf::MakeProperty(arena, bind_fuchsia::SDIO_VID, hw_info.manufacturer_id);
+  properties[2] = fdf::MakeProperty(arena, bind_fuchsia::SDIO_PID, hw_info.product_id);
+  properties[3] =
+      fdf::MakeProperty(arena, bind_fuchsia::SDIO_FUNCTION, static_cast<uint32_t>(function_));
 
   std::vector<fuchsia_driver_framework::wire::Offer> offers = compat_server_.CreateOffers2(arena);
   offers.push_back(fdf::MakeOffer2<fuchsia_hardware_sdio::Service>(arena, sdio_function_name_));
