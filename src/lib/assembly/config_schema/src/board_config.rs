@@ -213,6 +213,10 @@ pub struct PlatformConfig {
     #[serde(default)]
     pub development_support: DevelopmentSupportConfig,
 
+    /// Configure development support related features
+    #[serde(default)]
+    pub graphics: GraphicsConfig,
+
     /// Sysmem board defaults. This can be overridden field-by-field by the same
     /// struct in platform config.
     #[serde(default)]
@@ -277,6 +281,25 @@ pub struct NetworkConfig {
     /// determined from the shell by running the `lsdev` command on the device
     /// (e.g. `/dev/class/network/000` or `/dev/class/ethernet/000`).
     pub netsvc_interface: Option<String>,
+}
+
+/// This struct defines graphics configurations.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct GraphicsConfig {
+    /// Configure display related features.
+    pub display: DisplayConfig,
+}
+
+/// This struct defines display configurations.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct DisplayConfig {
+    /// The number of degrees to the rotate the screen display by.
+    pub rotation: Option<u32>,
+
+    /// Whether the display has rounded corners.
+    pub rounded_corners: Option<bool>,
 }
 
 #[cfg(test)]
@@ -358,6 +381,7 @@ mod test {
                 development_support: DevelopmentSupportConfig {
                     enable_debug_access_port_for_soc: Some(DapSoc::AmlogicT931g),
                 },
+                graphics: GraphicsConfig::default(),
                 sysmem_defaults: PlatformSysmemConfig::default(),
             },
             ..Default::default()
