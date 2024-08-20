@@ -447,6 +447,10 @@ assembly_input_bundle("bus_pci_driver") {
   ]
 }
 
+# AIB for the realtek-8211f driver
+assembly_input_bundle("realtek_8211f_driver") {
+}
+
 # The most minimal AIB that is included in eng assembled systems that are meant
 # to be standalone.
 #

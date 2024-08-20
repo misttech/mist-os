@@ -21,6 +21,7 @@ common_board_configuration = {
     "fuchsia::paver",
     "fuchsia::pmm_checker",
     "fuchsia::real_time_clock",
+    "fuchsia::realtek_8211f",
     "fuchsia::usb_peripheral_support",
     "fuchsia::wlan_fullmac",
   ]
