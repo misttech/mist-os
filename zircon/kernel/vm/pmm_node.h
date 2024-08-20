@@ -32,7 +32,7 @@ class PmmNode {
  public:
   // This constructor may be called early in the boot sequence so make sure it does not do any "real
   // work" or depend on any globals.
-  PmmNode() : evictor_(this) {}
+  PmmNode() = default;
   ~PmmNode() = default;
 
   DISALLOW_COPY_ASSIGN_AND_MOVE(PmmNode);

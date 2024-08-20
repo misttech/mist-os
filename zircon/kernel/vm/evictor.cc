@@ -42,6 +42,55 @@ inline void CheckedIncrement(uint64_t* a, uint64_t b) {
   *a = result;
 }
 
+ktl::optional<Evictor::EvictedPageCounts> ReclaimFromGlobalPageQueues(
+    VmCompressor* compression_instance, Evictor::EvictionLevel eviction_level) {
+  // Avoid evicting from the newest queue to prevent thrashing.
+  const size_t lowest_evict_queue = eviction_level == Evictor::EvictionLevel::IncludeNewest
+                                        ? PageQueues::kNumActiveQueues
+                                        : PageQueues::kNumReclaim - PageQueues::kNumOldestQueues;
+  // If we're going to include newest pages, ignore eviction hints as well, i.e. also consider
+  // evicting pages with always_need set if we encounter them in LRU order.
+  const VmCowPages::EvictionHintAction hint_action =
+      eviction_level == Evictor::EvictionLevel::IncludeNewest
+          ? VmCowPages::EvictionHintAction::Ignore
+          : VmCowPages::EvictionHintAction::Follow;
+
+  // TODO(rashaeqbal): The sequence of actions in PeekReclaim() and ReclaimPage() implicitly
+  // guarantee forward progress if being repeatedly called, so that we're not stuck trying to evict
+  // the same page (i.e. PeekReclaim keeps returning the same page). It would be nice to have
+  // some explicit checks here (or in PageQueues) to guarantee forward progress. Or we might want
+  // to use cursors to iterate the queues instead of peeking the tail each time.
+  if (ktl::optional<PageQueues::VmoBacklink> backlink =
+          pmm_page_queues()->PeekReclaim(lowest_evict_queue)) {
+    // A valid backlink always has a valid cow
+    DEBUG_ASSERT(backlink->cow);
+
+    if (compression_instance) {
+      zx_status_t status = compression_instance->Arm();
+      if (status != ZX_OK) {
+        return ktl::nullopt;
+      }
+    }
+    // We stack-own loaned pages from ReclaimPage() to pmm_free() below.
+    __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
+    list_node_t reclaim_list;
+    list_initialize(&reclaim_list);
+    VmCowPages::ReclaimCounts reclaimed = backlink->cow->ReclaimPage(
+        backlink->page, backlink->offset, hint_action, &reclaim_list, compression_instance);
+
+    if (!list_is_empty(&reclaim_list)) {
+      pmm_free(&reclaim_list);
+    }
+    return Evictor::EvictedPageCounts{
+        .pager_backed = reclaimed.evicted_non_loaned,
+        .pager_backed_loaned = reclaimed.evicted_loaned,
+        .discardable = reclaimed.discarded,
+        .compressed = reclaimed.compressed,
+    };
+  }
+  return ktl::nullopt;
+}
+
 }  // namespace
 
 // static
@@ -56,10 +105,11 @@ Evictor::EvictorStats Evictor::GetGlobalStats() {
   return stats;
 }
 
-Evictor::Evictor(PmmNode* node) : Evictor(node, node->GetPageQueues(), kEvictAll) {}
+Evictor::Evictor() : Evictor(nullptr, nullptr) {}
 
-Evictor::Evictor(PmmNode* node, PageQueues* queues, uint8_t eviction_types)
-    : pmm_node_(node), page_queues_(queues), eviction_types_(eviction_types) {}
+Evictor::Evictor(ReclaimFunction reclaim_function, FreePagesFunction free_pages_function)
+    : test_reclaim_function_(ktl::move(reclaim_function)),
+      test_free_pages_function_(ktl::move(free_pages_function)) {}
 
 Evictor::~Evictor() { DisableEviction(); }
 
@@ -161,14 +211,14 @@ Evictor::EvictedPageCounts Evictor::EvictOneShotFromPreloadedTarget() {
     return total_evicted_counts;
   }
 
-  uint64_t free_pages_before = pmm_node_->CountFreePages();
+  uint64_t free_pages_before = CountFreePages();
 
   total_evicted_counts =
       EvictUntilTargetsMet(target.min_pages_to_free, target.free_pages_target, target.level);
 
   if (target.print_counts) {
     printf("[EVICT]: Free memory before eviction was %zuMB and after eviction is %zuMB\n",
-           free_pages_before * PAGE_SIZE / MB, pmm_node_->CountFreePages() * PAGE_SIZE / MB);
+           free_pages_before * PAGE_SIZE / MB, CountFreePages() * PAGE_SIZE / MB);
     if (total_evicted_counts.pager_backed > 0) {
       printf("[EVICT]: Evicted %lu user pager backed pages\n", total_evicted_counts.pager_backed);
     }
@@ -244,10 +294,8 @@ Evictor::EvictedPageCounts Evictor::EvictUntilTargetsMet(uint64_t min_pages_to_e
 
   uint64_t total_non_loaned_pages_freed = 0;
 
-  DEBUG_ASSERT(pmm_node_);
-
   while (true) {
-    const uint64_t free_pages = pmm_node_->CountFreePages();
+    const uint64_t free_pages = CountFreePages();
     uint64_t pages_to_free = 0;
     if (total_non_loaned_pages_freed < min_pages_to_evict) {
       pages_to_free = min_pages_to_evict - total_non_loaned_pages_freed;
@@ -261,10 +309,7 @@ Evictor::EvictedPageCounts Evictor::EvictUntilTargetsMet(uint64_t min_pages_to_e
     EvictedPageCounts pages_freed = EvictPageQueues(pages_to_free, level);
     const uint64_t non_loaned_evicted =
         pages_freed.pager_backed + pages_freed.compressed + pages_freed.discardable;
-    total_evicted_counts.pager_backed += pages_freed.pager_backed;
-    total_evicted_counts.pager_backed_loaned += pages_freed.pager_backed_loaned;
-    total_evicted_counts.discardable += pages_freed.discardable;
-    total_evicted_counts.compressed += pages_freed.compressed;
+    total_evicted_counts += pages_freed;
     total_non_loaned_pages_freed += non_loaned_evicted;
 
     // Should we fail to free any pages then we give up and consider the eviction request complete.
@@ -284,84 +329,29 @@ Evictor::EvictedPageCounts Evictor::EvictPageQueues(uint64_t target_pages,
     return counts;
   }
 
-  list_node_t freed_list;
-  list_initialize(&freed_list);
-
-  // Avoid evicting from the newest queue to prevent thrashing.
-  const size_t lowest_evict_queue = eviction_level == EvictionLevel::IncludeNewest
-                                        ? PageQueues::kNumActiveQueues
-                                        : PageQueues::kNumReclaim - PageQueues::kNumOldestQueues;
-  // If we're going to include newest pages, ignore eviction hints as well, i.e. also consider
-  // evicting pages with always_need set if we encounter them in LRU order.
-  const VmCowPages::EvictionHintAction hint_action = eviction_level == EvictionLevel::IncludeNewest
-                                                         ? VmCowPages::EvictionHintAction::Ignore
-                                                         : VmCowPages::EvictionHintAction::Follow;
-
-  // We stack-own loaned pages from RemovePageForEviction() to FreeList() below.
-  __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
-
   ktl::optional<VmCompression::CompressorGuard> maybe_instance;
   VmCompressor* compression_instance = nullptr;
   if (IsCompressionEnabled()) {
-    VmCompression* compression = pmm_node_->GetPageCompression();
+    VmCompression* compression = pmm_page_compression();
     if (compression) {
       maybe_instance.emplace(compression->AcquireCompressor());
       compression_instance = &maybe_instance->get();
     }
   }
 
-  DEBUG_ASSERT(page_queues_);
   // Evict until we've counted enough pages to hit the target_pages. Explicitly do not consider
   // pager_backed_loaned towards our total, as loaned pages do not go to the free memory pool.
   while (counts.pager_backed + counts.compressed + counts.discardable < target_pages) {
-    // TODO(rashaeqbal): The sequence of actions in PeekPagerBacked() and RemovePageForEviction()
-    // implicitly guarantee forward progress in this loop, so that we're not stuck trying to evict
-    // the same page (i.e. PeekPagerBacked keeps returning the same page). It would be nice to have
-    // some explicit checks here (or in PageQueues) to guarantee forward progress. Or we might want
-    // to use cursors to iterate the queues instead of peeking the tail each time.
-    if (ktl::optional<PageQueues::VmoBacklink> backlink =
-            page_queues_->PeekReclaim(lowest_evict_queue)) {
-      // A valid backlink always has a valid cow
-      DEBUG_ASSERT(backlink->cow);
-
-      // The expectation is that the only reason not to have all kinds of eviction enabled is if
-      // running a unittest and so have an efficient pre-check.
-      if (unlikely((eviction_types_ & kEvictAll) != kEvictAll)) {
-        uint8_t required = 0;
-        if (backlink->cow->is_discardable()) {
-          required |= kEvictDiscardable;
-        } else if (backlink->cow->can_evict()) {
-          required |= kEvictPagerBacked;
-        } else {
-          required |= kEvictAnonymous;
-        }
-        if (!(eviction_types_ & required)) {
-          pmm_page_queues()->MarkAccessed(backlink->page);
-          continue;
-        }
-      }
-      if (compression_instance) {
-        zx_status_t status = compression_instance->Arm();
-        if (status != ZX_OK) {
-          break;
-        }
-      }
-      list_node_t reclaim_list;
-      list_initialize(&reclaim_list);
-      VmCowPages::ReclaimCounts reclaimed = backlink->cow->ReclaimPage(
-          backlink->page, backlink->offset, hint_action, &reclaim_list, compression_instance);
-      counts.pager_backed_loaned += reclaimed.evicted_loaned;
-      counts.pager_backed += reclaimed.evicted_non_loaned;
-      counts.compressed += reclaimed.compressed;
-      counts.discardable += reclaimed.discarded;
-      list_splice_after(&reclaim_list, &freed_list);
-    } else {
+    // Use the helper to perform a single 'step' of eviction.
+    ktl::optional<EvictedPageCounts> reclaimed =
+        EvictPageQueuesHelper(compression_instance, eviction_level);
+    // An empty return from the helper indicates that there are no more eviction candidates, so
+    // regardless of our desired target we must give up.
+    if (!reclaimed.has_value()) {
       break;
     }
+    counts += *reclaimed;
   }
-
-  DEBUG_ASSERT(pmm_node_);
-  pmm_node_->FreeList(&freed_list);
 
   pager_backed_pages_evicted.Add(counts.pager_backed + counts.pager_backed_loaned);
   compression_evicted.Add(counts.compressed);
@@ -381,4 +371,19 @@ int Evictor::EvictionThreadLoop() {
     EvictOneShotFromPreloadedTarget();
   }
   return 0;
+}
+
+uint64_t Evictor::CountFreePages() const {
+  if (unlikely(test_free_pages_function_)) {
+    return test_free_pages_function_();
+  }
+  return pmm_count_free_pages();
+}
+
+ktl::optional<Evictor::EvictedPageCounts> Evictor::EvictPageQueuesHelper(
+    VmCompressor* compression_instance, EvictionLevel eviction_level) const {
+  if (unlikely(test_reclaim_function_)) {
+    return test_reclaim_function_(compression_instance, eviction_level);
+  }
+  return ReclaimFromGlobalPageQueues(compression_instance, eviction_level);
 }

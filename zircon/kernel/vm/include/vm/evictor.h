@@ -16,6 +16,7 @@
 
 class PmmNode;
 class PageQueues;
+class VmCompressor;
 
 namespace vm_unittest {
 class TestPmmNode;
@@ -71,10 +72,17 @@ class Evictor {
     uint64_t discardable = 0;
     // evicted from an anonymous VMO via compression
     uint64_t compressed = 0;
+
+    EvictedPageCounts &operator+=(const EvictedPageCounts &counts) {
+      pager_backed += counts.pager_backed;
+      pager_backed_loaned += counts.pager_backed_loaned;
+      discardable += counts.discardable;
+      compressed += counts.compressed;
+      return *this;
+    }
   };
 
-  explicit Evictor(PmmNode *node);
-  Evictor() = delete;
+  Evictor();
   ~Evictor();
 
   // Called from the scanner to enable eviction if required. Creates an eviction thread to process
@@ -137,12 +145,12 @@ class Evictor {
   static EvictorStats GetGlobalStats();
 
  private:
-  static constexpr uint8_t kEvictPagerBacked = 0b1;
-  static constexpr uint8_t kEvictAnonymous = 0b10;
-  static constexpr uint8_t kEvictDiscardable = 0b100;
-  static constexpr uint8_t kEvictAll = kEvictPagerBacked | kEvictAnonymous | kEvictDiscardable;
-  // Private constructor for test code to specify |queues| not owned by |node|.
-  Evictor(PmmNode *node, PageQueues *queues, uint8_t eviction_types);
+  // Private constructor for test code to specify custom methods to fake the reclamation.
+  using ReclaimFunction = fit::inline_function<ktl::optional<EvictedPageCounts>(
+      VmCompressor *compression_instance, EvictionLevel eviction_level)>;
+  using FreePagesFunction = fit::inline_function<uint64_t()>;
+
+  Evictor(ReclaimFunction reclaim_function, FreePagesFunction free_pages_function);
 
   // Helpers for testing.
   EvictionTarget DebugGetOneShotEvictionTarget() const;
@@ -166,6 +174,19 @@ class Evictor {
   // The main loop for the eviction thread.
   int EvictionThreadLoop() TA_EXCL(lock_);
 
+  // Returns the count of the free pages for use in performing target calculations. This could be
+  // from the PMM or a test fake.
+  uint64_t CountFreePages() const;
+
+  // Helper method that performs a single 'step' of reclamation via the page queues. A return value
+  // of some (even if the counts themselves are all zero) indicates that there is more to
+  // reclamation that can be attempted, where as a nullopt indicates there is nothing left to try
+  // and reclaim.
+  // This method will either reclaim from the global page queues, or receive fake data from a test
+  // instance.
+  ktl::optional<EvictedPageCounts> EvictPageQueuesHelper(VmCompressor *compression_instance,
+                                                         EvictionLevel eviction_level) const;
+
   // Target for eviction.
   EvictionTarget one_shot_eviction_target_ TA_GUARDED(lock_) = {};
 
@@ -185,30 +206,16 @@ class Evictor {
   // Used by the eviction thread to wait for eviction requests.
   AutounsignalEvent eviction_signal_;
 
-  // The PmmNode whose free level the Evictor monitors, and frees pages to.
-  PmmNode *const pmm_node_;
-
-  // The set of PageQueues that the Evictor evicts pages from.
-  //
-  // This is technically not needed and is mostly for the benefit of unit tests. The Evictor can
-  // just call pmm_node_->GetPageQueues() to get the right set of page queues to work on. However,
-  // the VMO side code is currently PmmNode agnostic, and until there exists a way for VMOs to
-  // allocate from (and free to) a particular PmmNode, we'll need to track the PageQueues separately
-  // in order to write meaningful tests.
-  //
-  // This is set to pmm_node_->GetPageQueues() by the public constructor that passes in the PmmNode
-  // associated with this evictor. The private constructor which also passes in PageQueues (not
-  // necessarily owned by the PmmNode) is only used in test code.
-  PageQueues *const page_queues_;
+  // Optionally specified methods to allow for tests to fake interactions with the pmm. To avoid
+  // virtual dispatch in non test scenarios these are empty/null methods when not set.
+  const ReclaimFunction test_reclaim_function_;
+  const FreePagesFunction test_free_pages_function_;
 
   // These parameters are initialized later from kernel cmdline options.
   // Whether eviction is enabled.
   bool eviction_enabled_ TA_GUARDED(lock_) = false;
   // Whether eviction should attempt compression.
   bool use_compression_ TA_GUARDED(lock_) = false;
-  // Control of what kinds of evictions to perform. This is const as it is designed only to
-  // facilitate testing and must be set at construction.
-  const uint8_t eviction_types_;
 };
 
 #endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_EVICTOR_H_
