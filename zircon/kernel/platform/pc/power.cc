@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT
 //
 
+#include <lib/arch/intrin.h>
 #include <lib/backtrace.h>
 #include <lib/console.h>
 #include <lib/debuglog.h>
@@ -82,11 +83,11 @@ static void halt_other_cpus(void) {
 
     // spin for a while
     // TODO: find a better way to spin at this low level
-    for (volatile int i = 0; i < 100000000; i = i + 1) {
+    for (int i = 0; i < 100000000; ++i) {
       if (halted_cpus.load() == targets) {
         break;
       }
-      __asm volatile("nop");
+      arch::Yield();
     }
 
     // Don't send an INIT IPI to the BSP, since that may cause the system to
