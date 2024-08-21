@@ -138,14 +138,17 @@ mod test {
             error_bound_growth_ppm: TEST_ERROR_BOUND_GROWTH,
         };
 
-        assert_eq!(transform.synthetic(TEST_REFERENCE), TEST_REFERENCE + TEST_OFFSET);
         assert_eq!(
-            transform.synthetic(TEST_REFERENCE + 200.millis()),
-            TEST_REFERENCE + TEST_OFFSET + 200.millis()
+            transform.synthetic(TEST_REFERENCE).into_nanos(),
+            (TEST_REFERENCE + TEST_OFFSET).into_nanos()
         );
         assert_eq!(
-            transform.synthetic(TEST_REFERENCE - 100.millis()),
-            TEST_REFERENCE + TEST_OFFSET - 100.millis()
+            transform.synthetic(TEST_REFERENCE + 200.millis()).into_nanos(),
+            (TEST_REFERENCE + TEST_OFFSET + 200.millis()).into_nanos(),
+        );
+        assert_eq!(
+            transform.synthetic(TEST_REFERENCE - 100.millis()).into_nanos(),
+            (TEST_REFERENCE + TEST_OFFSET - 100.millis()).into_nanos(),
         );
 
         assert_eq!(transform.error_bound(TEST_REFERENCE), TEST_ERROR_BOUND);
@@ -166,14 +169,17 @@ mod test {
             error_bound_growth_ppm: 0,
         };
 
-        assert_eq!(transform.synthetic(TEST_REFERENCE), TEST_REFERENCE + TEST_OFFSET);
         assert_eq!(
-            transform.synthetic(TEST_REFERENCE + 200.millis()),
-            TEST_REFERENCE + TEST_OFFSET + 200.millis() + (25 * 200).nanos()
+            transform.synthetic(TEST_REFERENCE).into_nanos(),
+            (TEST_REFERENCE + TEST_OFFSET).into_nanos(),
         );
         assert_eq!(
-            transform.synthetic(TEST_REFERENCE - 100.millis()),
-            TEST_REFERENCE + TEST_OFFSET - 100.millis() - (25 * 100).nanos()
+            transform.synthetic(TEST_REFERENCE + 200.millis()).into_nanos(),
+            (TEST_REFERENCE + TEST_OFFSET + 200.millis() + (25 * 200).nanos()).into_nanos(),
+        );
+        assert_eq!(
+            transform.synthetic(TEST_REFERENCE - 100.millis()).into_nanos(),
+            (TEST_REFERENCE + TEST_OFFSET - 100.millis() - (25 * 100).nanos()).into_nanos(),
         );
 
         assert_eq!(transform.error_bound(TEST_REFERENCE), TEST_ERROR_BOUND);
@@ -191,14 +197,17 @@ mod test {
             error_bound_growth_ppm: TEST_ERROR_BOUND_GROWTH,
         };
 
-        assert_eq!(transform.synthetic(TEST_REFERENCE), TEST_REFERENCE + TEST_OFFSET);
         assert_eq!(
-            transform.synthetic(TEST_REFERENCE + 200.millis()),
-            TEST_REFERENCE + TEST_OFFSET + 200.millis() - (50 * 200).nanos()
+            transform.synthetic(TEST_REFERENCE).into_nanos(),
+            (TEST_REFERENCE + TEST_OFFSET).into_nanos(),
         );
         assert_eq!(
-            transform.synthetic(TEST_REFERENCE - 100.millis()),
-            TEST_REFERENCE + TEST_OFFSET - 100.millis() + (50 * 100).nanos()
+            transform.synthetic(TEST_REFERENCE + 200.millis()).into_nanos(),
+            (TEST_REFERENCE + TEST_OFFSET + 200.millis() - (50 * 200).nanos()).into_nanos(),
+        );
+        assert_eq!(
+            transform.synthetic(TEST_REFERENCE - 100.millis()).into_nanos(),
+            (TEST_REFERENCE + TEST_OFFSET - 100.millis() + (50 * 100).nanos()).into_nanos(),
         );
 
         assert_eq!(transform.error_bound(TEST_REFERENCE), TEST_ERROR_BOUND);
@@ -274,8 +283,14 @@ mod test {
         assert_eq!(double_converted.rate_adjust_ppm, transform.rate_adjust_ppm);
         // Before RFC-0077 we accumulate some error in setting a clock, perform a coarse comparison.
         let synthetic_from_double_converted = double_converted.synthetic(TEST_REFERENCE);
-        assert_geq!(synthetic_from_double_converted, TEST_REFERENCE + TEST_OFFSET - TOLERANCE);
-        assert_leq!(synthetic_from_double_converted, TEST_REFERENCE + TEST_OFFSET + TOLERANCE);
+        assert_geq!(
+            synthetic_from_double_converted.into_nanos(),
+            (TEST_REFERENCE + TEST_OFFSET - TOLERANCE).into_nanos()
+        );
+        assert_leq!(
+            synthetic_from_double_converted.into_nanos(),
+            (TEST_REFERENCE + TEST_OFFSET + TOLERANCE).into_nanos()
+        );
     }
 
     #[fuchsia::test]
