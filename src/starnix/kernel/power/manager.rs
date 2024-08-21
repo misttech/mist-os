@@ -447,6 +447,7 @@ impl SuspendResumeManager {
         self.lock().inspect_node.add_entry(|node| {
             node.record_int(SUSPEND_RESUMED_AT, now.into_nanos());
         });
+        log_info!(state=?state, "Resumed from suspend");
 
         Ok(())
     }

@@ -2,11 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use itertools::Itertools;
-
 use crate::task::CurrentTask;
 use crate::vfs::{BytesFile, BytesFileOps, FsNodeOps};
 use fidl_fuchsia_power_broker::PowerLevel;
+use itertools::Itertools;
+use starnix_logging::log_warn;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
 use std::borrow::Cow;
@@ -90,7 +90,7 @@ impl BytesFileOps for PowerStateFile {
             return error!(EINVAL);
         }
         fuchsia_trace::duration!(c"power", c"starnix-sysfs:suspend");
-        power_manager.suspend(state)?;
+        power_manager.suspend(state).inspect_err(|e| log_warn!("Suspend failed: {e}"))?;
         Ok(())
     }
 
