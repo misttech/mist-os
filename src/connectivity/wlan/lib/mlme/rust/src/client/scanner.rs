@@ -526,7 +526,7 @@ fn send_scan_result<D: DeviceOps>(txn_id: u64, bss: fidl_internal::BssDescriptio
         .send_mlme_event(fidl_mlme::MlmeEvent::OnScanResult {
             result: fidl_mlme::ScanResult {
                 txn_id,
-                timestamp_nanos: zx::Time::get_monotonic().into_nanos(),
+                timestamp_nanos: zx::MonotonicTime::get_monotonic().into_nanos(),
                 bss,
             },
         })
@@ -736,7 +736,7 @@ mod tests {
         let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
-        let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
+        let test_start_timestamp_nanos = zx::MonotonicTime::get_monotonic().into_nanos();
 
         scanner
             .bind(&mut ctx)
@@ -843,7 +843,7 @@ mod tests {
         let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
-        let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
+        let test_start_timestamp_nanos = zx::MonotonicTime::get_monotonic().into_nanos();
 
         scanner
             .bind(&mut ctx)
@@ -965,7 +965,7 @@ mod tests {
         let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
-        let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
+        let test_start_timestamp_nanos = zx::MonotonicTime::get_monotonic().into_nanos();
 
         scanner
             .bind(&mut ctx)
@@ -1010,7 +1010,7 @@ mod tests {
         let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
-        let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
+        let test_start_timestamp_nanos = zx::MonotonicTime::get_monotonic().into_nanos();
 
         scanner
             .bind(&mut ctx)
@@ -1054,7 +1054,7 @@ mod tests {
         let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
-        let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
+        let test_start_timestamp_nanos = zx::MonotonicTime::get_monotonic().into_nanos();
 
         scanner
             .bind(&mut ctx)
@@ -1090,7 +1090,7 @@ mod tests {
         let mut m = MockObjects::new().await;
         let mut ctx = m.make_ctx();
         let mut scanner = Scanner::new(*IFACE_MAC);
-        let test_start_timestamp_nanos = zx::Time::get_monotonic().into_nanos();
+        let test_start_timestamp_nanos = zx::MonotonicTime::get_monotonic().into_nanos();
 
         scanner
             .bind(&mut ctx)

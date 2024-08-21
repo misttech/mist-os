@@ -572,7 +572,7 @@ mod tests {
                 ]),
                 _ => None,
             },
-            timestamp: zx::Time::from_nanos(rng.gen()),
+            timestamp: zx::MonotonicTime::from_nanos(rng.gen()),
             bss_description: random_bss_description!(),
         }
     }

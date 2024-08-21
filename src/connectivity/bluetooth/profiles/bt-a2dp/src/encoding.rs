@@ -170,14 +170,14 @@ struct SilenceStream {
     pcm_format: PcmFormat,
     next_frame_timer: fasync::Timer,
     /// the last time we delivered frames.
-    last_frame_time: Option<zx::Time>,
+    last_frame_time: Option<zx::MonotonicTime>,
 }
 
 impl futures::Stream for SilenceStream {
     type Item = fuchsia_audio_device::Result<Vec<u8>>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let now = zx::Time::get_monotonic();
+        let now = zx::MonotonicTime::get_monotonic();
         if self.last_frame_time.is_none() {
             self.last_frame_time = Some(now - 1.second());
         }

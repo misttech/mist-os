@@ -196,7 +196,7 @@ mod tests {
     use diagnostics_log_encoding::encode::{Encoder, EncoderOpts};
     use diagnostics_log_encoding::{Argument, Record, Severity as StreamSeverity, Value};
     use fuchsia_async as fasync;
-    use fuchsia_zircon::Time;
+    use fuchsia_zircon::MonotonicTime;
     use futures::channel::mpsc;
     use moniker::ExtendedMoniker;
     use std::io::Cursor;
@@ -227,7 +227,7 @@ mod tests {
     #[fuchsia::test]
     fn write_to_serial_handles_denied_tags() {
         let log = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Time::from_nanos(1).into(),
+            timestamp_nanos: MonotonicTime::from_nanos(1).into(),
             component_url: Some("url".into()),
             moniker: "core/foo".try_into().unwrap(),
             severity: Severity::Info,
@@ -248,7 +248,7 @@ mod tests {
             "neque bibendum molestie. Etiam ac sapien justo. Nullam aliquet ipsum nec tincidunt."
         );
         let log = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Time::from_nanos(123456789).into(),
+            timestamp_nanos: MonotonicTime::from_nanos(123456789).into(),
             component_url: Some("url".into()),
             moniker: "core/foo".try_into().unwrap(),
             severity: Severity::Info,
@@ -275,7 +275,7 @@ mod tests {
     #[fuchsia::test]
     fn when_no_tags_are_present_the_component_name_is_used() {
         let log = LogsDataBuilder::new(BuilderArgs {
-            timestamp_nanos: Time::from_nanos(123456789).into(),
+            timestamp_nanos: MonotonicTime::from_nanos(123456789).into(),
             component_url: Some("url".into()),
             moniker: "core/foo".try_into().unwrap(),
             severity: Severity::Info,

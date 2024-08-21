@@ -252,7 +252,7 @@ impl LogIterator {
         })?;
         let iterator = fdiagnostics::BatchIteratorSynchronousProxy::new(client_end.into_channel());
         if is_subscribe {
-            let () = iterator.wait_for_ready(zx::Time::INFINITE).map_err(|err| {
+            let () = iterator.wait_for_ready(zx::MonotonicTime::INFINITE).map_err(|err| {
                 errno!(EIO, format!("Failed to wait for BatchIterator being ready: {err}"))
             })?;
         }
@@ -301,7 +301,7 @@ impl LogIterator {
             }
             let next_batch = self
                 .iterator
-                .get_next(zx::Time::INFINITE)
+                .get_next(zx::MonotonicTime::INFINITE)
                 .map_err(|_| errno!(ENOENT))?
                 .map_err(|_| errno!(ENOENT))?;
             if next_batch.is_empty() {

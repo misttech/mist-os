@@ -26,7 +26,7 @@ pub struct Transform {
 
 impl Transform {
     /// Returns the synthetic time at the supplied monotonic time.
-    pub fn synthetic(&self, monotonic: zx::Time) -> zx::Time {
+    pub fn synthetic(&self, monotonic: zx::MonotonicTime) -> zx::SyntheticTime {
         // Cast to i128 to avoid overflows in multiplication.
         let monotonic_difference = (monotonic.into_nanos() - self.monotonic_offset) as i128;
         let synthetic_offset = self.synthetic_offset as i128;
@@ -35,11 +35,11 @@ impl Transform {
 
         let time_nanos =
             (monotonic_difference * synthetic_ticks / reference_ticks) + synthetic_offset;
-        zx::Time::from_nanos(time_nanos as i64)
+        zx::SyntheticTime::from_nanos(time_nanos as i64)
     }
 
     /// Returns the error bound at the supplied monotonic time.
-    pub fn error_bound(&self, monotonic: zx::Time) -> u64 {
+    pub fn error_bound(&self, monotonic: zx::MonotonicTime) -> u64 {
         // Cast to i128 to avoid overflows in multiplication.
         let monotonic_difference = (monotonic.into_nanos() - self.monotonic_offset) as i128;
         if monotonic_difference <= 0 {
@@ -55,13 +55,13 @@ impl Transform {
 
     /// Returns the synthetic time on this `Transform` minus the synthetic time on `other`,
     /// calculated at the supplied monotonic time.
-    pub fn difference(&self, other: &Transform, monotonic: zx::Time) -> zx::Duration {
+    pub fn difference(&self, other: &Transform, monotonic: zx::MonotonicTime) -> zx::Duration {
         self.synthetic(monotonic) - other.synthetic(monotonic)
     }
 
     /// Returns a `ClockUpdate` that will set a `Clock` onto this `Transform` using data
     /// from the supplied monotonic time.
-    pub fn jump_to(&self, monotonic: zx::Time) -> zx::ClockUpdate {
+    pub fn jump_to(&self, monotonic: zx::MonotonicTime) -> zx::ClockUpdate {
         zx::ClockUpdate::builder()
             .absolute_value(monotonic, self.synthetic(monotonic))
             .rate_adjust(self.rate_adjust_ppm)
@@ -94,7 +94,7 @@ impl From<&zx::Clock> for Transform {
 /// Returns the time on the clock at a given monotonic reference time. This calculates the time
 /// based on the clock transform definition, which only contains the most recent segment. This
 /// is only useful for calculating the time for monotonic times close to the current time.
-pub fn time_at_monotonic(clock: &zx::Clock, monotonic: zx::Time) -> zx::Time {
+pub fn time_at_monotonic(clock: &zx::Clock, monotonic: zx::MonotonicTime) -> zx::SyntheticTime {
     let monotonic_reference = monotonic.into_nanos() as i128;
     // Clock read failures should only be caused by an invalid clock object.
     let details = clock.get_details().expect("failed to get clock details");
@@ -107,7 +107,7 @@ pub fn time_at_monotonic(clock: &zx::Clock, monotonic: zx::Time) -> zx::Time {
 
     let time_nanos = ((monotonic_reference - reference_offset) * synthetic_ticks / reference_ticks)
         + synthetic_offset;
-    zx::Time::from_nanos(time_nanos as i64)
+    zx::SyntheticTime::from_nanos(time_nanos as i64)
 }
 
 #[cfg(test)]
@@ -116,12 +116,12 @@ mod test {
     use test_util::{assert_geq, assert_leq};
     use zx::DurationNum;
 
-    const BACKSTOP: zx::Time = zx::Time::from_nanos(1234567890);
+    const BACKSTOP: zx::SyntheticTime = zx::SyntheticTime::from_nanos(1234567890);
     const TIME_DIFF: zx::Duration = zx::Duration::from_seconds(5);
     const SLEW_RATE_PPM: i32 = 750;
     const ONE_MILLION: i32 = 1_000_000;
 
-    const TEST_REFERENCE: zx::Time = zx::Time::from_nanos(70_000_000_000);
+    const TEST_REFERENCE: zx::MonotonicTime = zx::MonotonicTime::from_nanos(70_000_000_000);
     const TEST_OFFSET: zx::Duration = zx::Duration::from_nanos(5_000_000_000);
     const TEST_ERROR_BOUND: u64 = 1234_000;
     const TEST_ERROR_BOUND_GROWTH: u32 = 100;
@@ -253,7 +253,7 @@ mod test {
             error_bound_growth_ppm: 0,
         };
 
-        let monotonic = zx::Time::get_monotonic();
+        let monotonic = zx::MonotonicTime::get_monotonic();
         let clock_update = transform.jump_to(monotonic);
         assert_eq!(
             clock_update,
@@ -281,14 +281,17 @@ mod test {
     #[fuchsia::test]
     fn time_at_monotonic_clock_not_started() {
         let clock = zx::Clock::create(zx::ClockOpts::empty(), Some(BACKSTOP)).unwrap();
-        assert_eq!(time_at_monotonic(&clock, zx::Time::get_monotonic() + TIME_DIFF), BACKSTOP);
+        assert_eq!(
+            time_at_monotonic(&clock, zx::MonotonicTime::get_monotonic() + TIME_DIFF),
+            BACKSTOP
+        );
     }
 
     #[fuchsia::test]
     fn time_at_monotonic_clock_started() {
         let clock = zx::Clock::create(zx::ClockOpts::empty(), Some(BACKSTOP)).unwrap();
 
-        let mono = zx::Time::get_monotonic();
+        let mono = zx::MonotonicTime::get_monotonic();
         clock.update(zx::ClockUpdate::builder().absolute_value(mono, BACKSTOP)).unwrap();
 
         let clock_time = time_at_monotonic(&clock, mono + TIME_DIFF);
@@ -299,7 +302,7 @@ mod test {
     fn time_at_monotonic_clock_slew_fast() {
         let clock = zx::Clock::create(zx::ClockOpts::empty(), Some(BACKSTOP)).unwrap();
 
-        let mono = zx::Time::get_monotonic();
+        let mono = zx::MonotonicTime::get_monotonic();
         clock
             .update(
                 zx::ClockUpdate::builder()
@@ -316,7 +319,7 @@ mod test {
     fn time_at_monotonic_clock_slew_slow() {
         let clock = zx::Clock::create(zx::ClockOpts::empty(), Some(BACKSTOP)).unwrap();
 
-        let mono = zx::Time::get_monotonic();
+        let mono = zx::MonotonicTime::get_monotonic();
         clock
             .update(
                 zx::ClockUpdate::builder()

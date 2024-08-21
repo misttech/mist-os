@@ -262,7 +262,7 @@ fn send_consumer_controls_event(
             pressed_buttons,
         )),
         device_descriptor: device_descriptor.clone(),
-        event_time: zx::Time::get_monotonic(),
+        event_time: zx::MonotonicTime::get_monotonic(),
         handled: Handled::No,
         trace_id: None,
     };

@@ -971,13 +971,13 @@ impl TestProtocolSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::Time) -> Result<TestProtocolEvent, fidl::Error> {
+    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<TestProtocolEvent, fidl::Error> {
         TestProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
 
     pub fn r#strict_union_hence_response_may_be_stack_allocated(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<StrictBoundedUnion, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
@@ -993,7 +993,7 @@ impl TestProtocolSynchronousProxy {
 
     pub fn r#flexible_union_hence_response_must_be_heap_allocated(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<OlderSimpleUnion, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,

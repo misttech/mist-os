@@ -205,7 +205,7 @@ mod tests {
                 name: "foo".to_string(),
                 receiver,
             },
-            timestamp: zx::Time::get_monotonic(),
+            timestamp: zx::MonotonicTime::get_monotonic(),
         };
         sender.send(Message { channel: capability_server_end }).unwrap();
         dispatcher.dispatch(&event).await

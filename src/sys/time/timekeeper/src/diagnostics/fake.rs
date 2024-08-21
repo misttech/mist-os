@@ -176,8 +176,8 @@ mod test {
         let diagnostics = FakeDiagnostics::new();
         let test_event = Event::KalmanFilterUpdated {
             track: Track::Monitor,
-            monotonic: zx::Time::from_nanos(1234_000_000_000),
-            utc: zx::Time::from_nanos(2345_000_000_000),
+            monotonic: zx::MonotonicTime::from_nanos(1234_000_000_000),
+            utc: zx::SyntheticTime::from_nanos(2345_000_000_000),
             sqrt_covariance: zx::Duration::from_millis(321),
         };
 
@@ -187,21 +187,21 @@ mod test {
         diagnostics.assert_events(&[Event::KalmanFilterUpdated {
             track: Track::Monitor,
             monotonic: ANY_TIME,
-            utc: zx::Time::from_nanos(2345_000_000_000),
+            utc: zx::SyntheticTime::from_nanos(2345_000_000_000),
             sqrt_covariance: zx::Duration::from_millis(321),
         }]);
 
         diagnostics.assert_events(&[Event::KalmanFilterUpdated {
             track: Track::Monitor,
-            monotonic: zx::Time::from_nanos(1234_000_000_000),
+            monotonic: zx::MonotonicTime::from_nanos(1234_000_000_000),
             utc: ANY_TIME,
             sqrt_covariance: zx::Duration::from_millis(321),
         }]);
 
         diagnostics.assert_events(&[Event::KalmanFilterUpdated {
             track: Track::Monitor,
-            monotonic: zx::Time::from_nanos(1234_000_000_000),
-            utc: zx::Time::from_nanos(2345_000_000_000),
+            monotonic: zx::MonotonicTime::from_nanos(1234_000_000_000),
+            utc: zx::SyntheticTime::from_nanos(2345_000_000_000),
             sqrt_covariance: ANY_DURATION,
         }]);
 

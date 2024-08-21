@@ -25,7 +25,7 @@ pub trait UpdateAlgorithm {
     async fn sample(&self, urgency: Urgency) -> Result<TimeSample, SampleError>;
 
     /// Returns the monotonic time at which the next sample may be produced.
-    async fn next_possible_sample_time(&self) -> zx::Time;
+    async fn next_possible_sample_time(&self) -> zx::MonotonicTime;
 }
 
 /// Reasons `sample()` may fail.
@@ -152,9 +152,9 @@ impl UpdateAlgorithm for TestUpdateAlgorithm {
         }
     }
 
-    async fn next_possible_sample_time(&self) -> zx::Time {
+    async fn next_possible_sample_time(&self) -> zx::MonotonicTime {
         // TODO(https://fxbug.dev/42065019): Implement rate limiting.
-        zx::Time::get_monotonic()
+        zx::MonotonicTime::get_monotonic()
     }
 }
 

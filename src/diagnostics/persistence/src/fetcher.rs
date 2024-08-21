@@ -144,7 +144,7 @@ type ServicesInfo = HashMap<ServiceName, TagsInfo>;
 /// If we've gotten an error before trying to fetch, save it to all tags and log it as an error.
 fn record_service_error(service_name: &ServiceName, tags: &[Tag], error: String) {
     let utc = utc_now();
-    let monotonic = zx::Time::get_monotonic().into_nanos();
+    let monotonic = zx::MonotonicTime::get_monotonic().into_nanos();
     let timestamps = Timestamps {
         before_monotonic: monotonic,
         after_monotonic: monotonic,
@@ -229,10 +229,10 @@ async fn fetch_and_save(
 
     // Do the fetch and record the timestamps.
     let before_utc = utc_now();
-    let before_monotonic = zx::Time::get_monotonic().into_nanos();
+    let before_monotonic = zx::MonotonicTime::get_monotonic().into_nanos();
     let data = source.snapshot::<Inspect>().await;
     let after_utc = utc_now();
-    let after_monotonic = zx::Time::get_monotonic().into_nanos();
+    let after_monotonic = zx::MonotonicTime::get_monotonic().into_nanos();
     let timestamps = Timestamps { before_utc, before_monotonic, after_utc, after_monotonic };
     let data = match data {
         Err(e) => {

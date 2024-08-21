@@ -19,8 +19,8 @@ use tracing::error;
 const SAMPLES_RECORDED: usize = 5;
 /// Empty sample with which the sample buffer is originally initialized.
 const EMPTY_SAMPLE: HttpsSample = HttpsSample {
-    utc: zx::Time::ZERO,
-    monotonic: zx::Time::ZERO,
+    utc: zx::MonotonicTime::ZERO,
+    monotonic: zx::MonotonicTime::ZERO,
     standard_deviation: zx::Duration::from_nanos(0),
     final_bound_size: zx::Duration::from_nanos(0),
     polls: vec![],
@@ -58,12 +58,13 @@ impl InspectDiagnostics {
             )),
             phase: root_node.create_string("phase", &format!("{:?}", Phase::Initial)),
             phase_update_time: root_node
-                .create_int("phase_update_time", zx::Time::get_monotonic().into_nanos()),
+                .create_int("phase_update_time", zx::MonotonicTime::get_monotonic().into_nanos()),
         }
     }
 
     fn network_check_success(&self) {
-        self.root_node.record_int("network_check_time", zx::Time::get_monotonic().into_nanos());
+        self.root_node
+            .record_int("network_check_time", zx::MonotonicTime::get_monotonic().into_nanos());
     }
 
     fn success(&self, sample: &HttpsSample) {
@@ -81,12 +82,12 @@ impl InspectDiagnostics {
                     .insert(*error, self.failure_node.create_uint(format!("{:?}_count", error), 1));
             }
         }
-        self.last_failure_time.set(zx::Time::get_monotonic().into_nanos());
+        self.last_failure_time.set(zx::MonotonicTime::get_monotonic().into_nanos());
     }
 
     fn phase_update(&self, phase: &Phase) {
         self.phase.set(&format!("{:?}", phase));
-        self.phase_update_time.set(zx::Time::get_monotonic().into_nanos());
+        self.phase_update_time.set(zx::MonotonicTime::get_monotonic().into_nanos());
     }
 }
 
@@ -196,8 +197,9 @@ mod test {
     use lazy_static::lazy_static;
 
     lazy_static! {
-        static ref TEST_UTC: zx::Time = zx::Time::from_nanos(999_900_000_000);
-        static ref TEST_MONOTONIC: zx::Time = zx::Time::from_nanos(550_000_000_000);
+        static ref TEST_UTC: zx::MonotonicTime = zx::MonotonicTime::from_nanos(999_900_000_000);
+        static ref TEST_MONOTONIC: zx::MonotonicTime =
+            zx::MonotonicTime::from_nanos(550_000_000_000);
     }
 
     const TEST_STANDARD_DEVIATION: zx::Duration = zx::Duration::from_millis(211);

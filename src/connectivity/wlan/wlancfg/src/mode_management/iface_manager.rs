@@ -62,7 +62,7 @@ pub(crate) struct ApIfaceContainer {
     pub iface_id: u16,
     pub config: Option<ap_fsm::ApConfig>,
     pub ap_state_machine: Box<dyn AccessPointApi + Send + Sync>,
-    enabled_time: Option<zx::Time>,
+    enabled_time: Option<zx::MonotonicTime>,
 }
 
 #[derive(Clone, Debug)]
@@ -795,7 +795,7 @@ impl IfaceManagerService {
         match ap_iface_container.ap_state_machine.start(config, sender) {
             Ok(()) => {
                 if ap_iface_container.enabled_time.is_none() {
-                    ap_iface_container.enabled_time = Some(zx::Time::get_monotonic());
+                    ap_iface_container.enabled_time = Some(zx::MonotonicTime::get_monotonic());
                 }
 
                 self.aps.push(ap_iface_container)
@@ -825,7 +825,7 @@ impl IfaceManagerService {
             let mut ap_container = self.aps.remove(removal_index);
 
             if let Some(start_time) = ap_container.enabled_time.take() {
-                let enabled_duration = zx::Time::get_monotonic() - start_time;
+                let enabled_duration = zx::MonotonicTime::get_monotonic() - start_time;
                 self.telemetry_sender.send(TelemetryEvent::StopAp { enabled_duration });
             }
 
@@ -854,7 +854,7 @@ impl IfaceManagerService {
 
         for ap_container in aps.iter_mut() {
             if let Some(start_time) = ap_container.enabled_time.take() {
-                let enabled_duration = zx::Time::get_monotonic() - start_time;
+                let enabled_duration = zx::MonotonicTime::get_monotonic() - start_time;
                 self.telemetry_sender.send(TelemetryEvent::StopAp { enabled_duration });
             }
         }
@@ -3218,7 +3218,7 @@ mod tests {
         let mut iface_manager = create_iface_manager_with_ap(&test_values, fake_ap);
         let config = create_ap_config(&TEST_SSID, TEST_PASSWORD);
         iface_manager.aps[0].config = Some(config);
-        iface_manager.aps[0].enabled_time = Some(zx::Time::get_monotonic());
+        iface_manager.aps[0].enabled_time = Some(zx::MonotonicTime::get_monotonic());
 
         {
             let fut = iface_manager.stop_ap(TEST_SSID.clone(), TEST_PASSWORD.as_bytes().to_vec());
@@ -3241,7 +3241,7 @@ mod tests {
         let mut test_values = test_setup(&mut exec);
         let fake_ap = FakeAp { start_succeeds: true, stop_succeeds: true, exit_succeeds: true };
         let mut iface_manager = create_iface_manager_with_ap(&test_values, fake_ap);
-        iface_manager.aps[0].enabled_time = Some(zx::Time::get_monotonic());
+        iface_manager.aps[0].enabled_time = Some(zx::MonotonicTime::get_monotonic());
 
         {
             let fut = iface_manager.stop_ap(TEST_SSID.clone(), TEST_PASSWORD.as_bytes().to_vec());
@@ -3267,7 +3267,7 @@ mod tests {
         let mut iface_manager = create_iface_manager_with_ap(&test_values, fake_ap);
         let config = create_ap_config(&TEST_SSID, TEST_PASSWORD);
         iface_manager.aps[0].config = Some(config);
-        iface_manager.aps[0].enabled_time = Some(zx::Time::get_monotonic());
+        iface_manager.aps[0].enabled_time = Some(zx::MonotonicTime::get_monotonic());
 
         {
             let fut = iface_manager.stop_ap(TEST_SSID.clone(), TEST_PASSWORD.as_bytes().to_vec());
@@ -3294,7 +3294,7 @@ mod tests {
         let mut iface_manager = create_iface_manager_with_ap(&test_values, fake_ap);
         let config = create_ap_config(&TEST_SSID, TEST_PASSWORD);
         iface_manager.aps[0].config = Some(config);
-        iface_manager.aps[0].enabled_time = Some(zx::Time::get_monotonic());
+        iface_manager.aps[0].enabled_time = Some(zx::MonotonicTime::get_monotonic());
 
         {
             let fut = iface_manager.stop_ap(TEST_SSID.clone(), TEST_PASSWORD.as_bytes().to_vec());
@@ -3349,7 +3349,7 @@ mod tests {
         let mut test_values = test_setup(&mut exec);
         let fake_ap = FakeAp { start_succeeds: true, stop_succeeds: true, exit_succeeds: true };
         let mut iface_manager = create_iface_manager_with_ap(&test_values, fake_ap);
-        iface_manager.aps[0].enabled_time = Some(zx::Time::get_monotonic());
+        iface_manager.aps[0].enabled_time = Some(zx::MonotonicTime::get_monotonic());
 
         // Insert a second iface and add it to the list of APs.
         let second_iface = ApIfaceContainer {
@@ -3360,7 +3360,7 @@ mod tests {
                 stop_succeeds: true,
                 exit_succeeds: true,
             }),
-            enabled_time: Some(zx::Time::get_monotonic()),
+            enabled_time: Some(zx::MonotonicTime::get_monotonic()),
         };
         iface_manager.aps.push(second_iface);
 
@@ -3389,7 +3389,7 @@ mod tests {
         let mut test_values = test_setup(&mut exec);
         let fake_ap = FakeAp { start_succeeds: true, stop_succeeds: false, exit_succeeds: true };
         let mut iface_manager = create_iface_manager_with_ap(&test_values, fake_ap);
-        iface_manager.aps[0].enabled_time = Some(zx::Time::get_monotonic());
+        iface_manager.aps[0].enabled_time = Some(zx::MonotonicTime::get_monotonic());
 
         // Insert a second iface and add it to the list of APs.
         let second_iface = ApIfaceContainer {
@@ -3400,7 +3400,7 @@ mod tests {
                 stop_succeeds: true,
                 exit_succeeds: true,
             }),
-            enabled_time: Some(zx::Time::get_monotonic()),
+            enabled_time: Some(zx::MonotonicTime::get_monotonic()),
         };
         iface_manager.aps.push(second_iface);
 
@@ -3429,7 +3429,7 @@ mod tests {
         let mut test_values = test_setup(&mut exec);
         let fake_ap = FakeAp { start_succeeds: true, stop_succeeds: true, exit_succeeds: false };
         let mut iface_manager = create_iface_manager_with_ap(&test_values, fake_ap);
-        iface_manager.aps[0].enabled_time = Some(zx::Time::get_monotonic());
+        iface_manager.aps[0].enabled_time = Some(zx::MonotonicTime::get_monotonic());
 
         // Insert a second iface and add it to the list of APs.
         let second_iface = ApIfaceContainer {
@@ -3440,7 +3440,7 @@ mod tests {
                 stop_succeeds: true,
                 exit_succeeds: true,
             }),
-            enabled_time: Some(zx::Time::get_monotonic()),
+            enabled_time: Some(zx::MonotonicTime::get_monotonic()),
         };
         iface_manager.aps.push(second_iface);
 

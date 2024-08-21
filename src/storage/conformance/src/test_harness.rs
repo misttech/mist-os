@@ -131,7 +131,7 @@ async fn connect_to_harness() -> io_test::Io1HarnessProxy {
         .open_exposed_dir(
             &child_ref,
             fidl::endpoints::ServerEnd::<fio::DirectoryMarker>::new(server),
-            zx::Time::INFINITE,
+            zx::MonotonicTime::INFINITE,
         )
         .expect("FIDL error when binding to child in Realm")
         .expect("Cannot bind to test harness child in Realm");

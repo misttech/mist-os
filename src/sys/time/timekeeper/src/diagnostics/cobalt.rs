@@ -203,7 +203,7 @@ impl CobaltDiagnostics {
         );
         if track == Track::Monitor {
             if let Some(monitor_clock) = self.monitor_clock.as_ref() {
-                let monotonic_ref = zx::Time::get_monotonic();
+                let monotonic_ref = zx::MonotonicTime::get_monotonic();
                 let primary = time_at_monotonic(&self.primary_clock, monotonic_ref);
                 let monitor = time_at_monotonic(monitor_clock, monotonic_ref);
                 let direction =
@@ -332,7 +332,7 @@ mod test {
     // somewhat better.
     const MONITOR_OFFSET_ERROR: zx::Duration = zx::Duration::from_millis(40);
 
-    fn create_clock(time: zx::Time) -> Arc<zx::Clock> {
+    fn create_clock(time: zx::SyntheticTime) -> Arc<zx::Clock> {
         let clk = zx::Clock::create(zx::ClockOpts::empty(), None).unwrap();
         clk.update(zx::ClockUpdate::builder().approximate_value(time)).unwrap();
         Arc::new(clk)
@@ -346,8 +346,8 @@ mod test {
         let diagnostics = CobaltDiagnostics {
             sender: Mutex::new(sender),
             experiment: TEST_EXPERIMENT,
-            primary_clock: create_clock(zx::Time::ZERO),
-            monitor_clock: Some(create_clock(zx::Time::ZERO + MONITOR_OFFSET)),
+            primary_clock: create_clock(zx::SyntheticTime::ZERO),
+            monitor_clock: Some(create_clock(zx::SyntheticTime::ZERO + MONITOR_OFFSET)),
         };
         (diagnostics, mpsc_receiver)
     }
@@ -477,8 +477,8 @@ mod test {
 
         diagnostics.record(Event::KalmanFilterUpdated {
             track: Track::Primary,
-            monotonic: zx::Time::from_nanos(333_000_000_000),
-            utc: zx::Time::from_nanos(4455445544_000_000_000),
+            monotonic: zx::MonotonicTime::from_nanos(333_000_000_000),
+            utc: zx::SyntheticTime::from_nanos(4455445544_000_000_000),
             sqrt_covariance: zx::Duration::from_micros(55555),
         });
         assert_eq!(
@@ -504,7 +504,7 @@ mod test {
 
         diagnostics.record(Event::FrequencyUpdated {
             track: Track::Primary,
-            monotonic: zx::Time::from_nanos(888_000_000_000),
+            monotonic: zx::MonotonicTime::from_nanos(888_000_000_000),
             rate_adjust_ppm: -4,
             window_count: 7,
         });

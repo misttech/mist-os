@@ -2012,7 +2012,7 @@ fn select<L>(
     readfds_addr: UserRef<__kernel_fd_set>,
     writefds_addr: UserRef<__kernel_fd_set>,
     exceptfds_addr: UserRef<__kernel_fd_set>,
-    deadline: zx::Time,
+    deadline: zx::MonotonicTime,
     sigmask_addr: UserRef<pselect6_sigmask>,
 ) -> Result<i32, Errno>
 where
@@ -2144,10 +2144,10 @@ pub fn sys_pselect6(
     timeout_addr: UserRef<timespec>,
     sigmask_addr: UserRef<pselect6_sigmask>,
 ) -> Result<i32, Errno> {
-    let start_time = zx::Time::get_monotonic();
+    let start_time = zx::MonotonicTime::get_monotonic();
 
     let deadline = if timeout_addr.is_null() {
-        zx::Time::INFINITE
+        zx::MonotonicTime::INFINITE
     } else {
         let timespec = current_task.read_object(timeout_addr)?;
         start_time + duration_from_timespec(timespec)?
@@ -2167,7 +2167,7 @@ pub fn sys_pselect6(
     if !timeout_addr.is_null()
         && !current_task.thread_group.read().personality.contains(PersonalityFlags::STICKY_TIMEOUTS)
     {
-        let now = zx::Time::get_monotonic();
+        let now = zx::MonotonicTime::get_monotonic();
         let remaining = std::cmp::max(deadline - now, zx::Duration::from_seconds(0));
         current_task.write_object(timeout_addr, &timespec_from_duration(remaining))?;
     }
@@ -2185,10 +2185,10 @@ pub fn sys_select(
     exceptfds_addr: UserRef<__kernel_fd_set>,
     timeout_addr: UserRef<starnix_uapi::timeval>,
 ) -> Result<i32, Errno> {
-    let start_time = zx::Time::get_monotonic();
+    let start_time = zx::MonotonicTime::get_monotonic();
 
     let deadline = if timeout_addr.is_null() {
-        zx::Time::INFINITE
+        zx::MonotonicTime::INFINITE
     } else {
         let timeval = current_task.read_object(timeout_addr)?;
         start_time + starnix_uapi::time::duration_from_timeval(timeval)?
@@ -2208,7 +2208,7 @@ pub fn sys_select(
     if !timeout_addr.is_null()
         && !current_task.thread_group.read().personality.contains(PersonalityFlags::STICKY_TIMEOUTS)
     {
-        let now = zx::Time::get_monotonic();
+        let now = zx::MonotonicTime::get_monotonic();
         let remaining = std::cmp::max(deadline - now, zx::Duration::from_seconds(0));
         current_task
             .write_object(timeout_addr, &starnix_uapi::time::timeval_from_duration(remaining))?;
@@ -2286,7 +2286,7 @@ fn do_epoll_pwait<L>(
     epfd: FdNumber,
     events: UserRef<EpollEvent>,
     unvalidated_max_events: i32,
-    deadline: zx::Time,
+    deadline: zx::MonotonicTime,
     user_sigmask: UserRef<SigSet>,
 ) -> Result<usize, Errno>
 where
@@ -2330,7 +2330,7 @@ pub fn sys_epoll_pwait(
     timeout: i32,
     user_sigmask: UserRef<SigSet>,
 ) -> Result<usize, Errno> {
-    let deadline = zx::Time::after(duration_from_poll_timeout(timeout)?);
+    let deadline = zx::MonotonicTime::after(duration_from_poll_timeout(timeout)?);
     do_epoll_pwait(locked, current_task, epfd, events, max_events, deadline, user_sigmask)
 }
 
@@ -2344,10 +2344,10 @@ pub fn sys_epoll_pwait2(
     user_sigmask: UserRef<SigSet>,
 ) -> Result<usize, Errno> {
     let deadline = if user_timespec.is_null() {
-        zx::Time::INFINITE
+        zx::MonotonicTime::INFINITE
     } else {
         let ts = current_task.read_object(user_timespec)?;
-        zx::Time::after(duration_from_timespec(ts)?)
+        zx::MonotonicTime::after(duration_from_timespec(ts)?)
     };
     do_epoll_pwait(locked, current_task, epfd, events, max_events, deadline, user_sigmask)
 }
@@ -2402,7 +2402,7 @@ impl<Key: Into<ReadyItemKey>> FileWaiter<Key> {
         &self,
         current_task: &mut CurrentTask,
         signal_mask: Option<SigSet>,
-        deadline: zx::Time,
+        deadline: zx::MonotonicTime,
     ) -> Result<(), Errno> {
         if self.ready_items.lock().is_empty() {
             // When wait_until() returns Ok() it means there was a wake up; however there may not
@@ -2435,7 +2435,7 @@ pub fn poll<L>(
     user_pollfds: UserRef<pollfd>,
     num_fds: i32,
     mask: Option<SigSet>,
-    deadline: zx::Time,
+    deadline: zx::MonotonicTime,
 ) -> Result<usize, Errno>
 where
     L: LockEqualOrBefore<FileOpsCore>,
@@ -2498,7 +2498,7 @@ pub fn sys_ppoll(
     user_mask: UserRef<SigSet>,
     sigset_size: usize,
 ) -> Result<usize, Errno> {
-    let start_time = zx::Time::get_monotonic();
+    let start_time = zx::MonotonicTime::get_monotonic();
 
     let timeout = if user_timespec.is_null() {
         // Passing -1 to poll is equivalent to an infinite timeout.
@@ -2526,7 +2526,7 @@ pub fn sys_ppoll(
         return poll_result;
     }
 
-    let now = zx::Time::get_monotonic();
+    let now = zx::MonotonicTime::get_monotonic();
     let remaining = std::cmp::max(deadline - now, zx::Duration::from_seconds(0));
     let remaining_timespec = timespec_from_duration(remaining);
 

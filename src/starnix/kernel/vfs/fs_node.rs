@@ -204,9 +204,9 @@ pub struct FsNodeInfo {
     pub size: usize,
     pub blksize: usize,
     pub blocks: usize,
-    pub time_status_change: zx::Time,
-    pub time_access: zx::Time,
-    pub time_modify: zx::Time,
+    pub time_status_change: zx::SyntheticTime,
+    pub time_access: zx::SyntheticTime,
+    pub time_modify: zx::SyntheticTime,
     pub security_state: security::FsNodeState,
 }
 
@@ -1067,7 +1067,7 @@ macro_rules! fs_node_impl_not_dir {
 pub enum TimeUpdateType {
     Now,
     Omit,
-    Time(zx::Time),
+    Time(zx::SyntheticTime),
 }
 
 // Public re-export of macros allows them to be used like regular rust items.
@@ -1995,7 +1995,7 @@ impl FsNode {
         })
     }
 
-    fn statx_timestamp_from_time(time: zx::Time) -> statx_timestamp {
+    fn statx_timestamp_from_time(time: zx::SyntheticTime) -> statx_timestamp {
         let nanos = time.into_nanos();
         statx_timestamp {
             tv_sec: nanos / NANOS_PER_SECOND,
@@ -2379,9 +2379,9 @@ mod tests {
             info.uid = 9;
             info.gid = 10;
             info.link_count = 11;
-            info.time_status_change = zx::Time::from_nanos(1);
-            info.time_access = zx::Time::from_nanos(2);
-            info.time_modify = zx::Time::from_nanos(3);
+            info.time_status_change = zx::SyntheticTime::from_nanos(1);
+            info.time_access = zx::SyntheticTime::from_nanos(2);
+            info.time_modify = zx::SyntheticTime::from_nanos(3);
             info.rdev = DeviceType::new(13, 13);
         });
         let stat = node.stat(&current_task).expect("stat");

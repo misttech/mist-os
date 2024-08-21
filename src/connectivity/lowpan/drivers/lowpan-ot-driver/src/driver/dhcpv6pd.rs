@@ -29,15 +29,15 @@ pub struct DhcpV6PdInner {
     prefix_control: Option<PrefixControlProxy>,
     prefix_watch: Option<QueryResponseFut<PrefixEvent>>,
     prefix: Option<ot::Ip6Prefix>,
-    valid: zx::Time,
-    preferred: zx::Time,
+    valid: zx::MonotonicTime,
+    preferred: zx::MonotonicTime,
     last_state: ot::BorderRoutingDhcp6PdState,
     waker: Option<Waker>,
     refresh_task: Option<Task<()>>,
 }
 
-fn convert_zx_time_into_seconds_until(time: zx::Time) -> u32 {
-    let duration = time - zx::Time::get_monotonic();
+fn convert_zx_time_into_seconds_until(time: zx::MonotonicTime) -> u32 {
+    let duration = time - zx::MonotonicTime::get_monotonic();
 
     if duration == zx::Duration::INFINITE {
         u32::MAX
@@ -101,8 +101,8 @@ fn make_fake_ra_prefix_packet(prefix: ot::Ip6Prefix, valid: u32, preferred: u32)
 fn dhcp_v6_pd_prefix_assigned<T: ot::BorderRouter>(
     instance: &T,
     prefix: ot::Ip6Prefix,
-    valid: zx::Time,
-    preferred: zx::Time,
+    valid: zx::MonotonicTime,
+    preferred: zx::MonotonicTime,
 ) {
     // Here we need to construct a fake ICMPv6 RA
     // that we can feed into OpenThread to let it
@@ -273,9 +273,10 @@ impl DhcpV6Pd {
                             }
 
                             inner.prefix = Some(prefix_prefix);
-                            inner.valid = zx::Time::from_nanos(prefix.lifetimes.valid_until);
+                            inner.valid =
+                                zx::MonotonicTime::from_nanos(prefix.lifetimes.valid_until);
                             inner.preferred =
-                                zx::Time::from_nanos(prefix.lifetimes.preferred_until);
+                                zx::MonotonicTime::from_nanos(prefix.lifetimes.preferred_until);
 
                             info!(
                                 tag = "dhcp_v6_pd",

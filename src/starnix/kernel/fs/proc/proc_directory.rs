@@ -547,7 +547,7 @@ impl SysInfo {
 
     fn fetch() -> Result<SysInfo, anyhow::Error> {
         let sysinfo = connect_to_protocol_sync::<fidl_fuchsia_sysinfo::SysInfoMarker>()?;
-        let board_name = match sysinfo.get_board_name(zx::Time::INFINITE)? {
+        let board_name = match sysinfo.get_board_name(zx::MonotonicTime::INFINITE)? {
             (zx::sys::ZX_OK, Some(name)) => name,
             (_, _) => "Unknown".to_string(),
         };
@@ -618,12 +618,13 @@ impl MeminfoFile {
 impl DynamicFileSource for MeminfoFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
         let stats = self.kernel_stats.get();
-        let memory_stats = stats.get_memory_stats_extended(zx::Time::INFINITE).map_err(|e| {
-            log_error!("FIDL error getting memory stats: {e}");
-            errno!(EIO)
-        })?;
+        let memory_stats =
+            stats.get_memory_stats_extended(zx::MonotonicTime::INFINITE).map_err(|e| {
+                log_error!("FIDL error getting memory stats: {e}");
+                errno!(EIO)
+            })?;
         let compression_stats =
-            stats.get_memory_stats_compression(zx::Time::INFINITE).map_err(|e| {
+            stats.get_memory_stats_compression(zx::MonotonicTime::INFINITE).map_err(|e| {
                 log_error!("FIDL error getting memory compression stats: {e}");
                 errno!(EIO)
             })?;
@@ -662,11 +663,15 @@ impl UptimeFile {
 
 impl DynamicFileSource for UptimeFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let uptime = (zx::Time::get_monotonic() - zx::Time::ZERO).into_seconds_f64();
+        let uptime =
+            (zx::MonotonicTime::get_monotonic() - zx::MonotonicTime::ZERO).into_seconds_f64();
 
         // Fetch CPU stats from `fuchsia.kernel.Stats` to calculate idle time.
-        let cpu_stats =
-            self.kernel_stats.get().get_cpu_stats(zx::Time::INFINITE).map_err(|_| errno!(EIO))?;
+        let cpu_stats = self
+            .kernel_stats
+            .get()
+            .get_cpu_stats(zx::MonotonicTime::INFINITE)
+            .map_err(|_| errno!(EIO))?;
         let per_cpu_stats = cpu_stats.per_cpu_stats.unwrap_or(vec![]);
         let idle_time = per_cpu_stats.iter().map(|s| s.idle_time.unwrap_or(0)).sum();
         let idle_time = zx::Duration::from_nanos(idle_time).into_seconds_f64();
@@ -688,10 +693,13 @@ impl StatFile {
 }
 impl DynamicFileSource for StatFile {
     fn generate(&self, sink: &mut DynamicFileBuf) -> Result<(), Errno> {
-        let uptime = zx::Time::get_monotonic() - zx::Time::ZERO;
+        let uptime = zx::MonotonicTime::get_monotonic() - zx::MonotonicTime::ZERO;
 
-        let cpu_stats =
-            self.kernel_stats.get().get_cpu_stats(zx::Time::INFINITE).map_err(|_| errno!(EIO))?;
+        let cpu_stats = self
+            .kernel_stats
+            .get()
+            .get_cpu_stats(zx::MonotonicTime::INFINITE)
+            .map_err(|_| errno!(EIO))?;
 
         // Number of values reported per CPU. See `get_cpu_stats_row` below for the list of values.
         const NUM_CPU_STATS: usize = 10;

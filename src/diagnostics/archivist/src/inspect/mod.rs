@@ -28,7 +28,7 @@ pub struct NodeHierarchyData {
     // Name of the file that created this snapshot.
     name: Option<InspectHandleName>,
     // Timestamp at which this snapshot resolved or failed.
-    timestamp: zx::Time,
+    timestamp: zx::MonotonicTime,
     // Errors encountered when processing this snapshot.
     errors: Vec<schema::InspectError>,
     // Optional DiagnosticsHierarchy of the inspect hierarchy, in case reading fails
@@ -592,7 +592,7 @@ mod tests {
 
         let inspect_sink_server = Arc::new(InspectSinkServer::new(Arc::clone(&inspect_repo)));
         Arc::clone(&inspect_sink_server).handle(Event {
-            timestamp: zx::Time::get_monotonic(),
+            timestamp: zx::MonotonicTime::get_monotonic(),
             payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
                 component: Arc::clone(&identity),
                 request_stream,

@@ -456,15 +456,18 @@ impl ElfRunner {
 
         // Add UTC estimate of the process start time to the runtime dir.
         let utc_clock_started = fasync::OnSignals::new(&utc_clock_dup, zx::Signals::CLOCK_STARTED)
-            .on_timeout(zx::Time::after(zx::Duration::default()), || Err(zx::Status::TIMED_OUT))
+            .on_timeout(zx::MonotonicTime::after(zx::Duration::default()), || {
+                Err(zx::Status::TIMED_OUT)
+            })
             .await
             .is_ok();
         let clock_transformation = utc_clock_started
             .then(|| utc_clock_dup.get_details().map(|details| details.mono_to_synthetic).ok())
             .flatten();
         if let Some(clock_transformation) = clock_transformation {
-            let utc_timestamp =
-                clock_transformation.apply(zx::Time::from_nanos(process_start_time)).into_nanos();
+            let utc_timestamp = clock_transformation
+                .apply(zx::MonotonicTime::from_nanos(process_start_time))
+                .into_nanos();
             let seconds = (utc_timestamp / 1_000_000_000) as i64;
             let nanos = (utc_timestamp % 1_000_000_000) as u32;
             let dt =

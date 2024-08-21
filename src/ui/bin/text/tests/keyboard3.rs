@@ -481,10 +481,15 @@ fn test_inject_key_yields_expected_key_and_key_meaning(
     key: impl Into<Option<input::Key>>,
     key_meaning: impl Into<test_helpers::KeyMeaningWrapper>,
 ) -> (Option<input::Key>, Option<ui_input3::KeyMeaning>) {
-    let (was_handled, received_event) = inject_key_and_receive_keyboard_protocol_message(
-        create_key_event(zx::Time::ZERO, ui_input3::KeyEventType::Pressed, key, None, key_meaning),
-    )
-    .expect("injection failed");
+    let (was_handled, received_event) =
+        inject_key_and_receive_keyboard_protocol_message(create_key_event(
+            zx::MonotonicTime::ZERO,
+            ui_input3::KeyEventType::Pressed,
+            key,
+            None,
+            key_meaning,
+        ))
+        .expect("injection failed");
     assert_matches::assert_matches!(was_handled, Ok(ui_input3::KeyEventStatus::Handled));
     (received_event.key, received_event.key_meaning)
 }

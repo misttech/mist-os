@@ -349,7 +349,7 @@ async fn set_clock_from_rtc<R: Rtc, D: Diagnostics>(
     force_start: bool,
 ) {
     info!("reading initial RTC time.");
-    let mono_before = zx::Time::get_monotonic();
+    let mono_before = zx::MonotonicTime::get_monotonic();
     let mut rtc_time = match rtc.get().await {
         Err(err) => {
             error!("failed to read RTC time: {}", err);
@@ -361,7 +361,7 @@ async fn set_clock_from_rtc<R: Rtc, D: Diagnostics>(
         }
         Ok(time) => time,
     };
-    let mono_after = zx::Time::get_monotonic();
+    let mono_after = zx::MonotonicTime::get_monotonic();
     let mono_time = mono_before + (mono_after - mono_before) / 2;
 
     let mut rtc_chrono = Utc.timestamp_nanos(rtc_time.into_nanos());
@@ -463,7 +463,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
         let backstop = &clock_details.backstop;
         // Not possible to start at backstop, so we start just a bit after.
         let b1 = *backstop + zx::Duration::from_nanos(1);
-        let mono = zx::Time::get_monotonic();
+        let mono = zx::MonotonicTime::get_monotonic();
         info!("starting the UTC clock from backstop time, to handle legacy programs");
         debug!("`- synthetic (backstop+1): {:?}, reference (monotonic): {:?}", &b1, &mono);
         if let Err(status) =
@@ -562,9 +562,12 @@ mod tests {
     const OFFSET: zx::Duration = zx::Duration::from_seconds(1111_000);
     const OFFSET_2: zx::Duration = zx::Duration::from_seconds(1111_333);
     const STD_DEV: zx::Duration = zx::Duration::from_millis(44);
-    const INVALID_RTC_TIME: zx::Time = zx::Time::from_nanos(111111 * NANOS_PER_SECOND);
-    const BACKSTOP_TIME: zx::Time = zx::Time::from_nanos(222222 * NANOS_PER_SECOND);
-    const VALID_RTC_TIME: zx::Time = zx::Time::from_nanos(333333 * NANOS_PER_SECOND);
+    const INVALID_RTC_TIME: zx::SyntheticTime =
+        zx::SyntheticTime::from_nanos(111111 * NANOS_PER_SECOND);
+    const BACKSTOP_TIME: zx::SyntheticTime =
+        zx::SyntheticTime::from_nanos(222222 * NANOS_PER_SECOND);
+    const VALID_RTC_TIME: zx::SyntheticTime =
+        zx::SyntheticTime::from_nanos(333333 * NANOS_PER_SECOND);
 
     lazy_static! {
         static ref CLOCK_OPTS: zx::ClockOpts = zx::ClockOpts::empty();
@@ -635,7 +638,7 @@ mod tests {
         let diagnostics = Arc::new(FakeDiagnostics::new());
         let config = make_test_config();
 
-        let monotonic_ref = zx::Time::get_monotonic();
+        let monotonic_ref = zx::MonotonicTime::get_monotonic();
 
         let (s, r) = mpsc::channel(1);
 
@@ -724,7 +727,7 @@ mod tests {
         let diagnostics = Arc::new(FakeDiagnostics::new());
         let config = make_test_config_with_delay(delay);
 
-        let monotonic_ref = zx::Time::get_monotonic();
+        let monotonic_ref = zx::MonotonicTime::get_monotonic();
         let (s, r) = mpsc::channel(1);
 
         // Maintain UTC until no more work remains
@@ -800,7 +803,7 @@ mod tests {
         let diagnostics = Arc::new(FakeDiagnostics::new());
         let config = make_test_config_with_delay(1);
 
-        let monotonic_ref = zx::Time::get_monotonic();
+        let monotonic_ref = zx::MonotonicTime::get_monotonic();
         let (s, r) = mpsc::channel(1);
 
         // Maintain UTC until no more work remains
@@ -1038,17 +1041,23 @@ mod tests {
     #[fuchsia::test]
     fn test_initial_clock_state() {
         let clock =
-            zx::Clock::create(zx::ClockOpts::empty(), Some(zx::Time::from_nanos(1_000))).unwrap();
+            zx::Clock::create(zx::ClockOpts::empty(), Some(zx::SyntheticTime::from_nanos(1_000)))
+                .unwrap();
         // The clock must be started with an initial value.
         clock
-            .update(zx::ClockUpdate::builder().approximate_value(zx::Time::from_nanos(1_000)))
+            .update(
+                zx::ClockUpdate::builder().approximate_value(zx::SyntheticTime::from_nanos(1_000)),
+            )
             .unwrap();
         let (state, _) = initial_clock_state(&clock);
         assert!(matches!(state, InitialClockState::NotSet));
 
         // Update the clock, which is already running.
         clock
-            .update(zx::ClockUpdate::builder().approximate_value(zx::Time::from_nanos(1_000_000)))
+            .update(
+                zx::ClockUpdate::builder()
+                    .approximate_value(zx::SyntheticTime::from_nanos(1_000_000)),
+            )
             .unwrap();
         let (state, _) = initial_clock_state(&clock);
         assert_eq!(state, InitialClockState::PreviouslySet);

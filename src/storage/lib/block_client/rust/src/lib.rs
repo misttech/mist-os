@@ -695,20 +695,20 @@ impl RemoteBlockClientSync {
     ) -> Result<Self, zx::Status> {
         let remote = block::BlockSynchronousProxy::new(client_end.into_channel());
         let info = remote
-            .get_info(zx::Time::INFINITE)
+            .get_info(zx::MonotonicTime::INFINITE)
             .map_err(fidl_to_status)?
             .map_err(zx::Status::from_raw)?;
         let (client, server) = fidl::endpoints::create_endpoints();
         let () = remote.open_session(server).map_err(fidl_to_status)?;
         let session = block::SessionSynchronousProxy::new(client.into_channel());
         let fifo = session
-            .get_fifo(zx::Time::INFINITE)
+            .get_fifo(zx::MonotonicTime::INFINITE)
             .map_err(fidl_to_status)?
             .map_err(zx::Status::from_raw)?;
         let temp_vmo = zx::Vmo::create(TEMP_VMO_SIZE as u64)?;
         let dup = temp_vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?;
         let vmo_id = session
-            .attach_vmo(dup, zx::Time::INFINITE)
+            .attach_vmo(dup, zx::MonotonicTime::INFINITE)
             .map_err(fidl_to_status)?
             .map_err(zx::Status::from_raw)?;
         let vmo_id = VmoId::new(vmo_id.id);
@@ -731,7 +731,7 @@ impl RemoteBlockClientSync {
         let dup = vmo.duplicate_handle(zx::Rights::SAME_RIGHTS)?;
         let vmo_id = self
             .session
-            .attach_vmo(dup, zx::Time::INFINITE)
+            .attach_vmo(dup, zx::MonotonicTime::INFINITE)
             .map_err(fidl_to_status)?
             .map_err(zx::Status::from_raw)?;
         Ok(VmoId::new(vmo_id.id))
@@ -764,7 +764,7 @@ impl RemoteBlockClientSync {
     pub fn close(&self) -> Result<(), zx::Status> {
         let () = self
             .session
-            .close(zx::Time::INFINITE)
+            .close(zx::MonotonicTime::INFINITE)
             .map_err(fidl_to_status)?
             .map_err(zx::Status::from_raw)?;
         Ok(())

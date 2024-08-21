@@ -299,7 +299,7 @@ impl MouseInjectorHandler {
         self: &Rc<Self>,
         mouse_event: &mouse_binding::MouseEvent,
         mouse_descriptor: &mouse_binding::MouseDeviceDescriptor,
-        event_time: zx::Time,
+        event_time: zx::MonotonicTime,
     ) -> Result<(), anyhow::Error> {
         if self.inner().injectors.contains_key(&mouse_descriptor.device_id) {
             return Ok(());
@@ -429,7 +429,7 @@ impl MouseInjectorHandler {
         &self,
         mouse_event: &mouse_binding::MouseEvent,
         mouse_descriptor: &mouse_binding::MouseDeviceDescriptor,
-        event_time: zx::Time,
+        event_time: zx::MonotonicTime,
     ) -> Result<(), anyhow::Error> {
         let injector = self.inner().injectors.get(&mouse_descriptor.device_id).cloned();
         if let Some(injector) = injector {
@@ -471,7 +471,7 @@ impl MouseInjectorHandler {
     fn create_pointer_sample_event(
         &self,
         mouse_event: &mouse_binding::MouseEvent,
-        event_time: zx::Time,
+        event_time: zx::MonotonicTime,
         phase: pointerinjector::EventPhase,
         current_position: Position,
         relative_motion: Option<[f32; 2]>,
@@ -532,7 +532,10 @@ impl MouseInjectorHandler {
     }
 
     /// Reports the given event_time to the activity service.
-    async fn report_mouse_activity(&self, event_time: zx::Time) -> Result<(), fidl::Error> {
+    async fn report_mouse_activity(
+        &self,
+        event_time: zx::MonotonicTime,
+    ) -> Result<(), fidl::Error> {
         self.aggregator_proxy.report_discrete_activity(event_time.into_nanos()).await
     }
 
@@ -989,7 +992,7 @@ mod tests {
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
 
-        let event_time = zx::Time::get_monotonic();
+        let event_time = zx::MonotonicTime::get_monotonic();
         let input_event = create_mouse_event(
             move_location,
             None, /* wheel_delta_v */
@@ -1115,7 +1118,7 @@ mod tests {
         // Where w = DISPLAY_WIDTH, h = DISPLAY_HEIGHT
         let cursor_location =
             mouse_binding::MouseLocation::Absolute(Position { x: -25.0, y: 25.0 });
-        let event_time = zx::Time::get_monotonic();
+        let event_time = zx::MonotonicTime::get_monotonic();
         let descriptor =
             input_device::InputDeviceDescriptor::Mouse(mouse_binding::MouseDeviceDescriptor {
                 device_id: DEVICE_ID,
@@ -1248,7 +1251,7 @@ mod tests {
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
 
         let cursor_location = mouse_binding::MouseLocation::Absolute(Position { x: 0.0, y: 0.0 });
-        let event_time = zx::Time::get_monotonic();
+        let event_time = zx::MonotonicTime::get_monotonic();
 
         let input_event = create_mouse_event(
             cursor_location,
@@ -1359,7 +1362,7 @@ mod tests {
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
 
         let cursor_location = mouse_binding::MouseLocation::Absolute(Position { x: 0.0, y: 0.0 });
-        let event_time1 = zx::Time::get_monotonic();
+        let event_time1 = zx::MonotonicTime::get_monotonic();
         let event_time2 = event_time1.add(fuchsia_zircon::Duration::from_micros(1));
 
         let event1 = create_mouse_event(
@@ -1506,7 +1509,7 @@ mod tests {
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
 
         let cursor_location = mouse_binding::MouseLocation::Absolute(Position { x: 0.0, y: 0.0 });
-        let event_time1 = zx::Time::get_monotonic();
+        let event_time1 = zx::MonotonicTime::get_monotonic();
         let event_time2 = event_time1.add(fuchsia_zircon::Duration::from_micros(1));
         let event_time3 = event_time2.add(fuchsia_zircon::Duration::from_micros(1));
         let event_time4 = event_time3.add(fuchsia_zircon::Duration::from_micros(1));
@@ -1726,7 +1729,7 @@ mod tests {
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
 
-        let event_time1 = zx::Time::get_monotonic();
+        let event_time1 = zx::MonotonicTime::get_monotonic();
         let event_time2 = event_time1.add(fuchsia_zircon::Duration::from_micros(1));
         let event_time3 = event_time2.add(fuchsia_zircon::Duration::from_micros(1));
         let zero_position = Position { x: 0.0, y: 0.0 };
@@ -1928,7 +1931,7 @@ mod tests {
                     y: cursor_relative_position.y / COUNTS_PER_MM as f32,
                 },
             });
-        let event_time = zx::Time::get_monotonic();
+        let event_time = zx::MonotonicTime::get_monotonic();
         let input_events = vec![create_mouse_event_with_handled(
             cursor_location,
             None, /* wheel_delta_v */
@@ -1969,7 +1972,7 @@ mod tests {
             mouse_binding::MousePhase::Wheel,
             HashSet::new(),
             HashSet::new(),
-            zx::Time::ZERO,
+            zx::MonotonicTime::ZERO,
             &DESCRIPTOR,
         ),
         create_mouse_pointer_sample_event(
@@ -1980,7 +1983,7 @@ mod tests {
             Some(1), /*wheel_delta_v*/
             None,    /*wheel_delta_h*/
             Some(false), /*is_precision_scroll*/
-            zx::Time::ZERO,
+            zx::MonotonicTime::ZERO,
         ); "v tick scroll"
     )]
     #[test_case(
@@ -1992,7 +1995,7 @@ mod tests {
             mouse_binding::MousePhase::Wheel,
             HashSet::new(),
             HashSet::new(),
-            zx::Time::ZERO,
+            zx::MonotonicTime::ZERO,
             &DESCRIPTOR,
         ),
         create_mouse_pointer_sample_event(
@@ -2003,7 +2006,7 @@ mod tests {
             None,    /*wheel_delta_v*/
             Some(1), /*wheel_delta_h*/
             Some(false), /*is_precision_scroll*/
-            zx::Time::ZERO,
+            zx::MonotonicTime::ZERO,
         ); "h tick scroll"
     )]
     #[test_case(
@@ -2015,7 +2018,7 @@ mod tests {
             mouse_binding::MousePhase::Wheel,
             HashSet::new(),
             HashSet::new(),
-            zx::Time::ZERO,
+            zx::MonotonicTime::ZERO,
             &DESCRIPTOR,
         ),
         create_mouse_pointer_sample_event_with_wheel_physical_pixel(
@@ -2028,7 +2031,7 @@ mod tests {
             Some(120.0), /*wheel_delta_v_physical_pixel*/
             None,        /*wheel_delta_h_physical_pixel*/
             Some(false), /*is_precision_scroll*/
-            zx::Time::ZERO,
+            zx::MonotonicTime::ZERO,
         ); "v tick scroll with physical pixel"
     )]
     #[test_case(
@@ -2040,7 +2043,7 @@ mod tests {
             mouse_binding::MousePhase::Wheel,
             HashSet::new(),
             HashSet::new(),
-            zx::Time::ZERO,
+            zx::MonotonicTime::ZERO,
             &DESCRIPTOR,
         ),
         create_mouse_pointer_sample_event_with_wheel_physical_pixel(
@@ -2053,7 +2056,7 @@ mod tests {
             None,        /*wheel_delta_v_physical_pixel*/
             Some(120.0), /*wheel_delta_h_physical_pixel*/
             Some(false), /*is_precision_scroll*/
-            zx::Time::ZERO,
+            zx::MonotonicTime::ZERO,
         ); "h tick scroll with physical pixel"
     )]
     #[test_case(
@@ -2065,7 +2068,7 @@ mod tests {
             mouse_binding::MousePhase::Wheel,
             HashSet::new(),
             HashSet::new(),
-            zx::Time::ZERO,
+            zx::MonotonicTime::ZERO,
             &DESCRIPTOR,
         ),
         create_mouse_pointer_sample_event_with_wheel_physical_pixel(
@@ -2078,7 +2081,7 @@ mod tests {
             Some(120.0), /*wheel_delta_v_physical_pixel*/
             None,        /*wheel_delta_h_physical_pixel*/
             Some(true),  /*is_precision_scroll*/
-            zx::Time::ZERO,
+            zx::MonotonicTime::ZERO,
         ); "v mm scroll with physical pixel"
     )]
     #[test_case(
@@ -2090,7 +2093,7 @@ mod tests {
             mouse_binding::MousePhase::Wheel,
             HashSet::new(),
             HashSet::new(),
-            zx::Time::ZERO,
+            zx::MonotonicTime::ZERO,
             &DESCRIPTOR,
         ),
         create_mouse_pointer_sample_event_with_wheel_physical_pixel(
@@ -2103,7 +2106,7 @@ mod tests {
             None,        /*wheel_delta_v_physical_pixel*/
             Some(120.0), /*wheel_delta_h_physical_pixel*/
             Some(true),  /*is_precision_scroll*/
-            zx::Time::ZERO,
+            zx::MonotonicTime::ZERO,
         ); "h mm scroll with physical pixel"
     )]
     /// Test simple scroll in vertical and horizontal.
@@ -2150,7 +2153,7 @@ mod tests {
             injector_stream_sender,
         );
 
-        let event_time = zx::Time::get_monotonic();
+        let event_time = zx::MonotonicTime::get_monotonic();
 
         let event = input_device::InputEvent { event_time, ..event };
 
@@ -2228,7 +2231,7 @@ mod tests {
             injector_stream_sender,
         );
 
-        let event_time1 = zx::Time::get_monotonic();
+        let event_time1 = zx::MonotonicTime::get_monotonic();
         let event_time2 = event_time1.add(fuchsia_zircon::Duration::from_micros(1));
         let event_time3 = event_time2.add(fuchsia_zircon::Duration::from_micros(1));
         let event_time4 = event_time3.add(fuchsia_zircon::Duration::from_micros(1));
@@ -2449,7 +2452,7 @@ mod tests {
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
 
         let cursor_location = mouse_binding::MouseLocation::Absolute(Position { x: 0.0, y: 0.0 });
-        let event_time1 = zx::Time::get_monotonic();
+        let event_time1 = zx::MonotonicTime::get_monotonic();
         let event_time2 = event_time1.add(fuchsia_zircon::Duration::from_micros(1));
         let event_time3 = event_time2.add(fuchsia_zircon::Duration::from_micros(1));
 

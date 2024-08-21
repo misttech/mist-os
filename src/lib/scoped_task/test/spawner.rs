@@ -49,7 +49,7 @@ fn main() {
     let opts: Options = argh::from_env();
     println!("spawner opts={:?}", opts);
     if opts.sleep {
-        zx::Time::INFINITE.sleep();
+        zx::MonotonicTime::INFINITE.sleep();
     }
 
     // This test deliberately races threads where one is shutting down the process.
@@ -77,7 +77,7 @@ fn main() {
                     assert!(!opts.wait, "sending should always succeed with --wait");
                 }
 
-                zx::Time::INFINITE.sleep();
+                zx::MonotonicTime::INFINITE.sleep();
             });
         } else {
             _process = Some(

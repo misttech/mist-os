@@ -404,13 +404,13 @@ fn do_futex<Key: FutexKey>(
     let read_deadline = |current_task: &CurrentTask| {
         let utime = UserRef::<timespec>::from(timeout_or_value2);
         if utime.is_null() {
-            Ok(zx::Time::INFINITE)
+            Ok(zx::MonotonicTime::INFINITE)
         } else {
             // In theory, we should adjust this for a realtime
             // futex when the system gets suspended, but Zircon
             // does not give us a way to do this.
             let duration = current_task.read_object(utime)?;
-            Ok(zx::Time::after(duration_from_timespec(duration)?))
+            Ok(zx::MonotonicTime::after(duration_from_timespec(duration)?))
         }
     };
     match cmd {
@@ -429,7 +429,7 @@ fn do_futex<Key: FutexKey>(
             // timeout and WAIT_BITSET takes a deadline.
             let utime = UserRef::<timespec>::from(timeout_or_value2);
             let deadline = if utime.is_null() {
-                zx::Time::INFINITE
+                zx::MonotonicTime::INFINITE
             } else if is_realtime {
                 let timespec = current_task.read_object(utime)?;
                 crate::time::utc::estimate_monotonic_deadline_from_utc(time_from_timespec(
@@ -478,7 +478,7 @@ fn do_futex_wait_with_restart<Key: FutexKey>(
     addr: UserAddress,
     value: u32,
     mask: u32,
-    deadline: zx::Time,
+    deadline: zx::MonotonicTime,
 ) -> Result<(), Errno> {
     let futexes = Key::get_table_from_task(current_task);
     let result = futexes.wait(current_task, addr, value, mask, deadline);

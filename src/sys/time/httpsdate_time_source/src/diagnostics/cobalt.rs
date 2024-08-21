@@ -168,7 +168,7 @@ mod test {
     const TEST_BOUND_SIZE: zx::Duration = zx::Duration::from_millis(101);
     const TEST_STANDARD_DEVIATION: zx::Duration = zx::Duration::from_millis(20);
     const ONE_MICROS: zx::Duration = zx::Duration::from_micros(1);
-    const TEST_TIME: zx::Time = zx::Time::from_nanos(123_456_789);
+    const TEST_TIME: zx::MonotonicTime = zx::MonotonicTime::from_nanos(123_456_789);
     const TEST_RTT_BUCKET: u32 = 2;
     const TEST_RTT_2_BUCKET: u32 = 4;
     const OVERFLOW_RTT: zx::Duration = zx::Duration::from_seconds(10);

@@ -31,12 +31,13 @@ impl InterestFilter {
         let default_severity = interest.min_severity.unwrap_or(Severity::Info);
         let (proxy, min_severity) = if wait_for_initial_interest {
             let sync_proxy = LogSinkSynchronousProxy::new(proxy.into_channel().unwrap().into());
-            let initial_severity = match sync_proxy.wait_for_interest_change(zx::Time::INFINITE) {
-                Ok(Ok(initial_interest)) => {
-                    initial_interest.min_severity.unwrap_or(default_severity)
-                }
-                _ => default_severity,
-            };
+            let initial_severity =
+                match sync_proxy.wait_for_interest_change(zx::MonotonicTime::INFINITE) {
+                    Ok(Ok(initial_interest)) => {
+                        initial_interest.min_severity.unwrap_or(default_severity)
+                    }
+                    _ => default_severity,
+                };
             (
                 LogSinkProxy::new(fidl::AsyncChannel::from_channel(sync_proxy.into_channel())),
                 Arc::new(RwLock::new(initial_severity)),

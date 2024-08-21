@@ -36,7 +36,7 @@ lazy_static! {
 }
 
 fn monotonic_time() -> i64 {
-    zx::Time::get_monotonic().into_nanos()
+    zx::MonotonicTime::get_monotonic().into_nanos()
 }
 
 /// A vector of inspect nodes used to store some struct implementing `InspectWritable`, where the
@@ -91,7 +91,7 @@ impl TimeSet {
     pub fn now(clock: &zx::Clock) -> Self {
         TimeSet {
             monotonic: monotonic_time(),
-            clock_utc: clock.read().map(zx::Time::into_nanos).unwrap_or(FAILED_TIME),
+            clock_utc: clock.read().map(zx::SyntheticTime::into_nanos).unwrap_or(FAILED_TIME),
         }
     }
 }
@@ -161,7 +161,11 @@ struct RealTimeClockNode {
 
 impl RealTimeClockNode {
     /// Constructs a new `RealTimeClockNode`, recording the initial state.
-    pub fn new(node: Node, outcome: InitializeRtcOutcome, initial_time: Option<zx::Time>) -> Self {
+    pub fn new(
+        node: Node,
+        outcome: InitializeRtcOutcome,
+        initial_time: Option<zx::SyntheticTime>,
+    ) -> Self {
         node.record_string("initialization", format!("{:?}", outcome));
         if let Some(time) = initial_time {
             node.record_int("initial_time", time.into_nanos());
@@ -326,8 +330,8 @@ impl TrackNode {
     /// Records a new Kalman filter update for the track.
     pub fn update_filter_state(
         &mut self,
-        monotonic: zx::Time,
-        utc: zx::Time,
+        monotonic: zx::MonotonicTime,
+        utc: zx::SyntheticTime,
         sqrt_covariance: zx::Duration,
     ) {
         let filter_state = KalmanFilterState {
@@ -341,7 +345,7 @@ impl TrackNode {
     /// Records a new frequency update for the track.
     pub fn update_frequency(
         &mut self,
-        monotonic: zx::Time,
+        monotonic: zx::MonotonicTime,
         rate_adjust_ppm: i32,
         window_count: u32,
     ) {
@@ -566,8 +570,11 @@ mod tests {
     /// Creates a new wrapped clock set to backstop time.
     fn create_clock() -> Arc<zx::Clock> {
         Arc::new(
-            zx::Clock::create(zx::ClockOpts::empty(), Some(zx::Time::from_nanos(BACKSTOP_TIME)))
-                .unwrap(),
+            zx::Clock::create(
+                zx::ClockOpts::empty(),
+                Some(zx::SyntheticTime::from_nanos(BACKSTOP_TIME)),
+            )
+            .unwrap(),
         )
     }
 
@@ -656,11 +663,14 @@ mod tests {
         let (inspect_diagnostics, clock) = create_test_object(&inspector, false);
 
         // Perform two updates to the clock. The inspect data should reflect the most recent.
-        let monotonic_time = zx::Time::get_monotonic();
+        let monotonic_time = zx::MonotonicTime::get_monotonic();
         clock
             .update(
                 zx::ClockUpdate::builder()
-                    .absolute_value(monotonic_time, zx::Time::from_nanos(BACKSTOP_TIME + 1234))
+                    .absolute_value(
+                        monotonic_time,
+                        zx::SyntheticTime::from_nanos(BACKSTOP_TIME + 1234),
+                    )
                     .rate_adjust(0)
                     .error_bounds(0),
             )
@@ -668,11 +678,14 @@ mod tests {
         inspect_diagnostics
             .record(Event::StartClock { track: Track::Primary, source: StartClockSource::Rtc });
 
-        let monotonic_time = zx::Time::get_monotonic();
+        let monotonic_time = zx::MonotonicTime::get_monotonic();
         clock
             .update(
                 zx::ClockUpdate::builder()
-                    .absolute_value(monotonic_time, zx::Time::from_nanos(BACKSTOP_TIME + 2345))
+                    .absolute_value(
+                        monotonic_time,
+                        zx::SyntheticTime::from_nanos(BACKSTOP_TIME + 2345),
+                    )
                     .rate_adjust(RATE_ADJUST)
                     .error_bounds(ERROR_BOUNDS),
             )
@@ -714,7 +727,7 @@ mod tests {
         let (inspect_diagnostics, _) = create_test_object(&inspector, false);
         inspect_diagnostics.record(Event::InitializeRtc {
             outcome: InitializeRtcOutcome::Succeeded,
-            time: Some(zx::Time::from_nanos(RTC_INITIAL_TIME)),
+            time: Some(zx::SyntheticTime::from_nanos(RTC_INITIAL_TIME)),
         });
         assert_data_tree!(
             inspector,
@@ -847,13 +860,13 @@ mod tests {
         for i in 1..8 {
             test.record(Event::KalmanFilterUpdated {
                 track: Track::Primary,
-                monotonic: zx::Time::ZERO + OFFSET * i,
-                utc: zx::Time::from_nanos(BACKSTOP_TIME) + OFFSET * i,
+                monotonic: zx::MonotonicTime::ZERO + OFFSET * i,
+                utc: zx::SyntheticTime::from_nanos(BACKSTOP_TIME) + OFFSET * i,
                 sqrt_covariance: zx::Duration::from_nanos(SQRT_COVARIANCE) * i,
             });
             test.record(Event::FrequencyUpdated {
                 track: Track::Primary,
-                monotonic: zx::Time::ZERO + OFFSET * i,
+                monotonic: zx::MonotonicTime::ZERO + OFFSET * i,
                 rate_adjust_ppm: -i,
                 window_count: i as u32,
             });

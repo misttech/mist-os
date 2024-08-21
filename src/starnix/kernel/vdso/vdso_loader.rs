@@ -168,7 +168,7 @@ fn load_vdso_from_file() -> Result<Arc<MemoryObject>, Errno> {
         &dir_proxy,
         VDSO_FILENAME,
         fidl_fuchsia_io::VmoFlags::READ,
-        zx::Time::INFINITE,
+        zx::MonotonicTime::INFINITE,
     )
     .map_err(|status| from_status_like_fdio!(status))?;
 
@@ -191,7 +191,7 @@ fn load_time_values_memory() -> Result<Arc<MemoryObject>, Errno> {
         &dir_proxy,
         FILENAME,
         fidl_fuchsia_io::VmoFlags::READ,
-        zx::Time::INFINITE,
+        zx::MonotonicTime::INFINITE,
     )
     .map_err(|status| from_status_like_fdio!(status))?;
 

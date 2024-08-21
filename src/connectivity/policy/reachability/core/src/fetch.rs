@@ -30,7 +30,7 @@ async fn fetch<FA: FetchAddr + std::marker::Sync>(
     path: &str,
     addr: &FA,
 ) -> anyhow::Result<u8> {
-    let timeout = zx::Time::after(FETCH_TIMEOUT);
+    let timeout = zx::MonotonicTime::after(FETCH_TIMEOUT);
     let addr = addr.as_socket_addr();
     let socket = socket2::Socket::new(
         match addr {
@@ -141,7 +141,7 @@ mod test {
         let addr = listener.local_addr()?;
 
         let server_fut = async {
-            let timeout = zx::Time::after(FETCH_TIMEOUT);
+            let timeout = zx::MonotonicTime::after(FETCH_TIMEOUT);
             let mut incoming = listener.accept_stream();
             if let Some(result) = incoming
                 .next()

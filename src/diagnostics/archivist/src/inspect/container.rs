@@ -265,7 +265,7 @@ pub struct SnapshotData {
     /// Optional name of the file or InspectSink proxy that created this snapshot.
     pub name: Option<InspectHandleName>,
     /// Timestamp at which this snapshot resolved or failed.
-    pub timestamp: zx::Time,
+    pub timestamp: zx::MonotonicTime,
     /// Errors encountered when processing this snapshot.
     pub errors: Vec<schema::InspectError>,
     /// Optional snapshot of the inspect hierarchy, in case reading fails
@@ -415,25 +415,29 @@ struct State {
 }
 
 impl State {
-    fn into_pending(self, pending: collector::InspectHandleDeque, start_time: zx::Time) -> Self {
+    fn into_pending(
+        self,
+        pending: collector::InspectHandleDeque,
+        start_time: zx::MonotonicTime,
+    ) -> Self {
         Self {
             unpopulated: self.unpopulated,
             status: Status::Pending(pending),
             batch_timeout: self.batch_timeout,
             global_stats: self.global_stats,
-            elapsed_time: self.elapsed_time + (zx::Time::get_monotonic() - start_time),
+            elapsed_time: self.elapsed_time + (zx::MonotonicTime::get_monotonic() - start_time),
             trace_guard: self.trace_guard,
             trace_id: self.trace_id,
         }
     }
 
-    fn add_elapsed_time(&mut self, start_time: zx::Time) {
-        self.elapsed_time += zx::Time::get_monotonic() - start_time
+    fn add_elapsed_time(&mut self, start_time: zx::MonotonicTime) {
+        self.elapsed_time += zx::MonotonicTime::get_monotonic() - start_time
     }
 
     async fn iterate(
         mut self,
-        start_time: zx::Time,
+        start_time: zx::MonotonicTime,
     ) -> Option<(PopulatedInspectDataContainer, State)> {
         loop {
             match &mut self.status {
@@ -446,7 +450,7 @@ impl State {
                     None => {
                         self.global_stats.record_component_duration(
                             self.unpopulated.identity.moniker.to_string(),
-                            self.elapsed_time + (zx::Time::get_monotonic() - start_time),
+                            self.elapsed_time + (zx::MonotonicTime::get_monotonic() - start_time),
                         );
                         return None;
                     }
@@ -523,7 +527,7 @@ impl UnpopulatedInspectDataContainer {
             let timeout = state.batch_timeout;
             let elapsed_time = state.elapsed_time;
             let global_stats = Arc::clone(&state.global_stats);
-            let start_time = zx::Time::get_monotonic();
+            let start_time = zx::MonotonicTime::get_monotonic();
             let trace_guard = Arc::clone(&state.trace_guard);
             let trace_id = state.trace_id;
 
@@ -548,7 +552,7 @@ impl UnpopulatedInspectDataContainer {
                             unpopulated: unpopulated_for_timeout,
                             batch_timeout: timeout,
                             global_stats,
-                            elapsed_time: elapsed_time + (zx::Time::get_monotonic() - start_time),
+                            elapsed_time: elapsed_time + (zx::MonotonicTime::get_monotonic() - start_time),
                             trace_guard,
                             trace_id,
                         },

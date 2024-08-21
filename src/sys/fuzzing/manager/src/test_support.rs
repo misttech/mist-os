@@ -432,7 +432,9 @@ async fn serve_suite_controller(
                             let suite_events = payloads
                                 .drain(..)
                                 .map(|payload| SuiteEvent {
-                                    timestamp: Some(zx::Time::get_monotonic().into_nanos()),
+                                    timestamp: Some(
+                                        zx::MonotonicTime::get_monotonic().into_nanos(),
+                                    ),
                                     payload: Some(payload),
                                     ..Default::default()
                                 })
@@ -475,7 +477,7 @@ async fn serve_run_controller(
                     let run_events: Vec<RunEvent> = payloads
                         .into_iter()
                         .map(|payload| RunEvent {
-                            timestamp: Some(zx::Time::get_monotonic().into_nanos()),
+                            timestamp: Some(zx::MonotonicTime::get_monotonic().into_nanos()),
                             payload: Some(payload),
                             ..Default::default()
                         })

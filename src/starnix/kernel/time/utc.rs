@@ -25,10 +25,11 @@ struct UtcClock {
 
 impl UtcClock {
     pub fn new(real_utc_clock: zx::Clock) -> Self {
-        let offset = real_utc_clock.get_details().unwrap().backstop - zx::Time::get_monotonic();
+        let offset = real_utc_clock.get_details().unwrap().backstop.into_nanos()
+            - zx::MonotonicTime::get_monotonic().into_nanos();
         let current_transform = ClockTransformation {
             reference_offset: 0,
-            synthetic_offset: offset.into_nanos(),
+            synthetic_offset: offset,
             rate: zx::sys::zx_clock_rate_t { synthetic_ticks: 1, reference_ticks: 1 },
         };
         let mut utc_clock = Self {
@@ -47,7 +48,10 @@ impl UtcClock {
 
     fn check_real_utc_clock_started(&self) -> bool {
         // Poll the utc clock to check if CLOCK_STARTED is asserted.
-        match self.real_utc_clock.wait_handle(zx::Signals::CLOCK_STARTED, zx::Time::INFINITE_PAST) {
+        match self
+            .real_utc_clock
+            .wait_handle(zx::Signals::CLOCK_STARTED, zx::MonotonicTime::INFINITE_PAST)
+        {
             Ok(e) if e.contains(zx::Signals::CLOCK_STARTED) => true,
             Ok(_) | Err(zx::Status::TIMED_OUT) => false,
             Err(e) => {
@@ -57,15 +61,15 @@ impl UtcClock {
         }
     }
 
-    pub fn now(&self) -> zx::Time {
-        let monotonic_time = zx::Time::get_monotonic();
+    pub fn now(&self) -> zx::SyntheticTime {
+        let monotonic_time = zx::MonotonicTime::get_monotonic();
         // Utc time is calculated using the same transform as the one stored in vvar. This is
         // to ensure that utc calculations are the same whether using a syscall or the vdso
         // function.
         self.current_transform.apply(monotonic_time)
     }
 
-    pub fn estimate_monotonic_deadline(&self, utc: zx::Time) -> zx::Time {
+    pub fn estimate_monotonic_deadline(&self, utc: zx::SyntheticTime) -> zx::MonotonicTime {
         self.current_transform.apply_inverse(utc)
     }
 
@@ -99,7 +103,7 @@ pub fn update_utc_clock(dest: &MemoryMappedVvar) {
     (*UTC_CLOCK).lock().update_utc_clock(dest);
 }
 
-pub fn utc_now() -> zx::Time {
+pub fn utc_now() -> zx::SyntheticTime {
     #[cfg(test)]
     {
         if let Some(test_time) = UTC_CLOCK_OVERRIDE_FOR_TESTING
@@ -111,7 +115,7 @@ pub fn utc_now() -> zx::Time {
     (*UTC_CLOCK).lock().now()
 }
 
-pub fn estimate_monotonic_deadline_from_utc(utc: zx::Time) -> zx::Time {
+pub fn estimate_monotonic_deadline_from_utc(utc: zx::SyntheticTime) -> zx::MonotonicTime {
     #[cfg(test)]
     {
         if let Some(test_time) = UTC_CLOCK_OVERRIDE_FOR_TESTING.with(|cell| {

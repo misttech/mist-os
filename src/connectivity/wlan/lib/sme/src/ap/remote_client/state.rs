@@ -57,8 +57,11 @@ impl Authenticating {
         }
 
         let event = ClientEvent::AssociationTimeout;
-        let timeout_event_id =
-            r_sta.schedule_at(ctx, zx::Time::after(ASSOCIATION_TIMEOUT_SECONDS.seconds()), event);
+        let timeout_event_id = r_sta.schedule_at(
+            ctx,
+            zx::MonotonicTime::after(ASSOCIATION_TIMEOUT_SECONDS.seconds()),
+            event,
+        );
 
         Ok(timeout_event_id)
     }
@@ -298,7 +301,7 @@ impl RsnaLinkState {
 
         self.negotiation_timeout_event_id = Some(r_sta.schedule_at(
             ctx,
-            zx::Time::after(zx::Duration::from_seconds(RSNA_NEGOTIATION_TIMEOUT_SECONDS)),
+            zx::MonotonicTime::after(zx::Duration::from_seconds(RSNA_NEGOTIATION_TIMEOUT_SECONDS)),
             ClientEvent::RsnaTimeout(RsnaTimeout::Negotiation),
         ));
 
@@ -309,7 +312,9 @@ impl RsnaLinkState {
     fn reschedule_request_timeout(&mut self, r_sta: &mut RemoteClient, ctx: &mut Context) {
         self.request_timeout_event_id = Some(r_sta.schedule_at(
             ctx,
-            zx::Time::after(zx::Duration::from_seconds(RSNA_NEGOTIATION_REQUEST_TIMEOUT_SECONDS)),
+            zx::MonotonicTime::after(zx::Duration::from_seconds(
+                RSNA_NEGOTIATION_REQUEST_TIMEOUT_SECONDS,
+            )),
             ClientEvent::RsnaTimeout(RsnaTimeout::Request),
         ));
     }
@@ -513,7 +518,11 @@ impl Associated {
     ) -> EventId {
         aid_map.release_aid(self.aid);
         let event = ClientEvent::AssociationTimeout;
-        r_sta.schedule_at(ctx, zx::Time::after(ASSOCIATION_TIMEOUT_SECONDS.seconds()), event)
+        r_sta.schedule_at(
+            ctx,
+            zx::MonotonicTime::after(ASSOCIATION_TIMEOUT_SECONDS.seconds()),
+            event,
+        )
     }
 }
 

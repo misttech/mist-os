@@ -85,7 +85,7 @@ impl Sink {
             }
             let Ok(signals) = self.socket.wait_handle(
                 zx::Signals::SOCKET_PEER_CLOSED | zx::Signals::SOCKET_WRITABLE,
-                zx::Time::INFINITE,
+                zx::MonotonicTime::INFINITE,
             ) else {
                 on_error();
                 break;

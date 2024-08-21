@@ -30,7 +30,7 @@ use carnelian::{
     ViewAssistantContext, ViewKey,
 };
 use euclid::{size2, Size2D};
-use fuchsia_zircon::{Duration, Event, Time};
+use fuchsia_zircon::{Duration, Event, MonotonicTime};
 #[cfg(feature = "ota_ui")]
 use recovery_util::ota::state_machine::Event as StateMachineEvent;
 use std::collections::VecDeque;
@@ -45,7 +45,7 @@ const TEXT_FIELD_WIDTH: f32 = 960.0;
 /// enum that defines all messages sent with `App::queue_message` that
 /// the button view assistant will understand and process.
 pub enum KeyMessages {
-    Pressed(&'static Key, Time, String),
+    Pressed(&'static Key, MonotonicTime, String),
 }
 
 #[allow(unused)]
@@ -229,7 +229,7 @@ impl KeyButton {
                         if self.active {
                             context.queue_message(make_message(KeyMessages::Pressed(
                                 self.key,
-                                Time::get_monotonic(),
+                                MonotonicTime::get_monotonic(),
                                 self.label_text.clone(),
                             )));
                         }
@@ -281,7 +281,7 @@ pub struct KeyboardViewAssistant {
     privacy: TextVisibility,
     scene_details: Option<SceneDetails>,
     state_shift: bool,
-    shift_time: Time,
+    shift_time: MonotonicTime,
     sticky_shift: bool,
     accent_key: Option<&'static Key>,
     state_alt: bool,
@@ -304,7 +304,7 @@ impl KeyboardViewAssistant {
             privacy: TextVisibility::Always,
             scene_details: None,
             state_shift: false,
-            shift_time: Time::ZERO,
+            shift_time: MonotonicTime::ZERO,
             sticky_shift: false,
             state_alt: false,
             accent_key: None,
@@ -339,7 +339,7 @@ impl KeyboardViewAssistant {
         self.user_text = chars.as_str().to_string();
     }
 
-    fn key_press(&mut self, key: &&'static Key, key_cap: &String, time: &Time) {
+    fn key_press(&mut self, key: &&'static Key, key_cap: &String, time: &MonotonicTime) {
         let mut keyboard_changed = false;
         match key {
             Key::Letter(letter_key) => {

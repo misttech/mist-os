@@ -1112,7 +1112,7 @@ mod tests {
         assert_eq!(element.use_view_provider(), false);
         let exposed_dir = element.directory_channel();
         exposed_dir
-            .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::Time::INFINITE_PAST)
+            .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::MonotonicTime::INFINITE_PAST)
             .expect("exposed_dir should be closed");
     }
 

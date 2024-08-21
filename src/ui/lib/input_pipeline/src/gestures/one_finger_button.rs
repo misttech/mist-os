@@ -472,7 +472,7 @@ fn touchpad_event_to_mouse_drag_event(
 }
 
 fn make_mouse_event(
-    timestamp: zx::Time,
+    timestamp: zx::MonotonicTime,
     movement_in_mm: Position,
     phase: mouse_binding::MousePhase,
     affected_buttons: HashSet<MouseButton>,
@@ -510,13 +510,13 @@ mod tests {
     const BUTTON_CHANGE_STATE_TIMEOUT: zx::Duration = zx::Duration::from_seconds(1);
 
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO,
+        timestamp: zx::MonotonicTime::ZERO,
         pressed_buttons: vec![],
         contacts: vec![],
         filtered_palm_contacts: vec![],
     };"0 fingers")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO,
+        timestamp: zx::MonotonicTime::ZERO,
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 1.0, y: 1.0}),
@@ -548,7 +548,7 @@ mod tests {
             button_change_state_timeout: BUTTON_CHANGE_STATE_TIMEOUT,
         });
         let event = TouchpadEvent {
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             pressed_buttons: vec![],
             contacts: vec![make_touch_contact(1, Position { x: 1.0, y: 1.0 })],
             filtered_palm_contacts: vec![],
@@ -568,7 +568,7 @@ mod tests {
             button_change_state_timeout: BUTTON_CHANGE_STATE_TIMEOUT,
         });
         let event = TouchpadEvent {
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             pressed_buttons: vec![1],
             contacts: vec![make_touch_contact(1, Position { x: 1.0, y: 1.0 })],
             filtered_palm_contacts: vec![],
@@ -579,13 +579,13 @@ mod tests {
     }
 
     #[test_case(TouchpadEvent{
-      timestamp: zx::Time::ZERO,
+      timestamp: zx::MonotonicTime::ZERO,
       pressed_buttons: vec![],
       contacts: vec![],
       filtered_palm_contacts: vec![],
     };"0 fingers")]
     #[test_case(TouchpadEvent{
-      timestamp: zx::Time::ZERO,
+      timestamp: zx::MonotonicTime::ZERO,
       pressed_buttons: vec![],
       contacts: vec![
           make_touch_contact(1, Position{x: 1.0, y: 1.0}),
@@ -594,7 +594,7 @@ mod tests {
       filtered_palm_contacts: vec![],
     };"2 fingers")]
     #[test_case(TouchpadEvent{
-      timestamp: zx::Time::ZERO,
+      timestamp: zx::MonotonicTime::ZERO,
       pressed_buttons: vec![],
       contacts: vec![
           make_touch_contact(1, Position{x: 10.0, y: 1.0}),
@@ -617,7 +617,7 @@ mod tests {
     }
 
     #[test_case(TouchpadEvent{
-      timestamp: zx::Time::ZERO,
+      timestamp: zx::MonotonicTime::ZERO,
       pressed_buttons: vec![],
       contacts: vec![
           make_touch_contact(1, Position{x: 9.0, y: 1.0}),
@@ -625,7 +625,7 @@ mod tests {
       filtered_palm_contacts: vec![],
     };"1 fingers move less than threshold")]
     #[test_case(TouchpadEvent{
-      timestamp: zx::Time::ZERO,
+      timestamp: zx::MonotonicTime::ZERO,
       pressed_buttons: vec![],
       contacts: vec![
           make_touch_contact(1, Position{x: 0.0, y: 0.0}),
@@ -658,7 +658,7 @@ mod tests {
             initial_position: Position { x: 0.0, y: 0.0 },
         });
         let event = TouchpadEvent {
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             pressed_buttons: vec![1],
             contacts: vec![make_touch_contact(1, Position { x: 1.0, y: 1.0 })],
             filtered_palm_contacts: vec![],
@@ -677,7 +677,7 @@ mod tests {
                 SPURIOUS_TO_INTENTIONAL_MOTION_THRESHOLD_BUTTON_CHANGE_MM,
             button_change_state_timeout: BUTTON_CHANGE_STATE_TIMEOUT,
             pressed_event: TouchpadEvent {
-                timestamp: zx::Time::from_nanos(41),
+                timestamp: zx::MonotonicTime::from_nanos(41),
                 pressed_buttons: vec![1],
                 contacts: vec![make_touch_contact(1, Position { x: 1.0, y: 1.0 })],
                 filtered_palm_contacts: vec![],
@@ -685,13 +685,13 @@ mod tests {
         });
         let events = vec![
             TouchpadEvent {
-                timestamp: zx::Time::ZERO,
+                timestamp: zx::MonotonicTime::ZERO,
                 pressed_buttons: vec![],
                 contacts: vec![make_touch_contact(1, Position { x: 1.0, y: 1.0 })],
                 filtered_palm_contacts: vec![],
             },
             TouchpadEvent {
-                timestamp: zx::Time::from_nanos(41),
+                timestamp: zx::MonotonicTime::from_nanos(41),
                 pressed_buttons: vec![1],
                 contacts: vec![make_touch_contact(1, Position { x: 1.0, y: 1.0 })],
                 filtered_palm_contacts: vec![],
@@ -707,7 +707,7 @@ mod tests {
         } => {
           pretty_assertions::assert_eq!(generated_events, vec![
             MouseEvent {
-              timestamp:zx::Time::from_nanos(41),
+              timestamp:zx::MonotonicTime::from_nanos(41),
               mouse_data: mouse_binding::MouseEvent::new(
                   mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                       millimeters: Position { x: 0.0, y: 0.0 },
@@ -726,7 +726,7 @@ mod tests {
     }
 
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::from_nanos(41),
+        timestamp: zx::MonotonicTime::from_nanos(41),
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 1.0, y: 1.0}),
@@ -734,7 +734,7 @@ mod tests {
         filtered_palm_contacts: vec![],
     };"button release")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::from_nanos(41),
+        timestamp: zx::MonotonicTime::from_nanos(41),
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 19.0, y: 1.0}),
@@ -742,7 +742,7 @@ mod tests {
         filtered_palm_contacts: vec![],
     };"move less than threshold in edge state")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO + zx::Duration::from_millis(1500),
+        timestamp: zx::MonotonicTime::ZERO + zx::Duration::from_millis(1500),
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 9.0, y: 1.0}),
@@ -750,7 +750,7 @@ mod tests {
         filtered_palm_contacts: vec![],
     };"move less than threshold out of edge state")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::from_nanos(41),
+        timestamp: zx::MonotonicTime::from_nanos(41),
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 20.0, y: 1.0}),
@@ -758,7 +758,7 @@ mod tests {
         filtered_palm_contacts: vec![],
     };"move more than threshold in edge state and release button")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO + zx::Duration::from_millis(1500),
+        timestamp: zx::MonotonicTime::ZERO + zx::Duration::from_millis(1500),
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 10.0, y: 1.0}),
@@ -774,7 +774,7 @@ mod tests {
                 SPURIOUS_TO_INTENTIONAL_MOTION_THRESHOLD_BUTTON_CHANGE_MM,
             button_change_state_timeout: BUTTON_CHANGE_STATE_TIMEOUT,
             pressed_event: TouchpadEvent {
-                timestamp: zx::Time::ZERO,
+                timestamp: zx::MonotonicTime::ZERO,
                 pressed_buttons: vec![1],
                 contacts: vec![make_touch_contact(1, Position { x: 0.0, y: 0.0 })],
                 filtered_palm_contacts: vec![],
@@ -799,7 +799,7 @@ mod tests {
     }
 
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::from_nanos(41),
+        timestamp: zx::MonotonicTime::from_nanos(41),
         pressed_buttons: vec![1],
         contacts: vec![
             make_touch_contact(1, Position{x: 19.0, y: 1.0}),
@@ -807,7 +807,7 @@ mod tests {
         filtered_palm_contacts: vec![],
     };"move less than threshold in edge state")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO + zx::Duration::from_millis(1500),
+        timestamp: zx::MonotonicTime::ZERO + zx::Duration::from_millis(1500),
         pressed_buttons: vec![1],
         contacts: vec![
             make_touch_contact(1, Position{x: 9.0, y: 1.0}),
@@ -815,7 +815,7 @@ mod tests {
         filtered_palm_contacts: vec![],
     };"move less than threshold out of edge state")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::from_nanos(41),
+        timestamp: zx::MonotonicTime::from_nanos(41),
         pressed_buttons: vec![1],
         contacts: vec![
             make_touch_contact(1, Position{x: 1.0, y: 1.0}),
@@ -832,7 +832,7 @@ mod tests {
                 SPURIOUS_TO_INTENTIONAL_MOTION_THRESHOLD_BUTTON_CHANGE_MM,
             button_change_state_timeout: BUTTON_CHANGE_STATE_TIMEOUT,
             pressed_event: TouchpadEvent {
-                timestamp: zx::Time::ZERO,
+                timestamp: zx::MonotonicTime::ZERO,
                 pressed_buttons: vec![1],
                 contacts: vec![make_touch_contact(1, Position { x: 0.0, y: 0.0 })],
                 filtered_palm_contacts: vec![],
@@ -846,7 +846,7 @@ mod tests {
     }
 
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::from_nanos(41),
+        timestamp: zx::MonotonicTime::from_nanos(41),
         pressed_buttons: vec![1],
         contacts: vec![
             make_touch_contact(1, Position{x: 20.0, y: 1.0}),
@@ -854,7 +854,7 @@ mod tests {
         filtered_palm_contacts: vec![],
     };"move more than threshold in edge state")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO + zx::Duration::from_millis(1500),
+        timestamp: zx::MonotonicTime::ZERO + zx::Duration::from_millis(1500),
         pressed_buttons: vec![1],
         contacts: vec![
             make_touch_contact(1, Position{x: 10.0, y: 1.0}),
@@ -870,7 +870,7 @@ mod tests {
                 SPURIOUS_TO_INTENTIONAL_MOTION_THRESHOLD_BUTTON_CHANGE_MM,
             button_change_state_timeout: BUTTON_CHANGE_STATE_TIMEOUT,
             pressed_event: TouchpadEvent {
-                timestamp: zx::Time::ZERO,
+                timestamp: zx::MonotonicTime::ZERO,
                 pressed_buttons: vec![1],
                 contacts: vec![make_touch_contact(1, Position { x: 0.0, y: 0.0 })],
                 filtered_palm_contacts: vec![],
@@ -885,7 +885,7 @@ mod tests {
     }
 
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::from_nanos(41),
+        timestamp: zx::MonotonicTime::from_nanos(41),
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 1.0, y: 1.0}),
@@ -893,7 +893,7 @@ mod tests {
         filtered_palm_contacts: vec![],
     };"button release")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::from_nanos(41),
+        timestamp: zx::MonotonicTime::from_nanos(41),
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 19.0, y: 1.0}),
@@ -907,7 +907,7 @@ mod tests {
                 SPURIOUS_TO_INTENTIONAL_MOTION_THRESHOLD_BUTTON_CHANGE_MM,
             button_change_state_timeout: BUTTON_CHANGE_STATE_TIMEOUT,
             last_event: TouchpadEvent {
-                timestamp: zx::Time::ZERO,
+                timestamp: zx::MonotonicTime::ZERO,
                 pressed_buttons: vec![1],
                 contacts: vec![make_touch_contact(1, Position { x: 0.0, y: 0.0 })],
                 filtered_palm_contacts: vec![],
@@ -938,7 +938,7 @@ mod tests {
                 SPURIOUS_TO_INTENTIONAL_MOTION_THRESHOLD_BUTTON_CHANGE_MM,
             button_change_state_timeout: BUTTON_CHANGE_STATE_TIMEOUT,
             last_event: TouchpadEvent {
-                timestamp: zx::Time::ZERO,
+                timestamp: zx::MonotonicTime::ZERO,
                 pressed_buttons: vec![1],
                 contacts: vec![make_touch_contact(1, Position { x: 0.0, y: 0.0 })],
                 filtered_palm_contacts: vec![],
@@ -946,7 +946,7 @@ mod tests {
         });
 
         let event = TouchpadEvent {
-            timestamp: zx::Time::from_nanos(41),
+            timestamp: zx::MonotonicTime::from_nanos(41),
             pressed_buttons: vec![1],
             contacts: vec![make_touch_contact(1, Position { x: 19.0, y: 1.0 })],
             filtered_palm_contacts: vec![],
@@ -976,7 +976,7 @@ mod tests {
                 SPURIOUS_TO_INTENTIONAL_MOTION_THRESHOLD_BUTTON_CHANGE_MM,
             button_change_state_timeout: BUTTON_CHANGE_STATE_TIMEOUT,
             last_event: TouchpadEvent {
-                timestamp: zx::Time::ZERO,
+                timestamp: zx::MonotonicTime::ZERO,
                 pressed_buttons: vec![1],
                 contacts: vec![make_touch_contact(1, Position { x: 0.0, y: 0.0 })],
                 filtered_palm_contacts: vec![],
@@ -984,7 +984,7 @@ mod tests {
         });
 
         let event = TouchpadEvent {
-            timestamp: zx::Time::from_nanos(41),
+            timestamp: zx::MonotonicTime::from_nanos(41),
             pressed_buttons: vec![1],
             contacts: vec![
                 make_touch_contact(1, Position { x: 0.0, y: 0.0 }),
@@ -1011,7 +1011,7 @@ mod tests {
         });
 
         let event = TouchpadEvent {
-            timestamp: zx::Time::from_nanos(41),
+            timestamp: zx::MonotonicTime::from_nanos(41),
             pressed_buttons: vec![1],
             contacts: vec![
                 make_touch_contact(1, Position { x: 0.0, y: 0.0 }),
@@ -1044,7 +1044,7 @@ mod tests {
                 SPURIOUS_TO_INTENTIONAL_MOTION_THRESHOLD_BUTTON_CHANGE_MM,
             button_change_state_timeout: BUTTON_CHANGE_STATE_TIMEOUT,
             button_up_event: TouchpadEvent {
-                timestamp: zx::Time::ZERO,
+                timestamp: zx::MonotonicTime::ZERO,
                 pressed_buttons: vec![],
                 contacts: vec![make_touch_contact(1, Position { x: 0.0, y: 0.0 })],
                 filtered_palm_contacts: vec![],
@@ -1052,7 +1052,7 @@ mod tests {
         });
 
         let event = TouchpadEvent {
-            timestamp: zx::Time::from_nanos(41),
+            timestamp: zx::MonotonicTime::from_nanos(41),
             pressed_buttons: vec![],
             contacts: vec![make_touch_contact(1, Position { x: 10.0, y: 1.0 })],
             filtered_palm_contacts: vec![],
@@ -1065,7 +1065,7 @@ mod tests {
     }
 
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO + zx::Duration::from_millis(1_001),
+        timestamp: zx::MonotonicTime::ZERO + zx::Duration::from_millis(1_001),
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 0.0, y: 0.0}),
@@ -1073,7 +1073,7 @@ mod tests {
         filtered_palm_contacts: vec![],
     };"timeout")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::from_nanos(41),
+        timestamp: zx::MonotonicTime::from_nanos(41),
         pressed_buttons: vec![1],
         contacts: vec![
             make_touch_contact(1, Position{x: 0.0, y: 0.0}),
@@ -1081,7 +1081,7 @@ mod tests {
         filtered_palm_contacts: vec![],
     };"button down")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::from_nanos(41),
+        timestamp: zx::MonotonicTime::from_nanos(41),
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 21.0, y: 0.0}),
@@ -1089,7 +1089,7 @@ mod tests {
         filtered_palm_contacts: vec![],
     };"move more than threshold")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::from_nanos(41),
+        timestamp: zx::MonotonicTime::from_nanos(41),
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 0.0, y: 0.0}),
@@ -1098,7 +1098,7 @@ mod tests {
         filtered_palm_contacts: vec![],
     };"more contacts")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::from_nanos(41),
+        timestamp: zx::MonotonicTime::from_nanos(41),
         pressed_buttons: vec![],
         contacts: vec![],
         filtered_palm_contacts: vec![],
@@ -1110,7 +1110,7 @@ mod tests {
                 SPURIOUS_TO_INTENTIONAL_MOTION_THRESHOLD_BUTTON_CHANGE_MM,
             button_change_state_timeout: BUTTON_CHANGE_STATE_TIMEOUT,
             button_up_event: TouchpadEvent {
-                timestamp: zx::Time::ZERO,
+                timestamp: zx::MonotonicTime::ZERO,
                 pressed_buttons: vec![],
                 contacts: vec![make_touch_contact(1, Position { x: 0.0, y: 0.0 })],
                 filtered_palm_contacts: vec![],

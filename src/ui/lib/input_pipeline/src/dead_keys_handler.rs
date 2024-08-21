@@ -84,7 +84,7 @@ fn remove_combination(c: u32) -> u32 {
 struct StoredEvent {
     event: KeyboardEvent,
     device_descriptor: InputDeviceDescriptor,
-    event_time: zx::Time,
+    event_time: zx::MonotonicTime,
 }
 
 impl fmt::Display for StoredEvent {
@@ -785,7 +785,7 @@ mod tests {
             key,
             event_type,
             /*modifiers=*/ None,
-            /*event_time*/ zx::Time::ZERO,
+            /*event_time*/ zx::MonotonicTime::ZERO,
             &InputDeviceDescriptor::Fake,
             /*keymap=*/ None,
             key_meaning,
@@ -1292,7 +1292,7 @@ mod tests {
             new_event(Key::A, KeyEventType::Pressed, Some(KeyMeaning::Codepoint('A' as u32))),
             UnhandledInputEvent::try_from(testing_utilities::create_consumer_controls_event(
                 vec![ConsumerControlButton::VolumeUp],
-                zx::Time::ZERO,
+                zx::MonotonicTime::ZERO,
                 &testing_utilities::consumer_controls_device_descriptor(),
             ))
             .unwrap(),

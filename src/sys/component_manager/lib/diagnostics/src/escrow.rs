@@ -31,7 +31,7 @@ const STARTED_DURATIONS_HISTOGRAM_PARAMS: inspect::ExponentialHistogramParams<i6
 const STOPPED_DURATIONS_HISTOGRAM_PARAMS: inspect::LinearHistogramParams<i64> =
     inspect::LinearHistogramParams { floor: 10, step_size: 10, buckets: 24 };
 
-type StopTime = zx::Time;
+type StopTime = zx::MonotonicTime;
 
 /// [`DurationStats`] tracks:
 ///
@@ -97,7 +97,7 @@ impl DurationStats {
         )]
     }
 
-    fn on_component_started(self: &Arc<Self>, moniker: &Moniker, start_time: zx::Time) {
+    fn on_component_started(self: &Arc<Self>, moniker: &Moniker, start_time: zx::MonotonicTime) {
         if let Some(stop_time) = self.escrowing_components.lock().get(moniker) {
             let duration = start_time - *stop_time;
             self.stopped_durations.record(moniker, duration.into_seconds());
@@ -107,7 +107,7 @@ impl DurationStats {
     fn on_component_stopped(
         self: &Arc<Self>,
         moniker: &Moniker,
-        stop_time: zx::Time,
+        stop_time: zx::MonotonicTime,
         execution_duration: zx::Duration,
         requested_escrow: bool,
     ) {

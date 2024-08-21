@@ -240,15 +240,15 @@ mod zircon {
     use super::*;
     use fuchsia_zircon as zx;
 
-    impl From<zx::Time> for Timestamp {
-        fn from(t: zx::Time) -> Timestamp {
+    impl From<zx::MonotonicTime> for Timestamp {
+        fn from(t: zx::MonotonicTime) -> Timestamp {
             Timestamp(t.into_nanos())
         }
     }
 
-    impl Into<zx::Time> for Timestamp {
-        fn into(self) -> zx::Time {
-            zx::Time::from_nanos(self.0)
+    impl Into<zx::MonotonicTime> for Timestamp {
+        fn into(self) -> zx::MonotonicTime {
+            zx::MonotonicTime::from_nanos(self.0)
         }
     }
 }

@@ -89,7 +89,7 @@ impl ClientConfig {
     /// Converts a given BssDescription into a ScanResult.
     pub fn create_scan_result(
         &self,
-        timestamp: zx::Time,
+        timestamp: zx::MonotonicTime,
         bss_description: BssDescription,
         device_info: &fidl_mlme::DeviceInfo,
         security_support: &fidl_common::SecuritySupport,
@@ -653,7 +653,7 @@ pub struct ServingApInfo {
     pub ssid: Ssid,
     pub rssi_dbm: i8,
     pub snr_db: i8,
-    pub signal_report_time: zx::Time,
+    pub signal_report_time: zx::MonotonicTime,
     pub channel: wlan_common::channel::Channel,
     pub protection: BssProtection,
     pub ht_cap: Option<fidl_ieee80211::HtCapabilities>,
@@ -932,7 +932,7 @@ impl super::Station for ClientSme {
                                     .map(|bss_description| {
                                         self.cfg.create_scan_result(
                                             // TODO(https://fxbug.dev/42164608): ScanEnd drops the timestamp from MLME
-                                            zx::Time::from_nanos(0),
+                                            zx::MonotonicTime::from_nanos(0),
                                             bss_description,
                                             &self.context.device_info,
                                             &self.context.security_support,
@@ -1220,7 +1220,7 @@ mod tests {
                 .set(IeType::VHT_CAPABILITIES, fake_vht_cap_bytes().to_vec()),
         );
         let device_info = test_utils::fake_device_info([1u8; 6].into());
-        let timestamp = zx::Time::get_monotonic();
+        let timestamp = zx::MonotonicTime::get_monotonic();
         let scan_result = cfg.create_scan_result(
             timestamp,
             bss_description.clone(),
@@ -1250,7 +1250,7 @@ mod tests {
                 .set(IeType::HT_CAPABILITIES, fake_ht_cap_bytes().to_vec())
                 .set(IeType::VHT_CAPABILITIES, fake_vht_cap_bytes().to_vec()),
         );
-        let timestamp = zx::Time::get_monotonic();
+        let timestamp = zx::MonotonicTime::get_monotonic();
         let scan_result = cfg.create_scan_result(
             timestamp,
             bss_description.clone(),
@@ -1277,7 +1277,7 @@ mod tests {
                 .set(IeType::HT_CAPABILITIES, fake_ht_cap_bytes().to_vec())
                 .set(IeType::VHT_CAPABILITIES, fake_vht_cap_bytes().to_vec()),
         );
-        let timestamp = zx::Time::get_monotonic();
+        let timestamp = zx::MonotonicTime::get_monotonic();
         let scan_result = cfg.create_scan_result(
             timestamp,
             bss_description.clone(),
@@ -1297,7 +1297,7 @@ mod tests {
                 .set(IeType::HT_CAPABILITIES, fake_ht_cap_bytes().to_vec())
                 .set(IeType::VHT_CAPABILITIES, fake_vht_cap_bytes().to_vec()),
         );
-        let timestamp = zx::Time::get_monotonic();
+        let timestamp = zx::MonotonicTime::get_monotonic();
         let scan_result = cfg.create_scan_result(
             timestamp,
             bss_description.clone(),
@@ -1741,7 +1741,11 @@ mod tests {
                 ))),
             },
         ));
-        report_fake_scan_result(&mut sme, zx::Time::get_monotonic().into_nanos(), bss_description);
+        report_fake_scan_result(
+            &mut sme,
+            zx::MonotonicTime::get_monotonic().into_nanos(),
+            bss_description,
+        );
 
         assert_variant!(
             connect_txn_stream.try_next(),
@@ -1785,7 +1789,7 @@ mod tests {
         // that connection attempt will be canceled even in the middle of joining the network
         report_fake_scan_result(
             &mut sme,
-            zx::Time::get_monotonic().into_nanos(),
+            zx::MonotonicTime::get_monotonic().into_nanos(),
             fake_fidl_bss_description!(Open, ssid: Ssid::try_from("foo").unwrap()),
         );
 
@@ -1836,7 +1840,7 @@ mod tests {
         sme.on_mlme_event(fidl_mlme::MlmeEvent::OnScanResult {
             result: fidl_mlme::ScanResult {
                 txn_id: 1,
-                timestamp_nanos: zx::Time::get_monotonic().into_nanos(),
+                timestamp_nanos: zx::MonotonicTime::get_monotonic().into_nanos(),
                 bss,
             },
         });
@@ -1845,7 +1849,7 @@ mod tests {
         sme.on_mlme_event(fidl_mlme::MlmeEvent::OnScanResult {
             result: fidl_mlme::ScanResult {
                 txn_id: 1,
-                timestamp_nanos: zx::Time::get_monotonic().into_nanos(),
+                timestamp_nanos: zx::MonotonicTime::get_monotonic().into_nanos(),
                 bss,
             },
         });

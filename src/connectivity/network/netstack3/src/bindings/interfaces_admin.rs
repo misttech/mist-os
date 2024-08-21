@@ -1152,7 +1152,7 @@ fn add_address(
     if params.temporary.unwrap_or(false) {
         todo!("https://fxbug.dev/42056881: support adding temporary addresses");
     }
-    const INFINITE_NANOS: i64 = zx::Time::INFINITE.into_nanos();
+    const INFINITE_NANOS: i64 = zx::MonotonicTime::INFINITE.into_nanos();
     let initial_properties =
         params.initial_properties.unwrap_or(fnet_interfaces_admin::AddressProperties::default());
     let valid_lifetime_end = initial_properties.valid_lifetime_end.unwrap_or(INFINITE_NANOS);

@@ -78,8 +78,8 @@ loop {
               .iter()
               .map(
                 |x| PresentationInfo{
-                  latch_point: zx::Time::from_nanos(x.latch_point.unwrap()),
-                  presentation_time: zx::Time::from_nanos(x.presentation_time.unwrap())
+                  latch_point: zx::MonotonicTime::from_nanos(x.latch_point.unwrap()),
+                  presentation_time: zx::MonotonicTime::from_nanos(x.presentation_time.unwrap())
                 })
               .collect();
               sched_lib.on_next_frame_begin(additional_present_credits, infos);
@@ -89,14 +89,14 @@ loop {
               .iter()
               .map(|info| PresentedInfo{
                 present_received_time:
-                  zx::Time::from_nanos(info.present_received_time.unwrap()),
+                  zx::MonotonicTime::from_nanos(info.present_received_time.unwrap()),
                 actual_latch_point:
-                  zx::Time::from_nanos(info.latched_time.unwrap()),
+                  zx::MonotonicTime::from_nanos(info.latched_time.unwrap()),
               })
               .collect();
 
               sched_lib.on_frame_presented(
-                zx::Time::from_nanos(frame_presented_info.actual_presentation_time),
+                zx::MonotonicTime::from_nanos(frame_presented_info.actual_presentation_time),
                 presented_infos);
             }
           }

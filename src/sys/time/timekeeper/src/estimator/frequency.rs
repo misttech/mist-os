@@ -48,9 +48,9 @@ impl Into<FrequencyDiscardReason> for GetFrequencyError {
 #[derive(Debug, PartialEq)]
 struct EstimationWindow {
     /// The UTC time of the first sample in the window.
-    initial_utc: zx::Time,
+    initial_utc: zx::SyntheticTime,
     /// The monotonic time of the first sample in the window.
-    initial_monotonic: zx::Time,
+    initial_monotonic: zx::MonotonicTime,
     /// The number of samples accepted into this window.
     sample_count: u32,
     /// The sum of (UTC - initial UTC), in nanoseconds, over all samples.
@@ -236,7 +236,7 @@ mod test {
     use test_util::assert_near;
     use zx::DurationNum;
 
-    const INITIAL_MONO: zx::Time = zx::Time::from_nanos(7_000_000_000);
+    const INITIAL_MONO: zx::MonotonicTime = zx::MonotonicTime::from_nanos(7_000_000_000);
     const STD_DEV: zx::Duration = zx::Duration::from_millis(88);
 
     // This time is nowhere near a leap second.
@@ -246,10 +246,10 @@ mod test {
 
     /// Creates a single sample with the supplied times and the standard standard deviation
     /// Initial UTC is specified as an RFC3339 string.
-    fn create_sample(utc_string: &str, monotonic: zx::Time) -> Sample {
+    fn create_sample(utc_string: &str, monotonic: zx::MonotonicTime) -> Sample {
         let chrono_utc = DateTime::parse_from_rfc3339(utc_string).expect("Invalid UTC string");
         Sample::new(
-            zx::Time::from_nanos(chrono_utc.timestamp_nanos_opt().unwrap()),
+            zx::SyntheticTime::from_nanos(chrono_utc.timestamp_nanos_opt().unwrap()),
             monotonic,
             STD_DEV,
         )

@@ -12,7 +12,7 @@
 //! clock.update(update).expect("update failed");
 //! ```
 
-use crate::Time;
+use crate::{MonotonicTime, SyntheticTime};
 use fuchsia_zircon_sys as sys;
 use std::fmt::Debug;
 
@@ -49,8 +49,8 @@ impl ErrorState for Null {}
 /// A `ClockUpdateBuilder` state indicating value should be set using a
 /// (reference time, synthetic time) tuple.
 pub struct AbsoluteValue {
-    reference_value: Time,
-    synthetic_value: Time,
+    reference_value: MonotonicTime,
+    synthetic_value: SyntheticTime,
 }
 
 impl State for AbsoluteValue {
@@ -70,7 +70,7 @@ impl State for AbsoluteValue {
 impl ValueState for AbsoluteValue {}
 
 /// A `ClockUpdateBuilder` state indicating value should be set using only a synthetic time.
-pub struct ApproximateValue(Time);
+pub struct ApproximateValue(SyntheticTime);
 
 impl State for ApproximateValue {
     #[inline]
@@ -156,8 +156,8 @@ impl<R: RateState, E: ErrorState> ClockUpdateBuilder<Null, R, E> {
     #[inline]
     pub fn absolute_value(
         self,
-        reference_value: Time,
-        synthetic_value: Time,
+        reference_value: MonotonicTime,
+        synthetic_value: SyntheticTime,
     ) -> ClockUpdateBuilder<AbsoluteValue, R, E> {
         ClockUpdateBuilder {
             value_state: AbsoluteValue { reference_value, synthetic_value },
@@ -178,7 +178,7 @@ impl<E: ErrorState> ClockUpdateBuilder<Null, Null, E> {
     #[inline]
     pub fn approximate_value(
         self,
-        synthetic_value: Time,
+        synthetic_value: SyntheticTime,
     ) -> ClockUpdateBuilder<ApproximateValue, Null, E> {
         ClockUpdateBuilder {
             value_state: ApproximateValue(synthetic_value),
@@ -316,7 +316,7 @@ mod tests {
     #[test]
     fn approximate_value() {
         let update = ClockUpdateBuilder::new()
-            .approximate_value(Time::from_nanos(42))
+            .approximate_value(SyntheticTime::from_nanos(42))
             .error_bounds(62)
             .build();
         assert_eq!(
@@ -340,7 +340,7 @@ mod tests {
     #[test]
     fn absolute_value() {
         let update = ClockUpdateBuilder::new()
-            .absolute_value(Time::from_nanos(1000), Time::from_nanos(42))
+            .absolute_value(MonotonicTime::from_nanos(1000), SyntheticTime::from_nanos(42))
             .rate_adjust(52)
             .error_bounds(62)
             .build();

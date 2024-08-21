@@ -120,8 +120,8 @@ impl ComponentStartedInfo<FakeDiagnosticsContainer, FakeTask> for FakeRuntime {
         }
     }
 
-    fn start_time(&self) -> zx::Time {
-        zx::Time::from_nanos(self.start_time.now())
+    fn start_time(&self) -> zx::MonotonicTime {
+        zx::MonotonicTime::from_nanos(self.start_time.now())
     }
 }
 

@@ -497,15 +497,15 @@ generates a `TicTacToeSynchronousProxy` struct with the following methods:
 * `start_game(&self, mut a: i64) -> Result<(), fidl::Error>`: Proxy method
   for a fire and forget method: it takes the request parameters as arguments and
   returns an empty result.
-* `make_move(&self, mut row: u8, mut col: u8, __deadline: zx::Time) ->
+* `make_move(&self, mut row: u8, mut col: u8, __deadline: zx::MonotonicTime) ->
   Result<(bool, Option<Box<GameState>>), fidl::Error>`: Proxy method for a two
   way method. It takes the request parameters as arguments followed by a
   deadline parameter, which dictates how long the method call will wait for a
-  response (or `zx::Time::INFINITE` to block indefinitely). It returns a
+  response (or `zx::MonotonicTime::INFINITE` to block indefinitely). It returns a
   `Result` of the [response parameters](#request-response-event-parameters).
-* `wait_for_event(&self, deadline: zx::Time) ->
+* `wait_for_event(&self, deadline: zx::MonotonicTime) ->
   Result<TicTacToeEvent, fidl::Error>`: Blocks until an event is received or the
-  deadline expires (use `zx::Time::INFINITE` to block indefinitely). It returns
+  deadline expires (use `zx::MonotonicTime::INFINITE` to block indefinitely). It returns
   a `Result` of the [`TicTacToeEvent` enum](#protocols-events-client).
 
 An example of setting up a synchronous proxy is available in the

@@ -2,13 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use fuchsia_zircon::Time;
+use fuchsia_zircon::MonotonicTime;
 
 const TIMESTAMP_DIVIDEND: i64 = 1_000_000_000;
 
 #[cfg(not(test))]
-pub(crate) fn now() -> Time {
-    Time::get_monotonic()
+pub(crate) fn now() -> MonotonicTime {
+    MonotonicTime::get_monotonic()
 }
 
 #[cfg(not(test))]
@@ -31,13 +31,13 @@ pub(crate) mod mock {
     use super::*;
     use std::cell::RefCell;
 
-    thread_local!(static MOCK_TIME: RefCell<Time> = RefCell::new(Time::get_monotonic()));
+    thread_local!(static MOCK_TIME: RefCell<MonotonicTime> = RefCell::new(MonotonicTime::get_monotonic()));
 
-    pub(crate) fn now() -> Time {
+    pub(crate) fn now() -> MonotonicTime {
         MOCK_TIME.with(|time| *time.borrow())
     }
 
-    pub(crate) fn set(new_time: Time) {
+    pub(crate) fn set(new_time: MonotonicTime) {
         MOCK_TIME.with(|time| *time.borrow_mut() = new_time);
     }
 
@@ -55,19 +55,19 @@ mod tests {
 
     #[fuchsia::test]
     fn test_inspect_format() {
-        mock::set(Time::from_nanos(0));
+        mock::set(MonotonicTime::from_nanos(0));
         assert_eq!(String::from("0.000000000"), mock::inspect_format_now());
 
-        mock::set(Time::from_nanos(123));
+        mock::set(MonotonicTime::from_nanos(123));
         assert_eq!(String::from("0.000000123"), mock::inspect_format_now());
 
-        mock::set(Time::from_nanos(123_000_000_000));
+        mock::set(MonotonicTime::from_nanos(123_000_000_000));
         assert_eq!(String::from("123.000000000"), mock::inspect_format_now());
 
-        mock::set(Time::from_nanos(123_000_000_123));
+        mock::set(MonotonicTime::from_nanos(123_000_000_123));
         assert_eq!(String::from("123.000000123"), mock::inspect_format_now());
 
-        mock::set(Time::from_nanos(123_001_230_000));
+        mock::set(MonotonicTime::from_nanos(123_001_230_000));
         assert_eq!(String::from("123.001230000"), mock::inspect_format_now());
     }
 }

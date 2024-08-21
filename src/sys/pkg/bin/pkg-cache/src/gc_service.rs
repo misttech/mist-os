@@ -57,7 +57,7 @@ async fn gc(
 ) -> Result<(), SpaceErrorCode> {
     info!("performing gc");
 
-    event_pair.wait_handle(zx::Signals::USER_0, zx::Time::INFINITE_PAST).map_err(|e| {
+    event_pair.wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE_PAST).map_err(|e| {
         match e {
             zx::Status::TIMED_OUT => {
                 info!("GC is blocked pending update.");

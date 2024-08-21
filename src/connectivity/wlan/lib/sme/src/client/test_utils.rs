@@ -25,7 +25,7 @@ pub fn fake_serving_ap_info() -> ServingApInfo {
         ssid: Ssid::try_from("foo").unwrap(),
         rssi_dbm: 0,
         snr_db: 0,
-        signal_report_time: zx::Time::ZERO,
+        signal_report_time: zx::MonotonicTime::ZERO,
         channel: channel::Channel { primary: 1, cbw: channel::Cbw::Cbw20 },
         protection: Protection::Wpa2Personal,
         ht_cap: Some(fidl_ieee80211::HtCapabilities { bytes: fake_ht_cap_bytes() }),

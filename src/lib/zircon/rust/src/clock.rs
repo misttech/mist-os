@@ -4,7 +4,9 @@
 
 //! Type-safe bindings for Zircon clock objects.
 
-use crate::{ok, AsHandleRef, ClockUpdate, Handle, HandleBased, HandleRef, Time};
+use crate::{
+    ok, AsHandleRef, ClockUpdate, Handle, HandleBased, HandleRef, MonotonicTime, SyntheticTime,
+};
 use bitflags::bitflags;
 use fuchsia_zircon_status::Status;
 use fuchsia_zircon_sys as sys;
@@ -49,7 +51,7 @@ bitflags! {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ClockDetails {
     /// The minimum time the clock can ever be set to.
-    pub backstop: Time,
+    pub backstop: SyntheticTime,
 
     /// The current ticks to clock transformation.
     pub ticks_to_synthetic: ClockTransformation,
@@ -83,7 +85,7 @@ pub struct ClockDetails {
 impl From<sys::zx_clock_details_v1_t> for ClockDetails {
     fn from(details: sys::zx_clock_details_v1_t) -> Self {
         ClockDetails {
-            backstop: Time::from_nanos(details.backstop_time),
+            backstop: SyntheticTime::from_nanos(details.backstop_time),
             ticks_to_synthetic: details.ticks_to_synthetic.into(),
             mono_to_synthetic: details.mono_to_synthetic.into(),
             error_bounds: details.error_bound,
@@ -139,7 +141,7 @@ fn transform_clock(r: i64, r_offset: i64, c_offset: i64, r_rate: u32, c_rate: u3
 /// can be applied to convert a time from a reference time to a synthetic time. The inverse
 /// transformation can be applied to convert a synthetic time back to the reference time.
 impl ClockTransformation {
-    pub fn apply(&self, time: Time) -> Time {
+    pub fn apply(&self, time: MonotonicTime) -> SyntheticTime {
         let c = transform_clock(
             time.into_nanos(),
             self.reference_offset,
@@ -148,10 +150,10 @@ impl ClockTransformation {
             self.rate.synthetic_ticks,
         );
 
-        Time::from_nanos(c)
+        SyntheticTime::from_nanos(c)
     }
 
-    pub fn apply_inverse(&self, time: Time) -> Time {
+    pub fn apply_inverse(&self, time: SyntheticTime) -> MonotonicTime {
         let r = transform_clock(
             time.into_nanos(),
             self.synthetic_offset,
@@ -160,7 +162,7 @@ impl ClockTransformation {
             self.rate.reference_ticks,
         );
 
-        Time::from_nanos(r as i64)
+        MonotonicTime::from_nanos(r as i64)
     }
 }
 
@@ -168,7 +170,7 @@ impl Clock {
     /// Create a new clock object with the provided arguments. Wraps the [zx_clock_create] syscall.
     ///
     /// [zx_clock_create]: https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_create
-    pub fn create(opts: ClockOpts, backstop: Option<Time>) -> Result<Self, Status> {
+    pub fn create(opts: ClockOpts, backstop: Option<SyntheticTime>) -> Result<Self, Status> {
         let mut out = 0;
         let status = match backstop {
             Some(backstop) => {
@@ -192,11 +194,11 @@ impl Clock {
     /// `ZX_RIGHT_READ` and that the clock has had an initial time established.
     ///
     /// [zx_clock_read]: https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_read
-    pub fn read(&self) -> Result<Time, Status> {
+    pub fn read(&self) -> Result<SyntheticTime, Status> {
         let mut now = 0;
         let status = unsafe { sys::zx_clock_read(self.raw_handle(), &mut now) };
         ok(status)?;
-        Ok(Time::from_nanos(now))
+        Ok(SyntheticTime::from_nanos(now))
     }
 
     /// Get low level details of this clock's current status. Wraps the
@@ -247,7 +249,7 @@ mod tests {
         assert_matches!(Clock::create(ClockOpts::AUTO_START | ClockOpts::CONTINUOUS, None), Ok(_));
 
         // Now with backstop.
-        let backstop = Some(Time::from_nanos(5500));
+        let backstop = Some(SyntheticTime::from_nanos(5500));
         assert_matches!(Clock::create(ClockOpts::MONOTONIC, backstop), Ok(_));
         assert_matches!(Clock::create(ClockOpts::CONTINUOUS, backstop), Ok(_));
         assert_matches!(
@@ -271,13 +273,13 @@ mod tests {
         // No backstop.
         let clock = Clock::create(ClockOpts::MONOTONIC, None).expect("failed to create clock");
         let details = clock.get_details().expect("failed to get details");
-        assert_eq!(details.backstop, Time::from_nanos(0));
+        assert_eq!(details.backstop, SyntheticTime::from_nanos(0));
 
         // With backstop.
-        let clock = Clock::create(ClockOpts::MONOTONIC, Some(Time::from_nanos(5500)))
+        let clock = Clock::create(ClockOpts::MONOTONIC, Some(SyntheticTime::from_nanos(5500)))
             .expect("failed to create clock");
         let details = clock.get_details().expect("failed to get details");
-        assert_eq!(details.backstop, Time::from_nanos(5500));
+        assert_eq!(details.backstop, SyntheticTime::from_nanos(5500));
     }
 
     #[test]
@@ -292,7 +294,7 @@ mod tests {
         clock
             .update(
                 ClockUpdate::builder()
-                    .absolute_value(Time::from_nanos(999), Time::from_nanos(42))
+                    .absolute_value(MonotonicTime::from_nanos(999), SyntheticTime::from_nanos(42))
                     .rate_adjust(52)
                     .error_bounds(52),
             )
@@ -337,7 +339,7 @@ mod tests {
 
     #[test]
     fn clock_identity_transformation_roundtrip() {
-        let t_0 = Time::ZERO;
+        let t_0 = MonotonicTime::ZERO;
         // Identity clock transformation
         let xform = ClockTransformation {
             reference_offset: 0,
@@ -353,7 +355,7 @@ mod tests {
 
     #[test]
     fn clock_trivial_transformation() {
-        let t_0 = Time::ZERO;
+        let t_0 = MonotonicTime::ZERO;
         // Identity clock transformation
         let xform = ClockTransformation {
             reference_offset: 3,
@@ -372,7 +374,7 @@ mod tests {
 
     #[test]
     fn clock_transformation_roundtrip() {
-        let t_0 = Time::ZERO;
+        let t_0 = MonotonicTime::ZERO;
         // Arbitrary clock transformation
         let xform = ClockTransformation {
             reference_offset: 196980085208,
@@ -389,7 +391,7 @@ mod tests {
 
     #[test]
     fn clock_trailing_transformation_roundtrip() {
-        let t_0 = Time::ZERO;
+        let t_0 = MonotonicTime::ZERO;
         // Arbitrary clock transformation where the synthetic clock is trailing behind the
         // reference clock.
         let xform = ClockTransformation {
@@ -407,7 +409,7 @@ mod tests {
 
     #[test]
     fn clock_saturating_transformations() {
-        let t_0 = Time::from_nanos(i64::MAX);
+        let t_0 = MonotonicTime::from_nanos(i64::MAX);
         // Clock transformation which will positively overflow t_0
         let xform = ClockTransformation {
             reference_offset: 0,
@@ -419,7 +421,7 @@ mod tests {
         let time = xform.apply(t_0).into_nanos();
         assert_eq!(time, i64::MAX);
 
-        let t_0 = Time::from_nanos(i64::MIN);
+        let t_0 = MonotonicTime::from_nanos(i64::MIN);
         // Clock transformation which will negatively overflow t_0
         let xform = ClockTransformation {
             reference_offset: 1,

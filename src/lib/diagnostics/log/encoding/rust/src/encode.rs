@@ -131,7 +131,7 @@ where
 
     fn write_inner<F>(
         &mut self,
-        timestamp: zx::Time,
+        timestamp: zx::MonotonicTime,
         severity: fstream::RawSeverity,
         write_args: F,
     ) -> Result<(), EncodingError>
@@ -402,7 +402,7 @@ pub trait RecordEvent {
         writer: &mut Encoder<B>,
     ) -> Result<(), EncodingError>;
     /// Returns the timestamp associated to this record.
-    fn timestamp(&self) -> zx::Time;
+    fn timestamp(&self) -> zx::MonotonicTime;
 }
 
 /// Trait implemented by complete Records.
@@ -411,7 +411,7 @@ pub trait RecordFields {
     fn severity(&self) -> u8;
 
     /// Returns the timestamp associated to this record.
-    fn timestamp(&self) -> zx::Time;
+    fn timestamp(&self) -> zx::MonotonicTime;
 
     /// Consumes this type and writes all the arguments.
     fn write_arguments<B: MutableBuffer>(
@@ -425,7 +425,7 @@ pub struct TracingEvent<'a, S> {
     event: &'a Event<'a>,
     context: Option<Context<'a, S>>,
     metadata: StoredMetadata<'a>,
-    timestamp: zx::Time,
+    timestamp: zx::MonotonicTime,
 }
 
 // Just like Cow, but without requiring the inner type to be Clone.
@@ -463,14 +463,14 @@ impl<'a, S> TracingEvent<'a, S> {
                 event,
                 context,
                 metadata: StoredMetadata::Owned(metadata),
-                timestamp: zx::Time::get_monotonic(),
+                timestamp: zx::MonotonicTime::get_monotonic(),
             }
         } else {
             Self {
                 event,
                 context,
                 metadata: StoredMetadata::Borrowed(event.metadata()),
-                timestamp: zx::Time::get_monotonic(),
+                timestamp: zx::MonotonicTime::get_monotonic(),
             }
         }
     }
@@ -496,7 +496,7 @@ where
         self.metadata.target()
     }
 
-    fn timestamp(&self) -> zx::Time {
+    fn timestamp(&self) -> zx::MonotonicTime {
         self.timestamp
     }
 
@@ -528,7 +528,7 @@ pub struct TestRecord<'a> {
     /// Severity of the log
     pub severity: fstream::RawSeverity,
     /// Timestamp of the test record.
-    pub timestamp: zx::Time,
+    pub timestamp: zx::MonotonicTime,
     /// File that emitted the log.
     pub file: Option<&'a str>,
     /// Line in the file that emitted the log.
@@ -542,7 +542,7 @@ impl TestRecord<'_> {
     pub fn from<'a>(file: &'a str, line: u32, record: &'a fstream::Record) -> TestRecord<'a> {
         TestRecord {
             severity: record.severity,
-            timestamp: zx::Time::from_nanos(record.timestamp),
+            timestamp: zx::MonotonicTime::from_nanos(record.timestamp),
             file: Some(file),
             line: Some(line),
             record_arguments: record.arguments.iter().map(Argument::from).collect(),
@@ -567,7 +567,7 @@ impl RecordEvent for TestRecord<'_> {
         unimplemented!("Unused at the moment");
     }
 
-    fn timestamp(&self) -> zx::Time {
+    fn timestamp(&self) -> zx::MonotonicTime {
         self.timestamp
     }
 
@@ -597,8 +597,8 @@ impl RecordFields for fstream::Record {
         Ok(())
     }
 
-    fn timestamp(&self) -> zx::Time {
-        zx::Time::from_nanos(self.timestamp)
+    fn timestamp(&self) -> zx::MonotonicTime {
+        zx::MonotonicTime::from_nanos(self.timestamp)
     }
 }
 
@@ -958,7 +958,7 @@ mod tests {
             .write_event(WriteEventParams::<_, &str, _> {
                 event: TestRecord {
                     severity: Severity::Info.into_primitive(),
-                    timestamp: zx::Time::from_nanos(12345),
+                    timestamp: zx::MonotonicTime::from_nanos(12345),
                     file: None,
                     line: None,
                     record_arguments: vec![],
@@ -997,7 +997,7 @@ mod tests {
             .write_event(WriteEventParams::<_, &str, _> {
                 event: TestRecord {
                     severity: Severity::Error.into_primitive(),
-                    timestamp: zx::Time::from_nanos(12345),
+                    timestamp: zx::MonotonicTime::from_nanos(12345),
                     file: Some("foo.rs"),
                     line: Some(10),
                     record_arguments: vec![],
@@ -1044,7 +1044,7 @@ mod tests {
             .write_event(WriteEventParams::<_, &str, _> {
                 event: TestRecord {
                     severity: Severity::Warn.into_primitive(),
-                    timestamp: zx::Time::from_nanos(12345),
+                    timestamp: zx::MonotonicTime::from_nanos(12345),
                     file: None,
                     line: None,
                     record_arguments: vec![],
@@ -1119,7 +1119,7 @@ mod tests {
 
     #[test]
     fn build_record_from_tracing_event() {
-        let before_timestamp = zx::Time::get_monotonic().into_nanos();
+        let before_timestamp = zx::MonotonicTime::get_monotonic().into_nanos();
         let _s = tracing::subscriber::set_default(Registry::default().with(EncoderLayer));
         tracing::info!(
             is_a_str = "hahaha",
@@ -1189,7 +1189,7 @@ mod tests {
 
     #[test]
     fn spans_are_supported() {
-        let before_timestamp = zx::Time::get_monotonic().into_nanos();
+        let before_timestamp = zx::MonotonicTime::get_monotonic().into_nanos();
         let _s = tracing::subscriber::set_default(Registry::default().with(EncoderLayer));
         let span = info_span!("my span", tag = "span_tag", span_field = 42);
         span.in_scope(|| {

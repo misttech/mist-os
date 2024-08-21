@@ -311,8 +311,10 @@ impl BlockDevice for FvmVolume {
 
 impl Drop for FvmVolume {
     fn drop(&mut self) {
-        let status =
-            self.volume.destroy(zx::Time::INFINITE).expect("Failed to destroy the FVM volume");
+        let status = self
+            .volume
+            .destroy(zx::MonotonicTime::INFINITE)
+            .expect("Failed to destroy the FVM volume");
         zx::ok(status).expect("Failed to destroy the FVM volume");
     }
 }

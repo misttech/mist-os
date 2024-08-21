@@ -199,7 +199,7 @@ fn benchmark_{{ .Name }}_echo_call(b: &mut Bencher) {
             {{ .Value }}
         },
         |value| {
-            proxy.echo(value, zx::Time::after(zx::Duration::from_seconds(1))).unwrap();
+            proxy.echo(value, zx::MonotonicTime::after(zx::Duration::from_seconds(1))).unwrap();
         },
         BatchSize::SmallInput);
     }

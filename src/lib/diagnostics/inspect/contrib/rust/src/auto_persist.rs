@@ -104,7 +104,7 @@ fn log_at_most_once_per_min_factory(
 ) -> impl FnMut(String) {
     let mut last_logged = None;
     move |message| {
-        let now = zx::Time::from_nanos(time_source.now());
+        let now = zx::MonotonicTime::from_nanos(time_source.now());
         let should_log = match last_logged {
             Some(last_logged) => (now - last_logged) >= 1.minutes(),
             None => true,
@@ -220,7 +220,7 @@ mod tests {
 
     #[derive(Debug)]
     struct FakeTimeSource {
-        now: Arc<RefCell<zx::Time>>,
+        now: Arc<RefCell<zx::MonotonicTime>>,
     }
 
     impl TimeSource for FakeTimeSource {
@@ -232,7 +232,7 @@ mod tests {
     #[fuchsia::test]
     fn test_log_at_most_once_per_min_factory() {
         let log_count = Arc::new(RefCell::new(0));
-        let now = Arc::new(RefCell::new(zx::Time::from_nanos(0)));
+        let now = Arc::new(RefCell::new(zx::MonotonicTime::from_nanos(0)));
         let fake_time_source = FakeTimeSource { now: now.clone() };
         let mut log =
             log_at_most_once_per_min_factory(fake_time_source, |_| *log_count.borrow_mut() += 1);

@@ -539,9 +539,9 @@ mod tests {
     #[test]
     fn time_now_real_time() {
         let _executor = LocalExecutor::new();
-        let t1 = zx::Time::after(0.seconds());
+        let t1 = zx::MonotonicTime::after(0.seconds());
         let t2 = Time::now().into_zx();
-        let t3 = zx::Time::after(0.seconds());
+        let t3 = zx::MonotonicTime::after(0.seconds());
         assert!(t1 <= t2);
         assert!(t2 <= t3);
     }
@@ -549,11 +549,11 @@ mod tests {
     #[test]
     fn time_now_fake_time() {
         let executor = TestExecutor::new_with_fake_time();
-        let t1 = Time::from_zx(zx::Time::from_nanos(0));
+        let t1 = Time::from_zx(zx::MonotonicTime::from_nanos(0));
         executor.set_fake_time(t1);
         assert_eq!(Time::now(), t1);
 
-        let t2 = Time::from_zx(zx::Time::from_nanos(1000));
+        let t2 = Time::from_zx(zx::MonotonicTime::from_nanos(1000));
         executor.set_fake_time(t2);
         assert_eq!(Time::now(), t2);
     }

@@ -200,7 +200,8 @@ impl Session {
                     if !is_queue_empty {
                         signals |= zx::Signals::OBJECT_WRITABLE;
                     }
-                    let Ok(signals) = self.fifo.wait_handle(signals, zx::Time::INFINITE) else {
+                    let Ok(signals) = self.fifo.wait_handle(signals, zx::MonotonicTime::INFINITE)
+                    else {
                         return;
                     };
                     if signals.contains(zx::Signals::USER_0) {

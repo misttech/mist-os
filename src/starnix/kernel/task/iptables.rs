@@ -238,7 +238,7 @@ impl IpTables {
             Controller::new(
                 &control_proxy,
                 &ControllerId(NAMESPACE_ID_PREFIX.to_string()),
-                zx::Time::INFINITE,
+                zx::MonotonicTime::INFINITE,
             )
             .map_err(GetControllerError::ControllerCreation)?
         }))
@@ -482,7 +482,7 @@ impl IpTables {
             }
             Ok(controller) => {
                 for chunk in &changes.chunks(fnet_filter::MAX_BATCH_SIZE as usize) {
-                    match controller.push_changes(chunk.collect(), zx::Time::INFINITE) {
+                    match controller.push_changes(chunk.collect(), zx::MonotonicTime::INFINITE) {
                         Ok(()) => {}
                         Err(
                             e @ (PushChangesError::CallMethod(_)
@@ -505,7 +505,7 @@ impl IpTables {
                     }
                 }
 
-                match controller.commit_idempotent(zx::Time::INFINITE) {
+                match controller.commit_idempotent(zx::MonotonicTime::INFINITE) {
                     Ok(()) => {}
                     Err(e @ (CommitError::CallMethod(_) | CommitError::FidlConversion(_))) => {
                         log_warn!(

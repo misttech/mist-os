@@ -6,20 +6,20 @@ use fuchsia_sync::Mutex;
 use fuchsia_zircon as zx;
 
 pub(crate) trait Clock {
-    fn now(&self) -> zx::Time;
+    fn now(&self) -> zx::MonotonicTime;
 }
 
 pub(crate) struct Monotonic;
 
 impl Clock for Monotonic {
-    fn now(&self) -> zx::Time {
-        zx::Time::get_monotonic()
+    fn now(&self) -> zx::MonotonicTime {
+        zx::MonotonicTime::get_monotonic()
     }
 }
 
 pub(crate) struct RateLimiter<C> {
     delay: zx::Duration,
-    last_time: Mutex<Option<zx::Time>>,
+    last_time: Mutex<Option<zx::MonotonicTime>>,
     clock: C,
 }
 
@@ -83,8 +83,8 @@ mod tests {
     }
 
     impl Clock for FakeClock {
-        fn now(&self) -> zx::Time {
-            zx::Time::from_nanos(self.t.get())
+        fn now(&self) -> zx::MonotonicTime {
+            zx::MonotonicTime::from_nanos(self.t.get())
         }
     }
 

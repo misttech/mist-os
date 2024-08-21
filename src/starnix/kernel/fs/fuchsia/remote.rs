@@ -102,8 +102,10 @@ const SYNC_IOC_MERGE: u8 = 3;
 
 impl FileSystemOps for RemoteFs {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
-        let (status, info) =
-            self.root_proxy.query_filesystem(zx::Time::INFINITE).map_err(|_| errno!(EIO))?;
+        let (status, info) = self
+            .root_proxy
+            .query_filesystem(zx::MonotonicTime::INFINITE)
+            .map_err(|_| errno!(EIO))?;
         // Not all remote filesystems support `QueryFilesystem`, many return ZX_ERR_NOT_SUPPORTED.
         if status == 0 {
             if let Some(info) = info {
@@ -212,7 +214,7 @@ impl RemoteFs {
         // caches, so we can't use remote IDs if the remote filesystem is not guaranteed to provide
         // unique IDs, or if the remote filesystem spans multiple filesystems.
         let (status, info) =
-            root_proxy.query_filesystem(zx::Time::INFINITE).map_err(|_| errno!(EIO))?;
+            root_proxy.query_filesystem(zx::MonotonicTime::INFINITE).map_err(|_| errno!(EIO))?;
         // Be tolerant of errors here; many filesystems return `ZX_ERR_NOT_SUPPORTED`.
         let use_remote_ids = status == 0
             && info
@@ -367,11 +369,11 @@ pub fn update_info_from_attrs(info: &mut FsNodeInfo, attrs: &zxio_node_attribute
     }
     if attrs.has.modification_time {
         info.time_modify =
-            zx::Time::from_nanos(attrs.modification_time.try_into().unwrap_or(i64::MAX));
+            zx::SyntheticTime::from_nanos(attrs.modification_time.try_into().unwrap_or(i64::MAX));
     }
     if attrs.has.change_time {
         info.time_status_change =
-            zx::Time::from_nanos(attrs.change_time.try_into().unwrap_or(i64::MAX));
+            zx::SyntheticTime::from_nanos(attrs.change_time.try_into().unwrap_or(i64::MAX));
     }
 }
 
@@ -1788,7 +1790,8 @@ mod test {
             .add(&mut locked, &current_task, &pipe, &epoll_object, event)
             .expect("poll_file.add");
 
-        let fds = epoll_file.wait(&mut locked, &current_task, 1, zx::Time::ZERO).expect("wait");
+        let fds =
+            epoll_file.wait(&mut locked, &current_task, 1, zx::MonotonicTime::ZERO).expect("wait");
         assert!(fds.is_empty());
 
         assert_eq!(server_zxio.write(&[0]).expect("write"), 1);
@@ -1797,7 +1800,8 @@ mod test {
             pipe.query_events(&mut locked, &current_task),
             Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM | FdEvents::POLLIN | FdEvents::POLLRDNORM)
         );
-        let fds = epoll_file.wait(&mut locked, &current_task, 1, zx::Time::ZERO).expect("wait");
+        let fds =
+            epoll_file.wait(&mut locked, &current_task, 1, zx::MonotonicTime::ZERO).expect("wait");
         assert_eq!(fds.len(), 1);
 
         assert_eq!(
@@ -1809,7 +1813,8 @@ mod test {
             pipe.query_events(&mut locked, &current_task),
             Ok(FdEvents::POLLOUT | FdEvents::POLLWRNORM)
         );
-        let fds = epoll_file.wait(&mut locked, &current_task, 1, zx::Time::ZERO).expect("wait");
+        let fds =
+            epoll_file.wait(&mut locked, &current_task, 1, zx::MonotonicTime::ZERO).expect("wait");
         assert!(fds.is_empty());
     }
 
@@ -2830,7 +2835,7 @@ mod test {
                             locked,
                             &current_task,
                             &child.mount,
-                            TimeUpdateType::Time(zx::Time::from_nanos(30)),
+                            TimeUpdateType::Time(zx::SyntheticTime::from_nanos(30)),
                             TimeUpdateType::Omit,
                         )
                         .expect("update_atime_mtime failed");
@@ -2841,7 +2846,7 @@ mod test {
                         .expect("fetch_and_refresh_info failed")
                         .clone();
                     assert_eq!(info_after_update.time_modify, info_original.time_modify);
-                    assert_eq!(info_after_update.time_access, zx::Time::from_nanos(30));
+                    assert_eq!(info_after_update.time_access, zx::SyntheticTime::from_nanos(30));
 
                     child
                         .entry
@@ -2851,7 +2856,7 @@ mod test {
                             &current_task,
                             &child.mount,
                             TimeUpdateType::Omit,
-                            TimeUpdateType::Time(zx::Time::from_nanos(50)),
+                            TimeUpdateType::Time(zx::SyntheticTime::from_nanos(50)),
                         )
                         .expect("update_atime_mtime failed");
                     let info_after_update2 = child
@@ -2860,8 +2865,8 @@ mod test {
                         .fetch_and_refresh_info(&current_task)
                         .expect("fetch_and_refresh_info failed")
                         .clone();
-                    assert_eq!(info_after_update2.time_modify, zx::Time::from_nanos(50));
-                    assert_eq!(info_after_update2.time_access, zx::Time::from_nanos(30));
+                    assert_eq!(info_after_update2.time_modify, zx::SyntheticTime::from_nanos(50));
+                    assert_eq!(info_after_update2.time_access, zx::SyntheticTime::from_nanos(30));
                 }
             })
             .await

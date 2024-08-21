@@ -796,7 +796,7 @@ mod tests {
         let (_test_harness, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
 
         {
-            let timestamp = zx::Time::get_monotonic();
+            let timestamp = zx::MonotonicTime::get_monotonic();
             ActionsManager::register(
                 child.clone(),
                 StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
@@ -817,7 +817,7 @@ mod tests {
         }
 
         {
-            let timestamp = zx::Time::get_monotonic();
+            let timestamp = zx::MonotonicTime::get_monotonic();
             ActionsManager::register(
                 child.clone(),
                 StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),
@@ -835,7 +835,7 @@ mod tests {
         let (mut test_harness, child) = build_tree_with_single_child(TEST_CHILD_NAME).await;
 
         {
-            let timestamp = zx::Time::get_monotonic();
+            let timestamp = zx::MonotonicTime::get_monotonic();
             ActionsManager::register(
                 child.clone(),
                 StartAction::new(StartReason::Debug, None, IncomingCapabilities::default()),

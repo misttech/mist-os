@@ -46,7 +46,10 @@ struct Diagnostics {
 impl Diagnostics {
     pub fn record_session_start(&mut self) {
         self.session_started_at.add_entry(|node| {
-            node.record_int(DIAGNOSTICS_TIME_PROPERTY_NAME, zx::Time::get_monotonic().into_nanos());
+            node.record_int(
+                DIAGNOSTICS_TIME_PROPERTY_NAME,
+                zx::MonotonicTime::get_monotonic().into_nanos(),
+            );
         });
     }
 }

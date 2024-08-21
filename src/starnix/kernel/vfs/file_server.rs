@@ -398,10 +398,10 @@ impl StarnixNodeConnection {
     fn update_attributes(&self, attributes: fio::MutableNodeAttributes) {
         self.file.node().update_info(|info| {
             if let Some(time) = attributes.creation_time {
-                info.time_status_change = zx::Time::from_nanos(time as i64);
+                info.time_status_change = zx::SyntheticTime::from_nanos(time as i64);
             }
             if let Some(time) = attributes.modification_time {
-                info.time_modify = zx::Time::from_nanos(time as i64);
+                info.time_modify = zx::SyntheticTime::from_nanos(time as i64);
             }
             if let Some(mode) = attributes.mode {
                 info.mode = FileMode::from_bits(mode);

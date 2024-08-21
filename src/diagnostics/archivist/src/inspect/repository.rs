@@ -198,9 +198,9 @@ impl InspectRepository {
                 return;
             }
 
-            fasync::Timer::new(fuchsia_zircon::Time::after(fuchsia_zircon::Duration::from_millis(
-                100,
-            )))
+            fasync::Timer::new(fuchsia_zircon::MonotonicTime::after(
+                fuchsia_zircon::Duration::from_millis(100),
+            ))
             .await;
         }
     }
@@ -212,9 +212,9 @@ impl InspectRepository {
                 return;
             }
 
-            fasync::Timer::new(fuchsia_zircon::Time::after(fuchsia_zircon::Duration::from_millis(
-                100,
-            )))
+            fasync::Timer::new(fuchsia_zircon::MonotonicTime::after(
+                fuchsia_zircon::Duration::from_millis(100),
+            ))
             .await;
         }
     }

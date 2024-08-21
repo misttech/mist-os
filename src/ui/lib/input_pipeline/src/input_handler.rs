@@ -247,7 +247,7 @@ mod tests {
             .handle_input_event(InputEvent {
                 device_event: InputDeviceEvent::Fake,
                 device_descriptor: InputDeviceDescriptor::Fake,
-                event_time: zx::Time::from_nanos(1),
+                event_time: zx::MonotonicTime::from_nanos(1),
                 handled: Handled::No,
                 trace_id: expected_trace_id,
             })
@@ -257,7 +257,7 @@ mod tests {
             Some(UnhandledInputEvent {
                 device_event: InputDeviceEvent::Fake,
                 device_descriptor: InputDeviceDescriptor::Fake,
-                event_time: zx::Time::from_nanos(1),
+                event_time: zx::MonotonicTime::from_nanos(1),
                 trace_id: expected_trace_id,
             })
         )
@@ -273,7 +273,7 @@ mod tests {
         let input_event = InputEvent {
             device_event: InputDeviceEvent::Fake,
             device_descriptor: InputDeviceDescriptor::Fake,
-            event_time: zx::Time::from_nanos(1),
+            event_time: zx::MonotonicTime::from_nanos(1),
             handled: Handled::No,
             trace_id: None,
         };
@@ -296,7 +296,7 @@ mod tests {
             .handle_input_event(InputEvent {
                 device_event: InputDeviceEvent::Fake,
                 device_descriptor: InputDeviceDescriptor::Fake,
-                event_time: zx::Time::from_nanos(1),
+                event_time: zx::MonotonicTime::from_nanos(1),
                 handled: Handled::Yes,
                 trace_id: None,
             })
@@ -322,7 +322,7 @@ mod tests {
                 .handle_input_event(InputEvent {
                     device_event: InputDeviceEvent::Fake,
                     device_descriptor: InputDeviceDescriptor::Fake,
-                    event_time: zx::Time::from_nanos(1),
+                    event_time: zx::MonotonicTime::from_nanos(1),
                     handled: Handled::Yes,
                     trace_id: None,
                 })
@@ -331,7 +331,7 @@ mod tests {
             [InputEvent {
                 device_event: InputDeviceEvent::Fake,
                 device_descriptor: InputDeviceDescriptor::Fake,
-                event_time: zx::Time::from_nanos(1),
+                event_time: zx::MonotonicTime::from_nanos(1),
                 handled: Handled::Yes,
                 trace_id: None,
             }]

@@ -289,7 +289,7 @@ async fn verify_describe_file(node: fio::NodeProxy, flag: fio::OpenFlags) -> Res
         // should be immediately readable here.
         if let Some(observer) = observer {
             let _: zx::Signals = observer
-                .wait_handle(zx::Signals::USER_0, zx::Time::INFINITE_PAST)
+                .wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE_PAST)
                 .context("FILE_SIGNAL_READABLE not set")?;
         }
         // TODO(https://fxbug.dev/327633753): Check for stream support.

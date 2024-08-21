@@ -57,7 +57,7 @@ pub struct VsyncEvent {
     pub id: DisplayId,
 
     /// The monotonic timestamp of the vsync event.
-    pub timestamp: zx::Time,
+    pub timestamp: zx::MonotonicTime,
 
     /// The stamp of the latest fully applied display configuration.
     pub config: display_types::ConfigStamp,
@@ -197,7 +197,7 @@ impl Coordinator {
                 } => {
                     inner.write().handle_vsync(
                         display_id.into(),
-                        zx::Time::from_nanos(timestamp),
+                        zx::MonotonicTime::from_nanos(timestamp),
                         applied_config_stamp,
                         cookie,
                     )?;
@@ -356,7 +356,7 @@ impl CoordinatorInner {
     fn handle_vsync(
         &mut self,
         display_id: DisplayId,
-        timestamp: zx::Time,
+        timestamp: zx::MonotonicTime,
         applied_config_stamp: display_types::ConfigStamp,
         cookie: display::VsyncAckCookie,
     ) -> Result<()> {

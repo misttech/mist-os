@@ -31,7 +31,7 @@ impl NonceReader {
         // Fuchsia has no support for NTP yet; instead use a regular timestamp.
         // TODO(https://fxbug.dev/42124853): Use time in NTP format once Fuchsia added support.
         let mut buf = BytesMut::with_capacity(14);
-        let epoch_nanos = zx::Time::get_monotonic().into_nanos();
+        let epoch_nanos = zx::MonotonicTime::get_monotonic().into_nanos();
         buf.put_i64_le(epoch_nanos);
         buf.put_slice(sta_addr.as_slice());
         let k = OsRng.gen::<[u8; 32]>();

@@ -250,7 +250,7 @@ mod tests {
             .process
             .wait_handle(
                 zx::Signals::PROCESS_TERMINATED,
-                zx::Time::after(zx::Duration::from_seconds(60)),
+                zx::MonotonicTime::after(zx::Duration::from_seconds(60)),
             )
             .expect("shell process did not exit in time");
 
@@ -290,7 +290,7 @@ mod tests {
             .process
             .wait_handle(
                 zx::Signals::PROCESS_TERMINATED,
-                zx::Time::after(zx::Duration::from_seconds(60)),
+                zx::MonotonicTime::after(zx::Duration::from_seconds(60)),
             )
             .expect("shell process did not exit in time");
 

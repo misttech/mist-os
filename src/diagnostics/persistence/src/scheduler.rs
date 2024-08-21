@@ -29,7 +29,7 @@ struct State {
 struct TagState {
     backoff: zx::Duration,
     state: FetchState,
-    last_fetched: zx::Time,
+    last_fetched: zx::MonotonicTime,
 }
 
 impl Scheduler {
@@ -43,7 +43,7 @@ impl Scheduler {
                 let tag_state = TagState {
                     backoff,
                     state: FetchState::Idle,
-                    last_fetched: zx::Time::INFINITE_PAST,
+                    last_fetched: zx::MonotonicTime::INFINITE_PAST,
                 };
                 tag_states.insert(tag.clone(), tag_state);
             }
@@ -58,14 +58,14 @@ impl Scheduler {
     /// of the current time and the time the fetch becomes possible.
     pub(crate) fn schedule(&self, service: &ServiceName, tags: Vec<Tag>) {
         // Every tag we process should use the same Now
-        let now = zx::Time::get_monotonic();
+        let now = zx::MonotonicTime::get_monotonic();
         let mut state = self.state.lock();
         let Some(service_info) = state.services.get_mut(service) else {
             return;
         };
 
         let mut now_tags = vec![];
-        let mut later_tags: Vec<(zx::Time, Tag)> = vec![];
+        let mut later_tags: Vec<(zx::MonotonicTime, Tag)> = vec![];
         for tag in tags {
             let Some(tag_state) = service_info.get_mut(&tag) else {
                 return;
@@ -109,7 +109,7 @@ impl Scheduler {
         }
     }
 
-    fn enqueue(&self, state: &mut State, time: zx::Time, command: FetchCommand) {
+    fn enqueue(&self, state: &mut State, time: zx::MonotonicTime, command: FetchCommand) {
         let this = self.clone();
         let mut fetcher = state.fetcher.clone();
         state.tasks.spawn(async move {

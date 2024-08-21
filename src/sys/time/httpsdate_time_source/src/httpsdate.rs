@@ -231,9 +231,9 @@ where
         }
     }
 
-    async fn next_possible_sample_time(&self) -> zx::Time {
+    async fn next_possible_sample_time(&self) -> zx::MonotonicTime {
         // TODO(https://fxbug.dev/42065019): Implement rate limiting if required.
-        zx::Time::get_monotonic()
+        zx::MonotonicTime::get_monotonic()
     }
 }
 
@@ -325,15 +325,15 @@ mod test {
 
     lazy_static! {
         static ref TEST_SAMPLE_1: HttpsSample = HttpsSample {
-            utc: zx::Time::from_nanos(111_222_333_444_555),
-            monotonic: zx::Time::from_nanos(666_777_888_999_000),
+            utc: zx::MonotonicTime::from_nanos(111_222_333_444_555),
+            monotonic: zx::MonotonicTime::from_nanos(666_777_888_999_000),
             standard_deviation: zx::Duration::from_millis(101),
             final_bound_size: zx::Duration::from_millis(20),
             polls: vec![],
         };
         static ref TEST_SAMPLE_2: HttpsSample = HttpsSample {
-            utc: zx::Time::from_nanos(999_999_999_999_999),
-            monotonic: zx::Time::from_nanos(777_777_777_777_777),
+            utc: zx::MonotonicTime::from_nanos(999_999_999_999_999),
+            monotonic: zx::MonotonicTime::from_nanos(777_777_777_777_777),
             standard_deviation: zx::Duration::from_millis(102),
             final_bound_size: zx::Duration::from_millis(30),
             polls: vec![Poll { round_trip_time: zx::Duration::from_millis(23) }],

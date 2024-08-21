@@ -10,7 +10,7 @@ use std::task::Poll;
 use diagnostics_assertions::assert_data_tree;
 use fuchsia_async as fasync;
 use fuchsia_inspect::Inspector;
-use fuchsia_zircon::{Duration, DurationNum, Time};
+use fuchsia_zircon::{Duration, DurationNum, MonotonicTime};
 use futures::channel::mpsc::{UnboundedReceiver, UnboundedSender};
 use futures::channel::oneshot;
 use futures::lock::Mutex;
@@ -522,7 +522,7 @@ impl SettingHandlerFactory for ErrorFactory {
 #[fasync::run_until_stalled(test)]
 async fn inspect_catches_errors() {
     // Set the clock so that timestamps will always be 0.
-    clock::mock::set(Time::from_nanos(0));
+    clock::mock::set(MonotonicTime::from_nanos(0));
 
     const SETTING_TYPE: SettingType = SettingType::Unknown;
 
@@ -609,7 +609,7 @@ async fn test_active_listener_inspect() {
 #[fasync::run_until_stalled(test)]
 async fn inspect_errors_roll_after_limit() {
     // Set the clock so that timestamps will always be 0.
-    clock::mock::set(Time::from_nanos(0));
+    clock::mock::set(MonotonicTime::from_nanos(0));
     const SETTING_TYPE: SettingType = SettingType::Unknown;
 
     let delegate = service::MessageHub::create_hub();
@@ -631,7 +631,7 @@ async fn inspect_errors_roll_after_limit() {
     .expect("proxy creation should succeed");
 
     for i in 0..(MAX_NODE_ERRORS + 1) {
-        clock::mock::set(Time::from_nanos(i as i64 * 1000));
+        clock::mock::set(MonotonicTime::from_nanos(i as i64 * 1000));
         let mut receptor = service_client.message(
             HandlerPayload::Request(Request::Get).into(),
             Audience::Address(service::Address::Handler(SETTING_TYPE)),

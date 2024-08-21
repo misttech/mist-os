@@ -4,6 +4,10 @@
 
 //! Type-safe bindings for Zircon timer objects.
 
+// TODO(https://fxbug.dev/360952805) replace with aliases to generic types
+pub type MonotonicTime = Time;
+pub type SyntheticTime = Time;
+
 use crate::{ok, AsHandleRef, Handle, HandleBased, HandleRef, Status};
 use fuchsia_zircon_sys as sys;
 use std::{ops, time as stdtime};

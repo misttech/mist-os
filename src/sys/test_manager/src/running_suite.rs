@@ -289,8 +289,8 @@ impl RunningSuite {
             let mut invocations_iter = invocations.into_iter();
             let counter = AtomicU32::new(0);
             let timeout_time = match options.timeout {
-                Some(t) => zx::Time::after(zx::Duration::from_nanos(t)),
-                None => zx::Time::INFINITE,
+                Some(t) => zx::MonotonicTime::after(zx::Duration::from_nanos(t)),
+                None => zx::MonotonicTime::INFINITE,
             };
             let timeout_fut = fasync::Timer::new(timeout_time).shared();
 

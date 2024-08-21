@@ -6,7 +6,7 @@ use crate::bootfs::BootfsSvc;
 use anyhow::{anyhow, Context, Error};
 use fidl_fuchsia_time as ftime;
 use fuchsia_fs::{file, OpenFlags};
-use fuchsia_zircon::{Clock, ClockOpts, HandleBased, Rights, Time};
+use fuchsia_zircon::{Clock, ClockOpts, HandleBased, Rights, SyntheticTime};
 use futures::prelude::*;
 use std::sync::Arc;
 
@@ -36,7 +36,7 @@ impl UtcTimeMaintainer {
     }
 }
 
-async fn read_utc_backstop(path: &str, bootfs: &Option<BootfsSvc>) -> Result<Time, Error> {
+async fn read_utc_backstop(path: &str, bootfs: &Option<BootfsSvc>) -> Result<SyntheticTime, Error> {
     let file_contents: String;
     if bootfs.is_none() {
         let file_proxy = file::open_in_namespace(path, OpenFlags::RIGHT_READABLE)
@@ -60,7 +60,7 @@ async fn read_utc_backstop(path: &str, bootfs: &Option<BootfsSvc>) -> Result<Tim
     }
     let parsed_time =
         file_contents.trim().parse::<i64>().context("failed to parse backstop time")?;
-    Ok(Time::from_nanos(
+    Ok(SyntheticTime::from_nanos(
         parsed_time
             .checked_mul(1_000_000_000)
             .ok_or_else(|| anyhow!("backstop time is too large"))?,

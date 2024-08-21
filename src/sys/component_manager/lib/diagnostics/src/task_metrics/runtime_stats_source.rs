@@ -43,7 +43,7 @@ where
     async fn get_receiver(&self) -> Option<oneshot::Receiver<T>>;
 
     /// Returns the reported start time.
-    fn start_time(&self) -> zx::Time;
+    fn start_time(&self) -> zx::MonotonicTime;
 }
 
 #[async_trait]
@@ -101,7 +101,7 @@ impl ComponentStartedInfo<ComponentDiagnostics, DiagnosticsTask> for RuntimeInfo
         receiver_guard.take()
     }
 
-    fn start_time(&self) -> zx::Time {
+    fn start_time(&self) -> zx::MonotonicTime {
         self.start_time
     }
 }

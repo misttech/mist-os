@@ -5,7 +5,7 @@
 //! Type-safe bindings for Zircon port objects.
 
 use crate::{
-    guest, ok, AsHandleRef, GPAddr, Handle, HandleBased, HandleRef, Signals, Status, Time,
+    guest, ok, AsHandleRef, GPAddr, Handle, HandleBased, HandleRef, MonotonicTime, Signals, Status,
     VcpuContents,
 };
 use bitflags::bitflags;
@@ -447,7 +447,7 @@ impl Port {
     /// Wraps the
     /// [zx_port_wait](https://fuchsia.dev/fuchsia-src/reference/syscalls/port_wait.md)
     /// syscall.
-    pub fn wait(&self, deadline: Time) -> Result<Packet, Status> {
+    pub fn wait(&self, deadline: MonotonicTime) -> Result<Packet, Status> {
         let mut packet = Default::default();
         ok(unsafe { sys::zx_port_wait(self.raw_handle(), deadline.into_nanos(), &mut packet) })?;
         Ok(Packet(packet))
@@ -493,14 +493,14 @@ mod tests {
         let port = Port::create();
 
         // Waiting now should time out.
-        assert_eq!(port.wait(Time::after(ten_ms)), Err(Status::TIMED_OUT));
+        assert_eq!(port.wait(MonotonicTime::after(ten_ms)), Err(Status::TIMED_OUT));
 
         // Send a valid packet.
         let packet = Packet::from_user_packet(42, 123, UserPacket::from_u8_array([13; 32]));
         assert!(port.queue(&packet).is_ok());
 
         // Waiting should succeed this time. We should get back the packet we sent.
-        let read_packet = port.wait(Time::after(ten_ms)).unwrap();
+        let read_packet = port.wait(MonotonicTime::after(ten_ms)).unwrap();
         assert_eq!(read_packet, packet);
     }
 
@@ -518,11 +518,11 @@ mod tests {
             .is_ok());
 
         // Waiting without setting any signal should time out.
-        assert_eq!(port.wait(Time::after(ten_ms)), Err(Status::TIMED_OUT));
+        assert_eq!(port.wait(MonotonicTime::after(ten_ms)), Err(Status::TIMED_OUT));
 
         // If we set a signal, we should be able to wait for it.
         assert!(event.signal_handle(Signals::NONE, Signals::USER_0).is_ok());
-        let read_packet = port.wait(Time::after(ten_ms)).unwrap();
+        let read_packet = port.wait(MonotonicTime::after(ten_ms)).unwrap();
         assert_eq!(read_packet.key(), key);
         assert_eq!(read_packet.status(), 0);
         match read_packet.contents() {
@@ -535,11 +535,11 @@ mod tests {
         }
 
         // Shouldn't get any more packets.
-        assert_eq!(port.wait(Time::after(ten_ms)), Err(Status::TIMED_OUT));
+        assert_eq!(port.wait(MonotonicTime::after(ten_ms)), Err(Status::TIMED_OUT));
 
         // Calling wait_async again should result in another packet.
         assert!(event.wait_async_handle(&port, key, Signals::USER_0, no_opts).is_ok());
-        let read_packet = port.wait(Time::after(ten_ms)).unwrap();
+        let read_packet = port.wait(MonotonicTime::after(ten_ms)).unwrap();
         assert_eq!(read_packet.key(), key);
         assert_eq!(read_packet.status(), 0);
         match read_packet.contents() {
@@ -555,14 +555,14 @@ mod tests {
         // remove it from  the queue.
         assert!(event.wait_async_handle(&port, key, Signals::USER_0, no_opts).is_ok());
         assert!(port.cancel(&event, key).is_ok());
-        assert_eq!(port.wait(Time::after(ten_ms)), Err(Status::TIMED_OUT));
+        assert_eq!(port.wait(MonotonicTime::after(ten_ms)), Err(Status::TIMED_OUT));
 
         // If the event is signalled after the cancel, we also shouldn't get a packet.
         assert!(event.signal_handle(Signals::USER_0, Signals::NONE).is_ok()); // clear signal
         assert!(event.wait_async_handle(&port, key, Signals::USER_0, no_opts).is_ok());
         assert!(port.cancel(&event, key).is_ok());
         assert!(event.signal_handle(Signals::NONE, Signals::USER_0).is_ok());
-        assert_eq!(port.wait(Time::after(ten_ms)), Err(Status::TIMED_OUT));
+        assert_eq!(port.wait(MonotonicTime::after(ten_ms)), Err(Status::TIMED_OUT));
     }
 
     #[test]

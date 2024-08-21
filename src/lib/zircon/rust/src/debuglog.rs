@@ -100,8 +100,9 @@ mod tests {
         let (client_end, server_end) = Channel::create();
         connect_channel_to_protocol::<fkernel::DebuglogResourceMarker>(server_end).unwrap();
         let service = fkernel::DebuglogResourceSynchronousProxy::new(client_end);
-        let resource =
-            service.get(fuchsia_zircon::Time::INFINITE).expect("couldn't get debuglog resource");
+        let resource = service
+            .get(fuchsia_zircon::MonotonicTime::INFINITE)
+            .expect("couldn't get debuglog resource");
         // This test and fuchsia-zircon are different crates, so we need
         // to use from_raw to convert between the fuchsia_zircon handle and this test handle.
         // See https://fxbug.dev/42173139 for details.

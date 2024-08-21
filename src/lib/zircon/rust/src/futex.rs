@@ -7,7 +7,7 @@ use crate::sys::{
     zx_futex_wake, zx_futex_wake_handle_close_thread_exit, zx_futex_wake_single_owner,
     ZX_HANDLE_INVALID, ZX_KOID_INVALID, ZX_OK,
 };
-use crate::{AsHandleRef, Handle, Koid, Status, Thread, Time};
+use crate::{AsHandleRef, Handle, Koid, MonotonicTime, Status, Thread};
 
 /// A safe wrapper around zx_futex_t, generally called as part of higher-level synchronization
 /// primitives.
@@ -127,7 +127,7 @@ impl Futex {
         &self,
         current_value: i32,
         new_owner: Option<&Thread>,
-        deadline: Time,
+        deadline: MonotonicTime,
     ) -> Result<(), Status> {
         // SAFETY: Arguments for this system call do not have any liveness or validity requirements.
         Status::ok(unsafe {
@@ -169,7 +169,7 @@ mod tests {
             unsafe { Unowned::from_raw_handle(fuchsia_runtime::thread_self().raw_handle()) };
         let futex = Futex::new(0);
         std::thread::scope(|s| {
-            s.spawn(|| futex.wait(0, Some(&*main_thread), Time::INFINITE).unwrap());
+            s.spawn(|| futex.wait(0, Some(&*main_thread), MonotonicTime::INFINITE).unwrap());
             while futex.get_owner().is_none() {
                 std::thread::sleep(std::time::Duration::from_secs(1));
             }
@@ -180,13 +180,15 @@ mod tests {
     #[test]
     fn cant_wait_with_wrong_value() {
         let futex = Futex::new(0);
-        assert_eq!(futex.wait(5, None, Time::INFINITE).unwrap_err(), Status::BAD_STATE);
+        assert_eq!(futex.wait(5, None, MonotonicTime::INFINITE).unwrap_err(), Status::BAD_STATE);
     }
 
     #[test]
     fn wait_timed_out() {
         assert_eq!(
-            Futex::new(0).wait(0, None, Time::after(Duration::from_seconds(1))).unwrap_err(),
+            Futex::new(0)
+                .wait(0, None, MonotonicTime::after(Duration::from_seconds(1)))
+                .unwrap_err(),
             Status::TIMED_OUT,
         );
     }

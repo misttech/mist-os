@@ -63,7 +63,7 @@ impl LutexState {
         offset: u64,
         value: u32,
         mask: u32,
-        deadline: Option<zx::Time>,
+        deadline: Option<zx::MonotonicTime>,
     ) -> Result<(), fposix::Errno> {
         let koid = vmo.info().map_err(|_| panic!("Impossible Error"))?.koid;
         let key = LutexKey { koid, offset };
@@ -72,7 +72,7 @@ impl LutexState {
         Self::check_futex_value(&vmo, offset, value)?;
         let receiver = receiver.map_err(|_| fposix::Errno::Etimedout);
         if let Some(deadline) = deadline {
-            let timer = fasync::Timer::new(deadline - zx::Time::get_monotonic())
+            let timer = fasync::Timer::new(deadline - zx::MonotonicTime::get_monotonic())
                 .map(|_| Err(fposix::Errno::Etimedout));
             Self::select_first(timer, receiver).await
         } else {
@@ -119,7 +119,7 @@ async fn serve_lutex_controller(
                 let offset = payload.offset.ok_or_else(|| anyhow!("No offset"))?;
                 let value = payload.value.ok_or_else(|| anyhow!("No value"))?;
                 let mask = payload.mask.unwrap_or(u32::MAX);
-                let deadline = payload.deadline.map(zx::Time::from_nanos);
+                let deadline = payload.deadline.map(zx::MonotonicTime::from_nanos);
                 responder
                     .send(state.wait(vmo, offset, value, mask, deadline).await)
                     .context("Unable to send LutexControllerRequest::WaitBitset response")

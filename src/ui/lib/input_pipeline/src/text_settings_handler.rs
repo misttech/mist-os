@@ -200,7 +200,7 @@ mod tests {
         testing_utilities::create_input_event(
             keyboard_event,
             &input_device::InputDeviceDescriptor::Fake,
-            zx::Time::from_nanos(42),
+            zx::MonotonicTime::from_nanos(42),
             input_device::Handled::No,
         )
     }

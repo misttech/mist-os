@@ -9,7 +9,7 @@ use diagnostics_reader::{ArchiveReader, Inspect, RetryConfig};
 use fidl::endpoints::ServerEnd;
 use fuchsia_component::client;
 use fuchsia_component::server::ServiceFs;
-use fuchsia_zircon::{Duration, Status, Time};
+use fuchsia_zircon::{Duration, MonotonicTime, Status};
 use futures::channel::oneshot;
 use futures::future::{abortable, select, Either};
 use futures::{pin_mut, select, stream, FutureExt, StreamExt, TryStreamExt};
@@ -28,7 +28,7 @@ macro_rules! test_stdout {
     ($logger:ident, $format:literal) => {
         let formatted_with_time = format!(
             "[{:05.3}] {}\n",
-            (Time::get_monotonic().into_nanos() as f64 / NANOS_IN_SECONDS),
+            (MonotonicTime::get_monotonic().into_nanos() as f64 / NANOS_IN_SECONDS),
             $format
         );
         $logger.write(formatted_with_time.as_bytes()).ok()
@@ -37,7 +37,7 @@ macro_rules! test_stdout {
         let formatted = format!($format, $($content, )*);
         let formatted_with_time = format!(
             "[{:05.3}] {}\n",
-            (Time::get_monotonic().into_nanos() as f64 / NANOS_IN_SECONDS),
+            (MonotonicTime::get_monotonic().into_nanos() as f64 / NANOS_IN_SECONDS),
             formatted
         );
         $logger.write(formatted_with_time.as_bytes()).ok()
@@ -105,10 +105,11 @@ impl TestServer {
             }
         };
 
-        let end_time = Time::get_monotonic() + Duration::from_seconds(spec.timeout_seconds);
+        let end_time =
+            MonotonicTime::get_monotonic() + Duration::from_seconds(spec.timeout_seconds);
 
-        while end_time > Time::get_monotonic() {
-            let start_time = Time::get_monotonic();
+        while end_time > MonotonicTime::get_monotonic() {
+            let start_time = MonotonicTime::get_monotonic();
 
             let proxy = match client::connect_to_protocol_at_path::<
                 fdiagnostics::ArchiveAccessorMarker,
@@ -149,14 +150,14 @@ impl TestServer {
 
             let sleep_time = Duration::from_seconds(1);
 
-            if end_time - Time::get_monotonic() >= Duration::from_seconds(0) {
+            if end_time - MonotonicTime::get_monotonic() >= Duration::from_seconds(0) {
                 test_stdout!(
                     logs,
                     "Retrying after {}s, timeout after {}s",
                     sleep_time.into_seconds(),
-                    (end_time - Time::get_monotonic()).into_seconds()
+                    (end_time - MonotonicTime::get_monotonic()).into_seconds()
                 );
-                fasync::Timer::new(Time::after(sleep_time)).await;
+                fasync::Timer::new(MonotonicTime::after(sleep_time)).await;
             }
         }
 

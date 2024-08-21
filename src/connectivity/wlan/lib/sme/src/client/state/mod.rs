@@ -81,12 +81,12 @@ pub struct Associated {
     connect_txn_sink: ConnectTransactionSink,
     latest_ap_state: Box<BssDescription>,
     auth_method: Option<auth::MethodName>,
-    last_signal_report_time: zx::Time,
+    last_signal_report_time: zx::MonotonicTime,
     link_state: LinkState,
     protection_ie: Option<ProtectionIe>,
     // TODO(https://fxbug.dev/42163244): Remove `wmm_param` field when wlanstack telemetry is deprecated.
     wmm_param: Option<ie::WmmParam>,
-    last_channel_switch_time: Option<zx::Time>,
+    last_channel_switch_time: Option<zx::MonotonicTime>,
     reassociation_loop_count: u32,
     authentication: Authentication,
 }
@@ -1874,8 +1874,8 @@ fn send_deauthenticate_request(bssid: &Bssid, mlme_sink: &MlmeSink) {
     }));
 }
 
-fn now() -> zx::Time {
-    zx::Time::get_monotonic()
+fn now() -> zx::MonotonicTime {
+    zx::MonotonicTime::get_monotonic()
 }
 
 #[cfg(test)]
@@ -5082,7 +5082,7 @@ mod tests {
             latest_ap_state: cmd.bss,
             auth_method,
             connect_txn_sink: cmd.connect_txn_sink,
-            last_signal_report_time: zx::Time::ZERO,
+            last_signal_report_time: zx::MonotonicTime::ZERO,
             link_state,
             protection_ie: None,
             wmm_param: None,
@@ -5106,7 +5106,7 @@ mod tests {
             connect_txn_sink: cmd.connect_txn_sink,
             latest_ap_state: cmd.bss,
             auth_method,
-            last_signal_report_time: zx::Time::ZERO,
+            last_signal_report_time: zx::MonotonicTime::ZERO,
             link_state,
             protection_ie: None,
             wmm_param,

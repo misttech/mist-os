@@ -120,7 +120,7 @@ mod test {
 
     #[::fuchsia::test]
     fn test_itimerspec() {
-        let deadline = zx::Time::from_nanos(2 * NANOS_PER_SECOND + 50);
+        let deadline = zx::MonotonicTime::from_nanos(2 * NANOS_PER_SECOND + 50);
         let interval = zx::Duration::from_nanos(1000);
         let time_spec = itimerspec_from_deadline_interval(deadline, interval);
         assert_eq!(time_spec.it_value.tv_sec, 2);

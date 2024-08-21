@@ -11,7 +11,10 @@ mod tests {
     use maplit::hashset;
     use pretty_assertions::assert_eq;
 
-    fn touchpad_event(positions: Vec<Position>, time: zx::Time) -> input_device::InputEvent {
+    fn touchpad_event(
+        positions: Vec<Position>,
+        time: zx::MonotonicTime,
+    ) -> input_device::InputEvent {
         let injector_contacts: Vec<touch_binding::TouchContact> = positions
             .iter()
             .enumerate()
@@ -36,9 +39,12 @@ mod tests {
     async fn tap() {
         let inputs = vec![
             // contact.
-            touchpad_event(vec![Position { x: 2.0, y: 3.0 }], zx::Time::from_nanos(0)),
+            touchpad_event(vec![Position { x: 2.0, y: 3.0 }], zx::MonotonicTime::from_nanos(0)),
             // finger lift.
-            touchpad_event(vec![], zx::Time::from_nanos(args::TAP_TIMEOUT.into_nanos() / 2)),
+            touchpad_event(
+                vec![],
+                zx::MonotonicTime::from_nanos(args::TAP_TIMEOUT.into_nanos() / 2),
+            ),
         ];
         let got = utils::run_gesture_arena_test(inputs).await;
 
@@ -69,14 +75,17 @@ mod tests {
 
         let inputs = vec![
             // contact.
-            touchpad_event(vec![pos0_um], zx::Time::from_nanos(0)),
+            touchpad_event(vec![pos0_um], zx::MonotonicTime::from_nanos(0)),
             // move slightly.
             touchpad_event(
                 vec![pos2_um],
-                zx::Time::from_nanos(args::TAP_TIMEOUT.into_nanos() / 10),
+                zx::MonotonicTime::from_nanos(args::TAP_TIMEOUT.into_nanos() / 10),
             ),
             // finger lift.
-            touchpad_event(vec![], zx::Time::from_nanos(args::TAP_TIMEOUT.into_nanos() / 10 * 2)),
+            touchpad_event(
+                vec![],
+                zx::MonotonicTime::from_nanos(args::TAP_TIMEOUT.into_nanos() / 10 * 2),
+            ),
         ];
         let got = utils::run_gesture_arena_test(inputs).await;
 
@@ -102,9 +111,12 @@ mod tests {
     async fn tap_timeout() {
         let inputs = vec![
             // contact.
-            touchpad_event(vec![Position { x: 2.0, y: 3.0 }], zx::Time::from_nanos(0)),
+            touchpad_event(vec![Position { x: 2.0, y: 3.0 }], zx::MonotonicTime::from_nanos(0)),
             // finger lift after timeout.
-            touchpad_event(vec![], zx::Time::from_nanos(args::TAP_TIMEOUT.into_nanos() / 10 * 11)),
+            touchpad_event(
+                vec![],
+                zx::MonotonicTime::from_nanos(args::TAP_TIMEOUT.into_nanos() / 10 * 11),
+            ),
         ];
         let got = utils::run_gesture_arena_test(inputs).await;
 

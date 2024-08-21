@@ -269,7 +269,7 @@ impl From<ui_input3::NonPrintableKey> for KeyMeaningWrapper {
 
 /// Creates a `KeyEvent` with the given parameters.
 pub fn create_key_event(
-    timestamp: zx::Time,
+    timestamp: zx::MonotonicTime,
     event_type: ui_input3::KeyEventType,
     key: impl Into<Option<input::Key>>,
     modifiers: impl Into<Option<ui_input3::Modifiers>>,

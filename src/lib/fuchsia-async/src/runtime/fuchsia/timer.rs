@@ -34,7 +34,7 @@ impl WakeupTime for Time {
     }
 }
 
-impl WakeupTime for zx::Time {
+impl WakeupTime for zx::MonotonicTime {
     fn into_time(self) -> Time {
         self.into()
     }

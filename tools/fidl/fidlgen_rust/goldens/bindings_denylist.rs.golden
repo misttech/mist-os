@@ -169,7 +169,7 @@ impl AllowedSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::Time) -> Result<AllowedEvent, fidl::Error> {
+    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<AllowedEvent, fidl::Error> {
         AllowedEvent::decode(self.client.wait_for_event(deadline)?)
     }
 }
@@ -445,14 +445,14 @@ impl DenyEachBindingSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::Time) -> Result<DenyEachBindingEvent, fidl::Error> {
+    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<DenyEachBindingEvent, fidl::Error> {
         DenyEachBindingEvent::decode(self.client.wait_for_event(deadline)?)
     }
 
     pub fn r#only_deny_cpp(
         &self,
         mut a: bool,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<DenyEachBindingOnlyDenyCppResult, fidl::Error> {
         let _response = self.client.send_query::<
             DenyEachBindingOnlyDenyCppRequest,
@@ -469,7 +469,7 @@ impl DenyEachBindingSynchronousProxy {
     pub fn r#only_deny_dart(
         &self,
         mut a: bool,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<DenyEachBindingOnlyDenyDartResult, fidl::Error> {
         let _response = self.client.send_query::<
             DenyEachBindingOnlyDenyDartRequest,
@@ -486,7 +486,7 @@ impl DenyEachBindingSynchronousProxy {
     pub fn r#only_deny_go(
         &self,
         mut a: bool,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<DenyEachBindingOnlyDenyGoResult, fidl::Error> {
         let _response = self.client.send_query::<
             DenyEachBindingOnlyDenyGoRequest,
@@ -503,7 +503,7 @@ impl DenyEachBindingSynchronousProxy {
     pub fn r#only_deny_libfuzzer(
         &self,
         mut a: bool,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<DenyEachBindingOnlyDenyLibfuzzerResult, fidl::Error> {
         let _response = self.client.send_query::<
             DenyEachBindingOnlyDenyLibfuzzerRequest,
@@ -520,7 +520,7 @@ impl DenyEachBindingSynchronousProxy {
     pub fn r#only_deny_syzkaller(
         &self,
         mut a: bool,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<DenyEachBindingOnlyDenySyzkallerResult, fidl::Error> {
         let _response = self.client.send_query::<
             DenyEachBindingOnlyDenySyzkallerRequest,
@@ -1425,7 +1425,7 @@ impl ImportsSameNameContextSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::Time,
+        deadline: zx::MonotonicTime,
     ) -> Result<ImportsSameNameContextEvent, fidl::Error> {
         ImportsSameNameContextEvent::decode(self.client.wait_for_event(deadline)?)
     }

@@ -166,7 +166,7 @@ impl MainProtocolSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::Time) -> Result<MainProtocolEvent, fidl::Error> {
+    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<MainProtocolEvent, fidl::Error> {
         MainProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
 
@@ -181,7 +181,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_composed(
         &self,
         mut a: i32,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<i32, fidl::Error> {
         let _response = self.client.send_query::<
             fidl_test_protocolpayloads_imported::ImportStructPayload,
@@ -198,7 +198,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_composed_with_error(
         &self,
         mut a: i32,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<
         fidl_test_protocolpayloads_imported::ComposedProtocolTwoWayComposedWithErrorResult,
         fidl::Error,
@@ -227,7 +227,7 @@ impl MainProtocolSynchronousProxy {
         &self,
         mut a: u32,
         mut b: u32,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<(u32, u32), fidl::Error> {
         let _response = self.client.send_query::<LocalStructPayload, LocalStructPayload>(
             (a, b),
@@ -242,7 +242,7 @@ impl MainProtocolSynchronousProxy {
         &self,
         mut a: u32,
         mut b: u32,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<MainProtocolTwoWayLocalWithErrorResult, fidl::Error> {
         let _response = self
             .client
@@ -263,7 +263,7 @@ impl MainProtocolSynchronousProxy {
         )
     }
 
-    pub fn r#two_way_import(&self, mut a: i32, ___deadline: zx::Time) -> Result<i32, fidl::Error> {
+    pub fn r#two_way_import(&self, mut a: i32, ___deadline: zx::MonotonicTime) -> Result<i32, fidl::Error> {
         let _response = self.client.send_query::<
             fidl_test_protocolpayloads_imported::ImportStructPayload,
             fidl_test_protocolpayloads_imported::ImportStructPayload,
@@ -279,7 +279,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_import_with_error(
         &self,
         mut a: i32,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<MainProtocolTwoWayImportWithErrorResult, fidl::Error> {
         let _response = self.client.send_query::<
             fidl_test_protocolpayloads_imported::ImportStructPayload,
@@ -305,7 +305,7 @@ impl MainProtocolSynchronousProxy {
         &self,
         mut a: u32,
         mut b: u32,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<(u32, u32), fidl::Error> {
         let _response = self
             .client
@@ -322,7 +322,7 @@ impl MainProtocolSynchronousProxy {
         &self,
         mut a: u32,
         mut b: u32,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<MainProtocolTwoWayAnonWithErrorResult, fidl::Error> {
         let _response = self.client.send_query::<
             MainProtocolTwoWayAnonWithErrorRequest,

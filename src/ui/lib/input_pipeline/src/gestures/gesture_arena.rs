@@ -81,7 +81,7 @@ pub(super) const SECONDARY_BUTTON: mouse_binding::MouseButton = 2;
 // and variables in this file.
 #[derive(Debug, Clone, PartialEq)]
 pub(super) struct TouchpadEvent {
-    pub(super) timestamp: zx::Time,
+    pub(super) timestamp: zx::MonotonicTime,
     // TODO(https://fxbug.dev/42053615): replace these fields with a field that embeds
     // `touch_data: super::touch_binding::TouchpadEvent`.
     pub(super) pressed_buttons: Vec<u8>,
@@ -91,7 +91,7 @@ pub(super) struct TouchpadEvent {
 
 #[derive(Debug, PartialEq)]
 pub(super) struct MouseEvent {
-    pub(super) timestamp: zx::Time,
+    pub(super) timestamp: zx::MonotonicTime,
     pub(super) mouse_data: mouse_binding::MouseEvent,
 }
 
@@ -310,7 +310,7 @@ enum MutableState {
     Matching {
         contenders: Vec<Box<dyn Contender>>,
         matched_contenders: Vec<Box<dyn MatchedContender>>,
-        first_event_timestamp: zx::Time,
+        first_event_timestamp: zx::MonotonicTime,
         buffered_events: Vec<TouchpadEvent>,
     },
 
@@ -318,7 +318,7 @@ enum MutableState {
     Forwarding {
         winner: Box<dyn Winner>,
         current_gesture: RecognizedGesture,
-        gesture_start_timestamp: zx::Time,
+        gesture_start_timestamp: zx::MonotonicTime,
         num_events: usize,
     },
 
@@ -448,7 +448,7 @@ impl RecognizedGesture {
     }
 }
 
-fn log_common(inspect_node: &InspectNode, driver_timestamp: zx::Time) {
+fn log_common(inspect_node: &InspectNode, driver_timestamp: zx::MonotonicTime) {
     inspect_node.record_int("driver_monotonic_nanos", driver_timestamp.into_nanos());
     inspect_node.record_int(
         "entry_latency_micros",
@@ -470,7 +470,7 @@ impl MutableState {
 }
 
 fn parse_touchpad_event(
-    event_time: &zx::Time,
+    event_time: &zx::MonotonicTime,
     touchpad_event: &touch_binding::TouchpadEvent,
     touchpad_descriptor: &touch_binding::TouchpadDeviceDescriptor,
 ) -> Result<TouchpadEvent, Error> {
@@ -585,7 +585,7 @@ impl GestureArena {
     /// Interprets `TouchpadEvent`s, and sends corresponding `MouseEvent`s downstream.
     fn handle_touchpad_event(
         self: std::rc::Rc<Self>,
-        event_time: &zx::Time,
+        event_time: &zx::MonotonicTime,
         touchpad_event: &touch_binding::TouchpadEvent,
         device_descriptor: &touch_binding::TouchpadDeviceDescriptor,
     ) -> Result<Vec<input_device::InputEvent>, Error> {
@@ -713,7 +713,7 @@ impl GestureArena {
         &self,
         contenders: Vec<Box<dyn Contender>>,
         matched_contenders: Vec<Box<dyn MatchedContender>>,
-        first_event_timestamp: zx::Time,
+        first_event_timestamp: zx::MonotonicTime,
         buffered_events: Vec<TouchpadEvent>,
         new_event: TouchpadEvent,
     ) -> (MutableState, Vec<MouseEvent>) {
@@ -780,7 +780,7 @@ impl GestureArena {
         &self,
         buffered_events: Vec<TouchpadEvent>,
         new_event: TouchpadEvent,
-        first_event_timestamp: zx::Time,
+        first_event_timestamp: zx::MonotonicTime,
         contenders: Vec<Box<dyn Contender>>,
         matched_contenders: Vec<Box<dyn MatchedContender>>,
     ) -> (MutableState, Vec<MouseEvent>) {
@@ -877,7 +877,7 @@ impl GestureArena {
         &self,
         winner: Box<dyn Winner>,
         current_gesture: RecognizedGesture,
-        gesture_start_timestamp: zx::Time,
+        gesture_start_timestamp: zx::MonotonicTime,
         num_events: usize,
         new_event: TouchpadEvent,
     ) -> (MutableState, Vec<MouseEvent>) {
@@ -1168,7 +1168,7 @@ fn get_position_divisor_to_mm(
     Ok(first_divisor)
 }
 
-fn log_keyboard_event_timestamp(log_entry_node: &InspectNode, driver_timestamp: zx::Time) {
+fn log_keyboard_event_timestamp(log_entry_node: &InspectNode, driver_timestamp: zx::MonotonicTime) {
     log_entry_node.record_child("key_event", |key_event_node| {
         log_common(key_event_node, driver_timestamp);
     });
@@ -1297,7 +1297,7 @@ mod tests {
                     },
                 ),
                 device_descriptor: make_touchpad_descriptor(),
-                event_time: zx::Time::ZERO,
+                event_time: zx::MonotonicTime::ZERO,
                 trace_id: None,
                 handled: input_device::Handled::No,
             }
@@ -1319,7 +1319,7 @@ mod tests {
                     is_precision_scroll: None,
                 }),
                 device_descriptor: make_mouse_descriptor(),
-                event_time: zx::Time::ZERO,
+                event_time: zx::MonotonicTime::ZERO,
                 trace_id: None,
                 handled: input_device::Handled::No,
             }
@@ -1336,7 +1336,7 @@ mod tests {
                     ),
                 ),
                 device_descriptor: make_keyboard_descriptor(),
-                event_time: zx::Time::ZERO,
+                event_time: zx::MonotonicTime::ZERO,
                 trace_id: None,
                 handled: input_device::Handled::No,
             }
@@ -1955,7 +1955,7 @@ mod tests {
             let arena = make_gesture_arena_with_state(contender_factory, state);
             // Create the event which will be sent to the arena.
             let touchpad_event = input_device::InputEvent {
-                event_time: zx::Time::from_nanos(123456),
+                event_time: zx::MonotonicTime::from_nanos(123456),
                 device_event: input_device::InputDeviceEvent::Touchpad(
                     touch_binding::TouchpadEvent {
                         injector_contacts: vec![TOUCH_CONTACT_INDEX_FINGER],
@@ -1991,7 +1991,7 @@ mod tests {
                 } => pretty_assertions::assert_eq!(
                     buffered_events.as_slice(),
                     [TouchpadEvent {
-                        timestamp: zx::Time::from_nanos(123456),
+                        timestamp: zx::MonotonicTime::from_nanos(123456),
                         pressed_buttons: vec![0],
                         contacts: vec![
                             touch_binding::TouchContact {
@@ -2015,7 +2015,7 @@ mod tests {
             contender.set_next_result(ExamineEventResult::Mismatch(Reason::Basic("some reason")));
 
             let touchpad_event = input_device::InputEvent {
-                event_time: zx::Time::from_nanos(123456),
+                event_time: zx::MonotonicTime::from_nanos(123456),
                 device_event: input_device::InputDeviceEvent::Touchpad(
                     touch_binding::TouchpadEvent {
                         injector_contacts: vec![touch_binding::TouchContact {
@@ -2196,7 +2196,7 @@ mod tests {
                             .map(std::convert::From::<StubMatchedContender>::from)
                             .collect()
                     },
-                    first_event_timestamp: zx::Time::ZERO,
+                    first_event_timestamp: zx::MonotonicTime::ZERO,
                     buffered_events,
                 }),
                 inspect_log: RefCell::new(fuchsia_inspect_contrib::nodes::BoundedListNode::new(
@@ -2410,7 +2410,7 @@ mod tests {
             contender.set_next_result(ExamineEventResult::Mismatch(Reason::Basic("some reason")));
 
             let touchpad_event = input_device::InputEvent {
-                event_time: zx::Time::from_nanos(123456),
+                event_time: zx::MonotonicTime::from_nanos(123456),
                 device_event: input_device::InputDeviceEvent::Touchpad(
                     touch_binding::TouchpadEvent {
                         injector_contacts: vec![touch_binding::TouchContact {
@@ -2476,7 +2476,7 @@ mod tests {
                 ProcessBufferedEventsResult {
                     generated_events: vec![
                         MouseEvent {
-                            timestamp: zx::Time::from_nanos(123),
+                            timestamp: zx::MonotonicTime::from_nanos(123),
                             mouse_data: mouse_binding::MouseEvent {
                                 location: mouse_binding::MouseLocation::Relative(
                                     mouse_binding::RelativeLocation {
@@ -2492,7 +2492,7 @@ mod tests {
                             },
                         },
                         MouseEvent {
-                            timestamp: zx::Time::from_nanos(456),
+                            timestamp: zx::MonotonicTime::from_nanos(456),
                             mouse_data: mouse_binding::MouseEvent {
                                 location: mouse_binding::MouseLocation::Relative(
                                     mouse_binding::RelativeLocation {
@@ -2553,7 +2553,7 @@ mod tests {
                 vec![contender.clone()],
                 vec![matched_contender.clone()],
                 vec![TouchpadEvent {
-                    timestamp: zx::Time::from_nanos(123),
+                    timestamp: zx::MonotonicTime::from_nanos(123),
                     contacts: vec![],
                     pressed_buttons: vec![],
                     filtered_palm_contacts: vec![],
@@ -2570,7 +2570,7 @@ mod tests {
             arena
                 .clone()
                 .handle_input_event(input_device::InputEvent {
-                    event_time: zx::Time::from_nanos(456),
+                    event_time: zx::MonotonicTime::from_nanos(456),
                     device_event: input_device::InputDeviceEvent::Touchpad(
                         touch_binding::TouchpadEvent {
                             injector_contacts: vec![],
@@ -2597,7 +2597,7 @@ mod tests {
             );
             arena
                 .handle_input_event(input_device::InputEvent {
-                    event_time: zx::Time::from_nanos(789),
+                    event_time: zx::MonotonicTime::from_nanos(789),
                     device_event: input_device::InputDeviceEvent::Touchpad(
                         touch_binding::TouchpadEvent {
                             injector_contacts: vec![],
@@ -2758,7 +2758,7 @@ mod tests {
                     // Tests that care about `gesture_start_timestamp` should take care
                     // to set that value themselves. Default to a value that should cause
                     // any test that relies on a good value to fail.
-                    gesture_start_timestamp: zx::Time::INFINITE_PAST,
+                    gesture_start_timestamp: zx::MonotonicTime::INFINITE_PAST,
                     num_events: 0,
                 }),
                 inspect_log: RefCell::new(fuchsia_inspect_contrib::nodes::BoundedListNode::new(
@@ -2835,7 +2835,7 @@ mod tests {
             let arena = make_forwarding_arena(winner.clone(), None);
             winner.set_next_result(ProcessNewEventResult::ContinueGesture(
                 Some(MouseEvent {
-                    timestamp: zx::Time::from_nanos(123),
+                    timestamp: zx::MonotonicTime::from_nanos(123),
                     mouse_data: mouse_binding::MouseEvent {
                         location: mouse_binding::MouseLocation::Relative(
                             mouse_binding::RelativeLocation { millimeters: Position::zero() },
@@ -2859,7 +2859,7 @@ mod tests {
                         device_event: input_device::InputDeviceEvent::Mouse(_),
                         ..
                     },
-                ] => pretty_assertions::assert_eq!(*event_time, zx::Time::from_nanos(123))
+                ] => pretty_assertions::assert_eq!(*event_time, zx::MonotonicTime::from_nanos(123))
             );
         }
 
@@ -2902,7 +2902,7 @@ mod tests {
                 EndGestureEvent::UnconsumedEvent(TouchpadEvent {
                     contacts: vec![],
                     pressed_buttons: vec![],
-                    timestamp: zx::Time::ZERO,
+                    timestamp: zx::MonotonicTime::ZERO,
                     filtered_palm_contacts: vec![],
                 }),
                 Reason::Basic("some reason"),
@@ -2939,7 +2939,7 @@ mod tests {
                         contact_size: None,
                     }],
                     pressed_buttons: vec![],
-                    timestamp: zx::Time::from_nanos(123456),
+                    timestamp: zx::MonotonicTime::from_nanos(123456),
                     filtered_palm_contacts: vec![],
                 }),
                 Reason::Basic("some reason"),
@@ -2949,7 +2949,7 @@ mod tests {
             contender.set_next_result(ExamineEventResult::Mismatch(Reason::Basic("some reason")));
 
             let touchpad_event = input_device::InputEvent {
-                event_time: zx::Time::from_nanos(123456),
+                event_time: zx::MonotonicTime::from_nanos(123456),
                 device_event: input_device::InputDeviceEvent::Touchpad(
                     touch_binding::TouchpadEvent {
                         injector_contacts: vec![touch_binding::TouchContact {
@@ -2983,7 +2983,7 @@ mod tests {
             let winner = StubWinner::new();
             let arena = make_forwarding_arena(winner.clone(), None);
             let mouse_event = MouseEvent {
-                timestamp: zx::Time::from_nanos(123),
+                timestamp: zx::MonotonicTime::from_nanos(123),
                 mouse_data: mouse_binding::MouseEvent {
                     location: mouse_binding::MouseLocation::Relative(
                         mouse_binding::RelativeLocation { millimeters: Position::zero() },
@@ -3011,12 +3011,12 @@ mod tests {
                         device_event: input_device::InputDeviceEvent::Mouse(_),
                         ..
                     },
-                ] => pretty_assertions::assert_eq!(*event_time, zx::Time::from_nanos(123))
+                ] => pretty_assertions::assert_eq!(*event_time, zx::MonotonicTime::from_nanos(123))
             );
         }
 
         #[test_case(Some(MouseEvent{
-            timestamp: zx::Time::from_nanos(123),
+            timestamp: zx::MonotonicTime::from_nanos(123),
             mouse_data: mouse_binding::MouseEvent {
                 location: mouse_binding::MouseLocation::Relative(
                     mouse_binding::RelativeLocation {
@@ -3049,7 +3049,7 @@ mod tests {
             let winner = StubWinner::new();
             let arena = make_forwarding_arena(winner.clone(), None);
             let mouse_event = MouseEvent {
-                timestamp: zx::Time::from_nanos(123),
+                timestamp: zx::MonotonicTime::from_nanos(123),
                 mouse_data: mouse_binding::MouseEvent {
                     location: mouse_binding::MouseLocation::Relative(
                         mouse_binding::RelativeLocation { millimeters: Position::zero() },
@@ -3075,7 +3075,7 @@ mod tests {
             let winner = StubWinner::new();
             let arena = make_forwarding_arena(winner.clone(), None);
             let mouse_event = MouseEvent {
-                timestamp: zx::Time::from_nanos(123),
+                timestamp: zx::MonotonicTime::from_nanos(123),
                 mouse_data: mouse_binding::MouseEvent {
                     location: mouse_binding::MouseLocation::Relative(
                         mouse_binding::RelativeLocation { millimeters: Position::zero() },
@@ -3093,7 +3093,7 @@ mod tests {
                 Reason::Basic("some reason"),
             ));
             let touchpad_event = input_device::InputEvent {
-                event_time: zx::Time::from_nanos(123456),
+                event_time: zx::MonotonicTime::from_nanos(123456),
                 device_event: input_device::InputDeviceEvent::Touchpad(
                     touch_binding::TouchpadEvent {
                         injector_contacts: vec![touch_binding::TouchContact {
@@ -3136,7 +3136,7 @@ mod tests {
             // Set up `winner` to end the gesture and return an unconsumed event.
             winner.set_next_result(ProcessNewEventResult::EndGesture(
                 EndGestureEvent::UnconsumedEvent(TouchpadEvent {
-                    timestamp: zx::Time::ZERO,
+                    timestamp: zx::MonotonicTime::ZERO,
                     contacts: vec![],
                     pressed_buttons: vec![],
                     filtered_palm_contacts: vec![],
@@ -3203,7 +3203,7 @@ mod tests {
                     },
                 ),
                 device_descriptor: make_touchpad_descriptor(contact_position_units),
-                event_time: zx::Time::ZERO,
+                event_time: zx::MonotonicTime::ZERO,
                 trace_id: None,
                 handled: input_device::Handled::No,
             }
@@ -3321,7 +3321,7 @@ mod tests {
                     fidl_input_report::Unit { type_: UnitType::Meters, exponent: -3 },
                     fidl_input_report::Unit { type_: UnitType::Meters, exponent: -3 },
                 )]),
-                event_time: zx::Time::ZERO,
+                event_time: zx::MonotonicTime::ZERO,
                 trace_id: None,
                 handled: input_device::Handled::No,
             };
@@ -3367,7 +3367,7 @@ mod tests {
                     fidl_input_report::Unit { type_: UnitType::Meters, exponent: -3 },
                     fidl_input_report::Unit { type_: UnitType::Meters, exponent: -3 },
                 )]),
-                event_time: zx::Time::ZERO,
+                event_time: zx::MonotonicTime::ZERO,
                 trace_id: None,
                 handled: input_device::Handled::No,
             };
@@ -3437,7 +3437,7 @@ mod tests {
                     fidl_input_report::Unit { type_: UnitType::Meters, exponent: -3 },
                     fidl_input_report::Unit { type_: UnitType::Meters, exponent: -3 },
                 )]),
-                event_time: zx::Time::ZERO,
+                event_time: zx::MonotonicTime::ZERO,
                 trace_id: None,
                 handled: input_device::Handled::No,
             };
@@ -3706,7 +3706,7 @@ mod tests {
                     },
                 ),
                 device_descriptor: touchpad_descriptor.clone(),
-                event_time: zx::Time::from_nanos(12_300),
+                event_time: zx::MonotonicTime::from_nanos(12_300),
                 trace_id: None,
                 handled: input_device::Handled::No,
             });
@@ -3727,7 +3727,7 @@ mod tests {
                     ),
                 ),
                 device_descriptor: keyboard_descriptor.clone(),
-                event_time: zx::Time::from_nanos(11_000_000),
+                event_time: zx::MonotonicTime::from_nanos(11_000_000),
                 trace_id: None,
                 handled: input_device::Handled::Yes,
             });
@@ -3746,7 +3746,7 @@ mod tests {
                     ),
                 ),
                 device_descriptor: keyboard_descriptor,
-                event_time: zx::Time::from_nanos(13_000_000),
+                event_time: zx::MonotonicTime::from_nanos(13_000_000),
                 trace_id: None,
                 handled: input_device::Handled::No,
             });
@@ -3770,7 +3770,7 @@ mod tests {
                     },
                 ),
                 device_descriptor: touchpad_descriptor.clone(),
-                event_time: zx::Time::from_nanos(18_000_000),
+                event_time: zx::MonotonicTime::from_nanos(18_000_000),
                 trace_id: None,
                 handled: input_device::Handled::No,
             });
@@ -3915,7 +3915,7 @@ mod tests {
             arena
                 .clone()
                 .handle_input_event(input_device::InputEvent {
-                    event_time: zx::Time::from_nanos(15_000),
+                    event_time: zx::MonotonicTime::from_nanos(15_000),
                     ..make_unhandled_touchpad_event()
                 })
                 .await;
@@ -3933,7 +3933,7 @@ mod tests {
             arena
                 .clone()
                 .handle_input_event(input_device::InputEvent {
-                    event_time: zx::Time::from_nanos(6_000),
+                    event_time: zx::MonotonicTime::from_nanos(6_000),
                     ..make_unhandled_touchpad_event()
                 })
                 .await;
@@ -3968,13 +3968,13 @@ mod tests {
 
         #[test_case(EndGestureEvent::NoEvent; "end_gesture_no_event")]
         #[test_case(EndGestureEvent::UnconsumedEvent(TouchpadEvent {
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             pressed_buttons: vec![],
             contacts: vec![],
             filtered_palm_contacts: vec![],
         }); "end_gesture_unconsumed_event")]
         #[test_case(EndGestureEvent::GeneratedEvent(MouseEvent {
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             mouse_data: mouse_binding::MouseEvent {
                 location: mouse_binding::MouseLocation::Relative(
                     mouse_binding::RelativeLocation {
@@ -4033,7 +4033,7 @@ mod tests {
                         },
                     ),
                     device_descriptor: make_touchpad_descriptor(),
-                    event_time: zx::Time::from_nanos(123_000),
+                    event_time: zx::MonotonicTime::from_nanos(123_000),
                     trace_id: None,
                     handled: input_device::Handled::No,
                 })
@@ -4063,7 +4063,7 @@ mod tests {
                         },
                     ),
                     device_descriptor: make_touchpad_descriptor(),
-                    event_time: zx::Time::from_nanos(456_000),
+                    event_time: zx::MonotonicTime::from_nanos(456_000),
                     trace_id: None,
                     handled: input_device::Handled::No,
                 })
@@ -4138,7 +4138,7 @@ mod tests {
                     },
                 ),
                 device_descriptor: make_touchpad_descriptor(),
-                event_time: zx::Time::ZERO,
+                event_time: zx::MonotonicTime::ZERO,
                 trace_id: None,
                 handled: input_device::Handled::No,
             });

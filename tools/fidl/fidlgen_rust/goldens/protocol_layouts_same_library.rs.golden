@@ -413,7 +413,7 @@ impl ComposedProtocolSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::Time) -> Result<ComposedProtocolEvent, fidl::Error> {
+    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<ComposedProtocolEvent, fidl::Error> {
         ComposedProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
 
@@ -431,7 +431,7 @@ impl ComposedProtocolSynchronousProxy {
     pub fn r#two_way_anon_composed(
         &self,
         mut payload: &ComposedProtocolTwoWayAnonComposedRequest,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<ComposedProtocolTwoWayAnonComposedResponse, fidl::Error> {
         let _response = self.client.send_query::<
             ComposedProtocolTwoWayAnonComposedRequest,
@@ -448,7 +448,7 @@ impl ComposedProtocolSynchronousProxy {
     pub fn r#two_way_anon_composed_with_error(
         &self,
         mut payload: &ComposedProtocolTwoWayAnonComposedWithErrorRequest,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<ComposedProtocolTwoWayAnonComposedWithErrorResult, fidl::Error> {
         let _response = self.client.send_query::<
             ComposedProtocolTwoWayAnonComposedWithErrorRequest,
@@ -473,7 +473,7 @@ impl ComposedProtocolSynchronousProxy {
     pub fn r#two_way_named_composed(
         &self,
         mut payload: &UnionPayload,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<TablePayload, fidl::Error> {
         let _response = self.client.send_query::<UnionPayload, TablePayload>(
             payload,
@@ -487,7 +487,7 @@ impl ComposedProtocolSynchronousProxy {
     pub fn r#two_way_named_composed_with_error(
         &self,
         mut payload: &TablePayload,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<ComposedProtocolTwoWayNamedComposedWithErrorResult, fidl::Error> {
         let _response =
             self.client.send_query::<TablePayload, fidl::encoding::ResultType<UnionPayload, u32>>(
@@ -1512,7 +1512,7 @@ impl MainProtocolSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::Time) -> Result<MainProtocolEvent, fidl::Error> {
+    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<MainProtocolEvent, fidl::Error> {
         MainProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
 
@@ -1530,7 +1530,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_anon_composed(
         &self,
         mut payload: &ComposedProtocolTwoWayAnonComposedRequest,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<ComposedProtocolTwoWayAnonComposedResponse, fidl::Error> {
         let _response = self.client.send_query::<
             ComposedProtocolTwoWayAnonComposedRequest,
@@ -1547,7 +1547,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_anon_composed_with_error(
         &self,
         mut payload: &ComposedProtocolTwoWayAnonComposedWithErrorRequest,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<ComposedProtocolTwoWayAnonComposedWithErrorResult, fidl::Error> {
         let _response = self.client.send_query::<
             ComposedProtocolTwoWayAnonComposedWithErrorRequest,
@@ -1572,7 +1572,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_named_composed(
         &self,
         mut payload: &UnionPayload,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<TablePayload, fidl::Error> {
         let _response = self.client.send_query::<UnionPayload, TablePayload>(
             payload,
@@ -1586,7 +1586,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_named_composed_with_error(
         &self,
         mut payload: &TablePayload,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<ComposedProtocolTwoWayNamedComposedWithErrorResult, fidl::Error> {
         let _response =
             self.client.send_query::<TablePayload, fidl::encoding::ResultType<UnionPayload, u32>>(
@@ -1609,7 +1609,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_local(
         &self,
         mut payload: &UnionPayload,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<TablePayload, fidl::Error> {
         let _response = self.client.send_query::<UnionPayload, TablePayload>(
             payload,
@@ -1623,7 +1623,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_local_with_error(
         &self,
         mut payload: &TablePayload,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<MainProtocolTwoWayLocalWithErrorResult, fidl::Error> {
         let _response =
             self.client.send_query::<TablePayload, fidl::encoding::ResultType<UnionPayload, u32>>(
@@ -1649,7 +1649,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_anon(
         &self,
         mut payload: &MainProtocolTwoWayAnonRequest,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<MainProtocolTwoWayAnonResponse, fidl::Error> {
         let _response = self
             .client
@@ -1665,7 +1665,7 @@ impl MainProtocolSynchronousProxy {
     pub fn r#two_way_anon_with_error(
         &self,
         mut payload: &MainProtocolTwoWayAnonWithErrorRequest,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<MainProtocolTwoWayAnonWithErrorResult, fidl::Error> {
         let _response = self.client.send_query::<
             MainProtocolTwoWayAnonWithErrorRequest,

@@ -235,7 +235,7 @@ impl UinputDevice {
                                 device: Some(key_server),
                                 ..Default::default()
                             },
-                            zx::Time::INFINITE,
+                            zx::MonotonicTime::INFINITE,
                         );
                         if register_res.is_err() {
                             log_warn!("Uinput could not register Keyboard device to Registry");
@@ -255,7 +255,7 @@ impl UinputDevice {
                                 device: Some(touch_server),
                                 ..Default::default()
                             },
-                            zx::Time::INFINITE,
+                            zx::MonotonicTime::INFINITE,
                         );
                         if register_res.is_err() {
                             log_warn!("Uinput could not register Keyboard device to Registry");
@@ -382,7 +382,7 @@ impl FileOps for UinputDevice {
                                     report: Some(keyboard_report),
                                     ..Default::default()
                                 },
-                                zx::Time::INFINITE,
+                                zx::MonotonicTime::INFINITE,
                             );
                             if res.is_err() {
                                 return error!(EIO);
@@ -398,7 +398,8 @@ impl FileOps for UinputDevice {
                 match input_report {
                     Ok(Some(report)) => {
                         if let Some(touch_report) = report.touch {
-                            let res = proxy.simulate_touch_event(&touch_report, zx::Time::INFINITE);
+                            let res = proxy
+                                .simulate_touch_event(&touch_report, zx::MonotonicTime::INFINITE);
                             if res.is_err() {
                                 return error!(EIO);
                             }

@@ -863,7 +863,7 @@ pub mod sync {
             body: impl Encode<Request>,
             ordinal: u64,
             dynamic_flags: DynamicFlags,
-            deadline: zx::Time,
+            deadline: zx::MonotonicTime,
         ) -> Result<Response::Owned, Error> {
             let mut write_bytes = Vec::new();
             let mut write_handles = Vec::new();
@@ -899,7 +899,7 @@ pub mod sync {
         }
 
         /// Wait for an event to arrive on the underlying channel.
-        pub fn wait_for_event(&self, deadline: zx::Time) -> Result<MessageBufEtc, Error> {
+        pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<MessageBufEtc, Error> {
             let mut buf = zx::MessageBufEtc::new();
             buf.ensure_capacity_bytes(zx::sys::ZX_CHANNEL_MAX_MSG_BYTES as usize);
             buf.ensure_capacity_handle_infos(zx::sys::ZX_CHANNEL_MAX_MSG_HANDLES as usize);
@@ -1026,7 +1026,7 @@ mod tests {
             // Server
             let mut received = MessageBufEtc::new();
             server_end
-                .wait_handle(zx::Signals::CHANNEL_READABLE, zx::Time::after(5.seconds()))
+                .wait_handle(zx::Signals::CHANNEL_READABLE, zx::MonotonicTime::after(5.seconds()))
                 .expect("failed to wait for channel readable");
             server_end.read_etc(&mut received).expect("failed to read on server end");
             let (buf, _handles) = received.split_mut();
@@ -1042,7 +1042,7 @@ mod tests {
                 SEND_DATA,
                 SEND_ORDINAL,
                 DynamicFlags::empty(),
-                zx::Time::after(5.seconds()),
+                zx::MonotonicTime::after(5.seconds()),
             )
             .context("sending query")?;
         assert_eq!(SEND_DATA, response_data);
@@ -1057,7 +1057,7 @@ mod tests {
             // Server
             let mut received = MessageBufEtc::new();
             server_end
-                .wait_handle(zx::Signals::CHANNEL_READABLE, zx::Time::after(5.seconds()))
+                .wait_handle(zx::Signals::CHANNEL_READABLE, zx::MonotonicTime::after(5.seconds()))
                 .expect("failed to wait for channel readable");
             server_end.read_etc(&mut received).expect("failed to read on server end");
             let (buf, _handles) = received.split_mut();
@@ -1081,13 +1081,14 @@ mod tests {
                 SEND_DATA,
                 SEND_ORDINAL,
                 DynamicFlags::empty(),
-                zx::Time::after(5.seconds()),
+                zx::MonotonicTime::after(5.seconds()),
             )
             .context("sending query")?;
         assert_eq!(SEND_DATA, response_data);
 
-        let event_buf =
-            client.wait_for_event(zx::Time::after(5.seconds())).context("waiting for event")?;
+        let event_buf = client
+            .wait_for_event(zx::MonotonicTime::after(5.seconds()))
+            .context("waiting for event")?;
         let (bytes, _handles) = event_buf.split();
         let (header, _body) = decode_transaction_header(&bytes).expect("event decode");
         assert_eq!(header.ordinal, EVENT_ORDINAL);
@@ -1102,12 +1103,12 @@ mod tests {
         let client2 = client1.clone();
 
         let thread1 = thread::spawn(move || {
-            let result = client1.wait_for_event(zx::Time::after(5.seconds()));
+            let result = client1.wait_for_event(zx::MonotonicTime::after(5.seconds()));
             assert!(result.is_ok());
         });
 
         let thread2 = thread::spawn(move || {
-            let result = client2.wait_for_event(zx::Time::after(5.seconds()));
+            let result = client2.wait_for_event(zx::MonotonicTime::after(5.seconds()));
             assert!(result.is_ok());
         });
 
@@ -1135,7 +1136,7 @@ mod tests {
             &server_end,
         );
         assert_matches!(
-            client.wait_for_event(zx::Time::after(5.seconds())),
+            client.wait_for_event(zx::MonotonicTime::after(5.seconds())),
             Err(crate::Error::UnexpectedSyncResponse)
         );
         Ok(())
@@ -1160,7 +1161,7 @@ mod tests {
                 SEND_DATA,
                 SEND_ORDINAL,
                 DynamicFlags::empty(),
-                zx::Time::after(5.seconds())
+                zx::MonotonicTime::after(5.seconds())
             ),
             Err(crate::Error::ClientChannelClosed {
                 status: zx_status::Status::PEER_CLOSED,
@@ -1185,7 +1186,7 @@ mod tests {
                 SEND_DATA,
                 SEND_ORDINAL,
                 DynamicFlags::empty(),
-                zx::Time::after(5.seconds())
+                zx::MonotonicTime::after(5.seconds())
             ),
             Err(crate::Error::ClientChannelClosed {
                 status: zx_status::Status::PEER_CLOSED,

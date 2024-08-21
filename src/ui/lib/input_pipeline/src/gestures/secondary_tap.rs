@@ -535,7 +535,7 @@ mod tests {
             max_time_elapsed: MAX_TIME_ELAPSED,
             one_finger_contact_event: TouchpadEvent {
                 contacts: vec![create_touch_contact(0, Position::zero())],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             },
@@ -551,7 +551,7 @@ mod tests {
                     create_touch_contact(0, Position::zero()),
                     create_touch_contact(1, Position::zero()),
                 ],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             },
@@ -567,7 +567,7 @@ mod tests {
                     create_touch_contact(0, Position::zero()),
                     create_touch_contact(1, Position::zero()),
                 ],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             },
@@ -581,13 +581,13 @@ mod tests {
                     create_touch_contact(0, Position::zero()),
                     create_touch_contact(1, Position::zero()),
                 ],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             },
             no_contacts_event: TouchpadEvent {
                 contacts: vec![],
-                timestamp: zx::Time::from_nanos(123),
+                timestamp: zx::MonotonicTime::from_nanos(123),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             },
@@ -629,7 +629,7 @@ mod tests {
         assert_matches!(
             get_initial_contender().examine_event(&TouchpadEvent {
                 contacts: vec![create_touch_contact(0, Position::zero())],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![0],
                 filtered_palm_contacts: vec![],
             },),
@@ -644,7 +644,7 @@ mod tests {
         assert_matches!(
             get_initial_contender().examine_event(&TouchpadEvent {
                 contacts: vec![create_touch_contact(0, Position::zero())],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![0, 1],
                 filtered_palm_contacts: vec![],
             },),
@@ -659,7 +659,7 @@ mod tests {
         assert_matches!(
             get_initial_contender().examine_event(&TouchpadEvent {
                 contacts: vec![],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -674,7 +674,7 @@ mod tests {
         assert_contender(
             get_initial_contender().examine_event(&TouchpadEvent {
                 contacts: vec![create_touch_contact(0, Position::zero())],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -692,7 +692,7 @@ mod tests {
                     create_touch_contact(0, Position::zero()),
                     create_touch_contact(1, Position::zero()),
                 ],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -711,7 +711,7 @@ mod tests {
                     create_touch_contact(1, Position::zero()),
                     create_touch_contact(2, Position::zero())
                 ],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -726,7 +726,7 @@ mod tests {
         assert_matches!(
             get_one_finger_contact_contender().examine_event(&TouchpadEvent {
                 contacts: vec![create_touch_contact(0, Position::zero()),],
-                timestamp: MAX_TIME_ELAPSED + zx::Time::from_nanos(1),
+                timestamp: MAX_TIME_ELAPSED + zx::MonotonicTime::from_nanos(1),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -741,7 +741,7 @@ mod tests {
         assert_matches!(
             get_one_finger_contact_contender().examine_event(&TouchpadEvent {
                 contacts: vec![create_touch_contact(0, Position::zero())],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![0],
                 filtered_palm_contacts: vec![],
             }),
@@ -756,7 +756,7 @@ mod tests {
         assert_matches!(
             get_one_finger_contact_contender().examine_event(&TouchpadEvent {
                 contacts: vec![create_touch_contact(0, Position::zero())],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![0, 1],
                 filtered_palm_contacts: vec![],
             }),
@@ -771,7 +771,7 @@ mod tests {
         assert_matches!(
             get_one_finger_contact_contender().examine_event(&TouchpadEvent {
                 contacts: vec![],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -790,7 +790,7 @@ mod tests {
                     create_touch_contact(1, Position::zero()),
                     create_touch_contact(2, Position::zero())
                 ],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -805,7 +805,7 @@ mod tests {
         assert_contender(
             get_one_finger_contact_contender().examine_event(&TouchpadEvent {
                 contacts: vec![create_touch_contact(0, Position::zero())],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -823,7 +823,7 @@ mod tests {
                     create_touch_contact(0, Position::zero()),
                     create_touch_contact(1, Position::zero()),
                 ],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -841,7 +841,7 @@ mod tests {
                     0,
                     Position { x: MAX_FINGER_DISPLACEMENT_IN_MM, y: MAX_FINGER_DISPLACEMENT_IN_MM }
                 )],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -865,7 +865,7 @@ mod tests {
                     ),
                     create_touch_contact(1, Position::zero())
                 ],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -883,7 +883,7 @@ mod tests {
                     0,
                     Position { x: HALF_MOTION, y: HALF_MOTION },
                 )],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -901,7 +901,7 @@ mod tests {
                     create_touch_contact(0, Position { x: HALF_MOTION, y: HALF_MOTION }),
                     create_touch_contact(1, Position::zero()),
                 ],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -916,7 +916,7 @@ mod tests {
         assert_matches!(
             get_two_finger_contacts_contender().examine_event(&TouchpadEvent {
                 contacts: vec![],
-                timestamp: MAX_TIME_ELAPSED + zx::Time::from_nanos(1),
+                timestamp: MAX_TIME_ELAPSED + zx::MonotonicTime::from_nanos(1),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -931,7 +931,7 @@ mod tests {
         assert_matches!(
             get_two_finger_contacts_contender().examine_event(&TouchpadEvent {
                 contacts: vec![],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![0],
                 filtered_palm_contacts: vec![],
             }),
@@ -946,7 +946,7 @@ mod tests {
         assert_matches!(
             get_two_finger_contacts_contender().examine_event(&TouchpadEvent {
                 contacts: vec![],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![0, 1],
                 filtered_palm_contacts: vec![],
             }),
@@ -961,7 +961,7 @@ mod tests {
         assert_examined_matched_contender(get_two_finger_contacts_contender().examine_event(
             &TouchpadEvent {
                 contacts: vec![],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             },
@@ -975,7 +975,7 @@ mod tests {
         assert_contender(
             get_two_finger_contacts_contender().examine_event(&TouchpadEvent {
                 contacts: vec![create_touch_contact(0, Position::zero())],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -993,7 +993,7 @@ mod tests {
                     0,
                     Position { x: MAX_FINGER_DISPLACEMENT_IN_MM, y: MAX_FINGER_DISPLACEMENT_IN_MM },
                 )],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -1012,7 +1012,7 @@ mod tests {
                     create_touch_contact(1, Position::zero()),
                     create_touch_contact(2, Position::zero())
                 ],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -1030,7 +1030,7 @@ mod tests {
                     create_touch_contact(0, Position::zero()),
                     create_touch_contact(1, Position::zero()),
                 ],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -1054,7 +1054,7 @@ mod tests {
                     ),
                     create_touch_contact(1, Position::zero())
                 ],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -1073,7 +1073,7 @@ mod tests {
                         }
                     ),
                 ],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -1091,7 +1091,7 @@ mod tests {
                     create_touch_contact(0, Position::zero()),
                     create_touch_contact(1, Position { x: HALF_MOTION, y: HALF_MOTION }),
                 ],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -1104,7 +1104,7 @@ mod tests {
                     create_touch_contact(0, Position { x: HALF_MOTION, y: HALF_MOTION }),
                     create_touch_contact(1, Position::zero()),
                 ],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -1117,7 +1117,7 @@ mod tests {
                     create_touch_contact(0, Position { x: HALF_MOTION, y: HALF_MOTION }),
                     create_touch_contact(1, Position { x: HALF_MOTION, y: HALF_MOTION }),
                 ],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -1132,7 +1132,7 @@ mod tests {
         assert_matches!(
             get_one_finger_raised_contender().examine_event(&TouchpadEvent {
                 contacts: vec![],
-                timestamp: MAX_TIME_ELAPSED + zx::Time::from_nanos(1),
+                timestamp: MAX_TIME_ELAPSED + zx::MonotonicTime::from_nanos(1),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -1147,7 +1147,7 @@ mod tests {
         assert_matches!(
             get_one_finger_raised_contender().examine_event(&TouchpadEvent {
                 contacts: vec![],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![0],
                 filtered_palm_contacts: vec![],
             }),
@@ -1162,7 +1162,7 @@ mod tests {
         assert_matches!(
             get_one_finger_raised_contender().examine_event(&TouchpadEvent {
                 contacts: vec![],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![0, 1],
                 filtered_palm_contacts: vec![],
             }),
@@ -1177,7 +1177,7 @@ mod tests {
         assert_examined_matched_contender(get_one_finger_raised_contender().examine_event(
             &TouchpadEvent {
                 contacts: vec![],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             },
@@ -1192,7 +1192,7 @@ mod tests {
         assert_contender(
             get_one_finger_raised_contender().examine_event(&TouchpadEvent {
                 contacts: vec![create_touch_contact(0, Position::zero())],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -1205,7 +1205,7 @@ mod tests {
                     0,
                     Position { x: HALF_MOTION, y: HALF_MOTION },
                 )],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -1221,7 +1221,7 @@ mod tests {
         assert_contender(
             get_one_finger_raised_contender().examine_event(&TouchpadEvent {
                 contacts: vec![create_touch_contact(1, Position::zero())],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -1234,7 +1234,7 @@ mod tests {
                     1,
                     Position { x: HALF_MOTION, y: HALF_MOTION },
                 )],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -1250,7 +1250,7 @@ mod tests {
         assert_matches!(
             get_one_finger_raised_contender().examine_event(&TouchpadEvent {
                 contacts: vec![create_touch_contact(2, Position::zero(),)],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -1268,7 +1268,7 @@ mod tests {
                     0,
                     Position { x: MAX_FINGER_DISPLACEMENT_IN_MM, y: MAX_FINGER_DISPLACEMENT_IN_MM },
                 )],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -1286,7 +1286,7 @@ mod tests {
                     create_touch_contact(0, Position::zero()),
                     create_touch_contact(1, Position::zero()),
                 ],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -1301,7 +1301,7 @@ mod tests {
         assert_matches!(
             get_matched_contender().verify_event(&TouchpadEvent {
                 contacts: vec![],
-                timestamp: MAX_TIME_ELAPSED + zx::Time::from_nanos(1),
+                timestamp: MAX_TIME_ELAPSED + zx::MonotonicTime::from_nanos(1),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -1315,7 +1315,7 @@ mod tests {
         assert_matches!(
             get_matched_contender().verify_event(&TouchpadEvent {
                 contacts: vec![create_touch_contact(0, Position::zero())],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -1333,7 +1333,7 @@ mod tests {
                     create_touch_contact(0, Position::zero()),
                     create_touch_contact(1, Position::zero())
                 ],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![],
                 filtered_palm_contacts: vec![],
             }),
@@ -1347,7 +1347,7 @@ mod tests {
         assert_matches!(
             get_matched_contender().verify_event(&TouchpadEvent {
                 contacts: vec![],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![0],
                 filtered_palm_contacts: vec![],
             }),
@@ -1362,7 +1362,7 @@ mod tests {
         assert_matches!(
             get_matched_contender().verify_event(&TouchpadEvent {
                 contacts: vec![],
-                timestamp: zx::Time::from_nanos(0),
+                timestamp: zx::MonotonicTime::from_nanos(0),
                 pressed_buttons: vec![0, 1],
                 filtered_palm_contacts: vec![],
             }),
@@ -1376,7 +1376,7 @@ mod tests {
     fn matched_contender_no_contacts() {
         assert_verified_matched_contender(get_matched_contender().verify_event(&TouchpadEvent {
             contacts: vec![],
-            timestamp: zx::Time::from_nanos(0),
+            timestamp: zx::MonotonicTime::from_nanos(0),
             pressed_buttons: vec![],
             filtered_palm_contacts: vec![],
         }));
@@ -1393,7 +1393,7 @@ mod tests {
             generated_events,
             [
                 gesture_arena::MouseEvent {
-                    timestamp: zx::Time::from_nanos(0),
+                    timestamp: zx::MonotonicTime::from_nanos(0),
                     mouse_data: MouseEvent {
                         location: MouseLocation::Relative(RelativeLocation {
                             millimeters: Position { x: 0.0, y: 0.0 }
@@ -1407,7 +1407,7 @@ mod tests {
                     },
                 },
                 gesture_arena::MouseEvent {
-                    timestamp: zx::Time::from_nanos(123),
+                    timestamp: zx::MonotonicTime::from_nanos(123),
                     mouse_data: MouseEvent {
                         location: MouseLocation::Relative(RelativeLocation {
                             millimeters: Position { x: 0.0, y: 0.0 }

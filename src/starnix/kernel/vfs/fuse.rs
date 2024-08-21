@@ -21,8 +21,8 @@ use fuchsia_zircon as zx;
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_error, log_trace, log_warn, track_stub};
 use starnix_sync::{
-    AtomicTime, DeviceOpen, FileOpsCore, Locked, Mutex, MutexGuard, RwLock, RwLockReadGuard,
-    RwLockWriteGuard, Unlocked,
+    AtomicMonotonicTime, DeviceOpen, FileOpsCore, Locked, Mutex, MutexGuard, RwLock,
+    RwLockReadGuard, RwLockWriteGuard, Unlocked,
 };
 use starnix_syscalls::{SyscallArg, SyscallResult};
 use starnix_uapi::auth::FsCred;
@@ -463,7 +463,7 @@ struct FuseNode {
     connection: Arc<FuseConnection>,
     nodeid: u64,
     generation: u64,
-    attributes_valid_until: AtomicTime,
+    attributes_valid_until: AtomicMonotonicTime,
     state: Mutex<FuseNodeMutableState>,
 }
 
@@ -473,7 +473,7 @@ impl FuseNode {
             connection,
             nodeid,
             generation,
-            attributes_valid_until: zx::Time::INFINITE_PAST.into(),
+            attributes_valid_until: zx::MonotonicTime::INFINITE_PAST.into(),
             state: Default::default(),
         })
     }
@@ -507,7 +507,7 @@ impl FuseNode {
         // anything. Its final access is protected by the info lock anyways.
         const VALID_UNTIL_LOAD_ORDERING: Ordering = Ordering::Relaxed;
 
-        let now = zx::Time::get_monotonic();
+        let now = zx::MonotonicTime::get_monotonic();
         if self.attributes_valid_until.load(VALID_UNTIL_LOAD_ORDERING) >= now {
             let info = info.read();
 
@@ -561,7 +561,7 @@ impl FuseNode {
         info: &mut FsNodeInfo,
         attributes: uapi::fuse_attr,
         attr_valid_duration: zx::Duration,
-        node_attributes_valid_until: &AtomicTime,
+        node_attributes_valid_until: &AtomicMonotonicTime,
     ) -> Result<(), Errno> {
         info.ino = attributes.ino as uapi::ino_t;
         info.mode = FileMode::from_bits(attributes.mode);
@@ -585,7 +585,8 @@ impl FuseNode {
         })?;
         info.rdev = DeviceType::from_bits(attributes.rdev as u64);
 
-        node_attributes_valid_until.store(zx::Time::after(attr_valid_duration), Ordering::Relaxed);
+        node_attributes_valid_until
+            .store(zx::MonotonicTime::after(attr_valid_duration), Ordering::Relaxed);
         Ok(())
     }
 
@@ -932,12 +933,12 @@ impl FileOps for FuseFileObject {
 }
 
 struct FuseDirEntry {
-    valid_until: AtomicTime,
+    valid_until: AtomicMonotonicTime,
 }
 
 impl Default for FuseDirEntry {
     fn default() -> Self {
-        Self { valid_until: zx::Time::INFINITE_PAST.into() }
+        Self { valid_until: zx::MonotonicTime::INFINITE_PAST.into() }
     }
 }
 
@@ -947,7 +948,7 @@ impl DirEntryOps for FuseDirEntry {
         // anything.
         const VALID_UNTIL_ORDERING: Ordering = Ordering::Relaxed;
 
-        let now = zx::Time::get_monotonic();
+        let now = zx::MonotonicTime::get_monotonic();
         if self.valid_until.load(VALID_UNTIL_ORDERING) >= now {
             return Ok(true);
         }
@@ -1004,7 +1005,7 @@ impl DirEntryOps for FuseDirEntry {
             )?;
 
             self.valid_until.store(
-                zx::Time::after(attr_valid_to_duration(entry_valid, entry_valid_nsec)?),
+                zx::MonotonicTime::after(attr_valid_to_duration(entry_valid, entry_valid_nsec)?),
                 VALID_UNTIL_ORDERING,
             );
 

@@ -20,7 +20,7 @@ struct QueuedRequest {
     ssids: Vec<Ssid>,
     channels: Vec<types::WlanChan>,
     responder: oneshot::Sender<Result<Vec<types::ScanResult>, types::ScanError>>,
-    received_at: zx::Time,
+    received_at: zx::MonotonicTime,
 }
 
 impl QueuedRequest {
@@ -86,7 +86,7 @@ impl RequestQueue {
         ssids: Vec<Ssid>,
         channels: Vec<types::WlanChan>,
         responder: oneshot::Sender<Result<Vec<types::ScanResult>, types::ScanError>>,
-        current_time: zx::Time,
+        current_time: zx::MonotonicTime,
     ) {
         let req = QueuedRequest { reason, ssids, channels, responder, received_at: current_time };
         self.queue.push(req)
@@ -127,7 +127,7 @@ impl RequestQueue {
         &mut self,
         sme_request: fidl_sme::ScanRequest,
         result: Result<Vec<types::ScanResult>, types::ScanError>,
-        current_time: zx::Time,
+        current_time: zx::MonotonicTime,
     ) {
         let initial_queue_len = self.queue.len();
         let mut unfulfilled_requests = vec![];
@@ -196,7 +196,7 @@ mod tests {
     fn add_request() {
         let (mut queue, _telemetry_receiver) = setup_queue();
 
-        let time = zx::Time::get_monotonic();
+        let time = zx::MonotonicTime::get_monotonic();
         queue.add_request(ScanReason::NetworkSelection, vec![], vec![], oneshot::channel().0, time);
         assert_eq!(queue.queue.len(), 1);
         assert_eq!(queue.queue[0].reason, ScanReason::NetworkSelection);
@@ -204,7 +204,7 @@ mod tests {
         assert_eq!(queue.queue[0].channels, Vec::<types::WlanChan>::new());
         assert_eq!(queue.queue[0].received_at, time);
 
-        let time = zx::Time::get_monotonic();
+        let time = zx::MonotonicTime::get_monotonic();
         let ssids = vec![generate_ssid("foo"), generate_ssid("bar")];
         let channels = vec![types::WlanChan::new(3, types::Cbw::Cbw20)];
         queue.add_request(
@@ -230,14 +230,14 @@ mod tests {
                 ssids: vec![generate_ssid("foo"), generate_ssid("bar")],
                 channels: vec![generate_random_channel(), generate_random_channel()],
                 responder: oneshot::channel().0,
-                received_at: zx::Time::ZERO,
+                received_at: zx::MonotonicTime::ZERO,
             },
             QueuedRequest {
                 reason: ScanReason::NetworkSelection,
                 ssids: vec![],
                 channels: vec![generate_random_channel()],
                 responder: oneshot::channel().0,
-                received_at: zx::Time::ZERO,
+                received_at: zx::MonotonicTime::ZERO,
             },
         ];
 
@@ -292,14 +292,14 @@ mod tests {
             ssids: vec![],
             channels: vec![],
             responder: oneshot::channel().0,
-            received_at: zx::Time::ZERO,
+            received_at: zx::MonotonicTime::ZERO,
         };
         let req_with_only_wildcard_ssid = QueuedRequest {
             reason: ScanReason::BssSelectionAugmentation,
             ssids: vec![WILDCARD_SSID.clone()],
             channels: vec![],
             responder: oneshot::channel().0,
-            received_at: zx::Time::ZERO,
+            received_at: zx::MonotonicTime::ZERO,
         };
 
         assert_eq!(matches, req_without_ssids.ssids_match(&sme_request));
@@ -326,7 +326,7 @@ mod tests {
             ssids: vec![generate_ssid("foo"), generate_ssid(&WILDCARD_STR)],
             channels: vec![],
             responder: oneshot::channel().0,
-            received_at: zx::Time::ZERO,
+            received_at: zx::MonotonicTime::ZERO,
         };
 
         assert_eq!(matches, req_with_ssids.ssids_match(&sme_request));
@@ -349,7 +349,7 @@ mod tests {
             ssids: vec![generate_ssid("foo"), generate_ssid(&WILDCARD_STR)],
             channels: req_channels.iter().map(|c| generate_channel(*c)).collect(),
             responder: oneshot::channel().0,
-            received_at: zx::Time::ZERO,
+            received_at: zx::MonotonicTime::ZERO,
         };
 
         assert_eq!(matches, req.channels_match(&sme_request));
@@ -357,7 +357,7 @@ mod tests {
 
     #[fuchsia::test]
     fn handle_completed_sme_scan() {
-        let initial_time = zx::Time::from_nanos(123);
+        let initial_time = zx::MonotonicTime::from_nanos(123);
         let sme_req = passive_sme_req();
 
         // Generate two requests, one which matches the passive sme_req and one which doesn't
@@ -375,7 +375,7 @@ mod tests {
             ssids: vec![generate_ssid("foo")],
             channels: vec![],
             responder: non_matching_sender,
-            received_at: zx::Time::get_monotonic(), // this value is unused, so set it "randomly"
+            received_at: zx::MonotonicTime::get_monotonic(), // this value is unused, so set it "randomly"
         };
 
         // Set up the queue

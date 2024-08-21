@@ -26,7 +26,7 @@ use futures::StreamExt;
 use std::cell::RefCell;
 use std::rc::Rc;
 use test_case::test_case;
-use zx::Time;
+use zx::MonotonicTime;
 use {fuchsia_async as fasync, fuchsia_zircon as zx};
 
 const VENDOR_ID: u32 = 1;
@@ -744,7 +744,7 @@ async fn light_sensor_handler_input_event_handler() {
             device_id: 3,
             sensor_layout: Rgbc { red: 1, green: 2, blue: 3, clear: 4 },
         }),
-        event_time: Time::get_monotonic(),
+        event_time: MonotonicTime::get_monotonic(),
         handled: Handled::No,
         trace_id: None,
     };
@@ -832,7 +832,7 @@ async fn light_sensor_handler_subscriber_queue() {
             device_id: 3,
             sensor_layout: Rgbc { red: 1, green: 2, blue: 3, clear: 4 },
         }),
-        event_time: Time::get_monotonic(),
+        event_time: MonotonicTime::get_monotonic(),
         handled: Handled::No,
         trace_id: None,
     };
@@ -945,7 +945,7 @@ async fn light_sensor_handler_inspect_counts_events() {
             device_id: 3,
             sensor_layout: Rgbc { red: 1, green: 2, blue: 3, clear: 4 },
         }),
-        event_time: Time::get_monotonic(),
+        event_time: MonotonicTime::get_monotonic(),
         handled: Handled::No,
         trace_id: None,
     };
@@ -968,7 +968,7 @@ async fn light_sensor_handler_inspect_counts_events() {
             device_id: 3,
             sensor_layout: Rgbc { red: 1, green: 2, blue: 3, clear: 4 },
         }),
-        event_time: Time::get_monotonic(),
+        event_time: MonotonicTime::get_monotonic(),
         handled: Handled::Yes,
         trace_id: None,
     };
@@ -985,7 +985,7 @@ async fn light_sensor_handler_inspect_counts_events() {
             device_id: 3,
             sensor_layout: Rgbc { red: 1, green: 2, blue: 3, clear: 4 },
         }),
-        event_time: Time::get_monotonic(),
+        event_time: MonotonicTime::get_monotonic(),
         handled: Handled::No,
         trace_id: None,
     };
@@ -1007,7 +1007,7 @@ async fn light_sensor_handler_inspect_counts_events() {
             device_id: 3,
             sensor_layout: Rgbc { red: 1, green: 2, blue: 3, clear: 4 },
         }),
-        event_time: Time::get_monotonic(),
+        event_time: MonotonicTime::get_monotonic(),
         handled: Handled::No,
         trace_id: None,
     };

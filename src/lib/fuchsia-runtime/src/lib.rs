@@ -22,8 +22,8 @@ use {
         Process,
         Rights,
         Status,
+        SyntheticTime,
         Thread,
-        Time,
         Unowned,
         Vmar,
     },
@@ -386,7 +386,7 @@ pub fn swap_utc_clock_handle(new_clock: Clock) -> Result<Clock, Status> {
 ///
 /// Panics if there is no UTC clock registered with the runtime or the registered handle does not
 /// have the required rights.
-pub fn utc_time() -> Time {
+pub fn utc_time() -> SyntheticTime {
     let clock: Unowned<'static, Clock> = unsafe {
         let handle = zx_utc_reference_get();
         Unowned::from_raw_handle(handle)

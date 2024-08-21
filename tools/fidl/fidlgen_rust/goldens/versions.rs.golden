@@ -223,7 +223,7 @@ impl OtherProtocolSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::Time) -> Result<OtherProtocolEvent, fidl::Error> {
+    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<OtherProtocolEvent, fidl::Error> {
         OtherProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
 }
@@ -481,7 +481,7 @@ impl ProtocolSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::Time) -> Result<ProtocolEvent, fidl::Error> {
+    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<ProtocolEvent, fidl::Error> {
         ProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
 

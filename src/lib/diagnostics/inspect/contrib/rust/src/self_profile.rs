@@ -127,14 +127,14 @@ impl ProfileDuration {
 
 struct InnerGuard {
     start_runtime: zx::TaskRuntimeInfo,
-    start_monotonic_ns: zx::Time,
+    start_monotonic_ns: zx::MonotonicTime,
     parent_duration: Arc<ProfileDurationTree>,
 }
 
 impl InnerGuard {
     #[track_caller]
     fn enter(name: &'static str) -> Self {
-        let start_monotonic_ns = zx::Time::get_monotonic();
+        let start_monotonic_ns = zx::MonotonicTime::get_monotonic();
         let start_runtime = current_thread_runtime();
 
         // Get the location outside the below closure since it can't be track_caller on stable.
@@ -157,7 +157,7 @@ impl Drop for InnerGuard {
                 std::mem::replace(&mut *current_duration, self.parent_duration.clone());
 
             let runtime_delta = current_thread_runtime() - self.start_runtime;
-            let wall_time_delta = zx::Time::get_monotonic() - self.start_monotonic_ns;
+            let wall_time_delta = zx::MonotonicTime::get_monotonic() - self.start_monotonic_ns;
 
             completed_duration.count.fetch_add(1, Ordering::Relaxed);
             completed_duration.wall_time.fetch_add(wall_time_delta.into_nanos(), Ordering::Relaxed);

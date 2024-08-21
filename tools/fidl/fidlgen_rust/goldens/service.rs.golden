@@ -72,7 +72,7 @@ impl FirstProtocolSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::Time) -> Result<FirstProtocolEvent, fidl::Error> {
+    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<FirstProtocolEvent, fidl::Error> {
         FirstProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
 
@@ -375,7 +375,7 @@ impl SecondProtocolSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::Time) -> Result<SecondProtocolEvent, fidl::Error> {
+    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<SecondProtocolEvent, fidl::Error> {
         SecondProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
 

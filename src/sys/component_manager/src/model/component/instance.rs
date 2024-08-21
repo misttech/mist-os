@@ -1091,7 +1091,7 @@ pub struct StartedInstanceState {
     program: Option<ProgramRuntime>,
 
     /// Approximates when the component was started.
-    pub timestamp: zx::Time,
+    pub timestamp: zx::MonotonicTime,
 
     /// Describes why the component instance was started
     pub start_reason: StartReason,
@@ -1123,7 +1123,7 @@ impl StartedInstanceState {
         execution_controller_task: Option<controller::ExecutionControllerTask>,
         logger: Option<ScopedLogger>,
     ) -> Self {
-        let timestamp = zx::Time::get_monotonic();
+        let timestamp = zx::MonotonicTime::get_monotonic();
         StartedInstanceState {
             program: program.map(|p| ProgramRuntime::new(p, component)),
             timestamp,
