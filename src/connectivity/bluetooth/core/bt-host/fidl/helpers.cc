@@ -1963,7 +1963,8 @@ bt::gap::BrEdrSecurityRequirements FidlToBrEdrSecurityRequirements(
   return requirements;
 }
 
-bt::sco::ParameterSet FidlToScoParameterSet(const fbredr::HfpParameterSet param_set) {
+std::optional<bt::sco::ParameterSet> FidlToScoParameterSet(
+    const fbredr::HfpParameterSet param_set) {
   switch (param_set) {
     case fbredr::HfpParameterSet::T1:
       return bt::sco::kParameterSetT1;
@@ -1981,6 +1982,8 @@ bt::sco::ParameterSet FidlToScoParameterSet(const fbredr::HfpParameterSet param_
       return bt::sco::kParameterSetD0;
     case fbredr::HfpParameterSet::D1:
       return bt::sco::kParameterSetD1;
+    default:
+      return std::nullopt;
   }
 }
 
@@ -2061,8 +2064,12 @@ FidlToScoParameters(const fbredr::ScoConnectionParameters& params) {
     return fpromise::error();
   }
   auto param_set = FidlToScoParameterSet(params.parameter_set());
-  view.transmit_bandwidth().Write(param_set.transmit_receive_bandwidth);
-  view.receive_bandwidth().Write(param_set.transmit_receive_bandwidth);
+  if (!param_set.has_value()) {
+    bt_log(WARN, "fidl", "Unrecognized SCO parameters parameter_set");
+    return fpromise::error();
+  }
+  view.transmit_bandwidth().Write(param_set.value().transmit_receive_bandwidth);
+  view.receive_bandwidth().Write(param_set.value().transmit_receive_bandwidth);
 
   if (!params.has_air_coding_format()) {
     bt_log(WARN, "fidl", "SCO parameters missing air_coding_format");
@@ -2159,11 +2166,11 @@ FidlToScoParameters(const fbredr::ScoConnectionParameters& params) {
   view.input_transport_unit_size_bits().Write(0u);
   view.output_transport_unit_size_bits().Write(0u);
 
-  view.max_latency_ms().Write(param_set.max_latency_ms);
-  view.packet_types().BackingStorage().WriteUInt(param_set.packet_types);
+  view.max_latency_ms().Write(param_set.value().max_latency_ms);
+  view.packet_types().BackingStorage().WriteUInt(param_set.value().packet_types);
   view.retransmission_effort().Write(
       static_cast<pw::bluetooth::emboss::SynchronousConnectionParameters::ScoRetransmissionEffort>(
-          param_set.retransmission_effort));
+          param_set.value().retransmission_effort));
 
   return fpromise::ok(out);
 }

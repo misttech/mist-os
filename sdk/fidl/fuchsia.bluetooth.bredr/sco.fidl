@@ -14,7 +14,7 @@ type ScoErrorCode = flexible enum {
 };
 
 /// Codec parameter sets defined in the Hands-Free Profile specification (v1.8, section 5.7).
-type HfpParameterSet = strict enum : uint8 {
+type HfpParameterSet = flexible enum : uint8 {
     T1 = 1;
     T2 = 2;
     S1 = 3;
