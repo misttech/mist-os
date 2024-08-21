@@ -550,6 +550,12 @@ group("num-traits") {
   public_deps = [ ":num-traits-v0_2_18" ]
 }
 
+if (!(current_os == "fuchsia")) {
+  group("num_cpus") {
+    public_deps = [ ":num_cpus-v1_16_0" ]
+  }
+}
+
 group("omaha_client") {
   public_deps = [ ":omaha_client-v0_2_1" ]
 }
@@ -3497,7 +3503,7 @@ rust_library("criterion-v0_2_11") {
   deps += [ ":rand_core-v0_3_1" ]
   deps += [ ":rand_os-v0_1_2" ]
   deps += [ ":rand_xoshiro-v0_1_0" ]
-  deps += [ ":rayon-core-v1_9_3" ]
+  deps += [ ":rayon-core-v1_12_1" ]
   deps += [ ":rayon-v1_5_3" ]
   deps += [ ":serde-v1_0_204" ]
   deps += [ ":serde_derive-v1_0_204($host_toolchain)" ]
@@ -3588,7 +3594,6 @@ rust_library("crossbeam-channel-v0_5_1") {
     "-Cmetadata=4f2cca7fb0f4b481",
     "-Cextra-filename=-4f2cca7fb0f4b481",
     "--cfg=feature=\"crossbeam-utils\"",
-    "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
   ]
 
@@ -8825,7 +8830,8 @@ rust_library("num_cpus-v1_16_0") {
     "-Cextra-filename=-a19523bee9466ca1",
   ]
 
-  visibility = [ ":*" ]
+  visibility = []
+  visibility += [ ":*" ]
 
   applicable_licenses = [ ":num_cpus-v1_16_0.license" ]
 }
@@ -11676,7 +11682,7 @@ rust_library("rayon-v1_5_3") {
   deps = []
   deps += [ ":crossbeam-deque-v0_8_1" ]
   deps += [ ":either-v1_8_0" ]
-  deps += [ ":rayon-core-v1_9_3" ]
+  deps += [ ":rayon-core-v1_12_1" ]
 
   rustenv = []
 
@@ -11695,38 +11701,36 @@ rust_library("rayon-v1_5_3") {
   applicable_licenses = [ ":rayon-v1_5_3.license" ]
 }
 
-license("rayon-core-v1_9_3.license") {
+license("rayon-core-v1_12_1.license") {
   public_package_name = "rayon_core"
   license_files = [
-    "//third_party/rust_crates/vendor/rayon-core-1.9.3/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/rayon-core-1.9.3/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/rayon-core-1.12.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/rayon-core-1.12.1/LICENSE-MIT",
   ]
 }
 
-rust_library("rayon-core-v1_9_3") {
+rust_library("rayon-core-v1_12_1") {
   crate_name = "rayon_core"
-  crate_root = "//third_party/rust_crates/vendor/rayon-core-1.9.3/src/lib.rs"
-  output_name = "rayon_core-61be3cf1fea0e3c5"
+  crate_root = "//third_party/rust_crates/vendor/rayon-core-1.12.1/src/lib.rs"
+  output_name = "rayon_core-f03304964cc74a48"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
-  deps += [ ":crossbeam-channel-v0_5_1" ]
   deps += [ ":crossbeam-deque-v0_8_1" ]
   deps += [ ":crossbeam-utils-v0_8_14" ]
-  deps += [ ":num_cpus-v1_16_0" ]
 
   rustenv = []
 
   rustflags = [
     "--cap-lints=allow",
-    "--edition=2018",
-    "-Cmetadata=61be3cf1fea0e3c5",
-    "-Cextra-filename=-61be3cf1fea0e3c5",
+    "--edition=2021",
+    "-Cmetadata=f03304964cc74a48",
+    "-Cextra-filename=-f03304964cc74a48",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":rayon-core-v1_9_3.license" ]
+  applicable_licenses = [ ":rayon-core-v1_12_1.license" ]
 }
 
 license("rdrand-v0_4_0.license") {

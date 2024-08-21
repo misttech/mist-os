@@ -288,6 +288,9 @@ loom = "0.7.1"
 # pulled in automatically by tokio
 mio = { version = "0.8.9", features = ["net", "os-ext", "os-poll"] }
 notify = { version = "5.1.0", default-features = false, features = ["macos_fsevent"] }
+# TODO(https://fxbug.dev/106164) Remove this explicit num_cpus dependency when it can be
+# pulled in automatically by tokio
+num_cpus = "1.16.0"
 # See b/42169853, not used for target-side code to avoid system-wide impact of yield in spinloops.
 parking_lot = "0.12.0"
 petgraph = { version = "0.6.2" }
@@ -631,6 +634,11 @@ rustflags = ["--cfg=use_addcarry"]
 [gn.package.num-complex."0.4.0"]
 rustflags = ["--cfg=has_i128", "--cfg=has_const_fn"]
 
+[gn.package.num_cpus."1.16.0"]
+# We need to explicitly depend on num_cpus for tokio, but we're not exposing it
+# to first party code.
+visibility = [ ":*" ]
+
 [gn.package.num-integer."0.1.44"]
 rustflags = ["--cfg=has_i128"]
 
@@ -708,7 +716,7 @@ rustflags = [
   "--cfg=has_step_by_rev",
 ]
 
-[gn.package.rayon-core."1.9.3"]
+[gn.package.rayon-core."1.12.1"]
 # Has build script but no config needed.
 
 [gn.package.ref-cast."1.0.9"]
