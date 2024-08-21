@@ -10,6 +10,7 @@ import("//build/test.gni")
 import("//build/testing/environments.gni")
 import("//build/testing/perf/test.gni")
 import("//src/starnix/tests/build/starnix_host_test_component.gni")
+import("//src/storage/fshost/generated_fshost_config.gni")
 
 test("loopback_socket_benchmarks") {
   sources = [ "loopback_socket_benchmarks.cc" ]
@@ -182,7 +183,10 @@ if (target_cpu != "riscv64") {
 }
 
 # TODO(b/298565565): Enable these on vim3.
-if (host_os == "linux" && target_cpu == "x64" && !is_asan) {
+# TODO(https://fxbug.dev/359323478): Figure out a better way to disable these tests on Minfs without
+# relying on a global GN argument.
+if (host_os == "linux" && target_cpu == "x64" && !is_asan &&
+    data_filesystem_format != "minfs") {
   starnix_host_test_component("loopback-socket-benchmarks-starnix") {
     test_label = ":loopback_socket_benchmarks"
     test_binary = "loopback_socket_benchmarks"
