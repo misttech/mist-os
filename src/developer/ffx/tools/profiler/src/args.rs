@@ -105,7 +105,8 @@ pub struct Launch {
     #[argh(option, default = "true")]
     pub pprof_conversion: bool,
 
-    /// how frequently to take a sample
+    /// how frequently to take a sample. This is the time interval between samples, in
+    /// microseconds. The default is 10,000 microseconds (10 ms).
     #[argh(option, default = "10000")]
     pub sample_period_us: u64,
 }
