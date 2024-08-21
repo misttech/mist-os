@@ -1,0 +1,14 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+group("rustdoc") {
+  testonly = true
+  deps = [
+    "//build/rust/tests/rustdoc/cargo-transitive",
+    "//build/rust/tests/rustdoc/cargo-transitive-no-index",
+    "//build/rust/tests/rustdoc/single-crate-baseline",
+    "//build/rust/tests/rustdoc/single-crate-no-index",
+    "//build/rust/tests/rustdoc/working-dir-examples",
+    "//build/rust/tests/rustdoc/write-docs-somewhere-else",
+  ]
+}

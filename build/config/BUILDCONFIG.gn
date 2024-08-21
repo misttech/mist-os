@@ -420,6 +420,7 @@ if (zircon_toolchain == false) {
     "//build/config/rust:incremental",
     "//build/config/rust:no_features",
     "//build/config/rust:target",
+    "//build/config/rust:cap_lints",
     "//build/config/rust:2018_idioms",
     "//build/config:werror",
     "//build/config:no-template-backtrace-limit",
@@ -3788,14 +3789,75 @@ _built_in_target_types_without_public_wrapper -= [ "static_library" ]
 #   direct and transitive dependencies.
 #
 template("rust_library") {
-  _rust_library_internal_wrapper(target_name) {
+  # use include_rustdoc from declare_args below
+  import("//build/rust/include_rustdoc.gni")
+
+  # only want to define .rustdoc targets for environments that have
+  # include_rustdoc = true and targets that don't disable_rustdoc = true
+  _disable_rustdoc = (defined(invoker.disable_rustdoc) &&
+                      invoker.disable_rustdoc) || !include_rustdoc
+  if (!_disable_rustdoc) {
+    # don't want to import //build/config/sysroot.gni (imported indirectly from
+    # rustdoc.gni) into every BUILD.gn
+    import("//build/rust/rustdoc.gni")
+  }
+
+  actual_name = "$target_name"
+
+  # The rustdoc target needs an output file, so rustdoc_wrapper.py touches
+  # rustdoc_token_output after rustdoc exits successfully. Defined here because
+  # we put it in our metadata.
+  _rustdoc_token_output = "$target_gen_dir/$target_name.touch"
+
+  forward_variables_from(invoker,
+                         [
+                           "rustdoc_out_dir",
+                           "rustdoc_name",
+                         ])
+
+  if (!defined(rustdoc_out_dir)) {
+    rustdoc_out_dir = "$target_gen_dir/$target_name.doc"
+  }
+
+  if (!defined(rustdoc_name)) {
+    rustdoc_name = "$target_name.rustdoc"
+  }
+  if (!_disable_rustdoc) {
+    rustdoc(rustdoc_name) {
+      forward_variables_from(invoker,
+                             [
+                               "actual_name",
+                               "aliased_deps",
+                               "configs",
+                               "crate_name",
+                               "crate_root",
+                               "crate_type",
+                               "quiet_rustdoc",
+                               "rustdoc_args",
+                               "rustenv",
+                               "rustflags",
+                               "testonly",
+                               "visibility",
+                               "zip_rustdoc_to",
+                             ])
+      invoker_deps = invoker.deps
+      rustdoc_crate_type = "rlib"
+      rustdoc_token_output = _rustdoc_token_output
+
+      rustdoc_out_dir = rustdoc_out_dir
+    }
+  }
+
+  _rust_library_internal_wrapper(actual_name) {
     forward_variables_from(invoker,
                            "*",
                            [
                              "applicable_licenses",
                              "metadata",
+                             "visibility",
                            ])
     forward_variables_from(invoker, [ "applicable_licenses" ])
+    forward_variables_from(invoker, [ "visibility" ])
     if (!defined(inputs)) {
       inputs = []
     }
@@ -3806,6 +3868,12 @@ template("rust_library") {
         output_dir += "/" + target_name
       }
     }
+    if (!defined(gen_deps)) {
+      gen_deps = []
+    }
+    if (!_disable_rustdoc) {
+      gen_deps += [ ":$rustdoc_name" ]
+    }
     _rlib = rebase_path("$output_dir/lib${output_name}.rlib", root_build_dir)
     _searchdir = rebase_path(output_dir, root_build_dir)
     metadata = {
@@ -3814,6 +3882,30 @@ template("rust_library") {
       }
       rlib = [ "--extern=$crate_name=$_rlib" ]
       searchdir = [ "-Ldependency=$_searchdir" ]
+
+      # info about a target that is going to be rustdoc'd
+      # rustdoc metadata must be here, because sometimes rustdoc
+      # targets are gen_deps'd and not deps'd
+      rust_target_mapping = [
+        {
+          disable_rustdoc = _disable_rustdoc
+          rustdoc_label =
+              get_label_info(":$rustdoc_name", "label_with_toolchain")
+          actual_label = get_label_info(":$actual_name", "label_with_toolchain")
+          rustdoc_out_dir = rebase_path(rustdoc_out_dir, root_build_dir)
+
+          if (!_disable_rustdoc) {
+            target = current_target_tuple
+            extern_html_root_url = rustdoc_extern_html_root_url
+          }
+          extern = "--extern=$crate_name=$_rlib"
+
+          # rustdoc-link.py inspects this mtime to avoid unneeded copies
+          touch = rebase_path(_rustdoc_token_output, root_build_dir)
+          searchdir = "-Ldependency=$_searchdir"
+        },
+      ]
+
       rust_barrier = []
     }
   }

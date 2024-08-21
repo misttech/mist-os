@@ -5941,6 +5941,9 @@ rust_library("generator-v0_7_5") {
 
   visibility = []
   visibility += [ ":loom-v0_7_1" ]
+  visibility += [ ":loom-v0_7_1.rustdoc" ]
+  visibility += [ ":loom-v0_7_1.rustdoc.deps" ]
+  visibility += [ ":loom-v0_7_1.rustdoc.transdeps" ]
   testonly = true
   applicable_licenses = [ ":generator-v0_7_5.license" ]
 }
@@ -12240,6 +12243,24 @@ rust_library("ring-v0_16_20") {
   visibility += [ ":trust-dns-proto-v0_21_2" ]
   visibility += [ ":tuf-v0_3_0-beta12" ]
   visibility += [ ":webpki-v0_21_0" ]
+  visibility += [ ":ring.rustdoc" ]
+  visibility += [ ":rustls-v0_19_1.rustdoc" ]
+  visibility += [ ":sct-v0_6_0.rustdoc" ]
+  visibility += [ ":trust-dns-proto-v0_21_2.rustdoc" ]
+  visibility += [ ":tuf-v0_3_0-beta12.rustdoc" ]
+  visibility += [ ":webpki-v0_21_0.rustdoc" ]
+  visibility += [ ":ring.rustdoc.deps" ]
+  visibility += [ ":rustls-v0_19_1.rustdoc.deps" ]
+  visibility += [ ":sct-v0_6_0.rustdoc.deps" ]
+  visibility += [ ":trust-dns-proto-v0_21_2.rustdoc.deps" ]
+  visibility += [ ":tuf-v0_3_0-beta12.rustdoc.deps" ]
+  visibility += [ ":webpki-v0_21_0.rustdoc.deps" ]
+  visibility += [ ":ring.rustdoc.transdeps" ]
+  visibility += [ ":rustls-v0_19_1.rustdoc.transdeps" ]
+  visibility += [ ":sct-v0_6_0.rustdoc.transdeps" ]
+  visibility += [ ":trust-dns-proto-v0_21_2.rustdoc.transdeps" ]
+  visibility += [ ":tuf-v0_3_0-beta12.rustdoc.transdeps" ]
+  visibility += [ ":webpki-v0_21_0.rustdoc.transdeps" ]
 
   applicable_licenses = [ ":ring-v0_16_20.license" ]
 }
@@ -13154,6 +13175,10 @@ rust_library("scoped-tls-v1_0_1") {
 
   visibility = []
   visibility += [ ":loom-v0_7_1" ]
+  visibility += [ ":loom-v0_7_1" ]
+  visibility += [ ":loom-v0_7_1.rustdoc" ]
+  visibility += [ ":loom-v0_7_1.rustdoc.deps" ]
+  visibility += [ ":loom-v0_7_1.rustdoc.transdeps" ]
   testonly = true
   applicable_licenses = [ ":scoped-tls-v1_0_1.license" ]
 }

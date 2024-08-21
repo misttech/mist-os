@@ -268,10 +268,13 @@ template("rustc_library") {
                              "pool",
                              "public_deps",
                              "quiet_clippy",
+                             "rustdoc_args",
+                             "rustdoc_out_dir",
                              "rustenv",
                              "sources",
                              "testonly",
                              "visibility",
+                             "zip_rustdoc_to",
                            ])
 
     # Avoid walking into data_deps when checking component manifest expected includes.
