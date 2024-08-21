@@ -59,9 +59,9 @@ class Sampler {
 
  protected:
   zx::result<> WatchTarget(const JobTarget& target);
-  virtual void AddThread(std::vector<const zx_koid_t> job_path, zx_koid_t pid, zx_koid_t tid,
+  virtual void AddThread(std::vector<zx_koid_t> job_path, zx_koid_t pid, zx_koid_t tid,
                          zx::thread t);
-  virtual void RemoveThread(std::vector<const zx_koid_t> job_path, zx_koid_t pid, zx_koid_t tid);
+  virtual void RemoveThread(std::vector<zx_koid_t> job_path, zx_koid_t pid, zx_koid_t tid);
 
   void CollectSamples(async_dispatcher_t* dispatcher, async::TaskBase* task, zx_status_t status);
 

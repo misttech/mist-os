@@ -159,7 +159,7 @@ Collection ToCollection(fdf::DriverPackageType package) {
 // parents. If one of `node`'s parent's collection is none then check the
 // parent's parents and so on.
 Collection GetHighestRankingCollection(const Node& node, Collection collection) {
-  std::stack<const std::weak_ptr<Node>> ancestors;
+  std::stack<std::weak_ptr<Node>> ancestors;
   for (const auto& parent : node.parents()) {
     ancestors.emplace(parent);
   }

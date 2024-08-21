@@ -194,7 +194,7 @@ zx::duration FrameStats::CalculateMeanDuration(
   FX_DCHECK(percentile <= 100);
 
   const size_t num_frames = timestamps.size();
-  std::list<const zx::duration> durations;
+  std::list<zx::duration> durations;
   for (auto& times : timestamps) {
     durations.emplace_back(duration_func(times));
   }

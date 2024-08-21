@@ -101,7 +101,7 @@ zx::result<> profiler::KernelSampler::Start(size_t buffer_size_mb) {
           }
         }
 
-        std::vector<const zx_koid_t> saved_path{job_path.begin(), job_path.end()};
+        std::vector<zx_koid_t> saved_path{job_path.begin(), job_path.end()};
         auto process_watcher = std::make_unique<ProcessWatcher>(
             p.handle.borrow(),
             [saved_path, this](zx_koid_t pid, zx_koid_t tid, zx::thread t) {
@@ -240,7 +240,7 @@ zx::result<> profiler::KernelSampler::Stop() {
   return zx::make_result(encountered_error);
 }
 
-void profiler::KernelSampler::AddThread(std::vector<const zx_koid_t> job_path, zx_koid_t pid,
+void profiler::KernelSampler::AddThread(std::vector<zx_koid_t> job_path, zx_koid_t pid,
                                         zx_koid_t tid, zx::thread t) {
   if (zx::result res = session_->AttachThread(t); res.is_error()) {
     FX_PLOGS(ERROR, res.status_value()) << "Failed to start sampling thread: " << tid;
@@ -254,7 +254,7 @@ void profiler::KernelSampler::AddThread(std::vector<const zx_koid_t> job_path, z
   }
 }
 
-void profiler::KernelSampler::RemoveThread(std::vector<const zx_koid_t> job_path, zx_koid_t pid,
+void profiler::KernelSampler::RemoveThread(std::vector<zx_koid_t> job_path, zx_koid_t pid,
                                            zx_koid_t tid) {
   zx::result res = targets_.RemoveThread(job_path, pid, tid);
   if (res.is_error()) {

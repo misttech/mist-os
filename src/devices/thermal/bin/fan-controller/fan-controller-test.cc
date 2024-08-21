@@ -72,7 +72,7 @@ class FakeClientStateServer : public fidl::Server<fuchsia_thermal::ClientStateCo
  private:
   fidl::ServerBinding<fuchsia_thermal::ClientStateConnector> binding_;
 
-  std::queue<const std::string> expected_connect_;
+  std::queue<std::string> expected_connect_;
   std::map<std::string, FakeWatcher> watchers_;
 };
 

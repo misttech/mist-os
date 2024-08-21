@@ -87,12 +87,12 @@ struct PlatformCostsEntry {
   // platform values.
   const Platform next_platform;
 
-  const std::list<const UsagePixelFormatCostEntry>& costs;
+  const std::list<UsagePixelFormatCostEntry>& costs;
 };
 
 static void AddRgbaPixelFormat(fidl::AnyArena& allocator,
                                fuchsia_images2::PixelFormatModifier format_modifier, double cost,
-                               std::list<const UsagePixelFormatCostEntry>& result) {
+                               std::list<UsagePixelFormatCostEntry>& result) {
   // Both RGBA and BGRA versions have similar cost, if they're supported. At least for now we also
   // include corresponding "X" formats at the same nominal cost, though we may adjust this later
   // since X should be measurably cheaper than A at least in some cases.
@@ -124,8 +124,8 @@ static void AddRgbaPixelFormat(fidl::AnyArena& allocator,
 constexpr size_t kAllocatorSize = 3792;
 fidl::Arena<kAllocatorSize> allocator;
 
-const std::list<const UsagePixelFormatCostEntry> kArm_Mali_Cost_Entries = [] {
-  std::list<const UsagePixelFormatCostEntry> result;
+const std::list<UsagePixelFormatCostEntry> kArm_Mali_Cost_Entries = [] {
+  std::list<UsagePixelFormatCostEntry> result;
   // Split block is slightly worse than non-split-block for GPU<->GPU, but better for GPU->display.
   constexpr double kSplitCost = 10.0;
   constexpr double kNonYuvCost = 100.0;
@@ -180,8 +180,8 @@ const PlatformCostsEntry kArm_Mali_Costs = {
     .costs = kArm_Mali_Cost_Entries,
 };
 
-const std::list<const UsagePixelFormatCostEntry> kAmlogic_Generic_Cost_Entries = [] {
-  std::list<const UsagePixelFormatCostEntry> result;
+const std::list<UsagePixelFormatCostEntry> kAmlogic_Generic_Cost_Entries = [] {
+  std::list<UsagePixelFormatCostEntry> result;
   // NV12 weakly preferred for VIDEO_USAGE_HW_DECODER.
   fuchsia_images2::PixelFormat pixel_format;
   pixel_format = fuchsia_images2::PixelFormat::kNv12;
@@ -201,8 +201,8 @@ const std::list<const UsagePixelFormatCostEntry> kAmlogic_Generic_Cost_Entries =
 }();
 
 // These costs are expected to be true on every platform.
-const std::list<const UsagePixelFormatCostEntry> kGeneric_Cost_Entries = [] {
-  std::list<const UsagePixelFormatCostEntry> result;
+const std::list<UsagePixelFormatCostEntry> kGeneric_Cost_Entries = [] {
+  std::list<UsagePixelFormatCostEntry> result;
   AddRgbaPixelFormat(allocator, fuchsia_images2::PixelFormatModifier::kIntelI915YfTiledCcs, 500.0,
                      result);
   AddRgbaPixelFormat(allocator, fuchsia_images2::PixelFormatModifier::kIntelI915YTiledCcs, 600.0,
@@ -229,7 +229,7 @@ const PlatformCostsEntry kAmlogic_Generic_Costs = {
 const PlatformCostsEntry kAmlogic_S912_Costs = {
     .platform = kPlatform_Amlogic_S912,
     .next_platform = kPlatform_Amlogic_Generic,
-    .costs = std::list<const UsagePixelFormatCostEntry>(),
+    .costs = std::list<UsagePixelFormatCostEntry>(),
 };
 
 // kAmlogic_S905D2_Cost_Entries will go here.
@@ -237,7 +237,7 @@ const PlatformCostsEntry kAmlogic_S912_Costs = {
 const PlatformCostsEntry kAmlogic_S905D2_Costs = {
     .platform = kPlatform_Amlogic_S905D2,
     .next_platform = kPlatform_Amlogic_Generic,
-    .costs = std::list<const UsagePixelFormatCostEntry>(),
+    .costs = std::list<UsagePixelFormatCostEntry>(),
 };
 
 // kAmlogic_T931_Cost_Entries will go here.
@@ -245,7 +245,7 @@ const PlatformCostsEntry kAmlogic_S905D2_Costs = {
 const PlatformCostsEntry kAmlogic_T931_Costs = {
     .platform = kPlatform_Amlogic_T931,
     .next_platform = kPlatform_Amlogic_Generic,
-    .costs = std::list<const UsagePixelFormatCostEntry>(),
+    .costs = std::list<UsagePixelFormatCostEntry>(),
 };
 
 // kAmlogic_A311D_Cost_Entries will go here.
@@ -253,7 +253,7 @@ const PlatformCostsEntry kAmlogic_T931_Costs = {
 const PlatformCostsEntry kAmlogic_A311D_Costs = {
     .platform = kPlatform_Amlogic_A311D,
     .next_platform = kPlatform_Amlogic_Generic,
-    .costs = std::list<const UsagePixelFormatCostEntry>(),
+    .costs = std::list<UsagePixelFormatCostEntry>(),
 };
 
 const PlatformCostsEntry kGeneric_Costs = {

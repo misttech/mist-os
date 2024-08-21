@@ -10,7 +10,7 @@
 
 namespace memory {
 
-const std::vector<const NameMatch> Summary::kNameMatches = {
+const std::vector<NameMatch> Summary::kNameMatches = {
     // To prevent the [bootfs-libraries] regex from catching ld.so.1-internal-heap,
     // this regex must be before the [bootfs-libraries] regex.
     {.regex = "ld\\.so\\.1-internal-heap|(^stack: msg of.*)", .name = "[process-bootstrap]"},
@@ -24,7 +24,7 @@ const std::vector<const NameMatch> Summary::kNameMatches = {
     {.regex = "scudo:.*", .name = "[scudo]"},
     {.regex = ".*\\.so.*", .name = "[bootfs-libraries]"}};
 
-Namer::Namer(const std::vector<const NameMatch>& name_matches) {
+Namer::Namer(const std::vector<NameMatch>& name_matches) {
   regex_matches_.reserve(name_matches.size());
   for (size_t i = 0; i < name_matches.size(); i++) {
     regex_matches_.push_back(RegexMatch{.regex = std::make_unique<re2::RE2>(name_matches[i].regex),
@@ -47,7 +47,7 @@ const std::string& Namer::NameForName(const std::string& name) {
   return name;
 }
 
-Summary::Summary(const Capture& capture, const std::vector<const NameMatch>& name_matches)
+Summary::Summary(const Capture& capture, const std::vector<NameMatch>& name_matches)
     : time_(capture.time()), kstats_(capture.kmem()) {
   Namer namer(name_matches);
   std::unordered_set<zx_koid_t> empty_vmos;

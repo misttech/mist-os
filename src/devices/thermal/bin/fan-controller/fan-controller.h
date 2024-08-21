@@ -45,7 +45,7 @@ class FanController {
 
   struct ControllerInstance {
     fidl::Client<fuchsia_thermal::ClientStateWatcher> watcher_;
-    std::list<const fidl::SyncClient<fuchsia_hardware_fan::Device>> fans_;
+    std::list<fidl::SyncClient<fuchsia_hardware_fan::Device>> fans_;
 
     void WatchCallback(fidl::Result<fuchsia_thermal::ClientStateWatcher::Watch>& result);
   };
