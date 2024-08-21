@@ -917,6 +917,16 @@
         "type": "uint32"
     },
     {
+        "kind": "table/member",
+        "name": "fuchsia.sysmem2/Config.format_costs",
+        "ordinal": "1",
+        "type": "vector<fuchsia.sysmem2/FormatCostEntry>"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.sysmem2/Config"
+    },
+    {
         "kind": "const",
         "name": "fuchsia.sysmem2/DISPLAY_USAGE_CURSOR",
         "type": "uint32",
@@ -978,6 +988,54 @@
         "name": "fuchsia.sysmem2/Error",
         "strictness": "flexible",
         "type": "uint32"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sysmem2/FormatCostEntry.cost",
+        "ordinal": "2",
+        "type": "float32"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sysmem2/FormatCostEntry.key",
+        "ordinal": "1",
+        "type": "fuchsia.sysmem2/FormatCostKey"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.sysmem2/FormatCostEntry"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sysmem2/FormatCostKey.buffer_usage_bits",
+        "ordinal": "3",
+        "type": "fuchsia.sysmem2/BufferUsage"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sysmem2/FormatCostKey.pixel_format",
+        "ordinal": "1",
+        "type": "fuchsia.images2/PixelFormat"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sysmem2/FormatCostKey.pixel_format_modifier",
+        "ordinal": "2",
+        "type": "fuchsia.images2/PixelFormatModifier"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.sysmem2/FormatCostKey"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.sysmem2/FormatCosts.format_costs",
+        "ordinal": "1",
+        "type": "vector<fuchsia.sysmem2/FormatCostEntry>"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.sysmem2/FormatCosts"
     },
     {
         "kind": "table/member",

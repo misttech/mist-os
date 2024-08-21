@@ -30,6 +30,7 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
         thermal_config,
         thread_roles,
         power_metrics_recorder_config,
+        sysmem_format_costs_config,
     } = args;
     let bundle_file_path = outdir.join("board_input_bundle.json");
 
@@ -100,6 +101,17 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
         })
         .collect::<Result<Vec<FileRelativePathBuf>>>()?;
 
+    let sysmem_format_costs_config = sysmem_format_costs_config
+        .iter()
+        .map(|format_costs_file| {
+            let filename = format_costs_file.file_name().ok_or_else(|| {
+                anyhow!("Sysmem format costs file doesn't have a filename: {}", format_costs_file)
+            })?;
+            copy_config_file(format_costs_file, filename, &config_files_dir)
+                .context("copying sysmem format costs file to config files dir")
+        })
+        .collect::<Result<Vec<FileRelativePathBuf>>>()?;
+
     //========
     // Copy the drivers and packages to the outdir, writing the package manifests
     // using file-relative paths to the subpackages dir and the blobstore.  As
@@ -157,6 +169,7 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
             || system_power_mode_config.is_some()
             || thermal_config.is_some()
             || !thread_roles.is_empty()
+            || !sysmem_format_costs_config.is_empty()
         {
             Some(BoardProvidedConfig {
                 cpu_manager: cpu_manager_config,
@@ -165,6 +178,7 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
                 system_power_mode: system_power_mode_config,
                 thermal: thermal_config,
                 thread_roles: thread_roles_config,
+                sysmem_format_costs: sysmem_format_costs_config,
             })
         } else {
             None

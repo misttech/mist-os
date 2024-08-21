@@ -28,11 +28,11 @@ driver_bind_rules("sysmem_bind") {
 }
 
 # These build args are not the correct place to configure sysmem (outside of
-# local experiments). Instead, use PlatformSysmemConfig via the assembly tool.
-# PlatformSysmemConfig fields can be set at board info level (if/when it makes
-# sense for a board definition to provide sysmem defaults) or at platform config
-# level (when configuring sysmem for a product / when configuring fuchsia via
-# fuchsia SDK).
+# local experiments). Instead, use BoardSysmemConfig and/or PlatformSysmemConfig
+# via the assembly tool. The settings in PlatformSysmemConfig can override
+# settings in the BoardSysmemConfig. See also
+# BoardProvidedConfig.sysmem_format_costs which can also be specified for the
+# board.
 #
 # TODO(b/347090887): Remove these when developer overrides are wired up for
 # bazel-based builds.

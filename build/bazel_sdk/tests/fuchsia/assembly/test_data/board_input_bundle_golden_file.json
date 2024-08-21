@@ -21,6 +21,7 @@
         "power_metrics_recorder": null,
         "system_power_mode": null,
         "thermal": null,
-        "thread_roles": []
+        "thread_roles": [],
+        "sysmem_format_costs": []
     }
 }

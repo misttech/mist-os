@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 use crate::common::{PackageDetails, PackagedDriverDetails};
-use crate::platform_config::sysmem_config::PlatformSysmemConfig;
+use crate::platform_config::sysmem_config::BoardSysmemConfig;
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use assembly_images_config::BoardFilesystemConfig;
 use serde::{Deserialize, Serialize};
@@ -159,6 +159,18 @@ pub struct BoardProvidedConfig {
     #[serde(default)]
     #[file_relative_paths]
     pub thread_roles: Vec<FileRelativePathBuf>,
+
+    /// Sysmem format costs configuration for the board. The file content bytes
+    /// are a persistent fidl fuchsia.sysmem2.FormatCosts. Normally json[5]
+    /// would be preferable for config, but we generate this config in rust
+    /// using FIDL types (to avoid repetition and to take advantage of FIDL rust
+    /// codegen), and there's no json schema for FIDL types.
+    ///
+    /// See BoardInformation.platform.sysmem_defaults for other board-level
+    /// sysmem config.
+    #[serde(default)]
+    #[file_relative_paths]
+    pub sysmem_format_costs: Vec<FileRelativePathBuf>,
 }
 
 /// Where to print the serial logs.
@@ -206,7 +218,7 @@ pub struct BoardKernelConfig {
 }
 
 /// This struct defines platform configurations specified by board.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
 pub struct PlatformConfig {
     /// Configure connectivity related features
@@ -223,8 +235,12 @@ pub struct PlatformConfig {
 
     /// Sysmem board defaults. This can be overridden field-by-field by the same
     /// struct in platform config.
+    ///
+    /// We don't provide format_costs_persistent_fidl files via this struct, as
+    /// a BoardInputBundle provides the files via the BoardProvidedConfig
+    /// struct.
     #[serde(default)]
-    pub sysmem_defaults: PlatformSysmemConfig,
+    pub sysmem_defaults: BoardSysmemConfig,
 }
 
 /// This struct defines connectivity configurations.
@@ -386,7 +402,7 @@ mod test {
                     enable_debug_access_port_for_soc: Some(DapSoc::AmlogicT931g),
                 },
                 graphics: GraphicsConfig::default(),
-                sysmem_defaults: PlatformSysmemConfig::default(),
+                sysmem_defaults: BoardSysmemConfig::default(),
             },
             ..Default::default()
         };

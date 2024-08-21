@@ -54,6 +54,7 @@ shutdown-shim
 spi
 startup
 sysinfo
+?sysmem-config
 sysmem-driver
 sysmem_connector
 ums-function

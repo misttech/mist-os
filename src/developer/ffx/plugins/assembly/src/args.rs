@@ -405,4 +405,14 @@ pub struct BoardInputBundleArgs {
     /// thread role configuration files
     #[argh(option)]
     pub thread_roles: Vec<Utf8PathBuf>,
+
+    /// sysmem format costs configuration files
+    ///
+    /// Each file's content bytes are a persistent fidl
+    /// fuchsia.sysmem2.FormatCosts. Normally json[5] would be preferable for
+    /// config, but we generate this config in rust using FIDL types (to avoid
+    /// repetition and to take advantage of FIDL rust codegen), and there's no
+    /// json schema for FIDL types.
+    #[argh(option)]
+    pub sysmem_format_costs_config: Vec<Utf8PathBuf>,
 }

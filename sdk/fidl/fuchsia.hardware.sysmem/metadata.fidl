@@ -36,9 +36,9 @@ type Metadata = table {
     ///
     /// This field is only for testing and may be removed. This field should not
     /// be set outside of tests. For board-level config, see
-    /// PlatformSysmemConfig.protected_memory_size in assembly board info
+    /// BoardSysmemConfig.protected_memory_size in assembly board info
     /// platform.sysmem_defaults field. For product/platform level config, see
-    /// assembly platform config "sysmem" field.
+    /// assembly platform config "sysmem" (PlatformSysmemConfig) field.
     3: protected_memory_size int64;
 
     /// contiguous_memory_size
@@ -62,8 +62,8 @@ type Metadata = table {
     ///
     /// This field is only for testing and may be removed. This field should not
     /// be set outside of tests. For board-level config, see
-    /// PlatformSysmemConfig.contiguous_memory_size in assembly board info
+    /// BoardSysmemConfig.contiguous_memory_size in assembly board info
     /// platform.sysmem_defaults field. For product/platform level config, see
-    /// assembly platform config "sysmem" field.
+    /// assembly platform config "sysmem" (PlatformSysmemConfig) field.
     4: contiguous_memory_size int64;
 };

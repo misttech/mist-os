@@ -236,6 +236,13 @@ pub(crate) trait DomainConfigDirectoryBuilder {
         destination: &str,
         contents: &str,
     ) -> Result<&mut dyn DomainConfigDirectoryBuilder>;
+
+    /// Add a file to the directory using the binary contents provided.
+    fn entry_from_binary_contents(
+        &mut self,
+        destination: &str,
+        contents: Vec<u8>,
+    ) -> Result<&mut dyn DomainConfigDirectoryBuilder>;
 }
 
 /// The interface for specifying the configuration to provide for a component.
@@ -455,6 +462,7 @@ pub struct DomainConfig {
 pub enum FileOrContents {
     File(FileEntry<String>),
     Contents(String),
+    BinaryContents(Vec<u8>),
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -588,6 +596,17 @@ impl DomainConfigDirectoryBuilder for DomainConfigDirectory {
                 destination.to_string(),
                 FileOrContents::Contents(contents.to_string()),
             )
+            .context("A config destination can only be set once for a domain config")?;
+        Ok(self)
+    }
+
+    fn entry_from_binary_contents(
+        &mut self,
+        destination: &str,
+        contents: Vec<u8>,
+    ) -> Result<&mut dyn DomainConfigDirectoryBuilder> {
+        self.entries
+            .try_insert_unique(destination.to_string(), FileOrContents::BinaryContents(contents))
             .context("A config destination can only be set once for a domain config")?;
         Ok(self)
     }

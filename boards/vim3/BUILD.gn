@@ -341,6 +341,13 @@ board_input_bundle("devicetree_board_driver") {
   configuration = {
     power_manager = "//src/power/power-manager/node_config/vim3_devicetree_node_config.json5"
     thermal = "//src/power/power-manager/thermal_config/vim3_devicetree.json5"
+    sysmem_format_costs = [
+      # order is significant; please don't alphabetize; correct order is:
+      # * arm_mali
+      # * video_decoder_nv12
+      "//src/devices/sysmem/format_costs/arm_mali",
+      "//src/devices/sysmem/format_costs/video_decoder_nv12",
+    ]
   }
   drivers = [
     {

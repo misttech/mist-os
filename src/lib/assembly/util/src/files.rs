@@ -145,6 +145,8 @@ pub enum BootfsPackageDestination {
     ArchivistPipelines,
     /// The component config package.
     Config,
+    /// Sysmem configuration.
+    SysmemConfig,
     /// Variant specifically for making tests easier.
     ForTest,
     /// Any package that came from an AIB.
@@ -165,6 +167,7 @@ impl std::fmt::Display for BootfsPackageDestination {
                     return write!(f, "{}", s),
                 Self::ArchivistPipelines => "archivist-pipelines",
                 Self::Config => "config",
+                Self::SysmemConfig => "sysmem-config",
                 Self::ForTest => "for-test",
             }
         )
