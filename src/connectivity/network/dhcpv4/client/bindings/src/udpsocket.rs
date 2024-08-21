@@ -203,10 +203,6 @@ impl dhcp_client_core::deps::Socket<std::net::SocketAddr> for UdpSocket {
     }
 }
 
-// TODO(https://fxbug.dev/333754253): Replace this with `libc::SO_BINDTOIFINDEX`
-// once the `libc` crate is updated.
-const SO_BINDTOIFINDEX: libc::c_int = 62;
-
 fn set_bindtoifindex(
     socket: &impl AsRawFd,
     interface_id: NonZeroU64,
@@ -219,7 +215,7 @@ fn set_bindtoifindex(
         libc::setsockopt(
             socket.as_raw_fd(),
             libc::SOL_SOCKET,
-            SO_BINDTOIFINDEX,
+            libc::SO_BINDTOIFINDEX,
             &interface_id as *const _ as *const libc::c_void,
             std::mem::size_of_val(&interface_id) as libc::socklen_t,
         )
