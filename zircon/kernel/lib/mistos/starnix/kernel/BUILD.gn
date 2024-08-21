@@ -52,8 +52,8 @@ zx_library("kernel") {
 
   public_deps = [
     "//zircon/kernel/lib/mistos/linux_uapi",
-    "//zircon/kernel/lib/mistos/starnix_syscalls",
-    "//zircon/kernel/lib/mistos/starnix_uapi",
+    "//zircon/kernel/lib/mistos/starnix/lib/starnix-syscalls",
+    "//zircon/kernel/lib/mistos/starnix/lib/starnix-uapi",
     "//zircon/kernel/lib/mistos/zx",
     "//zircon/system/ulib/zxtest:prod",
   ]

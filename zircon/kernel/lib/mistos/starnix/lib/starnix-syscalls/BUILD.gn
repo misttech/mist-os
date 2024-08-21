@@ -4,9 +4,9 @@
 
 import("//build/zircon/migrated_targets.gni")
 
-zx_library("starnix_syscalls") {
+zx_library("starnix-syscalls") {
   sources = []
-  public_deps = [ "//zircon/kernel/lib/mistos/starnix_uapi" ]
+  public_deps = [ "//zircon/kernel/lib/mistos/starnix/lib/starnix-uapi" ]
   deps = []
   public_configs = []
 }
