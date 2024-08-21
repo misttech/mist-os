@@ -78,6 +78,10 @@ pub struct BoardInformation {
     /// Configure platform related feature
     #[serde(default)]
     pub platform: PlatformConfig,
+
+    /// GUIDs for the TAs provided by this board's TEE driver.
+    #[serde(default)]
+    pub tee_trusted_app_guids: Vec<uuid::Uuid>,
 }
 
 /// This struct defines board-provided data for the 'fuchsia.hwinfo.Board' fidl
