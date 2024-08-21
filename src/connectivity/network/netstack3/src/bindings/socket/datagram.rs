@@ -675,7 +675,7 @@ where
     type SetSocketDeviceError = SocketError;
     type SetMulticastMembershipError = NotSupportedError;
     type MulticastInterfaceError = NotSupportedError;
-    type MulticastLoopError = NotSupportedError;
+    type MulticastLoopError = NotDualStackCapableError;
     type SetBroadcastError = NotSupportedError;
     type SetReuseAddrError = NotSupportedError;
     type SetReusePortError = NotSupportedError;
@@ -915,20 +915,36 @@ where
     }
 
     fn set_multicast_loop(
-        _ctx: &mut Ctx,
-        _id: &Self::SocketId,
-        _value: bool,
-        _ip_version: IpVersion,
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        value: bool,
+        ip_version: IpVersion,
     ) -> Result<(), Self::MulticastLoopError> {
-        Err(NotSupportedError)
+        // Disallow setting multicast loop when its version doesn't match the
+        // socket's version. This matches Linux's behavior for IPv4 sockets, but
+        // diverges from Linux's behavior for IPv6 sockets. Rejecting setting
+        // the IPv4 multicast loop for IPv6 sockets more accurately reflects
+        // that ICMP sockets do not support dual stack operations.
+        if I::VERSION != ip_version {
+            return Err(NotDualStackCapableError);
+        }
+        Ok(ctx.api().icmp_echo().set_multicast_loop(id, value))
     }
 
     fn get_multicast_loop(
-        _ctx: &mut Ctx,
-        _id: &Self::SocketId,
-        _ip_version: IpVersion,
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        ip_version: IpVersion,
     ) -> Result<bool, Self::MulticastLoopError> {
-        Err(NotSupportedError)
+        // Disallow fetching multicast loop when its version doesn't match the
+        // socket's version. This matches Linux's behavior for IPv4 sockets, but
+        // diverges from Linux's behavior for IPv6 sockets. Rejecting fetches of
+        // the IPv4 multicast loop for IPv6 sockets more accurately reflects
+        // that ICMP sockets do not support dual stack operations.
+        if I::VERSION != ip_version {
+            return Err(NotDualStackCapableError);
+        }
+        Ok(ctx.api().icmp_echo().get_multicast_loop(id))
     }
 
     fn set_broadcast(
@@ -3878,6 +3894,75 @@ mod tests {
     }
 
     declare_tests!(get_hop_limit_wrong_type);
+
+    #[fixture::teardown(TestSetup::shutdown)]
+    async fn set_get_multicast_loop<A: TestSockAddr, T>(
+        proto: fposix_socket::DatagramSocketProtocol,
+    ) {
+        let (t, proxy, _event) = prepare_test::<A>(proto).await;
+
+        for multicast_loop in [false, true] {
+            match <<A::AddrType as IpAddress>::Version as Ip>::VERSION {
+                IpVersion::V4 => proxy.set_ip_multicast_loopback(multicast_loop),
+                IpVersion::V6 => proxy.set_ipv6_multicast_loopback(multicast_loop),
+            }
+            .await
+            .unwrap()
+            .expect("set multicast loop should succeed");
+
+            assert_eq!(
+                match <<A::AddrType as IpAddress>::Version as Ip>::VERSION {
+                    IpVersion::V4 => proxy.get_ip_multicast_loopback(),
+                    IpVersion::V6 => proxy.get_ipv6_multicast_loopback(),
+                }
+                .await
+                .unwrap()
+                .expect("get multicast loop should succeed"),
+                multicast_loop
+            );
+        }
+
+        t
+    }
+
+    declare_tests!(set_get_multicast_loop);
+
+    #[fixture::teardown(TestSetup::shutdown)]
+    async fn set_get_multicast_loop_wrong_type<A: TestSockAddr, T>(
+        proto: fposix_socket::DatagramSocketProtocol,
+    ) {
+        let (t, proxy, _event) = prepare_test::<A>(proto).await;
+
+        const MULTICAST_LOOP: bool = false;
+        let (get_result, set_result) = match <<A::AddrType as IpAddress>::Version as Ip>::VERSION {
+            IpVersion::V4 => (
+                proxy.get_ipv6_multicast_loopback().await.unwrap(),
+                proxy.set_ipv6_multicast_loopback(MULTICAST_LOOP).await.unwrap(),
+            ),
+            IpVersion::V6 => (
+                proxy.get_ip_multicast_loopback().await.unwrap(),
+                proxy.set_ip_multicast_loopback(MULTICAST_LOOP).await.unwrap(),
+            ),
+        };
+
+        match (proto, <<A::AddrType as IpAddress>::Version as Ip>::VERSION) {
+            // UDPv6 is a dualstack capable protocol, so it allows getting &
+            // setting the IP_MULTICAST_LOOP of IPv6 sockets.
+            (fposix_socket::DatagramSocketProtocol::Udp, IpVersion::V6) => {
+                assert_matches!(get_result, Ok(_));
+                assert_matches!(set_result, Ok(_));
+            }
+            // All other [protocol, ip_version] are not dualstack capable.
+            (_, _) => {
+                assert_matches!(get_result, Err(_));
+                assert_matches!(set_result, Err(_));
+            }
+        }
+
+        t
+    }
+
+    declare_tests!(set_get_multicast_loop_wrong_type);
 
     #[fixture::teardown(TestSetup::shutdown)]
     async fn receive_original_destination_address<A: TestSockAddr, T>(
