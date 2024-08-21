@@ -12,8 +12,8 @@ use std::time::Duration;
     subcommand,
     name = "usage",
     description = "Controls the metrics-logger component to log gpu usage. Logged samples will \
-be available in syslog, via iquery under core/metrics-logger and via tracing in the gpu \
-category.",
+be available in syslog, via iquery under core/metrics-logger and via tracing in the \
+`metrics_logger` category.",
     example = "\
 To poll gpu usage every 500 ms indefinitely:
 

@@ -36,14 +36,14 @@ component to record the CPU usage data to Inspect, Trace, and/or syslog.
     $ ffx profile cpu load start --interval 500ms
 
     Logged samples will be available via iquery under core/metrics-logger and via tracing in the \
-    `cpu_usage` category.
+    `metrics_logger` category.
 
 3) To log CPU load every 1 second for 30 seconds with output-to-syslog enabled:
 
     $ ffx profile cpu load start --interval 1s -d 30s --output-to-syslog
 
     Logged samples will be available in syslog, via iquery under core/metrics-logger and via \
-    tracing in the `cpu_usage` category.
+    tracing in the `metrics_logger` category.
 ",
     note = "\
 Please specify a duration for immediate load display, or alternatively, utilize the start/stop \

@@ -12,8 +12,8 @@ use std::time::Duration;
     subcommand,
     name = "logger",
     description = "Controls the metrics-logger component to log power. Logged power samples will \
-be available in syslog, via iquery under core/metrics-logger and via tracing in the power_logger \
-category.",
+be available in syslog, via iquery under core/metrics-logger and via tracing in the \
+`metrics_logger` category.",
     example = "\
 To poll power sensor every 500 ms indefinitely:
 

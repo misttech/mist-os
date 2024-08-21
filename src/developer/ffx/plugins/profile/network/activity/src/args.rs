@@ -12,8 +12,8 @@ use std::time::Duration;
     subcommand,
     name = "activity",
     description = "Controls the metrics-logger component to log network activity. Logged samples \
-will be available in syslog, via iquery under core/metrics-logger and via tracing in the network \
-category.",
+will be available in syslog, via iquery under core/metrics-logger and via tracing in the \
+`metrics_logger` category.",
     example = "\
 To poll network activity every 500 ms indefinitely:
 

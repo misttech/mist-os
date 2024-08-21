@@ -13,7 +13,7 @@ use std::time::Duration;
     name = "logger",
     description = "Controls the metrics-logger component to log temperature. Logged temperature \
 samples will be available in syslog, via iquery under core/metrics-logger and via tracing in the \
-metrics_logger category.",
+`metrics_logger` category.",
     example = "\
 To poll temperature sensor every 500 ms indefinitely:
 
