@@ -4063,22 +4063,6 @@ assembly_input_bundle("fonts_hermetic") {
   ]
 }
 
-assembly_input_bundle("tee_manager_shard_only") {
-  compiled_packages = [
-    {
-      name = "core"
-      components = [
-        {
-          component_name = "core"
-          shards = [
-            "//src/security/bin/tee_manager/meta/tee_manager.core_shard.cml",
-          ]
-        },
-      ]
-    },
-  ]
-}
-
 # Static resources files to make available to product assembly subsystems.
 assembly_resources_directory("resources") {
   sources = [

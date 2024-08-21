@@ -291,9 +291,6 @@ user_platform_aib_names =
 
       # The tzif zoneinfo files
       "zoneinfo",
-
-      # Security / Trusted Execution
-      "tee_manager_shard_only",
     ]
 
 # The names of all userdebug-allowed platform Assembly Input Bundles
