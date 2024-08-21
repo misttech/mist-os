@@ -300,7 +300,7 @@ async fn test_sync_cancel_with_connections(
 
     assert_eq!(
         ui_input3::KeyEvent {
-            timestamp: Some(0i64),
+            timestamp: client_a_event.timestamp,
             key: Some(input::Key::A),
             type_: Some(ui_input3::KeyEventType::Cancel),
             ..Default::default()
@@ -310,7 +310,7 @@ async fn test_sync_cancel_with_connections(
 
     assert_eq!(
         ui_input3::KeyEvent {
-            timestamp: Some(0i64),
+            timestamp: client_b_event.timestamp,
             key: Some(input::Key::A),
             type_: Some(ui_input3::KeyEventType::Sync),
             ..Default::default()
