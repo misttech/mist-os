@@ -1323,6 +1323,7 @@ dependencies = [
  "memoffset 0.7.1",
  "miniz_oxide",
  "mio 0.8.9",
+ "mock-omaha-server",
  "mockall",
  "nix 0.26.2",
  "nom",
@@ -2255,6 +2256,28 @@ dependencies = [
 [[package]]
 name = "miow"
 version = "0.3.7"
+
+[[package]]
+name = "mock-omaha-server"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "02d4482f779a71117fb3222a8f4d1727f128a4596654a1f93de0b5bb381649d1"
+dependencies = [
+ "anyhow",
+ "argh",
+ "derive_builder",
+ "futures",
+ "hex",
+ "hyper",
+ "omaha_client",
+ "p256",
+ "serde",
+ "serde_json",
+ "sha2",
+ "thiserror",
+ "tracing",
+ "url 1.7.2",
+]
 
 [[package]]
 name = "mockall"

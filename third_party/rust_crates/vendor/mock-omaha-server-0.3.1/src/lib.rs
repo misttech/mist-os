@@ -1,8 +1,10 @@
-// Copyright 2020 The Fuchsia Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
-
-use fuchsia_merkle::Hash;
+// Copyright 2020 The Fuchsia Authors
+//
+// Licensed under a BSD-style license <LICENSE-BSD>, Apache License, Version 2.0
+// <LICENSE-APACHE or https://www.apache.org/licenses/LICENSE-2.0>, or the MIT
+// license <LICENSE-MIT or https://opensource.org/licenses/MIT>, at your option.
+// This file may not be copied, modified, or distributed except according to
+// those terms.
 
 use anyhow::Error;
 use derive_builder::Builder;
@@ -22,7 +24,6 @@ use sha2::{Digest, Sha256};
 use std::collections::HashMap;
 use std::convert::Infallible;
 use std::net::{Ipv4Addr, SocketAddr};
-use std::str::FromStr;
 use std::sync::Arc;
 use url::Url;
 
@@ -37,10 +38,10 @@ use {
     tokio::task::JoinHandle,
 };
 
-#[cfg(feature = "fasync")]
+#[cfg(fasync)]
 use {fuchsia_async as fasync, fuchsia_async::Task, fuchsia_sync::Mutex};
 
-#[cfg(all(feature = "fasync", not(target_os = "fuchsia")))]
+#[cfg(all(fasync, not(target_os = "fuchsia")))]
 use {
     async_net::TcpListener,
     async_net::TcpStream,
@@ -49,7 +50,7 @@ use {
     std::task::{Context, Poll},
 };
 
-#[cfg(all(feature = "fasync", target_os = "fuchsia"))]
+#[cfg(all(fasync, target_os = "fuchsia"))]
 use fuchsia_async::net::TcpListener;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Deserialize)]
@@ -63,30 +64,26 @@ pub enum OmahaResponse {
 
 #[derive(Clone, Debug, Deserialize)]
 pub struct ResponseAndMetadata {
-    // Note: This struct is matched to the responseAndMetadata struct within
-    // //src/testing/host-target-testing/omaha_tool/omaha.go
     pub response: OmahaResponse,
-    pub merkle: Hash,
     pub check_assertion: UpdateCheckAssertion,
     pub version: Option<String>,
     pub cohort_assertion: Option<String>,
     pub codebase: String,
-    pub package_path: String,
+    pub package_name: String,
 }
 
 impl Default for ResponseAndMetadata {
     fn default() -> ResponseAndMetadata {
+        // This default uses examples from Fuchsia, https://fuchsia.dev/
         ResponseAndMetadata {
             response: OmahaResponse::NoUpdate,
-            merkle: Hash::from_str(
-                "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
-            )
-            .unwrap(),
             check_assertion: UpdateCheckAssertion::UpdatesEnabled,
             version: Some("0.1.2.3".to_string()),
             cohort_assertion: None,
             codebase: "fuchsia-pkg://integration.test.fuchsia.com/".to_string(),
-            package_path: "update".to_string(),
+            package_name:
+                "update?hash=deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+                    .to_string(),
         }
     }
 }
@@ -140,13 +137,13 @@ pub enum UpdateCheckAssertion {
 }
 
 /// Adapt [async_net::TcpStream] to work with hyper.
-#[cfg(any(feature = "tokio", all(feature = "fasync", not(target_os = "fuchsia"))))]
+#[cfg(any(feature = "tokio", all(fasync, not(target_os = "fuchsia"))))]
 #[derive(Debug)]
 pub enum ConnectionStream {
     Tcp(TcpStream),
 }
 
-#[cfg(any(feature = "tokio", all(feature = "fasync", not(target_os = "fuchsia"))))]
+#[cfg(any(feature = "tokio", all(fasync, not(target_os = "fuchsia"))))]
 impl tokio::io::AsyncRead for ConnectionStream {
     fn poll_read(
         mut self: Pin<&mut Self>,
@@ -162,7 +159,7 @@ impl tokio::io::AsyncRead for ConnectionStream {
     }
 }
 
-#[cfg(any(feature = "tokio", all(feature = "fasync", not(target_os = "fuchsia"))))]
+#[cfg(any(feature = "tokio", all(fasync, not(target_os = "fuchsia"))))]
 impl tokio::io::AsyncWrite for ConnectionStream {
     fn poll_write(
         mut self: Pin<&mut Self>,
@@ -222,7 +219,7 @@ impl OmahaServer {
         addr: Option<SocketAddr>,
     ) -> Result<String, Error> {
         let (addr, _server_task) = OmahaServer::start(arc_server, addr).await?;
-        #[cfg(feature = "fasync")]
+        #[cfg(fasync)]
         _server_task.expect("no server task found").detach();
 
         Ok(addr)
@@ -230,13 +227,16 @@ impl OmahaServer {
 
     /// Spawn the server on the current executor, returning the address of the server and
     /// its Task.
-    #[cfg(all(feature = "fasync", target_os = "fuchsia"))]
+    #[cfg(all(fasync, target_os = "fuchsia"))]
     pub async fn start(
         arc_server: Arc<Mutex<OmahaServer>>,
         addr: Option<SocketAddr>,
     ) -> Result<(String, Option<Task<()>>), Error> {
-        let addr =
-            if let Some(a) = addr { a } else { SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 0) };
+        let addr = if let Some(a) = addr {
+            a
+        } else {
+            SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 0)
+        };
 
         let (connections, addr) = {
             let listener = TcpListener::bind(&addr)?;
@@ -270,13 +270,16 @@ impl OmahaServer {
 
     /// Spawn the server on the current executor, returning the address of the server and
     /// its Task.
-    #[cfg(all(feature = "fasync", not(target_os = "fuchsia")))]
+    #[cfg(all(fasync, not(target_os = "fuchsia")))]
     pub async fn start(
         arc_server: Arc<Mutex<OmahaServer>>,
         addr: Option<SocketAddr>,
     ) -> Result<(String, Option<Task<()>>), Error> {
-        let addr =
-            if let Some(a) = addr { a } else { SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 0) };
+        let addr = if let Some(a) = addr {
+            a
+        } else {
+            SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 0)
+        };
 
         let make_svc = make_service_fn(move |_socket| {
             let arc_server = Arc::clone(&arc_server);
@@ -288,16 +291,20 @@ impl OmahaServer {
             }
         });
 
-        let listener = TcpListener::bind(&addr).await.expect("cannot bind to address");
+        let listener = TcpListener::bind(&addr)
+            .await
+            .expect("cannot bind to address");
 
         let addr = listener.local_addr()?;
 
         let server = async move {
-            Server::builder(from_stream(listener.incoming().map_ok(ConnectionStream::Tcp)))
-                .executor(fuchsia_hyper::Executor)
-                .serve(make_svc)
-                .await
-                .unwrap_or_else(|e| panic!("error serving omaha server: {e}"));
+            Server::builder(from_stream(
+                listener.incoming().map_ok(ConnectionStream::Tcp),
+            ))
+            .executor(fuchsia_hyper::Executor)
+            .serve(make_svc)
+            .await
+            .unwrap_or_else(|e| panic!("error serving omaha server: {e}"));
         };
 
         let server_task = fasync::Task::spawn(server);
@@ -311,8 +318,11 @@ impl OmahaServer {
         arc_server: Arc<Mutex<OmahaServer>>,
         addr: Option<SocketAddr>,
     ) -> Result<(String, Option<JoinHandle<()>>), Error> {
-        let addr =
-            if let Some(a) = addr { a } else { SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 0) };
+        let addr = if let Some(a) = addr {
+            a
+        } else {
+            SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 0)
+        };
 
         let make_svc = make_service_fn(move |_socket| {
             let arc_server = Arc::clone(&arc_server);
@@ -324,13 +334,17 @@ impl OmahaServer {
             }
         });
 
-        let listener = TcpListener::bind(&addr).await.expect("cannot bind to address");
+        let listener = TcpListener::bind(&addr)
+            .await
+            .expect("cannot bind to address");
 
         let addr = listener.local_addr()?;
 
         let server_task = tokio::spawn(async move {
             let connections = listener.incoming().map_ok(ConnectionStream::Tcp);
-            let _ = Server::builder(from_stream(connections)).serve(make_svc).await;
+            let _ = Server::builder(from_stream(connections))
+                .serve(make_svc)
+                .await;
         });
         Ok((format!("http://{addr}/"), Some(server_task)))
     }
@@ -389,6 +403,7 @@ pub async fn handle_request(
     req: Request<Body>,
     omaha_server: &Mutex<OmahaServer>,
 ) -> Result<Response<Body>, Error> {
+    tracing::debug!("{:#?}", req);
     if req.uri().path() == "/set_responses_by_appid" {
         return handle_set_responses(req, omaha_server).await;
     }
@@ -408,12 +423,14 @@ pub async fn handle_set_responses(
     {
         #[cfg(feature = "tokio")]
         let mut omaha_server = omaha_server.lock().await;
-        #[cfg(feature = "fasync")]
+        #[cfg(fasync)]
         let mut omaha_server = omaha_server.lock();
         omaha_server.responses_by_appid = req_json;
     }
 
-    let builder = Response::builder().status(StatusCode::OK).header(header::CONTENT_LENGTH, 0);
+    let builder = Response::builder()
+        .status(StatusCode::OK)
+        .header(header::CONTENT_LENGTH, 0);
     Ok(builder.body(Body::empty()).unwrap())
 }
 
@@ -422,8 +439,8 @@ pub async fn handle_omaha_request(
     omaha_server: &Mutex<OmahaServer>,
 ) -> Result<Response<Body>, Error> {
     #[cfg(feature = "tokio")]
-    let omaha_server = omaha_server.lock().await;
-    #[cfg(feature = "fasync")]
+    let omaha_server = omaha_server.lock().await.clone();
+    #[cfg(fasync)]
     let omaha_server = omaha_server.lock().clone();
     assert_eq!(req.method(), Method::POST);
 
@@ -444,7 +461,11 @@ pub async fn handle_omaha_request(
     let apps = request.get("app").unwrap().as_array().unwrap();
 
     // If this request contains updatecheck, make sure the mock has the right number of configured apps.
-    match apps.iter().filter(|app| app.get("updatecheck").is_some()).count() {
+    match apps
+        .iter()
+        .filter(|app| app.get("updatecheck").is_some())
+        .count()
+    {
         0 => {}
         x => assert_eq!(x, omaha_server.responses_by_appid.len()),
     }
@@ -460,7 +481,6 @@ pub async fn handle_omaha_request(
                 assert_eq!(version, expected_version);
             }
 
-            let package_name = format!("{}?hash={}", expected.package_path, expected.merkle);
             let app = if let Some(expected_update_check) = app.get("updatecheck") {
                 let updatedisabled = expected_update_check
                     .get("updatedisabled")
@@ -500,7 +520,7 @@ pub async fn handle_omaha_request(
                             "actions": {
                                 "action": [
                                     {
-                                        "run": &package_name,
+                                        "run": &expected.package_name,
                                         "event": "install"
                                     },
                                     {
@@ -511,7 +531,7 @@ pub async fn handle_omaha_request(
                             "packages": {
                                 "package": [
                                     {
-                                        "name": &package_name,
+                                        "name": &expected.package_name,
                                         "fp": "2.0.1.2.3",
                                         "required": true
                                     }
@@ -533,7 +553,7 @@ pub async fn handle_omaha_request(
                             "actions": {
                                 "action": [
                                     {
-                                        "run": &package_name,
+                                        "run": &expected.package_name,
                                         "event": "install"
                                     },
                                     {
@@ -544,7 +564,7 @@ pub async fn handle_omaha_request(
                             "packages": {
                                 "package": [
                                     {
-                                        "name": &package_name,
+                                        "name": &expected.package_name,
                                         "fp": "2.0.1.2.3",
                                         "required": true
                                     }
@@ -573,7 +593,7 @@ pub async fn handle_omaha_request(
                             "actions": {
                                 "action": [
                                     {
-                                        "run": &package_name,
+                                        "run": &expected.package_name,
                                         "event": "install"
                                     },
                                     {
@@ -584,7 +604,7 @@ pub async fn handle_omaha_request(
                             "packages": {
                                 "package": [
                                     {
-                                        "name": &package_name,
+                                        "name": &expected.package_name,
                                         "fp": "2.0.1.2.3",
                                         "required": true
                                     }
@@ -636,8 +656,12 @@ pub async fn handle_omaha_request(
 
     // It is only possible to calculate an induced etag if the incoming request
     // had a valid cup2key query argument.
-    let induced_etag: Option<String> =
-        make_etag(&req_body, &uri_string, &omaha_server.private_keys, &response_data);
+    let induced_etag: Option<String> = make_etag(
+        &req_body,
+        &uri_string,
+        &omaha_server.private_keys,
+        &response_data,
+    );
 
     if omaha_server.require_cup && induced_etag.is_none() {
         panic!(
@@ -645,7 +669,11 @@ pub async fn handle_omaha_request(
         );
     }
 
-    if let Some(etag) = omaha_server.etag_override.as_ref().or(induced_etag.as_ref()) {
+    if let Some(etag) = omaha_server
+        .etag_override
+        .as_ref()
+        .or(induced_etag.as_ref())
+    {
         builder = builder.header(header::ETAG, etag);
     }
 
@@ -656,13 +684,13 @@ pub async fn handle_omaha_request(
 mod tests {
     use super::*;
     use anyhow::Context;
-    #[cfg(feature = "fasync")]
-    use fuchsia_async as fasync;
     #[cfg(feature = "tokio")]
     use hyper::client::HttpConnector;
     use hyper::Client;
+    #[cfg(fasync)]
+    use {fuchsia_async as fasync, fuchsia_hyper};
 
-    #[cfg(feature = "fasync")]
+    #[cfg(fasync)]
     async fn new_http_client() -> Client<fuchsia_hyper::HyperConnector> {
         fuchsia_hyper::new_client()
     }
@@ -672,7 +700,7 @@ mod tests {
         Client::new()
     }
 
-    #[cfg_attr(feature = "fasync", fasync::run_singlethreaded(test))]
+    #[cfg_attr(fasync, fasync::run_singlethreaded(test))]
     #[cfg_attr(feature = "tokio", tokio::test)]
     async fn test_no_validate_version() -> Result<(), Error> {
         // Send a request with no specified version and assert that we don't check.
@@ -708,12 +736,16 @@ mod tests {
                 ]
             }
         });
-        let request = Request::post(&server).body(Body::from(body.to_string())).unwrap();
+        let request = Request::post(&server)
+            .body(Body::from(body.to_string()))
+            .unwrap();
 
         let response = client.request(request).await?;
 
         assert_eq!(response.status(), StatusCode::OK);
-        let body = hyper::body::to_bytes(response).await.context("reading response body")?;
+        let body = hyper::body::to_bytes(response)
+            .await
+            .context("reading response body")?;
         let obj: serde_json::Value =
             serde_json::from_slice(&body).context("parsing response json")?;
 
@@ -725,7 +757,7 @@ mod tests {
         Ok(())
     }
 
-    #[cfg_attr(feature = "fasync", fasync::run_singlethreaded(test))]
+    #[cfg_attr(fasync, fasync::run_singlethreaded(test))]
     #[cfg_attr(feature = "tokio", tokio::test)]
     async fn test_server_replies() -> Result<(), Error> {
         let server_url = OmahaServer::start_and_detach(
@@ -775,12 +807,16 @@ mod tests {
                     ]
                 }
             });
-            let request = Request::post(&server_url).body(Body::from(body.to_string())).unwrap();
+            let request = Request::post(&server_url)
+                .body(Body::from(body.to_string()))
+                .unwrap();
 
             let response = client.request(request).await?;
 
             assert_eq!(response.status(), StatusCode::OK);
-            let body = hyper::body::to_bytes(response).await.context("reading response body")?;
+            let body = hyper::body::to_bytes(response)
+                .await
+                .context("reading response body")?;
             let obj: serde_json::Value =
                 serde_json::from_slice(&body).context("parsing response json")?;
 
@@ -799,11 +835,10 @@ mod tests {
             let body = json!({
                 "integration-test-appid-1": {
                     "response": "Update",
-                    "merkle": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
                     "check_assertion": "UpdatesEnabled",
                     "version": "0.0.0.1",
                     "codebase": "fuchsia-pkg://integration.test.fuchsia.com/",
-                    "package_path": "update",
+                    "package_name": "update?hash=deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
                 }
             });
             let request = Request::post(format!("{server_url}set_responses_by_appid"))
@@ -826,13 +861,17 @@ mod tests {
                     ]
                 }
             });
-            let request = Request::post(&server_url).body(Body::from(body.to_string())).unwrap();
+            let request = Request::post(&server_url)
+                .body(Body::from(body.to_string()))
+                .unwrap();
 
             let client = new_http_client().await;
             let response = client.request(request).await?;
 
             assert_eq!(response.status(), StatusCode::OK);
-            let body = hyper::body::to_bytes(response).await.context("reading response body")?;
+            let body = hyper::body::to_bytes(response)
+                .await
+                .context("reading response body")?;
             let obj: serde_json::Value =
                 serde_json::from_slice(&body).context("parsing response json")?;
 
@@ -849,12 +888,15 @@ mod tests {
         Ok(())
     }
 
-    #[cfg_attr(feature = "fasync", fasync::run_singlethreaded(test))]
+    #[cfg_attr(fasync, fasync::run_singlethreaded(test))]
     #[cfg_attr(feature = "tokio", tokio::test)]
     async fn test_no_configured_responses() -> Result<(), Error> {
         let server = OmahaServer::start_and_detach(
             Arc::new(Mutex::new(
-                OmahaServerBuilder::default().responses_by_appid([]).build().unwrap(),
+                OmahaServerBuilder::default()
+                    .responses_by_appid([])
+                    .build()
+                    .unwrap(),
             )),
             None,
         )
@@ -873,13 +915,15 @@ mod tests {
                 ]
             }
         });
-        let request = Request::post(&server).body(Body::from(body.to_string())).unwrap();
+        let request = Request::post(&server)
+            .body(Body::from(body.to_string()))
+            .unwrap();
         let response = client.request(request).await?;
         assert_eq!(response.status(), StatusCode::INTERNAL_SERVER_ERROR);
         Ok(())
     }
 
-    #[cfg_attr(feature = "fasync", fasync::run_singlethreaded(test))]
+    #[cfg_attr(fasync, fasync::run_singlethreaded(test))]
     #[cfg_attr(feature = "tokio", tokio::test)]
     async fn test_server_expect_cup_nopanic() -> Result<(), Error> {
         let server_url = OmahaServer::start_and_detach(
@@ -930,7 +974,7 @@ mod tests {
     }
 
     #[cfg_attr(
-        feature = "fasync",
+        fasync,
         fasync::run_singlethreaded(test),
         should_panic(expected = "configured to expect CUP")
     )]
@@ -977,7 +1021,9 @@ mod tests {
         });
         // no CUP, but we set .require_cup(true) above, so mock-omaha-server will
         // panic. (See should_panic above.)
-        let request = Request::post(&server_url).body(Body::from(body.to_string())).unwrap();
+        let request = Request::post(&server_url)
+            .body(Body::from(body.to_string()))
+            .unwrap();
         let _response = client.request(request).await.unwrap();
     }
 }

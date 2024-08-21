@@ -1,9 +1,12 @@
-// Copyright 2022 The Fuchsia Authors. All rights reserved.
-// Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.
+// Copyright 2022 The Fuchsia Authors
+//
+// Licensed under a BSD-style license <LICENSE-BSD>, Apache License, Version 2.0
+// <LICENSE-APACHE or https://www.apache.org/licenses/LICENSE-2.0>, or the MIT
+// license <LICENSE-MIT or https://opensource.org/licenses/MIT>, at your option.
+// This file may not be copied, modified, or distributed except according to
+// those terms.
 
 use argh::FromArgs;
-use async_net as _;
 use mock_omaha_server::{
     OmahaServer, OmahaServerBuilder, PrivateKeyAndId, PrivateKeys, ResponseAndMetadata,
 };
@@ -14,20 +17,21 @@ use std::sync::Arc;
 #[cfg(feature = "tokio")]
 use tokio::sync::Mutex;
 
-#[cfg(feature = "fasync")]
+#[cfg(fasync)]
 use {fuchsia_async as fasync, fuchsia_sync::Mutex};
 
 #[derive(FromArgs)]
 /// Arguments for mock-omaha-server.
 struct Args {
     /// A hashmap from appid to response metadata struct.
-    /// Example JSON argument:
+    /// Example JSON argument (the minimal set of required fields per appid):
     ///     {
     ///         "appid_01": {
     ///             "response": "NoUpdate",
-    ///             "merkle": "deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef",
     ///             "check_assertion": "UpdatesEnabled",
     ///             "version": "0.1.2.3",
+    ///             "codebase": "fuchsia-pkg://omaha.mock.fuchsia.com/",
+    ///             "package_name": "update?hash=deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
     ///         },
     ///         ...
     ///     }
@@ -35,7 +39,7 @@ struct Args {
         option,
         description = "responses and metadata keyed by appid",
         from_str_fn(parse_responses_by_appid),
-        default = "HashMap::new()"
+        default = "parse_responses_by_appid(EXAMPLE_RESPONSES_BY_APPID).unwrap()"
     )]
     responses_by_appid: HashMap<String, ResponseAndMetadata>,
 
@@ -49,7 +53,7 @@ struct Args {
     #[argh(
         option,
         description = "path to private key",
-        default = "\"testing_keys/text_private_key.pem\".to_string()"
+        default = "\"mock-omaha-server/src/testing_keys/test_private_key.pem\".to_string()"
     )]
     key_path: String,
 
@@ -63,7 +67,10 @@ struct Args {
     )]
     listen_on: Ipv6Addr,
 
-    #[argh(switch, description = "if 'true', will only accept requests with CUP enabled.")]
+    #[argh(
+        switch,
+        description = "if 'true', will only accept requests with CUP enabled."
+    )]
     require_cup: bool,
 }
 
@@ -72,8 +79,19 @@ fn parse_responses_by_appid(value: &str) -> Result<HashMap<String, ResponseAndMe
 }
 
 pub const DEFAULT_PRIVATE_KEY_ID: i32 = 42;
+const EXAMPLE_RESPONSES_BY_APPID: &str = r#"
+{
+  "appid_01": {
+    "response": "NoUpdate",
+    "check_assertion": "UpdatesEnabled",
+    "version": "14.20230831.4.72",
+    "codebase": "fuchsia-pkg://omaha.mock.fuchsia.com/",
+    "package_name": "update?hash=deadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeefdeadbeef"
+  }
+}
+"#;
 
-#[cfg_attr(feature = "fasync", fasync::run(10))]
+#[cfg_attr(fasync, fasync::run(10))]
 #[cfg_attr(feature = "tokio", tokio::main)]
 async fn main() -> Result<(), anyhow::Error> {
     let args: Args = argh::from_env();
@@ -105,7 +123,7 @@ async fn main() -> Result<(), anyhow::Error> {
     println!("listening on {}", local_addr);
 
     if let Some(t) = task {
-        #[cfg(feature = "fasync")]
+        #[cfg(fasync)]
         {
             t.await;
             Ok(())

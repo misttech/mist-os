@@ -142,6 +142,7 @@ md-5 = "0.10.5"
 memchr = "2.7.1"
 memoffset = "0.7.1"
 miniz_oxide = "0.3.6"
+mock-omaha-server = { version = "0.3.1", default-features = false }
 mockall = "0.9"
 nix = "0.26.2"
 nom = { version = "7.1.3", default-features = false, features = ["std"] }
@@ -621,6 +622,21 @@ rustflags = ["--cfg=tuple_ty", "--cfg=allow_clippy", "--cfg=maybe_uninit", "--cf
 
 [gn.package.memoffset."0.9.1"]
 rustflags = ["--cfg=tuple_ty", "--cfg=allow_clippy", "--cfg=maybe_uninit", "--cfg=doctests", "--cfg=raw_ref_macros"]
+
+[gn.package.mock-omaha-server."0.3.1"]
+rustflags = ["--cfg=fasync"]
+deps = [
+  "//src/lib/fuchsia-async",
+  "//src/lib/fuchsia-hyper",
+  "//src/lib/fuchsia-sync",
+  "//third_party/rust_crates:argh"
+]
+
+[gn.package.mock-omaha-server."0.3.1".platform."cfg(not(target_os = \"fuchsia\"))"]
+deps = [
+  "//third_party/rust_crates:async-net",
+  "//third_party/rust_crates:tokio",
+]
 
 [gn.package.mockall."0.9.0"]
 deps = ["//build/validate:non_production_tag"]

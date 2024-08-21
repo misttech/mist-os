@@ -508,6 +508,10 @@ if (!(current_os == "fuchsia")) {
   }
 }
 
+group("mock-omaha-server") {
+  public_deps = [ ":mock-omaha-server-v0_3_1" ]
+}
+
 group("mockall") {
   public_deps = [ ":mockall-v0_9_0" ]
 }
@@ -8300,6 +8304,61 @@ rust_library("miow-v0_3_7") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ "//build/licenses:fuchsia_license" ]
+}
+
+license("mock-omaha-server-v0_3_1.license") {
+  public_package_name = "mock_omaha_server"
+  license_files = [
+    "//third_party/rust_crates/vendor/mock-omaha-server-0.3.1/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/mock-omaha-server-0.3.1/LICENSE-BSD",
+    "//third_party/rust_crates/vendor/mock-omaha-server-0.3.1/LICENSE-MIT",
+  ]
+}
+
+rust_library("mock-omaha-server-v0_3_1") {
+  crate_name = "mock_omaha_server"
+  crate_root =
+      "//third_party/rust_crates/vendor/mock-omaha-server-0.3.1/src/lib.rs"
+  output_name = "mock_omaha_server-29204b63f404bb37"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":anyhow-v1_0_86" ]
+  deps += [ ":argh-v0_1_12" ]
+  deps += [ ":derive_builder-v0_11_1" ]
+  deps += [ ":futures-v0_3_30" ]
+  deps += [ ":hex-v0_3_2" ]
+  deps += [ ":hyper-v0_14_19" ]
+  deps += [ ":omaha_client-v0_2_1" ]
+  deps += [ ":p256-v0_11_1" ]
+  deps += [ ":serde-v1_0_204" ]
+  deps += [ ":serde_json-v1_0_87" ]
+  deps += [ ":sha2-v0_10_6" ]
+  deps += [ ":thiserror-v1_0_57" ]
+  deps += [ ":tracing-v0_1_40" ]
+  deps += [ ":url-v1_7_2" ]
+  deps += [ "//src/lib/fuchsia-async" ]
+  deps += [ "//src/lib/fuchsia-hyper" ]
+  deps += [ "//src/lib/fuchsia-sync" ]
+  deps += [ "//third_party/rust_crates:argh" ]
+  if (!(current_os == "fuchsia")) {
+    deps += [ "//third_party/rust_crates:async-net" ]
+    deps += [ "//third_party/rust_crates:tokio" ]
+  }
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2021",
+    "-Cmetadata=29204b63f404bb37",
+    "-Cextra-filename=-29204b63f404bb37",
+    "--cfg=fasync",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":mock-omaha-server-v0_3_1.license" ]
 }
 
 license("mockall-v0_9_0.license") {
