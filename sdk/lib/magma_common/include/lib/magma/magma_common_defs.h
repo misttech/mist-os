@@ -220,7 +220,7 @@ typedef uint64_t magma_perf_count_pool_t;
 
 typedef uint64_t magma_connection_t;
 
-// An opaque handle that corresponds to a fuchsia.sysmem.Allocator connection to sysmem.
+// An opaque handle that corresponds to a fuchsia.sysmem2.Allocator connection to sysmem. ---
 typedef uint64_t magma_sysmem_connection_t;
 
 // Corresponds to a zx_handle_t on Fuchsia.
