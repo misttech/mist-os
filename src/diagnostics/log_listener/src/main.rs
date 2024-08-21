@@ -78,13 +78,14 @@ async fn main() -> Result<(), Error> {
         )
         .await
         .unwrap();
-    let boot_ts = fuchsia_runtime::utc_time() - zx::Time::get_monotonic();
+    let boot_ts =
+        fuchsia_runtime::utc_time().into_nanos() - zx::MonotonicTime::get_monotonic().into_nanos();
     let mut formatter = DefaultLogFormatter::<MachineWriter<LogEntry>>::new_from_args(
         &cmd,
         MachineWriter::new(if cmd.json { Some(Format::Json) } else { None }),
     );
     cmd.maybe_set_interest(&log_settings, &realm_proxy, cmd.json).await?;
-    formatter.set_boot_timestamp(boot_ts.into_nanos());
+    formatter.set_boot_timestamp(boot_ts);
     let _ = read_logs_from_socket(
         fuchsia_async::Socket::from_socket(receiver),
         &mut formatter,
