@@ -2,12 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef SRC_STORAGE_BLOBFS_FORMAT_ASSERTIONS_H_
-#define SRC_STORAGE_BLOBFS_FORMAT_ASSERTIONS_H_
+#include "src/storage/blobfs/format.h"
 
 #include <cstddef>
-
-#include "src/storage/blobfs/format.h"
 
 // This file tests the on-disk structures of Blobfs.
 
@@ -116,5 +113,3 @@ static_assert(sizeof(ExtentContainer) ==
 // clang-format on
 
 }  // namespace blobfs
-
-#endif  // SRC_STORAGE_BLOBFS_FORMAT_ASSERTIONS_H_

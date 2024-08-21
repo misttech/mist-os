@@ -39,7 +39,6 @@
 #include "src/storage/blobfs/cache_policy.h"
 #include "src/storage/blobfs/common.h"
 #include "src/storage/blobfs/format.h"
-#include "src/storage/blobfs/format_assertions.h"
 #include "src/storage/blobfs/loader_info.h"
 #include "src/storage/blobfs/page_loader.h"
 #include "src/storage/blobfs/transaction.h"
