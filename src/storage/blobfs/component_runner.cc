@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.device.manager/cpp/wire_messaging.h>
 #include <fidl/fuchsia.fs.startup/cpp/wire.h>
 #include <fidl/fuchsia.fs/cpp/wire.h>
+#include <fidl/fuchsia.fxfs/cpp/markers.h>
 #include <fidl/fuchsia.io/cpp/markers.h>
 #include <fidl/fuchsia.process.lifecycle/cpp/markers.h>
 #include <fidl/fuchsia.update.verify/cpp/wire.h>
@@ -31,6 +32,8 @@
 
 #include <fbl/ref_ptr.h>
 
+#include "src/storage/blobfs/blob_creator.h"
+#include "src/storage/blobfs/blob_reader.h"
 #include "src/storage/blobfs/blobfs.h"
 #include "src/storage/blobfs/mount.h"
 #include "src/storage/blobfs/page_loader.h"
@@ -259,6 +262,12 @@ zx::result<> ComponentRunner::Configure(std::unique_ptr<BlockDevice> device,
                           FX_LOGS(INFO) << "fs_admin shutdown received.";
                           this->Shutdown(std::move(cb));
                         }));
+
+  svc_dir->AddEntry(fidl::DiscoverableProtocolName<fuchsia_fxfs::BlobReader>,
+                    fbl::MakeRefCounted<BlobReader>(*blobfs_));
+
+  svc_dir->AddEntry(fidl::DiscoverableProtocolName<fuchsia_fxfs::BlobCreator>,
+                    fbl::MakeRefCounted<BlobCreator>(*blobfs_));
 
   status = ServeDirectory(std::move(svc_dir), std::move(svc_server_end_));
   if (status != ZX_OK) {

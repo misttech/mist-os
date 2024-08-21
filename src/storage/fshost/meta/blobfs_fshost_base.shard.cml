@@ -56,5 +56,13 @@
             protocol: "fuchsia.update.verify.BlobfsVerifier",
             from: "#blobfs",
         },
+        {
+            protocol: "fuchsia.fxfs.BlobCreator",
+            from: "#blobfs",
+        },
+        {
+            protocol: "fuchsia.fxfs.BlobReader",
+            from: "#blobfs",
+        },
     ],
 }

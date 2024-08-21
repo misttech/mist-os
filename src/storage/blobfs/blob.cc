@@ -246,11 +246,6 @@ zx_status_t Blob::LoadPagedVmosFromDisk() {
 }
 
 zx_status_t Blob::LoadVmosFromDisk() {
-  // We expect the file to be open in FIDL for this to be called. Whether the paged vmo is
-  // registered with the pager is dependent on the HasReferences() flag so this should not get
-  // out-of-sync.
-  ZX_DEBUG_ASSERT(HasReferences());
-
   if (IsDataLoaded())
     return ZX_OK;
 
@@ -759,6 +754,38 @@ zx_status_t Blob::OnWriteError(zx::error_result error) {
   }
   // Return the now latched write error.
   return writer_->status().error_value();
+}
+
+zx::result<zx::vmo> Blob::GetVmoForBlobReader() {
+  std::lock_guard lock(mutex_);
+  if (state_ != BlobState::kReadable) {
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+  if (zx_status_t status = LoadVmosFromDisk(); status != ZX_OK) {
+    return zx::error(status);
+  }
+
+  zx::vmo child_vmo;
+  if (zx_status_t status =
+          paged_vmo().create_child(ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE | ZX_VMO_CHILD_NO_WRITE,
+                                   0, blob_size_, &child_vmo);
+      status != ZX_OK) {
+    return zx::error(status);
+  }
+  DidClonePagedVmo();
+
+  if (zx_status_t status = child_vmo.replace(
+          ZX_RIGHTS_BASIC | ZX_RIGHT_MAP | ZX_RIGHT_GET_PROPERTY | ZX_RIGHT_READ, &child_vmo);
+      status != ZX_OK) {
+    return zx::error(status);
+  }
+
+  return zx::ok(std::move(child_vmo));
+}
+
+bool Blob::IsReadable() {
+  std::lock_guard lock(mutex_);
+  return state_ == BlobState::kReadable;
 }
 
 }  // namespace blobfs

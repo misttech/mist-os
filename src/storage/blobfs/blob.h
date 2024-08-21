@@ -125,6 +125,12 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
   // Reads in and verifies the contents of this Blob.
   zx_status_t Verify() __TA_EXCLUDES(mutex_);
 
+  // Creates a child VMO for the BlobReader protocol.
+  zx::result<zx::vmo> GetVmoForBlobReader() __TA_EXCLUDES(mutex_);
+
+  // Returns true is the blob is currently readable.
+  bool IsReadable() __TA_EXCLUDES(mutex_);
+
  private:
   friend class BlobLoaderTest;
   friend class BlobTest;
