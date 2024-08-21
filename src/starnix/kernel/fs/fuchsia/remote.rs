@@ -326,6 +326,27 @@ pub fn create_fuchsia_pipe(
     new_remote_file(current_task, socket.into(), flags)
 }
 
+fn fetch_and_refresh_info_impl<'a>(
+    zxio: &Arc<syncio::Zxio>,
+    info: &'a RwLock<FsNodeInfo>,
+) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
+    // TODO(https://fxbug.dev/294318193): when Fxfs and Memfs support tracking atime, we should
+    // refresh the corresponding value.
+    let attrs = zxio
+        .attr_get(zxio_node_attr_has_t {
+            content_size: true,
+            storage_size: true,
+            link_count: true,
+            modification_time: true,
+            change_time: true,
+            ..Default::default()
+        })
+        .map_err(|status| from_status_like_fdio!(status))?;
+    let mut info = info.write();
+    update_info_from_attrs(&mut info, &attrs);
+    Ok(RwLockWriteGuard::downgrade(info))
+}
+
 // Update info from attrs if they are set.
 pub fn update_info_from_attrs(info: &mut FsNodeInfo, attrs: &zxio_node_attributes_t) {
     // TODO - store these in FsNodeState and convert on fstat
@@ -701,22 +722,7 @@ impl FsNodeOps for RemoteNode {
         _current_task: &CurrentTask,
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
-        // TODO(https://fxbug.dev/294318193): when Fxfs and Memfs support tracking atime, we should
-        // refresh with the corresponding value.
-        let attrs = self
-            .zxio
-            .attr_get(zxio_node_attr_has_t {
-                content_size: true,
-                storage_size: true,
-                link_count: true,
-                modification_time: true,
-                change_time: true,
-                ..Default::default()
-            })
-            .map_err(|status| from_status_like_fdio!(status))?;
-        let mut info = info.write();
-        update_info_from_attrs(&mut info, &attrs);
-        Ok(RwLockWriteGuard::downgrade(info))
+        fetch_and_refresh_info_impl(&self.zxio, info)
     }
 
     fn filesystem_manages_timestamps(&self, _node: &FsNode) -> bool {
@@ -794,7 +800,10 @@ impl FsNodeOps for RemoteNode {
             current_task,
             RemoteSymlink { zxio },
             node_id,
-            FsNodeInfo::new(node_id, FileMode::IFLNK | FileMode::ALLOW_ALL, owner),
+            FsNodeInfo {
+                size: target.len(),
+                ..FsNodeInfo::new(node_id, FileMode::IFLNK | FileMode::ALLOW_ALL, owner)
+            },
         );
         Ok(symlink)
     }
@@ -1542,6 +1551,19 @@ impl FsNodeOps for RemoteSymlink {
         ))
     }
 
+    fn fetch_and_refresh_info<'a>(
+        &self,
+        _node: &FsNode,
+        _current_task: &CurrentTask,
+        info: &'a RwLock<FsNodeInfo>,
+    ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
+        fetch_and_refresh_info_impl(&self.zxio, info)
+    }
+
+    fn filesystem_manages_timestamps(&self, _node: &FsNode) -> bool {
+        true
+    }
+
     fn get_xattr(
         &self,
         _node: &FsNode,
@@ -1748,6 +1770,13 @@ mod test {
     async fn test_symlink() {
         let fixture = TestFixture::new().await;
 
+        const LINK_PATH: &'static str = "symlink";
+        const LINK_TARGET: &'static str = "私は「UTF8」です";
+        // We expect the reported size of the symlink to be the length of the target, in bytes,
+        // *without* a null terminator. Most Linux systems assume UTF-8 encoding.
+        const LINK_SIZE: usize = 22;
+        assert_eq!(LINK_SIZE, LINK_TARGET.len());
+
         {
             let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
             let (server, client) = zx::Channel::create();
@@ -1755,18 +1784,19 @@ mod test {
                 .root()
                 .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
                 .expect("clone failed");
-            let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
             let fs = RemoteFs::new_fs(
                 &kernel,
                 client,
                 FileSystemOptions { source: b"/".into(), ..Default::default() },
-                rights,
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
             )
             .expect("new_fs failed");
             let ns = Namespace::new(fs);
             let root = ns.root();
-            root.create_symlink(&mut locked, &current_task, "symlink".into(), "target".into())
+            let symlink_node = root
+                .create_symlink(&mut locked, &current_task, LINK_PATH.into(), LINK_TARGET.into())
                 .expect("symlink failed");
+            assert_matches!(&*symlink_node.entry.node.info(), FsNodeInfo { size: LINK_SIZE, .. });
 
             let mut context = LookupContext::new(SymlinkMode::NoFollow);
             let child = root
@@ -1774,9 +1804,57 @@ mod test {
                 .expect("lookup_child failed");
 
             match child.readlink(&current_task).expect("readlink failed") {
-                SymlinkTarget::Path(path) => assert_eq!(path, "target"),
+                SymlinkTarget::Path(path) => assert_eq!(path, LINK_TARGET),
                 SymlinkTarget::Node(_) => panic!("readlink returned SymlinkTarget::Node"),
             }
+            // Ensure the size stat reports matches what is expected.
+            let stat_result = child.entry.node.stat(&current_task).expect("stat failed");
+            assert_eq!(stat_result.st_size as usize, LINK_SIZE);
+        }
+
+        // Simulate a second run to ensure the symlink was persisted correctly.
+        let fixture = TestFixture::open(
+            fixture.close().await,
+            TestFixtureOptions {
+                encrypted: true,
+                as_blob: false,
+                format: false,
+                serve_volume: false,
+            },
+        )
+        .await;
+
+        {
+            let (kernel, current_task) = create_kernel_and_task();
+            let (server, client) = zx::Channel::create();
+            fixture
+                .root()
+                .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into())
+                .expect("clone failed after remount");
+            let fs = RemoteFs::new_fs(
+                &kernel,
+                client,
+                FileSystemOptions { source: b"/".into(), ..Default::default() },
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+            )
+            .expect("new_fs failed after remount");
+            let ns = Namespace::new(fs);
+            let root = ns.root();
+            let mut context = LookupContext::new(SymlinkMode::NoFollow);
+            let child = root
+                .lookup_child(&current_task, &mut context, "symlink".into())
+                .expect("lookup_child failed after remount");
+
+            match child.readlink(&current_task).expect("readlink failed after remount") {
+                SymlinkTarget::Path(path) => assert_eq!(path, LINK_TARGET),
+                SymlinkTarget::Node(_) => {
+                    panic!("readlink returned SymlinkTarget::Node after remount")
+                }
+            }
+            // Ensure the size stat reports matches what is expected.
+            let stat_result =
+                child.entry.node.stat(&current_task).expect("stat failed after remount");
+            assert_eq!(stat_result.st_size as usize, LINK_SIZE);
         }
 
         fixture.close().await;
@@ -2067,8 +2145,8 @@ mod test {
                         .lookup_child(&current_task, &mut context, "fifo".into())
                         .expect("lookup_child failed");
 
-                    // Test that we get expected behaviour for RemoteSpecialNode operation, e.g. test that
-                    // truncate should return EINVAL
+                    // Test that we get expected behaviour for RemoteSpecialNode operation, e.g.
+                    // test that truncate should return EINVAL
                     match fifo_node.truncate(locked, &current_task, 0) {
                         Ok(_) => {
                             panic!("truncate passed for special node")
