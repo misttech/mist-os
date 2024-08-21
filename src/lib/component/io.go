@@ -363,15 +363,13 @@ func (dirState *directoryState) Open(ctx fidl.Context, flags io.OpenFlags, mode 
 }
 
 func (dirState *directoryState) Open2(ctx fidl.Context, path string, protocols io.ConnectionProtocols, channel zx.Channel) error {
-	// TODO(https://fxbug.dev/42157659): implement.
-	_ = channel.Close()
-	return nil
+	// TODO(https://fxbug.dev/348698584): Remove.
+	return CloseWithEpitaph(channel, zx.ErrNotSupported)
 }
 
 func (dirState *directoryState) Open3(ctx fidl.Context, path string, flags io.Flags, options io.Options, channel zx.Channel) error {
-	// TODO(https://fxbug.dev/348698584): implement.
-	_ = channel.Close()
-	return nil
+	// TODO(https://fxbug.dev/348698584): Implement.
+	return CloseWithEpitaph(channel, zx.ErrNotSupported)
 }
 
 func (*directoryState) Unlink(fidl.Context, string, io.UnlinkOptions) (io.Directory2UnlinkResult, error) {
