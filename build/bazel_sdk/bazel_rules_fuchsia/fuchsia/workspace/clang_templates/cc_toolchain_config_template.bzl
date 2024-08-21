@@ -89,6 +89,9 @@ def _cc_toolchain_config_impl(ctx):
         features.generate_linkmap,
     ] + sanitizer_features
 
+    # TODO(https://fxbug.dev/356347441): Remove this once Bazel has been fixed.
+    cc_features += [features.no_dotd_file]
+
     return cc_common.create_cc_toolchain_config_info(
         ctx = ctx,
         toolchain_identifier = "crosstool-1.x.x-llvm-fuchsia-" + ctx.attr.cpu,
