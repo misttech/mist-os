@@ -208,7 +208,7 @@ void BlockDevice::OpenSession(OpenSessionRequestView request,
     if (zx_status_t status = device_set_profile_by_role(zxdev(), thrd_get_zx_handle(thread),
                                                         role_name, strlen(role_name));
         status != ZX_OK) {
-      zxlogf(WARNING, "block: Failed to apply role to block server: %s",
+      zxlogf(DEBUG, "block: Failed to apply role to block server: %s",
              zx_status_get_string(status));
     }
   }
