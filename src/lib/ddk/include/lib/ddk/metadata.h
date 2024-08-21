@@ -69,10 +69,10 @@ static_assert(DEVICE_METADATA_BOARD_PRIVATE == ZBI_TYPE_DRV_BOARD_PRIVATE, "");
 // type: array of gpio_pin_t
 #define DEVICE_METADATA_GPIO_PINS 0x4F495047  // GPIO
 
-// type: FIDL fuchsia.hardware.gpioimpl/InitMetadata
+// type: FIDL fuchsia.hardware.pinimpl/InitMetadata
 #define DEVICE_METADATA_GPIO_INIT 0x49495047  // GPII
 
-// type: FIDL fuchsia.hardware.gpioimpl/ControllerMetadata
+// type: FIDL fuchsia.hardware.pinimpl/ControllerMetadata
 #define DEVICE_METADATA_GPIO_CONTROLLER 0x43495047  // GPIC
 
 // type: FIDL fuchsia.hardware.clockimpl/InitMetadata
