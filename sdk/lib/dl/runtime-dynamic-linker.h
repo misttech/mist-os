@@ -13,6 +13,7 @@
 
 #include "diagnostics.h"
 #include "error.h"
+#include "linking-session.h"
 #include "runtime-module.h"
 
 namespace dl {
