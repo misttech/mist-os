@@ -88,7 +88,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2120
+From //build/config/BUILDCONFIG.gn:2119
 
 ### allow_tear_off_abi_breakage
 
@@ -1039,7 +1039,7 @@ Makes clippy targets fail to build when any "deny" lints are found
 
 **Current value (from the default):** `true`
 
-From //build/rust/config.gni:65
+From //build/rust/config.gni:64
 
 ### clippy_force_warn_all
 
@@ -1049,7 +1049,7 @@ should only be used to collect stats about clippy lints in our source tree.
 
 **Current value (from the default):** `false`
 
-From //build/rust/config.gni:62
+From //build/rust/config.gni:61
 
 ### clippy_ignore_rustc
 
@@ -1062,7 +1062,7 @@ up in ninja's stderr
 
 **Current value (from the default):** `false`
 
-From //build/rust/config.gni:78
+From //build/rust/config.gni:77
 
 ### clippy_warn_all
 
@@ -1071,7 +1071,7 @@ Note: setting lint levels in source takes precedence over this.
 
 **Current value (from the default):** `false`
 
-From //build/rust/config.gni:57
+From //build/rust/config.gni:56
 
 ### cobalt_environment
 
@@ -3283,7 +3283,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1842
+From //build/config/BUILDCONFIG.gn:1841
 
 ### extra_vbmeta_descriptors
 
@@ -3977,7 +3977,7 @@ causes clippy targets to get included in the build. This gets enabled by default
 
 **Current value (from the default):** `false`
 
-From //build/rust/config.gni:70
+From //build/rust/config.gni:69
 
 ### include_internal_fonts
 
@@ -3986,15 +3986,6 @@ Set to true to include internal fonts in the build.
 **Current value (from the default):** `false`
 
 From //src/fonts/build/font_args.gni:7
-
-### include_rustdoc
-
-Opt-in switch for .rustdoc subtargets. If `true`, respect per-target `disable_rustdoc` setting.
-If `false`, do not define any rustdoc subtargets.
-
-**Current value (from the default):** `false`
-
-From //build/rust/config.gni:82
 
 ### include_shell_commands_package
 
@@ -4411,7 +4402,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1650
+From //build/config/BUILDCONFIG.gn:1649
 
 ### legacy_base_package_labels
 
@@ -7225,7 +7216,7 @@ ignore warnings.
 
 **Current value (from the default):** `"deny"`
 
-From //build/rust/config.gni:53
+From //build/rust/config.gni:52
 
 ### rust_debug_assertions
 
@@ -7261,7 +7252,7 @@ Sets the default LTO type for rustc builds.
 
 **Current value (from the default):** `""`
 
-From //build/rust/config.gni:48
+From //build/rust/config.gni:47
 
 ### rust_one_rlib_per_dir
 
@@ -7383,7 +7374,7 @@ This can be used to test custom Rust toolchains.
 
 **Current value (from the default):** `"//prebuilt/third_party/rust/linux-x64"`
 
-From //build/rust/config.gni:20
+From //build/rust/config.gni:19
 
 ### rustc_timeout
 
@@ -7414,7 +7405,7 @@ e.g., clang_version_description = read_file("$_rustc_lib_dir/VERSION")
 
 **Current value (from the default):** `""`
 
-From //build/rust/config.gni:45
+From //build/rust/config.gni:44
 
 ### rustc_version_string
 
@@ -7427,17 +7418,7 @@ prebuilt is used.
 
 **Current value (from the default):** `"TDzgN1kRRXjyDbYULfxtDph_5Ac5A7g_9mKTNg3eNIAC"`
 
-From //build/rust/config.gni:39
-
-### rustdoc_extern_html_root_url
-
-Final destination of docs generated with `fx rustdoc-link`, as a URL. May
-use the file:/// scheme for local testing. Rustdoc will generate links
-relative to this path.
-
-**Current value (from the default):** `"https://fuchsia-docs.firebaseapp.com/rust/rustdoc_index/aarch64-unknown-fuchsia/"`
-
-From //build/rust/config.gni:87
+From //build/rust/config.gni:38
 
 ### scenic_enable_vulkan_validation
 
@@ -7695,7 +7676,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2110
+From //build/config/BUILDCONFIG.gn:2109
 
 ### select_variant_canonical
 
@@ -7705,7 +7686,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2115
+From //build/config/BUILDCONFIG.gn:2114
 
 ### select_variant_shortcuts
 
@@ -7764,7 +7745,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1888
+From //build/config/BUILDCONFIG.gn:1887
 
 ### size_checker_input
 
@@ -8255,7 +8236,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:47
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1872
+From //build/config/BUILDCONFIG.gn:1871
 
 ### universe_package_labels
 
