@@ -158,7 +158,9 @@ impl RepositoryServerBuilder {
         futures::channel::mpsc::UnboundedSender<Result<ConnectionStream>>,
         RepositoryServer,
     )> {
-        let listener = TcpListener::bind(&self.addr).await?;
+        let listener = TcpListener::bind(&self.addr).await.map_err(|e| {
+            std::io::Error::other(format!("Cannot start server on {}: {e}", self.addr))
+        })?;
         let local_addr = listener.local_addr()?;
 
         let (tx_stop_server, rx_stop_server) = futures::channel::oneshot::channel();
