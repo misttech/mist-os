@@ -26,7 +26,6 @@
 #include <cstdint>
 #include <memory>
 #include <mutex>
-#include <string>
 
 #include <fbl/macros.h>
 #include <fbl/recycler.h>
@@ -80,7 +79,6 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
       __TA_EXCLUDES(mutex_);
   zx::result<fs::VnodeAttributes> GetAttributes() const final __TA_EXCLUDES(mutex_);
   zx_status_t Truncate(size_t len) final __TA_EXCLUDES(mutex_);
-  zx::result<std::string> GetDevicePath() const final __TA_EXCLUDES(mutex_);
   zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) final
       __TA_EXCLUDES(mutex_);
   void Sync(SyncCallback on_complete) final __TA_EXCLUDES(mutex_);

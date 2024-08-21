@@ -647,14 +647,6 @@ void VnodeMinfs::Recreate(Minfs* fs, ino_t ino, fbl::RefPtr<VnodeMinfs>* out) {
   (*out)->SetSize(static_cast<uint32_t>((*out)->inode_.size));
 }
 
-#ifdef __Fuchsia__
-
-zx::result<std::string> VnodeMinfs::GetDevicePath() const {
-  return fs_->bc_->device()->GetTopologicalPath();
-}
-
-#endif
-
 zx::result<> VnodeMinfs::TruncateInternal(Transaction* transaction, size_t len) {
   // We should be called after validating length. Assert if len is unexpected.
   ZX_ASSERT(len <= kMinfsMaxFileSize);

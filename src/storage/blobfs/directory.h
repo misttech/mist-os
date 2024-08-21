@@ -12,7 +12,6 @@
 #include <zircon/types.h>
 
 #include <cstddef>
-#include <string>
 #include <string_view>
 
 #include <fbl/ref_ptr.h>
@@ -40,7 +39,6 @@ class Directory final : public fs::Vnode {
   zx_status_t Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out) final;
   zx::result<fs::VnodeAttributes> GetAttributes() const final;
   zx::result<fbl::RefPtr<Vnode>> Create(std::string_view name, fs::CreationType type) final;
-  zx::result<std::string> GetDevicePath() const final;
   zx_status_t Unlink(std::string_view name, bool must_be_dir) final;
   void Sync(SyncCallback closure) final;
 

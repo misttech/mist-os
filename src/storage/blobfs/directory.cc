@@ -14,7 +14,6 @@
 #include <zircon/types.h>
 
 #include <cassert>
-#include <string>
 #include <string_view>
 #include <utility>
 
@@ -126,10 +125,6 @@ zx::result<fbl::RefPtr<fs::Vnode>> Directory::Create(std::string_view name, fs::
     }
     return zx::ok(std::move(new_blob));
   });
-}
-
-zx::result<std::string> Directory::GetDevicePath() const {
-  return blobfs_->Device()->GetTopologicalPath();
 }
 
 zx_status_t Directory::Unlink(std::string_view name, bool must_be_dir) {

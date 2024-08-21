@@ -318,20 +318,19 @@ TEST(MemfsTest, SubdirectoryUpdateTime) {
   zx::result subdirectory = root->Create("subdirectory", fs::CreationType::kDirectory);
   ASSERT_TRUE(subdirectory.is_ok()) << subdirectory.status_string();
 
-  // Write a file at "subdirectory/file".
+  // Create a file at "subdirectory/file".
   zx::result file = subdirectory->Create("file", fs::CreationType::kFile);
   ASSERT_TRUE(file.is_ok()) << file.status_string();
-  file->DidModifyStream();
 
-  // Overwrite a file at "index".
-  index->DidModifyStream();
+  // Modify a file at "index".
+  index->Truncate(10);
 
   zx::result subdirectory_attr = subdirectory->GetAttributes();
   ASSERT_TRUE(subdirectory_attr.is_ok()) << subdirectory_attr.status_string();
   zx::result index_attr = index->GetAttributes();
   ASSERT_TRUE(index_attr.is_ok()) << index_attr.status_string();
 
-  // "index" was written after "subdirectory".
+  // "index" was modified after "subdirectory".
   ASSERT_LE(subdirectory_attr->modification_time, index_attr->modification_time);
 }
 

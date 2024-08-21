@@ -108,7 +108,6 @@ zx_status_t StreamFileConnection::WriteInternal(const void* data, size_t len, si
   zx_status_t status = stream_.writev(0, &vector, 1, out_actual);
   if (status == ZX_OK) {
     ZX_DEBUG_ASSERT(*out_actual <= len);
-    vnode()->DidModifyStream();
   }
   return status;
 }
@@ -136,7 +135,6 @@ zx_status_t StreamFileConnection::WriteAtInternal(const void* data, size_t len, 
   zx_status_t status = stream_.writev_at(0, offset, &vector, 1, out_actual);
   if (status == ZX_OK) {
     ZX_DEBUG_ASSERT(*out_actual <= len);
-    vnode()->DidModifyStream();
   }
   return status;
 }

@@ -25,7 +25,6 @@
 #include <memory>
 #include <mutex>
 #include <optional>
-#include <string>
 #include <utility>
 
 #include <fbl/ref_ptr.h>
@@ -513,10 +512,6 @@ zx_status_t Blob::Truncate(size_t len) {
     state_ = BlobState::kDataWrite;
     return ZX_OK;
   });
-}
-
-zx::result<std::string> Blob::GetDevicePath() const {
-  return blobfs_.Device()->GetTopologicalPath();
 }
 
 zx_status_t Blob::GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) {

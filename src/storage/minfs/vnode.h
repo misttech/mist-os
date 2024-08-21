@@ -216,9 +216,6 @@ class VnodeMinfs : public fs::Vnode,
   fs::VnodeAttributesQuery SupportedMutableAttributes() const final;
   zx::result<fs::VnodeAttributes> GetAttributes() const final;
   zx::result<> UpdateAttributes(const fs::VnodeAttributesUpdate& attributes) final;
-#ifdef __Fuchsia__
-  zx::result<std::string> GetDevicePath() const final;
-#endif
 
   // Get the disk block 'bno' corresponding to the 'n' block
   //

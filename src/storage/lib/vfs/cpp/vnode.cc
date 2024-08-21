@@ -56,8 +56,6 @@ zx_status_t Vnode::GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) {
   return ZX_ERR_NOT_SUPPORTED;
 }
 
-zx::result<std::string> Vnode::GetDevicePath() const { return zx::error(ZX_ERR_NOT_SUPPORTED); }
-
 void Vnode::OpenRemote(fuchsia_io::OpenFlags, fuchsia_io::ModeType, fidl::StringView,
                        fidl::ServerEnd<fuchsia_io::Node>) const {
   ZX_PANIC("OpenRemote should only be called on remote nodes!");
@@ -158,10 +156,6 @@ zx_status_t Vnode::Write(const void* data, size_t len, size_t offset, size_t* ou
 zx_status_t Vnode::Append(const void* data, size_t len, size_t* out_end, size_t* out_actual) {
   return ZX_ERR_NOT_SUPPORTED;
 }
-
-void Vnode::DidModifyStream() {}
-
-bool Vnode::SupportsClientSideStreams() const { return false; }
 
 zx_status_t Vnode::Lookup(std::string_view name, fbl::RefPtr<Vnode>* out) {
   return ZX_ERR_NOT_SUPPORTED;
