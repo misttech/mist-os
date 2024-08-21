@@ -356,7 +356,7 @@ group("heck") {
 }
 
 group("hex") {
-  public_deps = [ ":hex-v0_3_2" ]
+  public_deps = [ ":hex-v0_4_3" ]
 }
 
 group("hkdf") {
@@ -6387,6 +6387,41 @@ rust_library("hex-v0_3_2") {
   visibility = [ ":*" ]
 
   applicable_licenses = [ ":hex-v0_3_2.license" ]
+}
+
+license("hex-v0_4_3.license") {
+  public_package_name = "hex"
+  license_files = [
+    "//third_party/rust_crates/vendor/hex-0.4.3/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/hex-0.4.3/LICENSE-MIT",
+  ]
+}
+
+rust_library("hex-v0_4_3") {
+  crate_name = "hex"
+  crate_root = "//third_party/rust_crates/vendor/hex-0.4.3/src/lib.rs"
+  output_name = "hex-d0436d4653343f99"
+  configs -= [ "//build/config/rust:2018_idioms" ]
+
+  deps = []
+  deps += [ ":serde-v1_0_204" ]
+
+  rustenv = []
+
+  rustflags = [
+    "--cap-lints=allow",
+    "--edition=2018",
+    "-Cmetadata=d0436d4653343f99",
+    "-Cextra-filename=-d0436d4653343f99",
+    "--cfg=feature=\"alloc\"",
+    "--cfg=feature=\"default\"",
+    "--cfg=feature=\"serde\"",
+    "--cfg=feature=\"std\"",
+  ]
+
+  visibility = [ ":*" ]
+
+  applicable_licenses = [ ":hex-v0_4_3.license" ]
 }
 
 license("hkdf-v0_12_3.license") {

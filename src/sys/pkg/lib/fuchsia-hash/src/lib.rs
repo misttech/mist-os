@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use hex::{FromHex, FromHexError, ToHex as _};
+use hex::{FromHex, FromHexError};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt;
 use thiserror::Error;
@@ -105,7 +105,7 @@ impl<T> From<GenericDigest<T>> for String {
 
 impl<T> fmt::Display for GenericDigest<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        self.digest.write_hex(f)
+        hex::encode(self.digest).fmt(f)
     }
 }
 

@@ -24,6 +24,5 @@ include /src/sys/fuzzing/OWNERS
 include /src/sys/lib/component_id_index/OWNERS
 include /src/sys/lib/fidl-fuchsia-pkg-ext/OWNERS
 include /src/sys/pkg/OWNERS
-include /src/sys/pkg/lib/omaha-client/OWNERS
 include /src/testing/sl4f/OWNERS
 include /tools/update_crates/OWNERS

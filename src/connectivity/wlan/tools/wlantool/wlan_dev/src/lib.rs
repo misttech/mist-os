@@ -26,7 +26,7 @@ use {
 };
 
 #[cfg(target_os = "fuchsia")]
-use {hex::ToHex, wlan_rsn::psk};
+use wlan_rsn::psk;
 
 pub mod opts;
 use crate::opts::*;
@@ -574,9 +574,7 @@ async fn do_rsn(cmd: opts::RsnCmd) -> Result<(), Error> {
 #[cfg(target_os = "fuchsia")]
 fn generate_psk(passphrase: &str, ssid: &str) -> Result<String, Error> {
     let psk = psk::compute(passphrase.as_bytes(), &Ssid::try_from(ssid)?)?;
-    let mut psk_hex = String::new();
-    psk.write_hex(&mut psk_hex)?;
-    return Ok(psk_hex);
+    Ok(hex::encode(&psk))
 }
 
 fn print_scan_result(scan_result: fidl_sme::ClientSmeScanResult) {
