@@ -383,13 +383,6 @@ bool IsSeverityEnabled(LogSeverity severity);
 
 #define FX_NOTIMPLEMENTED() FX_LOGS(ERROR) << "Not implemented in: " << __PRETTY_FUNCTION__
 
-// TODO(b/299996898): Remove when no longer used.
-template <typename Msg, typename... Args>
-void fx_slog_internal(fuchsia_logging::LogSeverity severity, const char* file, int line, Msg msg,
-                      Args... args) {
-  syslog_runtime::internal::WriteStructuredLog(severity, __FILE__, __LINE__, msg, args...);
-}
-
 #define FX_LOG_KV_ETC(severity, args...)                                                \
   do {                                                                                  \
     if (::fuchsia_logging::IsSeverityEnabled(severity)) {                               \
