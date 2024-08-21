@@ -106,11 +106,11 @@ class BlockVerityTest : public zxtest::Test {
   void ZeroUnderlyingRamdisk() {
     fbl::Array<uint8_t> write_buf(new uint8_t[kBlockSize], kBlockSize);
     memset(write_buf.get(), 0, write_buf.size());
+    fdio_cpp::UnownedFdioCaller caller(ramdisk_->devfs_root_fd());
+    zx::result channel =
+        component::ConnectAt<fuchsia_hardware_block::Block>(caller.directory(), ramdisk_->path());
+    ASSERT_OK(channel);
     for (uint64_t block = 0; block < kBlockCount; block++) {
-      fdio_cpp::UnownedFdioCaller caller(ramdisk_->devfs_root_fd());
-      zx::result channel =
-          component::ConnectAt<fuchsia_hardware_block::Block>(caller.directory(), ramdisk_->path());
-      ASSERT_OK(channel);
       ASSERT_OK(BWrite(channel.value(), write_buf.get(), write_buf.size(), block * kBlockSize));
     }
   }
