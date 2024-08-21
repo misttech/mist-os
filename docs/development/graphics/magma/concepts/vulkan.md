@@ -35,6 +35,7 @@ The `fuchsia.media.ProfileProvider` capability optional, but recommended.
 A component that uses Vulkan must have these FIDL services routed to it:
 
 - `fuchsia.sysmem.Allocator`
+- `fuchsia.sysmem2.Allocator`
 - `fuchsia.vulkan.loader.Loader`
 - `fuchsia.tracing.provider.Registry`
 - `fuchsia.logger.LogSink`
