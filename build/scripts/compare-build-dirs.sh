@@ -337,6 +337,19 @@ function diff_file_relpath() {
     stdout-*) expect=ignore ;;
     stderr-*) expect=ignore ;;
 
+    # bazel runfile MANIFESTs contain absolute paths
+    MANIFEST)
+      case "$common_path" in
+        */bazel-out/*.runfiles) expect=ignore ;;
+      esac
+      ;;
+
+    *.runfiles_manifest)
+      case "$common_path" in
+        */bazel-out/*) expect=ignore ;;
+      esac
+      ;;
+
     # Various binaries.
     *.blk) expect=unknown; diff_binary "$left" "$right" ;;
     *.vboot) expect=unknown; diff_binary "$left" "$right" ;;
