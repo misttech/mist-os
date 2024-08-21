@@ -9,26 +9,20 @@ use crate::node::Node;
 use crate::ObjectRequestRef;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon_status::Status;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 #[cfg(test)]
 mod tests;
 
 /// A file with a byte array for content, useful for testing.
 pub struct SimpleFile {
-    data: Mutex<Vec<u8>>,
-    writable: bool,
+    data: Vec<u8>,
 }
 
 impl SimpleFile {
     /// Create a new read-only test file with the provided content.
     pub fn read_only(content: impl AsRef<[u8]>) -> Arc<Self> {
-        Arc::new(SimpleFile { data: Mutex::new(content.as_ref().to_vec()), writable: false })
-    }
-
-    /// Create a new writable test file with the provided content.
-    pub fn read_write(content: impl AsRef<[u8]>) -> Arc<Self> {
-        Arc::new(SimpleFile { data: Mutex::new(content.as_ref().to_vec()), writable: true })
+        Arc::new(SimpleFile { data: content.as_ref().to_vec() })
     }
 }
 
@@ -49,18 +43,12 @@ impl Node for SimpleFile {
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, Status> {
-        let content_size: u64 = self.data.lock().unwrap().len().try_into().unwrap();
+        let content_size: u64 = self.data.len().try_into().unwrap();
         Ok(immutable_attributes!(
             requested_attributes,
             Immutable {
                 protocols: fio::NodeProtocolKinds::FILE,
-                abilities: fio::Operations::GET_ATTRIBUTES
-                    | fio::Operations::READ_BYTES
-                    | if self.writable {
-                        fio::Operations::WRITE_BYTES
-                    } else {
-                        fio::Operations::empty()
-                    },
+                abilities: fio::Operations::GET_ATTRIBUTES | fio::Operations::READ_BYTES,
                 content_size: content_size,
                 storage_size: content_size,
             }
@@ -70,39 +58,23 @@ impl Node for SimpleFile {
 
 impl FileIo for SimpleFile {
     async fn read_at(&self, offset: u64, buffer: &mut [u8]) -> Result<u64, Status> {
-        let content_size = self.data.lock().unwrap().len().try_into().unwrap();
+        let content_size = self.data.len().try_into().unwrap();
         if offset >= content_size {
             return Ok(0u64);
         }
         let read_len: u64 = std::cmp::min(content_size - offset, buffer.len().try_into().unwrap());
         let read_len_usize: usize = read_len.try_into().unwrap();
-        buffer[..read_len_usize].copy_from_slice(
-            &self.data.lock().unwrap()[offset.try_into().unwrap()..][..read_len_usize],
-        );
+        buffer[..read_len_usize]
+            .copy_from_slice(&self.data[offset.try_into().unwrap()..][..read_len_usize]);
         Ok(read_len)
     }
 
-    async fn write_at(&self, offset: u64, content: &[u8]) -> Result<u64, Status> {
-        if !self.writable {
-            return Err(Status::ACCESS_DENIED);
-        }
-
-        let mut data = self.data.lock().unwrap();
-        let offset = offset.try_into().unwrap();
-        let data_len = data.len();
-        data.resize(std::cmp::max(data_len, offset + content.len()), 0);
-        data[offset..][..content.len()].copy_from_slice(content);
-        Ok(content.len().try_into().unwrap())
+    async fn write_at(&self, _offset: u64, _content: &[u8]) -> Result<u64, Status> {
+        return Err(Status::NOT_SUPPORTED);
     }
 
-    async fn append(&self, content: &[u8]) -> Result<(u64, u64), Status> {
-        if !self.writable {
-            return Err(Status::ACCESS_DENIED);
-        }
-
-        let mut data = self.data.lock().unwrap();
-        data.extend_from_slice(content);
-        Ok((content.len().try_into().unwrap(), data.len().try_into().unwrap()))
+    async fn append(&self, _content: &[u8]) -> Result<(u64, u64), Status> {
+        Err(Status::NOT_SUPPORTED)
     }
 }
 
@@ -112,7 +84,7 @@ impl File for SimpleFile {
     }
 
     fn writable(&self) -> bool {
-        self.writable
+        false
     }
 
     fn executable(&self) -> bool {
@@ -123,17 +95,12 @@ impl File for SimpleFile {
         Ok(())
     }
 
-    async fn truncate(&self, length: u64) -> Result<(), Status> {
-        if self.writable {
-            self.data.lock().unwrap().resize(length as usize, 0);
-            Ok(())
-        } else {
-            Err(Status::ACCESS_DENIED)
-        }
+    async fn truncate(&self, _length: u64) -> Result<(), Status> {
+        Err(Status::NOT_SUPPORTED)
     }
 
     async fn get_size(&self) -> Result<u64, Status> {
-        Ok(self.data.lock().unwrap().len().try_into().unwrap())
+        Ok(self.data.len().try_into().unwrap())
     }
 
     #[cfg(target_os = "fuchsia")]

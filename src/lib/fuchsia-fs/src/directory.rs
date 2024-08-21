@@ -745,8 +745,9 @@ mod tests {
     use tempfile::TempDir;
     use vfs::directory::entry_container::Directory;
     use vfs::execution_scope::ExecutionScope;
-    use vfs::file::vmo::{read_only, read_write};
+    use vfs::file::vmo::read_only;
     use vfs::pseudo_directory;
+    use vfs::remote::remote_dir;
 
     const DATA_FILE_CONTENTS: &str = "Hello World!\n";
 
@@ -964,11 +965,21 @@ mod tests {
         );
     }
 
-    #[fasync::run_until_stalled(test)]
+    #[fasync::run_singlethreaded(test)]
     async fn open_file_flags() {
+        let tempdir = TempDir::new().expect("failed to create tmp dir");
+        std::fs::write(tempdir.path().join("read_write"), "rw/read_write")
+            .expect("failed to write file");
+        let dir = crate::directory::open_in_namespace(
+            tempdir.path().to_str().unwrap(),
+            fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+        )
+        .expect("could not open tmp dir");
         let example_dir = pseudo_directory! {
-            "read_only" => read_only("read_only"),
-            "read_write" => read_write("read_write"),
+            "ro" => pseudo_directory! {
+                "read_only" => read_only("ro/read_only"),
+            },
+            "rw" => remote_dir(dir)
         };
         let (example_dir_proxy, example_dir_service) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
@@ -981,12 +992,20 @@ mod tests {
         );
 
         for (file_name, flags, should_succeed) in vec![
-            ("read_only", fio::OpenFlags::RIGHT_READABLE, true),
-            ("read_only", fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE, false),
-            ("read_only", fio::OpenFlags::RIGHT_WRITABLE, false),
-            ("read_write", fio::OpenFlags::RIGHT_READABLE, true),
-            ("read_write", fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE, true),
-            ("read_write", fio::OpenFlags::RIGHT_WRITABLE, true),
+            ("ro/read_only", fio::OpenFlags::RIGHT_READABLE, true),
+            (
+                "ro/read_only",
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                false,
+            ),
+            ("ro/read_only", fio::OpenFlags::RIGHT_WRITABLE, false),
+            ("rw/read_write", fio::OpenFlags::RIGHT_READABLE, true),
+            (
+                "rw/read_write",
+                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
+                true,
+            ),
+            ("rw/read_write", fio::OpenFlags::RIGHT_WRITABLE, true),
         ] {
             // open_file_no_describe
 
@@ -1007,7 +1026,7 @@ mod tests {
             if flags.intersects(fio::OpenFlags::RIGHT_WRITABLE) {
                 let _ = file.seek(fio::SeekOrigin::Start, 0).await.expect("Seek failed!");
                 let _: u64 = file
-                    .write(b"read_write")
+                    .write(file_name.as_bytes())
                     .await
                     .unwrap()
                     .map_err(zx_status::Status::from_raw)
@@ -1025,7 +1044,7 @@ mod tests {
                     if flags.intersects(fio::OpenFlags::RIGHT_WRITABLE) {
                         let _ = file.seek(fio::SeekOrigin::Start, 0).await.expect("Seek failed!");
                         let _: u64 = file
-                            .write(b"read_write")
+                            .write(file_name.as_bytes())
                             .await
                             .unwrap()
                             .map_err(zx_status::Status::from_raw)

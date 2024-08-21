@@ -34,8 +34,9 @@ mod tests {
     use tempfile::TempDir;
     use vfs::directory::entry_container::Directory;
     use vfs::execution_scope::ExecutionScope;
-    use vfs::file::vmo::{read_only, read_write};
+    use vfs::file::vmo::read_only;
     use vfs::pseudo_directory;
+    use vfs::remote::remote_dir;
     use {fuchsia_async as fasync, fuchsia_zircon_status as zx_status};
 
     #[fasync::run_singlethreaded(test)]
@@ -92,11 +93,21 @@ mod tests {
         assert_eq!(canonicalize_path("foo/bar/"), "foo/bar/");
     }
 
-    #[fasync::run_until_stalled(test)]
+    #[fasync::run_singlethreaded(test)]
     async fn flags_test() {
+        let tempdir = TempDir::new().expect("failed to create tmp dir");
+        std::fs::write(tempdir.path().join("read_write"), "rw/read_write")
+            .expect("failed to write file");
+        let dir = crate::directory::open_in_namespace(
+            tempdir.path().to_str().unwrap(),
+            OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE,
+        )
+        .expect("could not open tmp dir");
         let example_dir = pseudo_directory! {
-            "read_only" => read_only("read_only"),
-            "read_write" => read_write("read_write"),
+            "ro" => pseudo_directory! {
+                "read_only" => read_only("ro/read_only"),
+            },
+            "rw" => remote_dir(dir)
         };
         let (example_dir_proxy, example_dir_service) =
             fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
@@ -109,12 +120,12 @@ mod tests {
         );
 
         for (file_name, flags, should_succeed) in vec![
-            ("read_only", OpenFlags::RIGHT_READABLE, true),
-            ("read_only", OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE, false),
-            ("read_only", OpenFlags::RIGHT_WRITABLE, false),
-            ("read_write", OpenFlags::RIGHT_READABLE, true),
-            ("read_write", OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE, true),
-            ("read_write", OpenFlags::RIGHT_WRITABLE, true),
+            ("ro/read_only", OpenFlags::RIGHT_READABLE, true),
+            ("ro/read_only", OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE, false),
+            ("ro/read_only", OpenFlags::RIGHT_WRITABLE, false),
+            ("rw/read_write", OpenFlags::RIGHT_READABLE, true),
+            ("rw/read_write", OpenFlags::RIGHT_READABLE | OpenFlags::RIGHT_WRITABLE, true),
+            ("rw/read_write", OpenFlags::RIGHT_WRITABLE, true),
         ] {
             let file_proxy =
                 directory::open_file_no_describe(&example_dir_proxy, file_name, flags).unwrap();

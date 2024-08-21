@@ -284,7 +284,7 @@ async fn get_attributes_directory_query_all() {
 #[fuchsia::test]
 async fn update_attributes_file_unsupported() {
     let harness = TestHarness::new().await;
-    if harness.supports_mutable_attrs() {
+    if harness.supports_mutable_attrs() || !harness.config.supports_mutable_file {
         return;
     }
     let root = root_directory(vec![file(TEST_FILE, vec![])]);

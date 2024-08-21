@@ -40,11 +40,13 @@ impl TestHarness {
                 "GetToken must be supported for testing Rename/Link!"
             );
         }
+        if config.supports_append {
+            assert!(config.supports_mutable_file, "Files supporting append must also be mutable.");
+        }
 
         // Generate set of supported open rights for each object type.
         let dir_rights = Rights::new(get_supported_dir_rights(&config));
-        let file_rights =
-            Rights::new(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE);
+        let file_rights = Rights::new(get_supported_file_rights(&config));
         let executable_file_rights =
             Rights::new(fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE);
 
@@ -66,16 +68,14 @@ impl TestHarness {
 
     /// Returns the abilities [`io_test::File`] objects should have for the harness.
     pub fn supported_file_abilities(&self) -> fio::Abilities {
-        if self.supports_mutable_attrs() {
-            fio::Abilities::READ_BYTES
-                | fio::Abilities::WRITE_BYTES
-                | fio::Abilities::GET_ATTRIBUTES
-                | fio::Abilities::UPDATE_ATTRIBUTES
-        } else {
-            fio::Abilities::READ_BYTES
-                | fio::Abilities::WRITE_BYTES
-                | fio::Abilities::GET_ATTRIBUTES
+        let mut abilities = fio::Abilities::READ_BYTES | fio::Abilities::GET_ATTRIBUTES;
+        if self.config.supports_mutable_file {
+            abilities |= fio::Abilities::WRITE_BYTES;
         }
+        if self.supports_mutable_attrs() {
+            abilities |= fio::Abilities::UPDATE_ATTRIBUTES;
+        }
+        abilities
     }
 
     /// Returns the abilities [`io_test::Directory`] objects should have for the harness.
@@ -153,4 +153,13 @@ fn get_supported_dir_rights(config: &io_test::Io1Config) -> fio::OpenFlags {
         } else {
             fio::OpenFlags::empty()
         }
+}
+
+/// Returns the aggregate of all io1 rights that are supported for [`io_test::File`] objects.
+fn get_supported_file_rights(config: &io_test::Io1Config) -> fio::OpenFlags {
+    let mut rights = fio::OpenFlags::RIGHT_READABLE;
+    if config.supports_mutable_file {
+        rights |= fio::OpenFlags::RIGHT_WRITABLE;
+    }
+    rights
 }

@@ -39,6 +39,9 @@ type Io1Config = struct {
     /// ExecutableFile objects are supported.
     supports_executable_file bool;
 
+    /// Supports writing to files and updating file attributes.
+    supports_mutable_file bool;
+
     /// GetBackingMemory is supported.
     supports_get_backing_memory bool;
 

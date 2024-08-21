@@ -75,6 +75,7 @@ class MinfsHarness : public fidl::Server<fio_test::Io1Harness> {
     config.supports_get_token(true);
     config.supports_append(true);
     config.supports_modify_directory(true);
+    config.supports_mutable_file(true);
     config.supported_attributes(
         fio::NodeAttributesQuery::kCreationTime | fio::NodeAttributesQuery::kModificationTime |
         fio::NodeAttributesQuery::kId | fio::NodeAttributesQuery::kContentSize |

@@ -57,7 +57,7 @@ fn add_entry(entry: io_test::DirectoryEntry, dest: &Arc<Simple>) -> Result<(), E
             dest.add_entry(name, remote_dir(remote_client.into_proxy()?))?;
         }
         io_test::DirectoryEntry::File(io_test::File { name, contents, .. }) => {
-            let new_file = vmo::read_write(contents);
+            let new_file = vmo::read_only(contents);
             dest.add_entry(name, new_file)?;
         }
         io_test::DirectoryEntry::ExecutableFile(io_test::ExecutableFile { name, .. }) => {
@@ -78,7 +78,6 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
                     supports_get_backing_memory: true,
                     supports_remote_dir: true,
                     supports_open3: true,
-                    supports_append: true,
                     supported_attributes: fio::NodeAttributesQuery::PROTOCOLS
                         | fio::NodeAttributesQuery::ABILITIES
                         | fio::NodeAttributesQuery::CONTENT_SIZE
@@ -87,7 +86,9 @@ async fn run(mut stream: Io1HarnessRequestStream) -> Result<(), Error> {
                     // Unsupported options:
                     supports_link_into: false,
                     supports_get_token: false,
+                    supports_append: false,
                     supports_modify_directory: false,
+                    supports_mutable_file: false,
                 };
                 responder.send(&config)?;
                 continue;

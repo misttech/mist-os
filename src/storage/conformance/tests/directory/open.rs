@@ -140,9 +140,23 @@ async fn validate_file_rights() {
     // Opening as READABLE must succeed.
     open_node::<fio::NodeMarker>(&root_dir, fio::OpenFlags::RIGHT_READABLE, TEST_FILE).await;
 
-    // Opening as WRITABLE must succeed.
-    open_node::<fio::NodeMarker>(&root_dir, fio::OpenFlags::RIGHT_WRITABLE, TEST_FILE).await;
-    // Opening as EXECUTABLE must fail (W^X).
+    if harness.config.supports_mutable_file {
+        // Opening as WRITABLE must succeed.
+        open_node::<fio::NodeMarker>(&root_dir, fio::OpenFlags::RIGHT_WRITABLE, TEST_FILE).await;
+    } else {
+        // Opening as WRITABLE must fail.
+        assert_eq!(
+            open_node_status::<fio::NodeMarker>(
+                &root_dir,
+                fio::OpenFlags::RIGHT_WRITABLE,
+                TEST_FILE
+            )
+            .await
+            .expect_err("Opening as writable should fail"),
+            zx::Status::ACCESS_DENIED
+        );
+    }
+    // An executable file wasn't created, opening as EXECUTABLE must fail.
     open_node_status::<fio::NodeMarker>(&root_dir, fio::OpenFlags::RIGHT_EXECUTABLE, TEST_FILE)
         .await
         .expect_err("open succeeded");

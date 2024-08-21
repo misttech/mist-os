@@ -42,39 +42,8 @@ pub fn read_only(content: impl AsRef<[u8]>) -> Arc<VmoFile> {
     VmoFile::new(vmo, true, false, false)
 }
 
-/// Creates a new read-write `VmoFile` with the specified `content`.
-///
-/// ## Panics
-///
-/// This function panics if a VMO could not be created, or if `content` could not be written to the
-/// VMO.
-///
-/// ## Examples
-/// ```
-/// // Initially empty file:
-/// let empty = read_write("");
-/// // File created with contents:
-/// let sized = read_write("Hello world!");
-/// ```
-pub fn read_write(content: impl AsRef<[u8]>) -> Arc<VmoFile> {
-    let bytes: &[u8] = content.as_ref();
-    let vmo = zx::Vmo::create_with_opts(zx::VmoOptions::RESIZABLE, bytes.len().try_into().unwrap())
-        .unwrap();
-    if bytes.len() > 0 {
-        vmo.write(bytes, 0).unwrap();
-    }
-    VmoFile::new(vmo, /*readable*/ true, /*writable*/ true, /*executable*/ false)
-}
-
 /// Implementation of a VMO-backed file in a virtual file system.
 pub struct VmoFile {
-    /// Specifies if the file is readable. Always invoked even for non-readable VMOs.
-    readable: bool,
-
-    /// Specifies if the file is writable. If this is the case, the Vmo backing the file is never
-    /// destroyed until this object is dropped.
-    writable: bool,
-
     /// Specifies if the file can be opened as executable.
     executable: bool,
 
@@ -93,10 +62,13 @@ impl VmoFile {
     /// # Arguments
     ///
     /// * `vmo` - Vmo backing this file object.
-    /// * `readable` - If true, allow connections with OpenFlags::RIGHT_READABLE.
-    /// * `writable` - If true, allow connections with OpenFlags::RIGHT_WRITABLE.
+    /// * `readable` - Must be `true`, VmoFile needs to be readable.
+    /// * `writable` - Must be `false`, VmoFile no longer supports writing.
     /// * `executable` - If true, allow connections with OpenFlags::RIGHT_EXECUTABLE.
     pub fn new(vmo: zx::Vmo, readable: bool, writable: bool, executable: bool) -> Arc<Self> {
+        // TODO(https://fxbug.dev/294078001) Remove the readable and writable arguments.
+        assert!(readable, "VmoFile must be readable");
+        assert!(!writable, "VmoFile no longer supports writing");
         Self::new_with_inode(vmo, readable, writable, executable, fio::INO_UNKNOWN)
     }
 
@@ -105,8 +77,8 @@ impl VmoFile {
     /// # Arguments
     ///
     /// * `vmo` - Vmo backing this file object.
-    /// * `readable` - If true, allow connections with OpenFlags::RIGHT_READABLE.
-    /// * `writable` - If true, allow connections with OpenFlags::RIGHT_WRITABLE.
+    /// * `readable` - Must be `true`, VmoFile needs to be readable.
+    /// * `writable` - Must be `false`, VmoFile no longer supports writing.
     /// * `executable` - If true, allow connections with OpenFlags::RIGHT_EXECUTABLE.
     /// * `inode` - Inode value to report when getting the VmoFile's attributes.
     pub fn new_with_inode(
@@ -116,7 +88,10 @@ impl VmoFile {
         executable: bool,
         inode: u64,
     ) -> Arc<Self> {
-        Arc::new(VmoFile { readable, writable, executable, inode, vmo })
+        // TODO(https://fxbug.dev/294078001) Remove the readable and writable arguments.
+        assert!(readable, "VmoFile must be readable");
+        assert!(!writable, "VmoFile no longer supports writing");
+        Arc::new(VmoFile { executable, inode, vmo })
     }
 }
 
@@ -148,15 +123,14 @@ impl Node for VmoFile {
         &self,
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::NodeAttributes2, Status> {
-        let content_size = self.vmo.get_content_size()?;
-
-        let mut abilities = fio::Operations::GET_ATTRIBUTES;
-        if self.readable {
-            abilities |= fio::Operations::READ_BYTES
-        }
-        if self.writable {
-            abilities |= fio::Operations::WRITE_BYTES
-        }
+        let content_size = if requested_attributes.intersects(
+            fio::NodeAttributesQuery::CONTENT_SIZE.union(fio::NodeAttributesQuery::STORAGE_SIZE),
+        ) {
+            Some(self.vmo.get_content_size()?)
+        } else {
+            None
+        };
+        let mut abilities = fio::Operations::GET_ATTRIBUTES | fio::Operations::READ_BYTES;
         if self.executable {
             abilities |= fio::Operations::EXECUTE
         }
@@ -182,11 +156,11 @@ impl GetVmo for VmoFile {
 
 impl File for VmoFile {
     fn readable(&self) -> bool {
-        self.readable
+        true
     }
 
     fn writable(&self) -> bool {
-        self.writable
+        false
     }
 
     fn executable(&self) -> bool {
@@ -197,18 +171,11 @@ impl File for VmoFile {
         Ok(())
     }
 
-    async fn truncate(&self, length: u64) -> Result<(), Status> {
-        self.vmo.set_size(length)
+    async fn truncate(&self, _length: u64) -> Result<(), Status> {
+        Err(Status::NOT_SUPPORTED)
     }
 
     async fn get_backing_memory(&self, flags: fio::VmoFlags) -> Result<zx::Vmo, Status> {
-        // Disallow opening as both writable and executable. In addition to improving W^X
-        // enforcement, this also eliminates any inconsistencies related to clones that use
-        // SNAPSHOT_AT_LEAST_ON_WRITE since in that case, we cannot satisfy both requirements.
-        if flags.contains(fio::VmoFlags::EXECUTE) && flags.contains(fio::VmoFlags::WRITE) {
-            return Err(zx::Status::NOT_SUPPORTED);
-        }
-
         // Logic here matches fuchsia.io requirements and matches what works for memfs.
         // Shared requests are satisfied by duplicating an handle, and private shares are
         // child VMOs.
@@ -228,7 +195,6 @@ impl File for VmoFile {
         Ok(self.vmo.get_content_size()?)
     }
 
-    // TODO(https://fxbug.dev/42152303)
     async fn update_attributes(
         &self,
         _attributes: fio::MutableNodeAttributes,
@@ -242,23 +208,15 @@ impl File for VmoFile {
 }
 
 fn get_as_private(vmo: &zx::Vmo, mut rights: zx::Rights) -> Result<zx::Vmo, zx::Status> {
+    // SNAPSHOT_AT_LEAST_ON_WRITE removes ZX_RIGHT_EXECUTE even if the parent VMO has it, adding
+    // CHILD_NO_WRITE will ensure EXECUTE is maintained.
+    const CHILD_OPTIONS: zx::VmoChildOptions =
+        zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE.union(zx::VmoChildOptions::NO_WRITE);
+
     // Allow for the child VMO's content size and name to be changed.
     rights |= zx::Rights::SET_PROPERTY;
 
-    // Ensure we give out a copy-on-write child.
-    let mut child_options = zx::VmoChildOptions::SNAPSHOT_AT_LEAST_ON_WRITE;
-    if !rights.contains(zx::Rights::WRITE) {
-        // If we don't need a writable clone, we need to add CHILD_NO_WRITE since
-        // SNAPSHOT_AT_LEAST_ON_WRITE removes ZX_RIGHT_EXECUTE even if the parent VMO has it, but
-        // adding CHILD_NO_WRITE will ensure EXECUTE is maintained.
-        child_options |= zx::VmoChildOptions::NO_WRITE;
-    } else {
-        // If we need a writable child, ensure it can be resized.
-        child_options |= zx::VmoChildOptions::RESIZABLE;
-        rights |= zx::Rights::RESIZE;
-    }
-
     let size = vmo.get_content_size()?;
-    let new_vmo = vmo.create_child(child_options, 0, size)?;
+    let new_vmo = vmo.create_child(CHILD_OPTIONS, 0, size)?;
     new_vmo.replace_handle(rights)
 }
