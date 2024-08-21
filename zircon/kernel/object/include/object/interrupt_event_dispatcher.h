@@ -25,7 +25,7 @@ class InterruptEventDispatcher final : public InterruptDispatcher {
   InterruptEventDispatcher& operator=(const InterruptDispatcher&) = delete;
 
  private:
-  explicit InterruptEventDispatcher(uint32_t vector);
+  explicit InterruptEventDispatcher(uint32_t vector, uint32_t flags);
 
   void MaskInterrupt() final;
   void UnmaskInterrupt() final;

@@ -51,18 +51,22 @@ class InterruptDispatcher
   virtual void DeactivateInterrupt() = 0;
   virtual void UnregisterInterruptHandler() = 0;
 
-  InterruptDispatcher();
+  // It is an error to specify both INTERRUPT_UNMASK_PREWAIT and INTERRUPT_UNMASK_PREWAIT_UNLOCKED.
+  explicit InterruptDispatcher(uint32_t flags);
   void Signal() { event_.Signal(); }
-  zx_status_t set_flags(uint32_t flags);
   bool SendPacketLocked(zx_time_t timestamp) TA_REQ(spinlock_);
 
   // Bits for Interrupt.flags
   // The interrupt is virtual.
   static constexpr uint32_t INTERRUPT_VIRTUAL = (1u << 0);
   // The interrupt should be unmasked before waiting on the event.
+  //
+  // Mutually exclusive with INTERRUPT_UNMASK_PREWAIT_UNLOCKED.
   static constexpr uint32_t INTERRUPT_UNMASK_PREWAIT = (1u << 1);
   // The same as |INTERRUPT_UNMASK_PREWAIT| except release the dispatcher
   // spinlock before waiting.
+  //
+  // Mutually exclusive with INTERRUPT_UNMASK_PREWAIT.
   static constexpr uint32_t INTERRUPT_UNMASK_PREWAIT_UNLOCKED = (1u << 2);
   // The interrupt should be masked following waiting.
   static constexpr uint32_t INTERRUPT_MASK_POSTWAIT = (1u << 4);
@@ -74,7 +78,7 @@ class InterruptDispatcher
  private:
   AutounsignalEvent event_;
   // Interrupt Flags
-  uint32_t flags_;
+  const uint32_t flags_;
 
   zx_time_t timestamp_ TA_GUARDED(spinlock_);
   // Current state of the interrupt object

@@ -22,34 +22,11 @@ KCOUNTER(dispatcher_interrupt_event_destroy_count, "dispatcher.interrupt_event.d
 zx_status_t InterruptEventDispatcher::Create(KernelHandle<InterruptDispatcher>* handle,
                                              zx_rights_t* rights, uint32_t vector, uint32_t options,
                                              bool allow_ack_without_port_for_test) {
-  if (options & ZX_INTERRUPT_VIRTUAL) {
+  if (!is_valid_interrupt(vector, 0)) {
     return ZX_ERR_INVALID_ARGS;
   }
-
-  // Attempt to construct the dispatcher.
-  // Do not create a KernelHandle until all initialization has succeeded;
-  // if an interrupt already exists on |vector| our on_zero_handles() would
-  // tear down the existing interrupt when creation fails.
-  fbl::AllocChecker ac;
-  auto disp = fbl::AdoptRef(new (&ac) InterruptEventDispatcher(vector));
-  if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
-  }
-
-  Guard<CriticalMutex> guard{disp->get_lock()};
-
-  uint32_t interrupt_flags = 0;
 
   if (options & ~(ZX_INTERRUPT_REMAP_IRQ | ZX_INTERRUPT_MODE_MASK | ZX_INTERRUPT_WAKE_VECTOR)) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-
-  // Remap the vector if we have been asked to do so.
-  if (options & ZX_INTERRUPT_REMAP_IRQ) {
-    vector = remap_interrupt(vector);
-  }
-
-  if (!is_valid_interrupt(vector, 0)) {
     return ZX_ERR_INVALID_ARGS;
   }
 
@@ -84,19 +61,35 @@ zx_status_t InterruptEventDispatcher::Create(KernelHandle<InterruptDispatcher>* 
       return ZX_ERR_INVALID_ARGS;
   }
 
+  uint32_t interrupt_flags = 0;
+
   if (tm == IRQ_TRIGGER_MODE_LEVEL) {
     interrupt_flags |= INTERRUPT_UNMASK_PREWAIT | INTERRUPT_MASK_POSTWAIT;
   }
 
   if (options & ZX_INTERRUPT_WAKE_VECTOR) {
-    // TODO(https://fxbug.dev/348668110): Revisit this logging.  Still needed?
-    dprintf(INFO, "creating interrupt wake vector with vector %u, koid %" PRIu64 "\n", vector,
-            disp->get_koid());
     interrupt_flags |= INTERRUPT_WAKE_VECTOR;
   }
 
   if (allow_ack_without_port_for_test) {
     interrupt_flags |= INTERRUPT_ALLOW_ACK_WITHOUT_PORT_FOR_TEST;
+  }
+
+  // Attempt to construct the dispatcher.
+  // Do not create a KernelHandle until all initialization has succeeded;
+  // if an interrupt already exists on |vector| our on_zero_handles() would
+  // tear down the existing interrupt when creation fails.
+  fbl::AllocChecker ac;
+  auto disp = fbl::AdoptRef(new (&ac) InterruptEventDispatcher(vector, interrupt_flags));
+  if (!ac.check()) {
+    return ZX_ERR_NO_MEMORY;
+  }
+
+  Guard<CriticalMutex> guard{disp->get_lock()};
+
+  // Remap the vector if we have been asked to do so.
+  if (options & ZX_INTERRUPT_REMAP_IRQ) {
+    vector = remap_interrupt(vector);
   }
 
   if (!default_mode) {
@@ -106,15 +99,16 @@ zx_status_t InterruptEventDispatcher::Create(KernelHandle<InterruptDispatcher>* 
     }
   }
 
-  zx_status_t status = disp->set_flags(interrupt_flags);
+  // Register the interrupt
+  zx_status_t status = disp->RegisterInterruptHandler();
   if (status != ZX_OK) {
     return status;
   }
 
-  // Register the interrupt
-  status = disp->RegisterInterruptHandler();
-  if (status != ZX_OK) {
-    return status;
+  // TODO(https://fxbug.dev/348668110): Revisit this logging.  Still needed?
+  if (options & ZX_INTERRUPT_WAKE_VECTOR) {
+    dprintf(INFO, "creating interrupt wake vector with vector %u, koid %" PRIu64 "\n", vector,
+            disp->get_koid());
   }
 
   unmask_interrupt(vector);
@@ -132,7 +126,8 @@ void InterruptEventDispatcher::IrqHandler(void* ctx) {
   self->InterruptHandler();
 }
 
-InterruptEventDispatcher::InterruptEventDispatcher(uint32_t vector) : vector_(vector) {
+InterruptEventDispatcher::InterruptEventDispatcher(uint32_t vector, uint32_t flags)
+    : InterruptDispatcher(flags), vector_(vector) {
   kcounter_add(dispatcher_interrupt_event_create_count, 1);
 }
 

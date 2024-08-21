@@ -154,10 +154,6 @@ zx_status_t MsiInterruptDispatcher::Create(fbl::RefPtr<MsiAllocation> alloc, uin
   // the id if necessary.
   cleanup.cancel();
 
-  // MSI / MSI-X interrupts share a masking approach and should be masked while
-  // being serviced and unmasked while waiting for an interrupt message to arrive.
-  disp->set_flags(INTERRUPT_UNMASK_PREWAIT | INTERRUPT_MASK_POSTWAIT);
-
   disp->UnmaskInterrupt();
   st = disp->RegisterInterruptHandler();
   if (st != ZX_OK) {
@@ -175,7 +171,9 @@ zx_status_t MsiInterruptDispatcher::Create(fbl::RefPtr<MsiAllocation> alloc, uin
 MsiInterruptDispatcher::MsiInterruptDispatcher(fbl::RefPtr<MsiAllocation> alloc,
                                                fbl::RefPtr<VmMapping> mapping, uint32_t base_irq_id,
                                                uint32_t msi_id, RegisterIntFn register_int_fn)
-    : alloc_(ktl::move(alloc)),
+
+    : InterruptDispatcher(kFlags),
+      alloc_(ktl::move(alloc)),
       mapping_(ktl::move(mapping)),
       register_int_fn_(register_int_fn),
       base_irq_id_(base_irq_id),

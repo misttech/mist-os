@@ -15,8 +15,11 @@
 #include <object/port_dispatcher.h>
 #include <object/process_dispatcher.h>
 
-InterruptDispatcher::InterruptDispatcher()
-    : timestamp_(0), state_(InterruptState::IDLE), wake_event_(get_koid()) {}
+InterruptDispatcher::InterruptDispatcher(uint32_t flags)
+    : flags_(flags), timestamp_(0), state_(InterruptState::IDLE), wake_event_(get_koid()) {
+  DEBUG_ASSERT((flags & INTERRUPT_UNMASK_PREWAIT) == 0 ||
+               (flags & INTERRUPT_UNMASK_PREWAIT_UNLOCKED) == 0);
+}
 
 zx_status_t InterruptDispatcher::WaitForInterrupt(zx_time_t* out_timestamp) {
   bool defer_unmask = false;
@@ -273,14 +276,6 @@ zx_status_t InterruptDispatcher::Ack() {
   if (defer_unmask) {
     UnmaskInterrupt();
   }
-  return ZX_OK;
-}
-
-zx_status_t InterruptDispatcher::set_flags(uint32_t flags) {
-  if ((flags & INTERRUPT_UNMASK_PREWAIT) && (flags & INTERRUPT_UNMASK_PREWAIT_UNLOCKED)) {
-    return ZX_ERR_INVALID_ARGS;
-  }
-  flags_ = flags;
   return ZX_OK;
 }
 

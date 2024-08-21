@@ -51,6 +51,10 @@ class MsiInterruptDispatcher : public InterruptDispatcher {
   static void IrqHandler(void* ctx);
 
  private:
+  // MSI / MSI-X interrupts share a masking approach and should be masked while
+  // being serviced and unmasked while waiting for an interrupt message to arrive.
+  static constexpr uint32_t kFlags = INTERRUPT_UNMASK_PREWAIT | INTERRUPT_MASK_POSTWAIT;
+
   // The MSI allocation block this dispatcher shares.
   const fbl::RefPtr<MsiAllocation> alloc_;
   // The config space of the MSI capability controlling this MSI vector.

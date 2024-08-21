@@ -29,8 +29,6 @@ zx_status_t VirtualInterruptDispatcher::Create(KernelHandle<InterruptDispatcher>
   if (!ac.check())
     return ZX_ERR_NO_MEMORY;
 
-  new_handle.dispatcher()->set_flags(INTERRUPT_VIRTUAL);
-
   // Transfer control of the new dispatcher to the creator and we are done.
   *rights = default_rights();
   *handle = ktl::move(new_handle);
@@ -48,7 +46,8 @@ void VirtualInterruptDispatcher::DeactivateInterrupt() {}
 
 void VirtualInterruptDispatcher::UnregisterInterruptHandler() {}
 
-VirtualInterruptDispatcher::VirtualInterruptDispatcher() {
+VirtualInterruptDispatcher::VirtualInterruptDispatcher()
+    : InterruptDispatcher(InterruptDispatcher::INTERRUPT_VIRTUAL) {
   kcounter_add(dispatcher_virtual_interrupt_create_count, 1);
 }
 
