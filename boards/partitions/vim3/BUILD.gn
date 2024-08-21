@@ -3,6 +3,8 @@
 # found in the LICENSE file.
 
 import("//build/assembly/generated_partitions_config.gni")
+import(
+    "//build/bazel/assembly/partitions_configurations/verify_partitions_configuration.gni")
 
 assert(current_toolchain == default_toolchain,
        "//boards/paritions/* is only valid in the Fuchsia toolchain")
@@ -39,4 +41,10 @@ generated_partitions_config("vim3") {
   fvm_size = 30064771072  # 28GiB
   fxfs = "fvm"
   fxfs_size = 30064771072  # 28GiB
+}
+
+verify_partitions_configuration("verify") {
+  testonly = true
+  gn_partitions_config_target = ":vim3"
+  bazel_partitions_config_target = ":vim3"
 }
