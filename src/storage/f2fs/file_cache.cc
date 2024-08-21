@@ -100,7 +100,6 @@ zx_status_t Page::GetPage() {
 
 void LockedPage::Invalidate() {
   if (page_) {
-    WaitOnWriteback();
     ClearDirtyForIo();
     page_->block_addr_ = kNullAddr;
     page_->ClearColdData();
@@ -119,15 +118,13 @@ bool Page::SetUptodate() { return SetFlag(PageFlag::kPageUptodate); }
 
 void Page::ClearUptodate() { ClearFlag(PageFlag::kPageUptodate); }
 
+void Page::WaitOnWriteback() { GetFileCache().WaitOnWriteback(*this); }
+
 void LockedPage::WaitOnWriteback() {
   if (!page_) {
     return;
   }
-  if (page_->IsWriteback()) {
-    page_->fs()->ScheduleWriter();
-  }
-  page_->GetFileCache().WaitOnFlag(page_->flags_[static_cast<uint8_t>(PageFlag::kPageWriteback)],
-                                   false);
+  page_->WaitOnWriteback();
 }
 
 bool LockedPage::SetWriteback(block_t addr) {
@@ -135,18 +132,20 @@ bool LockedPage::SetWriteback(block_t addr) {
   if (!ret) {
     page_->fs()->GetSuperblockInfo().IncreasePageCount(CountType::kWriteback);
     page_->block_addr_ = addr;
+    size_t offset = page_->GetKey() * kPageSize;
+    ZX_ASSERT(page_->GetVmoManager()
+                  .WritebackBegin(*page_->fs()->vfs(), offset, offset + kPageSize)
+                  .is_ok());
   }
   return ret;
 }
 
-void Page::ClearWriteback(bool redirty) {
+void Page::ClearWriteback() {
   if (IsWriteback()) {
     fs()->GetSuperblockInfo().DecreasePageCount(CountType::kWriteback);
-    if (redirty && IsUptodate()) {
-      SetDirty();
-    }
+    size_t offset = GetKey() * kPageSize;
+    ZX_ASSERT(GetVmoManager().WritebackEnd(*fs()->vfs(), offset, offset + kPageSize) == ZX_OK);
     ClearFlag(PageFlag::kPageWriteback);
-    GetFileCache().NotifyFlag();
   }
 }
 
@@ -480,24 +479,23 @@ std::vector<LockedPage> FileCache::GetLockedPagesUnsafe(const std::vector<pgoff_
   return pages;
 }
 
-std::vector<LockedPage> FileCache::CleanupPagesUnsafe(pgoff_t start, pgoff_t end) {
-  std::vector<LockedPage> pages = GetLockedPagesUnsafe(start, end);
-  for (auto &page : pages) {
-    page.Invalidate();
-    EvictUnsafe(page.get());
-  }
-  return pages;
-}
-
 std::vector<LockedPage> FileCache::InvalidatePages(pgoff_t start, pgoff_t end, bool zero) {
-  std::vector<LockedPage> pages;
-  {
-    std::lock_guard tree_lock(tree_lock_);
-    pages = CleanupPagesUnsafe(start, end);
-    if (zero) {
-      // Make sure that all pages in the range are zeroed.
-      vmo_manager_->ZeroBlocks(*vnode_->fs()->vfs(), start, end);
-    }
+  std::lock_guard tree_lock(tree_lock_);
+  std::vector<LockedPage> pages = GetLockedPagesUnsafe(start, end);
+  // Unlock |tree_lock_| to allow |page_tree_| to serve other requests while invalidating pages.
+  tree_lock_.unlock();
+  // Invalidate pages after waiting for their writeback.
+  for (auto &page : pages) {
+    WaitOnWriteback(*page);
+    page.Invalidate();
+  }
+  if (zero) {
+    // Make sure that all pages in the range are zeroed.
+    vmo_manager_->ZeroBlocks(*vnode_->fs()->vfs(), start, end);
+  }
+  tree_lock_.lock();
+  for (auto &page : pages) {
+    EvictUnsafe(page.get());
   }
   return pages;
 }
@@ -517,11 +515,7 @@ void FileCache::ClearDirtyPages() {
 }
 
 void FileCache::Reset() {
-  std::vector<LockedPage> pages;
-  {
-    std::lock_guard tree_lock(tree_lock_);
-    pages = CleanupPagesUnsafe();
-  }
+  std::vector<LockedPage> pages = InvalidatePages(0, kPgOffMax, false);
   vmo_manager_->Reset();
 }
 
@@ -612,6 +606,22 @@ void FileCache::EvictCleanPages() {
       EvictUnsafe(raw_page);
     }
   }
+}
+
+void FileCache::WaitOnWriteback(Page &page) {
+  fs::SharedLock lock(flag_lock_);
+  if (page.IsWriteback()) {
+    fs()->ScheduleWriter();
+  }
+  flag_cvar_.wait(lock, [&]() { return !page.IsWriteback(); });
+}
+
+void FileCache::NotifyWriteback(PageList pages) {
+  std::lock_guard lock(flag_lock_);
+  for (auto &page : pages) {
+    page.ClearWriteback();
+  }
+  flag_cvar_.notify_all();
 }
 
 }  // namespace f2fs

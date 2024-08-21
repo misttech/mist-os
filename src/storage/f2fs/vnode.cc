@@ -868,6 +868,7 @@ void VnodeF2fs::TruncateNode(LockedPage &page) {
     DecBlocks(1);
     SetDirty();
   }
+  page.WaitOnWriteback();
   page.Invalidate();
   superblock_info_.SetDirty();
 }
@@ -1155,7 +1156,6 @@ zx::result<LockedPage> VnodeF2fs::NewInodePage() {
 // fs()->RemoveDirtyDirInode(this);
 pgoff_t VnodeF2fs::Writeback(WritebackOperation &operation) {
   pgoff_t nwritten = 0;
-  std::vector<std::unique_ptr<VmoCleaner>> cleaners;
   std::vector<LockedPage> pages = file_cache_->GetLockedDirtyPages(operation);
   PageList pages_to_disk;
   for (auto &page : pages) {
@@ -1171,20 +1171,11 @@ pgoff_t VnodeF2fs::Writeback(WritebackOperation &operation) {
       // |page_cb| conducts additional process for the last page of node and meta vnodes.
       operation.page_cb(page.CopyRefPtr(), page.get() == pages.back().get());
     }
-    // Notify kernel of ZX_PAGER_OP_WRITEBACK_BEGIN for the page.
-    // TODO(b/293977738): VmoCleaner is instantiated on a per-page basis, so
-    // ZX_PAGER_OP_WRITEBACK_BEGIN is called for each dirty page. We need to change it to work on
-    // a per-range basis for efficient system calls.
-    if (vmo_manager_->IsPaged()) {
-      cleaners.push_back(std::make_unique<VmoCleaner>(operation.bSync, fbl::RefPtr<VnodeF2fs>(this),
-                                                      page->GetKey(), page->GetKey() + 1));
-    }
     pages_to_disk.push_back(page.release());
     ++nwritten;
 
     if (!(nwritten % kDefaultBlocksPerSegment)) {
       fs()->ScheduleWriter(nullptr, std::move(pages_to_disk));
-      cleaners.clear();
     }
   }
   if (!pages_to_disk.is_empty() || operation.bSync) {

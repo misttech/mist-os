@@ -57,6 +57,22 @@ class Writer final {
   fs::BackgroundExecutor writeback_executor_;
 };
 
+// A helper class to mitigate notification costs
+class NotifyWriteback {
+ public:
+  ~NotifyWriteback() { Notify(1); }
+  // It tries to group notification to writeback waiters for the same file.
+  // If a new waiter of |page| doesn't belong to the same file as that of |waiters_|, it immediately
+  // notifies |waiters_|.
+  void ReserveNotify(fbl::RefPtr<Page> page);
+
+ private:
+  // It wakes |waiters| up when the number of waiters more than |kNotifyInterval| by default.
+  void Notify(size_t interval = kNotifyInterval);
+  static constexpr size_t kNotifyInterval = 8;
+  PageList waiters_ = {};
+};
+
 }  // namespace f2fs
 
 #endif  // SRC_STORAGE_F2FS_WRITEBACK_H_

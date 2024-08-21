@@ -117,7 +117,8 @@ class Page : public PageRefCounted<Page>,
   // It is called after the last reference is destroyed in FileCache::Downgrade().
   void ClearActive() { ClearFlag(PageFlag::kPageActive); }
 
-  void ClearWriteback(bool redirty = false);
+  void ClearWriteback();
+  void WaitOnWriteback();
 
   bool SetUptodate();
   void ClearUptodate();
@@ -195,8 +196,7 @@ class Page : public PageRefCounted<Page>,
 //   do something requiring page lock...
 // }
 //
-// When Page is used as a function parameter, you should use `Page&` type for unlocked page, and use
-// `LockedPage&` type for locked page.
+// When Page is used as a function parameter, you should use `LockedPage&` type for locked page.
 class LockedPage final {
  public:
   LockedPage() : page_(nullptr) {}
@@ -251,12 +251,11 @@ class LockedPage final {
   bool ClearDirtyForIo();
   bool SetDirty();
   void Zero(size_t start = 0, size_t end = Page::Size()) const;
-  // It invalidates |this| for truncate and punch-a-hole operations.
-  // It clears PageFlag::kPageUptodate and PageFlag::kPageDirty. If a caller invalidates
-  // |this| that is under writeback, writeback keeps going. So, it is recommended to invalidate
-  // its block address in a dnode or nat entry first.
+  // It invalidates |this| for truncate and punch-a-hole operations. A caller should call
+  // WaitOnWriteback() before it.
   void Invalidate();
-  // It waits for the writeback flag of |page_| to be cleared without other changes on |page_|.
+  // It waits for the writeback flag of |page_| to be cleared. So, it should not be called with
+  // FileCache::page_lock_ acquired. It keeps LockedPage::lock_ acquired.
   void WaitOnWriteback();
   bool SetWriteback(block_t addr = kNullAddr);
 
@@ -328,7 +327,8 @@ class FileCache {
   pgoff_t WritebackFromDirtyList(const WritebackOperation &operation) __TA_EXCLUDES(tree_lock_);
 
   // It invalidates Pages within the range of |start| to |end| in |page_tree_|. If |zero| is set,
-  // the data of the corresponding pages are zeored.
+  // the data of the corresponding pages are zeored. Then, it evicts all Pages within the range and
+  // returns them locked.
   std::vector<LockedPage> InvalidatePages(pgoff_t start = 0, pgoff_t end = kPgOffMax,
                                           bool zero = true) __TA_EXCLUDES(tree_lock_);
   // It removes all Pages from |page_tree_|. It should be called when no one can get access to
@@ -353,13 +353,9 @@ class FileCache {
   // It evicts every clean, inactive  page.
   void EvictCleanPages() __TA_EXCLUDES(tree_lock_);
 
-  // TODO(b/357147873): Use LockedPage::lock_ instead of flag_lock_
-  // It provides wait() and notify() for atomic flags of Page.
-  void WaitOnFlag(std::atomic_flag &flag, bool expect) __TA_EXCLUDES(flag_lock_) {
-    fs::SharedLock lock(flag_lock_);
-    flag_cvar_.wait(lock, [&]() { return flag.test(std::memory_order_acquire) == expect; });
-  }
-  void NotifyFlag() { flag_cvar_.notify_all(); }
+  // It provides wait() and notify() for kPageWriteback flag of Page.
+  void WaitOnWriteback(Page &page) __TA_EXCLUDES(flag_lock_, tree_lock_);
+  void NotifyWriteback(PageList pages) __TA_EXCLUDES(flag_lock_, tree_lock_);
 
  private:
   // Unless |page| is locked, it returns a locked |page|. If |page| is already locked,
@@ -383,22 +379,18 @@ class FileCache {
   // Therefore, returned vector's size is same as |page_offsets.size()|.
   std::vector<LockedPage> GetLockedPagesUnsafe(const std::vector<pgoff_t> &page_offsets)
       __TA_REQUIRES(tree_lock_);
-  // It evicts all Pages within the range of |start| to |end| and returns them locked.
-  // When a caller resets returned Pages after doing some necessary work, they will be deleted.
-  std::vector<LockedPage> CleanupPagesUnsafe(pgoff_t start = 0, pgoff_t end = kPgOffMax)
-      __TA_REQUIRES(tree_lock_);
 
   using PageTreeTraits = fbl::DefaultKeyedObjectTraits<pgoff_t, Page>;
   using PageTree = fbl::WAVLTree<pgoff_t, Page *, PageTreeTraits>;
 
-  // |tree_lock_| should be acquired before |flag_lock_| to avoid deadlock.
+  // |tree_lock_| should not be acquired with |flag_lock_| to avoid deadlock.
   std::shared_mutex tree_lock_;
 
   // If its file is orphaned, set it to prevent further dirty Pages.
   std::atomic_flag is_orphan_ = ATOMIC_FLAG_INIT;
   std::condition_variable_any recycle_cvar_;
 
-  // |flag_lock_| is used to protect atomic flags of Page.
+  // |flag_lock_| is used to protect writeback flags of Page.
   std::shared_mutex flag_lock_;
 
   std::condition_variable_any flag_cvar_;

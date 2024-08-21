@@ -156,25 +156,6 @@ class VmoManager {
   zx::vmo vmo_ __TA_GUARDED(mutex_);
 };
 
-// A utility class to notify kernel of start and end of writeback for a file vnode.
-class VmoCleaner final {
- public:
-  VmoCleaner() = delete;
-  VmoCleaner(const VmoCleaner &) = delete;
-  VmoCleaner &operator=(const VmoCleaner &) = delete;
-  VmoCleaner(VmoCleaner &&) = delete;
-  VmoCleaner &operator=(VmoCleaner &&) = delete;
-  explicit VmoCleaner(bool bSync, fbl::RefPtr<VnodeF2fs> vnode, const pgoff_t start = 0,
-                      const pgoff_t end = kPgOffMax);
-  ~VmoCleaner();
-
- private:
-  fbl::RefPtr<VnodeF2fs> vnode_;
-  bool sync_ = false;
-  size_t offset_ = 0;
-  size_t end_offset_ = 0;
-};
-
 }  // namespace f2fs
 
 #endif  // SRC_STORAGE_F2FS_VMO_MANAGER_H_
