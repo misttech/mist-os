@@ -46,11 +46,12 @@ pub struct StartCommand {
     #[argh(switch, hidden_help)]
     pub disconnected: bool,
 
+    // LINT.IfChange
     #[argh(option, short = 'r')]
     /// register this repository.
     /// Default is `devhost`.
     pub repository: Option<String>,
-
+    // LINT.ThenChange(../../../serve/src/lib.rs)
     /// path to the root metadata that was used to sign the
     /// repository TUF metadata. This establishes the root of
     /// trust for this repository. If the TUF metadata was not

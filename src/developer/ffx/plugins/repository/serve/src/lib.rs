@@ -41,11 +41,13 @@ use std::time::Duration;
 use timeout::timeout;
 use tuf::metadata::RawSignedMetadata;
 
+// LINT.IfChange
 /// Default name used for package repositories in ffx. It is expected that there is no need to
 /// change this constant. But in case this is changed, ensure that it is consistent with the ffx
-/// developer documentation :
+/// developer documentation, see
 /// https://cs.opensource.google/search?q=devhost&sq=&ss=fuchsia%2Ffuchsia:src%2Fdeveloper%2Fffx%2F
 pub const DEFAULT_REPO_NAME: &str = "devhost";
+// LINT.ThenChange(args.rs)
 
 const REPO_CONNECT_TIMEOUT_CONFIG: &str = "repository.connect_timeout_secs";
 const DEFAULT_CONNECTION_TIMEOUT_SECS: u64 = 120;

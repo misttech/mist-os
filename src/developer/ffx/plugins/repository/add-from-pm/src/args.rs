@@ -15,10 +15,11 @@ use std::path::PathBuf;
     description = "Make the daemon aware of a specific pm-built repository"
 )]
 pub struct AddFromPmCommand {
+    // LINT.IfChange
     /// repositories will be named `NAME`. Defaults to `devhost`.
     #[argh(option, short = 'r', default = "DEFAULT_REPO_NAME.into()")]
     pub repository: String,
-
+    // LINT.ThenChange(../../serve/src/lib.rs)
     /// alias this repository to these names when this repository is registered on a target.
     #[argh(option, long = "alias")]
     pub aliases: Vec<String>,

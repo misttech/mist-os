@@ -63,6 +63,7 @@ pub mod channel {
         List(List),
     }
 
+    // LINT.IfChange
     /// Get the current channel
     #[derive(Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
     #[argh(
@@ -73,6 +74,7 @@ pub mod channel {
         error_code(1, "Timeout while getting update channel.")
     )]
     pub struct Get {}
+    // LINT.ThenChange(../../../repository/serve/src/lib.rs)
 
     /// Get the target channel
     #[derive(Debug, Eq, ArgsInfo, FromArgs, PartialEq)]
