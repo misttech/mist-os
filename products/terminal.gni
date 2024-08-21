@@ -25,15 +25,10 @@
 
 include_shell_commands_package = true
 
-legacy_base_package_labels = []
 legacy_cache_package_labels = []
-core_realm_shards = []
 
 # Add UI packages on terminal.
 legacy_cache_package_labels += [
-  "//src/media/codec:codec_factory",
-  "//src/media/sessions:mediasession",
-
   "//src/fonts/collections:small-open-fonts-collection",
   "//src/ui/bin/terminal",
   "//src/ui/bin/tiles-session",
@@ -53,10 +48,8 @@ legacy_cache_package_labels += [ "//src/chromium:chromium_test_base_deps" ]
 # QEMU images generated for the SDK, but in cache, so they can be updated.
 legacy_cache_package_labels += [ "//sdk/bundles:tools" ]
 
-core_realm_shards += [ "//src/media/codec:codec_factory_shard" ]
-
 # Run tiles-flatland and flatland-view-provider automatically.
-core_realm_shards += [ "//products/terminal:tiles_flatland_core_shard" ]
+core_realm_shards = [ "//products/terminal:tiles_flatland_core_shard" ]
 
 # Add Test UI Stack for use in tests.
 # TODO(https://fxbug.dev/42056298): Remove once we migrate client usage to subpackages.

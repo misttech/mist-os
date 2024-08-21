@@ -494,14 +494,7 @@ group("core_realm_shards_allowlist") {
   # Used by terminal.gni
   visibility += [
     "//products/terminal:tiles_flatland_core_shard",
-    "//src/media/codec:codec_factory_shard",
     "//src/session/bin/session_manager:terminal_core_shard",
-  ]
-
-  # //bundles/assembly_input_groups/BUILD.gn
-  visibility += [
-    "//src/media/audio/audio_core:core_shard",
-    "//src/media/sounds/soundplayer:core_shard",
   ]
 
   # Used by boards

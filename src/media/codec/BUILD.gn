@@ -46,10 +46,6 @@ group("tests") {
   ]
 }
 
-core_shard("codec_factory_shard") {
-  shard_file = "factory/meta/codec_factory.core_shard.cml"
-}
-
 group("hw_dependent_tests") {
   testonly = true
   deps = [ "//src/media/codec/codecs:hw_dependent_tests" ]

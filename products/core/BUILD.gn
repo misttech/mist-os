@@ -49,6 +49,8 @@ _platform_configuration_base = {
       full_stack = {
       }
     }
+    enable_codecs = true
+    enable_sessions = true
   }
 
   setui = {

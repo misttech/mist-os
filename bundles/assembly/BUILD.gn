@@ -1979,27 +1979,6 @@ assembly_input_bundle("input_group_one") {
   base_packages = [ "//src/sys/cache_manager" ]
 }
 
-assembly_input_bundle("input_group_two") {
-  flexible_packages = [ "//src/media/sessions:mediasession" ]
-  if (current_cpu != "riscv64") {
-    flexible_packages += [ "//src/media/codec:codec_factory" ]
-  }
-  compiled_packages = [
-    {
-      name = "core"
-      components = [
-        {
-          component_name = "core"
-          shards = [
-            "//src/media/codec/factory/meta/codec_factory.core_shard.cml",
-            "//src/media/sessions/meta/mediasession.core_shard.cml",
-          ]
-        },
-      ]
-    },
-  ]
-}
-
 ########
 #
 # Bluetooth Support
@@ -3478,6 +3457,49 @@ assembly_input_bundle("soundplayer") {
           shards = [
             "//src/media/sounds/soundplayer/meta/soundplayer.core_shard.cml",
           ]
+        },
+      ]
+    },
+  ]
+}
+
+# Platform-provided video and audio decoders and encoders.
+#
+# feature_set_levels: standard
+# build-types: all
+#
+assembly_input_bundle("media_codecs") {
+  if (current_cpu != "riscv64") {
+    flexible_packages = [ "//src/media/codec:codec_factory" ]
+  }
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards =
+              [ "//src/media/codec/factory/meta/codec_factory.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
+# Service that allows active media players (sessions) to be published and discovered.
+#
+# feature_set_levels: standard
+# build-types: all
+#
+assembly_input_bundle("media_sessions") {
+  flexible_packages = [ "//src/media/sessions:mediasession" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/media/sessions/meta/mediasession.core_shard.cml" ]
         },
       ]
     },

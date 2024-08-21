@@ -176,6 +176,8 @@ user_platform_aib_names =
       "audio_device_registry",
       "soundplayer",
       "camera",
+      "media_codecs",
+      "media_sessions",
 
       # Diagnostics
       "diagnostics_triage_detect_mali",
@@ -233,7 +235,6 @@ user_platform_aib_names =
 
       # Opaque input groups.
       "input_group_one",
-      "input_group_two",
 
       # ICU-specific version of intl_services
 

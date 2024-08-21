@@ -53,6 +53,8 @@ product_assembly_configuration("terminal") {
         full_stack = {
         }
       }
+      enable_codecs = true
+      enable_sessions = true
     }
 
     fonts = {
