@@ -1235,6 +1235,11 @@ config("Wno-missing-declarations") {
   cflags = [ "-Wno-missing-declarations" ]
 }
 
+config("Wno-deprecated-anon-enum-enum-conversion") {
+  cflags = [ "-Wno-deprecated-anon-enum-enum-conversion" ]
+  visibility = [ "//vendor/*" ]
+}
+
 config("symbol_visibility_hidden") {
   # Disable libc++ visibility annotations to make sure that the compiler option
   # has effect on symbols defined in libc++ headers. Note that we don't want to

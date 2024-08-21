@@ -262,6 +262,9 @@ template("aidl_ndk") {
   source_set(main_target_name) {
     sources = aidl_cpp_outputs
     deps = [ ":${main_target_name}_aidl" ]
+
+    # TODO: Remove this once https://issuetracker.google.com/153746485 is fixed.
+    configs += [ "//build/config:Wno-deprecated-anon-enum-enum-conversion" ]
     public_deps = [
       "//src/lib/android/binder",
       "//src/lib/android/core",
@@ -385,6 +388,9 @@ template("aidl_cpp") {
     source_set(main_target_name) {
       sources = aidl_cpp_outputs
       deps = [ ":${main_target_name}_aidl" ]
+
+      # TODO: Remove this once https://issuetracker.google.com/153746485 is fixed.
+      configs += [ "//build/config:Wno-deprecated-anon-enum-enum-conversion" ]
       public_deps = [
         "//src/lib/android/binder",
         "//src/lib/android/core",
