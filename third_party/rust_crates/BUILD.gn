@@ -6575,18 +6575,18 @@ rust_library("http-body-v0_4_4") {
   applicable_licenses = [ ":http-body-v0_4_4.license" ]
 }
 
-license("httparse-v1_8_0.license") {
+license("httparse-v1_9_4.license") {
   public_package_name = "httparse"
   license_files = [
-    "//third_party/rust_crates/vendor/httparse-1.8.0/LICENSE-APACHE",
-    "//third_party/rust_crates/vendor/httparse-1.8.0/LICENSE-MIT",
+    "//third_party/rust_crates/vendor/httparse-1.9.4/LICENSE-APACHE",
+    "//third_party/rust_crates/vendor/httparse-1.9.4/LICENSE-MIT",
   ]
 }
 
-rust_library("httparse-v1_8_0") {
+rust_library("httparse-v1_9_4") {
   crate_name = "httparse"
-  crate_root = "//third_party/rust_crates/vendor/httparse-1.8.0/src/lib.rs"
-  output_name = "httparse-289adf6867b7b650"
+  crate_root = "//third_party/rust_crates/vendor/httparse-1.9.4/src/lib.rs"
+  output_name = "httparse-ae3045d96e052d7"
   configs -= [ "//build/config/rust:2018_idioms" ]
 
   deps = []
@@ -6596,16 +6596,17 @@ rust_library("httparse-v1_8_0") {
   rustflags = [
     "--cap-lints=allow",
     "--edition=2018",
-    "-Cmetadata=289adf6867b7b650",
-    "-Cextra-filename=-289adf6867b7b650",
+    "-Cmetadata=ae3045d96e052d7",
+    "-Cextra-filename=-ae3045d96e052d7",
     "--cfg=feature=\"default\"",
     "--cfg=feature=\"std\"",
     "--cfg=httparse_simd",
+    "--cfg=httparse_simd_neon_intrinsics",
   ]
 
   visibility = [ ":*" ]
 
-  applicable_licenses = [ ":httparse-v1_8_0.license" ]
+  applicable_licenses = [ ":httparse-v1_9_4.license" ]
 }
 
 license("httpdate-v1_0_2.license") {
@@ -6686,7 +6687,7 @@ rust_library("hyper-v0_14_19") {
   deps += [ ":futures-util-v0_3_30" ]
   deps += [ ":http-body-v0_4_4" ]
   deps += [ ":http-v0_2_4" ]
-  deps += [ ":httparse-v1_8_0" ]
+  deps += [ ":httparse-v1_9_4" ]
   deps += [ ":httpdate-v1_0_2" ]
   deps += [ ":itoa-v1_0_5" ]
   deps += [ ":pin-project-lite-v0_2_13" ]
