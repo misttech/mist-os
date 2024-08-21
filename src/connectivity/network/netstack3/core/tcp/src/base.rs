@@ -173,18 +173,7 @@ impl Default for BufferSizes {
     }
 }
 
-#[derive(Debug)]
-pub(crate) struct OptionalBufferSizes {
-    pub(crate) send: Option<usize>,
-    pub(crate) receive: Option<usize>,
-}
-
 impl BufferSizes {
-    pub(crate) fn into_optional(&self) -> OptionalBufferSizes {
-        let Self { send, receive } = self;
-        OptionalBufferSizes { send: Some(*send), receive: Some(*receive) }
-    }
-
     pub(crate) fn rwnd(&self) -> WindowSize {
         let Self { send: _, receive } = *self;
         WindowSize::new(receive).unwrap_or(WindowSize::MAX)
@@ -194,6 +183,22 @@ impl BufferSizes {
         let Self { send: _, receive } = *self;
         UnscaledWindowSize::from(u16::try_from(receive).unwrap_or(u16::MAX))
     }
+}
+
+/// A mutable reference to buffer configuration.
+pub(crate) enum BuffersRefMut<'a, R, S> {
+    /// All buffers are dropped.
+    NoBuffers,
+    /// Buffer sizes are configured but not instantiated yet.
+    Sizes(&'a mut BufferSizes),
+    /// Buffers are instantiated and mutable references are provided.
+    Both { send: &'a mut S, recv: &'a mut R },
+    /// Only the send buffer is still instantiated, which happens in Closing
+    /// states.
+    SendOnly(&'a mut S),
+    /// Only the receive buffer is still instantiated, which happens in Finwait
+    /// states.
+    RecvOnly(&'a mut R),
 }
 
 /// TCP socket options.

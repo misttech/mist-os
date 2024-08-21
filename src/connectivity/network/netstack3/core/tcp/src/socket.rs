@@ -52,8 +52,8 @@ use netstack3_base::sync::RwLock;
 use netstack3_base::{
     AnyDevice, BidirectionalConverter as _, ContextPair, Control, CoreTimerContext, CounterContext,
     CtxPair, DeferredResourceRemovalContext, DeviceIdContext, EitherDeviceId, ExistsError,
-    HandleableTimer, IcmpErrorCode, Inspector, InspectorDeviceExt, Instant, InstantBindingsTypes,
-    IpExt, LocalAddressError, Mss, OwnedOrRefsBidirectionalConverter, PortAllocImpl,
+    HandleableTimer, IcmpErrorCode, Inspector, InspectorDeviceExt, InstantBindingsTypes, IpExt,
+    LocalAddressError, Mss, OwnedOrRefsBidirectionalConverter, PortAllocImpl,
     ReferenceNotifiersExt as _, RemoveResourceResult, RngContext, Segment, SendPayload, SeqNum,
     StrongDeviceIdentifier as _, TimerBindingsTypes, TimerContext, TracingContext,
     WeakDeviceIdentifier, ZonedAddressError,
@@ -69,9 +69,9 @@ use smallvec::{smallvec, SmallVec};
 use thiserror::Error;
 
 use crate::internal::base::{
-    BufferSizes, ConnectionError, OptionalBufferSizes, SocketOptions, TcpCounters,
+    BufferSizes, BuffersRefMut, ConnectionError, SocketOptions, TcpCounters,
 };
-use crate::internal::buffer::{IntoBuffers, ReceiveBuffer, SendBuffer};
+use crate::internal::buffer::{Buffer, IntoBuffers, ReceiveBuffer, SendBuffer};
 use crate::internal::socket::accept_queue::{AcceptQueue, ListenerNotifier};
 use crate::internal::socket::demux::tcp_serialize_segment;
 use crate::internal::socket::isn::IsnGenerator;
@@ -4498,55 +4498,89 @@ fn do_send_inner<SockI, WireI, CC, BC>(
 enum SendBufferSize {}
 enum ReceiveBufferSize {}
 
-trait AccessBufferSize {
-    fn set_unconnected_size(sizes: &mut BufferSizes, new_size: usize);
-    fn set_connected_size<Inst: Instant + 'static, S: SendBuffer, R: ReceiveBuffer, P: Debug>(
-        state: &mut State<Inst, R, S, P>,
-        new_size: usize,
-    );
-    fn get_buffer_size(sizes: &OptionalBufferSizes) -> Option<usize>;
+trait AccessBufferSize<R, S> {
+    fn set_buffer_size(buffers: BuffersRefMut<'_, R, S>, new_size: usize);
+    fn get_buffer_size(buffers: BuffersRefMut<'_, R, S>) -> Option<usize>;
 }
 
-impl AccessBufferSize for SendBufferSize {
-    fn set_unconnected_size(sizes: &mut BufferSizes, new_size: usize) {
-        let BufferSizes { send, receive: _ } = sizes;
-        *send = new_size
+impl<R: Buffer, S: Buffer> AccessBufferSize<R, S> for SendBufferSize {
+    fn set_buffer_size(buffers: BuffersRefMut<'_, R, S>, new_size: usize) {
+        match buffers {
+            BuffersRefMut::NoBuffers | BuffersRefMut::RecvOnly { .. } => {}
+            BuffersRefMut::Both { send, recv: _ } | BuffersRefMut::SendOnly(send) => {
+                send.request_capacity(new_size)
+            }
+            BuffersRefMut::Sizes(BufferSizes { send, receive: _ }) => *send = new_size,
+        }
     }
 
-    fn set_connected_size<Inst: Instant + 'static, S: SendBuffer, R: ReceiveBuffer, P: Debug>(
-        state: &mut State<Inst, R, S, P>,
-        new_size: usize,
-    ) {
-        state.set_send_buffer_size(new_size)
-    }
-
-    fn get_buffer_size(sizes: &OptionalBufferSizes) -> Option<usize> {
-        let OptionalBufferSizes { send, receive: _ } = sizes;
-        *send
+    fn get_buffer_size(buffers: BuffersRefMut<'_, R, S>) -> Option<usize> {
+        match buffers {
+            BuffersRefMut::NoBuffers | BuffersRefMut::RecvOnly { .. } => None,
+            BuffersRefMut::Both { send, recv: _ } | BuffersRefMut::SendOnly(send) => {
+                Some(send.target_capacity())
+            }
+            BuffersRefMut::Sizes(BufferSizes { send, receive: _ }) => Some(*send),
+        }
     }
 }
 
-impl AccessBufferSize for ReceiveBufferSize {
-    fn set_unconnected_size(sizes: &mut BufferSizes, new_size: usize) {
-        let BufferSizes { send: _, receive } = sizes;
-        *receive = new_size
+impl<R: Buffer, S: Buffer> AccessBufferSize<R, S> for ReceiveBufferSize {
+    fn set_buffer_size(buffers: BuffersRefMut<'_, R, S>, new_size: usize) {
+        match buffers {
+            BuffersRefMut::NoBuffers | BuffersRefMut::SendOnly(_) => {}
+            BuffersRefMut::Both { recv, send: _ } | BuffersRefMut::RecvOnly(recv) => {
+                recv.request_capacity(new_size)
+            }
+            BuffersRefMut::Sizes(BufferSizes { receive, send: _ }) => *receive = new_size,
+        }
     }
 
-    fn set_connected_size<Inst: Instant + 'static, S: SendBuffer, R: ReceiveBuffer, P: Debug>(
-        state: &mut State<Inst, R, S, P>,
-        new_size: usize,
-    ) {
-        state.set_receive_buffer_size(new_size)
+    fn get_buffer_size(buffers: BuffersRefMut<'_, R, S>) -> Option<usize> {
+        match buffers {
+            BuffersRefMut::NoBuffers | BuffersRefMut::SendOnly(_) => None,
+            BuffersRefMut::Both { recv, send: _ } | BuffersRefMut::RecvOnly(recv) => {
+                Some(recv.target_capacity())
+            }
+            BuffersRefMut::Sizes(BufferSizes { receive, send: _ }) => Some(*receive),
+        }
     }
+}
 
-    fn get_buffer_size(sizes: &OptionalBufferSizes) -> Option<usize> {
-        let OptionalBufferSizes { send: _, receive } = sizes;
-        *receive
+fn get_buffers_mut<I: DualStackIpExt, CC: TcpContext<I, BC>, BC: TcpBindingsContext>(
+    state: &mut TcpSocketState<I, CC::WeakDeviceId, BC>,
+    converter: MaybeDualStack<CC::DualStackConverter, CC::SingleStackConverter>,
+) -> BuffersRefMut<'_, BC::ReceiveBuffer, BC::SendBuffer> {
+    match &mut state.socket_state {
+        TcpSocketStateInner::Unbound(Unbound { buffer_sizes, .. }) => {
+            BuffersRefMut::Sizes(buffer_sizes)
+        }
+        TcpSocketStateInner::Bound(BoundSocketState::Connected { conn, .. }) => {
+            let state = match converter {
+                MaybeDualStack::NotDualStack(converter) => {
+                    let (conn, _addr) = converter.convert(conn);
+                    &mut conn.state
+                }
+                MaybeDualStack::DualStack(converter) => match converter.convert(conn) {
+                    EitherStack::ThisStack((conn, _addr)) => &mut conn.state,
+                    EitherStack::OtherStack((conn, _addr)) => &mut conn.state,
+                },
+            };
+            state.buffers_mut()
+        }
+        TcpSocketStateInner::Bound(BoundSocketState::Listener((maybe_listener, _, _))) => {
+            match maybe_listener {
+                MaybeListener::Bound(BoundState { buffer_sizes, .. })
+                | MaybeListener::Listener(Listener { buffer_sizes, .. }) => {
+                    BuffersRefMut::Sizes(buffer_sizes)
+                }
+            }
+        }
     }
 }
 
 fn set_buffer_size<
-    Which: AccessBufferSize,
+    Which: AccessBufferSize<BC::ReceiveBuffer, BC::SendBuffer>,
     I: DualStackIpExt,
     BC: TcpBindingsContext,
     CC: TcpContext<I, BC>,
@@ -4555,37 +4589,13 @@ fn set_buffer_size<
     id: &TcpSocketId<I, CC::WeakDeviceId, BC>,
     size: usize,
 ) {
-    core_ctx.with_socket_mut_and_converter(
-        id,
-        |TcpSocketState { socket_state, ip_options: _ }, converter| match socket_state {
-            TcpSocketStateInner::Unbound(Unbound { buffer_sizes, .. }) => {
-                Which::set_unconnected_size(buffer_sizes, size)
-            }
-            TcpSocketStateInner::Bound(BoundSocketState::Connected { conn, .. }) => {
-                let state = match converter {
-                    MaybeDualStack::NotDualStack(converter) => {
-                        let (conn, _addr) = converter.convert(conn);
-                        &mut conn.state
-                    }
-                    MaybeDualStack::DualStack(converter) => match converter.convert(conn) {
-                        EitherStack::ThisStack((conn, _addr)) => &mut conn.state,
-                        EitherStack::OtherStack((conn, _addr)) => &mut conn.state,
-                    },
-                };
-                Which::set_connected_size(state, size)
-            }
-            TcpSocketStateInner::Bound(BoundSocketState::Listener((
-                MaybeListener::Listener(Listener { buffer_sizes, .. })
-                | MaybeListener::Bound(BoundState { buffer_sizes, .. }),
-                _,
-                _,
-            ))) => Which::set_unconnected_size(buffer_sizes, size),
-        },
-    )
+    core_ctx.with_socket_mut_and_converter(id, |state, converter| {
+        Which::set_buffer_size(get_buffers_mut::<I, CC, BC>(state, converter), size)
+    })
 }
 
 fn get_buffer_size<
-    Which: AccessBufferSize,
+    Which: AccessBufferSize<BC::ReceiveBuffer, BC::SendBuffer>,
     I: DualStackIpExt,
     BC: TcpBindingsContext,
     CC: TcpContext<I, BC>,
@@ -4593,35 +4603,8 @@ fn get_buffer_size<
     core_ctx: &mut CC,
     id: &TcpSocketId<I, CC::WeakDeviceId, BC>,
 ) -> Option<usize> {
-    core_ctx.with_socket_and_converter(id, |socket_state, converter| {
-        let TcpSocketState { socket_state, ip_options: _ } = socket_state;
-        let sizes = match socket_state {
-            TcpSocketStateInner::Unbound(Unbound { buffer_sizes, .. }) => {
-                buffer_sizes.into_optional()
-            }
-            TcpSocketStateInner::Bound(BoundSocketState::Connected { conn, .. }) => {
-                let state = match converter {
-                    MaybeDualStack::NotDualStack(converter) => {
-                        let (conn, _addr) = converter.convert(conn);
-                        &conn.state
-                    }
-                    MaybeDualStack::DualStack(converter) => match converter.convert(conn) {
-                        EitherStack::ThisStack((conn, _addr)) => &conn.state,
-                        EitherStack::OtherStack((conn, _addr)) => &conn.state,
-                    },
-                };
-                state.target_buffer_sizes()
-            }
-            TcpSocketStateInner::Bound(BoundSocketState::Listener((maybe_listener, _, _))) => {
-                match maybe_listener {
-                    MaybeListener::Bound(BoundState { buffer_sizes, .. })
-                    | MaybeListener::Listener(Listener { buffer_sizes, .. }) => {
-                        buffer_sizes.into_optional()
-                    }
-                }
-            }
-        };
-        Which::get_buffer_size(&sizes)
+    core_ctx.with_socket_mut_and_converter(id, |state, converter| {
+        Which::get_buffer_size(get_buffers_mut::<I, CC, BC>(state, converter))
     })
 }
 
