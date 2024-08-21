@@ -113,17 +113,6 @@ verify_assembly_configs("verify_assembly_configs") {
       },
     ]
   }
-  if (_partitions_config_label_no_toolchain == "//boards/partitions:arm64") {
-    partitions_configs += [
-      {
-        name = "arm64_partitions_config"
-        gn_target = "//boards/partitions:arm64"
-        bazel_target = "//build/bazel/assembly/partitions_configurations:arm64"
-        extra_copy_outputs = [ "bootloaders/fuchsia.esp.blk" ]
-        deps = [ "//build/images/flash:esp.bazel_input" ]
-      },
-    ]
-  }
   if (_partitions_config_label_no_toolchain ==
       "//boards/partitions/vim3:vim3") {
     partitions_configs += [

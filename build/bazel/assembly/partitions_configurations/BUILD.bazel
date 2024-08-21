@@ -97,6 +97,17 @@ fuchsia_bootloader_partition(
     type = "",
 )
 
+standard_partitions = [
+    ":zircon_a",
+    ":zircon_b",
+    ":zircon_r",
+    ":vbmeta_a",
+    ":vbmeta_b",
+    ":vbmeta_r",
+    ":fvm",
+    ":fxfs",
+]
+
 fuchsia_partitions_configuration(
     name = "x64",
     bootloader_partitions = [
@@ -122,15 +133,7 @@ fuchsia_partitions_configuration(
         ":fuchsia_esp",
     ],
     hardware_revision = "arm64",
-    partitions = [
-        ":zircon_a",
-        ":zircon_b",
-        ":zircon_r",
-        ":vbmeta_a",
-        ":vbmeta_b",
-        ":vbmeta_r",
-        ":fvm",
-    ],
+    partitions = standard_partitions,
 )
 
 alias(
