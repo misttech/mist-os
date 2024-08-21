@@ -27,6 +27,7 @@ namespace sysmem_driver {
 // Any override will take precedence over the default PixelFormat sort order.
 class UsagePixelFormatCost {
  public:
+  UsagePixelFormatCost(std::vector<fuchsia_sysmem2::FormatCostEntry> entries);
   // Compare the cost of two pixel formats, returning -1 if the first format
   // is lower cost, 0 if they're equal cost or unknown, and 1 if the first
   // format is higher cost.
@@ -36,13 +37,14 @@ class UsagePixelFormatCost {
   //
   // By passing in the BufferCollectionConstraints, the implementation can
   // consider other aspects of constraints in addition to the usage.
-  static int32_t Compare(uint32_t pdev_device_info_vid, uint32_t pdev_device_info_pid,
-                         const fuchsia_sysmem2::BufferCollectionConstraints& constraints,
-                         uint32_t image_format_constraints_index_a,
-                         uint32_t image_format_constraints_index_b);
+  int32_t Compare(const fuchsia_sysmem2::BufferCollectionConstraints& constraints,
+                  uint32_t image_format_constraints_index_a,
+                  uint32_t image_format_constraints_index_b) const;
 
  private:
-  // For now the implementation is via a static table.
+  double GetCost(const fuchsia_sysmem2::BufferCollectionConstraints& constraints,
+                 uint32_t image_format_constraints_index) const;
+  const std::vector<fuchsia_sysmem2::FormatCostEntry> entries_;
 };
 
 }  // namespace sysmem_driver

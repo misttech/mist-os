@@ -32,6 +32,7 @@
 #include "src/devices/sysmem/drivers/sysmem/snapshot_annotation_register.h"
 #include "src/devices/sysmem/drivers/sysmem/sysmem_config.h"
 #include "src/devices/sysmem/drivers/sysmem/sysmem_metrics.h"
+#include "src/devices/sysmem/drivers/sysmem/usage_pixel_format_cost.h"
 
 namespace sys {
 class ServiceDirectory;
@@ -292,6 +293,11 @@ class Device final : public fdf::DriverBase,
   mutable std::optional<async::synchronization_checker> loop_checker_;
   fidl::ServerBindingGroup<fuchsia_hardware_sysmem::Sysmem>& BindingsForTest() { return bindings_; }
 
+  const UsagePixelFormatCost& usage_pixel_format_cost() {
+    ZX_DEBUG_ASSERT(usage_pixel_format_cost_.has_value());
+    return *usage_pixel_format_cost_;
+  }
+
  private:
   class SecureMemConnection {
    public:
@@ -325,6 +331,8 @@ class Device final : public fdf::DriverBase,
                            zx_status_t status);
 
   void DdkUnbindInternal() __TA_REQUIRES(*driver_checker_);
+
+  zx::result<fuchsia_sysmem2::Config> GetConfigFromFile();
 
   inspect::Inspector inspector_;
 
@@ -465,6 +473,8 @@ class Device final : public fdf::DriverBase,
   compat::SyncInitializedDeviceServer compat_server_;
 
   fidl::SyncClient<fuchsia_driver_framework::NodeController> compat_node_controller_client_;
+
+  std::optional<const UsagePixelFormatCost> usage_pixel_format_cost_;
 };
 
 }  // namespace sysmem_driver

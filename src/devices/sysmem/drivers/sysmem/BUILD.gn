@@ -137,6 +137,7 @@ fuchsia_driver("sysmem-driver") {
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
+    "//build/config/fuchsia:fdio_config",
   ]
   if (is_fuchsia) {
     fdio_config = [ "//build/config/fuchsia:fdio_config" ]
@@ -235,8 +236,37 @@ test("sysmem-unittest-bin") {
   ]
 }
 
+template("test_format_costs_file") {
+  resource(target_name) {
+    _input = invoker.format_costs
+    deps = [ _input ]
+    sources =
+        [ get_label_info(_input, "target_out_dir") + "/" +
+          get_label_info(_input, "name") + ".format_costs_persistent_fidl" ]
+    outputs = "data/format_costs/" + get_label_info(_input, "name") +
+              ".format_costs_persistent_fidl"
+  }
+}
+
+test_format_costs_file("test_format_costs_arm_mali") {
+  format_costs = "//src/devices/sysmem/format_costs/arm_mali"
+}
+
+test_format_costs_file("test_format_costs_intel") {
+  format_costs = "//src/devices/sysmem/format_costs/intel"
+}
+
+test_format_costs_file("test_format_costs_video_decoder_nv12") {
+  format_costs = "//src/devices/sysmem/format_costs/video_decoder_nv12"
+}
+
 fuchsia_unittest_package("sysmem-unittest") {
-  deps = [ ":sysmem-unittest-bin" ]
+  deps = [
+    ":sysmem-unittest-bin",
+    ":test_format_costs_arm_mali",
+    ":test_format_costs_intel",
+    ":test_format_costs_video_decoder_nv12",
+  ]
   test_specs = {
     log_settings = {
       max_severity = "ERROR"

@@ -28,6 +28,7 @@
 #include "src/devices/sysmem/drivers/sysmem/indent.h"
 #include "src/devices/sysmem/drivers/sysmem/logging.h"
 #include "src/devices/sysmem/drivers/sysmem/node_properties.h"
+#include "src/devices/sysmem/drivers/sysmem/usage_pixel_format_cost.h"
 #include "src/devices/sysmem/drivers/sysmem/utils.h"
 #include "src/devices/sysmem/drivers/sysmem/versions.h"
 
@@ -389,6 +390,10 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   };
 
   explicit LogicalBufferCollection(Device* parent_device);
+
+  const UsagePixelFormatCost& usage_pixel_format_cost() {
+    return parent_device_->usage_pixel_format_cost();
+  }
 
   // Will log an error, and then FailRoot().
   void LogAndFailRootNode(Location location, fuchsia_sysmem2::Error error, const char* format, ...)

@@ -8,6 +8,8 @@
 // TODO(b/42113093): Remove this include of AmLogic-specific heap names in sysmem code. The include
 // is currently needed for secure heap names only, which is why an include for goldfish heap names
 // isn't here.
+#include <dirent.h>
+#include <fcntl.h>
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <inttypes.h>
@@ -22,6 +24,9 @@
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/clock.h>
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
@@ -177,7 +182,7 @@ bool IsNonZeroPowerOf2(T value) {
 template <typename Type>
 class IsStdVector : public std::false_type {};
 template <typename Type>
-class IsStdVector<std::vector<Type>> : public std::true_type{};
+class IsStdVector<std::vector<Type>> : public std::true_type {};
 template <typename Type>
 inline constexpr bool IsStdVector_v = IsStdVector<Type>::value;
 
@@ -188,7 +193,7 @@ template <typename Type, typename enable = void>
 class IsStdString : public std::false_type {};
 template <typename Type>
 class IsStdString<Type, std::enable_if_t<std::is_same_v<std::string, std::decay_t<Type>>>>
-    : public std::true_type{};
+    : public std::true_type {};
 template <typename Type>
 inline constexpr bool IsStdString_v = IsStdString<Type>::value;
 
@@ -4030,9 +4035,7 @@ int32_t LogicalBufferCollection::CompareImageFormatConstraintsTieBreaker(
 int32_t LogicalBufferCollection::CompareImageFormatConstraintsByIndex(
     const fuchsia_sysmem2::BufferCollectionConstraints& constraints, uint32_t index_a,
     uint32_t index_b) {
-  int32_t cost_compare = UsagePixelFormatCost::Compare(parent_device_->pdev_device_info_vid(),
-                                                       parent_device_->pdev_device_info_pid(),
-                                                       constraints, index_a, index_b);
+  int32_t cost_compare = usage_pixel_format_cost().Compare(constraints, index_a, index_b);
   if (cost_compare != 0) {
     return cost_compare;
   }

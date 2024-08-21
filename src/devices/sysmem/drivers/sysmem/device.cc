@@ -4,6 +4,9 @@
 
 #include "device.h"
 
+#include <dirent.h>
+#include <fcntl.h>
+#include <fidl/fuchsia.io/cpp/fidl.h>
 #include <fidl/fuchsia.kernel/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
@@ -19,6 +22,9 @@
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/event.h>
+#include <stdio.h>
+#include <sys/stat.h>
+#include <unistd.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/threads.h>
@@ -72,6 +78,8 @@ constexpr int64_t kDefaultProtectedMemorySize = 0;
 // on zx::vmo::create_contiguous() after early boot (by default), since it can
 // fail if physical memory has gotten too fragmented.
 constexpr int64_t kDefaultContiguousMemorySize = -5;
+
+constexpr char kSysmemConfigFilename[] = "/sysmem-config/config.sysmem_config_persistent_fidl";
 
 // fbl::round_up() doesn't work on signed types.
 template <typename T>
@@ -497,6 +505,23 @@ zx_status_t Device::Initialize() {
   }
 
   pdev_.Bind(std::move(*pdev_client_result));
+
+  auto config_from_file_result = GetConfigFromFile();
+  if (!config_from_file_result.is_ok()) {
+    LOG(WARNING, "sysmem-config - GetConfigFromFile() failed: %s",
+        config_from_file_result.status_string());
+    // fall back to default-initialized config
+    config_from_file_result = zx::ok(fuchsia_sysmem2::Config{});
+  }
+  auto config_from_file = std::move(config_from_file_result.value());
+  if (!config_from_file.format_costs().has_value()) {
+    LOG(WARNING, "sysmem-config - missing format_costs");
+    config_from_file.format_costs().emplace();
+  } else {
+    LOG(INFO, "sysmem-config - format_costs.size(): %zu", config_from_file.format_costs()->size());
+  }
+  usage_pixel_format_cost_.emplace(
+      UsagePixelFormatCost(std::move(*config_from_file.format_costs())));
 
   int64_t protected_memory_size = kDefaultProtectedMemorySize;
   int64_t contiguous_memory_size = kDefaultContiguousMemorySize;
@@ -1262,6 +1287,48 @@ void Device::UnregisterSecureMem(UnregisterSecureMemCompleter::Sync& completer) 
   } else {
     completer.Reply(fit::error(status));
   }
+}
+
+zx::result<fuchsia_sysmem2::Config> Device::GetConfigFromFile() {
+  std::vector<uint8_t> sysmem_config_vec;
+  auto config_file_as_protocol_result = incoming()->Open<fuchsia_io::File>(
+      kSysmemConfigFilename,
+      fuchsia_io::OpenFlags::kNotDirectory | fuchsia_io::OpenFlags::kRightReadable);
+  if (!config_file_as_protocol_result.is_ok()) {
+    LOG(WARNING, "incoming()->Open<fuchsia_io::File>(kSysmemConfigFilename, ...) failed: %s",
+        config_file_as_protocol_result.status_string());
+    return config_file_as_protocol_result.take_error();
+  }
+  auto config_file = fidl::SyncClient(std::move(config_file_as_protocol_result.value()));
+  // This relies on GetBackingMemory working for the sysmem config file; this is more direct than
+  // using an FD etc, but if this needs to stop assuming GetBackingMemory for whatever reason,
+  // feel free to reach out.
+  fuchsia_io::FileGetBackingMemoryRequest get_backing_request;
+  get_backing_request.flags() = fuchsia_io::VmoFlags::kRead;
+  auto backing_result = config_file->GetBackingMemory(std::move(get_backing_request));
+  if (!backing_result.is_ok()) {
+    LOG(WARNING, "sysmem config file GetBackingMemory failed: %s",
+        backing_result.error_value().FormatDescription().c_str());
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  auto backing_vmo = std::move(backing_result->vmo());
+
+  // Get the size of the VMO
+  uint64_t content_size_prop = 0;
+  zx_status_t status = backing_vmo.get_prop_content_size(&content_size_prop);
+  ZX_ASSERT_MSG(status == ZX_OK, "get_prop_content_size failed: %s", zx_status_get_string(status));
+  size_t vmo_content_size = static_cast<size_t>(content_size_prop);
+
+  std::vector<uint8_t> config_bytes(vmo_content_size);
+  status = backing_vmo.read(config_bytes.data(), 0, config_bytes.size());
+  ZX_ASSERT_MSG(status == ZX_OK, "Could not read config from config VMO");
+
+  // Decode the FIDL struct
+  fit::result result = fidl::Unpersist<fuchsia_sysmem2::Config>(config_bytes);
+  ZX_ASSERT_MSG(result.is_ok(), "Could not decode fuchsia.sysmem2.Config FIDL structure");
+  fuchsia_sysmem2::Config fidl_config = std::move(result.value());
+
+  return zx::ok(fidl_config);
 }
 
 }  // namespace sysmem_driver
