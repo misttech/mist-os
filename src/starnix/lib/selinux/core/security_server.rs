@@ -1100,27 +1100,27 @@ mod tests {
         let permission_check = security_server.as_permission_check();
 
         // Test policy allows "type0" the process getsched capability to "unlabeled_t".
-        assert!(permission_check.has_permissions(
+        assert!(permission_check.has_permission(
             valid_sid,
             unlabeled_sid,
-            &[ProcessPermission::GetSched]
+            ProcessPermission::GetSched
         ));
-        assert!(!permission_check.has_permissions(
+        assert!(!permission_check.has_permission(
             valid_sid,
             unlabeled_sid,
-            &[ProcessPermission::SetSched]
+            ProcessPermission::SetSched
         ));
 
         // Test policy allows "unlabeled_t" the process setsched capability to "type0".
-        assert!(!permission_check.has_permissions(
+        assert!(!permission_check.has_permission(
             unlabeled_sid,
             valid_sid,
-            &[ProcessPermission::GetSched]
+            ProcessPermission::GetSched
         ));
-        assert!(permission_check.has_permissions(
+        assert!(permission_check.has_permission(
             unlabeled_sid,
             valid_sid,
-            &[ProcessPermission::SetSched]
+            ProcessPermission::SetSched
         ));
     }
 
@@ -1136,11 +1136,11 @@ mod tests {
         let permission_check = security_server.as_permission_check();
 
         // Test policy grants "type0" the process-fork permission to itself.
-        assert!(permission_check.has_permissions(sid, sid, &[ProcessPermission::Fork]));
+        assert!(permission_check.has_permission(sid, sid, ProcessPermission::Fork));
 
         // Test policy does not grant "type0" the process-getrlimit permission to itself, but
         // the security server's "fake" mode makes the check permissive.
-        assert!(permission_check.has_permissions(sid, sid, &[ProcessPermission::GetRlimit]));
+        assert!(permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit));
     }
 
     #[fuchsia::test]
@@ -1155,11 +1155,11 @@ mod tests {
         let permission_check = security_server.as_permission_check();
 
         // Test policy grants "type0" the process-fork permission to itself.
-        assert!(permission_check.has_permissions(sid, sid, &[ProcessPermission::Fork]));
+        assert!(permission_check.has_permission(sid, sid, ProcessPermission::Fork));
 
         // Test policy does not grant "type0" the process-getrlimit permission to itself, but
         // the security server is configured to be permissive.
-        assert!(permission_check.has_permissions(sid, sid, &[ProcessPermission::GetRlimit]));
+        assert!(permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit));
     }
 
     #[fuchsia::test]
@@ -1174,9 +1174,9 @@ mod tests {
         let permission_check = security_server.as_permission_check();
 
         // Test policy grants "type0" the process-fork permission to itself.
-        assert!(permission_check.has_permissions(sid, sid, &[ProcessPermission::Fork]));
+        assert!(permission_check.has_permission(sid, sid, ProcessPermission::Fork));
 
         // Test policy does not grant "type0" the process-getrlimit permission to itself.
-        assert!(!permission_check.has_permissions(sid, sid, &[ProcessPermission::GetRlimit]));
+        assert!(!permission_check.has_permission(sid, sid, ProcessPermission::GetRlimit));
     }
 }

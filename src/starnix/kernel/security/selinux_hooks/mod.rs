@@ -242,25 +242,25 @@ fn fs_node_resolve_security_label(
 }
 
 /// Checks if `permissions` are allowed from the task with `source_sid` to the task with `target_sid`.
-fn check_permissions<P: ClassPermission + Into<Permission> + Clone + 'static>(
+fn check_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
     permission_check: &impl PermissionCheck,
     source_sid: SecurityId,
     target_sid: SecurityId,
-    permissions: &[P],
+    permissions: P,
 ) -> Result<(), Errno> {
-    match permission_check.has_permissions(source_sid, target_sid, permissions) {
+    match permission_check.has_permission(source_sid, target_sid, permissions) {
         true => Ok(()),
         false => error!(EACCES),
     }
 }
 
 /// Checks that `subject_sid` has the specified process `permissions` on `self`.
-fn check_self_permissions(
+fn check_self_permission(
     permission_check: &impl PermissionCheck,
     subject_sid: SecurityId,
-    permissions: &[ProcessPermission],
+    permissions: ProcessPermission,
 ) -> Result<(), Errno> {
-    check_permissions(permission_check, subject_sid, subject_sid, permissions)
+    check_permission(permission_check, subject_sid, subject_sid, permissions)
 }
 
 /// Return security state to associate with a filesystem based on the supplied mount options.
