@@ -216,10 +216,7 @@ impl SocketType for TcpSocket {
         let server_addr =
             std::net::SocketAddr::new(server_addr, /* let netstack pick the port */ 0);
 
-        let server =
-            fasync::net::TcpListener::listen_in_realm_with(&server, server_addr, |socket| {
-                Ok(socket.set_reuse_address(true).expect("set reuse address"))
-            })
+        let server = fasync::net::TcpListener::listen_in_realm(&server, server_addr)
             .await
             .expect("listen on server");
 
