@@ -6,6 +6,7 @@
 import unittest
 from unittest import mock
 
+from honeydew import errors
 from honeydew.affordances.sl4f.wlan import wlan as sl4f_wlan
 from honeydew.transports import sl4f as sl4f_transport
 from honeydew.typing.wlan import (
@@ -69,6 +70,41 @@ class WlanSL4FTests(unittest.TestCase):
         )
         self.sl4f_obj.run.assert_called()
 
+    def test_connect_failure_raise_honeydew_wlan_error(self) -> None:
+        """Test for Wlan.connect()."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.HoneydewWlanError):
+            self.wlan_obj.connect(
+                ssid="test",
+                password="password",
+                bss_desc=_TEST_BSS_DESC_1,
+            )
+        self.sl4f_obj.run.assert_called()
+
+    def test_connect_failure_raise_no_wlan_interface_found_error(self) -> None:
+        """Test for Wlan.connect()."""
+        self.sl4f_obj.run.return_value = {"error": "No wlan interface found"}
+        with self.assertRaises(errors.NetworkInterfaceNotFoundError):
+            self.wlan_obj.connect(
+                ssid="test",
+                password="password",
+                bss_desc=_TEST_BSS_DESC_1,
+            )
+        self.sl4f_obj.run.assert_called()
+
+    def test_connect_failure_raise_interface_role_not_found_error(self) -> None:
+        """Test for Wlan.connect()."""
+        self.sl4f_obj.run.return_value = {
+            "error": "interface with role client not found"
+        }
+        with self.assertRaises(errors.NetworkInterfaceNotFoundError):
+            self.wlan_obj.connect(
+                ssid="test",
+                password="password",
+                bss_desc=_TEST_BSS_DESC_1,
+            )
+        self.sl4f_obj.run.assert_called()
+
     def test_connect_failure_resp_not_bool(self) -> None:
         """Test for Wlan.connect()."""
         self.sl4f_obj.run.return_value = {"result": "not_bool"}
@@ -91,6 +127,15 @@ class WlanSL4FTests(unittest.TestCase):
         )
         self.sl4f_obj.run.assert_called()
 
+    def test_create_iface_failure_raise_honeydew_wlan_error(self) -> None:
+        """Test for Wlan.create_iface()."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.HoneydewWlanError):
+            self.wlan_obj.create_iface(
+                phy_id=1, role=WlanMacRole.CLIENT, sta_addr="test"
+            )
+        self.sl4f_obj.run.assert_called()
+
     def test_create_iface_failure_resp_not_int(self) -> None:
         """Test for Wlan.create_iface()."""
         self.sl4f_obj.run.return_value = {"result": "not_int"}
@@ -105,52 +150,81 @@ class WlanSL4FTests(unittest.TestCase):
         self.wlan_obj.destroy_iface(iface_id=1)
         self.sl4f_obj.run.assert_called()
 
+    def test_destroy_iface_failure_honeydew_wlan_error(self) -> None:
+        """Test for Wlan.destroy_iface()."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.HoneydewWlanError):
+            self.wlan_obj.destroy_iface(iface_id=1)
+        self.sl4f_obj.run.assert_called()
+
     def test_disconnect(self) -> None:
         """Test for Wlan.disconnect()."""
         self.wlan_obj.disconnect()
         self.sl4f_obj.run.assert_called()
 
-    def test_get_iface_id_list_success(self) -> None:
-        """Test for Wlan.get_iface_id_list()."""
-        self.sl4f_obj.run.return_value = {"result": [1, 2, 3]}
-
-        self.assertEqual(self.wlan_obj.get_iface_id_list(), [1, 2, 3])
-        self.sl4f_obj.run.assert_called()
-
-    def test_get_iface_id_list_failure(self) -> None:
-        """Test for Wlan.get_iface_id_list()."""
-        self.sl4f_obj.run.return_value = {"result": "not_list"}
-
-        with self.assertRaises(TypeError):
-            self.wlan_obj.get_iface_id_list()
+    def test_disconnect_failure_honeydew_wlan_error(self) -> None:
+        """Test for Wlan.disconnect()."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.HoneydewWlanError):
+            self.wlan_obj.disconnect()
         self.sl4f_obj.run.assert_called()
 
     def test_get_country_success(self) -> None:
         """Test for Wlan.get_country()."""
         self.sl4f_obj.run.return_value = {"result": [85, 83]}
-
         self.assertEqual(self.wlan_obj.get_country(1), "US")
+        self.sl4f_obj.run.assert_called()
+
+    def test_get_country_failure_honeydew_wlan_error(self) -> None:
+        """Test for Wlan.get_country()."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.HoneydewWlanError):
+            self.wlan_obj.get_country(1)
         self.sl4f_obj.run.assert_called()
 
     def test_get_country_failure_resp_not_str(self) -> None:
         """Test for Wlan.get_country()."""
         self.sl4f_obj.run.return_value = {"result": "a"}
-
         with self.assertRaises(TypeError):
             self.wlan_obj.get_country(1)
+        self.sl4f_obj.run.assert_called()
+
+    def test_get_iface_id_list_success(self) -> None:
+        """Test for Wlan.get_iface_id_list()."""
+        self.sl4f_obj.run.return_value = {"result": [1, 2, 3]}
+        self.assertEqual(self.wlan_obj.get_iface_id_list(), [1, 2, 3])
+        self.sl4f_obj.run.assert_called()
+
+    def test_get_iface_id_list_failure_honeydew_wlan_error(self) -> None:
+        """Test for Wlan.get_iface_id_list()."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.HoneydewWlanError):
+            self.wlan_obj.get_iface_id_list()
+        self.sl4f_obj.run.assert_called()
+
+    def test_get_iface_id_list_failure(self) -> None:
+        """Test for Wlan.get_iface_id_list()."""
+        self.sl4f_obj.run.return_value = {"result": "not_list"}
+        with self.assertRaises(TypeError):
+            self.wlan_obj.get_iface_id_list()
         self.sl4f_obj.run.assert_called()
 
     def test_get_phy_id_list_success(self) -> None:
         """Test for Wlan.get_phy_id_list()."""
         self.sl4f_obj.run.return_value = {"result": [1, 2, 3]}
-
         self.assertEqual(self.wlan_obj.get_phy_id_list(), [1, 2, 3])
+        self.sl4f_obj.run.assert_called()
+
+    def test_get_phy_id_list_failure_honeydew_wlan_error(self) -> None:
+        """Test for Wlan.get_phy_id_list()."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.HoneydewWlanError):
+            self.wlan_obj.get_phy_id_list()
         self.sl4f_obj.run.assert_called()
 
     def test_get_phy_id_list_failure(self) -> None:
         """Test for Wlan.get_phy_id_list()."""
         self.sl4f_obj.run.return_value = {"result": "not_list"}
-
         with self.assertRaises(TypeError):
             self.wlan_obj.get_phy_id_list()
         self.sl4f_obj.run.assert_called()
@@ -178,10 +252,16 @@ class WlanSL4FTests(unittest.TestCase):
         self.assertEqual(self.wlan_obj.query_iface(1), expected_value)
         self.sl4f_obj.run.assert_called()
 
+    def test_query_iface_failure_honeydew_wlan_error(self) -> None:
+        """Test for Wlan.query_iface()."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.HoneydewWlanError):
+            self.wlan_obj.query_iface(1)
+        self.sl4f_obj.run.assert_called()
+
     def test_query_iface_failure_resp_not_dict(self) -> None:
         """Test for Wlan.query_iface()."""
         self.sl4f_obj.run.return_value = {"result": "not_dict"}
-
         with self.assertRaises(TypeError):
             self.wlan_obj.query_iface(1)
         self.sl4f_obj.run.assert_called()
@@ -189,7 +269,6 @@ class WlanSL4FTests(unittest.TestCase):
     def test_query_iface_failure_resp_sta_addr_not_list(self) -> None:
         """Test for Wlan.query_iface()."""
         self.sl4f_obj.run.return_value = {"result": {"sta_addr": "not_list"}}
-
         with self.assertRaises(TypeError):
             self.wlan_obj.query_iface(1)
         self.sl4f_obj.run.assert_called()
@@ -238,10 +317,36 @@ class WlanSL4FTests(unittest.TestCase):
 
         self.sl4f_obj.run.assert_called()
 
+    def test_scan_for_bss_info_failure_honeydew_wlan_error(self) -> None:
+        """Test for Wlan.scan_for_bss_info()."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.HoneydewWlanError):
+            self.wlan_obj.scan_for_bss_info()
+        self.sl4f_obj.run.assert_called()
+
+    def test_scan_for_bss_info_failure_raise_no_wlan_interface_found_error(
+        self,
+    ) -> None:
+        """Test for Wlan.scan_for_bss_info()."""
+        self.sl4f_obj.run.return_value = {"error": "No wlan interface found"}
+        with self.assertRaises(errors.NetworkInterfaceNotFoundError):
+            self.wlan_obj.scan_for_bss_info()
+        self.sl4f_obj.run.assert_called()
+
+    def test_scan_for_bss_info_failure_raise_interface_role_not_found_error(
+        self,
+    ) -> None:
+        """Test for Wlan.scan_for_bss_info()."""
+        self.sl4f_obj.run.return_value = {
+            "error": "interface with role client not found"
+        }
+        with self.assertRaises(errors.NetworkInterfaceNotFoundError):
+            self.wlan_obj.scan_for_bss_info()
+        self.sl4f_obj.run.assert_called()
+
     def test_scan_for_bss_info_failure_resp_not_dict(self) -> None:
         """Test for Wlan.scan_for_bss_info()."""
         self.sl4f_obj.run.return_value = {"result": "not_dict"}
-
         with self.assertRaises(TypeError):
             self.wlan_obj.scan_for_bss_info()
         self.sl4f_obj.run.assert_called()
@@ -249,7 +354,6 @@ class WlanSL4FTests(unittest.TestCase):
     def test_scan_for_bss_info_failure_bss_desc_not_dict(self) -> None:
         """Test for Wlan.scan_for_bss_info()."""
         self.sl4f_obj.run.return_value = {"result": {"bss1": "not_dict"}}
-
         with self.assertRaises(TypeError):
             self.wlan_obj.scan_for_bss_info()
         self.sl4f_obj.run.assert_called()
@@ -312,6 +416,13 @@ class WlanSL4FTests(unittest.TestCase):
         self.wlan_obj.set_region(CountryCode.UNITED_STATES_OF_AMERICA)
         self.sl4f_obj.run.assert_called()
 
+    def test_set_region_failure_honeydew_wlan_error(self) -> None:
+        """Test for Wlan.set_region()."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.HoneydewWlanError):
+            self.wlan_obj.set_region(CountryCode.UNITED_STATES_OF_AMERICA)
+        self.sl4f_obj.run.assert_called()
+
     def test_status_idle_success(self) -> None:
         """Test for Wlan.status()."""
         self.sl4f_obj.run.return_value = {"result": {"Idle": None}}
@@ -360,10 +471,32 @@ class WlanSL4FTests(unittest.TestCase):
         self.assertEqual(self.wlan_obj.status(), expected_value)
         self.sl4f_obj.run.assert_called()
 
+    def test_status_failure_honeydew_wlan_error(self) -> None:
+        """Test for Wlan.status()."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.HoneydewWlanError):
+            self.wlan_obj.status()
+        self.sl4f_obj.run.assert_called()
+
+    def test_status_failure_raise_no_wlan_interface_found_error(self) -> None:
+        """Test for Wlan.status()."""
+        self.sl4f_obj.run.return_value = {"error": "No wlan interface found"}
+        with self.assertRaises(errors.NetworkInterfaceNotFoundError):
+            self.wlan_obj.status()
+        self.sl4f_obj.run.assert_called()
+
+    def test_status_failure_raise_interface_role_not_found_error(self) -> None:
+        """Test for Wlan.status()."""
+        self.sl4f_obj.run.return_value = {
+            "error": "interface with role client not found"
+        }
+        with self.assertRaises(errors.NetworkInterfaceNotFoundError):
+            self.wlan_obj.status()
+        self.sl4f_obj.run.assert_called()
+
     def test_status_failure_resp_not_dict(self) -> None:
         """Test for Wlan.status()."""
         self.sl4f_obj.run.return_value = {"result": "not_dict"}
-
         with self.assertRaises(TypeError):
             self.wlan_obj.status()
         self.sl4f_obj.run.assert_called()
@@ -371,7 +504,6 @@ class WlanSL4FTests(unittest.TestCase):
     def test_status_failure_connecting_not_list(self) -> None:
         """Test for Wlan.status()."""
         self.sl4f_obj.run.return_value = {"result": {"Connecting": "not_list"}}
-
         with self.assertRaises(TypeError):
             self.wlan_obj.status()
         self.sl4f_obj.run.assert_called()
@@ -379,7 +511,6 @@ class WlanSL4FTests(unittest.TestCase):
     def test_status_failure_connected_not_dict(self) -> None:
         """Test for Wlan.status()."""
         self.sl4f_obj.run.return_value = {"result": {"Connected": "not_dict"}}
-
         with self.assertRaises(TypeError):
             self.wlan_obj.status()
         self.sl4f_obj.run.assert_called()

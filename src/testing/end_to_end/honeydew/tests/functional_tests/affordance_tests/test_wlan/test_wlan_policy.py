@@ -75,8 +75,8 @@ def _wait_for_network_state(
         time_left = max(1, int(end_time - time.time()))
         try:
             client_state = device.wlan_policy.get_update(timeout=time_left)
-        except errors.Sl4fError:
-            # WlanPolicyError can be thrown if the SL4F command was not successfully
+        except errors.HoneydewWlanError:
+            # HoneydewWlanError can be thrown if the command was not successfully
             # sent, if the command timed out, or if the command returned with an
             # error code in the 'error' field. We retry here to handle the cases
             # in negative testing where we expect to receive an 'error'.
@@ -154,8 +154,8 @@ def _wait_for_client_state(
         time_left = max(1, int(end_time - time.time()))
         try:
             client_state = device.wlan_policy.get_update(timeout=time_left)
-        except errors.Sl4fError:
-            # WlanPolicyError can be thrown if the SL4F command was not successfully
+        except errors.HoneydewWlanError:
+            # HoneydewWlanError can be thrown if the command was not successfully
             # sent, if the command timed out, or if the command returned with an
             # error code in the 'error' field. We retry here to handle the cases
             # in negative testing where we expect to receive an 'error'.
