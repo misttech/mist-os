@@ -1,8 +1,7 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
-use anyhow::{Context, Error, Result};
+use anyhow::{Error, Result};
 use fidl::endpoints::{ClientEnd, ControlHandle, ServerEnd};
 use fidl_fuchsia_driver_testing::*;
 use fidl_fuchsia_testing_harness::OperationError;
@@ -10,8 +9,10 @@ use fuchsia_component::client;
 use fuchsia_component::directory::AsRefDirectory;
 use fuchsia_component::server::ServiceFs;
 use fuchsia_component_test::{
-    Capability, ChildOptions, LocalComponentHandles, RealmBuilder, RealmInstance, Ref, Route,
+    Capability, ChildOptions, ChildRef, LocalComponentHandles, RealmBuilder, RealmInstance, Ref,
+    Route,
 };
+use fuchsia_driver_test::{DriverTestRealmBuilder, DriverTestRealmInstance};
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use std::sync::Arc;
 use tracing::*;
@@ -128,7 +129,7 @@ async fn add_dynamic_expose_deprecated(
     expose: String,
     builder: &RealmBuilder,
     driver_test_realm_component_name: &str,
-    driver_test_realm_ref: &fuchsia_component_test::ChildRef,
+    driver_test_realm_ref: &Ref,
 ) -> Result<(), Error> {
     let expose_parsed =
         expose.parse::<cm_types::Name>().expect("service name is not a valid capability name");
@@ -160,7 +161,7 @@ async fn add_dynamic_expose_deprecated(
         .add_route(
             Route::new()
                 .capability(Capability::service_by_name(&expose))
-                .from(driver_test_realm_ref)
+                .from(driver_test_realm_ref.clone())
                 .to(Ref::parent()),
         )
         .await?;
@@ -170,9 +171,9 @@ async fn add_dynamic_expose_deprecated(
 async fn add_dynamic_offer_deprecated(
     offer: String,
     builder: &RealmBuilder,
-    offer_provider_ref: &fuchsia_component_test::ChildRef,
+    offer_provider_ref: &ChildRef,
     driver_test_realm_component_name: &str,
-    driver_test_realm_ref: &fuchsia_component_test::ChildRef,
+    driver_test_realm_ref: &Ref,
 ) -> Result<(), Error> {
     let offer_parsed =
         offer.parse::<cm_types::Name>().expect("offer name is not a valid capability name");
@@ -200,99 +201,7 @@ async fn add_dynamic_offer_deprecated(
             Route::new()
                 .capability(Capability::protocol_by_name(&offer))
                 .from(offer_provider_ref)
-                .to(driver_test_realm_ref),
-        )
-        .await?;
-    Ok(())
-}
-
-async fn add_dynamic_expose(
-    expose: fidl_fuchsia_component_test::Capability,
-    builder: &RealmBuilder,
-    driver_test_realm_component_name: &str,
-    driver_test_realm_ref: &fuchsia_component_test::ChildRef,
-) -> Result<(), Error> {
-    let name = match &expose {
-        fidl_fuchsia_component_test::Capability::Protocol(p) => p.name.as_ref(),
-        fidl_fuchsia_component_test::Capability::Directory(d) => d.name.as_ref(),
-        fidl_fuchsia_component_test::Capability::Storage(s) => s.name.as_ref(),
-        fidl_fuchsia_component_test::Capability::Service(s) => s.name.as_ref(),
-        fidl_fuchsia_component_test::Capability::EventStream(e) => e.name.as_ref(),
-        fidl_fuchsia_component_test::Capability::Config(c) => c.name.as_ref(),
-        fidl_fuchsia_component_test::Capability::Dictionary(d) => d.name.as_ref(),
-        _ => None,
-    };
-    let expose_parsed = name
-        .expect("No name found in capability.")
-        .parse::<cm_types::Name>()
-        .expect("Not a valid capability name");
-
-    // Dynamic exposes are not hardcoded in the driver test realm cml so we have to add them here.
-    // The source of this capability is the realm_builder collection which is where the
-    // driver_test_realm's own realm builder will spin up the driver framework and drivers.
-    let mut decl = builder.get_component_decl(driver_test_realm_component_name).await?;
-    decl.exposes.push(cm_rust::ExposeDecl::Service(cm_rust::ExposeServiceDecl {
-        source: cm_rust::ExposeSource::Collection(
-            "realm_builder".parse::<cm_types::Name>().unwrap(),
-        ),
-        source_name: expose_parsed.clone(),
-        source_dictionary: Default::default(),
-        target_name: expose_parsed.clone(),
-        target: cm_rust::ExposeTarget::Parent,
-        availability: cm_rust::Availability::Required,
-    }));
-    builder.replace_component_decl(driver_test_realm_component_name, decl).await?;
-
-    // Add the route through the realm builder.
-    builder
-        .add_route(Route::new().capability(expose).from(driver_test_realm_ref).to(Ref::parent()))
-        .await?;
-    Ok(())
-}
-
-async fn add_dynamic_offer(
-    offer: fidl_fuchsia_component_test::Capability,
-    builder: &RealmBuilder,
-    offer_provider_ref: &fuchsia_component_test::ChildRef,
-    driver_test_realm_component_name: &str,
-    driver_test_realm_ref: &fuchsia_component_test::ChildRef,
-) -> Result<(), Error> {
-    let name = match &offer {
-        fidl_fuchsia_component_test::Capability::Protocol(p) => p.name.as_ref(),
-        fidl_fuchsia_component_test::Capability::Directory(d) => d.name.as_ref(),
-        fidl_fuchsia_component_test::Capability::Storage(s) => s.name.as_ref(),
-        fidl_fuchsia_component_test::Capability::Service(s) => s.name.as_ref(),
-        fidl_fuchsia_component_test::Capability::EventStream(e) => e.name.as_ref(),
-        fidl_fuchsia_component_test::Capability::Config(c) => c.name.as_ref(),
-        fidl_fuchsia_component_test::Capability::Dictionary(d) => d.name.as_ref(),
-        _ => None,
-    };
-    let offer_parsed = name
-        .expect("No name found in capability.")
-        .parse::<cm_types::Name>()
-        .expect("Not a valid capability name");
-
-    // Dynamic offers are not hardcoded in the driver test realm cml so we have to add them here.
-    // The target of this capability is the realm_builder collection which is where the
-    // driver_test_realm's own realm builder will spin up the driver framework and drivers.
-    let mut decl = builder.get_component_decl(driver_test_realm_component_name).await?;
-    decl.offers.push(cm_rust::OfferDecl::Protocol(cm_rust::OfferProtocolDecl {
-        source: cm_rust::OfferSource::Parent,
-        source_name: offer_parsed.clone(),
-        source_dictionary: Default::default(),
-        target_name: offer_parsed.clone(),
-        target: cm_rust::OfferTarget::Collection(
-            "realm_builder".parse::<cm_types::Name>().unwrap(),
-        ),
-        dependency_type: cm_rust::DependencyType::Strong,
-        availability: cm_rust::Availability::Required,
-    }));
-    builder.replace_component_decl(driver_test_realm_component_name, decl).await?;
-
-    // Add the route through the realm builder.
-    builder
-        .add_route(
-            Route::new().capability(offer).from(offer_provider_ref).to(driver_test_realm_ref),
+                .to(driver_test_realm_ref.clone()),
         )
         .await?;
     Ok(())
@@ -300,48 +209,11 @@ async fn add_dynamic_offer(
 
 async fn add_capabilities(
     builder: &RealmBuilder,
-    driver_test_realm_ref: fuchsia_component_test::ChildRef,
+    driver_test_realm_ref: Ref,
     driver_test_realm_start_args: &Option<fdt::RealmArgs>,
     offers_client: Option<ClientEnd<fio::DirectoryMarker>>,
     driver_test_realm_component_name: &str,
 ) -> Result<(), Error> {
-    builder
-        .add_route(
-            Route::new()
-                .capability(Capability::directory("dev-topological").rights(fio::R_STAR_DIR))
-                .capability(Capability::directory("dev-class").rights(fio::R_STAR_DIR))
-                .from(&driver_test_realm_ref)
-                .to(Ref::parent()),
-        )
-        .await?;
-
-    builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.device.manager.Administrator"))
-                .capability(Capability::protocol_by_name(
-                    "fuchsia.driver.development.DriverDevelopment",
-                ))
-                .capability(Capability::protocol_by_name(
-                    "fuchsia.driver.registrar.DriverRegistrar",
-                ))
-                .capability(Capability::protocol_by_name("fuchsia.driver.test.Realm"))
-                .from(&driver_test_realm_ref)
-                .to(Ref::parent()),
-        )
-        .await?;
-
-    builder
-        .add_route(
-            Route::new()
-                .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                .capability(Capability::protocol_by_name("fuchsia.process.Launcher"))
-                .capability(Capability::protocol_by_name("fuchsia.inspect.InspectSink"))
-                .from(Ref::parent())
-                .to(&driver_test_realm_ref),
-        )
-        .await?;
-
     let deprecated_exposes =
         driver_test_realm_start_args.as_ref().and_then(|args| args.exposes.as_ref()).and_then(
             |exposes| Some(exposes.iter().map(|e| e.service_name.clone()).collect::<Vec<_>>()),
@@ -365,15 +237,7 @@ async fn add_capabilities(
     }
 
     if let Some(exposes) = exposes {
-        for expose in exposes {
-            add_dynamic_expose(
-                expose,
-                builder,
-                driver_test_realm_component_name,
-                &driver_test_realm_ref,
-            )
-            .await?;
-        }
+        builder.driver_test_realm_add_dtr_exposes(&exposes).await?;
     }
 
     let deprecated_offers =
@@ -385,49 +249,32 @@ async fn add_capabilities(
         .and_then(|args| args.dtr_offers.as_ref())
         .and_then(|offers| Some(offers.clone()));
 
-    let offer_provider_ref = {
-        if deprecated_offers.is_some() || offers.is_some() {
-            let client = offers_client.expect("Offers provided without an offers_client.");
-            let arc_client = Arc::new(client);
-            Some(
-                builder
-                    .add_local_child(
-                        "offer_provider",
-                        move |handles: LocalComponentHandles| {
-                            run_offers_forward(handles, arc_client.clone()).boxed()
-                        },
-                        ChildOptions::new(),
-                    )
-                    .await?,
-            )
-        } else {
-            None
-        }
-    };
-
-    if let Some(deprecated_offers) = deprecated_offers {
-        for deprecated_offer in deprecated_offers {
-            add_dynamic_offer_deprecated(
-                deprecated_offer,
-                builder,
-                offer_provider_ref.as_ref().unwrap(),
-                driver_test_realm_component_name,
-                &driver_test_realm_ref,
+    if deprecated_offers.is_some() || offers.is_some() {
+        let client = offers_client.expect("Offers provided without an offers_client.");
+        let arc_client = Arc::new(client);
+        let provider = builder
+            .add_local_child(
+                "offer_provider",
+                move |handles: LocalComponentHandles| {
+                    run_offers_forward(handles, arc_client.clone()).boxed()
+                },
+                ChildOptions::new(),
             )
             .await?;
+        if let Some(deprecated_offers) = deprecated_offers {
+            for deprecated_offer in deprecated_offers {
+                add_dynamic_offer_deprecated(
+                    deprecated_offer,
+                    builder,
+                    &provider,
+                    driver_test_realm_component_name,
+                    &driver_test_realm_ref,
+                )
+                .await?;
+            }
         }
-    }
-
-    if let Some(offers) = offers {
-        for offer in offers {
-            add_dynamic_offer(
-                offer,
-                builder,
-                offer_provider_ref.as_ref().unwrap(),
-                driver_test_realm_component_name,
-                &driver_test_realm_ref,
-            )
-            .await?;
+        if let Some(offers) = offers {
+            builder.driver_test_realm_add_dtr_offers(&offers, (&provider).into()).await?;
         }
     }
 
@@ -441,10 +288,8 @@ async fn create_realm(options: RealmOptions) -> Result<RealmInstance, Error> {
 
     // Add the driver_test_realm child.
     let builder = RealmBuilder::new().await?;
-    let driver_test_realm_ref = builder
-        .add_child(driver_test_realm_component_name, url, ChildOptions::new().eager())
-        .await?;
-
+    builder.driver_test_realm_manifest_setup(url.as_str()).await?;
+    let driver_test_realm_ref = Ref::child(fuchsia_driver_test::COMPONENT_NAME);
     // Adds the capabilities and routes we need for the realm.
     add_capabilities(
         &builder,
@@ -462,13 +307,7 @@ async fn create_realm(options: RealmOptions) -> Result<RealmInstance, Error> {
     let start_args = options
         .driver_test_realm_start_args
         .expect("No driver_test_realm_start_args was provided.");
-
-    let dtr = realm.root.connect_to_protocol_at_exposed_dir::<fdt::RealmMarker>()?;
-    dtr.start(start_args)
-        .await?
-        .map_err(fuchsia_zircon_status::Status::from_raw)
-        .context("DriverTestRealm Start failed")?;
-
+    realm.driver_test_realm_start(start_args).await?;
     // Connect dev-class.
     if let Some(dev_class) = options.dev_class {
         realm.root.get_exposed_dir().open(
