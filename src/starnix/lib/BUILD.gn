@@ -19,6 +19,7 @@ group("tests") {
 
   deps = [
     "ebpf:tests",
+    "expando:tests",
     "extended_pstate:tests",
     "range_map:tests",
     "selinux:tests",
