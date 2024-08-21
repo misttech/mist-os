@@ -9,21 +9,21 @@
 
 #include "tee_internal_api_types.h"
 
-// Fuchsia definition of the TEE Core Internal API v1.2.1
+// Fuchsia definition of the TEE Core Internal API v1.3.1
 //
 // https://globalplatform.org/specs-library/tee-internal-core-api-specification/
 
 // Common Definitions 3.1
 
-// API Version 3.1.1
+// 3.1.1 API Version
 
 #define TEE_CORE_API_MAJOR_VERSION (1)
-#define TEE_CORE_API_MINOR_VERSION (2)
+#define TEE_CORE_API_MINOR_VERSION (3)
 #define TEE_CORE_API_MAINTENANCE_VERSION (1)
 #define TEE_CORE_API_VERSION                                                 \
   ((TEE_CORE_API_MAJOR_VERSION << 24) + (TEE_CORE_API_MINOR_VERSION << 16) + \
    (TEE_CORE_API_MAINTENANCE_VERSION << 8))
-#define TEE_CORE_API_1_2_1
+#define TEE_CORE_API_1_3_1
 
 // 3.5.1 Version Compatibility Definitions
 
@@ -231,9 +231,7 @@ void TEE_InitValueAttribute(
     /* out */ TEE_Attribute* attr, uint32_t attributeID, uint32_t a, uint32_t b);
 
 // 5.6.6 TEE_CopyObjectAttributes1
-TEE_Result TEE_CopyObjectAttributes1(
-    /* out */ TEE_ObjectHandle destObject,
-    /* in */ TEE_ObjectHandle srcObject);
+TEE_Result TEE_CopyObjectAttributes1(TEE_ObjectHandle destObject, TEE_ObjectHandle srcObject);
 
 // 5.6.7 TEE_GenerateKey
 TEE_Result TEE_GenerateKey(TEE_ObjectHandle object, uint32_t keySize,
@@ -249,7 +247,7 @@ TEE_Result TEE_CreatePersistentObject(uint32_t storageID, /* in(objectIDLength) 
                                       size_t objectIDLen, uint32_t flags,
                                       TEE_ObjectHandle attributes,
                                       /* inbuf */ void* initialData, size_t initialDataLen,
-                                      /* out */ TEE_ObjectHandle* object);
+                                      /* outopt */ TEE_ObjectHandle* object);
 
 // 5.7.4 TEE_CloseAndDeletePersistentObject1
 TEE_Result TEE_CloseAndDeletePersistentObject1(TEE_ObjectHandle object);
@@ -286,13 +284,13 @@ TEE_Result TEE_ReadObjectData(TEE_ObjectHandle object,
 
 // 5.9.2 TEE_WriteObjectData
 TEE_Result TEE_WriteObjectData(TEE_ObjectHandle object,
-                               /* in */ void* buffer, size_t size);
+                               /* inbuf */ void* buffer, size_t size);
 
 // 5.9.3 TEE_TruncateObjectData
 TEE_Result TEE_TruncateObjectData(TEE_ObjectHandle object, size_t size);
 
 // 5.9.4 TEE_SeekObjectData
-TEE_Result TEE_SeekObjectData(TEE_ObjectHandle object, size_t offset, TEE_Whence whence);
+TEE_Result TEE_SeekObjectData(TEE_ObjectHandle object, intmax_t offset, TEE_Whence whence);
 
 // 6.2.1 TEE_AllocateOperation
 TEE_Result TEE_AllocateOperation(TEE_OperationHandle* operation, uint32_t algorithm, uint32_t mode,
@@ -314,23 +312,17 @@ TEE_Result TEE_GetOperationInfoMultiple(
 void TEE_ResetOperation(TEE_OperationHandle operation);
 
 // 6.2.6 TEE_SetOperationKey
-TEE_Result TEE_SetOperationKey(TEE_OperationHandle operation,
-                               /* in */ TEE_ObjectHandle key);
+TEE_Result TEE_SetOperationKey(TEE_OperationHandle operation, TEE_ObjectHandle key);
 
 // 6.2.7 TEE_SetOperationKey2
-TEE_Result TEE_SetOperationKey2(TEE_OperationHandle operation,
-                                /* in */ TEE_ObjectHandle key1,
-                                /* in */ TEE_ObjectHandle key2);
+TEE_Result TEE_SetOperationKey2(TEE_OperationHandle operation, TEE_ObjectHandle key1,
+                                TEE_ObjectHandle key2);
 
 // 6.2.8 TEE_CopyOperation
-void TEE_CopyOperation(
-    /* out */ TEE_OperationHandle dstOperation,
-    /* in */ TEE_OperationHandle srcOperation);
+void TEE_CopyOperation(TEE_OperationHandle dstOperation, TEE_OperationHandle srcOperation);
 
 // 6.2.9 TEE_IsAlgorithmSupported
-TEE_Result TEE_IsAlgorithmSupported(
-    /* in */ uint32_t algId,
-    /* in */ uint32_t element);
+TEE_Result TEE_IsAlgorithmSupported(uint32_t algId, uint32_t element);
 
 // 6.3.1 TEE_DigestUpdate
 void TEE_DigestUpdate(TEE_OperationHandle operation,
@@ -340,6 +332,10 @@ void TEE_DigestUpdate(TEE_OperationHandle operation,
 TEE_Result TEE_DigestDoFinal(TEE_OperationHandle operation,
                              /* inbuf */ void* chunk, size_t chunkLen,
                              /* outbuf */ void* hash, size_t* hashLen);
+
+// 6.3.3 TEE_DigestExtract
+TEE_Result TEE_DigestExtract(TEE_OperationHandle operation, /* outbuf */ void* hash,
+                             size_t* hashLen);
 
 // 6.4.1 TEE_CipherInit
 void TEE_CipherInit(TEE_OperationHandle operation,
@@ -356,8 +352,7 @@ TEE_Result TEE_CipherDoFinal(TEE_OperationHandle operation,
                              /* outbufopt */ void* destData, size_t* destLen);
 
 // 6.5.1 TEE_MACInit
-void TEE_MACInit(TEE_OperationHandle operation,
-                 /* inbuf */ void* IV, size_t IVLen);
+void TEE_MACInit(TEE_OperationHandle operation, void* IV, size_t IVLen);
 
 // 6.5.2 TEE_MACUpdate
 void TEE_MACUpdate(TEE_OperationHandle operation,
@@ -517,86 +512,86 @@ TEE_Result TEE_BigIntSetBit(
 // 8.7.7 TEE_BigIntAssign
 TEE_Result TEE_BigIntAssign(
     /* out */ TEE_BigInt* dest,
-    /* in */ TEE_BigInt* src);
+    /* in */ const TEE_BigInt* src);
 
 // 8.7.8 TEE_BigIntAbs
 TEE_Result TEE_BigIntAbs(
     /* out */ TEE_BigInt* dest,
-    /* in */ TEE_BigInt* src);
+    /* in */ const TEE_BigInt* src);
 
 // 8.8.1 TEE_BigIntAdd
 void TEE_BigIntAdd(
     /* out */ TEE_BigInt* dest,
-    /* in */ TEE_BigInt* op1,
-    /* in */ TEE_BigInt* op2);
+    /* in */ const TEE_BigInt* op1,
+    /* in */ const TEE_BigInt* op2);
 
 // 8.8.2 TEE_BigIntSub
 void TEE_BigIntSub(
     /* out */ TEE_BigInt* dest,
-    /* in */ TEE_BigInt* op1,
-    /* in */ TEE_BigInt* op2);
+    /* in */ const TEE_BigInt* op1,
+    /* in */ const TEE_BigInt* op2);
 
 // 8.8.3 TEE_BigIntNeg
 void TEE_BigIntNeg(
     /* out */ TEE_BigInt* dest,
-    /* in */ TEE_BigInt* op);
+    /* in */ const TEE_BigInt* op);
 
 // 8.8.4 TEE_BigIntMul
 void TEE_BigIntMul(
     /* out */ TEE_BigInt* dest,
-    /* in */ TEE_BigInt* op1,
-    /* in */ TEE_BigInt* op2);
+    /* in */ const TEE_BigInt* op1,
+    /* in */ const TEE_BigInt* op2);
 
 // 8.8.5 TEE_BigIntSquare
 void TEE_BigIntSquare(
     /* out */ TEE_BigInt* dest,
-    /* in */ TEE_BigInt* op);
+    /* in */ const TEE_BigInt* op);
 
 // 8.8.6 TEE_BigIntDiv
 void TEE_BigIntDiv(
     /* out */ TEE_BigInt* dest_q,
     /* out */ TEE_BigInt* dest_r,
-    /* in */ TEE_BigInt* op1,
-    /* in */ TEE_BigInt* op2);
+    /* in */ const TEE_BigInt* op1,
+    /* in */ const TEE_BigInt* op2);
 
 // 8.9.1 TEE_BigIntMod
 void TEE_BigIntMod(
     /* out */ TEE_BigInt* dest,
-    /* in */ TEE_BigInt* op,
-    /* in */ TEE_BigInt* n);
+    /* in */ const TEE_BigInt* op,
+    /* in */ const TEE_BigInt* n);
 
 // 8.9.2 TEE_BigIntAddMod
 void TEE_BigIntAddMod(
     /* out */ TEE_BigInt* dest,
-    /* in */ TEE_BigInt* op1,
-    /* in */ TEE_BigInt* op2,
-    /* in */ TEE_BigInt* n);
+    /* in */ const TEE_BigInt* op1,
+    /* in */ const TEE_BigInt* op2,
+    /* in */ const TEE_BigInt* n);
 
 // 8.9.3 TEE_BigIntSubMod
 void TEE_BigIntSubMod(
     /* out */ TEE_BigInt* dest,
-    /* in */ TEE_BigInt* op1,
-    /* in */ TEE_BigInt* op2,
-    /* in */ TEE_BigInt* n);
+    /* in */ const TEE_BigInt* op1,
+    /* in */ const TEE_BigInt* op2,
+    /* in */ const TEE_BigInt* n);
 
 // 8.9.4 TEE_BigIntMulMod
 void TEE_BigIntMulMod(
     /* out */ TEE_BigInt* dest,
-    /* in */ TEE_BigInt* op1,
-    /* in */ TEE_BigInt* op2,
-    /* in */ TEE_BigInt* n);
+    /* in */ const TEE_BigInt* op1,
+    /* in */ const TEE_BigInt* op2,
+    /* in */ const TEE_BigInt* n);
 
 // 8.9.5 TEE_BigIntSquareMod
 void TEE_BigIntSquareMod(
     /* out */ TEE_BigInt* dest,
-    /* in */ TEE_BigInt* op,
-    /* in */ TEE_BigInt* n);
+    /* in */ const TEE_BigInt* op,
+    /* in */ const TEE_BigInt* n);
 
 // 8.9.6 TEE_BigIntInvMod
 void TEE_BigIntInvMod(
     /* out */ TEE_BigInt* dest,
-    /* in */ TEE_BigInt* op,
-    /* in */ TEE_BigInt* n);
+    /* in */ const TEE_BigInt* op,
+    /* in */ const TEE_BigInt* n);
 
 // 8.9.7 TEE_BigIntExpMod
 TEE_Result TEE_BigIntExpMod(
@@ -644,6 +639,26 @@ void TEE_BigIntComputeFMM(
     /* in */ TEE_BigIntFMM* op2,
     /* in */ TEE_BigInt* n,
     /* in */ TEE_BigIntFMMContext* context);
+
+// B.1 Deprecated Functions
+
+// B.1.1 TEE_GetObjectInfo - Deprecated
+void TEE_GetObjectInfo(TEE_ObjectHandle object,
+                       /* out */ TEE_ObjectInfo* objectInfo);
+
+// B.1.2 TEE_RestrictObjectUsage - Deprecated
+void TEE_RestrictObjectUsage(TEE_ObjectHandle object, uint32_t objectUsage);
+
+// B.1.3 TEE_CopyObjectAttributes – Deprecated
+void TEE_CopyObjectAttributes(TEE_ObjectHandle destObject, TEE_ObjectHandle srcObject);
+
+// B.1.4 TEE_CloseAndDeletePersistentObject – Deprecated
+void TEE_CloseAndDeletePersistentObject(TEE_ObjectHandle object);
+
+// B.1.5 TEE_BigIntInitFMMContext - Deprecated
+void TEE_BigIntInitFMMContext(
+    /* out */ TEE_BigIntFMMContext* context, size_t len,
+    /* in */ const TEE_BigInt* modulus);
 
 __END_CDECLS
 

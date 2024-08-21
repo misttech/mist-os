@@ -90,6 +90,7 @@ pub fn exposed_c_entry_points() -> &'static [*const extern "C" fn()] {
         TEE_IsAlgorithmSupported as *const extern "C" fn(),
         TEE_DigestUpdate as *const extern "C" fn(),
         TEE_DigestDoFinal as *const extern "C" fn(),
+        TEE_DigestExtract as *const extern "C" fn(),
         TEE_CipherInit as *const extern "C" fn(),
         TEE_CipherUpdate as *const extern "C" fn(),
         TEE_CipherDoFinal as *const extern "C" fn(),
@@ -149,6 +150,11 @@ pub fn exposed_c_entry_points() -> &'static [*const extern "C" fn()] {
         TEE_BigIntConvertToFMM as *const extern "C" fn(),
         TEE_BigIntConvertFromFMM as *const extern "C" fn(),
         TEE_BigIntComputeFMM as *const extern "C" fn(),
+        TEE_GetObjectInfo as *const extern "C" fn(),
+        TEE_RestrictObjectUsage as *const extern "C" fn(),
+        TEE_CopyObjectAttributes as *const extern "C" fn(),
+        TEE_CloseAndDeletePersistentObject as *const extern "C" fn(),
+        TEE_BigIntInitFMMContext as *const extern "C" fn(),
         // This function is exposed to configure our default heap allocator.
         mem::__scudo_default_options as *const extern "C" fn(),
     ]
@@ -659,6 +665,15 @@ extern "C" fn TEE_DigestDoFinal(
 }
 
 #[no_mangle]
+extern "C" fn TEE_DigestExtract(
+    operation: TEE_OperationHandle,
+    hash: *mut ::std::os::raw::c_void,
+    hashLen: *mut usize,
+) -> TEE_Result {
+    unimplemented!()
+}
+
+#[no_mangle]
 extern "C" fn TEE_CipherInit(
     operation: TEE_OperationHandle,
     IV: *mut ::std::os::raw::c_void,
@@ -1119,6 +1134,35 @@ extern "C" fn TEE_BigIntComputeFMM(
     op2: *mut TEE_BigIntFMM,
     n: *mut TEE_BigInt,
     context: *mut TEE_BigIntFMMContext,
+) {
+    unimplemented!()
+}
+
+#[no_mangle]
+extern "C" fn TEE_GetObjectInfo(object: TEE_ObjectHandle, objectInfo: *mut TEE_ObjectInfo) {
+    unimplemented!()
+}
+
+#[no_mangle]
+extern "C" fn TEE_RestrictObjectUsage(object: TEE_ObjectHandle, objectUsage: u32) {
+    unimplemented!()
+}
+
+#[no_mangle]
+extern "C" fn TEE_CopyObjectAttributes(destObject: TEE_ObjectHandle, srcObject: TEE_ObjectHandle) {
+    unimplemented!()
+}
+
+#[no_mangle]
+extern "C" fn TEE_CloseAndDeletePersistentObject(object: TEE_ObjectHandle) {
+    unimplemented!()
+}
+
+#[no_mangle]
+extern "C" fn TEE_BigIntInitFMMContext(
+    context: *mut TEE_BigIntFMMContext,
+    len: usize,
+    modulus: *const TEE_BigInt,
 ) {
     unimplemented!()
 }

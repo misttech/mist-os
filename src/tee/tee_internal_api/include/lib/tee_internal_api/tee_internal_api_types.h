@@ -5,9 +5,12 @@
 #ifndef SRC_TEE_TEE_INTERNAL_API_INCLUDE_LIB_TEE_INTERNAL_API_TEE_INTERNAL_API_TYPES_H_
 #define SRC_TEE_TEE_INTERNAL_API_INCLUDE_LIB_TEE_INTERNAL_API_TEE_INTERNAL_API_TYPES_H_
 
-// Type definitions for the Fuchsia definition of the TEE Core Internal API v1.2.1
+// Type definitions for the Fuchsia definition of the TEE Core Internal API v1.3.1
 //
 // https://globalplatform.org/specs-library/tee-internal-core-api-specification/
+
+// 2.4 Opaque Handles
+#define TEE_HANDLE_NULL 0
 
 // 3.2 Data Types
 
@@ -45,7 +48,7 @@ typedef TEE_UUID TEEC_UUID;
 #define TEE_ERROR_CORRUPT_OBJECT_2 0xF0100002
 #define TEE_ERROR_STORAGE_NOT_AVAILABLE 0xF0100003
 #define TEE_ERROR_STORAGE_NOT_AVAILABLE_2 0xF0100004
-#define TEE_ERROR_OLD_VERSION 0xF0100005
+#define TEE_ERROR_UNSUPPORTED_VERSION 0xF0100005
 #define TEE_ERROR_CIPHERTEXT_INVALID 0xF0100006
 #define TEE_ERROR_GENERIC 0xFFFF0000
 #define TEEC_ERROR_GENERIC 0xFFFF0000
@@ -164,7 +167,7 @@ typedef struct {
   uint32_t attributeID;
   union {
     struct {
-      /* inbuf */ void* buffer;
+      /* inoutbuf */ void* buffer;
       size_t length;
     } ref;
     struct {
@@ -204,6 +207,8 @@ typedef struct __TEE_ObjectEnumHandle* TEE_ObjectEnumHandle;
 
 // Table 5-2: Object Storage Constants
 #define TEE_STORAGE_PRIVATE 0x00000001
+#define TEE_STORAGE_PERSO 0x00000002
+#define TEE_STORAGE_PROTECTED 0x00000003
 #define TEE_STORAGE_ILLEGAL_VALUE 0x7FFFFFFF
 
 // Table 5-3: Data Flag Constants
@@ -235,6 +240,7 @@ typedef struct __TEE_ObjectEnumHandle* TEE_ObjectEnumHandle;
 #define TEE_HANDLE_FLAG_INITIALIZED 0x00020000
 #define TEE_HANDLE_FLAG_KEY_SET 0x00040000
 #define TEE_HANDLE_FLAG_EXPECT_TWO_KEYS 0x00080000
+#define TEE_HANDLE_FLAG_EXTRACTING 0x00100000
 
 // Table 5-6: Operation Constants
 #define TEE_OPERATION_CIPHER 1
@@ -248,6 +254,7 @@ typedef struct __TEE_ObjectEnumHandle* TEE_ObjectEnumHandle;
 // Table 5-7: Operation States
 #define TEE_OPERATION_STATE_INITIAL 0x00000000
 #define TEE_OPERATION_STATE_ACTIVE 0x00000001
+#define TEE_OPERATION_STATE_EXTRACTING 0x00000002
 
 // 6.1.1 TEE_OperationMode
 typedef uint32_t TEE_OperationMode;
@@ -319,21 +326,37 @@ typedef struct __TEE_OperationHandle* TEE_OperationHandle;  // NOLINT(bugprone-r
 #define TEE_ALG_RSASSA_PKCS1_V1_5_SHA256 0x70004830
 #define TEE_ALG_RSASSA_PKCS1_V1_5_SHA384 0x70005830
 #define TEE_ALG_RSASSA_PKCS1_V1_5_SHA512 0x70006830
+#define TEE_ALG_RSASSA_PKCS1_V1_5_SHA3_224 0x70008830
+#define TEE_ALG_RSASSA_PKCS1_V1_5_SHA3_256 0x70009830
+#define TEE_ALG_RSASSA_PKCS1_V1_5_SHA3_384 0x7000A830
+#define TEE_ALG_RSASSA_PKCS1_V1_5_SHA3_512 0x7000B830
 #define TEE_ALG_RSASSA_PKCS1_PSS_MGF1_SHA1 0x70212930
 #define TEE_ALG_RSASSA_PKCS1_PSS_MGF1_SHA224 0x70313930
 #define TEE_ALG_RSASSA_PKCS1_PSS_MGF1_SHA256 0x70414930
 #define TEE_ALG_RSASSA_PKCS1_PSS_MGF1_SHA384 0x70515930
 #define TEE_ALG_RSASSA_PKCS1_PSS_MGF1_SHA512 0x70616930
+#define TEE_ALG_RSASSA_PKCS1_PSS_MGF1_SHA3_224 0x70818930
+#define TEE_ALG_RSASSA_PKCS1_PSS_MGF1_SHA3_256 0x70919930
+#define TEE_ALG_RSASSA_PKCS1_PSS_MGF1_SHA3_384 0x70A1A930
+#define TEE_ALG_RSASSA_PKCS1_PSS_MGF1_SHA3_512 0x70B1B930
 #define TEE_ALG_RSAES_PKCS1_V1_5 0x60000130
 #define TEE_ALG_RSAES_PKCS1_OAEP_MGF1_SHA1 0x60210230
 #define TEE_ALG_RSAES_PKCS1_OAEP_MGF1_SHA224 0x60310230
 #define TEE_ALG_RSAES_PKCS1_OAEP_MGF1_SHA256 0x60410230
 #define TEE_ALG_RSAES_PKCS1_OAEP_MGF1_SHA384 0x60510230
 #define TEE_ALG_RSAES_PKCS1_OAEP_MGF1_SHA512 0x60610230
+#define TEE_ALG_RSAES_PKCS1_OAEP_MGF1_SHA3_224 0x60810230
+#define TEE_ALG_RSAES_PKCS1_OAEP_MGF1_SHA3_256 0x60910230
+#define TEE_ALG_RSAES_PKCS1_OAEP_MGF1_SHA3_384 0x60A10230
+#define TEE_ALG_RSAES_PKCS1_OAEP_MGF1_SHA3_512 0x60B10230
 #define TEE_ALG_RSA_NOPAD 0x60000030
 #define TEE_ALG_DSA_SHA1 0x70002131
 #define TEE_ALG_DSA_SHA224 0x70003131
 #define TEE_ALG_DSA_SHA256 0x70004131
+#define TEE_ALG_DSA_SHA3_224 0x70008131
+#define TEE_ALG_DSA_SHA3_256 0x70009131
+#define TEE_ALG_DSA_SHA3_384 0x7000A131
+#define TEE_ALG_DSA_SHA3_512 0x7000B131
 #define TEE_ALG_DH_DERIVE_SHARED_SECRET 0x80000032
 #define TEE_ALG_MD5 0x50000001
 #define TEE_ALG_SHA1 0x50000002
@@ -341,12 +364,23 @@ typedef struct __TEE_OperationHandle* TEE_OperationHandle;  // NOLINT(bugprone-r
 #define TEE_ALG_SHA256 0x50000004
 #define TEE_ALG_SHA384 0x50000005
 #define TEE_ALG_SHA512 0x50000006
+#define TEE_ALG_SHA3_224 0x50000008
+#define TEE_ALG_SHA3_256 0x50000009
+#define TEE_ALG_SHA3_384 0x5000000A
+#define TEE_ALG_SHA3_512 0x5000000B
 #define TEE_ALG_HMAC_MD5 0x30000001
 #define TEE_ALG_HMAC_SHA1 0x30000002
 #define TEE_ALG_HMAC_SHA224 0x30000003
 #define TEE_ALG_HMAC_SHA256 0x30000004
 #define TEE_ALG_HMAC_SHA384 0x30000005
 #define TEE_ALG_HMAC_SHA512 0x30000006
+#define TEE_ALG_HMAC_SHA3_224 0x30000008
+#define TEE_ALG_HMAC_SHA3_256 0x30000009
+#define TEE_ALG_HMAC_SHA3_384 0x3000000A
+#define TEE_ALG_HMAC_SHA3_512 0x3000000B
+#define TEE_ALG_HKDF 0x80000047
+#define TEE_ALG_SHAKE128 0x50000101
+#define TEE_ALG_SHAKE256 0x50000102
 // The following constants are supposed to be defined if the corresponding algorithm is supported.
 // Since we don't support any encryption algorithms yet, none are defined.
 // We should define these as we add support.
@@ -356,15 +390,23 @@ typedef struct __TEE_OperationHandle* TEE_OperationHandle;  // NOLINT(bugprone-r
 // #define TEE_ALG_ECDSA_SHA256 0x70003042)               // If supported
 // #define TEE_ALG_ECDSA_SHA384 0x70004042)               // If supported
 // #define TEE_ALG_ECDSA_SHA512 0x70005042)               // If supported
+// #define TEE_ALG_ECDSA_SHA3_224 0x70006042)             // If supported
+// #define TEE_ALG_ECDSA_SHA3_256 0x70007042)             // If supported
+// #define TEE_ALG_ECDSA_SHA3_384 0x70008042)             // If supported
+// #define TEE_ALG_ECDSA_SHA3_512 0x70009042)             // If supported
 // #define TEE_ALG_ED25519 0x70006043)                    // If supported
+// #define TEE_ALG_ED448 0x70006044)                      // If supported
 // #define TEE_ALG_ECDH_DERIVE_SHARED_SECRET 0x80000042)  // If supported
 // #define TEE_ALG_X25519 0x80000044)                     // If supported
+// #define TEE_ALG_X448 0x80000045)                       // If supported
 // #define TEE_ALG_SM2_DSA_SM3 0x70006045)                // If supported
 // #define TEE_ALG_SM2_KEP 0x60000045)                    // If supported
-// #define TEE_ALG_SM2_PKE 0x80000045)                    // If supported
+// #define TEE_ALG_SM2_PKE 0x80000046)                    // If supported
 // #define TEE_ALG_SM3 0x50000007)                        // If supported
 // #define TEE_ALG_SM4_ECB_NOPAD 0x10000014)              // If supported
+// #define TEE_ALG_SM4_ECB_PKCS5 0x10000015)              // If supported
 // #define TEE_ALG_SM4_CBC_NOPAD 0x10000114)              // If supported
+// #define TEE_ALG_SM4_CBC_PKCS5 0x10000115)              // If supported
 // #define TEE_ALG_SM4_CTR 0x10000214)                    // If supported
 #define TEE_ALG_ILLEGAL_VALUE 0xEFFFFFFF
 
@@ -379,6 +421,10 @@ typedef struct __TEE_OperationHandle* TEE_OperationHandle;  // NOLINT(bugprone-r
 #define TEE_TYPE_HMAC_SHA384 0xA0000005
 #define TEE_TYPE_HMAC_SHA512 0xA0000006
 #define TEE_TYPE_HMAC_SM3 0xA0000007
+#define TEE_TYPE_HMAC_SHA3_224 0xA0000008
+#define TEE_TYPE_HMAC_SHA3_256 0xA0000009
+#define TEE_TYPE_HMAC_SHA3_384 0xA000000A
+#define TEE_TYPE_HMAC_SHA3_512 0xA000000B
 #define TEE_TYPE_RSA_PUBLIC_KEY 0xA0000030
 #define TEE_TYPE_RSA_KEYPAIR 0xA1000030
 #define TEE_TYPE_DSA_PUBLIC_KEY 0xA0000031
@@ -399,6 +445,7 @@ typedef struct __TEE_OperationHandle* TEE_OperationHandle;  // NOLINT(bugprone-r
 #define TEE_TYPE_SM2_PKE_PUBLIC_KEY 0xA0000047
 #define TEE_TYPE_SM2_PKE_KEYPAIR 0xA1000047
 #define TEE_TYPE_SM4 0xA0000014
+#define TEE_TYPE_HKDF 0xA000004A
 #define TEE_TYPE_GENERIC_SECRET 0xA0000000
 #define TEE_TYPE_CORRUPTED_OBJECT 0xA00000BE
 #define TEE_TYPE_DATA 0xA00000BF
@@ -426,6 +473,7 @@ typedef struct __TEE_OperationHandle* TEE_OperationHandle;  // NOLINT(bugprone-r
 #define TEE_ECC_CURVE_BSI_P384t1 0x00000206
 #define TEE_ECC_CURVE_BSI_P512t1 0x00000207
 #define TEE_ECC_CURVE_25519 0x00000300
+#define TEE_ECC_CURVE_448 0x00000301
 #define TEE_ECC_CURVE_SM2 0x00000300
 
 // 6.11 Object or Operation Attributes
@@ -450,26 +498,33 @@ typedef struct __TEE_OperationHandle* TEE_OperationHandle;  // NOLINT(bugprone-r
 #define TEE_ATTR_DH_PUBLIC_VALUE 0xD0000132
 #define TEE_ATTR_DH_PRIVATE_VALUE 0xC0000232
 #define TEE_ATTR_RSA_OAEP_LABEL 0xD0000930
+#define TEE_ATTR_RSA_OAEP_MGF_HASH 0xD0000931
 #define TEE_ATTR_RSA_PSS_SALT_LENGTH 0xF0000A30
 #define TEE_ATTR_ECC_PUBLIC_VALUE_X 0xD0000141
 #define TEE_ATTR_ECC_PUBLIC_VALUE_Y 0xD0000241
 #define TEE_ATTR_ECC_PRIVATE_VALUE 0xC0000341
+#define TEE_ATTR_ECC_EPHEMERAL_PUBLIC_VALUE_X 0xD0000146
+#define TEE_ATTR_ECC_EPHEMERAL_PUBLIC_VALUE_Y 0xD0000246
 #define TEE_ATTR_ECC_CURVE 0xF0000441
-#define TEE_ATTR_ED25519_CTX 0xD0000643
+#define TEE_ATTR_EDDSA_CTX 0xD0000643
 #define TEE_ATTR_ED25519_PUBLIC_VALUE 0xD0000743
 #define TEE_ATTR_ED25519_PRIVATE_VALUE 0xC0000843
-#define TEE_ATTR_ED25519_PH 0xF0000543
 #define TEE_ATTR_X25519_PUBLIC_VALUE 0xD0000944
 #define TEE_ATTR_X25519_PRIVATE_VALUE 0xC0000A44
-// The next three values have two conflicting definitions in the specification.
-// #define TEE_ATTR_ECC_PUBLIC_VALUE_X 0xD0000146
-// #define TEE_ATTR_ECC_PUBLIC_VALUE_Y 0xD0000246
-// #define TEE_ATTR_ECC_PRIVATE_VALUE 0xD0000346
+#define TEE_ATTR_ED448_PUBLIC_VALUE 0xD0000002
+#define TEE_ATTR_ED448_PRIVATE_VALUE 0xC0000003
+#define TEE_ATTR_EDDSA_PREHASH 0xF0000004
+#define TEE_ATTR_X448_PUBLIC_VALUE 0xD0000A45
+#define TEE_ATTR_X448_PRIVATE_VALUE 0xC0000A46
 #define TEE_ATTR_SM2_ID_INITIATOR 0xD0000446
 #define TEE_ATTR_SM2_ID_RESPONDER 0xD0000546
 #define TEE_ATTR_SM2_KEP_USER 0xF0000646
 #define TEE_ATTR_SM2_KEP_CONFIRMATION_IN 0xD0000746
 #define TEE_ATTR_SM2_KEP_CONFIRMATION_OUT 0xD0000846
+#define TEE_ATTR_HKDF_SALT 0xD0000946
+#define TEE_ATTR_HKDF_INFO 0xD0000A46
+#define TEE_ATTR_HKDF_HASH_ALGORITHM 0xF0000B46
+#define TEE_ATTR_KDF_KEY_SIZE 0xF0000C46
 
 // Table 6-18: Attribute Identifier Flags
 #define TEE_ATTR_FLAG_VALUE 0x20000000
@@ -480,6 +535,9 @@ typedef struct {
   uint32_t seconds;
   uint32_t millis;
 } TEE_Time;
+
+// 7.2.2 TEE_Wait
+#define TEE_TIMEOUT_INFINITE 0xFFFFFFFF
 
 // 8.3.1 TEE_BigInt
 typedef uint32_t TEE_BigInt;
