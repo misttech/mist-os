@@ -24,6 +24,12 @@ class InterruptEventDispatcher final : public InterruptDispatcher {
   InterruptEventDispatcher(const InterruptDispatcher&) = delete;
   InterruptEventDispatcher& operator=(const InterruptDispatcher&) = delete;
 
+  // This override of WakeVector::GetDiagnostics (and the destructor of this class) is marked final
+  // to prevent further overrides.  Because this method cannot be overridden further, it is safe for
+  // this class to initialize / destroy InterruptDispatcher::wake_event_ in the constructor /
+  // destructor. See lib/wake-vector.h for more details.
+  void GetDiagnostics(WakeVector::Diagnostics& diagnostics_out) const final;
+
  private:
   explicit InterruptEventDispatcher(uint32_t vector, uint32_t flags);
 

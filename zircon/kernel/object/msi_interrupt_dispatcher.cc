@@ -179,6 +179,7 @@ MsiInterruptDispatcher::MsiInterruptDispatcher(fbl::RefPtr<MsiAllocation> alloc,
       base_irq_id_(base_irq_id),
       msi_id_(msi_id) {
   kcounter_add(dispatcher_msi_create_count, 1);
+  InitializeWakeEvent();
 }
 
 MsiInterruptDispatcher::~MsiInterruptDispatcher() {
@@ -189,6 +190,13 @@ MsiInterruptDispatcher::~MsiInterruptDispatcher() {
   }
   LTRACEF("MsiInterruptDispatcher: cleaning up MSI id %u\n", msi_id_);
   kcounter_add(dispatcher_msi_destroy_count, 1);
+  DestroyWakeEvent();
+}
+
+void MsiInterruptDispatcher::GetDiagnostics(WakeVector::Diagnostics& diagnostics_out) const {
+  diagnostics_out.enabled = is_wake_vector();
+  diagnostics_out.koid = get_koid();
+  diagnostics_out.PrintExtra("MSI %" PRIu32, vector());
 }
 
 // This IrqHandler acts as a trampoline to call into the base

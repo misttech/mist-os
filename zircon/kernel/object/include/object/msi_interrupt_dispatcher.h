@@ -42,6 +42,12 @@ class MsiInterruptDispatcher : public InterruptDispatcher {
   zx_status_t RegisterInterruptHandler();
   void DeactivateInterrupt() final {}
 
+  // This override of WakeVector::GetDiagnostics is marked final to prevent further overrides.
+  // Because this method cannot be overridden further, it is safe for this class to initialize /
+  // destroy InterruptDispatcher::wake_event_ in the constructor / destructor. See lib/wake-vector.h
+  // for more details.
+  void GetDiagnostics(WakeVector::Diagnostics& diagnostics_out) const final;
+
  protected:
   MsiInterruptDispatcher(fbl::RefPtr<MsiAllocation> alloc, fbl::RefPtr<VmMapping> mapping,
                          uint32_t base_irq_id, uint32_t msi_id,

@@ -16,7 +16,11 @@
 #include <object/process_dispatcher.h>
 
 InterruptDispatcher::InterruptDispatcher(uint32_t flags)
-    : flags_(flags), timestamp_(0), state_(InterruptState::IDLE), wake_event_(get_koid()) {
+    : WakeVector(&InterruptDispatcher::wake_event_),
+      flags_(flags),
+      timestamp_(0),
+      state_(InterruptState::IDLE),
+      wake_event_(*this) {
   DEBUG_ASSERT((flags & INTERRUPT_UNMASK_PREWAIT) == 0 ||
                (flags & INTERRUPT_UNMASK_PREWAIT_UNLOCKED) == 0);
 }

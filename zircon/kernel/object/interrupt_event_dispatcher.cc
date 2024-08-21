@@ -8,8 +8,10 @@
 
 #include <lib/counters.h>
 #include <platform.h>
+#include <stdio.h>
 #include <zircon/rights.h>
 #include <zircon/syscalls-next.h>
+#include <zircon/types.h>
 
 #include <dev/interrupt.h>
 #include <fbl/alloc_checker.h>
@@ -120,6 +122,12 @@ zx_status_t InterruptEventDispatcher::Create(KernelHandle<InterruptDispatcher>* 
   return ZX_OK;
 }
 
+void InterruptEventDispatcher::GetDiagnostics(WakeVector::Diagnostics& diagnostics_out) const {
+  diagnostics_out.enabled = is_wake_vector();
+  diagnostics_out.koid = get_koid();
+  diagnostics_out.PrintExtra("IRQ %" PRIu32, vector_);
+}
+
 void InterruptEventDispatcher::IrqHandler(void* ctx) {
   InterruptEventDispatcher* self = reinterpret_cast<InterruptEventDispatcher*>(ctx);
 
@@ -129,10 +137,12 @@ void InterruptEventDispatcher::IrqHandler(void* ctx) {
 InterruptEventDispatcher::InterruptEventDispatcher(uint32_t vector, uint32_t flags)
     : InterruptDispatcher(flags), vector_(vector) {
   kcounter_add(dispatcher_interrupt_event_create_count, 1);
+  InitializeWakeEvent();
 }
 
 InterruptEventDispatcher::~InterruptEventDispatcher() {
   kcounter_add(dispatcher_interrupt_event_destroy_count, 1);
+  DestroyWakeEvent();
 }
 
 void InterruptEventDispatcher::MaskInterrupt() { mask_interrupt(vector_); }

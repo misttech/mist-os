@@ -6,6 +6,9 @@
 #ifndef ZIRCON_KERNEL_INCLUDE_KERNEL_IDLE_POWER_THREAD_H_
 #define ZIRCON_KERNEL_INCLUDE_KERNEL_IDLE_POWER_THREAD_H_
 
+#include <lib/lazy_init/lazy_init.h>
+#include <lib/relaxed_atomic.h>
+#include <lib/wake-vector.h>
 #include <stdint.h>
 #include <zircon/time.h>
 
@@ -14,7 +17,6 @@
 #include <kernel/spinlock.h>
 #include <kernel/thread.h>
 #include <kernel/timer.h>
-#include <ktl/atomic.h>
 
 //
 // Platform Independent Per-CPU Idle/Power Thread
@@ -100,108 +102,10 @@ class IdlePowerThread final {
   static zx_status_t TransitionAllActiveToSuspend(zx_boot_time_t resume_at = ZX_TIME_INFINITE)
       TA_EXCL(TransitionLock::Get());
 
-  // The result of a request to wake up the system.
-  enum class WakeResult : uint8_t {
-    // The system was not suspended at the time of the event.
-    Active,
-
-    // The system was suspended at the time of the wake event.
-    Resumed,
-
-    // The system was in the process of suspending at the time of the wake event.
-    SuspendAborted,
-
-    // An already pending wake event was triggered again.
-    BadState,
-  };
-
-  // Manages the lifecycle of a wake event.
-  //
-  // A wake event is triggered in response to an interrupt, exception, timer, or other wake source
-  // that should resume the system from a suspended state. When a wake event is triggered, it enters
-  // the pending state and will prevent the system from entering suspend until it has been
-  // acknowledged. A pending wake event is automatically acknowledged when the WakeEvent instance is
-  // destroyed to prevent missing an acknowledgement that would render the system unable to suspend.
-  //
-  // WakeEvent maintains a global (singleton) list of all instances.  Constructing or destroying an
-  // instance adds/removes it from the list.  See also |Dump|.
-  class WakeEvent {
-   public:
-    // Construct a WakeEvent owned by |koid|.
-    //
-    // |koid| is used for logging.
-    explicit WakeEvent(zx_koid_t koid) : owner_koid_(koid) {
-      Guard<SpinLock, IrqSave> guard(WakeEventListLock::Get());
-      WakeEvent::list_.push_front(this);
-    }
-    ~WakeEvent() {
-      Acknowledge();
-      Guard<SpinLock, IrqSave> guard(WakeEventListLock::Get());
-      WakeEvent::list_.erase(*this);
-    }
-
-    // Triggers a wakeup that resumes the system, or aborts an incomplete suspend sequence, and
-    // prevents the system from starting a new suspend sequence.
-    //
-    // Must be called with interrupts and preempt disabled.
-    //
-    // Returns:
-    //  - WakeResult::Active if this wake trigger occurred when the system was active.
-    //  - WakeResult::Resumed if this or another wake trigger resumed the system.
-    //  - WakeResult::SuspendAborted if this wake trigger occurred before suspend completed.
-    //  - WakeResult::BadState if this wake event is already pending.
-    //
-    WakeResult Trigger() {
-      DEBUG_ASSERT(arch_ints_disabled());
-      DEBUG_ASSERT(Thread::Current::Get()->preemption_state().PreemptIsEnabled() == false);
-      const bool pending =
-          last_trigger_ticks_.load(ktl::memory_order_relaxed) != ZX_TIME_INFINITE_PAST;
-      if (!pending) {
-        last_trigger_ticks_.store(current_ticks(), ktl::memory_order_relaxed);
-        return TriggerSystemWakeEvent();
-      }
-      return WakeResult::BadState;
-    }
-
-    // Acknowledges a pending wake event, allowing the system to enter suspend when all other
-    // suspend conditions are met.
-    void Acknowledge() {
-      const bool pending =
-          last_trigger_ticks_.load(ktl::memory_order_relaxed) != ZX_TIME_INFINITE_PAST;
-      if (pending) {
-        last_trigger_ticks_.store(ZX_TIME_INFINITE_PAST, ktl::memory_order_relaxed);
-        AcknowledgeSystemWakeEvent();
-      }
-    }
-
-    // Walk the global list of all instances and dump diagnostic information about the pendings ones
-    // to |f|
-    //
-    // Safe to call concurrently with any and all methods, including ctors and dtors.
-    static void DumpPending(FILE* f);
-
-    using NodeState = fbl::DoublyLinkedListNodeState<WakeEvent*>;
-    struct NodeListTraits {
-      static NodeState& node_state(WakeEvent& w) { return w.node_state_; }
-    };
-
-   private:
-    using WakeEventList = fbl::DoublyLinkedListCustomTraits<WakeEvent*, WakeEvent::NodeListTraits>;
-
-    DECLARE_SINGLETON_SPINLOCK(WakeEventListLock);
-    inline static WakeEventList list_ TA_GUARDED(WakeEventListLock::Get());
-
-    NodeState node_state_ TA_GUARDED(WakeEventListLock::Get());
-    const zx_koid_t owner_koid_;
-    // Indicates whether this WakeEvent is pending and if so, at what time it became pending.
-    // ZX_TIME_INFINITE_PAST means not pending.  This is an atomic because it may be accessed a
-    // thread calling |Dump| concurrent with another thread calling either |Trigger| or
-    // |Acknowledge|.
-    ktl::atomic<zx_ticks_t> last_trigger_ticks_{ZX_TIME_INFINITE_PAST};
-  };
-
   // Implements the run loop executed by the CPU's idle/power thread.
   static int Run(void* arg);
+
+  static void InitHook(uint level);
 
   // Called by mp_unplug_current_cpu() to complete last steps of taking the CPU offline.
   void FlushAndHalt();
@@ -247,6 +151,11 @@ class IdlePowerThread final {
   TransitionResult TransitionFromTo(State expected_state, State target_state, zx_time_t timeout_at)
       TA_REQ(TransitionLock::Get());
 
+  using WakeResult = wake_vector::WakeResult;
+  using WakeEvent = wake_vector::WakeEvent;
+
+  friend WakeEvent;
+
   static WakeResult WakeBootCpu();
   static WakeResult TriggerSystemWakeEvent();
   static void AcknowledgeSystemWakeEvent();
@@ -279,9 +188,32 @@ class IdlePowerThread final {
     SystemSuspendStateWakeEventPendingMask = SystemSuspendStateSuspendedBit - 1,
   };
 
+  // Provides an interlock between pending wake events and system suspend, preventing suspend entry
+  // until there are no pending wake events.
   inline static ktl::atomic<uint64_t> system_suspend_state_{SystemSuspendStateActive};
+
+  // A timer on the boot timeline used to resume the system at the given boot time if no other wake
+  // events occur by then.
   inline static Timer resume_timer_ TA_GUARDED(TransitionLock::Get()){
       Timer::ReferenceTimeline::kBoot};
+
+  // A bespoke wake vector used by the resume timer handler to wake the system when the resume boot
+  // time is reached.
+  struct ResumeTimerWakeVector : public wake_vector::WakeVector {
+    ResumeTimerWakeVector() : WakeVector{&ResumeTimerWakeVector::wake_event}, wake_event{*this} {
+      wake_event.Initialize();
+    }
+    ~ResumeTimerWakeVector() { wake_event.Destroy(); }
+
+    void GetDiagnostics(WakeVector::Diagnostics& diagnostics) const final;
+
+    WakeEvent wake_event;
+  };
+
+  // Use LazyInit to sequence constructing this instance after global ctors initialize the global
+  // WakeEvent list. This instance is initialized by an init hook well before it can be used at
+  // runtime by TransitionAllActiveToSuspend.
+  inline static lazy_init::LazyInit<ResumeTimerWakeVector> resume_timer_wake_vector_;
 };
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_IDLE_POWER_THREAD_H_
