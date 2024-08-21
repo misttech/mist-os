@@ -577,7 +577,7 @@ pub fn loop_device_init(locked: &mut Locked<'_, Unlocked>, current_task: &Curren
         .expect("loop device register failed.");
 
     // Ensure initial loop devices.
-    kernel.loop_device_registry.ensure_initial_devices(locked, current_task);
+    kernel.expando.get::<LoopDeviceRegistry>().ensure_initial_devices(locked, current_task);
 }
 
 #[derive(Debug, Default)]
@@ -697,7 +697,7 @@ pub fn create_loop_control_device(
     _node: &FsNode,
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
-    Ok(Box::new(LoopControlDevice::new(current_task.kernel().loop_device_registry.clone())))
+    Ok(Box::new(LoopControlDevice::new(current_task.kernel().expando.get::<LoopDeviceRegistry>())))
 }
 
 struct LoopControlDevice {
@@ -758,7 +758,8 @@ fn get_or_create_loop_device(
 ) -> Result<Box<dyn FileOps>, Errno> {
     Ok(current_task
         .kernel()
-        .loop_device_registry
+        .expando
+        .get::<LoopDeviceRegistry>()
         .get_or_create(locked, current_task, id.minor())
         .create_file_ops())
 }
