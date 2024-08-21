@@ -24,12 +24,14 @@ namespace sysmem_driver {
 
 class ContiguousPooledMemoryAllocator : public MemoryAllocator {
  public:
+  // The heap can be nullopt initially, but in that case set_heap() must be used to set the heap
+  // before set_ready().
   ContiguousPooledMemoryAllocator(Owner* parent_device, const char* allocation_name,
-                                  inspect::Node* parent_node, fuchsia_sysmem2::Heap heap,
-                                  uint64_t size, bool is_always_cpu_accessible,
-                                  bool is_ever_cpu_accessible, bool is_ever_zircon_accessible,
-                                  bool is_ready, bool can_be_torn_down,
-                                  async_dispatcher_t* dispatcher);
+                                  inspect::Node* parent_node,
+                                  std::optional<fuchsia_sysmem2::Heap> heap, uint64_t size,
+                                  bool is_always_cpu_accessible, bool is_ever_cpu_accessible,
+                                  bool is_ever_zircon_accessible, bool is_ready,
+                                  bool can_be_torn_down, async_dispatcher_t* dispatcher);
 
   ~ContiguousPooledMemoryAllocator();
 
@@ -73,6 +75,8 @@ class ContiguousPooledMemoryAllocator : public MemoryAllocator {
     return ZX_OK;
   }
 
+  void set_heap(fuchsia_sysmem2::Heap heap);
+
   void set_ready() override;
   bool is_ready() override;
 
@@ -94,7 +98,10 @@ class ContiguousPooledMemoryAllocator : public MemoryAllocator {
   }
   bool is_bti_fake() { return is_bti_fake_; }
 
-  const fuchsia_sysmem2::Heap& heap() { return heap_; }
+  const fuchsia_sysmem2::Heap& heap() {
+    ZX_ASSERT(heap_.has_value());
+    return *heap_;
+  }
 
   // loanable pages / un-used pages
   //
@@ -240,7 +247,7 @@ class ContiguousPooledMemoryAllocator : public MemoryAllocator {
   Owner* const parent_device_{};
   async_dispatcher_t* dispatcher_{};
   const char* const allocation_name_{};
-  const fuchsia_sysmem2::Heap heap_{};
+  std::optional<fuchsia_sysmem2::Heap> heap_;
   const uint64_t counter_id_{};
   char child_name_[ZX_MAX_NAME_LEN] = {};
 
@@ -390,11 +397,6 @@ class ContiguousPooledMemoryAllocator : public MemoryAllocator {
   int32_t deleted_regions_next_ = 0;
   // Only allocate if we'll be checking unused pages.
   std::vector<DeletedRegion> deleted_regions_;
-
-  // This is Zircon's zero page mapped a few times, read-only.
-  uint64_t zero_page_vmo_size_ = fbl::round_up(64ull * 1024, zx_system_get_page_size());
-  zx::vmo zero_page_vmo_;
-  uint8_t* zero_page_vmo_base_ = nullptr;
 
   protected_ranges::ProtectedRangesCoreControl* protected_ranges_core_control_ = nullptr;
 };

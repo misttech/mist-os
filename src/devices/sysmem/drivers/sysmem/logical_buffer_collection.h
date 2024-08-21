@@ -844,6 +844,11 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   bool FlattenPixelFormatAndModifiers(const fuchsia_sysmem2::BufferUsage& buffer_usage,
                                       fuchsia_sysmem2::BufferCollectionConstraints& constraints);
 
+  bool IsSecureHeap(const fuchsia_sysmem2::Heap& heap);
+  bool IsSecurePermitted(const fuchsia_sysmem2::BufferMemoryConstraints& constraints);
+  fpromise::result<fuchsia_sysmem2::Heap, zx_status_t> GetHeap(
+      const fuchsia_sysmem2::BufferMemoryConstraints& constraints, Device* device);
+
   Device* parent_device_ = nullptr;
 
   // This owns the current tree of BufferCollectionToken, BufferCollection, OrphanedNode.  The

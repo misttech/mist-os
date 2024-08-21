@@ -36,11 +36,6 @@
 
 #include <bind/fuchsia/hardware/sysmem/cpp/bind.h>
 #include <bind/fuchsia/sysmem/heap/cpp/bind.h>
-
-// TODO(b/42113093): Remove this include of AmLogic-specific heap names in sysmem code. The include
-// is currently needed for secure heap names only, which is why an include for goldfish heap names
-// isn't here.
-#include <bind/fuchsia/amlogic/platform/sysmem/heap/cpp/bind.h>
 #include <fbl/string_printf.h>
 #include <sdk/lib/sys/cpp/service_directory.h>
 
@@ -663,32 +658,28 @@ zx_status_t Device::Initialize() {
   }
 
   // TODO: Separate protected memory allocator into separate driver or library
-  if (pdev_device_info_vid_ == PDEV_VID_AMLOGIC && protected_memory_size > 0) {
+  if (protected_memory_size > 0) {
     constexpr bool kIsAlwaysCpuAccessible = false;
     constexpr bool kIsEverCpuAccessible = true;
     constexpr bool kIsEverZirconAccessible = true;
     constexpr bool kIsReady = false;
     // We have no way to tear down secure memory.
     constexpr bool kCanBeTornDown = false;
-    auto heap = sysmem::MakeHeap(bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE, 0);
-    auto amlogic_allocator = std::make_unique<ContiguousPooledMemoryAllocator>(
-        this, "SysmemAmlogicProtectedPool", &heaps_, heap, protected_memory_size,
+    // The heap is initially nullopt, but is set via set_heap before set_ready when we hear from
+    // the secmem driver.
+    auto protected_allocator = std::make_unique<ContiguousPooledMemoryAllocator>(
+        this, "SysmemProtectedPool", &heaps_, /*heap=*/std::nullopt, protected_memory_size,
         kIsAlwaysCpuAccessible, kIsEverCpuAccessible, kIsEverZirconAccessible, kIsReady,
         kCanBeTornDown, loop_dispatcher());
     // Request 64kB alignment because the hardware can only modify protections along 64kB
     // boundaries.
-    status = amlogic_allocator->Init(16);
+    status = protected_allocator->Init(16);
     if (status != ZX_OK) {
-      LOG(ERROR, "Failed to init allocator for amlogic protected memory: %d", status);
+      LOG(ERROR, "Failed to init allocator for protected/secure (DRM) memory: %d", status);
       return status;
     }
-    // For !is_cpu_accessible_, we don't call amlogic_allocator->SetupUnusedPages() until the start
-    // of set_ready().
-    RunSyncOnLoop([this, &heap, &amlogic_allocator] {
-      std::lock_guard thread_checker(*loop_checker_);
-      secure_allocators_[heap] = amlogic_allocator.get();
-      allocators_[std::move(heap)] = std::move(amlogic_allocator);
-    });
+
+    pending_protected_allocator_ = std::move(protected_allocator);
   }
 
   auto [devfs_connector_client, devfs_connector_server] =
@@ -864,7 +855,7 @@ zx_status_t Device::RegisterSecureMemInternal(
                                                     const zx_packet_signal_t* signal) {
           std::lock_guard checker(*loop_checker_);
           if (*close_is_abort && secure_mem_) {
-            // The server end of this channel (the aml-securemem driver) is the driver that
+            // The server end of this channel (the securemem driver) is the driver that
             // listens for suspend(mexec) so that soft reboot can succeed.  If that driver has
             // failed, intentionally force a hard reboot here to get back to a known-good state.
             //
@@ -892,12 +883,37 @@ zx_status_t Device::RegisterSecureMemInternal(
     // Else we already ZX_PANIC()ed in wait_for_close.
     ZX_DEBUG_ASSERT(secure_mem_);
 
-    // At this point secure_allocators_ has only the secure heaps that are configured via sysmem
-    // (not those configured via the TEE), and the memory for these is not yet protected.  Get
-    // the SecureMem properties for these.  At some point in the future it _may_ make sense to
-    // have connections to more than one SecureMem driver, but for now we assume that a single
-    // SecureMem connection is handling all the secure heaps.  We don't actually protect any
-    // range(s) until later.
+    // At this point pending_protected_vmo_ will have the protected_memory_size VMO that was
+    // allocated during sysmem driver Start (if protected_memory_size != 0), and secure_allocators_
+    // has no heaps yet. The pending_protected_vmo_ is not yet protected, but it is physically
+    // contiguous. We get the Heap identity and SecureMem properties and set up the heap in
+    // secure_allocators_. This location of this heap is determined by the VMO allocation, not by
+    // the TEE.
+    if (pending_protected_allocator_) {
+      auto dynamic_heaps_result = secure_mem_->channel()->GetDynamicSecureHeaps();
+      if (!dynamic_heaps_result->is_ok()) {
+        LOG(WARNING, "GetDynamicSecureHeaps failed: %s",
+            dynamic_heaps_result.FormatDescription().c_str());
+        return;
+      }
+      auto dynamic_heaps = std::move(dynamic_heaps_result->value());
+      if (!dynamic_heaps->has_heaps() || dynamic_heaps->heaps().empty()) {
+        LOG(WARNING, "protected_memory_size was set, but missing dynamic heap");
+        return;
+      }
+      fuchsia_sysmem::HeapType v1_heap = dynamic_heaps->heaps()[0].heap();
+      auto v2_heap_type_result = sysmem::V2CopyFromV1HeapType(v1_heap);
+      if (!v2_heap_type_result.is_ok()) {
+        LOG(WARNING, "V2CopyFromV1HeapType failed");
+        return;
+      }
+      auto& v2_heap_type = v2_heap_type_result.value();
+      auto heap = sysmem::MakeHeap(std::move(v2_heap_type), 0);
+      pending_protected_allocator_->set_heap(heap);
+      secure_allocators_[heap] = pending_protected_allocator_.get();
+      allocators_[std::move(heap)] = std::move(pending_protected_allocator_);
+    }
+
     for (const auto& [heap, allocator] : secure_allocators_) {
       uint64_t phys_base;
       uint64_t size_bytes;
@@ -1054,7 +1070,7 @@ zx_status_t Device::RegisterSecureMemInternal(
 // This call allows us to tell the difference between expected vs. unexpected close of the tee_
 // channel.
 zx_status_t Device::UnregisterSecureMemInternal() {
-  // By this point, the aml-securemem driver's suspend(mexec) has already prepared for mexec.
+  // By this point, the securemem driver's suspend(mexec) has already prepared for mexec.
   //
   // In this path, the server end of the channel hasn't closed yet, but will be closed shortly after
   // return from UnregisterSecureMem().
@@ -1226,6 +1242,16 @@ void Device::LogAllBufferCollections() {
     // the logger to avoid dropped lines, we could do that instead
     zx::nanosleep(zx::deadline_after(zx::msec(20)));
   };
+}
+
+void Device::ForeachSecureHeap(fit::function<bool(const fuchsia_sysmem2::Heap&)> callback) {
+  std::lock_guard checker(*loop_checker_);
+  for (auto& allocator : secure_allocators_) {
+    bool keep_going = callback(allocator.first);
+    if (!keep_going) {
+      break;
+    }
+  }
 }
 
 Device::SecureMemConnection::SecureMemConnection(fidl::ClientEnd<fuchsia_sysmem::SecureMem> channel,
