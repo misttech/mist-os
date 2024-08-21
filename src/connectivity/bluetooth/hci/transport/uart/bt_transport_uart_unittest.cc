@@ -313,7 +313,7 @@ class BtTransportUartHciTransportProtocolTest
   void SetManualAckReceive(bool manual) { manual_ack_receive_ = manual; }
 
   void AckReceive() {
-    auto ack_receive_result = hci_transport_client_->AckReceive();
+    auto ack_receive_result = hci_transport_client_.sync()->AckReceive();
     ASSERT_EQ(ack_receive_result.status(), ZX_OK);
   }
 
@@ -946,7 +946,8 @@ TEST_F(BtTransportUartHciTransportProtocolTest, ReceiveAclPacketsIn2Parts) {
     });
   }
 
-  driver_test().runtime().RunUntil([&]() { return received_acl_packets().size() == kNumPackets; });
+  driver_test().runtime().RunUntil(
+      [&]() { return received_acl_packets().size() == static_cast<size_t>(kNumPackets); });
 
   for (const std::vector<uint8_t>& packet : received_acl_packets()) {
     EXPECT_EQ(packet.size(), kRawData.size());
@@ -1059,9 +1060,10 @@ TEST_F(BtTransportUartHciTransportProtocolTest, ReceiveAclPacketsWithFlowControl
   };
   std::vector<uint8_t> kAclBuffer(kSerialAclBuffer.begin() + 1, kSerialAclBuffer.end());
 
-  // Queue two packets in the bus and the first one will be sent up, the second will stay in the bus
-  // driver until the first one is acked.
-  for (size_t i = 0; i < 2; i++) {
+  // The packet number exceeds the limit of unacked packets in the driver. The limit is now 10.
+  const size_t kNumPackets = 30;
+  const size_t kUnackedLimit = 20;
+  for (size_t i = 0; i < kNumPackets; i++) {
     driver_test().RunInEnvironmentTypeContext([&](FixtureBasedTestEnvironment& env) {
       // Store the sequence number in packet payload.
       kSerialAclBuffer[6] = static_cast<uint8_t>(i);
@@ -1069,20 +1071,23 @@ TEST_F(BtTransportUartHciTransportProtocolTest, ReceiveAclPacketsWithFlowControl
     });
   }
 
-  driver_test().runtime().RunUntil([&]() { return received_acl_packets().size() == 1; });
+  driver_test().runtime().RunUntil(
+      [&]() { return received_acl_packets().size() == kUnackedLimit; });
 
-  // Verify the content of the only received packet, this verification should never flake because no
-  // more ACL packet should be received at this point.
-  kAclBuffer[5] = 0;
+  // The last packet should be the |kUnackedLimit|th packet, and this verification should never
+  // flake because no more ACL packet should be received at this point.
+  kAclBuffer[5] = kUnackedLimit - 1;
   EXPECT_EQ(received_acl_packets().back(), kAclBuffer);
 
-  // Ack the first packet.
-  AckReceive();
+  // Ack half of the acked packets and the driver will poll the rest of the packets from bus.
+  for (size_t i = 0; i < (kUnackedLimit / 2); i++) {
+    AckReceive();
+  }
 
-  driver_test().runtime().RunUntil([&]() { return received_acl_packets().size() == 2; });
+  driver_test().runtime().RunUntil([&]() { return received_acl_packets().size() == kNumPackets; });
 
-  // The last packet received should be the second packet sent by the test at this point.
-  kAclBuffer[5] = 1;
+  // The last packet received should be the last packet sent by the test this time.
+  kAclBuffer[5] = kNumPackets - 1;
   EXPECT_EQ(received_acl_packets().back(), kAclBuffer);
 }
 
