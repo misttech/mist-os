@@ -19,6 +19,13 @@
         },
     ],
     offer: [
+        {
+            from: "parent",
+            to: "#console-launcher",
+            config: [ "fuchsia.virtcon.Disable" ],
+            availability: "optional",
+        },
+
         // Offer the kernel serial console to the console-launcher
         {
             protocol: "fuchsia.hardware.pty.Device",

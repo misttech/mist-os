@@ -28,7 +28,8 @@ TEST(SystemInstanceTest, CheckBootArgParsing) {
   zx::result boot_args = boot_server.CreateClient(loop.dispatcher());
   ASSERT_OK(boot_args);
 
-  zx::result args = console_launcher::GetArguments(boot_args.value().client_end());
+  console_launcher_config::Config config;
+  zx::result args = console_launcher::GetArguments(boot_args.value().client_end(), config);
   ASSERT_OK(args.status_value());
 
   ASSERT_TRUE(args->run_shell);
@@ -37,6 +38,7 @@ TEST(SystemInstanceTest, CheckBootArgParsing) {
   ASSERT_EQ(args->device_topological_suffix.value(), "/test/path");
   ASSERT_EQ(args->autorun_boot, "/boot/bin/ls+/dev/class/");
   ASSERT_EQ(args->autorun_system, "/boot/bin/ls+/system");
+  ASSERT_EQ(args->virtcon_disabled, false);
 }
 
 TEST(SystemInstanceTest, CheckBootArgDefaultStrings) {
@@ -51,7 +53,8 @@ TEST(SystemInstanceTest, CheckBootArgDefaultStrings) {
   zx::result boot_args = boot_server.CreateClient(loop.dispatcher());
   ASSERT_OK(boot_args);
 
-  zx::result args = console_launcher::GetArguments(boot_args.value().client_end());
+  console_launcher_config::Config config;
+  zx::result args = console_launcher::GetArguments(boot_args.value().client_end(), config);
   ASSERT_OK(args.status_value());
 
   ASSERT_FALSE(args->run_shell);
@@ -73,7 +76,8 @@ TEST(VirtconSetup, VirtconDefaults) {
   zx::result boot_args = boot_server.CreateClient(loop.dispatcher());
   ASSERT_OK(boot_args);
 
-  zx::result args = console_launcher::GetArguments(boot_args.value().client_end());
+  console_launcher_config::Config config;
+  zx::result args = console_launcher::GetArguments(boot_args.value().client_end(), config);
   ASSERT_OK(args.status_value());
 
   ASSERT_FALSE(args->virtual_console_need_debuglog);
@@ -92,7 +96,8 @@ TEST(VirtconSetup, VirtconNeedDebuglog) {
   zx::result boot_args = boot_server.CreateClient(loop.dispatcher());
   ASSERT_OK(boot_args);
 
-  zx::result args = console_launcher::GetArguments(boot_args.value().client_end());
+  console_launcher_config::Config config;
+  zx::result args = console_launcher::GetArguments(boot_args.value().client_end(), config);
   ASSERT_OK(args.status_value());
 
   ASSERT_TRUE(args->virtual_console_need_debuglog);
@@ -111,10 +116,30 @@ TEST(VirtconSetup, VirtconNetbootWithNetsvcDisabled) {
   zx::result boot_args = boot_server.CreateClient(loop.dispatcher());
   ASSERT_OK(boot_args);
 
-  zx::result args = console_launcher::GetArguments(boot_args.value().client_end());
+  console_launcher_config::Config config;
+  zx::result args = console_launcher::GetArguments(boot_args.value().client_end(), config);
   ASSERT_OK(args.status_value());
 
   ASSERT_FALSE(args->virtual_console_need_debuglog);
+}
+
+// Check that virtcon_disabled is propogated through to args correctly.
+TEST(VirtconSetup, VirtconDisabled) {
+  std::map<std::string, std::string> arguments;
+
+  async::Loop loop(&kAsyncLoopConfigNeverAttachToThread);
+  mock_boot_arguments::Server boot_server(std::move(arguments));
+  loop.StartThread();
+
+  zx::result boot_args = boot_server.CreateClient(loop.dispatcher());
+  ASSERT_OK(boot_args);
+
+  console_launcher_config::Config config;
+  config.virtcon_disabled() = true;
+  zx::result args = console_launcher::GetArguments(boot_args.value().client_end(), config);
+  ASSERT_OK(args.status_value());
+
+  ASSERT_TRUE(args->virtcon_disabled);
 }
 
 }  // namespace

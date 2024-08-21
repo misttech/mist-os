@@ -35,6 +35,7 @@
 #include <fbl/ref_ptr.h>
 
 #include "src/bringup/bin/console-launcher/console_launcher.h"
+#include "src/bringup/bin/console-launcher/console_launcher_config.h"
 #include "src/lib/fxl/strings/split_string.h"
 #include "src/lib/loader_service/loader_service.h"
 #include "src/storage/lib/vfs/cpp/managed_vfs.h"
@@ -301,7 +302,9 @@ int main(int argv, char** argc) {
         << "failed to connect to " << fidl::DiscoverableProtocolName<fuchsia_boot::Arguments>;
   }
 
-  zx::result get_args = console_launcher::GetArguments(boot_args.value());
+  auto config = console_launcher_config::Config::TakeFromStartupHandle();
+
+  zx::result get_args = console_launcher::GetArguments(boot_args.value(), config);
   if (get_args.is_error()) {
     FX_PLOGS(FATAL, get_args.status_value()) << "failed to get arguments";
   }
@@ -370,9 +373,8 @@ int main(int argv, char** argc) {
                   if (fragment_len < 0) {
                     const void* path_ptr = path.data();
                     const void* component_ptr = component.data();
-                    FX_LOGS(FATAL) << "expected overlapping memory:"
-                                   << " path@" << path_ptr << "=" << path << " component@"
-                                   << component_ptr << "=" << component;
+                    FX_LOGS(FATAL) << "expected overlapping memory:" << " path@" << path_ptr << "="
+                                   << path << " component@" << component_ptr << "=" << component;
                   }
                   return std::string_view{path.data(), static_cast<size_t>(fragment_len)};
                 }();
@@ -442,7 +444,7 @@ int main(int argv, char** argc) {
 
   std::vector<std::thread> workers;
 
-  if (!args.virtcon_disable) {
+  if (!args.virtcon_disabled) {
     zx_status_t status = [&]() {
       zx::result virtcon = component::Connect<fuchsia_virtualconsole::SessionManager>();
       if (virtcon.is_error()) {

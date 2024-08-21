@@ -16,6 +16,7 @@ use euclid::{point2, size2, vec2, Angle};
 use fuchsia_zircon::{self as zx};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
+use std::convert::TryFrom;
 use std::fs::File;
 use std::path::PathBuf;
 use std::slice;
@@ -75,6 +76,20 @@ impl From<DisplayRotation> for Angle<Coord> {
             DisplayRotation::Deg270 => 270.0,
         };
         Angle::degrees(degrees)
+    }
+}
+
+impl TryFrom<u32> for DisplayRotation {
+    type Error = Error;
+
+    fn try_from(num: u32) -> Result<Self, Self::Error> {
+        match num {
+            0 => Ok(DisplayRotation::Deg0),
+            90 => Ok(DisplayRotation::Deg90),
+            180 => Ok(DisplayRotation::Deg180),
+            270 => Ok(DisplayRotation::Deg270),
+            _ => Err(anyhow!("Invalid DisplayRotation {}", num)),
+        }
     }
 }
 

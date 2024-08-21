@@ -38,7 +38,7 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
         builder.set_config_capability("fuchsia.virtcon.ColorScheme", Config::new_void())?;
         builder.set_config_capability(
             "fuchsia.virtcon.Disable",
-            Config::new(ConfigValueType::Bool, enable_virtual_console.into()),
+            Config::new(ConfigValueType::Bool, (!enable_virtual_console).into()),
         )?;
         if let Some(rotation) = context.board_info.platform.graphics.display.rotation {
             builder.set_config_capability(
