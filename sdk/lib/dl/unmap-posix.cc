@@ -4,7 +4,7 @@
 
 #include <sys/mman.h>
 
-#include "module.h"
+#include "runtime-module.h"
 
 namespace dl {
 

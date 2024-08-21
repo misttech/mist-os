@@ -18,8 +18,8 @@ source_set("runtime") {
   }
 
   sources = [
-    "module.h",
     "runtime-dynamic-linker.cc",
+    "runtime-module.h",
   ]
   if (is_fuchsia) {
     sources += [ "unmap-zircon.cc" ]

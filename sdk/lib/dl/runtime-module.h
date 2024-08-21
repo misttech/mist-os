@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#ifndef LIB_DL_MODULE_H_
-#define LIB_DL_MODULE_H_
+#ifndef LIB_DL_RUNTIME_MODULE_H_
+#define LIB_DL_RUNTIME_MODULE_H_
 
 #include <lib/elfldltl/alloc-checker-container.h>
 #include <lib/elfldltl/dynamic.h>
@@ -260,4 +260,4 @@ class LoadModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
 
 }  // namespace dl
 
-#endif  // LIB_DL_MODULE_H_
+#endif  // LIB_DL_RUNTIME_MODULE_H_
