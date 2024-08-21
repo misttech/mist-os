@@ -28,8 +28,8 @@ def main(command: List[str]) -> int:
 
             while True:
                 try:
-                    stdout = os.read(host_fd, 1024).decode("utf-8")
-                    sys.stdout.write(stdout)
+                    stdout = os.read(host_fd, 1024)
+                    sys.stdout.buffer.write(stdout)
                     sys.stdout.flush()
                 except OSError:
                     break
