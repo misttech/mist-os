@@ -974,6 +974,11 @@ fn get_local_addr<
     remote_addr: Option<RoutableIpAddr<I::Addr>>,
     allow_non_local_src: bool,
 ) -> Result<IpDeviceAddr<I::Addr>, ResolveRouteError> {
+    // TODO(https://fxbug.dev/360187268): Use a witness type to prevent callers
+    // from providing a multicast local ip.
+    let local_ip =
+        if local_ip.is_some_and(|ip| ip.addr().is_multicast()) { None } else { local_ip };
+
     if let Some(local_ip) = local_ip {
         if allow_non_local_src {
             return Ok(local_ip);
