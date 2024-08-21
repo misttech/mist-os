@@ -834,7 +834,12 @@ impl ThreadGroup {
         self.write().timers.itimer_real()
     }
 
-    pub fn set_itimer(&self, which: u32, value: itimerval) -> Result<itimerval, Errno> {
+    pub fn set_itimer(
+        &self,
+        current_task: &CurrentTask,
+        which: u32,
+        value: itimerval,
+    ) -> Result<itimerval, Errno> {
         if which == ITIMER_PROF || which == ITIMER_VIRTUAL {
             // We don't support setting these timers.
             // The gvisor test suite clears ITIMER_PROF as part of its test setup logic, so we support
@@ -852,14 +857,9 @@ impl ThreadGroup {
         let itimer_real = self.itimer_real();
         let prev_remaining = itimer_real.time_remaining();
         if value.it_value.tv_sec != 0 || value.it_value.tv_usec != 0 {
-            itimer_real.arm(
-                &self.kernel,
-                self.weak_thread_group.clone(),
-                itimerspec_from_itimerval(value),
-                false,
-            )?;
+            itimer_real.arm(current_task, itimerspec_from_itimerval(value), false)?;
         } else {
-            itimer_real.disarm();
+            itimer_real.disarm(current_task)?;
         }
         Ok(itimerval {
             it_value: timeval_from_duration(prev_remaining.remainder),

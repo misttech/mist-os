@@ -63,6 +63,7 @@ syscall_tests = [
   "test_helper_test",
   "time_test",
   "timerfd_test",
+  "timers_test",
   "tmpfs_test",
   "touch_standby_test",
   "trivial_test",

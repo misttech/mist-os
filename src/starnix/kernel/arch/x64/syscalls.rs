@@ -51,6 +51,7 @@ pub fn sys_alarm(
     let duration = zx::Duration::from_seconds(duration.into());
     let new_value = timeval_from_duration(duration);
     let old_value = current_task.thread_group.set_itimer(
+        current_task,
         ITIMER_REAL,
         itimerval { it_value: new_value, it_interval: Default::default() },
     )?;

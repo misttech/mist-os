@@ -23,6 +23,7 @@ impl Timeline {
     }
 }
 
+#[derive(Debug)]
 pub enum TimerWakeup {
     /// A regular timer that does not wake the system if it is suspended.
     Regular,
