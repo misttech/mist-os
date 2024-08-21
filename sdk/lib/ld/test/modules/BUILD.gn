@@ -1211,4 +1211,7 @@ test_executable("llvm-profdata") {
     "//src/lib/llvm-profdata",
     "//zircon/system/ulib/zx",
   ]
+
+  # workaround for b/349448459 to remote-link successfully
+  configs = [ "//build/config:remote_link_scandeps_workaround" ]
 }
