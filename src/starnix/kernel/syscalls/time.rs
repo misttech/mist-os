@@ -467,8 +467,10 @@ pub fn sys_timer_settime(
     let new_value = current_task.read_object(user_new_value)?;
 
     // Return early if the user passes an obviously invalid pointer. This avoids changing the timer
-    // settings for common pointer errors. This check is not a guarantee.
-    current_task.mm().check_plausible(user_old_value.addr(), std::mem::size_of::<itimerspec>())?;
+    // settings for common pointer errors.
+    if !user_old_value.is_null() {
+        current_task.write_object(user_old_value, &Default::default())?;
+    }
 
     let timers = &current_task.thread_group.read().timers;
     let old_value = timers.set_time(current_task, id, flags, new_value)?;
