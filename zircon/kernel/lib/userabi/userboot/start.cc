@@ -8,7 +8,6 @@
 #include <lib/fidl/txn_header.h>
 #include <lib/processargs/processargs.h>
 #include <lib/stdcompat/array.h>
-#include <lib/stdcompat/source_location.h>
 #include <lib/stdcompat/span.h>
 #include <lib/userabi/userboot.h>
 #include <lib/zircon-internal/default_stack_size.h>
@@ -199,27 +198,18 @@ std::array<zx_handle_t, kChildHandleCount> ExtractHandles(zx::channel bootstrap)
   return handles;
 }
 
-template <typename T>
-T DuplicateOrDie(const zx::debuglog& log, const T& typed_handle,
-                 cpp20::source_location src_loc = cpp20::source_location::current()) {
-  T dup;
-  auto status = typed_handle.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
-  check(log, status, "[%s:%d]: Failed to duplicate handle.", src_loc.file_name(), src_loc.line());
-  return dup;
-}
-
-zx_handle_t RawDuplicateOrDie(const zx::debuglog& log, zx_handle_t handle,
-                              cpp20::source_location src_loc = cpp20::source_location::current()) {
-  zx_handle_t dup;
-  auto status = zx_handle_duplicate(handle, ZX_RIGHT_SAME_RIGHTS, &dup);
-  check(log, status, "[%s:%d]: Failed to duplicate handle.", src_loc.file_name(), src_loc.line());
-  return dup;
-}
-
-zx::debuglog DuplicateOrDie(const zx::debuglog& log,
-                            cpp20::source_location src_loc = cpp20::source_location::current()) {
-  return DuplicateOrDie(log, log, src_loc);
-}
+// cpp20::source_location cannot be guaranteed not to generate initialized data
+// declarations with dynamic relocations (RELRO).  So this must be done using
+// macros to expand __LINE__.
+#define DuplicateOrDie(log, handle) \
+  (std::decay_t<decltype(handle)>{RawDuplicateOrDie((log), (handle).get())})
+#define RawDuplicateOrDie(log, handle)                                              \
+  ({                                                                                \
+    zx_handle_t dup;                                                                \
+    zx_status_t status = zx_handle_duplicate((handle), ZX_RIGHT_SAME_RIGHTS, &dup); \
+    check(log, status, "[%s:%d]: Failed to duplicate handle.", __FILE__, __LINE__); \
+    dup;                                                                            \
+  })
 
 struct ChildContext {
   ChildContext() = default;
@@ -281,7 +271,7 @@ ChildContext CreateChildContext(const zx::debuglog& log, std::string_view name,
 
 void SetChildHandles(const zx::debuglog& log, const zx::vmo& bootfs_vmo, ChildContext& child) {
   child.handles[kBootfsVmo] = DuplicateOrDie(log, bootfs_vmo).release();
-  child.handles[kDebugLog] = DuplicateOrDie(log).release();
+  child.handles[kDebugLog] = DuplicateOrDie(log, log).release();
   child.handles[kProcSelf] = DuplicateOrDie(log, child.process).release();
   child.handles[kVmarRootSelf] = DuplicateOrDie(log, child.vmar).release();
   child.handles[kThreadSelf] = DuplicateOrDie(log, child.thread).release();
@@ -494,7 +484,8 @@ struct TerminationInfo {
 
   {
     auto borrowed_bootfs = bootfs_vmo.borrow();
-    Bootfs bootfs{vmar_self.borrow(), std::move(bootfs_vmo), std::move(vmex), DuplicateOrDie(log)};
+    Bootfs bootfs{vmar_self.borrow(), std::move(bootfs_vmo), std::move(vmex),
+                  DuplicateOrDie(log, log)};
     auto launch_process = [&](auto& elf_entry,
                               zx::channel userboot_protocol = zx::channel()) -> ChildContext {
       ChildMessageLayout child_message = CreateChildMessage();
@@ -524,7 +515,7 @@ struct TerminationInfo {
 
       // Now become the loader service for as long as that's needed.
       if (loader_svc) {
-        LoaderService ldsvc(DuplicateOrDie(log), &bootfs, elf_entry.root);
+        LoaderService ldsvc(DuplicateOrDie(log, log), &bootfs, elf_entry.root);
         ldsvc.Serve(std::move(loader_svc));
       }
 
