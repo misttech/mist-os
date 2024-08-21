@@ -286,12 +286,10 @@ class Fastboot(fastboot_interface.Fastboot):
     # List all the private methods
     def _boot_to_fastboot_mode_using_ffx(self) -> None:
         """Boot the device to fastboot mode using FFX."""
-        # LINT.IfChange
         _LOGGER.info(
             "Lacewing is booting the following device to fastboot mode: %s",
             self._device_name,
         )
-        # LINT.ThenChange(//tools/testing/tefmocheck/string_in_log_check.go)
         try:
             self._ffx_transport.run(cmd=_FFX_CMDS["BOOT_TO_FASTBOOT_MODE"])
         except errors.FfxCommandError:
@@ -331,12 +329,10 @@ class Fastboot(fastboot_interface.Fastboot):
         _LOGGER.info("Powering on %s...", self._device_name)
         power_switch.power_on(outlet)
 
-        # LINT.IfChange
         _LOGGER.info(
             "Lacewing is booting the following device to fastboot mode: %s",
             self._device_name,
         )
-        # LINT.ThenChange(//tools/testing/tefmocheck/string_in_log_check.go)
 
         start_time: float = time.time()
         end_time: float = start_time + 10
