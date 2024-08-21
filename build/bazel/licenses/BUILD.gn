@@ -13,18 +13,43 @@ import("//build/licenses/generated_licenses_spdx.gni")
 import("//build/security.gni")
 import("//tools/check-licenses/build/license_data.gni")
 
+# TODO(https://fxbug.dev/42068917): We only need to cover bazel inputs that end up in the product,
+# e.g. not tests or build tools. This can be achieved by adding metadata to
+# the bazel inputs list (i.e. converting it into some dictionary) or by
+# splitting into more granular lists.
+
 _excluded_bazel_inputs = [
-  # Remove a potential circular dependency on the spdx bazel_input_resource
-  # itself. This is added in by some extra_gn_labels_for_bazel_inputs configs.
+  # Remove a potential circular dependency on the spdx bazel_input_resource itself.
   "//build/bazel/licenses:legacy_ninja_build_outputs_licenses_spdx",
+
+  # See https://fxbug.dev/42077571#c15. Zedboot is only used in eng builds and is testonly, so can't
+  # be used in license calculations.
+  "//build/images/zedboot:zedboot.bazel_legacy_aib",
+
+  # Bringup is testonly too.
+  "//build/images/bringup:bringup.bazel_legacy_aib",
+
+  # This is only used for `//tools/devshell:fx_publish_test`.
+  "//build/images/updates/tests:fx_publish_test.gn_assembly.bazel_legacy_aib",
+
+  # These are testonly bazel inputs for power system integration tests.
+  "//src/power/testing/system-integration:bazel_test_inputs",
 ]
 
+# Remove all non-user platform aibs
+_excluded_bazel_inputs += eng_platform_aib_labels
+_excluded_bazel_inputs += user_platform_aib_labels
+_excluded_bazel_inputs -= user_platform_aib_labels
+
+if (fuchsia_zbi_testonly) {
+  # Remove fuchsia_zbi_testonly=true targets. See https://fxbug.dev/42077571#c18 for why that is ok.
+  _excluded_bazel_inputs +=
+      [ "//build/images/fuchsia:fuchsia.bazel_legacy_aib" ]
+}
+
 group("all_bazel_inputs") {
-  deps = [
-           "//build/images/flash:esp.bazel_input",
-           "//sdk:core",
-           "//src/fonts/asset_providers:bazel_inputs",
-         ] + extra_gn_labels_for_bazel_inputs
+  deps = gn_labels_for_bazel_inputs + extra_gn_labels_for_bazel_inputs
+
   deps += _excluded_bazel_inputs
   deps -= _excluded_bazel_inputs
 
