@@ -1556,8 +1556,9 @@ fn get_offer_availability(availability: &Option<fcdecl::Availability>) -> cm_rus
         Some(fcdecl::Availability::Optional) => cm_rust::Availability::Optional,
         Some(fcdecl::Availability::SameAsTarget) => cm_rust::Availability::SameAsTarget,
         Some(fcdecl::Availability::Required) => cm_rust::Availability::Required,
-        _ => {
-            tracing::warn!("unspecified availability in realm builder offer decl creation");
+        Some(fcdecl::Availability::Transitional) => cm_rust::Availability::Transitional,
+        None => {
+            // Required is the default.
             cm_rust::Availability::Required
         }
     }
