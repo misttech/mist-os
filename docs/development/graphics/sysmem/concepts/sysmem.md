@@ -44,7 +44,7 @@ other to ensure synchronization.
 ## Allocation process (simplified)
 
 1. [Participants](#participants) connect to the
-    [fuchsia.sysmem.Allocator][Allocator] service
+    [fuchsia.sysmem2.Allocator][Allocator] service
 1. One participant (called the initiator) creates an initial
     [buffer collection token](#token).
 1. That participant [duplicates] the token and sends the duplicate to other
@@ -125,7 +125,7 @@ different buffers may have the same buffer settings.
 
 ### Heaps
 
-A [heap][HeapType] represents one specific type of memory on a system. A
+A [heap][Heap] represents one specific type of memory on a system. A
 system may have multiple heaps with different performance characteristics
 from each other. Some heaps may only be usable from a subset of hardware
 devices on a system.
@@ -172,22 +172,22 @@ passed between processes before finally being [bound][bind] to a buffer
 collection.
 
 [vmo]: /docs/reference/kernel_objects/vm_object.md
-[sysmem]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem
-[HeapType]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem#HeapType
-[ImageFormat]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem#ImageFormat_2
-[SingleBufferSettings]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem#SingleBufferSettings
-[duplicates]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem#BufferCollectionToken.Duplicate
-[Allocator]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem#Allocator
-[BufferCollectionToken]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem#BufferCollectionToken
-[BufferCollection]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem#BufferCollection
+[sysmem]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2
+[Heap]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#Heap
+[ImageFormat]: https://fuchsia.dev/reference/fidl/fuchsia.images2#ImageFormat
+[SingleBufferSettings]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#SingleBufferSettings
+[duplicates]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#BufferCollectionToken.Duplicate
+[Allocator]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#Allocator
+[BufferCollectionToken]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#BufferCollectionToken
+[BufferCollection]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#BufferCollection
 [channel]: /docs/reference/kernel_objects/channel.md
 [pmt]: /docs/reference/kernel_objects/pinned_memory_token.md
 [vmo_create_child]: /reference/syscalls/vmo_create_child.md
 [handles]: /docs/concepts/kernel/handles.md
-[bind]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem#Allocator.BindSharedCollection
-[setconstraints]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem#BufferCollection.SetConstraints
+[bind]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#Allocator.BindSharedCollection
+[setconstraints]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#BufferCollection.SetConstraints
 [fidl]: /docs/development/languages/fidl/README.md
 [map]: /reference/syscalls/vmar_map.md
-[constraints]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem#BufferCollectionConstraints
-[AttachToken]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem#BufferCollection.AttachToken
-[SetDispensable]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem#BufferCollectionToken.SetDispensable
+[constraints]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#BufferCollectionConstraints
+[AttachToken]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#BufferCollection.AttachToken
+[SetDispensable]: https://fuchsia.dev/reference/fidl/fuchsia.sysmem2#BufferCollectionToken.SetDispensable
