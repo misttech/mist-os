@@ -61,10 +61,10 @@ __BEGIN_CDECLS
 
 // LINT.IfChange
 // global binding variables at 0x00XX
-#define BIND_FLAGS 0x0000     // value of the flags register
+// BIND_FLAGS was 0x0000, the value of the flags register
 #define BIND_PROTOCOL 0x0001  // primary protocol of the device
-#define BIND_AUTOBIND 0x0002  // if this is an automated bind/load
-#define BIND_COMPOSITE 0x003  // Whether this is a composite device
+// BIND_AUTOBIND was 0x0002, if this is an automated bind/load
+// BIND_COMPOSITE was 0x003, whether this is a composite device
 
 // pci binding variables at 0x01XX
 #define BIND_PCI_VID 0x0100
@@ -112,7 +112,7 @@ __BEGIN_CDECLS
 // BIND_SERIAL_PID was 0x0602
 
 // NAND binding variables at 0x07XX
-#define BIND_NAND_CLASS 0x0700
+// BIND_NAND_CLASS was 0x0700
 
 // SDIO binding variables at 0x09XX
 // BIND_SDIO_VID was 0x0900
@@ -127,12 +127,12 @@ __BEGIN_CDECLS
 #define BIND_I2C_DID 0x0A04
 
 // GPIO binding variables at 0x0A1X
-#define BIND_GPIO_PIN 0x0A10
-#define BIND_GPIO_CONTROLLER 0x0A11
+// BIND_GPIO_PIN was 0x0A10
+// BIND_GPIO_CONTROLLER was 0x0A11
 
 // POWER binding variables at 0x0A2X
-#define BIND_POWER_DOMAIN 0x0A20
-#define BIND_POWER_DOMAIN_COMPOSITE 0x0A21
+// BIND_POWER_DOMAIN was 0x0A20
+// BIND_POWER_DOMAIN_COMPOSITE was 0x0A21
 
 // POWER binding variables at 0x0A3X
 // BIND_CLOCK_ID was 0x0A30

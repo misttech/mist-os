@@ -18,12 +18,8 @@ namespace driver_manager {
 namespace {
 const char* BindParamName(uint32_t param_num) {
   switch (param_num) {
-    case BIND_FLAGS:
-      return "Flags";
     case BIND_PROTOCOL:
       return "Protocol";
-    case BIND_AUTOBIND:
-      return "Autobind";
     case BIND_PCI_VID:
       return "PCI.VID";
     case BIND_PCI_DID:

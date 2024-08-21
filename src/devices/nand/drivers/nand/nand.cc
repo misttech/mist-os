@@ -17,6 +17,8 @@
 #include <algorithm>
 #include <memory>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/nand/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <fbl/auto_lock.h>
 
@@ -410,13 +412,13 @@ zx_status_t NandDevice::Init() {
 }
 
 zx_status_t NandDevice::Bind() {
-  zx_device_prop_t props[] = {
-      {BIND_PROTOCOL, 0, ZX_PROTOCOL_NAND},
-      {BIND_NAND_CLASS, 0, NAND_CLASS_PARTMAP},
+  zx_device_str_prop_t props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_nand::BIND_PROTOCOL_DEVICE),
+      ddk::MakeStrProperty(bind_fuchsia::NAND_CLASS, NAND_CLASS_PARTMAP),
   };
 
   return DdkAdd(ddk::DeviceAddArgs("nand")
-                    .set_props(props)
+                    .set_str_props(props)
                     .set_inspect_vmo(inspect_.DuplicateVmo())
                     .forward_metadata(parent(), DEVICE_METADATA_PRIVATE)
                     .forward_metadata(parent(), DEVICE_METADATA_PARTITION_MAP));

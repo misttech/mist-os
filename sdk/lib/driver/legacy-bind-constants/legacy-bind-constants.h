@@ -7,10 +7,7 @@
 
 // LINT.IfChange
 // global binding variables at 0x00XX
-#define BIND_FLAGS 0x0000     // value of the flags register
 #define BIND_PROTOCOL 0x0001  // primary protocol of the device
-#define BIND_AUTOBIND 0x0002  // if this is an automated bind/load
-#define BIND_COMPOSITE 0x003  // Whether this is a composite device
 
 // pci binding variables at 0x01XX
 #define BIND_PCI_VID 0x0100
@@ -51,23 +48,12 @@
 #define BIND_IHDA_CODEC_VENDOR_REV 0x0504
 #define BIND_IHDA_CODEC_VENDOR_STEP 0x0505
 
-// NAND binding variables at 0x07XX
-#define BIND_NAND_CLASS 0x0700
-
 // I2C binding variables at 0x0A0X
 #define BIND_I2C_CLASS 0x0A00
 #define BIND_I2C_BUS_ID 0x0A01
 #define BIND_I2C_ADDRESS 0x0A02
 #define BIND_I2C_VID 0x0A03
 #define BIND_I2C_DID 0x0A04
-
-// GPIO binding variables at 0x0A1X
-#define BIND_GPIO_PIN 0x0A10
-#define BIND_GPIO_CONTROLLER 0x0A11
-
-// POWER binding variables at 0x0A2X
-#define BIND_POWER_DOMAIN 0x0A20
-#define BIND_POWER_DOMAIN_COMPOSITE 0x0A21
 
 // LINT.ThenChange(/src/lib/ddk/include/lib/ddk/binding_priv.h)
 

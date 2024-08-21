@@ -23,6 +23,8 @@
 #include <algorithm>
 #include <memory>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/nand/cpp/bind.h>
 #include <ddk/metadata/nand.h>
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
@@ -192,12 +194,12 @@ void NandPartDevice::DdkInit(ddk::InitTxn init_txn) {
 zx_status_t NandPartDevice::Bind(const char* name, uint32_t copy_count) {
   zxlogf(INFO, "nandpart: Binding %s", name);
   extra_partition_copy_count_ = copy_count;
-  zx_device_prop_t props[] = {
-      {BIND_PROTOCOL, 0, ZX_PROTOCOL_NAND},
-      {BIND_NAND_CLASS, 0, nand_info_.nand_class},
+  zx_device_str_prop_t props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_nand::BIND_PROTOCOL_DEVICE),
+      ddk::MakeStrProperty(bind_fuchsia::NAND_CLASS, nand_info_.nand_class),
   };
 
-  return DdkAdd(ddk::DeviceAddArgs(name).set_props(props));
+  return DdkAdd(ddk::DeviceAddArgs(name).set_str_props(props));
 }
 
 void NandPartDevice::NandQuery(nand_info_t* info_out, size_t* nand_op_size_out) {

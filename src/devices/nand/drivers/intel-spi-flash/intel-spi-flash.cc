@@ -15,6 +15,7 @@
 
 #include <cstddef>
 
+#include <bind/fuchsia/cpp/bind.h>
 #include <ddktl/device.h>
 #include <safemath/checked_math.h>
 
@@ -50,15 +51,12 @@ zx_status_t SpiFlashDevice::Bind() {
 
   io_thread_ = std::thread(&SpiFlashDevice::IoThread, this);
 
-  zx_device_prop_t props[] = {
-      {
-          .id = BIND_NAND_CLASS,
-          .value = NAND_CLASS_INTEL_FLASH_DESCRIPTOR,
-      },
+  zx_device_str_prop_t props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::NAND_CLASS, NAND_CLASS_INTEL_FLASH_DESCRIPTOR),
   };
   return DdkAdd(ddk::DeviceAddArgs("intel-spi-flash")
                     .set_inspect_vmo(inspect_.DuplicateVmo())
-                    .set_props(props));
+                    .set_str_props(props));
 }
 
 void SpiFlashDevice::StartShutdown() {
