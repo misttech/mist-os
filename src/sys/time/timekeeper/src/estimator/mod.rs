@@ -194,14 +194,18 @@ mod test {
         let diagnostics = Arc::new(FakeDiagnostics::new());
         let estimator = Estimator::new(
             TEST_TRACK,
-            Sample::new(TIME_1 + OFFSET_1, TIME_1, STD_DEV_1),
+            Sample::new(
+                zx::SyntheticTime::from_nanos((TIME_1 + OFFSET_1).into_nanos()),
+                TIME_1,
+                STD_DEV_1,
+            ),
             Arc::clone(&diagnostics),
             Arc::clone(&config),
         );
         diagnostics.assert_events(&[create_filter_event(TIME_1, OFFSET_1, SQRT_COV_1)]);
         let transform = estimator.transform();
-        assert_eq!(transform.synthetic(TIME_1), TIME_1 + OFFSET_1);
-        assert_eq!(transform.synthetic(TIME_2), TIME_2 + OFFSET_1);
+        assert_eq!(transform.synthetic(TIME_1).into_nanos(), (TIME_1 + OFFSET_1).into_nanos());
+        assert_eq!(transform.synthetic(TIME_2).into_nanos(), (TIME_2 + OFFSET_1).into_nanos());
         assert_eq!(transform.error_bound(TIME_1), 2 * SQRT_COV_1);
         // Earlier time should return same error bound.
         assert_eq!(transform.error_bound(TIME_1 - 1.second()), 2 * SQRT_COV_1);
@@ -218,16 +222,27 @@ mod test {
         let config = make_test_config();
         let mut estimator = Estimator::new(
             TEST_TRACK,
-            Sample::new(TIME_1 + OFFSET_1, TIME_1, STD_DEV_1),
+            Sample::new(
+                zx::SyntheticTime::from_nanos((TIME_1 + OFFSET_1).into_nanos()),
+                TIME_1,
+                STD_DEV_1,
+            ),
             Arc::clone(&diagnostics),
             config,
         );
-        estimator.update(Sample::new(TIME_2 + OFFSET_2, TIME_2, STD_DEV_1));
+        estimator.update(Sample::new(
+            zx::SyntheticTime::from_nanos((TIME_2 + OFFSET_2).into_nanos()),
+            TIME_2,
+            STD_DEV_1,
+        ));
 
         // Expected offset is biased slightly towards the second estimate.
         let expected_offset = 88_8002_580_002.nanos();
         let expected_sqrt_cov = 15_556_529u64;
-        assert_eq!(estimator.transform().synthetic(TIME_3), TIME_3 + expected_offset);
+        assert_eq!(
+            estimator.transform().synthetic(TIME_3).into_nanos(),
+            (TIME_3 + expected_offset).into_nanos(),
+        );
 
         // The frequency estimator should have discarded the first update.
         assert_eq!(estimator.frequency_estimator.window_count(), 0);
@@ -246,14 +261,25 @@ mod test {
         let config = make_test_config();
         let mut estimator = Estimator::new(
             TEST_TRACK,
-            Sample::new(TIME_1 + OFFSET_1, TIME_1, STD_DEV_1),
+            Sample::new(
+                zx::SyntheticTime::from_nanos((TIME_1 + OFFSET_1).into_nanos()),
+                TIME_1,
+                STD_DEV_1,
+            ),
             Arc::clone(&diagnostics),
             config,
         );
-        estimator.update(Sample::new(TIME_2 + OFFSET_1, TIME_2, STD_DEV_1));
+        estimator.update(Sample::new(
+            zx::SyntheticTime::from_nanos((TIME_2 + OFFSET_1).into_nanos()),
+            TIME_2,
+            STD_DEV_1,
+        ));
 
         let expected_sqrt_cov = 15_556_529u64;
-        assert_eq!(estimator.transform().synthetic(TIME_3), TIME_3 + OFFSET_1);
+        assert_eq!(
+            estimator.transform().synthetic(TIME_3).into_nanos(),
+            (TIME_3 + OFFSET_1).into_nanos(),
+        );
 
         // The frequency estimator should have retained both samples.
         assert_eq!(estimator.frequency_estimator.window_count(), 0);
@@ -271,13 +297,27 @@ mod test {
         let config = make_test_config();
         let mut estimator = Estimator::new(
             TEST_TRACK,
-            Sample::new(TIME_2 + OFFSET_1, TIME_2, STD_DEV_1),
+            Sample::new(
+                zx::SyntheticTime::from_nanos((TIME_2 + OFFSET_1).into_nanos()),
+                TIME_2,
+                STD_DEV_1,
+            ),
             Arc::clone(&diagnostics),
             config,
         );
-        assert_eq!(estimator.transform().synthetic(TIME_3), TIME_3 + OFFSET_1);
-        estimator.update(Sample::new(TIME_1 + OFFSET_2, TIME_1, STD_DEV_1));
-        assert_eq!(estimator.transform().synthetic(TIME_3), TIME_3 + OFFSET_1);
+        assert_eq!(
+            estimator.transform().synthetic(TIME_3).into_nanos(),
+            (TIME_3 + OFFSET_1).into_nanos(),
+        );
+        estimator.update(Sample::new(
+            zx::SyntheticTime::from_nanos((TIME_1 + OFFSET_2).into_nanos()),
+            TIME_1,
+            STD_DEV_1,
+        ));
+        assert_eq!(
+            estimator.transform().synthetic(TIME_3).into_nanos(),
+            (TIME_3 + OFFSET_1).into_nanos(),
+        );
         // Ignored event should not be logged.
         diagnostics.assert_events(&[create_filter_event(TIME_2, OFFSET_1, SQRT_COV_1)]);
         // Nor included in the frequency estimator.
@@ -287,7 +327,11 @@ mod test {
     #[fuchsia::test]
     fn frequency_convergence() {
         // Generate two days of samples at a fixed, slightly erroneous, frequency.
-        let reference_sample = Sample::new(TIME_1 + OFFSET_1, TIME_2, STD_DEV_1);
+        let reference_sample = Sample::new(
+            zx::SyntheticTime::from_nanos((TIME_1 + OFFSET_1).into_nanos()),
+            TIME_2,
+            STD_DEV_1,
+        );
         let mut samples = Vec::<Sample>::new();
         {
             let test_frequency = 1.000003;

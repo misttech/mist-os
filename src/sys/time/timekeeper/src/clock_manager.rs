@@ -932,7 +932,11 @@ mod tests {
         let monotonic_ref = zx::MonotonicTime::get_monotonic();
         let clock_manager = create_clock_manager(
             Arc::clone(&clock),
-            vec![Sample::new(monotonic_ref + OFFSET, monotonic_ref, STD_DEV)],
+            vec![Sample::new(
+                zx::SyntheticTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
+                monotonic_ref,
+                STD_DEV,
+            )],
             None,
             Some(rtc.clone()),
             Arc::clone(&diagnostics),
@@ -950,10 +954,10 @@ mod tests {
 
         // Check that the clocks have been updated. The UTC should be bounded by the offset we
         // supplied added to the monotonic window in which the calculation took place.
-        assert_geq!(updated_utc, monotonic_before + OFFSET);
-        assert_leq!(updated_utc, monotonic_after + OFFSET);
-        assert_geq!(rtc.last_set().unwrap(), monotonic_before + OFFSET);
-        assert_leq!(rtc.last_set().unwrap(), monotonic_after + OFFSET);
+        assert_geq!(updated_utc.into_nanos(), (monotonic_before + OFFSET).into_nanos());
+        assert_leq!(updated_utc.into_nanos(), (monotonic_after + OFFSET).into_nanos());
+        assert_geq!(rtc.last_set().unwrap().into_nanos(), (monotonic_before + OFFSET).into_nanos());
+        assert_leq!(rtc.last_set().unwrap().into_nanos(), (monotonic_after + OFFSET).into_nanos());
 
         // Check that the correct diagnostic events were logged.
         diagnostics.assert_events(&[
@@ -961,7 +965,7 @@ mod tests {
             Event::KalmanFilterUpdated {
                 track: *TEST_TRACK,
                 monotonic: monotonic_ref,
-                utc: monotonic_ref + OFFSET,
+                utc: zx::SyntheticTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                 sqrt_covariance: STD_DEV,
             },
             Event::StartClock { track: *TEST_TRACK, source: *START_CLOCK_SOURCE },
@@ -982,7 +986,11 @@ mod tests {
         let monotonic_ref = zx::MonotonicTime::get_monotonic();
         let clock_manager = create_clock_manager(
             Arc::clone(&clock),
-            vec![Sample::new(monotonic_ref + OFFSET, monotonic_ref, STD_DEV)],
+            vec![Sample::new(
+                zx::SyntheticTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
+                monotonic_ref,
+                STD_DEV,
+            )],
             None,
             Some(rtc.clone()),
             Arc::clone(&diagnostics),
@@ -1029,7 +1037,11 @@ mod tests {
             let monotonic_ref = zx::MonotonicTime::get_monotonic();
             let clock_manager = create_clock_manager(
                 Arc::clone(&clock),
-                vec![Sample::new(monotonic_ref + OFFSET, monotonic_ref, STD_DEV)],
+                vec![Sample::new(
+                    zx::SyntheticTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
+                    monotonic_ref,
+                    STD_DEV,
+                )],
                 None,
                 Some(rtc.clone()),
                 Arc::clone(&diagnostics),
@@ -1070,7 +1082,11 @@ mod tests {
             let monotonic_ref = zx::MonotonicTime::get_monotonic();
             let clock_manager = create_clock_manager(
                 Arc::clone(&clock),
-                vec![Sample::new(monotonic_ref + OFFSET, monotonic_ref, STD_DEV)],
+                vec![Sample::new(
+                    zx::SyntheticTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
+                    monotonic_ref,
+                    STD_DEV,
+                )],
                 None,
                 Some(rtc.clone()),
                 Arc::clone(&diagnostics),
@@ -1104,7 +1120,11 @@ mod tests {
         let config = make_test_config();
         let clock_manager = create_clock_manager(
             Arc::clone(&clock),
-            vec![Sample::new(monotonic_ref + OFFSET, monotonic_ref, STD_DEV)],
+            vec![Sample::new(
+                zx::SyntheticTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
+                monotonic_ref,
+                STD_DEV,
+            )],
             None,
             None,
             Arc::clone(&diagnostics),
@@ -1122,8 +1142,8 @@ mod tests {
 
         // Check that the clock has been updated. The UTC should be bounded by the offset we
         // supplied added to the monotonic window in which the calculation took place.
-        assert_geq!(updated_utc, monotonic_before + OFFSET);
-        assert_leq!(updated_utc, monotonic_after + OFFSET);
+        assert_geq!(updated_utc.into_nanos(), (monotonic_before + OFFSET).into_nanos());
+        assert_leq!(updated_utc.into_nanos(), (monotonic_after + OFFSET).into_nanos());
 
         // If we keep waiting the error bound should increase in the absence of updates.
         let details1 = clock.get_details().unwrap();
@@ -1144,7 +1164,7 @@ mod tests {
             Event::KalmanFilterUpdated {
                 track: *TEST_TRACK,
                 monotonic: monotonic_ref,
-                utc: monotonic_ref + OFFSET,
+                utc: zx::SyntheticTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                 sqrt_covariance: STD_DEV,
             },
             Event::StartClock { track: *TEST_TRACK, source: *START_CLOCK_SOURCE },
@@ -1165,11 +1185,17 @@ mod tests {
             Arc::clone(&clock),
             vec![
                 Sample::new(
-                    monotonic_ref - SAMPLE_SPACING + OFFSET,
+                    zx::SyntheticTime::from_nanos(
+                        (monotonic_ref - SAMPLE_SPACING + OFFSET).into_nanos(),
+                    ),
                     monotonic_ref - SAMPLE_SPACING,
                     STD_DEV,
                 ),
-                Sample::new(monotonic_ref + OFFSET_2, monotonic_ref, STD_DEV),
+                Sample::new(
+                    zx::SyntheticTime::from_nanos((monotonic_ref + OFFSET_2).into_nanos()),
+                    monotonic_ref,
+                    STD_DEV,
+                ),
             ],
             None,
             None,
@@ -1193,8 +1219,8 @@ mod tests {
 
         // Check that the clock has been updated. The UTC should be bounded by the expected offset
         // added to the monotonic window in which the calculation took place.
-        assert_geq!(updated_utc, monotonic_before + expected_offset);
-        assert_leq!(updated_utc, monotonic_after + expected_offset);
+        assert_geq!(updated_utc.into_nanos(), (monotonic_before + expected_offset).into_nanos());
+        assert_leq!(updated_utc.into_nanos(), (monotonic_after + expected_offset).into_nanos());
 
         // Check that the correct diagnostic events were logged.
         diagnostics.assert_events(&[
@@ -1202,14 +1228,16 @@ mod tests {
             Event::KalmanFilterUpdated {
                 track: *TEST_TRACK,
                 monotonic: monotonic_ref - SAMPLE_SPACING,
-                utc: monotonic_ref - SAMPLE_SPACING + OFFSET,
+                utc: zx::SyntheticTime::from_nanos(
+                    (monotonic_ref - SAMPLE_SPACING + OFFSET).into_nanos(),
+                ),
                 sqrt_covariance: STD_DEV,
             },
             Event::StartClock { track: *TEST_TRACK, source: *START_CLOCK_SOURCE },
             Event::KalmanFilterUpdated {
                 track: *TEST_TRACK,
                 monotonic: monotonic_ref,
-                utc: monotonic_ref + expected_offset,
+                utc: zx::SyntheticTime::from_nanos((monotonic_ref + expected_offset).into_nanos()),
                 sqrt_covariance: 62225396.nanos(),
             },
             Event::FrequencyWindowDiscarded {
@@ -1243,11 +1271,19 @@ mod tests {
             Arc::clone(&clock),
             vec![
                 Sample::new(
-                    monotonic_ref - SAMPLE_SPACING + OFFSET,
+                    zx::SyntheticTime::from_nanos(
+                        (monotonic_ref - SAMPLE_SPACING + OFFSET).into_nanos(),
+                    ),
                     monotonic_ref - SAMPLE_SPACING,
                     STD_DEV,
                 ),
-                Sample::new(monotonic_ref + OFFSET + delta_offset, monotonic_ref, STD_DEV),
+                Sample::new(
+                    zx::SyntheticTime::from_nanos(
+                        (monotonic_ref + OFFSET + delta_offset).into_nanos(),
+                    ),
+                    monotonic_ref,
+                    STD_DEV,
+                ),
             ],
             // Leave the time source in network unavailable after its sent the samples so it
             // doesn't get killed for being unresponsive while the slew is applied.
@@ -1270,8 +1306,11 @@ mod tests {
 
         // The clock time should still be very close to the original value but the details should
         // show that a rate change is in progress.
-        assert_geq!(updated_utc, monotonic_before + OFFSET);
-        assert_leq!(updated_utc, monotonic_after + OFFSET + filtered_delta_offset);
+        assert_geq!(updated_utc.into_nanos(), (monotonic_before + OFFSET).into_nanos());
+        assert_leq!(
+            updated_utc.into_nanos(),
+            (monotonic_after + OFFSET + filtered_delta_offset).into_nanos()
+        );
         assert_geq!(details.mono_to_synthetic.rate.synthetic_ticks, 1000050);
         assert_eq!(details.mono_to_synthetic.rate.reference_ticks, 1000000);
         assert_geq!(details.last_rate_adjust_update_ticks, details.last_value_update_ticks);
@@ -1319,14 +1358,18 @@ mod tests {
             Event::KalmanFilterUpdated {
                 track: *TEST_TRACK,
                 monotonic: monotonic_ref - SAMPLE_SPACING,
-                utc: monotonic_ref - SAMPLE_SPACING + OFFSET,
+                utc: zx::SyntheticTime::from_nanos(
+                    (monotonic_ref - SAMPLE_SPACING + OFFSET).into_nanos(),
+                ),
                 sqrt_covariance: STD_DEV,
             },
             Event::StartClock { track: *TEST_TRACK, source: *START_CLOCK_SOURCE },
             Event::KalmanFilterUpdated {
                 track: *TEST_TRACK,
                 monotonic: monotonic_ref,
-                utc: monotonic_ref + OFFSET + filtered_delta_offset,
+                utc: zx::SyntheticTime::from_nanos(
+                    (monotonic_ref + OFFSET + filtered_delta_offset).into_nanos(),
+                ),
                 sqrt_covariance: 62225396.nanos(),
             },
             Event::ClockCorrection {

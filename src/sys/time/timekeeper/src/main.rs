@@ -649,7 +649,7 @@ mod tests {
                 time_source: FakePushTimeSource::events(vec![
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Ok },
                     TimeSourceEvent::from(Sample::new(
-                        monotonic_ref + OFFSET,
+                        zx::SyntheticTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                         monotonic_ref,
                         STD_DEV,
                     )),
@@ -662,7 +662,7 @@ mod tests {
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Network },
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Ok },
                     TimeSourceEvent::from(Sample::new(
-                        monotonic_ref + OFFSET_2,
+                        zx::SyntheticTime::from_nanos((monotonic_ref + OFFSET_2).into_nanos()),
                         monotonic_ref,
                         STD_DEV,
                     )),
@@ -694,7 +694,7 @@ mod tests {
             Event::KalmanFilterUpdated {
                 track: Track::Primary,
                 monotonic: monotonic_ref,
-                utc: monotonic_ref + OFFSET,
+                utc: zx::SyntheticTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                 sqrt_covariance: STD_DEV,
             },
             Event::StartClock {
@@ -707,7 +707,7 @@ mod tests {
             Event::KalmanFilterUpdated {
                 track: Track::Monitor,
                 monotonic: monotonic_ref,
-                utc: monotonic_ref + OFFSET_2,
+                utc: zx::SyntheticTime::from_nanos((monotonic_ref + OFFSET_2).into_nanos()),
                 sqrt_covariance: STD_DEV,
             },
             Event::StartClock {
@@ -737,7 +737,7 @@ mod tests {
                 time_source: FakePushTimeSource::events(vec![
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Ok },
                     TimeSourceEvent::from(Sample::new(
-                        monotonic_ref + OFFSET,
+                        zx::SyntheticTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                         monotonic_ref,
                         STD_DEV,
                     )),
@@ -784,7 +784,7 @@ mod tests {
             Event::KalmanFilterUpdated {
                 track: Track::Primary,
                 monotonic: monotonic_ref,
-                utc: monotonic_ref + OFFSET,
+                utc: zx::SyntheticTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                 sqrt_covariance: STD_DEV,
             },
             Event::StartClock {
@@ -813,7 +813,7 @@ mod tests {
                 time_source: FakePushTimeSource::events(vec![
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Ok },
                     TimeSourceEvent::from(Sample::new(
-                        monotonic_ref + OFFSET,
+                        zx::SyntheticTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                         monotonic_ref,
                         STD_DEV,
                     )),

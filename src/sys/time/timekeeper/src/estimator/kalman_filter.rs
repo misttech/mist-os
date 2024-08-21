@@ -181,8 +181,14 @@ mod test {
     #[fuchsia::test]
     fn initialize() {
         let config = make_test_config();
-        let filter =
-            KalmanFilter::new(&Sample::new(TIME_1 + OFFSET_1, TIME_1, STD_DEV_1), config.clone());
+        let filter = KalmanFilter::new(
+            &Sample::new(
+                zx::SyntheticTime::from_nanos((TIME_1 + OFFSET_1).into_nanos()),
+                TIME_1,
+                STD_DEV_1,
+            ),
+            config.clone(),
+        );
         let transform = filter.transform();
         assert_eq!(
             transform,
@@ -194,8 +200,8 @@ mod test {
                 error_bound_growth_ppm: 2 * config.get_oscillator_error_std_dev_ppm() as u32,
             }
         );
-        assert_eq!(transform.synthetic(TIME_1), TIME_1 + OFFSET_1);
-        assert_eq!(transform.synthetic(TIME_2), TIME_2 + OFFSET_1);
+        assert_eq!(transform.synthetic(TIME_1).into_nanos(), (TIME_1 + OFFSET_1).into_nanos());
+        assert_eq!(transform.synthetic(TIME_2).into_nanos(), (TIME_2 + OFFSET_1).into_nanos());
         assert_eq!(transform.error_bound(TIME_1), 2 * SQRT_COV_1);
         // Earlier time should return same error bound.
         assert_eq!(transform.error_bound(TIME_1 - 1.second()), 2 * SQRT_COV_1);
@@ -205,7 +211,7 @@ mod test {
             2 * SQRT_COV_1 + 2000 * config.get_oscillator_error_std_dev_ppm() as u64
         );
         assert_eq!(filter.monotonic(), TIME_1);
-        assert_eq!(filter.utc(), TIME_1 + OFFSET_1);
+        assert_eq!(filter.utc().into_nanos(), (TIME_1 + OFFSET_1).into_nanos());
         assert_eq!(filter.sqrt_covariance(), STD_DEV_1);
     }
 
@@ -331,20 +337,44 @@ mod test {
     #[fuchsia::test]
     fn covariance_minimum() {
         let config = make_test_config();
-        let mut filter =
-            KalmanFilter::new(&Sample::new(TIME_1 + OFFSET_1, TIME_1, ZERO_DURATION), config);
+        let mut filter = KalmanFilter::new(
+            &Sample::new(
+                zx::SyntheticTime::from_nanos((TIME_1 + OFFSET_1).into_nanos()),
+                TIME_1,
+                ZERO_DURATION,
+            ),
+            config,
+        );
         assert_eq!(filter.covariance_00, MIN_COVARIANCE);
-        assert!(filter.update(&Sample::new(TIME_2 + OFFSET_2, TIME_2, ZERO_DURATION)).is_ok());
+        assert!(filter
+            .update(&Sample::new(
+                zx::SyntheticTime::from_nanos((TIME_2 + OFFSET_2).into_nanos()),
+                TIME_2,
+                ZERO_DURATION
+            ))
+            .is_ok());
         assert_eq!(filter.covariance_00, MIN_COVARIANCE);
     }
 
     #[fuchsia::test]
     fn earlier_monotonic_ignored() {
         let config = make_test_config();
-        let mut filter =
-            KalmanFilter::new(&Sample::new(TIME_2 + OFFSET_1, TIME_2, STD_DEV_1), config);
+        let mut filter = KalmanFilter::new(
+            &Sample::new(
+                zx::SyntheticTime::from_nanos((TIME_2 + OFFSET_1).into_nanos()),
+                TIME_2,
+                STD_DEV_1,
+            ),
+            config,
+        );
         assert_near!(filter.estimate_0, 0.0, 1.0);
-        assert!(filter.update(&Sample::new(TIME_1 + OFFSET_1, TIME_1, STD_DEV_1)).is_err());
+        assert!(filter
+            .update(&Sample::new(
+                zx::SyntheticTime::from_nanos((TIME_1 + OFFSET_1).into_nanos()),
+                TIME_1,
+                STD_DEV_1
+            ))
+            .is_err());
         assert_near!(filter.estimate_0, 0.0, 1.0);
     }
 }
