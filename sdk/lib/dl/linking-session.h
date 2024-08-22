@@ -27,6 +27,147 @@ class SessionModule;
 template <class Loader>
 using SessionModuleList = fbl::DoublyLinkedList<std::unique_ptr<SessionModule<Loader>>>;
 
+// TODO(https://fxbug.dev/333573264): Talk about how previously-loaded modules
+// that happen to be a dependency in this dlopen session are represented in
+// these lists.
+// Load the root module and all its dependencies, constructing two lists of
+// module data structures in the process:
+// - List of RuntimeModules: This is the list of permanent module data
+//   structures that will eventually be installed in the runtime dynamic
+//   linker's module list and managed by the runtime dynamic linker.
+// - List of SessionModules: This is the list of temporary load module data
+//   structures needed to perform loading, decoding, relocations, etc. The
+//   elements in this list live only as long as the current dlopen session.
+// The `retrieve_file` argument is a callable passed down from `Open` and is
+// invoked to retrieve the module's file from the file system for processing.
+template <class Loader, typename RetrieveFile>
+std::pair<ModuleList, SessionModuleList<Loader>> Load(Diagnostics& diag, Soname soname,
+                                                      RetrieveFile&& retrieve_file,
+                                                      const ModuleList& loaded_modules) {
+  static_assert(std::is_invocable_v<RetrieveFile, Diagnostics&, std::string_view>);
+
+  SessionModuleList<Loader> session_modules;
+  ModuleList runtime_modules;
+
+  // The root module will always be the first module in the list.
+  if (!EnqueueModule(diag, soname, runtime_modules, session_modules, loaded_modules)) {
+    return {};
+  }
+
+  // This lambda will retrieve the module's file, load the module into the
+  // system image, and then create new modules for each of its dependencies
+  // to enqueue onto session_modules list for future processing. A
+  // fit::result<bool> is returned to the caller where the boolean indicates
+  // if the file was found, so that the caller can handle the "not-found"
+  // error case.
+  auto load_and_enqueue_deps = [&](auto& module) -> fit::result<bool> {
+    auto file = retrieve_file(diag, module.name().str());
+    if (file.is_error()) [[unlikely]] {
+      // Check if the error is a not-found error or a system error.
+      if (auto error = file.error_value()) {
+        // If a general system error occurred, emit the error for the module.
+        diag.SystemError("cannot open ", module.name().str(), ": ", *error);
+        return fit::error(false);
+      }
+      // A "not-found" error occurred, and the caller is responsible for
+      // emitting the error message for the module.
+      return fit::error(true);
+    }
+
+    if (auto result = module.Load(diag, *std::move(file))) {
+      // Create a module for each dependency from the SessionModule.Load result
+      // and enqueue it onto `session_modules` to be processed and loaded in the
+      // future.
+      auto enqueue_dep = [&diag, &runtime_modules, &session_modules,
+                          &loaded_modules](const Soname& name) {
+        return EnqueueModule(diag, name, runtime_modules, session_modules, loaded_modules);
+      };
+      if (std::all_of(std::begin(*result), std::end(*result), enqueue_dep)) {
+        return fit::ok();
+      }
+    }
+
+    return fit::error(false);
+  };
+
+  // Load the root module and enqueue all its dependencies.
+  if (auto result = load_and_enqueue_deps(session_modules.front()); result.is_error()) {
+    if (result.error_value()) {
+      diag.SystemError(soname.str(), " not found");
+    }
+    return {};
+  }
+
+  // Proceed to load and enqueue the root module's dependencies and their
+  // dependencies in a breadth-first order.
+  for (auto it = std::next(session_modules.begin()); it != session_modules.end(); it++) {
+    if (auto result = load_and_enqueue_deps(*it); result.is_error()) {
+      if (result.error_value()) {
+        // TODO(https://fxbug.dev/336633049): harmonize this error message
+        // with musl, which appends a "(needed by <depending module>)" to the
+        // message.
+        diag.MissingDependency(it->name().str());
+      }
+      return {};
+    }
+  }
+
+  return std::make_pair(std::move(runtime_modules), std::move(session_modules));
+}
+
+// Create new Module and SessionModule data structures for `soname` and
+// enqueue these data structures to the `runtime_modules` and `session_modules` list.
+template <class Loader>
+bool EnqueueModule(Diagnostics& diag, Soname soname, ModuleList& runtime_modules,
+                   SessionModuleList<Loader>& session_modules, const ModuleList& loaded_modules) {
+  if (std::find(session_modules.begin(), session_modules.end(), soname) != session_modules.end()) {
+    // The module was already added to the session_modules list in this dlopen
+    // session.
+    return true;
+  }
+
+  // TODO(https://fxbug.dev/333573264): Check if the module was already
+  // loaded by a previous dlopen call or at startup and use that reference
+  // instead.
+
+  // TODO(https://fxbug.dev/338229987): This is just to make sure we're not
+  // exercising deps from modules already loaded yet.
+  assert(std::find(loaded_modules.begin(), loaded_modules.end(), soname) == loaded_modules.end());
+
+  fbl::AllocChecker module_ac;
+  auto module = RuntimeModule::Create(module_ac, soname);
+  if (!module_ac.check()) [[unlikely]] {
+    diag.OutOfMemory("permanent module data structure", sizeof(RuntimeModule));
+    return false;
+  }
+  fbl::AllocChecker session_module_ac;
+  auto session_module = SessionModule<Loader>::Create(session_module_ac, *module);
+  if (!session_module_ac.check()) [[unlikely]] {
+    diag.OutOfMemory("temporary module data structure", sizeof(SessionModule<Loader>));
+    return false;
+  }
+
+  runtime_modules.push_back(std::move(module));
+  session_modules.push_back(std::move(session_module));
+
+  return true;
+}
+
+// TODO(https://fxbug.dev/324136831): Include global modules.
+// Perform relocations on all pending modules to be loaded. Return a boolean
+// if relocations succeeded on all modules.
+template <class Loader>
+bool Relocate(Diagnostics& diag, SessionModuleList<Loader>& session_modules) {
+  auto relocate_and_relro = [&](auto& session_module) -> bool {
+    // TODO(https://fxbug.dev/339662473): this doesn't use the root module's
+    // name in the scoped diagnostics. Add test for missing transitive symbol
+    // and make sure the correct name is used in the error message.
+    ld::ScopedModuleDiagnostics root_module_diag{diag, session_module.name().str()};
+    return session_module.Relocate(diag, session_modules) && session_module.ProtectRelro(diag);
+  };
+  return std::all_of(std::begin(session_modules), std::end(session_modules), relocate_and_relro);
+}
+
 template <class Loader>
 class SessionModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
                       public fbl::DoublyLinkedListable<std::unique_ptr<SessionModule<Loader>>> {
