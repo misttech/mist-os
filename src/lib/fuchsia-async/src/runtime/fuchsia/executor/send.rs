@@ -7,6 +7,7 @@ use super::common::{with_local_timer_heap, Executor, ExecutorTime};
 use super::scope::ScopeRef;
 use crate::atomic_future::AtomicFuture;
 use fuchsia_sync::{Condvar, Mutex};
+use fuchsia_zircon as zx;
 use futures::FutureExt;
 use std::future::Future;
 use std::sync::atomic::Ordering;
@@ -53,6 +54,11 @@ impl SendExecutor {
         let root_scope = ScopeRef::root(inner.clone());
         Executor::set_local(root_scope.clone(), TimerHeap::default());
         Self { inner, root_scope, threads: Vec::default() }
+    }
+
+    /// Get a reference to the Fuchsia `zx::Port` being used to listen for events.
+    pub fn port(&self) -> &zx::Port {
+        &self.inner.port
     }
 
     /// Run `future` to completion, using this thread and `num_threads` workers in a pool to

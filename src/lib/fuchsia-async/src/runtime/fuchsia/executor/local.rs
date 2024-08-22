@@ -7,6 +7,7 @@ use super::common::{with_local_timer_heap, EHandle, Executor, ExecutorTime, MAIN
 use super::scope::ScopeRef;
 use super::time::Time;
 use crate::atomic_future::AtomicFuture;
+use fuchsia_zircon as zx;
 use futures::future::{self, Either};
 use futures::task::AtomicWaker;
 use std::fmt;
@@ -49,6 +50,11 @@ impl LocalExecutor {
         let root_scope = ScopeRef::root(inner.clone());
         Executor::set_local(root_scope.clone(), TimerHeap::default());
         Self { ehandle: EHandle { root_scope } }
+    }
+
+    /// Get a reference to the Fuchsia `zx::Port` being used to listen for events.
+    pub fn port(&self) -> &zx::Port {
+        self.ehandle.port()
     }
 
     /// Run a single future to completion on a single thread, also polling other active tasks.
@@ -137,6 +143,11 @@ impl TestExecutor {
     /// Create a new executor for testing.
     pub fn new() -> Self {
         Self { local: LocalExecutor::new() }
+    }
+
+    /// Get a reference to the Fuchsia `zx::Port` being used to listen for events.
+    pub fn port(&self) -> &zx::Port {
+        self.local.port()
     }
 
     /// Create a new single-threaded executor running with fake time.
