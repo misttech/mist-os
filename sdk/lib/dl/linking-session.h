@@ -95,23 +95,20 @@ class LinkingSession {
       return fit::error(false);
     };
 
-    // Load the root module and enqueue all its dependencies.
-    if (auto result = load_and_enqueue_deps(session_modules_.front()); result.is_error()) {
-      if (result.error_value()) {
-        diag.SystemError(soname.str(), " not found");
-      }
-      return false;
-    }
-
     // Proceed to load and enqueue the root module's dependencies and their
     // dependencies in a breadth-first order.
-    for (auto it = std::next(session_modules_.begin()); it != session_modules_.end(); it++) {
+    for (auto it = session_modules_.begin(); it != session_modules_.end(); ++it) {
       if (auto result = load_and_enqueue_deps(*it); result.is_error()) {
+        // If fit::error{true} is returned, this is a not-found error.
         if (result.error_value()) {
-          // TODO(https://fxbug.dev/336633049): harmonize this error message
-          // with musl, which appends a "(needed by <depending module>)" to the
-          // message.
-          diag.MissingDependency(it->name().str());
+          if (it == session_modules_.begin()) {
+            diag.SystemError(it->name().str(), " not found");
+          } else {
+            // TODO(https://fxbug.dev/336633049): harmonize this error message
+            // with musl, which appends a "(needed by <depending module>)" to the
+            // message.
+            diag.MissingDependency(it->name().str());
+          }
         }
         return false;
       }
@@ -291,11 +288,11 @@ class LinkingSession<Loader>::SessionModule
   }
 
   // Perform relative and symbolic relocations, resolving symbols from the
-  // list of modules as needed.
-  bool Relocate(Diagnostics& diag, SessionModuleList& session_modules) {
+  // ordered list of modules as needed.
+  bool Relocate(Diagnostics& diag, const SessionModuleList& ordered_modules) {
     constexpr NoTlsDesc kNoTlsDesc{};
     auto memory = ld::ModuleMemory{module()};
-    auto resolver = elfldltl::MakeSymbolResolver(*this, session_modules, diag, kNoTlsDesc);
+    auto resolver = elfldltl::MakeSymbolResolver(*this, ordered_modules, diag, kNoTlsDesc);
     return elfldltl::RelocateRelative(diag, memory, reloc_info(), load_bias()) &&
            elfldltl::RelocateSymbolic(memory, diag, reloc_info(), symbol_info(), load_bias(),
                                       resolver);
