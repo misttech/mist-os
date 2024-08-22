@@ -4,26 +4,28 @@
 
 #include "src/ui/tests/conformance_input_tests/conformance-test-base.h"
 
+#include <lib/component/incoming/cpp/protocol.h>
+
+#include <utility>
+
 namespace ui_conformance_test_base {
 
 void ConformanceTest::SetUp() {
-  {
-    context_ = sys::ComponentContext::Create();
-    ASSERT_EQ(context_->svc()->Connect(realm_factory_.NewRequest()), ZX_OK);
+  auto factory_connect = component::Connect<fuchsia_ui_test_context::RealmFactory>();
+  ZX_ASSERT_OK(factory_connect);
+  realm_factory_ = fidl::SyncClient(std::move(factory_connect.value()));
 
-    fuchsia::ui::test::context::RealmFactoryCreateRealmRequest req;
-    fuchsia::ui::test::context::RealmFactory_CreateRealm_Result res;
+  auto [proxy_client_end, proxy_server_end] =
+      fidl::Endpoints<fuchsia_testing_harness::RealmProxy>::Create();
 
-    req.set_realm_server(realm_proxy_.NewRequest());
-    req.set_display_rotation(DisplayRotation());
-    req.set_device_pixel_ratio(DevicePixelRatio());
+  fuchsia_ui_test_context::RealmFactoryCreateRealmRequest req;
+  req.realm_server(std::move(proxy_server_end));
+  req.display_rotation(DisplayRotation());
+  req.device_pixel_ratio(DevicePixelRatio());
 
-    ASSERT_EQ(realm_factory_->CreateRealm(std::move(req), &res), ZX_OK);
-  }
-}
+  ZX_ASSERT_OK(realm_factory_->CreateRealm(std::move(req)));
 
-const std::shared_ptr<sys::ServiceDirectory>& ConformanceTest::LocalServiceDirectory() const {
-  return context_->svc();
+  realm_proxy_ = fidl::SyncClient(std::move(proxy_client_end));
 }
 
 uint32_t ConformanceTest::DisplayRotation() const { return 0; }

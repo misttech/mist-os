@@ -5,21 +5,17 @@
 #ifndef SRC_UI_TESTS_CONFORMANCE_INPUT_TESTS_CONFORMANCE_TEST_BASE_H_
 #define SRC_UI_TESTS_CONFORMANCE_INPUT_TESTS_CONFORMANCE_TEST_BASE_H_
 
-#include <fuchsia/testing/harness/cpp/fidl.h>
-#include <fuchsia/ui/test/context/cpp/fidl.h>
-#include <lib/fidl/cpp/interface_handle.h>
-#include <lib/fidl/cpp/synchronous_interface_ptr.h>
-#include <lib/sys/cpp/component_context.h>
-#include <lib/sys/cpp/service_directory.h>
+#include <fidl/fuchsia.testing.harness/cpp/fidl.h>
+#include <fidl/fuchsia.ui.test.context/cpp/fidl.h>
+#include <lib/fidl/cpp/channel.h>
+#include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
 
-#include <cstdint>
-#include <cstdlib>
-#include <iostream>
-
+#include <src/ui/testing/util/fidl_cpp_helpers.h>
+#include <src/ui/testing/util/logging_event_loop.h>
 #include <zxtest/zxtest.h>
 
-#include "src/ui/testing/util/logging_event_loop.h"
+#include "lib/fidl/cpp/wire/internal/transport_channel.h"
 
 namespace ui_conformance_test_base {
 
@@ -32,8 +28,6 @@ class ConformanceTest : public zxtest::Test, public ui_testing::LoggingEventLoop
   /// SetUp connect test realm so test can use realm_proxy_ to access.
   void SetUp() override;
 
-  const std::shared_ptr<sys::ServiceDirectory>& LocalServiceDirectory() const;
-
   /// Override DisplayRotation() to provide display_rotation to test realm.
   /// By default, it returns 0.
   virtual uint32_t DisplayRotation() const;
@@ -42,27 +36,31 @@ class ConformanceTest : public zxtest::Test, public ui_testing::LoggingEventLoop
   /// By default, it returns 1.0.
   virtual float DevicePixelRatio() const;
 
-  /// Connect to the FIDL protocol which served from the realm proxy use default served path if no
-  /// name passed in.
-  template <typename Interface>
-  fidl::SynchronousInterfacePtr<Interface> ConnectSyncIntoRealm(
-      const std::string& service_path = Interface::Name_) {
-    fidl::SynchronousInterfacePtr<Interface> ptr;
+  /// ClientEnd connect to the FIDL protocol which served from the realm proxy
+  /// use default served path if no name passed in.
+  template <typename Protocol>
+  fidl::ClientEnd<Protocol> ConnectIntoRealm(
+      const std::string& service_path = fidl::DiscoverableProtocolName<Protocol>) {
+    auto [client_end, server_end] = fidl::Endpoints<Protocol>::Create();
 
-    fuchsia::testing::harness::RealmProxy_ConnectToNamedProtocol_Result result;
-    if (realm_proxy_->ConnectToNamedProtocol(service_path, ptr.NewRequest().TakeChannel(),
-                                             &result) != ZX_OK) {
-      std::cerr << "ConnectToNamedProtocol(" << service_path << ", " << Interface::Name_
-                << ") failed." << std::endl;
-      std::abort();
-    }
-    return std::move(ptr);
+    ZX_ASSERT_OK(realm_proxy_->ConnectToNamedProtocol(
+        fuchsia_testing_harness::RealmProxyConnectToNamedProtocolRequest(
+            service_path, server_end.TakeChannel())));
+
+    return std::move(client_end);
+  }
+
+  /// SyncClient connect to the FIDL protocol which served from the realm proxy
+  /// use default served path if no name passed in.
+  template <typename Protocol>
+  fidl::SyncClient<Protocol> ConnectSyncIntoRealm(
+      const std::string& service_path = fidl::DiscoverableProtocolName<Protocol>) {
+    return fidl::SyncClient(ConnectIntoRealm<Protocol>(service_path));
   }
 
  private:
-  fuchsia::ui::test::context::RealmFactorySyncPtr realm_factory_;
-  fuchsia::testing::harness::RealmProxySyncPtr realm_proxy_;
-  std::unique_ptr<sys::ComponentContext> context_;
+  fidl::SyncClient<fuchsia_ui_test_context::RealmFactory> realm_factory_;
+  fidl::SyncClient<fuchsia_testing_harness::RealmProxy> realm_proxy_;
 };
 
 }  // namespace ui_conformance_test_base
