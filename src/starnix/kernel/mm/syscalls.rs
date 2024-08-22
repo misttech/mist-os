@@ -424,10 +424,12 @@ fn do_futex<Key: FutexKey>(
     };
     let read_deadline = |current_task: &CurrentTask| {
         let timespec = read_timespec(current_task)?;
-        let mut deadline = time_from_timespec(timespec)?;
+        let mut deadline = time_from_timespec::<zx::MonotonicTimeline>(timespec)?;
         if is_realtime {
             track_stub!(TODO("https://fxbug.dev/356912301"), "FUTEX_CLOCK_REALTIME deadline");
-            deadline = crate::time::utc::estimate_monotonic_deadline_from_utc(deadline);
+            deadline = crate::time::utc::estimate_monotonic_deadline_from_utc(
+                zx::SyntheticTime::from_nanos(deadline.into_nanos()),
+            );
         };
         Ok(deadline)
     };

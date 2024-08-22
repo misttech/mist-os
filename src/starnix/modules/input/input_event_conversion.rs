@@ -826,7 +826,7 @@ impl LinuxKeyboardEventParser {
         };
 
         Ok(Some(fir::InputReport {
-            event_time: Some(time_from_timeval(e.time)?.into_nanos()),
+            event_time: Some(time_from_timeval::<zx::MonotonicTimeline>(e.time)?.into_nanos()),
             keyboard: Some(keyboard_report),
             ..Default::default()
         }))

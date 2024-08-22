@@ -802,11 +802,11 @@ mod inspect_tests {
             root: {
                 "repo-node": {
                     merkles_successfully_resolved_count: 1u64,
-                    last_merkle_successfully_resolved_time: "Some(Time(0))",
+                    last_merkle_successfully_resolved_time: "Some(Time<MonotonicTimeline>(0))",
                     "updating_tuf_client": {
                         update_check_success_count: 1u64,
                         update_check_failure_count: 0u64,
-                        last_update_successfully_checked_time: "Some(Time(0))",
+                        last_update_successfully_checked_time: "Some(Time<MonotonicTimeline>(0))",
                         updated_count: 1u64,
                         root_version: 1u64,
                         timestamp_version: 2i64,
@@ -873,7 +873,7 @@ mod inspect_tests {
                     "updating_tuf_client": {
                         update_check_success_count: 1u64,
                         update_check_failure_count: 0u64,
-                        last_update_successfully_checked_time: "Some(Time(0))",
+                        last_update_successfully_checked_time: "Some(Time<MonotonicTimeline>(0))",
                         updated_count: 1u64,
                         root_version: 1u64,
                         timestamp_version: 2i64,

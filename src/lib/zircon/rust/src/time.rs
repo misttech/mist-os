@@ -4,30 +4,61 @@
 
 //! Type-safe bindings for Zircon timer objects.
 
-// TODO(https://fxbug.dev/360952805) replace with aliases to generic types
-pub type MonotonicTime = Time;
-pub type SyntheticTime = Time;
-
 use crate::{ok, AsHandleRef, Handle, HandleBased, HandleRef, Status};
 use fuchsia_zircon_sys as sys;
+use std::cmp::{Eq, Ord, PartialEq, PartialOrd};
+use std::hash::{Hash, Hasher};
 use std::{ops, time as stdtime};
 
-#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub type MonotonicTime = Time<MonotonicTimeline>;
+pub type SyntheticTime = Time<SyntheticTimeline>;
+
+#[derive(Default, Copy, Clone)]
 #[repr(transparent)]
-pub struct Time(sys::zx_time_t);
+pub struct Time<T>(sys::zx_time_t, std::marker::PhantomData<T>);
 
-impl Time {
-    pub const INFINITE: Time = Time(sys::ZX_TIME_INFINITE);
-    pub const INFINITE_PAST: Time = Time(sys::ZX_TIME_INFINITE_PAST);
-    pub const ZERO: Time = Time(0);
+impl<T: Timeline> Hash for Time<T> {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.hash(state);
+    }
+}
 
+impl<T: Timeline> PartialEq for Time<T> {
+    fn eq(&self, other: &Self) -> bool {
+        self.0 == other.0
+    }
+}
+impl<T: Timeline> Eq for Time<T> {}
+
+impl<T: Timeline> PartialOrd for Time<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.0.partial_cmp(&other.0)
+    }
+}
+impl<T: Timeline> Ord for Time<T> {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.0.cmp(&other.0)
+    }
+}
+
+impl<T> std::fmt::Debug for Time<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Avoid line noise from the marker type but do include the timeline in the output.
+        let timeline_name = std::any::type_name::<T>();
+        let short_timeline_name =
+            timeline_name.rsplit_once("::").map(|(_, n)| n).unwrap_or(timeline_name);
+        f.debug_tuple(&format!("Time<{short_timeline_name}>")).field(&self.0).finish()
+    }
+}
+
+impl MonotonicTime {
     /// Get the current monotonic time.
     ///
     /// Wraps the
     /// [zx_clock_get_monotonic](https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_get_monotonic.md)
     /// syscall.
-    pub fn get_monotonic() -> Time {
-        unsafe { Time(sys::zx_clock_get_monotonic()) }
+    pub fn get_monotonic() -> Self {
+        unsafe { Self::from_nanos(sys::zx_clock_get_monotonic()) }
     }
 
     /// Compute a deadline for the time in the future that is the given `Duration` away.
@@ -35,8 +66,8 @@ impl Time {
     /// Wraps the
     /// [zx_deadline_after](https://fuchsia.dev/fuchsia-src/reference/syscalls/deadline_after.md)
     /// syscall.
-    pub fn after(duration: Duration) -> Time {
-        unsafe { Time(sys::zx_deadline_after(duration.0)) }
+    pub fn after(duration: Duration) -> Self {
+        unsafe { Self::from_nanos(sys::zx_deadline_after(duration.0)) }
     }
 
     /// Sleep until the given time.
@@ -49,6 +80,12 @@ impl Time {
             sys::zx_nanosleep(self.0);
         }
     }
+}
+
+impl<T: Timeline> Time<T> {
+    pub const INFINITE: Time<T> = Time(sys::ZX_TIME_INFINITE, std::marker::PhantomData);
+    pub const INFINITE_PAST: Time<T> = Time(sys::ZX_TIME_INFINITE_PAST, std::marker::PhantomData);
+    pub const ZERO: Time<T> = Time(0, std::marker::PhantomData);
 
     /// Returns the number of nanoseconds since the epoch contained by this `Time`.
     pub const fn into_nanos(self) -> i64 {
@@ -56,42 +93,53 @@ impl Time {
     }
 
     pub const fn from_nanos(nanos: i64) -> Self {
-        Time(nanos)
+        Time(nanos, std::marker::PhantomData)
     }
 }
 
-impl ops::Add<Duration> for Time {
-    type Output = Time;
-    fn add(self, dur: Duration) -> Time {
+impl<T: Timeline> ops::Add<Duration> for Time<T> {
+    type Output = Time<T>;
+    fn add(self, dur: Duration) -> Self::Output {
         Time::from_nanos(dur.into_nanos().saturating_add(self.into_nanos()))
     }
 }
 
-impl ops::Sub<Duration> for Time {
-    type Output = Time;
-    fn sub(self, dur: Duration) -> Time {
+impl<T: Timeline> ops::Sub<Duration> for Time<T> {
+    type Output = Time<T>;
+    fn sub(self, dur: Duration) -> Self::Output {
         Time::from_nanos(self.into_nanos().saturating_sub(dur.into_nanos()))
     }
 }
 
-impl ops::Sub<Time> for Time {
+impl<T: Timeline> ops::Sub<Time<T>> for Time<T> {
     type Output = Duration;
-    fn sub(self, other: Time) -> Duration {
+    fn sub(self, other: Time<T>) -> Self::Output {
         Duration::from_nanos(self.into_nanos().saturating_sub(other.into_nanos()))
     }
 }
 
-impl ops::AddAssign<Duration> for Time {
+impl<T: Timeline> ops::AddAssign<Duration> for Time<T> {
     fn add_assign(&mut self, dur: Duration) {
         self.0 = self.0.saturating_add(dur.into_nanos());
     }
 }
 
-impl ops::SubAssign<Duration> for Time {
+impl<T: Timeline> ops::SubAssign<Duration> for Time<T> {
     fn sub_assign(&mut self, dur: Duration) {
         self.0 = self.0.saturating_sub(dur.into_nanos());
     }
 }
+
+/// A marker trait for times to prevent accidental comparison between different timelines.
+pub trait Timeline {}
+
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct MonotonicTimeline;
+impl Timeline for MonotonicTimeline {}
+
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct SyntheticTimeline;
+impl Timeline for SyntheticTimeline {}
 
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(transparent)]
@@ -104,9 +152,9 @@ impl From<stdtime::Duration> for Duration {
     }
 }
 
-impl ops::Add<Time> for Duration {
-    type Output = Time;
-    fn add(self, time: Time) -> Time {
+impl<T: Timeline> ops::Add<Time<T>> for Duration {
+    type Output = Time<T>;
+    fn add(self, time: Time<T>) -> Self::Output {
         Time::from_nanos(self.into_nanos().saturating_add(time.into_nanos()))
     }
 }
@@ -372,7 +420,7 @@ impl Timer {
     /// Start a one-shot timer that will fire when `deadline` passes. Wraps the
     /// [zx_timer_set](https://fuchsia.dev/fuchsia-src/reference/syscalls/timer_set.md)
     /// syscall.
-    pub fn set(&self, deadline: Time, slack: Duration) -> Result<(), Status> {
+    pub fn set(&self, deadline: MonotonicTime, slack: Duration) -> Result<(), Status> {
         let status = unsafe {
             sys::zx_timer_set(self.raw_handle(), deadline.into_nanos(), slack.into_nanos())
         };
@@ -392,6 +440,12 @@ impl Timer {
 mod tests {
     use super::*;
     use crate::Signals;
+
+    #[test]
+    fn time_debug_repr_is_short() {
+        assert_eq!(format!("{:?}", MonotonicTime::from_nanos(0)), "Time<MonotonicTimeline>(0)");
+        assert_eq!(format!("{:?}", SyntheticTime::from_nanos(0)), "Time<SyntheticTimeline>(0)");
+    }
 
     #[test]
     fn monotonic_time_increases() {
@@ -481,55 +535,70 @@ mod tests {
 
     #[test]
     fn time_minus_time() {
-        let lhs = Time::from_nanos(10);
-        let rhs = Time::from_nanos(30);
+        let lhs = MonotonicTime::from_nanos(10);
+        let rhs = MonotonicTime::from_nanos(30);
         assert_eq!(lhs - rhs, Duration::from_nanos(-20));
     }
 
     #[test]
     fn time_saturation() {
         // Addition
-        assert_eq!(Time::from_nanos(10) + Duration::from_nanos(30), Time::from_nanos(40));
-        assert_eq!(Time::from_nanos(10) + Duration::INFINITE, Time::INFINITE);
-        assert_eq!(Time::from_nanos(-10) + Duration::INFINITE_PAST, Time::INFINITE_PAST);
+        assert_eq!(
+            MonotonicTime::from_nanos(10) + Duration::from_nanos(30),
+            MonotonicTime::from_nanos(40)
+        );
+        assert_eq!(MonotonicTime::from_nanos(10) + Duration::INFINITE, MonotonicTime::INFINITE);
+        assert_eq!(
+            MonotonicTime::from_nanos(-10) + Duration::INFINITE_PAST,
+            MonotonicTime::INFINITE_PAST
+        );
 
         // Subtraction
-        assert_eq!(Time::from_nanos(10) - Duration::from_nanos(30), Time::from_nanos(-20));
-        assert_eq!(Time::from_nanos(-10) - Duration::INFINITE, Time::INFINITE_PAST);
-        assert_eq!(Time::from_nanos(10) - Duration::INFINITE_PAST, Time::INFINITE);
+        assert_eq!(
+            MonotonicTime::from_nanos(10) - Duration::from_nanos(30),
+            MonotonicTime::from_nanos(-20)
+        );
+        assert_eq!(
+            MonotonicTime::from_nanos(-10) - Duration::INFINITE,
+            MonotonicTime::INFINITE_PAST
+        );
+        assert_eq!(
+            MonotonicTime::from_nanos(10) - Duration::INFINITE_PAST,
+            MonotonicTime::INFINITE
+        );
 
         // Assigning addition
         {
-            let mut t = Time::from_nanos(10);
+            let mut t = MonotonicTime::from_nanos(10);
             t += Duration::from_nanos(30);
-            assert_eq!(t, Time::from_nanos(40));
+            assert_eq!(t, MonotonicTime::from_nanos(40));
         }
         {
-            let mut t = Time::from_nanos(10);
+            let mut t = MonotonicTime::from_nanos(10);
             t += Duration::INFINITE;
-            assert_eq!(t, Time::INFINITE);
+            assert_eq!(t, MonotonicTime::INFINITE);
         }
         {
-            let mut t = Time::from_nanos(-10);
+            let mut t = MonotonicTime::from_nanos(-10);
             t += Duration::INFINITE_PAST;
-            assert_eq!(t, Time::INFINITE_PAST);
+            assert_eq!(t, MonotonicTime::INFINITE_PAST);
         }
 
         // Assigning subtraction
         {
-            let mut t = Time::from_nanos(10);
+            let mut t = MonotonicTime::from_nanos(10);
             t -= Duration::from_nanos(30);
-            assert_eq!(t, Time::from_nanos(-20));
+            assert_eq!(t, MonotonicTime::from_nanos(-20));
         }
         {
-            let mut t = Time::from_nanos(-10);
+            let mut t = MonotonicTime::from_nanos(-10);
             t -= Duration::INFINITE;
-            assert_eq!(t, Time::INFINITE_PAST);
+            assert_eq!(t, MonotonicTime::INFINITE_PAST);
         }
         {
-            let mut t = Time::from_nanos(10);
+            let mut t = MonotonicTime::from_nanos(10);
             t -= Duration::INFINITE_PAST;
-            assert_eq!(t, Time::INFINITE);
+            assert_eq!(t, MonotonicTime::INFINITE);
         }
     }
 
@@ -595,12 +664,12 @@ mod tests {
 
     #[test]
     fn time_minus_time_saturates() {
-        assert_eq!(Time::INFINITE - Time::INFINITE_PAST, Duration::INFINITE);
+        assert_eq!(MonotonicTime::INFINITE - MonotonicTime::INFINITE_PAST, Duration::INFINITE);
     }
 
     #[test]
     fn time_and_duration_defaults() {
-        assert_eq!(Time::default(), Time::from_nanos(0));
+        assert_eq!(MonotonicTime::default(), MonotonicTime::from_nanos(0));
         assert_eq!(Duration::default(), Duration::from_nanos(0));
     }
 }

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::diagnostics::{Diagnostics, Event, ANY_DURATION, ANY_TIME};
+use crate::diagnostics::{any_time, Diagnostics, Event, ANY_DURATION};
 use fuchsia_sync::Mutex;
 use fuchsia_zircon as zx;
 
@@ -19,13 +19,13 @@ impl FakeDiagnostics {
     }
 
     /// Panics if the supplied slice does not match the received events. When present in
-    /// expected, the special values ANY_TIME and ANY_DURATION will match any received value.
+    /// expected, the special values any_time() and ANY_DURATION will match any received value.
     pub fn assert_events(&self, expected: &[Event]) {
         self.assert_events_with_len(0, expected);
     }
 
     /// Panics if the supplied slice is not the prefix of the received events. When present in
-    /// expected, the special values ANY_TIME and ANY_DURATION will match any received value.
+    /// expected, the special values any_time() and ANY_DURATION will match any received value.
     /// See [assert_events] for details.
     pub fn assert_events_prefix(&self, expected: &[Event]) {
         self.assert_events_with_len(expected.len(), expected);
@@ -75,9 +75,9 @@ impl EqWithAny for zx::Duration {
     }
 }
 
-impl EqWithAny for zx::Time {
+impl<T: zx::Timeline> EqWithAny for zx::Time<T> {
     fn eq_with_any(&self, other: &Self) -> bool {
-        *self == ANY_TIME || self == other
+        self == &any_time::<T>() || self == other
     }
 }
 
@@ -186,7 +186,7 @@ mod test {
 
         diagnostics.assert_events(&[Event::KalmanFilterUpdated {
             track: Track::Monitor,
-            monotonic: ANY_TIME,
+            monotonic: any_time(),
             utc: zx::SyntheticTime::from_nanos(2345_000_000_000),
             sqrt_covariance: zx::Duration::from_millis(321),
         }]);
@@ -194,7 +194,7 @@ mod test {
         diagnostics.assert_events(&[Event::KalmanFilterUpdated {
             track: Track::Monitor,
             monotonic: zx::MonotonicTime::from_nanos(1234_000_000_000),
-            utc: ANY_TIME,
+            utc: any_time(),
             sqrt_covariance: zx::Duration::from_millis(321),
         }]);
 
@@ -207,8 +207,8 @@ mod test {
 
         diagnostics.assert_events(&[Event::KalmanFilterUpdated {
             track: Track::Monitor,
-            monotonic: ANY_TIME,
-            utc: ANY_TIME,
+            monotonic: any_time(),
+            utc: any_time(),
             sqrt_covariance: ANY_DURATION,
         }]);
     }

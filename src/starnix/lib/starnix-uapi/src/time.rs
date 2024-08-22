@@ -20,7 +20,7 @@ pub const SCHEDULER_CLOCK_HZ: i64 = 100;
 const_assert_eq!(NANOS_PER_SECOND % SCHEDULER_CLOCK_HZ, 0);
 const NANOS_PER_SCHEDULER_TICK: i64 = NANOS_PER_SECOND / SCHEDULER_CLOCK_HZ;
 
-pub fn timeval_from_time(time: zx::Time) -> timeval {
+pub fn timeval_from_time<T: zx::Timeline>(time: zx::Time<T>) -> timeval {
     let nanos = time.into_nanos();
     timeval { tv_sec: nanos / NANOS_PER_SECOND, tv_usec: (nanos % NANOS_PER_SECOND) / 1000 }
 }
@@ -30,7 +30,7 @@ pub fn timeval_from_duration(duration: zx::Duration) -> timeval {
     timeval { tv_sec: nanos / NANOS_PER_SECOND, tv_usec: (nanos % NANOS_PER_SECOND) / 1000 }
 }
 
-pub fn timespec_from_time(time: zx::Time) -> timespec {
+pub fn timespec_from_time<T: zx::Timeline>(time: zx::Time<T>) -> timespec {
     let nanos = time.into_nanos();
     timespec { tv_sec: nanos / NANOS_PER_SECOND, tv_nsec: nanos % NANOS_PER_SECOND }
 }
@@ -80,7 +80,7 @@ pub fn timespec_from_timeval(tv: timeval) -> timespec {
     timespec { tv_sec: tv.tv_sec, tv_nsec: tv.tv_usec * 1000 }
 }
 
-pub fn time_from_timeval(tv: timeval) -> Result<zx::Time, Errno> {
+pub fn time_from_timeval<T: zx::Timeline>(tv: timeval) -> Result<zx::Time<T>, Errno> {
     let duration = duration_from_timeval(tv)?;
     if duration.into_nanos() < 0 {
         error!(EINVAL)
@@ -89,9 +89,9 @@ pub fn time_from_timeval(tv: timeval) -> Result<zx::Time, Errno> {
     }
 }
 
-/// Returns a `zx::Time` for the given `timespec`, treating the `timespec` as an absolute point in
-/// time (i.e., not relative to "now").
-pub fn time_from_timespec(ts: timespec) -> Result<zx::Time, Errno> {
+/// Returns a `zx::SyntheticTime` for the given `timespec`, treating the `timespec` as an absolute
+/// point in time (i.e., not relative to "now").
+pub fn time_from_timespec<T: zx::Timeline>(ts: timespec) -> Result<zx::Time<T>, Errno> {
     let duration = duration_from_timespec(ts)?;
     Ok(zx::Time::ZERO + duration)
 }
@@ -101,7 +101,10 @@ pub fn timespec_is_zero(ts: timespec) -> bool {
 }
 
 /// Returns an `itimerspec` with `it_value` set to `deadline` and `it_interval` set to `interval`.
-pub fn itimerspec_from_deadline_interval(deadline: zx::Time, interval: zx::Duration) -> itimerspec {
+pub fn itimerspec_from_deadline_interval<T: zx::Timeline>(
+    deadline: zx::Time<T>,
+    interval: zx::Duration,
+) -> itimerspec {
     itimerspec {
         it_interval: timespec_from_duration(interval),
         it_value: timespec_from_time(deadline),
@@ -131,38 +134,40 @@ mod test {
     #[::fuchsia::test]
     fn test_time_from_timespec() {
         let time_spec = timespec { tv_sec: 100, tv_nsec: 100 };
-        let time = time_from_timespec(time_spec).expect("failed to create time from time spec");
+        let time: zx::MonotonicTime =
+            time_from_timespec(time_spec).expect("failed to create time from time spec");
         assert_eq!(time.into_nanos(), 100 * NANOS_PER_SECOND + 100);
     }
 
     #[::fuchsia::test]
     fn test_invalid_time_from_timespec() {
         let time_spec = timespec { tv_sec: 100, tv_nsec: NANOS_PER_SECOND * 2 };
-        assert_eq!(time_from_timespec(time_spec), error!(EINVAL));
+        assert_eq!(time_from_timespec::<zx::MonotonicTimeline>(time_spec), error!(EINVAL));
 
         let time_spec = timespec { tv_sec: 1, tv_nsec: -1 };
-        assert_eq!(time_from_timespec(time_spec), error!(EINVAL));
+        assert_eq!(time_from_timespec::<zx::MonotonicTimeline>(time_spec), error!(EINVAL));
 
         let time_spec = timespec { tv_sec: -1, tv_nsec: 1 };
-        assert_eq!(time_from_timespec(time_spec), error!(EINVAL));
+        assert_eq!(time_from_timespec::<zx::MonotonicTimeline>(time_spec), error!(EINVAL));
     }
 
     #[::fuchsia::test]
     fn test_time_from_timeval() {
         let tv = timeval { tv_sec: 100, tv_usec: 100 };
-        let time = time_from_timeval(tv).expect("failed to create time from time spec");
+        let time: zx::MonotonicTime =
+            time_from_timeval(tv).expect("failed to create time from time spec");
         assert_eq!(time.into_nanos(), 100 * NANOS_PER_SECOND + 100 * NANOS_PER_MICRO);
     }
 
     #[::fuchsia::test]
     fn test_invalid_time_from_timeval() {
         let tv = timeval { tv_sec: 100, tv_usec: MICROS_PER_SECOND * 2 };
-        assert_eq!(time_from_timeval(tv), error!(EDOM));
+        assert_eq!(time_from_timeval::<zx::MonotonicTimeline>(tv), error!(EDOM));
 
         let tv = timeval { tv_sec: 1, tv_usec: -1 };
-        assert_eq!(time_from_timeval(tv), error!(EDOM));
+        assert_eq!(time_from_timeval::<zx::MonotonicTimeline>(tv), error!(EDOM));
 
         let tv = timeval { tv_sec: -1, tv_usec: 1 };
-        assert_eq!(time_from_timeval(tv), error!(EINVAL));
+        assert_eq!(time_from_timeval::<zx::MonotonicTimeline>(tv), error!(EINVAL));
     }
 }
