@@ -26,5 +26,10 @@
         compatible = "fuchsia,test";
         reg = <I2C_ADDRESS2>;
       };
+
+      child@2b {
+        compatible = "fuchsia,test";
+        reg = <I2C_ADDRESS3 I2C_ADDRESS4>;
+      };
     };
 };
