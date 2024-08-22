@@ -132,6 +132,7 @@ config("compiler") {
   if (!is_gcc) {
     configs += [
       ":clang_defaults",
+      ":embed_bitcode",
       ":ffp_contract",
     ]
   }
@@ -160,14 +161,17 @@ config("cpu_baseline") {
 # These flags are enabled by default in Fuchsia's Clang toolchain, but we set
 # them explicitly to support other Clang toolchains and Clang-based tools.
 config("clang_defaults") {
+  if (current_cpu == "x64") {
+    asmflags = [ "-Wa,--mrelax-relocations=yes" ]
+  }
+}
+
+config("embed_bitcode") {
   if (clang_embed_bitcode) {
-    cflags += [
+    cflags = [
       "-Xclang",
       "-fembed-bitcode=all",
     ]
-  }
-  if (current_cpu == "x64") {
-    asmflags = [ "-Wa,--mrelax-relocations=yes" ]
   }
 }
 
