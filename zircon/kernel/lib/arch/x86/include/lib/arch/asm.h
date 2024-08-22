@@ -28,20 +28,33 @@
   .endr
 .endm
 
+// Allow both 32-bit and 64-bit .prologue.fp and .epilogue.fp can share the
+// same implementation, since they only differ in register name and size.
+#if defined(__i386__)
+#  define RSP_LP %esp
+#  define RBP_LP %ebp
+#  define SIZEOF_LP 4
+#else
+#  define RSP_LP %rsp
+#  define RBP_LP %rbp
+#  define SIZEOF_LP 8
+#endif
+
+
 // Standard prologue sequence for FP setup, with CFI.
 // Note that this realigns the SP from entry state to be ready for a call.
 .macro .prologue.fp
-  push %rbp
-  .cfi_adjust_cfa_offset 8
-  .cfi_offset %rbp, -16
-  mov %rsp, %rbp
+  push RBP_LP
+  .cfi_adjust_cfa_offset SIZEOF_LP
+  .cfi_offset RBP_LP, -(2*SIZEOF_LP)
+  mov RSP_LP, RBP_LP
 .endm
 
 // Epilogue sequence to match .prologue.fp.
 .macro .epilogue.fp
-  pop %rbp
-  .cfi_same_value %rbp
-  .cfi_adjust_cfa_offset -8
+  pop RBP_LP
+  .cfi_same_value RBP_LP
+  .cfi_adjust_cfa_offset -SIZEOF_LP
 .endm
 
 #endif  // clang-format on
