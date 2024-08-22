@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <dirent.h>
+#include <fcntl.h>
 #include <net/if.h>
 #include <net/if_arp.h>
 #include <netinet/in.h>
@@ -12,6 +14,7 @@
 
 #include <fbl/unique_fd.h>
 #include <gtest/gtest.h>
+#include <linux/input.h>
 
 #include "src/starnix/tests/syscalls/cpp/test_helper.h"
 
@@ -216,6 +219,52 @@ TEST_F(IoctlTest, SIOCGIFINDEX_Success) {
 
   EXPECT_EQ(strncmp(ifr.ifr_name, kLoopbackIfName, IFNAMSIZ), 0);
   EXPECT_GT(ifr.ifr_ifindex, 0);
+}
+
+// Check the names of all available input devices as reported by EVIOCGNAME.
+// We expect few (two to be exact).
+TEST_F(IoctlTest, EVIOCGNAME_Success) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "EVIOCGNAME requires permissions to avoid EACCESS, skipping here...";
+  }
+
+  std::vector<std::string> input_device_names;
+  const std::string dev_input_path = "/dev/input";
+  DIR* dir = opendir(dev_input_path.c_str());
+  ASSERT_NE(dir, nullptr);
+
+  for (struct dirent* entry = readdir(dir); entry != nullptr; entry = readdir(dir)) {
+    const std::string dev_file = entry->d_name;
+    if (dev_file == "." || dev_file == "..") {
+      continue;
+    }
+    const std::string dev_path = dev_input_path + "/" + dev_file;
+    const int fd = open(dev_path.c_str(), O_RDONLY);
+    ASSERT_GT(fd, 0) << "for: " << dev_path;
+    char dev_name[100];
+    const int result = ioctl(fd, EVIOCGNAME(sizeof(dev_name)), &dev_name);
+    ASSERT_GT(result, 0) << "for: " << dev_path;
+    close(fd);
+    input_device_names.push_back(dev_name);
+  }
+
+  EXPECT_THAT(input_device_names, testing::UnorderedElementsAre("starnix_touch_fc1a_0002_v0",
+                                                                "starnix_buttons_fc1a_0001_v1"));
+}
+
+// If the buffer for copying the device name is too small, copy only how much
+// will fit.
+TEST_F(IoctlTest, EVIOCGNAME_TooSmall) {
+  if (!test_helper::HasSysAdmin()) {
+    GTEST_SKIP() << "EVIOCGNAME requires permissions to avoid EACCESS, skipping here...";
+  }
+  const std::string dev_path = "/dev/input/event0";
+  int fd = open(dev_path.c_str(), O_RDONLY);
+  ASSERT_GT(fd, 0);
+  char dev_name[10];
+  int result = ioctl(fd, EVIOCGNAME(sizeof(dev_name)), &dev_name);
+  EXPECT_EQ(result, 10);
+  close(fd);
 }
 
 }  // namespace

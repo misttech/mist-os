@@ -4,7 +4,7 @@
 
 use fuchsia_inspect::NumericProperty;
 use starnix_core::fileops_impl_nonseekable;
-use starnix_core::mm::MemoryAccessorExt;
+use starnix_core::mm::{MemoryAccessor, MemoryAccessorExt};
 use starnix_core::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
 use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
 use starnix_core::vfs::{fileops_impl_noop_sync, FileObject, FileOps};
@@ -117,6 +117,9 @@ pub struct InputFile {
     x_axis_info: uapi::input_absinfo,
     y_axis_info: uapi::input_absinfo,
     pub inner: Mutex<InputFileMutableState>,
+
+    // A descriptive device name. Should contain only alphanumerics and `_`.
+    device_name: String,
 }
 
 // Mutable state of `InputFile`
@@ -178,6 +181,13 @@ fn keyboard_position_attributes() -> BitSet<{ min_bytes(ABS_CNT) }> {
     BitSet::new()
 }
 
+/// Makes a device name string from a name and device ID details.
+///
+/// For practical reasons the device name should contain alphanumerics and `_`.
+fn get_device_name(name: &str, input_id: &uapi::input_id) -> String {
+    format!("{}_{:04x}_{:04x}_v{}", name, input_id.vendor, input_id.product, input_id.version)
+}
+
 impl InputFile {
     // Per https://www.linuxjournal.com/article/6429, the driver version is 32-bits wide,
     // and interpreted as:
@@ -199,6 +209,7 @@ impl InputFile {
         height: i32,
         inspect_node: Option<fuchsia_inspect::Node>,
     ) -> Self {
+        let device_name = get_device_name("starnix_touch", &input_id);
         // Fuchsia scales the position reported by the touch sensor to fit view coordinates.
         // Hence, the range of touch positions is exactly the same as the range of view
         // coordinates.
@@ -242,6 +253,7 @@ impl InputFile {
                 waiters: WaitQueue::default(),
                 inspect_status: inspect_node.map(|n| InspectStatus::new(n)),
             }),
+            device_name,
         }
     }
 
@@ -253,6 +265,7 @@ impl InputFile {
         input_id: uapi::input_id,
         inspect_node: Option<fuchsia_inspect::Node>,
     ) -> Self {
+        let device_name = get_device_name("starnix_buttons", &input_id);
         Self {
             driver_version: Self::DRIVER_VERSION,
             input_id,
@@ -273,9 +286,14 @@ impl InputFile {
                 waiters: WaitQueue::default(),
                 inspect_status: inspect_node.map(|n| InspectStatus::new(n)),
             }),
+            device_name,
         }
     }
 }
+
+// The bit-mask that removes the variable parts of the EVIOCGNAME ioctl
+// request.
+const EVIOCGNAME_MASK: u32 = 0b11_00_0000_0000_0000_1111_1111_1111_1111;
 
 impl FileOps for InputFile {
     fileops_impl_nonseekable!();
@@ -357,9 +375,59 @@ impl FileOps for InputFile {
                 current_task.write_object(UserRef::new(user_addr), &self.y_axis_info)?;
                 Ok(SUCCESS)
             }
-            _ => {
-                track_stub!(TODO("https://fxbug.dev/322873200"), "input ioctl", request);
-                error!(EOPNOTSUPP)
+
+            request_with_params => {
+                // Remove the variable part of the request with params, so
+                // we can identify it.
+                match request_with_params & EVIOCGNAME_MASK {
+                    uapi::EVIOCGNAME_0 => {
+                        // Request to report the device name.
+                        //
+                        // An EVIOCGNAME request comes with the response buffer size encoded in
+                        // bits 29..16 of the request's `u32` code.  This is in contrast to
+                        // most other ioctl request codes in this file, which are fully known
+                        // at compile time, so we need to decode it a bit differently from
+                        // other ioctl codes.
+                        //
+                        // See [here][hh] the macros that do this.
+                        //
+                        // [hh]: https://cs.opensource.google/fuchsia/fuchsia/+/main:third_party/android/platform/bionic/libc/kernel/uapi/linux/input.h;l=82;drc=0f0c18f695543b15b852f68f297744d03d642a26
+                        let device_name = &self.device_name;
+
+                        // The lowest 14 bits of the top 16 bits are the unsigned buffer
+                        // length in bytes.  While we don't use multibyte characters,
+                        // make sure that all sizes below are expressed in terms of
+                        // bytes, not characters.
+                        let buffer_bytes_count =
+                            ((request_with_params >> 16) & ((1 << 14) - 1)) as usize;
+
+                        // Zero out the entire user buffer in case the user reads too much.
+                        // Probably not needed, but I don't think it hurts.
+                        current_task.zero(user_addr, buffer_bytes_count)?;
+                        let device_name_as_bytes = device_name.as_bytes();
+
+                        // Copy all bytes from device name if the buffer is large enough.
+                        // If not, copy one less than the buffer size, to leave space
+                        // for the final NUL.
+                        let to_copy_bytes_count =
+                            std::cmp::min(device_name_as_bytes.len(), buffer_bytes_count - 1);
+                        current_task.write_memory(
+                            user_addr,
+                            &device_name_as_bytes[..to_copy_bytes_count],
+                        )?;
+                        // EVIOCGNAME ioctl returns the number of bytes written.
+                        // Do not forget the trailing NUL.
+                        Ok((to_copy_bytes_count + 1).into())
+                    }
+                    _ => {
+                        track_stub!(
+                            TODO("https://fxbug.dev/322873200"),
+                            "input ioctl",
+                            request_with_params
+                        );
+                        error!(EOPNOTSUPP)
+                    }
+                }
             }
         }
     }

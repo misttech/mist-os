@@ -125,6 +125,7 @@ pub fn slice_to_maybe_uninit_mut<T>(slice: &mut [T]) -> &mut [MaybeUninit<T>] {
 type HermeticCopyFn =
     unsafe extern "C" fn(dest: *mut u8, source: *const u8, len: usize, ret_dest: bool) -> usize;
 
+#[derive(Debug)]
 pub struct Usercopy {
     // This is an event used to signal the exception handling thread to shut down.
     shutdown_event: zx::Event,
