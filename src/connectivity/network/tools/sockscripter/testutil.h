@@ -48,6 +48,8 @@ class TestApi : public ApiAbstraction {
                socklen_t* addrlen),
               (override));
 
+  MOCK_METHOD(ssize_t, recvmsg, (int fd, struct msghdr* msg, int flags), (override));
+
   MOCK_METHOD(int, getsockname, (int fd, struct sockaddr* addr, socklen_t* len), (override));
 
   MOCK_METHOD(int, getpeername, (int fd, struct sockaddr* addr, socklen_t* len), (override));

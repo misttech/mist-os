@@ -78,6 +78,10 @@ class PosixCalls : public ApiAbstraction {
     return ::recvfrom(fd, buf, buflen, flags, addr, addrlen);
   }
 
+  ssize_t recvmsg(int fd, struct msghdr* msg, int flags) override {
+    return ::recvmsg(fd, msg, flags);
+  }
+
   int getsockname(int fd, struct sockaddr* addr, socklen_t* len) override {
     return ::getsockname(fd, addr, len);
   }

@@ -136,6 +136,10 @@ const struct Command {
     {"set-bindtodevice", "<if-name-string>", "set SO_BINDTODEVICE", &SockScripter::SetBindToDevice},
     {"log-bindtodevice", nullptr, "log SO_BINDTODEVICE option value",
      &SockScripter::LogBindToDevice},
+    {"set-recvtclass", "{0|1}", "set IPV6_RECVTCLASS flag", &SockScripter::SetRecvtclass},
+    {"log-recvtclass", nullptr, "log IPV6_RECVTCLASS option value", &SockScripter::LogRecvtclass},
+    {"set-recvtos", "{0|1}", "set IP_RECVTOS flag", &SockScripter::SetRecvtos},
+    {"log-recvtos", nullptr, "log IP_RECVTOS option value", &SockScripter::LogRecvtos},
     {"set-reuseaddr", "{0|1}", "set SO_REUSEADDR flag", &SockScripter::SetReuseaddr},
     {"log-reuseaddr", nullptr, "log SO_REUSEADDR option value", &SockScripter::LogReuseaddr},
     {"set-reuseport", "{0|1}", "set SO_REUSEPORT flag", &SockScripter::SetReuseport},
@@ -218,11 +222,9 @@ const struct Command {
     {"recvfrom", nullptr, "recvfrom()", &SockScripter::RecvFrom},
     {"recvfrom-ping", nullptr, "recvfrom() and ping the packet back to the sender",
      &SockScripter::RecvFromPing},
-    {"recv", nullptr, "recv() on a connected TCP socket", &SockScripter::Recv},
-    {"recv-ping", nullptr,
-     "recv() and ping back the packet on a connected TCP "
-     "socket",
-     &SockScripter::RecvPing},
+    {"recv", nullptr, "recv() on a socket", &SockScripter::Recv},
+    {"recv-ping", nullptr, "recv() and ping back the packet on a socket", &SockScripter::RecvPing},
+    {"recvmsg", nullptr, "recvmsg() on a socket", &SockScripter::Recvmsg},
     {"set-send-buf-hex", "\"xx xx ..\" ", "set send-buffer with hex values",
      &SockScripter::SetSendBufHex},
     {"set-send-buf-text", "\"<string>\" ", "set send-buffer with text chars",
@@ -513,6 +515,28 @@ bool SockScripter::SetBroadcast(char* arg) {
 }
 
 bool SockScripter::LogBroadcast(char* arg) { LOG_SOCK_OPT_VAL(SOL_SOCKET, SO_BROADCAST, int) }
+
+bool SockScripter::SetRecvtclass(char* arg) {
+  int flag;
+  if (!getFlagInt(arg, &flag)) {
+    LOG(ERROR) << "Error: Invalid IPV6_RECVTCLASS flag='" << arg << "'!";
+    return false;
+  }
+  SET_SOCK_OPT_VAL(IPPROTO_IPV6, IPV6_RECVTCLASS, flag)
+}
+
+bool SockScripter::LogRecvtclass(char* arg) { LOG_SOCK_OPT_VAL(IPPROTO_IPV6, IPV6_RECVTCLASS, int) }
+
+bool SockScripter::SetRecvtos(char* arg) {
+  int flag;
+  if (!getFlagInt(arg, &flag)) {
+    LOG(ERROR) << "Error: Invalid reuseport flag='" << arg << "'!";
+    return false;
+  }
+  SET_SOCK_OPT_VAL(IPPROTO_IP, IP_RECVTOS, flag)
+}
+
+bool SockScripter::LogRecvtos(char* arg) { LOG_SOCK_OPT_VAL(IPPROTO_IP, IP_RECVTOS, int) }
 
 bool SockScripter::SetReuseaddr(char* arg) {
   int flag;
@@ -1399,6 +1423,71 @@ int SockScripter::RecvInternal(bool ping) {
 bool SockScripter::Recv(char* arg) { return RecvInternal(false /* ping */); }
 
 bool SockScripter::RecvPing(char* arg) { return RecvInternal(true /* ping */); }
+
+bool SockScripter::Recvmsg(char* arg) {
+  LOG(INFO) << "RecvFrom(fd:" << sockfd_ << ")...";
+
+  memset(recv_buf_, 0, sizeof(recv_buf_));
+
+  sockaddr_storage addr;
+  struct iovec iov = {
+      .iov_base = recv_buf_,
+      .iov_len = sizeof(recv_buf_),
+  };
+  char control_buffer[512];
+  struct msghdr msg = {
+      .msg_name = &addr,
+      .msg_namelen = sizeof(addr),
+      .msg_iov = &iov,
+      .msg_iovlen = 1,
+      .msg_control = control_buffer,
+      .msg_controllen = sizeof(control_buffer),
+  };
+
+  ssize_t recvd = api_->recvmsg(sockfd_, &msg, 0);
+  if (recvd < 0) {
+    if (errno == EAGAIN || errno == EWOULDBLOCK) {
+      LOG(INFO) << "  returned EAGAIN or EWOULDBLOCK!";
+    } else {
+      LOG(ERROR) << "  Error-recvmsg(fd:" << sockfd_ << ") failed-" << "[" << errno << "]"
+                 << strerror(errno);
+    }
+    return false;
+  }
+
+  std::string_view received(&recv_buf_[0], recvd);
+  LOG(INFO) << "  received(fd:" << sockfd_ << ") [" << recvd << "]'" << Escaped(received) << "' "
+            << "from " << Format(addr);
+
+  if (msg.msg_controllen > 0) {
+    for (struct cmsghdr* cmsg = CMSG_FIRSTHDR(&msg); cmsg != nullptr;
+         cmsg = CMSG_NXTHDR(&msg, cmsg)) {
+      if (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_TOS) {
+        uint8_t tos = *(reinterpret_cast<uint8_t*>(CMSG_DATA(cmsg)));
+        LOG(INFO) << "  cmsg(IP_TOS) = " << static_cast<int>(tos);
+      } else if (cmsg->cmsg_level == IPPROTO_IP && cmsg->cmsg_type == IP_ORIGDSTADDR) {
+        struct sockaddr_in* addr = (reinterpret_cast<struct sockaddr_in*>(CMSG_DATA(cmsg)));
+        char buf[INET_ADDRSTRLEN];
+        LOG(INFO) << "  cmsg(IP_ORIGDSTADDR) = "
+                  << inet_ntop(addr->sin_family, &addr->sin_addr, buf, sizeof(buf)) << ":"
+                  << ntohs(addr->sin_port);
+      } else if (cmsg->cmsg_level == IPPROTO_IPV6 && cmsg->cmsg_type == IPV6_TCLASS) {
+        uint8_t tclass = *(reinterpret_cast<uint8_t*>(CMSG_DATA(cmsg)));
+        LOG(INFO) << "  cmsg(IPV6_TCLASS) = " << static_cast<int>(tclass);
+      } else if (cmsg->cmsg_level == IPPROTO_IPV6 && cmsg->cmsg_type == IPV6_PKTINFO) {
+        struct in6_pktinfo* pktinfo = (reinterpret_cast<struct in6_pktinfo*>(CMSG_DATA(cmsg)));
+        char addr[128];
+        LOG(INFO) << "  cmsg(IPV6_PKTINFO) = { addr: "
+                  << inet_ntop(AF_INET6, &pktinfo->ipi6_addr, addr, sizeof(addr))
+                  << ", ifindex: " << pktinfo->ipi6_ifindex << " }";
+      } else {
+        LOG(INFO) << "  unknown cmsg: level=" << cmsg->cmsg_level << ", type=" << cmsg->cmsg_type;
+      }
+    }
+  }
+
+  return true;
+}
 
 bool SockScripter::SetSendBufHex(char* arg) { return snd_buf_gen_.SetSendBufHex(arg); }
 
