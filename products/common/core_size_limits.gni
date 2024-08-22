@@ -277,5 +277,20 @@ size_checker_input = {
       limit = 5096254741
       creep_limit = 0
     },
+    {
+      component = "Development Support - Connectivity"
+      pkgs = [
+        "donut",
+        "iperf3",
+        "lowpanctl",
+        "mdns-util",
+        "nc",
+        "net-cli",
+        "sockscripter",
+        "tcpdump",
+      ]
+      limit = 4194304  # 4.0 MiB
+      creep_limit = 49152  # 48.0 KiB
+    },
   ]
 }

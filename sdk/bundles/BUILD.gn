@@ -11,7 +11,6 @@ group("tools") {
 group("core-tools") {
   testonly = true
   public_deps = [
-    "//src/connectivity:tools",
     "//src/developer/debug/debug_agent",
     "//src/fonts",
     "//src/graphics/lib/magma:magma-tools",
@@ -22,7 +21,6 @@ group("core-tools") {
     "//src/sys/pkg/bin/far",
     "//src/ui/tools:scenic",
     "//third_party/curl:curl_pkg",
-    "//third_party/iperf:iperf3_pkg",
     "//third_party/openssh-portable:scp-shell-pkg",
     "//third_party/openssh-portable:ssh-keygen-shell-pkg",
     "//third_party/openssh-portable:ssh-shell-pkg",

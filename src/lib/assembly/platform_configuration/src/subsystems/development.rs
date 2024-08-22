@@ -115,6 +115,31 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
             builder.kernel_arg(arg);
         }
 
+        if config.tools.connectivity.enable_networking {
+            context.ensure_build_type_and_feature_set_level(
+                &[BuildType::Eng, BuildType::UserDebug],
+                &[FeatureSupportLevel::Utility, FeatureSupportLevel::Standard],
+                "Networking tools",
+            )?;
+            builder.platform_bundle("development_support_tools_connectivity_networking");
+        }
+        if config.tools.connectivity.enable_wlan {
+            context.ensure_build_type_and_feature_set_level(
+                &[BuildType::Eng, BuildType::UserDebug],
+                &[FeatureSupportLevel::Utility, FeatureSupportLevel::Standard],
+                "WLAN tools",
+            )?;
+            builder.platform_bundle("development_support_tools_connectivity_wlan");
+        }
+        if config.tools.connectivity.enable_thread {
+            context.ensure_build_type_and_feature_set_level(
+                &[BuildType::Eng, BuildType::UserDebug],
+                &[FeatureSupportLevel::Utility, FeatureSupportLevel::Standard],
+                "Thread (protocol) tools",
+            )?;
+            builder.platform_bundle("development_support_tools_connectivity_thread");
+        }
+
         Ok(())
     }
 }

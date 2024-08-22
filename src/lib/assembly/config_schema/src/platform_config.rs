@@ -271,6 +271,16 @@ pub enum BuildType {
     User,
 }
 
+impl std::fmt::Display for BuildType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BuildType::Eng => f.write_str("eng"),
+            BuildType::UserDebug => f.write_str("userdebug"),
+            BuildType::User => f.write_str("user"),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 pub struct ParseBuildTypeError;
 

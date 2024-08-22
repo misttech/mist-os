@@ -1527,6 +1527,28 @@ assembly_input_bundle("core_realm_development_access_rcs_no_usb") {
   ]
 }
 
+# Development and debug support tools for general networking
+assembly_input_bundle("development_support_tools_connectivity_networking") {
+  base_packages = [
+    "//src/connectivity/network/tools/nc",
+    "//src/connectivity/network/tools/sockscripter:package",
+    "//src/connectivity/network/mdns/util:mdns-util",
+    "//src/connectivity/network/net-cli",
+    "//third_party/iperf:iperf3_pkg",
+    "//third_party/tcpdump",
+  ]
+}
+
+# Development and debug support tools for wlan
+assembly_input_bundle("development_support_tools_connectivity_wlan") {
+  base_packages = [ "//src/connectivity/wlan/wlancfg/tool:donut" ]
+}
+
+# Development and debug support tools for the Thread protocol
+assembly_input_bundle("development_support_tools_connectivity_thread") {
+  flexible_packages = [ "//src/connectivity/lowpan/tools/lowpanctl" ]
+}
+
 assembly_input_bundle("radar_proxy_with_injector") {
   base_packages =
       [ "//src/devices/radar/bin/radar-proxy:radar-proxy-with-injector" ]
