@@ -1375,17 +1375,11 @@ mod tests {
             unreachable!();
         };
         assert_eq!(
-            route_result.route,
-            vec![
-                RouteSegment::RegisterBy {
-                    moniker: Moniker::root(),
-                    capability: RegistrationDecl::Runner(runner_reg)
-                },
-                RouteSegment::DeclareBy {
-                    moniker: Moniker::root(),
-                    capability: CapabilityDecl::Runner(runner_decl)
-                },
-            ]
+            route_result.source,
+            Some(CapabilitySource::Component(ComponentSource {
+                moniker: Moniker::root(),
+                capability: runner_decl.into(),
+            })),
         )
     }
 
@@ -1869,8 +1863,8 @@ mod tests {
 
         assert!(route_result.error.is_none());
         assert_eq!(
-            route_result.route,
-            vec![RouteSegment::ProvideAsBuiltin { capability: elf_runner_decl },]
+            route_result.source,
+            Some(CapabilitySource::Builtin(BuiltinSource { capability: elf_runner_decl.into() })),
         );
     }
 
@@ -2024,16 +2018,7 @@ mod tests {
                 })),
                 capability: Some("dwarf".parse().unwrap()),
                 error: None,
-                route: vec![
-                    RouteSegment::RegisterBy {
-                        moniker: Moniker::root(),
-                        capability: RegistrationDecl::Runner(runner_registration_decl)
-                    },
-                    RouteSegment::DeclareBy {
-                        moniker: Moniker::root(),
-                        capability: runner_decl.clone()
-                    }
-                ],
+                route: vec![],
                 source: Some(CapabilitySource::Component(ComponentSource {
                     capability: ComponentCapability::Runner(match runner_decl {
                         CapabilityDecl::Runner(decl) => decl,

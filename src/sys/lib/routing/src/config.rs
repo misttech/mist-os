@@ -66,7 +66,7 @@ where
             None => {
                 return Err(RoutingError::BedrockNotPresentInDictionary {
                     name: use_config.target_name.to_string(),
-                    moniker: component.moniker().clone(),
+                    moniker: component.moniker().clone().into(),
                 }
                 .into());
             }

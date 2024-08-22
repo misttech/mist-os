@@ -88,7 +88,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
             )
             .await?
             .ok_or_else(|| RoutingError::BedrockNotPresentInDictionary {
-                moniker: self.target.moniker.clone(),
+                moniker: self.target.moniker.clone().into(),
                 name: self.name.to_string(),
             })
             .map_err(RouterError::from)?;

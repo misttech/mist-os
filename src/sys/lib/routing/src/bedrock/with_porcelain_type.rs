@@ -6,7 +6,7 @@ use crate::bedrock::request_metadata::METADATA_KEY_TYPE;
 use crate::error::RoutingError;
 use async_trait::async_trait;
 use cm_rust::CapabilityTypeName;
-use moniker::Moniker;
+use moniker::ExtendedMoniker;
 use router_error::RouterError;
 use sandbox::{Capability, Data, Request, Routable, Router};
 
@@ -18,11 +18,19 @@ pub trait WithPorcelainType {
     /// Returns a router that ensures the capability request has a porcelain
     /// type that is the same as the type of the capability returned by the
     /// router.
-    fn with_porcelain_type(self, porcelain_type: CapabilityTypeName, moniker: Moniker) -> Router;
+    fn with_porcelain_type(
+        self,
+        porcelain_type: CapabilityTypeName,
+        moniker: impl Into<ExtendedMoniker>,
+    ) -> Router;
 }
 
 impl WithPorcelainType for Router {
-    fn with_porcelain_type(self, porcelain_type: CapabilityTypeName, moniker: Moniker) -> Router {
+    fn with_porcelain_type(
+        self,
+        porcelain_type: CapabilityTypeName,
+        moniker: impl Into<ExtendedMoniker>,
+    ) -> Router {
         if !is_supported(&porcelain_type) {
             return self;
         }
@@ -31,7 +39,7 @@ impl WithPorcelainType for Router {
         struct RouterWithPorcelainType {
             router: Router,
             porcelain_type: CapabilityTypeName,
-            moniker: Moniker,
+            moniker: ExtendedMoniker,
         }
 
         #[async_trait]
@@ -41,9 +49,7 @@ impl WithPorcelainType for Router {
                 let Capability::Data(Data::String(capability_type)) = request
                     .metadata
                     .get(&cm_types::Name::new(METADATA_KEY_TYPE).unwrap())
-                    .map_err(|()| RoutingError::BedrockNotCloneable {
-                        moniker: moniker.clone().into(),
-                    })?
+                    .map_err(|()| RoutingError::BedrockNotCloneable { moniker: moniker.clone() })?
                     .unwrap_or_else(|| {
                         panic!("missing capability type {porcelain_type} for request: {request:?}")
                     })
@@ -59,7 +65,7 @@ impl WithPorcelainType for Router {
                     router.route(request).await
                 } else {
                     Err(RoutingError::BedrockWrongCapabilityType {
-                        moniker: moniker.clone().into(),
+                        moniker: moniker.clone(),
                         actual: capability_type,
                         expected: porcelain_type,
                     }
@@ -68,7 +74,11 @@ impl WithPorcelainType for Router {
             }
         }
 
-        Router::new(RouterWithPorcelainType { router: self, porcelain_type, moniker })
+        Router::new(RouterWithPorcelainType {
+            router: self,
+            porcelain_type,
+            moniker: moniker.into(),
+        })
     }
 }
 
@@ -80,6 +90,7 @@ mod tests {
     use assert_matches::assert_matches;
     use cm_rust::Availability;
     use cm_types::Name;
+    use moniker::Moniker;
     use router_error::{DowncastErrorForTest, RouterError};
     use sandbox::{Capability, Data, Dict, WeakInstanceToken};
     use std::sync::Arc;

@@ -37,6 +37,7 @@ pub fn take_handle_as_stream<P: ProtocolMarker>(channel: zx::Channel) -> P::Requ
 
 /// Waits for a new message on a receiver, and launches a new async task on a `WeakTaskGroup` to
 /// handle each new message from the receiver.
+#[derive(Clone)]
 pub struct LaunchTaskOnReceive {
     capability_source: CapabilitySource,
     task_to_launch: Arc<

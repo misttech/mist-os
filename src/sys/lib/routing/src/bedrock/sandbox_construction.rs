@@ -96,6 +96,7 @@ impl ComponentSandbox {
             (&component_input.environment().debug(), &self.component_input.environment().debug()),
             (&component_output_dict, &self.component_output_dict),
             (&program_input.namespace, &self.program_input.namespace),
+            (&program_input.config, &self.program_input.config),
             (&program_output_dict, &self.program_output_dict),
             (&framework_dict, &self.framework_dict),
             (&capability_sourced_capabilities_dict, &self.capability_sourced_capabilities_dict),
@@ -105,6 +106,9 @@ impl ComponentSandbox {
                     .insert(key, capability_res.expect("sandbox capability is not cloneable"))
                     .unwrap();
             }
+        }
+        if let Some(runner_router) = program_input.runner.lock().unwrap().take() {
+            *self.program_input.runner.lock().unwrap() = Some(runner_router);
         }
         for (key, component_input) in child_inputs.enumerate() {
             self.child_inputs.insert(key, component_input).unwrap();
@@ -626,10 +630,15 @@ fn use_from_parent_router(
     moniker: &Moniker,
     program_input_dict_additions: &Dict,
 ) -> Router {
-    let component_input_capability = component_input.capabilities().lazy_get(
-        source_path.clone(),
-        RoutingError::use_from_parent_not_found(moniker, source_path.iter_segments().join("/")),
-    );
+    let err = if moniker == &Moniker::root() {
+        RoutingError::register_from_component_manager_not_found(
+            source_path.iter_segments().join("/"),
+        )
+    } else {
+        RoutingError::use_from_parent_not_found(moniker, source_path.iter_segments().join("/"))
+    };
+    let component_input_capability =
+        component_input.capabilities().lazy_get(source_path.clone(), err);
 
     let program_input_dict_additions = program_input_dict_additions.clone();
 
@@ -683,13 +692,17 @@ fn extend_dict_with_offer<C: ComponentInstanceInterface + 'static>(
     }
     let router = match offer.source() {
         cm_rust::OfferSource::Parent => {
-            let router = component_input.capabilities().lazy_get(
-                source_path.to_owned(),
+            let err = if component.moniker() == &Moniker::root() {
+                RoutingError::register_from_component_manager_not_found(
+                    offer.source_name().to_string(),
+                )
+            } else {
                 RoutingError::offer_from_parent_not_found(
                     &component.moniker(),
                     source_path.iter_segments().join("/"),
-                ),
-            );
+                )
+            };
+            let router = component_input.capabilities().lazy_get(source_path.to_owned(), err);
             router.with_porcelain_type(offer.into(), component.moniker().clone())
         }
         cm_rust::OfferSource::Self_ => {

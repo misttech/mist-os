@@ -92,7 +92,14 @@ impl ComponentDeclBuilder {
 
     /// Add a use decl.
     pub fn use_(mut self, use_: impl Into<cm_rust::UseDecl>) -> Self {
-        self.result.uses.push(use_.into());
+        let use_ = use_.into();
+        if let cm_rust::UseDecl::Runner(_) = &use_ {
+            assert!(
+                self.result.program.as_ref().and_then(|p| p.runner.as_ref()).is_none(),
+                "tried to add a use decl for a runner while program.runner is set"
+            );
+        }
+        self.result.uses.push(use_);
         self
     }
 

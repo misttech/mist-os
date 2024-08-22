@@ -2264,7 +2264,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_use_runner_from_child() {
-        let decl = ComponentDeclBuilder::new()
+        let decl = ComponentDeclBuilder::new_empty_component()
             .child_default("childA")
             .use_(UseBuilder::runner().name("test.runner").source_static_child("childA"))
             .build();
@@ -3645,6 +3645,16 @@ mod tests {
                 ComponentDeclBuilder::new()
                     .child(ChildBuilder::new().name("b").eager())
                     .child(ChildBuilder::new().name("c").eager())
+                    // TODO: this test fails if program is `None` when we try to start component a:
+                    // could not start a: ActionError { err: StartError { err: InstanceDestroyed { moniker: a } } }
+                    // Let's figure out why.
+                    .program(cm_rust::ProgramDecl {
+                        runner: None,
+                        info: fidl_fuchsia_data::Dictionary {
+                            entries: Some(vec![]),
+                            ..Default::default()
+                        },
+                    })
                     .use_(UseBuilder::runner().source_static_child("b").name("test.runner"))
                     .build(),
             ),

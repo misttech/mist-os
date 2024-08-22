@@ -19,15 +19,11 @@ pub mod resolving;
 pub mod rights;
 pub mod walk_state;
 
-use crate::bedrock::request_metadata::protocol_metadata;
+use crate::bedrock::request_metadata::{protocol_metadata, runner_metadata};
 use crate::capability_source::{
-    BuiltinSource, CapabilitySource, ComponentCapability, ComponentSource, InternalCapability,
-    VoidSource,
+    CapabilitySource, ComponentCapability, ComponentSource, InternalCapability, VoidSource,
 };
-use crate::component_instance::{
-    ComponentInstanceInterface, ExtendedInstanceInterface, TopInstanceInterface,
-    WeakComponentInstanceInterface,
-};
+use crate::component_instance::{ComponentInstanceInterface, WeakComponentInstanceInterface};
 use crate::environment::DebugRegistration;
 use crate::error::RoutingError;
 use crate::legacy_router::{
@@ -42,7 +38,7 @@ use cm_rust::{
     ExposeDirectoryDecl, ExposeProtocolDecl, ExposeResolverDecl, ExposeRunnerDecl,
     ExposeServiceDecl, ExposeSource, OfferConfigurationDecl, OfferDeclCommon, OfferDirectoryDecl,
     OfferEventStreamDecl, OfferProtocolDecl, OfferResolverDecl, OfferRunnerDecl, OfferServiceDecl,
-    OfferSource, OfferStorageDecl, RegistrationDeclCommon, RegistrationSource,
+    OfferSource, OfferStorageDecl, OfferTarget, RegistrationDeclCommon, RegistrationSource,
     ResolverRegistration, RunnerRegistration, SourceName, StorageDecl, StorageDirectorySource,
     UseConfigurationDecl, UseDecl, UseDeclCommon, UseDirectoryDecl, UseEventStreamDecl,
     UseProtocolDecl, UseRunnerDecl, UseServiceDecl, UseSource, UseStorageDecl,
@@ -336,7 +332,13 @@ where
             route_service_from_expose(expose_bundle, target, mapper).await
         }
         RouteRequest::ExposeRunner(expose_runner_decl) => {
-            route_runner_from_expose(expose_runner_decl, target, mapper).await
+            route_capability_inner(
+                &target.component_sandbox().await?.component_output_dict,
+                &expose_runner_decl.target_name,
+                runner_metadata(Availability::Required),
+                target,
+            )
+            .await
         }
         RouteRequest::ExposeResolver(expose_resolver_decl) => {
             route_resolver_from_expose(expose_resolver_decl, target, mapper).await
@@ -376,8 +378,10 @@ where
         RouteRequest::UseStorage(use_storage_decl) => {
             route_storage(use_storage_decl, target, mapper).await
         }
-        RouteRequest::UseRunner(use_runner_decl) => {
-            route_runner(use_runner_decl, target, mapper).await
+        RouteRequest::UseRunner(_use_runner_decl) => {
+            let router =
+                target.component_sandbox().await?.program_input.runner.lock().unwrap().as_ref().expect("we have a use declaration for a runner but the program input dictionary has no runner, this should be impossible").clone();
+            perform_route(router, runner_metadata(Availability::Required), target).await
         }
         RouteRequest::UseConfig(use_config_decl) => {
             route_config(use_config_decl, target, mapper).await
@@ -385,57 +389,8 @@ where
 
         // Route from a OfferDecl
         RouteRequest::OfferProtocol(offer_protocol_decl) => {
-            let target_dictionary = match &offer_protocol_decl.target {
-                cm_rust::OfferTarget::Child(child_ref) if child_ref.collection.is_none() => {
-                    // For static children we can find their inputs in the component's sandbox.
-                    let child_input_name = Name::new(child_ref.name.to_string())
-                        .map_err(MonikerError::InvalidMonikerPart)
-                        .expect("static child names must be short");
-                    let target_sandbox = target.component_sandbox().await?;
-                    let child_input = target_sandbox.child_inputs.get(&child_input_name).ok_or(
-                        RoutingError::OfferFromChildInstanceNotFound {
-                            child_moniker: child_ref.clone().into(),
-                            moniker: target.moniker().clone(),
-                            capability_id: offer_protocol_decl.target_name.clone().to_string(),
-                        },
-                    )?;
-                    child_input.capabilities()
-                }
-                cm_rust::OfferTarget::Child(child_ref) => {
-                    // Offers targeting dynamic children are trickier. The input to the dynamic
-                    // child wasn't created as part of the parent's sandbox, and dynamic offers
-                    // (like the one we're currently looking at) won't have their routes reflected
-                    // in the general component input for the collection. To work around this, we
-                    // look up the dynamic child from the parent and access its component input
-                    // from there. Unlike the code path for static children, this causes the child
-                    // to be resolved.
-                    let child = target
-                        .lock_resolved_state()
-                        .await?
-                        .get_child(&child_ref.clone().into())
-                        .ok_or(RoutingError::OfferFromChildInstanceNotFound {
-                            child_moniker: child_ref.clone().into(),
-                            moniker: target.moniker().clone(),
-                            capability_id: offer_protocol_decl.target_name.clone().to_string(),
-                        })?;
-                    child.component_sandbox().await?.component_input.capabilities()
-                }
-                cm_rust::OfferTarget::Collection(collection_name) => {
-                    // Offers targeting collections start at the component input generated for the
-                    // collection, which is in the component's sandbox.
-                    let target_sandbox = target.component_sandbox().await?;
-                    let collection_input = target_sandbox
-                        .collection_inputs
-                        .get(collection_name)
-                        .ok_or(RoutingError::OfferFromCollectionNotFound {
-                            collection: collection_name.to_string(),
-                            moniker: target.moniker().clone(),
-                            capability: offer_protocol_decl.target_name.clone(),
-                        })?;
-                    collection_input.capabilities()
-                }
-                cm_rust::OfferTarget::Capability(_) => unimplemented!(),
-            };
+            let target_dictionary =
+                get_dictionary_for_offer_target(target, &offer_protocol_decl).await?;
             let metadata = protocol_metadata(offer_protocol_decl.availability);
             metadata
                 .insert(
@@ -464,7 +419,22 @@ where
             route_event_stream_from_offer(offer_event_stream_decl, target, mapper).await
         }
         RouteRequest::OfferRunner(offer_runner_decl) => {
-            route_runner_from_offer(offer_runner_decl, target, mapper).await
+            let target_dictionary =
+                get_dictionary_for_offer_target(target, &offer_runner_decl).await?;
+            let metadata = runner_metadata(Availability::Required);
+            metadata
+                .insert(
+                    Name::new(crate::bedrock::with_policy_check::SKIP_POLICY_CHECKS).unwrap(),
+                    Capability::Data(Data::Uint64(1)),
+                )
+                .unwrap();
+            route_capability_inner(
+                &target_dictionary,
+                &offer_runner_decl.target_name,
+                metadata,
+                target,
+            )
+            .await
         }
         RouteRequest::OfferResolver(offer_resolver_decl) => {
             route_resolver_from_offer(offer_resolver_decl, target, mapper).await
@@ -486,9 +456,20 @@ where
 {
     let router =
         dictionary.get_capability(path).ok_or(RoutingError::BedrockNotPresentInDictionary {
-            moniker: target.moniker().clone(),
+            moniker: target.moniker().clone().into(),
             name: path.iter_segments().join("/"),
         })?;
+    perform_route(router, metadata, target).await
+}
+
+async fn perform_route<C>(
+    router: impl Routable,
+    metadata: Dict,
+    target: &Arc<C>,
+) -> Result<RouteSource, RoutingError>
+where
+    C: ComponentInstanceInterface + 'static,
+{
     let request = Request {
         target: WeakComponentInstanceInterface::new(target).into(),
         debug: true,
@@ -496,6 +477,65 @@ where
     };
     let capability = router.route(request).await?;
     Ok(RouteSource::new(capability.try_into().unwrap()))
+}
+
+async fn get_dictionary_for_offer_target<C, O>(
+    target: &Arc<C>,
+    offer: &O,
+) -> Result<Dict, RoutingError>
+where
+    C: ComponentInstanceInterface + 'static,
+    O: OfferDeclCommon,
+{
+    match offer.target() {
+        OfferTarget::Child(child_ref) if child_ref.collection.is_none() => {
+            // For static children we can find their inputs in the component's sandbox.
+            let child_input_name = Name::new(child_ref.name.to_string())
+                .map_err(MonikerError::InvalidMonikerPart)
+                .expect("static child names must be short");
+            let target_sandbox = target.component_sandbox().await?;
+            let child_input = target_sandbox.child_inputs.get(&child_input_name).ok_or(
+                RoutingError::OfferFromChildInstanceNotFound {
+                    child_moniker: child_ref.clone().into(),
+                    moniker: target.moniker().clone(),
+                    capability_id: offer.target_name().clone().to_string(),
+                },
+            )?;
+            Ok(child_input.capabilities())
+        }
+        OfferTarget::Child(child_ref) => {
+            // Offers targeting dynamic children are trickier. The input to the dynamic
+            // child wasn't created as part of the parent's sandbox, and dynamic offers
+            // (like the one we're currently looking at) won't have their routes reflected
+            // in the general component input for the collection. To work around this, we
+            // look up the dynamic child from the parent and access its component input
+            // from there. Unlike the code path for static children, this causes the child
+            // to be resolved.
+            let child =
+                target.lock_resolved_state().await?.get_child(&child_ref.clone().into()).ok_or(
+                    RoutingError::OfferFromChildInstanceNotFound {
+                        child_moniker: child_ref.clone().into(),
+                        moniker: target.moniker().clone(),
+                        capability_id: offer.target_name().clone().to_string(),
+                    },
+                )?;
+            Ok(child.component_sandbox().await?.component_input.capabilities())
+        }
+        OfferTarget::Collection(collection_name) => {
+            // Offers targeting collections start at the component input generated for the
+            // collection, which is in the component's sandbox.
+            let target_sandbox = target.component_sandbox().await?;
+            let collection_input = target_sandbox.collection_inputs.get(collection_name).ok_or(
+                RoutingError::OfferFromCollectionNotFound {
+                    collection: collection_name.to_string(),
+                    moniker: target.moniker().clone(),
+                    capability: offer.target_name().clone(),
+                },
+            )?;
+            Ok(collection_input.capabilities())
+        }
+        OfferTarget::Capability(_) => unimplemented!(),
+    }
 }
 
 /// Routes a Directory capability from `target` to its source, starting from `offer_decl`.
@@ -595,26 +635,6 @@ where
     Ok(RouteSource::new(source))
 }
 
-async fn route_runner_from_offer<C>(
-    offer_decl: OfferRunnerDecl,
-    target: &Arc<C>,
-    mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource, RoutingError>
-where
-    C: ComponentInstanceInterface + 'static,
-{
-    let allowed_sources = Sources::new(CapabilityTypeName::Runner).builtin().component();
-    let source = legacy_router::route_from_offer(
-        RouteBundle::from_offer(offer_decl.into()),
-        target.clone(),
-        allowed_sources,
-        &mut NoopVisitor::new(),
-        mapper,
-    )
-    .await?;
-    Ok(RouteSource::new(source))
-}
-
 async fn route_resolver_from_offer<C>(
     offer_decl: OfferResolverDecl,
     target: &Arc<C>,
@@ -652,33 +672,6 @@ where
         mapper,
     )
     .await?;
-    Ok(RouteSource::new(source))
-}
-
-async fn route_runner_from_expose<C>(
-    expose_decl: ExposeRunnerDecl,
-    target: &Arc<C>,
-    mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource, RoutingError>
-where
-    C: ComponentInstanceInterface + 'static,
-{
-    let allowed_sources = Sources::new(CapabilityTypeName::Runner)
-        .framework()
-        .builtin()
-        .namespace()
-        .component()
-        .capability();
-    let source = legacy_router::route_from_expose(
-        RouteBundle::from_expose(expose_decl.into()),
-        target.clone(),
-        allowed_sources,
-        &mut NoopVisitor::new(),
-        mapper,
-    )
-    .await?;
-
-    target.policy_checker().can_route_capability(&source, target.moniker())?;
     Ok(RouteSource::new(source))
 }
 
@@ -1092,90 +1085,6 @@ where
     target.policy_checker().can_route_capability(&source, target.moniker())?;
 
     Ok(RouteSource::new_with_relative_path(source, state.subdir))
-}
-
-/// Finds a Runner capability that matches `runner` in the `target`'s environment, and then
-/// routes the Runner capability from the environment's component instance to its source.
-async fn route_runner_from_environment<C>(
-    runner: &Name,
-    target: &Arc<C>,
-    mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource, RoutingError>
-where
-    C: ComponentInstanceInterface + 'static,
-{
-    let allowed_sources = Sources::new(CapabilityTypeName::Runner).builtin().component();
-    let source = match target.environment().get_registered_runner(&runner)? {
-        // The runner was registered in the environment of some component instance..
-        Some((ExtendedInstanceInterface::Component(env_component_instance), registration_decl)) => {
-            legacy_router::route_from_registration(
-                registration_decl,
-                env_component_instance,
-                allowed_sources,
-                &mut NoopVisitor::new(),
-                mapper,
-            )
-            .await
-        }
-        // The runner was registered in the root environment.
-        Some((ExtendedInstanceInterface::AboveRoot(top_instance), reg)) => {
-            let internal_capability = allowed_sources
-                .find_builtin_source(
-                    ExtendedMoniker::ComponentManager,
-                    reg.source_name(),
-                    top_instance.builtin_capabilities(),
-                    &mut NoopVisitor::new(),
-                    mapper,
-                )?
-                .ok_or(RoutingError::register_from_component_manager_not_found(
-                    reg.source_name().to_string(),
-                ))?;
-            Ok(CapabilitySource::Builtin(BuiltinSource { capability: internal_capability }))
-        }
-        None => Err(RoutingError::UseFromEnvironmentNotFound {
-            moniker: target.moniker().clone(),
-            capability_name: runner.clone(),
-            capability_type: "runner".to_string(),
-        }),
-    }?;
-
-    target.policy_checker().can_route_capability(&source, target.moniker())?;
-    Ok(RouteSource::new(source))
-}
-
-/// Finds a Runner capability that matches the use of `runner`.
-async fn route_runner<C>(
-    use_decl: UseRunnerDecl,
-    target: &Arc<C>,
-    mapper: &mut dyn DebugRouteMapper,
-) -> Result<RouteSource, RoutingError>
-where
-    C: ComponentInstanceInterface + 'static,
-{
-    match use_decl.source {
-        UseSource::Environment => {
-            route_runner_from_environment(use_decl.source_name(), target, mapper).await
-        }
-        _ => {
-            let allowed_sources = Sources::new(CapabilityTypeName::Runner)
-                .framework()
-                .builtin()
-                .capability()
-                .component();
-            let mut availability_visitor = use_decl.availability().clone();
-            let source = legacy_router::route_from_use(
-                use_decl.into(),
-                target.clone(),
-                allowed_sources,
-                &mut availability_visitor,
-                mapper,
-            )
-            .await?;
-
-            target.policy_checker().can_route_capability(&source, target.moniker())?;
-            Ok(RouteSource::new(source))
-        }
-    }
 }
 
 /// Finds a Configuration capability that matches the given use.

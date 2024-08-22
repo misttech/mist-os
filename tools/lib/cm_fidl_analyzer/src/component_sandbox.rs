@@ -5,21 +5,23 @@
 use crate::component_instance::ComponentInstanceForAnalyzer;
 use ::routing::bedrock::structured_dict::ComponentInput;
 use ::routing::bedrock::with_policy_check::WithPolicyCheck;
+use ::routing::bedrock::with_porcelain_type::WithPorcelainType;
 use ::routing::capability_source::{
     BuiltinSource, CapabilitySource, CapabilityToCapabilitySource, ComponentCapability,
     ComponentSource, FrameworkSource, InternalCapability, NamespaceSource,
 };
 use ::routing::component_instance::{ComponentInstanceInterface, WeakComponentInstanceInterface};
+use ::routing::environment::RunnerRegistry;
 use ::routing::error::RoutingError;
 use ::routing::policy::GlobalPolicyChecker;
 use ::routing::DictExt;
 use async_trait::async_trait;
 use cm_config::RuntimeConfig;
-use cm_rust::ComponentDecl;
+use cm_rust::{CapabilityTypeName, ComponentDecl};
 use cm_types::RelativePath;
 use fidl::endpoints::DiscoverableProtocolMarker;
 use futures::{future, FutureExt};
-use moniker::ChildName;
+use moniker::{ChildName, ExtendedMoniker};
 use router_error::RouterError;
 use sandbox::{Capability, Dict, Request, Routable, Router};
 use std::collections::HashMap;
@@ -48,46 +50,62 @@ fn new_debug_only_router(source: CapabilitySource) -> Router {
 pub fn build_root_component_input(
     runtime_config: &Arc<RuntimeConfig>,
     policy: &GlobalPolicyChecker,
+    runner_registry: RunnerRegistry,
 ) -> ComponentInput {
     let root_component_input = ComponentInput::default();
     let names_and_capability_sources = runtime_config
         .namespace_capabilities
         .iter()
         .filter_map(|capability_decl| match capability_decl {
-            cm_rust::CapabilityDecl::Protocol(protocol_decl) => Some((
-                protocol_decl.name.clone(),
+            cm_rust::CapabilityDecl::Protocol(_) | cm_rust::CapabilityDecl::Runner(_) => Some((
+                capability_decl.name().clone(),
                 CapabilitySource::Namespace(NamespaceSource {
-                    capability: ComponentCapability::Protocol(protocol_decl.clone()),
+                    capability: capability_decl.clone().into(),
                 }),
+                CapabilityTypeName::from(capability_decl),
             )),
             _ => None,
         })
         .chain(runtime_config.builtin_capabilities.iter().filter_map(|capability_decl| {
             match capability_decl {
-                cm_rust::CapabilityDecl::Protocol(protocol_decl) => Some((
-                    protocol_decl.name.clone(),
-                    CapabilitySource::Builtin(BuiltinSource {
-                        capability: InternalCapability::Protocol(protocol_decl.name.clone()),
-                    }),
-                )),
+                cm_rust::CapabilityDecl::Protocol(_) | cm_rust::CapabilityDecl::Runner(_) => {
+                    Some((
+                        capability_decl.name().clone(),
+                        CapabilitySource::Builtin(BuiltinSource {
+                            capability: capability_decl.clone().into(),
+                        }),
+                        CapabilityTypeName::from(capability_decl),
+                    ))
+                }
                 _ => None,
             }
         }));
-    for (name, capability_source) in names_and_capability_sources {
-        let capability: sandbox::Capability =
-            capability_source.clone().try_into().expect("failed to capability source to bedrock");
+    for (name, capability_source, capability_type) in names_and_capability_sources {
+        if capability_type == CapabilityTypeName::Runner
+            && runner_registry.get_runner(&name).is_none()
+        {
+            // If a runner has been declared as a builtin capability but its not in the runner
+            // registry, skip it.
+            continue;
+        }
+        let capability: sandbox::Capability = capability_source
+            .clone()
+            .try_into()
+            .expect("failed to convert capability source to bedrock capability");
+        let router = Router::new_ok(capability)
+            .with_policy_check::<ComponentInstanceForAnalyzer>(capability_source, policy.clone())
+            .with_porcelain_type(capability_type, ExtendedMoniker::ComponentManager);
         root_component_input
             .capabilities()
-            .insert_capability(
-                &name,
-                Router::new_ok(capability)
-                    .with_policy_check::<ComponentInstanceForAnalyzer>(
-                        capability_source,
-                        policy.clone(),
-                    )
-                    .into(),
-            )
+            .insert_capability(&name, router.clone().into())
             .expect("failed to insert builtin capability into dictionary");
+        if capability_type == CapabilityTypeName::Runner {
+            root_component_input
+                .environment()
+                .runners()
+                .insert_capability(&name, router.into())
+                .expect("failed to insert builtin runner into dictionary");
+        }
     }
     root_component_input
 }

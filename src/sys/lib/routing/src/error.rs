@@ -275,7 +275,7 @@ pub enum RoutingError {
     BedrockMemberAccessUnsupported { moniker: ExtendedMoniker },
 
     #[error("item `{name}` is not present in dictionary at component `{moniker}`")]
-    BedrockNotPresentInDictionary { name: String, moniker: Moniker },
+    BedrockNotPresentInDictionary { name: String, moniker: ExtendedMoniker },
 
     #[error("routed capability was the wrong type at component `{moniker}`. Was: {actual}, expected: {expected}")]
     BedrockWrongCapabilityType { actual: String, expected: String, moniker: ExtendedMoniker },
@@ -383,8 +383,7 @@ impl Explain for RoutingError {
 impl From<RoutingError> for ExtendedMoniker {
     fn from(err: RoutingError) -> ExtendedMoniker {
         match err {
-            RoutingError::BedrockNotPresentInDictionary { moniker, .. }
-            | RoutingError::BedrockRemoteCapability { moniker, .. }
+            RoutingError::BedrockRemoteCapability { moniker, .. }
             | RoutingError::BedrockSourceDictionaryExposeNotFound { moniker, .. }
             | RoutingError::CapabilityFromCapabilityNotFound { moniker, .. }
             | RoutingError::CapabilityFromFrameworkNotFound { moniker, .. }
@@ -414,6 +413,7 @@ impl From<RoutingError> for ExtendedMoniker {
             | RoutingError::UseFromSelfNotFound { moniker, .. } => moniker.into(),
 
             RoutingError::BedrockMemberAccessUnsupported { moniker }
+            | RoutingError::BedrockNotPresentInDictionary { moniker, .. }
             | RoutingError::BedrockNotCloneable { moniker }
             | RoutingError::BedrockSourceDictionaryCollision { moniker }
             | RoutingError::BedrockFailedToSend { moniker, .. }

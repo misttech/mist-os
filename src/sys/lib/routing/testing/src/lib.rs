@@ -3848,7 +3848,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     ///
     /// a: uses built-in runner "elf" from the root environment.
     pub async fn test_route_builtin_runner_from_root_env(&self) {
-        let components = vec![("a", ComponentDeclBuilder::new().build())];
+        let use_runner_decl =
+            UseBuilder::runner().source(UseSource::Environment).name("elf").build();
+        let components = vec![(
+            "a",
+            ComponentDeclBuilder::new_empty_component().use_(use_runner_decl.clone()).build(),
+        )];
 
         let mut builder = T::new("a", components);
         builder.set_builtin_capabilities(vec![CapabilityDecl::Runner(RunnerDecl {
@@ -3860,10 +3865,9 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let a_component = model.look_up_instance(&Moniker::root()).await.expect("a instance");
         let source = route_capability(
-            RouteRequest::UseRunner(UseRunnerDecl {
-                source: UseSource::Environment,
-                source_name: "elf".parse().unwrap(),
-                source_dictionary: Default::default(),
+            RouteRequest::UseRunner(match use_runner_decl {
+                UseDecl::Runner(u) => u,
+                _ => panic!("unexpected use type"),
             }),
             &a_component,
             &mut NoopRouteMapper,
@@ -3943,7 +3947,15 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
     ///    The runner is provided as a built-in capability, but not registered in
     ///    the root environment.
     pub async fn test_route_builtin_runner_from_root_env_registration_not_found(&self) {
-        let components = vec![("a", ComponentDeclBuilder::new().build())];
+        let use_runner_decl = UseRunnerDecl {
+            source: UseSource::Environment,
+            source_name: "hobbit".parse().unwrap(),
+            source_dictionary: Default::default(),
+        };
+        let components = vec![(
+            "a",
+            ComponentDeclBuilder::new_empty_component().use_(use_runner_decl.clone()).build(),
+        )];
 
         let mut builder = T::new("a", components);
         builder.set_builtin_capabilities(vec![CapabilityDecl::Runner(RunnerDecl {
@@ -3954,11 +3966,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
 
         let a_component = model.look_up_instance(&Moniker::root()).await.expect("a instance");
         let route_result = route_capability(
-            RouteRequest::UseRunner(UseRunnerDecl {
-                source: UseSource::Environment,
-                source_name: "hobbit".parse().unwrap(),
-                source_dictionary: Default::default(),
-            }),
+            RouteRequest::UseRunner(use_runner_decl),
             &a_component,
             &mut NoopRouteMapper,
         )
@@ -3988,7 +3996,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
         let components = vec![
             (
                 "a",
-                ComponentDeclBuilder::new()
+                ComponentDeclBuilder::new_empty_component()
                     .use_(UseBuilder::runner().source_static_child("b").name("dwarf"))
                     .child_default("b")
                     .build(),
@@ -4068,7 +4076,12 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
                     .child_default("b")
                     .build(),
             ),
-            ("b", ComponentDeclBuilder::new().use_(UseBuilder::runner().name("dwarf")).build()),
+            (
+                "b",
+                ComponentDeclBuilder::new_empty_component()
+                    .use_(UseBuilder::runner().name("dwarf"))
+                    .build(),
+            ),
         ];
 
         let model = T::new("a", components).build().await;
@@ -4133,7 +4146,7 @@ impl<T: RoutingTestModelBuilder> CommonRoutingTest<T> {
             ),
             (
                 "b",
-                ComponentDeclBuilder::new()
+                ComponentDeclBuilder::new_empty_component()
                     .use_(UseBuilder::runner().source(UseSource::Environment).name("hobbit"))
                     .build(),
             ),

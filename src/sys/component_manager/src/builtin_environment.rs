@@ -1,4 +1,4 @@
-// Copyright 2019 The Fuchsia Authors. All rights reserved.
+// Copyr, ExtendedMoniker::ComponentManageright 2019 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
@@ -50,6 +50,7 @@ use ::diagnostics::lifecycle::ComponentLifecycleTimeStats;
 use ::diagnostics::task_metrics::ComponentTreeStats;
 use ::routing::bedrock::dict_ext::DictExt;
 use ::routing::bedrock::structured_dict::ComponentInput;
+use ::routing::bedrock::with_porcelain_type::WithPorcelainType;
 use ::routing::capability_source::{
     BuiltinSource, CapabilitySource, ComponentCapability, InternalCapability, NamespaceSource,
 };
@@ -78,7 +79,9 @@ use builtins::profile_resource::ProfileResource;
 use builtins::root_job::RootJob;
 use builtins::vmex_resource::VmexResource;
 use cm_config::{RuntimeConfig, SecurityPolicy, VmexSource};
-use cm_rust::{Availability, RunnerRegistration, UseEventStreamDecl, UseSource};
+use cm_rust::{
+    Availability, CapabilityTypeName, RunnerRegistration, UseEventStreamDecl, UseSource,
+};
 use cm_types::Name;
 use elf_runner::crash_info::CrashRecords;
 use elf_runner::process_launcher::ProcessLauncher;
@@ -96,6 +99,7 @@ use fuchsia_zircon::{self as zx, Clock, Resource};
 use futures::future::{self, BoxFuture};
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use hooks::EventType;
+use moniker::ExtendedMoniker;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 use vfs::directory::entry::OpenRequest;
@@ -432,7 +436,13 @@ impl RootComponentInputBuilder {
 
         match self.input.insert_capability(
             &P::PROTOCOL_NAME.parse::<Name>().unwrap(),
-            launch.into_router().into(),
+            launch
+                .into_router()
+                .with_porcelain_type(
+                    CapabilityTypeName::Protocol,
+                    ExtendedMoniker::ComponentManager,
+                )
+                .into(),
         ) {
             Ok(()) => (),
             Err(e) => warn!("failed to add {name} to root component input: {e:?}"),
@@ -468,16 +478,30 @@ impl RootComponentInputBuilder {
                 fut.boxed()
             }),
         );
-        match self.input.insert_capability(&protocol.name, launch.into_router().into()) {
+        match self.input.insert_capability(
+            &protocol.name,
+            launch
+                .into_router()
+                .with_porcelain_type(
+                    CapabilityTypeName::Protocol,
+                    ExtendedMoniker::ComponentManager,
+                )
+                .into(),
+        ) {
             Ok(()) => (),
             Err(e) => warn!("failed to add {} to root component input: {e:?}", protocol.name),
         }
     }
 
-    fn add_runner(&mut self, runner: BuiltinRunner) {
-        let runner_name = runner.name().clone();
+    fn add_runner_if_enabled(&mut self, runner: BuiltinRunner) {
+        if self.builtin_capabilities.iter().find(|decl| decl.name() == runner.name()).is_none() {
+            // This builtin protocol is not enabled based on the runtime config, so don't add the
+            // capability to the input.
+            return;
+        }
+        let name = runner.name().clone();
         let capability_source = CapabilitySource::Builtin(BuiltinSource {
-            capability: InternalCapability::Runner(runner_name.clone()),
+            capability: InternalCapability::Runner(name.clone()),
         });
         let security_policy = self.security_policy.clone();
         let execution_scope = ExecutionScope::new();
@@ -508,14 +532,21 @@ impl RootComponentInputBuilder {
                 future::ready(Ok(())).boxed()
             }),
         );
-        match self
-            .input
-            .environment()
-            .runners()
-            .insert_capability(&runner_name, launch.into_router().into())
-        {
-            Ok(()) => (),
-            Err(e) => warn!("failed to add {} to root component input runners: {e:?}", runner_name),
+        let r = launch.into_router();
+        if let Err(e) = self.input.capabilities().insert_capability(
+            &name,
+            r.clone()
+                .with_porcelain_type(CapabilityTypeName::Runner, ExtendedMoniker::ComponentManager)
+                .into(),
+        ) {
+            warn!("failed to add runner {} to root component offered capabilities: {e:?}", name);
+        }
+        if let Err(e) = self.input.environment().runners().insert_capability(
+            &name,
+            r.with_porcelain_type(CapabilityTypeName::Runner, ExtendedMoniker::ComponentManager)
+                .into(),
+        ) {
+            warn!("failed to add runner {} to root component environment: {e:?}", name)
         }
     }
 
@@ -1195,7 +1226,7 @@ impl BuiltinEnvironment {
         }
 
         for runner in builtin_runners.iter() {
-            root_input_builder.add_runner(runner.clone());
+            root_input_builder.add_runner_if_enabled(runner.clone());
         }
 
         let root_component_input = root_input_builder.build();
