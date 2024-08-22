@@ -6,7 +6,7 @@ use starnix_sync::Mutex;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 
-use crate::vfs::{FsStr, FsString, XattrOp};
+use crate::vfs::{FsStr, FsString, XattrOp, XattrStorage};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::{errno, error};
 
@@ -14,13 +14,14 @@ use starnix_uapi::{errno, error};
 pub struct MemoryXattrStorage {
     xattrs: Mutex<HashMap<FsString, FsString>>,
 }
-impl MemoryXattrStorage {
-    pub fn get_xattr(&self, name: &FsStr) -> Result<FsString, Errno> {
+
+impl XattrStorage for MemoryXattrStorage {
+    fn get_xattr(&self, name: &FsStr) -> Result<FsString, Errno> {
         let xattrs = self.xattrs.lock();
         Ok(xattrs.get(name).ok_or_else(|| errno!(ENODATA))?.clone())
     }
 
-    pub fn set_xattr(&self, name: &FsStr, value: &FsStr, op: XattrOp) -> Result<(), Errno> {
+    fn set_xattr(&self, name: &FsStr, value: &FsStr, op: XattrOp) -> Result<(), Errno> {
         let mut xattrs = self.xattrs.lock();
         match xattrs.entry(name.to_owned()) {
             Entry::Vacant(_) if op == XattrOp::Replace => return error!(ENODATA),
@@ -37,7 +38,7 @@ impl MemoryXattrStorage {
         Ok(())
     }
 
-    pub fn remove_xattr(&self, name: &FsStr) -> Result<(), Errno> {
+    fn remove_xattr(&self, name: &FsStr) -> Result<(), Errno> {
         let mut xattrs = self.xattrs.lock();
         if xattrs.remove(name).is_none() {
             return error!(ENODATA);
@@ -45,7 +46,7 @@ impl MemoryXattrStorage {
         Ok(())
     }
 
-    pub fn list_xattrs(&self) -> Result<Vec<FsString>, Errno> {
+    fn list_xattrs(&self) -> Result<Vec<FsString>, Errno> {
         let xattrs = self.xattrs.lock();
         Ok(xattrs.keys().cloned().collect())
     }

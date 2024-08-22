@@ -10,7 +10,8 @@ use crate::vfs::buffers::{InputBuffer, OutputBuffer};
 use crate::vfs::{
     anon_fs, fileops_impl_noop_sync, fs_node_impl_not_dir, fs_node_impl_xattr_delegate,
     AppendLockGuard, DirEntry, FallocMode, FileHandle, FileObject, FileOps, FsNode, FsNodeInfo,
-    FsNodeOps, FsString, MemoryXattrStorage, MountInfo, NamespaceNode, MAX_LFS_FILESIZE,
+    FsNodeOps, FsString, MemoryXattrStorage, MountInfo, NamespaceNode, XattrStorage as _,
+    MAX_LFS_FILESIZE,
 };
 use fuchsia_zircon as zx;
 use starnix_logging::{impossible_error, track_stub};

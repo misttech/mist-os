@@ -17,6 +17,7 @@ use crate::vfs::{
     fs_node_impl_xattr_delegate, CacheMode, FdNumber, FileObject, FileOps, FileSystem,
     FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
     FsNodeOps, FsStr, FsString, MemoryDirectoryFile, MemoryXattrStorage, NamespaceNode, XattrOp,
+    XattrStorage as _,
 };
 use linux_uapi::XATTR_NAME_SELINUX;
 use starnix_logging::track_stub;

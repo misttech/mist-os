@@ -5,7 +5,7 @@
 use crate::task::CurrentTask;
 use crate::vfs::{
     fs_node_impl_symlink, fs_node_impl_xattr_delegate, FsNode, FsNodeInfo, FsNodeOps, FsStr,
-    FsString, MemoryXattrStorage, SymlinkTarget,
+    FsString, MemoryXattrStorage, SymlinkTarget, XattrStorage as _,
 };
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;

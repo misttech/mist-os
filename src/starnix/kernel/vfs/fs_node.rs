@@ -953,8 +953,45 @@ macro_rules! fs_node_impl_dir_readonly {
     };
 }
 
-/// Implements [`FsNodeOps::set_xattr`] by delegating to another [`FsNodeOps`]
-/// object.
+/// Trait that objects can implement if they need to handle extended attribute storage. Allows
+/// delegating extended attribute operations in [`FsNodeOps`] to another object.
+///
+/// See [`fs_node_impl_xattr_delegate`] for usage details.
+pub trait XattrStorage {
+    /// Delegate for [`FsNodeOps::get_xattr`].
+    fn get_xattr(&self, name: &FsStr) -> Result<FsString, Errno>;
+
+    /// Delegate for [`FsNodeOps::set_xattr`].
+    fn set_xattr(&self, name: &FsStr, value: &FsStr, op: XattrOp) -> Result<(), Errno>;
+
+    /// Delegate for [`FsNodeOps::remove_xattr`].
+    fn remove_xattr(&self, name: &FsStr) -> Result<(), Errno>;
+
+    /// Delegate for [`FsNodeOps::list_xattrs`].
+    fn list_xattrs(&self) -> Result<Vec<FsString>, Errno>;
+}
+
+/// Implements extended attribute ops for [`FsNodeOps`] by delegating to another object which
+/// implements the [`XattrStorage`] trait or a similar interface. For example:
+///
+/// ```
+/// struct Xattrs {}
+///
+/// impl XattrStorage for Xattrs {
+///     // implement XattrStorage
+/// }
+///
+/// struct Node {
+///     xattrs: Xattrs
+/// }
+///
+/// impl FsNodeOps for Node {
+///     // Delegate extended attribute ops in FsNodeOps to self.xattrs
+///     fs_node_impl_xattr_delegate!(self, self.xattrs);
+///
+///     // add other FsNodeOps impls here
+/// }
+/// ```
 #[macro_export]
 macro_rules! fs_node_impl_xattr_delegate {
     ($self:ident, $delegate:expr) => {
@@ -997,7 +1034,6 @@ macro_rules! fs_node_impl_xattr_delegate {
             Ok($delegate.list_xattrs()?.into())
         }
     };
-    ($delegate:expr) => { fs_node_impl_xattr_delegate(self, $delegate) };
 }
 
 /// Stubs out [`FsNodeOps`] methods that only apply to directories.
