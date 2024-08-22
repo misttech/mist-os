@@ -53,6 +53,4 @@ fuchsia_product_bundle(
     main = ":image.power_testing_msd_arm_mali_vim3",
     partitions_config = "//build/bazel/assembly/partitions_configurations:vim3",
     product_bundle_name = "power_testing",
-    repository_keys = "//src/sys/pkg/repositories/devhost/keys",
-    update_epoch = "1",
 )

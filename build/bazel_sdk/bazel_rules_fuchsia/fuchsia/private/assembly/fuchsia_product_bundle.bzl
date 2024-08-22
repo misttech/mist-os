@@ -6,14 +6,14 @@
 
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_product_bundle_inputs", "get_ffx_scrutiny_inputs")
 load(
-    "//fuchsia/private/workflows:fuchsia_product_bundle_tasks.bzl",
-    "fuchsia_product_bundle_tasks",
-    "product_bundles_help_executable",
-)
-load(
     "//fuchsia/private:fuchsia_debug_symbols.bzl",
     "fuchsia_collect_all_debug_symbols_infos_aspect",
     "transform_collected_debug_symbols_infos",
+)
+load(
+    "//fuchsia/private/workflows:fuchsia_product_bundle_tasks.bzl",
+    "fuchsia_product_bundle_tasks",
+    "product_bundles_help_executable",
 )
 load(
     ":providers.bzl",
@@ -665,7 +665,10 @@ def _build_fuchsia_product_bundle_impl(ctx):
         inputs.extend(ctx.files.recovery)
 
     # If update info is supplied, add it to the product bundle.
-    if ctx.file.update_version_file != None:
+    if ctx.file.update_version_file != None or ctx.attr.update_epoch != "":
+        # both the update version and the update epoch need to be set
+        if ctx.file.update_version_file == None:
+            fail("'update_version_file' must be supplied in order to build an update package.")
         if ctx.attr.repository_keys == None:
             fail("Repository keys must be supplied in order to build an update package")
         ffx_invocation.extend([
@@ -673,7 +676,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
             "--update-package-epoch $UPDATE_EPOCH",
         ])
         env["UPDATE_VERSION_FILE"] = ctx.file.update_version_file.path
-        env["UPDATE_EPOCH"] = ctx.attr.update_epoch
+        env["UPDATE_EPOCH"] = ctx.attr.update_epoch or "1"
         inputs.append(ctx.file.update_version_file)
 
     # If a repository is supplied, add it to the product bundle.
@@ -796,7 +799,6 @@ _build_fuchsia_product_bundle = rule(
         ),
         "update_epoch": attr.string(
             doc = "Epoch needed to create update package.",
-            default = "1",
         ),
         "main_scrutiny_config": attr.label(
             doc = "Scrutiny config for slot A.",
