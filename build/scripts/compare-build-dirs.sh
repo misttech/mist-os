@@ -365,6 +365,14 @@ function diff_file_relpath() {
       esac
       ;;
 
+      # These list hashes of binaries that are already being
+      # compared elsewhere, so this is redundant information.
+    *.ids_txt)
+      case "$common_path" in
+        */bazel-out/*) expect=ignore ;;
+      esac
+      ;;
+
     # Various binaries.
     *.blk) expect=unknown; diff_binary "$left" "$right" ;;
     *.vboot) expect=unknown; diff_binary "$left" "$right" ;;
