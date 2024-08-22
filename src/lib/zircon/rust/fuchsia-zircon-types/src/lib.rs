@@ -2243,6 +2243,14 @@ pub struct zx_processor_power_level_transition_info_t {
     pub context: u64,
 }
 
+multiconst!(u32, [
+    ZX_BTI_PERM_READ = 1 << 0;
+    ZX_BTI_PERM_WRITE = 1 << 1;
+    ZX_BTI_PERM_EXECUTE = 1 << 2;
+    ZX_BTI_COMPRESS = 1 << 3;
+    ZX_BTI_CONTIGUOUS = 1 << 4;
+]);
+
 #[cfg(test)]
 mod test {
     use super::*;
