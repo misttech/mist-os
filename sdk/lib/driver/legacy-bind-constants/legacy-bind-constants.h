@@ -9,15 +9,6 @@
 // global binding variables at 0x00XX
 #define BIND_PROTOCOL 0x0001  // primary protocol of the device
 
-// pci binding variables at 0x01XX
-#define BIND_PCI_VID 0x0100
-#define BIND_PCI_DID 0x0101
-#define BIND_PCI_CLASS 0x0102
-#define BIND_PCI_SUBCLASS 0x0103
-#define BIND_PCI_INTERFACE 0x0104
-#define BIND_PCI_REVISION 0x0105
-#define BIND_PCI_TOPO 0x0107
-
 #define BIND_PCI_TOPO_PACK(bus, dev, func) (((bus) << 8) | (dev << 3) | (func))
 
 // usb binding variables at 0x02XX

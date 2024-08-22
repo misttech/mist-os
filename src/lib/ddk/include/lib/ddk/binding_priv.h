@@ -67,13 +67,13 @@ __BEGIN_CDECLS
 // BIND_COMPOSITE was 0x003, whether this is a composite device
 
 // pci binding variables at 0x01XX
-#define BIND_PCI_VID 0x0100
-#define BIND_PCI_DID 0x0101
-#define BIND_PCI_CLASS 0x0102
-#define BIND_PCI_SUBCLASS 0x0103
-#define BIND_PCI_INTERFACE 0x0104
-#define BIND_PCI_REVISION 0x0105
-#define BIND_PCI_TOPO 0x0107
+// BIND_PCI_VID was 0x0100
+// BIND_PCI_DID was 0x0101
+// BIND_PCI_CLASS was 0x0102
+// BIND_PCI_SUBCLASS was 0x0103
+// BIND_PCI_INTERFACE was 0x0104
+// BIND_PCI_REVISION was 0x0105
+// BIND_PCI_TOPO was 0x0107
 
 #define BIND_PCI_TOPO_PACK(bus, dev, func) (((bus) << 8) | (dev << 3) | (func))
 

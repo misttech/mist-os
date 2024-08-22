@@ -31,6 +31,7 @@ fuchsia_driver("driver") {
   sources = [ "autobind.cc" ]
   deps = [
     ":bind",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/lib/driver",
     "//src/lib/ddktl",
     "//zircon/system/ulib/fbl",

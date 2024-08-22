@@ -20,20 +20,6 @@ const char* BindParamName(uint32_t param_num) {
   switch (param_num) {
     case BIND_PROTOCOL:
       return "Protocol";
-    case BIND_PCI_VID:
-      return "PCI.VID";
-    case BIND_PCI_DID:
-      return "PCI.DID";
-    case BIND_PCI_CLASS:
-      return "PCI.Class";
-    case BIND_PCI_SUBCLASS:
-      return "PCI.Subclass";
-    case BIND_PCI_INTERFACE:
-      return "PCI.Interface";
-    case BIND_PCI_REVISION:
-      return "PCI.Revision";
-    case BIND_PCI_TOPO:
-      return "PCI.Topology";
     case BIND_USB_VID:
       return "USB.VID";
     case BIND_USB_PID:
