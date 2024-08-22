@@ -35,7 +35,7 @@ use starnix_core::vfs::{FileSystemOptions, FsContext, LookupContext, Namespace, 
 use starnix_logging::{
     log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
 };
-use starnix_modules::init_common_devices;
+use starnix_modules::{init_common_devices, register_common_file_systems};
 use starnix_modules_magma::get_magma_params;
 use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::errors::{SourceContext, ENOENT};
@@ -418,6 +418,7 @@ async fn create_container(
 
     // Register common devices and add them in sysfs and devtmpfs.
     init_common_devices(kernel.kthreads.unlocked_for_async().deref_mut(), &system_task);
+    register_common_file_systems(kernel.kthreads.unlocked_for_async().deref_mut(), &kernel);
 
     mount_filesystems(
         kernel.kthreads.unlocked_for_async().deref_mut(),

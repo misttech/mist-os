@@ -8,13 +8,16 @@ use starnix_core::device::mem::{mem_device_init, DevRandom};
 use starnix_core::device::tun::DevTun;
 use starnix_core::device::{simple_device_ops, DeviceMode};
 use starnix_core::fs::devpts::tty_device_init;
+use starnix_core::fs::nmfs::nmfs;
 use starnix_core::fs::sysfs::DeviceDirectory;
-use starnix_core::task::CurrentTask;
+use starnix_core::task::{CurrentTask, Kernel};
+use starnix_core::vfs::fs_registry::FsRegistry;
 use starnix_core::vfs::fuse::open_fuse_device;
 use starnix_modules_loop::{create_loop_control_device, loop_device_init};
 use starnix_modules_zram::zram_device_init;
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::device_type::DeviceType;
+use std::sync::Arc;
 
 fn misc_device_init(locked: &mut Locked<'_, Unlocked>, current_task: &CurrentTask) {
     let kernel = current_task.kernel();
@@ -80,4 +83,9 @@ pub fn init_common_devices(locked: &mut Locked<'_, Unlocked>, system_task: &Curr
     loop_device_init(locked, system_task);
     device_mapper_init(system_task);
     zram_device_init(locked, system_task);
+}
+
+pub fn register_common_file_systems(_locked: &mut Locked<'_, Unlocked>, kernel: &Arc<Kernel>) {
+    let registry = kernel.expando.get::<FsRegistry>();
+    registry.register(b"nmfs".into(), nmfs);
 }

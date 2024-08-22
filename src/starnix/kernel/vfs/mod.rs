@@ -32,6 +32,7 @@ pub mod directory_file;
 pub mod eventfd;
 pub mod file_server;
 pub mod fs_args;
+pub mod fs_registry;
 pub mod fsverity;
 pub mod fuse;
 pub mod inotify;

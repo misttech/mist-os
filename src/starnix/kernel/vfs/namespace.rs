@@ -8,7 +8,6 @@ use crate::fs::devpts::dev_pts_fs;
 use crate::fs::devtmpfs::dev_tmp_fs;
 use crate::fs::ext4::ExtFilesystem;
 use crate::fs::functionfs::FunctionFs;
-use crate::fs::nmfs::nmfs;
 use crate::fs::overlayfs::OverlayFs;
 use crate::fs::proc::proc_fs;
 use crate::fs::sysfs::sys_fs;
@@ -19,6 +18,7 @@ use crate::security;
 use crate::task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, Waiter};
 use crate::time::utc;
 use crate::vfs::buffers::InputBuffer;
+use crate::vfs::fs_registry::FsRegistry;
 use crate::vfs::fuse::{new_fuse_fs, new_fusectl_fs};
 use crate::vfs::socket::{SocketAddress, SocketHandle, UnixSocket};
 use crate::vfs::{
@@ -734,6 +734,11 @@ impl FileSystemCreator for Arc<Kernel> {
         L: LockBefore<FileOpsCore>,
         L: LockBefore<DeviceOpen>,
     {
+        if let Some(result) =
+            self.expando.get::<FsRegistry>().create(self, fs_type, options.clone())
+        {
+            return result;
+        }
         Ok(match &**fs_type {
             b"binder" => BinderFs::new_fs(self, options)?,
             b"bpf" => BpfFs::new_fs(self, options)?,
@@ -778,7 +783,6 @@ impl FileSystemCreator for CurrentTask {
             b"devtmpfs" => Ok(dev_tmp_fs(locked, self).clone()),
             b"ext4" => ExtFilesystem::new_fs(locked, kernel, self, options),
             b"functionfs" => FunctionFs::new_fs(self, options),
-            b"nmfs" => Ok(nmfs(self, options).clone()),
             b"overlay" => OverlayFs::new_fs(locked, self, options),
             b"proc" => Ok(proc_fs(self, options).clone()),
             b"tracefs" => Ok(trace_fs(self, options).clone()),
