@@ -88,6 +88,10 @@ extern const int INSTR_PROF_PROFILE_RUNTIME_VAR = 0;
 // in with its own definition.
 [[gnu::weak]] extern uintptr_t INSTR_PROF_PROFILE_COUNTER_BIAS_VAR = 0;
 
+#ifdef INSTR_PROF_PROFILE_BITMAP_BIAS_VAR
+[[gnu::weak]] extern uintptr_t INSTR_PROF_PROFILE_BITMAP_BIAS_VAR = 0;
+#endif
+
 // These are outcalls made by the value-profiling instrumentation.  This
 // runtime doesn't support value-profiling in any meaningful way.  But the
 // entry points are provided so that instrumented code can be linked against
@@ -356,6 +360,25 @@ void MergeCounters(cpp20::span<std::byte> to, cpp20::span<const std::byte> from)
     MergeData<uint64_t, std::plus>(to, from);
 }
 
+void UseData(cpp20::span<std::byte> self_data, uintptr_t& bias_var, const char* what,
+             cpp20::span<std::byte> data) {
+  ZX_ASSERT_MSG(data.size_bytes() >= self_data.size_bytes(),
+                "cannot relocate %zu bytes of %s with only %zu bytes left!", self_data.size_bytes(),
+                what, data.size_bytes());
+
+  const uintptr_t old_addr = reinterpret_cast<uintptr_t>(self_data.data());
+  const uintptr_t new_addr = reinterpret_cast<uintptr_t>(data.data());
+  ZX_ASSERT(new_addr % LlvmProfdata::kAlign == 0);
+  const uintptr_t new_bias = new_addr - old_addr;
+
+  // Now that the data has been copied (or merged), start updating the new
+  // copy.  These compiler barriers should ensure we've finished all the
+  // copying before updating the bias that the instrumented code uses.
+  std::atomic_signal_fence(std::memory_order_seq_cst);
+  bias_var = new_bias;
+  std::atomic_signal_fence(std::memory_order_seq_cst);
+}
+
 }  // namespace
 
 void LlvmProfdata::Init(cpp20::span<const std::byte> build_id) {
@@ -512,28 +535,15 @@ void LlvmProfdata::MergeLiveData(LiveData to, LiveData from) {
   MergeData<char, std::bit_or>(to.bitmap, from.bitmap);
 }
 
-void LlvmProfdata::UseCounters(cpp20::span<std::byte> data) {
-  auto prof_counters = ProfCountersData();
-  ZX_ASSERT_MSG(data.size_bytes() >= prof_counters.size_bytes(),
-                "cannot relocate %zu bytes of counters with only %zu bytes left!",
-                prof_counters.size_bytes(), data.size_bytes());
-
-  const uintptr_t old_addr = reinterpret_cast<uintptr_t>(prof_counters.data());
-  const uintptr_t new_addr = reinterpret_cast<uintptr_t>(data.data());
-  ZX_ASSERT(new_addr % kAlign == 0);
-  const uintptr_t counters_bias = new_addr - old_addr;
-
-  // Now that the data has been copied (or merged), start updating the new
-  // copy.  These compiler barriers should ensure we've finished all the
-  // copying before updating the bias that the instrumented code uses.
-  std::atomic_signal_fence(std::memory_order_seq_cst);
-  INSTR_PROF_PROFILE_COUNTER_BIAS_VAR = counters_bias;
-  std::atomic_signal_fence(std::memory_order_seq_cst);
-}
-
 void LlvmProfdata::UseLiveData(LiveData data) {
+#ifdef INSTR_PROF_PROFILE_BITMAP_BIAS_VAR
+  UseData(cpp20::as_writable_bytes(ProfBitmapData()), INSTR_PROF_PROFILE_BITMAP_BIAS_VAR, "bitmap",
+          data.bitmap);
+#else
   ZX_ASSERT_MSG(data.bitmap.empty(), "bitmap bytes cannot be relocated");
-  UseCounters(data.counters);
+#endif
+  UseData(cpp20::as_writable_bytes(ProfCountersData()), INSTR_PROF_PROFILE_COUNTER_BIAS_VAR,
+          "counters", data.counters);
 }
 
 void LlvmProfdata::UseLinkTimeLiveData() {
