@@ -310,7 +310,7 @@ impl MockRunner {
         handle.send_on_stop(info).unwrap();
     }
 
-    async fn start(
+    fn start(
         &self,
         start_info: fcrunner::ComponentStartInfo,
         server_end: ServerEnd<fcrunner::ComponentControllerMarker>,
@@ -383,6 +383,16 @@ impl MockRunner {
             }
         }
     }
+
+    pub async fn handle_stream(
+        self: Arc<Self>,
+        mut stream: fcrunner::ComponentRunnerRequestStream,
+    ) {
+        while let Ok(Some(request)) = stream.try_next().await {
+            let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } = request;
+            self.start(start_info, controller);
+        }
+    }
 }
 
 impl BuiltinRunnerFactory for MockRunner {
@@ -391,20 +401,10 @@ impl BuiltinRunnerFactory for MockRunner {
         checker: ScopedPolicyChecker,
         open_request: OpenRequest<'_>,
     ) -> Result<(), zx::Status> {
-        {
-            let mut state = self.inner.lock().unwrap();
-            state.last_checker = Some(checker);
-        }
+        self.inner.lock().unwrap().last_checker = Some(checker);
         open_request.open_service(endpoint(move |scope, server_end| {
-            let mut stream = fcrunner::ComponentRunnerRequestStream::from_channel(server_end);
-            let runner = self.clone();
-            scope.spawn(async move {
-                while let Ok(Some(request)) = stream.try_next().await {
-                    let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } =
-                        request;
-                    runner.start(start_info, controller).await;
-                }
-            });
+            let stream = fcrunner::ComponentRunnerRequestStream::from_channel(server_end);
+            scope.spawn(self.clone().handle_stream(stream));
         }))
     }
 }

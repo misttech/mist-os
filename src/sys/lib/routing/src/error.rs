@@ -295,6 +295,9 @@ pub enum RoutingError {
     )]
     BedrockSourceDictionaryCollision { moniker: ExtendedMoniker },
 
+    #[error("failed to send message for capability `{capability_id}` from component `{moniker}`")]
+    BedrockFailedToSend { moniker: ExtendedMoniker, capability_id: String },
+
     #[error(transparent)]
     ComponentInstanceError(#[from] ComponentInstanceError),
 
@@ -361,6 +364,7 @@ impl Explain for RoutingError {
             | RoutingError::BedrockNotPresentInDictionary { .. }
             | RoutingError::BedrockSourceDictionaryExposeNotFound { .. }
             | RoutingError::BedrockSourceDictionaryCollision { .. }
+            | RoutingError::BedrockFailedToSend { .. }
             | RoutingError::BedrockWrongCapabilityType { .. }
             | RoutingError::BedrockRemoteCapability { .. }
             | RoutingError::BedrockNotCloneable { .. }
@@ -412,6 +416,7 @@ impl From<RoutingError> for ExtendedMoniker {
             RoutingError::BedrockMemberAccessUnsupported { moniker }
             | RoutingError::BedrockNotCloneable { moniker }
             | RoutingError::BedrockSourceDictionaryCollision { moniker }
+            | RoutingError::BedrockFailedToSend { moniker, .. }
             | RoutingError::BedrockWrongCapabilityType { moniker, .. }
             | RoutingError::NonDebugRoutesUnsupported { moniker }
             | RoutingError::UnsupportedCapabilityType { moniker, .. }

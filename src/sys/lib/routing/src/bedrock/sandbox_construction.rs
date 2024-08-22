@@ -22,7 +22,7 @@ use router_error::RouterError;
 use sandbox::{Capability, Dict, Request, Router, Unit};
 use std::collections::HashMap;
 use std::fmt::Debug;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tracing::warn;
 use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys};
 
@@ -31,6 +31,12 @@ use {fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_sys2 as fsys};
 pub struct ProgramInput {
     /// All of the capabilities that appear in a program's namespace.
     pub namespace: Dict,
+
+    /// A router for the runner that a component has used (if any). This is in an `Arc<Mutex<_>>`
+    /// because it needs to match the semantics of `Dict`, notably that clones grab new references
+    /// to the same underlying data and the data can be mutated without a mutable reference to
+    /// `ProgramInput`.
+    pub runner: Arc<Mutex<Option<Router>>>,
 
     /// All of the config capabilities that a program will use.
     pub config: Dict,
@@ -186,6 +192,29 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
             &capability_sourced_capabilities_dict,
             use_,
         );
+    }
+
+    // The runner may be specified by either use declaration or in the program section of the
+    // manifest. If there's no use declaration for a runner and there is one set in the program
+    // section, then let's synthesize a use decl for it and add it to the sandbox.
+    if !decl.uses.iter().any(|u| matches!(u, cm_rust::UseDecl::Runner(_))) {
+        if let Some(runner_name) = decl.program.as_ref().and_then(|p| p.runner.as_ref()) {
+            extend_dict_with_use(
+                &component.moniker(),
+                &child_component_output_dictionary_routers,
+                &component_input,
+                &program_input,
+                program_input_dict_additions,
+                &program_output_router,
+                &framework_dict,
+                &capability_sourced_capabilities_dict,
+                &cm_rust::UseDecl::Runner(cm_rust::UseRunnerDecl {
+                    source: cm_rust::UseSource::Environment,
+                    source_name: runner_name.clone(),
+                    source_dictionary: Default::default(),
+                }),
+            );
+        }
     }
 
     for offer in &decl.offers {
@@ -371,11 +400,11 @@ pub fn extend_dict_with_offers<C: ComponentInstanceInterface + 'static>(
     }
 }
 
-fn supported_use(use_: &cm_rust::UseDecl) -> Option<&cm_rust::UseProtocolDecl> {
-    match use_ {
-        cm_rust::UseDecl::Protocol(p) => Some(p),
-        _ => None,
-    }
+fn is_supported_use(use_: &cm_rust::UseDecl) -> bool {
+    matches!(
+        use_,
+        cm_rust::UseDecl::Config(_) | cm_rust::UseDecl::Protocol(_) | cm_rust::UseDecl::Runner(_)
+    )
 }
 
 // Add the `config_use` to the `program_input_dict`, so the component is able to
@@ -455,6 +484,9 @@ fn extend_dict_with_use(
     capability_sourced_capabilities_dict: &Dict,
     use_: &cm_rust::UseDecl,
 ) {
+    if !is_supported_use(use_) {
+        return;
+    }
     if let cm_rust::UseDecl::Config(config) = use_ {
         return extend_dict_with_config_use(
             moniker,
@@ -466,9 +498,6 @@ fn extend_dict_with_use(
             config,
         );
     };
-    let Some(use_protocol) = supported_use(use_) else {
-        return;
-    };
 
     let source_path = use_.source_path();
     let router = match use_.source() {
@@ -478,7 +507,7 @@ fn extend_dict_with_use(
             moniker,
             program_input_dict_additions,
         )
-        .with_porcelain_type(CapabilityTypeName::Protocol, moniker.clone()),
+        .with_porcelain_type(use_.into(), moniker.clone()),
         cm_rust::UseSource::Self_ => program_output_router
             .clone()
             .lazy_get(
@@ -488,7 +517,7 @@ fn extend_dict_with_use(
                     source_path.iter_segments().join("/"),
                 ),
             )
-            .with_porcelain_type(CapabilityTypeName::Protocol, moniker.clone()),
+            .with_porcelain_type(use_.into(), moniker.clone()),
         cm_rust::UseSource::Child(child_name) => {
             let child_name = ChildName::parse(child_name).expect("invalid child name");
             let Some(child_component_output) =
@@ -506,7 +535,7 @@ fn extend_dict_with_use(
                         use_.source_name().clone(),
                     ),
                 )
-                .with_porcelain_type(CapabilityTypeName::Protocol, moniker.clone())
+                .with_porcelain_type(use_.into(), moniker.clone())
         }
         cm_rust::UseSource::Framework if use_.is_from_dictionary() => {
             Router::new_error(RoutingError::capability_from_framework_not_found(
@@ -523,7 +552,7 @@ fn extend_dict_with_use(
                     source_path.iter_segments().join("/"),
                 ),
             )
-            .with_porcelain_type(CapabilityTypeName::Protocol, moniker.clone()),
+            .with_porcelain_type(use_.into(), moniker.clone()),
         cm_rust::UseSource::Capability(capability_name) => {
             let err = RoutingError::capability_from_capability_not_found(
                 moniker,
@@ -535,28 +564,54 @@ fn extend_dict_with_use(
                 Router::new_error(err)
             }
         }
-        cm_rust::UseSource::Debug => component_input
-            .environment()
-            .debug()
-            .lazy_get(
-                use_protocol.source_name.clone(),
-                RoutingError::use_from_environment_not_found(
-                    moniker,
-                    "protocol",
-                    &use_protocol.source_name,
-                ),
-            )
-            .with_porcelain_type(CapabilityTypeName::Protocol, moniker.clone()),
-        // UseSource::Environment is not used for protocol capabilities
-        cm_rust::UseSource::Environment => return,
+        cm_rust::UseSource::Debug => {
+            let cm_rust::UseDecl::Protocol(use_protocol) = use_ else {
+                panic!("non-protocol capability used with a debug source, this should be prevented by manifest validation");
+            };
+            component_input
+                .environment()
+                .debug()
+                .lazy_get(
+                    use_protocol.source_name.clone(),
+                    RoutingError::use_from_environment_not_found(
+                        moniker,
+                        "protocol",
+                        &use_protocol.source_name,
+                    ),
+                )
+                .with_porcelain_type(use_.into(), moniker.clone())
+        }
+        cm_rust::UseSource::Environment => {
+            let cm_rust::UseDecl::Runner(use_runner) = use_ else {
+                panic!("non-runner capability used with an environment source, this should be prevented by manifest validation");
+            };
+            component_input
+                .environment()
+                .runners()
+                .lazy_get(
+                    use_runner.source_name.clone(),
+                    RoutingError::use_from_environment_not_found(
+                        moniker,
+                        "runner",
+                        &use_runner.source_name,
+                    ),
+                )
+                .with_porcelain_type(use_.into(), moniker.clone())
+        }
     };
-    match program_input.namespace.insert_capability(
-        &use_protocol.target_path,
-        router.with_availability(moniker.clone(), *use_.availability()).into(),
-    ) {
-        Ok(()) => (),
-        Err(e) => {
-            warn!("failed to insert {} in program input dict: {e:?}", use_protocol.target_path)
+    let router = router.with_availability(moniker.clone(), *use_.availability());
+    if let Some(target_path) = use_.path() {
+        if let Err(e) = program_input.namespace.insert_capability(target_path, router.into()) {
+            warn!("failed to insert {} in program input dict: {e:?}", target_path)
+        }
+    } else {
+        match use_ {
+            cm_rust::UseDecl::Runner(_) => {
+                let mut runner_guard = program_input.runner.lock().unwrap();
+                assert!(runner_guard.is_none(), "component can't use multiple runners");
+                *runner_guard = Some(router);
+            }
+            _ => panic!("unexpected capability type: {:?}", use_),
         }
     }
 }

@@ -913,6 +913,7 @@ mod tests {
     use crate::model::actions::test_utils::MockAction;
     use crate::model::actions::StopAction;
     use crate::model::component::StartReason;
+    use crate::model::testing::out_dir::OutDir;
     use crate::model::testing::test_helpers::{
         component_decl_with_test_runner, execution_is_shut_down, has_child, ActionsTest,
         ComponentInfo,
@@ -923,13 +924,14 @@ mod tests {
     use cm_rust_testing::*;
     use cm_types::AllowedOffers;
     use errors::StopActionError;
+    use fidl::endpoints::RequestStream;
     use maplit::{btreeset, hashmap, hashset};
     use moniker::Moniker;
     use std::collections::BTreeSet;
     use test_case::test_case;
     use {
         fidl_fuchsia_component as fcomponent, fidl_fuchsia_component_decl as fdecl,
-        fuchsia_async as fasync,
+        fidl_fuchsia_component_runner as fcrunner, fuchsia_async as fasync,
     };
 
     /// Implementation of `super::Component` based on a `ComponentDecl` and
@@ -3650,11 +3652,34 @@ mod tests {
                 "b",
                 ComponentDeclBuilder::new()
                     .expose(ExposeBuilder::runner().name("test.runner").source(ExposeSource::Self_))
+                    .capability(CapabilityBuilder::runner().name("test.runner"))
                     .build(),
             ),
             ("c", ComponentDeclBuilder::new().build()),
         ];
         let test = ActionsTest::new("root", components, None).await;
+
+        // Set up component `b`'s outgoing directory to provide the test runner protocol, so that
+        // component `a` can also be started. Without this the outgoing directory for `b` will be
+        // closed by the mock runner and start requests for `a` will thus be ignored.
+        //
+        // We need a weak runner because otherwise the runner will hold the outgoing directory's
+        // host function, which will hold a reference to the runner, creating a cycle.
+        let weak_runner = Arc::downgrade(&test.runner);
+        let mut test_runner_out_dir = OutDir::new();
+        test_runner_out_dir.add_entry(
+            "/svc/fuchsia.component.runner.ComponentRunner".parse().unwrap(),
+            vfs::service::endpoint(move |_scope, channel| {
+                fuchsia_async::Task::spawn(
+                    weak_runner.upgrade().unwrap().handle_stream(
+                        fcrunner::ComponentRunnerRequestStream::from_channel(channel),
+                    ),
+                )
+                .detach();
+            }),
+        );
+        test.runner.add_host_fn("test:///b_resolved", test_runner_out_dir.host_fn());
+
         let root = test.model.root();
         let component_a = test.look_up(vec!["a"].try_into().unwrap()).await;
         let component_b = test.look_up(vec!["a", "b"].try_into().unwrap()).await;

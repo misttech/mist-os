@@ -11,14 +11,13 @@ use crate::model::namespace::create_namespace;
 use crate::model::routing::open_capability;
 use crate::runner::RemoteRunner;
 use ::namespace::Entry as NamespaceEntry;
-use ::routing::bedrock::lazy_get::LazyGet;
-use ::routing::bedrock::request_metadata::runner_metadata;
 use ::routing::component_instance::ComponentInstanceInterface;
 use ::routing::error::RoutingError;
 use ::routing::RouteRequest;
 use async_trait::async_trait;
 use cm_logger::scoped::ScopedLogger;
 use cm_rust::ComponentDecl;
+use cm_types::Name;
 use cm_util::{AbortError, AbortFutureExt, AbortHandle, AbortableScope};
 use config_encoder::ConfigFields;
 use errors::{ActionError, CreateNamespaceError, StartActionError, StructuredConfigError};
@@ -28,7 +27,8 @@ use futures::channel::oneshot;
 use hooks::{EventPayload, RuntimeInfo};
 use moniker::Moniker;
 use router_error::RouterError;
-use sandbox::{Capability, Connectable, Dict, Message, Request};
+use routing::bedrock::request_metadata::runner_metadata;
+use sandbox::{Capability, Connectable, Dict, Message, Request, Router};
 use serve_processargs::NamespaceBuilder;
 use std::sync::Arc;
 use tracing::warn;
@@ -136,9 +136,9 @@ async fn do_start(
         |_: AbortError| StartActionError::Aborted { moniker: component.moniker.clone() };
 
     // Resolve the component and find the runner to use.
-    let (runner, resolved_component, program_input_dict) = {
-        // Obtain the runner declaration under a short lock, as `open_runner` may lock the
-        // resolved state re-entrantly.
+    let (runner_router, runner_name, resolved_component, program_input_dict) = {
+        // Obtain the runner declaration under a short lock, as `open_runner` may run for a long
+        // time if components along the route need to be resolved.
         let resolved_state = component
             .lock_resolved_state()
             .with(&abortable_scope)
@@ -148,21 +148,29 @@ async fn do_start(
                 moniker: component.moniker.clone(),
                 err: Box::new(err),
             })?;
+        let runner = resolved_state.sandbox.program_input.runner.lock().unwrap().clone();
         (
-            resolved_state.decl().get_runner(),
+            runner,
+            resolved_state.decl().get_runner().as_ref().map(|r| r.source_name.clone()),
             resolved_state.resolved_component.clone(),
             resolved_state.sandbox.program_input.namespace.clone(),
         )
     };
-    let runner = match runner {
-        Some(runner) => open_runner(component, runner)
-            .with(&abortable_scope)
-            .await
-            .map_err(abort_error)?
-            .map_err(|err| {
-                warn!(moniker = %component.moniker, %err, "Failed to resolve runner.");
-                err
-            })?,
+    let runner = match runner_router {
+        Some(runner_router) => open_runner(
+            component,
+            runner_router,
+            runner_name.expect(
+                "runner is set in sandbox but is missing use decl, this should be impossible",
+            ),
+        )
+        .with(&abortable_scope)
+        .await
+        .map_err(abort_error)?
+        .map_err(|err| {
+            warn!(moniker = %component.moniker, %err, "Failed to resolve runner.");
+            err
+        })?,
         None => None,
     };
 
@@ -433,82 +441,66 @@ pub fn should_return_early(
 /// Returns None if the component's decl does not specify a runner.
 async fn open_runner(
     component: &Arc<ComponentInstance>,
-    runner: cm_rust::UseRunnerDecl,
+    runner_router: Router,
+    runner_name: Name,
 ) -> Result<Option<RemoteRunner>, StartActionError> {
     // Open up a channel to the runner.
-    match &runner.source {
-        cm_rust::UseSource::Environment => {
-            let runner_capability = component
-                .component_sandbox()
-                .await
-                .map_err(|err| StartActionError::ResolveRunnerError {
+    let request = Request {
+        target: component.as_weak().into(),
+        debug: false,
+        metadata: runner_metadata(cm_rust::Availability::Required),
+    };
+    let runner_capability =
+        runner_router.route(request).await.map_err(|err| StartActionError::ResolveRunnerError {
+            moniker: component.moniker.clone(),
+            err: Box::new(err),
+            runner: runner_name.clone(),
+        })?;
+    match &runner_capability {
+        // Built-in runners are hosted by a LaunchTaskOnReceive, which returns a Connector
+        // capability for new routes.
+        Capability::Connector(runner_connector) => {
+            let (proxy, server_end) = create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
+            runner_connector.send(Message { channel: server_end.into_channel() }).map_err(
+                |_| StartActionError::ResolveRunnerError {
                     moniker: component.moniker.clone(),
-                    err: Box::new(RouterError::NotFound(Arc::new(err))),
-                    runner: runner.source_name.clone(),
-                })?
-                .component_input
-                .environment()
-                .runners()
-                .lazy_get(
-                    runner.source_name.clone(),
-                    RoutingError::use_from_environment_not_found(
-                        &component.moniker,
-                        cm_rust::CapabilityTypeName::Runner.to_string(),
-                        &runner.source_name,
-                    ),
-                )
-                .route(Request {
-                    target: component.as_weak().into(),
-                    debug: false,
-                    metadata: runner_metadata(cm_rust::Availability::Required),
-                })
-                .await
-                .map_err(|err| StartActionError::ResolveRunnerError {
-                    moniker: component.moniker.clone(),
-                    err: Box::new(err),
-                    runner: runner.source_name.clone(),
-                })?;
-            match &runner_capability {
-                // Built-in runners are hosted by a LaunchTaskOnReceive, which returns a Connector
-                // capability for new routes.
-                Capability::Connector(runner_connector) => {
-                    let (proxy, server_end) =
-                        create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
-                    runner_connector.send(Message { channel: server_end.into_channel() }).unwrap();
-                    Ok(Some(RemoteRunner::new(proxy)))
-                }
-                // Component provided runners are handled by a program router, which returns a
-                // DirEntry capability for new routes.
-                Capability::DirEntry(runner_dir_entry) => {
-                    let (proxy, server_end) =
-                        create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
-                    runner_dir_entry.send(Message { channel: server_end.into_channel() }).unwrap();
-                    Ok(Some(RemoteRunner::new(proxy)))
-                }
-                cap => Err(StartActionError::ResolveRunnerError {
-                    moniker: component.moniker.clone(),
-                    err: Box::new(
-                        RoutingError::BedrockWrongCapabilityType {
-                            actual: cap.debug_typename().to_string(),
-                            expected: "Sender or DirEntry".to_string(),
-                            moniker: component.moniker.clone().into(),
-                        }
-                        .into(),
-                    ),
-                    runner: runner.source_name,
-                }),
-            }
-        }
-        _ => {
-            let proxy = open_capability(&RouteRequest::UseRunner(runner.clone()), component)
-                .await
-                .map_err(|err| StartActionError::ResolveRunnerError {
-                    moniker: component.moniker.clone(),
-                    err: Box::new(err),
-                    runner: runner.source_name,
-                })?;
+                    err: Box::new(RouterError::from(RoutingError::BedrockFailedToSend {
+                        moniker: component.moniker.clone().into(),
+                        capability_id: runner_name.to_string(),
+                    })),
+                    runner: runner_name.clone(),
+                },
+            )?;
             Ok(Some(RemoteRunner::new(proxy)))
         }
+        // Component provided runners are handled by a program router, which returns a DirEntry
+        // capability for new routes.
+        Capability::DirEntry(runner_dir_entry) => {
+            let (proxy, server_end) = create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
+            runner_dir_entry.send(Message { channel: server_end.into_channel() }).map_err(
+                |_| StartActionError::ResolveRunnerError {
+                    moniker: component.moniker.clone(),
+                    err: Box::new(RouterError::from(RoutingError::BedrockFailedToSend {
+                        moniker: component.moniker.clone().into(),
+                        capability_id: runner_name.to_string(),
+                    })),
+                    runner: runner_name.clone(),
+                },
+            )?;
+            Ok(Some(RemoteRunner::new(proxy)))
+        }
+        cap => Err(StartActionError::ResolveRunnerError {
+            moniker: component.moniker.clone(),
+            err: Box::new(
+                RoutingError::BedrockWrongCapabilityType {
+                    actual: cap.debug_typename().to_string(),
+                    expected: "Connector or DirEntry".to_string(),
+                    moniker: component.moniker.clone().into(),
+                }
+                .into(),
+            ),
+            runner: runner_name,
+        }),
     }
 }
 
