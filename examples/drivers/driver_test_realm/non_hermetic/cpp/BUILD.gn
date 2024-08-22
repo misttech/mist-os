@@ -17,7 +17,7 @@ test("driver_test_realm_example_non_hermetic_cpp") {
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",
-    "//sdk/lib/driver_test_realm",
+    "//sdk/lib/driver_test_realm:static",
     "//sdk/lib/syslog/cpp",
     "//third_party/googletest:gtest",
   ]

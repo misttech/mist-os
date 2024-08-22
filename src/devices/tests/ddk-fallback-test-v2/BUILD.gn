@@ -69,7 +69,7 @@ fuchsia_package("ddk-fallback-test-v2-package") {
   deps = [
     ":component",
     ":ddk-fallback-test-driver",
-    "//sdk/lib/driver_test_realm",
+    "//sdk/lib/driver_test_realm:static",
     "//src/devices/misc/drivers/test-parent",
   ]
 }

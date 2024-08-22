@@ -37,7 +37,7 @@ fuchsia_component("component") {
   manifest = "meta/factory_driver_test_realm.cml"
   deps = [
     ":bin",
-    "//sdk/lib/driver_test_realm",
+    "//sdk/lib/driver_test_realm:static",
     "//src/devices/bus/drivers/platform",
     "//src/storage/testing:storage_drivers",
   ]

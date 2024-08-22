@@ -43,7 +43,7 @@ source_set("visitor-test-helper") {
 
 group("devicetree-test-bazel-inputs") {
   deps = [
-    "//sdk/lib/driver_test_realm:realm-builder-version-package-bazel",
+    "//sdk/lib/driver_test_realm:package-bazel",
     "//src/devices/bus/drivers/platform:platform-bus-package-bazel",
   ]
 }

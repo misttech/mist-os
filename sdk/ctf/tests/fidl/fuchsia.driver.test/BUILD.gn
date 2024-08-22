@@ -52,7 +52,7 @@ fuchsia_test_package("fuchsia-driver-test_tests-package") {
   test_components = [ ":test-root" ]
   subpackages = [ ":fuchsia-driver-test_tests" ]
   deps = [
-    "//sdk/lib/driver_test_realm",
+    "//sdk/lib/driver_test_realm:static",
     "//src/devices/misc/drivers/test-parent",
   ]
   test_specs = {

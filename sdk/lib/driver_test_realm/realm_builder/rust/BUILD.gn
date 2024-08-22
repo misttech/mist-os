@@ -11,7 +11,7 @@ rustc_library("rust") {
     "//sdk/fidl/fuchsia.component.test:fuchsia.component.test_rust",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
-    "//sdk/lib/driver_test_realm:realm_builder_version",
+    "//sdk/lib/driver_test_realm",
     "//src/lib/fidl/rust/fidl",
     "//src/lib/fuchsia-component-test",
     "//src/lib/fuchsia-fs",

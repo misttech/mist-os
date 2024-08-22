@@ -53,7 +53,7 @@ test("nonbindable-test") {
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",
-    "//sdk/lib/driver_test_realm",
+    "//sdk/lib/driver_test_realm:static",
     "//src/devices/misc/drivers/test-parent",
     "//src/lib/fxl/test:gtest_main",
   ]

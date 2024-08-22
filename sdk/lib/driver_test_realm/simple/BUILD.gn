@@ -11,7 +11,7 @@ group("simple") {
   deps = [
     ":client_includes",
     ":simple_component",
-    "//sdk/lib/driver_test_realm",
+    "//sdk/lib/driver_test_realm:static",
     "//src/devices/misc/drivers/test-parent",
   ]
 }

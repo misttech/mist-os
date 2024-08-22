@@ -22,7 +22,7 @@ source_set("common") {
     "//sdk/fidl/fuchsia.nand:fuchsia.nand_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/device-watcher/cpp",
-    "//sdk/lib/driver_test_realm",
+    "//sdk/lib/driver_test_realm:static",
     "//sdk/lib/fdio",
     "//src/storage/lib/ramdevice_client/cpp",
     "//zircon/system/ulib/fbl",
