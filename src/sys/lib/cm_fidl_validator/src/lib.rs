@@ -808,16 +808,9 @@ impl<'a> ValidationContext<'a> {
                     Some(fdecl::Ref::Child(_)) | Some(fdecl::Ref::Parent(_)) => {
                         // Allowed.
                     }
-                    Some(fdecl::Ref::Framework(_)) => match &u.scope {
-                        Some(value) if value.is_empty() => {
-                            self.errors.push(Error::invalid_field(decl, "scope"));
-                        }
-                        Some(_) => {}
-                        None => {
-                            self.errors.push(Error::missing_field(decl, "scope"));
-                        }
-                    },
-                    Some(fdecl::Ref::Self_(_)) | Some(fdecl::Ref::Debug(_)) => {
+                    Some(fdecl::Ref::Framework(_))
+                    | Some(fdecl::Ref::Self_(_))
+                    | Some(fdecl::Ref::Debug(_)) => {
                         // Allowed in general but not for event streams, add an error.
                         self.errors.push(Error::invalid_field(decl, "source"));
                     }
@@ -5051,7 +5044,7 @@ mod tests {
                 Error::InvalidField(DeclField { decl: DeclType::UseEventStream, field: "scope".to_string() })
             ])),
         },
-        test_validate_event_stream_source_must_be_parent_framework_or_child => {
+        test_validate_event_stream_source_must_be_parent_or_child => {
             input = {
                 let mut decl = new_component_decl();
                 decl.uses = Some(vec![
@@ -5062,20 +5055,16 @@ mod tests {
                         scope: Some(vec![]),
                         ..Default::default()
                     }),
-                ]);
-                decl
-            },
-            result = Err(ErrorList::new(vec![
-                Error::InvalidField(DeclField { decl: DeclType::UseEventStream, field: "source".to_string() })
-            ])),
-        },
-        test_validate_event_stream_source_framework_must_have_nonempty_scope => {
-            input = {
-                let mut decl = new_component_decl();
-                decl.uses = Some(vec![
                     fdecl::Use::EventStream(fdecl::UseEventStream {
                         source: Some(fdecl::Ref::Framework(fdecl::FrameworkRef{})),
-                        target_path: Some("/svc/something".to_string()),
+                        target_path: Some("/svc/something_else".to_string()),
+                        source_name: Some("some_source".to_string()),
+                        scope: Some(vec![]),
+                        ..Default::default()
+                    }),
+                    fdecl::Use::EventStream(fdecl::UseEventStream {
+                        source: Some(fdecl::Ref::Self_(fdecl::SelfRef{})),
+                        target_path: Some("/svc/yet_something_else".to_string()),
                         source_name: Some("some_source".to_string()),
                         scope: Some(vec![]),
                         ..Default::default()
@@ -5084,24 +5073,9 @@ mod tests {
                 decl
             },
             result = Err(ErrorList::new(vec![
-                Error::InvalidField(DeclField { decl: DeclType::UseEventStream, field: "scope".to_string() })
-            ])),
-        },
-        test_validate_event_stream_source_framework_must_specify_scope => {
-            input = {
-                let mut decl = new_component_decl();
-                decl.uses = Some(vec![
-                    fdecl::Use::EventStream(fdecl::UseEventStream {
-                        source: Some(fdecl::Ref::Framework(fdecl::FrameworkRef{})),
-                        target_path: Some("/svc/something".to_string()),
-                        source_name: Some("some_source".to_string()),
-                        ..Default::default()
-                    }),
-                ]);
-                decl
-            },
-            result = Err(ErrorList::new(vec![
-                Error::MissingField(DeclField { decl: DeclType::UseEventStream, field: "scope".to_string() })
+                Error::InvalidField(DeclField { decl: DeclType::UseEventStream, field: "source".to_string() }),
+                Error::InvalidField(DeclField { decl: DeclType::UseEventStream, field: "source".to_string() }),
+                Error::InvalidField(DeclField { decl: DeclType::UseEventStream, field: "source".to_string() })
             ])),
         },
         test_validate_no_runner => {

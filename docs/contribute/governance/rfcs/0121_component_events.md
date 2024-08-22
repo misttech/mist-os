@@ -347,11 +347,9 @@ The use declaration contains:
   the given name for a `fuchsia.component.EventStream` that component manager
   serves (see [Use](#use)). When not provided, the component can use
   `EventSource` to start consuming events at a specific point.
-- `scope`: when an event is used from framework, the scope is required to
-  specify the child (or array of children) which the event will be about. When
-  the event is used from parent, the `scope` can be used to refer downscope the
-  event to a certain child scope, otherwise the event will carry the scope
-  coming from the parent.
+- `scope`: when the event is used from parent, the `scope` can be used to refer
+  downscope the event to a certain child scope, otherwise the event will carry
+  the scope coming from the parent.
 - `mode`: defaults to `async`. As mentioned earlier, the only event mode will
   be async. Therefore only allowlisted tests will be permitted to use mode
   "sync" until modes are completely eliminated. This field will eventually go
