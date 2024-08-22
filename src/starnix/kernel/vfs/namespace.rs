@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::bpf::fs::BpfFs;
-use crate::device::BinderFs;
+use crate::device::binder::BinderFs;
 use crate::fs::devpts::dev_pts_fs;
 use crate::fs::devtmpfs::dev_tmp_fs;
 use crate::fs::ext4::ExtFilesystem;

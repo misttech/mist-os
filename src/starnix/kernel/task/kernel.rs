@@ -3,10 +3,11 @@
 // found in the LICENSE file.
 
 use crate::device::android::bootloader_message_store::AndroidBootloaderMessageStore;
+use crate::device::binder::BinderDevice;
 use crate::device::device_mapper::DeviceMapperRegistry;
 use crate::device::framebuffer::{AspectRatio, Framebuffer};
 use crate::device::remote_block_device::RemoteBlockDeviceRegistry;
-use crate::device::{BinderDevice, DeviceMode, DeviceRegistry};
+use crate::device::{DeviceMode, DeviceRegistry};
 use crate::execution::CrashReporter;
 use crate::fs::nmfs::NetworkManagerHandle;
 use crate::fs::proc::SystemLimits;

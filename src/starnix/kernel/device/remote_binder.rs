@@ -2,7 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::{BinderDriver, DeviceOps, RemoteBinderConnection};
+use crate::device::binder::{BinderDriver, RemoteBinderConnection};
+use crate::device::DeviceOps;
 use crate::mm::memory::MemoryObject;
 use crate::mm::{DesiredAddress, MappingOptions, MemoryAccessorExt, ProtectionFlags};
 use crate::task::{CurrentTask, Kernel, ThreadGroup, WaitQueue, Waiter};
@@ -1054,7 +1055,7 @@ async fn select_first<O>(f1: impl Future<Output = O>, f2: impl Future<Output = O
 mod tests {
     use super::*;
     use crate::device::binder::tests::run_process_accessor;
-    use crate::device::BinderFs;
+    use crate::device::binder::BinderFs;
     use crate::mm::MemoryAccessor;
     use crate::testing::*;
     use crate::vfs::{FileSystemOptions, WhatToMount};

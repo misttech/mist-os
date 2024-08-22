@@ -2,15 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-mod binder;
 mod framebuffer_server;
 mod registry;
 mod remote_binder;
 
-pub use binder::*;
 pub use registry::*;
 
 pub mod android;
+pub mod binder;
 pub mod device_mapper;
 pub mod framebuffer;
 pub mod kobject;

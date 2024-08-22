@@ -71,7 +71,7 @@ pub use vec_directory::*;
 pub use wd_number::*;
 pub use xattr::*;
 
-use crate::device::BinderDriver;
+use crate::device::binder::BinderDriver;
 use crate::task::CurrentTask;
 use starnix_lifecycle::{ObjectReleaser, ReleaserAction};
 use starnix_uapi::ownership::{Releasable, ReleaseGuard};
