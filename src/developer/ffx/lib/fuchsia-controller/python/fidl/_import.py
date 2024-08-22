@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 """Defines the import hooks for when a user writes `import fidl.[fidl_library]`."""
+# autoflake: skip_file
 import importlib.abc
 import sys
 
