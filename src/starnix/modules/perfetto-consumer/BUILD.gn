@@ -19,7 +19,7 @@ rustc_library("perfetto-consumer") {
     "//src/lib/trace/rust:trace-observer",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",
-    "//src/starnix/kernel:starnix_sync",
+    "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-uapi",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:once_cell",

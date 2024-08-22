@@ -47,7 +47,7 @@ rustc_library("input") {
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",
-    "//src/starnix/kernel:starnix_sync",
+    "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-syscalls",
     "//src/starnix/lib/starnix-uapi",
     "//third_party/rust_crates:bit-vec",

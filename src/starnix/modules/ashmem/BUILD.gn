@@ -15,10 +15,10 @@ rustc_library("ashmem") {
   deps = [
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/starnix/kernel:starnix_core",
-    "//src/starnix/kernel:starnix_sync",
     "//src/starnix/lib/linux_uapi",
     "//src/starnix/lib/range_map",
     "//src/starnix/lib/starnix-lifecycle",
+    "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-syscalls",
     "//src/starnix/lib/starnix-uapi",
     "//third_party/rust_crates:once_cell",

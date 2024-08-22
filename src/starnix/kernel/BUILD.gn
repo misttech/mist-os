@@ -24,7 +24,6 @@ group("tests") {
     ":starnix_kernel_bin-tests",
     ":starnix_kernel_runner-tests",
     ":starnix_logging-tests",
-    ":starnix_sync-tests",
   ]
 }
 
@@ -289,7 +288,6 @@ rustc_library("starnix_core") {
 
   deps = [
     ":starnix_logging",
-    ":starnix_sync",
     ":vdso-data($bionic_linux_toolchain)",
     "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_rust",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
@@ -364,6 +362,7 @@ rustc_library("starnix_core") {
     "//src/starnix/lib/selinux",
     "//src/starnix/lib/selinux/core",
     "//src/starnix/lib/starnix-lifecycle",
+    "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-syscalls",
     "//src/starnix/lib/starnix-uapi",
     "//src/starnix/lib/syncio",
@@ -481,7 +480,6 @@ rustc_library("starnix_kernel_runner") {
   deps = [
     ":starnix_core",
     ":starnix_logging",
-    ":starnix_sync",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
@@ -506,6 +504,7 @@ rustc_library("starnix_kernel_runner") {
     "//src/lib/ui/fuchsia-scenic",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/starnix/lib/selinux/core",
+    "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-uapi",
     "//src/starnix/modules",
     "//src/starnix/modules/ashmem",
@@ -545,11 +544,11 @@ rustc_library("starnix_logging") {
   ]
 
   deps = [
-    ":starnix_sync",
     "//src/lib/diagnostics/inspect/contrib/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/trace/rust:trace",
     "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-uapi",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bstr",
@@ -574,43 +573,6 @@ rustc_library("starnix_logging") {
   if (starnix_enable_trace_and_debug_logs_in_release) {
     features += [ "trace_and_debug_logs_in_release" ]
   }
-
-  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
-}
-
-rustc_library("starnix_sync") {
-  name = "starnix_sync"
-  edition = "2021"
-  version = "0.1.0"
-  with_unit_tests = true
-  source_root = "sync/lib.rs"
-
-  deps = [
-    "//src/lib/fuchsia-sync",
-    "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/starnix/kernel/sync/lock_ordering_macro",
-    "//third_party/rust_crates:lock_api",
-    "//third_party/rust_crates:once_cell",
-    "//third_party/rust_crates:static_assertions",
-    "//third_party/rust_crates:tracing-mutex",
-  ]
-
-  test_deps = [
-    "//src/lib/fuchsia",
-    "//third_party/rust_crates:test-case",
-  ]
-
-  sources = [
-    "sync/atomic_time.rs",
-    "sync/interruptible_event.rs",
-    "sync/lib.rs",
-    "sync/lock_ordering.rs",
-    "sync/lock_relations.rs",
-    "sync/lock_sequence.rs",
-    "sync/lock_traits.rs",
-    "sync/locks.rs",
-    "sync/port_event.rs",
-  ]
 
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
@@ -766,8 +728,4 @@ fuchsia_unittest_package("starnix_kernel_runner-tests") {
 
 fuchsia_unittest_package("starnix_logging-tests") {
   deps = [ ":starnix_logging_test" ]
-}
-
-fuchsia_unittest_package("starnix_sync-tests") {
-  deps = [ ":starnix_sync_test" ]
 }

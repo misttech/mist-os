@@ -23,7 +23,7 @@ rustc_library("gralloc") {
     "//src/lib/fuchsia-async",
     "//src/starnix/kernel:starnix_core",
     "//src/starnix/kernel:starnix_logging",
-    "//src/starnix/kernel:starnix_sync",
+    "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-syscalls",
     "//src/starnix/lib/starnix-uapi",
     "//src/starnix/lib/virtgralloc",
