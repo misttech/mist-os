@@ -4,7 +4,6 @@
 
 use starnix_core::device::device_mapper::{create_device_mapper, device_mapper_init};
 use starnix_core::device::kobject::DeviceMetadata;
-use starnix_core::device::loop_device::{create_loop_control_device, loop_device_init};
 use starnix_core::device::mem::{mem_device_init, DevRandom};
 use starnix_core::device::tun::DevTun;
 use starnix_core::device::{simple_device_ops, DeviceMode};
@@ -12,6 +11,7 @@ use starnix_core::fs::devpts::tty_device_init;
 use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::CurrentTask;
 use starnix_core::vfs::fuse::open_fuse_device;
+use starnix_modules_loop::{create_loop_control_device, loop_device_init};
 use starnix_modules_zram::zram_device_init;
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::device_type::DeviceType;

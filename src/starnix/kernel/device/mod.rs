@@ -13,7 +13,6 @@ pub mod binder;
 pub mod device_mapper;
 pub mod framebuffer;
 pub mod kobject;
-pub mod loop_device;
 pub mod mem;
 pub mod remote_block_device;
 pub mod terminal;

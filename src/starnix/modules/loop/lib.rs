@@ -2,20 +2,20 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::device::kobject::{Device, DeviceMetadata};
-use crate::device::DeviceMode;
-use crate::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo};
-use crate::mm::memory::MemoryObject;
-use crate::mm::{MemoryAccessorExt, ProtectionFlags, PAGE_SIZE};
-use crate::task::CurrentTask;
-use crate::vfs::buffers::{InputBuffer, OutputBuffer};
-use crate::vfs::{
+use bitflags::bitflags;
+use fuchsia_zircon::VmoChildOptions;
+use starnix_core::device::kobject::{Device, DeviceMetadata};
+use starnix_core::device::DeviceMode;
+use starnix_core::fs::sysfs::{BlockDeviceDirectory, BlockDeviceInfo};
+use starnix_core::mm::memory::MemoryObject;
+use starnix_core::mm::{MemoryAccessorExt, ProtectionFlags, PAGE_SIZE};
+use starnix_core::task::CurrentTask;
+use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
+use starnix_core::vfs::{
     default_ioctl, fileops_impl_dataless, fileops_impl_noop_sync, fileops_impl_seekable,
     fileops_impl_seekless, Buffer, FdNumber, FileHandle, FileObject, FileOps, FsNode, FsString,
     InputBufferCallback, PeekBufferSegmentsCallback,
 };
-use bitflags::bitflags;
-use fuchsia_zircon::VmoChildOptions;
 use starnix_logging::track_stub;
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
@@ -767,11 +767,13 @@ fn get_or_create_loop_device(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::fs::fuchsia::new_remote_file;
-    use crate::testing::*;
-    use crate::vfs::buffers::*;
-    use crate::vfs::{Anon, DynamicFile, DynamicFileBuf, DynamicFileSource, FdFlags, FsNodeOps};
     use fidl::endpoints::Proxy;
+    use starnix_core::fs::fuchsia::new_remote_file;
+    use starnix_core::testing::*;
+    use starnix_core::vfs::buffers::*;
+    use starnix_core::vfs::{
+        Anon, DynamicFile, DynamicFileBuf, DynamicFileSource, FdFlags, FsNodeOps,
+    };
     use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
     #[derive(Clone)]

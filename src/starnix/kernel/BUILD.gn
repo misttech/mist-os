@@ -110,7 +110,6 @@ rustc_library("starnix_core") {
     "device/framebuffer.rs",
     "device/framebuffer_server.rs",
     "device/kobject.rs",
-    "device/loop_device.rs",
     "device/mem.rs",
     "device/mod.rs",
     "device/registry.rs",
