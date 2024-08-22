@@ -2,9 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::bpf::fs::BpfFs;
-use crate::device::binder::BinderFs;
-use crate::fs::devpts::dev_pts_fs;
 use crate::fs::devtmpfs::dev_tmp_fs;
 use crate::fs::ext4::ExtFilesystem;
 use crate::fs::functionfs::FunctionFs;
@@ -740,8 +737,6 @@ impl FileSystemCreator for Arc<Kernel> {
             return result;
         }
         Ok(match &**fs_type {
-            b"binder" => BinderFs::new_fs(self, options)?,
-            b"bpf" => BpfFs::new_fs(self, options)?,
             b"remotefs" => crate::fs::fuchsia::create_remotefs_filesystem(
                 self,
                 self.container_data_dir
@@ -779,7 +774,6 @@ impl FileSystemCreator for CurrentTask {
         match &**fs_type {
             b"fuse" => new_fuse_fs(self, options),
             b"fusectl" => new_fusectl_fs(self, options),
-            b"devpts" => Ok(dev_pts_fs(self, options).clone()),
             b"devtmpfs" => Ok(dev_tmp_fs(locked, self).clone()),
             b"ext4" => ExtFilesystem::new_fs(locked, kernel, self, options),
             b"functionfs" => FunctionFs::new_fs(self, options),

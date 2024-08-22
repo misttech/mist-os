@@ -2,12 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use starnix_core::bpf::fs::BpfFs;
+use starnix_core::device::binder::BinderFs;
 use starnix_core::device::device_mapper::{create_device_mapper, device_mapper_init};
 use starnix_core::device::kobject::DeviceMetadata;
 use starnix_core::device::mem::{mem_device_init, DevRandom};
 use starnix_core::device::tun::DevTun;
 use starnix_core::device::{simple_device_ops, DeviceMode};
-use starnix_core::fs::devpts::tty_device_init;
+use starnix_core::fs::devpts::{dev_pts_fs, tty_device_init};
 use starnix_core::fs::nmfs::nmfs;
 use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::{CurrentTask, Kernel};
@@ -87,5 +89,8 @@ pub fn init_common_devices(locked: &mut Locked<'_, Unlocked>, system_task: &Curr
 
 pub fn register_common_file_systems(_locked: &mut Locked<'_, Unlocked>, kernel: &Arc<Kernel>) {
     let registry = kernel.expando.get::<FsRegistry>();
+    registry.register(b"binder".into(), BinderFs::new_fs);
+    registry.register(b"bpf".into(), BpfFs::new_fs);
+    registry.register(b"devpts".into(), dev_pts_fs);
     registry.register(b"nmfs".into(), nmfs);
 }
