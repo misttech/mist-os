@@ -3220,55 +3220,11 @@ From //build/images/args.gni:216
 
 ### extra_gn_labels_for_bazel_inputs
 
-A list of extra labels to bazel_input_xxx() targets that complement
-`gn_labels_for_bazel_inputs`. These labels can be defined anywhere,
-including the //vendor/... directory.
-
-This can be set in args.gn by vendor-specific build configurations.
-Consider the following example from a fictitious
-//vendor/acme/proprietary/BUILD.gn file:
-
-     # Generate the firmware for our device.
-     action("generate_firmware") {
-       ...
-     }
-
-     # Ensure the generated firmware is visible to Bazel as a filegroup()
-     # @legacy_ninja_build_outputs repository//:acme_firmware
-     bazel_input_resource("acme_firmware") {
-       deps = [ ":generate_firmware" ]
-       sources = get_target_outputs(deps[0])
-       outputs = [ "{{source_file_part}}" ]
-       visibility = [ ":*" ]
-     }
-
-     # Build the installer with Bazel.
-     bazel_build_action("build_installer") {
-       bazel_targets = "//vendor/acme/proprietary/installer"
-       deps = [ ":acme_firmware" ]
-       copy_outputs = [
-         {
-           bazel = "vendor/acme/proprietary/installer/installer"
-           ninja = "installer"
-         }
-       ]
-     }
-
-Which requires the following, which could be in args.gn, or in a file
-imported from it (e.g. //vendor/acme/products/device.gni):
-
-   extra_gn_labels_for_bazel_inputs = [
-     "//vendor/acme/proprietary:acme_firmware"
-   ]
-
-In order to ensure that the @legacy_ninja_build_outputs//:acme_firmware
-filegroup() will be defined and properly generated before building
-vendor/acme/proprietary:build_installer with Ninja:
-
+DEPRECATED, do not use.
 
 **Current value (from the default):** `[]`
 
-From //build/bazel/legacy_ninja_build_outputs.gni:126
+From //build/bazel/legacy_ninja_build_outputs.gni:7
 
 ### extra_package_labels
 
@@ -5576,7 +5532,7 @@ From //out/not-default/args.gn:26
 
 **Overridden from the default:** `[]`
 
-From //build/assembly/developer_overrides.gni:376
+From //build/assembly/developer_overrides.gni:377
 
 **Current value for `target_cpu = "x64"`:** `[]`
 
@@ -5584,7 +5540,7 @@ From //out/not-default/args.gn:26
 
 **Overridden from the default:** `[]`
 
-From //build/assembly/developer_overrides.gni:376
+From //build/assembly/developer_overrides.gni:377
 
 ### product_bootfs_packages
 
@@ -7043,7 +6999,7 @@ Valid alternatives vary by machine, but include "linuxboot".
 
 **Current value (from the default):** `"linuxboot"`
 
-From //zircon/kernel/phys/qemu.gni:131
+From //zircon/kernel/phys/qemu.gni:164
 
 ### qr_codes_path
 
