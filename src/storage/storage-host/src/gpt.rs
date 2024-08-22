@@ -11,28 +11,21 @@ use block_server::BlockServer;
 use fs_management::filesystem::BlockConnector;
 use fuchsia_zircon as zx;
 use std::collections::BTreeMap;
+use std::ops::Range;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
-use zerocopy::FromBytes as _;
-
-pub mod format;
 
 /// A single partition in a GPT device.
 pub struct GptPartition {
-    runner: Arc<GptManager>,
     block_client: RemoteBlockClient,
-    info: PartitionInfo,
+    block_range: Range<u64>,
     index: u32,
 }
 
 impl GptPartition {
-    pub fn new(
-        runner: Arc<GptManager>,
-        block_client: RemoteBlockClient,
-        index: u32,
-        info: PartitionInfo,
-    ) -> Arc<Self> {
-        Arc::new(Self { runner, block_client, info, index })
+    pub fn new(block_client: RemoteBlockClient, index: u32, block_range: Range<u64>) -> Arc<Self> {
+        debug_assert!(block_range.end >= block_range.start);
+        Arc::new(Self { block_client, block_range, index })
     }
 
     pub async fn terminate(&self) {
@@ -41,20 +34,16 @@ impl GptPartition {
         }
     }
 
-    pub fn info(&self) -> &PartitionInfo {
-        &self.info
-    }
-
     pub fn index(&self) -> u32 {
         self.index
     }
 
     pub fn block_size(&self) -> u32 {
-        self.runner.block_size
+        self.block_client.block_size()
     }
 
     pub fn block_count(&self) -> u64 {
-        self.info.num_blocks
+        self.block_range.end - self.block_range.start
     }
 
     pub async fn attach_vmo(&self, vmo: &zx::Vmo) -> Result<VmoId, zx::Status> {
@@ -114,21 +103,13 @@ impl GptPartition {
         self.block_client.trim(device_block_offset..device_block_offset + block_count as u64).await
     }
 
-    fn start_offset(&self) -> u64 {
-        self.info.start_block
-    }
-
-    fn end_offset(&self) -> u64 {
-        self.info.start_block + self.info.num_blocks
-    }
-
     // Converts a relative range specified by [offset, offset+len) into an absolute offset in the
     // GPT device, performing bounds checking within the partition.  Returns ZX_ERR_OUT_OF_RANGE for
     // an invalid offset/len.
     fn absolute_offset(&self, mut offset: u64, len: u32) -> Result<u64, zx::Status> {
-        offset = offset.checked_add(self.start_offset()).ok_or(zx::Status::OUT_OF_RANGE)?;
+        offset = offset.checked_add(self.block_range.start).ok_or(zx::Status::OUT_OF_RANGE)?;
         let end = offset.checked_add(len as u64).ok_or(zx::Status::OUT_OF_RANGE)?;
-        if end > self.end_offset() {
+        if end > self.block_range.end {
             Err(zx::Status::OUT_OF_RANGE)
         } else {
             Ok(offset)
@@ -136,45 +117,32 @@ impl GptPartition {
     }
 }
 
-#[derive(Debug)]
-pub struct PartitionInfo {
-    pub label: String,
-    pub type_guid: uuid::Uuid,
-    pub instance_guid: uuid::Uuid,
-    pub start_block: u64,
-    pub num_blocks: u64,
+fn convert_partition_info(
+    info: &gpt::PartitionInfo,
+    block_size: u32,
+) -> block_server::PartitionInfo {
+    block_server::PartitionInfo {
+        block_count: info.num_blocks,
+        block_size,
+        type_guid: info.type_guid.as_bytes().to_owned(),
+        instance_guid: info.instance_guid.as_bytes().to_owned(),
+        name: info.label.clone(),
+    }
 }
 
-impl PartitionInfo {
-    fn as_block_server_info(&self, block_size: u32) -> block_server::PartitionInfo {
-        block_server::PartitionInfo {
-            block_count: self.num_blocks,
-            block_size,
-            type_guid: self.type_guid.as_bytes().to_owned(),
-            instance_guid: self.instance_guid.as_bytes().to_owned(),
-            name: self.label.clone(),
-        }
-    }
-
-    fn from_entry(entry: &format::PartitionTableEntry) -> Result<Self, Error> {
-        Ok(Self {
-            label: String::from_utf16(&entry.name)?.trim_end_matches('\0').to_owned(),
-            type_guid: uuid::Uuid::from_bytes_le(entry.type_guid),
-            instance_guid: uuid::Uuid::from_bytes_le(entry.instance_guid),
-            start_block: entry.first_lba,
-            num_blocks: entry.last_lba.checked_sub(entry.first_lba).unwrap(),
-        })
-    }
+struct Inner {
+    gpt: gpt::GptManager,
+    partitions: BTreeMap<u32, Arc<BlockServer<SessionManager<PartitionBackend>>>>,
+    // Exposes all partitions for discovery by other components.  Should be kept in sync with
+    // `partitions`.
+    partitions_dir: PartitionsDirectory,
 }
 
 /// Runs a GPT device.
 pub struct GptManager {
-    block_connector: Arc<dyn BlockConnector>,
     block_size: u32,
     block_count: u64,
-    // Exposes all partitions for discovery by other components.
-    partitions_dir: PartitionsDirectory,
-    partitions: Mutex<BTreeMap<u32, Arc<BlockServer<SessionManager<PartitionBackend>>>>>,
+    inner: Mutex<Inner>,
     shutdown: AtomicBool,
 }
 
@@ -183,22 +151,8 @@ impl std::fmt::Debug for GptManager {
         f.debug_struct("GptManager")
             .field("block_size", &self.block_size)
             .field("block_count", &self.block_count)
-            .field("partitions_dir", &self.partitions_dir)
+            .field("metadata", &self.inner.lock().unwrap().gpt)
             .finish()
-    }
-}
-
-enum WhichHeader {
-    Primary,
-    Backup,
-}
-
-impl WhichHeader {
-    fn offset(&self, block_size: u64, block_count: u64) -> u64 {
-        match self {
-            Self::Primary => block_size,
-            Self::Backup => (block_count - 1) * block_size,
-        }
     }
 }
 
@@ -212,122 +166,50 @@ impl GptManager {
         let client = RemoteBlockClient::new(block).await?;
         let block_size = client.block_size();
         let block_count = client.block_count();
-        let partition_table =
-            Self::load_partitions(&client).await.context("Failed to load partition table")?;
+        let gpt = gpt::GptManager::open(client).await.context("Failed to load GPT")?;
 
-        let this = Arc::new(Self {
-            block_connector,
-            block_size,
-            block_count,
-            partitions: Default::default(),
+        let mut inner = Inner {
+            gpt,
+            partitions: BTreeMap::new(),
             partitions_dir: PartitionsDirectory::new(partitions_dir),
-            shutdown: AtomicBool::new(false),
-        });
+        };
         tracing::info!("Bind to GPT OK, binding partitions");
-        // TODO(https://fxbug.dev/339491886): Think about handling errors during startup.  (Avoid
-        // leaving a half-initialized service.)
-        {
-            for (index, info) in partition_table.into_iter() {
-                tracing::info!("GPT part {index}: {info:?}");
-                let block_client =
-                    this.create_session().await.context("Failed to establish new block session")?;
-                let block_server_info = info.as_block_server_info(block_size);
-                let partition = PartitionBackend::new(GptPartition::new(
-                    this.clone(),
-                    block_client,
-                    index,
-                    info,
-                ));
-                let block_server = Arc::new(BlockServer::new(block_server_info, partition));
-                this.partitions_dir
-                    .add_entry(&format!("part-{}", index), Arc::downgrade(&block_server));
-                this.partitions.lock().unwrap().insert(index, block_server);
-            }
+        for (index, info) in inner.gpt.partitions().iter() {
+            tracing::info!("GPT part {index}: {info:?}");
+            let block = block_connector.connect_block()?.into_proxy()?;
+            let block_client = RemoteBlockClient::new(block).await?;
+            let block_server_info = convert_partition_info(&info, block_size);
+            let partition = PartitionBackend::new(GptPartition::new(
+                block_client,
+                *index,
+                info.start_block
+                    ..info
+                        .start_block
+                        .checked_add(info.num_blocks)
+                        .ok_or(anyhow!("Overflow in partition range"))?,
+            ));
+            let block_server = Arc::new(BlockServer::new(block_server_info, partition));
+            inner
+                .partitions_dir
+                .add_entry(&format!("part-{}", index), Arc::downgrade(&block_server));
+            inner.partitions.insert(*index, block_server);
         }
         tracing::info!("Starting all partitions OK!");
-        Ok(this)
+        Ok(Arc::new(Self {
+            block_size,
+            block_count,
+            inner: Mutex::new(inner),
+            shutdown: AtomicBool::new(false),
+        }))
     }
 
     pub async fn shutdown(self: Arc<Self>) {
         tracing::info!("Shutting down gpt");
-        self.partitions_dir.clear();
-        self.partitions.lock().unwrap().clear();
+        let mut inner = self.inner.lock().unwrap();
+        inner.partitions_dir.clear();
+        inner.partitions.clear();
         self.shutdown.store(true, Ordering::Relaxed);
         tracing::info!("Shutting down gpt OK");
-    }
-
-    async fn create_session(&self) -> Result<RemoteBlockClient, Error> {
-        let block = self.block_connector.connect_block()?.into_proxy()?;
-        Ok(RemoteBlockClient::new(block).await?)
-    }
-
-    async fn try_load_partitions(
-        client: &RemoteBlockClient,
-        which: WhichHeader,
-    ) -> Result<BTreeMap<u32, PartitionInfo>, Error> {
-        let bs = client.block_size() as usize;
-        let mut header_block = vec![0u8; client.block_size() as usize];
-        client
-            .read_at(
-                MutableBufferSlice::Memory(&mut header_block[..]),
-                which.offset(bs as u64, client.block_count() as u64),
-            )
-            .await
-            .context("Read header")?;
-        let header = format::Header::ref_from_prefix(&header_block[..])
-            .ok_or(anyhow!("Header has invalid size"))?;
-        header.ensure_integrity(client.block_count(), client.block_size() as u64)?;
-        let partition_table_offset = header.part_start * bs as u64;
-        let partition_table_size = (header.num_parts * header.part_size) as usize;
-        let partition_table_size_rounded = partition_table_size
-            .checked_next_multiple_of(bs)
-            .ok_or(anyhow!("Overflow when rounding up partition table size "))?;
-        let mut partition_table = BTreeMap::new();
-        if header.num_parts > 0 {
-            let mut partition_table_blocks = vec![0u8; partition_table_size_rounded];
-            client
-                .read_at(
-                    MutableBufferSlice::Memory(&mut partition_table_blocks[..]),
-                    partition_table_offset,
-                )
-                .await
-                .with_context(|| {
-                    format!(
-                        "Failed to read partition table (sz {}) from offset {}",
-                        partition_table_size, partition_table_offset
-                    )
-                })?;
-            let crc = crc::crc32::checksum_ieee(&partition_table_blocks[..partition_table_size]);
-            anyhow::ensure!(header.crc32_parts == crc, "Invalid partition table checksum");
-
-            for i in 0..header.num_parts as usize {
-                let entry_raw = &partition_table_blocks
-                    [i * header.part_size as usize..(i + 1) * header.part_size as usize];
-                let entry = format::PartitionTableEntry::ref_from_prefix(entry_raw)
-                    .ok_or(anyhow!("Failed to parse partition {i}"))?;
-                if entry.is_empty() {
-                    continue;
-                }
-                entry.ensure_integrity().context("GPT partition table entry invalid!")?;
-
-                partition_table.insert(i as u32, PartitionInfo::from_entry(entry)?);
-            }
-        }
-        Ok(partition_table)
-    }
-
-    async fn load_partitions(
-        client: &RemoteBlockClient,
-    ) -> Result<BTreeMap<u32, PartitionInfo>, Error> {
-        match Self::try_load_partitions(&client, WhichHeader::Primary).await {
-            Ok(partitions) => Ok(partitions),
-            Err(error) => {
-                tracing::warn!(?error, "Failed to load primary metadata; falling back to backup");
-                Self::try_load_partitions(&client, WhichHeader::Backup)
-                    .await
-                    .context("Failed to load backup metadata")
-            }
-        }
     }
 }
 
@@ -340,13 +222,13 @@ impl Drop for GptManager {
 #[cfg(test)]
 mod tests {
     use super::GptManager;
-    use crate::gpt::format::testing::{format_gpt, PartitionDescriptor};
     use anyhow::Error;
     use block_client::{BlockClient as _, BufferSlice, MutableBufferSlice, RemoteBlockClient};
     use event_listener::{Event, EventListener};
     use fake_block_server::FakeServer;
     use fidl::endpoints::{ClientEnd, Proxy as _};
     use fs_management::filesystem::BlockConnector;
+    use gpt_testing::{format_gpt, PartitionDescriptor};
     use std::sync::{Arc, Mutex};
     use vfs::directory::entry_container::Directory as _;
     use vfs::ObjectRequest;
