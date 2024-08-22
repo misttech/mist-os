@@ -1,1 +1,0 @@
-gen/build/bazel/tests/build_action/02_input_from_bazel_source/foo.ninja.out: ../../build/bazel/tests/build_action/02_input_from_bazel_source/BUILD.bazel ../../build/bazel/tests/build_action/02_input_from_bazel_source/foo.in.txt
