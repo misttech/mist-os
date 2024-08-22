@@ -104,6 +104,9 @@ def _get_ignore_parser() -> ArgumentParser:
     parser = ArgumentParser(
         description="ignore arguments in rustdoc invocation"
     )
+    # ignored see //build/rbe/local-only.sh
+    parser.add_argument("--local-only", nargs="*", help="ignored")
+    parser.add_argument("--remote-only", nargs="*", help="ignored")
     # ignored from //build/rbe/remote_action.py
     parser.add_argument("--remote-disable", nargs="*", help="ignored")
     parser.add_argument("--remote-inputs", nargs="*", help="ignored")
