@@ -218,11 +218,7 @@ def fuchsia_board_configuration(
     )
 
 def _fuchsia_prebuilt_board_configuration_impl(ctx):
-    board_configuration = (
-        # TODO(https://fxbug.dev/349939865): Remove this ugly hack once the
-        # board configuration manifest's name is fixed.
-        ([file for file in ctx.files.files if file.path.endswith("_board_config.json")] + [None])[0]
-    ) or select_single_file(ctx.files.files, "board_configuration.json")
+    board_configuration = select_single_file(ctx.files.files, "board_configuration.json")
     return [
         FuchsiaBoardConfigInfo(
             files = ctx.files.files,
