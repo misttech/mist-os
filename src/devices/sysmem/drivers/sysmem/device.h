@@ -45,6 +45,7 @@ class BufferCollectionToken;
 class LogicalBuffer;
 class LogicalBufferCollection;
 class Node;
+class ContiguousPooledMemoryAllocator;
 
 struct Settings {
   // Maximum size of a single allocation. Mainly useful for unit tests.
@@ -202,11 +203,11 @@ class Device final : public fdf::DriverBase,
   // true - secure heaps are expected to exist (regardless of whether any of them currently exist)
   bool is_secure_mem_expected() const {
     std::lock_guard checker(*loop_checker_);
-    // Currently, we can base this on secure_allocators_ non-empty() since in all current cases
-    // there will be at least one secure allocator added before any clients can connect iff there
-    // will be any secure heaps available. Non-empty here does not imply that all secure heaps are
-    // already present and ready. For that, use is_secure_mem_ready().
-    return !secure_allocators_.empty();
+    // We can base this on pending_protected_allocator_ || secure_allocators_ non-empty() since
+    // there will be at least one secure allocator created before any clients can connect iff there
+    // will be any secure heaps available. A true result here does not imply that all secure heaps
+    // are already present and ready. For that, use is_secure_mem_ready().
+    return pending_protected_allocator_ || !secure_allocators_.empty();
   }
 
   // false - secure mem is expected, but is not yet ready
@@ -298,6 +299,9 @@ class Device final : public fdf::DriverBase,
     return *usage_pixel_format_cost_;
   }
 
+  // Iff callback returns false, stop iterating and return.
+  void ForeachSecureHeap(fit::function<bool(const fuchsia_sysmem2::Heap&)> callback);
+
  private:
   class SecureMemConnection {
    public:
@@ -379,8 +383,6 @@ class Device final : public fdf::DriverBase,
       __TA_GUARDED(*loop_checker_);
 
   // This map contains only the secure allocators, if any.  The pointers are owned by allocators_.
-  //
-  // TODO(dustingreen): Consider unordered_map for this and some of above.
   std::unordered_map<fuchsia_sysmem2::Heap, MemoryAllocator*, HashHeap> secure_allocators_
       __TA_GUARDED(*loop_checker_);
 
@@ -475,6 +477,12 @@ class Device final : public fdf::DriverBase,
   fidl::SyncClient<fuchsia_driver_framework::NodeController> compat_node_controller_client_;
 
   std::optional<const UsagePixelFormatCost> usage_pixel_format_cost_;
+
+  // We allocate protected_memory_size during sysmem driver Start, and then when the securemem
+  // driver calls sysmem, that triggers the rest of setting up this ContiguousPooledMemoryAllocator
+  // in secure_allocators_. At that point secure_allocators_ owns the allocator and we reset() this
+  // field.
+  std::unique_ptr<ContiguousPooledMemoryAllocator> pending_protected_allocator_;
 };
 
 }  // namespace sysmem_driver

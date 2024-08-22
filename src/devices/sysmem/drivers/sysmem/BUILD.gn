@@ -102,11 +102,6 @@ source_set("sysmem_common_srcs") {
     "//sdk/lib/fidl",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp:cpp",
-
-    # TODO(b/42113093): Remove this dep on AmLogic-specific heap names in sysmem code. The dep is
-    # currently needed for secure heap names only, which is why a dep for goldfish heap names isn't
-    # here.
-    "//src/devices/bind/fuchsia.amlogic.platform.sysmem.heap:fuchsia.amlogic.platform.sysmem.heap_cpp",
     "//src/devices/bind/fuchsia.sysmem.heap:fuchsia.sysmem.heap_cpp",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/sysmem/metrics",

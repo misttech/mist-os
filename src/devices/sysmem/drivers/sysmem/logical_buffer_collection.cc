@@ -4,10 +4,6 @@
 
 #include "logical_buffer_collection.h"
 
-#include <bind/fuchsia/sysmem/heap/cpp/bind.h>
-// TODO(b/42113093): Remove this include of AmLogic-specific heap names in sysmem code. The include
-// is currently needed for secure heap names only, which is why an include for goldfish heap names
-// isn't here.
 #include <dirent.h>
 #include <fcntl.h>
 #include <fidl/fuchsia.images2/cpp/fidl.h>
@@ -37,7 +33,7 @@
 #include <unordered_map>
 #include <vector>
 
-#include <bind/fuchsia/amlogic/platform/sysmem/heap/cpp/bind.h>
+#include <bind/fuchsia/sysmem/heap/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <fbl/ref_ptr.h>
 #include <fbl/string.h>
@@ -247,13 +243,6 @@ static_assert(!IsStdString_v<uint32_t>);
 template <typename T>
 T AlignUp(T value, T divisor) {
   return (value + divisor - 1) / divisor * divisor;
-}
-
-bool IsSecureHeap(const std::string& heap_type) {
-  // TODO(https://fxbug.dev/42113093): Generalize this by finding if the heap_type maps to secure
-  // MemoryAllocator.
-  return heap_type == bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE ||
-         heap_type == bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE_VDEC;
 }
 
 bool IsPotentiallyIncludedInInitialAllocation(const NodeProperties& node) {
@@ -491,6 +480,17 @@ TokenServerEndCombinedV1AndV2 ConvertV2TokenRequestToCombinedTokenRequest(
   // This is the only place we convert from a V2 token request to a combined V1 and V2 internal
   // "request".
   return TokenServerEndCombinedV1AndV2(token_server_end_v2.TakeChannel());
+}
+
+bool IsSecureRequired(const fuchsia_sysmem2::BufferCollectionConstraints& constraints) {
+  if (!constraints.buffer_memory_constraints().has_value()) {
+    return false;
+  }
+  auto& bmc = *constraints.buffer_memory_constraints();
+  if (!bmc.secure_required().has_value()) {
+    return false;
+  }
+  return *bmc.secure_required();
 }
 
 }  // namespace
@@ -1618,6 +1618,20 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, Error> LogicalBufferColl
     InitializeConstraintSnapshots(constraints_list);
   }
 
+  bool is_secure_required = false;
+  for (auto& constraints : constraints_list) {
+    if (IsSecureRequired(constraints.constraints())) {
+      is_secure_required = true;
+      break;
+    }
+  }
+  if (is_secure_required && !parent_device_->is_secure_mem_ready()) {
+    // parent_device_ will call OnDependencyReady when all secure heaps/allocators are ready
+    LogInfo(FROM_HERE, "secure_required && !is_secure_mem_ready");
+    waiting_for_secure_allocators_ready_ = true;
+    return fpromise::error(Error::kPending);
+  }
+
   auto combine_result = CombineConstraints(&constraints_list);
   if (!combine_result.is_ok()) {
     // It's impossible to combine the constraints due to incompatible
@@ -1628,14 +1642,6 @@ fpromise::result<fuchsia_sysmem2::BufferCollectionInfo, Error> LogicalBufferColl
   ZX_DEBUG_ASSERT(combine_result.is_ok());
   ZX_DEBUG_ASSERT(constraints_list.empty());
   auto combined_constraints = combine_result.take_value();
-
-  if (*combined_constraints.buffer_memory_constraints()->secure_required() &&
-      !parent_device_->is_secure_mem_ready()) {
-    // parent_device_ will call OnDependencyReady when all secure heaps/allocators are ready
-    LogInfo(FROM_HERE, "secure_required && !is_secure_mem_ready");
-    waiting_for_secure_allocators_ready_ = true;
-    return fpromise::error(Error::kPending);
-  }
 
   auto generate_result = GenerateUnpopulatedBufferCollectionInfo(combined_constraints);
   if (!generate_result.is_ok()) {
@@ -1774,9 +1780,8 @@ std::optional<Error> LogicalBufferCollection::TryLateLogicalAllocation(
   if (existing.settings()->buffer_settings()->is_physically_contiguous().value()) {
     buffer_memory_constraints.physically_contiguous_required().emplace(true);
   }
-  ZX_DEBUG_ASSERT(
-      existing.settings()->buffer_settings()->is_secure().value() ==
-      IsSecureHeap(existing.settings()->buffer_settings()->heap()->heap_type().value()));
+  ZX_DEBUG_ASSERT(existing.settings()->buffer_settings()->is_secure().value() ==
+                  IsSecureHeap(existing.settings()->buffer_settings()->heap().value()));
   if (existing.settings()->buffer_settings()->is_secure().value()) {
     buffer_memory_constraints.secure_required().emplace(true);
   }
@@ -2352,6 +2357,11 @@ LogicalBufferCollection::CombineConstraints(ConstraintsList* constraints_list) {
     }
   }
 
+  ZX_DEBUG_ASSERT_MSG(
+      !acc.buffer_memory_constraints().value().secure_required().value() ||
+          parent_device_->is_secure_mem_ready(),
+      "CombineConstraints called too soon before parent_device_->is_secure_mem_ready()");
+
   if (!CheckSanitizeBufferCollectionConstraints(CheckSanitizeStage::kAggregated, acc)) {
     return fpromise::error();
   }
@@ -2385,18 +2395,6 @@ static bool IsPermittedHeap(const fuchsia_sysmem2::BufferMemoryConstraints& cons
   }
   // Zero heaps in heap_permitted() means any heap is ok.
   return true;
-}
-
-static bool IsSecurePermitted(const fuchsia_sysmem2::BufferMemoryConstraints& constraints) {
-  // TODO(https://fxbug.dev/42113093): Generalize this by finding if there's a heap that maps to
-  // secure MemoryAllocator in the permitted heaps.
-  const static auto kAmlogicSecureHeapSingleton =
-      sysmem::MakeHeap(bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE, 0);
-  const static auto kAmlogicSecureVdecHeapSingleton =
-      sysmem::MakeHeap(bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE_VDEC, 0);
-  return constraints.inaccessible_domain_supported().value() &&
-         (IsPermittedHeap(constraints, kAmlogicSecureHeapSingleton) ||
-          IsPermittedHeap(constraints, kAmlogicSecureVdecHeapSingleton));
 }
 
 static bool IsCpuAccessSupported(const fuchsia_sysmem2::BufferMemoryConstraints& constraints) {
@@ -2759,7 +2757,13 @@ bool LogicalBufferCollection::CheckSanitizeBufferMemoryConstraints(
     LogError(FROM_HERE, "min_size_bytes > max_size_bytes");
     return false;
   }
-  if (*constraints.secure_required() && !IsSecurePermitted(constraints)) {
+  // When/if secure_required() && !is_secure_mem_ready(), we'll check this again later after
+  // is_secure_mem_ready() becomes true (as called during CombineConstraints which only gets called
+  // with !secure_required() || is_secure_mem_ready()).
+  ZX_DEBUG_ASSERT(stage != CheckSanitizeStage::kAggregated ||
+                  (!*constraints.secure_required() || parent_device_->is_secure_mem_ready()));
+  if (*constraints.secure_required() && parent_device_->is_secure_mem_ready() &&
+      !IsSecurePermitted(constraints)) {
     LogError(FROM_HERE, "secure memory required but not permitted");
     return false;
   }
@@ -3412,23 +3416,30 @@ bool LogicalBufferCollection::IsColorSpaceEqual(const fuchsia_images2::ColorSpac
   return a == b;
 }
 
-static fpromise::result<fuchsia_sysmem2::Heap, zx_status_t> GetHeap(
+fpromise::result<fuchsia_sysmem2::Heap, zx_status_t> LogicalBufferCollection::GetHeap(
     const fuchsia_sysmem2::BufferMemoryConstraints& constraints, Device* device) {
   if (*constraints.secure_required()) {
-    // TODO(https://fxbug.dev/42113093): Generalize this.
-    //
-    // checked previously
-    ZX_DEBUG_ASSERT(!*constraints.secure_required() || IsSecurePermitted(constraints));
-    const static auto kAmlogicSecureHeapSingleton =
-        sysmem::MakeHeap(bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE, 0);
-    const static auto kAmlogicSecureVdecHeapSingleton =
-        sysmem::MakeHeap(bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE_VDEC, 0);
-    if (IsPermittedHeap(constraints, kAmlogicSecureHeapSingleton)) {
-      return fpromise::ok(kAmlogicSecureHeapSingleton);
-    } else {
-      ZX_DEBUG_ASSERT(IsPermittedHeap(constraints, kAmlogicSecureVdecHeapSingleton));
-      return fpromise::ok(kAmlogicSecureVdecHeapSingleton);
-    }
+    // If two different secure heaps are mutually supported among all participants of a collection
+    // (rare outside of tests), we pick the one with alphabetically lower bind string. As needed, we
+    // could add a way to override the relative selection priority of secure heaps via sysmem config
+    // (either in PlatformSysmemConfig -> structured config, or in fuchsia.sysmem2.Config).
+    ZX_DEBUG_ASSERT(IsSecurePermitted(constraints));
+    std::optional<fuchsia_sysmem2::Heap> best_heap;
+    parent_device_->ForeachSecureHeap([&constraints, &best_heap](
+                                          const fuchsia_sysmem2::Heap& secure_heap) -> bool {
+      if (!IsPermittedHeap(constraints, secure_heap)) {
+        // keep going
+        return true;
+      }
+      if (!best_heap.has_value() || secure_heap.heap_type()->compare(*best_heap->heap_type()) < 0) {
+        best_heap = secure_heap;
+      }
+      // keep going
+      return true;
+    });
+    // We already checked previosuly that IsSecurePermitted(), so we'll have a "best" heap here.
+    ZX_DEBUG_ASSERT(best_heap.has_value());
+    return fpromise::ok(std::move(*best_heap));
   }
   const static auto kSystemRamHeapSingleton =
       sysmem::MakeHeap(bind_fuchsia_sysmem_heap::HEAP_TYPE_SYSTEM_RAM, 0);
@@ -3548,7 +3559,7 @@ LogicalBufferCollection::GenerateUnpopulatedBufferCollectionInfo(
       *constraints.buffer_memory_constraints();
   buffer_settings.is_physically_contiguous() = *buffer_constraints.physically_contiguous_required();
   // checked previously
-  ZX_DEBUG_ASSERT(IsSecurePermitted(buffer_constraints) || !*buffer_constraints.secure_required());
+  ZX_DEBUG_ASSERT(!*buffer_constraints.secure_required() || IsSecurePermitted(buffer_constraints));
   buffer_settings.is_secure() = *buffer_constraints.secure_required();
 
   auto result_get_heap = GetHeap(buffer_constraints, parent_device_);
@@ -4813,6 +4824,44 @@ void LogicalBufferCollection::LogSummary(IndentTracker& indent_tracker) {
       }
     }
   }
+}
+
+bool LogicalBufferCollection::IsSecureHeap(const fuchsia_sysmem2::Heap& heap) {
+  bool found_in_secure_heaps = false;
+  parent_device_->ForeachSecureHeap(
+      [&heap, &found_in_secure_heaps](const fuchsia_sysmem2::Heap& secure_heap) -> bool {
+        if (heap == secure_heap) {
+          found_in_secure_heaps = true;
+          // stop iterating
+          return false;
+        }
+        // keep going
+        return true;
+      });
+  return found_in_secure_heaps;
+}
+
+bool LogicalBufferCollection::IsSecurePermitted(
+    const fuchsia_sysmem2::BufferMemoryConstraints& constraints) {
+  // Without this, we don't know about all the expected secure heaps yet, so can't determine if the
+  // constraints are permitting a secure heap that is missing currently but will be present shortly.
+  ZX_DEBUG_ASSERT_MSG(parent_device_->is_secure_mem_ready(),
+                      "IsSecurePermitted called before is_secure_mem_ready");
+  if (!*constraints.inaccessible_domain_supported()) {
+    return false;
+  }
+  bool found_permitted_secure_heap = false;
+  parent_device_->ForeachSecureHeap([&constraints, &found_permitted_secure_heap](
+                                        const fuchsia_sysmem2::Heap secure_heap) -> bool {
+    if (IsPermittedHeap(constraints, secure_heap)) {
+      found_permitted_secure_heap = true;
+      // stop iterating over secure heaps
+      return false;
+    }
+    // keep going
+    return true;
+  });
+  return found_permitted_secure_heap;
 }
 
 fit::result<zx_status_t, std::unique_ptr<LogicalBuffer>> LogicalBuffer::Create(
