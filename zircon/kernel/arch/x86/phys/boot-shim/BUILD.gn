@@ -35,9 +35,7 @@ linux_thin_shims = [
   # The 32-bit Linux/x896 shim can be booted directly by QEMU and others.
   # It supports the 16-bit and 32-bit Linux/x86 boot protocols.
   {
-    # TODO(https://fxbug.dev/335547883): Rename this to .32 or something
-    # when the biboot is ready to be the default.
-    name = "linux-x86-boot-shim"
+    name = "linux-x86-32-boot-shim"
     format = "linuxboot"
   },
 
@@ -53,7 +51,7 @@ legacy_shims += linux_thin_shims
 legacy_shims += [
   # The best of both worlds!  This supports 16-bit, 32-bit, or 64-bit boots.
   {
-    name = "linux-x86-bi-boot-shim"
+    name = "linux-x86-boot-shim"
     format = "linuxbiboot"
   },
 ]
@@ -148,7 +146,7 @@ if (toolchain_environment == "kernel.phys32" ||
     }
   }
 
-  shim_executable("linux-x86-bi-boot-shim") {
+  shim_executable("linux-x86-boot-shim") {
     import = "../linuxbiboot_executable.gni"
     target_type = "linuxbiboot_executable"
 

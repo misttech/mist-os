@@ -98,7 +98,7 @@ if (current_cpu == "x64") {
       name = "linuxboot"
       environment = "//zircon/kernel/arch/x86/phys:kernel.phys32"
       deps = [ "//zircon/kernel/arch/x86/phys:linuxboot" ]
-      shim_deps = [ "//zircon/kernel/arch/x86/phys/boot-shim:linux-x86-boot-shim($environment)" ]
+      shim_deps = [ "//zircon/kernel/arch/x86/phys/boot-shim:linux-x86-32-boot-shim($environment)" ]
       timeout = qemu_short_timeout
 
       supported_environments = linuxboot32_environments
@@ -119,7 +119,7 @@ if (current_cpu == "x64") {
       target_type = "linuxbiboot_executable"
       target_second_environment = phys_toolchain
       deps = []
-      shim_deps = [ "//zircon/kernel/arch/x86/phys/boot-shim:linux-x86-bi-boot-shim($environment)" ]
+      shim_deps = [ "//zircon/kernel/arch/x86/phys/boot-shim:linux-x86-boot-shim($environment)" ]
       timeout = qemu_short_timeout
 
       supported_environments =
