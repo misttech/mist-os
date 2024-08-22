@@ -13,6 +13,7 @@
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fit/function.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/trace/event.h>
 #include <lib/zx/clock.h>
 #include <lib/zx/result.h>
 #include <zircon/errors.h>
@@ -2593,14 +2594,19 @@ void Device::CheckForRingBufferReady(ElementId element_id) {
 bool Device::SetActiveChannels(
     ElementId element_id, uint64_t channel_bitmask,
     fit::callback<void(zx::result<zx::time>)> set_active_channels_callback) {
+  TRACE_DURATION("power-audio", "ADR::Device::SetActiveChannels", "bitmask", channel_bitmask);
   if (!GetControlNotify()) {
     ADR_WARN_METHOD() << "Device is not yet controlled: cannot SetActiveChannels";
+    TRACE_INSTANT("power-audio", "ADR::Device::SetActiveChannels exit", TRACE_SCOPE_PROCESS,
+                  "reason", "Device is not yet controlled", "bitmask", channel_bitmask);
     set_active_channels_callback(zx::error(ZX_ERR_INTERNAL));
     return false;
   }
 
   if (!is_composite() && !is_stream_config()) {
     ADR_WARN_METHOD() << "Incorrect device_type " << device_type_ << ": cannot SetActiveChannels";
+    TRACE_INSTANT("power-audio", "ADR::Device::SetActiveChannels exit", TRACE_SCOPE_PROCESS,
+                  "reason", "Incorrect device type", "bitmask", channel_bitmask);
     set_active_channels_callback(zx::error(ZX_ERR_INTERNAL));
     return false;
   }
@@ -2609,6 +2615,8 @@ bool Device::SetActiveChannels(
     ADR_WARN_METHOD() << "device already has an error";
     // We need not invoke set_active_channels_callback: this device is in the process of being
     // unwound. The client has already received a HasError notification for this device.
+    TRACE_INSTANT("power-audio", "ADR::Device::SetActiveChannels exit", TRACE_SCOPE_PROCESS,
+                  "reason", "Device already has an error", "bitmask", channel_bitmask);
     return false;
   }
   FX_CHECK(is_operational());
@@ -2620,36 +2628,48 @@ bool Device::SetActiveChannels(
 
   // If we already know this device doesn't support SetActiveChannels, do nothing.
   if (!ring_buffer.supports_set_active_channels.value_or(true)) {
+    TRACE_INSTANT("power-audio", "ADR::Device::SetActiveChannels exit", TRACE_SCOPE_PROCESS,
+                  "reason", "Device does not support SetActiveChannels", "bitmask",
+                  channel_bitmask);
     return false;
   }
   (*ring_buffer.ring_buffer_client)
       ->SetActiveChannels({{.active_channels_bitmask = channel_bitmask}})
-      .Then(
-          [this, &ring_buffer, channel_bitmask, callback = std::move(set_active_channels_callback)](
-              fidl::Result<fha::RingBuffer::SetActiveChannels>& result) mutable {
-            if (result.is_error() && result.error_value().is_domain_error() &&
-                result.error_value().domain_error() == ZX_ERR_NOT_SUPPORTED) {
-              ADR_LOG_OBJECT(kLogRingBufferFidlResponses)
-                  << "RingBuffer/SetActiveChannels: device does not support this method";
-              ring_buffer.supports_set_active_channels = false;
-              callback(zx::error(ZX_ERR_NOT_SUPPORTED));
-              return;
-            }
-            if (SetDeviceErrorOnFidlError(result, "RingBuffer/SetActiveChannels response")) {
-              ring_buffer.supports_set_active_channels = false;
-              // We need not invoke the callback: this device is in the process of being unwound.
-              return;
-            }
+      .Then([this, &ring_buffer, channel_bitmask,
+             callback = std::move(set_active_channels_callback)](
+                fidl::Result<fha::RingBuffer::SetActiveChannels>& result) mutable {
+        if (result.is_error() && result.error_value().is_domain_error() &&
+            result.error_value().domain_error() == ZX_ERR_NOT_SUPPORTED) {
+          ADR_LOG_OBJECT(kLogRingBufferFidlResponses)
+              << "RingBuffer/SetActiveChannels: device does not support this method";
+          ring_buffer.supports_set_active_channels = false;
+          TRACE_INSTANT("power-audio", "ADR::Device::SetActiveChannels response",
+                        TRACE_SCOPE_PROCESS, "reason", "Device does not support SetActiveChannels",
+                        "bitmask", channel_bitmask);
+          callback(zx::error(ZX_ERR_NOT_SUPPORTED));
+          return;
+        }
+        if (SetDeviceErrorOnFidlError(result, "RingBuffer/SetActiveChannels response")) {
+          ring_buffer.supports_set_active_channels = false;
+          // We need not invoke the callback: this device is in the process of being unwound.
+          TRACE_INSTANT("power-audio", "ADR::Device::SetActiveChannels response",
+                        TRACE_SCOPE_PROCESS, "reason", "Driver error", "bitmask", channel_bitmask);
+          return;
+        }
 
-            ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "RingBuffer/SetActiveChannels: success";
+        ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "RingBuffer/SetActiveChannels: success";
+        TRACE_INSTANT("power-audio", "ADR::Device::SetActiveChannels response", TRACE_SCOPE_PROCESS,
+                      "reason", "Success", "bitmask", channel_bitmask);
 
-            ring_buffer.supports_set_active_channels = true;
-            ring_buffer.active_channels_bitmask = channel_bitmask;
-            ring_buffer.active_channels_set_time = zx::time(result->set_time());
-            callback(zx::ok(*ring_buffer.active_channels_set_time));
-            LogActiveChannels(ring_buffer.active_channels_bitmask,
-                              *ring_buffer.active_channels_set_time);
-          });
+        ring_buffer.supports_set_active_channels = true;
+        ring_buffer.active_channels_bitmask = channel_bitmask;
+        ring_buffer.active_channels_set_time = zx::time(result->set_time());
+        callback(zx::ok(*ring_buffer.active_channels_set_time));
+        LogActiveChannels(ring_buffer.active_channels_bitmask,
+                          *ring_buffer.active_channels_set_time);
+      });
+  TRACE_INSTANT("power-audio", "ADR::Device::SetActiveChannels exit", TRACE_SCOPE_PROCESS, "reason",
+                "Waiting for async response", "bitmask", channel_bitmask);
   return true;
 }
 

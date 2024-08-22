@@ -6,6 +6,7 @@
 #include <lib/async-loop/default.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/trace-provider/provider.h>
 
 #include <memory>
 
@@ -23,6 +24,8 @@ int main(int argc, const char** argv) {
   auto adr_thread = media_audio::FidlThread::CreateFromCurrentThread("AudioDeviceRegistryMain",
                                                                      loop->dispatcher());
   auto adr_service = std::make_shared<media_audio::AudioDeviceRegistry>(adr_thread);
+
+  trace::TraceProviderWithFdio trace_provider(loop->dispatcher(), "audio_device_registry_provider");
 
   // ...then start the device detection process (which continues after this call returns)...
   if (adr_service->StartDeviceDetection() != ZX_OK) {

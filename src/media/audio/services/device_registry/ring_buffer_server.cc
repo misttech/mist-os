@@ -5,7 +5,9 @@
 #include "src/media/audio/services/device_registry/ring_buffer_server.h"
 
 #include <fidl/fuchsia.audio.device/cpp/markers.h>
+#include <lib/fidl/cpp/enum.h>
 #include <lib/fit/internal/result.h>
+#include <lib/trace/event.h>
 #include <zircon/errors.h>
 
 #include <utility>
@@ -81,15 +83,23 @@ void RingBufferServer::DeviceDroppedRingBuffer() {
 void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
                                          SetActiveChannelsCompleter::Sync& completer) {
   ADR_LOG_METHOD(kLogRingBufferServerMethods);
+  TRACE_DURATION("power-audio", "ADR::RingBufferServer::SetActiveChannels", "bitmask",
+                 request.channel_bitmask().value_or(-1));
 
   if (parent_->ControlledDeviceReceivedError()) {
     ADR_WARN_METHOD() << "device has an error";
+    TRACE_INSTANT("power-audio", "ADR::RingBufferServer::SetActiveChannels exit",
+                  TRACE_SCOPE_PROCESS, "status",
+                  fidl::ToUnderlying(fad::RingBufferSetActiveChannelsError::kDeviceError));
     completer.Reply(fit::error(fad::RingBufferSetActiveChannelsError::kDeviceError));
     return;
   }
 
   if (active_channels_completer_.has_value()) {
     ADR_WARN_METHOD() << "previous `SetActiveChannels` request has not yet completed";
+    TRACE_INSTANT("power-audio", "ADR::RingBufferServer::SetActiveChannels exit",
+                  TRACE_SCOPE_PROCESS, "status",
+                  fidl::ToUnderlying(fad::RingBufferSetActiveChannelsError::kAlreadyPending));
     completer.Reply(fit::error(fad::RingBufferSetActiveChannelsError::kAlreadyPending));
     return;
   }
@@ -98,35 +108,46 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
   FX_CHECK(device_->supports_set_active_channels(element_id_).has_value());
   if (!*device_->supports_set_active_channels(element_id_)) {
     ADR_LOG_METHOD(kLogRingBufferServerMethods) << "device does not support SetActiveChannels";
+    TRACE_INSTANT("power-audio", "ADR::RingBufferServer::SetActiveChannels exit",
+                  TRACE_SCOPE_PROCESS, "status",
+                  fidl::ToUnderlying(fad::RingBufferSetActiveChannelsError::kMethodNotSupported));
     completer.Reply(fit::error(fad::RingBufferSetActiveChannelsError::kMethodNotSupported));
     return;
   }
 
   if (!request.channel_bitmask().has_value()) {
     ADR_WARN_METHOD() << "required field 'channel_bitmask' is missing";
+    TRACE_INSTANT(
+        "power-audio", "ADR::RingBufferServer::SetActiveChannels exit", TRACE_SCOPE_PROCESS,
+        "status",
+        fidl::ToUnderlying(fad::RingBufferSetActiveChannelsError::kInvalidChannelBitmask));
     completer.Reply(fit::error(fad::RingBufferSetActiveChannelsError::kInvalidChannelBitmask));
     return;
   }
-
+  auto bitmask = *request.channel_bitmask();
   FX_CHECK(device_->ring_buffer_format(element_id_).channel_count().has_value());
-  if (*request.channel_bitmask() >=
-      (1u << *device_->ring_buffer_format(element_id_).channel_count())) {
-    ADR_WARN_METHOD() << "channel_bitmask (0x0" << std::hex << *request.channel_bitmask()
-                      << ") too large, for this " << std::dec
-                      << *device_->ring_buffer_format(element_id_).channel_count()
+  if (bitmask >= (1u << *device_->ring_buffer_format(element_id_).channel_count())) {
+    ADR_WARN_METHOD() << "channel_bitmask (0x0" << std::hex << bitmask << ") too large, for this "
+                      << std::dec << *device_->ring_buffer_format(element_id_).channel_count()
                       << "-channel format";
+    TRACE_INSTANT("power-audio", "ADR::RingBufferServer::SetActiveChannels exit",
+                  TRACE_SCOPE_PROCESS, "status",
+                  fidl::ToUnderlying(fad::RingBufferSetActiveChannelsError::kChannelOutOfRange),
+                  "bitmask", bitmask);
     completer.Reply(fit::error(fad::RingBufferSetActiveChannelsError::kChannelOutOfRange));
     return;
   }
 
   active_channels_completer_ = completer.ToAsync();
   auto succeeded = device_->SetActiveChannels(
-      element_id_, *request.channel_bitmask(), [this](zx::result<zx::time> result) {
+      element_id_, *request.channel_bitmask(), [this, bitmask](zx::result<zx::time> result) {
         ADR_LOG_OBJECT(kLogRingBufferFidlResponses) << "Device/SetActiveChannels response";
         // If we have no async completer, maybe we're shutting down and it was cleared. Just exit.
         if (!active_channels_completer_.has_value()) {
           ADR_WARN_OBJECT()
               << "active_channels_completer_ gone by the time the StartRingBuffer callback ran";
+          TRACE_INSTANT("power-audio", "ADR::RingBufferServer::SetActiveChannels response",
+                        TRACE_SCOPE_PROCESS, "status", -1ll, "bitmask", bitmask);
           return;
         }
 
@@ -134,9 +155,15 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
         active_channels_completer_.reset();
         if (result.is_error()) {
           ADR_WARN_OBJECT() << "SetActiveChannels callback: device has an error";
+          TRACE_INSTANT("power-audio", "ADR::RingBufferServer::SetActiveChannels response",
+                        TRACE_SCOPE_PROCESS, "status",
+                        fidl::ToUnderlying(fad::RingBufferSetActiveChannelsError::kDeviceError),
+                        "bitmask", bitmask);
           completer->Reply(fit::error(fad::RingBufferSetActiveChannelsError::kDeviceError));
         }
 
+        TRACE_INSTANT("power-audio", "ADR::RingBufferServer::SetActiveChannels response",
+                      TRACE_SCOPE_PROCESS, "status", ZX_OK, "bitmask", bitmask);
         completer->Reply(fit::success(fad::RingBufferSetActiveChannelsResponse{{
             .set_time = result.value().get(),
         }}));
@@ -148,10 +175,17 @@ void RingBufferServer::SetActiveChannels(SetActiveChannelsRequest& request,
     ADR_LOG_METHOD(kLogRingBufferServerMethods) << "device does not support SetActiveChannels";
     auto completer = std::move(active_channels_completer_);
     active_channels_completer_.reset();
+    TRACE_INSTANT("power-audio", "ADR::RingBufferServer::SetActiveChannels exit",
+                  TRACE_SCOPE_PROCESS, "status",
+                  fidl::ToUnderlying(fad::RingBufferSetActiveChannelsError::kMethodNotSupported),
+                  "bitmask", bitmask);
     completer->Reply(fit::error(fad::RingBufferSetActiveChannelsError::kMethodNotSupported));
   }
 
   // Otherwise, `active_channels_completer_` is saved for the future async response.
+
+  TRACE_INSTANT("power-audio", "ADR::RingBufferServer::SetActiveChannels exit", TRACE_SCOPE_PROCESS,
+                "reason", "Waiting for async response", "bitmask", bitmask);
 }
 
 void RingBufferServer::Start(StartRequest& request, StartCompleter::Sync& completer) {

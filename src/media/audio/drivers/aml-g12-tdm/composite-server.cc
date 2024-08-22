@@ -5,6 +5,7 @@
 #include "src/media/audio/drivers/aml-g12-tdm/composite-server.h"
 
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/trace/event_args.h>
 #include <zircon/errors.h>
 
 #include <algorithm>
@@ -496,9 +497,12 @@ void AudioCompositeServer::SetDaiFormat(SetDaiFormatRequest& request,
 }
 
 zx_status_t AudioCompositeServer::StartSocPower(bool wait_for_completion) {
+  TRACE_DURATION("power-audio", "aml-g12-audio-composite::StartSocPower");
   // Only if needed (not done previously) so voting on relevant clock ids is not repeated.
   // Each driver instance (audio or any other) may vote independently.
   if (soc_power_started_) {
+    TRACE_INSTANT("power-audio", "aml-g12-audio-composite::StartSocPower exit", TRACE_SCOPE_PROCESS,
+                  "status", ZX_OK, "reason", "Already started");
     return ZX_OK;
   }
   FDF_LOG(INFO, "Starting SoC power");
@@ -506,21 +510,31 @@ zx_status_t AudioCompositeServer::StartSocPower(bool wait_for_completion) {
   if (!clock_gate_result.ok()) {
     FDF_LOG(ERROR, "Failed to send request to enable clock gate: %s",
             clock_gate_result.status_string());
+    TRACE_INSTANT("power-audio", "aml-g12-audio-composite::StartSocPower exit", TRACE_SCOPE_PROCESS,
+                  "status", clock_gate_result.status(), "reason",
+                  "Could not send request to enable clock gate");
     return clock_gate_result.status();
   }
   if (clock_gate_result->is_error()) {
     FDF_LOG(ERROR, "Send request to enable clock gate error: %s",
             zx_status_get_string(clock_gate_result->error_value()));
+    TRACE_INSTANT("power-audio", "aml-g12-audio-composite::StartSocPower exit", TRACE_SCOPE_PROCESS,
+                  "status", clock_gate_result->error_value(), "reason",
+                  "Could not enable clock gate");
     return clock_gate_result->error_value();
   }
   fidl::WireResult pll_result = pll_->Enable();
   if (!pll_result.ok()) {
     FDF_LOG(ERROR, "Failed to send request to enable PLL: %s", pll_result.status_string());
+    TRACE_INSTANT("power-audio", "aml-g12-audio-composite::StartSocPower exit", TRACE_SCOPE_PROCESS,
+                  "status", pll_result.status(), "reason", "Could not send request to enable PLL");
     return pll_result.status();
   }
   if (pll_result->is_error()) {
     FDF_LOG(ERROR, "Send request to enable PLL error: %s",
             zx_status_get_string(pll_result->error_value()));
+    TRACE_INSTANT("power-audio", "aml-g12-audio-composite::StartSocPower exit", TRACE_SCOPE_PROCESS,
+                  "status", pll_result->error_value(), "reason", "Could not enable PLL");
     return pll_result->error_value();
   }
   if (wait_for_completion) {
@@ -531,19 +545,27 @@ zx_status_t AudioCompositeServer::StartSocPower(bool wait_for_completion) {
     fidl::WireResult result = gpio_sclk_client->SetAltFunction(kSclkAltFunction);
     if (!result.ok()) {
       FDF_LOG(ERROR, "Failed to send request to set GPIO function: %s", result.status_string());
+      TRACE_INSTANT("power-audio", "aml-g12-audio-composite::StartSocPower exit",
+                    TRACE_SCOPE_PROCESS, "status", result.status(), "reason",
+                    "Could not set GPIO function");
       return result.status();
     }
   }
   TRACE_ASYNC_END("aml-g12-composite", "suspend", trace_async_id_);
+  TRACE_INSTANT("power-audio", "aml-g12-audio-composite::StartSocPower exit", TRACE_SCOPE_PROCESS,
+                "status", ZX_OK, "reason", "Successfully powered up");
   soc_power_started_ = true;
   last_started_time_ = zx::clock::get_monotonic();
   return ZX_OK;
 }
 
 zx_status_t AudioCompositeServer::StopSocPower() {
+  TRACE_DURATION("power-audio", "aml-g12-audio-composite::StopSocPower");
   // Only if needed (not done previously) so voting on relevant clock ids is not repeated.
   // Each driver instance (audio or any other) may vote independently.
   if (!soc_power_started_) {
+    TRACE_INSTANT("power-audio", "aml-g12-audio-composite::StopSocPower exit", TRACE_SCOPE_PROCESS,
+                  "status", ZX_OK, "reason", "Already stopped");
     return ZX_OK;
   }
   FDF_LOG(INFO, "Stopping SoC power");
@@ -553,12 +575,18 @@ zx_status_t AudioCompositeServer::StopSocPower() {
     if (!alt_function_result.ok()) {
       FDF_LOG(ERROR, "Failed to send request to set GPIO function: %s",
               alt_function_result.status_string());
+      TRACE_INSTANT("power-audio", "aml-g12-audio-composite::StopSocPower exit",
+                    TRACE_SCOPE_PROCESS, "status", alt_function_result.status(), "reason",
+                    "Could not set GPIO function");
       return alt_function_result.status();
     }
     fidl::WireResult config_out_result = gpio_sclk_client->ConfigOut(0);
     if (!config_out_result.ok()) {
       FDF_LOG(ERROR, "Failed to send request to set GPIO output: %s",
               config_out_result.status_string());
+      TRACE_INSTANT("power-audio", "aml-g12-audio-composite::StopSocPower exit",
+                    TRACE_SCOPE_PROCESS, "status", config_out_result.status(), "reason",
+                    "Could not set GPIO output");
       return config_out_result.status();
     }
   }
@@ -568,24 +596,36 @@ zx_status_t AudioCompositeServer::StopSocPower() {
   if (!clock_gate_result.ok()) {
     FDF_LOG(ERROR, "Failed to send request to disable clock gate: %s",
             clock_gate_result.status_string());
+    TRACE_INSTANT("power-audio", "aml-g12-audio-composite::StopSocPower exit", TRACE_SCOPE_PROCESS,
+                  "status", clock_gate_result.status(), "reason",
+                  "Could not send request to disable clock gate");
     return clock_gate_result.status();
   }
   if (clock_gate_result->is_error()) {
     FDF_LOG(ERROR, "Send request to disable clock gate error: %s",
             zx_status_get_string(clock_gate_result->error_value()));
+    TRACE_INSTANT("power-audio", "aml-g12-audio-composite::StopSocPower exit", TRACE_SCOPE_PROCESS,
+                  "status", clock_gate_result->error_value(), "reason",
+                  "Could not disable clock gate");
     return clock_gate_result->error_value();
   }
-  // MMIO access is still valid after disableing the PLL used.
+  // MMIO access is still valid after disabling the PLL used.
   fidl::WireResult pll_result = pll_->Disable();
   if (!pll_result.ok()) {
     FDF_LOG(ERROR, "Failed to send request to disable PLL: %s", pll_result.status_string());
+    TRACE_INSTANT("power-audio", "aml-g12-audio-composite::StopSocPower exit", TRACE_SCOPE_PROCESS,
+                  "status", pll_result.status(), "reason", "Could not send request to disable PLL");
     return pll_result.status();
   }
   if (pll_result->is_error()) {
     FDF_LOG(ERROR, "Send request to disable PLL error: %s",
             zx_status_get_string(pll_result->error_value()));
+    TRACE_INSTANT("power-audio", "aml-g12-audio-composite::StopSocPower exit", TRACE_SCOPE_PROCESS,
+                  "status", pll_result->error_value(), "reason", "Could not disable PLL");
     return pll_result->error_value();
   }
+  TRACE_INSTANT("power-audio", "aml-g12-audio-composite::StopSocPower exit", TRACE_SCOPE_PROCESS,
+                "status", ZX_OK, "reason", "Successfully powered down");
   trace_async_id_ = TRACE_NONCE();
   TRACE_ASYNC_BEGIN("aml-g12-composite", "suspend", trace_async_id_);
   soc_power_started_ = false;
@@ -831,12 +871,17 @@ void RingBufferServer::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) 
 void RingBufferServer::SetActiveChannels(
     fuchsia_hardware_audio::RingBufferSetActiveChannelsRequest& request,
     SetActiveChannelsCompleter::Sync& completer) {
+  TRACE_DURATION("power-audio", "aml-g12-audio-composite::SetActiveChannels", "bitmask",
+                 request.active_channels_bitmask());
   // Check if bitmask activating channels go beyond the current number of channels.
   if (request.active_channels_bitmask() &
       ~((1 << engine_.ring_buffer_format.pcm_format()->number_of_channels()) - 1)) {
     FDF_LOG(ERROR, "Bitmask: 0x%lX activating channels beyond the current number of channels: %u",
             request.active_channels_bitmask(),
             engine_.ring_buffer_format.pcm_format()->number_of_channels());
+    TRACE_INSTANT("power-audio", "aml-g12-audio-composite::SetActiveChannels exit",
+                  TRACE_SCOPE_PROCESS, "status", ZX_ERR_INVALID_ARGS, "reason",
+                  "Bitmask out of range");
     completer.Reply(zx::error(ZX_ERR_INVALID_ARGS));
     return;
   }
@@ -851,20 +896,27 @@ void RingBufferServer::SetActiveChannels(
     // we reply with a time indicating when the hardware configuration was completed.
     zx_status_t status = owner_.StartSocPower(/*wait_for_completion*/ false);
     if (status != ZX_OK) {
+      TRACE_INSTANT("power-audio", "aml-g12-audio-composite::SetActiveChannels exit",
+                    TRACE_SCOPE_PROCESS, "status", status, "reason", "StartSocPower failed");
       completer.Reply(zx::error(status));
       return;
     }
+    TRACE_INSTANT("power-audio", "aml-g12-audio-composite::SetActiveChannels exit",
+                  TRACE_SCOPE_PROCESS, "status", ZX_OK, "reason", "Successfully enabled channels");
     completer.Reply(zx::ok(owner_.last_started_time_.get()));
     return;
-  } else {
-    zx_status_t status = owner_.StopSocPower();
-    if (status != ZX_OK) {
-      completer.Reply(zx::error(status));
-      return;
-    }
-    completer.Reply(zx::ok(owner_.last_stopped_time_.get()));
+  }
+
+  zx_status_t status = owner_.StopSocPower();
+  if (status != ZX_OK) {
+    TRACE_INSTANT("power-audio", "aml-g12-audio-composite::SetActiveChannels exit",
+                  TRACE_SCOPE_PROCESS, "status", status, "reason", "StopSocPower failed");
+    completer.Reply(zx::error(status));
     return;
   }
+  TRACE_INSTANT("power-audio", "aml-g12-audio-composite::SetActiveChannels exit",
+                TRACE_SCOPE_PROCESS, "status", ZX_OK, "reason", "Successfully disabled channels");
+  completer.Reply(zx::ok(owner_.last_stopped_time_.get()));
 }
 
 void AudioCompositeServer::GetElements(GetElementsCompleter::Sync& completer) {
