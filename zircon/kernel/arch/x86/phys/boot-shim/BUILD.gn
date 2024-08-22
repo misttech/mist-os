@@ -242,18 +242,22 @@ if (current_toolchain != host_toolchain) {
             forward_variables_from(qemu,
                                    [
                                      "disabled",
-                                     "environments",
+                                     "supported_environments",
                                      "timeout",
                                    ])
           }
         }
         assert(defined(qemu_kernel), "$shim not in $qemu_boot_formats")
 
+        forward_variables_from(invoker,
+                               "*",
+                               [
+                                 "qemu_kernel",
+                                 "supported_environments",
+                               ])
         if (!defined(environments)) {
-          environments = [ qemu_env ]
+          environments = supported_environments
         }
-
-        forward_variables_from(invoker, "*")
       }
     }
   }

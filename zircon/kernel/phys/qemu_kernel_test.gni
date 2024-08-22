@@ -16,14 +16,17 @@ import("qemu.gni")
 # Parameters
 #
 #   * disabled
-#     - Optional: See boot_test().
+#     - Optional: See boot_test().  This overrides the $qemu_boot_formats value
+#     for all instances of this test.  By default, the $qemu_boot_formats entry
+#     for each format will determine whether its test is disabled.
 #     - Type: bool
 #     - Default: false
 #
 #   * environments
-#     - Optional: See boot_test().
+#     - Optional: See boot_test().  This overrides the $qemu_boot_formats value
+#     for all instances of this test.  By default, the $qemu_boot_formats entry
+#     for each format will determine where its test is run.
 #     - Type: list(scope)
-#     - Default: [ qemu_env ]
 #
 #   * initrd
 #     - Optional: A ramdisk (e.g., ZBI) with which to boot.
@@ -107,13 +110,15 @@ template("qemu_kernel_test") {
           zbi = invoker.initrd
         }
 
-        forward_variables_from(qemu,
-                               [
-                                 "disabled",
-                                 "environments",
-                               ])
-        if (!defined(environments)) {
-          environments = [ qemu_env ]
+        if (defined(invoker.disabled)) {
+          disabled = invoker.disabled
+        } else {
+          forward_variables_from(qemu, [ "disabled" ])
+        }
+        if (defined(invoker.environments)) {
+          environments = invoker.environments
+        } else {
+          environments = qemu.supported_environments
         }
       }
     } else {

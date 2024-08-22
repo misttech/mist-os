@@ -59,11 +59,10 @@ template("qemu_shim_test") {
       if (qemu.name == qemu_boot_format) {
         qemu_kernel = ":linux-riscv64-boot-shim(${qemu.environment})"
         forward_variables_from(qemu, [ "timeout" ])
+        environments = qemu.supported_environments
       }
     }
     assert(defined(qemu_kernel), "$qemu_boot_format not in $qemu_boot_formats")
-
-    environments = [ qemu_env ]
 
     forward_variables_from(invoker, "*")
   }
