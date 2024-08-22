@@ -321,7 +321,7 @@ impl RoutingTest {
         {
             let name = ECHO_CAPABILITY.clone();
             let top_instance = model.top_instance();
-            let root = top_instance.root().await;
+            let root = top_instance.root();
             let state = root.lock_state().await;
             let InstanceState::Unresolved(state) = &*state else {
                 unreachable!();

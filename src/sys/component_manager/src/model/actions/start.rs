@@ -11,7 +11,10 @@ use crate::model::namespace::create_namespace;
 use crate::model::routing::open_capability;
 use crate::runner::RemoteRunner;
 use ::namespace::Entry as NamespaceEntry;
+use ::routing::bedrock::lazy_get::LazyGet;
+use ::routing::bedrock::request_metadata::runner_metadata;
 use ::routing::component_instance::ComponentInstanceInterface;
+use ::routing::error::RoutingError;
 use ::routing::RouteRequest;
 use async_trait::async_trait;
 use cm_logger::scoped::ScopedLogger;
@@ -19,20 +22,21 @@ use cm_rust::ComponentDecl;
 use cm_util::{AbortError, AbortFutureExt, AbortHandle, AbortableScope};
 use config_encoder::ConfigFields;
 use errors::{ActionError, CreateNamespaceError, StartActionError, StructuredConfigError};
-use fidl::endpoints::DiscoverableProtocolMarker;
+use fidl::endpoints::{create_proxy, DiscoverableProtocolMarker};
 use fidl::Vmo;
 use futures::channel::oneshot;
 use hooks::{EventPayload, RuntimeInfo};
 use moniker::Moniker;
-use sandbox::{Capability, Dict};
+use router_error::RouterError;
+use sandbox::{Capability, Connectable, Dict, Message, Request};
 use serve_processargs::NamespaceBuilder;
 use std::sync::Arc;
 use tracing::warn;
 use vfs::execution_scope::ExecutionScope;
 use {
-    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_data as fdata,
-    fidl_fuchsia_logger as flogger, fidl_fuchsia_mem as fmem, fidl_fuchsia_process as fprocess,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_component_decl as fdecl, fidl_fuchsia_component_runner as fcrunner,
+    fidl_fuchsia_data as fdata, fidl_fuchsia_logger as flogger, fidl_fuchsia_mem as fmem,
+    fidl_fuchsia_process as fprocess, fuchsia_zircon as zx,
 };
 
 /// Starts a component instance.
@@ -432,14 +436,80 @@ async fn open_runner(
     runner: cm_rust::UseRunnerDecl,
 ) -> Result<Option<RemoteRunner>, StartActionError> {
     // Open up a channel to the runner.
-    let proxy = open_capability(&RouteRequest::UseRunner(runner.clone()), component)
-        .await
-        .map_err(|err| StartActionError::ResolveRunnerError {
-            moniker: component.moniker.clone(),
-            err: Box::new(err),
-            runner: runner.source_name,
-        })?;
-    Ok(Some(RemoteRunner::new(proxy)))
+    match &runner.source {
+        cm_rust::UseSource::Environment => {
+            let runner_capability = component
+                .component_sandbox()
+                .await
+                .map_err(|err| StartActionError::ResolveRunnerError {
+                    moniker: component.moniker.clone(),
+                    err: Box::new(RouterError::NotFound(Arc::new(err))),
+                    runner: runner.source_name.clone(),
+                })?
+                .component_input
+                .environment()
+                .runners()
+                .lazy_get(
+                    runner.source_name.clone(),
+                    RoutingError::use_from_environment_not_found(
+                        &component.moniker,
+                        cm_rust::CapabilityTypeName::Runner.to_string(),
+                        &runner.source_name,
+                    ),
+                )
+                .route(Request {
+                    target: component.as_weak().into(),
+                    debug: false,
+                    metadata: runner_metadata(cm_rust::Availability::Required),
+                })
+                .await
+                .map_err(|err| StartActionError::ResolveRunnerError {
+                    moniker: component.moniker.clone(),
+                    err: Box::new(err),
+                    runner: runner.source_name.clone(),
+                })?;
+            match &runner_capability {
+                // Built-in runners are hosted by a LaunchTaskOnReceive, which returns a Connector
+                // capability for new routes.
+                Capability::Connector(runner_connector) => {
+                    let (proxy, server_end) =
+                        create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
+                    runner_connector.send(Message { channel: server_end.into_channel() }).unwrap();
+                    Ok(Some(RemoteRunner::new(proxy)))
+                }
+                // Component provided runners are handled by a program router, which returns a
+                // DirEntry capability for new routes.
+                Capability::DirEntry(runner_dir_entry) => {
+                    let (proxy, server_end) =
+                        create_proxy::<fcrunner::ComponentRunnerMarker>().unwrap();
+                    runner_dir_entry.send(Message { channel: server_end.into_channel() }).unwrap();
+                    Ok(Some(RemoteRunner::new(proxy)))
+                }
+                cap => Err(StartActionError::ResolveRunnerError {
+                    moniker: component.moniker.clone(),
+                    err: Box::new(
+                        RoutingError::BedrockWrongCapabilityType {
+                            actual: cap.debug_typename().to_string(),
+                            expected: "Sender or DirEntry".to_string(),
+                            moniker: component.moniker.clone().into(),
+                        }
+                        .into(),
+                    ),
+                    runner: runner.source_name,
+                }),
+            }
+        }
+        _ => {
+            let proxy = open_capability(&RouteRequest::UseRunner(runner.clone()), component)
+                .await
+                .map_err(|err| StartActionError::ResolveRunnerError {
+                    moniker: component.moniker.clone(),
+                    err: Box::new(err),
+                    runner: runner.source_name,
+                })?;
+            Ok(Some(RemoteRunner::new(proxy)))
+        }
+    }
 }
 
 /// Returns true if the decl uses configuration capabilities.

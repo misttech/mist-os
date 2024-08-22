@@ -654,7 +654,7 @@ impl ComponentInstance {
                         .top_instance()
                         .await
                         .map_err(|_| StopActionError::GetTopInstanceFailed)?;
-                    top_instance.trigger_reboot().await;
+                    top_instance.trigger_reboot();
                 }
                 Some((ret, started_timestamp))
             } else {

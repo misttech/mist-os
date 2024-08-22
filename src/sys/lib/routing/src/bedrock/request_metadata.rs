@@ -38,3 +38,19 @@ pub fn config_metadata(availability: cm_types::Availability) -> sandbox::Dict {
     metadata.set_availability(availability);
     metadata
 }
+
+/// Returns a `Dict` containing Router Request metadata specifying a Runner
+/// porcelain type.
+pub fn runner_metadata(availability: cm_types::Availability) -> sandbox::Dict {
+    let metadata = sandbox::Dict::new();
+    metadata
+        .insert(
+            cm_types::Name::new(METADATA_KEY_TYPE).unwrap(),
+            sandbox::Capability::Data(sandbox::Data::String(
+                cm_rust::CapabilityTypeName::Runner.to_string(),
+            )),
+        )
+        .unwrap();
+    metadata.set_availability(availability);
+    metadata
+}

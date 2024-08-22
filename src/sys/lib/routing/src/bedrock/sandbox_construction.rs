@@ -151,7 +151,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
             environment = environments.get(environment_name).expect(
                 "child references nonexistent environment, \
                     this should be prevented in manifest validation",
-            )
+            );
         } else {
             environment = component_input.environment();
         }
@@ -283,20 +283,25 @@ fn build_environment(
             warn!("failed to copy component_input.environment");
         }
     }
-    for debug_registration in &environment_decl.debug_capabilities {
-        let cm_rust::DebugRegistration::Protocol(debug_protocol) = debug_registration;
-        let source_path = SeparatedPath {
-            dirname: Default::default(),
-            basename: debug_protocol.source_name.clone(),
-        };
-        let router = match &debug_protocol.source {
+    let debug_registrations =
+        environment_decl.debug_capabilities.iter().map(|debug_registration| {
+            let cm_rust::DebugRegistration::Protocol(debug) = debug_registration;
+            (&debug.source_name, &debug.target_name, &debug.source, CapabilityTypeName::Protocol)
+        });
+    let runners = environment_decl.runners.iter().map(|runner| {
+        (&runner.source_name, &runner.target_name, &runner.source, CapabilityTypeName::Runner)
+    });
+    for (source_name, target_name, source, cap_type) in debug_registrations.chain(runners) {
+        let source_path =
+            SeparatedPath { dirname: Default::default(), basename: source_name.clone() };
+        let router = match &source {
             cm_rust::RegistrationSource::Parent => use_from_parent_router(
                 component_input,
                 source_path,
                 moniker,
                 program_input_dict_additions,
             )
-            .with_porcelain_type(CapabilityTypeName::Protocol, moniker.clone()),
+            .with_porcelain_type(cap_type, moniker.clone()),
             cm_rust::RegistrationSource::Self_ => program_output_router
                 .clone()
                 .lazy_get(
@@ -306,7 +311,7 @@ fn build_environment(
                         source_path.iter_segments().join("/"),
                     ),
                 )
-                .with_porcelain_type(CapabilityTypeName::Protocol, moniker.clone()),
+                .with_porcelain_type(cap_type, moniker.clone()),
             cm_rust::RegistrationSource::Child(child_name) => {
                 let child_name = ChildName::parse(child_name).expect("invalid child name");
                 let Some(child_component_output) =
@@ -321,18 +326,20 @@ fn build_environment(
                         RoutingError::use_from_child_expose_not_found(
                             &child_name,
                             &moniker,
-                            debug_protocol.source_name.clone(),
+                            source_name.clone(),
                         ),
                     )
-                    .with_porcelain_type(CapabilityTypeName::Protocol, moniker.clone())
+                    .with_porcelain_type(cap_type, moniker.clone())
             }
         };
-        match environment.debug().insert_capability(&debug_protocol.target_name, router.into()) {
+        let dict_to_insert_to = match cap_type {
+            CapabilityTypeName::Protocol => environment.debug(),
+            CapabilityTypeName::Runner => environment.runners(),
+            c => panic!("unexpected capability type {}", c),
+        };
+        match dict_to_insert_to.insert_capability(target_name, router.into()) {
             Ok(()) => (),
-            Err(e) => warn!(
-                "failed to add {} to debug capabilities dict: {e:?}",
-                debug_protocol.target_name
-            ),
+            Err(e) => warn!("failed to add {} {} to environment: {e:?}", cap_type, target_name),
         }
     }
     environment
@@ -592,6 +599,7 @@ fn is_supported_offer(offer: &cm_rust::OfferDecl) -> bool {
         cm_rust::OfferDecl::Config(_)
             | cm_rust::OfferDecl::Protocol(_)
             | cm_rust::OfferDecl::Dictionary(_)
+            | cm_rust::OfferDecl::Runner(_)
     )
 }
 
@@ -713,6 +721,7 @@ pub fn is_supported_expose(expose: &cm_rust::ExposeDecl) -> bool {
         cm_rust::ExposeDecl::Config(_)
             | cm_rust::ExposeDecl::Protocol(_)
             | cm_rust::ExposeDecl::Dictionary(_)
+            | cm_rust::ExposeDecl::Runner(_)
     )
 }
 

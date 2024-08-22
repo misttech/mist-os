@@ -48,13 +48,14 @@ use crate::root_stop_notifier::RootStopNotifier;
 use crate::sandbox_util::LaunchTaskOnReceive;
 use ::diagnostics::lifecycle::ComponentLifecycleTimeStats;
 use ::diagnostics::task_metrics::ComponentTreeStats;
+use ::routing::bedrock::dict_ext::DictExt;
 use ::routing::bedrock::structured_dict::ComponentInput;
 use ::routing::capability_source::{
     BuiltinSource, CapabilitySource, ComponentCapability, InternalCapability, NamespaceSource,
 };
 use ::routing::component_instance::{ComponentInstanceInterface, TopInstanceInterface};
 use ::routing::environment::{DebugRegistry, RunnerRegistry};
-use ::routing::policy::GlobalPolicyChecker;
+use ::routing::policy::{GlobalPolicyChecker, ScopedPolicyChecker};
 use anyhow::{format_err, Context as _, Error};
 use builtins::arguments::Arguments as BootArguments;
 use builtins::cpu_resource::CpuResource;
@@ -76,7 +77,7 @@ use builtins::power_resource::PowerResource;
 use builtins::profile_resource::ProfileResource;
 use builtins::root_job::RootJob;
 use builtins::vmex_resource::VmexResource;
-use cm_config::{RuntimeConfig, VmexSource};
+use cm_config::{RuntimeConfig, SecurityPolicy, VmexSource};
 use cm_rust::{Availability, RunnerRegistration, UseEventStreamDecl, UseSource};
 use cm_types::Name;
 use elf_runner::crash_info::CrashRecords;
@@ -92,12 +93,13 @@ use fuchsia_inspect::{component, Inspector};
 use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
 use fuchsia_zbi::{ZbiParser, ZbiType};
 use fuchsia_zircon::{self as zx, Clock, Resource};
-use futures::future::BoxFuture;
+use futures::future::{self, BoxFuture};
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use hooks::EventType;
 use std::sync::Arc;
 use tracing::{error, info, warn};
 use vfs::directory::entry::OpenRequest;
+use vfs::execution_scope::ExecutionScope;
 use vfs::path::Path;
 use vfs::ToObjectRequest;
 use {
@@ -372,6 +374,7 @@ impl BuiltinEnvironmentBuilder {
 struct RootComponentInputBuilder {
     input: ComponentInput,
     top_instance: Arc<ComponentManagerInstance>,
+    security_policy: Arc<SecurityPolicy>,
     policy_checker: GlobalPolicyChecker,
     builtin_capabilities: Vec<cm_rust::CapabilityDecl>,
 }
@@ -384,6 +387,7 @@ impl RootComponentInputBuilder {
         Self {
             input: ComponentInput::default(),
             top_instance,
+            security_policy: runtime_config.security_policy.clone(),
             policy_checker: GlobalPolicyChecker::new(runtime_config.security_policy.clone()),
             builtin_capabilities: runtime_config.builtin_capabilities.clone(),
         }
@@ -467,6 +471,51 @@ impl RootComponentInputBuilder {
         match self.input.insert_capability(&protocol.name, launch.into_router().into()) {
             Ok(()) => (),
             Err(e) => warn!("failed to add {} to root component input: {e:?}", protocol.name),
+        }
+    }
+
+    fn add_runner(&mut self, runner: BuiltinRunner) {
+        let runner_name = runner.name().clone();
+        let capability_source = CapabilitySource::Builtin(BuiltinSource {
+            capability: InternalCapability::Runner(runner_name.clone()),
+        });
+        let security_policy = self.security_policy.clone();
+        let execution_scope = ExecutionScope::new();
+        let launch = LaunchTaskOnReceive::new(
+            capability_source,
+            self.top_instance.task_group().as_weak(),
+            runner.name().clone(),
+            Some(self.policy_checker.clone()),
+            Arc::new(move |server_end, weak_component| {
+                let flags = fio::OpenFlags::empty();
+                let mut object_request = flags.to_object_request(server_end);
+                runner
+                    .factory()
+                    .clone()
+                    .get_scoped_runner(
+                        ScopedPolicyChecker::new(
+                            security_policy.clone(),
+                            weak_component.moniker.clone(),
+                        ),
+                        OpenRequest::new(
+                            execution_scope.clone(),
+                            flags,
+                            Path::dot(),
+                            &mut object_request,
+                        ),
+                    )
+                    .expect("TODO");
+                future::ready(Ok(())).boxed()
+            }),
+        );
+        match self
+            .input
+            .environment()
+            .runners()
+            .insert_capability(&runner_name, launch.into_router().into())
+        {
+            Ok(()) => (),
+            Err(e) => warn!("failed to add {} to root component input runners: {e:?}", runner_name),
         }
     }
 
@@ -1145,6 +1194,10 @@ impl BuiltinEnvironment {
             builtin_capabilities.push(Box::new(boot_resolver));
         }
 
+        for runner in builtin_runners.iter() {
+            root_input_builder.add_runner(runner.clone());
+        }
+
         let root_component_input = root_input_builder.build();
         let model = Model::new(params, root_component_input).await?;
 
@@ -1274,7 +1327,7 @@ impl BuiltinEnvironment {
         if self.capability_passthrough {
             let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()?;
             service_fs.add_remote("root-exposed", proxy);
-            let root = self.model.top_instance().root().await;
+            let root = self.model.top_instance().root();
             let root = WeakComponentInstance::new(&root);
             scope.clone().spawn(async move {
                 let flags = routing::rights::Rights::from(fio::RW_STAR_DIR).into_legacy();

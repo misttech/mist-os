@@ -68,6 +68,12 @@ impl ComponentInstanceError {
     }
 }
 
+impl Explain for ComponentInstanceError {
+    fn as_zx_status(&self) -> zx::Status {
+        self.as_zx_status()
+    }
+}
+
 impl From<ComponentInstanceError> for ExtendedMoniker {
     fn from(err: ComponentInstanceError) -> ExtendedMoniker {
         match err {

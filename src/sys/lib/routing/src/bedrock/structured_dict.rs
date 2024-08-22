@@ -97,6 +97,9 @@ lazy_static! {
 
     /// Dictionary of debug capabilities in a component's environment.
     static ref DEBUG: Name = "debug".parse().unwrap();
+
+    /// Dictionary of runner capabilities in a component's environment.
+    static ref RUNNERS: Name = "runners".parse().unwrap();
 }
 
 /// Contains the capabilities component receives from its parent and environment. Stored as a
@@ -181,6 +184,7 @@ impl Default for ComponentEnvironment {
     fn default() -> Self {
         let dict = Dict::new();
         dict.insert(DEBUG.clone(), Dict::new().into()).ok();
+        dict.insert(RUNNERS.clone(), Dict::new().into()).ok();
         Self(dict)
     }
 }
@@ -205,12 +209,22 @@ impl ComponentEnvironment {
         dict.clone()
     }
 
+    /// Capabilities listed in the `debug_capabilities` portion of its environment.
+    pub fn runners(&self) -> Dict {
+        let cap = self.0.get(&*RUNNERS).expect("runners must be cloneable").unwrap();
+        let Capability::Dictionary(dict) = cap else {
+            unreachable!("runners entry must be a dict: {cap:?}");
+        };
+        dict
+    }
+
     pub fn shallow_copy(&self) -> Result<Self, ()> {
         // Note: We call [Dict::copy] on the nested [Dict]s, not the root [Dict], because
         // [Dict::copy] only goes one level deep and we want to copy the contents of the
         // inner sandboxes.
         let dict = Dict::new();
         dict.insert(DEBUG.clone(), self.debug().shallow_copy()?.into()).ok();
+        dict.insert(RUNNERS.clone(), self.runners().shallow_copy()?.into()).ok();
         Ok(Self(dict))
     }
 }
