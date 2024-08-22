@@ -192,9 +192,11 @@ fidl_library://fidl/fuchsia.auth
 fidl_library://fidl/fuchsia.auth.oldtokens
 fidl_library://fidl/fuchsia.bluetooth
 fidl_library://fidl/fuchsia.bluetooth.a2dp
+fidl_library://fidl/fuchsia.bluetooth.bredr
 fidl_library://fidl/fuchsia.bluetooth.fastpair
 fidl_library://fidl/fuchsia.bluetooth.gatt
 fidl_library://fidl/fuchsia.bluetooth.gatt2
+fidl_library://fidl/fuchsia.bluetooth.host
 fidl_library://fidl/fuchsia.bluetooth.hfp
 fidl_library://fidl/fuchsia.bluetooth.le
 fidl_library://fidl/fuchsia.bluetooth.sys
@@ -240,6 +242,7 @@ fidl_library://fidl/fuchsia.gpu.magma
 fidl_library://fidl/fuchsia.hardware.adc
 fidl_library://fidl/fuchsia.hardware.audio
 fidl_library://fidl/fuchsia.hardware.audio.signalprocessing
+fidl_library://fidl/fuchsia.hardware.bluetooth
 fidl_library://fidl/fuchsia.hardware.clock
 fidl_library://fidl/fuchsia.hardware.clockimpl
 fidl_library://fidl/fuchsia.hardware.gpio (unstable)

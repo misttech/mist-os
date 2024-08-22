@@ -5,7 +5,7 @@ library fuchsia.bluetooth;
 
 /// Coding Format, as specified by the Bluetooth SIG (see Assigned Numbers document for values):
 /// https://www.bluetooth.com/specifications/assigned-numbers/
-@available(added=HEAD)
+@available(added=NEXT)
 type AssignedCodingFormat = flexible enum : uint8 {
     U_LAW_LOG = 0;
     A_LAW_LOG = 1;

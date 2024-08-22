@@ -303,6 +303,52 @@
         "type": "uint16"
     },
     {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth/AssignedCodingFormat.A_LAW_LOG",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth/AssignedCodingFormat.CVSD",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth/AssignedCodingFormat.G_729A",
+        "value": "7"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth/AssignedCodingFormat.LC3",
+        "value": "6"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth/AssignedCodingFormat.LINEAR_PCM",
+        "value": "4"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth/AssignedCodingFormat.MSBC",
+        "value": "5"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth/AssignedCodingFormat.TRANSPARENT",
+        "value": "3"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth/AssignedCodingFormat.U_LAW_LOG",
+        "value": "0"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.bluetooth/AssignedCodingFormat",
+        "strictness": "flexible",
+        "type": "uint8"
+    },
+    {
         "kind": "struct/member",
         "name": "fuchsia.bluetooth/Bool.value",
         "ordinal": "1",
@@ -311,6 +357,111 @@
     {
         "kind": "struct",
         "name": "fuchsia.bluetooth/Bool"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth/Channel.Receive",
+        "strictness": "flexible",
+        "ordinal": "3790016296264777684",
+        "direction": "two_way",
+        "response": "fuchsia.bluetooth/Channel_Receive_Response"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth/Channel.Send",
+        "strictness": "flexible",
+        "ordinal": "8053634172695491364",
+        "direction": "two_way",
+        "request": "fuchsia.bluetooth/ChannelSendRequest",
+        "response": "fuchsia.bluetooth/Channel_Send_Response"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.bluetooth/Channel.WatchChannelParameters",
+        "strictness": "flexible",
+        "ordinal": "6488821205503011858",
+        "direction": "two_way",
+        "response": "fuchsia.bluetooth/ChannelParameters"
+    },
+    {
+        "kind": "protocol",
+        "name": "fuchsia.bluetooth/Channel",
+        "openness": "open",
+        "transport": "channel"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth/ChannelMode.BASIC",
+        "value": "1"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth/ChannelMode.ENHANCED_CREDIT_BASED_FLOW_CONTROL",
+        "value": "4"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth/ChannelMode.ENHANCED_RETRANSMISSION",
+        "value": "2"
+    },
+    {
+        "kind": "enum/member",
+        "name": "fuchsia.bluetooth/ChannelMode.LE_CREDIT_BASED_FLOW_CONTROL",
+        "value": "3"
+    },
+    {
+        "kind": "enum",
+        "name": "fuchsia.bluetooth/ChannelMode",
+        "strictness": "flexible",
+        "type": "uint32"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth/ChannelParameters.channel_mode",
+        "ordinal": "1",
+        "type": "fuchsia.bluetooth/ChannelMode"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth/ChannelParameters.flush_timeout",
+        "ordinal": "4",
+        "type": "int64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth/ChannelParameters.max_rx_packet_size",
+        "ordinal": "2",
+        "type": "uint16"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth/ChannelParameters.security_requirements",
+        "ordinal": "3",
+        "type": "fuchsia.bluetooth/SecurityRequirements"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth/ChannelParameters"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth/ChannelSendRequest.packets",
+        "ordinal": "1",
+        "type": "vector<fuchsia.bluetooth/Packet>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth/ChannelSendRequest"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.bluetooth/Channel_Receive_Response.packets",
+        "ordinal": "1",
+        "type": "vector<fuchsia.bluetooth/Packet>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth/Channel_Receive_Response"
     },
     {
         "kind": "enum/member",
@@ -526,6 +677,16 @@
     },
     {
         "kind": "struct/member",
+        "name": "fuchsia.bluetooth/Packet.packet",
+        "ordinal": "1",
+        "type": "vector<uint8>"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.bluetooth/Packet"
+    },
+    {
+        "kind": "struct/member",
         "name": "fuchsia.bluetooth/PeerId.value",
         "ordinal": "1",
         "type": "uint64"
@@ -533,6 +694,22 @@
     {
         "kind": "struct",
         "name": "fuchsia.bluetooth/PeerId"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth/SecurityRequirements.authentication_required",
+        "ordinal": "1",
+        "type": "bool"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.bluetooth/SecurityRequirements.secure_connections_required",
+        "ordinal": "2",
+        "type": "bool"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.bluetooth/SecurityRequirements"
     },
     {
         "kind": "struct/member",
