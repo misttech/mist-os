@@ -196,6 +196,8 @@ class Sdhci : public DeviceType, public ddk::SdmmcProtocol<Sdhci, ddk::base_prot
     fzl::VmoMapper vmo_mapper;
   };
 
+  using BlockSizeType = decltype(BlockSize::Get().FromValue(0).reg_value());
+  using BlockCountType = decltype(BlockCount::Get().FromValue(0).reg_value());
   using SdmmcVmoStore = DmaDescriptorBuilder<OwnedVmoInfo>::VmoStore;
 
   static void PrepareCmd(const sdmmc_req_t& req, TransferMode* transfer_mode, Command* command);
