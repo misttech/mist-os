@@ -18,6 +18,14 @@ zx_library("ktrace") {
     "//zircon/system/ulib/zircon-internal",
   ]
 
+  if (is_mistos) {
+    sources += [ "debugcommands.cc" ]
+    deps += [
+      "//zircon/kernel/lib/console",
+      "//zircon/kernel/lib/unittest",
+    ]
+  }
+
   public_deps = [
     ":suppress-warning",
     "//src/performance/lib/fxt:headers",
