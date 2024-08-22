@@ -89,24 +89,24 @@ class RuntimeDynamicLinker {
 
     // A Module for `file` does not yet exist; create a new LinkingSession
     // to perform the loading and linking of the file and all its dependencies.
-    LinkingSession linking_session;
+    LinkingSession<Loader> linking_session;
 
     // Use a non-scoped diagnostics object for the root module. Because errors
     // are generated on this module directly, its name does not need to be
     // prefixed to the error, as is the case using ld::ScopedModuleDiagnostics.
     dl::Diagnostics diag;
-    auto [pending_modules, pending_session_modules] = linking_session.Load<Loader, RetrieveFile>(
-        diag, Soname{file}, std::forward<RetrieveFile>(retrieve_file), modules_);
-    if (pending_session_modules.is_empty()) [[unlikely]] {
-      assert(pending_modules.is_empty() == pending_session_modules.is_empty());
+    if (!linking_session.Load(diag, Soname{file}, std::forward<RetrieveFile>(retrieve_file),
+                              modules_)) {
       return diag.take_error();
     }
 
-    // TODO(https://fxbug.dev/324136831): This does not include global modules
-    // yet.
-    if (!linking_session.Relocate(diag, pending_session_modules)) {
+    // TODO(https://fxbug.dev/324136831): Include global modules in relocations.
+    if (!linking_session.Relocate(diag)) {
       return diag.take_error();
     }
+
+    // Commit the linking session and its mapped modules.
+    auto pending_modules = std::move(linking_session).Commit();
 
     // Obtain a reference to the root module for the dlopen-ed file to return
     // back to the caller.
@@ -115,7 +115,7 @@ class RuntimeDynamicLinker {
     // TODO(https://fxbug.dev/333573264): this assumes that all pending modules
     // are not already in modules_.
     // After successful loading and relocation, append the new permanent modules
-    // created by this dlopen session to the dynamic linker's module list.
+    // created by the linking session to the dynamic linker's module list.
     modules_.splice(modules_.end(), pending_modules);
 
     return diag.ok(&root_module);
