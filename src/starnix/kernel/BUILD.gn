@@ -66,8 +66,6 @@ rustc_binary("starnix_kernel_bin") {
     "//third_party/rust_crates:tracing-mutex",
   ]
 
-  non_rust_deps = [ ":restricted_trampoline" ]
-
   sources = [ "main.rs" ]
 
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
@@ -287,6 +285,7 @@ rustc_library("starnix_core") {
   ]
 
   deps = [
+    ":restricted_trampoline",
     ":starnix_logging",
     ":vdso-data($bionic_linux_toolchain)",
     "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_rust",

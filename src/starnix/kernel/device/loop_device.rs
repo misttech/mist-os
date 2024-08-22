@@ -824,55 +824,55 @@ mod tests {
 
     #[::fuchsia::test]
     async fn basic_read() {
-        let expected_contents = b"hello, world!";
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        spawn_kernel_and_run(|locked, current_task| {
+            let expected_contents = b"hello, world!";
 
-        let backing_node = FsNode::new_root(PassthroughTestFile::new_node(expected_contents));
-        let backing_file = Anon::new_file(
-            &current_task,
-            backing_node.create_file_ops(&mut locked, &current_task, OpenFlags::RDONLY).unwrap(),
-            OpenFlags::RDONLY,
-        );
-        let loop_file =
-            bind_simple_loop_device(&mut locked, &current_task, backing_file, OpenFlags::RDONLY);
+            let backing_node = FsNode::new_root(PassthroughTestFile::new_node(expected_contents));
+            let backing_file = Anon::new_file(
+                current_task,
+                backing_node.create_file_ops(locked, current_task, OpenFlags::RDONLY).unwrap(),
+                OpenFlags::RDONLY,
+            );
+            let loop_file =
+                bind_simple_loop_device(locked, current_task, backing_file, OpenFlags::RDONLY);
 
-        let mut buf = VecOutputBuffer::new(expected_contents.len());
-        loop_file.read(&mut locked, &current_task, &mut buf).unwrap();
+            let mut buf = VecOutputBuffer::new(expected_contents.len());
+            loop_file.read(locked, current_task, &mut buf).unwrap();
 
-        assert_eq!(buf.data(), expected_contents);
+            assert_eq!(buf.data(), expected_contents);
+        });
     }
 
     #[::fuchsia::test]
     async fn offset_works() {
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        spawn_kernel_and_run(|locked, current_task| {
+            let backing_node = FsNode::new_root(PassthroughTestFile::new_node(b"hello, world!"));
+            let backing_file = Anon::new_file(
+                current_task,
+                backing_node.create_file_ops(locked, current_task, OpenFlags::RDONLY).unwrap(),
+                OpenFlags::RDONLY,
+            );
+            let loop_file =
+                bind_simple_loop_device(locked, current_task, backing_file, OpenFlags::RDONLY);
 
-        let backing_node = FsNode::new_root(PassthroughTestFile::new_node(b"hello, world!"));
-        let backing_file = Anon::new_file(
-            &current_task,
-            backing_node.create_file_ops(&mut locked, &current_task, OpenFlags::RDONLY).unwrap(),
-            OpenFlags::RDONLY,
-        );
-        let loop_file =
-            bind_simple_loop_device(&mut locked, &current_task, backing_file, OpenFlags::RDONLY);
+            let info_addr = map_object_anywhere(
+                locked,
+                current_task,
+                &uapi::loop_info64 { lo_offset: 3, ..Default::default() },
+            );
+            loop_file.ioctl(locked, current_task, LOOP_SET_STATUS64, info_addr.into()).unwrap();
 
-        let info_addr = map_object_anywhere(
-            &mut locked,
-            &current_task,
-            &uapi::loop_info64 { lo_offset: 3, ..Default::default() },
-        );
-        loop_file.ioctl(&mut locked, &current_task, LOOP_SET_STATUS64, info_addr.into()).unwrap();
+            let mut buf = VecOutputBuffer::new(25);
+            loop_file.read(locked, current_task, &mut buf).unwrap();
 
-        let mut buf = VecOutputBuffer::new(25);
-        loop_file.read(&mut locked, &current_task, &mut buf).unwrap();
-
-        assert_eq!(buf.data(), b"lo, world!");
+            assert_eq!(buf.data(), b"lo, world!");
+        });
     }
 
     #[::fuchsia::test]
     async fn basic_get_memory() {
         let test_data_path = "/pkg/data/testfile.txt";
         let expected_contents = std::fs::read(test_data_path).unwrap();
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
 
         let txt_channel: zx::Channel =
             fuchsia_fs::file::open_in_namespace(test_data_path, fio::OpenFlags::RIGHT_READABLE)
@@ -881,16 +881,18 @@ mod tests {
                 .unwrap()
                 .into();
 
-        let backing_file =
-            new_remote_file(&current_task, txt_channel.into(), OpenFlags::RDONLY).unwrap();
-        let loop_file =
-            bind_simple_loop_device(&mut locked, &current_task, backing_file, OpenFlags::RDONLY);
+        spawn_kernel_and_run(move |locked, current_task| {
+            let backing_file =
+                new_remote_file(current_task, txt_channel.into(), OpenFlags::RDONLY).unwrap();
+            let loop_file =
+                bind_simple_loop_device(locked, current_task, backing_file, OpenFlags::RDONLY);
 
-        let memory =
-            loop_file.get_memory(&mut locked, &current_task, None, ProtectionFlags::READ).unwrap();
-        let size = memory.get_content_size();
-        let memory_contents = memory.read_to_vec(0, size).unwrap();
-        assert_eq!(memory_contents, expected_contents);
+            let memory =
+                loop_file.get_memory(locked, current_task, None, ProtectionFlags::READ).unwrap();
+            let size = memory.get_content_size();
+            let memory_contents = memory.read_to_vec(0, size).unwrap();
+            assert_eq!(memory_contents, expected_contents);
+        });
     }
 
     #[::fuchsia::test]
@@ -902,10 +904,9 @@ mod tests {
         let expected_offset = *PAGE_SIZE;
         let expected_size_limit = *PAGE_SIZE;
         let expected_contents = std::fs::read(&test_data_path).unwrap();
-        let expected_contents = &expected_contents
-            [expected_offset as usize..(expected_offset + expected_size_limit) as usize];
-
-        let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        let expected_contents = expected_contents
+            [expected_offset as usize..(expected_offset + expected_size_limit) as usize]
+            .to_vec();
 
         let txt_channel: zx::Channel =
             fuchsia_fs::file::open_in_namespace(&test_data_path, fio::OpenFlags::RIGHT_READABLE)
@@ -914,26 +915,28 @@ mod tests {
                 .unwrap()
                 .into();
 
-        let backing_file =
-            new_remote_file(&current_task, txt_channel.into(), OpenFlags::RDONLY).unwrap();
-        let loop_file =
-            bind_simple_loop_device(&mut locked, &current_task, backing_file, OpenFlags::RDONLY);
+        spawn_kernel_and_run(move |locked, current_task| {
+            let backing_file =
+                new_remote_file(current_task, txt_channel.into(), OpenFlags::RDONLY).unwrap();
+            let loop_file =
+                bind_simple_loop_device(locked, current_task, backing_file, OpenFlags::RDONLY);
 
-        let info_addr = map_object_anywhere(
-            &mut locked,
-            &current_task,
-            &uapi::loop_info64 {
-                lo_offset: expected_offset,
-                lo_sizelimit: expected_size_limit,
-                ..Default::default()
-            },
-        );
-        loop_file.ioctl(&mut locked, &current_task, LOOP_SET_STATUS64, info_addr.into()).unwrap();
+            let info_addr = map_object_anywhere(
+                locked,
+                current_task,
+                &uapi::loop_info64 {
+                    lo_offset: expected_offset,
+                    lo_sizelimit: expected_size_limit,
+                    ..Default::default()
+                },
+            );
+            loop_file.ioctl(locked, current_task, LOOP_SET_STATUS64, info_addr.into()).unwrap();
 
-        let memory =
-            loop_file.get_memory(&mut locked, &current_task, None, ProtectionFlags::READ).unwrap();
-        let size = memory.get_content_size();
-        let memory_contents = memory.read_to_vec(0, size).unwrap();
-        assert_eq!(memory_contents, expected_contents);
+            let memory =
+                loop_file.get_memory(locked, current_task, None, ProtectionFlags::READ).unwrap();
+            let size = memory.get_content_size();
+            let memory_contents = memory.read_to_vec(0, size).unwrap();
+            assert_eq!(memory_contents, expected_contents);
+        });
     }
 }
