@@ -1098,8 +1098,102 @@ impl Interface for PartitionInterface {
         Ok(())
     }
 
-    async fn shrink(&self, _start_slice: u64, _slice_count: u64) -> Result<(), zx::Status> {
-        todo!();
+    async fn shrink(&self, start_slice: u64, mut slice_count: u64) -> Result<(), zx::Status> {
+        let inner = self.fvm.inner.upgradable_read().await;
+        let mappings = inner.mappings.get(&self.partition_index).unwrap();
+
+        // When we're updating the mappings, we might need to update the first and last mapping
+        // in the range and then delete the mappings between.
+        let delete_start;
+        let start_index =
+            match mappings.binary_search_by(|m: &Mapping| m.logical_slice.cmp(&start_slice)) {
+                Ok(index) => {
+                    delete_start = index;
+                    index
+                }
+                Err(index) if index > 0 => {
+                    delete_start = index;
+                    index - 1
+                }
+                _ => return Err(zx::Status::INVALID_ARGS),
+            };
+
+        let mut new_metadata = inner.metadata.clone();
+
+        let mut index = start_index;
+        let mut slice = start_slice;
+        loop {
+            let mapping = &mappings[index];
+            if mapping.logical_slice > slice || mapping.end_slice() <= slice {
+                return Err(zx::Status::INVALID_ARGS);
+            }
+            let offset = slice - mapping.logical_slice;
+            let start_physical_slice = (mapping.physical_slice + offset) as usize;
+            let count = std::cmp::min(slice_count, mapping.slice_count - offset);
+            new_metadata.allocations[start_physical_slice..start_physical_slice + count as usize]
+                .fill(SliceEntry(0));
+            slice += count;
+            slice_count -= count;
+            if slice_count == 0 {
+                break;
+            }
+            index += 1;
+            if index == mappings.len() {
+                return Err(zx::Status::INVALID_ARGS);
+            }
+        }
+
+        new_metadata.header.generation =
+            new_metadata.header.generation.checked_add(1).ok_or(zx::Status::BAD_STATE)?;
+
+        let new_slot = 1 - inner.slot;
+        new_metadata
+            .write(self.fvm.device.as_ref(), new_metadata.header.offset_for_slot(new_slot))
+            .await
+            .map_err(map_to_status)?;
+
+        let mut inner = async_lock::RwLockUpgradableReadGuard::upgrade(inner).await;
+
+        inner.slot = new_slot;
+        inner.metadata = new_metadata;
+
+        let mappings = inner.mappings.get_mut(&self.partition_index).unwrap();
+        let delete_end = if mappings[index].end_slice() == slice { index + 1 } else { index };
+        if delete_end > delete_start {
+            mappings.drain(delete_start..delete_end);
+        }
+
+        // Now adjust the first and last mappings if necessary.
+        if start_index != delete_start {
+            let mapping = &mut mappings[start_index];
+            let end = mapping.end_slice();
+            mapping.slice_count = start_slice - mapping.logical_slice;
+
+            if end > slice {
+                // We need to insert a new mapping to cover the remainder.
+                let new_mapping = Mapping {
+                    logical_slice: slice,
+                    physical_slice: mapping.physical_slice + (slice - mapping.logical_slice),
+                    slice_count: end - slice,
+                };
+                mappings.insert(start_index + 1, new_mapping);
+
+                // This path is for when we're deleting a chunk out of a single mapping.  We don't
+                // want to enter the code path below because that's for the case where there is
+                // more than one mapping involved.
+                return Ok(());
+            }
+        }
+
+        if delete_end == index {
+            let mapping = &mut mappings[start_index + 1];
+            let delta = slice - mapping.logical_slice;
+            mapping.logical_slice = slice;
+            mapping.physical_slice += delta;
+            mapping.slice_count -= delta;
+        }
+
+        Ok(())
     }
 }
 
@@ -1580,5 +1674,196 @@ mod tests {
             volume_proxy.extend(0x8005, 20).await.expect("extend failed (FIDL)"),
             zx::sys::ZX_ERR_INVALID_ARGS
         );
+    }
+
+    #[fuchsia::test]
+    async fn test_shrink() {
+        let final_checks;
+
+        let fake_server = {
+            let fixture = Fixture::new(23 * 32768).await;
+
+            let volumes_proxy =
+                connect_to_protocol_at_dir_svc::<VolumesMarker>(&fixture.outgoing_dir).unwrap();
+
+            let (dir_proxy, dir_server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                    .expect("Create proxy to succeed");
+            volumes_proxy
+                .create(
+                    "foo",
+                    dir_server_end,
+                    CreateOptions {
+                        initial_size: Some(32768 * 5),
+                        type_guid: Some([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]),
+                        ..CreateOptions::default()
+                    },
+                    MountOptions::default(),
+                )
+                .await
+                .expect("create failed (FIDL)")
+                .expect("create failed");
+
+            let volume_proxy =
+                connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap();
+
+            // Mount the blobfs partition.
+            let blobfs_volume = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
+                &fixture.outgoing_dir,
+                "volumes/blobfs",
+            )
+            .unwrap();
+
+            let (dir_proxy, dir_server_end) =
+                fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+                    .expect("Create proxy to succeed");
+            blobfs_volume
+                .mount(dir_server_end, MountOptions::default())
+                .await
+                .expect("mount failed (FIDL)")
+                .expect("mount failed");
+
+            let blobfs_volume_proxy =
+                connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap();
+
+            // Extend the blobfs volume so we get some fragmentation
+            assert_eq!(
+                blobfs_volume_proxy.extend(1, 1).await.expect("extend failed (FIDL)"),
+                zx::sys::ZX_OK
+            );
+
+            // Extend the volume we created by another 5 slices.
+            assert_eq!(
+                volume_proxy.extend(5, 5).await.expect("extend failed (FIDL)"),
+                zx::sys::ZX_OK
+            );
+
+            // And again...
+            assert_eq!(
+                blobfs_volume_proxy.extend(2, 1).await.expect("extend failed (FIDL)"),
+                zx::sys::ZX_OK
+            );
+            assert_eq!(
+                volume_proxy.extend(10, 5).await.expect("extend failed (FIDL)"),
+                zx::sys::ZX_OK
+            );
+
+            // And again...
+            assert_eq!(
+                blobfs_volume_proxy.extend(3, 1).await.expect("extend failed (FIDL)"),
+                zx::sys::ZX_OK
+            );
+            assert_eq!(
+                volume_proxy.extend(15, 5).await.expect("extend failed (FIDL)"),
+                zx::sys::ZX_OK
+            );
+
+            // Write to every slice.
+            let client = RemoteBlockClient::new(&volume_proxy).await.unwrap();
+            for i in 0..20 {
+                let buf = vec![i; 32768];
+                client.write_at(BufferSlice::Memory(&buf), i as u64 * 32768).await.unwrap();
+            }
+
+            // Shrink, and check with QuerySlices.
+            assert_eq!(
+                volume_proxy.shrink(4, 7).await.expect("shrink failed (FIDL)"),
+                zx::sys::ZX_OK
+            );
+
+            let (status, ranges, range_count) =
+                volume_proxy.query_slices(&[0, 4, 11]).await.unwrap();
+            assert_eq!(status, zx::sys::ZX_OK);
+            assert_eq!(range_count, 3);
+            assert_eq!(
+                &ranges[..3],
+                &[
+                    fvolume::VsliceRange { allocated: true, count: 4 },
+                    fvolume::VsliceRange { allocated: false, count: 7 },
+                    fvolume::VsliceRange { allocated: true, count: 9 }
+                ]
+            );
+
+            // Delete the last range we added, which should occupy a whole mapping.
+            assert_eq!(
+                volume_proxy.shrink(15, 5).await.expect("shrink failed (FIDL)"),
+                zx::sys::ZX_OK
+            );
+
+            let (status, ranges, range_count) =
+                volume_proxy.query_slices(&[0, 4, 11, 15]).await.unwrap();
+            assert_eq!(status, zx::sys::ZX_OK);
+            assert_eq!(range_count, 4);
+            assert_eq!(
+                &ranges[..4],
+                &[
+                    fvolume::VsliceRange { allocated: true, count: 4 },
+                    fvolume::VsliceRange { allocated: false, count: 7 },
+                    fvolume::VsliceRange { allocated: true, count: 4 },
+                    fvolume::VsliceRange { allocated: false, count: MAX_SLICE_COUNT - 15 }
+                ]
+            );
+
+            // Delete a chunk within a single mapping.
+            assert_eq!(
+                volume_proxy.shrink(1, 2).await.expect("shrink failed (FIDL)"),
+                zx::sys::ZX_OK
+            );
+
+            // Some checks that we also want to perform after reopening.
+            final_checks = |volume_proxy: fvolume::VolumeProxy| async move {
+                let (status, ranges, range_count) =
+                    volume_proxy.query_slices(&[0, 1, 3, 4, 11, 15]).await.unwrap();
+                assert_eq!(status, zx::sys::ZX_OK);
+                assert_eq!(range_count, 6);
+                assert_eq!(
+                    &ranges[..6],
+                    &[
+                        fvolume::VsliceRange { allocated: true, count: 1 },
+                        fvolume::VsliceRange { allocated: false, count: 2 },
+                        fvolume::VsliceRange { allocated: true, count: 1 },
+                        fvolume::VsliceRange { allocated: false, count: 7 },
+                        fvolume::VsliceRange { allocated: true, count: 4 },
+                        fvolume::VsliceRange { allocated: false, count: MAX_SLICE_COUNT - 15 }
+                    ]
+                );
+
+                // Read back and check all slices.
+                let client = RemoteBlockClient::new(&volume_proxy).await.unwrap();
+                for i in [0, 3, 11, 12, 13, 14] {
+                    let mut buf = vec![0; 32768];
+                    client
+                        .read_at(MutableBufferSlice::Memory(&mut buf), i as u64 * 32768)
+                        .await
+                        .unwrap();
+                    assert_eq!(&buf, &vec![i; 32768]);
+                }
+            };
+
+            final_checks(volume_proxy).await;
+
+            fixture.fake_server
+        };
+
+        // Reopen, and check we get the same.
+        let fixture = Fixture::from_fake_server(fake_server).await;
+
+        let volume_proxy = connect_to_named_protocol_at_dir_root::<VolumeMarker>(
+            &fixture.outgoing_dir,
+            "volumes/foo",
+        )
+        .unwrap();
+        let (dir_proxy, dir_server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>()
+            .expect("Create proxy to succeed");
+        volume_proxy
+            .mount(dir_server_end, MountOptions::default())
+            .await
+            .expect("mount failed (FIDL)")
+            .expect("mount failed");
+
+        let volume_proxy =
+            connect_to_protocol_at_dir_svc::<fvolume::VolumeMarker>(&dir_proxy).unwrap();
+
+        final_checks(volume_proxy).await;
     }
 }
