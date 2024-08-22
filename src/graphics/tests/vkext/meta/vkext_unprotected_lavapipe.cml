@@ -67,6 +67,12 @@
             rights: [ "r*" ],
         },
         {
+            protocol: "fuchsia.sysmem2.Allocator",
+            from: "parent",
+            to: "#test",
+            rights: [ "r*" ],
+        },
+        {
             protocol: "fuchsia.tracing.provider.Registry",
             from: "parent",
             to: "#test",
