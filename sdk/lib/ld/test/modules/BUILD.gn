@@ -52,6 +52,8 @@ executables = [
   ":fixed-load-address",
 ]
 
+non_module_executables = [ ":backtrace" ]
+
 if (is_fuchsia) {
   in_process_executables += [ ":llvm-profdata" ]
   executables += [ ":second-session" ]
@@ -116,6 +118,8 @@ foreach(module, per_test_modules) {
 foreach(label, executables + in_process_executables) {
   modules += [ "$label.module" ]
 }
+
+executables += non_module_executables
 
 foreach(label, in_process_executables + non_module_in_process_executables) {
   executables += [
@@ -439,7 +443,10 @@ foreach(in_process,
       "test-start.h",
     ]
     public_deps = [ "//sdk/lib/ld:standalone" ]
-    public_configs = [ ":semantic-interposition" ]
+    public_configs = [
+      ":semantic-interposition",
+      "//build/config:frame_pointers",
+    ]
     sources = [ "ensure-test-thread-pointer.cc" ]
     deps = [
       ":test-module.deps",
@@ -1214,4 +1221,9 @@ test_executable("llvm-profdata") {
 
   # workaround for b/349448459 to remote-link successfully
   configs = [ "//build/config:remote_link_scandeps_workaround" ]
+}
+
+test_executable("backtrace") {
+  sources = [ "backtrace.cc" ]
+  deps = [ "//zircon/system/public" ]
 }

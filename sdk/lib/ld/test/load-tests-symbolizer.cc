@@ -207,5 +207,21 @@ TYPED_TEST(LdLoadTests, SymbolizerMarkup) {
   EXPECT_EQ(tail, std::nullopt) << *tail;
 }
 
+TYPED_TEST(LdLoadTests, Backtrace) {
+  if constexpr (std::is_same_v<ld::testing::LdStartupInProcessTests, TestFixture>) {
+    GTEST_SKIP() << "test not supported in-process";
+  }
+
+  constexpr int64_t kReturnValue = 17;
+
+  ASSERT_NO_FATAL_FAILURE(this->Init());
+
+  ASSERT_NO_FATAL_FAILURE(this->Load("backtrace"));
+
+  EXPECT_EQ(this->Run(), kReturnValue);
+
+  this->ExpectLog("");
+}
+
 }  // namespace
 }  // namespace ld::testing
