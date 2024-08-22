@@ -37,6 +37,8 @@ source "$script_dir"/../../build/rbe/common-setup.sh
 
 project_root="$default_project_root"
 
+readonly detail_diff="$project_root"/build/rbe/detail-diff.sh
+
 # json formatting (as pipe): jq . < stdin > stdout
 readonly jq="$project_root"/prebuilt/third_party/jq/"$HOST_PLATFORM"/bin/jq
 
@@ -72,7 +74,7 @@ function diff_text() {
 }
 
 function diff_binary() {
-  diff -q "$1" "$2"
+  "$detail_diff" "$1" "$2"
 }
 
 function exe_unstripped_expect() {
@@ -146,10 +148,7 @@ function diff_file_relpath() {
     # C++ object files (binary)
     # Nondeterminism due to __TIME__-stamping has been eliminated
     # and is continuously verified by another builder.
-    *.o) expect=match; diff_binary "$left" "$right"
-      # TODO(fangism): compare objdumps for details
-      # See build/rbe/detail-diff.sh.
-      ;;
+    *.o) expect=match; diff_binary "$left" "$right" ;;
     *.so) expect=match; diff_binary "$left" "$right" ;;
     *.dylib) expect=match; diff_binary "$left" "$right" ;;
 
