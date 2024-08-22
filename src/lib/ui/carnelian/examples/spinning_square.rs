@@ -251,7 +251,7 @@ impl SpinningSquareViewAssistant {
     ) -> Result<ViewAssistantPtr, Error> {
         let square_color = Color { r: 0xbb, g: 0x00, b: 0xff, a: 0xbb };
         let background_color = Color { r: 0x3f, g: 0x8a, b: 0x99, a: 0xff };
-        let start = MonotonicTime::get_monotonic();
+        let start = MonotonicTime::get();
         let face = load_font(PathBuf::from("/pkg/data/fonts/RobotoSlab-Regular.ttf"))?;
 
         Ok(Box::new(SpinningSquareViewAssistant {

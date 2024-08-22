@@ -192,7 +192,7 @@ impl ConnectionSelector {
                     .await
             } else {
                 let last_scan_result_time = *self.last_scan_result_time.lock().await;
-                let scan_age = zx::MonotonicTime::get_monotonic() - last_scan_result_time;
+                let scan_age = zx::MonotonicTime::get() - last_scan_result_time;
                 if last_scan_result_time != zx::MonotonicTime::ZERO {
                     info!("Scan results are {}s old, triggering a scan", scan_age.into_seconds());
                     self.telemetry_sender.send(TelemetryEvent::NetworkSelectionScanInterval {
@@ -253,7 +253,7 @@ impl ConnectionSelector {
                     merge_saved_networks_and_scan_data(&self.saved_network_manager, scan_results)
                         .await;
                 if network.is_none() {
-                    *self.last_scan_result_time.lock().await = zx::MonotonicTime::get_monotonic();
+                    *self.last_scan_result_time.lock().await = zx::MonotonicTime::get();
                     record_metrics_on_scan(candidates.clone(), &self.telemetry_sender);
                 }
                 candidates

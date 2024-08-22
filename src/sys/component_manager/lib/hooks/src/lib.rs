@@ -312,7 +312,7 @@ impl Event {
             target_moniker: ExtendedMoniker::ComponentManager,
             component_url: "file:///bin/component_manager".parse().unwrap(),
             payload,
-            timestamp: zx::MonotonicTime::get_monotonic(),
+            timestamp: zx::MonotonicTime::get(),
         }
     }
 }
@@ -450,7 +450,7 @@ mod tests {
                 name: "foo".to_string(),
                 receiver,
             },
-            timestamp: zx::MonotonicTime::get_monotonic(),
+            timestamp: zx::MonotonicTime::get(),
         };
 
         // Verify the transferred event carries the capability.

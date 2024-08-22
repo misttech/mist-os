@@ -128,7 +128,7 @@ impl<'a, S: Scene> DoubleBufferedFenceLoop<'a, S> {
         let mut counter = Counter::new();
         loop {
             // Log the frame rate.
-            counter.add(fuchsia_zircon::MonotonicTime::get_monotonic());
+            counter.add(fuchsia_zircon::MonotonicTime::get());
             let stats = counter.stats();
             print!(
                 "{}Display {:.2} fps ({:.5} ms)",

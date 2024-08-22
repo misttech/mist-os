@@ -765,7 +765,7 @@ pub trait TimeProvider {
 pub struct MonotonicTime;
 impl TimeProvider for MonotonicTime {
     fn now(&mut self) -> zx::MonotonicTime {
-        zx::MonotonicTime::get_monotonic()
+        zx::MonotonicTime::get()
     }
 }
 
@@ -1752,7 +1752,7 @@ mod tests {
             sender,
             FakeTime {
                 increment: sleep_between.unwrap_or(zx::Duration::from_nanos(10)),
-                time: zx::MonotonicTime::get_monotonic(),
+                time: zx::MonotonicTime::get(),
             },
         )
         .unwrap();

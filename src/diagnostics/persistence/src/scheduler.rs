@@ -58,7 +58,7 @@ impl Scheduler {
     /// of the current time and the time the fetch becomes possible.
     pub(crate) fn schedule(&self, service: &ServiceName, tags: Vec<Tag>) {
         // Every tag we process should use the same Now
-        let now = zx::MonotonicTime::get_monotonic();
+        let now = zx::MonotonicTime::get();
         let mut state = self.state.lock();
         let Some(service_info) = state.services.get_mut(service) else {
             return;

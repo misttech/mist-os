@@ -131,7 +131,7 @@ pub async fn serve_scanning_loop(
             request = scan_request_channel.next() => {
                 match request {
                     Some(ApiScanRequest::Scan(reason, ssids, channels, responder)) => {
-                        queue.add_request(reason, ssids, channels, responder, zx::MonotonicTime::get_monotonic());
+                        queue.add_request(reason, ssids, channels, responder, zx::MonotonicTime::get());
                         // Check if there's an ongoing scan, otherwise take one from the queue
                         if ongoing_scan.is_terminated() {
                             ongoing_scan.set(transform_next_sme_req(queue.get_next_sme_request()));
@@ -156,7 +156,7 @@ pub async fn serve_scanning_loop(
                     }
                 }
                 // Send scan results to requesters
-                queue.handle_completed_sme_scan(completed_sme_request, scan_results, zx::MonotonicTime::get_monotonic());
+                queue.handle_completed_sme_scan(completed_sme_request, scan_results, zx::MonotonicTime::get());
                 // Get the next (if any) request from the queue
                 ongoing_scan.set(transform_next_sme_req(queue.get_next_sme_request()));
             },
@@ -638,7 +638,7 @@ mod tests {
             compatibility: Some(Box::new(fidl_sme::Compatibility {
                 mutual_security_protocols: vec![fidl_security::Protocol::Wpa3Personal],
             })),
-            timestamp_nanos: zx::MonotonicTime::get_monotonic().into_nanos(),
+            timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
             bss_description: random_fidl_bss_description!(
                 Wpa3,
                 bssid: [0, 0, 0, 0, 0, 0],
@@ -652,7 +652,7 @@ mod tests {
             compatibility: Some(Box::new(fidl_sme::Compatibility {
                 mutual_security_protocols: vec![fidl_security::Protocol::Wpa2Personal],
             })),
-            timestamp_nanos: zx::MonotonicTime::get_monotonic().into_nanos(),
+            timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
             bss_description: random_fidl_bss_description!(
                 Wpa2,
                 bssid: [1, 2, 3, 4, 5, 6],
@@ -664,7 +664,7 @@ mod tests {
         };
         let sme_result_3 = fidl_sme::ScanResult {
             compatibility: None,
-            timestamp_nanos: zx::MonotonicTime::get_monotonic().into_nanos(),
+            timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
             bss_description: random_fidl_bss_description!(
                 Wpa3,
                 bssid: [7, 8, 9, 10, 11, 12],
@@ -1108,7 +1108,7 @@ mod tests {
             compatibility: Some(Box::new(fidl_sme::Compatibility {
                 mutual_security_protocols: vec![fidl_security::Protocol::Wpa3Personal],
             })),
-            timestamp_nanos: zx::MonotonicTime::get_monotonic().into_nanos(),
+            timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
             bss_description: random_fidl_bss_description!(
                 Wpa3,
                 bssid: [0, 0, 0, 0, 0, 0],
@@ -1122,7 +1122,7 @@ mod tests {
             compatibility: Some(Box::new(fidl_sme::Compatibility {
                 mutual_security_protocols: vec![fidl_security::Protocol::Wpa3Personal],
             })),
-            timestamp_nanos: zx::MonotonicTime::get_monotonic().into_nanos(),
+            timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
             bss_description: random_fidl_bss_description!(
                 Wpa3,
                 ssid: types::Ssid::try_from("duplicated ssid").unwrap(),
@@ -1141,7 +1141,7 @@ mod tests {
                 compatibility: Some(Box::new(fidl_sme::Compatibility {
                     mutual_security_protocols: vec![fidl_security::Protocol::Wpa3Personal],
                 })),
-                timestamp_nanos: zx::MonotonicTime::get_monotonic().into_nanos(),
+                timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
                 bss_description: random_fidl_bss_description!(
                     Wpa3,
                     bssid: [0, 0, 0, 0, 0, 0],

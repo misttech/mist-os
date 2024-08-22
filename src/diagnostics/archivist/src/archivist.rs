@@ -446,7 +446,7 @@ mod tests {
         pub fn new_connection(&mut self, request_stream: LogSinkRequestStream) {
             self.dispatcher
                 .emit(Event {
-                    timestamp: zx::MonotonicTime::get_monotonic(),
+                    timestamp: zx::MonotonicTime::get(),
                     payload: EventPayload::LogSinkRequested(LogSinkRequestedPayload {
                         component: Arc::new(ComponentIdentity::unknown()),
                         request_stream,
@@ -460,7 +460,7 @@ mod tests {
         pub fn new_connection(&mut self, request_stream: InspectSinkRequestStream) {
             self.dispatcher
                 .emit(Event {
-                    timestamp: zx::MonotonicTime::get_monotonic(),
+                    timestamp: zx::MonotonicTime::get(),
                     payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
                         component: Arc::new(ComponentIdentity::unknown()),
                         request_stream,

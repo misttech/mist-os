@@ -37,7 +37,7 @@ pub struct DhcpV6PdInner {
 }
 
 fn convert_zx_time_into_seconds_until(time: zx::MonotonicTime) -> u32 {
-    let duration = time - zx::MonotonicTime::get_monotonic();
+    let duration = time - zx::MonotonicTime::get();
 
     if duration == zx::Duration::INFINITE {
         u32::MAX

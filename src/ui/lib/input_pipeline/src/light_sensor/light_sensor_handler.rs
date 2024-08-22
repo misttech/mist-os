@@ -224,7 +224,7 @@ impl FeatureEvent {
         Some(FeatureEvent {
             sampling_rate: sensor.sampling_rate?,
             sensitivity: *sensor.sensitivity?.get(0)?,
-            event_time: zx::MonotonicTime::get_monotonic(),
+            event_time: zx::MonotonicTime::get(),
         })
     }
 }

@@ -8,7 +8,7 @@ const TIMESTAMP_DIVIDEND: i64 = 1_000_000_000;
 
 #[cfg(not(test))]
 pub(crate) fn now() -> MonotonicTime {
-    MonotonicTime::get_monotonic()
+    MonotonicTime::get()
 }
 
 #[cfg(not(test))]
@@ -31,7 +31,7 @@ pub(crate) mod mock {
     use super::*;
     use std::cell::RefCell;
 
-    thread_local!(static MOCK_TIME: RefCell<MonotonicTime> = RefCell::new(MonotonicTime::get_monotonic()));
+    thread_local!(static MOCK_TIME: RefCell<MonotonicTime> = RefCell::new(MonotonicTime::get()));
 
     pub(crate) fn now() -> MonotonicTime {
         MOCK_TIME.with(|time| *time.borrow())

@@ -89,7 +89,7 @@ impl TimeSource for UtcTime {
 }
 
 /// MonotonicTime instances provide a monotonic clock.
-/// On Fuchsia, MonotonicTime uses fuchsia_zircon::MonotonicTime::get_monotonic().
+/// On Fuchsia, MonotonicTime uses fuchsia_zircon::MonotonicTime::get().
 #[derive(Debug)]
 pub struct MonotonicTime {
     #[cfg(not(target_os = "fuchsia"))]
@@ -110,7 +110,7 @@ impl MonotonicTime {
 impl TimeSource for MonotonicTime {
     fn now(&self) -> i64 {
         #[cfg(target_os = "fuchsia")]
-        let now = zx::MonotonicTime::get_monotonic().into_nanos();
+        let now = zx::MonotonicTime::get().into_nanos();
         #[cfg(not(target_os = "fuchsia"))]
         let now = (std::time::Instant::now() - self.starting_time).as_nanos() as i64;
 

@@ -88,7 +88,7 @@ async fn diagnostics_persistence_integration() {
     // persistence to verify that the change doesn't happen too soon.
     // backoff_time should be the same as "min_seconds_between_fetch" in
     // TEST_CONFIG_CONTENTS.
-    let backoff_time = MonotonicTime::get_monotonic() + Duration::from_seconds(1);
+    let backoff_time = MonotonicTime::get() + Duration::from_seconds(1);
 
     // For development it may be convenient to set this to 5. For production, slow virtual devices
     // may cause test flakes even with surprisingly long timeouts.
@@ -263,13 +263,10 @@ async fn wait_for_inspect_source() {
     let mut inspect_fetcher = ArchiveReader::new();
     inspect_fetcher.retry(RetryConfig::never());
     inspect_fetcher.add_selector("realm_builder*/single_counter:root");
-    let start_time = MonotonicTime::get_monotonic();
+    let start_time = MonotonicTime::get();
 
     loop {
-        assert!(
-            start_time + Duration::from_seconds(GIVE_UP_POLLING_SECS)
-                > MonotonicTime::get_monotonic()
-        );
+        assert!(start_time + Duration::from_seconds(GIVE_UP_POLLING_SECS) > MonotonicTime::get());
         let published_inspect =
             inspect_fetcher.snapshot_raw::<Inspect, serde_json::Value>().await.unwrap().to_string();
         if published_inspect.contains(KEY_FROM_INSPECT_SOURCE) {
@@ -448,15 +445,12 @@ fn expect_file_change(rules: FileChange<'_>) {
         }
     }
 
-    let start_time = MonotonicTime::get_monotonic();
+    let start_time = MonotonicTime::get();
     let old_string = expected_string(&rules.old);
     let new_string = expected_string(&rules.new);
 
     loop {
-        assert!(
-            start_time + Duration::from_seconds(GIVE_UP_POLLING_SECS)
-                > MonotonicTime::get_monotonic()
-        );
+        assert!(start_time + Duration::from_seconds(GIVE_UP_POLLING_SECS) > MonotonicTime::get());
         let contents =
             unbrittle_too_big_message(zero_file_timestamps(file_contents(rules.file_name)));
         if rules.old != rules.new && strings_match(&contents, &old_string, "old file (likely OK)") {
@@ -465,7 +459,7 @@ fn expect_file_change(rules: FileChange<'_>) {
         }
         if strings_match(&contents, &new_string, "new file check") {
             if let Some(after) = rules.after {
-                assert!(MonotonicTime::get_monotonic() > after);
+                assert!(MonotonicTime::get() > after);
             }
             return;
         }

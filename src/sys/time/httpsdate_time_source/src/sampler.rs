@@ -142,10 +142,10 @@ impl<C: HttpsDateClient + Send> HttpsSamplerImpl<'_, C> {
     /// Poll the server once to produce a fresh bound on the UTC time. Returns a bound and the
     /// observed round trip time.
     async fn poll_server(&self) -> Result<(Bound, Poll), HttpsDateError> {
-        let monotonic_before = zx::MonotonicTime::get_monotonic();
+        let monotonic_before = zx::MonotonicTime::get();
         let reported_utc =
             self.client.lock().await.request_utc(&self.uri, self.config.https_timeout).await?;
-        let monotonic_after = zx::MonotonicTime::get_monotonic();
+        let monotonic_after = zx::MonotonicTime::get();
         let round_trip_time = monotonic_after - monotonic_before;
         let monotonic_center = monotonic_before + round_trip_time / 2;
         // We assume here that the time reported by an HTTP server is truncated down to the second.
@@ -187,14 +187,14 @@ where
     // polls due to TLS handshaking, so we make a best effort to account for that when the first
     // poll is the only one available. Otherwise, we discard the first poll rtt.
     let rtt_guess = match observed_rtt.len() {
-        0 => return zx::MonotonicTime::get_monotonic(),
+        0 => return zx::MonotonicTime::get(),
         1 => *observed_rtt.next().unwrap() / first_rtt_time_factor,
         _ => avg(observed_rtt.skip(1)),
     };
     let ideal_poll_start_time = ideal_server_check_time - rtt_guess / 2;
 
     // Adjust the time in case it has already passed.
-    let now = zx::MonotonicTime::get_monotonic();
+    let now = zx::MonotonicTime::get();
     if now < ideal_poll_start_time {
         ideal_poll_start_time
     } else {
@@ -346,7 +346,7 @@ mod test {
             _https_timeout: zx::Duration,
         ) -> Result<zx::MonotonicTime, HttpsDateError> {
             let offset = self.enqueued_offsets.pop_front().unwrap()?;
-            let unquantized_time = zx::MonotonicTime::get_monotonic() + offset;
+            let unquantized_time = zx::MonotonicTime::get() + offset;
             Ok(unquantized_time - time_subs(unquantized_time))
         }
     }
@@ -369,9 +369,9 @@ mod test {
             TestClient::with_offset_responses(vec![Ok(TEST_UTC_OFFSET)]),
             &config,
         );
-        let monotonic_before = zx::MonotonicTime::get_monotonic();
+        let monotonic_before = zx::MonotonicTime::get();
         let sample = sampler.produce_sample(1).await.unwrap().await;
-        let monotonic_after = zx::MonotonicTime::get_monotonic();
+        let monotonic_after = zx::MonotonicTime::get();
 
         assert!(sample.utc >= monotonic_before + TEST_UTC_OFFSET - ONE_SECOND);
         assert!(sample.utc <= monotonic_after + TEST_UTC_OFFSET + ONE_SECOND);
@@ -400,9 +400,9 @@ mod test {
             ]),
             &config,
         );
-        let monotonic_before = zx::MonotonicTime::get_monotonic();
+        let monotonic_before = zx::MonotonicTime::get();
         let sample = sampler.produce_sample(3).await.unwrap().await;
-        let monotonic_after = zx::MonotonicTime::get_monotonic();
+        let monotonic_after = zx::MonotonicTime::get();
 
         assert!(sample.utc >= monotonic_before + TEST_UTC_OFFSET - ONE_SECOND);
         assert!(sample.utc <= monotonic_after + TEST_UTC_OFFSET + ONE_SECOND);
@@ -469,9 +469,9 @@ mod test {
             config,
         );
 
-        let monotonic_before = zx::MonotonicTime::get_monotonic();
+        let monotonic_before = zx::MonotonicTime::get();
         let sample = sampler.produce_sample(3).await.unwrap().await;
-        let monotonic_after = zx::MonotonicTime::get_monotonic();
+        let monotonic_after = zx::MonotonicTime::get();
 
         assert_eq!(sample.polls.len(), 1);
         assert!(sample.utc >= monotonic_before + expected_offset - ONE_SECOND);
@@ -480,7 +480,7 @@ mod test {
 
     #[fuchsia::test]
     fn test_ideal_poll_time_in_future() {
-        let future_monotonic = zx::MonotonicTime::get_monotonic() + zx::Duration::from_hours(100);
+        let future_monotonic = zx::MonotonicTime::get() + zx::Duration::from_hours(100);
         let first_rtt_time_factor = make_test_config().first_rtt_time_factor;
         let bound_1 = Bound {
             monotonic: future_monotonic,
@@ -527,7 +527,7 @@ mod test {
 
     #[fuchsia::test]
     fn test_ideal_poll_time_in_past() {
-        let monotonic_now = zx::MonotonicTime::get_monotonic();
+        let monotonic_now = zx::MonotonicTime::get();
         let past_monotonic = zx::MonotonicTime::from_nanos(0);
         let first_rtt_time_factor = make_test_config().first_rtt_time_factor;
         let bound = Bound {

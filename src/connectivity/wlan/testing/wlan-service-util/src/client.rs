@@ -1281,7 +1281,7 @@ mod tests {
     ) -> fidl_sme::ScanResult {
         fidl_sme::ScanResult {
             compatibility: compatibility.map(Box::new),
-            timestamp_nanos: zx::MonotonicTime::get_monotonic().into_nanos(),
+            timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
             bss_description: fake_fidl_bss_description!(
                 protection => protection,
                 bssid: bssid,

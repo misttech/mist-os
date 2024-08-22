@@ -78,8 +78,7 @@ async fn main() -> Result<(), Error> {
         )
         .await
         .unwrap();
-    let boot_ts =
-        fuchsia_runtime::utc_time().into_nanos() - zx::MonotonicTime::get_monotonic().into_nanos();
+    let boot_ts = fuchsia_runtime::utc_time().into_nanos() - zx::MonotonicTime::get().into_nanos();
     let mut formatter = DefaultLogFormatter::<MachineWriter<LogEntry>>::new_from_args(
         &cmd,
         MachineWriter::new(if cmd.json { Some(Format::Json) } else { None }),

@@ -29,7 +29,7 @@ pub trait NodeExt {
 
 impl NodeExt for Node {
     fn create_time(&self, name: impl Into<StringReference>) -> TimeProperty {
-        self.create_time_at(name, zx::MonotonicTime::get_monotonic())
+        self.create_time_at(name, zx::MonotonicTime::get())
     }
 
     fn create_time_at<'b>(
@@ -41,7 +41,7 @@ impl NodeExt for Node {
     }
 
     fn record_time(&self, name: impl Into<StringReference>) {
-        self.record_int(name, zx::MonotonicTime::get_monotonic().into_nanos());
+        self.record_int(name, zx::MonotonicTime::get().into_nanos());
     }
 }
 
@@ -54,7 +54,7 @@ pub struct TimeProperty {
 impl TimeProperty {
     /// Updates the underlying property with the current monotonic timestamp.
     pub fn update(&self) {
-        self.set_at(zx::MonotonicTime::get_monotonic());
+        self.set_at(zx::MonotonicTime::get());
     }
 
     /// Updates the underlying property with the given timestamp.
@@ -108,7 +108,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_record_time() {
-        let before_time = zx::MonotonicTime::get_monotonic().into_nanos();
+        let before_time = zx::MonotonicTime::get().into_nanos();
         let inspector = Inspector::default();
         inspector.root().record_time("time");
         let after_time = validate_inspector_get_time(&inspector, AnyProperty);

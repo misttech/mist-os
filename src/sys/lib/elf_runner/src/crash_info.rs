@@ -65,9 +65,7 @@ async fn record_cleanup_task(records: Arc<Mutex<Vec<Record>>>) {
         let timer = fasync::Timer::new(sleep_until);
         timer.await;
         let mut records_guard = records.lock().await;
-        while !records_guard.is_empty()
-            && zx::MonotonicTime::get_monotonic() > records_guard[0].deadline
-        {
+        while !records_guard.is_empty() && zx::MonotonicTime::get() > records_guard[0].deadline {
             records_guard.remove(0);
         }
     }

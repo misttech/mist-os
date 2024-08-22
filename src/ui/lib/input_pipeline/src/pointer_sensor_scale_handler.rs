@@ -523,7 +523,7 @@ mod tests {
         let handler =
             PointerSensorScaleHandler::new(&fake_handlers_node, metrics::MetricsLogger::default());
 
-        let event_time1 = zx::MonotonicTime::get_monotonic();
+        let event_time1 = zx::MonotonicTime::get();
         let event_time2 = event_time1.add(fuchsia_zircon::Duration::from_micros(1));
         let event_time3 = event_time2.add(fuchsia_zircon::Duration::from_micros(1));
 

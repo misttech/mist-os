@@ -23,7 +23,7 @@ pub use diagnostics_assertions;
 
 /// Returns the current time as an i64 for InputReports and zx::MonotonicTime for InputEvents.
 pub fn event_times() -> (i64, zx::MonotonicTime) {
-    let event_time = zx::MonotonicTime::get_monotonic();
+    let event_time = zx::MonotonicTime::get();
     (event_time.into_nanos(), event_time)
 }
 
@@ -200,7 +200,7 @@ pub fn create_keyboard_event(
         key,
         event_type,
         modifiers,
-        zx::MonotonicTime::get_monotonic(),
+        zx::MonotonicTime::get(),
         device_descriptor,
         keymap,
     )

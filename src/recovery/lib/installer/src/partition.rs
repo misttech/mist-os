@@ -263,7 +263,7 @@ impl Partition {
             fuchsia_component::client::connect_to_protocol_at_path::<BlockMarker>(&self.src)?;
         let streamer: Box<dyn PayloadStreamer> =
             Box::new(BlockDevicePayloadStreamer::new(partition_block).await?);
-        let start_time = zx::MonotonicTime::get_monotonic();
+        let start_time = zx::MonotonicTime::get();
         let last_percent = Mutex::new(0 as i64);
         let status_callback = move |data_read, data_total| {
             progress_callback(data_read, data_total);
@@ -274,7 +274,7 @@ impl Partition {
                 unsafe { (((data_read as f64) / (data_total as f64)) * 100.0).to_int_unchecked() };
             let mut prev = last_percent.lock().unwrap();
             if percent != *prev {
-                let now = zx::MonotonicTime::get_monotonic();
+                let now = zx::MonotonicTime::get();
                 let nanos = now.into_nanos() - start_time.into_nanos();
                 let secs = nanos / NS_PER_S;
                 let rate = ((data_read as f64) / (secs as f64)) / (1024 as f64);

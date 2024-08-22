@@ -542,7 +542,7 @@ mod tests {
         input_device::UnhandledInputEvent {
             device_event,
             device_descriptor: create_input_device_descriptor(),
-            event_time: zx::MonotonicTime::get_monotonic(),
+            event_time: zx::MonotonicTime::get(),
             trace_id: None,
         }
     }
@@ -555,7 +555,7 @@ mod tests {
         input_device::UnhandledInputEvent {
             device_event,
             device_descriptor: create_input_device_descriptor(),
-            event_time: zx::MonotonicTime::get_monotonic(),
+            event_time: zx::MonotonicTime::get(),
             trace_id: None,
         }
     }

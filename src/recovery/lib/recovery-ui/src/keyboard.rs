@@ -229,7 +229,7 @@ impl KeyButton {
                         if self.active {
                             context.queue_message(make_message(KeyMessages::Pressed(
                                 self.key,
-                                MonotonicTime::get_monotonic(),
+                                MonotonicTime::get(),
                                 self.label_text.clone(),
                             )));
                         }

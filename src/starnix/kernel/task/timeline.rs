@@ -20,9 +20,9 @@ impl Timeline {
     pub fn now(&self) -> TargetTime {
         match self {
             Self::RealTime => TargetTime::RealTime(utc::utc_now()),
-            Self::Monotonic => TargetTime::Monotonic(zx::MonotonicTime::get_monotonic()),
+            Self::Monotonic => TargetTime::Monotonic(zx::MonotonicTime::get()),
             // TODO(https://fxbug.dev/328306129) handle boot and monotonic time separately
-            Self::BootTime => TargetTime::BootTime(zx::MonotonicTime::get_monotonic()),
+            Self::BootTime => TargetTime::BootTime(zx::MonotonicTime::get()),
         }
     }
 

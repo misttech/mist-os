@@ -184,7 +184,7 @@ mod tests {
                 event_type: Some(fcomponent::EventType::CapabilityRequested),
                 moniker: Some(target_moniker),
                 component_url: Some(target_url),
-                timestamp: Some(zx::MonotonicTime::get_monotonic().into_nanos()),
+                timestamp: Some(zx::MonotonicTime::get().into_nanos()),
                 ..Default::default()
             }),
             payload: Some(fcomponent::EventPayload::CapabilityRequested(

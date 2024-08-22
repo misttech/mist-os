@@ -421,7 +421,7 @@ fn parse_fidl_button_event(
     power_was_pressed: bool,
     function_was_pressed: bool,
 ) -> (Vec<uapi::input_event>, bool /* power_is_pressed */, bool /* function_is_pressed */) {
-    let time = timeval_from_time(zx::MonotonicTime::get_monotonic());
+    let time = timeval_from_time(zx::MonotonicTime::get());
     let mut events = vec![];
     let sync_event = uapi::input_event {
         // See https://www.kernel.org/doc/Documentation/input/event-codes.rst.

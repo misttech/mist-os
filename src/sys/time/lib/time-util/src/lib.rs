@@ -262,7 +262,7 @@ mod test {
             error_bound_growth_ppm: 0,
         };
 
-        let monotonic = zx::MonotonicTime::get_monotonic();
+        let monotonic = zx::MonotonicTime::get();
         let clock_update = transform.jump_to(monotonic);
         assert_eq!(
             clock_update,
@@ -296,17 +296,14 @@ mod test {
     #[fuchsia::test]
     fn time_at_monotonic_clock_not_started() {
         let clock = zx::Clock::create(zx::ClockOpts::empty(), Some(BACKSTOP)).unwrap();
-        assert_eq!(
-            time_at_monotonic(&clock, zx::MonotonicTime::get_monotonic() + TIME_DIFF),
-            BACKSTOP
-        );
+        assert_eq!(time_at_monotonic(&clock, zx::MonotonicTime::get() + TIME_DIFF), BACKSTOP);
     }
 
     #[fuchsia::test]
     fn time_at_monotonic_clock_started() {
         let clock = zx::Clock::create(zx::ClockOpts::empty(), Some(BACKSTOP)).unwrap();
 
-        let mono = zx::MonotonicTime::get_monotonic();
+        let mono = zx::MonotonicTime::get();
         clock.update(zx::ClockUpdate::builder().absolute_value(mono, BACKSTOP)).unwrap();
 
         let clock_time = time_at_monotonic(&clock, mono + TIME_DIFF);
@@ -317,7 +314,7 @@ mod test {
     fn time_at_monotonic_clock_slew_fast() {
         let clock = zx::Clock::create(zx::ClockOpts::empty(), Some(BACKSTOP)).unwrap();
 
-        let mono = zx::MonotonicTime::get_monotonic();
+        let mono = zx::MonotonicTime::get();
         clock
             .update(
                 zx::ClockUpdate::builder()
@@ -334,7 +331,7 @@ mod test {
     fn time_at_monotonic_clock_slew_slow() {
         let clock = zx::Clock::create(zx::ClockOpts::empty(), Some(BACKSTOP)).unwrap();
 
-        let mono = zx::MonotonicTime::get_monotonic();
+        let mono = zx::MonotonicTime::get();
         clock
             .update(
                 zx::ClockUpdate::builder()

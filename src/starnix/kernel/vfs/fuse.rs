@@ -507,7 +507,7 @@ impl FuseNode {
         // anything. Its final access is protected by the info lock anyways.
         const VALID_UNTIL_LOAD_ORDERING: Ordering = Ordering::Relaxed;
 
-        let now = zx::MonotonicTime::get_monotonic();
+        let now = zx::MonotonicTime::get();
         if self.attributes_valid_until.load(VALID_UNTIL_LOAD_ORDERING) >= now {
             let info = info.read();
 
@@ -948,7 +948,7 @@ impl DirEntryOps for FuseDirEntry {
         // anything.
         const VALID_UNTIL_ORDERING: Ordering = Ordering::Relaxed;
 
-        let now = zx::MonotonicTime::get_monotonic();
+        let now = zx::MonotonicTime::get();
         if self.valid_until.load(VALID_UNTIL_ORDERING) >= now {
             return Ok(true);
         }

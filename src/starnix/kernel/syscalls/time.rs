@@ -78,7 +78,7 @@ pub fn sys_clock_gettime(
             }
             CLOCK_MONOTONIC | CLOCK_MONOTONIC_COARSE | CLOCK_MONOTONIC_RAW | CLOCK_BOOTTIME => {
                 profile_duration!("GetMonotonic");
-                zx::MonotonicTime::get_monotonic().into_nanos()
+                zx::MonotonicTime::get().into_nanos()
             }
             CLOCK_THREAD_CPUTIME_ID => {
                 profile_duration!("GetThreadCpuTime");
@@ -252,7 +252,7 @@ fn clock_nanosleep_monotonic_with_deadline(
             if !user_remaining.is_null() {
                 let remaining = match original_utc_deadline {
                     Some(original_utc_deadline) => original_utc_deadline - utc_now(),
-                    None => deadline - zx::MonotonicTime::get_monotonic(),
+                    None => deadline - zx::MonotonicTime::get(),
                 };
                 let remaining =
                     timespec_from_duration(std::cmp::max(zx::Duration::from_nanos(0), remaining));
@@ -532,7 +532,7 @@ pub fn sys_times(
         current_task.write_object(buf, &tms_result)?;
     }
 
-    Ok(duration_to_scheduler_clock(zx::MonotonicTime::get_monotonic() - zx::MonotonicTime::ZERO))
+    Ok(duration_to_scheduler_clock(zx::MonotonicTime::get() - zx::MonotonicTime::ZERO))
 }
 
 #[cfg(test)]
@@ -630,8 +630,7 @@ mod test {
 
         // Interrupt the sleep roughly halfway through. The actual interruption might be before the
         // sleep starts, during the sleep, or after.
-        let interruption_target =
-            zx::MonotonicTime::get_monotonic() + zx::Duration::from_seconds(1);
+        let interruption_target = zx::MonotonicTime::get() + zx::Duration::from_seconds(1);
 
         let thread_group = OwnedRef::downgrade(&current_task.thread_group);
         let thread_join_handle = std::thread::Builder::new()

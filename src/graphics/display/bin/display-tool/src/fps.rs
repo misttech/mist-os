@@ -30,7 +30,7 @@ pub(crate) struct Counts {
 impl Counter {
     pub fn new() -> Counter {
         Counter {
-            last_sample_timestamp: zx::MonotonicTime::get_monotonic(),
+            last_sample_timestamp: zx::MonotonicTime::get(),
             avg_time_delta_ns: 0.0,
             num_frames: 0,
         }

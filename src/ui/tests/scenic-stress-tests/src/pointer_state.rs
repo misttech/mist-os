@@ -60,7 +60,7 @@ impl PointerState {
         self.x = (self.x + 1) % (self.display_width + 1);
 
         pointerinjector::Event {
-            timestamp: Some(MonotonicTime::get_monotonic().into_nanos()),
+            timestamp: Some(MonotonicTime::get().into_nanos()),
             data: Some(pointerinjector::Data::PointerSample(pointer_sample)),
             ..Default::default()
         }

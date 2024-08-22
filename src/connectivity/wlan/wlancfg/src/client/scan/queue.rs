@@ -196,7 +196,7 @@ mod tests {
     fn add_request() {
         let (mut queue, _telemetry_receiver) = setup_queue();
 
-        let time = zx::MonotonicTime::get_monotonic();
+        let time = zx::MonotonicTime::get();
         queue.add_request(ScanReason::NetworkSelection, vec![], vec![], oneshot::channel().0, time);
         assert_eq!(queue.queue.len(), 1);
         assert_eq!(queue.queue[0].reason, ScanReason::NetworkSelection);
@@ -204,7 +204,7 @@ mod tests {
         assert_eq!(queue.queue[0].channels, Vec::<types::WlanChan>::new());
         assert_eq!(queue.queue[0].received_at, time);
 
-        let time = zx::MonotonicTime::get_monotonic();
+        let time = zx::MonotonicTime::get();
         let ssids = vec![generate_ssid("foo"), generate_ssid("bar")];
         let channels = vec![types::WlanChan::new(3, types::Cbw::Cbw20)];
         queue.add_request(
@@ -375,7 +375,7 @@ mod tests {
             ssids: vec![generate_ssid("foo")],
             channels: vec![],
             responder: non_matching_sender,
-            received_at: zx::MonotonicTime::get_monotonic(), // this value is unused, so set it "randomly"
+            received_at: zx::MonotonicTime::get(), // this value is unused, so set it "randomly"
         };
 
         // Set up the queue

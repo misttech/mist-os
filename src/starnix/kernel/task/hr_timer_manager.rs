@@ -144,7 +144,7 @@ impl HrTimerManager {
                         // away.
                         let ticks = std::cmp::max(
                             0,
-                            (new_deadline - zx::MonotonicTime::get_monotonic()).into_nanos(),
+                            (new_deadline - zx::MonotonicTime::get()).into_nanos(),
                         ) / resolution_nsecs;
                         match device_proxy.start_and_wait(
                             HRTIMER_DEFAULT_ID,

@@ -441,7 +441,7 @@ impl ThreadGroup {
                 ptracees: Default::default(),
                 stop_state: AtomicStopState::new(StopState::Awake),
                 pending_signals: Default::default(),
-                start_time: zx::MonotonicTime::get_monotonic(),
+                start_time: zx::MonotonicTime::get(),
                 mutable_state: RwLock::new(ThreadGroupMutableState {
                     parent: parent
                         .as_ref()

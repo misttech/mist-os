@@ -773,7 +773,7 @@ mod tests {
         let touch_handler = touch_handler_res.expect("Failed to create touch handler.");
 
         // Create touch event.
-        let event_time = zx::MonotonicTime::get_monotonic();
+        let event_time = zx::MonotonicTime::get();
         let contact = create_touch_contact(TOUCH_ID, Position { x: 20.0, y: 40.0 });
         let descriptor = get_touch_screen_device_descriptor();
         let input_event = input_device::UnhandledInputEvent::try_from(create_touch_screen_event(
@@ -868,7 +868,7 @@ mod tests {
         });
 
         // Create touch event.
-        let event_time = zx::MonotonicTime::get_monotonic();
+        let event_time = zx::MonotonicTime::get();
         let contact = create_touch_contact(TOUCH_ID, Position { x: 20.0, y: 40.0 });
         let descriptor = get_touch_screen_device_descriptor();
         let input_event = input_device::UnhandledInputEvent::try_from(create_touch_screen_event(
@@ -980,7 +980,7 @@ mod tests {
         });
 
         // Create touch event.
-        let event_time = zx::MonotonicTime::get_monotonic();
+        let event_time = zx::MonotonicTime::get();
         let contact = create_touch_contact(TOUCH_ID, Position { x: 20.0, y: 40.0 });
         let descriptor = get_touchpad_device_descriptor();
         let input_event = input_device::UnhandledInputEvent::try_from(create_touchpad_event(
@@ -1073,7 +1073,7 @@ mod tests {
 
         let contact = create_touch_contact(TOUCH_ID, Position { x: 20.0, y: 40.0 });
         let descriptor = get_touch_screen_device_descriptor();
-        let event_time1 = zx::MonotonicTime::get_monotonic();
+        let event_time1 = zx::MonotonicTime::get();
         let event_time2 = event_time1.add(fuchsia_zircon::Duration::from_micros(1));
         let event_time3 = event_time2.add(fuchsia_zircon::Duration::from_micros(1));
 

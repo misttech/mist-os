@@ -174,7 +174,7 @@ mod tests {
         let fut = async {
             let (timer, time_stream) = mpsc::unbounded::<ScheduledEvent<TestEvent>>();
             let mut timeout_stream = make_async_timed_event_stream(time_stream);
-            let now = zx::MonotonicTime::get_monotonic();
+            let now = zx::MonotonicTime::get();
             schedule(&timer, now + 40.millis(), 0);
             schedule(&timer, now + 10.millis(), 1);
             schedule(&timer, now + 20.millis(), 2);

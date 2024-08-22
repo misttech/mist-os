@@ -57,8 +57,13 @@ impl MonotonicTime {
     /// Wraps the
     /// [zx_clock_get_monotonic](https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_get_monotonic.md)
     /// syscall.
-    pub fn get_monotonic() -> Self {
+    pub fn get() -> Self {
         unsafe { Self::from_nanos(sys::zx_clock_get_monotonic()) }
+    }
+
+    // TODO(https://fxbug.dev/360959987) remove
+    pub fn get_monotonic() -> Self {
+        Self::get()
     }
 
     /// Compute a deadline for the time in the future that is the given `Duration` away.
@@ -449,9 +454,9 @@ mod tests {
 
     #[test]
     fn monotonic_time_increases() {
-        let time1 = Time::get_monotonic();
+        let time1 = MonotonicTime::get();
         1_000.nanos().sleep();
-        let time2 = Time::get_monotonic();
+        let time2 = MonotonicTime::get();
         assert!(time2 > time1);
     }
 
@@ -478,9 +483,9 @@ mod tests {
     #[test]
     fn sleep() {
         let sleep_ns = 1.millis();
-        let time1 = Time::get_monotonic();
+        let time1 = MonotonicTime::get();
         sleep_ns.sleep();
-        let time2 = Time::get_monotonic();
+        let time2 = MonotonicTime::get();
         assert!(time2 > time1 + sleep_ns);
     }
 

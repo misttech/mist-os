@@ -58,13 +58,12 @@ impl InspectDiagnostics {
             )),
             phase: root_node.create_string("phase", &format!("{:?}", Phase::Initial)),
             phase_update_time: root_node
-                .create_int("phase_update_time", zx::MonotonicTime::get_monotonic().into_nanos()),
+                .create_int("phase_update_time", zx::MonotonicTime::get().into_nanos()),
         }
     }
 
     fn network_check_success(&self) {
-        self.root_node
-            .record_int("network_check_time", zx::MonotonicTime::get_monotonic().into_nanos());
+        self.root_node.record_int("network_check_time", zx::MonotonicTime::get().into_nanos());
     }
 
     fn success(&self, sample: &HttpsSample) {
@@ -82,12 +81,12 @@ impl InspectDiagnostics {
                     .insert(*error, self.failure_node.create_uint(format!("{:?}_count", error), 1));
             }
         }
-        self.last_failure_time.set(zx::MonotonicTime::get_monotonic().into_nanos());
+        self.last_failure_time.set(zx::MonotonicTime::get().into_nanos());
     }
 
     fn phase_update(&self, phase: &Phase) {
         self.phase.set(&format!("{:?}", phase));
-        self.phase_update_time.set(zx::MonotonicTime::get_monotonic().into_nanos());
+        self.phase_update_time.set(zx::MonotonicTime::get().into_nanos());
     }
 }
 

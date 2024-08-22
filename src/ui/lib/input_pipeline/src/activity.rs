@@ -186,7 +186,7 @@ impl ActivityManager {
 
         Self::new_internal(
             idle_threshold_ms,
-            zx::MonotonicTime::get_monotonic(),
+            zx::MonotonicTime::get(),
             suspend_enabled,
             lease_holder,
         )

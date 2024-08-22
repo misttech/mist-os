@@ -211,7 +211,7 @@ impl DisplayOwnership {
                         false => KeyEventType::Sync,
                     };
                     let keys = self.key_state.borrow().get_set();
-                    let mut event_time = MonotonicTime::get_monotonic();
+                    let mut event_time = MonotonicTime::get();
                     for key in keys.into_iter() {
                         let key_event = KeyboardEvent::new(key, event_type);
                         output.unbounded_send(into_input_event(key_event, event_time))

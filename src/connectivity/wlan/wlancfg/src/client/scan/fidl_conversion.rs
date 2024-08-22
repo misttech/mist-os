@@ -190,14 +190,14 @@ mod tests {
                         bssid: Some([0, 0, 0, 0, 0, 0]),
                         rssi: Some(0),
                         frequency: Some(CENTER_FREQ_CHAN_1),
-                        timestamp_nanos: Some(zx::MonotonicTime::get_monotonic().into_nanos()),
+                        timestamp_nanos: Some(zx::MonotonicTime::get().into_nanos()),
                         ..Default::default()
                     },
                     fidl_policy::Bss {
                         bssid: Some([7, 8, 9, 10, 11, 12]),
                         rssi: Some(13),
                         frequency: Some(CENTER_FREQ_CHAN_11),
-                        timestamp_nanos: Some(zx::MonotonicTime::get_monotonic().into_nanos()),
+                        timestamp_nanos: Some(zx::MonotonicTime::get().into_nanos()),
                         ..Default::default()
                     },
                 ]),
@@ -213,7 +213,7 @@ mod tests {
                     bssid: Some([1, 2, 3, 4, 5, 6]),
                     rssi: Some(7),
                     frequency: Some(CENTER_FREQ_CHAN_8),
-                    timestamp_nanos: Some(zx::MonotonicTime::get_monotonic().into_nanos()),
+                    timestamp_nanos: Some(zx::MonotonicTime::get().into_nanos()),
                     ..Default::default()
                 }]),
                 compatibility: Some(fidl_policy::Compatibility::Supported),

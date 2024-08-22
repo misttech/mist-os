@@ -481,7 +481,7 @@ impl KeyboardBinding {
             &new_keys,
             &previous_keys,
             device_descriptor.clone(),
-            zx::MonotonicTime::get_monotonic(),
+            zx::MonotonicTime::get(),
             input_event_sender.clone(),
             inspect_sender,
             metrics_logger,

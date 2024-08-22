@@ -72,7 +72,7 @@ impl CrashReporter {
         };
 
         // TODO(https://fxbug.dev/356912301) use boot time
-        let uptime = zx::MonotonicTime::get_monotonic() - current_task.thread_group.start_time;
+        let uptime = zx::MonotonicTime::get() - current_task.thread_group.start_time;
 
         let dump_info = CoreDumpInfo {
             process_koid,

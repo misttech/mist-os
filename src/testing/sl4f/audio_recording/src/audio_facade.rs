@@ -249,7 +249,7 @@ impl OutputWorker {
                                 trace!("AudioFacade::OutputWorker: Extraction OnPositionNotify received before OnStart");
                             }
                             last_timestamp = zx::MonotonicTime::from_nanos(start_time);
-                            last_event_time = zx::MonotonicTime::get_monotonic();
+                            last_event_time = zx::MonotonicTime::get();
                         },
                         Some(fidl_fuchsia_virtualaudio::DeviceEvent::OnStop { stop_time: _, ring_position: _ }) => {
                             if last_timestamp == zx::MonotonicTime::from_nanos(0) {
@@ -261,7 +261,7 @@ impl OutputWorker {
                         },
                         Some(fidl_fuchsia_virtualaudio::DeviceEvent::OnPositionNotify { monotonic_time, ring_position }) => {
                             let monotonic_zx_time = zx::MonotonicTime::from_nanos(monotonic_time);
-                            let now = zx::MonotonicTime::get_monotonic();
+                            let now = zx::MonotonicTime::get();
 
                             // To minimize logspam, log glitches only when capturing.
                             if self.capturing {
@@ -668,7 +668,7 @@ impl InputWorker {
                                 trace!("AudioFacade::InputWorker: Injection OnPositionNotify received before OnStart");
                             }
                             last_timestamp = zx::MonotonicTime::from_nanos(start_time);
-                            last_event_time = zx::MonotonicTime::get_monotonic();
+                            last_event_time = zx::MonotonicTime::get();
                         },
                         Some(fidl_fuchsia_virtualaudio::DeviceEvent::OnStop { stop_time: _, ring_position: _ }) => {
                             if last_timestamp == zx::MonotonicTime::from_nanos(0) {
@@ -679,7 +679,7 @@ impl InputWorker {
                         },
                         Some(fidl_fuchsia_virtualaudio::DeviceEvent::OnPositionNotify { monotonic_time, ring_position }) => {
                             let monotonic_zx_time = zx::MonotonicTime::from_nanos(monotonic_time);
-                            let now = zx::MonotonicTime::get_monotonic();
+                            let now = zx::MonotonicTime::get();
 
                             // To minimize logspam, log glitches only when writing audio.
                             if self.inj_data.len() > 0 {

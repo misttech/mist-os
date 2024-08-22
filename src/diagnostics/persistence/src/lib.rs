@@ -110,9 +110,7 @@ pub async fn main(_args: CommandLine) -> Result<(), Error> {
             component::health().set_ok();
             info!("Diagnostics Persistence Service ready");
         });
-        inspector
-            .root()
-            .record_int(PUBLISHED_TIME_KEY, MonotonicTime::get_monotonic().into_nanos());
+        inspector.root().record_int(PUBLISHED_TIME_KEY, MonotonicTime::get().into_nanos());
     };
 
     join(fs.collect::<()>(), publish_fut).await;

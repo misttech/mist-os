@@ -240,7 +240,7 @@ impl Button {
                                 #[cfg(feature = "debug_logging")]
                                 println!("====== Button {} pressed", self.label_text);
                                 context.queue_message(make_message(ButtonMessages::Pressed(
-                                    MonotonicTime::get_monotonic(),
+                                    MonotonicTime::get(),
                                     self.label_text.clone(),
                                 )));
                             }

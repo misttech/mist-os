@@ -85,7 +85,7 @@ pub struct InputDeviceStatus {
 
 impl InputDeviceStatus {
     pub fn new(device_node: fuchsia_inspect::Node) -> Self {
-        Self::new_internal(device_node, Box::new(zx::MonotonicTime::get_monotonic))
+        Self::new_internal(device_node, Box::new(zx::MonotonicTime::get))
     }
 
     fn new_internal(
@@ -476,7 +476,7 @@ pub fn get_device_from_dir_entry_path(
 pub fn event_time_or_now(event_time: Option<i64>) -> zx::MonotonicTime {
     match event_time {
         Some(time) => zx::MonotonicTime::from_nanos(time),
-        None => zx::MonotonicTime::get_monotonic(),
+        None => zx::MonotonicTime::get(),
     }
 }
 

@@ -515,7 +515,7 @@ impl FlatlandViewStrategy {
             image_id,
             image_index,
             app_sender,
-            MonotonicTime::get_monotonic(),
+            MonotonicTime::get(),
         )
     }
 

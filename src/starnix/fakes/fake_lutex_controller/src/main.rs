@@ -72,7 +72,7 @@ impl LutexState {
         Self::check_futex_value(&vmo, offset, value)?;
         let receiver = receiver.map_err(|_| fposix::Errno::Etimedout);
         if let Some(deadline) = deadline {
-            let timer = fasync::Timer::new(deadline - zx::MonotonicTime::get_monotonic())
+            let timer = fasync::Timer::new(deadline - zx::MonotonicTime::get())
                 .map(|_| Err(fposix::Errno::Etimedout));
             Self::select_first(timer, receiver).await
         } else {

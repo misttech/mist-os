@@ -59,7 +59,7 @@ where
 /// on the test component retrieve the real time. When the test component needs to read fake
 /// time, it must do so using the `FakeClockController` handle. Basically, tests should access
 /// fake time through fake_clock_controller.get_monotonic() instead of the common methods such as
-/// zx::MonotonicTime::get_monotonic().
+/// zx::MonotonicTime::get().
 ///
 /// The provided `test_fn` is provided with handles to manipulate the time source, observe events
 /// passed to cobalt, and manipulate the fake time.

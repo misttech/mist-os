@@ -1220,7 +1220,7 @@ mod tests {
                 .set(IeType::VHT_CAPABILITIES, fake_vht_cap_bytes().to_vec()),
         );
         let device_info = test_utils::fake_device_info([1u8; 6].into());
-        let timestamp = zx::MonotonicTime::get_monotonic();
+        let timestamp = zx::MonotonicTime::get();
         let scan_result = cfg.create_scan_result(
             timestamp,
             bss_description.clone(),
@@ -1250,7 +1250,7 @@ mod tests {
                 .set(IeType::HT_CAPABILITIES, fake_ht_cap_bytes().to_vec())
                 .set(IeType::VHT_CAPABILITIES, fake_vht_cap_bytes().to_vec()),
         );
-        let timestamp = zx::MonotonicTime::get_monotonic();
+        let timestamp = zx::MonotonicTime::get();
         let scan_result = cfg.create_scan_result(
             timestamp,
             bss_description.clone(),
@@ -1277,7 +1277,7 @@ mod tests {
                 .set(IeType::HT_CAPABILITIES, fake_ht_cap_bytes().to_vec())
                 .set(IeType::VHT_CAPABILITIES, fake_vht_cap_bytes().to_vec()),
         );
-        let timestamp = zx::MonotonicTime::get_monotonic();
+        let timestamp = zx::MonotonicTime::get();
         let scan_result = cfg.create_scan_result(
             timestamp,
             bss_description.clone(),
@@ -1297,7 +1297,7 @@ mod tests {
                 .set(IeType::HT_CAPABILITIES, fake_ht_cap_bytes().to_vec())
                 .set(IeType::VHT_CAPABILITIES, fake_vht_cap_bytes().to_vec()),
         );
-        let timestamp = zx::MonotonicTime::get_monotonic();
+        let timestamp = zx::MonotonicTime::get();
         let scan_result = cfg.create_scan_result(
             timestamp,
             bss_description.clone(),
@@ -1741,11 +1741,7 @@ mod tests {
                 ))),
             },
         ));
-        report_fake_scan_result(
-            &mut sme,
-            zx::MonotonicTime::get_monotonic().into_nanos(),
-            bss_description,
-        );
+        report_fake_scan_result(&mut sme, zx::MonotonicTime::get().into_nanos(), bss_description);
 
         assert_variant!(
             connect_txn_stream.try_next(),
@@ -1789,7 +1785,7 @@ mod tests {
         // that connection attempt will be canceled even in the middle of joining the network
         report_fake_scan_result(
             &mut sme,
-            zx::MonotonicTime::get_monotonic().into_nanos(),
+            zx::MonotonicTime::get().into_nanos(),
             fake_fidl_bss_description!(Open, ssid: Ssid::try_from("foo").unwrap()),
         );
 
@@ -1840,7 +1836,7 @@ mod tests {
         sme.on_mlme_event(fidl_mlme::MlmeEvent::OnScanResult {
             result: fidl_mlme::ScanResult {
                 txn_id: 1,
-                timestamp_nanos: zx::MonotonicTime::get_monotonic().into_nanos(),
+                timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
                 bss,
             },
         });
@@ -1849,7 +1845,7 @@ mod tests {
         sme.on_mlme_event(fidl_mlme::MlmeEvent::OnScanResult {
             result: fidl_mlme::ScanResult {
                 txn_id: 1,
-                timestamp_nanos: zx::MonotonicTime::get_monotonic().into_nanos(),
+                timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
                 bss,
             },
         });

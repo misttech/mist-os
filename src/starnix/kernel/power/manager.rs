@@ -405,7 +405,7 @@ impl SuspendResumeManager {
     pub fn suspend(&self, state: SuspendState) -> Result<(), Errno> {
         log_info!(target=?state, "Initiating suspend");
         self.lock().inspect_node.add_entry(|node| {
-            node.record_int(SUSPEND_ATTEMPTED_AT, zx::MonotonicTime::get_monotonic().into_nanos());
+            node.record_int(SUSPEND_ATTEMPTED_AT, zx::MonotonicTime::get().into_nanos());
             node.record_string(SUSPEND_REQUESTED_STATE, state.to_str());
         });
 
@@ -432,7 +432,7 @@ impl SuspendResumeManager {
         }
 
         // Use the same "now" for all subsequent stats.
-        let now = zx::MonotonicTime::get_monotonic();
+        let now = zx::MonotonicTime::get();
 
         match suspend_result {
             SuspendResult::Success => self.wait_for_power_level(STARNIX_POWER_ON_LEVEL)?,

@@ -263,7 +263,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
     /// anymore it deletes it. If any component is not alive any more and no more historical
     /// measurements are available for it, deletes it too.
     pub async fn measure(self: &Arc<Self>) {
-        let start = zx::MonotonicTime::get_monotonic();
+        let start = zx::MonotonicTime::get();
 
         // Copy the stats and release the lock.
         let stats = self
@@ -311,7 +311,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> ComponentTreeStats<T
         }
 
         self.totals.lock().await.insert(aggregated);
-        self.processing_times.insert((zx::MonotonicTime::get_monotonic() - start).into_nanos());
+        self.processing_times.insert((zx::MonotonicTime::get() - start).into_nanos());
     }
 
     async fn prune_dead_tasks(self: &Arc<Self>, max_dead_tasks: usize) {

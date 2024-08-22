@@ -14,7 +14,7 @@ mod monotonic {
 
     pub fn monotonic_examples() {
         // Read monotonic time.
-        let monotonic_time = zx::MonotonicTime::get_monotonic();
+        let monotonic_time = zx::MonotonicTime::get();
         println!("The monotonic time is {:?}.", monotonic_time);
     }
     // [END monotonic]

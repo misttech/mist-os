@@ -893,7 +893,7 @@ impl<'a> AudioStream<'a> for AudioInput<'a> {
             }
         }
 
-        let latency = zx::MonotonicTime::get_monotonic() - zx::MonotonicTime::from_nanos(resp.pts);
+        let latency = zx::MonotonicTime::get() - zx::MonotonicTime::from_nanos(resp.pts);
         inner.lead_time.send(latency)?;
         reply_rxq::success(chain, inner.conn.latency_bytes())?;
         Ok(())

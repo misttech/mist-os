@@ -177,7 +177,7 @@ impl Puppet {
             panic!("puppet should not exit! status: {:?}", status);
         });
 
-        let start_time = zx::MonotonicTime::get_monotonic();
+        let start_time = zx::MonotonicTime::get();
         let proxy =
             instance.root.connect_to_protocol_at_exposed_dir::<LogSinkPuppetMarker>().unwrap();
 
@@ -213,7 +213,7 @@ impl Puppet {
                     .unwrap(),
                 RecordAssertion::new(&puppet.info, Severity::Info, new_file_line_rules)
                     .add_string("message", "Puppet started.�(")
-                    .build(puppet.start_time..zx::MonotonicTime::get_monotonic())
+                    .build(puppet.start_time..zx::MonotonicTime::get())
             );
         } else {
             info!("Reading regular record.");
@@ -224,7 +224,7 @@ impl Puppet {
                     .unwrap(),
                 RecordAssertion::new(&puppet.info, Severity::Info, new_file_line_rules)
                     .add_string("message", "Puppet started.")
-                    .build(puppet.start_time..zx::MonotonicTime::get_monotonic())
+                    .build(puppet.start_time..zx::MonotonicTime::get())
             );
         }
         info!("Testing dot removal.");
@@ -338,9 +338,9 @@ impl Puppet {
         spec: RecordSpec,
         new_file_line_rules: bool,
     ) -> Result<(TestRecord, Range<zx::MonotonicTime>), Error> {
-        let before = zx::MonotonicTime::get_monotonic();
+        let before = zx::MonotonicTime::get();
         self.proxy.emit_log(&spec).await?;
-        let after = zx::MonotonicTime::get_monotonic();
+        let after = zx::MonotonicTime::get();
 
         // read until we get to a non-ignored record
         let record = loop {
@@ -377,7 +377,7 @@ async fn assert_logged_severities(
             puppet.read_record_no_tid(puppet.info.tid).await?.unwrap(),
             RecordAssertion::new(&puppet.info, *severity, new_file_line_rules)
                 .add_string("message", &severity_to_string(*severity))
-                .build(puppet.start_time..zx::MonotonicTime::get_monotonic())
+                .build(puppet.start_time..zx::MonotonicTime::get())
         );
     }
     Ok(())
@@ -420,7 +420,7 @@ where
         puppet.read_record_no_tid(puppet.info.tid).await?.unwrap(),
         RecordAssertion::new(&puppet.info, Severity::Warn, new_file_line_rules)
             .add_string("message", "Changed severity")
-            .build(puppet.start_time..zx::MonotonicTime::get_monotonic())
+            .build(puppet.start_time..zx::MonotonicTime::get())
     );
 
     send_log_with_severity!(Debug);
@@ -438,7 +438,7 @@ where
         puppet.read_record_no_tid(puppet.info.tid).await?.unwrap(),
         RecordAssertion::new(&puppet.info, Severity::Trace, new_file_line_rules)
             .add_string("message", "Changed severity")
-            .build(puppet.start_time..zx::MonotonicTime::get_monotonic())
+            .build(puppet.start_time..zx::MonotonicTime::get())
     );
     send_log_with_severity!(Trace);
     send_log_with_severity!(Debug);
@@ -462,7 +462,7 @@ where
         puppet.read_record_no_tid(puppet.info.tid).await?.unwrap(),
         RecordAssertion::new(&puppet.info, Severity::Info, new_file_line_rules)
             .add_string("message", "Changed severity")
-            .build(puppet.start_time..zx::MonotonicTime::get_monotonic())
+            .build(puppet.start_time..zx::MonotonicTime::get())
     );
 
     send_log_with_severity!(Debug);
@@ -498,7 +498,7 @@ where
             puppet.read_record_no_tid(puppet.info.tid).await?.unwrap(),
             RecordAssertion::new(&puppet.info, Severity::Trace, new_file_line_rules)
                 .add_string("message", "Changed severity")
-                .build(puppet.start_time..zx::MonotonicTime::get_monotonic())
+                .build(puppet.start_time..zx::MonotonicTime::get())
         );
         info!("Changed interest back");
     }
@@ -529,7 +529,7 @@ async fn assert_dot_removal(puppet: &mut Puppet, new_file_line_rules: bool) -> R
             .add_string("file", "test_file.cc")
             .add_string("key", "value")
             .add_unsigned("line", 9001)
-            .build(puppet.start_time..zx::MonotonicTime::get_monotonic())
+            .build(puppet.start_time..zx::MonotonicTime::get())
     );
     info!("Dot removed");
     Ok(())

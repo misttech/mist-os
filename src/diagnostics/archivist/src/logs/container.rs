@@ -116,7 +116,7 @@ impl LogsArtifactsContainer {
                 is_initializing: true,
             })),
             stats: Arc::new(stats),
-            event_timestamp: zx::MonotonicTime::get_monotonic(),
+            event_timestamp: zx::MonotonicTime::get(),
             next_hanging_get_id: AtomicUsize::new(0),
             hanging_get_test_state: Arc::new(Mutex::new(TestState::NoRequest)),
         };

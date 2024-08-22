@@ -19,7 +19,7 @@ pub enum Event<'a> {
 
 impl Event<'_> {
     fn write_to_inspect(&self, node: &Node, session_id: u64) {
-        node.record_int("ts", MonotonicTime::get_monotonic().into_nanos());
+        node.record_int("ts", MonotonicTime::get().into_nanos());
         node.record_uint("session-id", session_id);
         match self {
             Self::CheckingForUpdates => {

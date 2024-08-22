@@ -203,7 +203,7 @@ impl Button {
                     input::pointer::Phase::Up => {
                         if self.active {
                             context.queue_message(make_message(ButtonMessages::Pressed(
-                                MonotonicTime::get_monotonic(),
+                                MonotonicTime::get(),
                             )));
                         }
                         self.tracking_pointer = None;

@@ -48,7 +48,7 @@ pub(crate) struct MonotonicTime(zx::MonotonicTime);
 
 impl MonotonicTime {
     fn now() -> MonotonicTime {
-        MonotonicTime(zx::MonotonicTime::get_monotonic())
+        MonotonicTime(zx::MonotonicTime::get())
     }
 }
 
@@ -377,7 +377,7 @@ impl<S: for<'a> AsyncSocket<'a>> Client<S> {
 
                         let Self { prefixes, prefixes_changed, .. } = client;
 
-                        let now = zx::MonotonicTime::get_monotonic();
+                        let now = zx::MonotonicTime::get();
                         let nonzero_timevalue_to_zx_time = |tv| match tv {
                             v6::NonZeroTimeValue::Finite(tv) => {
                                 now + zx::Duration::from_seconds(tv.get().into())
@@ -1723,7 +1723,7 @@ mod tests {
                             },
                         },
                     ] => {
-                        let now = zx::MonotonicTime::get_monotonic();
+                        let now = zx::MonotonicTime::get();
                         let preferred_until = zx::MonotonicTime::from_nanos(preferred_until1);
                         let valid_until = zx::MonotonicTime::from_nanos(valid_until1);
 
@@ -1754,7 +1754,7 @@ mod tests {
             // that the client has not yet handled the Reply message.
             let mut watch_prefixes = client_proxy.watch_prefixes().fuse();
             assert_matches!(poll!(&mut watch_prefixes), Poll::Pending);
-            let before_handling_reply = zx::MonotonicTime::get_monotonic();
+            let before_handling_reply = zx::MonotonicTime::get();
             select! {
                 () = client_fut => panic!("should never return"),
                 res = watch_prefixes => check_watch_prefixes_result(
@@ -1823,7 +1823,7 @@ mod tests {
             .await
             .expect("failed to send reply message");
 
-            let before_handling_reply = zx::MonotonicTime::get_monotonic();
+            let before_handling_reply = zx::MonotonicTime::get();
             select! {
                 () = client_fut => panic!("should never return"),
                 res = client_proxy.watch_prefixes().fuse() => check_watch_prefixes_result(

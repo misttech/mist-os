@@ -6,7 +6,7 @@ use fuchsia_zircon as zx;
 
 #[cfg(not(test))]
 pub(crate) fn now() -> zx::MonotonicTime {
-    zx::MonotonicTime::get_monotonic()
+    zx::MonotonicTime::get()
 }
 
 #[cfg(test)]
@@ -18,7 +18,7 @@ pub(crate) mod mock {
     use std::cell::Cell;
 
     thread_local!(
-        static MOCK_TIME: Cell<zx::MonotonicTime> = Cell::new(zx::MonotonicTime::get_monotonic())
+        static MOCK_TIME: Cell<zx::MonotonicTime> = Cell::new(zx::MonotonicTime::get())
     );
 
     pub fn now() -> zx::MonotonicTime {

@@ -24,7 +24,7 @@ fn with_profiler_and_call_site(
     f: impl FnOnce(&Profiler, &mut PerThreadData, zx::MonotonicTime, &[u8]),
 ) {
     // Collect the timestamp as early as possible.
-    let timestamp = zx::MonotonicTime::get_monotonic();
+    let timestamp = zx::MonotonicTime::get();
 
     // Collect stack trace outside of the recursion guard to avoid including it in the stack trace.
     let mut stack_buf = [0; STACK_TRACE_MAXIMUM_DEPTH];

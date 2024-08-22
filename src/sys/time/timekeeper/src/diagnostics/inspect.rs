@@ -36,7 +36,7 @@ lazy_static! {
 }
 
 fn monotonic_time() -> i64 {
-    zx::MonotonicTime::get_monotonic().into_nanos()
+    zx::MonotonicTime::get().into_nanos()
 }
 
 /// A vector of inspect nodes used to store some struct implementing `InspectWritable`, where the
@@ -663,7 +663,7 @@ mod tests {
         let (inspect_diagnostics, clock) = create_test_object(&inspector, false);
 
         // Perform two updates to the clock. The inspect data should reflect the most recent.
-        let monotonic_time = zx::MonotonicTime::get_monotonic();
+        let monotonic_time = zx::MonotonicTime::get();
         clock
             .update(
                 zx::ClockUpdate::builder()
@@ -678,7 +678,7 @@ mod tests {
         inspect_diagnostics
             .record(Event::StartClock { track: Track::Primary, source: StartClockSource::Rtc });
 
-        let monotonic_time = zx::MonotonicTime::get_monotonic();
+        let monotonic_time = zx::MonotonicTime::get();
         clock
             .update(
                 zx::ClockUpdate::builder()

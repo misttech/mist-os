@@ -1875,7 +1875,7 @@ fn send_deauthenticate_request(bssid: &Bssid, mlme_sink: &MlmeSink) {
 }
 
 fn now() -> zx::MonotonicTime {
-    zx::MonotonicTime::get_monotonic()
+    zx::MonotonicTime::get()
 }
 
 #[cfg(test)]

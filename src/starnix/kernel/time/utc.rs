@@ -26,7 +26,7 @@ struct UtcClock {
 impl UtcClock {
     pub fn new(real_utc_clock: zx::Clock) -> Self {
         let offset = real_utc_clock.get_details().unwrap().backstop.into_nanos()
-            - zx::MonotonicTime::get_monotonic().into_nanos();
+            - zx::MonotonicTime::get().into_nanos();
         let current_transform = ClockTransformation {
             reference_offset: 0,
             synthetic_offset: offset,
@@ -62,7 +62,7 @@ impl UtcClock {
     }
 
     pub fn now(&self) -> zx::SyntheticTime {
-        let monotonic_time = zx::MonotonicTime::get_monotonic();
+        let monotonic_time = zx::MonotonicTime::get();
         // Utc time is calculated using the same transform as the one stored in vvar. This is
         // to ensure that utc calculations are the same whether using a syscall or the vdso
         // function.

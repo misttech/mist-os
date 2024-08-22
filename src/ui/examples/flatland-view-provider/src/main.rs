@@ -105,7 +105,7 @@ impl<'a> AppModel<'a> {
             hue: 0.0,
             // If there are multiple instances of this example on-screen, it looks prettier if they
             // don't all have exactly the same color, which would happen if we zeroed this value.
-            last_expected_presentation_time: zx::MonotonicTime::get_monotonic(),
+            last_expected_presentation_time: zx::MonotonicTime::get(),
             is_focused: false,
             frame_count: 0,
         }

@@ -463,14 +463,14 @@ impl<'a, S> TracingEvent<'a, S> {
                 event,
                 context,
                 metadata: StoredMetadata::Owned(metadata),
-                timestamp: zx::MonotonicTime::get_monotonic(),
+                timestamp: zx::MonotonicTime::get(),
             }
         } else {
             Self {
                 event,
                 context,
                 metadata: StoredMetadata::Borrowed(event.metadata()),
-                timestamp: zx::MonotonicTime::get_monotonic(),
+                timestamp: zx::MonotonicTime::get(),
             }
         }
     }
@@ -1119,7 +1119,7 @@ mod tests {
 
     #[test]
     fn build_record_from_tracing_event() {
-        let before_timestamp = zx::MonotonicTime::get_monotonic().into_nanos();
+        let before_timestamp = zx::MonotonicTime::get().into_nanos();
         let _s = tracing::subscriber::set_default(Registry::default().with(EncoderLayer));
         tracing::info!(
             is_a_str = "hahaha",
@@ -1189,7 +1189,7 @@ mod tests {
 
     #[test]
     fn spans_are_supported() {
-        let before_timestamp = zx::MonotonicTime::get_monotonic().into_nanos();
+        let before_timestamp = zx::MonotonicTime::get().into_nanos();
         let _s = tracing::subscriber::set_default(Registry::default().with(EncoderLayer));
         let span = info_span!("my span", tag = "span_tag", span_field = 42);
         span.in_scope(|| {

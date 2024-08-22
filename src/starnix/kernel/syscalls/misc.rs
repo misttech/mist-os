@@ -103,7 +103,7 @@ pub fn sys_sysinfo(
     let freeram = total_ram_pages / 8;
 
     let result = uapi::sysinfo {
-        uptime: (zx::MonotonicTime::get_monotonic() - zx::MonotonicTime::ZERO).into_seconds(),
+        uptime: (zx::MonotonicTime::get() - zx::MonotonicTime::ZERO).into_seconds(),
         loads,
         totalram: total_ram_pages,
         freeram,

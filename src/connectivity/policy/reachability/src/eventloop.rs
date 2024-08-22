@@ -597,7 +597,7 @@ impl EventLoop {
         // TODO(https://fxbug.dev/42074495): Move watchdog into its own future in the eventloop to prevent
         // network check reliance on the watchdog completing.
         let () = watchdog
-            .check_interface_state(zx::MonotonicTime::get_monotonic(), &SystemDispatcher {}, view)
+            .check_interface_state(zx::MonotonicTime::get(), &SystemDispatcher {}, view)
             .await;
 
         let (system_internet, system_gateway, system_dns, system_http) = {

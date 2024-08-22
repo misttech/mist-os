@@ -73,7 +73,7 @@ async fn test_example() {
 
     // Sampling the monotonic clock directly is OK since we configured the timekeeper test realm
     // to use the real monotonic clock. See `fttr::RealmOptions` above.
-    let sample_monotonic = zx::MonotonicTime::get_monotonic();
+    let sample_monotonic = zx::MonotonicTime::get();
 
     // Convert to a proxy so we can send RPCs.
     let push_source_puppet = push_source_puppet_client_end.into_proxy().expect("infallible");

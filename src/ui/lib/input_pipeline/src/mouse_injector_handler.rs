@@ -992,7 +992,7 @@ mod tests {
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
 
-        let event_time = zx::MonotonicTime::get_monotonic();
+        let event_time = zx::MonotonicTime::get();
         let input_event = create_mouse_event(
             move_location,
             None, /* wheel_delta_v */
@@ -1118,7 +1118,7 @@ mod tests {
         // Where w = DISPLAY_WIDTH, h = DISPLAY_HEIGHT
         let cursor_location =
             mouse_binding::MouseLocation::Absolute(Position { x: -25.0, y: 25.0 });
-        let event_time = zx::MonotonicTime::get_monotonic();
+        let event_time = zx::MonotonicTime::get();
         let descriptor =
             input_device::InputDeviceDescriptor::Mouse(mouse_binding::MouseDeviceDescriptor {
                 device_id: DEVICE_ID,
@@ -1251,7 +1251,7 @@ mod tests {
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
 
         let cursor_location = mouse_binding::MouseLocation::Absolute(Position { x: 0.0, y: 0.0 });
-        let event_time = zx::MonotonicTime::get_monotonic();
+        let event_time = zx::MonotonicTime::get();
 
         let input_event = create_mouse_event(
             cursor_location,
@@ -1362,7 +1362,7 @@ mod tests {
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
 
         let cursor_location = mouse_binding::MouseLocation::Absolute(Position { x: 0.0, y: 0.0 });
-        let event_time1 = zx::MonotonicTime::get_monotonic();
+        let event_time1 = zx::MonotonicTime::get();
         let event_time2 = event_time1.add(fuchsia_zircon::Duration::from_micros(1));
 
         let event1 = create_mouse_event(
@@ -1509,7 +1509,7 @@ mod tests {
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
 
         let cursor_location = mouse_binding::MouseLocation::Absolute(Position { x: 0.0, y: 0.0 });
-        let event_time1 = zx::MonotonicTime::get_monotonic();
+        let event_time1 = zx::MonotonicTime::get();
         let event_time2 = event_time1.add(fuchsia_zircon::Duration::from_micros(1));
         let event_time3 = event_time2.add(fuchsia_zircon::Duration::from_micros(1));
         let event_time4 = event_time3.add(fuchsia_zircon::Duration::from_micros(1));
@@ -1729,7 +1729,7 @@ mod tests {
         let (mouse_handler_res, _) = futures::join!(mouse_handler_fut, config_request_stream_fut);
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
 
-        let event_time1 = zx::MonotonicTime::get_monotonic();
+        let event_time1 = zx::MonotonicTime::get();
         let event_time2 = event_time1.add(fuchsia_zircon::Duration::from_micros(1));
         let event_time3 = event_time2.add(fuchsia_zircon::Duration::from_micros(1));
         let zero_position = Position { x: 0.0, y: 0.0 };
@@ -1931,7 +1931,7 @@ mod tests {
                     y: cursor_relative_position.y / COUNTS_PER_MM as f32,
                 },
             });
-        let event_time = zx::MonotonicTime::get_monotonic();
+        let event_time = zx::MonotonicTime::get();
         let input_events = vec![create_mouse_event_with_handled(
             cursor_location,
             None, /* wheel_delta_v */
@@ -2153,7 +2153,7 @@ mod tests {
             injector_stream_sender,
         );
 
-        let event_time = zx::MonotonicTime::get_monotonic();
+        let event_time = zx::MonotonicTime::get();
 
         let event = input_device::InputEvent { event_time, ..event };
 
@@ -2231,7 +2231,7 @@ mod tests {
             injector_stream_sender,
         );
 
-        let event_time1 = zx::MonotonicTime::get_monotonic();
+        let event_time1 = zx::MonotonicTime::get();
         let event_time2 = event_time1.add(fuchsia_zircon::Duration::from_micros(1));
         let event_time3 = event_time2.add(fuchsia_zircon::Duration::from_micros(1));
         let event_time4 = event_time3.add(fuchsia_zircon::Duration::from_micros(1));
@@ -2452,7 +2452,7 @@ mod tests {
         let mouse_handler = mouse_handler_res.expect("Failed to create mouse handler");
 
         let cursor_location = mouse_binding::MouseLocation::Absolute(Position { x: 0.0, y: 0.0 });
-        let event_time1 = zx::MonotonicTime::get_monotonic();
+        let event_time1 = zx::MonotonicTime::get();
         let event_time2 = event_time1.add(fuchsia_zircon::Duration::from_micros(1));
         let event_time3 = event_time2.add(fuchsia_zircon::Duration::from_micros(1));
 

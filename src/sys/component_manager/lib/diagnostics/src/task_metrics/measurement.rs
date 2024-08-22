@@ -69,7 +69,7 @@ impl SubAssign<&Measurement> for Measurement {
 
 impl From<zx::TaskRuntimeInfo> for Measurement {
     fn from(info: zx::TaskRuntimeInfo) -> Self {
-        Measurement::from_runtime_info(info, zx::MonotonicTime::get_monotonic())
+        Measurement::from_runtime_info(info, zx::MonotonicTime::get())
     }
 }
 
@@ -533,7 +533,7 @@ mod tests {
         let mut q = MeasurementsQueue::new(max_values, Arc::new(FakeTime::new()));
 
         for _ in 0..(max_values + 100) {
-            q.insert(Measurement::empty(MonotonicTime::get_monotonic()));
+            q.insert(Measurement::empty(MonotonicTime::get()));
         }
 
         assert_eq!(max_values, q.true_measurement_count());

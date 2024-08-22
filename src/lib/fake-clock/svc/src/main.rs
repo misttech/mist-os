@@ -566,7 +566,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_event_heap() {
-        let time = zx::MonotonicTime::get_monotonic();
+        let time = zx::MonotonicTime::get();
         let after = time + 10.millis();
         let e1 = PendingEvent { time, event: 0 };
         let e2 = PendingEvent { time: after, event: 1 };

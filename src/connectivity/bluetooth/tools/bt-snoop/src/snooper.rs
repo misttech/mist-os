@@ -114,7 +114,7 @@ impl TryFrom<SnoopOnObservePacketRequest> for SnoopPacket {
     type Error = Error;
 
     fn try_from(value: SnoopOnObservePacketRequest) -> Result<Self, Self::Error> {
-        let time = zx::MonotonicTime::get_monotonic();
+        let time = zx::MonotonicTime::get();
         let SnoopOnObservePacketRequest {
             packet: Some(packet), direction: Some(direction), ..
         } = value

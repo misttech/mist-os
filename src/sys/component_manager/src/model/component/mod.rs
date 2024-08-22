@@ -688,7 +688,7 @@ impl ComponentInstance {
                 };
             }
 
-            let stop_time = zx::MonotonicTime::get_monotonic();
+            let stop_time = zx::MonotonicTime::get();
             let event = self.new_event(EventPayload::Stopped {
                 status: disposition.stop_info().termination_status,
                 exit_code: disposition.stop_info().exit_code,
@@ -1266,7 +1266,7 @@ impl ComponentInstance {
     }
 
     pub fn new_event(&self, payload: EventPayload) -> Event {
-        self.new_event_with_timestamp(payload, zx::MonotonicTime::get_monotonic())
+        self.new_event_with_timestamp(payload, zx::MonotonicTime::get())
     }
 
     pub fn new_event_with_timestamp(

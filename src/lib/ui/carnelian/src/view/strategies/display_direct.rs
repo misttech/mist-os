@@ -221,7 +221,7 @@ impl DisplayDirectViewStrategy {
             display_resources: Some(display_resources),
             drop_display_resources_task: None,
             display_resource_release_delay: app_config.display_resource_release_delay,
-            vsync_phase: MonotonicTime::get_monotonic(),
+            vsync_phase: MonotonicTime::get(),
             vsync_interval: Duration::from_millis(16),
             mouse_cursor_position: None,
             collection_id,
@@ -235,7 +235,7 @@ impl DisplayDirectViewStrategy {
         view_details: &ViewDetails,
         image_id: Option<ImageId>,
     ) -> ViewAssistantContext {
-        let time_now = MonotonicTime::get_monotonic();
+        let time_now = MonotonicTime::get();
         // |interval_offset| is the offset from |time_now| to the next multiple
         // of vsync interval after vsync phase, possibly negative if in the past.
         let mut interval_offset = Duration::from_nanos(

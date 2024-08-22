@@ -203,7 +203,7 @@ impl CobaltDiagnostics {
         );
         if track == Track::Monitor {
             if let Some(monitor_clock) = self.monitor_clock.as_ref() {
-                let monotonic_ref = zx::MonotonicTime::get_monotonic();
+                let monotonic_ref = zx::MonotonicTime::get();
                 let primary = time_at_monotonic(&self.primary_clock, monotonic_ref);
                 let monitor = time_at_monotonic(monitor_clock, monotonic_ref);
                 let direction =

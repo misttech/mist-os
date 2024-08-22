@@ -68,7 +68,7 @@ struct Monotonic;
 
 impl Clock for Monotonic {
     fn now(&self) -> zx::MonotonicTime {
-        zx::MonotonicTime::get_monotonic()
+        zx::MonotonicTime::get()
     }
 }
 

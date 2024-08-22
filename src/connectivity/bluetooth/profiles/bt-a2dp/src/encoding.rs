@@ -177,7 +177,7 @@ impl futures::Stream for SilenceStream {
     type Item = fuchsia_audio_device::Result<Vec<u8>>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let now = zx::MonotonicTime::get_monotonic();
+        let now = zx::MonotonicTime::get();
         if self.last_frame_time.is_none() {
             self.last_frame_time = Some(now - 1.second());
         }

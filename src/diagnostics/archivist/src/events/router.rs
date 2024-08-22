@@ -524,7 +524,7 @@ mod tests {
         let request_stream = LogSinkRequestStream::from_channel(fidl::AsyncChannel::from_channel(
             server_end.into_channel(),
         ));
-        let timestamp = zx::MonotonicTime::get_monotonic();
+        let timestamp = zx::MonotonicTime::get();
         producer
             .dispatcher
             .emit(Event {
@@ -587,7 +587,7 @@ mod tests {
         producer
             .dispatcher
             .emit(Event {
-                timestamp: zx::MonotonicTime::get_monotonic(),
+                timestamp: zx::MonotonicTime::get(),
                 payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
                     component: IDENTITY.clone(),
                     request_stream,
@@ -607,7 +607,7 @@ mod tests {
         producer
             .dispatcher
             .emit(Event {
-                timestamp: zx::MonotonicTime::get_monotonic(),
+                timestamp: zx::MonotonicTime::get(),
                 payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
                     component: IDENTITY.clone(),
                     request_stream,
