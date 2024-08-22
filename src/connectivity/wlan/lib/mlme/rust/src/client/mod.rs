@@ -751,7 +751,6 @@ impl<'a, D: DeviceOps> BoundClient<'a, D> {
     }
 
     /// Sends an association request frame based on device capability.
-    // TODO(https://fxbug.dev/42114977): Use an IE set instead of individual IEs.
     pub fn send_assoc_req_frame(&mut self) -> Result<(), Error> {
         let ssid = self.sta.ssid().clone();
         let cap = &self.sta.client_capabilities.0;
