@@ -251,13 +251,13 @@ impl Injector for Injection {
         //     a confusing error.
         let proxy_timeout = self.env_context.get_proxy_timeout().await?;
         let target_info = std::sync::Mutex::new(None);
-        let proxy = timeout(proxy_timeout, async {
+        let proxy = Box::pin(timeout(proxy_timeout, async {
             self.remote_once
                 .get_or_try_init(|_| async {
                     self.init_remote_proxy(&mut *target_info.lock().unwrap()).await
                 })
                 .await
-        })
+        }))
         .await
         .map_err(|_| {
             tracing::warn!("Timed out getting remote control proxy for: {:?}", self.target_spec);
@@ -417,7 +417,8 @@ mod test {
     use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream, ServerEnd};
     use fidl_fuchsia_developer_ffx::{
         DaemonMarker, DaemonRequest, DaemonRequestStream, TargetCollectionMarker,
-        TargetCollectionRequest, TargetCollectionRequestStream, TargetMarker, TargetRequest,
+        TargetCollectionRequest, TargetCollectionRequestStream, TargetConnectionError,
+        TargetMarker, TargetRequest,
     };
     use fuchsia_async::Task;
     use futures::{AsyncReadExt, StreamExt, TryStreamExt};
@@ -458,7 +459,7 @@ mod test {
         })
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_init_daemon_proxy_link_lost() {
         let test_env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let sockpath = test_env.context.get_ascendd_path().await.expect("No ascendd path");
@@ -484,7 +485,7 @@ mod test {
         assert!(str.contains("ffx doctor"));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_init_daemon_proxy_timeout_no_connection() {
         let test_env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let sockpath = test_env.context.get_ascendd_path().await.expect("No ascendd path");
@@ -600,7 +601,7 @@ mod test {
         .await
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_init_daemon_proxy_hash_matches() {
         let test_env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let sockpath = test_env.context.get_ascendd_path().await.expect("No ascendd path");
@@ -624,7 +625,7 @@ mod test {
         daemons_task.await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_init_daemon_proxy_upgrade() {
         let test_env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let sockpath = test_env.context.get_ascendd_path().await.expect("No ascendd path");
@@ -658,7 +659,7 @@ mod test {
         daemons_task.await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_init_daemon_blocked_for_4s_succeeds() {
         let test_env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let sockpath = test_env.context.get_ascendd_path().await.expect("No ascendd path");
@@ -683,7 +684,7 @@ mod test {
         daemon_task.await;
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_init_daemon_blocked_for_6s_timesout() {
         let test_env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let sockpath = test_env.context.get_ascendd_path().await.expect("No ascendd path");
@@ -709,7 +710,7 @@ mod test {
         assert!(str.contains("ffx doctor"));
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_remote_proxy_timeout() {
         let test_env = ffx_config::test_init().await.expect("Failed to initialize test env");
         let sockpath = test_env.context.get_ascendd_path().await.expect("No ascendd path");
@@ -803,9 +804,144 @@ mod test {
 
         match error.downcast::<FfxError>().unwrap() {
             FfxError::DaemonError { err: DaemonError::Timeout, target } => {
-                assert_eq!(target.as_deref(), Some("target_name"));
+                assert_eq!(target.as_deref(), Some(""));
             }
             err => panic!("Unexpected: {err}"),
         }
+    }
+
+    // These errors should ONLY be used with `test_rcs_connection_eventually_successful`.
+    static ERRORS: std::sync::LazyLock<Arc<Mutex<Vec<TargetConnectionError>>>> =
+        std::sync::LazyLock::new(|| Arc::new(Mutex::new(Vec::new())));
+
+    #[fuchsia::test]
+    async fn test_rcs_connection_eventually_successful() {
+        let test_env = ffx_config::test_init().await.expect("Failed to initialize test env");
+        let sockpath = test_env.context.get_ascendd_path().await.expect("No ascendd path");
+        let local_node = overnet_core::Router::new(None).unwrap();
+        fn start_target_task(
+            target_handle: ServerEnd<TargetMarker>,
+            errors: Arc<Mutex<Vec<TargetConnectionError>>>,
+        ) -> Task<()> {
+            let mut stream = target_handle.into_stream().unwrap();
+
+            let errors = errors.clone();
+            Task::local(async move {
+                while let Some(request) = stream.try_next().await.unwrap() {
+                    match request {
+                        TargetRequest::Identity { responder } => {
+                            responder
+                                .send(&TargetInfo {
+                                    nodename: Some("target_name".into()),
+                                    ..TargetInfo::default()
+                                })
+                                .unwrap();
+                        }
+                        TargetRequest::OpenRemoteControl { remote_control, responder } => {
+                            if let Some(err) = errors.lock().await.pop() {
+                                responder.send(Err(err)).unwrap();
+                                continue;
+                            }
+                            Task::local(async move {
+                                let mut stream = remote_control.into_stream().unwrap();
+                                while let Ok(Some(request)) = stream.try_next().await {
+                                    eprintln!("Got a request for RCS proxy: {request:?}");
+                                }
+                            })
+                            .detach();
+                            responder.send(Ok(())).unwrap();
+                        }
+                        TargetRequest::GetSshLogs { responder } => responder.send("").unwrap(),
+                        _ => {
+                            eprintln!("unhandled request: {request:?}");
+                            panic!("unhandled: {request:?}")
+                        }
+                    }
+                }
+            })
+        }
+
+        fn start_target_collection_task(channel: fidl::AsyncChannel) -> Task<()> {
+            let errors = ERRORS.clone();
+            let mut stream = TargetCollectionRequestStream::from_channel(channel);
+            Task::local(async move {
+                while let Some(request) = stream.try_next().await.unwrap() {
+                    eprintln!("{request:?}");
+                    match request {
+                        TargetCollectionRequest::OpenTarget {
+                            query: _,
+                            target_handle,
+                            responder,
+                        } => {
+                            start_target_task(target_handle, errors.clone()).detach();
+
+                            responder.send(Ok(())).unwrap();
+                        }
+                        _ => panic!("unhandled: {request:?}"),
+                    }
+                }
+            })
+        }
+
+        let daemon_request_handler = move |request| async move {
+            match request {
+                DaemonRequest::ConnectToProtocol { name, server_end, responder }
+                    if name == TargetCollectionMarker::PROTOCOL_NAME =>
+                {
+                    start_target_collection_task(fidl::AsyncChannel::from_channel(server_end))
+                        .detach();
+                    responder.send(Ok(()))?;
+                }
+                _ => panic!("unhandled request: {request:?}"),
+            }
+            Ok(())
+        };
+
+        let sockpath1 = sockpath.to_owned();
+        let local_node1 = Arc::clone(&local_node);
+        test_daemon_custom(
+            local_node1,
+            sockpath1.to_owned(),
+            "testcurrenthash",
+            0,
+            daemon_request_handler,
+        )
+        .await
+        .detach();
+
+        let injection = Injection::new(
+            test_env.context.clone(),
+            DaemonVersionCheck::SameBuildId("testcurrenthash".to_owned()),
+            local_node,
+            Some("".into()),
+        );
+        let error_list = [
+            TargetConnectionError::Timeout,
+            TargetConnectionError::Timeout,
+            TargetConnectionError::ConnectionRefused,
+        ];
+        ERRORS.lock().await.extend_from_slice(&error_list[..]);
+        let mut target_info = None;
+        assert!(injection.init_remote_proxy(&mut target_info).await.is_ok());
+        // We should also get the target info here.
+        assert_eq!(target_info.unwrap().nodename.unwrap(), "target_name".to_owned());
+
+        let error_list = [
+            TargetConnectionError::Timeout,
+            TargetConnectionError::KeyVerificationFailure,
+            TargetConnectionError::Timeout,
+            TargetConnectionError::ConnectionRefused,
+        ];
+        ERRORS.lock().await.extend_from_slice(&error_list[..]);
+        let mut target_info = None;
+        let res = injection.init_remote_proxy(&mut target_info).await;
+        assert!(res.is_err());
+        let err = res.unwrap_err().downcast::<FfxError>().unwrap();
+        let FfxError::TargetConnectionError { err, .. } = err else {
+            panic!("Unexpected error: {err:?}");
+        };
+        assert_eq!(err, TargetConnectionError::KeyVerificationFailure);
+        // We should still get the target info even during failure.
+        assert_eq!(target_info.unwrap().nodename.unwrap(), "target_name".to_owned());
     }
 }

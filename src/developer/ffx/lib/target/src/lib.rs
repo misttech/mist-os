@@ -1,7 +1,6 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-// use addr::TargetAddr;
 use addr::TargetAddr;
 use anyhow::{Context as _, Result};
 use compat_info::CompatibilityInfo;
@@ -36,7 +35,7 @@ pub use connection::ConnectionError;
 pub use discovery::desc::{Description, FastbootInterface};
 pub use discovery::query::TargetInfoQuery;
 pub use fidl_pipe::{create_overnet_socket, FidlPipe};
-pub use overnet_connector::{OvernetConnection, OvernetConnector};
+pub use overnet_connector::{OvernetConnection, OvernetConnectionError, OvernetConnector};
 pub use resolve::{
     maybe_locally_resolve_target_spec, resolve_target_address, resolve_target_query_to_info,
     resolve_target_query_with,
@@ -59,11 +58,61 @@ pub async fn get_remote_proxy(
     mut target_info: Option<&mut Option<TargetInfo>>,
     context: &EnvironmentContext,
 ) -> Result<RemoteControlProxy> {
+    let mut target_info_out = None;
+    let res = loop {
+        match get_remote_proxy_impl(
+            &target_spec,
+            &daemon_proxy,
+            &proxy_timeout,
+            &mut target_info_out,
+            &context,
+        )
+        .await
+        {
+            Ok(p) => break Ok(p),
+            Err(e) => {
+                let e = e.downcast::<FfxError>()?;
+                let FfxError::TargetConnectionError { err, .. } = e else {
+                    break Err(e.into());
+                };
+                match err {
+                    ffx::TargetConnectionError::KeyVerificationFailure
+                    | ffx::TargetConnectionError::InvalidArgument
+                    | ffx::TargetConnectionError::PermissionDenied => {
+                        break (Err(anyhow::Error::new(e)))
+                    }
+                    _ => {
+                        let retry_info =
+                            format!("Retrying connection after non-fatal error encountered: {e}");
+                        eprintln!("{}", retry_info.as_str());
+                        tracing::info!("{}", retry_info.as_str());
+                        // Insert a small delay to prevent too tight of a spinning loop.
+                        fuchsia_async::Timer::new(Duration::from_millis(20)).await;
+                        continue;
+                    }
+                }
+            }
+        }
+    };
+    if let Some(ref mut info_out) = target_info {
+        **info_out = target_info_out.clone();
+    }
+    res
+}
+
+async fn get_remote_proxy_impl(
+    target_spec: &Option<String>,
+    daemon_proxy: &DaemonProxy,
+    proxy_timeout: &Duration,
+    target_info: &mut Option<TargetInfo>,
+    context: &EnvironmentContext,
+) -> Result<RemoteControlProxy> {
     // See if we need to do local resolution. (Do it here not in
     // open_target_with_fut because o_t_w_f is not async)
-    let target_spec = resolve::maybe_locally_resolve_target_spec(target_spec, context).await?;
+    let mut target_spec =
+        resolve::maybe_locally_resolve_target_spec(target_spec.clone(), context).await?;
     let (target_proxy, target_proxy_fut) =
-        open_target_with_fut(target_spec.clone(), daemon_proxy, proxy_timeout, context)?;
+        open_target_with_fut(target_spec.clone(), daemon_proxy.clone(), *proxy_timeout, context)?;
     let mut target_proxy_fut = target_proxy_fut.boxed_local().fuse();
     let (remote_proxy, remote_server_end) = create_proxy::<RemoteControlMarker>()?;
     let mut open_remote_control_fut =
@@ -84,13 +133,18 @@ pub async fn get_remote_proxy(
                     Ok(r) => break(r),
                 }
             }
-            res = target_proxy_fut => {
-                res?;
-                if let Some(ref mut info_out) = target_info {
-                    **info_out = Some(target_proxy.identity().await?);
-                }
-            }
+            res = target_proxy_fut => res?,
         }
+    };
+    let info = target_proxy.identity().await?;
+    *target_info = Some(info.clone());
+    // Only replace the target spec info if we're going from less info to more info.
+    // Don't want to overwrite it otherwise.
+    match (target_spec.as_ref(), info.nodename, info.ssh_address) {
+        (None, Some(n), Some(s)) => target_spec.replace(format!("{n} at {}", TargetAddr::from(s))),
+        (None, None, Some(s)) => target_spec.replace(TargetAddr::from(s).to_string()),
+        (None, Some(n), None) => target_spec.replace(format!("{n}")),
+        (_, _, _) => None,
     };
     let target_spec = target_spec.as_ref().map(ToString::to_string);
     match res {

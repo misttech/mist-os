@@ -35,6 +35,7 @@ if (is_host) {
 
     test_deps = [
       "//src/connectivity/overnet/lib/ascendd",
+      "//src/lib/fuchsia",
       "//third_party/rust_crates:async-lock",
       "//third_party/rust_crates:async-net",
     ]
