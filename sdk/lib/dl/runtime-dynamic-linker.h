@@ -78,30 +78,31 @@ class RuntimeDynamicLinker {
   // API object that will use it for reporting file read errors.
   template <class Loader, typename RetrieveFile>
   fit::result<Error, void*> Open(const char* file, int mode, RetrieveFile&& retrieve_file) {
-    auto already_loaded = CheckOpen(file, mode);
-    if (already_loaded.is_error()) [[unlikely]] {
-      return already_loaded.take_error();
+    // `mode` must be a valid value.
+    if (mode & ~(kOpenSymbolScopeMask | kOpenBindingModeMask | kOpenFlagsMask)) {
+      return fit::error{Error{"invalid mode parameter"}};
     }
-    // If the module for `file` was found, return a reference to it.
-    if (already_loaded.value()) {
-      return fit::ok(already_loaded.value());
+
+    if (!file || !strlen(file)) {
+      return fit::error{
+          Error{"TODO(https://fxbug.dev/324136831): nullptr for file is unsupported."}};
+    }
+
+    Soname name{file};
+    if (RuntimeModule* found = FindModule(name)) {
+      // A module for this file is already loaded, return a reference to it.
+      return fit::ok(found);
     }
 
     // A Module for `file` does not yet exist; create a new LinkingSession
     // to perform the loading and linking of the file and all its dependencies.
-    LinkingSession<Loader> linking_session;
+    LinkingSession<Loader> linking_session{modules_};
 
     // Use a non-scoped diagnostics object for the root module. Because errors
     // are generated on this module directly, its name does not need to be
     // prefixed to the error, as is the case using ld::ScopedModuleDiagnostics.
     dl::Diagnostics diag;
-    if (!linking_session.Load(diag, Soname{file}, std::forward<RetrieveFile>(retrieve_file),
-                              modules_)) {
-      return diag.take_error();
-    }
-
-    // TODO(https://fxbug.dev/324136831): Include global modules in relocations.
-    if (!linking_session.Relocate(diag)) {
+    if (!linking_session.Link(diag, name, std::forward<RetrieveFile>(retrieve_file))) {
       return diag.take_error();
     }
 
@@ -122,12 +123,6 @@ class RuntimeDynamicLinker {
   }
 
  private:
-  // Perform basic argument checking and check whether a module for `file` was
-  // already loaded. An error is returned if bad input was given. Otherwise,
-  // return a reference to the module if it was already loaded, or nullptr if
-  // a module for `file` was not found.
-  fit::result<Error, RuntimeModule*> CheckOpen(const char* file, int mode);
-
   // The RuntimeDynamicLinker owns the list of all 'live' modules that have been
   // loaded into the system image.
   // TODO(https://fxbug.dev/324136831): support startup modules

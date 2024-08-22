@@ -16,16 +16,6 @@ RuntimeModule* RuntimeDynamicLinker::FindModule(Soname name) {
   return nullptr;
 }
 
-fit::result<Error, RuntimeModule*> RuntimeDynamicLinker::CheckOpen(const char* file, int mode) {
-  if (mode & ~(kOpenSymbolScopeMask | kOpenBindingModeMask | kOpenFlagsMask)) {
-    return fit::error{Error{"invalid mode parameter"}};
-  }
-  if (!file || !strlen(file)) {
-    return fit::error{Error{"TODO(https://fxbug.dev/324136831): nullptr for file is unsupported."}};
-  }
-  return fit::ok(FindModule(Soname{file}));
-}
-
 fit::result<Error, void*> RuntimeDynamicLinker::LookupSymbol(RuntimeModule* module,
                                                              const char* ref) {
   Diagnostics diag;

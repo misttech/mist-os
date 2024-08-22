@@ -25,7 +25,17 @@ class LinkingSession {
   // Not copyable, not movable.
   LinkingSession(const LinkingSession&) = delete;
   LinkingSession(LinkingSession&&) = delete;
-  LinkingSession() = default;
+
+  // A LinkingSession is provided a reference to the dynamic linker's list of
+  // already loaded modules to refer to during the linking procedure.
+  explicit LinkingSession(const ModuleList& loaded_modules) : loaded_modules_(loaded_modules) {}
+
+  ~LinkingSession() = default;
+
+  template <typename RetrieveFile>
+  bool Link(Diagnostics& diag, Soname soname, RetrieveFile&& retrieve_file) {
+    return Load(diag, soname, std::forward<RetrieveFile>(retrieve_file)) && Relocate(diag);
+  }
 
   // The caller calls Commit() to finalize the LinkingSession after it has
   // loaded and linked all the modules needed for a single dlopen call. This
@@ -33,18 +43,23 @@ class LinkingSession {
   // to the caller.
   ModuleList Commit() && { return std::move(runtime_modules_); }
 
+ private:
+  // Forward declaration; see definition below.
+  class SessionModule;
+
+  using SessionModuleList = fbl::DoublyLinkedList<std::unique_ptr<SessionModule>>;
+
   // TODO(https://fxbug.dev/333573264): Talk about how previously-loaded modules
   // are handled in this function.
   // Load the root module and all its dependencies. The `retrieve_file` argument
   // is a callable passed down from `Open` and is invoked to retrieve the
   // module's file from the file system for processing.
   template <typename RetrieveFile>
-  bool Load(Diagnostics& diag, Soname soname, RetrieveFile&& retrieve_file,
-            const ModuleList& loaded_modules) {
+  bool Load(Diagnostics& diag, Soname soname, RetrieveFile&& retrieve_file) {
     static_assert(std::is_invocable_v<RetrieveFile, Diagnostics&, std::string_view>);
 
     // The root module will always be the first module in the list.
-    if (!EnqueueModule(diag, soname, loaded_modules)) {
+    if (!EnqueueModule(diag, soname)) {
       return false;
     }
 
@@ -69,12 +84,9 @@ class LinkingSession {
       }
 
       if (auto result = module.Load(diag, *std::move(file))) {
-        // Create a module for each dependency from the SessionModule.Load result
-        // and enqueue it onto session_modules_ to be processed and loaded in the
-        // future.
-        auto enqueue_dep = [this, &diag, &loaded_modules](const Soname& name) {
-          return EnqueueModule(diag, name, loaded_modules);
-        };
+        // Create and enqueue a module for each dependency from the Load result
+        // so it can be processed and loaded in the future.
+        auto enqueue_dep = [this, &diag](const Soname& name) { return EnqueueModule(diag, name); };
         if (std::all_of(std::begin(*result), std::end(*result), enqueue_dep)) {
           return fit::ok();
         }
@@ -108,7 +120,7 @@ class LinkingSession {
     return true;
   }
 
-  bool EnqueueModule(Diagnostics& diag, Soname soname, const ModuleList& loaded_modules) {
+  bool EnqueueModule(Diagnostics& diag, Soname soname) {
     if (std::find(session_modules_.begin(), session_modules_.end(), soname) !=
         session_modules_.end()) {
       // The module was already added to session_modules_ in this LinkingSession.
@@ -121,7 +133,8 @@ class LinkingSession {
 
     // TODO(https://fxbug.dev/338229987): This is just to make sure we're not
     // exercising deps from modules already loaded yet.
-    assert(std::find(loaded_modules.begin(), loaded_modules.end(), soname) == loaded_modules.end());
+    assert(std::find(loaded_modules_.begin(), loaded_modules_.end(), soname) ==
+           loaded_modules_.end());
 
     fbl::AllocChecker module_ac;
     auto module = RuntimeModule::Create(module_ac, soname);
@@ -157,12 +170,6 @@ class LinkingSession {
                        relocate_and_relro);
   }
 
- private:
-  // Forward declaration; see definition below.
-  class SessionModule;
-
-  using SessionModuleList = fbl::DoublyLinkedList<std::unique_ptr<SessionModule>>;
-
   // The list of "temporary" SessionModules needed to perform loading, decoding,
   // relocations, etc during this LinkingSession. There is a 1:1 mapping between
   // elements in session_modules_ and runtime_modules_: each element in
@@ -178,6 +185,10 @@ class LinkingSession {
   // LinkingSession::Commit is called, otherwise this list will get gc'ed with
   // the LinkingSession.
   ModuleList runtime_modules_;
+
+  // The set of loaded modules at the time this LinkingSession instance was
+  // created.
+  const ModuleList& loaded_modules_;
 };
 
 // SessionModule is the temporary data structure created to load a file and
