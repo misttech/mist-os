@@ -104,9 +104,14 @@ group("default") {
     "//:host",
     "//:tests",
     "//bundles/boot_tests",
+
+    # Basie Elf
     "//zircon/kernel/lib/mistos/userloader/example:hello_zbi",
 
-    #
+    # Bench
+    "//examples/mistos_linux_bench:bench",
+
+    # Host tools tests
     "//zircon/tools:tests",
   ]
 }

@@ -3,20 +3,45 @@
 # found in the LICENSE file.
 
 import("//build/dist/resource.gni")
+import("//build/zbi/kernel_cmdline.gni")
+import("//build/zbi/zbi.gni")
+import("//build/zbi/zbi_input.gni")
 
-# Linux pre compiled binary 
-# GCC11.4.0 -O2 -DMULTITHREAD=1     -DUSE_SOCKET -DPERFORMANCE_RUN=1     -static       -lrt / Heap
+# Pre compiled linux binaries
 resource("coremark") {
   sources = [ "coremark.exe" ]
   outputs = [ "data/coremark" ]
 }
 
 resource("libc-bench") {
-  sources = [ "libc-bench-nofork" ]
+  sources = [ "libc-bench" ]
   outputs = [ "data/libc-bench" ]
 }
 
 resource("sqlite-bench-uk") {
   sources = [ "sqlite-bench-uk" ]
   outputs = [ "data/sqlite-bench-uk" ]
+}
+
+kernel_cmdline("kernel_args") {
+  args = [
+    "kernel.shell=true",
+    "kernel.enable-debugging-syscalls=true",
+  ]
+}
+
+zbi("bench") {
+  deps = [ "//zircon/kernel" ]
+  deps += [
+    # Kernel arguments
+    ":kernel_args",
+
+    # Binaries
+    ":coremark",
+    ":libc-bench",
+    ":sqlite-bench-uk",
+  ]
+
+  output_dir = root_out_dir
+  output_extension = "zbi"
 }
