@@ -49,7 +49,7 @@ bool NativeFakeDispatcher::RunUntil(chrono::SystemClock::time_point end_time) {
   if (stop_requested_) {
     return DestroyLoop();
   }
-  return fake_loop_.Run(pw_async_fuchsia::TimepointToZxTime(end_time).get(), false);
+  return fake_loop_.Run(pw::async_fuchsia::TimepointToZxTime(end_time).get(), false);
 }
 
 bool NativeFakeDispatcher::RunFor(chrono::SystemClock::duration duration) {
@@ -62,7 +62,7 @@ NativeFakeDispatcher::FakeAsyncLoop::FakeAsyncLoop() {
 }
 
 chrono::SystemClock::time_point NativeFakeDispatcher::FakeAsyncLoop::Now() const {
-  return pw_async_fuchsia::ZxTimeToTimepoint(zx::time{now_});
+  return pw::async_fuchsia::ZxTimeToTimepoint(zx::time{now_});
 }
 
 zx_status_t NativeFakeDispatcher::FakeAsyncLoop::PostTask(async_task_t* task) {

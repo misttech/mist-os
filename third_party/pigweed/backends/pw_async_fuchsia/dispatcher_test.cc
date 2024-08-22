@@ -14,22 +14,22 @@
 
 using namespace std::chrono_literals;
 
-namespace pw::async::fuchsia {
+namespace pw::async_fuchsia {
 
 using DispatcherFuchsiaTest = ::gtest::TestLoopFixture;
 
 TEST_F(DispatcherFuchsiaTest, TimeConversions) {
   zx::time time{timespec{123, 456}};
-  chrono::SystemClock::time_point tp = pw_async_fuchsia::ZxTimeToTimepoint(time);
+  chrono::SystemClock::time_point tp = pw::async_fuchsia::ZxTimeToTimepoint(time);
   EXPECT_EQ(tp.time_since_epoch(), 123s + 456ns);
-  EXPECT_EQ(pw_async_fuchsia::TimepointToZxTime(tp), time);
+  EXPECT_EQ(pw::async_fuchsia::TimepointToZxTime(tp), time);
 }
 
 TEST_F(DispatcherFuchsiaTest, Basic) {
   FuchsiaDispatcher fuchsia_dispatcher(dispatcher());
 
   bool set = false;
-  Task task([&set](Context& ctx, Status status) {
+  async::Task task([&set](async::Context& ctx, Status status) {
     ASSERT_OK(status);
     set = true;
   });
@@ -43,15 +43,15 @@ TEST_F(DispatcherFuchsiaTest, DelayedTasks) {
   FuchsiaDispatcher fuchsia_dispatcher(dispatcher());
 
   int c = 0;
-  Task first([&c](Context& ctx, Status status) {
+  async::Task first([&c](async::Context& ctx, Status status) {
     ASSERT_OK(status);
     c = c * 10 + 1;
   });
-  Task second([&c](Context& ctx, Status status) {
+  async::Task second([&c](async::Context& ctx, Status status) {
     ASSERT_OK(status);
     c = c * 10 + 2;
   });
-  Task third([&c](Context& ctx, Status status) {
+  async::Task third([&c](async::Context& ctx, Status status) {
     ASSERT_OK(status);
     c = c * 10 + 3;
   });
@@ -67,7 +67,7 @@ TEST_F(DispatcherFuchsiaTest, DelayedTasks) {
 TEST_F(DispatcherFuchsiaTest, CancelTask) {
   FuchsiaDispatcher fuchsia_dispatcher(dispatcher());
 
-  Task task([](Context& ctx, Status status) { FAIL(); });
+  async::Task task([](async::Context& ctx, Status status) { FAIL(); });
   fuchsia_dispatcher.Post(task);
   EXPECT_TRUE(fuchsia_dispatcher.Cancel(task));
 
@@ -76,7 +76,7 @@ TEST_F(DispatcherFuchsiaTest, CancelTask) {
 
 class DestructionChecker {
  public:
-  DestructionChecker(bool* flag) : flag_(flag) {}
+  explicit DestructionChecker(bool* flag) : flag_(flag) {}
   DestructionChecker(DestructionChecker&& other) {
     flag_ = other.flag_;
     other.flag_ = nullptr;
@@ -96,7 +96,7 @@ TEST_F(DispatcherFuchsiaTest, HeapAllocatedTasks) {
 
   int c = 0;
   for (int i = 0; i < 3; i++) {
-    pw_async_fuchsia::Post(&fuchsia_dispatcher, [&c](Context& ctx, Status status) {
+    pw::async_fuchsia::Post(&fuchsia_dispatcher, [&c](async::Context& ctx, Status status) {
       ASSERT_OK(status);
       c++;
     });
@@ -108,8 +108,8 @@ TEST_F(DispatcherFuchsiaTest, HeapAllocatedTasks) {
 
   // Test that the lambda is destroyed after being called.
   bool flag = false;
-  pw_async_fuchsia::Post(&fuchsia_dispatcher,
-                         [checker = DestructionChecker(&flag)](Context& ctx, Status status) {});
+  pw::async_fuchsia::Post(&fuchsia_dispatcher, [checker = DestructionChecker(&flag)](
+                                                   async::Context& ctx, Status status) {});
   EXPECT_FALSE(flag);
   RunLoopUntilIdle();
   EXPECT_TRUE(flag);
@@ -120,13 +120,13 @@ TEST_F(DispatcherFuchsiaTest, ChainedTasks) {
 
   int c = 0;
 
-  pw_async_fuchsia::Post(&fuchsia_dispatcher, [&c](Context& ctx, Status status) {
+  pw::async_fuchsia::Post(&fuchsia_dispatcher, [&c](async::Context& ctx, Status status) {
     ASSERT_OK(status);
     c++;
-    pw_async_fuchsia::Post(ctx.dispatcher, [&c](Context& ctx, Status status) {
+    pw::async_fuchsia::Post(ctx.dispatcher, [&c](async::Context& ctx, Status status) {
       ASSERT_OK(status);
       c++;
-      pw_async_fuchsia::Post(ctx.dispatcher, [&c](Context& ctx, Status status) {
+      pw::async_fuchsia::Post(ctx.dispatcher, [&c](async::Context& ctx, Status status) {
         ASSERT_OK(status);
         c++;
       });
@@ -137,4 +137,4 @@ TEST_F(DispatcherFuchsiaTest, ChainedTasks) {
   EXPECT_EQ(c, 3);
 }
 
-}  // namespace pw::async::fuchsia
+}  // namespace pw::async_fuchsia

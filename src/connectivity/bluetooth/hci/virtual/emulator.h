@@ -124,7 +124,7 @@ class EmulatorDevice : public fidl::WireAsyncEventHandler<fuchsia_driver_framewo
   pw_random_zircon::ZirconRandomGenerator rng_;
 
   // Responsible for running the thread-hostile |fake_device_|
-  pw::async::fuchsia::FuchsiaDispatcher pw_dispatcher_;
+  pw::async_fuchsia::FuchsiaDispatcher pw_dispatcher_;
 
   bt::testing::FakeController fake_device_;
 

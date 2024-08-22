@@ -11,7 +11,7 @@
 #include "pw_async/dispatcher.h"
 #include "pw_async/task.h"
 
-namespace pw_async_fuchsia {
+namespace pw::async_fuchsia {
 
 struct AllocatedTaskAndFunction {
   pw::async::Task task;
@@ -39,26 +39,21 @@ inline void Post(pw::async::Dispatcher* dispatcher, pw::async::TaskFunction&& ta
   PostAt(dispatcher, std::move(task), dispatcher->now());
 }
 
-}  // namespace pw_async_fuchsia
-
-// TODO(https://fxbug.dev/42082984): move to pw_async_fuchsia namespace
-namespace pw::async::fuchsia {
-
-class FuchsiaDispatcher final : public Dispatcher {
+class FuchsiaDispatcher final : public async::Dispatcher {
  public:
   explicit FuchsiaDispatcher(async_dispatcher_t* dispatcher) : dispatcher_(dispatcher) {}
-  ~FuchsiaDispatcher() = default;
+  ~FuchsiaDispatcher() override = default;
 
   chrono::SystemClock::time_point now() override;
 
-  void PostAt(Task& task, chrono::SystemClock::time_point time) override;
+  void PostAt(async::Task& task, chrono::SystemClock::time_point time) override;
 
-  bool Cancel(Task& task) override;
+  bool Cancel(async::Task& task) override;
 
  private:
   async_dispatcher_t* dispatcher_;
 };
 
-}  // namespace pw::async::fuchsia
+}  // namespace pw::async_fuchsia
 
 #endif  // THIRD_PARTY_PIGWEED_BACKENDS_PW_ASYNC_FUCHSIA_PUBLIC_PW_ASYNC_FUCHSIA_DISPATCHER_H_

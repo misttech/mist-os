@@ -32,7 +32,7 @@ class FakeAdapterTestFixture : public bt::testing::TestLoopFixture {
 
  private:
   std::unique_ptr<bt::gap::testing::FakeAdapter> adapter_;
-  pw::async::fuchsia::FuchsiaDispatcher dispatcher_{dispatcher()};
+  pw::async_fuchsia::FuchsiaDispatcher dispatcher_{dispatcher()};
 
   BT_DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(FakeAdapterTestFixture);
 };

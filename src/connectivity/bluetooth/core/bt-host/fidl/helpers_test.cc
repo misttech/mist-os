@@ -101,7 +101,7 @@ class HelpersTestWithLoop : public bt::testing::TestLoopFixture {
   pw::async::Dispatcher& pw_dispatcher() { return pw_dispatcher_; }
 
  private:
-  pw::async::fuchsia::FuchsiaDispatcher pw_dispatcher_{dispatcher()};
+  pw::async_fuchsia::FuchsiaDispatcher pw_dispatcher_{dispatcher()};
 };
 
 TEST(HelpersTest, HostErrorToFidl) {
@@ -934,7 +934,7 @@ TEST(HelpersTest, SecurityLevelFromBadFidlFails) {
 TEST(HelpersTest, PeerToFidlMandatoryFields) {
   // Required by PeerCache expiry functions.
   async::TestLoop test_loop;
-  pw::async::fuchsia::FuchsiaDispatcher pw_dispatcher(test_loop.dispatcher());
+  pw::async_fuchsia::FuchsiaDispatcher pw_dispatcher(test_loop.dispatcher());
 
   bt::gap::PeerCache cache(pw_dispatcher);
   bt::DeviceAddress addr(bt::DeviceAddress::Type::kLEPublic, {0, 1, 2, 3, 4, 5});
@@ -965,7 +965,7 @@ TEST(HelpersTest, PeerToFidlMandatoryFields) {
 TEST(HelpersTest, PeerToFidlOptionalFields) {
   // Required by PeerCache expiry functions.
   async::TestLoop test_loop;
-  pw::async::fuchsia::FuchsiaDispatcher pw_dispatcher(test_loop.dispatcher());
+  pw::async_fuchsia::FuchsiaDispatcher pw_dispatcher(test_loop.dispatcher());
 
   const int8_t kRssi = 5;
   const int8_t kTxPower = 6;

@@ -22,11 +22,11 @@ void NativeTask::operator()(Context& ctx, Status status) { func_(ctx, status); }
 void NativeTask::set_function(TaskFunction&& f) { func_ = std::move(f); }
 
 pw::chrono::SystemClock::time_point NativeTask::due_time() const {
-  return pw_async_fuchsia::ZxTimeToTimepoint(zx::time{deadline});
+  return pw::async_fuchsia::ZxTimeToTimepoint(zx::time{deadline});
 }
 
 void NativeTask::set_due_time(chrono::SystemClock::time_point due_time) {
-  deadline = pw_async_fuchsia::TimepointToZxTime(due_time).get();
+  deadline = pw::async_fuchsia::TimepointToZxTime(due_time).get();
 }
 
 void NativeTask::Handler(async_dispatcher_t* /*dispatcher*/, async_task_t* task,
