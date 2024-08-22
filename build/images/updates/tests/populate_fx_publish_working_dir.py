@@ -11,6 +11,7 @@ orchestrated `fx publish` test invocation.
 import argparse
 import filecmp
 import json
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -113,6 +114,10 @@ def main() -> int:
         depfile.write_text(
             f'{" ".join([str(file) for file in OUTPUTS])}: {" ".join([str(file) for file in INPUTS])}'
         )
+
+    # Explicitly update the mtime of the output directory to avoid ninja convergence no-op flakes.
+    # See https://fxbug.dev/361451367.
+    os.utime(working_dir)
 
     return 0
 
