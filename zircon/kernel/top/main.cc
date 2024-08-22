@@ -233,13 +233,14 @@ void lk_init_secondary_cpus(uint secondary_cpu_count) {
             SMP_MAX_CPUS);
     secondary_cpu_count = SMP_MAX_CPUS - 1;
   }
+
+  secondary_idle_thread_count = 0;
   for (uint i = 0; i < secondary_cpu_count; i++) {
     Thread* t = Thread::CreateIdleThread(i + 1);
     if (!t) {
       dprintf(CRITICAL, "could not allocate idle thread %u\n", i + 1);
-      secondary_idle_thread_count = i;
       break;
     }
+    secondary_idle_thread_count++;
   }
-  secondary_idle_thread_count = secondary_cpu_count;
 }
