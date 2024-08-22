@@ -989,6 +989,28 @@ class GenericWatchdogItemBase
 
 using GenericWatchdogItem = WithAllWatchdogs<GenericWatchdogItemBase>;
 
+// Defines an item that will look for the `ramoops` reserved memory node, and will provide the ram
+// region provided for panic logging as a ZBI item. While the node itself provides much more
+// information that can be stored in the NVRAM item, most of that information is specific to the
+// logger being targetted. As for Zircon, it will treat it as a carved out memory region where data
+// can be preserved across reboots.
+//
+// See https://www.kernel.org/doc/Documentation/admin-guide/ramoops.rst
+class RamoopsMatcher : public DevicetreeItemBase<RamoopsMatcher, 1> {
+ public:
+  RamoopsMatcher(const char* shim_name, FILE* log) : DevicetreeItemBase(shim_name, log) {}
+
+  // Matcher API.
+  devicetree::ScanState OnNode(const devicetree::NodePath& path,
+                               const devicetree::PropertyDecoder& decoder);
+  devicetree::ScanState OnScan() { return devicetree::ScanState::kDone; }
+
+  constexpr auto range() const { return range_; }
+
+ private:
+  std::optional<zbi_nvram_t> range_;
+};
+
 }  // namespace boot_shim
 
 #endif  // ZIRCON_KERNEL_PHYS_LIB_BOOT_SHIM_INCLUDE_LIB_BOOT_SHIM_DEVICETREE_H_

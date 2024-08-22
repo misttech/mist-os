@@ -9,6 +9,7 @@
 #include <lib/stdcompat/span.h>
 #include <lib/zbi-format/cpu.h>
 
+#include <iostream>
 #include <optional>
 
 #include <zxtest/zxtest.h>
@@ -26,8 +27,10 @@ class SyntheticDevicetreeTest {
  public:
   static void SetUpTestSuite() {
     auto loaded_dtb = LoadDtb("empty.dtb");
+
     ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
     empty_dtb_ = std::move(loaded_dtb).value();
+    std::cout << "empty dtb loaded SIZE " << empty_dtb_->fdt().size_bytes() << std::endl;
 
     loaded_dtb = LoadDtb("arm_gic2_no_msi.dtb");
     ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
