@@ -15,18 +15,6 @@
 
 namespace dl {
 
-// SessionModule is the temporary data structure created to load a file; a
-// SessionModule is created when a file needs to be loaded, and is destroyed after
-// the file module and all its dependencies have been loaded, decoded, symbols
-// resolved, and relro protected.
-template <class Loader>
-class SessionModule;
-
-// A list of unique "temporary" SessionModule data structures used for loading a
-// file.
-template <class Loader>
-using SessionModuleList = fbl::DoublyLinkedList<std::unique_ptr<SessionModule<Loader>>>;
-
 // A LinkingSession encapsulates the decoding, loading, relocation and creation
 // of RuntimeModules from a single dlopen call. A LinkingSession instance only
 // lives as long as the dlopen call, and a successful LinkingSession will
@@ -142,9 +130,9 @@ class LinkingSession {
       return false;
     }
     fbl::AllocChecker session_module_ac;
-    auto session_module = SessionModule<Loader>::Create(session_module_ac, *module);
+    auto session_module = SessionModule::Create(session_module_ac, *module);
     if (!session_module_ac.check()) [[unlikely]] {
-      diag.OutOfMemory("temporary module data structure", sizeof(SessionModule<Loader>));
+      diag.OutOfMemory("temporary module data structure", sizeof(SessionModule));
       return false;
     }
 
@@ -170,6 +158,11 @@ class LinkingSession {
   }
 
  private:
+  // Forward declaration; see definition below.
+  class SessionModule;
+
+  using SessionModuleList = fbl::DoublyLinkedList<std::unique_ptr<SessionModule>>;
+
   // The list of "temporary" SessionModules needed to perform loading, decoding,
   // relocations, etc during this LinkingSession. There is a 1:1 mapping between
   // elements in session_modules_ and runtime_modules_: each element in
@@ -178,7 +171,7 @@ class LinkingSession {
   // In other words, session_modules_[idx].runtime_module() is a reference to
   // the runtime module at runtime_modules_[idx]. Unlike runtime_modules_, this
   // list will live only as long as this LinkingSession instance.
-  SessionModuleList<Loader> session_modules_;
+  SessionModuleList session_modules_;
 
   // The list of "permanent" RuntimeModules created during this LinkingSession.
   // Its ownership is transferred to the RuntimeDynamicLinker when
@@ -187,9 +180,13 @@ class LinkingSession {
   ModuleList runtime_modules_;
 };
 
+// SessionModule is the temporary data structure created to load a file and
+// perform relocations for a new module. A SessionModule is managed by
+// session_modules_ and will get destroyed with the LinkingSession instance.
 template <class Loader>
-class SessionModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
-                      public fbl::DoublyLinkedListable<std::unique_ptr<SessionModule<Loader>>> {
+class LinkingSession<Loader>::SessionModule
+    : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
+      public fbl::DoublyLinkedListable<std::unique_ptr<SessionModule>> {
  public:
   using Relro = typename Loader::Relro;
   using Phdr = Elf::Phdr;
@@ -284,7 +281,7 @@ class SessionModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
 
   // Perform relative and symbolic relocations, resolving symbols from the
   // list of modules as needed.
-  bool Relocate(Diagnostics& diag, SessionModuleList<Loader>& session_modules) {
+  bool Relocate(Diagnostics& diag, SessionModuleList& session_modules) {
     constexpr NoTlsDesc kNoTlsDesc{};
     auto memory = ld::ModuleMemory{module()};
     auto resolver = elfldltl::MakeSymbolResolver(*this, session_modules, diag, kNoTlsDesc);
@@ -307,6 +304,7 @@ class SessionModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
   // its `runtime_module_` will live as long as the file is loaded, in the
   // RuntimeDynamicLinker's `modules_` list.
   RuntimeModule& runtime_module_;
+
   // The relro capability that is provided when the module is decoded and is
   // used to apply relro protections after the module is relocated.
   Relro relro_;
