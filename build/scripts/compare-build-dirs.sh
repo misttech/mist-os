@@ -303,6 +303,11 @@ function diff_file_relpath() {
         *) expect=unknown ;;
       esac
       ;;
+    uuid)  # uuids are unique and random
+      case "$common_path" in
+        */bazel-out/*.ffx/metrics) expect=ignore ;;
+      esac
+      ;;
 
     volatile-status.txt) expect=ignore ;;  # bears timestamp
 
