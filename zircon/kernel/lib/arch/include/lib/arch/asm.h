@@ -26,8 +26,15 @@
 #define DW_OP_lit0 0x30
 #define DW_OP_lit(n) (DW_OP_lit0 + (n))  // n <= 31
 
+#define ULEB128_1BYTE(n) (n)
 #define ULEB128_2BYTE(n) (((n) & 0x7f) | 0x80), ((n) >> 7)
+#define SLEB128_1BYTE(n) ((n) & 0x7f)
 #define SLEB128_2BYTE(n) (((n) & 0x7f) | 0x80), (((n) >> 7) & 0x7f)
+
+// Check that `n` is in the representable range of the one-byte SLEB128 encoding.
+#define SLEB128_IS_1BYTE(n) ((n) > -0x40 && (n) < 0x3f)
+// Check that `n` is in the representable range of the two-byte SLEB128 encoding.
+#define SLEB128_IS_2BYTE(n) (!SLEB128_IS_1BYTE(n) && ((n) > -0x2000 && (n) < 0x1fff))
 
 #ifdef __ASSEMBLER__  // clang-format off
 
@@ -195,6 +202,34 @@
   .endif
   _.entity \name, \scope, \align, \nosection, \retain, object, \type
 .endm  // .start_object
+
+/// Dispatch to the appropriate macro for one-byte or two-byte SLEB128 encoding.
+///
+/// Results in an error for values out of the valid range.
+///
+/// Parameters
+///
+///   * if_1byte
+///     - Required: A macro that expects a value in range for one-byte SLEB128.
+///
+///   * if_2byte
+///     - Required: A macro that expects a value in range for two-byte SLEB128.
+///
+///   * value
+///     - Required: The numerical value to encode as SLEB128.
+///
+///   * args
+///     - Vararg: additional arguments for if_1byte and if_2byte.
+///
+.macro .sleb128.size_dispatch if_1byte:req, if_2byte:req, value:req, args:vararg
+  .if SLEB128_IS_1BYTE(\value)
+    \if_1byte \value, \args
+  .elseif SLEB128_IS_2BYTE(\value)
+    \if_2byte \value, \args
+  .else
+    .error "value out of range for one-byte or two-byte SLEB128: \value"
+  .endif
+.endm
 
 #endif  // clang-format on
 
