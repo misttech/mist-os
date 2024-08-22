@@ -17,7 +17,7 @@ use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
 use starnix_syscalls::SyscallArg;
 use starnix_uapi::auth::{CAP_SYS_PTRACE, PTRACE_MODE_ATTACH_REALCREDS};
 use starnix_uapi::errors::{Errno, EINTR};
-use starnix_uapi::time::{duration_from_timespec, time_from_timespec};
+use starnix_uapi::time::{duration_from_timespec, time_from_timespec, timespec_from_time};
 use starnix_uapi::user_address::{UserAddress, UserRef};
 use starnix_uapi::user_value::UserValue;
 use starnix_uapi::{
@@ -401,21 +401,40 @@ fn do_futex<Key: FutexKey>(
     let is_realtime = op & FUTEX_CLOCK_REALTIME != 0;
     let cmd = op & (FUTEX_CMD_MASK as u32);
 
-    let read_deadline = |current_task: &CurrentTask| {
+    // The timeout is interpreted differently by WAIT and WAIT_BITSET: WAIT takes a
+    // timeout and WAIT_BITSET takes a deadline.
+    let read_timespec = |current_task: &CurrentTask| {
         let utime = UserRef::<timespec>::from(timeout_or_value2);
         if utime.is_null() {
-            Ok(zx::MonotonicTime::INFINITE)
+            Ok(timespec_from_time(zx::MonotonicTime::INFINITE))
         } else {
-            // In theory, we should adjust this for a realtime
-            // futex when the system gets suspended, but Zircon
-            // does not give us a way to do this.
-            let duration = current_task.read_object(utime)?;
-            Ok(zx::MonotonicTime::after(duration_from_timespec(duration)?))
+            current_task.read_object(utime)
         }
     };
+    let read_timeout = |current_task: &CurrentTask| {
+        let timespec = read_timespec(current_task)?;
+        let timeout = duration_from_timespec(timespec);
+        let deadline = zx::MonotonicTime::after(timeout?);
+        if is_realtime {
+            // Since this is a timeout, waiting on the monotonic timeline before it's paused is
+            // just as good as actually estimating UTC here.
+            track_stub!(TODO("https://fxbug.dev/356912301"), "FUTEX_CLOCK_REALTIME timeout");
+        }
+        Ok(deadline)
+    };
+    let read_deadline = |current_task: &CurrentTask| {
+        let timespec = read_timespec(current_task)?;
+        let mut deadline = time_from_timespec(timespec)?;
+        if is_realtime {
+            track_stub!(TODO("https://fxbug.dev/356912301"), "FUTEX_CLOCK_REALTIME deadline");
+            deadline = crate::time::utc::estimate_monotonic_deadline_from_utc(deadline);
+        };
+        Ok(deadline)
+    };
+
     match cmd {
         FUTEX_WAIT => {
-            let deadline = read_deadline(current_task)?;
+            let deadline = read_timeout(current_task)?;
             let bitset = FUTEX_BITSET_MATCH_ANY;
             do_futex_wait_with_restart::<Key>(current_task, addr, value, bitset, deadline)?;
             Ok(0)
@@ -425,20 +444,7 @@ fn do_futex<Key: FutexKey>(
             if value3 == 0 {
                 return error!(EINVAL);
             }
-            // The timeout is interpreted differently by WAIT and WAIT_BITSET: WAIT takes a
-            // timeout and WAIT_BITSET takes a deadline.
-            let utime = UserRef::<timespec>::from(timeout_or_value2);
-            let deadline = if utime.is_null() {
-                zx::MonotonicTime::INFINITE
-            } else if is_realtime {
-                let timespec = current_task.read_object(utime)?;
-                crate::time::utc::estimate_monotonic_deadline_from_utc(time_from_timespec(
-                    timespec,
-                )?)
-            } else {
-                let deadline = current_task.read_object(utime)?;
-                time_from_timespec(deadline)?
-            };
+            let deadline = read_deadline(current_task)?;
             do_futex_wait_with_restart::<Key>(current_task, addr, value, value3, deadline)?;
             Ok(0)
         }
@@ -458,8 +464,7 @@ fn do_futex<Key: FutexKey>(
             futexes.requeue(current_task, addr, wake_count, requeue_count, addr2, expected_value)
         }
         FUTEX_LOCK_PI => {
-            let deadline = read_deadline(current_task)?;
-            futexes.lock_pi(current_task, addr, deadline)?;
+            futexes.lock_pi(current_task, addr, read_timeout(current_task)?)?;
             Ok(0)
         }
         FUTEX_UNLOCK_PI => {
