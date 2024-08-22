@@ -1021,7 +1021,7 @@ mod tests {
     fn unhandled_to_generic_conversion_preserves_fields() {
         const EVENT_TIME: zx::MonotonicTime = zx::MonotonicTime::from_nanos(42);
         let expected_trace_id: Option<ftrace::Id> = Some(1234.into());
-        assert_matches!(
+        assert_eq!(
             InputEvent::from(UnhandledInputEvent {
                 device_event: InputDeviceEvent::Fake,
                 device_descriptor: InputDeviceDescriptor::Fake,
@@ -1032,9 +1032,9 @@ mod tests {
                 device_event: InputDeviceEvent::Fake,
                 device_descriptor: InputDeviceDescriptor::Fake,
                 event_time: EVENT_TIME,
-                handled: _,
-                trace_id
-            } if trace_id == expected_trace_id
+                handled: Handled::No,
+                trace_id: expected_trace_id,
+            },
         );
     }
 
@@ -1056,20 +1056,21 @@ mod tests {
     fn generic_to_unhandled_conversion_preserves_fields_for_unhandled_events() {
         const EVENT_TIME: zx::MonotonicTime = zx::MonotonicTime::from_nanos(42);
         let expected_trace_id: Option<ftrace::Id> = Some(1234.into());
-        assert_matches!(
+        assert_eq!(
             UnhandledInputEvent::try_from(InputEvent {
                 device_event: InputDeviceEvent::Fake,
                 device_descriptor: InputDeviceDescriptor::Fake,
                 event_time: EVENT_TIME,
                 handled: Handled::No,
                 trace_id: expected_trace_id,
-            }),
-            Ok(UnhandledInputEvent {
+            })
+            .unwrap(),
+            UnhandledInputEvent {
                 device_event: InputDeviceEvent::Fake,
                 device_descriptor: InputDeviceDescriptor::Fake,
                 event_time: EVENT_TIME,
-                trace_id
-            }) if trace_id == expected_trace_id
+                trace_id: expected_trace_id,
+            },
         )
     }
 

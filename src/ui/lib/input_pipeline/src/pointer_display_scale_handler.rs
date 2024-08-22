@@ -477,10 +477,10 @@ mod tests {
         let mut input_event = make_unhandled_input_event(event);
         const EVENT_TIME: zx::MonotonicTime = zx::MonotonicTime::from_nanos(42);
         input_event.event_time = EVENT_TIME;
-        assert_matches!(
-            handler.clone().handle_unhandled_input_event(input_event).await.as_slice(),
-            [input_device::InputEvent { event_time: EVENT_TIME, .. }]
-        );
+
+        let events = handler.clone().handle_unhandled_input_event(input_event).await;
+        assert_eq!(events.len(), 1, "{events:?} should be 1 element");
+        assert_eq!(events[0].event_time, EVENT_TIME);
     }
 
     #[test_case(
