@@ -165,9 +165,9 @@ uint32_t GetColorBufferFormatFromSysmemPixelFormat(
     const fuchsia_images2::PixelFormat& pixel_format) {
   switch (pixel_format) {
     case fuchsia_images2::PixelFormat::kR8G8B8A8:
-      return GL_BGRA_EXT;
-    case fuchsia_images2::PixelFormat::kB8G8R8A8:
       return GL_RGBA;
+    case fuchsia_images2::PixelFormat::kB8G8R8A8:
+      return GL_BGRA_EXT;
     default:
       // This should not happen. The sysmem-negotiated pixel format must be supported.
       ZX_ASSERT_MSG(false, "Import unsupported image: %u", static_cast<uint32_t>(pixel_format));
