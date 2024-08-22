@@ -63,7 +63,7 @@ qemu_boot_formats = []
 qemu_default_boot_format = ""
 
 if (current_cpu == "x64") {
-  qemu_default_boot_format = "multiboot"
+  qemu_default_boot_format = "linuxboot"
 
   # The multiboot x86-32 protocol is supported by QEMU and AEMU.
   multiboot_environments = [
