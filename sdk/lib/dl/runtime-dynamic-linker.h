@@ -59,8 +59,6 @@ class RuntimeDynamicLinker {
   // or an error if not found (ie undefined symbol).
   fit::result<Error, void*> LookupSymbol(RuntimeModule* module, const char* ref);
 
-  // - TODO(https://fxbug.dev/341473244): Introduce LinkingSession and
-  // LinkingState to the RuntimeDynamicLinker
   // - TODO(https://fxbug.dev/339037138): Add a test exercising the system error
   // case and include it as an example for the fit::error{Error} description.
 
@@ -89,14 +87,15 @@ class RuntimeDynamicLinker {
       return fit::ok(already_loaded.value());
     }
 
-    // A Module for `file` does not yet exist; proceed to loading the
-    // file and all its dependencies.
+    // A Module for `file` does not yet exist; create a new LinkingSession
+    // to perform the loading and linking of the file and all its dependencies.
+    LinkingSession linking_session;
 
-    // Use a non-scoped diagnostics object for the main module. Because errors
-    // are generated on this module directly, it's name does not need to be
+    // Use a non-scoped diagnostics object for the root module. Because errors
+    // are generated on this module directly, its name does not need to be
     // prefixed to the error, as is the case using ld::ScopedModuleDiagnostics.
     dl::Diagnostics diag;
-    auto [pending_modules, pending_session_modules] = Load<Loader, RetrieveFile>(
+    auto [pending_modules, pending_session_modules] = linking_session.Load<Loader, RetrieveFile>(
         diag, Soname{file}, std::forward<RetrieveFile>(retrieve_file), modules_);
     if (pending_session_modules.is_empty()) [[unlikely]] {
       assert(pending_modules.is_empty() == pending_session_modules.is_empty());
@@ -105,7 +104,7 @@ class RuntimeDynamicLinker {
 
     // TODO(https://fxbug.dev/324136831): This does not include global modules
     // yet.
-    if (!Relocate(diag, pending_session_modules)) {
+    if (!linking_session.Relocate(diag, pending_session_modules)) {
       return diag.take_error();
     }
 
