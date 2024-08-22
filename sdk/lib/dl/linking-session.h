@@ -15,21 +15,21 @@
 
 namespace dl {
 
-// LoadModule is the temporary data structure created to load a file; a
-// LoadModule is created when a file needs to be loaded, and is destroyed after
+// SessionModule is the temporary data structure created to load a file; a
+// SessionModule is created when a file needs to be loaded, and is destroyed after
 // the file module and all its dependencies have been loaded, decoded, symbols
 // resolved, and relro protected.
 template <class Loader>
-class LoadModule;
+class SessionModule;
 
-// A list of unique "temporary" LoadModule data structures used for loading a
+// A list of unique "temporary" SessionModule data structures used for loading a
 // file.
 template <class Loader>
-using LoadModuleList = fbl::DoublyLinkedList<std::unique_ptr<LoadModule<Loader>>>;
+using SessionModuleList = fbl::DoublyLinkedList<std::unique_ptr<SessionModule<Loader>>>;
 
 template <class Loader>
-class LoadModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
-                   public fbl::DoublyLinkedListable<std::unique_ptr<LoadModule<Loader>>> {
+class SessionModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
+                      public fbl::DoublyLinkedListable<std::unique_ptr<SessionModule<Loader>>> {
  public:
   using Relro = typename Loader::Relro;
   using Phdr = Elf::Phdr;
@@ -56,20 +56,20 @@ class LoadModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
   using NeededObserver = elfldltl::DynamicValueCollectionObserver<  //
       Elf, elfldltl::ElfDynTag::kNeeded, Vector<size_type>, kNeededError>;
 
-  // The LoadModule::Create(...) takes a reference to the ModuleHandle for the
+  // The SessionModule::Create(...) takes a reference to the Module for the
   // file, setting information on it during the loading, decoding, and
   // relocation process.
-  [[nodiscard]] static std::unique_ptr<LoadModule> Create(fbl::AllocChecker& ac,
-                                                          ModuleHandle& module) {
-    std::unique_ptr<LoadModule> load_module{new (ac) LoadModule(module)};
-    if (load_module) [[likely]] {
-      load_module->set_name(module.name());
+  [[nodiscard]] static std::unique_ptr<SessionModule> Create(fbl::AllocChecker& ac,
+                                                             RuntimeModule& runtime_module) {
+    std::unique_ptr<SessionModule> session_module{new (ac) SessionModule(runtime_module)};
+    if (session_module) [[likely]] {
+      session_module->set_name(runtime_module.name());
       // Have the underlying DecodedModule (see <lib/ld/decoded-module.h>) point to
-      // the ABIModule embedded in the ModuleHandle, so that its information will
+      // the ABIModule embedded in the Module, so that its information will
       // be filled out during decoding operations.
-      load_module->decoded().set_module(module.module());
+      session_module->decoded().set_module(runtime_module.module());
     }
-    return load_module;
+    return session_module;
   }
 
   // Load `file` into the system image, decode phdrs and save the metadata in
@@ -124,10 +124,10 @@ class LoadModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
 
   // Perform relative and symbolic relocations, resolving symbols from the
   // list of modules as needed.
-  bool Relocate(Diagnostics& diag, LoadModuleList<Loader>& modules) {
+  bool Relocate(Diagnostics& diag, SessionModuleList<Loader>& session_modules) {
     constexpr NoTlsDesc kNoTlsDesc{};
     auto memory = ld::ModuleMemory{module()};
-    auto resolver = elfldltl::MakeSymbolResolver(*this, modules, diag, kNoTlsDesc);
+    auto resolver = elfldltl::MakeSymbolResolver(*this, session_modules, diag, kNoTlsDesc);
     return elfldltl::RelocateRelative(diag, memory, reloc_info(), load_bias()) &&
            elfldltl::RelocateSymbolic(memory, diag, reloc_info(), symbol_info(), load_bias(),
                                       resolver);
@@ -137,15 +137,16 @@ class LoadModule : public ld::LoadModule<ld::DecodedModuleInMemory<>>,
   bool ProtectRelro(Diagnostics& diag) { return std::move(relro_).Commit(diag); }
 
  private:
-  // A LoadModule can only be created with LoadModule::Create...).
-  explicit LoadModule(ModuleHandle& module) : module_(module) {}
+  // A SessionModule can only be created with SessionModule::Create...).
+  explicit SessionModule(RuntimeModule& runtime_module) : runtime_module_(runtime_module) {}
 
   // This is a reference to the "permanent" module data structure that this
-  // LoadModule is responsible for: runtime information is set on the `module_`
-  // during the course of the loading process. Whereas this LoadModule instance
-  // will get destroyed at the end of `dlopen`, its `module_` will live as long
-  // as the file is loaded in the RuntimeDynamicLinker's `modules_` list.
-  ModuleHandle& module_;
+  // SessionModule is responsible for: runtime information is set on the
+  // `runtime_module_` during the course of the loading process. Whereas this
+  // SessionModule instance will get destroyed at the end of `dlopen`,
+  // its `runtime_module_` will live as long as the file is loaded, in the
+  // RuntimeDynamicLinker's `modules_` list.
+  RuntimeModule& runtime_module_;
   // The relro capability that is provided when the module is decoded and is
   // used to apply relro protections after the module is relocated.
   Relro relro_;
