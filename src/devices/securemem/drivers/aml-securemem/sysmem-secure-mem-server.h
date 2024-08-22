@@ -36,7 +36,6 @@ class SysmemSecureMemServer : public fidl::WireServer<fuchsia_sysmem::SecureMem>
 
   // fidl::WireServer<fuchsia_sysmem::SecureMem> impl
   void GetPhysicalSecureHeaps(GetPhysicalSecureHeapsCompleter::Sync& completer) override;
-  void GetDynamicSecureHeaps(GetDynamicSecureHeapsCompleter::Sync& completer) override;
   void GetPhysicalSecureHeapProperties(
       GetPhysicalSecureHeapPropertiesRequestView request,
       GetPhysicalSecureHeapPropertiesCompleter::Sync& completer) override;
@@ -109,9 +108,6 @@ class SysmemSecureMemServer : public fidl::WireServer<fuchsia_sysmem::SecureMem>
 
   zx_status_t GetPhysicalSecureHeapsInternal(
       fidl::AnyArena* allocator, fuchsia_sysmem::wire::SecureHeapsAndRanges* heaps_and_ranges);
-  zx_status_t GetDynamicSecureHeapsInternal(
-      fidl::AnyArena* allocator,
-      fuchsia_sysmem::wire::SecureMemGetDynamicSecureHeapsResponse* response);
   zx_status_t GetPhysicalSecureHeapPropertiesInternal(
       const fuchsia_sysmem::wire::SecureHeapAndRange& entire_heap, fidl::AnyArena& allocator,
       fuchsia_sysmem::wire::SecureHeapProperties* properties);
@@ -142,7 +138,6 @@ class SysmemSecureMemServer : public fidl::WireServer<fuchsia_sysmem::SecureMem>
   SecureMemServerOnUnbound secure_mem_server_on_unbound_;
 
   bool is_get_physical_secure_heaps_called_ = {};
-  bool is_get_dynamic_secure_heaps_called_ = {};
 
   bool is_dynamic_checked_ = {};
   bool is_dynamic_ = {};

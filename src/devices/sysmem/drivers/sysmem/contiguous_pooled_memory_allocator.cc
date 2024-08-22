@@ -92,7 +92,7 @@ std::atomic<trace_counter_id_t> next_counter_id;
 
 ContiguousPooledMemoryAllocator::ContiguousPooledMemoryAllocator(
     Owner* parent_device, const char* allocation_name, inspect::Node* parent_node,
-    std::optional<fuchsia_sysmem2::Heap> heap, uint64_t size, bool is_always_cpu_accessible,
+    fuchsia_sysmem2::Heap heap, uint64_t size, bool is_always_cpu_accessible,
     bool is_ever_cpu_accessible, bool is_ever_zircon_accessible, bool is_ready,
     bool can_be_torn_down, async_dispatcher_t* dispatcher)
     : MemoryAllocator(BuildHeapProperties(is_always_cpu_accessible, is_ever_zircon_accessible)),
@@ -289,7 +289,26 @@ zx_status_t ContiguousPooledMemoryAllocator::InitPhysical(zx_paddr_t paddr) {
 }
 
 zx_status_t ContiguousPooledMemoryAllocator::InitCommon(zx::vmo local_contiguous_vmo) {
-  zx_status_t status =
+  zx_status_t status = zx::vmo::create(zero_page_vmo_size_, 0, &zero_page_vmo_);
+  if (status != ZX_OK) {
+    LOG(ERROR, "Couldn't create the zero_page_vmo_");
+    return status;
+  }
+  status = zx::vmar::root_self()->map(ZX_VM_PERM_READ, 0, zero_page_vmo_, 0, zero_page_vmo_size_,
+                                      reinterpret_cast<zx_vaddr_t*>(&zero_page_vmo_base_));
+  if (status != ZX_OK) {
+    LOG(ERROR, "Unable to map zero_page_vmo_");
+    return status;
+  }
+  // This may be unnecessary, but in case Zircon needs a hint that we really mean for this to use
+  // the shared zero page...
+  status = zero_page_vmo_.op_range(ZX_VMO_OP_ZERO, 0, zero_page_vmo_size_, nullptr, 0);
+  if (status != ZX_OK) {
+    LOG(ERROR, "Coundn't zero zero_page_vmo_");
+    return status;
+  }
+
+  status =
       local_contiguous_vmo.set_property(ZX_PROP_NAME, allocation_name_, strlen(allocation_name_));
   if (status != ZX_OK) {
     LOG(ERROR, "Failed vmo.set_property(ZX_PROP_NAME, ...): %d", status);
@@ -599,12 +618,6 @@ void ContiguousPooledMemoryAllocator::Delete(zx::vmo parent_vmo) {
   }
 }
 
-void ContiguousPooledMemoryAllocator::set_heap(fuchsia_sysmem2::Heap heap) {
-  ZX_DEBUG_ASSERT(!heap_.has_value());
-  ZX_DEBUG_ASSERT(!is_ready_);
-  heap_ = std::move(heap);
-}
-
 void ContiguousPooledMemoryAllocator::set_ready() {
   if (!is_always_cpu_accessible_) {
     protected_ranges_control_.emplace(this);
@@ -827,9 +840,8 @@ void ContiguousPooledMemoryAllocator::StepTowardOptimalProtectedRanges(
 
 protected_ranges::ProtectedRangesCoreControl&
 ContiguousPooledMemoryAllocator::protected_ranges_core_control(const fuchsia_sysmem2::Heap& heap) {
-  ZX_DEBUG_ASSERT(heap_.has_value());
   if (!protected_ranges_core_control_) {
-    protected_ranges_core_control_ = &parent_device_->protected_ranges_core_control(*heap_);
+    protected_ranges_core_control_ = &parent_device_->protected_ranges_core_control(heap_);
   }
   return *protected_ranges_core_control_;
 }
@@ -1357,12 +1369,11 @@ void ContiguousPooledMemoryAllocator::OnRegionUnused(const ralloc_region_t& regi
           static zx::time next_log_time = zx::time::infinite_past();
           zx::time now = zx::clock::get_monotonic();
           if (now >= next_log_time) {
-            ZX_DEBUG_ASSERT(heap_.has_value());
             LOG(INFO,
                 "(log rate limited) ZX_VMO_OP_DECOMMIT failed on contiguous VMO - decommit_status: "
                 "%d base: 0x%" PRIx64 " size: 0x%" PRIx64 " heap_type: %s heap_id: 0x%" PRIx64,
-                decommit_status, loan_range.base, loan_range.size, heap_->heap_type()->c_str(),
-                heap_->id().value());
+                decommit_status, loan_range.base, loan_range.size, heap_.heap_type()->c_str(),
+                heap_.id().value());
             next_log_time = now + zx::sec(30);
           }
           // If we can't decommit (unexpected), we try to zero before giving up.  Overall, we rely

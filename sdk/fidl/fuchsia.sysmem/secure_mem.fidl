@@ -32,9 +32,8 @@ closed protocol SecureMem {
     /// Presently, these will be fixed physical addresses and lengths, with the
     /// location plumbed via the TEE.
     ///
-    /// This is preferred over ['fuchsia.hardware.sysmem.Sysmem/RegisterHeap']
-    /// when there isn't any special heap-specific per-VMO setup or teardown
-    /// required.
+    /// This is preferred over RegisterHeap() when there isn't any special
+    /// heap-specific per-VMO setup or teardown required.
     ///
     /// The physical range must be secured/protected by the TEE before the
     /// securemem driver responds to this request with success.
@@ -46,27 +45,10 @@ closed protocol SecureMem {
     ///  * ZX_ERR_BAD_STATE - called more than once.
     ///  * ZX_ERR_INTERNAL - generic internal error (such as in communication
     ///    with TEE which doesn't generate zx_status_t errors).
-    ///  * other errors are allowed; any other errors should be treated the same
-    ///    as ZX_ERR_INTERNAL.
+    ///  * other errors are possible, such as from communication failures or
+    ///    server propagation of zx_status_t failures
     strict GetPhysicalSecureHeaps() -> (struct {
         heaps SecureHeapsAndRanges;
-    }) error zx.Status;
-
-    /// Gets information about any secure heaps whose physical pages are not
-    /// configured by the TEE, but by sysmem.
-    ///
-    /// Sysmem should only call this once. Returning zero heaps is not a
-    /// failure.
-    ///
-    /// Errors:
-    ///  * ZX_ERR_BAD_STATE - called more than once.
-    ///  * ZX_ERR_INTERNAL - generic internal error (such as in communication
-    ///    with TEE which doesn't generate zx_status_t errors).
-    ///  * other errors are allowed; any other errors should be treated the same
-    ///    as ZX_ERR_INTERNAL.
-    @available(added=NEXT)
-    strict GetDynamicSecureHeaps() -> (table {
-        1: heaps vector<DynamicSecureHeap>:MAX_HEAPS_COUNT;
     }) error zx.Status;
 
     /// This request from sysmem to the securemem driver gets the properties of
@@ -317,9 +299,4 @@ type SecureHeapAndRangeModification = table {
     1: heap HeapType;
     2: old_range SecureHeapRange;
     3: new_range SecureHeapRange;
-};
-
-@available(added=NEXT)
-type DynamicSecureHeap = table {
-    1: heap HeapType;
 };

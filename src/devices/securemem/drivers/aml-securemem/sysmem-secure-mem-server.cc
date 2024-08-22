@@ -231,19 +231,6 @@ void SysmemSecureMemServer::GetPhysicalSecureHeaps(
   completer.ReplySuccess(heaps);
 }
 
-void SysmemSecureMemServer::GetDynamicSecureHeaps(GetDynamicSecureHeapsCompleter::Sync& completer) {
-  std::scoped_lock lock{checker_};
-  fidl::Arena allocator;
-  fuchsia_sysmem::wire::SecureMemGetDynamicSecureHeapsResponse response;
-  zx_status_t status = GetDynamicSecureHeapsInternal(&allocator, &response);
-  if (status != ZX_OK) {
-    LOG(ERROR, "GetDynamicSecureHeaps() failed - status: %s", zx_status_get_string(status));
-    completer.ReplyError(status);
-    return;
-  }
-  completer.ReplySuccess(std::move(response));
-}
-
 void SysmemSecureMemServer::GetPhysicalSecureHeapProperties(
     GetPhysicalSecureHeapPropertiesRequestView request,
     GetPhysicalSecureHeapPropertiesCompleter::Sync& completer) {
@@ -407,35 +394,6 @@ zx_status_t SysmemSecureMemServer::GetPhysicalSecureHeapsInternal(
   builder.heaps(heaps);
 
   *heaps_and_ranges = builder.Build();
-
-  return ZX_OK;
-}
-
-zx_status_t SysmemSecureMemServer::GetDynamicSecureHeapsInternal(
-    fidl::AnyArena* allocator,
-    fuchsia_sysmem::wire::SecureMemGetDynamicSecureHeapsResponse* response) {
-  std::scoped_lock lock(checker_);
-
-  if (is_get_dynamic_secure_heaps_called_) {
-    LOG(ERROR, "GetDynamicSecureHeaps may only be called at most once.");
-    return ZX_ERR_BAD_STATE;
-  }
-  is_get_dynamic_secure_heaps_called_ = true;
-
-  if (!TrySetupSecmemSession()) {
-    // Logging handled in `TrySetupSecmemSession`
-    return ZX_ERR_INTERNAL;
-  }
-
-  auto response_builder =
-      fuchsia_sysmem::wire::SecureMemGetDynamicSecureHeapsResponse::Builder(*allocator);
-  auto heaps = fidl::VectorView<fuchsia_sysmem::wire::DynamicSecureHeap>(*allocator, 1);
-  auto heap = fuchsia_sysmem::wire::DynamicSecureHeap::Builder(*allocator);
-  heap.heap(fuchsia_sysmem::HeapType::kAmlogicSecure);
-  heaps[0] = heap.Build();
-  response_builder.heaps(std::move(heaps));
-
-  *response = response_builder.Build();
 
   return ZX_OK;
 }
