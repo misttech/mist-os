@@ -3,7 +3,7 @@
 // found in the LICENSE file.
 
 use crate::power::OnWakeOps;
-use crate::task::{CurrentTask, HandleWaitCanceler, WaitCanceler};
+use crate::task::{CurrentTask, HandleWaitCanceler, TargetTime, WaitCanceler};
 use crate::vfs::timer::TimerOps;
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleRef};
 use starnix_uapi::errors::Errno;
@@ -25,10 +25,10 @@ impl TimerOps for ZxTimer {
         &self,
         _currnet_task: &CurrentTask,
         _source: Option<Weak<dyn OnWakeOps>>,
-        deadline: zx::Time,
+        deadline: TargetTime,
     ) -> Result<(), Errno> {
         self.timer
-            .set(deadline, zx::Duration::default())
+            .set(deadline.estimate_monotonic(), zx::Duration::default())
             .map_err(|status| from_status_like_fdio!(status))?;
         Ok(())
     }

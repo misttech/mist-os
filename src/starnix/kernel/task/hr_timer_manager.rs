@@ -13,7 +13,7 @@ use std::collections::BinaryHeap;
 use std::sync::{Arc, Weak};
 
 use crate::power::OnWakeOps;
-use crate::task::{CurrentTask, HandleWaitCanceler, WaitCanceler};
+use crate::task::{CurrentTask, HandleWaitCanceler, TargetTime, WaitCanceler};
 use crate::vfs::timer::TimerOps;
 
 const HRTIMER_DIRECTORY: &str = "/dev/class/hrtimer";
@@ -282,14 +282,19 @@ impl TimerOps for HrTimerHandle {
         &self,
         current_task: &CurrentTask,
         source: Option<Weak<dyn OnWakeOps>>,
-        deadline: zx::Time,
+        deadline: TargetTime,
     ) -> Result<(), Errno> {
         // Before (re)starting the timer, ensure the signal is cleared.
         self.event
             .as_handle_ref()
             .signal(zx::Signals::TIMER_SIGNALED, zx::Signals::NONE)
             .map_err(|status| from_status_like_fdio!(status))?;
-        current_task.kernel().hrtimer_manager.add_timer(current_task, source, self, deadline)?;
+        current_task.kernel().hrtimer_manager.add_timer(
+            current_task,
+            source,
+            self,
+            deadline.estimate_monotonic(),
+        )?;
         Ok(())
     }
 
