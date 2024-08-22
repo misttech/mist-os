@@ -28,8 +28,6 @@ toc:
   section:
   - title: "symbolizer"
     path: /reference/tools/sdk/symbolizer.md
-  - title: "triage"
-    path: /reference/tools/sdk/triage.md
   - title: "zxdb"
     path: /reference/tools/sdk/zxdb.md
 - title: "Device management commands"
