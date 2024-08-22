@@ -14,6 +14,7 @@ use crate::path::Path;
 
 use anyhow::Error;
 use fidl::endpoints::ServerEnd;
+#[cfg(any(fuchsia_api_level_less_than = "NEXT", fuchsia_api_level_at_least = "PLATFORM"))]
 use fidl::epitaph::ChannelEpitaphExt;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon_status::Status;
@@ -173,6 +174,10 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 // chance to run before we try and process the next request for this directory.
                 yield_to_executor().await;
             }
+            #[cfg(any(
+                fuchsia_api_level_less_than = "NEXT",
+                fuchsia_api_level_at_least = "PLATFORM"
+            ))]
             fio::DirectoryRequest::Open2 {
                 path: _,
                 protocols: _,
