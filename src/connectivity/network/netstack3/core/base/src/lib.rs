@@ -23,6 +23,7 @@ mod event;
 mod frame;
 mod inspect;
 mod ip;
+mod matchers;
 mod port_alloc;
 mod resource_references;
 mod rng;
@@ -55,6 +56,7 @@ pub use ip::{
     BroadcastIpExt, IcmpErrorCode, IcmpIpExt, Icmpv4ErrorCode, Icmpv6ErrorCode, IpExt,
     IpTypesIpExt, Mms, WrapBroadcastMarker,
 };
+pub use matchers::{DeviceNameMatcher, Matcher, SubnetMatcher};
 pub use port_alloc::{simple_randomized_port_alloc, EphemeralPort, PortAllocImpl};
 pub use resource_references::{
     DeferredResourceRemovalContext, ReferenceNotifiers, ReferenceNotifiersExt,

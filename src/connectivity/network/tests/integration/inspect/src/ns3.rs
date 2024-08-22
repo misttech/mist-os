@@ -1333,7 +1333,7 @@ async fn inspect_filtering_state(name: &str) {
                                 // because it has an address matcher with an IPv4 subnet.
                                 "matchers": {
                                     "dst_address": "AddressMatcher { \
-                                        matcher: Subnet(127.0.0.0/8), \
+                                        matcher: SubnetMatcher(127.0.0.0/8), \
                                         invert: false \
                                     }",
                                 },

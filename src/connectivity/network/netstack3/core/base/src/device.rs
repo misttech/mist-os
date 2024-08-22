@@ -224,7 +224,8 @@ pub(crate) mod testutil {
     pub struct FakeDeviceId;
 
     impl FakeDeviceId {
-        const FAKE_NAME: &'static str = "FakeDeviceId";
+        /// The name of the fake device.
+        pub const FAKE_NAME: &'static str = "FakeDeviceId";
     }
 
     impl StrongDeviceIdentifier for FakeDeviceId {
