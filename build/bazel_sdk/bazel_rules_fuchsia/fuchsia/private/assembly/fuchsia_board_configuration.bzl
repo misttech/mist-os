@@ -81,13 +81,6 @@ def _fuchsia_board_configuration_impl(ctx):
     if platform != {}:
         board_config["platform"] = platform
 
-    if ctx.attr.board_bundles_dir:
-        board_dir_name = ctx.file.board_bundles_dir.basename
-        board_config["input_bundles"] = [board_dir_name + "/" + i for i in ctx.attr.input_bundles]
-        board_dir = ctx.actions.declare_directory(board_dir_name)
-        _copy_directory(ctx, ctx.file.board_bundles_dir.path, board_dir.path, [ctx.file.board_bundles_dir], [board_dir])
-        board_files.append(board_dir)
-
     # Files from board_input_bundles have paths that are relative to root,
     # prefix "../"s to make them relative to the output board config.
     board_config_relative_to_root = "../" * board_config_file.path.count("/")
@@ -102,13 +95,7 @@ def _fuchsia_board_configuration_impl(ctx):
 
     if ctx.attr.devicetree:
         board_files.append(ctx.file.devicetree)
-        if ctx.attr.board_bundles_dir:
-            # Relativize the file path to the board file instead of the
-            # workspace root
-            short_dir = board_config_file.short_path.removesuffix(board_config_file.basename)
-            board_config["devicetree"] = ctx.file.devicetree.path.removeprefix(short_dir)
-        else:
-            board_config["devicetree"] = board_config_relative_to_root + ctx.file.devicetree.path
+        board_config["devicetree"] = board_config_relative_to_root + ctx.file.devicetree.path
 
     args = []
     if ctx.attr.post_processing_script:
@@ -170,13 +157,6 @@ _fuchsia_board_configuration = rule(
         "board_name": attr.string(
             doc = "Name of this board.",
             mandatory = True,
-        ),
-        "board_bundles_dir": attr.label(
-            doc = "Directory containing all precompiled board input bundles.",
-            allow_single_file = True,
-        ),
-        "input_bundles": attr.string_list(
-            doc = "Directories of precompiled board input bundles to include, relative to `board_bundles_dir`.",
         ),
         "board_input_bundles": attr.label_list(
             doc = "Board Input Bundles targets to be included into the board.",
