@@ -144,7 +144,8 @@ impl<T: FfxTool> ToolRunner for FhoTool<T> {
         } else {
             self.main.main(writer).await.map(|_| ExitStatus::from_raw(0))
         };
-        metrics.command_finished(&res, &self.redacted_args).await.and(res)
+        let res = metrics.command_finished(&res, &self.redacted_args).await.and(res);
+        self.env.maybe_wrap_connection_errors(res).await
     }
 }
 
@@ -166,7 +167,13 @@ impl<T: FfxTool> FhoTool<T> {
             false => ffx.redact_subcmd(&tool),
             true => ffx.unredacted_args_for_analytics(),
         };
-        let env = FhoEnvironment { ffx, context: context.clone(), injector: Arc::new(injector) };
+        let injector: Arc<dyn ffx_core::Injector> = Arc::new(injector);
+        let env = FhoEnvironment {
+            behavior: crate::from_env::connection_behavior(&ffx, &injector, &context).await?,
+            ffx,
+            context: context.clone(),
+            injector,
+        };
         let main = T::from_env(env.clone(), tool).await?;
 
         if !main.supports_machine_output() && is_machine_output {

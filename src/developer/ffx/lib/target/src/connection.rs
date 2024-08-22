@@ -130,8 +130,7 @@ impl OvernetClient {
     }
 }
 
-#[cfg(test)]
-mod test {
+pub mod testing {
     use super::*;
     use crate::overnet_connector::{OvernetConnection, OvernetConnectionError};
     use async_channel::Receiver;
@@ -180,14 +179,14 @@ mod test {
     }
 
     #[derive(Debug, Clone, Eq, PartialEq)]
-    enum FakeOvernetBehavior {
+    pub enum FakeOvernetBehavior {
         CloseRcsImmediately,
         KeepRcsOpen,
         FailNonFatalOnce,
     }
 
     #[derive(Debug)]
-    struct FakeOvernet {
+    pub struct FakeOvernet {
         circuit_node: Arc<overnet_core::Router>,
         error_receiver: Receiver<anyhow::Error>,
         behavior: FakeOvernetBehavior,
@@ -195,7 +194,7 @@ mod test {
     }
 
     impl FakeOvernet {
-        fn new(
+        pub fn new(
             circuit_node: Arc<overnet_core::Router>,
             error_receiver: Receiver<anyhow::Error>,
             behavior: FakeOvernetBehavior,
@@ -264,6 +263,12 @@ mod test {
             })
         }
     }
+}
+
+#[cfg(test)]
+mod test {
+    use super::testing::*;
+    use super::*;
 
     #[fuchsia::test]
     async fn test_overnet_rcs_knock() {

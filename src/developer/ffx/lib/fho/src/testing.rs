@@ -72,7 +72,13 @@ impl ToolEnv {
     }
 
     pub fn make_environment(self, context: EnvironmentContext) -> FhoEnvironment {
-        FhoEnvironment { injector: Arc::new(self.injector), context, ffx: self.ffx_cmd_line }
+        let injector = Arc::new(self.injector);
+        FhoEnvironment {
+            ffx: self.ffx_cmd_line,
+            context,
+            behavior: crate::FhoConnectionBehavior::DaemonConnector(injector.clone()),
+            injector,
+        }
     }
 
     pub async fn build_tool<T: FfxTool>(self, context: EnvironmentContext) -> Result<T> {

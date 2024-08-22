@@ -25,11 +25,12 @@ use tracing::{debug, info};
 #[cfg(test)]
 use mockall::predicate::*;
 
-mod connection;
+pub mod connection;
+pub mod ssh_connector;
+
 mod fidl_pipe;
 mod overnet_connector;
 mod resolve;
-mod ssh_connector;
 
 pub use connection::ConnectionError;
 pub use discovery::desc::{Description, FastbootInterface};
@@ -38,7 +39,7 @@ pub use fidl_pipe::{create_overnet_socket, FidlPipe};
 pub use overnet_connector::{OvernetConnection, OvernetConnectionError, OvernetConnector};
 pub use resolve::{
     maybe_locally_resolve_target_spec, resolve_target_address, resolve_target_query_to_info,
-    resolve_target_query_with,
+    resolve_target_query_with, Resolution,
 };
 
 /// Re-export of [`fidl_fuchsia_developer_ffx::TargetProxy`] for ease of use
@@ -553,7 +554,6 @@ mod test {
     use futures_lite::future::{pending, ready};
 
     #[fuchsia::test]
-
     async fn test_target_wait_too_short_timeout() {
         let (proxy, _server) = fidl::endpoints::create_proxy::<ffx::TargetMarker>().unwrap();
         let res = knock_target_with_timeout(&proxy, rcs::RCS_KNOCK_TIMEOUT).await;
