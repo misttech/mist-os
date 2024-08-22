@@ -33,16 +33,16 @@ To enable a DFv2 driver to use Banjo protocols, see the tasks below:
 
 - [Serve a Banjo protocol from a DFv2 driver](#serve-a-bano-protocol-from-a-dfv2-driver):
   Implement and serve Banjo protocols in a DFv2 driver, which sets up
-  the driver to communicate with DFv1 child drivers.
+  the driver to communicate with child drivers using Banjo protocols.
 
-- [Connect to a Banjo server from a DFv1 driver](#connect-to-a-banjo-server-from-a-DFv1-driver):
-  Connect to a DFv2 parent driver's Banjo server from a DFv1 child driver
+- [Connect to a Banjo server from a DFv2 driver](#connect-to-a-banjo-server-from-a-DFv2-driver):
+  Connect to a parent driver's Banjo server from a DFv2 child driver
   and start using Banjo protocols.
 
 ## Serve a Banjo protocol from a DFv2 driver {:#serve-a-bano-protocol-from-a-dfv2-driver}
 
 This section walks through implementing a Banjo protocol in a DFv2 driver
-and serving the protocol to a DFv1 child driver. This walkthrough is based
+and serving the protocol to child drivers. This walkthrough is based
 on the [Banjo Transport example][banjo-transport-example], which implements
 the `Misc` Banjo protocol in the [`gizmo.test`][gizmo-test-fidl] FIDL library.
 
@@ -214,11 +214,11 @@ guide:
 1. [Set up the compat device server][set-up-the-compat-device-server].
 2. [Provide Banjo services to descendant DFv1 drivers][provide-banjo-services].
 
-## Connect to a Banjo server from a DFv1 driver {:#connect-to-a-banjo-server-from-a-DFv1-driver}
+## Connect to a Banjo server from a DFv2 driver {:#connect-to-a-banjo-server-from-a-DFv2-driver}
 
 This section uses the [Banjo transport example][banjo-transport-example]
-to walk through the task of connecting a DFv1 child driver to a DFv2
-parent driver that serves a Banjo protocol.
+to walk through the task of connecting a DFv2 child driver to a parent
+driver that serves a Banjo protocol.
 
 The steps are:
 
@@ -255,8 +255,8 @@ To connect the child driver to the parent driver, do the following:
 
    (Source: [`child-driver.cml`][child-driver-cml])
 
-1. In the driver's `BUILD.gn` file, add the Banjo library as a dependency
-   in the `fuchsia_driver` target, for example:
+1. In the child driver's `BUILD.gn` file, add the Banjo library as
+   a dependency in the `fuchsia_driver` target, for example:
 
    ```gn {:.devsite-disable-click-to-copy}
    fuchsia_driver("child_driver") {
@@ -272,8 +272,8 @@ To connect the child driver to the parent driver, do the following:
 
    (Source: [`BUILD.gn`][build-gn])
 
-1. In the driver's C++ header file, include the Banjo library's C++ header,
-   for example:
+1. In the child driver's C++ header file, include the Banjo library's
+   C++ header, for example:
 
    ```
    {{"<strong>"}}#include <fuchsia/examples/gizmo/cpp/banjo.h>{{"</strong>"}}
@@ -285,7 +285,7 @@ To connect the child driver to the parent driver, do the following:
 
    (Source: [`child-driver.h`][child-driver-h])
 
-1. In the driver's `BUILD.gn` file, add the compat `banjo_client`
+1. In the child driver's `BUILD.gn` file, add the compat `banjo_client`
    library as a dependency in the `fuchsia_driver` target, for example:
 
    ```gn {:.devsite-disable-click-to-copy}
@@ -303,7 +303,7 @@ To connect the child driver to the parent driver, do the following:
 
    (Source: [`BUILD.gn`][build-gn])
 
-1. In the driver's C++ source file, include the compat `banjo_client`
+1. In the child driver's C++ source file, include the compat `banjo_client`
    library's C++ header, for example:
 
    ```cpp {:.devsite-disable-click-to-copy}
@@ -321,7 +321,7 @@ To connect the child driver to the parent driver, do the following:
 
    (Source: [`child-driver.cc`][child-driver-cc])
 
-1. In the driver's C++ source file, set up a Banjo client with the
+1. In the child driver's C++ source file, set up a Banjo client with the
    `compat::ConnectBanjo()` function, for example:
 
    ```cpp
