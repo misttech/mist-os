@@ -350,6 +350,21 @@ function diff_file_relpath() {
       esac
       ;;
 
+    # bazel repo-mapping files seem to differ:
+    # rules_license only appears in remote builds.
+    # Don't know why, but these are not important build artifacts.
+    _repo_mapping)
+      case "$common_path" in
+        */bazel-out/*.runfiles) expect=ignore ;;
+      esac
+      ;;
+
+    *.repo_mapping)
+      case "$common_path" in
+        */bazel-out/*) expect=ignore ;;
+      esac
+      ;;
+
     # Various binaries.
     *.blk) expect=unknown; diff_binary "$left" "$right" ;;
     *.vboot) expect=unknown; diff_binary "$left" "$right" ;;
