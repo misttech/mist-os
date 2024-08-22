@@ -88,18 +88,21 @@ TEST(I2cBusVisitorTest, TestI2CChannels) {
       ASSERT_TRUE(mgr_request.parents().has_value());
       ASSERT_EQ(2lu, mgr_request.parents()->size());
 
-      // 1st parent is pdev. Skipping that.
-      EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty(bind_fuchsia_hardware_i2c::SERVICE,
-                              bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT)}},
-          (*mgr_request.parents())[1].properties(), false));
-
       uint32_t address = 0;
       if (node->args().name() == "child-c") {
         address = I2C_ADDRESS1;
       } else if (node->args().name() == "child-1e") {
         address = I2C_ADDRESS2;
       }
+
+      // 1st parent is pdev. Skipping that.
+      EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
+          {{
+              fdf::MakeProperty(bind_fuchsia_hardware_i2c::SERVICE,
+                                bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeProperty(bind_fuchsia::I2C_ADDRESS, address),
+          }},
+          (*mgr_request.parents())[1].properties(), false));
 
       EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
           {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_i2c::SERVICE,

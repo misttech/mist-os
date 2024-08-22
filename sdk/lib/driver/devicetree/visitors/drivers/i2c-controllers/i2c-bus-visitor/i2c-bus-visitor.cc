@@ -56,6 +56,7 @@ zx::result<> I2cBusVisitor::AddChildNodeSpec(fdf_devicetree::ChildNode& child, u
           {
               fdf::MakeProperty(bind_fuchsia_hardware_i2c::SERVICE,
                                 bind_fuchsia_hardware_i2c::SERVICE_ZIRCONTRANSPORT),
+              fdf::MakeProperty(bind_fuchsia::I2C_ADDRESS, address),
           },
   }};
   child.AddNodeSpec(i2c_node);
