@@ -124,11 +124,6 @@ fpromise::promise<void, zx_status_t> Interrupter::Timeout(zx::time deadline) {
   return bridge.consumer.promise().discard_value();
 }
 
-void UsbXhci::ConnectToEndpoint(ConnectToEndpointRequest& request,
-                                ConnectToEndpointCompleter::Sync& completer) {
-  completer.Reply(fit::as_error(ZX_ERR_NOT_SUPPORTED));
-}
-
 void UsbXhci::SetDeviceInformation(uint8_t slot, uint8_t port, const std::optional<HubInfo>& hub) {
   auto state = reinterpret_cast<TestState*>(parent_);
   auto context = state->trb_context_allocator_.New();
@@ -278,45 +273,6 @@ fpromise::promise<void, zx_status_t> UsbXhci::DisableSlotCommand(uint32_t slot) 
 
 void UsbXhci::ResetPort(uint16_t port) {}
 
-void UsbXhci::UsbHciSetBusInterface(const usb_bus_interface_protocol_t* bus_intf) {}
-
-size_t UsbXhci::UsbHciGetMaxDeviceCount() { return 0; }
-
-zx_status_t UsbXhci::UsbHciEnableEndpoint(uint32_t device_id,
-                                          const usb_endpoint_descriptor_t* ep_desc,
-                                          const usb_ss_ep_comp_descriptor_t* ss_com_desc,
-                                          bool enable) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-uint64_t UsbXhci::UsbHciGetCurrentFrame() { return 0; }
-
-zx_status_t UsbXhci::UsbHciConfigureHub(uint32_t device_id, usb_speed_t speed,
-                                        const usb_hub_descriptor_t* desc, bool multi_tt) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-zx_status_t UsbXhci::UsbHciHubDeviceAdded(uint32_t device_id, uint32_t port, usb_speed_t speed) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx_status_t UsbXhci::UsbHciHubDeviceRemoved(uint32_t hub_id, uint32_t port) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx_status_t UsbXhci::UsbHciHubDeviceReset(uint32_t device_id, uint32_t port) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx_status_t UsbXhci::UsbHciResetEndpoint(uint32_t device_id, uint8_t ep_address) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx_status_t UsbXhci::UsbHciResetDevice(uint32_t hub_address, uint32_t device_id) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-size_t UsbXhci::UsbHciGetMaxTransferSize(uint32_t device_id, uint8_t ep_address) { return 0; }
-
 zx_status_t UsbXhci::UsbHciCancelAll(uint32_t device_id, uint8_t ep_address) {
   return ZX_ERR_NOT_SUPPORTED;
 }
@@ -357,25 +313,12 @@ fpromise::promise<OwnedRequest, void> UsbXhci::UsbHciRequestQueue(OwnedRequest u
   return bridge.consumer.promise().box();
 }
 
-size_t UsbXhci::UsbHciGetRequestSize() { return Request::RequestSize(sizeof(usb_request_t)); }
-
 fpromise::promise<void, zx_status_t> UsbXhci::Timeout(uint16_t target_interrupter,
                                                       zx::time deadline) {
   return interrupter(target_interrupter).Timeout(deadline);
 }
 
 zx_status_t TransferRing::DeinitIfActive() { return ZX_OK; }
-
-Endpoint::Endpoint(UsbXhci* hci, uint32_t device_id, uint8_t address)
-    : usb_endpoint::UsbEndpoint(hci->bti(), address) {}
-void Endpoint::QueueRequests(QueueRequestsRequest& request,
-                             QueueRequestsCompleter::Sync& completer) {}
-void Endpoint::CancelAll(CancelAllCompleter::Sync& completer) {
-  completer.Reply(fit::as_error(ZX_ERR_NOT_SUPPORTED));
-}
-void Endpoint::OnUnbound(fidl::UnbindInfo info,
-                         fidl::ServerEnd<fuchsia_hardware_usb_endpoint::Endpoint> server_end) {}
-DeviceState::~DeviceState() = default;
 
 void UsbXhci::CreateDeviceInspectNode(uint32_t slot, uint16_t vendor_id, uint16_t product_id) {}
 
