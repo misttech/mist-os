@@ -472,10 +472,13 @@ pub mod options {
     use super::NonZeroNdpLifetime;
     use crate::utils::NonZeroDuration;
 
+    /// A `u32` value representing an infinite lifetime for various NDP options' lifetime fields.
+    pub const INFINITE_LIFETIME_SECONDS: u32 = u32::MAX;
+
     /// A value representing an infinite lifetime for various NDP options'
     /// lifetime fields.
     pub const INFINITE_LIFETIME: NonZeroDuration =
-        const_unwrap_option(NonZeroDuration::from_secs(core::u32::MAX as u64));
+        const_unwrap_option(NonZeroDuration::from_secs(INFINITE_LIFETIME_SECONDS as u64));
 
     /// The number of reserved bytes immediately following the kind and length
     /// bytes in a Redirected Header option.
@@ -559,6 +562,9 @@ pub mod options {
     }
 
     impl<'a> RecursiveDnsServer<'a> {
+        /// The `u32` value representing an infinite lifetime for a RecursiveDnsServer option.
+        pub const INFINITE_LIFETIME: u32 = INFINITE_LIFETIME_SECONDS;
+
         /// Returns a new `RecursiveDnsServer`.
         pub fn new(lifetime: u32, addresses: &'a [Ipv6Addr]) -> RecursiveDnsServer<'a> {
             RecursiveDnsServer { lifetime, addresses }
