@@ -6,6 +6,7 @@ import("//build/host.gni")
 
 group("tools") {
   deps = [
+    "adb_proxy",
     "convert_tarball_to_starnix_container",
     "gen_android_starnix_container",
   ]
