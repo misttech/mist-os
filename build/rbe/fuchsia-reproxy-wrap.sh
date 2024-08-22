@@ -328,12 +328,16 @@ _timetrace "Bootstrapping reproxy"
   "$bootstrap" \
   --re_proxy="$reproxy" \
   --cfg="$bootstrap_reproxy_cfg" \
-  "${bootstrap_options[@]}" > "$reproxy_logdir"/bootstrap.stdout
-[[ "$verbose" != 1 ]] || {
+  "${bootstrap_options[@]}" > "$reproxy_logdir"/bootstrap.stdout 2>&1
+bootstrap_status="$?"
+# Silence, unless --verbose or there is an error.
+[[ "$bootstrap_status" == 0 && "$verbose" != 1 ]] || {
   cat "$reproxy_logdir"/bootstrap.stdout
+  echo
   echo "build id: $build_uuid"
   echo "logs: $reproxy_logdir"
   echo "socket: $socket_path"
+  [[ "$bootstrap_status" == 0 ]] || exit "$bootstrap_status"
 }
 _timetrace "Bootstrapping reproxy (done)"
 
@@ -353,8 +357,9 @@ shutdown() {
   "${bootstrap_env[@]}" \
     "$bootstrap" \
     --shutdown \
-    --cfg="$reproxy_cfg" > "$reproxy_logdir"/shutdown.stdout
-  [[ "$verbose" != 1 ]] || {
+    --cfg="$reproxy_cfg" > "$reproxy_logdir"/shutdown.stdout 2>&1
+  shutdown_status="$?"
+  [[ "$shutdown_status" == 0 && "$verbose" != 1 ]] || {
     cat "$reproxy_logdir"/shutdown.stdout
   }
   _timetrace "Shutting down reproxy (done)"
