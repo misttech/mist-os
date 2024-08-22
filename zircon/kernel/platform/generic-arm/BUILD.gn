@@ -32,6 +32,7 @@ source_set("generic-arm") {
     "//zircon/kernel/dev/uart/imx",
     "//zircon/kernel/dev/uart/motmot",
     "//zircon/kernel/dev/uart/pl011",
+    "//zircon/kernel/lib/arch",
     "//zircon/kernel/lib/boot-options",
     "//zircon/kernel/lib/cbuf",
     "//zircon/kernel/lib/console",

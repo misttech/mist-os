@@ -65,6 +65,7 @@
 #include <kernel/thread.h>
 #endif
 
+#include <lib/arch/intrin.h>
 #include <lib/zbi-format/zbi.h>
 #include <zircon/errors.h>
 #include <zircon/rights.h>
@@ -97,8 +98,8 @@ static void halt_other_cpus(void) {
 
     // spin for a while
     // TODO: find a better way to spin at this low level
-    for (volatile int i = 0; i < 100000000; i = i + 1) {
-      __asm volatile("nop");
+    for (int i = 0; i < 100000000; i = i + 1) {
+      arch::Yield();
     }
   }
 }
