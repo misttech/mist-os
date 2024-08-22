@@ -180,6 +180,7 @@ zx::result<> BtTransportUart::Start() {
 
   node_controller_.Bind(std::move(controller_endpoints->client), dispatcher(), this);
 
+  queue_read_task_.Post(dispatcher_);
   return zx::ok();
 }
 
@@ -668,7 +669,9 @@ void BtTransportUart::ProcessNextUartPacketFromReadBuffer(
     if (snoop_type == BT_HCI_SNOOP_TYPE_SCO) {
       if (sco_connection_binding_.size() == 0) {
         FDF_LOG(DEBUG, "No SCO connection available for sending SCO packets up.");
+        return;
       }
+
       sco_connection_binding_.ForEachBinding(
           [&](const fidl::ServerBinding<fhbt::ScoConnection>& binding) {
             fit::result<fidl::OneWayError> result = fidl::SendEvent(binding)->OnReceive(fidl_vec);
@@ -977,16 +980,14 @@ void BtTransportUart::ConfigureSco(
 
   sco_connection_binding_.AddBinding(dispatcher_, std::move(request.connection().value()),
                                      &sco_connection_server_, fidl::kIgnoreBindingClosure);
-  // Only useful in tests, it doesn't hurt to signal it when no one is waiting for it.
-  sco_connection_setup_.Signal();
 }
 
-fit::function<void(void)> BtTransportUart::WaitForSnoopCallback() {
+fit::function<void(void)> BtTransportUart::WaitforSnoopCallback() {
   return [this]() { snoop_setup_.Wait(); };
 }
 
-fit::function<void(void)> BtTransportUart::WaitForScoConnectionCallback() {
-  return [this]() { sco_connection_setup_.Wait(); };
+fit::function<void(void)> BtTransportUart::WaitforHciTransportCallback() {
+  return [this]() { hci_transport_setup_.Wait(); };
 }
 
 uint64_t BtTransportUart::GetAckedSnoopSeq() { return acked_snoop_seq_; }
@@ -1097,7 +1098,6 @@ zx_status_t BtTransportUart::ServeProtocols() {
               "Only one type of transport should be used");
     }
     hci_binding_.AddBinding(dispatcher_, std::move(server_end), this, fidl::kIgnoreBindingClosure);
-    queue_read_task_.Post(dispatcher_);
   };
   auto hci_transport_protocol = [this](fidl::ServerEnd<fhbt::HciTransport> server_end) mutable {
     if (hci_binding_.size() != 0) {
@@ -1107,7 +1107,7 @@ zx_status_t BtTransportUart::ServeProtocols() {
     }
     hci_transport_binding_.emplace(dispatcher_, std::move(server_end), this,
                                    [this](fidl::UnbindInfo) { hci_transport_binding_.reset(); });
-    queue_read_task_.Post(dispatcher_);
+    hci_transport_setup_.Signal();
   };
   auto snoop_protocol = [this](fidl::ServerEnd<fhbt::Snoop> server_end) mutable {
     if (snoop_server_.has_value()) {
