@@ -286,7 +286,9 @@ void bootstrap_vmos(Handle** handles) {
   ASSERT(status == ZX_OK);
 }
 
-void userboot_init(uint) {
+}  // namespace
+
+void userboot_init() {
   // Prepare the bootstrap message packet.  This allocates space for its
   // handles, which we'll fill in as we create things.
   MessagePacketPtr msg;
@@ -415,7 +417,3 @@ void userboot_init(uint) {
   timeline_userboot.Set(current_ticks());
   init_time.Add(current_time() / 1000000LL);
 }
-
-}  // namespace
-
-LK_INIT_HOOK(userboot, userboot_init, LK_INIT_LEVEL_USER + 1)

@@ -943,7 +943,7 @@ void RecurringCallback::Toggle() {
   }
 }
 
-static void kernel_shell_init(uint level) {
+void kernel_shell_init() {
   if (!gBootOptions->shell_script.empty()) {
     SmallString script = gBootOptions->shell_script;
     for (char* p = strchr(script.data(), '+'); p; p = strchr(p + 1, '+')) {
@@ -955,5 +955,3 @@ static void kernel_shell_init(uint level) {
     console_start();
   }
 }
-
-LK_INIT_HOOK(kernel_shell, kernel_shell_init, LK_INIT_LEVEL_USER)

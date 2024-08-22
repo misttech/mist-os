@@ -100,6 +100,10 @@ void console_abort_script(void);
 /* panic shell api */
 void panic_shell_start(void);
 
+// Attempt to start the kernel shell.
+// Will return if shell is not started or if shell exits.
+void kernel_shell_init();
+
 extern int lastresult;
 
 #endif  // ZIRCON_KERNEL_LIB_CONSOLE_INCLUDE_LIB_CONSOLE_H_
