@@ -164,11 +164,6 @@ if (toolchain_environment == "kernel.phys32" ||
         ":legacy-boot-shim",
         "..:multiboot",
       ]
-
-      # Everything should find this via the //:images build API.
-      # But some things might still look for "out/.../multiboot.bin" directly.
-      output_dir = root_build_dir
-      output_name = "multiboot"
     }
 
     phys_executable("depthcharge-multiboot-shim") {

@@ -90,10 +90,6 @@ if (current_cpu == "x64") {
       shim_deps = [
         "//zircon/kernel/arch/x86/phys/boot-shim:multiboot-shim($environment)",
       ]
-
-      # TODO(mcgrathr): Use root_out_dir of environment, multiboot-shim
-      # when nothing cares.
-      shim_path = "$root_build_dir/multiboot.bin"
       timeout = qemu_short_timeout
 
       supported_environments = multiboot_environments
