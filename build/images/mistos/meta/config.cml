@@ -146,6 +146,14 @@
             from: "self",
             to: "parent",
         },
+
+        // virtcon
+        {
+            config: "fuchsia.virtcon.Disable",
+            from: "self",
+            to: "parent",
+        },
+
     ],
     capabilities: [
         {
@@ -315,6 +323,13 @@
             config: "fuchsia.starnix.runner.EnableDataCollection",
             type: "bool",
             value: false,
+        },
+
+        // Virtcon
+        {
+            config: "fuchsia.virtcon.Disable",
+            type: "bool",
+            value: true,
         },
     ],
 }

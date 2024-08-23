@@ -35,11 +35,6 @@ rustc_library("loop") {
     "//third_party/rust_crates:bitflags",
   ]
 
-  if (is_mistos) {
-    deps -= [ "//src/starnix/kernel:starnix_core" ]
-    deps += [ "//src/starnix_lite/kernel:starnix_lite_core" ]
-  }
-
   test_deps = [
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//src/graphics/lib/magma/src/libmagma",

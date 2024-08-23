@@ -586,7 +586,6 @@ rustc_library("starnix_kernel_runner") {
       "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
       "//src/graphics/lib/magma/src/libmagma",
       "//src/lib/ui/fuchsia-scenic",
-      "//src/starnix/modules",
       "//src/starnix/modules/ashmem",
       "//src/starnix/modules/gpu",
       "//src/starnix/modules/gralloc",
