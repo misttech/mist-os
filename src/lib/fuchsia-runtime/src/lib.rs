@@ -22,8 +22,9 @@ use {
         Process,
         Rights,
         Status,
-        SyntheticTime,
         Thread,
+        Time,
+        Timeline,
         Unowned,
         Vmar,
     },
@@ -358,20 +359,35 @@ pub fn job_default() -> Unowned<'static, Job> {
     }
 }
 
-/// Duplicate the UTC `Clock` registered with the runtime.
-pub fn duplicate_utc_clock_handle(rights: Rights) -> Result<Clock, Status> {
-    let handle: Unowned<'static, Clock> = unsafe {
+/// Marker type for the UTC timeline.
+#[derive(Debug, Default, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+pub struct UtcTimeline;
+impl Timeline for UtcTimeline {}
+
+/// A UTC timestamp, measured in nanoseconds since Jan 1 1970.
+pub type UtcTime = Time<UtcTimeline>;
+
+/// A UTC clock that will return UTC timestamps.
+pub type UtcClock = Clock<UtcTimeline>;
+
+fn utc_clock() -> Unowned<'static, UtcClock> {
+    // SAFETY: basic FFI call which returns either a valid handle or ZX_HANDLE_INVALID.
+    unsafe {
         let handle = zx_utc_reference_get();
         Unowned::from_raw_handle(handle)
-    };
-    handle.duplicate(rights)
+    }
+}
+
+/// Duplicate the UTC `Clock` registered with the runtime.
+pub fn duplicate_utc_clock_handle(rights: Rights) -> Result<UtcClock, Status> {
+    utc_clock().duplicate(rights)
 }
 
 /// Swaps the current process-global UTC clock with `new_clock`, returning
 /// the old clock on success.
 /// If `new_clock` is a valid handle but does not have the ZX_RIGHT_READ right,
 /// an error is returned and `new_clock` is dropped.
-pub fn swap_utc_clock_handle(new_clock: Clock) -> Result<Clock, Status> {
+pub fn swap_utc_clock_handle(new_clock: UtcClock) -> Result<UtcClock, Status> {
     Ok(unsafe {
         let mut prev_handle = ZX_HANDLE_INVALID;
         Status::ok(zx_utc_reference_swap(new_clock.into_raw(), &mut prev_handle))?;
@@ -386,12 +402,9 @@ pub fn swap_utc_clock_handle(new_clock: Clock) -> Result<Clock, Status> {
 ///
 /// Panics if there is no UTC clock registered with the runtime or the registered handle does not
 /// have the required rights.
-pub fn utc_time() -> SyntheticTime {
-    let clock: Unowned<'static, Clock> = unsafe {
-        let handle = zx_utc_reference_get();
-        Unowned::from_raw_handle(handle)
-    };
-    clock.read().expect("Failed to read UTC clock")
+#[inline]
+pub fn utc_time() -> UtcTime {
+    utc_clock().read().expect("Failed to read UTC clock")
 }
 
 #[cfg(test)]

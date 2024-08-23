@@ -7,6 +7,7 @@ use crate::signals::{RunState, SignalEvent};
 use crate::task::{ClockId, CurrentTask, Timeline, TimerId, TimerWakeup};
 use crate::time::utc::utc_now;
 use fuchsia_inspect_contrib::profile_duration;
+use fuchsia_runtime::UtcTime;
 use fuchsia_zircon::{
     Task, {self as zx},
 };
@@ -236,7 +237,7 @@ fn clock_nanosleep_monotonic_with_deadline(
     current_task: &mut CurrentTask,
     is_absolute: bool,
     deadline: zx::MonotonicTime,
-    original_utc_deadline: Option<zx::SyntheticTime>,
+    original_utc_deadline: Option<UtcTime>,
     user_remaining: UserRef<timespec>,
 ) -> Result<(), Errno> {
     let event = InterruptibleEvent::new();
@@ -541,6 +542,7 @@ mod test {
     use crate::mm::PAGE_SIZE;
     use crate::testing::*;
     use crate::time::utc::UtcClockOverrideGuard;
+    use fuchsia_runtime::{UtcClock, UtcTimeline};
     use fuchsia_zircon::HandleBased;
     use starnix_uapi::ownership::OwnedRef;
     use starnix_uapi::signals;
@@ -586,13 +588,14 @@ mod test {
     async fn test_clock_nanosleep_relative_to_slow_clock() {
         let (_kernel, mut current_task, _) = create_kernel_task_and_unlocked();
 
-        let test_clock = zx::Clock::create(zx::ClockOpts::AUTO_START, None).unwrap();
+        let test_clock = UtcClock::create(zx::ClockOpts::AUTO_START, None).unwrap();
         let _test_clock_guard = UtcClockOverrideGuard::new(
             test_clock.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
         );
 
         // Slow |test_clock| down and verify that we sleep long enough.
-        let slow_clock_update = zx::ClockUpdate::builder().rate_adjust(-1000).build();
+        let slow_clock_update =
+            zx::ClockUpdate::<UtcTimeline>::builder().rate_adjust(-1000).build();
         test_clock.update(slow_clock_update).unwrap();
 
         let before = test_clock.read().unwrap();
@@ -610,13 +613,13 @@ mod test {
     async fn test_clock_nanosleep_interrupted_relative_to_fast_utc_clock() {
         let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let test_clock = zx::Clock::create(zx::ClockOpts::AUTO_START, None).unwrap();
+        let test_clock = UtcClock::create(zx::ClockOpts::AUTO_START, None).unwrap();
         let _test_clock_guard = UtcClockOverrideGuard::new(
             test_clock.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
         );
 
         // Speed |test_clock| up.
-        let slow_clock_update = zx::ClockUpdate::builder().rate_adjust(1000).build();
+        let slow_clock_update = zx::ClockUpdate::<UtcTimeline>::builder().rate_adjust(1000).build();
         test_clock.update(slow_clock_update).unwrap();
 
         let before = test_clock.read().unwrap();

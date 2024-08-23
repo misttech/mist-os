@@ -13,9 +13,15 @@ use std::{ops, time as stdtime};
 pub type MonotonicTime = Time<MonotonicTimeline>;
 pub type SyntheticTime = Time<SyntheticTimeline>;
 
-#[derive(Default, Copy, Clone)]
+#[derive(Copy, Clone)]
 #[repr(transparent)]
 pub struct Time<T>(sys::zx_time_t, std::marker::PhantomData<T>);
+
+impl<T> Default for Time<T> {
+    fn default() -> Self {
+        Time(0, std::marker::PhantomData)
+    }
+}
 
 impl<T> Hash for Time<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {

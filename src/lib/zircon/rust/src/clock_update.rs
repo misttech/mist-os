@@ -24,7 +24,7 @@ pub trait State {
 
 /// A trait implemented by states that describe how to set a clock value.
 pub trait ValueState: State {
-    type OutputTimeline: Timeline + Default;
+    type OutputTimeline: Timeline;
     fn reference_value(&self) -> Option<MonotonicTime>;
     fn synthetic_value(&self) -> Option<Time<Self::OutputTimeline>>;
 }
@@ -40,27 +40,27 @@ pub trait ErrorState: State {
 }
 
 /// A `ClockUpdateBuilder` state indicating no change.
-pub struct Null;
+pub struct Null<O>(std::marker::PhantomData<O>);
 
-impl State for Null {
+impl<O: Timeline> State for Null<O> {
     fn add_options(&self, _: &mut u64) {}
 }
 
-impl ValueState for Null {
-    type OutputTimeline = SyntheticTimeline;
+impl<O: Timeline> ValueState for Null<O> {
+    type OutputTimeline = O;
     fn reference_value(&self) -> Option<MonotonicTime> {
         None
     }
-    fn synthetic_value(&self) -> Option<Time<SyntheticTimeline>> {
+    fn synthetic_value(&self) -> Option<Time<O>> {
         None
     }
 }
-impl RateState for Null {
+impl<O: Timeline> RateState for Null<O> {
     fn rate_adjustment(&self) -> Option<i32> {
         None
     }
 }
-impl ErrorState for Null {
+impl<O: Timeline> ErrorState for Null<O> {
     fn error_bound(&self) -> Option<u64> {
         None
     }
@@ -82,7 +82,7 @@ impl<O: Timeline + Copy> State for AbsoluteValue<O> {
     }
 }
 
-impl<O: Timeline + Copy + Default> ValueState for AbsoluteValue<O> {
+impl<O: Timeline + Copy> ValueState for AbsoluteValue<O> {
     type OutputTimeline = O;
     fn reference_value(&self) -> Option<MonotonicTime> {
         Some(self.reference_value)
@@ -102,7 +102,7 @@ impl<O: Timeline + Copy> State for ApproximateValue<O> {
     }
 }
 
-impl<O: Timeline + Copy + Default> ValueState for ApproximateValue<O> {
+impl<O: Timeline + Copy> ValueState for ApproximateValue<O> {
     type OutputTimeline = O;
     fn reference_value(&self) -> Option<MonotonicTime> {
         None
@@ -157,7 +157,7 @@ pub struct ClockUpdateBuilder<V, R, E, O> {
     _output_marker: std::marker::PhantomData<O>,
 }
 
-impl<V: ValueState<OutputTimeline = O>, R: RateState, E: ErrorState, O: Timeline + Default>
+impl<V: ValueState<OutputTimeline = O>, R: RateState, E: ErrorState, O: Timeline>
     ClockUpdateBuilder<V, R, E, O>
 {
     /// Converts this `ClockUpdateBuilder` to a `ClockUpdate`.
@@ -167,20 +167,20 @@ impl<V: ValueState<OutputTimeline = O>, R: RateState, E: ErrorState, O: Timeline
     }
 }
 
-impl<Output: Timeline> ClockUpdateBuilder<Null, Null, Null, Output> {
+impl<O: Timeline> ClockUpdateBuilder<Null<O>, Null<O>, Null<O>, O> {
     /// Returns an empty `ClockUpdateBuilder`.
     #[inline]
     fn new() -> Self {
         Self {
-            value_state: Null,
-            rate_state: Null,
-            error_state: Null,
+            value_state: Null(std::marker::PhantomData),
+            rate_state: Null(std::marker::PhantomData),
+            error_state: Null(std::marker::PhantomData),
             _output_marker: std::marker::PhantomData,
         }
     }
 }
 
-impl<R: RateState, E: ErrorState, O: Timeline> ClockUpdateBuilder<Null, R, E, O> {
+impl<R: RateState, E: ErrorState, O: Timeline> ClockUpdateBuilder<Null<O>, R, E, O> {
     /// Sets an absolute value for this `ClockUpdate` using a (reference time, synthetic time) pair.
     ///
     /// Reference time is typically monotonic and synthetic time is the time tracked by the clock.
@@ -204,7 +204,7 @@ impl<R: RateState, E: ErrorState, O: Timeline> ClockUpdateBuilder<Null, R, E, O>
     }
 }
 
-impl<E: ErrorState, O: Timeline> ClockUpdateBuilder<Null, Null, E, O> {
+impl<E: ErrorState, O: Timeline> ClockUpdateBuilder<Null<O>, Null<O>, E, O> {
     /// Sets an approximate value for this `ClockUpdateBuilder` using a synthetic time only.
     ///
     /// Synthetic time is the time tracked by the clock. The reference time will be set to current
@@ -216,7 +216,7 @@ impl<E: ErrorState, O: Timeline> ClockUpdateBuilder<Null, Null, E, O> {
     pub fn approximate_value(
         self,
         synthetic_value: Time<O>,
-    ) -> ClockUpdateBuilder<ApproximateValue<O>, Null, E, O> {
+    ) -> ClockUpdateBuilder<ApproximateValue<O>, Null<O>, E, O> {
         ClockUpdateBuilder {
             value_state: ApproximateValue(synthetic_value),
             rate_state: self.rate_state,
@@ -226,13 +226,13 @@ impl<E: ErrorState, O: Timeline> ClockUpdateBuilder<Null, Null, E, O> {
     }
 }
 
-impl<E: ErrorState, O: Timeline> ClockUpdateBuilder<Null, Null, E, O> {
+impl<E: ErrorState, O: Timeline> ClockUpdateBuilder<Null<O>, Null<O>, E, O> {
     /// Adds a rate change in parts per million to this `ClockUpdateBuilder`.
     ///
     /// Adding a rate is only possible when the value is either not set or set to an absolute value
     /// and when no rate has been set previously.
     #[inline]
-    pub fn rate_adjust(self, rate_adjust_ppm: i32) -> ClockUpdateBuilder<Null, Rate, E, O> {
+    pub fn rate_adjust(self, rate_adjust_ppm: i32) -> ClockUpdateBuilder<Null<O>, Rate, E, O> {
         ClockUpdateBuilder {
             value_state: self.value_state,
             rate_state: Rate(rate_adjust_ppm),
@@ -242,7 +242,7 @@ impl<E: ErrorState, O: Timeline> ClockUpdateBuilder<Null, Null, E, O> {
     }
 }
 
-impl<E: ErrorState, O: Timeline> ClockUpdateBuilder<AbsoluteValue<O>, Null, E, O> {
+impl<E: ErrorState, O: Timeline> ClockUpdateBuilder<AbsoluteValue<O>, Null<O>, E, O> {
     /// Adds a rate change in parts per million to this `ClockUpdateBuilder`.
     ///
     /// Adding a rate is only possible when the value is either not set or set to an absolute value
@@ -261,7 +261,7 @@ impl<E: ErrorState, O: Timeline> ClockUpdateBuilder<AbsoluteValue<O>, Null, E, O
     }
 }
 
-impl<V: ValueState, R: RateState, O: Timeline> ClockUpdateBuilder<V, R, Null, O> {
+impl<V: ValueState, R: RateState, O: Timeline> ClockUpdateBuilder<V, R, Null<O>, O> {
     /// Adds an error bound in nanoseconds to this `ClockUpdateBuilder`.
     #[inline]
     pub fn error_bounds(self, error_bound_ns: u64) -> ClockUpdateBuilder<V, R, Error, O> {
@@ -284,10 +284,10 @@ pub struct ClockUpdate<Output = SyntheticTimeline> {
     error_bound: u64,
 }
 
-impl<Output: Timeline> ClockUpdate<Output> {
+impl<O: Timeline> ClockUpdate<O> {
     /// Returns a new, empty, `ClockUpdateBuilder`.
     #[inline]
-    pub fn builder() -> ClockUpdateBuilder<Null, Null, Null, Output> {
+    pub fn builder() -> ClockUpdateBuilder<Null<O>, Null<O>, Null<O>, O> {
         ClockUpdateBuilder::new()
     }
 
@@ -299,7 +299,7 @@ impl<Output: Timeline> ClockUpdate<Output> {
     }
 }
 
-impl<V: ValueState<OutputTimeline = O>, R: RateState, E: ErrorState, O: Timeline + Default>
+impl<V: ValueState<OutputTimeline = O>, R: RateState, E: ErrorState, O: Timeline>
     From<ClockUpdateBuilder<V, R, E, O>> for ClockUpdate<O>
 {
     fn from(builder: ClockUpdateBuilder<V, R, E, O>) -> Self {

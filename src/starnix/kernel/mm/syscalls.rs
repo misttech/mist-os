@@ -11,6 +11,7 @@ use crate::task::{CurrentTask, Task};
 use crate::vfs::buffers::{OutputBuffer, UserBuffersInputBuffer, UserBuffersOutputBuffer};
 use crate::vfs::FdNumber;
 use fuchsia_inspect_contrib::profile_duration;
+use fuchsia_runtime::UtcTime;
 use fuchsia_zircon as zx;
 use starnix_logging::{log_trace, trace_duration, track_stub, CATEGORY_STARNIX_MM};
 use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Unlocked};
@@ -427,9 +428,9 @@ fn do_futex<Key: FutexKey>(
         let mut deadline = time_from_timespec::<zx::MonotonicTimeline>(timespec)?;
         if is_realtime {
             track_stub!(TODO("https://fxbug.dev/356912301"), "FUTEX_CLOCK_REALTIME deadline");
-            deadline = crate::time::utc::estimate_monotonic_deadline_from_utc(
-                zx::SyntheticTime::from_nanos(deadline.into_nanos()),
-            );
+            deadline = crate::time::utc::estimate_monotonic_deadline_from_utc(UtcTime::from_nanos(
+                deadline.into_nanos(),
+            ));
         };
         Ok(deadline)
     };

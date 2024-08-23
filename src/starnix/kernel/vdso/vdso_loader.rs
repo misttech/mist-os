@@ -6,6 +6,7 @@ use crate::arch::vdso::VDSO_SIGRETURN_NAME;
 use crate::mm::memory::MemoryObject;
 use crate::mm::PAGE_SIZE;
 use crate::time::utc::update_utc_clock;
+use fuchsia_runtime::{UtcTime, UtcTimeline};
 use fuchsia_zircon::{
     ClockTransformation, {self as zx},
 };
@@ -59,13 +60,13 @@ impl MemoryMappedVvar {
         vvar_data
     }
 
-    pub fn update_utc_data_transform(&self, new_transform: &ClockTransformation) {
+    pub fn update_utc_data_transform(&self, new_transform: &ClockTransformation<UtcTimeline>) {
         let vvar_data = self.get_pointer_to_memory_mapped_vvar();
         let old_transform = ClockTransformation {
             reference_offset: zx::MonotonicTime::from_nanos(
                 vvar_data.mono_to_utc_reference_offset.load(Ordering::Acquire),
             ),
-            synthetic_offset: zx::SyntheticTime::from_nanos(
+            synthetic_offset: UtcTime::from_nanos(
                 vvar_data.mono_to_utc_synthetic_offset.load(Ordering::Acquire),
             ),
             rate: zx::sys::zx_clock_rate_t {

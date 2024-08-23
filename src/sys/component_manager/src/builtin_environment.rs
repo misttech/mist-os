@@ -93,9 +93,9 @@ use fuchsia_component::server::*;
 use fuchsia_inspect::health::Reporter;
 use fuchsia_inspect::stats::InspectorExt;
 use fuchsia_inspect::{component, Inspector};
-use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType};
+use fuchsia_runtime::{take_startup_handle, HandleInfo, HandleType, UtcClock};
 use fuchsia_zbi::{ZbiParser, ZbiType};
-use fuchsia_zircon::{self as zx, Clock, Resource};
+use fuchsia_zircon::{self as zx, Resource};
 use futures::future::{self, BoxFuture};
 use futures::{FutureExt, StreamExt, TryStreamExt};
 use hooks::EventType;
@@ -133,7 +133,7 @@ pub struct BuiltinEnvironmentBuilder {
     bootfs_svc: Option<BootfsSvc>,
     runners: Vec<(Name, Arc<dyn BuiltinRunnerFactory>)>,
     resolvers: ResolverRegistry,
-    utc_clock: Option<Arc<Clock>>,
+    utc_clock: Option<Arc<UtcClock>>,
     add_environment_resolvers: bool,
     inspector: Option<Inspector>,
     crash_records: CrashRecords,
@@ -609,7 +609,7 @@ impl BuiltinEnvironment {
         builtin_runners: Vec<BuiltinRunner>,
         boot_resolver: Option<FuchsiaBootResolver>,
         realm_builder_resolver: Option<RealmBuilderResolver>,
-        utc_clock: Option<Arc<Clock>>,
+        utc_clock: Option<Arc<UtcClock>>,
         inspector: Inspector,
         crash_records: CrashRecords,
         capability_passthrough: bool,

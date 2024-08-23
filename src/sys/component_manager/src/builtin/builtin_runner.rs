@@ -10,7 +10,8 @@ use cm_util::TaskGroup;
 use elf_runner::crash_info::CrashRecords;
 use elf_runner::process_launcher::NamespaceConnector;
 use fidl::endpoints::{DiscoverableProtocolMarker, RequestStream, ServerEnd};
-use fuchsia_zircon::{self as zx, Clock};
+use fuchsia_runtime::UtcClock;
+use fuchsia_zircon::{self as zx};
 use futures::future::BoxFuture;
 use futures::{Future, FutureExt, TryStreamExt};
 use namespace::{Namespace, NamespaceError};
@@ -63,7 +64,7 @@ pub struct ElfRunnerResources {
     /// Job policy requests in the program block of ELF components will be checked against
     /// the provided security policy.
     pub security_policy: Arc<SecurityPolicy>,
-    pub utc_clock: Option<Arc<Clock>>,
+    pub utc_clock: Option<Arc<UtcClock>>,
     pub crash_records: CrashRecords,
     pub instance_registry: Arc<InstanceRegistry>,
 }

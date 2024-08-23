@@ -19,7 +19,7 @@ use crate::vfs::{
     RecordLockOwner, RecordLocks, WeakFileHandle, MAX_LFS_FILESIZE,
 };
 use bitflags::bitflags;
-use fuchsia_zircon as zx;
+use fuchsia_runtime::UtcTime;
 use linux_uapi::XATTR_SECURITY_PREFIX;
 use once_cell::sync::OnceCell;
 use starnix_logging::{log_error, track_stub};
@@ -204,9 +204,9 @@ pub struct FsNodeInfo {
     pub size: usize,
     pub blksize: usize,
     pub blocks: usize,
-    pub time_status_change: zx::SyntheticTime,
-    pub time_access: zx::SyntheticTime,
-    pub time_modify: zx::SyntheticTime,
+    pub time_status_change: UtcTime,
+    pub time_access: UtcTime,
+    pub time_modify: UtcTime,
     pub security_state: security::FsNodeState,
 }
 
@@ -1103,7 +1103,7 @@ macro_rules! fs_node_impl_not_dir {
 pub enum TimeUpdateType {
     Now,
     Omit,
-    Time(zx::SyntheticTime),
+    Time(UtcTime),
 }
 
 // Public re-export of macros allows them to be used like regular rust items.
@@ -2031,7 +2031,7 @@ impl FsNode {
         })
     }
 
-    fn statx_timestamp_from_time(time: zx::SyntheticTime) -> statx_timestamp {
+    fn statx_timestamp_from_time(time: UtcTime) -> statx_timestamp {
         let nanos = time.into_nanos();
         statx_timestamp {
             tv_sec: nanos / NANOS_PER_SECOND,
@@ -2415,9 +2415,9 @@ mod tests {
             info.uid = 9;
             info.gid = 10;
             info.link_count = 11;
-            info.time_status_change = zx::SyntheticTime::from_nanos(1);
-            info.time_access = zx::SyntheticTime::from_nanos(2);
-            info.time_modify = zx::SyntheticTime::from_nanos(3);
+            info.time_status_change = UtcTime::from_nanos(1);
+            info.time_access = UtcTime::from_nanos(2);
+            info.time_modify = UtcTime::from_nanos(3);
             info.rdev = DeviceType::new(13, 13);
         });
         let stat = node.stat(&current_task).expect("stat");

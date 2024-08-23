@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::time::utc;
+use fuchsia_runtime::UtcTime;
 use fuchsia_zircon as zx;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::time::{itimerspec_from_deadline_interval, time_from_timespec};
@@ -54,7 +55,7 @@ pub enum TimerWakeup {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum TargetTime {
     Monotonic(zx::MonotonicTime),
-    RealTime(zx::SyntheticTime),
+    RealTime(UtcTime),
     // TODO(https://fxbug.dev/328306129) handle boot time with its own type
     BootTime(zx::MonotonicTime),
 }

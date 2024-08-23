@@ -11,6 +11,7 @@ use crate::vfs::{
 };
 use fidl::endpoints::{ClientEnd, ServerEnd};
 use fidl::HandleBased;
+use fuchsia_runtime::UtcTime;
 use futures::future::BoxFuture;
 use starnix_logging::track_stub;
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked};
@@ -398,10 +399,10 @@ impl StarnixNodeConnection {
     fn update_attributes(&self, attributes: fio::MutableNodeAttributes) {
         self.file.node().update_info(|info| {
             if let Some(time) = attributes.creation_time {
-                info.time_status_change = zx::SyntheticTime::from_nanos(time as i64);
+                info.time_status_change = UtcTime::from_nanos(time as i64);
             }
             if let Some(time) = attributes.modification_time {
-                info.time_modify = zx::SyntheticTime::from_nanos(time as i64);
+                info.time_modify = UtcTime::from_nanos(time as i64);
             }
             if let Some(mode) = attributes.mode {
                 info.mode = FileMode::from_bits(mode);

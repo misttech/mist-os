@@ -31,7 +31,7 @@ use fidl_fuchsia_diagnostics_types::{
 };
 use fidl_fuchsia_process_lifecycle::LifecycleMarker;
 use fuchsia_async::{self as fasync, TimeoutExt};
-use fuchsia_runtime::{duplicate_utc_clock_handle, job_default, HandleInfo, HandleType};
+use fuchsia_runtime::{duplicate_utc_clock_handle, job_default, HandleInfo, HandleType, UtcClock};
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
 use futures::channel::oneshot;
 use futures::TryStreamExt;
@@ -84,7 +84,7 @@ pub struct ElfRunner {
     /// clock will be duplicated from current process' process table.
     /// The latter is typically the case in unit tests and nested
     /// component managers.
-    utc_clock: Option<Arc<zx::Clock>>,
+    utc_clock: Option<Arc<UtcClock>>,
 
     crash_records: CrashRecords,
 
@@ -121,7 +121,7 @@ impl ElfRunner {
     pub fn new(
         job: zx::Job,
         launcher_connector: process_launcher::Connector,
-        utc_clock: Option<Arc<zx::Clock>>,
+        utc_clock: Option<Arc<UtcClock>>,
         crash_records: CrashRecords,
     ) -> ElfRunner {
         let components = ComponentSet::new();
@@ -132,7 +132,7 @@ impl ElfRunner {
     /// Returns a UTC clock handle.
     ///
     /// Duplicates `self.utc_clock` if populated, or the UTC clock assigned to the current process.
-    async fn duplicate_utc_clock(&self) -> Result<zx::Clock, zx::Status> {
+    async fn duplicate_utc_clock(&self) -> Result<UtcClock, zx::Status> {
         if let Some(utc_clock) = &self.utc_clock {
             utc_clock.duplicate_handle(DUPLICATE_CLOCK_RIGHTS)
         } else {
@@ -194,7 +194,7 @@ impl ElfRunner {
     fn create_handle_infos(
         outgoing_dir: Option<zx::Channel>,
         lifecycle_server: Option<zx::Channel>,
-        utc_clock: zx::Clock,
+        utc_clock: UtcClock,
         next_vdso: Option<zx::Vmo>,
         config_vmo: Option<zx::Vmo>,
     ) -> Vec<fproc::HandleInfo> {

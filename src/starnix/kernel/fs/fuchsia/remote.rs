@@ -20,6 +20,7 @@ use crate::vfs::{
 };
 use bstr::ByteSlice;
 use fidl::AsHandleRef;
+use fuchsia_runtime::UtcTime;
 use fuchsia_zircon::{HandleBased, Status};
 use linux_uapi::SYNC_IOC_MAGIC;
 use once_cell::sync::OnceCell;
@@ -363,11 +364,11 @@ pub fn update_info_from_attrs(info: &mut FsNodeInfo, attrs: &zxio_node_attribute
     }
     if attrs.has.modification_time {
         info.time_modify =
-            zx::SyntheticTime::from_nanos(attrs.modification_time.try_into().unwrap_or(i64::MAX));
+            UtcTime::from_nanos(attrs.modification_time.try_into().unwrap_or(i64::MAX));
     }
     if attrs.has.change_time {
         info.time_status_change =
-            zx::SyntheticTime::from_nanos(attrs.change_time.try_into().unwrap_or(i64::MAX));
+            UtcTime::from_nanos(attrs.change_time.try_into().unwrap_or(i64::MAX));
     }
 }
 
@@ -2678,7 +2679,7 @@ mod test {
                             locked,
                             &current_task,
                             &child.mount,
-                            TimeUpdateType::Time(zx::SyntheticTime::from_nanos(30)),
+                            TimeUpdateType::Time(UtcTime::from_nanos(30)),
                             TimeUpdateType::Omit,
                         )
                         .expect("update_atime_mtime failed");
@@ -2689,7 +2690,7 @@ mod test {
                         .expect("fetch_and_refresh_info failed")
                         .clone();
                     assert_eq!(info_after_update.time_modify, info_original.time_modify);
-                    assert_eq!(info_after_update.time_access, zx::SyntheticTime::from_nanos(30));
+                    assert_eq!(info_after_update.time_access, UtcTime::from_nanos(30));
 
                     child
                         .entry
@@ -2699,7 +2700,7 @@ mod test {
                             &current_task,
                             &child.mount,
                             TimeUpdateType::Omit,
-                            TimeUpdateType::Time(zx::SyntheticTime::from_nanos(50)),
+                            TimeUpdateType::Time(UtcTime::from_nanos(50)),
                         )
                         .expect("update_atime_mtime failed");
                     let info_after_update2 = child
@@ -2708,8 +2709,8 @@ mod test {
                         .fetch_and_refresh_info(&current_task)
                         .expect("fetch_and_refresh_info failed")
                         .clone();
-                    assert_eq!(info_after_update2.time_modify, zx::SyntheticTime::from_nanos(50));
-                    assert_eq!(info_after_update2.time_access, zx::SyntheticTime::from_nanos(30));
+                    assert_eq!(info_after_update2.time_modify, UtcTime::from_nanos(50));
+                    assert_eq!(info_after_update2.time_access, UtcTime::from_nanos(30));
                 }
             })
             .await

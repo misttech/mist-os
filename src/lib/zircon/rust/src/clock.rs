@@ -95,6 +95,12 @@ impl<Output: Timeline> Clock<Output> {
         ok(status)?;
         Ok(())
     }
+
+    /// Convert this clock to one on a generic synthetic timeline, erasing any user-defined
+    /// timeline.
+    pub fn downcast(self) -> Clock<SyntheticTimeline> {
+        Clock(self.0, std::marker::PhantomData)
+    }
 }
 
 impl<Output: Timeline> AsHandleRef for Clock<Output> {
