@@ -86,7 +86,6 @@ template("_cuckoo_product_bundle") {
           ":$stub_test_target",
         ]
     cmdline_deps = []
-    core_realm_definition = "//build/testing:cuckoo-core-realm"
     board_config_label = board_configuration_label
     allow_eng_platform_bundle_use = true
 

@@ -12,7 +12,6 @@
 # The shard target must be included in one of the following GN argument arrays:
 #
 #   * core_realm_shards
-#   * board_core_realm_shards
 #   * fuchsia_base.extra_core_realm_shards
 #
 # Example:

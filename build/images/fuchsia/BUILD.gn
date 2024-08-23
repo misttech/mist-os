@@ -123,7 +123,7 @@ if (is_fuchsia) {
   }
 
   core_realm_definition("core_realm") {
-    deps = core_realm_shards + board_core_realm_shards
+    deps = core_realm_shards
   }
 
   ##################################################

@@ -6,13 +6,6 @@ import("//build/assembly/product_assembly_configuration.gni")
 import("//build/testing/boot_tests/kernel_zbi_test.gni")
 import("//src/sys/core/build/core.gni")
 
-# Core realm definition to be used only instances of cuckoo_kernel_zbi_test()
-core_realm_definition("cuckoo-core-realm") {
-  testonly = true
-
-  deps = board_core_realm_shards
-}
-
 # Generates a product_assembly_configuration for a cukoo tests with a set of
 # default settings. Some of these settings may be overridden, see the list
 # of parameters for more details.

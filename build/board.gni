@@ -28,10 +28,6 @@ declare_args() {
   # board definition rather than the product definition.
   board_recovery_package_labels = []
 
-  # Core realm shards specific to this board. See //src/sys/core for more
-  # context.
-  board_core_realm_shards = []
-
   # A list of paths to the unlock credentials file necessary to unlock this
   # board's fastboot protocol.
   board_fastboot_unlock_credentials = []
