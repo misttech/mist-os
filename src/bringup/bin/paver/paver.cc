@@ -21,6 +21,7 @@
 #if defined(LEGACY_PAVER)
 #include "src/storage/lib/paver/android.h"
 #include "src/storage/lib/paver/astro.h"
+#include "src/storage/lib/paver/kola.h"
 #include "src/storage/lib/paver/luis.h"
 #include "src/storage/lib/paver/nelson.h"
 #include "src/storage/lib/paver/sherlock.h"
@@ -28,6 +29,8 @@
 #include "src/storage/lib/paver/x64.h"
 #elif defined(astro)
 #include "src/storage/lib/paver/astro.h"
+#elif defined(kola)
+#include "src/storage/lib/paver/kola.h"
 #elif defined(luis)
 #include "src/storage/lib/paver/luis.h"
 #elif defined(nelson)
@@ -90,6 +93,8 @@ int main(int argc, char** argv) {
   abr::ClientFactory::Register(std::make_unique<paver::NelsonAbrClientFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::SherlockPartitionerFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::SherlockAbrClientFactory>());
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::KolaPartitionerFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::KolaAbrClientFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::LuisPartitionerFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::LuisAbrClientFactory>());
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::Vim3PartitionerFactory>());
@@ -108,6 +113,9 @@ int main(int argc, char** argv) {
 #elif defined(sherlock)
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::SherlockPartitionerFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::SherlockAbrClientFactory>());
+#elif defined(kola)
+  paver::DevicePartitionerFactory::Register(std::make_unique<paver::KolaPartitionerFactory>());
+  abr::ClientFactory::Register(std::make_unique<paver::KolaAbrClientFactory>());
 #elif defined(luis)
   paver::DevicePartitionerFactory::Register(std::make_unique<paver::LuisPartitionerFactory>());
   abr::ClientFactory::Register(std::make_unique<paver::LuisAbrClientFactory>());

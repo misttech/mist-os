@@ -24,6 +24,7 @@
 #include "src/storage/lib/block_client/cpp/remote_block_device.h"
 #include "src/storage/lib/paver/abr-client.h"
 #include "src/storage/lib/paver/astro.h"
+#include "src/storage/lib/paver/kola.h"
 #include "src/storage/lib/paver/luis.h"
 #include "src/storage/lib/paver/sherlock.h"
 #include "src/storage/lib/paver/test/test-utils.h"
@@ -64,6 +65,20 @@ TEST(SherlockAbrTests, CreateFails) {
   ASSERT_OK(devices);
   ASSERT_NOT_OK(
       paver::SherlockAbrClientFactory().Create(*devices, devmgr.fshost_svc_dir(), nullptr));
+}
+
+TEST(KolaAbrTests, CreateFails) {
+  IsolatedDevmgr devmgr;
+  IsolatedDevmgr::Args args;
+  args.disable_block_watcher = false;
+  args.board_name = "astro";
+
+  ASSERT_OK(IsolatedDevmgr::Create(&args, &devmgr));
+  ASSERT_OK(RecursiveWaitForFile(devmgr.devfs_root().get(), "sys/platform").status_value());
+
+  zx::result devices = paver::BlockDevices::Create(devmgr.devfs_root().duplicate());
+  ASSERT_OK(devices);
+  ASSERT_NOT_OK(paver::KolaAbrClientFactory().Create(*devices, devmgr.fshost_svc_dir(), nullptr));
 }
 
 TEST(LuisAbrTests, CreateFails) {

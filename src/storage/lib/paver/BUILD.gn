@@ -130,6 +130,17 @@ source_set("nelson") {
   ]
 }
 
+source_set("kola") {
+  sources = [ "kola.cc" ]
+  public_deps = [
+    ":gpt",
+    ":paver-core",
+    "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
+    "//src/lib/uuid",
+    "//src/storage/gpt",
+  ]
+}
+
 source_set("luis") {
   sources = [ "luis.cc" ]
   public_deps = [
@@ -185,6 +196,7 @@ source_set("paver") {
   public_deps = [
     ":android",
     ":astro",
+    ":kola",
     ":luis",
     ":nelson",
     ":paver-core",
