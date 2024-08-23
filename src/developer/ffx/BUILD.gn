@@ -3,7 +3,7 @@
 # found in the LICENSE file.
 
 import("//build/host.gni")
-import("//build/product.gni")
+import("//build/images/paths.gni")
 import("//build/sdk/sdk_host_tool.gni")
 import("//build/testing/host_test.gni")
 import("//build/testing/host_test_data.gni")
@@ -16,10 +16,97 @@ group("ffx") {
 
   public_deps = [
     ":ffx-defaults.json($host_toolchain)",
+    ":ffx_build_dir_config_file($default_toolchain)",
     ":ffx_tool($host_toolchain)",
     ":tests",
     "lib($host_toolchain)",
   ]
+}
+
+if (current_toolchain == default_toolchain) {
+  _ffx_build_dir_config_data_file = "${target_gen_dir}/ffx-config-data.json"
+
+  action("ffx_build_dir_config_file") {
+    testonly = true
+    script = "write_ffx_config.py"
+    inputs = [ _ffx_build_dir_config_data_file ]
+
+    # The output path matches the code in ffx to look for $BUILD_DIR/ffx-config.json.
+    outputs = [ "${root_build_dir}/ffx-config.json" ]
+
+    args = [
+      "--dollar-placeholder",
+      "!!",
+      "--data",
+      rebase_path(_ffx_build_dir_config_data_file, root_build_dir),
+      "--build-dir",
+      rebase_path(root_build_dir, root_build_dir),
+      "--output",
+      rebase_path("${root_out_dir}/ffx-config.json", root_build_dir),
+    ]
+
+    deps = [ ":ffx-build-config.metadata" ]
+  }
+
+  # Builds the build directory level configuration file for ffx.
+  generated_file("ffx-build-config.metadata") {
+    # The output directory should be in the root build dir, so the path can be correctly computed.
+    outputs = [ _ffx_build_dir_config_data_file ]
+    data_keys = [ "ffx" ]
+    deps = [
+      ":default_ffx_config",
+      ":host($host_toolchain)",
+      "frontends/ffx:ffx_bin($host_toolchain)",
+      "tools($host_toolchain)",
+    ]
+    output_conversion = "json"
+  }
+
+  group("default_ffx_config") {
+    #
+    # NOTE: There is a long standing issue with using $ in the value of string variables in scopes.
+    # To work around this, !! is used as a placeholder for $ and replaced before writing out
+    # the configuration file.
+    #
+    # Don't use absolute paths since they risk poisoning the build cache across machines.
+    #
+    metadata = {
+      # The "ffx" metadata is collected and written into the build-dir level ffx config file.
+      ffx = [
+        {
+          # FIDL IR root is the location of all FIDL IR files
+          fidl = {
+            ir = {
+              path = "!!BUILD_DIR/fidling/gen/ir_root"
+            }
+          }
+
+          # SDK root
+          sdk = {
+            root = "!!BUILD_DIR"
+          }
+
+          # The "main" product bundle
+          # Only define it if the variable exists since there are builds, such as SDK only,
+          # that do not build any product bundles. In those builds, there is no product, so
+          # it is OK to not set this value.
+          if (defined(files) && defined(files.product_bundle_dir)) {
+            product = {
+              path = "!!BUILD_DIR/" +
+                     rebase_path(files.product_bundle_dir, root_out_dir)
+            }
+          }
+
+          # package repository
+          repository = {
+            # the repo name cannot have _, so they are replaced with -.
+            default =
+                string_replace(get_path_info(root_build_dir, "name"), "_", "-")
+          }
+        },
+      ]
+    }
+  }
 }
 
 if (is_host) {

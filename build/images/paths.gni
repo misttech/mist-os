@@ -58,9 +58,11 @@ files = {
     _images_outdir = get_label_info(labels.images, "target_out_dir") +
                      "/${_bazel_target_name}/product_bundle"
     _assembly_outdir = _images_outdir + "/system_a"
+    product_bundle_dir = _images_outdir
   } else {
     _images_outdir = get_label_info(labels.images, "target_out_dir")
     _assembly_outdir = _images_outdir + "/${labels.assembly_name}"
+    product_bundle_dir = _images_outdir + "/product_bundle"
   }
 
   if (!use_bringup_assembly) {
