@@ -159,11 +159,12 @@ zx_status_t VmObjectDispatcher::ReadVector(user_out_iovec_t user_data, uint64_t 
 }
 
 zx_status_t VmObjectDispatcher::WriteVector(
-    user_in_iovec_t user_data, uint64_t offset, size_t length, size_t* out_actual,
-    VmObject::OnWriteBytesTransferredCallback on_bytes_transferred) {
+    user_in_iovec_t user_data, uint64_t offset, size_t length, VmObjectReadWriteOptions options,
+    size_t* out_actual, VmObject::OnWriteBytesTransferredCallback on_bytes_transferred) {
   canary_.Assert();
 
-  return vmo_->WriteUserVector(user_data, offset, length, out_actual, on_bytes_transferred);
+  return vmo_->WriteUserVector(user_data, offset, length, options, out_actual,
+                               on_bytes_transferred);
 }
 
 zx_status_t VmObjectDispatcher::Write(

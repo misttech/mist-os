@@ -2698,7 +2698,13 @@ bool VmCowPages::LookupCursor::CursorIsContentZero() const {
   if (owner_->page_source_) {
     // With a page source emptiness implies needing to request content, however we can have zero
     // intervals which do start as zero content.
-    return CursorIsInIntervalZero();
+    if (CursorIsInIntervalZero()) {
+      return true;
+    }
+    // Knowing that we cannot be in an interval, if the cursor is otherwise empty check if we can
+    // assume this offset is zero content.
+    return zero_above_user_size_ && CursorIsEmpty() && owner()->user_content_size_ &&
+           owner_offset_ >= owner()->user_content_size_->GetContentSize();
   }
   // Without a page source emptiness is filled with zeros and intervals are only permitted if there
   // is a page source.
@@ -2888,8 +2894,12 @@ zx_status_t VmCowPages::LookupCursor::DirtyRequest(uint max_request_pages,
                                                    LazyPageRequest* page_request) {
   // Dirty requests, unlike read requests, happen directly against the target, and not the owner.
   // This is because to make something dirty you must own it, i.e. target_ is already equal to
-  // owner_.
-  DEBUG_ASSERT(target_ == owner_);
+  // owner_. Unfortunately we cannot explicitly check for target_ == owner_, since owner_ doubles as
+  // tracking for whether the cursor is valid, and it may have been made invalid just prior to
+  // generating this dirty request, and we do not otherwise need the cursor here.
+  // Instead we validate that we have no parent, and that we have a page source.
+  DEBUG_ASSERT(target_ == owner_ || !IsCursorValid());
+  DEBUG_ASSERT(!target_->parent_);
   DEBUG_ASSERT(target_->page_source_);
   DEBUG_ASSERT(max_request_pages > 0);
   DEBUG_ASSERT(offset_ + PAGE_SIZE * max_request_pages <= end_offset_);
@@ -3102,6 +3112,32 @@ zx::result<VmCowPages::LookupCursor::RequireResult> VmCowPages::LookupCursor::Re
     // should not be trapped.
     const bool target_page_dirty = TargetZeroContentSupplyDirty(will_write);
     if (target_page_dirty && target_->page_source_->ShouldTrapDirtyTransitions()) {
+      // As we need to generate a dirty request we want to check if we can assume any of the range
+      // we are about to dirty can be zero. If it can, then by first replacing any gaps with zero
+      // intervals these ranges can be included in the dirty request. This prevents us from needing
+      // to read request these pages, and minimizes the number of dirty transitions we need to make.
+      if (zero_above_user_size_ && target_->user_content_size_) {
+        const uint64_t end_offset = offset_ + max_request_pages * PAGE_SIZE;
+        const uint64_t byte_zero_start = target_->user_content_size_->GetContentSize();
+        if (end_offset > byte_zero_start) {
+          // As end_offset is a valid page aligned value, and it is greater than byte_zero_start, we
+          // know that rounding up byte_zero_start is a safe operation. This could cause us to zero
+          // a zero sized range, but that is safe to do.
+          const uint64_t zero_start = ROUNDUP_PAGE_SIZE(byte_zero_start);
+          uint64_t zeroed_out;
+          // Passing in |true| for |only_zero_gaps| is fine here as we do not *have* to zero the
+          // range, rather we *may* zero it, and by only zeroing the gaps this method will not
+          // attempt to zero existing pages, which could otherwise generate dirty requests.
+          zx_status_t status = target_->ZeroPagesPreservingContentLocked(
+              zero_start, end_offset, true, nullptr, nullptr, &zeroed_out);
+          // Regardless of the result, the zeroing may modified the page list, invalidating our
+          // cursor.
+          owner_ = nullptr;
+          if (status != ZX_OK) {
+            return zx::error(status);
+          }
+        }
+      }
       zx_status_t status = DirtyRequest(max_request_pages, page_request->GetLazyDirtyRequest());
       // Since we know we have a page source that traps, and page sources will never succeed
       // synchronously, our dirty request must have 'failed'.

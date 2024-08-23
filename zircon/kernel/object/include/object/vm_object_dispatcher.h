@@ -83,7 +83,7 @@ class VmObjectDispatcher final : public SoloDispatcher<VmObjectDispatcher, ZX_DE
                     size_t* out_actual,
                     VmObject::OnWriteBytesTransferredCallback on_bytes_transferred = nullptr);
   zx_status_t WriteVector(user_in_iovec_t user_data, uint64_t offset, size_t length,
-                          size_t* out_actual,
+                          VmObjectReadWriteOptions options, size_t* out_actual,
                           VmObject::OnWriteBytesTransferredCallback on_bytes_transferred = nullptr);
   zx_status_t SetSize(uint64_t);
   zx_status_t GetSize(uint64_t* size);

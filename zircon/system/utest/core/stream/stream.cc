@@ -1410,4 +1410,52 @@ TEST(StreamTestCase, PartialVmoDirty) {
   pager_thread.join();
 }
 
+TEST(StreamTestCase, AppendSuppliesZeroes) {
+  const size_t page_size = zx_system_get_page_size();
+  pager_tests::UserPager pager;
+  ASSERT_TRUE(pager.Init());
+  pager_tests::Vmo* vmo;
+  ASSERT_TRUE(pager.CreateUnboundedVmo(0, ZX_VMO_TRAP_DIRTY, &vmo));
+  zx::stream stream;
+  ASSERT_OK(
+      zx::stream::create(ZX_STREAM_MODE_WRITE | ZX_STREAM_MODE_APPEND, vmo->vmo(), 0u, &stream));
+
+  const size_t kAppends[] = {page_size / 2, page_size,     page_size * 2,
+                             page_size / 2, page_size * 2, page_size / 4,
+                             page_size / 4, page_size / 4, page_size};
+
+  std::thread pager_thread([&]() {
+    ASSERT_TRUE(pager.WaitForPageDirty(vmo, 0, 1, ZX_TIME_INFINITE));
+    ASSERT_TRUE(pager.DirtyPages(vmo, 0, 1));
+    ASSERT_TRUE(pager.WaitForPageDirty(vmo, 1, 1, ZX_TIME_INFINITE));
+    ASSERT_TRUE(pager.DirtyPages(vmo, 1, 1));
+    ASSERT_TRUE(pager.WaitForPageDirty(vmo, 2, 2, ZX_TIME_INFINITE));
+    ASSERT_TRUE(pager.DirtyPages(vmo, 2, 2));
+    ASSERT_TRUE(pager.WaitForPageDirty(vmo, 4, 2, ZX_TIME_INFINITE));
+    ASSERT_TRUE(pager.DirtyPages(vmo, 4, 2));
+    ASSERT_TRUE(pager.WaitForPageDirty(vmo, 6, 1, ZX_TIME_INFINITE));
+    ASSERT_TRUE(pager.DirtyPages(vmo, 6, 1));
+    ASSERT_TRUE(pager.WaitForPageDirty(vmo, 7, 1, ZX_TIME_INFINITE));
+    ASSERT_TRUE(pager.DirtyPages(vmo, 7, 1));
+  });
+
+  auto buffer = std::make_unique<uint8_t[]>(page_size * 2);
+  for (size_t size : kAppends) {
+    zx_iovec_t iovec = {
+        .buffer = buffer.get(),
+        .capacity = size,
+    };
+    size_t bytes_written = 0;
+    EXPECT_OK(stream.writev(ZX_STREAM_APPEND, &iovec, 1, &bytes_written));
+    EXPECT_EQ(bytes_written, size);
+  }
+  uint64_t offset, length;
+  // No more requests.
+  ASSERT_FALSE(pager.GetPageDirtyRequest(vmo, 0, &offset, &length));
+  // If a read request had been generated this test would have hung, but validate there are none
+  // anyway.
+  ASSERT_FALSE(pager.GetPageReadRequest(vmo, 0, &offset, &length));
+  pager_thread.join();
+}
+
 }  // namespace
