@@ -19,10 +19,6 @@ product_assembly_configuration("terminal") {
   platform = {
     build_type = "eng"
 
-    input_groups = {
-      group1 = true
-    }
-
     bluetooth = {
       type = "standard"
       snoop = "lazy"
@@ -75,6 +71,10 @@ product_assembly_configuration("terminal") {
 
       # avoid impacting existing terminal users like chromium tests
       autolaunch = false
+    }
+
+    storage = {
+      mutable_storage_garbage_collection = true
     }
   }
   product = {

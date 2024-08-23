@@ -39,10 +39,6 @@ _platform_configuration_base = {
     }
   }
 
-  input_groups = {
-    group1 = true
-  }
-
   fonts = {
     # See base_packages below.
     font_collection = "small-open-fonts-collection"
@@ -79,6 +75,7 @@ _platform_configuration_base = {
 
 _storage_f2fs = {
   storage = {
+    mutable_storage_garbage_collection = true
     filesystems = {
       volume = {
         fvm = {
@@ -95,6 +92,7 @@ _storage_f2fs = {
 
 _storage_minfs = {
   storage = {
+    mutable_storage_garbage_collection = true
     filesystems = {
       volume = {
         fvm = {

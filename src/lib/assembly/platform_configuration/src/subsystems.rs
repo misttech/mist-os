@@ -39,7 +39,6 @@ mod forensics;
 mod graphics;
 mod hwinfo;
 mod icu;
-mod input_groups;
 mod intl;
 mod kernel;
 mod media;
@@ -327,13 +326,6 @@ fn configure_subsystems(
         builder,
     )
     .context("Configuring the 'icu' subsystem")?;
-
-    input_groups::InputGroupsSubsystem::define_configuration(
-        &context_base.for_subsystem("input_groups"),
-        &platform.input_groups,
-        builder,
-    )
-    .context("Configuring the 'input_groups' subsystem")?;
 
     media::MediaSubsystem::define_configuration(
         &context_base.for_subsystem("media"),
