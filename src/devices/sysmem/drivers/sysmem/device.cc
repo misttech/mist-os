@@ -279,8 +279,6 @@ void Device::DdkUnbindInternal() {
   // disconnect existing connections from drivers
   bindings_.RemoveAll();
 
-  compat_server_.reset();
-
   // Try to ensure there are no outstanding VMOS before shutting down the loop.
   PostTask([this]() mutable {
     ZX_ASSERT(loop_checker_.has_value());
@@ -485,12 +483,6 @@ zx_status_t Device::Initialize() {
   heaps_ = sysmem_root_.CreateChild("heaps");
   collections_node_ = sysmem_root_.CreateChild("collections");
 
-  zx::result<> compat_server_init_result =
-      compat_server_.Initialize(incoming(), outgoing(), node_name(), name());
-  if (compat_server_init_result.is_error()) {
-    return compat_server_init_result.error_value();
-  }
-
   zx::result<fidl::ClientEnd<fuchsia_hardware_platform_device::Device>> pdev_client_result =
       incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
   if (pdev_client_result.is_error()) {
@@ -668,20 +660,6 @@ zx_status_t Device::Initialize() {
     return add_owned_child_result.status_value();
   }
   devfs_owned_child_node_ = std::move(add_owned_child_result).value();
-
-  // compat node
-  const fuchsia_driver_framework::NodePropertyVector properties = {
-      fdf::MakeProperty(bind_fuchsia_hardware_sysmem::SERVICE,
-                        bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
-  };
-  std::vector<fuchsia_driver_framework::Offer> offers = compat_server_.CreateOffers2();
-  zx::result<fidl::ClientEnd<fuchsia_driver_framework::NodeController>> add_child_result =
-      AddChild("sysmem", properties, offers);
-  if (!add_child_result.is_ok()) {
-    LOG(ERROR, "Failed to call FIDL AddChild: %s", add_child_result.status_string());
-    return ZX_ERR_INTERNAL;
-  }
-  compat_node_controller_client_ = fidl::SyncClient(std::move(add_child_result).value());
 
   RunSyncOnLoop([this, devfs_connector_server = std::move(devfs_connector_server)]() mutable {
     devfs_connector_.AddBinding(

@@ -463,10 +463,6 @@ class Device final : public fdf::DriverBase,
 
   std::optional<fdf::OwnedChildNode> devfs_owned_child_node_;
 
-  compat::SyncInitializedDeviceServer compat_server_;
-
-  fidl::SyncClient<fuchsia_driver_framework::NodeController> compat_node_controller_client_;
-
   std::optional<const UsagePixelFormatCost> usage_pixel_format_cost_;
 
   // We allocate protected_memory_size during sysmem driver Start, and then when the securemem

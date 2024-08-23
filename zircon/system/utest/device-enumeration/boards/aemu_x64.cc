@@ -8,7 +8,8 @@ namespace {
 
 TEST_F(DeviceEnumerationTest, AemuX64Test) {
   static const char* kNodeMonikers[] = {
-      "dev.sys.platform.00_00_1b.sysmem",
+      // sysmem
+      "dev.sys.platform.00_00_1b",
 
       "dev.sys.platform.pt.acpi",
       "dev.sys.platform.pt.PCI0.bus.00_1f.2.00_1f_2.ahci",
