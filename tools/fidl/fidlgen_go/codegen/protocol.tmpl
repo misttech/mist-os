@@ -13,9 +13,9 @@ const (
 {{- end }}
 )
 
-{{ if $protocol.Openness.IsClosed -}}
 type {{ $protocol.ProxyName }} _bindings.{{ $protocol.ProxyType }}
 {{ range $method := $protocol.Methods }}
+{{ if $method.IsStrict }}
 {{ range $comment := $method.DocComments }}
 //{{ $comment }}
 {{- end }}
@@ -71,6 +71,13 @@ func (p *{{ $.ProxyName }}) {{ if $method.IsEvent -}}
 	return err_
 	{{- end }}
 }
+{{- else }}
+  {{- if $method.IsEvent }}
+	// NOTE: flexible event {{ $protocol.Name}}.{{ $method.Name }} is not implemented in Go.
+  {{- else }}
+    // NOTE: flexible method {{ $protocol.Name}}.{{ $method.Name }} is not implemented in Go.
+  {{- end }}
+{{- end }}
 {{- end }}
 
 {{ range $comment := .DocComments }}
@@ -78,6 +85,7 @@ func (p *{{ $.ProxyName }}) {{ if $method.IsEvent -}}
 {{- end }}
 type {{ $protocol.Name }} interface {
 {{- range $method := $protocol.Methods }}
+	{{- if $method.IsStrict }}
 	{{- range $comment := $method.DocComments }}
 	//{{ $comment }}
 	{{- end }}
@@ -91,6 +99,7 @@ type {{ $protocol.Name }} interface {
 	{{- if $method.Response }} ({{ $method.Response.Types }}, error)
 	{{- else }} error{{ end -}}
 	{{- else }} error{{ end }}
+	{{- end }}
 	{{- end }}
 {{- end }}
 }
@@ -123,6 +132,7 @@ type {{ $protocol.StubName }} struct {
 func (s_ *{{ $protocol.StubName }}) Dispatch(args_ _bindings.DispatchArgs) (_bindings.Message, bool, error) {
 	switch args_.Ordinal {
 	{{- range $method := $protocol.Methods }}
+	{{- if $method.IsStrict }}
 	{{- if not $method.IsEvent }}
 	case {{ $method.OrdinalName }}:
 		{{- if $method.HasRequest }}
@@ -155,12 +165,14 @@ func (s_ *{{ $protocol.StubName }}) Dispatch(args_ _bindings.DispatchArgs) (_bin
 		{{- end }}
 	{{- end }}
 	{{- end }}
+	{{- end }}
 	}
 	return nil, false, _bindings.ErrUnknownOrdinal
 }
 
 type {{ $protocol.EventProxyName }} _bindings.{{ $protocol.ProxyType }}
 {{ range $method := $protocol.Methods }}
+{{- if $method.IsStrict }}
 {{- if $method.IsEvent }}
 func (p *{{ $protocol.EventProxyName }}) {{ $method.Name }}(
 	{{- if $method.Response -}}
@@ -179,47 +191,6 @@ func (p *{{ $protocol.EventProxyName }}) {{ $method.Name }}(
 }
 {{- end }}
 {{- end }}
-{{- else }}{{/* end of if $protocol.Openness.IsClosed */}}
-// Bindings for this protocol have not been generated because it is an
-// {{ $protocol.Openness }} protocol. If bindings for {{ $protocol.Openness }} protocols are
-// needed in Go, please contact the FIDL team: fidl-dev@fuchsia.dev.
-type {{ $protocol.ProxyName }} _bindings.{{ $protocol.ProxyType }}
-
-// Bindings for this protocol have not been generated because it is an
-// {{ $protocol.Openness }} protocol. If bindings for {{ $protocol.Openness }} protocols are
-// needed in Go, please contact the FIDL team: fidl-dev@fuchsia.dev.
-type {{ $protocol.Name }} interface {}
-
-{{- if eq $protocol.ProxyType "ChannelProxy" }}
-type {{ $protocol.RequestName }} _bindings.InterfaceRequest
-
-func New{{ $protocol.RequestName }}() ({{ $protocol.RequestName }}, *{{ $protocol.ProxyName }}, error) {
-	req, cli, err := _bindings.NewInterfaceRequest()
-	return {{ $protocol.RequestName }}(req), (*{{ $protocol.ProxyName }})(cli), err
-}
-
-{{- if $protocol.ProtocolNameString }}
-// Implements ServiceRequest.
-func (_ {{ $protocol.RequestName }}) Name() string {
-	return {{ $protocol.ProtocolNameString }}
-}
-func (c {{ $protocol.RequestName }}) ToChannel() _zx.Channel {
-	return c.Channel
-}
-
-const {{ $protocol.ProtocolNameConstant }} = {{ $protocol.ProtocolNameString }}
 {{- end }}
-{{- end }}
-
-// Bindings for this protocol have not been generated because it is an
-// {{ $protocol.Openness }} protocol. If bindings for {{ $protocol.Openness }} protocols are
-// needed in Go, please contact the FIDL team: fidl-dev@fuchsia.dev.
-type {{ $protocol.StubName }} struct {}
-
-// Bindings for this protocol have not been generated because it is an
-// {{ $protocol.Openness }} protocol. If bindings for {{ $protocol.Openness }} protocols are
-// needed in Go, please contact the FIDL team: fidl-dev@fuchsia.dev.
-type {{ $protocol.EventProxyName }} struct {}
-{{- end }}{{/* end of else for if $protocol.Openness.IsClosed */}}
 
 {{ end -}}
