@@ -43,7 +43,7 @@ $CGPT add -i `$CGPT find -t A0E5CF57-2DEF-46BE-A80C-A2067C37CD49 -n $DISK` -l zi
 Then use `fx qemu` to start the emulator using the disk:
 
 ```bash
-fx qemu -a x64 -N --uefi --disktype=nvme --no-build -D $DISK
+fx qemu -a x64 -N --uefi --disktype=nvme -D $DISK
 ```
 
 In the bootloader, press f at the prompt to interrupt auto-boot and instead enable fastboot.
