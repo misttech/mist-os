@@ -17,6 +17,9 @@
 #include <zircon/compiler.h>
 #include <zircon/errors.h>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/platform/cpp/bind.h>
+
 #include "driver.h"
 #include "src/devices/misc/drivers/compat/composite_node_spec_util.h"
 
@@ -119,6 +122,9 @@ std::vector<fuchsia_driver_framework::wire::NodeProperty> CreateProperties(
   }
 
   for (auto [key, value] : cpp20::span(zx_args->str_props, zx_args->str_prop_count)) {
+    if (key == bind_fuchsia::PROTOCOL) {
+      has_protocol = true;
+    }
     switch (value.data_type) {
       case ZX_DEVICE_PROPERTY_VALUE_BOOL:
         properties.emplace_back(fdf::MakeProperty(arena, key, value.data.bool_val));
@@ -143,7 +149,7 @@ std::vector<fuchsia_driver_framework::wire::NodeProperty> CreateProperties(
   if (!has_protocol) {
     // If we do not have a protocol id, set it to MISC to match DFv1 behavior.
     uint32_t proto_id = zx_args->proto_id == 0 ? ZX_PROTOCOL_MISC : zx_args->proto_id;
-    properties.emplace_back(fdf::MakeProperty(arena, BIND_PROTOCOL, proto_id));
+    properties.emplace_back(fdf::MakeProperty(arena, bind_fuchsia::PROTOCOL, proto_id));
   }
   return properties;
 }

@@ -15,6 +15,8 @@
 #include <lib/fidl/cpp/wire/connect_service.h>
 #include <lib/fidl/cpp/wire/transaction.h>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <ddktl/device.h>
 #include <gtest/gtest.h>
 
 #include "lib/ddk/binding_priv.h"
@@ -192,6 +194,42 @@ TEST_F(DeviceTest, AddChildWithProtoPropAndProtoId) {
   ASSERT_EQ(properties[0].value().int_value().value(), static_cast<uint32_t>(ZX_PROTOCOL_I2C));
 }
 
+TEST_F(DeviceTest, AddChildWithProtoStrPropAndProtoId) {
+  fdf_testing::TestNode node("root", dispatcher());
+  zx::result node_client = node.CreateNodeChannel();
+  ASSERT_EQ(ZX_OK, node_client.status_value());
+
+  // Create a device.
+  zx_protocol_device_t ops{};
+  compat::Device parent(compat::kDefaultDevice, &ops, nullptr, std::nullopt, logger(),
+                        dispatcher());
+  parent.Bind({std::move(node_client.value()), dispatcher()});
+
+  // Add a child device.
+  zx_device_str_prop_t prop =
+      ddk::MakeStrProperty(bind_fuchsia::PROTOCOL, static_cast<uint32_t>(ZX_PROTOCOL_I2C));
+
+  device_add_args_t args{
+      .name = "child", .str_props = &prop, .str_prop_count = 1, .proto_id = ZX_PROTOCOL_BLOCK};
+  zx_device_t* child = nullptr;
+  ASSERT_EQ(ZX_OK, parent.Add(&args, &child));
+  ASSERT_EQ(ZX_OK, child->CreateNode());
+
+  EXPECT_NE(nullptr, child);
+  EXPECT_STREQ("child", child->Name());
+  EXPECT_TRUE(parent.HasChildren());
+
+  ASSERT_TRUE(RunLoopUntilIdle());
+
+  // Check the child was added with the right properties.
+  ASSERT_EQ(node.children().count("child"), 1ul);
+  const fdf_testing::TestNode& child_node = node.children().at("child");
+  std::vector properties = child_node.GetProperties();
+  ASSERT_EQ(1ul, properties.size());
+  ASSERT_EQ(properties[0].key().string_value().value(), bind_fuchsia::PROTOCOL);
+  ASSERT_EQ(properties[0].value().int_value().value(), static_cast<uint32_t>(ZX_PROTOCOL_I2C));
+}
+
 TEST_F(DeviceTest, AddChildWithStringProps) {
   fdf_testing::TestNode node("root", dispatcher());
   zx::result node_client = node.CreateNodeChannel();
@@ -205,18 +243,9 @@ TEST_F(DeviceTest, AddChildWithStringProps) {
 
   // Add a child device.
   zx_device_str_prop_t props[4] = {
-      zx_device_str_prop_t{
-          .key = "hello",
-          .property_value = str_prop_int_val(1),
-      },
-      zx_device_str_prop_t{
-          .key = "another",
-          .property_value = str_prop_bool_val(true),
-      },
-      zx_device_str_prop_t{
-          .key = "key",
-          .property_value = str_prop_str_val("value"),
-      },
+      ddk::MakeStrProperty("hello", 1u),
+      ddk::MakeStrProperty("another", true),
+      ddk::MakeStrProperty("key", "value"),
       zx_device_str_prop_t{
           .key = "enum_key",
           .property_value = str_prop_enum_val("enum_value"),
@@ -746,6 +775,6 @@ TEST_F(DeviceTest, CreateNodeProperties) {
   EXPECT_EQ("test", properties[1].key.string_value().get());
   EXPECT_EQ(5u, properties[1].value.int_value());
 
-  EXPECT_EQ(static_cast<uint32_t>(BIND_PROTOCOL), properties[2].key.int_value());
+  EXPECT_EQ(bind_fuchsia::PROTOCOL, properties[2].key.string_value().get());
   EXPECT_EQ(10u, properties[2].value.int_value());
 }
