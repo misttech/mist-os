@@ -226,8 +226,10 @@ Device::Device(fdf::DriverStartArgs start_args,
 
 Device::~Device() {
   std::lock_guard checker(*driver_checker_);
+  // Outside of some unit tests, is_ddk_unbind_internal_called_ is true already and
+  // DdkUnbindInternal won't do anything here (already done by PrepareStop).
   DdkUnbindInternal();
-  LOG(DEBUG, "Finished DdkUnbindInternal");
+  LOG(DEBUG, "~Device called DdkUnbindInternal");
 }
 
 zx_status_t Device::GetContiguousGuardParameters(const std::optional<sysmem_config::Config>& config,
@@ -275,6 +277,11 @@ zx_status_t Device::GetContiguousGuardParameters(const std::optional<sysmem_conf
 
 void Device::DdkUnbindInternal() {
   ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent()->async_dispatcher() == driver_dispatcher());
+
+  if (is_ddk_unbind_internal_called_) {
+    return;
+  }
+  is_ddk_unbind_internal_called_ = true;
 
   // disconnect existing connections from drivers
   bindings_.RemoveAll();
@@ -474,6 +481,12 @@ zx::result<> Device::Start() {
   }
 
   return zx::ok();
+}
+
+void Device::PrepareStop(fdf::PrepareStopCompleter completer) {
+  std::lock_guard checker(*driver_checker_);
+  DdkUnbindInternal();
+  completer(zx::ok());
 }
 
 zx_status_t Device::Initialize() {
