@@ -3445,6 +3445,163 @@ bool VmCowPages::PageWouldReadZeroLocked(uint64_t page_offset) {
   return false;
 }
 
+zx_status_t VmCowPages::ZeroPagesPreservingContentLocked(
+    uint64_t page_start_base, uint64_t page_end_base, bool only_zero_gaps, list_node_t* freed_list,
+    MultiPageRequest* page_request, uint64_t* processed_len_out) {
+  // Validate inputs.
+  DEBUG_ASSERT(IS_PAGE_ALIGNED(page_start_base) && IS_PAGE_ALIGNED(page_end_base));
+  DEBUG_ASSERT(page_end_base <= size_);
+  DEBUG_ASSERT(is_source_preserving_page_content());
+  // Page requests and freeing of pages will only happen if we need to actively zero existing pages,
+  // instead of just inserting zero intervals.
+  DEBUG_ASSERT(only_zero_gaps || (page_request && freed_list));
+
+  // Give us easier names for our range.
+  const uint64_t start = page_start_base;
+  const uint64_t end = page_end_base;
+
+  if (start == end) {
+    return ZX_OK;
+  }
+
+  IncrementHierarchyGenerationCountLocked();
+
+  // Inserting zero intervals can modify the page list such that new nodes are added and deleted.
+  // So we cannot safely insert zero intervals while iterating the page list. The pattern we
+  // follow here is:
+  // 1. Traverse the page list to find a range that can be represented by a zero interval instead.
+  // 2. When such a range is found, break out of the traversal, and insert the zero interval.
+  // 3. Advance past the zero interval we inserted and resume the traversal from there, until
+  // we've covered the entire range.
+
+  // The start offset at which to start the next traversal loop.
+  uint64_t next_start_offset = start;
+  do {
+    // Zeroing a zero interval is a no-op. Track whether we find ourselves in a zero interval.
+    bool in_interval = false;
+    // The start of the zero interval if we are in one.
+    uint64_t interval_start = next_start_offset;
+    const uint64_t prev_start_offset = next_start_offset;
+    // State tracking information for inserting a new zero interval.
+    struct {
+      bool add_zero_interval;
+      uint64_t start;
+      uint64_t end;
+      bool replace_page;
+    } state = {.add_zero_interval = false, .start = 0, .end = 0, .replace_page = false};
+
+    zx_status_t status = page_list_.RemovePagesAndIterateGaps(
+        [&](VmPageOrMarker* p, uint64_t off) {
+          // We cannot have references in pager-backed VMOs.
+          DEBUG_ASSERT(!p->IsReference());
+
+          // If this is a page, see if we can remove it and absorb it into a zero interval.
+          if (p->IsPage()) {
+            // If we do not need to zero pages then just increment our tracking and continue.
+            if (only_zero_gaps) {
+              *processed_len_out += PAGE_SIZE;
+              next_start_offset = off + PAGE_SIZE;
+              return ZX_ERR_NEXT;
+            }
+            AssertHeld(lock_ref());
+            if (p->Page()->object.pin_count > 0) {
+              // Cannot remove this page if it is pinned. Lookup the page and zero it. Looking up
+              // ensures that we request dirty transition if needed by the pager.
+              LookupCursor cursor(this, off, PAGE_SIZE);
+              AssertHeld(cursor.lock_ref());
+              zx::result<LookupCursor::RequireResult> result =
+                  cursor.RequireOwnedPage(true, 1, page_request);
+              if (result.is_error()) {
+                return result.error_value();
+              }
+              DEBUG_ASSERT(result->page == p->Page());
+              // Zero the page we looked up.
+              ZeroPage(result->page->paddr());
+              *processed_len_out += PAGE_SIZE;
+              next_start_offset = off + PAGE_SIZE;
+              return ZX_ERR_NEXT;
+            }
+            // Break out of the traversal. We can release the page and add a zero interval
+            // instead.
+            state = {.add_zero_interval = true,
+                     .start = off,
+                     .end = off + PAGE_SIZE,
+                     .replace_page = true};
+            return ZX_ERR_STOP;
+          }
+
+          // Otherwise this is a marker or zero interval, in which case we already have zeroes.
+          DEBUG_ASSERT(p->IsMarker() || p->IsIntervalZero());
+          if (p->IsIntervalStart()) {
+            // Track the interval start so we know how much to add to processed_len_out later.
+            interval_start = off;
+            in_interval = true;
+          } else if (p->IsIntervalEnd()) {
+            // Add the range from interval start to end.
+            *processed_len_out += (off + PAGE_SIZE - interval_start);
+            in_interval = false;
+          } else {
+            // This is either a single interval slot or a marker.
+            *processed_len_out += PAGE_SIZE;
+          }
+          next_start_offset = off + PAGE_SIZE;
+          return ZX_ERR_NEXT;
+        },
+        [&](uint64_t gap_start, uint64_t gap_end) {
+          AssertHeld(lock_ref());
+          // This gap will be replaced with a zero interval. Invalidate any read requests in this
+          // range. Since we have just validated that this is a gap in the page list we can directly
+          // call OnPagesSupplied, instead of iterating through the gaps using
+          // InvalidateReadRequestsLocked
+          page_source_->OnPagesSupplied(gap_start, gap_end - gap_start);
+          // We have found a new zero interval to insert. Break out of the traversal.
+          state = {
+              .add_zero_interval = true, .start = gap_start, .end = gap_end, .replace_page = false};
+          return ZX_ERR_STOP;
+        },
+        next_start_offset, end);
+    // Bubble up any errors from LookupCursor.
+    if (status != ZX_OK) {
+      return status;
+    }
+
+    // Add any new zero interval.
+    if (state.add_zero_interval) {
+      if (state.replace_page) {
+        DEBUG_ASSERT(state.start + PAGE_SIZE == state.end);
+        vm_page_t* page = page_list_.ReplacePageWithZeroInterval(
+            state.start, VmPageOrMarker::IntervalDirtyState::Dirty);
+        DEBUG_ASSERT(page->object.pin_count == 0);
+        pmm_page_queues()->Remove(page);
+        DEBUG_ASSERT(!list_in_list(&page->queue_node));
+        list_add_tail(freed_list, &page->queue_node);
+      } else {
+        status = page_list_.AddZeroInterval(state.start, state.end,
+                                            VmPageOrMarker::IntervalDirtyState::Dirty);
+        if (status != ZX_OK) {
+          DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
+          return status;
+        }
+      }
+      *processed_len_out += (state.end - state.start);
+      next_start_offset = state.end;
+    }
+
+    // Handle the last partial interval. Or the case where we did not advance next_start_offset at
+    // all, which can only happen if the range fell entirely inside an interval.
+    if (in_interval || next_start_offset == prev_start_offset) {
+      // If the range fell entirely inside an interval, verify that it was indeed a zero interval.
+      DEBUG_ASSERT(next_start_offset != prev_start_offset ||
+                   page_list_.IsOffsetInZeroInterval(next_start_offset));
+      *processed_len_out += (end - interval_start);
+      next_start_offset = end;
+    }
+  } while (next_start_offset < end);
+
+  VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
+  return ZX_OK;
+}
+
 zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_end_base,
                                         MultiPageRequest* page_request, uint64_t* zeroed_len_out) {
   canary_.Assert();
@@ -3495,16 +3652,6 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
     RangeChangeUpdateLocked(page_start_base, page_end_base - page_start_base, RangeChangeOp::Unmap);
   }
 
-  // Increment the gen count early as it's possible to fail part way through and this function
-  // doesn't unroll its actions. If we were able to successfully decommit pages above,
-  // DecommitRangeLocked would have incremented the gen count already, so we can do this after the
-  // decommit attempt.
-  //
-  // Zeroing pages of a contiguous VMO doesn't commit or decommit any pages currently, but we
-  // increment the generation count anyway in case that changes in future, and to keep the tests
-  // more consistent.
-  IncrementHierarchyGenerationCountLocked();
-
   // We stack-own loaned pages from when they're removed until they're freed.
   __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
 
@@ -3552,138 +3699,19 @@ zx_status_t VmCowPages::ZeroPagesLocked(uint64_t page_start_base, uint64_t page_
   // If the page source preserves content, we can perform efficient zeroing by inserting dirty zero
   // intervals. Handle this case separately.
   if (is_source_preserving_page_content()) {
-    // Inserting zero intervals can modify the page list such that new nodes are added and deleted.
-    // So we cannot safely insert zero intervals while iterating the page list. The pattern we
-    // follow here is:
-    // 1. Traverse the page list to find a range that can be represented by a zero interval instead.
-    // 2. When such a range is found, break out of the traversal, and insert the zero interval.
-    // 3. Advance past the zero interval we inserted and resume the traversal from there, until
-    // we've covered the entire range.
-
-    // The start offset at which to start the next traversal loop.
-    uint64_t next_start_offset = start;
-    do {
-      // Zeroing a zero interval is a no-op. Track whether we find ourselves in a zero interval.
-      bool in_interval = false;
-      // The start of the zero interval if we are in one.
-      uint64_t interval_start = next_start_offset;
-      const uint64_t prev_start_offset = next_start_offset;
-      // State tracking information for inserting a new zero interval.
-      struct {
-        bool add_zero_interval;
-        uint64_t start;
-        uint64_t end;
-        bool replace_page;
-      } state = {.add_zero_interval = false, .start = 0, .end = 0, .replace_page = false};
-
-      zx_status_t status = page_list_.RemovePagesAndIterateGaps(
-          [&](VmPageOrMarker* p, uint64_t off) {
-            // We cannot have references in pager-backed VMOs.
-            DEBUG_ASSERT(!p->IsReference());
-
-            // If this is a page, see if we can remove it and absorb it into a zero interval.
-            if (p->IsPage()) {
-              AssertHeld(lock_ref());
-              if (p->Page()->object.pin_count > 0) {
-                // Cannot remove this page if it is pinned. Lookup the page and zero it. Looking up
-                // ensures that we request dirty transition if needed by the pager.
-                LookupCursor cursor(this, off, PAGE_SIZE);
-                AssertHeld(cursor.lock_ref());
-                zx::result<LookupCursor::RequireResult> result =
-                    cursor.RequireOwnedPage(true, 1, page_request);
-                if (result.is_error()) {
-                  return result.error_value();
-                }
-                DEBUG_ASSERT(result->page == p->Page());
-                // Zero the page we looked up.
-                ZeroPage(result->page->paddr());
-                *zeroed_len_out += PAGE_SIZE;
-                next_start_offset = off + PAGE_SIZE;
-                return ZX_ERR_NEXT;
-              }
-              // Break out of the traversal. We can release the page and add a zero interval
-              // instead.
-              state = {.add_zero_interval = true,
-                       .start = off,
-                       .end = off + PAGE_SIZE,
-                       .replace_page = true};
-              return ZX_ERR_STOP;
-            }
-
-            // Otherwise this is a marker or zero interval, in which case we already have zeroes.
-            DEBUG_ASSERT(p->IsMarker() || p->IsIntervalZero());
-            if (p->IsIntervalStart()) {
-              // Track the interval start so we know how much to add to zeroed_len_out later.
-              interval_start = off;
-              in_interval = true;
-            } else if (p->IsIntervalEnd()) {
-              // Add the range from interval start to end.
-              *zeroed_len_out += (off + PAGE_SIZE - interval_start);
-              in_interval = false;
-            } else {
-              // This is either a single interval slot or a marker.
-              *zeroed_len_out += PAGE_SIZE;
-            }
-            next_start_offset = off + PAGE_SIZE;
-            return ZX_ERR_NEXT;
-          },
-          [&](uint64_t gap_start, uint64_t gap_end) {
-            AssertHeld(lock_ref());
-            // This gap will be replaced with a zero interval. Invalidate any read requests in this
-            // range.
-            InvalidateReadRequestsLocked(gap_start, gap_end - gap_start);
-            // We have found a new zero interval to insert. Break out of the traversal.
-            state = {.add_zero_interval = true,
-                     .start = gap_start,
-                     .end = gap_end,
-                     .replace_page = false};
-            return ZX_ERR_STOP;
-          },
-          next_start_offset, end);
-      // Bubble up any errors from LookupCursor.
-      if (status != ZX_OK) {
-        return status;
-      }
-
-      // Add any new zero interval.
-      if (state.add_zero_interval) {
-        if (state.replace_page) {
-          DEBUG_ASSERT(state.start + PAGE_SIZE == state.end);
-          vm_page_t* page = page_list_.ReplacePageWithZeroInterval(
-              state.start, VmPageOrMarker::IntervalDirtyState::Dirty);
-          DEBUG_ASSERT(page->object.pin_count == 0);
-          pmm_page_queues()->Remove(page);
-          DEBUG_ASSERT(!list_in_list(&page->queue_node));
-          list_add_tail(&freed_list, &page->queue_node);
-        } else {
-          status = page_list_.AddZeroInterval(state.start, state.end,
-                                              VmPageOrMarker::IntervalDirtyState::Dirty);
-          if (status != ZX_OK) {
-            DEBUG_ASSERT(status == ZX_ERR_NO_MEMORY);
-            return status;
-          }
-        }
-        *zeroed_len_out += (state.end - state.start);
-        next_start_offset = state.end;
-      }
-
-      // Handle the last partial interval. Or the case where we did not advance next_start_offset at
-      // all, which can only happen if the range fell entirely inside an interval.
-      if (in_interval || next_start_offset == prev_start_offset) {
-        // If the range fell entirely inside an interval, verify that it was indeed a zero interval.
-        DEBUG_ASSERT(next_start_offset != prev_start_offset ||
-                     page_list_.IsOffsetInZeroInterval(next_start_offset));
-        *zeroed_len_out += (end - interval_start);
-        next_start_offset = end;
-      }
-    } while (next_start_offset < end);
-
-    VMO_VALIDATION_ASSERT(DebugValidateZeroIntervalsLocked());
-    return ZX_OK;
+    return ZeroPagesPreservingContentLocked(start, end, false, &freed_list, page_request,
+                                            zeroed_len_out);
   }
 
-  // We've already handled this case above and returned early.
-  DEBUG_ASSERT(!is_source_preserving_page_content());
+  // Increment the gen count early as it's possible to fail part way through and this function
+  // doesn't unroll its actions. If we were able to successfully decommit pages above,
+  // DecommitRangeLocked would have incremented the gen count already, so we can do this after the
+  // decommit attempt.
+  //
+  // Zeroing pages of a contiguous VMO doesn't commit or decommit any pages currently, but we
+  // increment the generation count anyway in case that changes in future, and to keep the tests
+  // more consistent.
+  IncrementHierarchyGenerationCountLocked();
 
   // If we're zeroing at the end of our parent range we can update to reflect this similar to a
   // resize. This does not work if we are a slice, but we checked for that earlier. Whilst this does

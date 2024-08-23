@@ -1273,6 +1273,16 @@ class VmCowPages final : public VmHierarchyBase,
   // propagation can be halted.
   int64_t ChangeSingleHighPriorityCountLocked(int64_t delta) TA_REQ(lock());
 
+  // Specialized internal version of ZeroPagesLocked that only operates for a VMO where
+  // |is_source_preserving_page_content| is true. The |only_zero_gaps| flags can be set to true to
+  // indicate that existing pages do not need to be zeroed, in which case no pages requests will be
+  // generated and no pages freed, allowing those respective parameters to be passed as nullptr.
+  // Otherwise the parameters, operation and return values are same as ZeroPagesLocked.
+  zx_status_t ZeroPagesPreservingContentLocked(uint64_t page_start_base, uint64_t page_end_base,
+                                               bool only_zero_gaps, list_node_t* freed_list,
+                                               MultiPageRequest* page_request,
+                                               uint64_t* processed_len_out) TA_REQ(lock());
+
   // magic value
   fbl::Canary<fbl::magic("VMCP")> canary_;
 
