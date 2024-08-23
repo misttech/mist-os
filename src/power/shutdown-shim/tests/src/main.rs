@@ -14,16 +14,14 @@ use test_case::test_case;
 use {
     fidl_fuchsia_boot as fboot, fidl_fuchsia_device_manager as fdevicemanager,
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol,
-    fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_system as fsystem,
-    fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_power_system as fsystem, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
 };
 
 mod shutdown_mocks;
 
 const SHUTDOWN_SHIM_URL: &'static str =
     "fuchsia-pkg://fuchsia.com/shutdown-shim-integration-tests#meta/shutdown-shim.cm";
-
-const POWER_BROKER_URL: &'static str = "#meta/power-broker.cm";
 
 #[derive(PartialEq)]
 enum RealmVariant {
@@ -142,27 +140,6 @@ async fn new_realm(
     }
 
     if is_power_framework_available {
-        let power_broker =
-            builder.add_child("power-broker", POWER_BROKER_URL, ChildOptions::new()).await?;
-
-        // Give the shim access to power_broker
-        builder
-            .add_route(
-                Route::new()
-                    .capability(Capability::protocol::<fbroker::TopologyMarker>())
-                    .from(&power_broker)
-                    .to(&shutdown_shim),
-            )
-            .await?;
-        // Give the mocks access to power_broker
-        builder
-            .add_route(
-                Route::new()
-                    .capability(Capability::protocol::<fbroker::TopologyMarker>())
-                    .from(&power_broker)
-                    .to(&mocks_server),
-            )
-            .await?;
         // Give the shim access to mock activity governor.
         builder
             .add_route(
@@ -170,14 +147,6 @@ async fn new_realm(
                     .capability(Capability::protocol::<fsystem::ActivityGovernorMarker>())
                     .from(&mocks_server)
                     .to(&shutdown_shim),
-            )
-            .await?;
-        builder
-            .add_route(
-                Route::new()
-                    .capability(Capability::protocol_by_name("fuchsia.logger.LogSink"))
-                    .from(Ref::parent())
-                    .to(&power_broker),
             )
             .await?;
     }

@@ -13,6 +13,11 @@
             service: "fuchsia.hardware.suspend.SuspendService",
             from: "#boot-drivers",
             to: "#system-activity-governor",
+
+            // system-activity-governor depends on the suspend HAL but not all
+            // drivers depend on system-activity-governor.
+            // Weak to resolve dependency cycles.
+            dependency: "weak",
         },
         {
             protocol: [

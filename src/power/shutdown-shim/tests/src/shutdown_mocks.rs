@@ -10,71 +10,12 @@ use fuchsia_component_test::LocalComponentHandles;
 use futures::channel::mpsc;
 use futures::future::BoxFuture;
 use futures::{FutureExt, StreamExt, TryFutureExt, TryStreamExt};
-use power_broker_client::{basic_update_fn_factory, run_power_element, PowerElementContext};
-use std::sync::Arc;
 use tracing::{info, warn};
 use {
     fidl_fuchsia_hardware_power_statecontrol as fstatecontrol, fidl_fuchsia_io as fio,
-    fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_system as fsystem,
-    fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_power_system as fsystem, fidl_fuchsia_sys2 as fsys, fuchsia_async as fasync,
+    fuchsia_zircon as zx,
 };
-
-struct ActivityGovernor {
-    send_signals: mpsc::UnboundedSender<Signal>,
-    wake_handling: PowerElementContext,
-}
-impl ActivityGovernor {
-    async fn new(
-        topology: &fbroker::TopologyProxy,
-        send_signals: mpsc::UnboundedSender<Signal>,
-    ) -> Arc<Self> {
-        let wake_handling = PowerElementContext::builder(
-            topology,
-            "wake_handling",
-            &[
-                fsystem::WakeHandlingLevel::Inactive.into_primitive(),
-                fsystem::WakeHandlingLevel::Active.into_primitive(),
-            ],
-        )
-        .build()
-        .await
-        .unwrap();
-
-        Arc::new(Self { send_signals, wake_handling })
-    }
-
-    async fn run(&self) {
-        let update_fn = Arc::new(basic_update_fn_factory(&self.wake_handling));
-        let send_signals = self.send_signals.clone();
-
-        run_power_element(
-            self.wake_handling.name(),
-            &self.wake_handling.required_level,
-            fsystem::WakeHandlingLevel::Inactive.into_primitive(),
-            None,
-            Box::new(move |new_power_level: fbroker::PowerLevel| {
-                let update_fn = update_fn.clone();
-                let send_signals = send_signals.clone();
-
-                async move {
-                    update_fn(new_power_level).await;
-
-                    if new_power_level == 0 {
-                        send_signals
-                            .unbounded_send(Signal::ShutdownControlLease(LeaseState::Dropped))
-                            .unwrap();
-                    } else {
-                        send_signals
-                            .unbounded_send(Signal::ShutdownControlLease(LeaseState::Acquired))
-                            .unwrap();
-                    }
-                }
-                .boxed_local()
-            }),
-        )
-        .await;
-    }
-}
 
 pub fn new_mocks_provider(
     is_power_framework_available: bool,
@@ -102,16 +43,9 @@ async fn run_mocks(
     let mut fs = fserver::ServiceFs::new();
 
     if is_power_framework_available {
-        let topology = handles.connect_to_protocol::<fbroker::TopologyMarker>()?;
-        let sag = ActivityGovernor::new(&topology, send_signals.clone()).await;
-        let sag2 = sag.clone();
-        fasync::Task::local(async move {
-            sag2.run().await;
-        })
-        .detach();
-
+        let send_sag_signals = send_signals.clone();
         fs.dir("svc").add_fidl_service(move |stream| {
-            fasync::Task::spawn(run_activity_governor(sag.clone(), stream)).detach();
+            fasync::Task::spawn(run_activity_governor(send_sag_signals.clone(), stream)).detach();
         });
     }
 
@@ -164,25 +98,29 @@ pub enum Signal {
 }
 
 async fn run_activity_governor(
-    sag: Arc<ActivityGovernor>,
+    send_signals: mpsc::UnboundedSender<Signal>,
     mut stream: fsystem::ActivityGovernorRequestStream,
 ) {
     info!("new connection to {}", fsystem::ActivityGovernorMarker::DEBUG_NAME);
 
     while let Ok(Some(request)) = stream.try_next().await {
         match request {
-            fsystem::ActivityGovernorRequest::GetPowerElements { responder } => {
-                responder
-                    .send(fsystem::PowerElements {
-                        wake_handling: Some(fsystem::WakeHandling {
-                            assertive_dependency_token: Some(
-                                sag.wake_handling.assertive_dependency_token().unwrap(),
-                            ),
-                            ..Default::default()
-                        }),
-                        ..Default::default()
-                    })
-                    .unwrap();
+            fsystem::ActivityGovernorRequest::TakeWakeLease { name: _, responder } => {
+                let (client_token, server_token) = fsystem::WakeLeaseToken::create();
+                let send_signals2 = send_signals.clone();
+                fasync::Task::spawn(async move {
+                    fasync::OnSignals::new(&server_token, zx::Signals::EVENTPAIR_PEER_CLOSED)
+                        .await
+                        .unwrap();
+                    send_signals2
+                        .unbounded_send(Signal::ShutdownControlLease(LeaseState::Dropped))
+                        .expect("receiver dropped");
+                })
+                .detach();
+                send_signals
+                    .unbounded_send(Signal::ShutdownControlLease(LeaseState::Acquired))
+                    .expect("receiver dropped");
+                responder.send(client_token).unwrap();
             }
             _ => unreachable!("Unexpected request to ActivityGovernor"),
         }
