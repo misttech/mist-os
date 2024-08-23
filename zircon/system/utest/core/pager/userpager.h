@@ -42,17 +42,21 @@ class Vmo : public fbl::DoublyLinkedListable<std::unique_ptr<Vmo>> {
  public:
   ~Vmo() {
     std::lock_guard guard(mutex_);
-    zx::vmar::root_self()->unmap(base_addr_, size_);
+    if (size_ != 0) {
+      zx::vmar::root_self()->unmap(base_addr_, size_);
+    }
   }
 
   static std::unique_ptr<Vmo> Create(zx::vmo vmo, uint64_t size, uint64_t key) {
     ZX_ASSERT(size % zx_system_get_page_size() == 0);
-    zx_vaddr_t addr;
-    zx_status_t status =
-        zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, size, &addr);
-    if (status != ZX_OK) {
-      fprintf(stderr, "vmar map failed with %s\n", zx_status_get_string(status));
-      return nullptr;
+    zx_vaddr_t addr = 0;
+    if (size != 0) {
+      zx_status_t status =
+          zx::vmar::root_self()->map(ZX_VM_PERM_READ | ZX_VM_PERM_WRITE, 0, vmo, 0, size, &addr);
+      if (status != ZX_OK) {
+        fprintf(stderr, "vmar map failed with %s\n", zx_status_get_string(status));
+        return nullptr;
+      }
     }
 
     return std::unique_ptr<Vmo>(new Vmo(std::move(vmo), size, addr, key));
@@ -166,9 +170,13 @@ class UserPager {
   void ClosePortHandle() { port_.reset(); }
 
   // Creates a new paged vmo.
-  bool CreateVmo(uint64_t size, Vmo** vmo_out);
+  bool CreateVmo(uint64_t num_pages, Vmo** vmo_out);
   // Creates a new paged vmo with the provided create |options|.
-  bool CreateVmoWithOptions(uint64_t size, uint32_t options, Vmo** vmo_out);
+  bool CreateVmoWithOptions(uint64_t num_pages, uint32_t options, Vmo** vmo_out);
+  // Create a VMO of type ZX_VMO_UNBOUNDED. The resulting Vmo only has limited support and cannot
+  // be accessed via its mapping. Additional |options| may also be specified, as long as they do not
+  // conflict with ZX_VMO_UNBOUNDED.
+  bool CreateUnboundedVmo(uint64_t initial_stream_size, uint32_t options, Vmo** vmo_out);
   // Detaches the paged vmo.
   bool DetachVmo(Vmo* vmo);
   // Destroys the paged vmo.
@@ -242,6 +250,8 @@ class UserPager {
   bool VerifyDirtyRangesHelper(Vmo* paged_vmo, zx_vmo_dirty_range_t* dirty_ranges_to_verify,
                                size_t num_dirty_ranges_to_verify, zx_vmo_dirty_range_t* ranges_buf,
                                size_t ranges_buf_size, uint64_t* num_ranges_buf);
+
+  bool CreateVmoInternal(uint64_t byte_size, uint32_t options, Vmo** vmo_out);
 
   zx::pager pager_;
   zx::port port_;

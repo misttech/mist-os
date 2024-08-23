@@ -222,42 +222,54 @@ bool UserPager::Init() {
   return true;
 }
 
-bool UserPager::CreateVmo(uint64_t size, Vmo** vmo_out) {
-  return CreateVmoWithOptions(size, 0, vmo_out);
+bool UserPager::CreateVmo(uint64_t num_pages, Vmo** vmo_out) {
+  return CreateVmoWithOptions(num_pages, 0, vmo_out);
 }
 
-bool UserPager::CreateVmoWithOptions(uint64_t size, uint32_t options, Vmo** vmo_out) {
+bool UserPager::CreateVmoWithOptions(uint64_t num_pages, uint32_t options, Vmo** vmo_out) {
+  // Cannot create unbounded VMO through this interface, must use CreateUnboundedVmo.
+  if (options & ZX_VMO_UNBOUNDED) {
+    fprintf(stderr, "ZX_VMO_UNBOUNDED is not supported by this method.\n");
+    return false;
+  }
+  return CreateVmoInternal(num_pages * zx_system_get_page_size(), options, vmo_out);
+}
+
+bool UserPager::CreateVmoInternal(uint64_t byte_size, uint32_t options, Vmo** vmo_out) {
   if (shutdown_event_) {
     fprintf(stderr, "creating vmo after starting pager thread\n");
     return false;
   }
 
-  // Cannot create unbounded VMO.
+  uint64_t tracked_vmo_size = byte_size;
   if (options & ZX_VMO_UNBOUNDED) {
-    fprintf(stderr, "ZX_VMO_UNBOUNDED is not supported in this class.\n");
-    return false;
+    tracked_vmo_size = 0;
   }
 
   zx::vmo vmo;
-  size *= zx_system_get_page_size();
-  zx_status_t status = pager_.create_vmo(options, port_, next_key_, size, &vmo);
+  zx_status_t status = pager_.create_vmo(options, port_, next_key_, byte_size, &vmo);
   if (status != ZX_OK) {
     fprintf(stderr, "pager create_vmo failed with %s\n", zx_status_get_string(status));
     return false;
   }
 
-  auto paged_vmo = Vmo::Create(std::move(vmo), size, next_key_);
+  auto paged_vmo = Vmo::Create(std::move(vmo), tracked_vmo_size, next_key_);
   if (paged_vmo == nullptr) {
     fprintf(stderr, "could not create Vmo instance\n");
     return false;
   }
 
-  next_key_ += (size / sizeof(uint64_t));
+  // Add 1 in case size is 0, which could be the case for a resizable or unbounded VMO.
+  next_key_ += (tracked_vmo_size / sizeof(uint64_t)) + 1;
 
   *vmo_out = paged_vmo.get();
   vmos_.push_back(std::move(paged_vmo));
 
   return true;
+}
+
+bool UserPager::CreateUnboundedVmo(uint64_t initial_stream_size, uint32_t options, Vmo** vmo_out) {
+  return CreateVmoInternal(initial_stream_size, ZX_VMO_UNBOUNDED | options, vmo_out);
 }
 
 bool UserPager::DetachVmo(Vmo* vmo) {
