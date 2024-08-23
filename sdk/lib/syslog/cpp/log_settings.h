@@ -17,8 +17,6 @@
 #include <string>
 
 namespace fuchsia_logging {
-// Sets the log tags without modifying the settings. This is ignored on host.
-void SetTags(const std::initializer_list<std::string>& tags);
 
 // Interest listener configuration
 enum InterestListenerBehavior : uint8_t {
