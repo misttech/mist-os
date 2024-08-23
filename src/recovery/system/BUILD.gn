@@ -178,6 +178,7 @@ rustc_library("ota_lib") {
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:maplit",
     "//third_party/rust_crates:pretty_assertions",
+    "//third_party/rust_crates:url",
   ]
   source_root = "src/ota_lib.rs"
   sources = [

@@ -142,9 +142,9 @@ impl OtaEnvBuilder {
                 "repo_url": "fuchsia-pkg://fuchsia.com",
                 "root_version": 1,
                 "root_threshold": 1,
-                "root_keys": repo_info["RootKeys"],
+                "root_keys": repo_info["root_keys"],
                 "mirrors":[{
-                    "mirror_url": repo_info["RepoURL"],
+                    "mirror_url": repo_info["repo_url"],
                     "subscribe": true
                 }],
                 "update_package_url": null
@@ -344,6 +344,7 @@ mod tests {
     use hyper::{header, Body, Request, Response, StatusCode};
     use std::collections::{BTreeSet, HashMap};
     use std::sync::Mutex;
+    use url::Url;
 
     /// Wrapper around a ramdisk blobfs.
     struct FakeStorage {
@@ -407,19 +408,26 @@ mod tests {
             if *val == "unknown" {
                 panic!("Expected address to be set!");
             }
-
-            // This emulates the format returned by `pm serve` running on a devhost.
-            let config = json!({
-                "ID": &*val,
-                "RepoURL": &*val,
-                "BlobRepoURL": format!("{}/blobs", val),
-                "RatePeriod": 60,
-                "RootKeys": self.arc.repo_keys,
-                "StatusConfig": {
-                    "Enabled": true
+            let repo_url = match Url::parse(&*val) {
+                Ok(u) => match u.host_str() {
+                    Some(host) => format!("fuchsia-pkg://{}", host),
+                    _ => "default".into(),
                 },
-                "Auto": true,
-                "BlobKey": null,
+                _ => panic!("Invalid address provided: {}", &*val),
+            };
+
+            // This emulates the format returned by `ffx repository serve` running on a devhost.
+            let config = json!({
+                "repo_url": repo_url,
+                "root_version": "1",
+                "root_threshold": "1",
+                "root_keys": self.arc.repo_keys,
+                "mirrors":[{
+                    "mirror_url": &*val,
+                    "subscribe": true
+                }],
+                "use_local_mirror": false,
+                "repo_storage_type": "ephemeral",
             });
 
             let json_str = serde_json::to_string(&config).context("Serializing JSON").unwrap();
@@ -553,7 +561,7 @@ mod tests {
                 .await
                 .context("Building environment")?;
 
-            ota_env.do_ota("devhost", "20200101.1.1").await.context("Running OTA")?;
+            ota_env.do_ota("devhost", "20240101.1.1").await.context("Running OTA")?;
             Ok(())
         }
 

@@ -524,15 +524,10 @@ func (c *Client) RegisterPackageRepository(
 	createRewriteRule bool,
 	rewritePackages []string,
 ) error {
-	cmd := []string{"pkgctl", "repo", "add", "url"}
-	var b bytes.Buffer
-	stdoutTee := io.MultiWriter(&b, os.Stdout)
-	c.Run(ctx, cmd, stdoutTee, os.Stderr)
-
 	logger.Infof(ctx, "registering package repository: %s", repo.Dir)
 
 	if createRewriteRule {
-		cmd := []string{"pkgctl", "repo", "add", "url", "-n", repoName, "-f", "1", repo.URL}
+		cmd := []string{"pkgctl", "repo", "add", "url", "-n", repoName, repo.URL}
 		if err := c.Run(ctx, cmd, os.Stdout, os.Stderr); err != nil {
 			return err
 		}
@@ -564,7 +559,7 @@ func (c *Client) RegisterPackageRepository(
 		cmd = []string{"pkgctl", "rule", "replace", "json", fmt.Sprintf(ruleTemplate, repoName)}
 		return c.Run(ctx, cmd, os.Stdout, os.Stderr)
 	} else {
-		cmd := []string{"pkgctl", "repo", "add", "url", "-f", "1", repo.URL}
+		cmd := []string{"pkgctl", "repo", "add", "url", repo.URL}
 		return c.Run(ctx, cmd, os.Stdout, os.Stderr)
 	}
 }
