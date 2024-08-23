@@ -26,13 +26,6 @@
 #define BIND_PLATFORM_DEV_DID 0x0302
 #define BIND_PLATFORM_DEV_INSTANCE_ID 0x0304
 
-// I2C binding variables at 0x0A0X
-#define BIND_I2C_CLASS 0x0A00
-#define BIND_I2C_BUS_ID 0x0A01
-#define BIND_I2C_ADDRESS 0x0A02
-#define BIND_I2C_VID 0x0A03
-#define BIND_I2C_DID 0x0A04
-
 // LINT.ThenChange(/src/lib/ddk/include/lib/ddk/binding_priv.h)
 
 #endif  // LIB_DRIVER_LEGACY_BIND_CONSTANTS_LEGACY_BIND_CONSTANTS_H_

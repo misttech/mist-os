@@ -75,11 +75,11 @@ __BEGIN_CDECLS
 // BIND_SDIO_FUNCTION was 0x0902
 
 // I2C binding variables at 0x0A0X
-#define BIND_I2C_CLASS 0x0A00
-#define BIND_I2C_BUS_ID 0x0A01
-#define BIND_I2C_ADDRESS 0x0A02
-#define BIND_I2C_VID 0x0A03
-#define BIND_I2C_DID 0x0A04
+// BIND_I2C_CLASS was 0x0A00
+// BIND_I2C_BUS_ID was 0x0A01
+// BIND_I2C_ADDRESS was 0x0A02
+// BIND_I2C_VID was 0x0A03
+// BIND_I2C_DID was 0x0A04
 
 // GPIO binding variables at 0x0A1X
 // BIND_GPIO_PIN was 0x0A10
