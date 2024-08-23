@@ -833,7 +833,6 @@ assembly_input_bundle("core_realm") {
           [
             "//src/connectivity/bluetooth/profiles/bt-a2dp/meta/bt-a2dp-common.core_shard.cml",
             "//src/intl/intl_services/meta/intl.core_shard.base.cml",
-            "//src/media/audio/audio_core/meta/audio_core.core_shard.base.cml",
             "//src/recovery/system/meta/core_shards/base.shard.cml",
             "//src/recovery/system/meta/core_shards/ui.shard.cml",
             "//src/session/bin/session_manager/meta/session_manager.core_shard.cml",
