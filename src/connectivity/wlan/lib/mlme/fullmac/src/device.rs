@@ -2,356 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::convert::{banjo_to_fidl, fullmac_to_mlme};
-use super::{FullmacDriverEvent, FullmacDriverEventSink};
+use super::convert::fullmac_to_mlme;
 use anyhow::{format_err, Context};
-use fidl::HandleBased;
-use std::ffi::c_void;
+use fidl::endpoints::ClientEnd;
 use {
-    banjo_fuchsia_wlan_common as banjo_wlan_common,
-    banjo_fuchsia_wlan_fullmac as banjo_wlan_fullmac,
-    banjo_fuchsia_wlan_ieee80211 as banjo_wlan_ieee80211,
-    banjo_fuchsia_wlan_internal as banjo_wlan_internal, fidl_fuchsia_wlan_common as fidl_common,
-    fidl_fuchsia_wlan_fullmac as fidl_fullmac, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac,
+    fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_zircon as zx,
 };
-
-/// Hand-rolled Rust version of the banjo wlan_fullmac_ifc_protocol for communication from the
-/// driver up.
-/// Note that we copy the individual fns out of this struct into the equivalent generated struct
-/// in C++. Thanks to cbindgen, this gives us a compile-time confirmation that our function
-/// signatures are correct.
-#[repr(C)]
-pub struct WlanFullmacIfcProtocol {
-    pub(crate) ops: *const WlanFullmacIfcProtocolOps,
-    pub(crate) ctx: Box<FullmacDriverEventSink>,
-}
-
-#[repr(C)]
-pub struct WlanFullmacIfcProtocolOps {
-    pub(crate) on_scan_result: extern "C" fn(
-        ctx: &mut FullmacDriverEventSink,
-        result: *const banjo_wlan_fullmac::WlanFullmacScanResult,
-    ),
-    pub(crate) on_scan_end: extern "C" fn(
-        ctx: &mut FullmacDriverEventSink,
-        end: *const banjo_wlan_fullmac::WlanFullmacScanEnd,
-    ),
-    pub(crate) connect_conf: extern "C" fn(
-        ctx: &mut FullmacDriverEventSink,
-        resp: *const banjo_wlan_fullmac::WlanFullmacConnectConfirm,
-    ),
-    pub(crate) roam_start_ind: extern "C" fn(
-        ctx: &mut FullmacDriverEventSink,
-        selected_bssid: *const u8,
-        selected_bss: *const banjo_wlan_internal::BssDescription,
-        original_association_maintained: bool,
-    ),
-    pub(crate) roam_result_ind: extern "C" fn(
-        ctx: &mut FullmacDriverEventSink,
-        selected_bssid: *const u8,
-        status_code: banjo_wlan_ieee80211::StatusCode,
-        original_association_maintained: bool,
-        target_bss_authenticated: bool,
-        association_id: u16,
-        association_ies_list: *const u8,
-        association_ies_count: usize,
-    ),
-    pub(crate) auth_ind: extern "C" fn(
-        ctx: &mut FullmacDriverEventSink,
-        ind: *const banjo_wlan_fullmac::WlanFullmacAuthInd,
-    ),
-    pub(crate) deauth_conf:
-        extern "C" fn(ctx: &mut FullmacDriverEventSink, peer_sta_address: *const u8),
-    pub(crate) deauth_ind: extern "C" fn(
-        ctx: &mut FullmacDriverEventSink,
-        ind: *const banjo_wlan_fullmac::WlanFullmacDeauthIndication,
-    ),
-    pub(crate) assoc_ind: extern "C" fn(
-        ctx: &mut FullmacDriverEventSink,
-        ind: *const banjo_wlan_fullmac::WlanFullmacAssocInd,
-    ),
-    pub(crate) disassoc_conf: extern "C" fn(
-        ctx: &mut FullmacDriverEventSink,
-        resp: *const banjo_wlan_fullmac::WlanFullmacDisassocConfirm,
-    ),
-    pub(crate) disassoc_ind: extern "C" fn(
-        ctx: &mut FullmacDriverEventSink,
-        ind: *const banjo_wlan_fullmac::WlanFullmacDisassocIndication,
-    ),
-    pub(crate) start_conf: extern "C" fn(
-        ctx: &mut FullmacDriverEventSink,
-        resp: *const banjo_wlan_fullmac::WlanFullmacStartConfirm,
-    ),
-    pub(crate) stop_conf: extern "C" fn(
-        ctx: &mut FullmacDriverEventSink,
-        resp: *const banjo_wlan_fullmac::WlanFullmacStopConfirm,
-    ),
-    pub(crate) eapol_conf: extern "C" fn(
-        ctx: &mut FullmacDriverEventSink,
-        resp: *const banjo_wlan_fullmac::WlanFullmacEapolConfirm,
-    ),
-    pub(crate) on_channel_switch: extern "C" fn(
-        ctx: &mut FullmacDriverEventSink,
-        resp: *const banjo_wlan_fullmac::WlanFullmacChannelSwitchInfo,
-    ),
-
-    // MLME extensions
-    pub(crate) signal_report: extern "C" fn(
-        ctx: &mut FullmacDriverEventSink,
-        ind: *const banjo_wlan_fullmac::WlanFullmacSignalReportIndication,
-    ),
-    pub(crate) eapol_ind: extern "C" fn(
-        ctx: &mut FullmacDriverEventSink,
-        ind: *const banjo_wlan_fullmac::WlanFullmacEapolIndication,
-    ),
-    pub(crate) on_pmk_available: extern "C" fn(
-        ctx: &mut FullmacDriverEventSink,
-        info: *const banjo_wlan_fullmac::WlanFullmacPmkInfo,
-    ),
-    pub(crate) sae_handshake_ind: extern "C" fn(
-        ctx: &mut FullmacDriverEventSink,
-        ind: *const banjo_wlan_fullmac::WlanFullmacSaeHandshakeInd,
-    ),
-    pub(crate) sae_frame_rx: extern "C" fn(
-        ctx: &mut FullmacDriverEventSink,
-        frame: *const banjo_wlan_fullmac::WlanFullmacSaeFrame,
-    ),
-    pub(crate) on_wmm_status_resp: extern "C" fn(
-        ctx: &mut FullmacDriverEventSink,
-        status: zx::sys::zx_status_t,
-        wmm_params: *const banjo_wlan_common::WlanWmmParameters,
-    ),
-}
-
-#[no_mangle]
-extern "C" fn on_scan_result(
-    ctx: &mut FullmacDriverEventSink,
-    result: *const banjo_wlan_fullmac::WlanFullmacScanResult,
-) {
-    let result = banjo_to_fidl::convert_scan_result(unsafe { *result });
-    ctx.0.send(FullmacDriverEvent::OnScanResult { result });
-}
-#[no_mangle]
-extern "C" fn on_scan_end(
-    ctx: &mut FullmacDriverEventSink,
-    end: *const banjo_wlan_fullmac::WlanFullmacScanEnd,
-) {
-    let end = banjo_to_fidl::convert_scan_end(unsafe { *end });
-    ctx.0.send(FullmacDriverEvent::OnScanEnd { end });
-}
-#[no_mangle]
-extern "C" fn connect_conf(
-    ctx: &mut FullmacDriverEventSink,
-    resp: *const banjo_wlan_fullmac::WlanFullmacConnectConfirm,
-) {
-    let resp = banjo_to_fidl::convert_connect_confirm(unsafe { *resp });
-    ctx.0.send(FullmacDriverEvent::ConnectConf { resp });
-}
-#[no_mangle]
-extern "C" fn roam_start_ind(
-    ctx: &mut FullmacDriverEventSink,
-    selected_bssid: *const u8,
-    selected_bss: *const banjo_wlan_internal::BssDescription,
-    original_association_maintained: bool,
-) {
-    let ind = banjo_to_fidl::convert_roam_start_indication(
-        selected_bssid,
-        unsafe { *selected_bss },
-        original_association_maintained,
-    );
-    ctx.0.send(FullmacDriverEvent::RoamStartInd { ind });
-}
-#[no_mangle]
-extern "C" fn roam_result_ind(
-    ctx: &mut FullmacDriverEventSink,
-    selected_bssid: *const u8,
-    status_code: banjo_wlan_ieee80211::StatusCode,
-    original_association_maintained: bool,
-    target_bss_authenticated: bool,
-    association_id: u16,
-    association_ies_list: *const u8,
-    association_ies_count: usize,
-) {
-    let ind = banjo_to_fidl::convert_roam_result_indication(
-        selected_bssid,
-        status_code,
-        original_association_maintained,
-        target_bss_authenticated,
-        association_id,
-        association_ies_list,
-        association_ies_count,
-    );
-    ctx.0.send(FullmacDriverEvent::RoamResultInd { ind });
-}
-#[no_mangle]
-extern "C" fn auth_ind(
-    ctx: &mut FullmacDriverEventSink,
-    ind: *const banjo_wlan_fullmac::WlanFullmacAuthInd,
-) {
-    let ind = banjo_to_fidl::convert_authenticate_indication(unsafe { *ind });
-    ctx.0.send(FullmacDriverEvent::AuthInd { ind });
-}
-#[no_mangle]
-extern "C" fn deauth_conf(ctx: &mut FullmacDriverEventSink, peer_sta_address: *const u8) {
-    let resp = banjo_to_fidl::convert_deauthenticate_confirm(peer_sta_address);
-    ctx.0.send(FullmacDriverEvent::DeauthConf { resp });
-}
-#[no_mangle]
-extern "C" fn deauth_ind(
-    ctx: &mut FullmacDriverEventSink,
-    ind: *const banjo_wlan_fullmac::WlanFullmacDeauthIndication,
-) {
-    let ind = banjo_to_fidl::convert_deauthenticate_indication(unsafe { *ind });
-    ctx.0.send(FullmacDriverEvent::DeauthInd { ind });
-}
-#[no_mangle]
-extern "C" fn assoc_ind(
-    ctx: &mut FullmacDriverEventSink,
-    ind: *const banjo_wlan_fullmac::WlanFullmacAssocInd,
-) {
-    let ind = banjo_to_fidl::convert_associate_indication(unsafe { *ind });
-    ctx.0.send(FullmacDriverEvent::AssocInd { ind });
-}
-#[no_mangle]
-extern "C" fn disassoc_conf(
-    ctx: &mut FullmacDriverEventSink,
-    resp: *const banjo_wlan_fullmac::WlanFullmacDisassocConfirm,
-) {
-    let resp = banjo_to_fidl::convert_disassociate_confirm(unsafe { *resp });
-    ctx.0.send(FullmacDriverEvent::DisassocConf { resp });
-}
-#[no_mangle]
-extern "C" fn disassoc_ind(
-    ctx: &mut FullmacDriverEventSink,
-    ind: *const banjo_wlan_fullmac::WlanFullmacDisassocIndication,
-) {
-    let ind = banjo_to_fidl::convert_disassociate_indication(unsafe { *ind });
-    ctx.0.send(FullmacDriverEvent::DisassocInd { ind });
-}
-#[no_mangle]
-extern "C" fn start_conf(
-    ctx: &mut FullmacDriverEventSink,
-    resp: *const banjo_wlan_fullmac::WlanFullmacStartConfirm,
-) {
-    let resp = banjo_to_fidl::convert_start_confirm(unsafe { *resp });
-    ctx.0.send(FullmacDriverEvent::StartConf { resp });
-}
-#[no_mangle]
-extern "C" fn stop_conf(
-    ctx: &mut FullmacDriverEventSink,
-    resp: *const banjo_wlan_fullmac::WlanFullmacStopConfirm,
-) {
-    let resp = banjo_to_fidl::convert_stop_confirm(unsafe { *resp });
-    ctx.0.send(FullmacDriverEvent::StopConf { resp });
-}
-#[no_mangle]
-extern "C" fn eapol_conf(
-    ctx: &mut FullmacDriverEventSink,
-    resp: *const banjo_wlan_fullmac::WlanFullmacEapolConfirm,
-) {
-    let resp = banjo_to_fidl::convert_eapol_confirm(unsafe { *resp });
-    ctx.0.send(FullmacDriverEvent::EapolConf { resp });
-}
-#[no_mangle]
-extern "C" fn on_channel_switch(
-    ctx: &mut FullmacDriverEventSink,
-    resp: *const banjo_wlan_fullmac::WlanFullmacChannelSwitchInfo,
-) {
-    let resp = banjo_to_fidl::convert_channel_switch_info(unsafe { *resp });
-    ctx.0.send(FullmacDriverEvent::OnChannelSwitch { resp });
-}
-
-// MLME extensions
-#[no_mangle]
-extern "C" fn signal_report(
-    ctx: &mut FullmacDriverEventSink,
-    ind: *const banjo_wlan_fullmac::WlanFullmacSignalReportIndication,
-) {
-    let ind = banjo_to_fidl::convert_signal_report_indication(unsafe { *ind });
-    ctx.0.send(FullmacDriverEvent::SignalReport { ind });
-}
-#[no_mangle]
-extern "C" fn eapol_ind(
-    ctx: &mut FullmacDriverEventSink,
-    ind: *const banjo_wlan_fullmac::WlanFullmacEapolIndication,
-) {
-    let ind = banjo_to_fidl::convert_eapol_indication(unsafe { *ind });
-    ctx.0.send(FullmacDriverEvent::EapolInd { ind });
-}
-#[no_mangle]
-extern "C" fn on_pmk_available(
-    ctx: &mut FullmacDriverEventSink,
-    info: *const banjo_wlan_fullmac::WlanFullmacPmkInfo,
-) {
-    let info = banjo_to_fidl::convert_pmk_info(unsafe { *info });
-    ctx.0.send(FullmacDriverEvent::OnPmkAvailable { info });
-}
-#[no_mangle]
-extern "C" fn sae_handshake_ind(
-    ctx: &mut FullmacDriverEventSink,
-    ind: *const banjo_wlan_fullmac::WlanFullmacSaeHandshakeInd,
-) {
-    let ind = banjo_to_fidl::convert_sae_handshake_indication(unsafe { *ind });
-    ctx.0.send(FullmacDriverEvent::SaeHandshakeInd { ind });
-}
-#[no_mangle]
-extern "C" fn sae_frame_rx(
-    ctx: &mut FullmacDriverEventSink,
-    frame: *const banjo_wlan_fullmac::WlanFullmacSaeFrame,
-) {
-    let frame = banjo_to_fidl::convert_sae_frame(unsafe { *frame });
-    ctx.0.send(FullmacDriverEvent::SaeFrameRx { frame });
-}
-#[no_mangle]
-extern "C" fn on_wmm_status_resp(
-    ctx: &mut FullmacDriverEventSink,
-    status: zx::sys::zx_status_t,
-    wmm_params: *const banjo_wlan_common::WlanWmmParameters,
-) {
-    let resp = banjo_to_fidl::convert_wmm_params(unsafe { *wmm_params });
-    ctx.0.send(FullmacDriverEvent::OnWmmStatusResp { status, resp });
-}
-
-const PROTOCOL_OPS: WlanFullmacIfcProtocolOps = WlanFullmacIfcProtocolOps {
-    on_scan_result: on_scan_result,
-    on_scan_end: on_scan_end,
-    connect_conf: connect_conf,
-    roam_start_ind: roam_start_ind,
-    roam_result_ind: roam_result_ind,
-    auth_ind: auth_ind,
-    deauth_conf: deauth_conf,
-    deauth_ind: deauth_ind,
-    assoc_ind: assoc_ind,
-    disassoc_conf: disassoc_conf,
-    disassoc_ind: disassoc_ind,
-    start_conf: start_conf,
-    stop_conf: stop_conf,
-    eapol_conf: eapol_conf,
-    on_channel_switch: on_channel_switch,
-
-    // MLME extensions
-    signal_report: signal_report,
-    eapol_ind: eapol_ind,
-    on_pmk_available: on_pmk_available,
-    sae_handshake_ind: sae_handshake_ind,
-    sae_frame_rx: sae_frame_rx,
-    on_wmm_status_resp: on_wmm_status_resp,
-};
-
-impl WlanFullmacIfcProtocol {
-    pub(crate) fn new(sink: Box<FullmacDriverEventSink>) -> Self {
-        // Const reference has 'static lifetime, so it's safe to pass down to the driver.
-        let ops = &PROTOCOL_OPS;
-        Self { ops, ctx: sink }
-    }
-}
 
 /// This trait abstracts how Device accomplish operations. Test code
 /// can then implement trait methods instead of mocking an underlying DeviceInterface
 /// and FIDL proxy.
 pub trait DeviceOps {
-    fn start(&mut self, ifc: *const WlanFullmacIfcProtocol) -> Result<fidl::Channel, zx::Status>;
+    fn start(
+        &mut self,
+        fullmac_ifc_client_end: ClientEnd<fidl_fullmac::WlanFullmacImplIfcMarker>,
+    ) -> Result<fidl::Channel, zx::Status>;
     fn query_device_info(&self) -> anyhow::Result<fidl_fullmac::WlanFullmacQueryInfo>;
     fn query_mac_sublayer_support(&self) -> anyhow::Result<fidl_common::MacSublayerSupport>;
     fn query_security_support(&self) -> anyhow::Result<fidl_common::SecuritySupport>;
@@ -388,48 +54,23 @@ pub trait DeviceOps {
     fn on_link_state_changed(&self, online: bool) -> anyhow::Result<()>;
 }
 
-/// A `RawFullmacDeviceFfi` allows transmitting MLME messages.
-#[repr(C)]
-pub struct RawFullmacDeviceFfi {
-    device: *mut c_void,
-    /// Start operations on the underlying device and return the SME channel.
-    start_fullmac_ifc_server: extern "C" fn(
-        device: *mut c_void,
-        ifc: *const WlanFullmacIfcProtocol,
-        fullmac_ifc_server_end_handle: zx::sys::zx_handle_t,
-    ) -> zx::sys::zx_status_t,
-}
-
-// Our device is used inside a separate worker thread, so we force Rust to allow this.
-unsafe impl Send for FullmacDevice {}
-
 pub struct FullmacDevice {
-    raw_device: RawFullmacDeviceFfi,
     fullmac_impl_sync_proxy: fidl_fullmac::WlanFullmacImpl_SynchronousProxy,
 }
 
 impl FullmacDevice {
     pub fn new(
-        raw_device: RawFullmacDeviceFfi,
         fullmac_impl_sync_proxy: fidl_fullmac::WlanFullmacImpl_SynchronousProxy,
     ) -> FullmacDevice {
-        FullmacDevice { raw_device, fullmac_impl_sync_proxy }
+        FullmacDevice { fullmac_impl_sync_proxy }
     }
 }
 
 impl DeviceOps for FullmacDevice {
-    fn start(&mut self, ifc: *const WlanFullmacIfcProtocol) -> Result<fidl::Channel, zx::Status> {
-        let (fullmac_ifc_client_end, fullmac_ifc_server_end) = fidl::endpoints::create_endpoints();
-
-        // Start the WlanFullmacImplIfc server in wlanif before calling WlanFullmacImpl::Start.
-        // Note: wlanif takes ownership of the server end through this call.
-        let status = (self.raw_device.start_fullmac_ifc_server)(
-            self.raw_device.device,
-            ifc,
-            fullmac_ifc_server_end.into_channel().into_raw(),
-        );
-        zx::Status::ok(status)?;
-
+    fn start(
+        &mut self,
+        fullmac_ifc_client_end: ClientEnd<fidl_fullmac::WlanFullmacImplIfcMarker>,
+    ) -> Result<fidl::Channel, zx::Status> {
         self.fullmac_impl_sync_proxy
             .start(fullmac_ifc_client_end, zx::MonotonicTime::INFINITE)
             .map_err(|e| {
@@ -640,6 +281,8 @@ pub mod test_utils {
         pub set_keys_resp_mock: Option<fidl_fullmac::WlanFullmacSetKeysResp>,
         pub get_iface_counter_stats_mock: Option<fidl_mlme::GetIfaceCounterStatsResponse>,
         pub get_iface_histogram_stats_mock: Option<fidl_mlme::GetIfaceHistogramStatsResponse>,
+
+        pub fullmac_ifc_client_end: Option<ClientEnd<fidl_fullmac::WlanFullmacImplIfcMarker>>,
     }
 
     unsafe impl Send for FakeFullmacDevice {}
@@ -683,6 +326,7 @@ pub mod test_utils {
                 usme_bootstrap_server_end: Some(usme_bootstrap_server_end),
                 driver_call_sender: UnboundedSink::new(driver_call_sender),
                 mocks: Arc::new(Mutex::new(FakeFullmacDeviceMocks {
+                    fullmac_ifc_client_end: None,
                     start_fn_status_mock: None,
                     query_device_info_mock: Some(fidl_fullmac::WlanFullmacQueryInfo {
                         sta_addr: [0u8; 6],
@@ -728,9 +372,12 @@ pub mod test_utils {
     impl DeviceOps for FakeFullmacDevice {
         fn start(
             &mut self,
-            _ifc: *const WlanFullmacIfcProtocol,
+            fullmac_ifc_client_end: ClientEnd<fidl_fullmac::WlanFullmacImplIfcMarker>,
         ) -> Result<fidl::Channel, zx::Status> {
-            match self.mocks.lock().unwrap().start_fn_status_mock {
+            let mut mocks = self.mocks.lock().unwrap();
+
+            mocks.fullmac_ifc_client_end = Some(fullmac_ifc_client_end);
+            match mocks.start_fn_status_mock {
                 Some(status) => Err(zx::Status::from_raw(status)),
 
                 // Start can only be called once since this moves usme_bootstrap_server_end.

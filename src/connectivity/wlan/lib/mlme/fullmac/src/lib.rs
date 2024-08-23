@@ -5,9 +5,11 @@
 mod convert;
 pub mod device;
 mod logger;
+mod wlan_fullmac_impl_ifc_request_handler;
 
 use crate::convert::fullmac_to_mlme;
 use crate::device::DeviceOps;
+use crate::wlan_fullmac_impl_ifc_request_handler::serve_wlan_fullmac_impl_ifc_request_handler;
 use anyhow::bail;
 use fuchsia_inspect::Inspector;
 use fuchsia_inspect_contrib::auto_persist;
@@ -19,9 +21,10 @@ use tracing::{error, info, warn};
 use wlan_common::sink::UnboundedSink;
 use wlan_sme::serve::create_sme;
 use {
-    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211,
-    fidl_fuchsia_wlan_internal as fidl_internal, fidl_fuchsia_wlan_mlme as fidl_mlme,
-    fidl_fuchsia_wlan_sme as fidl_sme, fuchsia_async as fasync, fuchsia_zircon as zx,
+    fidl_fuchsia_wlan_common as fidl_common, fidl_fuchsia_wlan_fullmac as fidl_fullmac,
+    fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
+    fidl_fuchsia_wlan_mlme as fidl_mlme, fidl_fuchsia_wlan_sme as fidl_sme,
+    fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
 #[derive(thiserror::Error, Debug)]
@@ -52,6 +55,8 @@ pub enum FullmacMlmeError {
     FailedToCreatePersistenceProxy(fidl::Error),
     #[error("Failed to create sme: {0}")]
     FailedToCreateSme(anyhow::Error),
+    #[error("Failed to create WlanFullmacImplIfcRequestStream: {0}")]
+    FailedToCreateIfcRequestStream(fidl::Error),
 }
 
 #[derive(Debug)]
@@ -75,7 +80,6 @@ pub enum FullmacDriverEvent {
     StopConf { resp: fidl_mlme::StopConfirm },
     EapolConf { resp: fidl_mlme::EapolConfirm },
     OnChannelSwitch { resp: fidl_internal::ChannelSwitchInfo },
-
     SignalReport { ind: fidl_internal::SignalReportIndication },
     EapolInd { ind: fidl_mlme::EapolIndication },
     OnPmkAvailable { info: fidl_mlme::PmkInfo },
@@ -140,9 +144,13 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
 
         let (startup_sender, startup_receiver) = oneshot::channel();
         let mlme_loop_join_handle = std::thread::spawn(move || {
+            // NOTE: Until MLME can be made async, MLME needs two threads to be able to
+            // send requests to the vendor driver and receive requests from the vendor driver
+            // simultaneously.
+            let mut executor = fasync::SendExecutor::new(2);
+
             info!("Starting WLAN MLME main loop");
-            let mut executor = fasync::LocalExecutor::new();
-            let future = Self::main_loop_thread(
+            let future = Self::mlme_main_loop(
                 device,
                 driver_event_sender_clone,
                 driver_event_stream,
@@ -150,7 +158,7 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
                 inspect_usme_node,
                 startup_sender,
             );
-            executor.run_singlethreaded(future);
+            executor.run(future);
         });
 
         let startup_result = executor.run_singlethreaded(startup_receiver);
@@ -178,14 +186,23 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
     /// On success, returns an instance of FullmacMlme and the SME future.
     async fn initialize(
         mut device: D,
-        ifc: &device::WlanFullmacIfcProtocol,
         driver_event_stream: mpsc::UnboundedReceiver<FullmacDriverEvent>,
         inspector: Inspector,
         inspect_usme_node: fuchsia_inspect::Node,
-    ) -> Result<(Self, Pin<Box<impl Future<Output = Result<(), anyhow::Error>>>>), FullmacMlmeError>
-    {
+    ) -> Result<
+        (
+            Self,
+            Pin<Box<impl Future<Output = Result<(), anyhow::Error>>>>,
+            fidl_fullmac::WlanFullmacImplIfcRequestStream,
+        ),
+        FullmacMlmeError,
+    > {
+        let (fullmac_ifc_client_end, fullmac_ifc_request_stream) =
+            fidl::endpoints::create_request_stream()
+                .map_err(FullmacMlmeError::FailedToCreateIfcRequestStream)?;
+
         let usme_bootstrap_protocol_channel =
-            device.start(ifc).map_err(FullmacMlmeError::DeviceStartFailed)?;
+            device.start(fullmac_ifc_client_end).map_err(FullmacMlmeError::DeviceStartFailed)?;
 
         let server = fidl::endpoints::ServerEnd::<fidl_sme::UsmeBootstrapMarker>::new(
             usme_bootstrap_protocol_channel,
@@ -288,10 +305,10 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
             device_link_state: fidl_mlme::ControlledPortState::Closed,
         };
 
-        Ok((mlme, sme_fut))
+        Ok((mlme, sme_fut, fullmac_ifc_request_stream))
     }
 
-    /// The main MLME thread.
+    /// The main MLME loop.
     ///
     /// This initializes the MLME, then on successful initialization runs the MLME main loop future
     /// and SME futures concurrently until completion.
@@ -304,7 +321,7 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
     ///
     /// This panics if sending over |startup_sender| returns an error. This probably means the
     /// thread that called |Self::start| already exited due to an error/panic.
-    async fn main_loop_thread(
+    async fn mlme_main_loop(
         device: D,
         driver_event_sink: mpsc::UnboundedSender<FullmacDriverEvent>,
         driver_event_stream: mpsc::UnboundedReceiver<FullmacDriverEvent>,
@@ -312,17 +329,12 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
         inspect_usme_node: fuchsia_inspect::Node,
         startup_sender: oneshot::Sender<Result<(), FullmacMlmeError>>,
     ) {
-        let driver_event_sink =
-            Box::new(FullmacDriverEventSink(UnboundedSink::new(driver_event_sink)));
-        let ifc = device::WlanFullmacIfcProtocol::new(driver_event_sink);
-
-        let (mlme, sme_fut) =
-            match Self::initialize(device, &ifc, driver_event_stream, inspector, inspect_usme_node)
-                .await
+        let (mlme, sme_fut, fullmac_ifc_request_stream) =
+            match Self::initialize(device, driver_event_stream, inspector, inspect_usme_node).await
             {
-                Ok((mlme, sme_fut)) => {
+                Ok(ret) => {
                     startup_sender.send(Ok(())).unwrap();
-                    (mlme, sme_fut)
+                    ret
                 }
                 Err(e) => {
                     startup_sender.send(Err(e)).unwrap();
@@ -330,15 +342,33 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
                 }
             };
 
-        let mlme_main_loop_fut = mlme.run_main_loop();
+        let driver_event_sink = FullmacDriverEventSink(UnboundedSink::new(driver_event_sink));
+        let mlme_main_loop_fut = mlme.run_main_loop(fullmac_ifc_request_stream, driver_event_sink);
         match futures::try_join!(mlme_main_loop_fut, sme_fut) {
             Ok(_) => info!("MLME and/or SME event loop exited gracefully"),
             Err(e) => error!("MLME and/or SME event loop exited with error: {:?}", e),
         }
     }
 
-    pub async fn run_main_loop(mut self) -> anyhow::Result<()> {
+    pub async fn run_main_loop(
+        mut self,
+        fullmac_ifc_request_stream: fidl_fullmac::WlanFullmacImplIfcRequestStream,
+        driver_event_sink: FullmacDriverEventSink,
+    ) -> anyhow::Result<()> {
         let mac_role = self.device.query_device_info()?.role;
+
+        // The WlanFullmacImplIfc server is a background task so that a blocking call into the
+        // vendor driver does not prevent MLME from handling incoming WlanFullmacImplIfc requests.
+        let (ifc_server_stop_sender, mut ifc_server_stop_receiver) = oneshot::channel::<()>();
+        let _fullmac_ifc_server_task = fasync::Task::spawn(async move {
+            serve_wlan_fullmac_impl_ifc_request_handler(
+                fullmac_ifc_request_stream,
+                driver_event_sink,
+            )
+            .await;
+            ifc_server_stop_sender.send(()).unwrap();
+        });
+
         loop {
             select! {
                 mlme_request = self.mlme_request_stream.next() => match mlme_request {
@@ -358,7 +388,11 @@ impl<D: DeviceOps + Send + 'static> FullmacMlme<D> {
                         }
                     },
                     None => bail!("Driver event stream terminated unexpectedly."),
-                }
+                },
+                ifc_stop = ifc_server_stop_receiver => match ifc_stop {
+                    Ok(()) => bail!("WlanFullmacImplIfc request stream terminated unexpectedly."),
+                    Err(e) => bail!("WlanFullmacImplIfc server task dropped stop sender unexpectedly. {}", e),
+                },
             }
         }
     }
@@ -597,7 +631,7 @@ enum DriverState {
 }
 
 #[cfg(test)]
-mod tests {
+mod main_loop_tests {
     use super::*;
     use crate::device::test_utils::{DriverCall, FakeFullmacDevice, FakeFullmacDeviceMocks};
     use fuchsia_async as fasync;
@@ -608,7 +642,7 @@ mod tests {
     use wlan_common::assert_variant;
 
     #[test]
-    fn test_main_loop_thread_happy_path() {
+    fn test_mlme_main_loop_happy_path() {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
@@ -619,7 +653,9 @@ mod tests {
         let (client_sme_proxy, client_sme_server) =
             fidl::endpoints::create_proxy::<fidl_sme::ClientSmeMarker>()
                 .expect("creating ClientSme proxy should succeed");
-        let mut client_sme_response_fut = h.generic_sme_proxy.get_client_sme(client_sme_server);
+
+        let mut client_sme_response_fut =
+            h.generic_sme_proxy.as_ref().unwrap().get_client_sme(client_sme_server);
         assert_variant!(h.exec.run_until_stalled(&mut client_sme_response_fut), Poll::Pending);
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
         assert_variant!(
@@ -635,7 +671,7 @@ mod tests {
     }
 
     #[test]
-    fn test_main_loop_thread_stops() {
+    fn test_mlme_main_loop_stops() {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
@@ -650,7 +686,7 @@ mod tests {
     }
 
     #[test]
-    fn test_main_loop_thread_fails_due_to_device_start() {
+    fn test_mlme_main_loop_fails_due_to_device_start() {
         let (mut h, mut test_fut) = TestHelper::set_up();
         h.fake_device.lock().unwrap().start_fn_status_mock = Some(zx::sys::ZX_ERR_BAD_STATE);
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
@@ -661,7 +697,7 @@ mod tests {
     }
 
     #[test]
-    fn test_main_loop_thread_fails_due_to_usme_bootstrap_terminated() {
+    fn test_mlme_main_loop_fails_due_to_usme_bootstrap_terminated() {
         let bootstrap = false;
         let (mut h, mut test_fut) = TestHelper::set_up_with_usme_bootstrap(bootstrap);
         h.usme_bootstrap_proxy.take();
@@ -673,7 +709,7 @@ mod tests {
     }
 
     #[test]
-    fn test_main_loop_thread_fails_due_to_wrong_mac_implementation_type() {
+    fn test_mlme_main_loop_fails_due_to_wrong_mac_implementation_type() {
         let (mut h, mut test_fut) = TestHelper::set_up();
         h.fake_device
             .lock()
@@ -691,7 +727,7 @@ mod tests {
     }
 
     #[test]
-    fn test_main_loop_thread_fails_due_to_wrong_data_plane_type() {
+    fn test_mlme_main_loop_fails_due_to_wrong_data_plane_type() {
         let (mut h, mut test_fut) = TestHelper::set_up();
         h.fake_device
             .lock()
@@ -709,7 +745,7 @@ mod tests {
     }
 
     #[test]
-    fn test_main_loop_thread_fails_due_to_query_device_info_error() {
+    fn test_mlme_main_loop_fails_due_to_query_device_info_error() {
         let (mut h, mut test_fut) = TestHelper::set_up();
         h.fake_device.lock().unwrap().query_device_info_mock = None;
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
@@ -720,7 +756,7 @@ mod tests {
     }
 
     #[test]
-    fn test_main_loop_thread_fails_due_to_query_mac_sublayer_support_error() {
+    fn test_mlme_main_loop_fails_due_to_query_mac_sublayer_support_error() {
         let (mut h, mut test_fut) = TestHelper::set_up();
         h.fake_device.lock().unwrap().query_mac_sublayer_support_mock = None;
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
@@ -731,7 +767,7 @@ mod tests {
     }
 
     #[test]
-    fn test_main_loop_thread_fails_due_to_query_security_support_error() {
+    fn test_mlme_main_loop_fails_due_to_query_security_support_error() {
         let (mut h, mut test_fut) = TestHelper::set_up();
         h.fake_device.lock().unwrap().query_security_support_mock = None;
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
@@ -742,7 +778,7 @@ mod tests {
     }
 
     #[test]
-    fn test_main_loop_thread_fails_due_to_query_spectrum_management_support_error() {
+    fn test_mlme_main_loop_fails_due_to_query_spectrum_management_support_error() {
         let (mut h, mut test_fut) = TestHelper::set_up();
         h.fake_device.lock().unwrap().query_spectrum_management_support_mock = None;
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
@@ -752,12 +788,32 @@ mod tests {
         assert_variant!(startup_result, Err(FullmacMlmeError::FailedToQueryVendorDriver(_)));
     }
 
+    #[test]
+    fn test_mlme_main_loop_exits_due_to_sme_channel_closure() {
+        let (mut h, mut test_fut) = TestHelper::set_up();
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.startup_receiver.try_recv(), Ok(Some(Ok(()))));
+
+        std::mem::drop(h.generic_sme_proxy.take());
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
+    }
+
+    #[test]
+    fn test_mlme_main_loop_exits_due_to_wlan_fullmac_impl_ifc_channel_closure() {
+        let (mut h, mut test_fut) = TestHelper::set_up();
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
+        assert_variant!(h.startup_receiver.try_recv(), Ok(Some(Ok(()))));
+
+        std::mem::drop(h.fake_device.lock().unwrap().fullmac_ifc_client_end.take());
+        assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Ready(()));
+    }
+
     struct TestHelper {
         fake_device: Arc<Mutex<FakeFullmacDeviceMocks>>,
         driver_event_sender: mpsc::UnboundedSender<FullmacDriverEvent>,
         usme_bootstrap_proxy: Option<fidl_sme::UsmeBootstrapProxy>,
         _usme_bootstrap_result: Option<fidl::client::QueryResponseFut<zx::Vmo>>,
-        generic_sme_proxy: fidl_sme::GenericSmeProxy,
+        generic_sme_proxy: Option<fidl_sme::GenericSmeProxy>,
         startup_receiver: oneshot::Receiver<Result<(), FullmacMlmeError>>,
         _driver_calls: mpsc::UnboundedReceiver<DriverCall>,
         exec: fasync::TestExecutor,
@@ -801,7 +857,7 @@ mod tests {
 
             let mocks = fake_device.mocks.clone();
 
-            let test_fut = Box::pin(FullmacMlme::main_loop_thread(
+            let test_fut = Box::pin(FullmacMlme::mlme_main_loop(
                 fake_device,
                 driver_event_sender.clone(),
                 driver_event_stream,
@@ -815,7 +871,7 @@ mod tests {
                 driver_event_sender,
                 usme_bootstrap_proxy: Some(usme_bootstrap_proxy),
                 _usme_bootstrap_result: usme_bootstrap_result,
-                generic_sme_proxy,
+                generic_sme_proxy: Some(generic_sme_proxy),
                 startup_receiver,
                 _driver_calls,
                 exec,
@@ -1598,52 +1654,30 @@ mod handle_mlme_request_tests {
         }
     }
 }
-
 #[cfg(test)]
 mod handle_driver_event_tests {
-    use crate::device::WlanFullmacIfcProtocol;
-
     use super::*;
     use crate::device::test_utils::{DriverCall, FakeFullmacDevice, FakeFullmacDeviceMocks};
+    use futures::channel::mpsc;
     use futures::task::Poll;
     use futures::Future;
     use std::pin::Pin;
     use std::sync::{Arc, Mutex};
     use test_case::test_case;
+    use wlan_common::sink::UnboundedSink;
     use wlan_common::{assert_variant, fake_fidl_bss_description};
     use {
-        banjo_fuchsia_wlan_common as banjo_wlan_common,
-        banjo_fuchsia_wlan_fullmac as banjo_wlan_fullmac,
-        banjo_fuchsia_wlan_ieee80211 as banjo_wlan_ieee80211,
-        banjo_fuchsia_wlan_internal as banjo_wlan_internal, fidl_fuchsia_wlan_mlme as fidl_mlme,
-        fuchsia_async as fasync,
+        fidl_fuchsia_wlan_ieee80211 as fidl_ieee80211, fidl_fuchsia_wlan_internal as fidl_internal,
+        fidl_fuchsia_wlan_mlme as fidl_mlme, fuchsia_async as fasync, fuchsia_zircon as zx,
     };
 
-    fn create_bss_descriptions(
-    ) -> (banjo_wlan_internal::BssDescription, fidl_internal::BssDescription, Vec<u8>) {
-        let ies = vec![3, 4, 5];
-        let banjo_bss = banjo_wlan_internal::BssDescription {
-            bssid: [9u8; 6],
-            bss_type: banjo_wlan_common::BssType::INFRASTRUCTURE,
-            beacon_period: 1,
-            capability_info: 2,
-            ies_list: ies.as_ptr(),
-            ies_count: ies.len(),
-            channel: banjo_wlan_common::WlanChannel {
-                primary: 6,
-                cbw: banjo_wlan_common::ChannelBandwidth::CBW20,
-                secondary80: 0,
-            },
-            rssi_dbm: 7,
-            snr_db: 8,
-        };
-
-        let fidl_bss = fidl_internal::BssDescription {
+    fn create_bss_descriptions() -> fidl_internal::BssDescription {
+        fidl_internal::BssDescription {
             bssid: [9u8; 6],
             bss_type: fidl_common::BssType::Infrastructure,
             beacon_period: 1,
             capability_info: 2,
-            ies: ies.clone(),
+            ies: vec![3, 4, 5],
             channel: fidl_common::WlanChannel {
                 primary: 6,
                 cbw: fidl_common::ChannelBandwidth::Cbw20,
@@ -1651,9 +1685,7 @@ mod handle_driver_event_tests {
             },
             rssi_dbm: 7,
             snr_db: 8,
-        };
-
-        (banjo_bss, fidl_bss, ies)
+        }
     }
 
     fn create_connect_request(security_ie: Vec<u8>) -> wlan_sme::MlmeRequest {
@@ -1672,31 +1704,22 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let (banjo_bss, expected_fidl_bss, _ies_buffer) = create_bss_descriptions();
-        let scan_result = banjo_wlan_fullmac::WlanFullmacScanResult {
+        let bss = create_bss_descriptions();
+        let scan_result = fidl_fullmac::WlanFullmacScanResult {
             txn_id: 42u64,
             timestamp_nanos: 1337i64,
-            bss: banjo_bss,
+            bss: bss.clone(),
         };
-        unsafe {
-            ((*h.driver_event_protocol.ops).on_scan_result)(
-                &mut h.driver_event_protocol.ctx,
-                &scan_result,
-            );
-        }
+        assert_variant!(
+            h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.on_scan_result(&scan_result)),
+            Poll::Ready(Ok(())),
+        );
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
         let result =
             assert_variant!(event, fidl_mlme::MlmeEvent::OnScanResult { result } => result);
-        assert_eq!(
-            result,
-            fidl_mlme::ScanResult {
-                txn_id: 42u64,
-                timestamp_nanos: 1337i64,
-                bss: expected_fidl_bss,
-            }
-        );
+        assert_eq!(result, fidl_mlme::ScanResult { txn_id: 42u64, timestamp_nanos: 1337i64, bss });
     }
 
     #[test]
@@ -1704,16 +1727,14 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let scan_end = banjo_wlan_fullmac::WlanFullmacScanEnd {
+        let scan_end = fidl_fullmac::WlanFullmacScanEnd {
             txn_id: 42u64,
-            code: banjo_wlan_fullmac::WlanScanResult::SUCCESS,
+            code: fidl_fullmac::WlanScanResult::Success,
         };
-        unsafe {
-            ((*h.driver_event_protocol.ops).on_scan_end)(
-                &mut h.driver_event_protocol.ctx,
-                &scan_end,
-            );
-        }
+        assert_variant!(
+            h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.on_scan_end(&scan_end)),
+            Poll::Ready(Ok(())),
+        );
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
@@ -1729,20 +1750,16 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let association_ies = vec![1, 2, 3, 4, 5, 6, 7, 8, 9];
-        let connect_conf = banjo_wlan_fullmac::WlanFullmacConnectConfirm {
+        let connect_conf = fidl_fullmac::WlanFullmacConnectConfirm {
             peer_sta_address: [1u8; 6],
-            result_code: banjo_wlan_ieee80211::StatusCode::SUCCESS,
+            result_code: fidl_ieee80211::StatusCode::Success,
             association_id: 2,
-            association_ies_list: association_ies.as_ptr(),
-            association_ies_count: association_ies.len(),
+            association_ies: vec![1, 2, 3, 4, 5, 6, 7, 8, 9],
         };
-        unsafe {
-            ((*h.driver_event_protocol.ops).connect_conf)(
-                &mut h.driver_event_protocol.ctx,
-                &connect_conf,
-            );
-        }
+        assert_variant!(
+            h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.connect_conf(&connect_conf)),
+            Poll::Ready(Ok(())),
+        );
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
@@ -1758,14 +1775,14 @@ mod handle_driver_event_tests {
         );
     }
 
-    #[test_case(true, banjo_wlan_ieee80211::StatusCode::SUCCESS, false; "secure connect with success status is not online yet")]
-    #[test_case(false, banjo_wlan_ieee80211::StatusCode::SUCCESS, true; "insecure connect with success status is online right away")]
-    #[test_case(true, banjo_wlan_ieee80211::StatusCode::REFUSED_REASON_UNSPECIFIED, false; "secure connect with failed status is not online")]
-    #[test_case(false, banjo_wlan_ieee80211::StatusCode::REFUSED_REASON_UNSPECIFIED, false; "insecure connect with failed status in not online")]
+    #[test_case(true, fidl_ieee80211::StatusCode::Success, false; "secure connect with success status is not online yet")]
+    #[test_case(false, fidl_ieee80211::StatusCode::Success, true; "insecure connect with success status is online right away")]
+    #[test_case(true, fidl_ieee80211::StatusCode::RefusedReasonUnspecified, false; "secure connect with failed status is not online")]
+    #[test_case(false, fidl_ieee80211::StatusCode::RefusedReasonUnspecified, false; "insecure connect with failed status in not online")]
     #[fuchsia::test(add_test_attr = false)]
     fn test_connect_req_connect_conf_link_state(
         secure_connect: bool,
-        connect_result_code: banjo_wlan_ieee80211::StatusCode,
+        connect_result_code: fidl_ieee80211::StatusCode,
         expected_online: bool,
     ) {
         let (mut h, mut test_fut) =
@@ -1779,20 +1796,17 @@ mod handle_driver_event_tests {
             .expect("sending ConnectReq should succeed");
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let association_ies = vec![1, 2, 3, 4, 5, 6, 7, 8, 9];
-        let connect_conf = banjo_wlan_fullmac::WlanFullmacConnectConfirm {
+        let connect_conf = fidl_fullmac::WlanFullmacConnectConfirm {
             peer_sta_address: [1u8; 6],
             result_code: connect_result_code,
             association_id: 2,
-            association_ies_list: association_ies.as_ptr(),
-            association_ies_count: association_ies.len(),
+            association_ies: vec![1, 2, 3, 4, 5, 6, 7, 8, 9],
         };
-        unsafe {
-            ((*h.driver_event_protocol.ops).connect_conf)(
-                &mut h.driver_event_protocol.ctx,
-                &connect_conf,
-            );
-        }
+
+        assert_variant!(
+            h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.connect_conf(&connect_conf)),
+            Poll::Ready(Ok(()))
+        );
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         assert_variant!(
@@ -1815,13 +1829,14 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let auth_ind = banjo_wlan_fullmac::WlanFullmacAuthInd {
+        let auth_ind = fidl_fullmac::WlanFullmacAuthInd {
             peer_sta_address: [1u8; 6],
-            auth_type: banjo_wlan_fullmac::WlanAuthType::OPEN_SYSTEM,
+            auth_type: fidl_fullmac::WlanAuthType::OpenSystem,
         };
-        unsafe {
-            ((*h.driver_event_protocol.ops).auth_ind)(&mut h.driver_event_protocol.ctx, &auth_ind);
-        }
+        assert_variant!(
+            h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.auth_ind(&auth_ind)),
+            Poll::Ready(Ok(()))
+        );
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
@@ -1844,13 +1859,14 @@ mod handle_driver_event_tests {
         h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role = mac_role;
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let peer_sta_address = [1u8; 6];
-        unsafe {
-            ((*h.driver_event_protocol.ops).deauth_conf)(
-                &mut h.driver_event_protocol.ctx,
-                peer_sta_address.as_ptr(),
-            );
-        }
+        let deauth_conf = fidl_fullmac::WlanFullmacImplIfcDeauthConfRequest {
+            peer_sta_address: Some([1u8; 6]),
+            ..Default::default()
+        };
+        assert_variant!(
+            h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.deauth_conf(&deauth_conf)),
+            Poll::Ready(Ok(()))
+        );
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         if mac_role == fidl_common::WlanMacRole::Client {
@@ -1877,17 +1893,15 @@ mod handle_driver_event_tests {
         h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role = mac_role;
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let deauth_ind = banjo_wlan_fullmac::WlanFullmacDeauthIndication {
+        let deauth_ind = fidl_fullmac::WlanFullmacDeauthIndication {
             peer_sta_address: [1u8; 6],
-            reason_code: banjo_wlan_ieee80211::ReasonCode::LEAVING_NETWORK_DEAUTH,
+            reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDeauth,
             locally_initiated: true,
         };
-        unsafe {
-            ((*h.driver_event_protocol.ops).deauth_ind)(
-                &mut h.driver_event_protocol.ctx,
-                &deauth_ind,
-            );
-        }
+        assert_variant!(
+            h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.deauth_ind(&deauth_ind)),
+            Poll::Ready(Ok(())),
+        );
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         if mac_role == fidl_common::WlanMacRole::Client {
@@ -1916,21 +1930,19 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let assoc_ind = banjo_wlan_fullmac::WlanFullmacAssocInd {
+        let assoc_ind = fidl_fullmac::WlanFullmacAssocInd {
             peer_sta_address: [1u8; 6],
             listen_interval: 2,
-            ssid: banjo_wlan_ieee80211::CSsid { data: [3u8; 32], len: 4 },
+            ssid: fidl_ieee80211::CSsid { data: [3u8; 32], len: 4 },
             rsne: [5u8; 257],
             rsne_len: 6,
             vendor_ie: [7u8; 514],
             vendor_ie_len: 8,
         };
-        unsafe {
-            ((*h.driver_event_protocol.ops).assoc_ind)(
-                &mut h.driver_event_protocol.ctx,
-                &assoc_ind,
-            );
-        }
+        assert_variant!(
+            h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.assoc_ind(&assoc_ind)),
+            Poll::Ready(Ok(()))
+        );
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
@@ -1957,13 +1969,11 @@ mod handle_driver_event_tests {
         h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role = mac_role;
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let disassoc_conf = banjo_wlan_fullmac::WlanFullmacDisassocConfirm { status: 1 };
-        unsafe {
-            ((*h.driver_event_protocol.ops).disassoc_conf)(
-                &mut h.driver_event_protocol.ctx,
-                &disassoc_conf,
-            );
-        }
+        let disassoc_conf = fidl_fullmac::WlanFullmacDisassocConfirm { status: 1 };
+        assert_variant!(
+            h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.disassoc_conf(&disassoc_conf)),
+            Poll::Ready(Ok(()))
+        );
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         if mac_role == fidl_common::WlanMacRole::Client {
@@ -1989,17 +1999,15 @@ mod handle_driver_event_tests {
         h.fake_device.lock().unwrap().query_device_info_mock.as_mut().unwrap().role = mac_role;
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let disassoc_ind = banjo_wlan_fullmac::WlanFullmacDisassocIndication {
+        let disassoc_ind = fidl_fullmac::WlanFullmacDisassocIndication {
             peer_sta_address: [1u8; 6],
-            reason_code: banjo_wlan_ieee80211::ReasonCode::LEAVING_NETWORK_DEAUTH,
+            reason_code: fidl_ieee80211::ReasonCode::LeavingNetworkDeauth,
             locally_initiated: true,
         };
-        unsafe {
-            ((*h.driver_event_protocol.ops).disassoc_ind)(
-                &mut h.driver_event_protocol.ctx,
-                &disassoc_ind,
-            );
-        }
+        assert_variant!(
+            h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.disassoc_ind(&disassoc_ind)),
+            Poll::Ready(Ok(()))
+        );
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         if mac_role == fidl_common::WlanMacRole::Client {
@@ -2023,24 +2031,22 @@ mod handle_driver_event_tests {
         );
     }
 
-    #[test_case(banjo_wlan_fullmac::WlanStartResult::SUCCESS, true, fidl_mlme::StartResultCode::Success; "success start result")]
-    #[test_case(banjo_wlan_fullmac::WlanStartResult::BSS_ALREADY_STARTED_OR_JOINED, false, fidl_mlme::StartResultCode::BssAlreadyStartedOrJoined; "other start result")]
+    #[test_case(fidl_fullmac::WlanStartResult::Success, true, fidl_mlme::StartResultCode::Success; "success start result")]
+    #[test_case(fidl_fullmac::WlanStartResult::BssAlreadyStartedOrJoined, false, fidl_mlme::StartResultCode::BssAlreadyStartedOrJoined; "other start result")]
     #[fuchsia::test(add_test_attr = false)]
     fn test_start_conf(
-        start_result: banjo_wlan_fullmac::WlanStartResult,
+        start_result: fidl_fullmac::WlanStartResult,
         expected_link_state_changed: bool,
         expected_fidl_result_code: fidl_mlme::StartResultCode,
     ) {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let start_conf = banjo_wlan_fullmac::WlanFullmacStartConfirm { result_code: start_result };
-        unsafe {
-            ((*h.driver_event_protocol.ops).start_conf)(
-                &mut h.driver_event_protocol.ctx,
-                &start_conf,
-            );
-        }
+        let start_conf = fidl_fullmac::WlanFullmacStartConfirm { result_code: start_result };
+        assert_variant!(
+            h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.start_conf(&start_conf)),
+            Poll::Ready(Ok(()))
+        );
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         if expected_link_state_changed {
@@ -2062,15 +2068,13 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let stop_conf = banjo_wlan_fullmac::WlanFullmacStopConfirm {
-            result_code: banjo_wlan_fullmac::WlanStopResult::SUCCESS,
+        let stop_conf = fidl_fullmac::WlanFullmacStopConfirm {
+            result_code: fidl_fullmac::WlanStopResult::Success,
         };
-        unsafe {
-            ((*h.driver_event_protocol.ops).stop_conf)(
-                &mut h.driver_event_protocol.ctx,
-                &stop_conf,
-            );
-        }
+        assert_variant!(
+            h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.stop_conf(&stop_conf)),
+            Poll::Ready(Ok(()))
+        );
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
@@ -2086,16 +2090,14 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let eapol_conf = banjo_wlan_fullmac::WlanFullmacEapolConfirm {
-            result_code: banjo_wlan_fullmac::WlanEapolResult::SUCCESS,
+        let eapol_conf = fidl_fullmac::WlanFullmacEapolConfirm {
+            result_code: fidl_fullmac::WlanEapolResult::Success,
             dst_addr: [1u8; 6],
         };
-        unsafe {
-            ((*h.driver_event_protocol.ops).eapol_conf)(
-                &mut h.driver_event_protocol.ctx,
-                &eapol_conf,
-            );
-        }
+        assert_variant!(
+            h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.eapol_conf(&eapol_conf)),
+            Poll::Ready(Ok(()))
+        );
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
@@ -2114,14 +2116,13 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let channel_switch_info =
-            banjo_wlan_fullmac::WlanFullmacChannelSwitchInfo { new_channel: 9 };
-        unsafe {
-            ((*h.driver_event_protocol.ops).on_channel_switch)(
-                &mut h.driver_event_protocol.ctx,
-                &channel_switch_info,
-            );
-        }
+        let channel_switch_info = fidl_fullmac::WlanFullmacChannelSwitchInfo { new_channel: 9 };
+        assert_variant!(
+            h.exec.run_until_stalled(
+                &mut h.fullmac_ifc_proxy.on_channel_switch(&channel_switch_info)
+            ),
+            Poll::Ready(Ok(()))
+        );
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
@@ -2135,16 +2136,17 @@ mod handle_driver_event_tests {
             TestHelper::set_up_with_link_state(fidl_mlme::ControlledPortState::Open);
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let (selected_bss_banjo, selected_bss, _ies) = create_bss_descriptions();
-        let original_association_maintained = false;
-        unsafe {
-            ((*h.driver_event_protocol.ops).roam_start_ind)(
-                &mut h.driver_event_protocol.ctx,
-                selected_bss_banjo.bssid.as_ptr(),
-                &selected_bss_banjo,
-                original_association_maintained,
-            );
-        }
+        let selected_bss = create_bss_descriptions();
+        let roam_start_ind = fidl_fullmac::WlanFullmacImplIfcRoamStartIndRequest {
+            selected_bssid: Some(selected_bss.bssid.clone()),
+            selected_bss: Some(selected_bss.clone()),
+            original_association_maintained: Some(false),
+            ..Default::default()
+        };
+        assert_variant!(
+            h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.roam_start_ind(&roam_start_ind)),
+            Poll::Ready(Ok(()))
+        );
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         // Receipt of a roam start causes MLME to close the controlled port.
@@ -2162,7 +2164,7 @@ mod handle_driver_event_tests {
             fidl_mlme::RoamStartIndication {
                 selected_bssid: selected_bss.bssid,
                 selected_bss,
-                original_association_maintained,
+                original_association_maintained: false,
             }
         );
     }
@@ -2172,23 +2174,26 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let (selected_bss_banjo, selected_bss, _ies) = create_bss_descriptions();
+        let selected_bss = create_bss_descriptions();
         let original_association_maintained = false;
         let target_bss_authenticated = true;
         let association_id = 42;
         let association_ies = Vec::new();
-        unsafe {
-            ((*h.driver_event_protocol.ops).roam_result_ind)(
-                &mut h.driver_event_protocol.ctx,
-                selected_bss_banjo.bssid.as_ptr(),
-                banjo_wlan_ieee80211::StatusCode::SUCCESS,
-                original_association_maintained,
-                target_bss_authenticated,
-                association_id,
-                association_ies.as_ptr(),
-                0,
-            );
-        }
+
+        let roam_result_ind = fidl_fullmac::WlanFullmacImplIfcRoamResultIndRequest {
+            selected_bssid: Some(selected_bss.bssid.clone()),
+            status_code: Some(fidl_ieee80211::StatusCode::Success),
+            original_association_maintained: Some(original_association_maintained),
+            target_bss_authenticated: Some(target_bss_authenticated),
+            association_id: Some(association_id),
+            association_ies: Some(association_ies.clone()),
+            ..Default::default()
+        };
+
+        assert_variant!(
+            h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.roam_result_ind(&roam_result_ind)),
+            Poll::Ready(Ok(()))
+        );
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         // Receipt of a roam result success causes MLME to open the controlled port on an open network.
@@ -2220,13 +2225,11 @@ mod handle_driver_event_tests {
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let signal_report_ind =
-            banjo_wlan_fullmac::WlanFullmacSignalReportIndication { rssi_dbm: 1, snr_db: 2 };
-        unsafe {
-            ((*h.driver_event_protocol.ops).signal_report)(
-                &mut h.driver_event_protocol.ctx,
-                &signal_report_ind,
-            );
-        }
+            fidl_fullmac::WlanFullmacSignalReportIndication { rssi_dbm: 1, snr_db: 2 };
+        assert_variant!(
+            h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.signal_report(&signal_report_ind)),
+            Poll::Ready(Ok(()))
+        );
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
@@ -2239,19 +2242,15 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let data = vec![3u8; 4];
-        let eapol_ind = banjo_wlan_fullmac::WlanFullmacEapolIndication {
+        let eapol_ind = fidl_fullmac::WlanFullmacEapolIndication {
             src_addr: [1u8; 6],
             dst_addr: [2u8; 6],
-            data_list: data.as_ptr(),
-            data_count: data.len(),
+            data: vec![3u8; 4],
         };
-        unsafe {
-            ((*h.driver_event_protocol.ops).eapol_ind)(
-                &mut h.driver_event_protocol.ctx,
-                &eapol_ind,
-            );
-        }
+        assert_variant!(
+            h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.eapol_ind(&eapol_ind)),
+            Poll::Ready(Ok(()))
+        );
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
@@ -2271,20 +2270,11 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let pmk = vec![1u8; 2];
-        let pmkid = vec![3u8; 4];
-        let pmk_info = banjo_wlan_fullmac::WlanFullmacPmkInfo {
-            pmk_list: pmk.as_ptr(),
-            pmk_count: pmk.len(),
-            pmkid_list: pmkid.as_ptr(),
-            pmkid_count: pmkid.len(),
-        };
-        unsafe {
-            ((*h.driver_event_protocol.ops).on_pmk_available)(
-                &mut h.driver_event_protocol.ctx,
-                &pmk_info,
-            );
-        }
+        let pmk_info = fidl_fullmac::WlanFullmacPmkInfo { pmk: vec![1u8; 2], pmkid: vec![3u8; 4] };
+        assert_variant!(
+            h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.on_pmk_available(&pmk_info)),
+            Poll::Ready(Ok(()))
+        );
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
@@ -2298,13 +2288,12 @@ mod handle_driver_event_tests {
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let sae_handshake_ind =
-            banjo_wlan_fullmac::WlanFullmacSaeHandshakeInd { peer_sta_address: [1u8; 6] };
-        unsafe {
-            ((*h.driver_event_protocol.ops).sae_handshake_ind)(
-                &mut h.driver_event_protocol.ctx,
-                &sae_handshake_ind,
-            );
-        }
+            fidl_fullmac::WlanFullmacSaeHandshakeInd { peer_sta_address: [1u8; 6] };
+        assert_variant!(
+            h.exec
+                .run_until_stalled(&mut h.fullmac_ifc_proxy.sae_handshake_ind(&sae_handshake_ind)),
+            Poll::Ready(Ok(()))
+        );
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
@@ -2317,20 +2306,16 @@ mod handle_driver_event_tests {
         let (mut h, mut test_fut) = TestHelper::set_up();
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
-        let sae_fields = vec![3u8; 4];
-        let sae_frame = banjo_wlan_fullmac::WlanFullmacSaeFrame {
+        let sae_frame = fidl_fullmac::WlanFullmacSaeFrame {
             peer_sta_address: [1u8; 6],
-            status_code: banjo_wlan_ieee80211::StatusCode::SUCCESS,
+            status_code: fidl_ieee80211::StatusCode::Success,
             seq_num: 2,
-            sae_fields_list: sae_fields.as_ptr(),
-            sae_fields_count: sae_fields.len(),
+            sae_fields: vec![3u8; 4],
         };
-        unsafe {
-            ((*h.driver_event_protocol.ops).sae_frame_rx)(
-                &mut h.driver_event_protocol.ctx,
-                &sae_frame,
-            );
-        }
+        assert_variant!(
+            h.exec.run_until_stalled(&mut h.fullmac_ifc_proxy.sae_frame_rx(&sae_frame)),
+            Poll::Ready(Ok(()))
+        );
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
@@ -2352,30 +2337,30 @@ mod handle_driver_event_tests {
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let status = zx::sys::ZX_OK;
-        let wmm_params = banjo_wlan_common::WlanWmmParameters {
+        let wmm_params = fidl_common::WlanWmmParameters {
             apsd: true,
-            ac_be_params: banjo_wlan_common::WlanWmmAccessCategoryParameters {
+            ac_be_params: fidl_common::WlanWmmAccessCategoryParameters {
                 ecw_min: 1,
                 ecw_max: 2,
                 aifsn: 3,
                 txop_limit: 4,
                 acm: true,
             },
-            ac_bk_params: banjo_wlan_common::WlanWmmAccessCategoryParameters {
+            ac_bk_params: fidl_common::WlanWmmAccessCategoryParameters {
                 ecw_min: 5,
                 ecw_max: 6,
                 aifsn: 7,
                 txop_limit: 8,
                 acm: false,
             },
-            ac_vi_params: banjo_wlan_common::WlanWmmAccessCategoryParameters {
+            ac_vi_params: fidl_common::WlanWmmAccessCategoryParameters {
                 ecw_min: 9,
                 ecw_max: 10,
                 aifsn: 11,
                 txop_limit: 12,
                 acm: true,
             },
-            ac_vo_params: banjo_wlan_common::WlanWmmAccessCategoryParameters {
+            ac_vo_params: fidl_common::WlanWmmAccessCategoryParameters {
                 ecw_min: 13,
                 ecw_max: 14,
                 aifsn: 15,
@@ -2383,13 +2368,12 @@ mod handle_driver_event_tests {
                 acm: false,
             },
         };
-        unsafe {
-            ((*h.driver_event_protocol.ops).on_wmm_status_resp)(
-                &mut h.driver_event_protocol.ctx,
-                status,
-                &wmm_params,
-            );
-        }
+        assert_variant!(
+            h.exec.run_until_stalled(
+                &mut h.fullmac_ifc_proxy.on_wmm_status_resp(status, &wmm_params)
+            ),
+            Poll::Ready(Ok(()))
+        );
         assert_variant!(h.exec.run_until_stalled(&mut test_fut), Poll::Pending);
 
         let event = assert_variant!(h.mlme_event_receiver.try_next(), Ok(Some(ev)) => ev);
@@ -2434,7 +2418,7 @@ mod handle_driver_event_tests {
     struct TestHelper {
         fake_device: Arc<Mutex<FakeFullmacDeviceMocks>>,
         mlme_request_sender: mpsc::UnboundedSender<wlan_sme::MlmeRequest>,
-        driver_event_protocol: WlanFullmacIfcProtocol,
+        fullmac_ifc_proxy: fidl_fullmac::WlanFullmacImplIfcProxy,
         mlme_event_receiver: mpsc::UnboundedReceiver<fidl_mlme::MlmeEvent>,
         driver_calls: mpsc::UnboundedReceiver<DriverCall>,
         exec: fasync::TestExecutor,
@@ -2459,9 +2443,13 @@ mod handle_driver_event_tests {
             let mlme_event_sink = UnboundedSink::new(mlme_event_sender);
 
             let (driver_event_sender, driver_event_stream) = mpsc::unbounded();
-            let driver_event_sink =
-                Box::new(FullmacDriverEventSink(UnboundedSink::new(driver_event_sender)));
-            let ifc = device::WlanFullmacIfcProtocol::new(driver_event_sink);
+            let driver_event_sink = FullmacDriverEventSink(UnboundedSink::new(driver_event_sender));
+
+            let (fullmac_ifc_proxy, fullmac_ifc_request_stream) =
+                fidl::endpoints::create_proxy_and_stream::<fidl_fullmac::WlanFullmacImplIfcMarker>(
+                )
+                .unwrap();
+
             let mocks = fake_device.mocks.clone();
 
             let mlme = FullmacMlme {
@@ -2472,11 +2460,12 @@ mod handle_driver_event_tests {
                 is_bss_protected: false,
                 device_link_state,
             };
-            let test_fut = Box::pin(mlme.run_main_loop());
+            let test_fut =
+                Box::pin(mlme.run_main_loop(fullmac_ifc_request_stream, driver_event_sink));
             let test_helper = TestHelper {
                 fake_device: mocks,
                 mlme_request_sender,
-                driver_event_protocol: ifc,
+                fullmac_ifc_proxy,
                 mlme_event_receiver,
                 driver_calls: driver_call_receiver,
                 exec,

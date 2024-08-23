@@ -13,8 +13,7 @@ include_guard = "SRC_CONNECTIVITY_WLAN_LIB_MLME_FULLMAC_C_BINDING_BINDINGS_H_"
 language = "C"
 
 sys_includes = [
-    # Banjo types.
-    "fuchsia/wlan/fullmac/c/banjo.h",   # wlan_fullmac_scan_result_t, etc.
+    "zircon/types.h",
 ]
 
 # Dictates how C structs are generated. "type" means that codegen is of the form:
@@ -27,69 +26,11 @@ style = "type"
 parse_deps = true
 include = ["wlan_fullmac_mlme"]
 
-[export]
-# Explicitly declare types to export as cbindgen seems to have trouble
-# detecting their usage.
-include = []
-
-exclude = [
-    # Voided types.
-    "FullmacDriverEventSink",
-]
-
 [export.rename]
 # Unfortunately cbindgen's rename machinery is rather simple
 # and doesn't accommodate our needs. As a result we have to
 # explicitly declare the items which should get renamed
-"RawFullmacDeviceFfi" = "rust_fullmac_device_ffi_t"
 "FullmacMlmeHandle" = "wlan_fullmac_mlme_handle_t"
-
-# These structs are used for void* context fields in protocol ops.
-"FullmacDriverEventSink" = "void"
-
-# Banjo types.
-"MacSublayerSupport" = "mac_sublayer_support_t"
-"SecuritySupport" = "security_support_t"
-"SpectrumManagementSupport" = "spectrum_management_support_t"
-"WlanFullmacIfcProtocol" = "rust_wlan_fullmac_ifc_protocol_copy_t"
-"WlanFullmacIfcProtocolOps" = "rust_wlan_fullmac_ifc_protocol_ops_copy_t"
-"WlanFullmacAuthInd" = "wlan_fullmac_auth_ind_t"
-"WlanFullmacImplAuthRespRequest" = "wlan_fullmac_impl_auth_resp_request_t"
-"WlanFullmacAssocInd" = "wlan_fullmac_assoc_ind_t"
-"WlanFullmacImplAssocRespRequest" = "wlan_fullmac_impl_assoc_resp_request_t"
-"WlanFullmacChannelSwitchInfo" = "wlan_fullmac_channel_switch_info_t"
-"WlanFullmacConnectConfirm" = "wlan_fullmac_connect_confirm_t"
-"WlanFullmacImplConnectRequest" = "wlan_fullmac_impl_connect_request_t"
-"WlanFullmacDeauthConfirm" = "wlan_fullmac_deauth_confirm_t"
-"WlanFullmacDeauthIndication" = "wlan_fullmac_deauth_indication_t"
-"WlanFullmacImplDeauthRequest" = "wlan_fullmac_impl_deauth_request_t"
-"WlanFullmacDelKeysReq" = "wlan_fullmac_del_keys_req_t"
-"WlanFullmacDisassocConfirm" = "wlan_fullmac_disassoc_confirm_t"
-"WlanFullmacDisassocIndication" = "wlan_fullmac_disassoc_indication_t"
-"WlanFullmacImplDisassocRequest" = "wlan_fullmac_impl_disassoc_request_t"
-"WlanFullmacEapolConfirm" = "wlan_fullmac_eapol_confirm_t"
-"WlanFullmacEapolIndication" = "wlan_fullmac_eapol_indication_t"
-"WlanFullmacImplEapolTxRequest" = "wlan_fullmac_impl_eapol_tx_request_t"
-"WlanFullmacIfaceCounterStats" = "wlan_fullmac_iface_counter_stats_t"
-"WlanFullmacIfaceHistogramStats" = "wlan_fullmac_iface_histogram_stats_t"
-"WlanFullmacPmkInfo" = "wlan_fullmac_pmk_info_t"
-"WlanFullmacQueryInfo" = "wlan_fullmac_query_info_t"
-"WlanFullmacImplReconnectRequest" = "wlan_fullmac_impl_reconnect_request_t"
-"WlanFullmacImplResetRequest" = "wlan_fullmac_impl_reset_request_t"
-"WlanFullmacSaeFrame" = "wlan_fullmac_sae_frame_t"
-"WlanFullmacSaeHandshakeInd" = "wlan_fullmac_sae_handshake_ind_t"
-"WlanFullmacSaeHandshakeResp" = "wlan_fullmac_sae_handshake_resp_t"
-"WlanFullmacImplStartScanRequest" = "wlan_fullmac_impl_start_scan_request_t"
-"WlanFullmacScanResult" = "wlan_fullmac_scan_result_t"
-"WlanFullmacScanEnd" = "wlan_fullmac_scan_end_t"
-"WlanFullmacSetKeysReq" = "wlan_fullmac_set_keys_req_t"
-"WlanFullmacSetKeysResp" = "wlan_fullmac_set_keys_resp_t"
-"WlanFullmacSignalReportIndication" = "wlan_fullmac_signal_report_indication_t"
-"WlanFullmacStartConfirm" = "wlan_fullmac_start_confirm_t"
-"WlanFullmacImplStartBssRequest" = "wlan_fullmac_impl_start_bss_request_t"
-"WlanFullmacImplStopBssRequest" = "wlan_fullmac_impl_stop_bss_request_t"
-"WlanFullmacStopConfirm" = "wlan_fullmac_stop_confirm_t"
-"WlanWmmParameters" = "wlan_wmm_parameters_t"
 
 # fuchsia-zircon types
 "Vmo" = "zx_handle_t"
