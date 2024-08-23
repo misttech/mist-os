@@ -15,7 +15,6 @@
 #include <kernel/mutex.h>
 #include <ktl/span.h>
 #include <vm/compression.h>
-#include <vm/loan_sweeper.h>
 #include <vm/physical_page_borrowing_config.h>
 #include <vm/pmm.h>
 #include <vm/pmm_checker.h>
