@@ -12,6 +12,7 @@
 #include <lib/ddk/device.h>
 #include <lib/ddk/driver.h>
 
+#include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/test/cpp/bind.h>
 
 #include "src/devices/tests/v2/compat-node-group/root/root.h"
@@ -32,18 +33,18 @@ zx_status_t Root::Bind(void* ctx, zx_device_t* dev) {
   };
 
   const device_bind_prop_t node_1_properties[] = {
-      ddk::MakeProperty(BIND_PROTOCOL, 100),
-      ddk::MakeProperty(BIND_USB_VID, 20),
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, 100u),
+      ddk::MakeProperty(bind_fuchsia::USB_VID, 20u),
   };
 
   const uint32_t node_2_props_values_1[] = {88, 99};
   const ddk::BindRule node_2_bind_rules[] = {
-      ddk::MakeAcceptBindRuleList(BIND_PLATFORM_DEV_VID, node_2_props_values_1),
+      ddk::MakeAcceptBindRuleList(bind_fuchsia::PLATFORM_DEV_VID, node_2_props_values_1),
       ddk::MakeRejectBindRule(20, 10),
   };
 
   const device_bind_prop_t node_2_properties[] = {
-      ddk::MakeProperty(BIND_PROTOCOL, 20),
+      ddk::MakeProperty(bind_fuchsia::PROTOCOL, 20u),
   };
 
   status = root_dev->DdkAddCompositeNodeSpec(

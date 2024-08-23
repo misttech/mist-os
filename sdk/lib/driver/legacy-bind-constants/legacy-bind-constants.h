@@ -11,15 +11,6 @@
 
 #define BIND_PCI_TOPO_PACK(bus, dev, func) (((bus) << 8) | (dev << 3) | (func))
 
-// usb binding variables at 0x02XX
-// these are used for both ZX_PROTOCOL_USB_INTERFACE and ZX_PROTOCOL_USB_FUNCTION
-#define BIND_USB_VID 0x0200
-#define BIND_USB_PID 0x0201
-#define BIND_USB_CLASS 0x0202
-#define BIND_USB_SUBCLASS 0x0203
-#define BIND_USB_PROTOCOL 0x0204
-#define BIND_USB_INTERFACE_NUMBER 0x0205
-
 // Platform bus binding variables at 0x03XX
 #define BIND_PLATFORM_DEV_VID 0x0300
 #define BIND_PLATFORM_DEV_PID 0x0301

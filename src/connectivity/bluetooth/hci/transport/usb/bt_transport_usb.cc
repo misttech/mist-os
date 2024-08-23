@@ -22,6 +22,8 @@
 #include <zircon/syscalls/port.h>
 #include <zircon/types.h>
 
+#include <bind/fuchsia/bluetooth/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
 #include <fbl/auto_lock.h>
 #include <usb/usb-request.h>
 #include <usb/usb.h>
@@ -291,10 +293,10 @@ zx_status_t Device::Bind() {
   // for HCI drivers
   usb_device_descriptor_t dev_desc;
   usb_get_device_descriptor(&usb, &dev_desc);
-  zx_device_prop_t props[] = {
-      {.id = BIND_PROTOCOL, .reserved = 0, .value = ZX_PROTOCOL_BT_TRANSPORT},
-      {.id = BIND_USB_VID, .reserved = 0, .value = dev_desc.id_vendor},
-      {.id = BIND_USB_PID, .reserved = 0, .value = dev_desc.id_product},
+  zx_device_str_prop_t props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_bluetooth::BIND_PROTOCOL_TRANSPORT),
+      ddk::MakeStrProperty(bind_fuchsia::USB_VID, static_cast<uint32_t>(dev_desc.id_vendor)),
+      ddk::MakeStrProperty(bind_fuchsia::USB_PID, static_cast<uint32_t>(dev_desc.id_product)),
   };
   zxlogf(DEBUG, "bt-transport-usb: vendor id = %hu, product id = %hu", dev_desc.id_vendor,
          dev_desc.id_product);
@@ -347,7 +349,7 @@ zx_status_t Device::Bind() {
   };
 
   status = DdkAdd(ddk::DeviceAddArgs("bt-transport-usb")
-                      .set_props(props)
+                      .set_str_props(props)
                       .set_proto_id(ZX_PROTOCOL_BT_TRANSPORT)
                       .set_fidl_service_offers(offers)
                       .set_outgoing_dir(endpoints->client.TakeChannel()));
