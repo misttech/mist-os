@@ -59,20 +59,20 @@ impl TouchPowerPolicyDevice {
     pub fn start_relay(self: &Arc<Self>, kernel: &Kernel, touch_standby_receiver: Receiver<bool>) {
         let slf = self.clone();
         kernel.kthreads.spawn(move |_lock_context, _current_task| {
-            let mut prev_standby = false;
-            while let Ok(standby) = touch_standby_receiver.recv() {
-                if standby != prev_standby {
-                    slf.notify_standby_state_changed(standby);
+            let mut prev_enabled = true;
+            while let Ok(touch_enabled) = touch_standby_receiver.recv() {
+                if touch_enabled != prev_enabled {
+                    slf.notify_standby_state_changed(touch_enabled);
                 }
-                prev_standby = standby;
+                prev_enabled = touch_enabled;
             }
             log_error!("touch_standby relay was terminated unexpectedly.");
         });
     }
 
-    fn notify_standby_state_changed(self: &Arc<Self>, standby: bool) {
+    fn notify_standby_state_changed(self: &Arc<Self>, touch_enabled: bool) {
         // TODO(b/341142285): notify input pipeline that touch_standby state has changed
-        log_info!("touch_standby enabled: {:?}", standby);
+        log_info!("touch enabled: {:?}", touch_enabled);
     }
 }
 
@@ -92,8 +92,8 @@ impl DeviceOps for TouchPowerPolicyDevice {
 
 #[allow(dead_code)]
 pub struct TouchPowerPolicyFile {
-    // When true, Input Pipeline suspends processing of all touch events.
-    touch_standby: Mutex<bool>,
+    // When false, Input Pipeline suspends processing of all touch events.
+    touch_enabled: Mutex<bool>,
     // Sender used to send changes to `touch_standby` to the device relay
     touch_standby_sender: Sender<bool>,
 }
@@ -101,7 +101,7 @@ pub struct TouchPowerPolicyFile {
 #[allow(dead_code)]
 impl TouchPowerPolicyFile {
     pub fn new(touch_standby_sender: Sender<bool>) -> Arc<Self> {
-        Arc::new(TouchPowerPolicyFile { touch_standby: Mutex::new(false), touch_standby_sender })
+        Arc::new(TouchPowerPolicyFile { touch_enabled: Mutex::new(true), touch_standby_sender })
     }
 }
 
@@ -118,8 +118,8 @@ impl FileOps for TouchPowerPolicyFile {
         data: &mut dyn OutputBuffer,
     ) -> Result<usize, Errno> {
         debug_assert!(offset == 0);
-        let touch_standby = self.touch_standby.lock().to_owned();
-        data.write_all(touch_standby.as_bytes())
+        let touch_enabled = self.touch_enabled.lock().to_owned();
+        data.write_all(touch_enabled.as_bytes())
     }
 
     fn write(
@@ -131,7 +131,7 @@ impl FileOps for TouchPowerPolicyFile {
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
         let content = data.read_all()?;
-        let standby = match &*content {
+        let sys_touch_standby = match &*content {
             b"0" | b"0\n" => false,
             b"1" | b"1\n" => true,
             _ => {
@@ -139,8 +139,8 @@ impl FileOps for TouchPowerPolicyFile {
                 return error!(EINVAL);
             }
         };
-        *self.touch_standby.lock() = standby;
-        if let Err(e) = self.touch_standby_sender.send(standby) {
+        *self.touch_enabled.lock() = sys_touch_standby;
+        if let Err(e) = self.touch_standby_sender.send(sys_touch_standby) {
             log_error!("unable to send recent touch_standby state to device relay: {:?}", e);
         }
         Ok(content.len())

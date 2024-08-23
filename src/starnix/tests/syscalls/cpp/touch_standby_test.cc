@@ -33,19 +33,19 @@ TEST_F(TouchStandbyTest, WriteTouchStandbyState) {
   auto res = write(touch_standby_fd_.get(), &write_standby, sizeof(write_standby));
   EXPECT_EQ(res, static_cast<ssize_t>(sizeof(write_standby)));
 
-  uint8_t read_standby_on;
-  res = read(touch_standby_fd_.get(), &read_standby_on, sizeof(read_standby_on));
-  EXPECT_EQ(res, static_cast<ssize_t>(sizeof(read_standby_on)));
-  EXPECT_EQ(read_standby_on, 1);
+  uint8_t read_touch_on;
+  res = read(touch_standby_fd_.get(), &read_touch_on, sizeof(read_touch_on));
+  EXPECT_EQ(res, static_cast<ssize_t>(sizeof(read_touch_on)));
+  EXPECT_EQ(read_touch_on, 1);
 
   write_standby = '0';
   res = write(touch_standby_fd_.get(), &write_standby, sizeof(write_standby));
   EXPECT_EQ(res, static_cast<ssize_t>(sizeof(write_standby)));
 
-  uint8_t read_standby_off;
-  res = read(touch_standby_fd_.get(), &read_standby_off, sizeof(read_standby_off));
-  EXPECT_EQ(res, static_cast<ssize_t>(sizeof(read_standby_off)));
-  EXPECT_EQ(read_standby_off, 0);
+  uint8_t read_touch_off;
+  res = read(touch_standby_fd_.get(), &read_touch_off, sizeof(read_touch_off));
+  EXPECT_EQ(res, static_cast<ssize_t>(sizeof(read_touch_off)));
+  EXPECT_EQ(read_touch_off, 0);
 
   uint8_t write_nl_standby[] = {'1', '\n'};
   res = write(touch_standby_fd_.get(), &write_nl_standby, sizeof(write_nl_standby));
