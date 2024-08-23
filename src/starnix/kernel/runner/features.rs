@@ -43,7 +43,6 @@ pub struct Features {
     pub ashmem: bool,
 
     pub framebuffer: bool,
-    pub framebuffer2: bool,
 
     pub gralloc: bool,
 
@@ -105,7 +104,7 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
             ("custom_artifacts", _) => features.custom_artifacts = true,
             ("ashmem", _) => features.ashmem = true,
             ("framebuffer", _) => features.framebuffer = true,
-            ("framebuffer2", _) => features.framebuffer2 = true,
+            ("framebuffer2", _) => features.framebuffer = true,
             ("gralloc", _) => features.gralloc = true,
             ("magma", _) => features.magma = true,
             ("network_manager", _) => features.network_manager = true,
@@ -147,7 +146,7 @@ pub fn run_container_features(
     let kernel = system_task.kernel();
 
     let mut enabled_profiling = false;
-    if features.framebuffer || features.framebuffer2 {
+    if features.framebuffer {
         fb_device_init(locked, system_task);
 
         let (touch_source_proxy, touch_source_stream) = fidl::endpoints::create_sync_proxy();
@@ -202,12 +201,7 @@ pub fn run_container_features(
         touch_policy_device.clone().register(locked, &kernel.kthreads.system_task());
         touch_policy_device.start_relay(&kernel, touch_standby_receiver);
 
-        if features.framebuffer2 {
-            kernel
-                .framebuffer
-                .start_server(kernel, None)
-                .expect("Failed to start framebuffer server");
-        }
+        kernel.framebuffer.start_server(kernel, None).expect("Failed to start framebuffer server");
     }
     if features.gralloc {
         // The virtgralloc0 device allows vulkan_selector to indicate to gralloc

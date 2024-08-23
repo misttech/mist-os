@@ -10,7 +10,7 @@
         runner: "starnix",
         features: [
             "container",
-            "framebuffer2",
+            "framebuffer",
         ],
         init: [],
         mounts: [
