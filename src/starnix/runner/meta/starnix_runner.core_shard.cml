@@ -154,6 +154,12 @@
             availability: "optional",
         },
         {
+            service: "fuchsia.hardware.sockettunnel.Service",
+            from: "parent",
+            to: "#starnix_runner",
+            availability: "optional",
+        },
+        {
             service: "fuchsia.power.broker.ElementInfoProviderService",
             from: "parent",
             to: "#starnix_runner",

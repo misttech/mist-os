@@ -175,11 +175,6 @@
             to: "#core",
         },
         {
-            service: "fuchsia.power.broker.ElementInfoProviderService",
-            from: "#bootstrap",
-            to: "#core",
-        },
-        {
             protocol: [
                 "fuchsia.tpm.cr50.Cr50",
                 "fuchsia.virtualconsole.SessionManager",
@@ -231,7 +226,12 @@
             to: "#core",
         },
         {
-            service: "fuchsia.hardware.rtc.Service",
+            service: [
+                "fuchsia.hardware.cpu.ctrl.Service",
+                "fuchsia.hardware.rtc.Service",
+                "fuchsia.hardware.sockettunnel.Service",
+                "fuchsia.power.broker.ElementInfoProviderService",
+            ],
             from: "#bootstrap",
             to: "#core",
         },
@@ -244,11 +244,6 @@
             from: "#bootstrap",
             to: "#core",
             availability: "optional",
-        },
-        {
-            service: "fuchsia.hardware.cpu.ctrl.Service",
-            from: "#bootstrap",
-            to: "#core",
         },
     ],
     environments: [

@@ -383,11 +383,11 @@
             from: "#driver_index",
         },
         {
-            service: "fuchsia.hardware.rtc.Service",
-            from: "#boot-drivers",
-        },
-        {
-            service: "fuchsia.hardware.cpu.ctrl.Service",
+            service: [
+                "fuchsia.hardware.cpu.ctrl.Service",
+                "fuchsia.hardware.rtc.Service",
+                "fuchsia.hardware.sockettunnel.Service",
+            ],
             from: "#boot-drivers",
         },
         {
