@@ -4,7 +4,7 @@
 
 use crate::environment::EnvironmentKind;
 use crate::EnvironmentContext;
-use anyhow::{anyhow, Result};
+use anyhow::{anyhow, Context, Result};
 use camino::Utf8Path;
 use std::fs::create_dir_all;
 use std::path::{Path, PathBuf};
@@ -13,7 +13,6 @@ use std::env::var;
 
 pub const ENV_FILE: &str = ".ffx_env";
 pub const USER_FILE: &str = ".ffx_user_config.json";
-pub const DEFAULT_BUILD_CONFIG_FILE: &str = "ffx-config.json";
 
 impl EnvironmentContext {
     pub fn get_default_user_file_path(&self) -> Result<PathBuf> {
@@ -31,8 +30,9 @@ impl EnvironmentContext {
     }
 
     pub fn get_default_build_dir_config_path(&self, build_dir: &Path) -> Result<PathBuf> {
-        let filename = build_dir.join(DEFAULT_BUILD_CONFIG_FILE);
-        Ok(filename)
+        let mut filename = build_dir.file_name().context("build dir filename")?.to_owned();
+        filename.push(".json");
+        Ok(build_dir.with_file_name(&filename))
     }
 
     /// If this environment context has an explicitly set build config path,
