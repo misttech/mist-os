@@ -74,6 +74,8 @@ zx_status_t VmObjectDispatcher::CreateWithCsm(fbl::RefPtr<VmObject> vmo,
     return ZX_ERR_NO_MEMORY;
   }
 
+  new_handle.dispatcher()->vmo()->SetUserContentSize(new_handle.dispatcher()->content_size_mgr_);
+
   new_handle.dispatcher()->vmo()->set_user_id(new_handle.dispatcher()->get_koid());
   *rights =
       default_rights() | (new_handle.dispatcher()->vmo()->is_resizable() ? ZX_RIGHT_RESIZE : 0);

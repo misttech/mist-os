@@ -31,6 +31,7 @@
 #include <kernel/lockdep.h>
 #include <kernel/mutex.h>
 #include <ktl/move.h>
+#include <vm/content_size_manager.h>
 #include <vm/page.h>
 #include <vm/vm.h>
 #include <vm/vm_page_list.h>
@@ -554,6 +555,13 @@ class VmObject : public VmHierarchyBase,
   virtual void CommitHighPriorityPages(uint64_t offset, uint64_t len) TA_EXCL(lock()) {
     // This does nothing by default.
   }
+
+  // Provides the VMO with a user defined queryable byte aligned size. This provided size can then
+  // be referenced in other operations, but otherwise has no effect. The VMO will never read or act
+  // on this value unless instructed by user operations, and it is therefore the responsibility of
+  // the user to ensure any synchronization of the reported value with the operation being
+  // requested.
+  virtual void SetUserContentSize(fbl::RefPtr<ContentSizeManager> csm) = 0;
 
   // The associated VmObjectDispatcher will set an observer to notify user mode.
   void SetChildObserver(VmObjectChildObserver* child_observer);
