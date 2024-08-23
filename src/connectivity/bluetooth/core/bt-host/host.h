@@ -63,7 +63,7 @@ class BtHostComponent {
 
   bool initialize_rng_;
 
-  pw_random_zircon::ZirconRandomGenerator random_generator_;
+  pw::random_fuchsia::ZirconRandomGenerator random_generator_;
 
   std::unique_ptr<bt::hci::Transport> hci_;
 

@@ -13,7 +13,7 @@
 #include "pw_random/random.h"
 #include "pw_span/span.h"
 
-namespace pw_random_zircon {
+namespace pw::random_fuchsia {
 
 class ZirconRandomGenerator final : public pw::random::RandomGenerator {
  public:
@@ -36,6 +36,6 @@ class ZirconRandomGenerator final : public pw::random::RandomGenerator {
   }
 };
 
-}  // namespace pw_random_zircon
+}  // namespace pw::random_fuchsia
 
 #endif  // THIRD_PARTY_PIGWEED_BACKENDS_PW_RANDOM_ZIRCON_RANDOM_GENERATOR_H_
