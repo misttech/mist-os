@@ -25,11 +25,6 @@
 #define BIND_PLATFORM_DEV_PID 0x0301
 #define BIND_PLATFORM_DEV_DID 0x0302
 #define BIND_PLATFORM_DEV_INSTANCE_ID 0x0304
-#define BIND_PLATFORM_DEV_INTERRUPT_ID 0x0305
-
-// ACPI binding variables at 0x04XX
-// Internal use only.
-#define BIND_ACPI_ID 0x0401
 
 // I2C binding variables at 0x0A0X
 #define BIND_I2C_CLASS 0x0A00

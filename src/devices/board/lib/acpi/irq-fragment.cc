@@ -4,6 +4,8 @@
 
 #include "src/devices/board/lib/acpi/irq-fragment.h"
 
+#include <bind/fuchsia/cpp/bind.h>
+
 #include "ddktl/device.h"
 #include "fbl/string_printf.h"
 #include "fidl/fuchsia.hardware.interrupt/cpp/wire_messaging.h"
@@ -60,15 +62,9 @@ zx::result<> IrqFragment::Init(uint32_t device_id) {
   // Make sure the properties here stay in sync with
   // the bind rules in device-builder.cc.
   // LINT.IfChange
-  std::array properties = {
-      zx_device_prop_t{
-          .id = BIND_ACPI_ID,
-          .value = device_id,
-      },
-      zx_device_prop_t{
-          .id = BIND_PLATFORM_DEV_INTERRUPT_ID,
-          .value = irq_index_ + 1,
-      },
+  zx_device_str_prop_t properties[] = {
+      ddk::MakeStrProperty(bind_fuchsia::ACPI_ID, device_id),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_INTERRUPT_ID, irq_index_ + 1),
   };
   // LINT.ThenChange(device-builder.cc)
 
@@ -77,7 +73,7 @@ zx::result<> IrqFragment::Init(uint32_t device_id) {
                                   .set_flags(DEVICE_ADD_MUST_ISOLATE)
                                   .set_outgoing_dir(endpoints->client.TakeChannel())
                                   .set_fidl_service_offers(offers)
-                                  .set_props(properties));
+                                  .set_str_props(properties));
 
   return zx::make_result(status);
 }
