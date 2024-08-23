@@ -22,13 +22,21 @@ use starnix_core::task::{CurrentTask, Kernel, KernelFeatures};
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_core::vfs::FsString;
 use starnix_logging::log_error;
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_modules_ashmem::ashmem_device_init;
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_modules_gpu::gpu_device_init;
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_modules_gralloc::gralloc_device_init;
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_modules_input::uinput::register_uinput_device;
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_modules_input::InputDevice;
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_modules_magma::magma_device_init;
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_modules_perfetto_consumer::start_perfetto_consumer_thread;
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_modules_touch_power_policy::TouchPowerPolicyDevice;
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::error;

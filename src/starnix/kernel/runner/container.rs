@@ -11,8 +11,8 @@ use crate::{
 };
 #[cfg(feature = "starnix_lite")]
 use crate::{
-    create_filesystem_from_spec, expose_root, parse_features, run_container_features,
-    serve_component_runner, serve_container_controller, Features,
+    create_filesystem_from_spec, expose_root, parse_features, parse_numbered_handles,
+    run_container_features, serve_component_runner, serve_container_controller, Features,
 };
 use anyhow::{anyhow, bail, Error};
 use bstr::BString;
@@ -50,6 +50,7 @@ use starnix_logging::{
     log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
 };
 use starnix_modules::{init_common_devices, register_common_file_systems};
+#[cfg(not(feature = "starnix_lite"))]
 use starnix_modules_magma::get_magma_params;
 use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::errors::{SourceContext, ENOENT};
@@ -96,6 +97,7 @@ struct Config {
     /// The path that the container will wait until exists before considering itself to have started.
     startup_file_path: String,
 
+    #[cfg(not(feature = "starnix_lite"))]
     /// The remote block devices to use for the container.
     remote_block_devices: Vec<String>,
 
@@ -143,6 +145,7 @@ fn get_config_from_component_start_info(mut start_info: frunner::ComponentStartI
     let rlimits = get_strvec("rlimits");
     let name = get_string("name");
     let startup_file_path = get_string("startup_file_path");
+    #[cfg(not(feature = "starnix_lite"))]
     let remote_block_devices = get_strvec("remote_block_devices");
 
     let mut ns = start_info.ns.take();
@@ -159,6 +162,7 @@ fn get_config_from_component_start_info(mut start_info: frunner::ComponentStartI
         rlimits,
         name,
         startup_file_path,
+        #[cfg(not(feature = "starnix_lite"))]
         remote_block_devices,
         pkg_dir,
         outgoing_dir,
