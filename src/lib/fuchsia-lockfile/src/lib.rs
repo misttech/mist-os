@@ -4,6 +4,7 @@
 
 use nix::unistd::{self, Pid};
 use serde::{Deserialize, Serialize};
+use std::error::Error;
 use std::fs::{remove_file, File, Metadata, OpenOptions};
 use std::io::{ErrorKind, Write};
 use std::path::{Path, PathBuf};
@@ -20,21 +21,24 @@ pub struct Lockfile {
     handle: Option<File>,
 }
 
-#[derive(thiserror::Error, Debug)]
+#[derive(Debug)]
 /// An error while creating a lockfile, including the underlying file io error
 /// and if possible the error
-#[error("Error obtaining lock on {:?} (existing owner if present: '{:?}', our pid is {pid})",
-        .lock_path, .owner, pid=std::process::id())]
 pub struct LockfileCreateError {
     /// The underlying error attempting to obtain the lockfile
-    #[source]
-    pub error: std::io::Error,
+    pub kind: LockfileCreateErrorKind,
     /// The filename of the lockfile being attempted
     pub lock_path: PathBuf,
     /// Details about the lockfile's original owner, from the file.
     pub owner: Option<LockContext>,
     /// Metadata about the lockfile if it was available
     pub metadata: Option<Metadata>,
+}
+
+#[derive(Debug)]
+pub enum LockfileCreateErrorKind {
+    Io(std::io::Error),
+    TimedOut,
 }
 
 impl LockfileCreateError {
@@ -48,7 +52,7 @@ impl LockfileCreateError {
         };
         let metadata = std::fs::metadata(lock_path).ok(); // purely advisory, ignore the error.
         let lock_path = lock_path.to_owned();
-        Self { error, lock_path, owner, metadata }
+        Self { kind: LockfileCreateErrorKind::Io(error), lock_path, owner, metadata }
     }
 
     /// Validates if a lockfile's info is inherently invalid and should be removed or ignored.
@@ -99,6 +103,11 @@ impl LockfileCreateError {
         }
     }
 
+    /// Returns if the error timed out.
+    pub fn is_timeout(&self) -> bool {
+        matches!(self.kind, LockfileCreateErrorKind::TimedOut)
+    }
+
     /// Removes the lockfile if it exists, consuming the error if it was removed
     /// or returning the error back if it failed in any other way than already not-existing.
     pub fn remove_lock(self) -> Result<(), Self> {
@@ -111,6 +120,40 @@ impl LockfileCreateError {
                     lockfile = self.lock_path.display()
                 );
                 Err(self)
+            }
+        }
+    }
+}
+
+impl std::error::Error for LockfileCreateError {
+    fn source(&self) -> Option<&(dyn Error + 'static)> {
+        match &self.kind {
+            LockfileCreateErrorKind::Io(err) => Some(err),
+            LockfileCreateErrorKind::TimedOut => None,
+        }
+    }
+}
+
+impl std::fmt::Display for LockfileCreateError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match &self.kind {
+            LockfileCreateErrorKind::Io(_) => {
+                write!(
+                    f,
+                    "Error obtaining lock on {:?} (existing owner if present: '{:?}', our pid is {pid})",
+                    self.lock_path,
+                    self.owner,
+                    pid = std::process::id(),
+                )
+            }
+            LockfileCreateErrorKind::TimedOut => {
+                write!(
+                    f,
+                    "Timed out obtaining lock on {:?} (existing owner if present: '{:?}', our pid is {pid})",
+                    self.lock_path,
+                    self.owner,
+                    pid = std::process::id(),
+                )
             }
         }
     }
@@ -196,7 +239,14 @@ impl Lockfile {
                     info!("Removing invalid lockfile {lockfile}", lockfile = lock_path.display());
                     e.remove_lock()?;
                 }
-                Err(e) if Instant::now() > end_time => return Err(e),
+                Err(e) if Instant::now() > end_time => {
+                    return Err(LockfileCreateError {
+                        kind: LockfileCreateErrorKind::TimedOut,
+                        lock_path: e.lock_path,
+                        owner: e.owner,
+                        metadata: e.metadata,
+                    });
+                }
                 _ => {
                     fuchsia_async::Timer::new(Duration::from_millis(sleep_time)).await;
                     // next time, retry with a longer wait, but not exponential, and not
@@ -272,32 +322,30 @@ mod test {
     use std::io::{Read, Seek, Write};
 
     #[test]
-    fn create_lockfile_works() -> Result<(), anyhow::Error> {
-        let dir = tempfile::TempDir::new()?;
+    fn create_lockfile_works() {
+        let dir = tempfile::TempDir::new().unwrap();
         let path = dir.path().join("lockedfile");
-        let lock = Lockfile::new(&path, LockContext::current())?;
+        let lock = Lockfile::new(&path, LockContext::current()).unwrap();
         assert!(path.is_file(), "Lockfile {path:?} should exist");
 
         assert!(
             Lockfile::new(&path, LockContext::current()).is_err(),
             "Should not be able to create lockfile at {path:?} while one already exists."
         );
-        lock.unlock()?;
+        lock.unlock().unwrap();
         assert!(!path.is_file(), "Lockfile {path:?} shouldn't exist");
 
         assert!(
             Lockfile::new(&path, LockContext::current()).is_ok(),
             "Should be able to make a new lockfile when the old one is unlocked."
         );
-
-        Ok(())
     }
 
     #[test]
-    fn create_lockfile_for_other_file_works() -> Result<(), anyhow::Error> {
-        let dir = tempfile::TempDir::new()?;
+    fn create_lockfile_for_other_file_works() {
+        let dir = tempfile::TempDir::new().unwrap();
         let mut path = dir.path().join("lockedfile");
-        let lock = Lockfile::new_for(&path, LockContext::current())?;
+        let lock = Lockfile::new_for(&path, LockContext::current()).unwrap();
         path.set_file_name("lockedfile.lock");
         assert!(path.is_file(), "Lockfile {path:?} should exist");
 
@@ -305,22 +353,20 @@ mod test {
             Lockfile::new(&path, LockContext::current()).is_err(),
             "Should not be able to create lockfile at {path:?} while one already exists."
         );
-        lock.unlock()?;
+        lock.unlock().unwrap();
         assert!(!path.is_file(), "Lockfile {path:?} shouldn't exist");
 
         assert!(
             Lockfile::new(&path, LockContext::current()).is_ok(),
             "Should be able to make a new lockfile when the old one is unlocked."
         );
-
-        Ok(())
     }
 
     #[fuchsia_async::run_singlethreaded(test)]
-    async fn lock_with_timeout() -> Result<(), anyhow::Error> {
-        let dir = tempfile::TempDir::new()?;
+    async fn lock_with_timeout() {
+        let dir = tempfile::TempDir::new().unwrap();
         let mut path = dir.path().join("lockedfile");
-        let lock = Lockfile::lock_for(&path, Duration::from_secs(1)).await?;
+        let lock = Lockfile::lock_for(&path, Duration::from_secs(1)).await.unwrap();
         path.set_file_name("lockedfile.lock");
         assert!(path.is_file(), "Lockfile {path:?} should exist");
 
@@ -329,19 +375,17 @@ mod test {
             .err()
             .expect("Shouldn't be able to re-lock lock file with timeout");
 
-        lock.unlock()?;
+        lock.unlock().unwrap();
         assert!(!path.is_file(), "Lockfile {path:?} shouldn't exist");
 
-        Lockfile::lock(&path, Duration::from_secs(1)).await?;
-
-        Ok(())
+        Lockfile::lock(&path, Duration::from_secs(1)).await.unwrap();
     }
 
     #[test]
-    fn lock_file_validity() -> Result<(), anyhow::Error> {
-        let dir = tempfile::TempDir::new()?;
+    fn lock_file_validity() {
+        let dir = tempfile::TempDir::new().unwrap();
         let path = dir.path().join("lockedfile.lock");
-        let _lock = Lockfile::new(&path, LockContext::current())?;
+        let _lock = Lockfile::new(&path, LockContext::current()).unwrap();
         assert!(path.is_file(), "Lockfile {path:?} should exist");
 
         let err = Lockfile::new(&path, LockContext::current())
@@ -362,13 +406,11 @@ mod test {
             !err.is_valid(now - Duration::from_secs(9999), real_pid),
             "A lockfile from the far future should be valid"
         );
-
-        Ok(())
     }
 
     #[test]
-    fn ownerless_lockfile_validity() -> Result<(), anyhow::Error> {
-        let dir = tempfile::TempDir::new()?;
+    fn ownerless_lockfile_validity() {
+        let dir = tempfile::TempDir::new().unwrap();
         let path = dir.path().join("lockedfile.lock");
         let _lock = File::create(&path).expect("Creating empty lock file");
         assert!(path.is_file(), "Lockfile {path:?} should exist");
@@ -388,15 +430,13 @@ mod test {
             !err.is_valid(now + Duration::from_secs(9999), real_pid),
             "An ownerless lockfile from a long time ago should be invalid"
         );
-
-        Ok(())
     }
 
     #[test]
-    fn non_running_pid_lockfile_validity() -> Result<(), anyhow::Error> {
-        let dir = tempfile::TempDir::new()?;
+    fn non_running_pid_lockfile_validity() {
+        let dir = tempfile::TempDir::new().unwrap();
         let path = dir.path().join("lockedfile.lock");
-        let _lock = Lockfile::new(&path, LockContext { pid: u32::MAX })?;
+        let _lock = Lockfile::new(&path, LockContext { pid: u32::MAX }).unwrap();
         assert!(path.is_file(), "Lockfile {path:?} should exist");
 
         let err = Lockfile::new(&path, LockContext::current())
@@ -409,27 +449,24 @@ mod test {
             !err.is_valid(now, real_pid),
             "A lockfile owned by a pid that isn't running should be invalid"
         );
-
-        Ok(())
     }
 
     #[test]
-    fn force_delete_nonexistent_lockfile_ok() -> Result<(), anyhow::Error> {
-        let dir = tempfile::TempDir::new()?;
+    fn force_delete_nonexistent_lockfile_ok() {
+        let dir = tempfile::TempDir::new().unwrap();
         let path = dir.path().join("lockedfile.lock");
         let bogus_error = LockfileCreateError::new(
             &path,
             std::io::Error::new(std::io::ErrorKind::Other, "stuff"),
         );
         bogus_error.remove_lock().expect("Removing non-existent lock file");
-        Ok(())
     }
 
     #[test]
-    fn force_delete_real_lockfile_ok() -> Result<(), anyhow::Error> {
-        let dir = tempfile::TempDir::new()?;
+    fn force_delete_real_lockfile_ok() {
+        let dir = tempfile::TempDir::new().unwrap();
         let mut path = dir.path().join("lockedfile");
-        let lock = Lockfile::new_for(&path, LockContext::current())?;
+        let lock = Lockfile::new_for(&path, LockContext::current()).unwrap();
         path.set_file_name("lockedfile.lock");
         assert!(path.is_file(), "Lockfile {path:?} should exist");
 
@@ -441,8 +478,6 @@ mod test {
         assert!(!path.is_file(), "Lockfile {path:?} should have been deleted");
 
         lock.unlock().expect("Unlock should have succeeded even though lock file was already gone");
-
-        Ok(())
     }
 
     #[test]
@@ -453,36 +488,79 @@ mod test {
 
         std::fs::write(&counter_path, "0").unwrap();
 
+        let (tx, rx) = std::sync::mpsc::channel();
+        let rx = std::sync::Arc::new(std::sync::Mutex::new(rx));
+
+        let lock_count = 128;
         let thread_count = 128;
         let mut threads = vec![];
 
-        for _i in 0..thread_count {
+        for _thread_num in 0..thread_count {
             let lockfile_path = lockfile_path.clone();
             let counter_path = counter_path.clone();
+            let rx = rx.clone();
 
             let thread = std::thread::spawn(move || {
-                let lockfile = futures::executor::block_on(async {
-                    Lockfile::lock_for(&lockfile_path, Duration::from_secs(10)).await.unwrap()
-                });
+                loop {
+                    let rx = rx.lock().unwrap();
+                    let Ok(lock_num) = rx.recv() else {
+                        break;
+                    };
 
-                let mut file =
-                    OpenOptions::new().read(true).write(true).open(counter_path).unwrap();
+                    // Release the rx lock so other threads can run.
+                    drop(rx);
 
-                // Read the contents.
-                let mut contents = String::new();
-                file.read_to_string(&mut contents).unwrap();
-                let counter: u64 = contents.parse().unwrap();
+                    // This implementation of lockfiles is not guaranteed to be fair, so it's
+                    // possible to starve one or more threads. So loop again around our timeout
+                    // until we get our lock.
+                    let mut attempt = 0;
+                    let lockfile = loop {
+                        let lockfile = futures::executor::block_on(async {
+                            Lockfile::lock_for(&lockfile_path, Duration::from_secs(10)).await
+                        });
 
-                // Increment the contents.
-                file.rewind().unwrap();
-                file.write_all((counter + 1).to_string().as_bytes()).unwrap();
+                        match lockfile {
+                            Ok(lockfile) => {
+                                break lockfile;
+                            }
+                            Err(err) if err.is_timeout() => {
+                                println!("timed out getting lockfile, trying again. lock_num: {lock_num} attempt: {attempt}");
 
-                // Explicitly release the lock.
-                lockfile.unlock().unwrap();
+                                if attempt > 10 {
+                                    panic!("failed to get a lockfile after 10 attempts");
+                                }
+                                attempt += 1;
+                            }
+                            Err(err) => {
+                                panic!("unexpected error locking file: {:#?}", err);
+                            }
+                        }
+                    };
+
+                    let mut file =
+                        OpenOptions::new().read(true).write(true).open(&counter_path).unwrap();
+
+                    // Read the contents.
+                    let mut contents = String::new();
+                    file.read_to_string(&mut contents).unwrap();
+                    let counter: u64 = contents.parse().unwrap();
+
+                    // Increment the contents.
+                    file.rewind().unwrap();
+                    file.write_all((counter + 1).to_string().as_bytes()).unwrap();
+
+                    // Explicitly release the lock.
+                    lockfile.unlock().unwrap();
+                }
             });
 
             threads.push(thread);
         }
+
+        for lock_num in 0..lock_count {
+            tx.send(lock_num).unwrap();
+        }
+        drop(tx);
 
         for thread in threads {
             thread.join().unwrap();
@@ -491,6 +569,6 @@ mod test {
         let contents = std::fs::read_to_string(&counter_path).unwrap();
         let counter: u64 = contents.parse().unwrap();
 
-        assert_eq!(counter, thread_count);
+        assert_eq!(counter, lock_count);
     }
 }

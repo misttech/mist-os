@@ -23,12 +23,12 @@ use fidl_fuchsia_developer_ffx::{
     TargetCollectionReaderRequest, TargetInfo, TargetMarker, TargetQuery, TargetState, VersionInfo,
 };
 use fidl_fuchsia_developer_remotecontrol::RemoteControlMarker;
-use fuchsia_lockfile::LockfileCreateError;
+use fuchsia_lockfile::{LockfileCreateError, LockfileCreateErrorKind};
 use futures::TryStreamExt;
 use serde_json::json;
 use std::collections::HashSet;
 use std::fs;
-use std::io::{stdout, BufWriter, ErrorKind, Write};
+use std::io::{stdout, BufWriter, Write};
 use std::path::PathBuf;
 use std::process::Command;
 use std::sync::Arc;
@@ -927,22 +927,40 @@ async fn doctor_summary<W: Write>(
 
     for (file, locked) in ffx_config::environment::Environment::check_locks(env_context).await? {
         let (outcome, description) = match locked {
-            Err(LockfileCreateError { error, lock_path, owner: None, .. }) if error.kind() == ErrorKind::AlreadyExists=> (
-                LedgerOutcome::Failure,
-                format!("Lockfile `{lockfile}` exists, but is malformed. It should be removed.", lockfile=lock_path.display()),
-            ),
-            Err(LockfileCreateError { lock_path, owner: Some(owner), .. }) => (
-                LedgerOutcome::Failure,
-                format!("Lockfile `{lockfile}` was owned by another process that didn't release it in our timeout. Check that it's running? Pid {pid}", lockfile=lock_path.display(), pid=owner.pid),
-            ),
-            Err(LockfileCreateError { error, lock_path, .. }) => (
-                LedgerOutcome::Failure,
-                format!("Could not open lockfile `{lockfile}` due to error: {error:?}, check permissions on the directory.", lockfile=lock_path.display()),
-            ),
             Ok(lockfile) => (
                 LedgerOutcome::Success,
                 format!("{path} locked by {lock}", path=file.display(), lock=lockfile.display()),
-            )
+            ),
+            Err(LockfileCreateError {
+                kind: LockfileCreateErrorKind::TimedOut,
+                lock_path,
+                owner,
+                ..
+            }) => {
+                let mut msg = format!(
+                    "Lockfile `{lockfile}` was owned by another process that didn't release it in our timeout.",
+                    lockfile=lock_path.display(),
+                );
+
+                if let Some(owner) = owner {
+                    msg = format!("{msg} Check that it's running? Pid {pid}", pid=owner.pid);
+                }
+
+                (LedgerOutcome::Failure, msg)
+            }
+            Err(LockfileCreateError {
+                kind: LockfileCreateErrorKind::Io(error),
+                lock_path,
+                ..
+            }) => {
+                (
+                    LedgerOutcome::Failure,
+                    format!(
+                        "Could not open lockfile `{lockfile}` due to error: {error:?}. Check permissions on the directory.",
+                        lockfile=lock_path.display(),
+                    ),
+                )
+            }
         };
         let node = ledger.add_node(&description, LedgerMode::Automatic)?;
         ledger.set_outcome(node, outcome)?;
