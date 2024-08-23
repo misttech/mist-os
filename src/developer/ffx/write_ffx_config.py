@@ -48,7 +48,6 @@ def main():
 
     # Always replace build dir. GN always writes "$BUILD_DIR" as "\$BUILD_DIR" so use python.
     replace_placeholder(config_data, args.dollar_placeholder, "$")
-    replace_placeholder(config_data, args.build_dir, "$BUILD_DIR")
     replace_placeholder(
         config_data, os.path.abspath(args.build_dir), "$BUILD_DIR"
     )
