@@ -154,7 +154,9 @@ pub trait File: Node {
     /// This is used to calculate seek offset relative to the end.
     fn get_size(&self) -> impl Future<Output = Result<u64, Status>> + Send;
 
-    /// Set the attributes of this file based on the values in `attributes`.
+    /// Set the mutable attributes of this file based on the values in `attributes`. If the file
+    /// does not support updating *all* of the specified attributes, implementations should fail
+    /// with `ZX_ERR_NOT_SUPPORTED`.
     fn update_attributes(
         &self,
         attributes: fio::MutableNodeAttributes,

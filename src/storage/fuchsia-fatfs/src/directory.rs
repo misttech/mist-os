@@ -754,9 +754,18 @@ impl MutableDirectory for FatDirectory {
         &self,
         attributes: fio::MutableNodeAttributes,
     ) -> Result<(), Status> {
+        const SUPPORTED_MUTABLE_ATTRIBUTES: fio::NodeAttributesQuery =
+            fio::NodeAttributesQuery::CREATION_TIME
+                .union(fio::NodeAttributesQuery::MODIFICATION_TIME);
+
+        if !SUPPORTED_MUTABLE_ATTRIBUTES
+            .contains(vfs::common::mutable_node_attributes_to_query(&attributes))
+        {
+            return Err(Status::NOT_SUPPORTED);
+        }
+
         let fs_lock = self.filesystem.lock().unwrap();
         let dir = self.borrow_dir_mut(&fs_lock).ok_or(Status::BAD_HANDLE)?;
-        // TODO(https://fxbug.dev/353768723): Reject unsupported attributes.
         if let Some(creation_time) = attributes.creation_time {
             dir.set_created(unix_to_dos_time(creation_time));
         }
@@ -1344,6 +1353,107 @@ mod tests {
             fidl::Error::ClientChannelClosed { status: Status::ALREADY_EXISTS, .. }
         );
 
+        root.close();
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_update_attributes_directory() {
+        let disk = TestFatDisk::empty_disk(TEST_DISK_SIZE);
+        let structure = TestDiskContents::dir().add_child("test", "Hello".into());
+        structure.create(&disk.root_dir());
+
+        let fs = disk.into_fatfs();
+        let root = fs.get_root().expect("get_root failed");
+
+        let scope = ExecutionScope::new();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::DirectoryMarker>().unwrap();
+        let flags = fio::Flags::PERM_READ | fio::Flags::PERM_SET_ATTRIBUTES;
+        ObjectRequest::new3(flags, &fio::Options::default(), server_end.into()).handle(|request| {
+            root.clone().open3(
+                scope.clone(),
+                Path::validate_and_split(".").unwrap(),
+                flags,
+                request,
+            )
+        });
+
+        let mut new_attrs = fio::MutableNodeAttributes {
+            creation_time: Some(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                    .expect("SystemTime before UNIX EPOCH")
+                    .as_nanos()
+                    .try_into()
+                    .unwrap(),
+            ),
+            ..Default::default()
+        };
+        proxy
+            .update_attributes(&new_attrs)
+            .await
+            .expect("FIDL call failed")
+            .map_err(Status::from_raw)
+            .expect("update attributes failed");
+
+        new_attrs.mode = Some(123);
+        let status = proxy
+            .update_attributes(&new_attrs)
+            .await
+            .expect("FIDL call failed")
+            .map_err(Status::from_raw)
+            .expect_err("update unsupported attributes passed unexpectedly");
+        assert_eq!(status, Status::NOT_SUPPORTED);
+        root.close();
+    }
+
+    #[fuchsia::test(allow_stalls = false)]
+    async fn test_update_attributes_file() {
+        let disk = TestFatDisk::empty_disk(TEST_DISK_SIZE);
+        let structure = TestDiskContents::dir().add_child("test_file", "Hello".into());
+        structure.create(&disk.root_dir());
+
+        let fs = disk.into_fatfs();
+        let root = fs.get_root().expect("get_root failed");
+
+        let scope = ExecutionScope::new();
+        let (proxy, server_end) = fidl::endpoints::create_proxy::<fio::FileMarker>().unwrap();
+        let flags =
+            fio::Flags::PERM_READ | fio::Flags::PERM_SET_ATTRIBUTES | fio::Flags::PROTOCOL_FILE;
+        ObjectRequest::new3(flags, &fio::Options::default(), server_end.into()).handle(|request| {
+            root.clone().open3(
+                scope.clone(),
+                Path::validate_and_split("test_file").unwrap(),
+                flags,
+                request,
+            )
+        });
+
+        let mut new_attrs = fio::MutableNodeAttributes {
+            creation_time: Some(
+                std::time::SystemTime::now()
+                    .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                    .expect("SystemTime before UNIX EPOCH")
+                    .as_nanos()
+                    .try_into()
+                    .unwrap(),
+            ),
+            ..Default::default()
+        };
+        proxy
+            .update_attributes(&new_attrs)
+            .await
+            .expect("FIDL call failed")
+            .map_err(Status::from_raw)
+            .expect("update attributes failed");
+
+        new_attrs.mode = Some(123);
+        let status = proxy
+            .update_attributes(&new_attrs)
+            .await
+            .expect("FIDL call failed")
+            .map_err(Status::from_raw)
+            .expect_err("update unsupported attributes passed unexpectedly");
+        assert_eq!(status, Status::NOT_SUPPORTED);
         root.close();
     }
 }

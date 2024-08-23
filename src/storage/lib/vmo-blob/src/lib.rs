@@ -118,7 +118,7 @@ impl File for VmoBlob {
         &self,
         _attributes: fio::MutableNodeAttributes,
     ) -> Result<(), zx::Status> {
-        Err(zx::Status::ACCESS_DENIED)
+        Err(zx::Status::NOT_SUPPORTED)
     }
 
     async fn sync(&self, _mode: SyncMode) -> Result<(), zx::Status> {

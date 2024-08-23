@@ -220,6 +220,7 @@ struct VnodeAttributes {
 struct VnodeAttributesUpdate {
   std::optional<uint64_t> creation_time;
   std::optional<uint64_t> modification_time;
+  std::optional<uint64_t> access_time;
 
   // POSIX Compatibility Attributes
   std::optional<uint32_t> mode;
@@ -248,6 +249,9 @@ struct VnodeAttributesUpdate {
     }
     if (rdev) {
       query |= VnodeAttributesQuery::kRdev;
+    }
+    if (access_time) {
+      query |= VnodeAttributesQuery::kAccessTime;
     }
 #endif
     return query;
@@ -286,6 +290,9 @@ struct VnodeAttributesUpdate {
     }
     if (attrs.has_rdev()) {
       attr_update.rdev = attrs.rdev();
+    }
+    if (attrs.has_access_time()) {
+      attr_update.access_time = attrs.access_time();
     }
 #endif
     return attr_update;

@@ -413,10 +413,10 @@ impl File for FxFile {
         &self,
         attributes: fio::MutableNodeAttributes,
     ) -> Result<(), Status> {
-        let empty_attributes = fio::MutableNodeAttributes { ..Default::default() };
-        if attributes == empty_attributes {
+        if attributes == fio::MutableNodeAttributes::default() {
             return Ok(());
         }
+        // TODO(https://fxbug.dev/298128836): atime can be updated but is not properly supported.
         self.handle.update_attributes(&attributes).await.map_err(map_to_status)?;
         Ok(())
     }

@@ -553,8 +553,12 @@ mod tests {
             mode: Some(200),
             ..Default::default()
         };
-        let () =
-            proxy.update_attributes(&attributes).await.unwrap().map_err(Status::from_raw).unwrap();
+        proxy
+            .update_attributes(&attributes)
+            .await
+            .expect("FIDL call failed")
+            .map_err(Status::from_raw)
+            .expect("update attributes failed");
 
         let events = events.0.lock().unwrap();
         assert_eq!(*events, vec![MutableDirectoryAction::UpdateAttributes { id: 0, attributes }]);

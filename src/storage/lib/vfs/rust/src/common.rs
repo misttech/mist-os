@@ -394,6 +394,35 @@ pub async fn io2_to_io1_attrs<T: Node>(
     )
 }
 
+pub fn mutable_node_attributes_to_query(
+    attributes: &fio::MutableNodeAttributes,
+) -> fio::NodeAttributesQuery {
+    let mut query = fio::NodeAttributesQuery::empty();
+
+    if attributes.creation_time.is_some() {
+        query |= fio::NodeAttributesQuery::CREATION_TIME;
+    }
+    if attributes.modification_time.is_some() {
+        query |= fio::NodeAttributesQuery::MODIFICATION_TIME;
+    }
+    if attributes.access_time.is_some() {
+        query |= fio::NodeAttributesQuery::ACCESS_TIME;
+    }
+    if attributes.mode.is_some() {
+        query |= fio::NodeAttributesQuery::MODE;
+    }
+    if attributes.uid.is_some() {
+        query |= fio::NodeAttributesQuery::UID;
+    }
+    if attributes.gid.is_some() {
+        query |= fio::NodeAttributesQuery::GID;
+    }
+    if attributes.rdev.is_some() {
+        query |= fio::NodeAttributesQuery::RDEV;
+    }
+    query
+}
+
 #[cfg(test)]
 mod tests {
     use super::inherit_rights_for_clone;
