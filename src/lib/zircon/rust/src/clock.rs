@@ -26,6 +26,75 @@ use std::ptr;
 pub struct Clock(Handle);
 impl_handle_based!(Clock);
 
+impl Clock {
+    /// Create a new clock object with the provided arguments. Wraps the [zx_clock_create] syscall.
+    ///
+    /// [zx_clock_create]: https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_create
+    pub fn create(opts: ClockOpts, backstop: Option<SyntheticTime>) -> Result<Self, Status> {
+        let mut out = 0;
+        let status = match backstop {
+            Some(backstop) => {
+                // When using backstop time, use the API v1 args struct.
+                let args = sys::zx_clock_create_args_v1_t { backstop_time: backstop.into_nanos() };
+                unsafe {
+                    sys::zx_clock_create(
+                        sys::ZX_CLOCK_ARGS_VERSION_1 | opts.bits(),
+                        &args as *const _ as *const u8,
+                        &mut out,
+                    )
+                }
+            }
+            None => unsafe { sys::zx_clock_create(opts.bits(), ptr::null(), &mut out) },
+        };
+        ok(status)?;
+        unsafe { Ok(Self::from(Handle::from_raw(out))) }
+    }
+
+    /// Perform a basic read of this clock. Wraps the [zx_clock_read] syscall. Requires
+    /// `ZX_RIGHT_READ` and that the clock has had an initial time established.
+    ///
+    /// [zx_clock_read]: https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_read
+    pub fn read(&self) -> Result<SyntheticTime, Status> {
+        let mut now = 0;
+        let status = unsafe { sys::zx_clock_read(self.raw_handle(), &mut now) };
+        ok(status)?;
+        Ok(SyntheticTime::from_nanos(now))
+    }
+
+    /// Get low level details of this clock's current status. Wraps the
+    /// [zx_clock_get_details] syscall. Requires `ZX_RIGHT_READ`.
+    ///
+    /// [zx_clock_get_details]: https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_get_details
+    pub fn get_details(&self) -> Result<ClockDetails, Status> {
+        let mut out_details = MaybeUninit::<sys::zx_clock_details_v1_t>::uninit();
+        let status = unsafe {
+            sys::zx_clock_get_details(
+                self.raw_handle(),
+                sys::ZX_CLOCK_ARGS_VERSION_1,
+                out_details.as_mut_ptr() as *mut u8,
+            )
+        };
+        ok(status)?;
+        let out_details = unsafe { out_details.assume_init() };
+        Ok(out_details.into())
+    }
+
+    /// Make adjustments to this clock. Wraps the [zx_clock_update] syscall. Requires
+    /// `ZX_RIGHT_WRITE`.
+    ///
+    /// [zx_clock_update]: https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_update
+    pub fn update(&self, update: impl Into<ClockUpdate>) -> Result<(), Status> {
+        let update = update.into();
+        let options = update.options();
+        let args = sys::zx_clock_update_args_v2_t::from(update);
+        let status = unsafe {
+            sys::zx_clock_update(self.raw_handle(), options, &args as *const _ as *const u8)
+        };
+        ok(status)?;
+        Ok(())
+    }
+}
+
 bitflags! {
     #[repr(transparent)]
     #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -163,75 +232,6 @@ impl ClockTransformation {
         );
 
         MonotonicTime::from_nanos(r as i64)
-    }
-}
-
-impl Clock {
-    /// Create a new clock object with the provided arguments. Wraps the [zx_clock_create] syscall.
-    ///
-    /// [zx_clock_create]: https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_create
-    pub fn create(opts: ClockOpts, backstop: Option<SyntheticTime>) -> Result<Self, Status> {
-        let mut out = 0;
-        let status = match backstop {
-            Some(backstop) => {
-                // When using backstop time, use the API v1 args struct.
-                let args = sys::zx_clock_create_args_v1_t { backstop_time: backstop.into_nanos() };
-                unsafe {
-                    sys::zx_clock_create(
-                        sys::ZX_CLOCK_ARGS_VERSION_1 | opts.bits(),
-                        &args as *const _ as *const u8,
-                        &mut out,
-                    )
-                }
-            }
-            None => unsafe { sys::zx_clock_create(opts.bits(), ptr::null(), &mut out) },
-        };
-        ok(status)?;
-        unsafe { Ok(Self::from(Handle::from_raw(out))) }
-    }
-
-    /// Perform a basic read of this clock. Wraps the [zx_clock_read] syscall. Requires
-    /// `ZX_RIGHT_READ` and that the clock has had an initial time established.
-    ///
-    /// [zx_clock_read]: https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_read
-    pub fn read(&self) -> Result<SyntheticTime, Status> {
-        let mut now = 0;
-        let status = unsafe { sys::zx_clock_read(self.raw_handle(), &mut now) };
-        ok(status)?;
-        Ok(SyntheticTime::from_nanos(now))
-    }
-
-    /// Get low level details of this clock's current status. Wraps the
-    /// [zx_clock_get_details] syscall. Requires `ZX_RIGHT_READ`.
-    ///
-    /// [zx_clock_get_details]: https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_get_details
-    pub fn get_details(&self) -> Result<ClockDetails, Status> {
-        let mut out_details = MaybeUninit::<sys::zx_clock_details_v1_t>::uninit();
-        let status = unsafe {
-            sys::zx_clock_get_details(
-                self.raw_handle(),
-                sys::ZX_CLOCK_ARGS_VERSION_1,
-                out_details.as_mut_ptr() as *mut u8,
-            )
-        };
-        ok(status)?;
-        let out_details = unsafe { out_details.assume_init() };
-        Ok(out_details.into())
-    }
-
-    /// Make adjustments to this clock. Wraps the [zx_clock_update] syscall. Requires
-    /// `ZX_RIGHT_WRITE`.
-    ///
-    /// [zx_clock_update]: https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_update
-    pub fn update(&self, update: impl Into<ClockUpdate>) -> Result<(), Status> {
-        let update = update.into();
-        let options = update.options();
-        let args = sys::zx_clock_update_args_v2_t::from(update);
-        let status = unsafe {
-            sys::zx_clock_update(self.raw_handle(), options, &args as *const _ as *const u8)
-        };
-        ok(status)?;
-        Ok(())
     }
 }
 
