@@ -167,7 +167,6 @@ assembly_input_bundle("bootstrap") {
     "//src/devices/sysmem/bin/sysmem_connector:pkg",
     "//src/zircon/bin/role_manager:package",
   ]
-  kernel_cmdline = [ "blobfs.cache-eviction-policy=NEVER_EVICT" ]
 
   compiled_packages = [
     {

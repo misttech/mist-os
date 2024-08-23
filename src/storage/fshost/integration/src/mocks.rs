@@ -105,15 +105,9 @@ async fn run_boot_items(mut stream: fboot::ItemsRequestStream, vmo: Option<Arc<z
 /// so for now we either return None or the provided default depending on the context.
 ///
 /// String args -
-///   blobfs.write-compression-algorithm (optional)
-///   blobfs.cache-eviction-policy (optional)
-///   zircon.system.pkgfs.file.<path> - used when loading pkgfs and deps from blobfs
-///   zircon.system.pkgfs.cmd - used when launching pkgfs
 ///   factory_verity_seal - only used when writing to the factory partition
 /// Bool args -
 ///   netsvc.netboot (optional; default false)
-///   zircon.system.disable-automount (optional; default false)
-///   zircon.system.filesystem-check (optional; default false)
 async fn run_boot_args(mut stream: fboot::ArgumentsRequestStream, netboot: bool) {
     while let Some(request) = stream.next().await {
         match request.unwrap() {

@@ -176,6 +176,16 @@
             ],
         },
         {
+            from: "void",
+            to: "#fshost",
+            config: [
+                "fuchsia.blobfs.CacheEvictionPolicy",
+                "fuchsia.blobfs.WriteCompressionAlgorithm",
+                "fuchsia.fshost.DisableAutomount",
+            ],
+            availability: "optional",
+        },
+        {
             directory: "blob-exec",
             from: "#fshost",
             as: "blob",

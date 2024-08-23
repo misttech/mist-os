@@ -26,6 +26,10 @@ pub struct StorageConfig {
     #[serde(default)]
     pub filesystems: ProductFilesystemConfig,
 
+    // Prevents fshost from binding to detected block devices.
+    /// If unset, an internally defined system default is used.
+    pub disable_automount: Option<bool>,
+
     /// Enables storage-host.  See RFC (https://fxrev.dev/1077832) for details.
     #[serde(default)]
     pub storage_host_enabled: bool,

@@ -28,31 +28,6 @@ names.
 In order to specify options in the build, see
 [this guide](/docs/development/kernel/build.md#options).
 
-## blobfs.cache-eviction-policy=\<policy\>
-
-Controls blobfs' eviction strategy for pager-backed blobs with no open handles
-or VMO clones. If unset, an internally defined system default is used.
-
-Blobs that are not pager-backed are not affected by this knob.
-
-The following values are supported:
-
-*   `NEVER_EVICT`: Nodes are never evicted. It is recommended to enable kernel
-    page eviction (`kernel.page-scanner.enable-eviction`) in this case, as
-    otherwise blobfs will indefinitely retain all data pages in memory.
-*   `EVICT_IMMEDIATELY`: Nodes are evicted as soon as they have no open handles
-    or VMO clones. They will need to be loaded from disk again on next access.
-
-## blobfs.write-compression-algorithm=\<algorithm\>
-
-The compression algorithm that blobfs should use for writing blobs at runtime.
-If unset, an internally defined system default is used.
-
-The following values are supported:
-
-*   `ZSTD_CHUNKED`
-*   `UNCOMPRESSED`
-
 ## boot.usb=\<bool\>
 
 If true, indicates that the boot storage medium is connected over a USB bus.

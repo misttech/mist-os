@@ -763,8 +763,8 @@ mod tests {
         let config = Blobfs {
             verbose: true,
             readonly: true,
-            write_compression_algorithm: Some(BlobCompression::Uncompressed),
-            cache_eviction_policy_override: Some(BlobEvictionPolicy::EvictImmediately),
+            write_compression_algorithm: BlobCompression::Uncompressed,
+            cache_eviction_policy_override: BlobEvictionPolicy::EvictImmediately,
             ..Default::default()
         };
         let mut blobfs = new_fs(&mut ramdisk, config).await;

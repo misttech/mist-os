@@ -85,6 +85,9 @@
             from: "#config",
             to: "#bootstrap",
             config: [
+                "fuchsia.blobfs.CacheEvictionPolicy",
+                "fuchsia.blobfs.WriteCompressionAlgorithm",
+                "fuchsia.fshost.DisableAutomount",
                 "fuchsia.network.PrimaryInterface",
                 "fuchsia.sysmem.ContiguousGuardPagesUnused",
                 "fuchsia.sysmem.FixedContiguousMemorySize",

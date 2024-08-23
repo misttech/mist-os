@@ -85,7 +85,6 @@ async fn main() -> Result<(), Error> {
     let matcher_lock = Arc::new(Mutex::new(HashSet::new()));
     let mut env = FshostEnvironment::new(
         config.clone(),
-        boot_args,
         ramdisk_path.clone(),
         matcher_lock.clone(),
         inspector.clone(),

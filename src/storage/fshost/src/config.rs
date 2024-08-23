@@ -32,15 +32,14 @@ pub fn default_config() -> fshost_config::Config {
         no_zxcrypt: false,
         storage_host: false,
         use_disk_migration: false,
+        disable_automount: false,
+        blobfs_write_compression_algorithm: "".to_string(),
+        blobfs_cache_eviction_policy: "".to_string(),
     }
 }
 
 pub fn apply_boot_args_to_config(config: &mut fshost_config::Config, boot_args: &BootArgs) {
-    if boot_args.netboot() {
+    if boot_args.netboot() || config.disable_automount {
         config.netboot = true;
-    }
-
-    if boot_args.check_filesystems() {
-        config.check_filesystems = true;
     }
 }

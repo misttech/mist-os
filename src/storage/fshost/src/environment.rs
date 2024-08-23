@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::boot_args::BootArgs;
 use crate::copier::recursive_copy;
 use crate::crypt::fxfs::{self, CryptService};
 use crate::crypt::zxcrypt::{UnsealOutcome, ZxcryptDevice};
@@ -253,7 +252,6 @@ pub struct FshostEnvironment {
 impl FshostEnvironment {
     pub fn new(
         config: Arc<fshost_config::Config>,
-        boot_args: BootArgs,
         ramdisk_prefix: Option<String>,
         matcher_lock: Arc<Mutex<HashSet<String>>>,
         inspector: fuchsia_inspect::Inspector,
@@ -264,7 +262,7 @@ impl FshostEnvironment {
             blobfs: Filesystem::Queue(FilesystemQueue::default()),
             data: Filesystem::Queue(FilesystemQueue::default()),
             fvm: None,
-            launcher: Arc::new(FilesystemLauncher { config, boot_args, ramdisk_prefix }),
+            launcher: Arc::new(FilesystemLauncher { config, ramdisk_prefix }),
             matcher_lock,
             inspector,
         }
@@ -924,7 +922,6 @@ impl Environment for FshostEnvironment {
 
 pub struct FilesystemLauncher {
     config: Arc<fshost_config::Config>,
-    boot_args: BootArgs,
     ramdisk_prefix: Option<String>,
 }
 
@@ -978,8 +975,16 @@ impl FilesystemLauncher {
 
     pub fn get_blobfs_config(&self) -> Blobfs {
         Blobfs {
-            write_compression_algorithm: self.boot_args.blobfs_write_compression_algorithm(),
-            cache_eviction_policy_override: self.boot_args.blobfs_eviction_policy(),
+            write_compression_algorithm: self
+                .config
+                .blobfs_write_compression_algorithm
+                .as_str()
+                .into(),
+            cache_eviction_policy_override: self
+                .config
+                .blobfs_cache_eviction_policy
+                .as_str()
+                .into(),
             ..Default::default()
         }
     }
