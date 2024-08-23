@@ -14,51 +14,6 @@
 
 __BEGIN_CDECLS
 
-// COAABBBB VVVVVVVV  Condition Opcode paramA paramB Value
-
-#define OP_ABORT 0x0  // if (cond) return no-match
-#define OP_MATCH 0x1  // if (cond) return match
-#define OP_GOTO 0x2   // if (cond) advance to next LABEL(paramA)
-#define OP_LABEL 0x5  // no-op, labels line with paramA
-
-#define COND_AL 0x0  // true
-#define COND_EQ 0x1  // bind(paramB) == Value
-#define COND_NE 0x2  // bind(paramB) != Value
-#define COND_GT 0x3  // bind(paramB) > Value
-#define COND_LT 0x4  // bind(paramB) < Value
-#define COND_GE 0x5  // bind(paramB) >= Value
-#define COND_LE 0x6  // bind(paramB) <= Value
-
-// branches are forward-only
-// branches always go to the first matching LABEL
-// branches that cannot find a matching LABEL are treated as ABORTs
-// there is an implied unconditional ABORT after the last instruction
-// flags are initially zero, may be set/cleared with SET/CLEAR
-// flags may be tested by comparison against BIND_FLAGS
-
-#define BINDINST(c, o, a, b, v)                                                               \
-  {                                                                                           \
-      (((c) & 0xF) << 28) | (((o) & 0xF) << 24) | (((a) & 0xFF) << 16) | ((b) & 0xFFFF), (v), \
-      0 /* debug */                                                                           \
-  }
-
-#define BINDINST_CC(n) ((n) >> 28)
-#define BINDINST_OP(n) (((n) >> 24) & 0xF)
-#define BINDINST_PA(n) (((n) >> 16) & 0xFF)
-#define BINDINST_PB(n) ((n) & 0xFFFF)
-
-#define BI_ABORT() BINDINST(COND_AL, OP_ABORT, 0, 0, 0)
-#define BI_MATCH() BINDINST(COND_AL, OP_MATCH, 0, 0, 0)
-#define BI_GOTO(n) BINDINST(COND_AL, OP_GOTO, n, 0, 0)
-#define BI_LABEL(n) BINDINST(COND_AL, OP_LABEL, n, 0, 0)
-
-#define BI_ABORT_IF(c, b, v) BINDINST(COND_##c, OP_ABORT, 0, b, v)
-#define BI_MATCH_IF(c, b, v) BINDINST(COND_##c, OP_MATCH, 0, b, v)
-#define BI_GOTO_IF(c, b, v, n) BINDINST(COND_##c, OP_GOTO, n, b, v)
-
-// for drivers that only want to be bound on user request
-#define BI_ABORT_IF_AUTOBIND BI_ABORT_IF(NE, BIND_AUTOBIND, 0)
-
 // LINT.IfChange
 // global binding variables at 0x00XX
 // BIND_FLAGS was 0x0000, the value of the flags register
@@ -156,28 +111,11 @@ __BEGIN_CDECLS
 // BIND_POWER_SENSOR_DOMAIN was 0x0A90
 // LINT.ThenChange(/sdk/lib/driver/legacy-bind-constants/legacy-bind-constants.h)
 
-typedef struct zx_bind_inst {
-  uint32_t op;
-  uint32_t arg;
-  uint32_t debug;
-} zx_bind_inst_t;
-
 typedef struct zx_device_prop {
   uint16_t id;
   uint16_t reserved;
   uint32_t value;
 } zx_device_prop_t;
-
-// simple example
-#if 0
-zx_bind_inst_t i915_binding[] = {
-    BI_ABORT_IF(NE, BIND_PROTOCOL, ZX_PROTOCOL_PCI),
-    BI_ABORT_IF(NE, BIND_PCI_VID, 0x8086),
-    BI_MATCH_IF(EQ, BIND_PCI_DID, 0x1616), // broadwell
-    BI_MATCH_IF(EQ, BIND_PCI_DID, 0x1916), // skylake
-    BI_ABORT(),
-};
-#endif
 
 #define ZIRCON_NOTE_NAME "Zircon"
 #define ZIRCON_NOTE_DRIVER 0x31565244  // DRV1
