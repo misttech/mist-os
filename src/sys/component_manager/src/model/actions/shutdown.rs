@@ -3642,19 +3642,9 @@ mod tests {
             ("root", ComponentDeclBuilder::new().child_default("a").build()),
             (
                 "a",
-                ComponentDeclBuilder::new()
+                ComponentDeclBuilder::new_empty_component()
                     .child(ChildBuilder::new().name("b").eager())
                     .child(ChildBuilder::new().name("c").eager())
-                    // TODO: this test fails if program is `None` when we try to start component a:
-                    // could not start a: ActionError { err: StartError { err: InstanceDestroyed { moniker: a } } }
-                    // Let's figure out why.
-                    .program(cm_rust::ProgramDecl {
-                        runner: None,
-                        info: fidl_fuchsia_data::Dictionary {
-                            entries: Some(vec![]),
-                            ..Default::default()
-                        },
-                    })
                     .use_(UseBuilder::runner().source_static_child("b").name("test.runner"))
                     .build(),
             ),

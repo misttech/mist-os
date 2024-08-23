@@ -401,7 +401,7 @@ impl ResolvedInstanceState {
             }
         }
 
-        let program_escrow = if decl.program.is_some() {
+        let program_escrow = if decl.get_runner().is_some() {
             let (escrow, escrow_task) = escrow::Actor::new(component.as_weak());
             component.nonblocking_task_group().spawn(escrow_task);
             Some(escrow)
@@ -463,7 +463,7 @@ impl ResolvedInstanceState {
         component_decl: &ComponentDecl,
         capability_decl: &cm_rust::CapabilityDecl,
     ) -> Router {
-        if component_decl.program.is_none() {
+        if component_decl.get_runner().is_none() {
             return Router::new_error(OpenOutgoingDirError::InstanceNonExecutable);
         }
         let name = capability_decl.name();
