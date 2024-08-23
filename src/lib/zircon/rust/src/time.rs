@@ -229,36 +229,6 @@ impl Duration {
         Time::after(self).sleep()
     }
 
-    #[deprecated(note = "Users should instead use into_nanos")]
-    pub fn nanos(self) -> i64 {
-        self.0
-    }
-
-    #[deprecated(note = "Users should instead use into_micros")]
-    pub fn micros(self) -> i64 {
-        self.0 / 1_000
-    }
-
-    #[deprecated(note = "Users should instead use into_millis")]
-    pub fn millis(self) -> i64 {
-        self.into_micros() / 1_000
-    }
-
-    #[deprecated(note = "Users should instead use into_seconds")]
-    pub fn seconds(self) -> i64 {
-        self.into_millis() / 1_000
-    }
-
-    #[deprecated(note = "Users should instead use into_minutes")]
-    pub fn minutes(self) -> i64 {
-        self.into_seconds() / 60
-    }
-
-    #[deprecated(note = "Users should instead use into_hours")]
-    pub fn hours(self) -> i64 {
-        self.into_minutes() / 60
-    }
-
     /// Returns the number of nanoseconds contained by this `Duration`.
     pub const fn into_nanos(self) -> i64 {
         self.0
