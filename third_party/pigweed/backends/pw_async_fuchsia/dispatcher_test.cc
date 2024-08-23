@@ -4,10 +4,10 @@
 
 #include "pw_async_fuchsia/dispatcher.h"
 
-#include <gtest/gtest.h>
+#include <lib/async-testing/test_loop.h>
 
 #include "pw_async_fuchsia/util.h"
-#include "src/lib/testing/loop_fixture/test_loop_fixture.h"
+#include "pw_unit_test/framework.h"
 
 #define ASSERT_OK(status) ASSERT_EQ(OkStatus(), status)
 #define ASSERT_CANCELLED(status) ASSERT_EQ(Status::Cancelled(), status)
@@ -16,7 +16,15 @@ using namespace std::chrono_literals;
 
 namespace pw::async_fuchsia {
 
-using DispatcherFuchsiaTest = ::gtest::TestLoopFixture;
+class DispatcherFuchsiaTest : public ::testing::Test {
+ public:
+  async_dispatcher_t* dispatcher() { return loop_.dispatcher(); }
+  void RunLoopUntilIdle() { loop_.RunUntilIdle(); }
+  void RunLoopFor(zx::duration duration) { loop_.RunFor(duration); }
+
+ private:
+  ::async::TestLoop loop_;
+};
 
 TEST_F(DispatcherFuchsiaTest, TimeConversions) {
   zx::time time{timespec{123, 456}};

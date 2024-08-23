@@ -79,8 +79,9 @@ executable("pigweed_backend_pw_async_fuchsia_tests_executable") {
   deps = [
     ":dispatcher",
     ":fake_dispatcher_fixture",
+    "$dir_pw_unit_test",
     "//src/lib/fxl/test:gtest_main",
-    "//src/lib/testing/loop_fixture",
+    "//zircon/system/ulib/async-testing:async-testing",
   ]
 }
 

@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 #include "pw_async/fake_dispatcher_fixture.h"
 
-#include "gtest/gtest.h"
 #include "pw_async_fuchsia/dispatcher.h"
+#include "pw_unit_test/framework.h"
 
 #define ASSERT_OK(status) ASSERT_EQ(OkStatus(), status)
 #define ASSERT_CANCELLED(status) ASSERT_EQ(Status::Cancelled(), status)
