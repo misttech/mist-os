@@ -97,12 +97,19 @@ _SAG_INSPECT_DATA_BEFORE: list[dict[str, Any]] = [
     }
 ]
 
+_SAG_SUSPEND_STATS_AFTER: dict[str, int] = {
+    "fail_count": 0,
+    "last_failed_error": 0,
+    "last_time_in_suspend": 3053743875,
+    "last_time_in_suspend_operations": 188959,
+    "success_count": 1,
+}
 _SAG_INSPECT_DATA_AFTER: list[dict[str, Any]] = deepcopy(
     _SAG_INSPECT_DATA_BEFORE
 )
-_SAG_INSPECT_DATA_AFTER[0]["payload"]["root"]["suspend_stats"][
-    "success_count"
-] = 1
+_SAG_INSPECT_DATA_AFTER[0]["payload"]["root"][
+    "suspend_stats"
+] = _SAG_SUSPEND_STATS_AFTER
 
 _FSH_INSPECT_DATA_BEFORE: list[dict[str, Any]] = [
     {
@@ -601,10 +608,10 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
         mock_openpty.assert_called_once()
         mock_os_read.assert_called_once()
 
-    def test_get_suspend_resume_count_sag_inspect_data_fail(
+    def test_get_suspend_stats_from_sag_inspect_data_fail(
         self,
     ) -> None:
-        """Test case for SystemPowerStateController._get_suspend_resume_count_sag_inspect_data()
+        """Test case for SystemPowerStateController._get_suspend_stats_from_sag_inspect_data()
         raising exception as it fails to read SAG inspect data."""
         self.mock_inspect.get_data.side_effect = errors.InspectError(
             "Inspect operation failed"
@@ -613,7 +620,7 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
             errors.SystemPowerStateControllerError,
             "Failed to read SAG inspect data",
         ):
-            self.system_power_state_controller_obj._get_suspend_resume_count_sag_inspect_data()
+            self.system_power_state_controller_obj._get_suspend_stats_from_sag_inspect_data()
 
     def test_get_suspend_events_from_fsh_inspect_data_fail(
         self,
@@ -641,8 +648,8 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
                 resume_mode=system_power_state_controller_interface.TimerResume(
                     duration=3
                 ),
-                suspend_events_before={},
-                suspend_events_after={},
+                suspend_resume_events_before={},
+                suspend_resume_events_after={},
             )
 
     def test_validate_using_fsh_inspect_data_fail_2(self) -> None:
@@ -657,8 +664,8 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
                 resume_mode=system_power_state_controller_interface.TimerResume(
                     duration=3
                 ),
-                suspend_events_before={},
-                suspend_events_after=SUSPEND_RESUME_EVENTS_AFTER_FAIL_2,
+                suspend_resume_events_before={},
+                suspend_resume_events_after=SUSPEND_RESUME_EVENTS_AFTER_FAIL_2,
             )
 
     def test_validate_using_fsh_inspect_data_fail_3(self) -> None:
@@ -673,6 +680,6 @@ class SystemPowerStateControllerStarnixTests(unittest.TestCase):
                 resume_mode=system_power_state_controller_interface.TimerResume(
                     duration=3
                 ),
-                suspend_events_before={},
-                suspend_events_after=SUSPEND_RESUME_EVENTS_AFTER_FAIL_3,
+                suspend_resume_events_before={},
+                suspend_resume_events_after=SUSPEND_RESUME_EVENTS_AFTER_FAIL_3,
             )
