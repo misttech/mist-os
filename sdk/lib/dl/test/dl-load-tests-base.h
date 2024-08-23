@@ -27,6 +27,15 @@ class DlLoadTestsBase : public DlTestsBase {
   using Loader = elfldltl::MmapLoader;
   using SystemError = elfldltl::PosixError;
 
+  // Track information about a dlopen-ed module in a test so that the test
+  // fixture can verify all dlopen-ed modules have a corresponding dlclose.
+  struct ModuleInfo {
+    std::string name;  // The filename of the module.
+    unsigned refcnt;   // The number of times this module was dlopen-ed.
+  };
+
+  using ModuleMap = std::unordered_map<void*, ModuleInfo>;
+
   // The Expect/Needed API checks that the test files exist in test paths as
   // expected, or are missing if the test files are expected to not be found.
   static void ExpectRootModule(std::string_view name);
@@ -49,6 +58,26 @@ class DlLoadTestsBase : public DlTestsBase {
   // encountered system error.
   fit::result<std::optional<SystemError>, File> RetrieveFile(Diagnostics& diag,
                                                              std::string_view filename);
+
+  // This is called when a test fixture DlOpens a file module.
+  void TrackModule(void* file, std::string filename);
+
+  // This is called when a test fixture DlCloses a file module.
+  void UntrackModule(void* file);
+
+  // At the end of the test, check that all files that were dlopened in the test
+  // were also dlclosed.
+  void TearDown() override;
+
+  // Test fixtures may override this function with the platform-specific dlclose
+  // operation
+  virtual void CleanUpOpenedFile(void* ptr) = 0;
+
+  constexpr ModuleMap& opened_modules() { return opened_modules_; }
+
+ private:
+  // Track the files that are dlopened and dlclosed by tests.
+  ModuleMap opened_modules_;
 };
 
 }  // namespace dl::testing

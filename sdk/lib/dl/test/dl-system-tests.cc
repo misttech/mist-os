@@ -29,12 +29,12 @@ fit::result<Error, void*> DlSystemTests::DlOpen(const char* file, int mode) {
   if (!result) {
     return TakeError();
   }
+  TrackModule(result, std::string{file});
   return fit::ok(result);
 }
 
-// TODO(https://fxbug.dev/342483491): Have the test fixture automatically track
-// dlopen-ed files so they can be dlclosed and unmapped at test teardown.
 fit::result<Error> DlSystemTests::DlClose(void* module) {
+  auto untrack_file = fit::defer([&]() { DlSystemLoadTestsBase::UntrackModule(module); });
   if (dlclose(module)) {
     return TakeError();
   }

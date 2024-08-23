@@ -51,9 +51,7 @@ class RuntimeDynamicLinker {
   RuntimeDynamicLinker(const RuntimeDynamicLinker&) = delete;
   RuntimeDynamicLinker(RuntimeDynamicLinker&&) = delete;
 
-  // Attempt to find the loaded module with the given name, returning a nullptr
-  // if the module was not found.
-  RuntimeModule* FindModule(Soname name);
+  constexpr const ModuleList& modules() const { return modules_; }
 
   // Lookup a symbol from the given module, returning a pointer to it in memory,
   // or an error if not found (ie undefined symbol).
@@ -85,7 +83,7 @@ class RuntimeDynamicLinker {
 
     if (!file || !strlen(file)) {
       return fit::error{
-          Error{"TODO(https://fxbug.dev/324136831): nullptr for file is unsupported."}};
+          Error{"TODO(https://fxbug.dev/361674544): nullptr for file is unsupported."}};
     }
 
     Soname name{file};
@@ -123,6 +121,10 @@ class RuntimeDynamicLinker {
   }
 
  private:
+  // Attempt to find the loaded module with the given name, returning a nullptr
+  // if the module was not found.
+  RuntimeModule* FindModule(Soname name);
+
   // The RuntimeDynamicLinker owns the list of all 'live' modules that have been
   // loaded into the system image.
   // TODO(https://fxbug.dev/324136831): support startup modules

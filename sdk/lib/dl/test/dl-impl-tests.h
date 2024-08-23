@@ -39,18 +39,23 @@ class DlImplTests : public Base {
     // Check that all Needed/Expect* expectations for loaded objects were
     // satisfied and then clear the expectation set.
     auto verify_expectations = fit::defer([&]() { Base::VerifyAndClearNeeded(); });
-    return dynamic_linker_.Open<typename Base::Loader>(
+    auto result = dynamic_linker_.Open<typename Base::Loader>(
         file, mode, cpp20::bind_front(&Base::RetrieveFile, this));
+    if (result.is_ok()) {
+      Base::TrackModule(result.value(), std::string{file});
+    }
+    return result;
   }
 
-  // TODO(https://fxbug.dev/342483491): Have the test fixture automatically track
-  // dlopen-ed files so they can be dlclosed and unmapped at test teardown.
   // TODO(https://fxbug.dev/342028933): Implement dlclose.
   fit::result<Error> DlClose(void* module) {
+    auto untrack_file = fit::defer([&]() { Base::UntrackModule(module); });
     // At minimum check that a valid handle was passed and present in the
     // dynamic linker's list of modules.
-    if (auto* m = static_cast<RuntimeModule*>(module); dynamic_linker_.FindModule(m->name())) {
-      return fit::ok();
+    for (auto& m : dynamic_linker_.modules()) {
+      if (&m == module) {
+        return fit::ok();
+      }
     }
     return fit::error<Error>{"Invalid library handle %p", module};
   }
@@ -63,6 +68,10 @@ class DlImplTests : public Base {
   // become pure wrappers in the DlSystemTests fixture.
   void ExpectRootModuleNotLoaded(std::string_view name) {}
   void ExpectNeededNotLoaded(std::initializer_list<std::string_view> names) {}
+
+  // The `dynamic_linker_` dtor will also destroy and unmap modules remaining in
+  // its modules list, so there is no need to do any extra clean up operation.
+  void CleanUpOpenedFile(void* ptr) override {}
 
  private:
   RuntimeDynamicLinker dynamic_linker_;

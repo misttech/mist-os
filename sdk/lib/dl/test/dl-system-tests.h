@@ -38,7 +38,7 @@ class DlSystemTests : public DlSystemLoadTestsBase {
 
   fit::result<Error, void*> DlOpen(const char* file, int mode);
 
-  static fit::result<Error> DlClose(void* module);
+  fit::result<Error> DlClose(void* module);
 
   static fit::result<Error, void*> DlSym(void* module, const char* ref);
 
@@ -52,6 +52,8 @@ class DlSystemTests : public DlSystemLoadTestsBase {
   void ExpectRootModuleNotLoaded(std::string_view name);
 
   void ExpectNeededNotLoaded(std::initializer_list<std::string_view> names);
+
+  void CleanUpOpenedFile(void* ptr) override { ASSERT_TRUE(DlClose(ptr).is_ok()); }
 
  private:
   // This will call the system dlopen in an OS-specific context. This method is
