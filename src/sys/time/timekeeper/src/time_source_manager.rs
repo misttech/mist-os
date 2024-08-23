@@ -10,6 +10,7 @@ use crate::time_source::{
 };
 use fidl_fuchsia_time_external::{Status, Urgency};
 use fuchsia_async::{self as fasync, TimeoutExt};
+use fuchsia_runtime::UtcTime;
 use fuchsia_zircon as zx;
 use futures::{FutureExt as _, StreamExt as _};
 use std::sync::Arc;
@@ -79,7 +80,7 @@ struct PushSourceManager<D: Diagnostics, M: MonotonicProvider> {
     /// The role of the time source being managed.
     role: Role,
     /// The backstop time that samples must not come before.
-    backstop: zx::SyntheticTime,
+    backstop: UtcTime,
     /// Whether the time source restart delay and minimum update delay should be enabled.
     delays_enabled: bool,
     /// A source of monotonic time.
@@ -237,7 +238,7 @@ impl<D: Diagnostics, M: MonotonicProvider> PushSourceManager<D, M> {
 impl<D: Diagnostics> TimeSourceManager<D, KernelMonotonicProvider> {
     /// Constructs a new `TimeSourceManager` that reads monotonic times from the kernel.
     pub fn new(
-        backstop: zx::SyntheticTime,
+        backstop: UtcTime,
         role: Role,
         time_source: TimeSource,
         diagnostics: Arc<D>,
@@ -282,7 +283,7 @@ impl<D: Diagnostics> TimeSourceManager<D, KernelMonotonicProvider> {
     /// the restart delay and minimum update delay set to zero. This makes the behavior more
     /// amenable to use in tests.
     pub fn new_with_delays_disabled(
-        backstop: zx::SyntheticTime,
+        backstop: UtcTime,
         role: Role,
         time_source: TimeSource,
         diagnostics: Arc<D>,
@@ -324,7 +325,7 @@ struct PullSourceManager<D: Diagnostics, M: MonotonicProvider> {
     /// The role of the time source being managed.
     role: Role,
     /// The backstop time that samples must not come before.
-    backstop: zx::SyntheticTime,
+    backstop: UtcTime,
     /// Whether the time source restart delay and minimum update delay should be enabled.
     delays_enabled: bool,
     /// A source of monotonic time.
@@ -498,7 +499,7 @@ mod test {
     ) -> TimeSourceManager<FakeDiagnostics, FakeMonotonicProvider> {
         let manager = TimeManager::Push(PushSourceManager {
             role: TEST_ROLE,
-            backstop: zx::SyntheticTime::ZERO + (MIN_UPDATE_DELAY * BACKSTOP_FACTOR),
+            backstop: UtcTime::ZERO + (MIN_UPDATE_DELAY * BACKSTOP_FACTOR),
             delays_enabled: true,
             monotonic: FakeMonotonicProvider::new(MIN_UPDATE_DELAY),
             time_source: Box::new(time_source),
@@ -519,7 +520,7 @@ mod test {
     ) -> TimeSourceManager<FakeDiagnostics, FakeMonotonicProvider> {
         let manager = TimeManager::Pull(PullSourceManager {
             role: TEST_ROLE,
-            backstop: zx::SyntheticTime::ZERO + (MIN_UPDATE_DELAY * BACKSTOP_FACTOR),
+            backstop: UtcTime::ZERO + (MIN_UPDATE_DELAY * BACKSTOP_FACTOR),
             delays_enabled: true,
             monotonic: FakeMonotonicProvider::new(MIN_UPDATE_DELAY),
             time_source: Box::new(time_source),
@@ -541,7 +542,7 @@ mod test {
         diagnostics: Arc<FakeDiagnostics>,
     ) -> TimeSourceManager<FakeDiagnostics, FakeMonotonicProvider> {
         let manager = TimeManager::Push(PushSourceManager {
-            backstop: zx::SyntheticTime::ZERO + (MIN_UPDATE_DELAY * BACKSTOP_FACTOR),
+            backstop: UtcTime::ZERO + (MIN_UPDATE_DELAY * BACKSTOP_FACTOR),
             role: TEST_ROLE,
             delays_enabled: false,
             monotonic: FakeMonotonicProvider::new(MIN_UPDATE_DELAY),
@@ -559,7 +560,7 @@ mod test {
     /// accept between samples.rate at hence the rate we choose our fake monotonic clock to tick at.
     fn create_sample(utc_factor: i64, monotonic_factor: i64) -> Sample {
         Sample {
-            utc: zx::SyntheticTime::ZERO + (MIN_UPDATE_DELAY * utc_factor),
+            utc: UtcTime::ZERO + (MIN_UPDATE_DELAY * utc_factor),
             monotonic: zx::MonotonicTime::ZERO + (MIN_UPDATE_DELAY * monotonic_factor),
             std_dev: STD_DEV,
         }
@@ -720,7 +721,7 @@ mod test {
         let time_source = FakePushTimeSource::failing();
         let diagnostics = Arc::new(FakeDiagnostics::new());
         let mut manager = TimeSourceManager::new(
-            zx::SyntheticTime::ZERO,
+            UtcTime::ZERO,
             TEST_ROLE,
             time_source.into(),
             Arc::clone(&diagnostics),
@@ -748,12 +749,8 @@ mod test {
     async fn restart_on_launch_failure_pull_source() {
         let time_source = FakePullTimeSource::failing().into();
         let diagnostics = Arc::new(FakeDiagnostics::new());
-        let mut manager = TimeSourceManager::new(
-            zx::SyntheticTime::ZERO,
-            TEST_ROLE,
-            time_source,
-            Arc::clone(&diagnostics),
-        );
+        let mut manager =
+            TimeSourceManager::new(UtcTime::ZERO, TEST_ROLE, time_source, Arc::clone(&diagnostics));
 
         // Calling next sample on this manager with the restart delay enabled should lead to
         // failed launch and then a few minute cooldown period before relaunch. We test for this by

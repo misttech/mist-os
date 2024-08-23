@@ -103,6 +103,14 @@ impl<Output: Timeline> Clock<Output> {
     }
 }
 
+impl Clock<SyntheticTimeline> {
+    /// Cast a "base" clock to one with a user-defined timeline that will carry the timeline for
+    /// all transformations and reads..
+    pub fn cast<UserTimeline: Timeline>(self) -> Clock<UserTimeline> {
+        Clock(self.0, std::marker::PhantomData)
+    }
+}
+
 impl<Output: Timeline> AsHandleRef for Clock<Output> {
     fn as_handle_ref(&self) -> HandleRef<'_> {
         self.0.as_handle_ref()

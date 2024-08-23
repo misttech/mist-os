@@ -6,6 +6,7 @@ use crate::enums::FrequencyDiscardReason;
 use crate::time_source::Sample;
 use crate::Config;
 use chrono::{Datelike, Duration, TimeZone, Utc};
+use fuchsia_runtime::UtcTime;
 use fuchsia_zircon as zx;
 use std::mem;
 use std::sync::Arc;
@@ -48,7 +49,7 @@ impl Into<FrequencyDiscardReason> for GetFrequencyError {
 #[derive(Debug, PartialEq)]
 struct EstimationWindow {
     /// The UTC time of the first sample in the window.
-    initial_utc: zx::SyntheticTime,
+    initial_utc: UtcTime,
     /// The monotonic time of the first sample in the window.
     initial_monotonic: zx::MonotonicTime,
     /// The number of samples accepted into this window.
@@ -249,7 +250,7 @@ mod test {
     fn create_sample(utc_string: &str, monotonic: zx::MonotonicTime) -> Sample {
         let chrono_utc = DateTime::parse_from_rfc3339(utc_string).expect("Invalid UTC string");
         Sample::new(
-            zx::SyntheticTime::from_nanos(chrono_utc.timestamp_nanos_opt().unwrap()),
+            UtcTime::from_nanos(chrono_utc.timestamp_nanos_opt().unwrap()),
             monotonic,
             STD_DEV,
         )

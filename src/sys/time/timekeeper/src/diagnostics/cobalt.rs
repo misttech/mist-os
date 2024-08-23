@@ -16,6 +16,7 @@ use fidl_fuchsia_metrics::{
 };
 use fuchsia_cobalt_builders::MetricEventExt;
 use fuchsia_component::client::connect_to_protocol;
+use fuchsia_runtime::UtcClock;
 use fuchsia_sync::Mutex;
 use futures::{future, FutureExt as _};
 use std::sync::Arc;
@@ -90,9 +91,9 @@ pub struct CobaltDiagnostics {
     /// The experiment to record on all experiment-based events.
     experiment: Experiment,
     /// The UTC clock used in the primary track.
-    primary_clock: Arc<zx::Clock>,
+    primary_clock: Arc<UtcClock>,
     /// The UTC clock used in the monitor track.
-    monitor_clock: Option<Arc<zx::Clock>>,
+    monitor_clock: Option<Arc<UtcClock>>,
     // TODO(https://fxbug.dev/42135549): Move back to an owned fasync::Task instead of detaching the spawned
     // Task once the lifecycle of timekeeper ensures CobaltDiagnostics objects will last long enough
     // to finish their logging.
@@ -320,6 +321,7 @@ mod test {
         WriteRtcOutcome,
     };
     use fidl_fuchsia_metrics::MetricEventPayload;
+    use fuchsia_runtime::{UtcTime, UtcTimeline};
     use futures::channel::mpsc;
     use futures::{FutureExt, StreamExt};
     use test_util::{assert_geq, assert_leq};
@@ -332,9 +334,9 @@ mod test {
     // somewhat better.
     const MONITOR_OFFSET_ERROR: zx::Duration = zx::Duration::from_millis(40);
 
-    fn create_clock(time: zx::SyntheticTime) -> Arc<zx::Clock> {
-        let clk = zx::Clock::create(zx::ClockOpts::empty(), None).unwrap();
-        clk.update(zx::ClockUpdate::builder().approximate_value(time)).unwrap();
+    fn create_clock(time: UtcTime) -> Arc<UtcClock> {
+        let clk = UtcClock::create(zx::ClockOpts::empty(), None).unwrap();
+        clk.update(zx::ClockUpdate::<UtcTimeline>::builder().approximate_value(time)).unwrap();
         Arc::new(clk)
     }
 
@@ -346,8 +348,8 @@ mod test {
         let diagnostics = CobaltDiagnostics {
             sender: Mutex::new(sender),
             experiment: TEST_EXPERIMENT,
-            primary_clock: create_clock(zx::SyntheticTime::ZERO),
-            monitor_clock: Some(create_clock(zx::SyntheticTime::ZERO + MONITOR_OFFSET)),
+            primary_clock: create_clock(UtcTime::ZERO),
+            monitor_clock: Some(create_clock(UtcTime::ZERO + MONITOR_OFFSET)),
         };
         (diagnostics, mpsc_receiver)
     }
@@ -478,7 +480,7 @@ mod test {
         diagnostics.record(Event::KalmanFilterUpdated {
             track: Track::Primary,
             monotonic: zx::MonotonicTime::from_nanos(333_000_000_000),
-            utc: zx::SyntheticTime::from_nanos(4455445544_000_000_000),
+            utc: UtcTime::from_nanos(4455445544_000_000_000),
             sqrt_covariance: zx::Duration::from_micros(55555),
         });
         assert_eq!(

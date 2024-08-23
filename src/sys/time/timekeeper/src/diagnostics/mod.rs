@@ -20,6 +20,7 @@ use crate::enums::{
     WriteRtcOutcome,
 };
 use fidl_fuchsia_time_external::Status;
+use fuchsia_runtime::UtcTime;
 use fuchsia_zircon as zx;
 
 /// A special `Duration` that will match any value during an `eq_with_any` operation.
@@ -38,7 +39,7 @@ pub enum Event {
     /// Timekeeper has completed initialization.
     Initialized { clock_state: InitialClockState },
     /// An attempt was made to initialize and read from the real time clock.
-    InitializeRtc { outcome: InitializeRtcOutcome, time: Option<zx::SyntheticTime> },
+    InitializeRtc { outcome: InitializeRtcOutcome, time: Option<UtcTime> },
     /// A time source failed, relaunch will be attempted.
     TimeSourceFailed { role: Role, error: TimeSourceError },
     /// A time source changed its state.
@@ -52,7 +53,7 @@ pub enum Event {
         /// The monotonic time at which the state applies.
         monotonic: zx::MonotonicTime,
         /// The estimated UTC corresponding to monotonic.
-        utc: zx::SyntheticTime,
+        utc: UtcTime,
         /// Square root of element [0,0] of the covariance matrix.
         sqrt_covariance: zx::Duration,
     },

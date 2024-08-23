@@ -10,11 +10,11 @@ const MILLION: u64 = 1_000_000;
 /// A transformation from monotonic time to synthetic time, including an error bound on this
 /// synthetic time.
 #[derive(Clone, Default, Debug, Eq, PartialEq)]
-pub struct Transform {
+pub struct Transform<Output> {
     /// An offset on the monotonic timeline in nanoseconds.
-    pub monotonic_offset: i64,
+    pub monotonic_offset: zx::MonotonicTime,
     /// An offset on the synthetic timeline in nanoseconds.
-    pub synthetic_offset: i64,
+    pub synthetic_offset: zx::Time<Output>,
     /// An adjustment to the standard 1 monotonic tick:1 synthetic tick rate in parts per million.
     /// Positive values indicate the synthetic clock is moving faster than the monotonic clock.
     pub rate_adjust_ppm: i32,
@@ -24,24 +24,24 @@ pub struct Transform {
     pub error_bound_growth_ppm: u32,
 }
 
-impl Transform {
+impl<Output: zx::Timeline + Copy> Transform<Output> {
     /// Returns the synthetic time at the supplied monotonic time.
-    pub fn synthetic(&self, monotonic: zx::MonotonicTime) -> zx::SyntheticTime {
+    pub fn synthetic(&self, monotonic: zx::MonotonicTime) -> zx::Time<Output> {
         // Cast to i128 to avoid overflows in multiplication.
-        let monotonic_difference = (monotonic.into_nanos() - self.monotonic_offset) as i128;
-        let synthetic_offset = self.synthetic_offset as i128;
+        let monotonic_difference = (monotonic - self.monotonic_offset).into_nanos() as i128;
+        let synthetic_offset = self.synthetic_offset.into_nanos() as i128;
         let synthetic_ticks = self.rate_adjust_ppm as i128 + MILLION as i128;
         let reference_ticks = MILLION as i128;
 
         let time_nanos =
             (monotonic_difference * synthetic_ticks / reference_ticks) + synthetic_offset;
-        zx::SyntheticTime::from_nanos(time_nanos as i64)
+        zx::Time::from_nanos(time_nanos as i64)
     }
 
     /// Returns the error bound at the supplied monotonic time.
     pub fn error_bound(&self, monotonic: zx::MonotonicTime) -> u64 {
         // Cast to i128 to avoid overflows in multiplication.
-        let monotonic_difference = (monotonic.into_nanos() - self.monotonic_offset) as i128;
+        let monotonic_difference = (monotonic - self.monotonic_offset).into_nanos() as i128;
         if monotonic_difference <= 0 {
             // Assume the error bound was fixed at the supplied value before the reference time.
             self.error_bound_at_offset
@@ -55,14 +55,14 @@ impl Transform {
 
     /// Returns the synthetic time on this `Transform` minus the synthetic time on `other`,
     /// calculated at the supplied monotonic time.
-    pub fn difference(&self, other: &Transform, monotonic: zx::MonotonicTime) -> zx::Duration {
+    pub fn difference(&self, other: &Self, monotonic: zx::MonotonicTime) -> zx::Duration {
         self.synthetic(monotonic) - other.synthetic(monotonic)
     }
 
     /// Returns a `ClockUpdate` that will set a `Clock` onto this `Transform` using data
     /// from the supplied monotonic time.
-    pub fn jump_to(&self, monotonic: zx::MonotonicTime) -> zx::ClockUpdate {
-        zx::ClockUpdate::builder()
+    pub fn jump_to(&self, monotonic: zx::MonotonicTime) -> zx::ClockUpdate<Output> {
+        zx::ClockUpdate::<Output>::builder()
             .absolute_value(monotonic, self.synthetic(monotonic))
             .rate_adjust(self.rate_adjust_ppm)
             .error_bounds(self.error_bound(monotonic))
@@ -70,8 +70,8 @@ impl Transform {
     }
 }
 
-impl From<&zx::Clock> for Transform {
-    fn from(clock: &zx::Clock) -> Self {
+impl<Output: zx::Timeline> From<&zx::Clock<Output>> for Transform<Output> {
+    fn from(clock: &zx::Clock<Output>) -> Self {
         // Clock read failures should only be caused by an invalid clock object.
         let details = clock.get_details().expect("failed to get clock details");
         // Cast to i64 to avoid overflows in multiplication.
@@ -81,8 +81,8 @@ impl From<&zx::Clock> for Transform {
             ((synthetic_ticks * MILLION as i64) / reference_ticks) - MILLION as i64;
 
         Transform {
-            monotonic_offset: details.mono_to_synthetic.reference_offset.into_nanos(),
-            synthetic_offset: details.mono_to_synthetic.synthetic_offset.into_nanos(),
+            monotonic_offset: details.mono_to_synthetic.reference_offset,
+            synthetic_offset: details.mono_to_synthetic.synthetic_offset,
             rate_adjust_ppm: rate_adjust_ppm as i32,
             // Zircon clocks don't document the change in error over time. Assume a fixed error.
             error_bound_at_offset: details.error_bounds,
@@ -94,7 +94,10 @@ impl From<&zx::Clock> for Transform {
 /// Returns the time on the clock at a given monotonic reference time. This calculates the time
 /// based on the clock transform definition, which only contains the most recent segment. This
 /// is only useful for calculating the time for monotonic times close to the current time.
-pub fn time_at_monotonic(clock: &zx::Clock, monotonic: zx::MonotonicTime) -> zx::SyntheticTime {
+pub fn time_at_monotonic<T: zx::Timeline>(
+    clock: &zx::Clock<T>,
+    monotonic: zx::MonotonicTime,
+) -> zx::Time<T> {
     let monotonic_reference = monotonic.into_nanos() as i128;
     // Clock read failures should only be caused by an invalid clock object.
     let details = clock.get_details().expect("failed to get clock details");
@@ -107,7 +110,7 @@ pub fn time_at_monotonic(clock: &zx::Clock, monotonic: zx::MonotonicTime) -> zx:
 
     let time_nanos = ((monotonic_reference - reference_offset) * synthetic_ticks / reference_ticks)
         + synthetic_offset;
-    zx::SyntheticTime::from_nanos(time_nanos as i64)
+    zx::Time::from_nanos(time_nanos as i64)
 }
 
 #[cfg(test)]
@@ -131,8 +134,10 @@ mod test {
     #[fuchsia::test]
     fn transform_properties_zero_rate_adjust() {
         let transform = Transform {
-            monotonic_offset: TEST_REFERENCE.into_nanos(),
-            synthetic_offset: (TEST_REFERENCE + TEST_OFFSET).into_nanos(),
+            monotonic_offset: TEST_REFERENCE,
+            synthetic_offset: zx::SyntheticTime::from_nanos(
+                (TEST_REFERENCE + TEST_OFFSET).into_nanos(),
+            ),
             rate_adjust_ppm: 0,
             error_bound_at_offset: TEST_ERROR_BOUND,
             error_bound_growth_ppm: TEST_ERROR_BOUND_GROWTH,
@@ -162,8 +167,10 @@ mod test {
     #[fuchsia::test]
     fn transform_properties_positive_rate_adjust() {
         let transform = Transform {
-            monotonic_offset: TEST_REFERENCE.into_nanos(),
-            synthetic_offset: (TEST_REFERENCE + TEST_OFFSET).into_nanos(),
+            monotonic_offset: TEST_REFERENCE,
+            synthetic_offset: zx::SyntheticTime::from_nanos(
+                (TEST_REFERENCE + TEST_OFFSET).into_nanos(),
+            ),
             rate_adjust_ppm: 25,
             error_bound_at_offset: TEST_ERROR_BOUND,
             error_bound_growth_ppm: 0,
@@ -190,8 +197,10 @@ mod test {
     #[fuchsia::test]
     fn transform_properties_negative_rate_adjust() {
         let transform = Transform {
-            monotonic_offset: TEST_REFERENCE.into_nanos(),
-            synthetic_offset: (TEST_REFERENCE + TEST_OFFSET).into_nanos(),
+            monotonic_offset: TEST_REFERENCE,
+            synthetic_offset: zx::SyntheticTime::from_nanos(
+                (TEST_REFERENCE + TEST_OFFSET).into_nanos(),
+            ),
             rate_adjust_ppm: -50,
             error_bound_at_offset: TEST_ERROR_BOUND,
             error_bound_growth_ppm: TEST_ERROR_BOUND_GROWTH,
@@ -221,16 +230,18 @@ mod test {
     #[fuchsia::test]
     fn transform_difference() {
         let transform_1 = Transform {
-            monotonic_offset: TEST_REFERENCE.into_nanos(),
-            synthetic_offset: (TEST_REFERENCE + TEST_OFFSET).into_nanos(),
+            monotonic_offset: TEST_REFERENCE,
+            synthetic_offset: zx::SyntheticTime::from_nanos(
+                (TEST_REFERENCE + TEST_OFFSET).into_nanos(),
+            ),
             rate_adjust_ppm: 25,
             error_bound_at_offset: TEST_ERROR_BOUND,
             error_bound_growth_ppm: TEST_ERROR_BOUND_GROWTH,
         };
 
         let transform_2 = Transform {
-            monotonic_offset: TEST_REFERENCE.into_nanos(),
-            synthetic_offset: TEST_REFERENCE.into_nanos(),
+            monotonic_offset: TEST_REFERENCE,
+            synthetic_offset: zx::SyntheticTime::from_nanos(TEST_REFERENCE.into_nanos()),
             rate_adjust_ppm: -50,
             error_bound_at_offset: TEST_ERROR_BOUND,
             error_bound_growth_ppm: 0,
@@ -255,8 +266,10 @@ mod test {
     #[fuchsia::test]
     fn transform_conversion() {
         let transform = Transform {
-            monotonic_offset: TEST_REFERENCE.into_nanos(),
-            synthetic_offset: (TEST_REFERENCE + TEST_OFFSET).into_nanos(),
+            monotonic_offset: TEST_REFERENCE,
+            synthetic_offset: zx::SyntheticTime::from_nanos(
+                (TEST_REFERENCE + TEST_OFFSET).into_nanos(),
+            ),
             rate_adjust_ppm: -15,
             error_bound_at_offset: TEST_ERROR_BOUND,
             error_bound_growth_ppm: 0,

@@ -146,6 +146,7 @@ impl EqWithAny for Event {
 mod test {
     use super::*;
     use crate::enums::{InitialClockState, StartClockSource, Track};
+    use fuchsia_runtime::UtcTime;
 
     const INITIALIZATION_EVENT: Event =
         Event::Initialized { clock_state: InitialClockState::NotSet };
@@ -177,7 +178,7 @@ mod test {
         let test_event = Event::KalmanFilterUpdated {
             track: Track::Monitor,
             monotonic: zx::MonotonicTime::from_nanos(1234_000_000_000),
-            utc: zx::SyntheticTime::from_nanos(2345_000_000_000),
+            utc: UtcTime::from_nanos(2345_000_000_000),
             sqrt_covariance: zx::Duration::from_millis(321),
         };
 
@@ -187,7 +188,7 @@ mod test {
         diagnostics.assert_events(&[Event::KalmanFilterUpdated {
             track: Track::Monitor,
             monotonic: any_time(),
-            utc: zx::SyntheticTime::from_nanos(2345_000_000_000),
+            utc: UtcTime::from_nanos(2345_000_000_000),
             sqrt_covariance: zx::Duration::from_millis(321),
         }]);
 
@@ -201,7 +202,7 @@ mod test {
         diagnostics.assert_events(&[Event::KalmanFilterUpdated {
             track: Track::Monitor,
             monotonic: zx::MonotonicTime::from_nanos(1234_000_000_000),
-            utc: zx::SyntheticTime::from_nanos(2345_000_000_000),
+            utc: UtcTime::from_nanos(2345_000_000_000),
             sqrt_covariance: ANY_DURATION,
         }]);
 

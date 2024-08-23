@@ -12,6 +12,7 @@ use fidl_fuchsia_time_external::Status;
 use fuchsia_inspect::{
     Inspector, IntProperty, Node, NumericProperty, Property, StringProperty, UintProperty,
 };
+use fuchsia_runtime::{UtcClock, UtcTime, UtcTimeline};
 use fuchsia_sync::Mutex;
 use fuchsia_zircon as zx;
 use futures::FutureExt;
@@ -82,28 +83,28 @@ impl<T: InspectWritable + Default> CircularBuffer<T> {
 pub struct TimeSet {
     /// The ZX_CLOCK_MONOTONIC time, in ns.
     monotonic: i64,
-    /// The UTC zx::Clock time, in ns.
+    /// The UTC UtcClock time, in ns.
     clock_utc: i64,
 }
 
 impl TimeSet {
     /// Creates a new `TimeSet` set to current time.
-    pub fn now(clock: &zx::Clock) -> Self {
+    pub fn now(clock: &UtcClock) -> Self {
         TimeSet {
             monotonic: monotonic_time(),
-            clock_utc: clock.read().map(zx::SyntheticTime::into_nanos).unwrap_or(FAILED_TIME),
+            clock_utc: clock.read().map(UtcTime::into_nanos).unwrap_or(FAILED_TIME),
         }
     }
 }
 
-/// A representation of a single update to a UTC zx::Clock.
+/// A representation of a single update to a UTC UtcClock.
 #[derive(InspectWritable)]
 pub struct ClockDetails {
     /// The monotonic time at which the details were retrieved. Note this is the time the Rust
     /// object was created, which may not exactly match the time its contents were supplied by
     /// the kernel.
     retrieval_monotonic: i64,
-    /// The generation counter as documented in the zx::Clock.
+    /// The generation counter as documented in the UtcClock.
     generation_counter: u32,
     /// The monotonic time from the monotonic-UTC correspondence pair, in ns.
     monotonic_offset: i64,
@@ -112,7 +113,7 @@ pub struct ClockDetails {
     /// The ratio between UTC tick rate and monotonic tick rate in parts per million, expressed as
     /// a PPM deviation from nominal. A positive number means UTC is running faster than monotonic.
     rate_ppm: i32,
-    /// The error bounds as documented in the zx::Clock.
+    /// The error bounds as documented in the UtcClock.
     error_bounds: u64,
     /// The reason this clock update occurred, if known.
     reason: Option<ClockUpdateReason>,
@@ -126,8 +127,8 @@ impl ClockDetails {
     }
 }
 
-impl From<zx::ClockDetails> for ClockDetails {
-    fn from(details: zx::ClockDetails) -> ClockDetails {
+impl From<zx::ClockDetails<UtcTimeline>> for ClockDetails {
+    fn from(details: zx::ClockDetails<UtcTimeline>) -> ClockDetails {
         // Handle the potential for a divide by zero in an unset rate.
         let rate_ppm = match (
             details.mono_to_synthetic.rate.synthetic_ticks,
@@ -161,11 +162,7 @@ struct RealTimeClockNode {
 
 impl RealTimeClockNode {
     /// Constructs a new `RealTimeClockNode`, recording the initial state.
-    pub fn new(
-        node: Node,
-        outcome: InitializeRtcOutcome,
-        initial_time: Option<zx::SyntheticTime>,
-    ) -> Self {
+    pub fn new(node: Node, outcome: InitializeRtcOutcome, initial_time: Option<UtcTime>) -> Self {
         node.record_string("initialization", format!("{:?}", outcome));
         if let Some(time) = initial_time {
             node.record_int("initial_time", time.into_nanos());
@@ -295,14 +292,14 @@ struct TrackNode {
     /// The number of frequency window discards for each failure mode.
     frequency_discard_counters: HashMap<FrequencyDiscardReason, UintProperty>,
     /// The clock used to determine the result of a clock update operation.
-    clock: Arc<zx::Clock>,
+    clock: Arc<UtcClock>,
     /// The inspect `Node` these fields are exported to.
     node: Node,
 }
 
 impl TrackNode {
     /// Constructs a new `TrackNode`.
-    pub fn new(node: Node, clock: Arc<zx::Clock>) -> Self {
+    pub fn new(node: Node, clock: Arc<UtcClock>) -> Self {
         TrackNode {
             filter_states: CircularBuffer::new(FILTER_STATE_COUNT, "filter_state_", &node),
             frequencies: CircularBuffer::new(FREQUENCY_COUNT, "frequency_", &node),
@@ -331,7 +328,7 @@ impl TrackNode {
     pub fn update_filter_state(
         &mut self,
         monotonic: zx::MonotonicTime,
-        utc: zx::SyntheticTime,
+        utc: UtcTime,
         sqrt_covariance: zx::Duration,
     ) {
         let filter_state = KalmanFilterState {
@@ -568,13 +565,10 @@ mod tests {
     }
 
     /// Creates a new wrapped clock set to backstop time.
-    fn create_clock() -> Arc<zx::Clock> {
+    fn create_clock() -> Arc<UtcClock> {
         Arc::new(
-            zx::Clock::create(
-                zx::ClockOpts::empty(),
-                Some(zx::SyntheticTime::from_nanos(BACKSTOP_TIME)),
-            )
-            .unwrap(),
+            UtcClock::create(zx::ClockOpts::empty(), Some(UtcTime::from_nanos(BACKSTOP_TIME)))
+                .unwrap(),
         )
     }
 
@@ -583,7 +577,7 @@ mod tests {
     fn create_test_object(
         inspector: &Inspector,
         include_monitor: bool,
-    ) -> (InspectDiagnostics, Arc<zx::Clock>) {
+    ) -> (InspectDiagnostics, Arc<UtcClock>) {
         let primary = PrimaryTrack {
             time_source: FakePushTimeSource::failing().into(),
             clock: create_clock(),
@@ -666,11 +660,8 @@ mod tests {
         let monotonic_time = zx::MonotonicTime::get();
         clock
             .update(
-                zx::ClockUpdate::builder()
-                    .absolute_value(
-                        monotonic_time,
-                        zx::SyntheticTime::from_nanos(BACKSTOP_TIME + 1234),
-                    )
+                zx::ClockUpdate::<UtcTimeline>::builder()
+                    .absolute_value(monotonic_time, UtcTime::from_nanos(BACKSTOP_TIME + 1234))
                     .rate_adjust(0)
                     .error_bounds(0),
             )
@@ -681,11 +672,8 @@ mod tests {
         let monotonic_time = zx::MonotonicTime::get();
         clock
             .update(
-                zx::ClockUpdate::builder()
-                    .absolute_value(
-                        monotonic_time,
-                        zx::SyntheticTime::from_nanos(BACKSTOP_TIME + 2345),
-                    )
+                zx::ClockUpdate::<UtcTimeline>::builder()
+                    .absolute_value(monotonic_time, UtcTime::from_nanos(BACKSTOP_TIME + 2345))
                     .rate_adjust(RATE_ADJUST)
                     .error_bounds(ERROR_BOUNDS),
             )
@@ -727,7 +715,7 @@ mod tests {
         let (inspect_diagnostics, _) = create_test_object(&inspector, false);
         inspect_diagnostics.record(Event::InitializeRtc {
             outcome: InitializeRtcOutcome::Succeeded,
-            time: Some(zx::SyntheticTime::from_nanos(RTC_INITIAL_TIME)),
+            time: Some(UtcTime::from_nanos(RTC_INITIAL_TIME)),
         });
         assert_data_tree!(
             inspector,
@@ -861,7 +849,7 @@ mod tests {
             test.record(Event::KalmanFilterUpdated {
                 track: Track::Primary,
                 monotonic: zx::MonotonicTime::ZERO + OFFSET * i,
-                utc: zx::SyntheticTime::from_nanos(BACKSTOP_TIME) + OFFSET * i,
+                utc: UtcTime::from_nanos(BACKSTOP_TIME) + OFFSET * i,
                 sqrt_covariance: zx::Duration::from_nanos(SQRT_COVARIANCE) * i,
             });
             test.record(Event::FrequencyUpdated {

@@ -28,6 +28,7 @@ use anyhow::{Context as _, Result};
 use chrono::prelude::*;
 use fidl::AsHandleRef;
 use fuchsia_component::server::ServiceFs;
+use fuchsia_runtime::{UtcClock, UtcTimeline};
 use futures::channel::mpsc;
 use futures::future::{self, OptionFuture};
 use futures::stream::StreamExt as _;
@@ -178,16 +179,16 @@ const COBALT_EXPERIMENT: TimeMetricDimensionExperiment = TimeMetricDimensionExpe
 /// The information required to maintain UTC for the primary track.
 struct PrimaryTrack {
     time_source: TimeSource,
-    clock: Arc<zx::Clock>,
+    clock: Arc<UtcClock>,
 }
 
 /// The information required to maintain UTC for the monitor track.
 struct MonitorTrack {
     time_source: TimeSource,
-    clock: Arc<zx::Clock>,
+    clock: Arc<UtcClock>,
 }
 
-fn koid_of(c: &zx::Clock) -> u64 {
+fn koid_of(c: &UtcClock) -> u64 {
     c.as_handle_ref().get_koid().expect("infallible").raw_koid()
 }
 
@@ -202,12 +203,11 @@ async fn main() -> Result<()> {
     info!("retrieving UTC clock handle");
     let time_maintainer =
         fuchsia_component::client::connect_to_protocol::<ftime::MaintenanceMarker>().unwrap();
-    let utc_clock = zx::Clock::from(
-        time_maintainer
-            .get_writable_utc_clock()
-            .await
-            .context("failed to get UTC clock from maintainer")?,
-    );
+    let utc_clock = time_maintainer
+        .get_writable_utc_clock()
+        .await
+        .context("failed to get UTC clock from maintainer")?
+        .cast();
     debug!("utc_clock handle with koid: {}", koid_of(&utc_clock));
 
     let time_source_urls = TimeSourceUrls {
@@ -311,18 +311,18 @@ async fn main() -> Result<()> {
 
 /// Creates a new userspace clock for use in the monitor track, set to the same backstop time as
 /// the supplied primary clock.
-fn create_monitor_clock(primary_clock: &zx::Clock) -> zx::Clock {
-    // Note: Failure should not be possible from a valid zx::Clock.
+fn create_monitor_clock(primary_clock: &UtcClock) -> UtcClock {
+    // Note: Failure should not be possible from a valid UtcClock.
     let backstop = primary_clock.get_details().expect("failed to get UTC clock details").backstop;
     // Note: Only failure mode is an OOM which we handle via panic.
-    zx::Clock::create(zx::ClockOpts::empty(), Some(backstop))
+    UtcClock::create(zx::ClockOpts::empty(), Some(backstop))
         .expect("failed to create new monitor clock")
 }
 
 /// Determines whether the supplied clock has previously been set.
 /// Returns the clock state and the backstop.
-fn initial_clock_state(utc_clock: &zx::Clock) -> (InitialClockState, zx::ClockDetails) {
-    // Note: Failure should not be possible from a valid zx::Clock.
+fn initial_clock_state(utc_clock: &UtcClock) -> (InitialClockState, zx::ClockDetails<UtcTimeline>) {
+    // Note: Failure should not be possible from a valid UtcClock.
     let clock_details = utc_clock.get_details().expect("failed to get UTC clock details");
     // When the clock is first initialized to the backstop time, its synthetic offset should
     // be identical. Once the clock is updated, this is no longer true.
@@ -344,7 +344,7 @@ fn initial_clock_state(utc_clock: &zx::Clock) -> (InitialClockState, zx::ClockDe
 ///   backstop.
 async fn set_clock_from_rtc<R: Rtc, D: Diagnostics>(
     rtc: &R,
-    clock: &zx::Clock,
+    clock: &UtcClock,
     diagnostics: Arc<D>,
     force_start: bool,
 ) {
@@ -392,7 +392,7 @@ async fn set_clock_from_rtc<R: Rtc, D: Diagnostics>(
         time: Some(rtc_time),
     });
     if let Err(status) =
-        clock.update(zx::ClockUpdate::builder().absolute_value(mono_time, rtc_time))
+        clock.update(zx::ClockUpdate::<UtcTimeline>::builder().absolute_value(mono_time, rtc_time))
     {
         error!("failed to start UTC clock from RTC at time {}: {}", rtc_chrono, status);
     } else {
@@ -467,7 +467,7 @@ async fn maintain_utc<R: 'static, D: 'static>(
         info!("starting the UTC clock from backstop time, to handle legacy programs");
         debug!("`- synthetic (backstop+1): {:?}, reference (monotonic): {:?}", &b1, &mono);
         if let Err(status) =
-            primary.clock.update(zx::ClockUpdate::builder().absolute_value(mono, b1))
+            primary.clock.update(zx::ClockUpdate::<UtcTimeline>::builder().absolute_value(mono, b1))
         {
             warn!("failed to start UTC clock from backstop time: {}", &status);
             // If we got here, the UTC clock is not started yet. We might have better luck with
@@ -552,6 +552,7 @@ mod tests {
     use crate::enums::WriteRtcOutcome;
     use crate::rtc::FakeRtc;
     use crate::time_source::{Event as TimeSourceEvent, FakePushTimeSource, Sample};
+    use fuchsia_runtime::UtcTime;
     use futures::FutureExt;
     use lazy_static::lazy_static;
     use std::matches;
@@ -562,12 +563,9 @@ mod tests {
     const OFFSET: zx::Duration = zx::Duration::from_seconds(1111_000);
     const OFFSET_2: zx::Duration = zx::Duration::from_seconds(1111_333);
     const STD_DEV: zx::Duration = zx::Duration::from_millis(44);
-    const INVALID_RTC_TIME: zx::SyntheticTime =
-        zx::SyntheticTime::from_nanos(111111 * NANOS_PER_SECOND);
-    const BACKSTOP_TIME: zx::SyntheticTime =
-        zx::SyntheticTime::from_nanos(222222 * NANOS_PER_SECOND);
-    const VALID_RTC_TIME: zx::SyntheticTime =
-        zx::SyntheticTime::from_nanos(333333 * NANOS_PER_SECOND);
+    const INVALID_RTC_TIME: UtcTime = UtcTime::from_nanos(111111 * NANOS_PER_SECOND);
+    const BACKSTOP_TIME: UtcTime = UtcTime::from_nanos(222222 * NANOS_PER_SECOND);
+    const VALID_RTC_TIME: UtcTime = UtcTime::from_nanos(333333 * NANOS_PER_SECOND);
 
     lazy_static! {
         static ref CLOCK_OPTS: zx::ClockOpts = zx::ClockOpts::empty();
@@ -575,9 +573,11 @@ mod tests {
 
     /// Creates and starts a new clock with default options, returning a tuple of the clock and its
     /// initial update time in ticks.
-    fn create_clock() -> (Arc<zx::Clock>, i64) {
-        let clock = zx::Clock::create(*CLOCK_OPTS, Some(BACKSTOP_TIME)).unwrap();
-        clock.update(zx::ClockUpdate::builder().approximate_value(BACKSTOP_TIME)).unwrap();
+    fn create_clock() -> (Arc<UtcClock>, i64) {
+        let clock = UtcClock::create(*CLOCK_OPTS, Some(BACKSTOP_TIME)).unwrap();
+        clock
+            .update(zx::ClockUpdate::<UtcTimeline>::builder().approximate_value(BACKSTOP_TIME))
+            .unwrap();
         let initial_update_ticks = clock.get_details().unwrap().last_value_update_ticks;
         (Arc::new(clock), initial_update_ticks)
     }
@@ -649,7 +649,7 @@ mod tests {
                 time_source: FakePushTimeSource::events(vec![
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Ok },
                     TimeSourceEvent::from(Sample::new(
-                        zx::SyntheticTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
+                        UtcTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                         monotonic_ref,
                         STD_DEV,
                     )),
@@ -662,7 +662,7 @@ mod tests {
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Network },
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Ok },
                     TimeSourceEvent::from(Sample::new(
-                        zx::SyntheticTime::from_nanos((monotonic_ref + OFFSET_2).into_nanos()),
+                        UtcTime::from_nanos((monotonic_ref + OFFSET_2).into_nanos()),
                         monotonic_ref,
                         STD_DEV,
                     )),
@@ -694,7 +694,7 @@ mod tests {
             Event::KalmanFilterUpdated {
                 track: Track::Primary,
                 monotonic: monotonic_ref,
-                utc: zx::SyntheticTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
+                utc: UtcTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                 sqrt_covariance: STD_DEV,
             },
             Event::StartClock {
@@ -707,7 +707,7 @@ mod tests {
             Event::KalmanFilterUpdated {
                 track: Track::Monitor,
                 monotonic: monotonic_ref,
-                utc: zx::SyntheticTime::from_nanos((monotonic_ref + OFFSET_2).into_nanos()),
+                utc: UtcTime::from_nanos((monotonic_ref + OFFSET_2).into_nanos()),
                 sqrt_covariance: STD_DEV,
             },
             Event::StartClock {
@@ -737,7 +737,7 @@ mod tests {
                 time_source: FakePushTimeSource::events(vec![
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Ok },
                     TimeSourceEvent::from(Sample::new(
-                        zx::SyntheticTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
+                        UtcTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                         monotonic_ref,
                         STD_DEV,
                     )),
@@ -784,7 +784,7 @@ mod tests {
             Event::KalmanFilterUpdated {
                 track: Track::Primary,
                 monotonic: monotonic_ref,
-                utc: zx::SyntheticTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
+                utc: UtcTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                 sqrt_covariance: STD_DEV,
             },
             Event::StartClock {
@@ -813,7 +813,7 @@ mod tests {
                 time_source: FakePushTimeSource::events(vec![
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Ok },
                     TimeSourceEvent::from(Sample::new(
-                        zx::SyntheticTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
+                        UtcTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                         monotonic_ref,
                         STD_DEV,
                     )),
@@ -997,7 +997,7 @@ mod tests {
         let (clock, _) = create_clock();
         clock
             .update(
-                zx::ClockUpdate::builder()
+                zx::ClockUpdate::<UtcTimeline>::builder()
                     .approximate_value(BACKSTOP_TIME + zx::Duration::from_millis(1)),
             )
             .unwrap();
@@ -1041,12 +1041,12 @@ mod tests {
     #[fuchsia::test]
     fn test_initial_clock_state() {
         let clock =
-            zx::Clock::create(zx::ClockOpts::empty(), Some(zx::SyntheticTime::from_nanos(1_000)))
-                .unwrap();
+            UtcClock::create(zx::ClockOpts::empty(), Some(UtcTime::from_nanos(1_000))).unwrap();
         // The clock must be started with an initial value.
         clock
             .update(
-                zx::ClockUpdate::builder().approximate_value(zx::SyntheticTime::from_nanos(1_000)),
+                zx::ClockUpdate::<UtcTimeline>::builder()
+                    .approximate_value(UtcTime::from_nanos(1_000)),
             )
             .unwrap();
         let (state, _) = initial_clock_state(&clock);
@@ -1055,8 +1055,8 @@ mod tests {
         // Update the clock, which is already running.
         clock
             .update(
-                zx::ClockUpdate::builder()
-                    .approximate_value(zx::SyntheticTime::from_nanos(1_000_000)),
+                zx::ClockUpdate::<UtcTimeline>::builder()
+                    .approximate_value(UtcTime::from_nanos(1_000_000)),
             )
             .unwrap();
         let (state, _) = initial_clock_state(&clock);

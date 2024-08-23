@@ -11,6 +11,7 @@ use crate::time_source::Sample;
 use crate::Config;
 use chrono::prelude::*;
 use frequency::FrequencyEstimator;
+use fuchsia_runtime::UtcTimeline;
 use fuchsia_zircon as zx;
 use kalman_filter::KalmanFilter;
 use std::sync::Arc;
@@ -130,7 +131,7 @@ impl<D: Diagnostics> Estimator<D> {
 
     /// Returns a `Transform` describing the estimated synthetic time and error as a function
     /// of the monotonic time.
-    pub fn transform(&self) -> Transform {
+    pub fn transform(&self) -> Transform<UtcTimeline> {
         self.filter.transform()
     }
 }
@@ -140,6 +141,7 @@ mod test {
     use super::*;
     use crate::diagnostics::FakeDiagnostics;
     use crate::make_test_config;
+    use fuchsia_runtime::UtcTime;
     use fuchsia_zircon::{self as zx, DurationNum};
     use test_util::assert_near;
 
@@ -161,7 +163,7 @@ mod test {
         Event::KalmanFilterUpdated {
             track: TEST_TRACK,
             monotonic: monotonic,
-            utc: zx::SyntheticTime::from_nanos((monotonic + offset).into_nanos()),
+            utc: UtcTime::from_nanos((monotonic + offset).into_nanos()),
             sqrt_covariance: zx::Duration::from_nanos(sqrt_covariance as i64),
         }
     }
@@ -194,11 +196,7 @@ mod test {
         let diagnostics = Arc::new(FakeDiagnostics::new());
         let estimator = Estimator::new(
             TEST_TRACK,
-            Sample::new(
-                zx::SyntheticTime::from_nanos((TIME_1 + OFFSET_1).into_nanos()),
-                TIME_1,
-                STD_DEV_1,
-            ),
+            Sample::new(UtcTime::from_nanos((TIME_1 + OFFSET_1).into_nanos()), TIME_1, STD_DEV_1),
             Arc::clone(&diagnostics),
             Arc::clone(&config),
         );
@@ -222,16 +220,12 @@ mod test {
         let config = make_test_config();
         let mut estimator = Estimator::new(
             TEST_TRACK,
-            Sample::new(
-                zx::SyntheticTime::from_nanos((TIME_1 + OFFSET_1).into_nanos()),
-                TIME_1,
-                STD_DEV_1,
-            ),
+            Sample::new(UtcTime::from_nanos((TIME_1 + OFFSET_1).into_nanos()), TIME_1, STD_DEV_1),
             Arc::clone(&diagnostics),
             config,
         );
         estimator.update(Sample::new(
-            zx::SyntheticTime::from_nanos((TIME_2 + OFFSET_2).into_nanos()),
+            UtcTime::from_nanos((TIME_2 + OFFSET_2).into_nanos()),
             TIME_2,
             STD_DEV_1,
         ));
@@ -261,16 +255,12 @@ mod test {
         let config = make_test_config();
         let mut estimator = Estimator::new(
             TEST_TRACK,
-            Sample::new(
-                zx::SyntheticTime::from_nanos((TIME_1 + OFFSET_1).into_nanos()),
-                TIME_1,
-                STD_DEV_1,
-            ),
+            Sample::new(UtcTime::from_nanos((TIME_1 + OFFSET_1).into_nanos()), TIME_1, STD_DEV_1),
             Arc::clone(&diagnostics),
             config,
         );
         estimator.update(Sample::new(
-            zx::SyntheticTime::from_nanos((TIME_2 + OFFSET_1).into_nanos()),
+            UtcTime::from_nanos((TIME_2 + OFFSET_1).into_nanos()),
             TIME_2,
             STD_DEV_1,
         ));
@@ -297,11 +287,7 @@ mod test {
         let config = make_test_config();
         let mut estimator = Estimator::new(
             TEST_TRACK,
-            Sample::new(
-                zx::SyntheticTime::from_nanos((TIME_2 + OFFSET_1).into_nanos()),
-                TIME_2,
-                STD_DEV_1,
-            ),
+            Sample::new(UtcTime::from_nanos((TIME_2 + OFFSET_1).into_nanos()), TIME_2, STD_DEV_1),
             Arc::clone(&diagnostics),
             config,
         );
@@ -310,7 +296,7 @@ mod test {
             (TIME_3 + OFFSET_1).into_nanos(),
         );
         estimator.update(Sample::new(
-            zx::SyntheticTime::from_nanos((TIME_1 + OFFSET_2).into_nanos()),
+            UtcTime::from_nanos((TIME_1 + OFFSET_2).into_nanos()),
             TIME_1,
             STD_DEV_1,
         ));
@@ -327,11 +313,8 @@ mod test {
     #[fuchsia::test]
     fn frequency_convergence() {
         // Generate two days of samples at a fixed, slightly erroneous, frequency.
-        let reference_sample = Sample::new(
-            zx::SyntheticTime::from_nanos((TIME_1 + OFFSET_1).into_nanos()),
-            TIME_2,
-            STD_DEV_1,
-        );
+        let reference_sample =
+            Sample::new(UtcTime::from_nanos((TIME_1 + OFFSET_1).into_nanos()), TIME_2, STD_DEV_1);
         let mut samples = Vec::<Sample>::new();
         {
             let test_frequency = 1.000003;
