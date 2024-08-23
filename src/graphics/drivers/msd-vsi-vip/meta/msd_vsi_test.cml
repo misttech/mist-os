@@ -9,7 +9,7 @@
     ],
     program: {
         runner: "driver",
-        bind: "meta/bind/msd_vsi_test_bind.bindbc",
+        bind: "meta/bind/msd_vsi_bind.bindbc",
         colocate: "true",
         compat: "driver/libmsd_vsi_test.so",
         default_dispatcher_opts: [ "allow_sync_calls" ],

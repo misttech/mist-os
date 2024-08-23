@@ -28,6 +28,11 @@ source_set("magma_vsi_exec") {
 }
 
 test("msd_vsi_vip_integration_tests") {
+  defines = [
+    "VSI_TEST_DRIVER_PACKAGE=\"fuchsia.com/msd-vsi-vip-integration-tests\"",
+    "VSI_PRODUCTION_DRIVER_PACKAGE=\"fuchsia.com/msd-vsi-vip\"",
+  ]
+
   sources = [
     "run_unit_tests.cc",
     "test_vsi_icd.cc",
@@ -36,7 +41,12 @@ test("msd_vsi_vip_integration_tests") {
 
   deps = [
     ":magma_vsi_exec",
+    "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_cpp",
+    "//sdk/fidl/fuchsia.driver.registrar:fuchsia.driver.registrar_cpp",
     "//sdk/fidl/fuchsia.gpu.magma:fuchsia.gpu.magma_cpp",
+    "//sdk/fidl/fuchsia.hardware.gpu.mali:fuchsia.hardware.gpu.mali_cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/magma_client:magma_headers",
     "//src/graphics/drivers/msd-vsi-vip/include",
     "//src/graphics/lib/magma/src/libmagma",
     "//src/graphics/magma/lib/magma/platform:buffer",
@@ -50,7 +60,10 @@ test("msd_vsi_vip_integration_tests") {
 
 fuchsia_unittest_package("msd-vsi-vip-integration-tests") {
   manifest = "meta/msd_vsi_vip_integration_tests.cml"
-  deps = [ ":msd_vsi_vip_integration_tests" ]
+  deps = [
+    ":msd_vsi_vip_integration_tests",
+    "//src/graphics/drivers/msd-vsi-vip:msd_vsi_test",
+  ]
   test_specs = {
     environments = [
       sherlock_env,

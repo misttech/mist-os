@@ -111,22 +111,13 @@ source_set("msd_vsi_test_entry") {
   defines = [ "MAGMA_TEST_DRIVER=1" ]
 
   deps = entry_deps + [
-           ":msd_vsi_test_bind",
+           ":msd_vsi_bind",
            "src",
            "tests/unit_tests:hardware_tests",
            "//src/graphics/magma/lib/magma_service/test_util:platform_device_helper",
            "//src/graphics/magma/lib/magma_service/test_util:platform_msd_device_helper",
            "//third_party/googletest:gtest",
          ]
-}
-
-driver_bind_rules("msd_vsi_test_bind") {
-  rules = "meta/msd_vsi_test.bind"
-  disable_autobind = true
-  deps = [
-    "//src/devices/bind/fuchsia.platform",
-    "//src/devices/bind/fuchsia.verisilicon.platform",
-  ]
 }
 
 group("tests") {
