@@ -850,11 +850,6 @@ mod stub {
             self
         }
 
-        pub fn time_source(mut self, time_source: MockTimeSource) -> Self {
-            self.time_source = Some(time_source);
-            self
-        }
-
         pub fn with_current_channel(mut self, current_channel: Option<String>) -> Self {
             self.current_channel = current_channel;
             self
