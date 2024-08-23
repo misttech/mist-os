@@ -61,11 +61,6 @@ impl MonotonicTime {
         unsafe { Self::from_nanos(sys::zx_clock_get_monotonic()) }
     }
 
-    // TODO(https://fxbug.dev/360959987) remove
-    pub fn get_monotonic() -> Self {
-        Self::get()
-    }
-
     /// Compute a deadline for the time in the future that is the given `Duration` away.
     ///
     /// Wraps the
