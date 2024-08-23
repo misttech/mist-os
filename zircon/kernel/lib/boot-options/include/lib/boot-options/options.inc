@@ -826,7 +826,7 @@ that well behaved programs will not hit the limit, but low enough to terminate m
 before they impact the system.
 )""")
 
-DEFINE_OPTION("kernel.experimental.serial_migration", bool, experimental_serial_migration, {false},
+DEFINE_OPTION("kernel.experimental.serial_migration", bool, experimental_serial_migration, {true},
               R"""(
 **TODO(https://fxbug.dev/42170495)**
 

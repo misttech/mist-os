@@ -962,7 +962,7 @@ before they impact the system.
 
 ### kernel.experimental.serial_migration=\<bool>
 
-**Default:** `false`
+**Default:** `true`
 
 **TODO(https://fxbug.dev/42170495)**
 
