@@ -1990,17 +1990,6 @@ assembly_input_bundle("detect_user") {
 # (via the `:core_realm` AIB).  Each should list which feature_set_level and
 # build type that it is valid for.
 
-# Input groups
-#
-# feature_set_levels: minimal
-# build-types:all
-#
-# These AIBs are opaque groups of inputs that are common to many products, but
-# have not been organized into specific features yet.
-assembly_input_bundle("input_group_one") {
-  base_packages = [ "//src/sys/cache_manager" ]
-}
-
 ########
 #
 # Bluetooth Support
@@ -2705,6 +2694,15 @@ assembly_input_bundle("fshost_fvm_f2fs") {
     },
   ]
   bootfs_packages = [ "//src/storage/f2fs/bin:package" ]
+}
+
+# Automatic garbage collection for mutable storage
+#
+# feature_set_levels: minimal
+# build-types:all
+#
+assembly_input_bundle("storage_cache_manager") {
+  base_packages = [ "//src/sys/cache_manager" ]
 }
 
 assembly_input_bundle("system_update_checker") {

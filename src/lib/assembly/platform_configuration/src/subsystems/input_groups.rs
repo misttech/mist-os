@@ -13,7 +13,7 @@ impl DefineSubsystemConfiguration<InputGroupsConfig> for InputGroupsSubsystem {
         builder: &mut dyn ConfigurationBuilder,
     ) -> anyhow::Result<()> {
         if config.group1 {
-            builder.platform_bundle("input_group_one");
+            builder.platform_bundle("storage_cache_manager");
         }
         Ok(())
     }

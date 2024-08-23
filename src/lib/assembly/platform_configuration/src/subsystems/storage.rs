@@ -95,6 +95,14 @@ impl DefineSubsystemConfiguration<StorageConfig> for StorageSubsystemConfig {
             builder.platform_bundle("factory_data");
         }
 
+        if storage_config.mutable_storage_garbage_collection {
+            context.ensure_feature_set_level(
+                &[FeatureSupportLevel::Standard],
+                "Mutable storage garbage collection",
+            )?;
+            builder.platform_bundle("storage_cache_manager");
+        }
+
         // Collect the arguments from the board.
         let blobfs_max_bytes = context.board_info.filesystems.fvm.blobfs.maximum_bytes.unwrap_or(0);
         let blobfs_initial_inodes =

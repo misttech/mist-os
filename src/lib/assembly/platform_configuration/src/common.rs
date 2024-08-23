@@ -152,6 +152,18 @@ impl<'a> ConfigurationContext<'a> {
             );
         }
 
+        self.ensure_feature_set_level(feature_set_levels, item_name)
+    }
+
+    /// Ensure that the configuration context matches the give set of
+    /// feature-set-levels
+    ///
+    /// Returns an error if they do not, and Ok(()) if they do.
+    pub fn ensure_feature_set_level(
+        &self,
+        feature_set_levels: &[FeatureSupportLevel],
+        item_name: &str,
+    ) -> anyhow::Result<()> {
         if !feature_set_levels.contains(self.feature_set_level) {
             bail!(
                 "{} can only be enabled on the following feature sets, not '{}': [{}]",
