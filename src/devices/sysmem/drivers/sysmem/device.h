@@ -73,7 +73,6 @@ class Device final : public fdf::DriverBase,
  public:
   Device(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher);
   zx::result<> Start() override;
-  void PrepareStop(fdf::PrepareStopCompleter completer) override;
 
   ~Device() __TA_REQUIRES(*driver_checker_);
 
@@ -475,8 +474,6 @@ class Device final : public fdf::DriverBase,
   // in secure_allocators_. At that point secure_allocators_ owns the allocator and we reset() this
   // field.
   std::unique_ptr<ContiguousPooledMemoryAllocator> pending_protected_allocator_;
-
-  bool is_ddk_unbind_internal_called_ = false;
 };
 
 }  // namespace sysmem_driver
