@@ -197,13 +197,14 @@ struct VnodeAttributes {
   std::optional<uint32_t> mode;
   std::optional<uint32_t> uid;
   std::optional<uint32_t> gid;
+  std::optional<uint64_t> rdev;
 
   // Compare two |VnodeAttributes| instances for equality.
   bool operator==(const VnodeAttributes& other) const {
     return id == other.id && content_size == other.content_size &&
            storage_size == other.storage_size && link_count == other.link_count &&
            creation_time == other.creation_time && modification_time == other.modification_time &&
-           mode == other.mode;
+           mode == other.mode && uid == other.uid && gid == other.gid && rdev == other.rdev;
   }
 
   // Converts from |VnodeAttributes| to fuchsia.io v1 |NodeAttributes|.
@@ -224,6 +225,7 @@ struct VnodeAttributesUpdate {
   std::optional<uint32_t> mode;
   std::optional<uint32_t> uid;
   std::optional<uint32_t> gid;
+  std::optional<uint64_t> rdev;
 
   // Return a set of flags representing those attributes which we want to update.
   constexpr VnodeAttributesQuery Query() const {
@@ -243,6 +245,9 @@ struct VnodeAttributesUpdate {
     }
     if (gid) {
       query |= VnodeAttributesQuery::kGid;
+    }
+    if (rdev) {
+      query |= VnodeAttributesQuery::kRdev;
     }
 #endif
     return query;
@@ -278,6 +283,9 @@ struct VnodeAttributesUpdate {
     }
     if (attrs.has_gid()) {
       attr_update.gid = attrs.gid();
+    }
+    if (attrs.has_rdev()) {
+      attr_update.rdev = attrs.rdev();
     }
 #endif
     return attr_update;

@@ -88,7 +88,7 @@ class TestHarness : public fidl::Server<fio_test::Io1Harness> {
         fio::NodeAttributesQuery::kContentSize | fio::NodeAttributesQuery::kStorageSize |
         fio::NodeAttributesQuery::kId | fio::NodeAttributesQuery::kLinkCount |
         fio::NodeAttributesQuery::kMode | fio::NodeAttributesQuery::kUid |
-        fio::NodeAttributesQuery::kGid);
+        fio::NodeAttributesQuery::kGid | fio::NodeAttributesQuery::kRdev);
 
     completer.Reply(config);
   }

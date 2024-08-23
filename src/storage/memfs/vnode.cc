@@ -25,11 +25,10 @@ Vnode::~Vnode() { deleted_ino_ctr_.fetch_add(1, std::memory_order_relaxed); }
 fs::VnodeAttributesQuery Vnode::SupportedMutableAttributes() const {
   return fs::VnodeAttributesQuery::kCreationTime | fs::VnodeAttributesQuery::kModificationTime |
          fs::VnodeAttributesQuery::kMode | fs::VnodeAttributesQuery::kUid |
-         fs::VnodeAttributesQuery::kGid;
+         fs::VnodeAttributesQuery::kGid | fs::VnodeAttributesQuery::kRdev;
 }
 
 zx::result<> Vnode::UpdateAttributes(const fs::VnodeAttributesUpdate& attributes) {
-  // TODO(): Add support for POSIX mode/uid/gid.
   create_time_ = attributes.creation_time.value_or(create_time_);
   modify_time_ = attributes.modification_time.value_or(modify_time_);
   if (attributes.mode) {
@@ -40,6 +39,9 @@ zx::result<> Vnode::UpdateAttributes(const fs::VnodeAttributesUpdate& attributes
   }
   if (attributes.gid) {
     gid_ = attributes.gid;
+  }
+  if (attributes.rdev) {
+    rdev_ = attributes.rdev;
   }
   return zx::ok();
 }

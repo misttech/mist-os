@@ -57,6 +57,7 @@ class Vnode : public fs::PagedVnode {
   std::optional<uint32_t> mode_;
   std::optional<uint32_t> uid_;
   std::optional<uint32_t> gid_;
+  std::optional<uint64_t> rdev_;
 
   void VmoRead(uint64_t offset, uint64_t length) final { ZX_PANIC("Not supported"); }
   void VmoDirty(uint64_t offset, uint64_t length) final { ZX_PANIC("Not supported"); }
