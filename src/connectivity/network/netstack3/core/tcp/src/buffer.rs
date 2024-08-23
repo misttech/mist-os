@@ -21,6 +21,9 @@ use crate::internal::state::Takeable;
 
 /// Common super trait for both sending and receiving buffer.
 pub trait Buffer: Takeable + Debug + Sized {
+    /// Returns the capacity range `(min, max)` for this buffer type.
+    fn capacity_range() -> (usize, usize);
+
     /// Returns information about the number of bytes in the buffer.
     ///
     /// Returns a [`BufferLimits`] instance with information about the number of
@@ -336,6 +339,12 @@ impl RingBuffer {
 }
 
 impl Buffer for RingBuffer {
+    fn capacity_range() -> (usize, usize) {
+        // Arbitrarily chosen to satisfy tests so we have some semblance of
+        // clamping capacity in tests.
+        (16, 16 << 20)
+    }
+
     fn limits(&self) -> BufferLimits {
         let Self { storage, shrink, len, head: _ } = self;
         let capacity = storage.len() - shrink.as_ref().map_or(0, |r| r.current);
@@ -595,6 +604,10 @@ pub(crate) mod testutil {
     }
 
     impl Buffer for Arc<Mutex<RingBuffer>> {
+        fn capacity_range() -> (usize, usize) {
+            RingBuffer::capacity_range()
+        }
+
         fn limits(&self) -> BufferLimits {
             self.lock().limits()
         }
@@ -634,6 +647,11 @@ pub(crate) mod testutil {
     }
 
     impl Buffer for TestSendBuffer {
+        fn capacity_range() -> (usize, usize) {
+            let (min, max) = RingBuffer::capacity_range();
+            (min * 2, max * 2)
+        }
+
         fn limits(&self) -> BufferLimits {
             let Self { fake_stream, ring } = self;
             let BufferLimits { capacity: ring_capacity, len: ring_len } = ring.limits();

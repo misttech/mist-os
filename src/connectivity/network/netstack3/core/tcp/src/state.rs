@@ -2804,6 +2804,10 @@ mod test {
     struct NullBuffer;
 
     impl Buffer for NullBuffer {
+        fn capacity_range() -> (usize, usize) {
+            (usize::MIN, usize::MAX)
+        }
+
         fn limits(&self) -> BufferLimits {
             BufferLimits { len: 0, capacity: 0 }
         }
@@ -5114,6 +5118,10 @@ mod test {
     }
 
     impl<B: Buffer> Buffer for ReservingBuffer<B> {
+        fn capacity_range() -> (usize, usize) {
+            B::capacity_range()
+        }
+
         fn limits(&self) -> BufferLimits {
             self.buffer.limits()
         }

@@ -50,6 +50,7 @@ async fn main() {
     // TODO(https://fxbug.dev/42053067): maintain a separate receive buffer for
     // each socket to support multiple concurrent sockets over loopback.
     let mut receive_buffer_size = DEFAULT_BUFFER_SIZE;
+    let mut send_buffer_size = DEFAULT_BUFFER_SIZE;
     let mut loopback_receive_buffer = VecDeque::new();
     let mut icmp_echo_receive_buffer = VecDeque::new();
 
@@ -72,6 +73,7 @@ async fn main() {
                     &mut datagram_sockets,
                     &mut loopback_receive_buffer,
                     &mut receive_buffer_size,
+                    &mut send_buffer_size,
                     &mut icmp_echo_receive_buffer,
                 )
                 .await
@@ -483,6 +485,7 @@ async fn handle_datagram_request(
     sockets: &mut HashSet<fnet::SocketAddress>,
     loopback_receive_buffer: &mut VecDeque<(fnet::SocketAddress, Vec<u8>)>,
     receive_buffer_size: &mut u64,
+    send_buffer_size: &mut u64,
     icmp_echo_receive_buffer: &mut VecDeque<(fnet::SocketAddress, Vec<u8>)>,
 ) -> Result<(), anyhow::Error> {
     match request.context("receive request")? {
@@ -515,6 +518,18 @@ async fn handle_datagram_request(
                 );
             }
             info!("got close request for socket");
+        }
+        fposix_socket::SynchronousDatagramSocketRequest::GetSendBuffer { responder } => {
+            responder.send(Ok(*send_buffer_size)).context("send GetSendBuffer response")?;
+        }
+        fposix_socket::SynchronousDatagramSocketRequest::SetSendBuffer {
+            value_bytes,
+            responder,
+        } => {
+            // NB: the fake netstack doesn't actually enforce send buffer size.
+            *send_buffer_size = value_bytes;
+            info!("modified size of send buffer to {}", send_buffer_size);
+            responder.send(Ok(())).context("send SetSendBuffer response")?;
         }
         fposix_socket::SynchronousDatagramSocketRequest::GetReceiveBuffer { responder } => {
             responder.send(Ok(*receive_buffer_size)).context("send GetReceiveBuffer response")?;

@@ -4501,6 +4501,7 @@ enum ReceiveBufferSize {}
 trait AccessBufferSize<R, S> {
     fn set_buffer_size(buffers: BuffersRefMut<'_, R, S>, new_size: usize);
     fn get_buffer_size(buffers: BuffersRefMut<'_, R, S>) -> Option<usize>;
+    fn allowed_range() -> (usize, usize);
 }
 
 impl<R: Buffer, S: Buffer> AccessBufferSize<R, S> for SendBufferSize {
@@ -4512,6 +4513,10 @@ impl<R: Buffer, S: Buffer> AccessBufferSize<R, S> for SendBufferSize {
             }
             BuffersRefMut::Sizes(BufferSizes { send, receive: _ }) => *send = new_size,
         }
+    }
+
+    fn allowed_range() -> (usize, usize) {
+        S::capacity_range()
     }
 
     fn get_buffer_size(buffers: BuffersRefMut<'_, R, S>) -> Option<usize> {
@@ -4534,6 +4539,10 @@ impl<R: Buffer, S: Buffer> AccessBufferSize<R, S> for ReceiveBufferSize {
             }
             BuffersRefMut::Sizes(BufferSizes { receive, send: _ }) => *receive = new_size,
         }
+    }
+
+    fn allowed_range() -> (usize, usize) {
+        R::capacity_range()
     }
 
     fn get_buffer_size(buffers: BuffersRefMut<'_, R, S>) -> Option<usize> {
@@ -4589,6 +4598,8 @@ fn set_buffer_size<
     id: &TcpSocketId<I, CC::WeakDeviceId, BC>,
     size: usize,
 ) {
+    let (min, max) = Which::allowed_range();
+    let size = size.clamp(min, max);
     core_ctx.with_socket_mut_and_converter(id, |state, converter| {
         Which::set_buffer_size(get_buffers_mut::<I, CC, BC>(state, converter), size)
     })
@@ -7507,6 +7518,38 @@ mod tests {
         });
 
         step_and_increment_buffer_sizes_until_idle(&mut net, &local_connection, &remote_connection);
+    }
+
+    #[ip_test(I)]
+    fn clamp_buffer_size<I: TcpTestIpExt>()
+    where
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
+            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
+    {
+        set_logger_for_test();
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::new::<I>(
+            I::TEST_ADDRS.local_ip,
+            I::TEST_ADDRS.remote_ip,
+            I::TEST_ADDRS.subnet.prefix(),
+        ));
+        let mut api = ctx.tcp_api::<I>();
+        let socket = api.create(Default::default());
+
+        let (min, max) = <
+            <TcpBindingsCtx<FakeDeviceId> as TcpBindingsTypes>::SendBuffer as crate::Buffer
+        >::capacity_range();
+        api.set_send_buffer_size(&socket, min - 1);
+        assert_eq!(api.send_buffer_size(&socket), Some(min));
+        api.set_send_buffer_size(&socket, max + 1);
+        assert_eq!(api.send_buffer_size(&socket), Some(max));
+
+        let (min, max) = <
+            <TcpBindingsCtx<FakeDeviceId> as TcpBindingsTypes>::ReceiveBuffer as crate::Buffer
+        >::capacity_range();
+        api.set_receive_buffer_size(&socket, min - 1);
+        assert_eq!(api.receive_buffer_size(&socket), Some(min));
+        api.set_receive_buffer_size(&socket, max + 1);
+        assert_eq!(api.receive_buffer_size(&socket), Some(max));
     }
 
     #[ip_test(I)]
