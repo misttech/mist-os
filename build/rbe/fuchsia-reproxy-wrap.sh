@@ -357,6 +357,8 @@ shutdown() {
   "${bootstrap_env[@]}" \
     "$bootstrap" \
     --shutdown \
+    --fast_log_collection \
+    --async_reproxy_termination \
     --cfg="$reproxy_cfg" > "$reproxy_logdir"/shutdown.stdout 2>&1
   shutdown_status="$?"
   [[ "$shutdown_status" == 0 && "$verbose" != 1 ]] || {
