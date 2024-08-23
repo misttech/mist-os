@@ -6,6 +6,7 @@
 from collections.abc import Mapping
 from enum import StrEnum
 
+from honeydew import errors
 from honeydew.interfaces.affordances.wlan import wlan_policy
 from honeydew.transports.sl4f import SL4F
 from honeydew.typing.wlan import (
@@ -71,16 +72,19 @@ class WlanPolicy(wlan_policy.WlanPolicy):
             A RequestStatus response to the connect request
 
         Raises:
-            errors.Sl4fError: Sl4f run command failed.
+            errors.HoneydewWlanError: Sl4f run command failed.
             TypeError: Return value not a string.
         """
         method_params = {
             "target_ssid": target_ssid,
             "security_type": str(security_type),
         }
-        resp: dict[str, object] = self._sl4f.run(
-            method=_Sl4fMethods.CONNECT, params=method_params
-        )
+        try:
+            resp: dict[str, object] = self._sl4f.run(
+                method=_Sl4fMethods.CONNECT, params=method_params
+            )
+        except errors.Sl4fError as e:
+            raise errors.HoneydewWlanError("Failed to connect") from e
         result: object = resp.get("result")
 
         if not isinstance(result, str):
@@ -92,10 +96,14 @@ class WlanPolicy(wlan_policy.WlanPolicy):
         """Initializes the client controller.
 
         Raises:
-            errors.Sl4fError: Sl4f run command failed.
+            errors.HoneydewWlanError: Sl4f run command failed.
         """
-
-        self._sl4f.run(method=_Sl4fMethods.CREATE_CLIENT_CONTROLLER)
+        try:
+            self._sl4f.run(method=_Sl4fMethods.CREATE_CLIENT_CONTROLLER)
+        except errors.Sl4fError as e:
+            raise errors.HoneydewWlanError(
+                "Failed to create_client_controller"
+            ) from e
 
     def get_saved_networks(self) -> list[NetworkConfig]:
         """Gets networks saved on device.
@@ -104,12 +112,17 @@ class WlanPolicy(wlan_policy.WlanPolicy):
             A list of NetworkConfigs.
 
         Raises:
-            errors.Sl4fError: Sl4f run command failed.
+            errors.HoneydewWlanError: Sl4f run command failed.
             TypeError: Return values not correct types.
         """
-        resp: dict[str, object] = self._sl4f.run(
-            method=_Sl4fMethods.GET_SAVED_NETWORKS
-        )
+        try:
+            resp: dict[str, object] = self._sl4f.run(
+                method=_Sl4fMethods.GET_SAVED_NETWORKS
+            )
+        except errors.Sl4fError as e:
+            raise errors.HoneydewWlanError(
+                "Failed to get_saved_networks"
+            ) from e
         result: object = resp.get("result")
 
         if not isinstance(result, list):
@@ -155,12 +168,15 @@ class WlanPolicy(wlan_policy.WlanPolicy):
             ClientStateSummary struct given for updates.
 
         Raises:
-            errors.Sl4fError: Sl4f run command failed.
+            errors.HoneydewWlanError: Sl4f run command failed.
             TypeError: Return values not correct types.
         """
-        resp: dict[str, object] = self._sl4f.run(
-            method=_Sl4fMethods.GET_UPDATE, timeout=timeout
-        )
+        try:
+            resp: dict[str, object] = self._sl4f.run(
+                method=_Sl4fMethods.GET_UPDATE, timeout=timeout
+            )
+        except errors.Sl4fError as e:
+            raise errors.HoneydewWlanError("Failed to get_update") from e
         result: object = resp.get("result")
 
         if not isinstance(result, dict):
@@ -206,9 +222,14 @@ class WlanPolicy(wlan_policy.WlanPolicy):
         """Deletes all saved networks on the device.
 
         Raises:
-            errors.Sl4fError: Sl4f run command failed.
+            errors.HoneydewWlanError: Sl4f run command failed.
         """
-        self._sl4f.run(method=_Sl4fMethods.REMOVE_ALL_NETWORKS)
+        try:
+            self._sl4f.run(method=_Sl4fMethods.REMOVE_ALL_NETWORKS)
+        except errors.Sl4fError as e:
+            raise errors.HoneydewWlanError(
+                "Failed to remove_all_networks"
+            ) from e
 
     def remove_network(
         self,
@@ -225,7 +246,7 @@ class WlanPolicy(wlan_policy.WlanPolicy):
                 is equivalent to an empty string.
 
         Raises:
-            errors.Sl4fError: Sl4f run command failed.
+            errors.HoneydewWlanError: Sl4f run command failed.
         """
         if not target_pwd:
             target_pwd = ""
@@ -235,7 +256,12 @@ class WlanPolicy(wlan_policy.WlanPolicy):
             "security_type": str(security_type),
             "target_pwd": target_pwd,
         }
-        self._sl4f.run(method=_Sl4fMethods.REMOVE_NETWORK, params=method_params)
+        try:
+            self._sl4f.run(
+                method=_Sl4fMethods.REMOVE_NETWORK, params=method_params
+            )
+        except errors.Sl4fError as e:
+            raise errors.HoneydewWlanError("Failed to remove_network") from e
 
     def save_network(
         self,
@@ -252,7 +278,7 @@ class WlanPolicy(wlan_policy.WlanPolicy):
                 is equivalent to an empty string.
 
         Raises:
-            errors.Sl4fError: Sl4f run command failed.
+            errors.HoneydewWlanError: Sl4f run command failed.
         """
         if not target_pwd:
             target_pwd = ""
@@ -262,7 +288,12 @@ class WlanPolicy(wlan_policy.WlanPolicy):
             "security_type": str(security_type.value),
             "target_pwd": target_pwd,
         }
-        self._sl4f.run(method=_Sl4fMethods.SAVE_NETWORK, params=method_params)
+        try:
+            self._sl4f.run(
+                method=_Sl4fMethods.SAVE_NETWORK, params=method_params
+            )
+        except errors.Sl4fError as e:
+            raise errors.HoneydewWlanError("Failed to save_network") from e
 
     def scan_for_networks(self) -> list[str]:
         """Scans for networks.
@@ -271,12 +302,15 @@ class WlanPolicy(wlan_policy.WlanPolicy):
             A list of network SSIDs that can be connected to.
 
         Raises:
-            errors.Sl4fError: Sl4f run command failed.
+            errors.HoneydewWlanError: Sl4f run command failed.
             TypeError: Return value not a list.
         """
-        resp: dict[str, object] = self._sl4f.run(
-            method=_Sl4fMethods.SCAN_FOR_NETWORKS
-        )
+        try:
+            resp: dict[str, object] = self._sl4f.run(
+                method=_Sl4fMethods.SCAN_FOR_NETWORKS
+            )
+        except errors.Sl4fError as e:
+            raise errors.HoneydewWlanError("Failed to scan_for_networks") from e
         result: object = resp.get("result")
 
         if not isinstance(result, list):
@@ -291,22 +325,37 @@ class WlanPolicy(wlan_policy.WlanPolicy):
         tests.
 
         Raises:
-            errors.Sl4fError: Sl4f run command failed.
+            errors.HoneydewWlanError: Sl4f run command failed.
         """
-        self._sl4f.run(method=_Sl4fMethods.SET_NEW_UPDATE_LISTENER)
+        try:
+            self._sl4f.run(method=_Sl4fMethods.SET_NEW_UPDATE_LISTENER)
+        except errors.Sl4fError as e:
+            raise errors.HoneydewWlanError(
+                "Failed to set_new_update_listener"
+            ) from e
 
     def start_client_connections(self) -> None:
         """Enables device to initiate connections to networks.
 
         Raises:
-            errors.Sl4fError: Sl4f run command failed.
+            errors.HoneydewWlanError: Sl4f run command failed.
         """
-        self._sl4f.run(method=_Sl4fMethods.START_CLIENT_CONNECTIONS)
+        try:
+            self._sl4f.run(method=_Sl4fMethods.START_CLIENT_CONNECTIONS)
+        except errors.Sl4fError as e:
+            raise errors.HoneydewWlanError(
+                "Failed to start_client_connections"
+            ) from e
 
     def stop_client_connections(self) -> None:
         """Disables device for initiating connections to networks.
 
         Raises:
-            errors.Sl4fError: Sl4f run command failed.
+            errors.HoneydewWlanError: Sl4f run command failed.
         """
-        self._sl4f.run(method=_Sl4fMethods.STOP_CLIENT_CONNECTIONS)
+        try:
+            self._sl4f.run(method=_Sl4fMethods.STOP_CLIENT_CONNECTIONS)
+        except errors.Sl4fError as e:
+            raise errors.HoneydewWlanError(
+                "Failed to stop_client_connections"
+            ) from e

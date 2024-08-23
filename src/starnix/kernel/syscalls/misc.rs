@@ -69,7 +69,7 @@ pub fn sys_uname(
     let version = current_task.kernel().build_version.get_or_try_init(|| {
         let proxy =
             connect_to_protocol_sync::<buildinfo::ProviderMarker>().map_err(|_| errno!(ENOENT))?;
-        let buildinfo = proxy.get_build_info(zx::Time::INFINITE).map_err(|e| {
+        let buildinfo = proxy.get_build_info(zx::MonotonicTime::INFINITE).map_err(|e| {
             log_error!("FIDL error getting build info: {e}");
             errno!(EIO)
         })?;
@@ -107,7 +107,7 @@ pub fn sys_sysinfo(
     let freeram = total_ram_pages / 8;
 
     let result = uapi::sysinfo {
-        uptime: (zx::Time::get_monotonic() - zx::Time::ZERO).into_seconds(),
+        uptime: (zx::MonotonicTime::get() - zx::MonotonicTime::ZERO).into_seconds(),
         loads,
         totalram: total_ram_pages,
         freeram,
@@ -255,11 +255,11 @@ pub fn sys_reboot(
         LINUX_REBOOT_CMD_SW_SUSPEND => error!(EINVAL),
 
         LINUX_REBOOT_CMD_HALT | LINUX_REBOOT_CMD_POWER_OFF => {
-            match proxy.poweroff(zx::Time::INFINITE) {
+            match proxy.poweroff(zx::MonotonicTime::INFINITE) {
                 Ok(_) => {
                     log_info!("Powering off device.");
                     // System is rebooting... wait until runtime ends.
-                    zx::Time::INFINITE.sleep();
+                    zx::MonotonicTime::INFINITE.sleep();
                 }
                 Err(e) => return error!(EINVAL, format!("Failed to power off, status: {e}")),
             }
@@ -276,10 +276,10 @@ pub fn sys_reboot(
 
             if reboot_args.contains(&&b"bootloader"[..]) {
                 log_info!("Rebooting to bootloader");
-                match proxy.reboot_to_bootloader(zx::Time::INFINITE) {
+                match proxy.reboot_to_bootloader(zx::MonotonicTime::INFINITE) {
                     Ok(_) => {
                         // System is rebooting... wait until runtime ends.
-                        zx::Time::INFINITE.sleep();
+                        zx::MonotonicTime::INFINITE.sleep();
                     }
                     Err(e) => return error!(EINVAL, format!("Failed to reboot, status: {e}")),
                 }
@@ -302,10 +302,10 @@ pub fn sys_reboot(
                                         .or_else(|_| error!(EINVAL))?;
                                 // NB: This performs a reboot for us.
                                 log_info!("Initiating factory data reset...");
-                                match factory_reset_proxy.reset(zx::Time::INFINITE) {
+                                match factory_reset_proxy.reset(zx::MonotonicTime::INFINITE) {
                                     Ok(_) => {
                                         // System is rebooting... wait until runtime ends.
-                                        zx::Time::INFINITE.sleep();
+                                        zx::MonotonicTime::INFINITE.sleep();
                                     }
                                     Err(e) => {
                                         return error!(
@@ -338,10 +338,10 @@ pub fn sys_reboot(
             };
 
             log_info!("Rebooting... reason: {:?}", reboot_reason);
-            match proxy.reboot(reboot_reason, zx::Time::INFINITE) {
+            match proxy.reboot(reboot_reason, zx::MonotonicTime::INFINITE) {
                 Ok(_) => {
                     // System is rebooting... wait until runtime ends.
-                    zx::Time::INFINITE.sleep();
+                    zx::MonotonicTime::INFINITE.sleep();
                 }
                 Err(e) => return error!(EINVAL, format!("Failed to reboot, status: {e}")),
             }

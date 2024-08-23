@@ -50,7 +50,8 @@ zx::result<ConsoleLauncher> ConsoleLauncher::Create() {
   return zx::ok(std::move(launcher));
 }
 
-zx::result<Arguments> GetArguments(const fidl::ClientEnd<fuchsia_boot::Arguments>& client) {
+zx::result<Arguments> GetArguments(const fidl::ClientEnd<fuchsia_boot::Arguments>& client,
+                                   const console_launcher_config::Config& config) {
   Arguments ret;
 
   {
@@ -61,10 +62,6 @@ zx::result<Arguments> GetArguments(const fidl::ClientEnd<fuchsia_boot::Arguments
         },
         {
             .key = "kernel.shell",
-            .defaultval = false,
-        },
-        {
-            .key = "virtcon.disable",
             .defaultval = false,
         },
         {
@@ -87,9 +84,9 @@ zx::result<Arguments> GetArguments(const fidl::ClientEnd<fuchsia_boot::Arguments
     const bool kernel_shell = response.values[1];
     // If the kernel console is running a shell we can't launch our own shell.
     ret.run_shell = console_shell && !kernel_shell;
-    ret.virtcon_disable = response.values[2];
-    const bool netsvc_disable = response.values[3];
-    const bool netsvc_netboot = response.values[4];
+    ret.virtcon_disabled = config.virtcon_disabled();
+    const bool netsvc_disable = response.values[2];
+    const bool netsvc_netboot = response.values[3];
     const bool netboot = !netsvc_disable && netsvc_netboot;
     ret.virtual_console_need_debuglog = netboot;
   }

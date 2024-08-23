@@ -27,6 +27,9 @@
             protocol: [ "fuchsia.update.verify.BlobfsVerifier" ],
         },
         {
+            protocol: [ "fuchsia.fxfs.CryptManagement" ],
+        },
+        {
             protocol: "fuchsia.fxfs.BlobCreator",
             path: "/fs/blob/svc/fuchsia.fxfs.BlobCreator",
         },
@@ -85,6 +88,11 @@
             from: "self",
         },
         {
+            directory: "partitions",
+            from: "void",
+            availability: "optional",
+        },
+        {
             directory: "volumes",
             from: "#fxfs",
         },
@@ -104,6 +112,10 @@
             protocol: "fuchsia.fxfs.BlobReader",
             from: "self",
             availability: "same_as_target",
+        },
+        {
+            protocol: "fuchsia.fxfs.CryptManagement",
+            from: "self",
         },
     ],
 }

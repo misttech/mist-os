@@ -5,8 +5,9 @@
 #ifndef SRC_UI_SCENIC_LIB_SCREENSHOT_SCREENSHOT_MANAGER_H_
 #define SRC_UI_SCENIC_LIB_SCREENSHOT_SCREENSHOT_MANAGER_H_
 
-#include <fuchsia/ui/composition/cpp/fidl.h>
-#include <lib/fidl/cpp/binding_set.h>
+#include <fidl/fuchsia.ui.composition/cpp/fidl.h>
+
+#include <memory>
 
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 #include "src/ui/scenic/lib/flatland/engine/engine.h"
@@ -41,9 +42,7 @@ class ScreenshotManager {
   // Angle in degrees by which the display is rotated.
   int display_rotation_ = 0;
 
-  fidl::BindingSet<fuchsia::ui::composition::Screenshot,
-                   std::unique_ptr<fuchsia::ui::composition::Screenshot>>
-      bindings_;
+  fidl::ServerBindingGroup<fuchsia_ui_composition::Screenshot> bindings_;
 };
 
 class CompressorEventHandler

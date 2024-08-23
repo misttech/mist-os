@@ -152,7 +152,7 @@ typedef __WCHAR_TYPE__ wchar_t;
 #endif
 
 #if defined(__NEED_wint_t) && !defined(__DEFINED_wint_t)
-typedef unsigned wint_t;
+typedef __WINT_TYPE__ wint_t;
 #define __DEFINED_wint_t
 #endif
 

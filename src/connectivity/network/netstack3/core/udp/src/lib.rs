@@ -20,7 +20,7 @@ mod internal {
 pub use internal::base::{
     BoundSockets, BoundStateContext, DualStackBoundStateContext, NonDualStackBoundStateContext,
     SendError, SendToError, Sockets, StateContext, UdpApi, UdpBindingsContext, UdpBindingsTypes,
-    UdpCounters, UdpCountersInner, UdpIpTransportContext, UdpReceiveBindingsContext, UdpRemotePort,
-    UdpSocketId, UdpSocketSet, UdpSocketState, UdpState, UdpStateBuilder, UdpStateContext,
-    UseUdpIpTransportContextBlanket,
+    UdpCounters, UdpCountersInner, UdpIpTransportContext, UdpPacketMeta, UdpReceiveBindingsContext,
+    UdpRemotePort, UdpSocketId, UdpSocketSet, UdpSocketState, UdpState, UdpStateBuilder,
+    UdpStateContext, UseUdpIpTransportContextBlanket,
 };

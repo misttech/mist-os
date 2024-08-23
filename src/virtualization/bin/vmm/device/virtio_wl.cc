@@ -1228,7 +1228,8 @@ bool VirtioWl::AcquireWritableDescriptor(VirtioQueue* queue, VirtioChain* chain,
 }
 
 int main(int argc, char** argv) {
-  fuchsia_logging::SetTags({"virtio_wl"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"virtio_wl"}).BuildAndInitialize();
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher());

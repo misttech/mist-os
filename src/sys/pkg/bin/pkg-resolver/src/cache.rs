@@ -768,33 +768,38 @@ async fn download_blob(
     trace_id: ftrace::Id,
 ) -> Result<u64, FetchError> {
     inspect.state(inspect::Http::HttpGet);
-    let (expected_len, content) =
-        resume::resuming_get(client, uri, blob_fetch_params, fetch_stats).await?;
-    ftrace::async_instant!(trace_id, c"app", c"header_received");
 
+    let (expected_len, content) = {
+        let _guard = ftrace::async_enter(trace_id, c"app", c"http_get_startup", &[]);
+        resume::resuming_get(client, uri, blob_fetch_params, fetch_stats).await?
+    };
     inspect.expected_size_bytes(expected_len);
-
     inspect.state(inspect::Http::TruncateBlob);
     let mut written = 0u64;
-    let dest = match dest.truncate(expected_len).await.map_err(FetchError::Truncate)? {
+
+    let truncate_success = {
+        let _guard = ftrace::async_enter(trace_id, c"app", c"truncating_blob", &[]);
+        dest.truncate(expected_len).await.map_err(FetchError::Truncate)?
+    };
+    let dest = match truncate_success {
         pkg::cache::TruncateBlobSuccess::AllWritten(dest) => dest,
         pkg::cache::TruncateBlobSuccess::NeedsData(mut dest) => {
             futures::pin_mut!(content);
             loop {
                 inspect.state(inspect::Http::ReadHttpBody);
-                let Some(chunk) = content.try_next().await? else {
+
+                let chunk = {
+                    let _guard =
+                        ftrace::async_enter(trace_id, c"app", c"reading_from_network", &[]);
+                    content.try_next().await?
+                };
+                let Some(chunk) = chunk else {
                     return Err(FetchError::BlobTooSmall { uri: uri.to_string() });
                 };
 
                 if written + chunk.len() as u64 > expected_len {
                     return Err(FetchError::BlobTooLarge { uri: uri.to_string() });
                 }
-                ftrace::async_instant!(
-                    trace_id,
-                    c"app",
-                    c"read_chunk_from_hyper",
-                    "size" => chunk.len() as u64
-                );
 
                 inspect.state(inspect::Http::WriteBlob);
                 dest = match dest
@@ -804,18 +809,11 @@ async fn download_blob(
                             ftrace::async_begin(
                                 trace_id,
                                 c"app",
-                                c"waiting_for_pkg_cache_to_ack_write",
+                                c"waiting_for_blob_write_ack",
                                 &[ftrace::ArgValue::of("size", size)],
                             )
                         },
-                        &|| {
-                            ftrace::async_end(
-                                trace_id,
-                                c"app",
-                                c"waiting_for_pkg_cache_to_ack_write",
-                                &[],
-                            )
-                        },
+                        &|| ftrace::async_end(trace_id, c"app", c"waiting_for_blob_write_ack", &[]),
                     )
                     .await
                     .map_err(|e| FetchError::Write { e, uri: uri.to_string() })?

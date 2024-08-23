@@ -4,11 +4,14 @@
 
 #include "src/storage/blobfs/compression/decompressor.h"
 
+#include <zircon/assert.h>
 #include <zircon/errors.h>
+#include <zircon/types.h>
 
 #include <memory>
 
 #include "src/storage/blobfs/compression/chunked.h"
+#include "src/storage/blobfs/compression_settings.h"
 
 namespace blobfs {
 

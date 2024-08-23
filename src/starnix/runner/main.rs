@@ -38,7 +38,7 @@ async fn main() -> Result<(), Error> {
                 user_data_sharing_consent: Some(true),
                 ..Default::default()
             };
-            match privacy.set(&privacy_settings, zx::Time::INFINITE) {
+            match privacy.set(&privacy_settings, zx::MonotonicTime::INFINITE) {
                 Ok(Ok(())) => info!("Successfully set user data sharing consent."),
                 Ok(Err(err)) => warn!("Could not set user data sharing consent: {err:?}"),
                 Err(err) => warn!("Could not set user data sharing consent: {err:?}"),
@@ -183,7 +183,7 @@ async fn suspend_kernel(kernel_job: &zx::Job) -> Vec<zx::Handle> {
                     let thread = zx::Thread::from_handle(thread_handle);
                     match thread.wait_handle(
                         zx::Signals::THREAD_SUSPENDED,
-                        zx::Time::after(zx::Duration::INFINITE),
+                        zx::MonotonicTime::after(zx::Duration::INFINITE),
                     ) {
                         Err(e) => tracing::warn!("Error waiting for task suspension: {:?}", e),
                         _ => {}

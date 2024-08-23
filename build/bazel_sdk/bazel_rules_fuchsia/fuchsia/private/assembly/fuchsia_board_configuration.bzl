@@ -23,23 +23,26 @@ load(
     "check_type",
 )
 
-def _copy_bash(ctx, src, dst):
+def _copy_directory(ctx, src, dst, inputs, outputs, subdirectories_to_skip = None):
     cmd = """\
 if [ ! -d \"$1\" ]; then
     echo \"Error: $1 is not a directory\"
     exit 1
 fi
 
-rm -rf \"$2\" && cp -fR \"$1/\" \"$2\"
+rm -rf \"$2\" && cp -fR \"$1/\" \"$2\";
 """
+    if subdirectories_to_skip:
+        for d in subdirectories_to_skip:
+            cmd += 'rm -rf \"' + src + "/" + d + '\";\n'
     mnemonic = "CopyDirectory"
-    progress_message = "Copying directory %s" % src.path
+    progress_message = "Copying directory %s" % src
 
     ctx.actions.run_shell(
-        inputs = [src],
-        outputs = [dst],
+        inputs = inputs,
+        outputs = outputs,
         command = cmd,
-        arguments = [src.path, dst.path],
+        arguments = [src, dst],
         mnemonic = mnemonic,
         progress_message = progress_message,
         use_default_shell_env = True,
@@ -78,13 +81,6 @@ def _fuchsia_board_configuration_impl(ctx):
     if platform != {}:
         board_config["platform"] = platform
 
-    if ctx.attr.board_bundles_dir:
-        board_dir_name = ctx.file.board_bundles_dir.basename
-        board_config["input_bundles"] = [board_dir_name + "/" + i for i in ctx.attr.input_bundles]
-        board_dir = ctx.actions.declare_directory(board_dir_name)
-        _copy_bash(ctx, ctx.file.board_bundles_dir, board_dir)
-        board_files.append(board_dir)
-
     # Files from board_input_bundles have paths that are relative to root,
     # prefix "../"s to make them relative to the output board config.
     board_config_relative_to_root = "../" * board_config_file.path.count("/")
@@ -99,13 +95,7 @@ def _fuchsia_board_configuration_impl(ctx):
 
     if ctx.attr.devicetree:
         board_files.append(ctx.file.devicetree)
-        if ctx.attr.board_bundles_dir:
-            # Relativize the file path to the board file instead of the
-            # workspace root
-            short_dir = board_config_file.short_path.removesuffix(board_config_file.basename)
-            board_config["devicetree"] = ctx.file.devicetree.path.removeprefix(short_dir)
-        else:
-            board_config["devicetree"] = board_config_relative_to_root + ctx.file.devicetree.path
+        board_config["devicetree"] = board_config_relative_to_root + ctx.file.devicetree.path
 
     args = []
     if ctx.attr.post_processing_script:
@@ -168,13 +158,6 @@ _fuchsia_board_configuration = rule(
             doc = "Name of this board.",
             mandatory = True,
         ),
-        "board_bundles_dir": attr.label(
-            doc = "Directory containing all precompiled board input bundles.",
-            allow_single_file = True,
-        ),
-        "input_bundles": attr.string_list(
-            doc = "Directories of precompiled board input bundles to include, relative to `board_bundles_dir`.",
-        ),
         "board_input_bundles": attr.label_list(
             doc = "Board Input Bundles targets to be included into the board.",
             providers = [FuchsiaBoardInputBundleInfo],
@@ -235,11 +218,7 @@ def fuchsia_board_configuration(
     )
 
 def _fuchsia_prebuilt_board_configuration_impl(ctx):
-    board_configuration = (
-        # TODO(https://fxbug.dev/349939865): Remove this ugly hack once the
-        # board configuration manifest's name is fixed.
-        ([file for file in ctx.files.files if file.path.endswith("_board_config.json")] + [None])[0]
-    ) or select_single_file(ctx.files.files, "board_configuration.json")
+    board_configuration = select_single_file(ctx.files.files, "board_configuration.json")
     return [
         FuchsiaBoardConfigInfo(
             files = ctx.files.files,
@@ -269,3 +248,117 @@ def fuchsia_prebuilt_board_configuration(
     if directory:
         kwargs["files"] = directory
     _fuchsia_prebuilt_board_configuration(**kwargs)
+
+def _fuchsia_hybrid_board_configuration_impl(ctx):
+    board_dir_name = ctx.label.name
+    board_configuration = ctx.attr.board_configuration[FuchsiaBoardConfigInfo].config.split("/")[-1]
+    board_configuration_file = ctx.actions.declare_file(board_dir_name + "/" + board_configuration)
+
+    board_outputs = []
+    board_input_bundle_dirs = ctx.attr.board_input_bundle_output_dirs
+    src_config_dirname = "/".join(ctx.attr.board_configuration[FuchsiaBoardConfigInfo].config.split("/")[:-1])
+
+    output_config = ctx.actions.declare_file(board_dir_name + "/" + ctx.attr.board_configuration[FuchsiaBoardConfigInfo].config.split("/")[-1])
+    for f in ctx.attr.board_configuration[FuchsiaBoardConfigInfo].files:
+        file_path = f.path[len(src_config_dirname):]
+        output_path = board_dir_name + "/" + file_path
+
+        # Skip copying the board input bundles which are going to be replaced
+        skip = False
+        for d in board_input_bundle_dirs:
+            if file_path.removeprefix("/").startswith(d):
+                skip = True
+
+        if skip:
+            continue
+        if not f.is_directory:
+            board_outputs.append(ctx.actions.declare_file(output_path))
+
+    _copy_directory(
+        ctx,
+        src_config_dirname,
+        output_config.dirname,
+        ctx.attr.board_configuration[FuchsiaBoardConfigInfo].files,
+        board_outputs,
+        subdirectories_to_skip = board_input_bundle_dirs,
+    )
+
+    all_outputs = board_outputs
+    for d in board_input_bundle_dirs:
+        src_board_dirname = "/".join(ctx.attr.replacement_board_input_bundles[FuchsiaBoardConfigInfo].config.split("/")[:-1])
+        bib_outputs = []
+        files_to_copy = []
+        for f in ctx.attr.replacement_board_input_bundles[FuchsiaBoardConfigInfo].files:
+            file_path = f.path[len(src_board_dirname):].removeprefix("/")
+
+            # Copy in only the files which are under the boards directory
+            # of this bundle
+            if file_path.startswith(ctx.attr.board_input_bundles_path):
+                relative_output_path = file_path[len(ctx.attr.board_input_bundles_path):].removeprefix("/")
+
+                if not f.is_directory:
+                    output_path = d + "/" + relative_output_path
+                    bib_outputs.append(ctx.actions.declare_file(board_dir_name + "/" + output_path))
+                    files_to_copy.append(f)
+
+        _copy_directory(
+            ctx,
+            src_board_dirname + "/" + ctx.attr.board_input_bundles_path,
+            output_config.dirname + "/" + d,
+            files_to_copy,
+            bib_outputs,
+        )
+
+        all_outputs += bib_outputs
+
+    return [
+        DefaultInfo(
+            files = depset(all_outputs),
+        ),
+        FuchsiaBoardConfigInfo(
+            files = board_outputs + bib_outputs,
+            config = board_configuration_file.path,
+        ),
+    ]
+
+_fuchsia_hybrid_board_configuration = rule(
+    doc = "Combine in-tree board input bundles with a board from out-of-tree for hybrid assembly",
+    implementation = _fuchsia_hybrid_board_configuration_impl,
+    provides = [FuchsiaBoardConfigInfo],
+    attrs = {
+        "board_configuration": attr.label(
+            doc = "Prebuilt board config",
+            providers = [FuchsiaBoardConfigInfo],
+            mandatory = True,
+        ),
+        "replacement_board_input_bundles": attr.label(
+            doc = "In-tree board containing input bundles to replace those in `board_configuration`",
+            providers = [FuchsiaBoardConfigInfo],
+            mandatory = True,
+        ),
+        "board_input_bundle_output_dirs": attr.string_list(
+            doc = "Output directories inside of the target board input bundle",
+            mandatory = True,
+        ),
+        "board_input_bundles_path": attr.string(
+            doc = "Subdirectory of the board containing the board input bundles",
+            mandatory = True,
+        ),
+    },
+)
+
+def fuchsia_hybrid_board_configuration(
+        name,
+        board_configuration,
+        board_input_bundles_path,
+        board_input_bundle_output_dirs,
+        replacement_board_input_bundles,
+        **kwargs):
+    _fuchsia_hybrid_board_configuration(
+        name = name,
+        board_configuration = board_configuration,
+        board_input_bundles_path = board_input_bundles_path,
+        board_input_bundle_output_dirs = board_input_bundle_output_dirs,
+        replacement_board_input_bundles = replacement_board_input_bundles,
+        **kwargs
+    )

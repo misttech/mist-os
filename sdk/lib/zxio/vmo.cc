@@ -70,7 +70,7 @@ class Vmo : public HasIo {
 
   zx_status_t Readv(const zx_iovec_t* vector, size_t vector_count, zxio_flags_t flags,
                     size_t* out_actual) {
-    if (flags) {
+    if (flags || !stream_) {
       return ZX_ERR_NOT_SUPPORTED;
     }
 
@@ -79,7 +79,7 @@ class Vmo : public HasIo {
 
   zx_status_t ReadvAt(zx_off_t offset, const zx_iovec_t* vector, size_t vector_count,
                       zxio_flags_t flags, size_t* out_actual) {
-    if (flags) {
+    if (flags || !stream_) {
       return ZX_ERR_NOT_SUPPORTED;
     }
 
@@ -88,7 +88,7 @@ class Vmo : public HasIo {
 
   zx_status_t Writev(const zx_iovec_t* vector, size_t vector_count, zxio_flags_t flags,
                      size_t* out_actual) {
-    if (flags) {
+    if (flags || !stream_) {
       return ZX_ERR_NOT_SUPPORTED;
     }
 
@@ -97,7 +97,7 @@ class Vmo : public HasIo {
 
   zx_status_t WritevAt(zx_off_t offset, const zx_iovec_t* vector, size_t vector_count,
                        zxio_flags_t flags, size_t* out_actual) {
-    if (flags) {
+    if (flags || !stream_) {
       return ZX_ERR_NOT_SUPPORTED;
     }
 
@@ -109,6 +109,9 @@ class Vmo : public HasIo {
   static_assert(ZXIO_SEEK_ORIGIN_END == ZX_STREAM_SEEK_ORIGIN_END, "ZXIO should match ZX");
 
   zx_status_t Seek(zxio_seek_origin_t start, int64_t offset, size_t* out_offset) {
+    if (!stream_) {
+      return ZX_ERR_NOT_SUPPORTED;
+    }
     return stream_.seek(static_cast<zx_stream_seek_origin_t>(start), offset, out_offset);
   }
 

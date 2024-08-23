@@ -14,8 +14,8 @@ namespace fs {
 // Drop-in replacement for std::shared_lock that has thread safety annotations. The current libcxx
 // implementation does not have these annotations, and thus don't work correctly.
 //
-// TODO(https://fxbug.dev/42080556): this can be removed replaced with std::shared_lock if we update
-// to an implementation that is annotated with the correct thread capabilities.
+// TODO(https://fxbug.dev/361092091): this can be removed replaced with std::shared_lock if we
+// update to an implementation that is annotated with the correct thread capabilities.
 class __TA_SCOPED_CAPABILITY SharedLock {
  public:
   __WARN_UNUSED_CONSTRUCTOR explicit SharedLock(std::shared_mutex& m) __TA_ACQUIRE_SHARED(m)

@@ -11,20 +11,33 @@
 #error Fuchsia-only Header
 #endif
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/zx/event.h>
+#include <lib/zx/result.h>
+#include <lib/zx/vmo.h>
+#include <zircon/compiler.h>
+#include <zircon/rights.h>
+#include <zircon/types.h>
 
+#include <atomic>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
+#include <mutex>
 
-#include <fbl/algorithm.h>
+#include <fbl/macros.h>
+#include <fbl/recycler.h>
 #include <fbl/ref_ptr.h>
 
-#include "src/lib/digest/digest.h"
 #include "src/storage/blobfs/blob_cache.h"
 #include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/cache_node.h"
-#include "src/storage/blobfs/compression_settings.h"
+#include "src/storage/blobfs/format.h"
 #include "src/storage/blobfs/loader_info.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace blobfs {
 
@@ -43,7 +56,7 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
  public:
   // Creates a writable blob. Will become readable once all data has been written and verified.
   // `blobfs` must outlive this blob.
-  Blob(Blobfs& blobfs, const digest::Digest& digest, bool is_delivery_blob);
+  Blob(Blobfs& blobfs, const Digest& digest, bool is_delivery_blob);
 
   // Creates a readable blob from existing data. `blobfs` must outlive this blob.
   Blob(Blobfs& blobfs, uint32_t node_index, const Inode& inode);
@@ -66,7 +79,6 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
       __TA_EXCLUDES(mutex_);
   zx::result<fs::VnodeAttributes> GetAttributes() const final __TA_EXCLUDES(mutex_);
   zx_status_t Truncate(size_t len) final __TA_EXCLUDES(mutex_);
-  zx::result<std::string> GetDevicePath() const final __TA_EXCLUDES(mutex_);
   zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) final
       __TA_EXCLUDES(mutex_);
   void Sync(SyncCallback on_complete) final __TA_EXCLUDES(mutex_);
@@ -112,6 +124,12 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
 
   // Reads in and verifies the contents of this Blob.
   zx_status_t Verify() __TA_EXCLUDES(mutex_);
+
+  // Creates a child VMO for the BlobReader protocol.
+  zx::result<zx::vmo> GetVmoForBlobReader() __TA_EXCLUDES(mutex_);
+
+  // Returns true is the blob is currently readable.
+  bool IsReadable() __TA_EXCLUDES(mutex_);
 
  private:
   friend class BlobLoaderTest;
@@ -198,7 +216,7 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
   bool deletable_ __TA_GUARDED(mutex_) = false;
 
   // When paging we can dynamically notice that a blob is corrupt. The read operation will set this
-  // flag if a corruption is encoutered at runtime and future operations will fail.
+  // flag if a corruption is encountered at runtime and future operations will fail.
   //
   // This value is specifically atomic and not guarded by the mutex. First, it's not critical that
   // this value be synchronized in any particular way if there are multiple simultaneous readers
@@ -219,7 +237,7 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
     // this point.
     kDataIncomplete,
 
-    // The blob merkle root is complete but the metadate write has not yet submitted to the
+    // The blob merkle root is complete but the metadata write has not yet submitted to the
     // underlying media.
     kSyncing,
 
@@ -244,7 +262,7 @@ class Blob final : public CacheNode, fbl::Recyclable<Blob> {
 
 // Verifies the integrity of the null blob (i.e. that |digest| is correct). On failure, the |blobfs|
 // metrics and corruption notifier will be updated accordingly.
-zx::result<> VerifyNullBlob(Blobfs& blobfs, const digest::Digest& digest);
+zx::result<> VerifyNullBlob(Blobfs& blobfs, const Digest& digest);
 
 }  // namespace blobfs
 

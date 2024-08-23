@@ -11,7 +11,8 @@
 #include "src/virtualization/bin/vmm/vmm_controller.h"
 
 int main(int argc, char** argv) {
-  fuchsia_logging::SetTags({"vmm"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"vmm"}).BuildAndInitialize();
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   trace::TraceProviderWithFdio trace_provider(loop.dispatcher());

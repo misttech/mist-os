@@ -35,14 +35,13 @@ type OmahaToolArgs struct {
 
 type responseAndMetadata struct {
 	// Note: Keep this struct up-to-date with ResponseAndMetadata within
-	// mock-omaha-server/src/lib.rs
+	// third_party/rust_crates/vendor/mock-omaha-server-<version>/src/lib.rs
 	Response        string `json:"response,omitempty"`
-	Merkle          string `json:"merkle,omitempty"`
 	CheckAssertion  string `json:"check_assertion,omitempty"`
 	Version         string `json:"version,omitempty"`
 	CohortAssertion string `json:"cohort_assertion,omitempty"`
 	Codebase        string `json:"codebase,omitempty"`
-	PackagePath     string `json:"package_path,omitempty"`
+	PackageName     string `json:"package_name,omitempty"`
 }
 
 type OmahaTool struct {
@@ -76,6 +75,7 @@ func NewOmahaServer(ctx context.Context, args OmahaToolArgs, providedStdout io.W
 	toolArgs := []string{
 		"--key-id", args.PrivateKeyId,
 		"--key-path", privateKeyPath,
+		"--responses-by-appid", "{}",
 	}
 	if args.RequireCup {
 		toolArgs = append(toolArgs, "--require-cup")
@@ -218,10 +218,9 @@ func (o *OmahaTool) SetPkgURL(ctx context.Context, updatePkgURL string) error {
 	responsesByAppID := map[string]responseAndMetadata{
 		o.Args.AppId: {
 			Response:       "Update",
-			Merkle:         u.Query().Get("hash"),
 			CheckAssertion: "UpdatesEnabled",
 			Codebase:       "fuchsia-pkg://" + u.Host + "/",
-			PackagePath:    strings.TrimPrefix(u.Path, "/"),
+			PackageName:    strings.TrimPrefix(u.Path, "/") + "?hash=" + u.Query().Get("hash"),
 		},
 	}
 	req, err := json.Marshal(responsesByAppID)

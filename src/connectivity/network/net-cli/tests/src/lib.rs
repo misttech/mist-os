@@ -14,14 +14,16 @@
 use anyhow::Result;
 use argh::FromArgs as _;
 use net_declare::{fidl_ip_v6, fidl_mac};
-use net_types::ip::IpVersion;
+use net_types::ip::{IpVersion, Ipv4, Ipv6};
 use netstack_testing_common::realms::KnownServiceProvider;
 use test_case::test_case;
 use {
     fidl_fuchsia_component as fcomponent, fidl_fuchsia_io as fio, fidl_fuchsia_net as fnet,
     fidl_fuchsia_net_interfaces as fnet_interfaces,
     fidl_fuchsia_net_interfaces_admin as fnet_interfaces_admin,
-    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext, fidl_fuchsia_net_test_realm as fntr,
+    fidl_fuchsia_net_interfaces_ext as fnet_interfaces_ext,
+    fidl_fuchsia_net_routes_admin as fnet_routes_admin,
+    fidl_fuchsia_net_routes_ext as fnet_routes_ext, fidl_fuchsia_net_test_realm as fntr,
 };
 
 struct NetworkTestRealmConnector<'a> {
@@ -273,4 +275,158 @@ async fn add_del_route(ip_version: IpVersion) {
         !after_remove_routes.contains(&route_record),
         "{after_remove_routes:?} should not contain {route_record:?}"
     );
+}
+
+#[fuchsia_async::run_singlethreaded(test)]
+async fn rule_list() {
+    let sandbox = netemul::TestSandbox::new().expect("failed to create sandbox");
+    let network = sandbox.create_network("network").await.expect("failed to create network");
+    let realm = sandbox
+        .create_realm(
+            "net-cli-test-realm",
+            &[KnownServiceProvider::NetworkTestRealm { require_outer_netstack: false }],
+        )
+        .expect("creating realm should succeed");
+
+    let network_test_realm = realm
+        .connect_to_protocol::<fntr::ControllerMarker>()
+        .expect("failed to connect to network test realm controller");
+
+    network_test_realm
+        .start_hermetic_network_realm(fntr::Netstack::V3)
+        .await
+        .expect("start_hermetic_network_realm failed")
+        .expect("start_hermetic_network_realm error");
+
+    let (_endpoint, _nicid, _control, _device_control) = join_network_with_hermetic_netstack(
+        &realm,
+        &network,
+        INTERFACE1_NAME,
+        INTERFACE1_MAC_ADDRESS,
+        DEFAULT_IPV6_LINK_LOCAL_SOURCE_SUBNET,
+    )
+    .await;
+
+    let connector = NetworkTestRealmConnector { realm: &realm };
+    let list_rules = || async {
+        let buffers = ffx_writer::TestBuffers::default();
+        net_cli::do_root(
+            ffx_writer::MachineWriter::new_test(Some(ffx_writer::Format::JsonPretty), &buffers),
+            net_cli::Command::from_args(&["net"], &["rule", "list"])
+                .expect("should parse args successfully"),
+            &connector,
+        )
+        .await
+        .expect("should succeed");
+        let list: Vec<serde_json::Value> =
+            serde_json::from_slice(&buffers.into_stdout()[..]).expect("should be valid JSON array");
+        list
+    };
+
+    let initial_rules = list_rules().await;
+
+    // Initially, there are no rules installed.
+    assert!(initial_rules.is_empty());
+
+    let rule_table_v6 =
+        connect_to_hermetic_network_realm_protocol::<fnet_routes_admin::RuleTableV6Marker>(&realm)
+            .await;
+
+    const RULE_SET_PRIORITY: u32 = 42;
+    let rule_set_v6 =
+        fnet_routes_ext::rules::new_rule_set::<Ipv6>(&rule_table_v6, RULE_SET_PRIORITY.into())
+            .expect("new rule set");
+
+    let main_route_table_v6 =
+        connect_to_hermetic_network_realm_protocol::<fnet_routes_admin::RouteTableV6Marker>(&realm)
+            .await;
+    let fnet_routes_admin::GrantForRouteTableAuthorization { table_id, token } =
+        fnet_routes_ext::admin::get_authorization_for_route_table::<Ipv6>(&main_route_table_v6)
+            .await
+            .expect("get authorization for route table");
+    fnet_routes_ext::rules::authenticate_for_route_table::<Ipv6>(&rule_set_v6, table_id, token)
+        .await
+        .expect("should not get FIDL error")
+        .expect("should successfully authenticate route table");
+
+    const RULE_INDEX: u32 = 123;
+    fnet_routes_ext::rules::add_rule::<Ipv6>(
+        &rule_set_v6,
+        RULE_INDEX.into(),
+        fnet_routes_ext::rules::RuleSelector {
+            from: Some(net_declare::net_subnet_v6!("::1:2:3:4/128")),
+            locally_generated: None,
+            bound_device: None,
+            mark_1_selector: None,
+            mark_2_selector: None,
+        },
+        fnet_routes_ext::rules::RuleAction::Lookup(table_id),
+    )
+    .await
+    .expect("should not get FIDL error")
+    .expect("should successfully add rule");
+
+    let v6_rule = serde_json::json!({
+        "action": format!("lookup {table_id}"),
+        "bound_device": null,
+        "from": "::1:2:3:4/128",
+        "index": RULE_INDEX,
+        "locally_generated": null,
+        "mark_1_selector": null,
+        "mark_2_selector": null,
+        "rule_set_priority": RULE_SET_PRIORITY,
+    });
+
+    let rules = list_rules().await;
+    assert_eq!(&rules[..], &[v6_rule.clone()][..]);
+
+    let rule_table_v4 =
+        connect_to_hermetic_network_realm_protocol::<fnet_routes_admin::RuleTableV4Marker>(&realm)
+            .await;
+
+    let rule_set_v4 =
+        fnet_routes_ext::rules::new_rule_set::<Ipv4>(&rule_table_v4, RULE_SET_PRIORITY.into())
+            .expect("new rule set");
+
+    let main_route_table_v4 =
+        connect_to_hermetic_network_realm_protocol::<fnet_routes_admin::RouteTableV4Marker>(&realm)
+            .await;
+    let fnet_routes_admin::GrantForRouteTableAuthorization { table_id, token } =
+        fnet_routes_ext::admin::get_authorization_for_route_table::<Ipv4>(&main_route_table_v4)
+            .await
+            .expect("get authorization for route table");
+    fnet_routes_ext::rules::authenticate_for_route_table::<Ipv4>(&rule_set_v4, table_id, token)
+        .await
+        .expect("should not get FIDL error")
+        .expect("should successfully authenticate route table");
+
+    fnet_routes_ext::rules::add_rule::<Ipv4>(
+        &rule_set_v4,
+        RULE_INDEX.into(),
+        fnet_routes_ext::rules::RuleSelector {
+            from: Some(net_declare::net_subnet_v4!("1.2.3.4/32")),
+            locally_generated: None,
+            bound_device: None,
+            mark_1_selector: None,
+            mark_2_selector: None,
+        },
+        fnet_routes_ext::rules::RuleAction::Lookup(table_id),
+    )
+    .await
+    .expect("should not get FIDL error")
+    .expect("should successfully add rule");
+
+    let v4_rule = serde_json::json!({
+        "action": format!("lookup {table_id}"),
+        "bound_device": null,
+        "from": "1.2.3.4/32",
+        "index": RULE_INDEX,
+        "locally_generated": null,
+        "mark_1_selector": null,
+        "mark_2_selector": null,
+        "rule_set_priority": RULE_SET_PRIORITY,
+    });
+
+    let rules = list_rules().await;
+    assert_eq!(&rules[..], &[v4_rule, v6_rule][..]);
 }

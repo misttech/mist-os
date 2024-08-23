@@ -211,8 +211,7 @@ mod tests {
             source: ExposeSource::Self_,
             source_name,
             target: ExposeTarget::Parent,
-            target_name: _,
-            availability: _,
+            ..
         }) => {
             assert_eq!(source_name, &cml::Name::new("fuchsia.config.MyConfig").unwrap());
         });
@@ -265,8 +264,8 @@ mod tests {
             source: ExposeSource::Void,
             source_name,
             target: ExposeTarget::Parent,
-            target_name: _,
             availability: cm_rust::Availability::Optional,
+            ..
         }) => {
             assert_eq!(source_name, &cml::Name::new("fuchsia.config.MyConfig").unwrap());
         });

@@ -18,11 +18,13 @@
 
 #include <fbl/unique_fd.h>
 
+#include "src/bringup/bin/console-launcher/console_launcher_config.h"
+
 namespace console_launcher {
 
 struct Arguments {
   bool run_shell = true;
-  bool virtcon_disable = false;
+  bool virtcon_disabled = false;
   std::string autorun_boot;
   std::string autorun_system;
 
@@ -33,7 +35,8 @@ struct Arguments {
   bool virtual_console_need_debuglog = false;
 };
 
-zx::result<Arguments> GetArguments(const fidl::ClientEnd<fuchsia_boot::Arguments>& client);
+zx::result<Arguments> GetArguments(const fidl::ClientEnd<fuchsia_boot::Arguments>& client,
+                                   const console_launcher_config::Config& config);
 
 class ConsoleLauncher {
  public:

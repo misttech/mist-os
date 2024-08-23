@@ -67,6 +67,7 @@ fn convert_state(status: &fidl_sme::ClientStatusResponse) -> deprecated::State {
     match status {
         fidl_sme::ClientStatusResponse::Connected(_) => deprecated::State::Associated,
         fidl_sme::ClientStatusResponse::Connecting(_) => deprecated::State::Associating,
+        fidl_sme::ClientStatusResponse::Roaming(_) => deprecated::State::Associating,
         fidl_sme::ClientStatusResponse::Idle(_) => deprecated::State::Disassociated,
     }
 }
@@ -79,9 +80,9 @@ fn extract_current_ap(status: &fidl_sme::ClientStatusResponse) -> Option<Box<dep
             let rssi_dbm = serving_ap_info.rssi_dbm;
             Some(Box::new(deprecated::Ap { ssid, rssi_dbm }))
         }
-        fidl_sme::ClientStatusResponse::Connecting(_) | fidl_sme::ClientStatusResponse::Idle(_) => {
-            None
-        }
+        fidl_sme::ClientStatusResponse::Connecting(_)
+        | fidl_sme::ClientStatusResponse::Roaming(_)
+        | fidl_sme::ClientStatusResponse::Idle(_) => None,
     }
 }
 

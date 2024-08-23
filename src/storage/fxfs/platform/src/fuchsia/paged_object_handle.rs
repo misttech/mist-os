@@ -998,10 +998,15 @@ impl FlushBatch {
     ) -> Result<(), Error> {
         for range in &self.ranges {
             if range.is_zero_range {
+                // TODO(https://fxbug.dev/349447236): This doesn't seem to ever do anything, so
+                // this experimental assert is going to sit around for a bit to see if there is a
+                // case we aren't aware of.
+                let pre_zero_len = transaction.mutations().len();
                 handle
                     .zero(transaction, range.range.clone())
                     .await
                     .context("zeroing a range failed")?;
+                assert_eq!(pre_zero_len, transaction.mutations().len());
             }
         }
 

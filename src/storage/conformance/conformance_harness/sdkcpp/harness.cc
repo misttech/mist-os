@@ -44,6 +44,7 @@ class SdkCppHarness : public fidl::Server<fio_test::Io1Harness> {
     config.supports_get_backing_memory(true);
     config.supports_remote_dir(true);
     config.supports_get_token(true);
+    config.supports_mutable_file(true);
     config.supported_attributes(fio::NodeAttributesQuery::kContentSize |
                                 fio::NodeAttributesQuery::kStorageSize);
 
@@ -118,7 +119,8 @@ class SdkCppHarness : public fidl::Server<fio_test::Io1Harness> {
 
 int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  fuchsia_logging::SetTags({"io_conformance_harness_sdkcpp_new"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"io_conformance_harness_sdkcpp_new"}).BuildAndInitialize();
   component::OutgoingDirectory outgoing(loop.dispatcher());
   zx::result result = outgoing.AddProtocol<fio_test::Io1Harness>(std::make_unique<SdkCppHarness>());
   ZX_ASSERT_MSG(result.is_ok(), "Failed to add protocol: %s", result.status_string());

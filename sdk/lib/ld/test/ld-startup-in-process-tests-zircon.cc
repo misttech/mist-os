@@ -89,7 +89,7 @@ void LdStartupInProcessTests::Load(std::string_view executable_name) {
 }
 
 int64_t LdStartupInProcessTests::Run() {
-  using EntryFunction = int(zx_handle_t, void*);
+  using EntryFunction = int64_t(zx_handle_t, void*);
   auto fn = reinterpret_cast<EntryFunction*>(entry_);
   zx::channel bootstrap_receiver = bootstrap().PackBootstrap();
   return fn(bootstrap_receiver.release(), GetVdso());

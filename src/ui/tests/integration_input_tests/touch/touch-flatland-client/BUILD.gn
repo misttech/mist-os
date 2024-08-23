@@ -22,7 +22,7 @@ executable("touch-flatland-client-binary") {
   output_name = "touch-flatland-client"
   sources = [ "touch-flatland-client.cc" ]
   deps = [
-    "//sdk/fidl/fuchsia.ui.app:fuchsia.ui.app_cpp",
+    "//sdk/fidl/fuchsia.element:fuchsia.element_cpp",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_cpp",
     "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_cpp",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_cpp",

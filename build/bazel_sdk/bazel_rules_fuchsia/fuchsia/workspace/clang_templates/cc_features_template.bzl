@@ -485,6 +485,17 @@ _generate_linkmap_feature = feature(
     ],
 )
 
+# TODO(https://fxbug.dev/356347441): Remove this once Bazel has been fixed.
+#
+# Adding this hard-coded feature to a C++ toolchain disables .d file processing.
+# Surprisingly, this is currently required to avoid incremental Bazel build
+# correctness issues that affect Bazel 7.2+ and 7.3.1, such as the one described
+# in the associated bug.
+_no_dotd_file_feature = feature(
+    name = "no_dotd_file",
+    enabled = True,
+)
+
 features = struct(
     default_compile_flags = _default_compile_flags_feature,
     dbg = _dbg_feature,
@@ -497,6 +508,7 @@ features = struct(
     static_cpp_standard_library = _static_cpp_standard_library_feature,
     no_runtime_library_search_directories = _no_runtime_library_search_directories_feature,
     generate_linkmap = _generate_linkmap_feature,
+    no_dotd_file = _no_dotd_file_feature,
 )
 
 # Redefine the features here so that we can share with the in-tree definitions.

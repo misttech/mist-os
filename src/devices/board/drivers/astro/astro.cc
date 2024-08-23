@@ -175,15 +175,8 @@ zx_status_t Astro::Create(void* ctx, zx_device_t* parent) {
     return status;
   }
 
-  iommu_protocol_t iommu;
-
-  status = device_get_protocol(parent, ZX_PROTOCOL_IOMMU, &iommu);
-  if (status != ZX_OK) {
-    return status;
-  }
-
   fbl::AllocChecker ac;
-  auto board = fbl::make_unique_checked<Astro>(&ac, parent, std::move(endpoints->client), &iommu);
+  auto board = fbl::make_unique_checked<Astro>(&ac, parent, std::move(endpoints->client));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }

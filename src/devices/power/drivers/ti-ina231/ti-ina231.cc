@@ -9,6 +9,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 
+#include <bind/fuchsia/cpp/bind.h>
 #include <ddktl/fidl.h>
 #include <fbl/auto_lock.h>
 
@@ -94,12 +95,12 @@ zx_status_t Ina231Device::Create(void* ctx, zx_device_t* parent) {
       fuchsia_hardware_power_sensor::Service::Name,
   };
 
-  zx_device_prop_t props[] = {
-      {BIND_POWER_SENSOR_DOMAIN, 0, metadata.power_sensor_domain},
+  zx_device_str_prop_t props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::POWER_SENSOR_DOMAIN, metadata.power_sensor_domain),
   };
   dev->outgoing_server_end_ = std::move(endpoints->server);
   status = dev->DdkAdd(ddk::DeviceAddArgs("ti-ina231")
-                           .set_props(props)
+                           .set_str_props(props)
                            .set_fidl_service_offers(offers)
                            .set_outgoing_dir(endpoints->client.TakeChannel())
                            .set_proto_id(ZX_PROTOCOL_POWER_SENSOR)

@@ -1,7 +1,7 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
+@available(added=NEXT)
 library fuchsia.element.test;
 
 using fuchsia.component.sandbox;
@@ -21,6 +21,7 @@ open protocol RealmFactory {
     /// Specifies the options to use when creating the realm.
     ///
     /// Returns OperationError.INVALID if called more than once.
+    @available(added=HEAD)
     flexible CreateRealm(resource struct {
         options RealmOptions;
         realm_server server_end:fuchsia.testing.harness.RealmProxy;

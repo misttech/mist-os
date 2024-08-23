@@ -42,6 +42,12 @@ class MsiInterruptDispatcher : public InterruptDispatcher {
   zx_status_t RegisterInterruptHandler();
   void DeactivateInterrupt() final {}
 
+  // This override of WakeVector::GetDiagnostics is marked final to prevent further overrides.
+  // Because this method cannot be overridden further, it is safe for this class to initialize /
+  // destroy InterruptDispatcher::wake_event_ in the constructor / destructor. See lib/wake-vector.h
+  // for more details.
+  void GetDiagnostics(WakeVector::Diagnostics& diagnostics_out) const final;
+
  protected:
   MsiInterruptDispatcher(fbl::RefPtr<MsiAllocation> alloc, fbl::RefPtr<VmMapping> mapping,
                          uint32_t base_irq_id, uint32_t msi_id,
@@ -51,6 +57,10 @@ class MsiInterruptDispatcher : public InterruptDispatcher {
   static void IrqHandler(void* ctx);
 
  private:
+  // MSI / MSI-X interrupts share a masking approach and should be masked while
+  // being serviced and unmasked while waiting for an interrupt message to arrive.
+  static constexpr uint32_t kFlags = INTERRUPT_UNMASK_PREWAIT | INTERRUPT_MASK_POSTWAIT;
+
   // The MSI allocation block this dispatcher shares.
   const fbl::RefPtr<MsiAllocation> alloc_;
   // The config space of the MSI capability controlling this MSI vector.

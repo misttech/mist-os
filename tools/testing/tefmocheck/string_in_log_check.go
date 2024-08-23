@@ -739,63 +739,10 @@ func infraToolLogChecks() []FailureModeCheck {
 			AttributeToTest: true,
 			AddTag:          true,
 		},
-		// These errors happen when the ssh keepalive fails, which in turns closes the SSH
-		// connection. It should come before the ProcessTerminatedMsg to distinguish when the
-		// SSH connection terminates due to the keepalive or something else.
-		&stringInLogCheck{
-			String:          "botanist DEBUG: error sending keepalive",
-			Type:            swarmingOutputType,
-			AlwaysFlake:     true,
-			AttributeToTest: true,
-			AddTag:          true,
-			ExceptStrings: []string{
-				// Reboots by user request mean the test caused the target
-				// to reboot which would cause the SSH connection to fail.
-				"Reboot(UserRequest)",
-				"REBOOT REASON (USER REQUEST)",
-				// Lacewing tests output these logs when rebooting, powering
-				// off the switch to the device, or putting the device into
-				// fastboot mode.
-				"Lacewing is rebooting",
-				"Lacewing is powering off",
-				"Lacewing is booting the following device to fastboot mode",
-				// OTA tests use dm reboot to reboot the device.
-				"dm reboot",
-				// The NetstackIperfTest blasts a lot of traffic at the device
-				// and often gets close to saturating the host-device link,
-				// which can cause keepalive failures.
-				"==========> NetstackIperfTest <==========",
-			},
-		},
-		&stringInLogCheck{
-			String:          "botanist DEBUG: ssh keepalive timed out",
-			Type:            swarmingOutputType,
-			AlwaysFlake:     true,
-			AttributeToTest: true,
-			AddTag:          true,
-			ExceptStrings: []string{
-				"Reboot(UserRequest)",
-				"REBOOT REASON (USER REQUEST)",
-				"Lacewing is rebooting",
-				"Lacewing is powering off",
-				"Lacewing is booting the following device to fastboot mode",
-				"dm reboot",
-				"==========> NetstackIperfTest <==========",
-			},
-		},
 		&stringInLogCheck{
 			String:          "remote command exited without exit status or exit signal",
 			Type:            swarmingOutputType,
 			AlwaysFlake:     true,
-			AttributeToTest: true,
-			AddTag:          true,
-		},
-		// For https://fxbug.dev/317290699.
-		&stringInLogCheck{
-			String:          sshutilconstants.ProcessTerminatedMsg,
-			Type:            swarmingOutputType,
-			SkipPassedTest:  true,
-			IgnoreFlakes:    true,
 			AttributeToTest: true,
 			AddTag:          true,
 		},

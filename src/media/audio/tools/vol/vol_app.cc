@@ -618,8 +618,8 @@ int main(int argc, const char** argv) {
       "WARNING: vol is deprecated. Please use `ffx audio device`\n"
       "to set device gain/mute/AGC settings. For more information, run \n"
       "`ffx audio device --help`\n\n");
-
-  fuchsia_logging::SetTags({"vol_util"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"vol_util"}).BuildAndInitialize();
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   media::VolApp app(argc, argv,

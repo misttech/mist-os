@@ -9,6 +9,7 @@
 #include <lib/media/codec_impl/codec_buffer.h>
 #include <lib/media/codec_impl/codec_packet.h>
 
+#include <cmath>
 #include <optional>
 
 // These are default values recommended in Bluetooth Core spec v5.3 section 9.2.

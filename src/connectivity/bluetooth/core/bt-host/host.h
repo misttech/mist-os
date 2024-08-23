@@ -56,7 +56,7 @@ class BtHostComponent {
   BtHostComponent(async_dispatcher_t* dispatcher, const std::string& device_path,
                   bool initialize_rng);
 
-  pw::async::fuchsia::FuchsiaDispatcher pw_dispatcher_;
+  pw::async_fuchsia::FuchsiaDispatcher pw_dispatcher_;
 
   // Path of bt-hci device the component supports
   std::string device_path_;

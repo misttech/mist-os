@@ -202,9 +202,9 @@ impl OutputWorker {
         self.va_output = Some(va_output);
 
         // Monotonic timestamp returned by the most-recent OnStart/OnPositionNotify/OnStop response.
-        let mut last_timestamp = zx::Time::from_nanos(0);
+        let mut last_timestamp = zx::MonotonicTime::from_nanos(0);
         // Observed monotonic time that OnStart/OnPositionNotify/OnStop messages actually arrived.
-        let mut last_event_time = zx::Time::from_nanos(0);
+        let mut last_event_time = zx::MonotonicTime::from_nanos(0);
 
         loop {
             select! {
@@ -245,27 +245,27 @@ impl OutputWorker {
                                                    notifications_per_ring).await?;
                         },
                         Some(fidl_fuchsia_virtualaudio::DeviceEvent::OnStart { start_time }) => {
-                            if self.capturing && last_timestamp > zx::Time::from_nanos(0) {
+                            if self.capturing && last_timestamp > zx::MonotonicTime::from_nanos(0) {
                                 trace!("AudioFacade::OutputWorker: Extraction OnPositionNotify received before OnStart");
                             }
-                            last_timestamp = zx::Time::from_nanos(start_time);
-                            last_event_time = zx::Time::get_monotonic();
+                            last_timestamp = zx::MonotonicTime::from_nanos(start_time);
+                            last_event_time = zx::MonotonicTime::get();
                         },
                         Some(fidl_fuchsia_virtualaudio::DeviceEvent::OnStop { stop_time: _, ring_position: _ }) => {
-                            if last_timestamp == zx::Time::from_nanos(0) {
+                            if last_timestamp == zx::MonotonicTime::from_nanos(0) {
                                 trace!(
                                     "AudioFacade::OutputWorker: Extraction OnPositionNotify timestamp cleared before OnStop");
                             }
-                            last_timestamp = zx::Time::from_nanos(0);
-                            last_event_time = zx::Time::from_nanos(0);
+                            last_timestamp = zx::MonotonicTime::from_nanos(0);
+                            last_event_time = zx::MonotonicTime::from_nanos(0);
                         },
                         Some(fidl_fuchsia_virtualaudio::DeviceEvent::OnPositionNotify { monotonic_time, ring_position }) => {
-                            let monotonic_zx_time = zx::Time::from_nanos(monotonic_time);
-                            let now = zx::Time::get_monotonic();
+                            let monotonic_zx_time = zx::MonotonicTime::from_nanos(monotonic_time);
+                            let now = zx::MonotonicTime::get();
 
                             // To minimize logspam, log glitches only when capturing.
                             if self.capturing {
-                                if last_timestamp == zx::Time::from_nanos(0) {
+                                if last_timestamp == zx::MonotonicTime::from_nanos(0) {
                                     trace!(
                                         "AudioFacade::OutputWorker: Extraction OnStart not received before OnPositionNotify");
                                 }
@@ -359,7 +359,7 @@ impl VirtualOutput {
                     is_input: Some(false),
                     ..Default::default()
                 },
-                zx::Time::INFINITE,
+                zx::MonotonicTime::INFINITE,
             )?
             .map_err(|status| anyhow!("GetDefaultConfiguration returned error {:?}", status))?;
         config.unique_id = Some(AUDIO_OUTPUT_ID);
@@ -395,7 +395,7 @@ impl VirtualOutput {
         let (va_output_client, va_output_server) =
             create_endpoints::<fidl_fuchsia_virtualaudio::DeviceMarker>();
         vad_control
-            .add_device(&config, va_output_server, zx::Time::INFINITE)?
+            .add_device(&config, va_output_server, zx::MonotonicTime::INFINITE)?
             .map_err(|status| anyhow!("AddDevice returned error {:?}", status))?;
 
         // Create a channel for handling requests.
@@ -629,9 +629,9 @@ impl InputWorker {
         self.va_input = Some(va_input);
 
         // Monotonic timestamp returned by the most-recent OnStart/OnPositionNotify/OnStop response.
-        let mut last_timestamp = zx::Time::from_nanos(0);
+        let mut last_timestamp = zx::MonotonicTime::from_nanos(0);
         // Observed monotonic time that OnStart/OnPositionNotify/OnStop messages actually arrived.
-        let mut last_event_time = zx::Time::from_nanos(0);
+        let mut last_event_time = zx::MonotonicTime::from_nanos(0);
 
         loop {
             select! {
@@ -664,26 +664,26 @@ impl InputWorker {
                                                    notifications_per_ring).await?;
                         },
                         Some(fidl_fuchsia_virtualaudio::DeviceEvent::OnStart { start_time }) => {
-                            if last_timestamp > zx::Time::from_nanos(0) {
+                            if last_timestamp > zx::MonotonicTime::from_nanos(0) {
                                 trace!("AudioFacade::InputWorker: Injection OnPositionNotify received before OnStart");
                             }
-                            last_timestamp = zx::Time::from_nanos(start_time);
-                            last_event_time = zx::Time::get_monotonic();
+                            last_timestamp = zx::MonotonicTime::from_nanos(start_time);
+                            last_event_time = zx::MonotonicTime::get();
                         },
                         Some(fidl_fuchsia_virtualaudio::DeviceEvent::OnStop { stop_time: _, ring_position: _ }) => {
-                            if last_timestamp == zx::Time::from_nanos(0) {
+                            if last_timestamp == zx::MonotonicTime::from_nanos(0) {
                                 trace!("AudioFacade::InputWorker: Injection OnPositionNotify timestamp cleared before OnStop");
                             }
-                            last_timestamp = zx::Time::from_nanos(0);
-                            last_event_time = zx::Time::from_nanos(0);
+                            last_timestamp = zx::MonotonicTime::from_nanos(0);
+                            last_event_time = zx::MonotonicTime::from_nanos(0);
                         },
                         Some(fidl_fuchsia_virtualaudio::DeviceEvent::OnPositionNotify { monotonic_time, ring_position }) => {
-                            let monotonic_zx_time = zx::Time::from_nanos(monotonic_time);
-                            let now = zx::Time::get_monotonic();
+                            let monotonic_zx_time = zx::MonotonicTime::from_nanos(monotonic_time);
+                            let now = zx::MonotonicTime::get();
 
                             // To minimize logspam, log glitches only when writing audio.
                             if self.inj_data.len() > 0 {
-                                if last_timestamp == zx::Time::from_nanos(0) {
+                                if last_timestamp == zx::MonotonicTime::from_nanos(0) {
                                     trace!("AudioFacade::InputWorker: Injection OnStart not received before OnPositionNotify");
                                 }
 
@@ -770,7 +770,7 @@ impl VirtualInput {
                     is_input: Some(true),
                     ..Default::default()
                 },
-                zx::Time::INFINITE,
+                zx::MonotonicTime::INFINITE,
             )?
             .map_err(|status| anyhow!("GetDefaultConfiguration returned error {:?}", status))?;
         config.unique_id = Some(AUDIO_INPUT_ID);
@@ -806,7 +806,7 @@ impl VirtualInput {
         let (va_input_client, va_input_server) =
             create_endpoints::<fidl_fuchsia_virtualaudio::DeviceMarker>();
         vad_control
-            .add_device(&config, va_input_server, zx::Time::INFINITE)?
+            .add_device(&config, va_input_server, zx::MonotonicTime::INFINITE)?
             .map_err(|status| anyhow!("AddDevice returned error {:?}", status))?;
 
         // Create a channel for handling requests.
@@ -867,7 +867,7 @@ impl AudioFacade {
         if !*(initialized) {
             // Make sure there are no other virtual devices to ensure that audio_core
             // will connect to our new virtual devices.
-            self.vad_control.remove_all(zx::Time::INFINITE)?;
+            self.vad_control.remove_all(zx::MonotonicTime::INFINITE)?;
             self.audio_input.write().await.start_input(&self.vad_control)?;
             self.audio_output.write().await.start_output(&self.vad_control)?;
             *(initialized) = true;

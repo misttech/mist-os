@@ -137,8 +137,31 @@ local_only=0
 use_py_wrapper=0
 rewrapper_opts=()
 
+# Intercept and accumulate input/output file arguments.
+# Paths must be relative to exec_root.
+remote_input_files=()
+remote_output_files=()
+remote_output_dirs=()
+
+prev_opt=
+prev_opt_append=
 for opt
 do
+  if [[ -n "$prev_opt" ]]
+  then
+    eval "$prev_opt"=\$opt
+    prev_opt=
+    shift
+    continue
+  fi
+  if [[ -n "$prev_opt_append" ]]
+  then
+    eval "$prev_opt_append"+=\(\$opt\)
+    prev_opt_append=
+    shift
+    continue
+  fi
+
   keep_opt=1
   # Extract optarg from --opt=optarg
   optarg=
@@ -156,6 +179,17 @@ do
       ;;
     --local) local_only=1 ;;
     --working-subdir=*) working_subdir="$optarg"; keep_opt=0 ;;
+
+    # The following options will be reconstructed from cumulative arguments:
+    --inputs=*) remote_input_files+=( "$optarg" ) ; keep_opt=0 ;;
+    --inputs) prev_opt_append=remote_input_files ; keep_opt=0 ;;
+
+    --output_files=*) remote_output_files+=( "$optarg" ) ; keep_opt=0 ;;
+    --output_files) prev_opt_append=remote_output_files ; keep_opt=0 ;;
+
+    --output_directories=*) remote_output_dirs+=( "$optarg" ) ; keep_opt=0 ;;
+    --output_directories) prev_opt_append=remote_output_dirs ; keep_opt=0 ;;
+
     --) shift; break ;;
   esac
   if [[ "$keep_opt" == 1 ]]
@@ -244,11 +278,6 @@ then
 fi
 
 [[ -n "$output" ]] || { msg "Missing required compiler option -o" ; exit 1 ;}
-
-# Paths must be relative to exec_root.
-remote_input_files=()
-remote_output_files=()
-remote_output_dirs=()
 
 # TODO(b/302613832): delete this once upstream supports it.
 if [[ "$save_temps" == 1 ]]

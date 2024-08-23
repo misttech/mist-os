@@ -23,17 +23,6 @@ group("connectivity_no_e2e") {
   ]
 }
 
-group("tools") {
-  testonly = true
-  deps = [
-    "lowpan/tools",
-    "network/bundles:tools",
-    "network/mdns/bundles:utils",
-    "network/net-cli",
-    "wlan:tools",
-  ]
-}
-
 group("tests_no_e2e") {
   testonly = true
   assert_no_deps = e2e_test_libs

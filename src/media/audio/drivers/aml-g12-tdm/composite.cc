@@ -222,7 +222,7 @@ zx::result<> Driver::Start() {
     return result.take_error();
   }
 
-  FDF_SLOG(INFO, "Started");
+  FDF_SLOG(INFO, "Driver started");
 
   return zx::ok();
 }

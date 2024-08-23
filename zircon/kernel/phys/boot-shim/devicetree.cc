@@ -45,9 +45,10 @@ void InitMemory(void* dtb, AddressSpace* aspace) {
                                 std::numeric_limits<uintptr_t>::max());
   devicetree::Devicetree fdt(fdt_blob);
 
+  boot_shim::RamoopsMatcher ramoops("init-memory", stdout);
   boot_shim::DevicetreeMemoryMatcher memory("init-memory", stdout, range_storage);
   boot_shim::DevicetreeChosenNodeMatcher<> chosen("init-memory", stdout);
-  ZX_ASSERT(devicetree::Match(fdt, chosen, memory));
+  ZX_ASSERT(devicetree::Match(fdt, chosen, memory, ramoops));
 
   //
   // The following 'special' memory ranges are those that we already know are
@@ -55,7 +56,7 @@ void InitMemory(void* dtb, AddressSpace* aspace) {
   //
   uint64_t phys_start = reinterpret_cast<uint64_t>(PHYS_LOAD_ADDRESS);
   uint64_t phys_end = reinterpret_cast<uint64_t>(_end);
-  ktl::array<memalloc::Range, 3> special_range_storage = {
+  ktl::array<memalloc::Range, 4> special_range_storage = {
       memalloc::Range{
           .addr = phys_start,
           .size = phys_end - phys_start,
@@ -70,12 +71,21 @@ void InitMemory(void* dtb, AddressSpace* aspace) {
   cpp20::span<memalloc::Range> special_ranges = cpp20::span{special_range_storage}.subspan(0, 2);
 
   if (!chosen.zbi().empty()) {
-    special_range_storage[2] = memalloc::Range{
+    special_range_storage[special_ranges.size()] = memalloc::Range{
         .addr = reinterpret_cast<uintptr_t>(chosen.zbi().data()),
         .size = chosen.zbi().size(),
         .type = memalloc::Type::kDataZbi,
     };
-    special_ranges = special_range_storage;
+    special_ranges = cpp20::span(special_range_storage).subspan(0, special_ranges.size() + 1);
+  }
+
+  if (ramoops.range()) {
+    special_range_storage[special_ranges.size()] = memalloc::Range{
+        .addr = reinterpret_cast<uintptr_t>(ramoops.range()->base),
+        .size = ramoops.range()->length,
+        .type = memalloc::Type::kNvram,
+    };
+    special_ranges = cpp20::span(special_range_storage).subspan(0, special_ranges.size() + 1);
   }
 
   // The matching phase above recorded all of the memory ranges encoded within

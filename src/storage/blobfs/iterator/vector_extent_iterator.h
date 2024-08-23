@@ -5,11 +5,13 @@
 #ifndef SRC_STORAGE_BLOBFS_ITERATOR_VECTOR_EXTENT_ITERATOR_H_
 #define SRC_STORAGE_BLOBFS_ITERATOR_VECTOR_EXTENT_ITERATOR_H_
 
-#include <stdbool.h>
+#include <lib/zx/result.h>
 #include <stdint.h>
-#include <zircon/types.h>
 
+#include <cstddef>
 #include <vector>
+
+#include <fbl/macros.h>
 
 #include "src/storage/blobfs/allocator/extent_reserver.h"
 #include "src/storage/blobfs/format.h"

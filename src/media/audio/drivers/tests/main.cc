@@ -17,8 +17,8 @@ int main(int argc, char** argv) {
   if (!fxl::SetTestSettings(command_line)) {
     return EXIT_FAILURE;
   }
-
-  fuchsia_logging::SetTags({"audio_driver_tests"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"audio_driver_tests"}).BuildAndInitialize();
   testing::InitGoogleTest(&argc, argv);
 
   // --devfs-only: Only test devices detected in devfs; don't add/test Bluetooth audio a2dp output.
@@ -31,7 +31,8 @@ int main(int argc, char** argv) {
 
   // --admin: Validate commands that require exclusive access, such as SetFormat.
   //   Otherwise, omit AdminTest cases if a device/driver is exposed in the device tree.
-  //   TODO(https://fxbug.dev/42175212): Enable AdminTests if no service is already connected to the driver.
+  //   TODO(https://fxbug.dev/42175212): Enable AdminTests if no service is already connected to the
+  //   driver.
   bool expect_audio_core_not_connected = command_line.HasOption("admin");
 
   // --run-position-tests: Include audio position test cases (requires realtime capable system).

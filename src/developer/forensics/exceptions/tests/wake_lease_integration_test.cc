@@ -242,7 +242,7 @@ TEST_F(WakeLeaseIntegrationTest, AcquiresLease) {
   // Take an assertive dependency on ApplicationActivity to indicate boot complete, allowing SAG to
   // suspend if it deems appropriate. After we've acquired our wake lease using the WakeLease class,
   // we'll drop the lease on ApplicationActivity and check that ExecutionState was held at the
-  // kWakeHandling level (the level that WakeLease has an opportunistic dependency on).
+  // kSuspending level (the level that WakeLease has an opportunistic dependency on).
   ElementWithLease aa_element = RaiseApplicationActivity();
   ASSERT_EQ(GetCurrentLevel(kApplicationActivity), ToUint(ApplicationActivityLevel::kActive));
 
@@ -295,7 +295,7 @@ TEST_F(WakeLeaseIntegrationTest, AcquiresLease) {
   ASSERT_FALSE(aa_element.element_control.is_valid());
 
   RunLoopUntilIdle();
-  ASSERT_EQ(GetCurrentLevel(es_status_client), ToUint(ExecutionStateLevel::kWakeHandling));
+  ASSERT_EQ(GetCurrentLevel(es_status_client), ToUint(ExecutionStateLevel::kSuspending));
 
   // Drop |lease| so nothing is holding the system awake anymore.
   ASSERT_TRUE(lease.UnbindMaybeGetEndpoint().is_ok());

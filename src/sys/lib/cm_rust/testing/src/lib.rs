@@ -92,7 +92,14 @@ impl ComponentDeclBuilder {
 
     /// Add a use decl.
     pub fn use_(mut self, use_: impl Into<cm_rust::UseDecl>) -> Self {
-        self.result.uses.push(use_.into());
+        let use_ = use_.into();
+        if let cm_rust::UseDecl::Runner(_) = &use_ {
+            assert!(
+                self.result.program.as_ref().and_then(|p| p.runner.as_ref()).is_none(),
+                "tried to add a use decl for a runner while program.runner is set"
+            );
+        }
+        self.result.uses.push(use_);
         self
     }
 
@@ -822,6 +829,7 @@ impl UseBuilder {
                 availability: self.availability,
                 type_: self.config_type.expect("config_type not set"),
                 default: None,
+                source_dictionary: self.source_dictionary,
             }),
             CapabilityTypeName::Resolver | CapabilityTypeName::Dictionary => unreachable!(),
         }
@@ -1016,6 +1024,7 @@ impl ExposeBuilder {
                 cm_rust::ExposeDecl::Config(cm_rust::ExposeConfigurationDecl {
                     source: self.source.expect("source not set"),
                     source_name: self.source_name.expect("name not set"),
+                    source_dictionary: self.source_dictionary,
                     target: self.target,
                     target_name: self.target_name.expect("name not set"),
                     availability: self.availability,
@@ -1263,6 +1272,7 @@ impl OfferBuilder {
                 source_instance_filter: self.source_instance_filter,
                 renamed_instances: self.renamed_instances,
                 availability: self.availability,
+                dependency_type: Default::default(),
             }),
             CapabilityTypeName::Directory => {
                 cm_rust::OfferDecl::Directory(cm_rust::OfferDirectoryDecl {
@@ -1317,6 +1327,7 @@ impl OfferBuilder {
                     target: self.target.expect("target not set"),
                     target_name: self.target_name.expect("name not set"),
                     availability: self.availability,
+                    source_dictionary: self.source_dictionary,
                 })
             }
             CapabilityTypeName::Dictionary => {

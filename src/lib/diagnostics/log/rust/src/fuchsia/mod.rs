@@ -449,7 +449,7 @@ pub fn increment_clock(duration: Duration) {
 #[doc(hidden)]
 pub fn get_now() -> i64 {
     #[cfg(not(test))]
-    return zx::Time::get_monotonic().into_nanos();
+    return zx::MonotonicTime::get().into_nanos();
 
     #[cfg(test)]
     CURRENT_TIME_NANOS.load(Ordering::Relaxed)

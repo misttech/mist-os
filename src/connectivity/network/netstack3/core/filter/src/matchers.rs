@@ -2,52 +2,27 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use alloc::string::String;
 use core::fmt::Debug;
 use core::num::NonZeroU64;
 use core::ops::RangeInclusive;
-use netstack3_base::InspectableValue;
+use netstack3_base::{DeviceNameMatcher, DeviceWithName, InspectableValue, Matcher, SubnetMatcher};
 
 use derivative::Derivative;
-use net_types::ip::{IpAddress, Subnet};
+use net_types::ip::IpAddress;
 use packet_formats::ip::IpExt;
 
 use crate::logic::Interfaces;
 use crate::packets::{IpPacket, MaybeTransportPacket, TransportPacketData};
 
-/// Matches on metadata of packets that come through the filtering framework.
-trait Matcher<T> {
-    /// Returns whether the provided value matches.
-    fn matches(&self, actual: &T) -> bool;
-
-    /// Returns whether the provided value is set and matches.
-    fn required_matches(&self, actual: Option<&T>) -> bool {
-        actual.map_or(false, |actual| self.matches(actual))
-    }
-}
-
-/// Implement `Matcher` for optional matchers, so that if a matcher is left
-/// unspecified, it matches all packets by default.
-impl<T, O> Matcher<T> for Option<O>
-where
-    O: Matcher<T>,
-{
-    fn matches(&self, actual: &T) -> bool {
-        self.as_ref().map_or(true, |expected| expected.matches(actual))
-    }
-
-    fn required_matches(&self, actual: Option<&T>) -> bool {
-        self.as_ref().map_or(true, |expected| expected.required_matches(actual))
-    }
-}
-
 /// A matcher for network interfaces.
-#[derive(Clone, Debug)]
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub enum InterfaceMatcher<DeviceClass> {
     /// The ID of the interface as assigned by the netstack.
     Id(NonZeroU64),
-    /// The name of the interface.
-    Name(String),
+    /// Match based on name.
+    #[derivative(Debug = "transparent")]
+    Name(DeviceNameMatcher),
     /// The device class of the interface.
     DeviceClass(DeviceClass),
 }
@@ -61,12 +36,9 @@ impl<DeviceClass: Debug> InspectableValue for InterfaceMatcher<DeviceClass> {
 /// Allows filtering code to match on properties of an interface (ID, name, and
 /// device class) without Netstack3 Core (or Bindings, in the case of the device
 /// class) having to specifically expose that state.
-pub trait InterfaceProperties<DeviceClass> {
+pub trait InterfaceProperties<DeviceClass>: DeviceWithName {
     /// Returns whether the provided ID matches the interface.
     fn id_matches(&self, id: &NonZeroU64) -> bool;
-
-    /// Returns whether the provided name matches the interface.
-    fn name_matches(&self, name: &str) -> bool;
 
     /// Returns whether the provided device class matches the interface.
     fn device_class_matches(&self, device_class: &DeviceClass) -> bool;
@@ -78,7 +50,7 @@ impl<DeviceClass, I: InterfaceProperties<DeviceClass>> Matcher<I>
     fn matches(&self, actual: &I) -> bool {
         match self {
             InterfaceMatcher::Id(id) => actual.id_matches(id),
-            InterfaceMatcher::Name(name) => actual.name_matches(name),
+            InterfaceMatcher::Name(name_matcher) => name_matcher.matches(actual),
             InterfaceMatcher::DeviceClass(device_class) => {
                 actual.device_class_matches(device_class)
             }
@@ -87,10 +59,12 @@ impl<DeviceClass, I: InterfaceProperties<DeviceClass>> Matcher<I>
 }
 
 /// A matcher for IP addresses.
-#[derive(Clone, Debug)]
+#[derive(Clone, Derivative)]
+#[derivative(Debug)]
 pub enum AddressMatcherType<A: IpAddress> {
     /// A subnet that must contain the address.
-    Subnet(Subnet<A>),
+    #[derivative(Debug = "transparent")]
+    Subnet(SubnetMatcher<A>),
     /// An inclusive range of IP addresses that must contain the address.
     Range(RangeInclusive<A>),
 }
@@ -98,7 +72,7 @@ pub enum AddressMatcherType<A: IpAddress> {
 impl<A: IpAddress> Matcher<A> for AddressMatcherType<A> {
     fn matches(&self, actual: &A) -> bool {
         match self {
-            Self::Subnet(subnet) => subnet.contains(actual),
+            Self::Subnet(subnet_matcher) => subnet_matcher.matches(actual),
             Self::Range(range) => range.contains(actual),
         }
     }
@@ -221,9 +195,12 @@ impl<I: IpExt, DeviceClass> PacketMatcher<I, DeviceClass> {
 
 #[cfg(test)]
 pub(crate) mod testutil {
+    use alloc::string::String;
+    use core::num::NonZeroU64;
+
     use const_unwrap::const_unwrap_option;
     use netstack3_base::testutil::{FakeStrongDeviceId, FakeWeakDeviceId};
-    use netstack3_base::{DeviceIdentifier, StrongDeviceIdentifier};
+    use netstack3_base::{DeviceIdentifier, DeviceWithName, StrongDeviceIdentifier};
 
     use super::*;
     use crate::context::testutil::FakeDeviceClass;
@@ -261,13 +238,15 @@ pub(crate) mod testutil {
         }
     }
 
+    impl DeviceWithName for FakeDeviceId {
+        fn name_matches(&self, name: &str) -> bool {
+            &self.name == name
+        }
+    }
+
     impl InterfaceProperties<FakeDeviceClass> for FakeDeviceId {
         fn id_matches(&self, id: &NonZeroU64) -> bool {
             &self.id == id
-        }
-
-        fn name_matches(&self, name: &str) -> bool {
-            &self.name == name
         }
 
         fn device_class_matches(&self, class: &FakeDeviceClass) -> bool {
@@ -302,10 +281,6 @@ mod base_testutil {
             unimplemented!()
         }
 
-        fn name_matches(&self, _: &str) -> bool {
-            unimplemented!()
-        }
-
         fn device_class_matches(&self, _: &()) -> bool {
             unimplemented!()
         }
@@ -316,10 +291,6 @@ mod base_testutil {
             unimplemented!()
         }
 
-        fn name_matches(&self, _: &str) -> bool {
-            unimplemented!()
-        }
-
         fn device_class_matches(&self, _: &()) -> bool {
             unimplemented!()
         }
@@ -327,10 +298,6 @@ mod base_testutil {
 
     impl InterfaceProperties<()> for netstack3_base::testutil::MultipleDevicesId {
         fn id_matches(&self, _: &core::num::NonZeroU64) -> bool {
-            unimplemented!()
-        }
-
-        fn name_matches(&self, _: &str) -> bool {
             unimplemented!()
         }
 
@@ -358,7 +325,7 @@ mod tests {
     };
 
     #[test_case(InterfaceMatcher::Id(wlan_interface().id))]
-    #[test_case(InterfaceMatcher::Name(wlan_interface().name.clone()))]
+    #[test_case(InterfaceMatcher::Name(DeviceNameMatcher(wlan_interface().name.clone())))]
     #[test_case(InterfaceMatcher::DeviceClass(wlan_interface().class))]
     fn match_on_interface_properties(matcher: InterfaceMatcher<FakeDeviceClass>) {
         let matcher = PacketMatcher {
@@ -387,7 +354,7 @@ mod tests {
     }
 
     #[test_case(InterfaceMatcher::Id(wlan_interface().id))]
-    #[test_case(InterfaceMatcher::Name(wlan_interface().name.clone()))]
+    #[test_case(InterfaceMatcher::Name(DeviceNameMatcher(wlan_interface().name.clone())))]
     #[test_case(InterfaceMatcher::DeviceClass(wlan_interface().class))]
     fn interface_matcher_specified_but_not_available_in_hook_does_not_match(
         matcher: InterfaceMatcher<FakeDeviceClass>,
@@ -437,7 +404,9 @@ mod tests {
     ) {
         let matcher = AddressMatcher {
             matcher: match test_case {
-                AddressMatcherTestCase::Subnet => AddressMatcherType::Subnet(I::SUBNET),
+                AddressMatcherTestCase::Subnet => {
+                    AddressMatcherType::Subnet(SubnetMatcher(I::SUBNET))
+                }
                 AddressMatcherTestCase::Range => {
                     // Generate the inclusive address range that is equivalent to the subnet.
                     let start = I::SUBNET.network();
@@ -625,11 +594,11 @@ mod tests {
     fn packet_must_match_all_provided_matchers<I: TestIpExt>() {
         let matcher = PacketMatcher::<I, FakeDeviceClass> {
             src_address: Some(AddressMatcher {
-                matcher: AddressMatcherType::Subnet(I::SUBNET),
+                matcher: AddressMatcherType::Subnet(SubnetMatcher(I::SUBNET)),
                 invert: false,
             }),
             dst_address: Some(AddressMatcher {
-                matcher: AddressMatcherType::Subnet(I::SUBNET),
+                matcher: AddressMatcherType::Subnet(SubnetMatcher(I::SUBNET)),
                 invert: false,
             }),
             ..Default::default()

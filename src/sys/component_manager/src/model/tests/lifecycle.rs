@@ -552,7 +552,7 @@ async fn on_terminate_stop_triggers_reboot() {
         assert_eq!(reason, fstatecontrol::RebootReason::CriticalComponentFailure);
     };
     join!(stop, recv_reboot);
-    assert!(test.model.top_instance().has_reboot_task().await);
+    assert!(test.model.top_instance().has_reboot_task());
 }
 
 #[fuchsia::test]
@@ -595,7 +595,7 @@ async fn on_terminate_exit_triggers_reboot() {
         _ => panic!("unexpected request"),
     };
     assert_eq!(reason, fstatecontrol::RebootReason::CriticalComponentFailure);
-    assert!(test.model.top_instance().has_reboot_task().await);
+    assert!(test.model.top_instance().has_reboot_task());
 }
 
 #[fuchsia::test]
@@ -633,7 +633,7 @@ async fn reboot_shutdown_does_not_trigger_reboot() {
     ActionsManager::register(component.clone(), ShutdownAction::new(ShutdownType::Instance))
         .await
         .unwrap();
-    assert!(!test.model.top_instance().has_reboot_task().await);
+    assert!(!test.model.top_instance().has_reboot_task());
 }
 
 #[fuchsia::test]

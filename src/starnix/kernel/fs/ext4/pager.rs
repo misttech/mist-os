@@ -130,7 +130,7 @@ impl Pager {
             };
         });
         loop {
-            match self.port.wait(zx::Time::INFINITE) {
+            match self.port.wait(zx::MonotonicTime::INFINITE) {
                 Ok(packet) => {
                     match packet.contents() {
                         zx::PacketContents::Pager(contents)

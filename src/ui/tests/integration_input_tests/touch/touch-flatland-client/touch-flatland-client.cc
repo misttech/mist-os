@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fidl/fuchsia.ui.app/cpp/fidl.h>
+#include <fidl/fuchsia.element/cpp/fidl.h>
 #include <fidl/fuchsia.ui.composition/cpp/fidl.h>
 #include <fidl/fuchsia.ui.scenic/cpp/hlcpp_conversion.h>
 #include <fidl/fuchsia.ui.test.input/cpp/fidl.h>
@@ -14,6 +14,7 @@
 #include <lib/fidl/cpp/channel.h>
 #include <lib/fit/function.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/ui/scenic/cpp/view_creation_tokens.h>
 #include <lib/ui/scenic/cpp/view_identity.h>
 #include <zircon/status.h>
 
@@ -28,18 +29,11 @@
 namespace touch_flatland_client {
 
 // Implementation of a simple scenic client using the Flatland API.
-class TouchFlatlandClient final : public fidl::Server<fuchsia_ui_app::ViewProvider> {
+class TouchFlatlandClient final {
  public:
   explicit TouchFlatlandClient(async::Loop* loop)
       : loop_(loop), outgoing_directory_(loop_->dispatcher()) {
     FX_CHECK(loop_);
-
-    ZX_ASSERT_OK(outgoing_directory_.AddUnmanagedProtocol<fuchsia_ui_app::ViewProvider>(
-        [&](fidl::ServerEnd<fuchsia_ui_app::ViewProvider> server_end) {
-          FX_LOGS(INFO) << "fuchsia_ui_app::ViewProvider connect";
-          view_provider_binding_.AddBinding(loop_->dispatcher(), std::move(server_end), this,
-                                            fidl::kIgnoreBindingClosure);
-        }));
 
     ZX_ASSERT_OK(outgoing_directory_.ServeFromStartupInfo());
 
@@ -50,12 +44,14 @@ class TouchFlatlandClient final : public fidl::Server<fuchsia_ui_app::ViewProvid
         fidl::Client(std::move(touch_input_listener_connect.value()), loop_->dispatcher());
 
     flatland_connection_ = simple_present::FlatlandConnection::Create(loop, "TouchFlatlandClient");
+
+    auto presenter_connect = component::Connect<fuchsia_element::GraphicalPresenter>();
+    ZX_ASSERT_OK(presenter_connect);
+    presenter_ = fidl::Client(std::move(presenter_connect.value()), loop_->dispatcher());
+    PresentView();
   }
 
-  // |fuchsia_ui_app::ViewProvider|
-  void CreateView2(CreateView2Request& req, CreateView2Completer::Sync& completer) override {
-    FX_LOGS(INFO) << "Call CreateView2";
-
+  void PresentView() {
     auto [touch_source_client, touch_source_server] =
         fidl::Endpoints<fuchsia_ui_pointer::TouchSource>::Create();
     touch_source_ = fidl::Client(std::move(touch_source_client), loop_->dispatcher());
@@ -64,11 +60,26 @@ class TouchFlatlandClient final : public fidl::Server<fuchsia_ui_app::ViewProvid
         fidl::Endpoints<fuchsia_ui_composition::ParentViewportWatcher>::Create();
     parent_viewport_watcher_ = fidl::SyncClient(std::move(parent_viewport_watcher_client));
 
+    fuchsia_ui_views::ViewCreationToken child_token;
+    fuchsia_ui_views::ViewportCreationToken parent_token;
+    zx::channel::create(0, &parent_token.value(), &child_token.value());
+
+    fuchsia_element::ViewSpec view_spec;
+    view_spec.viewport_creation_token() = std::move(parent_token);
+    fuchsia_element::GraphicalPresenterPresentViewRequest request;
+    request.view_spec() = std::move(view_spec);
+    presenter_->PresentView(std::move(request))
+        .Then([](fidl::Result<fuchsia_element::GraphicalPresenter::PresentView>& result) {
+          if (!result.is_ok()) {
+            FX_LOGS(FATAL) << "PresentView failed";
+          }
+        });
+
     auto identity = fidl::HLCPPToNatural(scenic::NewViewIdentityOnCreation());
     fuchsia_ui_composition::ViewBoundProtocols protocols;
     protocols.touch_source(std::move(touch_source_server));
     fuchsia_ui_composition::FlatlandCreateView2Request create_view2_req;
-    create_view2_req.token(std::move(req.args().view_creation_token()->value()));
+    create_view2_req.token(std::move(child_token));
     create_view2_req.view_identity(std::move(identity));
     create_view2_req.protocols(std::move(protocols));
     create_view2_req.parent_viewport_watcher(std::move(parent_viewport_watcher_server));
@@ -103,13 +114,6 @@ class TouchFlatlandClient final : public fidl::Server<fuchsia_ui_app::ViewProvid
     fidl::SyncClient test_app_status_listener(std::move(test_app_status_listener_connect.value()));
     ZX_ASSERT_OK(test_app_status_listener->ReportStatus(
         {fuchsia_ui_test_input::TestAppStatus::kHandlersRegistered}));
-  }
-
-  // |fuchsia_ui_app::ViewProvider|
-  void CreateViewWithViewRef(CreateViewWithViewRefRequest& request,
-                             CreateViewWithViewRefCompleter::Sync& completer) override {
-    // Flatland only use |CreateView2|.
-    ZX_PANIC("Not Implemented");
   }
 
  private:
@@ -163,8 +167,8 @@ class TouchFlatlandClient final : public fidl::Server<fuchsia_ui_app::ViewProvid
   }
 
   // Creates a watch loop to continuously watch for pointer events using the
-  // |fuchsia.ui.pointer.TouchSource.Watch|. Changes the color of the rectangle in the scene when a
-  // tap event is received.
+  // |fuchsia.ui.pointer.TouchSource.Watch|. Changes the color of the rectangle in the scene when
+  // a tap event is received.
   void Watch(std::vector<fuchsia_ui_pointer::TouchEvent> events) {
     // Stores the response for touch events in |events|.
     std::vector<fuchsia_ui_pointer::TouchResponse> responses;
@@ -296,8 +300,7 @@ class TouchFlatlandClient final : public fidl::Server<fuchsia_ui_app::ViewProvid
   // Protocols used by this component.
   fidl::Client<fuchsia_ui_test_input::TouchInputListener> touch_input_listener_;
 
-  // Protocols vended by this component.
-  fidl::ServerBindingGroup<fuchsia_ui_app::ViewProvider> view_provider_binding_;
+  fidl::Client<fuchsia_element::GraphicalPresenter> presenter_;
 
   std::unique_ptr<simple_present::FlatlandConnection> flatland_connection_;
 

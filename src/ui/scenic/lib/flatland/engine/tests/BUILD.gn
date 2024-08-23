@@ -23,6 +23,7 @@ executable("unittests") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp_testing",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_cpp",
     "//sdk/lib/ui/scenic/cpp:cpp",
     "//src/lib/fsl:fsl",
     "//src/lib/fxl/test:gtest_main",

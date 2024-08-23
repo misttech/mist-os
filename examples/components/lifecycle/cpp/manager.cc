@@ -129,7 +129,8 @@ class ChildRequestManager {
 };
 
 int main(int argc, const char** argv) {
-  fuchsia_logging::SetTags({"lifecycle", "example"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"lifecycle", "example"}).BuildAndInitialize();
 
   // Create the main async event loop and component context
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);

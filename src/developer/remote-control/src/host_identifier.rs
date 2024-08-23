@@ -33,7 +33,7 @@ impl HostIdentifier {
         let system_info_proxy = connect_to_protocol::<sysinfo::SysInfoMarker>()?;
         let build_info_proxy = connect_to_protocol::<buildinfo::ProviderMarker>()?;
         let boot_timestamp_nanos = (fuchsia_runtime::utc_time().into_nanos()
-            - zx::Time::get_monotonic().into_nanos()) as u64;
+            - zx::MonotonicTime::get().into_nanos()) as u64;
         return Ok(Self {
             interface_state_proxy,
             name_provider_proxy,

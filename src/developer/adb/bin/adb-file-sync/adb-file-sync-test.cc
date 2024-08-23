@@ -269,8 +269,8 @@ class AdbFileSyncTest : public gtest::RealLoopFixture {
     EXPECT_EQ(actual, sizeof(msg.data));
     EXPECT_EQ(static_cast<int32_t>(msg.data.id), ID_FAIL);
 
-    char buffer[msg.data.size];
-    RunLoopUntil([&]() { return adb_.read(0, buffer, msg.data.size, &actual) == ZX_OK; });
+    auto buffer = std::make_unique<uint8_t[]>(msg.data.size);
+    RunLoopUntil([&]() { return adb_.read(0, buffer.get(), msg.data.size, &actual) == ZX_OK; });
     EXPECT_EQ(actual, msg.data.size);
   }
 
@@ -490,14 +490,14 @@ TEST_F(AdbFileSyncTest, HandleReceiveTest) {
   EXPECT_EQ(static_cast<int32_t>(msg.data.id), ID_DATA);
   EXPECT_EQ(msg.data.size, 4U);
 
-  uint8_t buffer[msg.data.size];
-  RunLoopUntil([&]() { return adb_.read(0, buffer, msg.data.size, &actual) == ZX_OK; });
+  auto buffer = std::make_unique<uint8_t[]>(msg.data.size);
+  RunLoopUntil([&]() { return adb_.read(0, buffer.get(), msg.data.size, &actual) == ZX_OK; });
   EXPECT_EQ(actual, msg.data.size);
 
   uint8_t expected_data[] = {4, 3, 2, 1};
-  EXPECT_EQ(sizeof(buffer), sizeof(expected_data));
-  for (size_t i = 0; i < sizeof(buffer); i++) {
-    EXPECT_EQ(buffer[i], expected_data[i]);
+  EXPECT_EQ(msg.data.size, sizeof(expected_data));
+  for (size_t i = 0; i < msg.data.size; i++) {
+    EXPECT_EQ(buffer.get()[i], expected_data[i]);
   }
 
   // Read done

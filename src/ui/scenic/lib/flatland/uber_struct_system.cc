@@ -196,12 +196,12 @@ inline ostream& operator<<(ostream& out, const fuchsia::ui::views::ViewRef& ref)
   return out;
 }
 
-inline ostream& operator<<(ostream& out, const fuchsia::ui::composition::BlendMode& blend_mode) {
+inline ostream& operator<<(ostream& out, const fuchsia_ui_composition::BlendMode& blend_mode) {
   switch (blend_mode) {
-    case fuchsia::ui::composition::BlendMode::SRC:
+    case fuchsia_ui_composition::BlendMode::kSrc:
       out << "SRC";
       break;
-    case fuchsia::ui::composition::BlendMode::SRC_OVER:
+    case fuchsia_ui_composition::BlendMode::kSrcOver:
       out << "SRC_OVER";
       break;
   }

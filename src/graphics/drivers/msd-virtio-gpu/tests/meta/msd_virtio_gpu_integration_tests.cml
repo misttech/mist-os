@@ -11,11 +11,6 @@
         binary: "bin/msd_virtio_gpu_integration_tests",
     },
     use: [
-        {
-            directory: "dev-topological",
-            rights: [ "r*" ],
-            path: "/dev",
-        },
         { protocol: "fuchsia.tracing.provider.Registry" },
     ],
 }

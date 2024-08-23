@@ -23,9 +23,12 @@ pub mod signals;
 pub mod syscalls;
 pub mod task;
 pub mod time;
-pub mod timer;
 #[cfg(not(feature = "starnix_lite"))]
 pub mod vdso;
 pub mod vfs;
 
 pub mod testing;
+
+// This allows macros to use paths within this crate
+// by referring to them by the external crate name.
+extern crate self as starnix_core;

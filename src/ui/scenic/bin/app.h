@@ -11,7 +11,6 @@
 #include <optional>
 
 #include "src/graphics/display/lib/coordinator-getter/client.h"
-#include "src/lib/async-watchdog/watchdog.h"
 #include "src/lib/fsl/io/device_watcher.h"
 #include "src/ui/lib/escher/escher.h"
 #include "src/ui/scenic/lib/allocation/allocator.h"
@@ -67,7 +66,7 @@ enum class RendererType : uint8_t {
 class App {
  public:
   App(std::unique_ptr<sys::ComponentContext> app_context, inspect::Node inspect_node,
-      fpromise::promise<::display::CoordinatorClientEnd, zx_status_t> dc_handles_promise,
+      fpromise::promise<::display::CoordinatorClientChannels, zx_status_t> dc_handles_promise,
       fit::closure quit_callback);
 
   ~App();
@@ -129,8 +128,6 @@ class App {
 
   uint64_t flatland_frame_count_ = 0;
   uint64_t skipped_frame_count_ = 0;
-
-  async_watchdog::Watchdog watchdog_;
 
   const bool enable_snapshot_dump_ = false;
 };

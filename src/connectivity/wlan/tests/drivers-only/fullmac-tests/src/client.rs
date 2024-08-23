@@ -122,12 +122,12 @@ async fn test_scan_request_success() {
         let scan_result_list = vec![
             fidl_fullmac::WlanFullmacScanResult {
                 txn_id,
-                timestamp_nanos: zx::Time::get_monotonic().into_nanos(),
+                timestamp_nanos: zx::MonotonicTime::get().into_nanos(),
                 bss: random_fidl_bss_description!(),
             },
             fidl_fullmac::WlanFullmacScanResult {
                 txn_id,
-                timestamp_nanos: zx::Time::get_monotonic().into_nanos() + 1,
+                timestamp_nanos: zx::MonotonicTime::get().into_nanos() + 1,
                 bss: random_fidl_bss_description!(),
             },
         ];

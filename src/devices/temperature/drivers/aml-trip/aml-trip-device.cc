@@ -12,6 +12,7 @@
 #include <zircon/errors.h>
 
 #include <algorithm>
+#include <cmath>
 
 #include <src/devices/temperature/drivers/aml-trip/util.h>
 

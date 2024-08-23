@@ -9,13 +9,16 @@
 #include <lib/zx/result.h>
 #include <zircon/types.h>
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <optional>
 
-#include <src/lib/chunked-compression/chunked-decompressor.h>
-#include <src/lib/chunked-compression/streaming-chunked-compressor.h>
+#include <fbl/macros.h>
 
 #include "src/lib/chunked-compression/chunked-archive.h"
+#include "src/lib/chunked-compression/chunked-decompressor.h"
+#include "src/lib/chunked-compression/streaming-chunked-compressor.h"
 #include "src/storage/blobfs/compression/compressor.h"
 #include "src/storage/blobfs/compression/decompressor.h"
 #include "src/storage/blobfs/compression/seekable_decompressor.h"
@@ -71,7 +74,7 @@ class ChunkedDecompressor : public Decompressor {
 
   // Decompressor implementation.
   zx_status_t Decompress(void* uncompressed_buf, size_t* uncompressed_size,
-                         const void* compressed_buf, const size_t max_compressed_size) final;
+                         const void* compressed_buf, size_t max_compressed_size) final;
 
  private:
   chunked_compression::ChunkedDecompressor decompressor_;

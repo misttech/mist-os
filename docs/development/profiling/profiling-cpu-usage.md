@@ -23,7 +23,7 @@ do the following:
 
    - `experimental_thread_sampler_enabled=true` enables experimental
      sampling support.
-   - `enabled_frame_pointers=true` enables the profiler to collect stack
+   - `enable_frame_pointers=true` enables the profiler to collect stack
      samples.
    - `debuginfo="backtrace"` adds the needed debug info to symbolize stacks.
 

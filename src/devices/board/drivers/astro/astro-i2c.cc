@@ -120,7 +120,7 @@ zx_status_t AddI2cBus(const I2cBus& bus,
   const std::vector<fpbus::Irq> irqs{
       {{
           .irq = bus.irq,
-          .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+          .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
       }},
 
   };

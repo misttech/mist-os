@@ -4,11 +4,11 @@
 
 #include <sys/mman.h>
 
-#include "module.h"
+#include "runtime-module.h"
 
 namespace dl {
 
-ModuleHandle::~ModuleHandle() {
+RuntimeModule::~RuntimeModule() {
   if (vaddr_size() > 0) {
     munmap(reinterpret_cast<void*>(static_cast<uintptr_t>(abi_module_.vaddr_start)), vaddr_size());
   }

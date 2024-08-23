@@ -26,6 +26,73 @@
 
 namespace fio = fuchsia_io;
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+namespace {
+constexpr zxio_open_flags_t Open1FlagsToOpen3(fio::wire::OpenFlags io1_flags) {
+  fio::Flags flags = fio::Flags::kPermGetAttributes;
+
+  if (io1_flags & fio::OpenFlags::kNodeReference) {
+    flags |= fio::Flags::kProtocolNode;
+    if (io1_flags & fio::OpenFlags::kDirectory) {
+      flags |= fio::Flags::kProtocolDirectory;
+    } else if (io1_flags & fio::OpenFlags::kNotDirectory) {
+      flags |= fio::Flags::kProtocolFile;
+    }
+  } else {
+    // Permissions
+    if (io1_flags & fio::OpenFlags::kRightReadable) {
+      flags |= static_cast<fio::Flags>(static_cast<uint64_t>(fio::wire::kRStarDir));
+    }
+    if (io1_flags & fio::OpenFlags::kRightWritable) {
+      flags |= static_cast<fio::Flags>(static_cast<uint64_t>(fio::wire::kWStarDir));
+    }
+    if (io1_flags & fio::OpenFlags::kRightExecutable) {
+      flags |= static_cast<fio::Flags>(static_cast<uint64_t>(fio::wire::kXStarDir));
+    }
+
+    // POSIX flags
+    if (io1_flags & fio::OpenFlags::kPosixWritable) {
+      flags |= fio::Flags::kPermInheritWrite;
+    }
+    if (io1_flags & fio::OpenFlags::kPosixExecutable) {
+      flags |= fio::Flags::kPermInheritExecute;
+    }
+
+    // Type flags
+    if (io1_flags & fio::OpenFlags::kDirectory) {
+      flags |= fio::Flags::kProtocolDirectory;
+    } else if (io1_flags & fio::OpenFlags::kNotDirectory) {
+      flags |= fio::Flags::kProtocolFile;
+    }
+
+    // Create flags
+    if (io1_flags & fio::OpenFlags::kCreateIfAbsent) {
+      flags |= fio::Flags::kFlagMustCreate;
+    } else if (io1_flags & fio::OpenFlags::kCreate) {
+      flags |= fio::Flags::kFlagMaybeCreate;
+    }
+
+    if (io1_flags & (fio::OpenFlags::kCreateIfAbsent | fio::OpenFlags::kCreate) &&
+        !(flags & fio::wire::kMaskKnownProtocols)) {
+      // A protocol must be specified when creating a node. If the DIRECTORY flag wasn't specified,
+      // we ensure that we will create a file.
+      flags |= fio::Flags::kProtocolFile;
+    }
+
+    // File flags
+    if (io1_flags & fio::OpenFlags::kTruncate) {
+      flags |= fio::Flags::kFileTruncate;
+    }
+    if (io1_flags & fio::OpenFlags::kAppend) {
+      flags |= fio::Flags::kFileAppend;
+    }
+  }
+
+  return static_cast<zxio_open_flags_t>(flags);
+}
+}  // namespace
+#endif
+
 namespace fdio_internal {
 
 zx::result<fdio_ptr> zxio::create() {
@@ -237,13 +304,29 @@ zx_status_t pipe::recvmsg(struct msghdr* msg, int flags, size_t* out_actual, int
 
 zx::result<fdio_ptr> open_async(zxio_t* directory, std::string_view path,
                                 fio::wire::OpenFlags flags) {
+  zx_status_t status;
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  zxio_open_flags_t open3_flags = Open1FlagsToOpen3(flags);
+
+  fdio_ptr io = fbl::MakeRefCounted<remote>();
+  status = zxio_open3(directory, path.data(), path.length(), open3_flags,
+                      /*options*/ {}, &io->zxio_storage());
+  if (status == ZX_OK) {
+    return zx::ok(io);
+  }
+
+  // Only fallback to open1 if open3 is not supported.
+  if (status != ZX_ERR_NOT_SUPPORTED) {
+    return zx::error(status);
+  }
+#endif
   zx::result endpoints = fidl::CreateEndpoints<fio::Node>();
   if (endpoints.is_error()) {
     return endpoints.take_error();
   }
 
-  zx_status_t status = zxio_open_async(directory, static_cast<uint32_t>(flags), path.data(),
-                                       path.length(), endpoints->server.channel().release());
+  status = zxio_open_async(directory, static_cast<uint32_t>(flags), path.data(), path.length(),
+                           endpoints->server.channel().release());
   if (status != ZX_OK) {
     return zx::error(status);
   }

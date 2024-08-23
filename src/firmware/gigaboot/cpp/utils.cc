@@ -13,8 +13,10 @@
 #include <zircon/hw/gpt.h>
 
 #include <algorithm>
+#include <string_view>
 
 #include <efi/global-variable.h>
+#include <efi/string/string.h>
 #include <efi/types.h>
 #include <fbl/string_printf.h>
 
@@ -23,6 +25,8 @@
 namespace gigaboot {
 
 namespace {
+
+const std::string_view kCommandlineBootToFastboot = "boot_mode=fastboot";
 
 std::optional<RebootMode> ParseByteToRebootMode(uint8_t b) {
   switch (b) {
@@ -217,13 +221,51 @@ std::string_view MaybeMapPartitionName(const EfiGptBlockDevice& device,
   return partition;
 }
 
+std::optional<gigaboot::RebootMode> GetCommandlineRebootMode() {
+  if (!gEfiLoadedImage) {
+    printf("No loaded image protocol; cannot fetch Gigaboot commandline\n");
+    return std::nullopt;
+  }
+
+  if (!gEfiLoadedImage->LoadOptions) {
+    printf("No Gigaboot commandline was found\n");
+    return std::nullopt;
+  }
+
+  // The UEFI spec allows arbitrary binary data in LoadOptions, but for Gigaboot our only use case
+  // is QEMU passing us commandline args which will always be UCS-2.
+  if (reinterpret_cast<uintptr_t>(gEfiLoadedImage->LoadOptions) % alignof(char16_t) != 0) {
+    printf("Warning: Gigaboot commandline is not aligned UTF-16; ignoring\n");
+    return std::nullopt;
+  }
+
+  efi::String commandline(
+      std::u16string_view(reinterpret_cast<char16_t*>(gEfiLoadedImage->LoadOptions),
+                          gEfiLoadedImage->LoadOptionsSize / sizeof(char16_t)));
+  if (!commandline.IsValid()) {
+    printf("Warning: Gigaboot commandline is not valid UTF-16; ignoring\n");
+    return std::nullopt;
+  }
+
+  printf("Gigaboot commandline: %s\n", commandline.c_str());
+
+  // Just do super basic matching to look for the only commandline arg we care about. We don't
+  // really need to convert to UTF-8 above for this, but it's useful to print the commandline.
+  if (std::string_view(commandline).find(kCommandlineBootToFastboot) != std::string_view::npos) {
+    printf("Found commandline fastboot trigger\n");
+    return gigaboot::RebootMode::kBootloader;
+  }
+
+  return std::nullopt;
+}
+
 // TODO(b/285053546) 'BootByte' usage should be removed in favour of ABR Metadata
 bool SetRebootMode(RebootMode mode) {
   return gEfiSystemTable != nullptr &&
          set_bootbyte(gEfiSystemTable->RuntimeServices, RebootModeToByte(mode)) == EFI_SUCCESS;
 }
 
-std::optional<RebootMode> GetRebootMode(AbrDataOneShotFlags one_shot_flags) {
+std::optional<RebootMode> GetOneShotRebootMode(AbrDataOneShotFlags one_shot_flags) {
   if (AbrIsOneShotRecoveryBootSet(one_shot_flags)) {
     return RebootMode::kRecovery;
   }

@@ -13,7 +13,6 @@ use diagnostics_hierarchy::{
 };
 use fidl_diagnostics_validate::{self as validate, Value};
 use inspect_format::{ArrayFormat, BlockIndex, LinkNodeDisposition};
-use num_derive::{FromPrimitive, ToPrimitive};
 use num_traits::Zero;
 use std::clone::Clone;
 use std::collections::{HashMap, HashSet};
@@ -75,15 +74,16 @@ pub struct Property {
     payload: Payload,
 }
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 #[derive(Debug, Clone)]
+// Note: Some of the inner members on this struct are flagged by the compiler as
+// Unused. In reality, they're used in the `Debug` impl.
 enum Payload {
-    String(String),
+    String(#[allow(unused)] String),
     Bytes(Vec<u8>),
     Int(i64),
     Uint(u64),
     Double(f64),
-    Bool(bool),
+    Bool(#[allow(unused)] bool),
     IntArray(Vec<i64>, ArrayFormat),
     UintArray(Vec<u64>, ArrayFormat),
     DoubleArray(Vec<f64>, ArrayFormat),
@@ -93,10 +93,10 @@ enum Payload {
     // Used when parsing from JSON. We have trouble identifying numeric types and types of
     // histograms from the output. We can use these generic types to be safe for comparison from
     // JSON.
-    GenericNumber(String),
-    GenericArray(Vec<String>),
-    GenericLinearHistogram(Vec<String>),
-    GenericExponentialHistogram(Vec<String>),
+    GenericNumber(#[allow(unused)] String),
+    GenericArray(#[allow(unused)] Vec<String>),
+    GenericLinearHistogram(#[allow(unused)] Vec<String>),
+    GenericExponentialHistogram(#[allow(unused)] Vec<String>),
 }
 
 fn to_string<T: std::fmt::Display>(v: T) -> String {
@@ -1202,16 +1202,6 @@ impl Data {
     }
 }
 
-// There's no enum in fuchsia_inspect::format::block which contains only
-// values that are valid for an ArrayType.
-#[allow(dead_code)] // TODO(https://fxbug.dev/351850634)
-#[derive(Debug, PartialEq, Eq, FromPrimitive, ToPrimitive)]
-enum ArrayType {
-    Int = 4,
-    Uint = 5,
-    Double = 6,
-}
-
 impl From<DiagnosticsHierarchy> for Data {
     fn from(hierarchy: DiagnosticsHierarchy) -> Self {
         let mut nodes = HashMap::new();
@@ -1286,6 +1276,7 @@ mod tests {
     use fidl_diagnostics_validate::{ValueType, ROOT_ID};
     use fuchsia_inspect::reader::ArrayContent as iArrayContent;
     use inspect_format::BlockType;
+    use num_derive::{FromPrimitive, ToPrimitive};
 
     #[fuchsia::test]
     fn test_basic_data_strings() -> Result<(), Error> {
@@ -1318,6 +1309,15 @@ mod tests {
 > > > uint_a: GenericArray(["1", "2"])
 > > > uint_eh: GenericExponentialHistogram(["1", "1", "2", "1", "2", "3"])
 > > > uint_lh: GenericLinearHistogram(["1", "1", "1", "2", "3"])"#;
+
+    // There's no enum in fuchsia_inspect::format::block which contains only
+    // values that are valid for an ArrayType.
+    #[derive(Debug, PartialEq, Eq, FromPrimitive, ToPrimitive)]
+    enum ArrayType {
+        Int = 4,
+        Uint = 5,
+        Double = 6,
+    }
 
     #[fuchsia::test]
     fn test_parse_hierarchy() -> Result<(), Error> {

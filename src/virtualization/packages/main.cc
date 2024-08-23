@@ -14,7 +14,8 @@
 // Serve /pkg as /pkg in the outgoing directory to provide access to configuration data
 // i.e. /pkg/data/guest.cfg
 int main(int argc, char** argv) {
-  fuchsia_logging::SetTags({"guest_package"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"guest_package"}).BuildAndInitialize();
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
   auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();

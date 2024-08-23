@@ -140,11 +140,11 @@ zx_status_t Sherlock::LightInit() {
 
   // Enable the Amber LED so it will be controlled by PWM.
   gpio_init_steps_.push_back(GpioFunction(GPIO_AMBER_LED, 3));  // Set as GPIO.
-  gpio_init_steps_.push_back(GpioConfigOut(GPIO_AMBER_LED, 1));
+  gpio_init_steps_.push_back(GpioOutput(GPIO_AMBER_LED, true));
 
   // Enable the Green LED so it will be controlled by PWM.
   gpio_init_steps_.push_back(GpioFunction(GPIO_GREEN_LED, 4));  // Set as PWM.
-  gpio_init_steps_.push_back(GpioConfigOut(GPIO_GREEN_LED, 1));
+  gpio_init_steps_.push_back(GpioOutput(GPIO_GREEN_LED, true));
 
   auto amber_led_gpio_bind_rules = std::vector{
       fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,

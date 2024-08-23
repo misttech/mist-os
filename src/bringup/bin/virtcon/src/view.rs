@@ -83,7 +83,7 @@ struct Animation {
     _file: rive::File,
     artboard: rive::Object<rive::Artboard>,
     instance: rive::animation::LinearAnimationInstance,
-    last_presentation_time: Option<zx::Time>,
+    last_presentation_time: Option<zx::MonotonicTime>,
 }
 
 struct SceneDetails {
@@ -434,12 +434,13 @@ impl VirtualConsoleViewAssistant {
                         let (server_end, client_end) = zx::Channel::create();
                         connect_channel_to_protocol::<AdminMarker>(server_end)?;
                         let admin = AdminSynchronousProxy::new(client_end);
-                        match admin
-                            .reboot(RebootReason::UserRequest, zx::Time::after(5.second()))?
-                        {
+                        match admin.reboot(
+                            RebootReason::UserRequest,
+                            zx::MonotonicTime::after(5.second()),
+                        )? {
                             Ok(()) => {
                                 // Wait for the world to end.
-                                zx::Time::INFINITE.sleep();
+                                zx::MonotonicTime::INFINITE.sleep();
                             }
                             Err(e) => println!("Failed to reboot, status: {}", e),
                         }

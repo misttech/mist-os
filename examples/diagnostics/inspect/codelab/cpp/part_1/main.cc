@@ -14,7 +14,8 @@
 
 int main(int argc, char** argv) {
   // [START init_logger]
-  fuchsia_logging::SetTags({"inspect_cpp_codelab", "part1"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"inspect_cpp_codelab", "part1"}).BuildAndInitialize();
   // [END init_logger]
 
   FX_LOGS(INFO) << "Starting up...";

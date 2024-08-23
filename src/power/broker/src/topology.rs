@@ -114,9 +114,11 @@ impl fmt::Display for Dependency {
 
 #[derive(Clone, Debug)]
 pub struct Element {
+    // Suppress 'dead_code' warning as no one currently accesses this ID from the element structure
+    // itself and we instead store the elements in a map indexed by this ID. This is still useful
+    // to keep around when we need to debug cloned Element objects.
     #[allow(dead_code)]
     id: ElementID,
-    #[allow(dead_code)]
     name: String,
     valid_levels: Vec<IndexedPowerLevel>,
     inspect_vertex: Rc<RefCell<IGraphVertex<ElementID>>>,
@@ -163,7 +165,8 @@ pub enum ModifyDependencyError {
     AlreadyExists,
     Invalid,
     NotAuthorized,
-    // TODO(https://fxbug.dev/332392008): Remove or explain #[allow(dead_code)].
+    // Suppress `dead_code`, callers may want to know what ElementID was not found, but currently
+    // no one makes use of this or prints it out.
     #[allow(dead_code)]
     NotFound(ElementID),
 }

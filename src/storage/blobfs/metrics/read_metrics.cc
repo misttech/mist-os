@@ -4,9 +4,14 @@
 
 #include "src/storage/blobfs/metrics/read_metrics.h"
 
+#include <lib/inspect/cpp/vmo/types.h>
+
+#include <cstdint>
 #include <mutex>
+#include <utility>
 
 #include "src/storage/blobfs/compression_settings.h"
+#include "src/storage/lib/vfs/cpp/ticker.h"
 
 namespace blobfs {
 

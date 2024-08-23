@@ -13,7 +13,7 @@ use fuchsia_zircon::Duration;
 use futures::{TryFutureExt, TryStreamExt};
 use {fidl_fuchsia_hardware_suspend as fhsuspend, fidl_fuchsia_power_broker as fbroker};
 
-const SUSPEND_DEVICE_TIMEOUT: Duration = Duration::from_seconds(5);
+const SUSPEND_DEVICE_TIMEOUT: Duration = Duration::from_seconds(10);
 
 async fn connect_to_suspender() -> Result<fhsuspend::SuspenderProxy> {
     let service_dir =

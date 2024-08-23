@@ -146,7 +146,9 @@ PhysbootHandoff = _start
     call    lk_main
 
     // should never return here
-    j       .
+0:
+    wfi
+    j       0b
 END_FUNCTION(_start)
 
 // Entry point for secondary cpus when started from SBI
@@ -189,7 +191,9 @@ FUNCTION(riscv64_secondary_entry_asm)
     call    riscv64_secondary_entry
 
     // should never return here
-    j       .
+0:
+    wfi
+    j       0b
 END_FUNCTION(riscv64_secondary_entry_asm)
 
 

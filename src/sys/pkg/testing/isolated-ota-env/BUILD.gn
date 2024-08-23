@@ -24,12 +24,12 @@ rustc_library("isolated-ota-env") {
     "//src/sys/pkg/lib/fuchsia-pkg-testing",
     "//src/sys/pkg/lib/fuchsia-pkg-testing/certs",
     "//src/sys/pkg/lib/isolated-ota",
-    "//src/sys/pkg/testing/mock-omaha-server",
     "//src/sys/pkg/testing/mock-paver",
     "//src/sys/pkg/tests/pkg-resolver:empty-repo",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
+    "//third_party/rust_crates:mock-omaha-server",
     "//third_party/rust_crates:serde_json",
     "//third_party/rust_crates:tempfile",
   ]

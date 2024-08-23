@@ -101,7 +101,7 @@ impl ExampleUseOfErrorSyntaxSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::Time,
+        deadline: zx::MonotonicTime,
     ) -> Result<ExampleUseOfErrorSyntaxEvent, fidl::Error> {
         ExampleUseOfErrorSyntaxEvent::decode(self.client.wait_for_event(deadline)?)
     }
@@ -109,7 +109,7 @@ impl ExampleUseOfErrorSyntaxSynchronousProxy {
     pub fn r#composed_call_which_may_fail(
         &self,
         mut s: &str,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<
         fidl_test_errorsyntax_parent::ParentUsesErrorSyntaxComposedCallWhichMayFailResult,
         fidl::Error,
@@ -129,7 +129,7 @@ impl ExampleUseOfErrorSyntaxSynchronousProxy {
     pub fn r#call_which_may_fail(
         &self,
         mut s: &str,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<ExampleUseOfErrorSyntaxCallWhichMayFailResult, fidl::Error> {
         let _response = self.client.send_query::<
             ExampleUseOfErrorSyntaxCallWhichMayFailRequest,

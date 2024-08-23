@@ -54,8 +54,6 @@ if (is_fuchsia) {
 
     additional_boot_args = [ "virtcon.disable=true" ]
 
-    bootfs_labels = [ "//build/input:bootfs" ]
-
     if (custom_signing_script != "") {
       inputs = custom_signing_script_inputs
       generate_signed_zbi = true
@@ -334,8 +332,6 @@ if (is_fuchsia) {
 
     product_assembly_config_label = ":for-fdr"
     board_config_label = recovery_board_configuration_label
-
-    bootfs_labels = [ "//build/input:bootfs" ]
 
     if (custom_signing_script != "") {
       inputs = custom_signing_script_inputs

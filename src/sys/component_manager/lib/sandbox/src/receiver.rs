@@ -65,7 +65,7 @@ mod tests {
 
         // Check connectivity.
         message.channel.signal_peer(zx::Signals::empty(), zx::Signals::USER_1).unwrap();
-        ch2.wait_handle(zx::Signals::USER_1, zx::Time::INFINITE).unwrap();
+        ch2.wait_handle(zx::Signals::USER_1, zx::MonotonicTime::INFINITE).unwrap();
     }
 
     #[fuchsia::test]
@@ -136,7 +136,7 @@ mod tests {
             fsandbox::ReceiverRequest::Receive { channel, .. } => {
                 // Check connectivity.
                 channel.signal_peer(zx::Signals::empty(), zx::Signals::USER_1).unwrap();
-                ch2.wait_handle(zx::Signals::USER_1, zx::Time::INFINITE).unwrap();
+                ch2.wait_handle(zx::Signals::USER_1, zx::MonotonicTime::INFINITE).unwrap();
             }
             _ => panic!("Unexpected message"),
         }

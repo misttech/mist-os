@@ -493,7 +493,10 @@ impl ReadWrite {
                     && self
                         .socket
                         .as_handle_ref()
-                        .wait_handle(zx::Signals::OBJECT_PEER_CLOSED, zx::Time::INFINITE_PAST)
+                        .wait_handle(
+                            zx::Signals::OBJECT_PEER_CLOSED,
+                            zx::MonotonicTime::INFINITE_PAST,
+                        )
                         .is_ok()
                 {
                     // The socket peer is closed, but bytes remain on the local socket that have yet

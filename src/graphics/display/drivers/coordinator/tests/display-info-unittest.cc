@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/stdcompat/span.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
@@ -19,7 +20,12 @@ namespace display {
 
 namespace {
 
-TEST(DisplayInfo, InitializeWithEdidValueSingleBlock) {
+class DisplayInfoTest : public ::testing::Test {
+ private:
+  fdf_testing::ScopedGlobalLogger logger_;
+};
+
+TEST_F(DisplayInfoTest, InitializeWithEdidValueSingleBlock) {
   const std::vector<fuchsia_images2_pixel_format_enum_value_t> pixel_formats = {
       fuchsia_images2_pixel_format_enum_value_t{fuchsia_images2::PixelFormat::kR8G8B8A8},
   };
@@ -49,7 +55,7 @@ TEST(DisplayInfo, InitializeWithEdidValueSingleBlock) {
   EXPECT_EQ(edid_base.GetDisplayProductSerialNumber(), std::string("CN413010YH"));
 }
 
-TEST(DisplayInfo, InitializeWithEdidValueMultipleBlocks) {
+TEST_F(DisplayInfoTest, InitializeWithEdidValueMultipleBlocks) {
   const std::vector<fuchsia_images2_pixel_format_enum_value_t> pixel_formats = {
       fuchsia_images2_pixel_format_enum_value_t{fuchsia_images2::PixelFormat::kR8G8B8A8},
   };
@@ -79,7 +85,7 @@ TEST(DisplayInfo, InitializeWithEdidValueMultipleBlocks) {
   EXPECT_EQ(edid_base.GetDisplayProductSerialNumber(), std::string("H4ZR701271"));
 }
 
-TEST(DisplayInfo, InitializeWithEdidValueOfInvalidLength) {
+TEST_F(DisplayInfoTest, InitializeWithEdidValueOfInvalidLength) {
   const std::vector<fuchsia_images2_pixel_format_enum_value_t> pixel_formats = {
       fuchsia_images2_pixel_format_enum_value_t{fuchsia_images2::PixelFormat::kR8G8B8A8},
   };
@@ -103,7 +109,7 @@ TEST(DisplayInfo, InitializeWithEdidValueOfInvalidLength) {
   EXPECT_STATUS(display_info_result.error_value(), ZX_ERR_INTERNAL);
 }
 
-TEST(DisplayInfo, InitializeWithEdidValueIncomplete) {
+TEST_F(DisplayInfoTest, InitializeWithEdidValueIncomplete) {
   const std::vector<fuchsia_images2_pixel_format_enum_value_t> pixel_formats = {
       fuchsia_images2_pixel_format_enum_value_t{fuchsia_images2::PixelFormat::kR8G8B8A8},
   };
@@ -127,7 +133,7 @@ TEST(DisplayInfo, InitializeWithEdidValueIncomplete) {
   EXPECT_STATUS(display_info_result.error_value(), ZX_ERR_INTERNAL);
 }
 
-TEST(DisplayInfo, InitializeWithEdidValueNonDigitalDisplay) {
+TEST_F(DisplayInfoTest, InitializeWithEdidValueNonDigitalDisplay) {
   // A synthetic EDID of an analog display device.
   const std::vector<uint8_t> kEdidAnalogDisplay = {
       0x00, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0x00, 0x22, 0xf0, 0x6c, 0x28, 0x01, 0x01, 0x01,

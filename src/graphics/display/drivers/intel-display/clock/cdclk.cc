@@ -11,10 +11,10 @@
 
 #include <cstdint>
 
-#include "src/graphics/display/drivers/intel-display/poll-until.h"
 #include "src/graphics/display/drivers/intel-display/power-controller.h"
 #include "src/graphics/display/drivers/intel-display/registers-dpll.h"
 #include "src/graphics/display/drivers/intel-display/registers.h"
+#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
 
 namespace intel_display {
 

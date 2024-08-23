@@ -6,18 +6,28 @@
 #define SRC_STORAGE_BLOBFS_COMPONENT_RUNNER_H_
 
 #include <fidl/fuchsia.device.manager/cpp/wire.h>
+#include <fidl/fuchsia.io/cpp/markers.h>
 #include <fidl/fuchsia.process.lifecycle/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fidl/cpp/wire/client.h>
+#include <lib/fit/function.h>
 #include <lib/inspect/component/cpp/component.h>
 #include <lib/zx/resource.h>
 #include <lib/zx/result.h>
+#include <zircon/compiler.h>
+#include <zircon/types.h>
 
+#include <memory>
+#include <mutex>
 #include <optional>
+#include <vector>
+
+#include <fbl/ref_ptr.h>
 
 #include "src/storage/blobfs/blobfs.h"
 #include "src/storage/blobfs/mount.h"
-#include "src/storage/lib/vfs/cpp/managed_vfs.h"
+#include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
 #include "src/storage/lib/vfs/cpp/paged_vfs.h"
 #include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 
@@ -74,7 +84,7 @@ class ComponentRunner final : public fs::PagedVfs {
   // A queue of callbacks for shutdown requests that arrive while shutdown is running.
   std::vector<fs::FuchsiaVfs::ShutdownCallback> shutdown_callbacks_ __TA_GUARDED(shutdown_lock_);
 
-  std::optional<inspect::ComponentInspector> exposed_inspector_ = {};
+  std::optional<inspect::ComponentInspector> exposed_inspector_;
 };
 
 }  // namespace blobfs

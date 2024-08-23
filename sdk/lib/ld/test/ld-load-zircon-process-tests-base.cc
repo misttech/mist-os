@@ -88,9 +88,9 @@ void LdLoadZirconProcessTestsBase::Start(TestProcessArgs* bootstrap, zx::channel
 }
 
 int64_t LdLoadZirconProcessTestsBase::Run(  //
-    TestProcessArgs* bootstrap, std::optional<size_t> stack_size, const zx::thread& thread,
-    uintptr_t entry, uintptr_t vdso_base, const zx::vmar& root_vmar) {
-  Start(bootstrap, {}, stack_size, thread, entry, vdso_base, root_vmar);
+    TestProcessArgs* bootstrap, zx::channel bootstrap_receiver, std::optional<size_t> stack_size,
+    const zx::thread& thread, uintptr_t entry, uintptr_t vdso_base, const zx::vmar& root_vmar) {
+  Start(bootstrap, std::move(bootstrap_receiver), stack_size, thread, entry, vdso_base, root_vmar);
   return ::testing::Test::HasFatalFailure() ? -1 : Wait();
 }
 

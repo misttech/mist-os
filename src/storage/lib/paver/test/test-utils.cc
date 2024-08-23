@@ -94,7 +94,8 @@ void BlockDevice::Create(const fbl::unique_fd& devfs_root, const uint8_t* guid,
 
 void BlockDevice::Read(const zx::vmo& vmo, size_t blk_cnt, size_t blk_offset) {
   ASSERT_LE(blk_offset + blk_cnt, block_count());
-  zx::result block_client = paver::BlockPartitionClient::Create(block_controller_interface());
+  auto block_client = paver::BlockPartitionClient::Create(
+      std::make_unique<paver::DevfsVolumeConnector>(ConnectToController()));
   ASSERT_OK(block_client);
   ASSERT_OK(block_client->Read(vmo, blk_cnt, blk_offset, 0));
 }

@@ -9,13 +9,11 @@ import("//build/drivers.gni")
 all_hdrs = [
   "device.h",
   "debug.h",
-  "fullmac_mlme.h",
   "convert.h",
 ]
 
 all_src = [
   "device.cc",
-  "fullmac_mlme.cc",
   "convert.cc",
 ]
 

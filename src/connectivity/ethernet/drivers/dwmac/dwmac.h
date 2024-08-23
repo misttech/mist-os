@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.ethernet.board/cpp/wire.h>
 #include <fuchsia/hardware/ethernet/cpp/banjo.h>
 #include <fuchsia/hardware/ethernet/mac/cpp/banjo.h>
+#include <fuchsia/hardware/network/driver/cpp/banjo.h>
 #include <fuchsia/hardware/test/c/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/device-protocol/pdev-fidl.h>
@@ -23,9 +24,11 @@
 #include <optional>
 
 #include <ddktl/device.h>
-#include <fbl/mutex.h>
 
+#include "dw-gmac-dma.h"
 #include "pinned-buffer.h"
+#include "src/connectivity/network/drivers/network-device/device/public/locks.h"
+#include "src/lib/vmo_store/vmo_store.h"
 
 // clang-format off
 #define DW_MAC_MAC_CONF             (0x0000)
@@ -92,12 +95,17 @@ typedef volatile struct dw_dmadescr {
 
 namespace eth {
 
-class EthPhyFunction;
+class NetworkFunction;
 class EthMacFunction;
 
-class DWMacDevice : public ddk::Device<DWMacDevice, ddk::Unbindable, ddk::Suspendable> {
+class DWMacDevice : public ddk::Device<DWMacDevice, ddk::Unbindable, ddk::Suspendable>
+
+{
  public:
-  DWMacDevice(zx_device_t* device, ddk::PDevFidl pdev,
+  static constexpr uint8_t kPortId = 13;
+  static constexpr size_t kMtu = MAC_MAX_FRAME_SZ;
+
+  DWMacDevice(zx_device_t* device, ddk::PDevFidl pdev, zx::bti bti,
               fidl::ClientEnd<fuchsia_hardware_ethernet_board::EthBoard> eth_board);
 
   static zx_status_t Create(void* ctx, zx_device_t* device);
@@ -106,71 +114,86 @@ class DWMacDevice : public ddk::Device<DWMacDevice, ddk::Unbindable, ddk::Suspen
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkSuspend(ddk::SuspendTxn txn);
 
-  // ZX_PROTOCOL_ETHERNET_IMPL ops.
-  zx_status_t EthernetImplQuery(uint32_t options, ethernet_info_t* info);
-  void EthernetImplStop() __TA_EXCLUDES(lock_);
-  zx_status_t EthernetImplStart(const ethernet_ifc_protocol_t* ifc) __TA_EXCLUDES(lock_);
-  void EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
-                           ethernet_impl_queue_tx_callback completion_cb, void* cookie)
-      __TA_EXCLUDES(lock_);
-  zx_status_t EthernetImplSetParam(uint32_t param, int32_t value, const uint8_t* data,
-                                   size_t data_size);
-  void EthernetImplGetBti(zx::bti* bti);
-
   // ZX_PROTOCOL_ETH_MAC ops.
   zx_status_t EthMacMdioWrite(uint32_t reg, uint32_t val);
   zx_status_t EthMacMdioRead(uint32_t reg, uint32_t* val);
   zx_status_t EthMacRegisterCallbacks(const eth_mac_callbacks_t* callbacks);
 
+  // For NetworkDeviceImplProtocol.
+  void NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface,
+                             network_device_impl_init_callback callback, void* cookie);
+  void NetworkDeviceImplStart(network_device_impl_start_callback callback, void* cookie);
+  void NetworkDeviceImplStop(network_device_impl_stop_callback callback, void* cookie);
+  void NetworkDeviceImplGetInfo(device_impl_info_t* out_info);
+  void NetworkDeviceImplQueueTx(const tx_buffer_t* buffers_list, size_t buffers_count);
+  void NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buffers_list, size_t buffers_count);
+  void NetworkDeviceImplPrepareVmo(uint8_t id, zx::vmo vmo,
+                                   network_device_impl_prepare_vmo_callback callback, void* cookie);
+  void NetworkDeviceImplReleaseVmo(uint8_t id);
+  void NetworkDeviceImplSetSnoop(bool snoop);
+
+  // For NetworkPortProtocol.
+  void NetworkPortGetInfo(port_base_info_t* out_info);
+  void NetworkPortGetStatus(port_status_t* out_status);
+  void NetworkPortSetActive(bool active);
+  void NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc);
+  void NetworkPortRemoved();
+
+  // For MacAddrProtocol.
+  void MacAddrGetAddress(mac_address_t* out_mac);
+  void MacAddrGetFeatures(features_t* out_features);
+  void MacAddrSetMode(mac_filter_mode_t mode, const mac_address_t* multicast_macs_list,
+                      size_t multicast_macs_count);
+
  private:
   friend class EthMacFunction;
-  friend class EthPhyFunction;
+  friend class NetworkFunction;
 
+  zx_status_t AllocateBuffers();
   zx_status_t InitBuffers();
   zx_status_t InitDevice();
-  zx_status_t DeInitDevice() __TA_REQUIRES(lock_);
+  zx_status_t DeInitDevice() __TA_REQUIRES(state_lock_);
   zx_status_t InitPdev();
-  zx_status_t ShutDown() __TA_EXCLUDES(lock_);
+  zx_status_t ShutDown();
 
-  void UpdateLinkStatus() __TA_REQUIRES(lock_);
+  void UpdateLinkStatus() __TA_REQUIRES(state_lock_);
+  void SendPortStatus() __TA_REQUIRES(state_lock_);
   void DumpRegisters();
   void DumpStatus(uint32_t status);
-  void ReleaseBuffers();
-  void ProcRxBuffer(uint32_t int_status) __TA_EXCLUDES(lock_);
+  void ReleaseBuffers() __TA_REQUIRES(state_lock_);
+  void ProcRxBuffer(uint32_t int_status) __TA_REQUIRES_SHARED(state_lock_);
+  void ProcTxBuffer() __TA_REQUIRES_SHARED(state_lock_);
   uint32_t DmaRxStatus();
 
-  int Thread() __TA_EXCLUDES(lock_);
+  int Thread();
   int WorkerThread();
 
   zx_status_t GetMAC(zx_device_t* dev);
 
   // Number each of tx/rx transaction descriptors
-  //  4096 buffers = ~48ms of packets
-  static constexpr uint32_t kNumDesc = 4096;
-  // Size of each transaction buffer
-  static constexpr uint32_t kTxnBufSize = 4096;
+  //  2048 buffers = ~24ms of packets
+  static constexpr uint32_t kNumDesc = 2048;
 
-  dw_dmadescr_t* tx_descriptors_ = nullptr;
-  dw_dmadescr_t* rx_descriptors_ = nullptr;
+  network::SharedLock state_lock_;
+  std::mutex tx_lock_;
+  std::mutex rx_lock_;
 
-  fbl::RefPtr<PinnedBuffer> txn_buffer_;
+  dw_dmadescr_t* tx_descriptors_ __TA_GUARDED(tx_lock_) = nullptr;
+  dw_dmadescr_t* rx_descriptors_ __TA_GUARDED(rx_lock_) = nullptr;
+
   fbl::RefPtr<PinnedBuffer> desc_buffer_;
 
-  uint8_t* tx_buffer_ = nullptr;
-  uint32_t curr_tx_buf_ = 0;
-  uint8_t* rx_buffer_ = nullptr;
-  uint32_t curr_rx_buf_ = 0;
-
-  // designware mac options
-  uint32_t options_ = 0;
+  uint32_t tx_head_ __TA_GUARDED(tx_lock_) = 0;
+  uint32_t tx_tail_ __TA_GUARDED(tx_lock_) = 0;
+  uint32_t rx_head_ __TA_GUARDED(rx_lock_) = 0;
+  uint32_t rx_tail_ __TA_GUARDED(rx_lock_) = 0;
+  uint32_t rx_queued_ __TA_GUARDED(rx_lock_) = 0;
 
   // ethermac fields
-  uint32_t features_ = 0;
-  uint32_t mtu_ = 0;
-  uint8_t mac_[MAC_ARRAY_LENGTH] = {};
+  std::array<uint8_t, MAC_SIZE> mac_ __TA_GUARDED(state_lock_) = {};
   uint16_t mii_addr_ = 0;
 
-  zx::bti bti_;
+  const zx::bti bti_;
   zx::interrupt dma_irq_;
 
   ddk::PDevFidl pdev_;
@@ -178,19 +201,25 @@ class DWMacDevice : public ddk::Device<DWMacDevice, ddk::Unbindable, ddk::Suspen
 
   std::optional<fdf::MmioBuffer> mmio_;
 
-  fbl::Mutex lock_;
-  ddk::EthernetIfcProtocolClient ethernet_client_ __TA_GUARDED(lock_);
+  ddk::NetworkDeviceIfcProtocolClient netdevice_ __TA_GUARDED(state_lock_);
+  bool started_ __TA_GUARDED(state_lock_) = false;
 
-  // Only accessed from Thread, so not locked.
-  bool online_ = false;
+  bool online_ __TA_GUARDED(state_lock_) = false;
 
   // statistics
-  uint32_t bus_errors_;
-  uint32_t tx_counter_ = 0;
-  uint32_t rx_packet_ = 0;
-  uint32_t loop_count_ = 0;
+  std::atomic<uint32_t> bus_errors_ = 0;
+  std::atomic<uint32_t> tx_counter_ = 0;
+  std::atomic<uint32_t> rx_packet_ = 0;
+  std::atomic<uint32_t> loop_count_ = 0;
 
   std::atomic<bool> running_;
+
+  using VmoStore = vmo_store::VmoStore<vmo_store::SlabStorage<uint32_t>>;
+  VmoStore vmo_store_ __TA_GUARDED(state_lock_);
+
+  std::array<tx_result_t, kNumDesc> tx_in_flight_buffer_ids_ __TA_GUARDED(tx_lock_);
+  std::array<std::pair<uint32_t, void*>, kNumDesc> rx_in_flight_buffer_ids_ __TA_GUARDED(rx_lock_);
+  std::bitset<kNumDesc> tx_in_flight_active_ __TA_GUARDED(tx_lock_);
 
   thrd_t thread_;
   thrd_t worker_thread_;
@@ -201,24 +230,27 @@ class DWMacDevice : public ddk::Device<DWMacDevice, ddk::Unbindable, ddk::Suspen
   // Callbacks registered signal.
   sync_completion_t cb_registered_signal_;
 
-  EthPhyFunction* phy_function_;
+  NetworkFunction* network_function_;
   EthMacFunction* mac_function_;
 };
 
-using EthPhyFunctionType = ddk::Device<EthPhyFunction, ddk::Unbindable, ddk::Suspendable>;
-class EthPhyFunction : public EthPhyFunctionType,
-                       public ddk::EthernetImplProtocol<EthPhyFunction, ddk::base_protocol> {
+class NetworkFunction : public ddk::Device<NetworkFunction, ddk::Unbindable, ddk::Suspendable>,
+                        public ddk::NetworkDeviceImplProtocol<NetworkFunction, ddk::base_protocol>,
+                        public ddk::NetworkPortProtocol<NetworkFunction>,
+                        public ddk::MacAddrProtocol<NetworkFunction> {
  public:
-  explicit EthPhyFunction(zx_device_t* device, DWMacDevice* peripheral)
-      : EthPhyFunctionType(device), device_(peripheral) {}
+  explicit NetworkFunction(zx_device_t* device, DWMacDevice* peripheral)
+      : ddk::Device<NetworkFunction, ddk::Unbindable, ddk::Suspendable>(device),
+        device_(peripheral),
+        mac_addr_proto_({&mac_addr_protocol_ops_, this}) {}
 
   void DdkUnbind(ddk::UnbindTxn txn) {
-    device_->phy_function_ = nullptr;
+    device_->mac_function_ = nullptr;
     device_ = nullptr;
     txn.Reply();
   }
   void DdkSuspend(ddk::SuspendTxn txn) {
-    device_->phy_function_ = nullptr;
+    device_->mac_function_ = nullptr;
     device_ = nullptr;
     txn.Reply(ZX_OK, txn.requested_state());
   }
@@ -226,27 +258,57 @@ class EthPhyFunction : public EthPhyFunctionType,
     ZX_ASSERT(device_ == nullptr);
     delete this;
   }
+  // For NetworkDeviceImplProtocol.
+  void NetworkDeviceImplInit(const network_device_ifc_protocol_t* iface,
+                             network_device_impl_init_callback callback, void* cookie) {
+    device_->NetworkDeviceImplInit(iface, callback, cookie);
+  }
+  void NetworkDeviceImplStart(network_device_impl_start_callback callback, void* cookie) {
+    device_->NetworkDeviceImplStart(callback, cookie);
+  }
+  void NetworkDeviceImplStop(network_device_impl_stop_callback callback, void* cookie) {
+    device_->NetworkDeviceImplStop(callback, cookie);
+  }
+  void NetworkDeviceImplGetInfo(device_impl_info_t* out_info) {
+    device_->NetworkDeviceImplGetInfo(out_info);
+  }
+  void NetworkDeviceImplQueueTx(const tx_buffer_t* buffers_list, size_t buffers_count) {
+    device_->NetworkDeviceImplQueueTx(buffers_list, buffers_count);
+  }
+  void NetworkDeviceImplQueueRxSpace(const rx_space_buffer_t* buffers_list, size_t buffers_count) {
+    device_->NetworkDeviceImplQueueRxSpace(buffers_list, buffers_count);
+  }
+  void NetworkDeviceImplPrepareVmo(uint8_t id, zx::vmo vmo,
+                                   network_device_impl_prepare_vmo_callback callback,
+                                   void* cookie) {
+    device_->NetworkDeviceImplPrepareVmo(id, std::move(vmo), callback, cookie);
+  }
+  void NetworkDeviceImplReleaseVmo(uint8_t id) { device_->NetworkDeviceImplReleaseVmo(id); }
+  void NetworkDeviceImplSetSnoop(bool snoop) { device_->NetworkDeviceImplSetSnoop(snoop); }
 
-  // ZX_PROTOCOL_ETHERNET_IMPL ops.
-  zx_status_t EthernetImplQuery(uint32_t options, ethernet_info_t* info) {
-    return device_->EthernetImplQuery(options, info);
+  // For NetworkPortProtocol.
+  void NetworkPortGetInfo(port_base_info_t* out_info) { device_->NetworkPortGetInfo(out_info); }
+  void NetworkPortGetStatus(port_status_t* out_status) {
+    device_->NetworkPortGetStatus(out_status);
   }
-  void EthernetImplStop() { device_->EthernetImplStop(); }
-  zx_status_t EthernetImplStart(const ethernet_ifc_protocol_t* ifc) {
-    return device_->EthernetImplStart(ifc);
+  void NetworkPortSetActive(bool active) { device_->NetworkPortSetActive(active); }
+  void NetworkPortGetMac(mac_addr_protocol_t** out_mac_ifc) {
+    device_->NetworkPortGetMac(out_mac_ifc);
   }
-  void EthernetImplQueueTx(uint32_t options, ethernet_netbuf_t* netbuf,
-                           ethernet_impl_queue_tx_callback completion_cb, void* cookie) {
-    device_->EthernetImplQueueTx(options, netbuf, completion_cb, cookie);
+  void NetworkPortRemoved() { device_->NetworkPortRemoved(); }
+
+  // For MacAddrProtocol.
+  void MacAddrGetAddress(mac_address_t* out_mac) { device_->MacAddrGetAddress(out_mac); }
+  void MacAddrGetFeatures(features_t* out_features) { device_->MacAddrGetFeatures(out_features); }
+  void MacAddrSetMode(mac_filter_mode_t mode, const mac_address_t* multicast_macs_list,
+                      size_t multicast_macs_count) {
+    device_->MacAddrSetMode(mode, multicast_macs_list, multicast_macs_count);
   }
-  zx_status_t EthernetImplSetParam(uint32_t param, int32_t value, const uint8_t* data,
-                                   size_t data_size) {
-    return device_->EthernetImplSetParam(param, value, data, data_size);
-  }
-  void EthernetImplGetBti(zx::bti* bti) { device_->EthernetImplGetBti(bti); }
 
  private:
+  friend DWMacDevice;
   DWMacDevice* device_;
+  mac_addr_protocol_t mac_addr_proto_;
 };
 
 using EthMacFunctionType = ddk::Device<EthMacFunction, ddk::Unbindable, ddk::Suspendable>;

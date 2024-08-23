@@ -48,4 +48,37 @@ pub struct DevelopmentSupportConfig {
     /// Follows the same resolution as `enabled` if absent.
     #[serde(default)]
     pub include_netsvc: bool,
+
+    /// Tools to enable along with development support
+    #[serde(default)]
+    pub tools: ToolsConfig,
+}
+
+/// Platform-provided tools for development and debugging.
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ToolsConfig {
+    /// Tools for connectivity.
+    #[serde(default)]
+    pub connectivity: ConnectivityToolsConfig,
+}
+
+/// Platform-provided tools for development and debugging connectivity.
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ConnectivityToolsConfig {
+    /// Include tools for basic networking, such as:
+    ///   - 'nc'
+    ///   - 'iperf3'
+    ///   - 'tcpdump'
+    #[serde(default)]
+    pub enable_networking: bool,
+
+    /// Include tools for wlan
+    #[serde(default)]
+    pub enable_wlan: bool,
+
+    /// Include tools for Thread
+    #[serde(default)]
+    pub enable_thread: bool,
 }

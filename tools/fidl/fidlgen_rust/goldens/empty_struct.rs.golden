@@ -107,7 +107,7 @@ impl EmptyProtocolSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::Time) -> Result<EmptyProtocolEvent, fidl::Error> {
+    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<EmptyProtocolEvent, fidl::Error> {
         EmptyProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
 
@@ -122,7 +122,7 @@ impl EmptyProtocolSynchronousProxy {
     pub fn r#send_and_receive(
         &self,
         mut e: &Empty,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<Empty, fidl::Error> {
         let _response = self
             .client

@@ -142,10 +142,9 @@ pub trait MutableDirectory: Directory + Send + Sync {
         Box::pin(ready(Err(Status::NOT_SUPPORTED)))
     }
 
-    /// Set the mutable attributes of this directory based on the values in `attributes`.
-    // TODO(https://fxbug.dev/353768723): Ensure that implementations reject unsupported attributes
-    // when new ones are added to `attributes`. This might require that implementations report the
-    // specific set of attributes they support before calling this function.
+    /// Set the mutable attributes of this directory based on the values in `attributes`. If the
+    /// directory does not support updating *all* of the specified attributes, implementations
+    /// should fail with `ZX_ERR_NOT_SUPPORTED`.
     fn update_attributes(
         &self,
         attributes: fio::MutableNodeAttributes,

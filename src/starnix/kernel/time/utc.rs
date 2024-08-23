@@ -5,7 +5,9 @@
 
 #[cfg(not(feature = "starnix_lite"))]
 use crate::vdso::vdso_loader::MemoryMappedVvar;
-use fuchsia_runtime::duplicate_utc_clock_handle;
+use fuchsia_runtime::{
+    duplicate_utc_clock_handle, UtcClock as UtcClockHandle, UtcTime, UtcTimeline,
+};
 use fuchsia_zircon::{
     AsHandleRef, ClockTransformation, {self as zx},
 };
@@ -20,17 +22,18 @@ use starnix_sync::Mutex;
 
 #[derive(Debug)]
 struct UtcClock {
-    real_utc_clock: zx::Clock,
-    current_transform: ClockTransformation,
+    real_utc_clock: UtcClockHandle,
+    current_transform: ClockTransformation<UtcTimeline>,
     real_utc_clock_started: bool,
 }
 
 impl UtcClock {
-    pub fn new(real_utc_clock: zx::Clock) -> Self {
-        let offset = real_utc_clock.get_details().unwrap().backstop - zx::Time::get_monotonic();
+    pub fn new(real_utc_clock: UtcClockHandle) -> Self {
+        let offset = real_utc_clock.get_details().unwrap().backstop.into_nanos()
+            - zx::MonotonicTime::get().into_nanos();
         let current_transform = ClockTransformation {
-            reference_offset: 0,
-            synthetic_offset: offset.into_nanos(),
+            reference_offset: zx::MonotonicTime::default(),
+            synthetic_offset: UtcTime::from_nanos(offset),
             rate: zx::sys::zx_clock_rate_t { synthetic_ticks: 1, reference_ticks: 1 },
         };
         let mut utc_clock = Self {
@@ -49,7 +52,10 @@ impl UtcClock {
 
     fn check_real_utc_clock_started(&self) -> bool {
         // Poll the utc clock to check if CLOCK_STARTED is asserted.
-        match self.real_utc_clock.wait_handle(zx::Signals::CLOCK_STARTED, zx::Time::INFINITE_PAST) {
+        match self
+            .real_utc_clock
+            .wait_handle(zx::Signals::CLOCK_STARTED, zx::MonotonicTime::INFINITE_PAST)
+        {
             Ok(e) if e.contains(zx::Signals::CLOCK_STARTED) => true,
             Ok(_) | Err(zx::Status::TIMED_OUT) => false,
             Err(e) => {
@@ -59,15 +65,15 @@ impl UtcClock {
         }
     }
 
-    pub fn now(&self) -> zx::Time {
-        let monotonic_time = zx::Time::get_monotonic();
+    pub fn now(&self) -> UtcTime {
+        let monotonic_time = zx::MonotonicTime::get();
         // Utc time is calculated using the same transform as the one stored in vvar. This is
         // to ensure that utc calculations are the same whether using a syscall or the vdso
         // function.
         self.current_transform.apply(monotonic_time)
     }
 
-    pub fn estimate_monotonic_deadline(&self, utc: zx::Time) -> zx::Time {
+    pub fn estimate_monotonic_deadline(&self, utc: UtcTime) -> zx::MonotonicTime {
         self.current_transform.apply_inverse(utc)
     }
 
@@ -103,7 +109,7 @@ pub fn update_utc_clock(dest: &MemoryMappedVvar) {
     (*UTC_CLOCK).lock().update_utc_clock(dest);
 }
 
-pub fn utc_now() -> zx::Time {
+pub fn utc_now() -> UtcTime {
     #[cfg(test)]
     {
         if let Some(test_time) = UTC_CLOCK_OVERRIDE_FOR_TESTING
@@ -115,7 +121,7 @@ pub fn utc_now() -> zx::Time {
     (*UTC_CLOCK).lock().now()
 }
 
-pub fn estimate_monotonic_deadline_from_utc(utc: zx::Time) -> zx::Time {
+pub fn estimate_monotonic_deadline_from_utc(utc: UtcTime) -> zx::MonotonicTime {
     #[cfg(test)]
     {
         if let Some(test_time) = UTC_CLOCK_OVERRIDE_FOR_TESTING.with(|cell| {
@@ -131,7 +137,7 @@ pub fn estimate_monotonic_deadline_from_utc(utc: zx::Time) -> zx::Time {
 
 #[cfg(test)]
 thread_local! {
-    static UTC_CLOCK_OVERRIDE_FOR_TESTING: std::cell::RefCell<Option<zx::Clock>> =
+    static UTC_CLOCK_OVERRIDE_FOR_TESTING: std::cell::RefCell<Option<UtcClockHandle>> =
         std::cell::RefCell::new(None);
 }
 
@@ -140,7 +146,7 @@ pub struct UtcClockOverrideGuard(());
 
 #[cfg(test)]
 impl UtcClockOverrideGuard {
-    pub fn new(test_clock: zx::Clock) -> Self {
+    pub fn new(test_clock: UtcClockHandle) -> Self {
         UTC_CLOCK_OVERRIDE_FOR_TESTING.with(|cell| {
             assert_eq!(*cell.borrow(), None); // We don't expect a previously set clock override when using this type.
             *cell.borrow_mut() = Some(test_clock);

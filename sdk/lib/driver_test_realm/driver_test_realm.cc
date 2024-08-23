@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.component.resolution/cpp/wire.h>
 #include <fidl/fuchsia.device.manager/cpp/wire.h>
 #include <fidl/fuchsia.diagnostics/cpp/fidl.h>
+#include <fidl/fuchsia.driver.development/cpp/fidl.h>
 #include <fidl/fuchsia.driver.framework/cpp/wire.h>
 #include <fidl/fuchsia.driver.test/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
@@ -408,11 +409,18 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
             });
             break;
           }
+          case fuchsia_component_test::Capability::Tag::kConfig: {
+            const auto& offer_cap_config = offer_cap.config().value();
+            converted.emplace(Config{
+                offer_cap_config.name().value(),
+                offer_cap_config.as(),
+            });
+            break;
+          }
           case fuchsia_component_test::Capability::Tag::kDirectory:
           case fuchsia_component_test::Capability::Tag::kStorage:
           case fuchsia_component_test::Capability::Tag::kService:
           case fuchsia_component_test::Capability::Tag::kEventStream:
-          case fuchsia_component_test::Capability::Tag::kConfig:
           case fuchsia_component_test::Capability::Tag::kDictionary:
           default:
             FX_LOG_KV(WARNING, "Skipping unsupported offer capability.",
@@ -590,7 +598,27 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
       return;
     }
 
-    completer.Reply(zx::ok());
+    // Connect to the driver manager and wait for bootup to complete before returning.
+    auto manager = component::ConnectAt<fuchsia_driver_development::Manager>(
+        fidl::UnownedClientEnd<fuchsia_io::Directory>(
+            realm_->component().exposed().unowned_channel()));
+    if (manager.is_error()) {
+      completer.Reply(manager.take_error());
+      return;
+    }
+
+    development_manager_client_.Bind(*std::move(manager), dispatcher_);
+
+    development_manager_client_->WaitForBootup().Then(
+        [completer = completer.ToAsync()](
+            fidl::Result<fuchsia_driver_development::Manager::WaitForBootup>& wait_result) mutable {
+          if (wait_result.is_error()) {
+            completer.Reply(zx::error(wait_result.error_value().status()));
+            return;
+          }
+
+          completer.Reply(zx::ok());
+        });
   }
 
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_driver_test::Realm> metadata,
@@ -688,6 +716,7 @@ class DriverTestRealm final : public fidl::Server<fuchsia_driver_test::Realm> {
   component::OutgoingDirectory* outgoing_;
   async_dispatcher_t* dispatcher_;
   fidl::ServerBindingGroup<fuchsia_driver_test::Realm> bindings_;
+  fidl::Client<fuchsia_driver_development::Manager> development_manager_client_;
 
   struct Directory {
     const char* name;

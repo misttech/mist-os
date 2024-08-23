@@ -1039,9 +1039,9 @@ impl DynamicFileSource for StatFile {
         stime = duration_to_scheduler_clock(time_stats.system_time);
 
         let info = task.thread_group.process.info().map_err(|_| errno!(EIO))?;
-        starttime =
-            duration_to_scheduler_clock(zx::Time::from_nanos(info.start_time) - zx::Time::ZERO)
-                as u64;
+        starttime = duration_to_scheduler_clock(
+            zx::MonotonicTime::from_nanos(info.start_time) - zx::MonotonicTime::ZERO,
+        ) as u64;
 
         let mem_stats = task.mm().get_stats().map_err(|_| errno!(EIO))?;
         let page_size = *PAGE_SIZE as usize;

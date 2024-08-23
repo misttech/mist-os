@@ -689,7 +689,7 @@ fn send_touch_screen_event(
             injector_contacts,
         }),
         device_descriptor: device_descriptor.clone(),
-        event_time: zx::Time::get_monotonic(),
+        event_time: zx::MonotonicTime::get(),
         handled: Handled::No,
         trace_id: Some(trace_id),
     };
@@ -727,7 +727,7 @@ fn send_touchpad_event(
             pressed_buttons,
         }),
         device_descriptor: device_descriptor.clone(),
-        event_time: zx::Time::get_monotonic(),
+        event_time: zx::MonotonicTime::get(),
         handled: Handled::No,
         trace_id: Some(trace_id),
     };
@@ -784,13 +784,13 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn process_empty_reports() {
-        let previous_report_time = fuchsia_zircon::Time::get_monotonic().into_nanos();
+        let previous_report_time = fuchsia_zircon::MonotonicTime::get().into_nanos();
         let previous_report = create_touch_input_report(
             vec![],
             /* pressed_buttons= */ None,
             previous_report_time,
         );
-        let report_time = fuchsia_zircon::Time::get_monotonic().into_nanos();
+        let report_time = fuchsia_zircon::MonotonicTime::get().into_nanos();
         let report =
             create_touch_input_report(vec![], /* pressed_buttons= */ None, report_time);
 
@@ -1022,14 +1022,14 @@ mod tests {
 
     #[fasync::run_singlethreaded(test)]
     async fn sent_event_has_trace_id() {
-        let previous_report_time = fuchsia_zircon::Time::get_monotonic().into_nanos();
+        let previous_report_time = fuchsia_zircon::MonotonicTime::get().into_nanos();
         let previous_report = create_touch_input_report(
             vec![],
             /* pressed_buttons= */ None,
             previous_report_time,
         );
 
-        let report_time = fuchsia_zircon::Time::get_monotonic().into_nanos();
+        let report_time = fuchsia_zircon::MonotonicTime::get().into_nanos();
         let contact = fidl_fuchsia_input_report::ContactInputReport {
             contact_id: Some(222),
             position_x: Some(333),

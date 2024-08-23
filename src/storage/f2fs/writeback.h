@@ -43,6 +43,7 @@ class Writer final {
   // writeback pages that StorageOperations conveys. In addition, it signals |completion| if
   // it is not null.
   fpromise::promise<> GetTaskForWriteIO(sync_completion_t *completion);
+  // TODO(b/354796037): need to handle larger I/Os
   StorageOperations MakeStorageOperations(PageList &to_submit) __TA_EXCLUDES(mutex_);
 
   std::mutex mutex_;
@@ -54,6 +55,22 @@ class Writer final {
   fs::BackgroundExecutor executor_;
   // An executor to run writeback tasks. Refer to F2fs::ScheduleWriteback().
   fs::BackgroundExecutor writeback_executor_;
+};
+
+// A helper class to mitigate notification costs
+class NotifyWriteback {
+ public:
+  ~NotifyWriteback() { Notify(1); }
+  // It tries to group notification to writeback waiters for the same file.
+  // If a new waiter of |page| doesn't belong to the same file as that of |waiters_|, it immediately
+  // notifies |waiters_|.
+  void ReserveNotify(fbl::RefPtr<Page> page);
+
+ private:
+  // It wakes |waiters| up when the number of waiters more than |kNotifyInterval| by default.
+  void Notify(size_t interval = kNotifyInterval);
+  static constexpr size_t kNotifyInterval = 8;
+  PageList waiters_ = {};
 };
 
 }  // namespace f2fs

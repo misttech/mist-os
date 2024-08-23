@@ -23,6 +23,9 @@ impl DefineSubsystemConfiguration<ForensicsConfig> for ForensicsSubsystem {
         if config.feedback.remote_device_id_provider {
             builder.platform_bundle("feedback_remote_device_id_provider");
         }
+        if config.feedback.include_kernel_logs_in_last_reboot_info {
+            builder.platform_bundle("kernel_logs_in_reboot_info");
+        }
 
         match context.build_type {
             // The userdebug/user configs are platform bundles that add an override config.

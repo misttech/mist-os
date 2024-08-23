@@ -10,7 +10,7 @@ use fidl_fuchsia_ui_composition_internal as fcomp;
 use fidl_fuchsia_ui_input3::KeyEventType;
 use fuchsia_async::{OnSignals, Task};
 use fuchsia_inspect::health::Reporter;
-use fuchsia_zircon::{AsHandleRef, Duration, Signals, Status, Time};
+use fuchsia_zircon::{AsHandleRef, Duration, MonotonicTime, Signals, Status};
 use futures::channel::mpsc::{self, UnboundedReceiver, UnboundedSender};
 use futures::{select, StreamExt};
 use keymaps::KeyState;
@@ -144,7 +144,7 @@ impl DisplayOwnership {
         let initial_state = display_ownership_event
             // scenic guarantees that ANY_DISPLAY_EVENT is asserted. If it is
             // not, this will fail with a timeout error.
-            .wait_handle(*ANY_DISPLAY_EVENT, Time::INFINITE_PAST)
+            .wait_handle(*ANY_DISPLAY_EVENT, MonotonicTime::INFINITE_PAST)
             .expect("unable to set the initial display state");
         tracing::debug!("setting initial display ownership to: {:?}", &initial_state);
         let initial_ownership: Ownership = initial_state.into();
@@ -211,7 +211,7 @@ impl DisplayOwnership {
                         false => KeyEventType::Sync,
                     };
                     let keys = self.key_state.borrow().get_set();
-                    let mut event_time = Time::get_monotonic();
+                    let mut event_time = MonotonicTime::get();
                     for key in keys.into_iter() {
                         let key_event = KeyboardEvent::new(key, event_type);
                         output.unbounded_send(into_input_event(key_event, event_time))
@@ -278,7 +278,10 @@ fn empty_keyboard_device_descriptor() -> input_device::InputDeviceDescriptor {
     )
 }
 
-fn into_input_event(keyboard_event: KeyboardEvent, event_time: Time) -> input_device::InputEvent {
+fn into_input_event(
+    keyboard_event: KeyboardEvent,
+    event_time: MonotonicTime,
+) -> input_device::InputEvent {
     input_device::InputEvent {
         device_event: input_device::InputDeviceEvent::Keyboard(keyboard_event),
         device_descriptor: empty_keyboard_device_descriptor(),
@@ -354,7 +357,7 @@ mod tests {
             handler.handle_input_events(handler_receiver, handler_sender).await.unwrap();
         });
 
-        let fake_time = Time::from_nanos(42);
+        let fake_time = MonotonicTime::from_nanos(42);
 
         // Go two full circles of signaling.
 
@@ -401,7 +404,7 @@ mod tests {
     }
 
     fn new_keyboard_input_event(key: Key, event_type: KeyEventType) -> InputEvent {
-        let fake_time = Time::from_nanos(42);
+        let fake_time = MonotonicTime::from_nanos(42);
         create_input_event(
             KeyboardEvent::new(key, event_type),
             &input_device::InputDeviceDescriptor::Fake,
@@ -422,7 +425,7 @@ mod tests {
             handler.handle_input_events(handler_receiver, handler_sender).await.unwrap();
         });
 
-        let fake_time = Time::from_nanos(42);
+        let fake_time = MonotonicTime::from_nanos(42);
 
         // Gain the display, and press a key.
         wrangler.set_owned();
@@ -474,7 +477,7 @@ mod tests {
             handler.handle_input_events(handler_receiver, handler_sender).await.unwrap();
         });
 
-        let fake_time = Time::from_nanos(42);
+        let fake_time = MonotonicTime::from_nanos(42);
 
         wrangler.set_owned();
         loop_done.next().await;

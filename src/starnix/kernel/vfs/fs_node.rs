@@ -19,7 +19,7 @@ use crate::vfs::{
     RecordLockOwner, RecordLocks, WeakFileHandle, MAX_LFS_FILESIZE,
 };
 use bitflags::bitflags;
-use fuchsia_zircon as zx;
+use fuchsia_runtime::UtcTime;
 use linux_uapi::XATTR_SECURITY_PREFIX;
 use once_cell::sync::OnceCell;
 use starnix_logging::{log_error, track_stub};
@@ -204,9 +204,9 @@ pub struct FsNodeInfo {
     pub size: usize,
     pub blksize: usize,
     pub blocks: usize,
-    pub time_status_change: zx::Time,
-    pub time_access: zx::Time,
-    pub time_modify: zx::Time,
+    pub time_status_change: UtcTime,
+    pub time_access: UtcTime,
+    pub time_modify: UtcTime,
     pub security_state: security::FsNodeState,
 }
 
@@ -871,69 +871,71 @@ where
 
 /// Implements [`FsNodeOps`] methods in a way that makes sense for symlinks.
 /// You must implement [`FsNodeOps::readlink`].
+#[macro_export]
 macro_rules! fs_node_impl_symlink {
     () => {
-        crate::vfs::fs_node_impl_not_dir!();
+        starnix_core::vfs::fs_node_impl_not_dir!();
 
         fn create_file_ops(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            node: &crate::vfs::FsNode,
+            node: &starnix_core::vfs::FsNode,
             _current_task: &CurrentTask,
             _flags: starnix_uapi::open_flags::OpenFlags,
-        ) -> Result<Box<dyn crate::vfs::FileOps>, starnix_uapi::errors::Errno> {
+        ) -> Result<Box<dyn starnix_core::vfs::FileOps>, starnix_uapi::errors::Errno> {
             assert!(node.is_lnk());
             unreachable!("Symlink nodes cannot be opened.");
         }
     };
 }
 
+#[macro_export]
 macro_rules! fs_node_impl_dir_readonly {
     () => {
         fn mkdir(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _node: &crate::vfs::FsNode,
-            _current_task: &crate::task::CurrentTask,
-            _name: &crate::vfs::FsStr,
+            _node: &starnix_core::vfs::FsNode,
+            _current_task: &starnix_core::task::CurrentTask,
+            _name: &starnix_core::vfs::FsStr,
             _mode: starnix_uapi::file_mode::FileMode,
             _owner: starnix_uapi::auth::FsCred,
-        ) -> Result<crate::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
+        ) -> Result<starnix_core::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(EROFS)
         }
 
         fn mknod(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _node: &crate::vfs::FsNode,
-            _current_task: &crate::task::CurrentTask,
-            _name: &crate::vfs::FsStr,
+            _node: &starnix_core::vfs::FsNode,
+            _current_task: &starnix_core::task::CurrentTask,
+            _name: &starnix_core::vfs::FsStr,
             _mode: starnix_uapi::file_mode::FileMode,
             _dev: starnix_uapi::device_type::DeviceType,
             _owner: starnix_uapi::auth::FsCred,
-        ) -> Result<crate::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
+        ) -> Result<starnix_core::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(EROFS)
         }
 
         fn create_symlink(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _node: &crate::vfs::FsNode,
-            _current_task: &crate::task::CurrentTask,
-            _name: &crate::vfs::FsStr,
-            _target: &crate::vfs::FsStr,
+            _node: &starnix_core::vfs::FsNode,
+            _current_task: &starnix_core::task::CurrentTask,
+            _name: &starnix_core::vfs::FsStr,
+            _target: &starnix_core::vfs::FsStr,
             _owner: starnix_uapi::auth::FsCred,
-        ) -> Result<crate::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
+        ) -> Result<starnix_core::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(EROFS)
         }
 
         fn link(
             &self,
             _locked: &mut Locked<'_, FileOpsCore>,
-            _node: &crate::vfs::FsNode,
-            _current_task: &crate::task::CurrentTask,
-            _name: &crate::vfs::FsStr,
-            _child: &crate::vfs::FsNodeHandle,
+            _node: &starnix_core::vfs::FsNode,
+            _current_task: &starnix_core::task::CurrentTask,
+            _name: &starnix_core::vfs::FsStr,
+            _child: &starnix_core::vfs::FsNodeHandle,
         ) -> Result<(), starnix_uapi::errors::Errno> {
             starnix_uapi::error!(EROFS)
         }
@@ -941,27 +943,65 @@ macro_rules! fs_node_impl_dir_readonly {
         fn unlink(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _node: &crate::vfs::FsNode,
-            _current_task: &crate::task::CurrentTask,
-            _name: &crate::vfs::FsStr,
-            _child: &crate::vfs::FsNodeHandle,
+            _node: &starnix_core::vfs::FsNode,
+            _current_task: &starnix_core::task::CurrentTask,
+            _name: &starnix_core::vfs::FsStr,
+            _child: &starnix_core::vfs::FsNodeHandle,
         ) -> Result<(), starnix_uapi::errors::Errno> {
             starnix_uapi::error!(EROFS)
         }
     };
 }
 
-/// Implements [`FsNodeOps::set_xattr`] by delegating to another [`FsNodeOps`]
-/// object.
+/// Trait that objects can implement if they need to handle extended attribute storage. Allows
+/// delegating extended attribute operations in [`FsNodeOps`] to another object.
+///
+/// See [`fs_node_impl_xattr_delegate`] for usage details.
+pub trait XattrStorage {
+    /// Delegate for [`FsNodeOps::get_xattr`].
+    fn get_xattr(&self, name: &FsStr) -> Result<FsString, Errno>;
+
+    /// Delegate for [`FsNodeOps::set_xattr`].
+    fn set_xattr(&self, name: &FsStr, value: &FsStr, op: XattrOp) -> Result<(), Errno>;
+
+    /// Delegate for [`FsNodeOps::remove_xattr`].
+    fn remove_xattr(&self, name: &FsStr) -> Result<(), Errno>;
+
+    /// Delegate for [`FsNodeOps::list_xattrs`].
+    fn list_xattrs(&self) -> Result<Vec<FsString>, Errno>;
+}
+
+/// Implements extended attribute ops for [`FsNodeOps`] by delegating to another object which
+/// implements the [`XattrStorage`] trait or a similar interface. For example:
+///
+/// ```
+/// struct Xattrs {}
+///
+/// impl XattrStorage for Xattrs {
+///     // implement XattrStorage
+/// }
+///
+/// struct Node {
+///     xattrs: Xattrs
+/// }
+///
+/// impl FsNodeOps for Node {
+///     // Delegate extended attribute ops in FsNodeOps to self.xattrs
+///     fs_node_impl_xattr_delegate!(self, self.xattrs);
+///
+///     // add other FsNodeOps impls here
+/// }
+/// ```
+#[macro_export]
 macro_rules! fs_node_impl_xattr_delegate {
     ($self:ident, $delegate:expr) => {
         fn get_xattr(
             &$self,
             _node: &FsNode,
             _current_task: &CurrentTask,
-            name: &crate::vfs::FsStr,
+            name: &starnix_core::vfs::FsStr,
             _size: usize,
-        ) -> Result<crate::vfs::ValueOrSize<crate::vfs::FsString>, starnix_uapi::errors::Errno> {
+        ) -> Result<starnix_core::vfs::ValueOrSize<starnix_core::vfs::FsString>, starnix_uapi::errors::Errno> {
             Ok($delegate.get_xattr(name)?.into())
         }
 
@@ -969,9 +1009,9 @@ macro_rules! fs_node_impl_xattr_delegate {
             &$self,
             _node: &FsNode,
             _current_task: &CurrentTask,
-            name: &crate::vfs::FsStr,
-            value: &crate::vfs::FsStr,
-            op: crate::vfs::XattrOp,
+            name: &starnix_core::vfs::FsStr,
+            value: &starnix_core::vfs::FsStr,
+            op: starnix_core::vfs::XattrOp,
         ) -> Result<(), starnix_uapi::errors::Errno> {
             $delegate.set_xattr(name, value, op)
         }
@@ -980,7 +1020,7 @@ macro_rules! fs_node_impl_xattr_delegate {
             &$self,
             _node: &FsNode,
             _current_task: &CurrentTask,
-            name: &crate::vfs::FsStr,
+            name: &starnix_core::vfs::FsStr,
         ) -> Result<(), starnix_uapi::errors::Errno> {
             $delegate.remove_xattr(name)
         }
@@ -990,69 +1030,69 @@ macro_rules! fs_node_impl_xattr_delegate {
             _node: &FsNode,
             _current_task: &CurrentTask,
             _size: usize,
-        ) -> Result<crate::vfs::ValueOrSize<Vec<crate::vfs::FsString>>, starnix_uapi::errors::Errno> {
+        ) -> Result<starnix_core::vfs::ValueOrSize<Vec<starnix_core::vfs::FsString>>, starnix_uapi::errors::Errno> {
             Ok($delegate.list_xattrs()?.into())
         }
     };
-    ($delegate:expr) => { fs_node_impl_xattr_delegate(self, $delegate) };
 }
 
 /// Stubs out [`FsNodeOps`] methods that only apply to directories.
+#[macro_export]
 macro_rules! fs_node_impl_not_dir {
     () => {
         fn lookup(
             &self,
-            _node: &crate::vfs::FsNode,
-            _current_task: &crate::task::CurrentTask,
-            _name: &crate::vfs::FsStr,
-        ) -> Result<crate::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
+            _node: &starnix_core::vfs::FsNode,
+            _current_task: &starnix_core::task::CurrentTask,
+            _name: &starnix_core::vfs::FsStr,
+        ) -> Result<starnix_core::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(ENOTDIR)
         }
 
         fn mknod(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _node: &crate::vfs::FsNode,
-            _current_task: &crate::task::CurrentTask,
-            _name: &crate::vfs::FsStr,
+            _node: &starnix_core::vfs::FsNode,
+            _current_task: &starnix_core::task::CurrentTask,
+            _name: &starnix_core::vfs::FsStr,
             _mode: starnix_uapi::file_mode::FileMode,
             _dev: starnix_uapi::device_type::DeviceType,
             _owner: starnix_uapi::auth::FsCred,
-        ) -> Result<crate::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
+        ) -> Result<starnix_core::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(ENOTDIR)
         }
 
         fn mkdir(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _node: &crate::vfs::FsNode,
-            _current_task: &crate::task::CurrentTask,
-            _name: &crate::vfs::FsStr,
+            _node: &starnix_core::vfs::FsNode,
+            _current_task: &starnix_core::task::CurrentTask,
+            _name: &starnix_core::vfs::FsStr,
             _mode: starnix_uapi::file_mode::FileMode,
             _owner: starnix_uapi::auth::FsCred,
-        ) -> Result<crate::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
+        ) -> Result<starnix_core::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(ENOTDIR)
         }
 
         fn create_symlink(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _node: &crate::vfs::FsNode,
-            _current_task: &crate::task::CurrentTask,
-            _name: &crate::vfs::FsStr,
-            _target: &crate::vfs::FsStr,
+            _node: &starnix_core::vfs::FsNode,
+            _current_task: &starnix_core::task::CurrentTask,
+            _name: &starnix_core::vfs::FsStr,
+            _target: &starnix_core::vfs::FsStr,
             _owner: starnix_uapi::auth::FsCred,
-        ) -> Result<crate::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
+        ) -> Result<starnix_core::vfs::FsNodeHandle, starnix_uapi::errors::Errno> {
             starnix_uapi::error!(ENOTDIR)
         }
 
         fn unlink(
             &self,
             _locked: &mut starnix_sync::Locked<'_, starnix_sync::FileOpsCore>,
-            _node: &crate::vfs::FsNode,
-            _current_task: &crate::task::CurrentTask,
-            _name: &crate::vfs::FsStr,
-            _child: &crate::vfs::FsNodeHandle,
+            _node: &starnix_core::vfs::FsNode,
+            _current_task: &starnix_core::task::CurrentTask,
+            _name: &starnix_core::vfs::FsStr,
+            _child: &starnix_core::vfs::FsNodeHandle,
         ) -> Result<(), starnix_uapi::errors::Errno> {
             starnix_uapi::error!(ENOTDIR)
         }
@@ -1063,11 +1103,11 @@ macro_rules! fs_node_impl_not_dir {
 pub enum TimeUpdateType {
     Now,
     Omit,
-    Time(zx::Time),
+    Time(UtcTime),
 }
 
 // Public re-export of macros allows them to be used like regular rust items.
-pub(crate) use {
+pub use {
     fs_node_impl_dir_readonly, fs_node_impl_not_dir, fs_node_impl_symlink,
     fs_node_impl_xattr_delegate,
 };
@@ -1991,7 +2031,7 @@ impl FsNode {
         })
     }
 
-    fn statx_timestamp_from_time(time: zx::Time) -> statx_timestamp {
+    fn statx_timestamp_from_time(time: UtcTime) -> statx_timestamp {
         let nanos = time.into_nanos();
         statx_timestamp {
             tv_sec: nanos / NANOS_PER_SECOND,
@@ -2313,12 +2353,14 @@ impl Releasable for FsNode {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::device::mem::mem_device_init;
     use crate::testing::*;
     use crate::vfs::buffers::VecOutputBuffer;
 
     #[::fuchsia::test]
     async fn open_device_file() {
         let (_kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        mem_device_init(&mut locked, &current_task);
 
         // Create a device file that points to the `zero` device (which is automatically
         // registered in the kernel).
@@ -2373,9 +2415,9 @@ mod tests {
             info.uid = 9;
             info.gid = 10;
             info.link_count = 11;
-            info.time_status_change = zx::Time::from_nanos(1);
-            info.time_access = zx::Time::from_nanos(2);
-            info.time_modify = zx::Time::from_nanos(3);
+            info.time_status_change = UtcTime::from_nanos(1);
+            info.time_access = UtcTime::from_nanos(2);
+            info.time_modify = UtcTime::from_nanos(3);
             info.rdev = DeviceType::new(13, 13);
         });
         let stat = node.stat(&current_task).expect("stat");

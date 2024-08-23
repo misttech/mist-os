@@ -6,28 +6,29 @@
 
 #include "src/storage/blobfs/blobfs_metrics.h"
 
-#include <lib/async/cpp/task.h>
-#include <lib/fzl/time.h>
+#include <lib/fpromise/promise.h>
+#include <lib/fpromise/result.h>
 #include <lib/inspect/cpp/inspector.h>
-#include <lib/inspect/cpp/vmo/types.h>
-#include <lib/syslog/cpp/macros.h>
-#include <lib/zx/time.h>
 #include <zircon/assert.h>
 
+#include <cstdint>
+#include <mutex>
 #include <string>
+#include <utility>
 
 #include <fbl/algorithm.h>
+#include <fbl/string.h>
 
-#include "src/storage/lib/vfs/cpp/service.h"
-#include "src/storage/lib/vfs/cpp/vnode.h"
+#include "src/storage/blobfs/format.h"
+#include "src/storage/lib/vfs/cpp/ticker.h"
 
 namespace blobfs {
 
 BlobfsMetrics::BlobfsMetrics(bool should_record_page_in, inspect::Inspector inspector)
     : inspector_{std::move(inspector)}, should_record_page_in_(should_record_page_in) {
   // Add a node that allows querying the size of the Inspect VMO at runtime.
-  // TODO(https://fxbug.dev/42160612): Replace the following lazy node with the one now part of the Inspector
-  // class itself (i.e. call `inspector_.CreateStatsNode()` instead).
+  // TODO(https://fxbug.dev/42160612): Replace the following lazy node with the one now part of the
+  // Inspector class itself (i.e. call `inspector_.CreateStatsNode()` instead).
   root_.CreateLazyNode(
       "inspect_vmo_stats",
       [this] {

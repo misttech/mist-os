@@ -4,17 +4,24 @@
 
 declare_args() {
   # **NOTE:** This is for **experimentation only** and should not normally be
-  # changed.  Set the version of the C++ standard to compile for, 17 or 20.
+  # changed.  Set the version of the C++ standard to compile for: 17, 20, 23.
   # Note also that GN code should never use this variable directly, but always
   # instead use the `fuchsia_cxx_version` variable.
   experimental_cxx_version = 17
 }
 
-assert(experimental_cxx_version == 17 || experimental_cxx_version == 20,
-       "`experimental_cxx_version` must be either 17 or 20")
+_available_cxx_versions = [
+  17,
+  20,
+  23,
+]
+assert(
+    _available_cxx_versions + [ experimental_cxx_version ] -
+        [ experimental_cxx_version ] != _available_cxx_versions,
+    "`experimental_cxx_version=$experimental_cxx_version` must be one of $_available_cxx_versions")
 
 # The C++ standard version with which the Fuchsia build compiles C++ code.
-# Possible values are 17 and 20 (as an integer).
+# Possible values are integers: 17, 20, or 23.
 #
 # GN code both in fuchsia.git and in cooperating repositories should use only
 # this variable, which can remain part of the Fuchsia build's internal GN API

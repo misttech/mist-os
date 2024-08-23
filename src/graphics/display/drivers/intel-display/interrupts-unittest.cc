@@ -9,7 +9,6 @@
 #include <lib/async-loop/loop.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/ddk/driver.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fdf/cpp/dispatcher.h>
@@ -43,8 +42,10 @@ class InterruptTest : public testing::Test {
   }
 
  protected:
-  fdf_testing::DriverRuntime driver_runtime_;
+  // `logger_` must outlive `driver_runtime_` to allow for any
+  // logging in driver de-initialization code.
   fdf_testing::ScopedGlobalLogger logger_;
+  fdf_testing::DriverRuntime driver_runtime_;
   fdf::UnownedSynchronizedDispatcher interrupt_dispatcher_ =
       driver_runtime_.StartBackgroundDispatcher();
 

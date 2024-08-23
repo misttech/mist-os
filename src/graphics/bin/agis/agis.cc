@@ -296,7 +296,8 @@ class ConnectorImpl final : public fuchsia::gpu::agis::Connector {
 int main(int argc, const char **argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   srand(static_cast<unsigned int>(time(nullptr)));
-  fuchsia_logging::SetTags({"agis"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"agis"}).BuildAndInitialize();
 
   auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
   context->outgoing()->AddPublicService(

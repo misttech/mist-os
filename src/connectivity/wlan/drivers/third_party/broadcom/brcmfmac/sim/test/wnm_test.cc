@@ -61,10 +61,8 @@ void WnmTest::PreInit() {
   ASSERT_EQ(SimTest::PreInit(), ZX_OK);
   WithSimDevice([this](brcmfmac::SimDevice* device) {
     if (setup_btm_firmware_support_) {
-      device->GetSim()->drvr->feat_flags |= BIT(BRCMF_FEAT_ROAM_ENGINE);
       device->GetSim()->drvr->feat_flags |= BIT(BRCMF_FEAT_WNM_BTM);
     } else {
-      device->GetSim()->drvr->feat_flags &= !(BIT(BRCMF_FEAT_ROAM_ENGINE));
       device->GetSim()->drvr->feat_flags &= !(BIT(BRCMF_FEAT_WNM_BTM));
     }
   });

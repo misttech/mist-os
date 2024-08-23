@@ -63,8 +63,7 @@ open protocol Channel {
         handle Hid;
         channel_sent flexible union {
             1: message ChannelMessage;
-            2: read_error Error;
-            3: channel_read_stopped struct {};
+            2: stopped AioStopped;
         };
     });
 };

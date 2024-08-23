@@ -6,7 +6,7 @@
 #define LIB_DRIVER_DEVICETREE_VISITORS_DRIVERS_GPIO_CONTROLLERS_GPIOIMPL_VISITOR_GPIOIMPL_VISITOR_H_
 
 #include <fidl/fuchsia.hardware.gpio/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.gpioimpl/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.pinimpl/cpp/fidl.h>
 #include <lib/driver/devicetree/visitors/driver-visitor.h>
 #include <lib/driver/devicetree/visitors/property-parser.h>
 
@@ -44,8 +44,10 @@ class GpioImplVisitor : public fdf_devicetree::Visitor {
 
  private:
   struct GpioController {
+    GpioController() { metadata.init_steps().emplace(); }
+
     std::vector<gpio_pin_t> gpio_pins_metadata;
-    fuchsia_hardware_gpioimpl::InitMetadata init_steps;
+    fuchsia_hardware_pinimpl::Metadata metadata;
   };
 
   // Return an existing or a new instance of GpioController.
@@ -57,7 +59,7 @@ class GpioImplVisitor : public fdf_devicetree::Visitor {
                                    fdf_devicetree::PropertyCells specifiers,
                                    std::optional<std::string_view> gpio_name);
 
-  // Helper to parse gpio init hog to produce fuchsia_hardware_gpioimpl::InitStep.
+  // Helper to parse gpio init hog to produce fuchsia_hardware_pinimpl::InitStep.
   zx::result<> ParseGpioHogChild(fdf_devicetree::Node& child);
 
   // Helper to parse pin controller configuration as it relates to gpio.

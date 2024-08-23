@@ -4,12 +4,31 @@
 
 #include "src/storage/blobfs/service/startup.h"
 
+#include <fidl/fuchsia.fs.startup/cpp/markers.h>
+#include <fidl/fuchsia.fs.startup/cpp/wire_types.h>
+#include <fidl/fuchsia.hardware.block.volume/cpp/markers.h>
+#include <lib/async/dispatcher.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/result.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <algorithm>
+#include <cstdint>
+#include <optional>
+#include <utility>
+
+#include "src/storage/blobfs/blob_layout.h"
+#include "src/storage/blobfs/cache_policy.h"
+#include "src/storage/blobfs/common.h"
+#include "src/storage/blobfs/compression_settings.h"
 #include "src/storage/blobfs/fsck.h"
 #include "src/storage/blobfs/mkfs.h"
 #include "src/storage/blobfs/mount.h"
 #include "src/storage/lib/block_client/cpp/remote_block_device.h"
+#include "src/storage/lib/vfs/cpp/service.h"
 
 namespace blobfs {
 namespace {

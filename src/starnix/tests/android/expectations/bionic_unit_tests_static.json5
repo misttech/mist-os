@@ -82,6 +82,7 @@
                 "stdlib.getloadavg",
                 "sys_io.iopl",
                 "sys_io.ioperm",
+                "sys_mseal.mseal",
                 "sys_msg.smoke",
                 "sys_ptrace.hardware_breakpoint",
                 "sys_ptrace.watchpoint_imprecise",

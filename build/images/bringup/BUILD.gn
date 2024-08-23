@@ -92,12 +92,7 @@ bringup_base = {
 
   include_shell_commands = false
 
-  cmdline_deps = [ "//build/input:bootfs" ]
-
-  bootfs_labels = [
-    "//build/input:bootfs",
-    "//:developer_base_packages",
-  ]
+  bootfs_labels = [ "//:developer_base_packages" ]
 }
 
 assembled_system("bringup_assembly") {

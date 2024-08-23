@@ -4,6 +4,12 @@
 
 #include "src/storage/blobfs/metrics/fragmentation_metrics.h"
 
+#include <lib/inspect/cpp/vmo/types.h>
+
+#include <cstddef>
+#include <cstdint>
+#include <string_view>
+
 namespace {
 
 // Helper function to create histograms matching the fragmentation metric definitions in Cobalt.

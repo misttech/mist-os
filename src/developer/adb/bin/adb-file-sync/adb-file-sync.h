@@ -19,7 +19,7 @@ namespace adb_file_sync {
 class AdbFileSync : public AdbFileSyncBase,
                     public fidl::WireServer<fuchsia_hardware_adb::Provider> {
  public:
-  explicit AdbFileSync(adb_file_sync_config::Config config, async_dispatcher_t* dispatcher)
+  AdbFileSync(adb_file_sync_config::Config config, async_dispatcher_t* dispatcher)
       : dispatcher_(dispatcher),
         context_(std::make_unique<sys::ComponentContext>(
             sys::ServiceDirectory::CreateFromNamespace(), dispatcher)),

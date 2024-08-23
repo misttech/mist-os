@@ -54,6 +54,12 @@ type DisconnectCause = struct {
 type DisconnectMlmeEventName = strict enum {
     DEAUTHENTICATE_INDICATION = 1;
     DISASSOCIATE_INDICATION = 2;
+    // Roam start indication was malformed, so roam could not proceed.
+    ROAM_START_INDICATION = 3;
+    // Roam result indication reported failure (or was malformed), causing the disconnect.
+    ROAM_RESULT_INDICATION = 4;
+    // SAE handshake failed (or timed out).
+    SAE_HANDSHAKE_RESPONSE = 5;
 };
 
 type DisconnectSource = strict union {
@@ -141,6 +147,30 @@ type ConnectResult = struct {
     is_reconnect bool;
 };
 
+/// Result of a roam attempt.
+type RoamResult = struct {
+    /// BSSID of the selected BSS for this roam attempt.
+    bssid ieee80211.MacAddr;
+
+    status_code ieee80211.StatusCode;
+
+    /// Whether the original BSS association has been maintained through the roam attempt.
+    /// A successful roam always incurs disassociation from the original BSS, so if `status_code` is
+    /// success then this field must be set to false; a roam failure typically incurs disassociation
+    /// from the original BSS, but may not in some cases (e.g. in some Fast BSS Transition scenarios).
+    original_association_maintained bool;
+
+    bss_description box<fuchsia.wlan.internal.BssDescription>;
+
+    /// If the roam attempt failed and the original association was not maintained, this field must
+    /// be populated; otherwise this field must be empty.
+    disconnect_info box<DisconnectInfo>;
+
+    /// `is_credential_rejected` is true if roam failure is likely due to wrong credential.
+    /// Policy may use this to determine whether to decide whether to roam to this BSS in the future.
+    is_credential_rejected bool;
+};
+
 type DisconnectInfo = struct {
     /// Whether SME is attempting to reconnect by itself
     is_sme_reconnecting bool;
@@ -158,6 +188,11 @@ closed protocol ConnectTransaction {
     /// attempting to reconnect by itself, there's not need for caller to intervene for now.
     strict -> OnDisconnect(struct {
         info DisconnectInfo;
+    });
+
+    /// Report the result of a roam attempt.
+    strict -> OnRoamResult(struct {
+        result RoamResult;
     });
 
     /// Give an update of the latest signal report.
@@ -208,6 +243,7 @@ type ClientStatusResponse = strict union {
     1: connected ServingApInfo;
     2: connecting ieee80211.Ssid;
     3: idle Empty;
+    4: roaming ieee80211.MacAddr;
 };
 
 closed protocol ClientSme {

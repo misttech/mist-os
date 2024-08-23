@@ -60,15 +60,9 @@ fuchsia_package("package") {
   deps = [ ":component" ]
 }
 
-group("benchmarks") {
-  testonly = true
-  deps = [ "bench" ]
-}
-
 group("tests") {
   testonly = true
   deps = [
-    "bench:integration",
     "fake/tests",
     "integration/tests",
   ]

@@ -331,7 +331,7 @@ mod test {
     #[test]
     fn event_code_point_only() -> Result<(), Error> {
         let event = test_helpers::create_key_event(
-            zx::Time::ZERO,
+            zx::MonotonicTime::ZERO,
             ui_input3::KeyEventType::Pressed,
             None,
             None,
@@ -358,7 +358,7 @@ mod test {
     #[test]
     fn event_code_point_only_unaffected_by_modifier_keys() -> Result<(), Error> {
         let event = test_helpers::create_key_event(
-            zx::Time::ZERO,
+            zx::MonotonicTime::ZERO,
             ui_input3::KeyEventType::Pressed,
             None,
             None,
@@ -385,7 +385,7 @@ mod test {
     #[test]
     fn event_non_printable_key_meaning_only() -> Result<(), Error> {
         let event = test_helpers::create_key_event(
-            zx::Time::ZERO,
+            zx::MonotonicTime::ZERO,
             ui_input3::KeyEventType::Pressed,
             None,
             None,
@@ -449,7 +449,7 @@ mod test {
     #[test]
     fn key_meaning_alone_is_sufficient() -> Result<(), Error> {
         let event = test_helpers::create_key_event(
-            zx::Time::ZERO,
+            zx::MonotonicTime::ZERO,
             ui_input3::KeyEventType::Pressed,
             None,
             None,
@@ -524,7 +524,7 @@ mod test {
     #[test]
     fn explicit_code_point_overrides_calculated_code_point() -> Result<(), Error> {
         let event = test_helpers::create_key_event(
-            zx::Time::ZERO,
+            zx::MonotonicTime::ZERO,
             ui_input3::KeyEventType::Pressed,
             input::Key::Q,
             None,
@@ -540,7 +540,7 @@ mod test {
     #[test]
     fn calculated_code_point_is_preserved_with_non_printable_key_meaning() -> Result<(), Error> {
         let event = test_helpers::create_key_event(
-            zx::Time::ZERO,
+            zx::MonotonicTime::ZERO,
             ui_input3::KeyEventType::Pressed,
             input::Key::Q,
             ui_input3::Modifiers::CAPS_LOCK,

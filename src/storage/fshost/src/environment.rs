@@ -105,8 +105,14 @@ pub trait Environment: Send + Sync {
 }
 
 // Before a filesystem is mounted, we queue requests.
+#[derive(Default)]
+pub struct FilesystemQueue {
+    exposed_dir_queue: Vec<ServerEnd<fio::DirectoryMarker>>,
+    crypt_service_exposed_dir: Vec<ServerEnd<fio::DirectoryMarker>>,
+}
+
 pub enum Filesystem {
-    Queue(Vec<ServerEnd<fio::DirectoryMarker>>),
+    Queue(FilesystemQueue),
     Serving(ServingSingleVolumeFilesystem),
     ServingMultiVolume(
         // We hold onto crypt service here to avoid it prematurely shutting down.
@@ -133,13 +139,33 @@ impl Filesystem {
         }
     }
 
+    pub fn crypt_service(&mut self) -> Result<fio::DirectoryProxy, Error> {
+        let (proxy, server) = create_proxy::<fio::DirectoryMarker>()?;
+        match self {
+            Filesystem::Queue(queue) => queue.crypt_service_exposed_dir.push(server),
+            Filesystem::Serving(_) => bail!(anyhow!("filesystem doesn't have crypt service")),
+            Filesystem::ServingMultiVolume(crypt_service, ..) => crypt_service
+                .exposed_dir()
+                .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?,
+            Filesystem::ServingVolumeInFxblob(crypt_service_option, volume_name, ..) => {
+                crypt_service_option
+                    .as_ref()
+                    .ok_or(anyhow!("volume {} doesn't have a crypt service", volume_name))?
+                    .exposed_dir()
+                    .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?
+            }
+            Filesystem::Shutdown => bail!(anyhow!("filesystem is shutting down")),
+        }
+        Ok(proxy)
+    }
+
     pub fn exposed_dir(
         &mut self,
         serving_fs: Option<&mut ServingMultiVolumeFilesystem>,
     ) -> Result<fio::DirectoryProxy, Error> {
         let (proxy, server) = create_proxy::<fio::DirectoryMarker>()?;
         match self {
-            Filesystem::Queue(queue) => queue.push(server),
+            Filesystem::Queue(queue) => queue.exposed_dir_queue.push(server),
             Filesystem::Serving(fs) => fs
                 .exposed_dir()
                 .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?,
@@ -182,7 +208,7 @@ impl Filesystem {
         }
     }
 
-    fn queue(&mut self) -> Option<&mut Vec<ServerEnd<fio::DirectoryMarker>>> {
+    fn queue(&mut self) -> Option<&mut FilesystemQueue> {
         match self {
             Filesystem::Queue(queue) => Some(queue),
             _ => None,
@@ -235,8 +261,8 @@ impl FshostEnvironment {
         Self {
             config: config.clone(),
             fxblob: None,
-            blobfs: Filesystem::Queue(Vec::new()),
-            data: Filesystem::Queue(Vec::new()),
+            blobfs: Filesystem::Queue(FilesystemQueue::default()),
+            data: Filesystem::Queue(FilesystemQueue::default()),
             fvm: None,
             launcher: Arc::new(FilesystemLauncher { config, boot_args, ramdisk_prefix }),
             matcher_lock,
@@ -265,6 +291,13 @@ impl FshostEnvironment {
     /// "/data" is mounted and it will get routed once the data partition is mounted.
     pub fn data_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
         self.data.exposed_dir(self.fxblob.as_mut())
+    }
+
+    /// Returns a proxy for the exposed dir of the data filesystem's crypt service. This can be
+    /// called before "/data" is mounted and it will get routed once the data partition is
+    /// mounted and the crypt service becomes available. Fails for single volume filesystems.
+    pub fn crypt_service_exposed_dir(&mut self) -> Result<fio::DirectoryProxy, Error> {
+        self.data.crypt_service()
     }
 
     /// Returns a proxy for the root of the data filesystem.  This can be called before "/data" is
@@ -483,7 +516,7 @@ impl FshostEnvironment {
         let mut fs = self.launcher.serve_blobfs(device).await?;
 
         let exposed_dir = fs.exposed_dir(None)?;
-        for server in queue.drain(..) {
+        for server in queue.exposed_dir_queue.drain(..) {
             exposed_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
         }
         self.blobfs = fs;
@@ -646,7 +679,7 @@ impl Environment for FshostEnvironment {
             .context("Failed to open the blob volume")?;
         let exposed_dir = blobfs.exposed_dir();
         let queue = self.blobfs.queue().ok_or(anyhow!("blobfs already mounted"))?;
-        for server in queue.drain(..) {
+        for server in queue.exposed_dir_queue.drain(..) {
             exposed_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
         }
         self.blobfs = Filesystem::ServingVolumeInFxblob(None, "blob".to_string());
@@ -667,8 +700,13 @@ impl Environment for FshostEnvironment {
         }
         let queue = self.data.queue().unwrap();
         let exposed_dir = filesystem.exposed_dir(self.fxblob.as_mut())?;
-        for server in queue.drain(..) {
+        let crypt_service_exposed_dir = filesystem.crypt_service()?;
+        for server in queue.exposed_dir_queue.drain(..) {
             exposed_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
+        }
+        for server in queue.crypt_service_exposed_dir.drain(..) {
+            crypt_service_exposed_dir
+                .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
         }
         self.data = filesystem;
         Ok(())
@@ -820,9 +858,20 @@ impl Environment for FshostEnvironment {
 
         let queue = self.data.queue().unwrap();
         let exposed_dir = filesystem.exposed_dir(None)?;
-        for server in queue.drain(..) {
+        for server in queue.exposed_dir_queue.drain(..) {
             exposed_dir.clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
         }
+        match &filesystem {
+            Filesystem::ServingMultiVolume(..) | Filesystem::ServingVolumeInFxblob(..) => {
+                let crypt_service_exposed_dir = filesystem.crypt_service()?;
+                for server in queue.crypt_service_exposed_dir.drain(..) {
+                    crypt_service_exposed_dir
+                        .clone(fio::OpenFlags::CLONE_SAME_RIGHTS, server.into_channel().into())?;
+                }
+            }
+            _ => {}
+        }
+
         self.data = filesystem;
         Ok(())
     }

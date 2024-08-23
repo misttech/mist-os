@@ -17,6 +17,15 @@ pub struct PlatformMediaConfig {
 
     #[serde(default)]
     pub multizone_leader: MultizoneConfig,
+
+    /// Enable platform-provided video and audio decoders and encoders.
+    #[serde(default)]
+    pub enable_codecs: bool,
+
+    /// Enable a platform-provided service that allows active media players (sessions) to be
+    /// published and discovered, primarily for user control of those sessiosn.
+    #[serde(default)]
+    pub enable_sessions: bool,
 }
 
 /// The audio stack to use in the platform.

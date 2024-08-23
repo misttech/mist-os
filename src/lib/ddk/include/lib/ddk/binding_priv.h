@@ -36,10 +36,10 @@ __BEGIN_CDECLS
 // flags are initially zero, may be set/cleared with SET/CLEAR
 // flags may be tested by comparison against BIND_FLAGS
 
-#define BINDINST(c, o, a, b, v)                                                             \
-  {                                                                                         \
-    (((c) & 0xF) << 28) | (((o) & 0xF) << 24) | (((a) & 0xFF) << 16) | ((b) & 0xFFFF), (v), \
-        0 /* debug */                                                                       \
+#define BINDINST(c, o, a, b, v)                                                               \
+  {                                                                                           \
+      (((c) & 0xF) << 28) | (((o) & 0xF) << 24) | (((a) & 0xFF) << 16) | ((b) & 0xFFFF), (v), \
+      0 /* debug */                                                                           \
   }
 
 #define BINDINST_CC(n) ((n) >> 28)
@@ -61,19 +61,19 @@ __BEGIN_CDECLS
 
 // LINT.IfChange
 // global binding variables at 0x00XX
-#define BIND_FLAGS 0x0000     // value of the flags register
+// BIND_FLAGS was 0x0000, the value of the flags register
 #define BIND_PROTOCOL 0x0001  // primary protocol of the device
-#define BIND_AUTOBIND 0x0002  // if this is an automated bind/load
-#define BIND_COMPOSITE 0x003  // Whether this is a composite device
+// BIND_AUTOBIND was 0x0002, if this is an automated bind/load
+// BIND_COMPOSITE was 0x003, whether this is a composite device
 
 // pci binding variables at 0x01XX
-#define BIND_PCI_VID 0x0100
-#define BIND_PCI_DID 0x0101
-#define BIND_PCI_CLASS 0x0102
-#define BIND_PCI_SUBCLASS 0x0103
-#define BIND_PCI_INTERFACE 0x0104
-#define BIND_PCI_REVISION 0x0105
-#define BIND_PCI_TOPO 0x0107
+// BIND_PCI_VID was 0x0100
+// BIND_PCI_DID was 0x0101
+// BIND_PCI_CLASS was 0x0102
+// BIND_PCI_SUBCLASS was 0x0103
+// BIND_PCI_INTERFACE was 0x0104
+// BIND_PCI_REVISION was 0x0105
+// BIND_PCI_TOPO was 0x0107
 
 #define BIND_PCI_TOPO_PACK(bus, dev, func) (((bus) << 8) | (dev << 3) | (func))
 
@@ -94,7 +94,7 @@ __BEGIN_CDECLS
 #define BIND_PLATFORM_DEV_INTERRUPT_ID 0x0305
 
 // ACPI binding variables at 0x04XX
-#define BIND_ACPI_BUS_TYPE 0x0400
+// BIND_ACPI_BUS_TYPE was 0x0400
 // Internal use only.
 #define BIND_ACPI_ID 0x0401
 
@@ -107,17 +107,17 @@ __BEGIN_CDECLS
 #define BIND_IHDA_CODEC_VENDOR_STEP 0x0505
 
 // Serial binding variables at 0x06XX
-#define BIND_SERIAL_CLASS 0x0600
-#define BIND_SERIAL_VID 0x0601
-#define BIND_SERIAL_PID 0x0602
+// BIND_SERIAL_CLASS was 0x0600
+// BIND_SERIAL_VID was 0x0601
+// BIND_SERIAL_PID was 0x0602
 
 // NAND binding variables at 0x07XX
-#define BIND_NAND_CLASS 0x0700
+// BIND_NAND_CLASS was 0x0700
 
 // SDIO binding variables at 0x09XX
-#define BIND_SDIO_VID 0x0900
-#define BIND_SDIO_PID 0x0901
-#define BIND_SDIO_FUNCTION 0x0902
+// BIND_SDIO_VID was 0x0900
+// BIND_SDIO_PID was 0x0901
+// BIND_SDIO_FUNCTION was 0x0902
 
 // I2C binding variables at 0x0A0X
 #define BIND_I2C_CLASS 0x0A00
@@ -127,33 +127,33 @@ __BEGIN_CDECLS
 #define BIND_I2C_DID 0x0A04
 
 // GPIO binding variables at 0x0A1X
-#define BIND_GPIO_PIN 0x0A10
-#define BIND_GPIO_CONTROLLER 0x0A11
+// BIND_GPIO_PIN was 0x0A10
+// BIND_GPIO_CONTROLLER was 0x0A11
 
 // POWER binding variables at 0x0A2X
-#define BIND_POWER_DOMAIN 0x0A20
-#define BIND_POWER_DOMAIN_COMPOSITE 0x0A21
+// BIND_POWER_DOMAIN was 0x0A20
+// BIND_POWER_DOMAIN_COMPOSITE was 0x0A21
 
 // POWER binding variables at 0x0A3X
-#define BIND_CLOCK_ID 0x0A30
+// BIND_CLOCK_ID was 0x0A30
 
 // SPI binding variables at 0x0A4X
-#define BIND_SPI_BUS_ID 0x0A41
-#define BIND_SPI_CHIP_SELECT 0x0A42
+// BIND_SPI_BUS_ID was 0x0A41
+// BIND_SPI_CHIP_SELECT was 0x0A42
 
 // PWM binding variables at 0x0A5X
-#define BIND_PWM_ID 0x0A50
+// BIND_PWM_ID was 0x0A50
 
 // Init Step binding variables at 0x0A6X
-#define BIND_INIT_STEP 0x0A60
+// BIND_INIT_STEP was 0x0A60
 
 // Codec binding variables at 0x0A7X
-#define BIND_CODEC_INSTANCE 0x0A70
+// BIND_CODEC_INSTANCE was 0x0A70
 
 // 0x0A80 was BIND_REGISTER_ID which is now deprecated.
 
 // Power sensor binding variables at 0x0A9X
-#define BIND_POWER_SENSOR_DOMAIN 0x0A90
+// BIND_POWER_SENSOR_DOMAIN was 0x0A90
 // LINT.ThenChange(/sdk/lib/driver/legacy-bind-constants/legacy-bind-constants.h)
 
 typedef struct zx_bind_inst {
@@ -192,11 +192,12 @@ typedef struct {
   char name[(sizeof(ZIRCON_NOTE_NAME) + 3) & -4];
 } zircon_driver_note_header_t;
 
-#define ZIRCON_DRIVER_NOTE_HEADER_INIT(object)                                  \
-  {                                                                             \
-    /* .namesz = */ sizeof(ZIRCON_NOTE_NAME),                                   \
-        /* .descsz = */ (sizeof(object) - sizeof(zircon_driver_note_header_t)), \
-        /* .type = */ ZIRCON_NOTE_DRIVER, /* .name = */ ZIRCON_NOTE_NAME,       \
+#define ZIRCON_DRIVER_NOTE_HEADER_INIT(object)                                \
+  {                                                                           \
+      /* .namesz = */ sizeof(ZIRCON_NOTE_NAME),                               \
+      /* .descsz = */ (sizeof(object) - sizeof(zircon_driver_note_header_t)), \
+      /* .type = */ ZIRCON_NOTE_DRIVER,                                       \
+      /* .name = */ ZIRCON_NOTE_NAME,                                         \
   }
 
 typedef struct {
@@ -217,10 +218,13 @@ typedef struct {
 // devhost that supports the ASan runtime.
 #define ZIRCON_DRIVER_NOTE_FLAG_ASAN (1u << 0)
 
-#define ZIRCON_DRIVER_NOTE_PAYLOAD_INIT(Driver, VendorName, Version)                      \
-  {                                                                                       \
-    /* .flags = */ ZIRCON_DRIVER_NOTE_FLAGS, /* .reserved0 = */ 0, /* .name = */ #Driver, \
-        /* .vendor = */ VendorName, /* .version = */ Version,                             \
+#define ZIRCON_DRIVER_NOTE_PAYLOAD_INIT(Driver, VendorName, Version) \
+  {                                                                  \
+      /* .flags = */ ZIRCON_DRIVER_NOTE_FLAGS,                       \
+      /* .reserved0 = */ 0,                                          \
+      /* .name = */ #Driver,                                         \
+      /* .vendor = */ VendorName,                                    \
+      /* .version = */ Version,                                      \
   }
 
 #define ZIRCON_DRIVER_NOTE_FLAGS \

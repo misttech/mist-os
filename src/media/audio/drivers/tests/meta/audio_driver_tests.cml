@@ -41,7 +41,7 @@
             path: "/dev/class/codec",
         },
         {
-            directory: "dev-composite",
+            directory: "dev-audio-composite",
             rights: [ "r*" ],
             path: "/dev/class/audio-composite",
         },

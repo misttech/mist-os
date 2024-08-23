@@ -337,7 +337,7 @@ mod tests {
     fn arg_of_each_type_roundtrips() {
         assert_roundtrips(
             Record {
-                timestamp: zx::Time::get_monotonic().into_nanos(),
+                timestamp: zx::MonotonicTime::get().into_nanos(),
                 severity: Severity::Warn.into_primitive(),
                 arguments: vec![
                     Argument { name: String::from("signed"), value: Value::SignedInt(-10) },
@@ -360,7 +360,7 @@ mod tests {
     fn multiple_string_args() {
         assert_roundtrips(
             Record {
-                timestamp: zx::Time::get_monotonic().into_nanos(),
+                timestamp: zx::MonotonicTime::get().into_nanos(),
                 severity: Severity::Trace.into_primitive(),
                 arguments: vec![
                     Argument {
@@ -391,7 +391,7 @@ mod tests {
         header.set_type(TRACING_FORMAT_LOG_RECORD_TYPE);
         header.set_size_words(0); // invalid, should be at least 2 as header and time are included
         encoder.buf.put_u64_le(header.0).unwrap();
-        encoder.buf.put_i64_le(zx::Time::get_monotonic().into_nanos()).unwrap();
+        encoder.buf.put_i64_le(zx::MonotonicTime::get().into_nanos()).unwrap();
         encoder
             .write_argument(crate::encode::Argument {
                 name: "msg",

@@ -103,7 +103,6 @@ class LlvmProfdata {
 
  private:
   LiveData DoFixedData(cpp20::span<std::byte> data, bool match);
-  static void UseCounters(cpp20::span<std::byte> data);
 
   cpp20::span<const std::byte> build_id_;
   size_t size_bytes_ = 0;

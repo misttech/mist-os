@@ -5,16 +5,12 @@
 use crate::colors::ColorScheme;
 use anyhow::Error;
 use carnelian::drawing::DisplayRotation;
-use fidl_fuchsia_boot::{ArgumentsProxy, BoolPair};
+use std::convert::TryFrom;
 use std::str::FromStr;
+use virtcon_config::Config;
 
 pub const MIN_FONT_SIZE: f32 = 16.0;
 pub const MAX_FONT_SIZE: f32 = 160.0;
-
-const DEFAULT_KEYMAP: &'static str = "US_QWERTY";
-const DEFAULT_FONT_SIZE: f32 = 16.0;
-const DEFAULT_SCROLLBACK_ROWS: u32 = 1024;
-const DEFAULT_BUFFER_COUNT: usize = 1;
 
 #[derive(Debug, Default)]
 pub struct VirtualConsoleArgs {
@@ -32,88 +28,31 @@ pub struct VirtualConsoleArgs {
     pub buffer_count: usize,
 }
 
-impl VirtualConsoleArgs {
-    pub async fn new_with_proxy(boot_args: ArgumentsProxy) -> Result<VirtualConsoleArgs, Error> {
-        let bool_keys = &[
-            BoolPair { key: "virtcon.disable".to_string(), defaultval: false },
-            BoolPair { key: "virtcon.keep-log-visible".to_string(), defaultval: false },
-            BoolPair { key: "virtcon.keyrepeat".to_string(), defaultval: true },
-            BoolPair { key: "virtcon.rounded_corners".to_string(), defaultval: false },
-            BoolPair { key: "virtcon.boot_animation".to_string(), defaultval: false },
-        ];
-        let mut disable = false;
-        let mut keep_log_visible = false;
-        let mut keyrepeat = true;
-        let mut rounded_corners = false;
-        let mut boot_animation = false;
-        if let Ok(values) = boot_args.get_bools(bool_keys).await {
-            disable = values[0];
-            keep_log_visible = values[1];
-            keyrepeat = values[2];
-            rounded_corners = values[3];
-            boot_animation = values[4];
-        }
+impl TryFrom<Config> for VirtualConsoleArgs {
+    type Error = Error;
 
-        let string_keys = &[
-            "virtcon.colorscheme".to_owned(),
-            "virtcon.keymap".to_owned(),
-            "virtcon.display_rotation".to_owned(),
-            "virtcon.font_size".to_owned(),
-            "virtcon.dpi".to_owned(),
-            "virtcon.scrollback_rows".to_owned(),
-            "virtcon.buffer_count".to_owned(),
-        ];
-        let mut color_scheme = ColorScheme::default();
-        let mut keymap = DEFAULT_KEYMAP.to_string();
-        let mut display_rotation = DisplayRotation::default();
-        let mut font_size = DEFAULT_FONT_SIZE;
-        let mut dpi = vec![];
-        let mut scrollback_rows = DEFAULT_SCROLLBACK_ROWS;
-        let mut buffer_count = DEFAULT_BUFFER_COUNT;
-        if let Ok(values) = boot_args.get_strings(string_keys).await {
-            if let Some(value) = values[0].as_ref() {
-                color_scheme = ColorScheme::from_str(value)?;
-            }
-            if let Some(value) = values[1].as_ref() {
-                keymap = match value.as_str() {
-                    "qwerty" => "US_QWERTY",
-                    "dvorak" => "US_DVORAK",
-                    _ => value,
-                }
-                .to_string();
-            }
-            if let Some(value) = values[2].as_ref() {
-                display_rotation = DisplayRotation::from_str(value)?;
-            }
-            if let Some(value) = values[3].as_ref() {
-                font_size = value.parse::<f32>()?.clamp(MIN_FONT_SIZE, MAX_FONT_SIZE);
-            }
-            if let Some(value) = values[4].as_ref() {
-                let result: Result<Vec<_>, _> =
-                    value.split(",").map(|x| x.parse::<u32>()).collect();
-                dpi = result?;
-            }
-            if let Some(value) = values[5].as_ref() {
-                scrollback_rows = value.parse::<u32>()?;
-            }
-            if let Some(value) = values[6].as_ref() {
-                buffer_count = value.parse::<usize>()?;
-            }
+    fn try_from(config: Config) -> Result<Self, Self::Error> {
+        let keymap = match config.key_map.as_str() {
+            "qwerty" => "US_QWERTY",
+            "dvorak" => "US_DVORAK",
+            _ => &config.key_map,
         }
+        .to_string();
+        let font_size = config.font_size.parse::<f32>()?.clamp(MIN_FONT_SIZE, MAX_FONT_SIZE);
 
         Ok(VirtualConsoleArgs {
-            disable,
-            keep_log_visible,
-            keyrepeat,
-            rounded_corners,
-            boot_animation,
-            color_scheme,
+            disable: config.disable,
+            keep_log_visible: config.keep_log_visible,
+            keyrepeat: config.keyrepeat,
+            rounded_corners: config.rounded_corners,
+            boot_animation: config.boot_animation,
+            color_scheme: ColorScheme::from_str(&config.color_scheme)?,
             keymap,
-            display_rotation,
+            display_rotation: DisplayRotation::try_from(config.display_rotation)?,
             font_size,
-            dpi,
-            scrollback_rows,
-            buffer_count,
+            dpi: config.dpi,
+            scrollback_rows: config.scrollback_rows,
+            buffer_count: config.buffer_count as usize,
         })
     }
 }
@@ -122,275 +61,168 @@ impl VirtualConsoleArgs {
 mod tests {
     use super::*;
     use crate::colors::LIGHT_COLOR_SCHEME;
-    use fidl_fuchsia_boot::{ArgumentsMarker, ArgumentsRequest};
-    use fuchsia_async as fasync;
-    use futures::TryStreamExt;
-    use std::collections::HashMap;
 
-    fn serve_bootargs(env: HashMap<String, String>) -> Result<ArgumentsProxy, Error> {
-        let (proxy, mut stream) = fidl::endpoints::create_proxy_and_stream::<ArgumentsMarker>()?;
-
-        fn get_bool_arg(env: &HashMap<String, String>, name: &String, default: bool) -> bool {
-            let mut ret = default;
-            if let Some(val) = env.get(name) {
-                if val == "0" || val == "false" || val == "off" {
-                    ret = false;
-                } else {
-                    ret = true;
-                }
-            }
-            ret
+    fn new_config() -> Config {
+        // Should match defaults set in component manifest.
+        Config {
+            boot_animation: false,
+            buffer_count: 1,
+            color_scheme: "default".into(),
+            disable: false,
+            display_rotation: 0,
+            dpi: vec![],
+            font_size: "16.0".into(),
+            keep_log_visible: false,
+            keyrepeat: false,
+            key_map: "qwerty".into(),
+            rounded_corners: false,
+            scrollback_rows: 1024,
         }
-
-        fasync::Task::local(async move {
-            while let Ok(Some(req)) = stream.try_next().await {
-                match req {
-                    ArgumentsRequest::GetStrings { keys, responder } => {
-                        let vec: Vec<_> =
-                            keys.into_iter().map(|key| env.get(&key).map(|s| s.clone())).collect();
-                        responder.send(&vec).unwrap();
-                    }
-                    ArgumentsRequest::GetBools { keys, responder } => {
-                        let vec: Vec<_> = keys
-                            .into_iter()
-                            .map(|key| get_bool_arg(&env, &key.key, key.defaultval))
-                            .collect();
-                        responder.send(&vec).unwrap();
-                    }
-                    _ => assert!(false),
-                }
-            }
-        })
-        .detach();
-
-        Ok(proxy)
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn check_disable() -> Result<(), Error> {
-        let vars: HashMap<String, String> = [("virtcon.disable", "true")]
-            .iter()
-            .map(|(a, b)| (a.to_string(), b.to_string()))
-            .collect();
-        let proxy = serve_bootargs(vars)?;
-        let args = VirtualConsoleArgs::new_with_proxy(proxy).await?;
+    #[test]
+    fn check_disable() -> Result<(), Error> {
+        let config = Config { disable: true, ..new_config() };
+        let args = VirtualConsoleArgs::try_from(config)?;
         assert_eq!(args.disable, true);
 
-        let vars: HashMap<String, String> = [("virtcon.disable", "false")]
-            .iter()
-            .map(|(a, b)| (a.to_string(), b.to_string()))
-            .collect();
-        let proxy = serve_bootargs(vars)?;
-        let args = VirtualConsoleArgs::new_with_proxy(proxy).await?;
+        let config = Config { disable: false, ..new_config() };
+        let args = VirtualConsoleArgs::try_from(config)?;
         assert_eq!(args.disable, false);
 
         Ok(())
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn check_keep_log_visible() -> Result<(), Error> {
-        let vars: HashMap<String, String> = [("virtcon.keep-log-visible", "true")]
-            .iter()
-            .map(|(a, b)| (a.to_string(), b.to_string()))
-            .collect();
-        let proxy = serve_bootargs(vars)?;
-        let args = VirtualConsoleArgs::new_with_proxy(proxy).await?;
+    #[test]
+    fn check_keep_log_visible() -> Result<(), Error> {
+        let config = Config { keep_log_visible: true, ..new_config() };
+        let args = VirtualConsoleArgs::try_from(config)?;
         assert_eq!(args.keep_log_visible, true);
 
-        let vars: HashMap<String, String> = [("virtcon.keep-log-visible", "false")]
-            .iter()
-            .map(|(a, b)| (a.to_string(), b.to_string()))
-            .collect();
-        let proxy = serve_bootargs(vars)?;
-        let args = VirtualConsoleArgs::new_with_proxy(proxy).await?;
+        let config = Config { keep_log_visible: false, ..new_config() };
+        let args = VirtualConsoleArgs::try_from(config)?;
         assert_eq!(args.keep_log_visible, false);
 
         Ok(())
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn check_keyrepeat() -> Result<(), Error> {
-        let vars: HashMap<String, String> = [("virtcon.keyrepeat", "true")]
-            .iter()
-            .map(|(a, b)| (a.to_string(), b.to_string()))
-            .collect();
-        let proxy = serve_bootargs(vars)?;
-        let args = VirtualConsoleArgs::new_with_proxy(proxy).await?;
+    #[test]
+    fn check_keyrepeat() -> Result<(), Error> {
+        let config = Config { keyrepeat: true, ..new_config() };
+        let args = VirtualConsoleArgs::try_from(config)?;
         assert_eq!(args.keyrepeat, true);
 
-        let vars: HashMap<String, String> = [("virtcon.keyrepeat", "false")]
-            .iter()
-            .map(|(a, b)| (a.to_string(), b.to_string()))
-            .collect();
-        let proxy = serve_bootargs(vars)?;
-        let args = VirtualConsoleArgs::new_with_proxy(proxy).await?;
+        let config = Config { keyrepeat: false, ..new_config() };
+        let args = VirtualConsoleArgs::try_from(config)?;
         assert_eq!(args.keyrepeat, false);
 
         Ok(())
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn check_rounded_corners() -> Result<(), Error> {
-        let vars: HashMap<String, String> = [("virtcon.rounded_corners", "true")]
-            .iter()
-            .map(|(a, b)| (a.to_string(), b.to_string()))
-            .collect();
-        let proxy = serve_bootargs(vars)?;
-        let args = VirtualConsoleArgs::new_with_proxy(proxy).await?;
+    #[test]
+    fn check_rounded_corners() -> Result<(), Error> {
+        let config = Config { rounded_corners: true, ..new_config() };
+        let args = VirtualConsoleArgs::try_from(config)?;
         assert_eq!(args.rounded_corners, true);
 
-        let vars: HashMap<String, String> = [("virtcon.rounded_corners", "false")]
-            .iter()
-            .map(|(a, b)| (a.to_string(), b.to_string()))
-            .collect();
-        let proxy = serve_bootargs(vars)?;
-        let args = VirtualConsoleArgs::new_with_proxy(proxy).await?;
+        let config = Config { rounded_corners: false, ..new_config() };
+        let args = VirtualConsoleArgs::try_from(config)?;
         assert_eq!(args.rounded_corners, false);
 
         Ok(())
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn check_boot_animation() -> Result<(), Error> {
-        let vars: HashMap<String, String> = [("virtcon.boot_animation", "true")]
-            .iter()
-            .map(|(a, b)| (a.to_string(), b.to_string()))
-            .collect();
-        let proxy = serve_bootargs(vars)?;
-        let args = VirtualConsoleArgs::new_with_proxy(proxy).await?;
+    #[test]
+    fn check_boot_animation() -> Result<(), Error> {
+        let config = Config { boot_animation: true, ..new_config() };
+        let args = VirtualConsoleArgs::try_from(config)?;
         assert_eq!(args.boot_animation, true);
 
-        let vars: HashMap<String, String> = [("virtcon.boot_animation", "false")]
-            .iter()
-            .map(|(a, b)| (a.to_string(), b.to_string()))
-            .collect();
-        let proxy = serve_bootargs(vars)?;
-        let args = VirtualConsoleArgs::new_with_proxy(proxy).await?;
+        let config = Config { boot_animation: false, ..new_config() };
+        let args = VirtualConsoleArgs::try_from(config)?;
         assert_eq!(args.boot_animation, false);
 
         Ok(())
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn check_color_scheme() -> Result<(), Error> {
-        let vars: HashMap<String, String> = [("virtcon.colorscheme", "light")]
-            .iter()
-            .map(|(a, b)| (a.to_string(), b.to_string()))
-            .collect();
-        let proxy = serve_bootargs(vars)?;
-        let args = VirtualConsoleArgs::new_with_proxy(proxy).await?;
+    #[test]
+    fn check_color_scheme() -> Result<(), Error> {
+        let config = Config { color_scheme: "light".into(), ..new_config() };
+        let args = VirtualConsoleArgs::try_from(config)?;
         assert_eq!(args.color_scheme, LIGHT_COLOR_SCHEME);
 
-        let vars: HashMap<String, String> = HashMap::new();
-        let proxy = serve_bootargs(vars)?;
-        let args = VirtualConsoleArgs::new_with_proxy(proxy).await?;
+        let config = Config { ..new_config() };
+        let args = VirtualConsoleArgs::try_from(config)?;
         assert_eq!(args.color_scheme, ColorScheme::default());
 
         Ok(())
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn check_keymap() -> Result<(), Error> {
-        let vars: HashMap<String, String> = [("virtcon.keymap", "US_DVORAK")]
-            .iter()
-            .map(|(a, b)| (a.to_string(), b.to_string()))
-            .collect();
-        let proxy = serve_bootargs(vars)?;
-        let args = VirtualConsoleArgs::new_with_proxy(proxy).await?;
+    #[test]
+    fn check_keymap() -> Result<(), Error> {
+        let config = Config { key_map: "US_DVORAK".into(), ..new_config() };
+        let args = VirtualConsoleArgs::try_from(config)?;
         assert_eq!(args.keymap, "US_DVORAK");
 
-        let vars: HashMap<String, String> = [("virtcon.keymap", "dvorak")]
-            .iter()
-            .map(|(a, b)| (a.to_string(), b.to_string()))
-            .collect();
-        let proxy = serve_bootargs(vars)?;
-        let args = VirtualConsoleArgs::new_with_proxy(proxy).await?;
+        let config = Config { key_map: "dvorak".into(), ..new_config() };
+        let args = VirtualConsoleArgs::try_from(config)?;
         assert_eq!(args.keymap, "US_DVORAK");
 
-        let vars: HashMap<String, String> = HashMap::new();
-        let proxy = serve_bootargs(vars)?;
-        let args = VirtualConsoleArgs::new_with_proxy(proxy).await?;
+        let config = Config { ..new_config() };
+        let args = VirtualConsoleArgs::try_from(config)?;
         assert_eq!(args.keymap, "US_QWERTY");
 
         Ok(())
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn check_display_rotation() -> Result<(), Error> {
-        let vars: HashMap<String, String> = [("virtcon.display_rotation", "90")]
-            .iter()
-            .map(|(a, b)| (a.to_string(), b.to_string()))
-            .collect();
-        let proxy = serve_bootargs(vars)?;
-        let args = VirtualConsoleArgs::new_with_proxy(proxy).await?;
+    #[test]
+    fn check_display_rotation() -> Result<(), Error> {
+        let config = Config { display_rotation: 90, ..new_config() };
+        let args = VirtualConsoleArgs::try_from(config)?;
         assert_eq!(args.display_rotation, DisplayRotation::Deg90);
 
-        let vars: HashMap<String, String> = [("virtcon.display_rotation", "0")]
-            .iter()
-            .map(|(a, b)| (a.to_string(), b.to_string()))
-            .collect();
-        let proxy = serve_bootargs(vars)?;
-        let args = VirtualConsoleArgs::new_with_proxy(proxy).await?;
+        let config = Config { display_rotation: 0, ..new_config() };
+        let args = VirtualConsoleArgs::try_from(config)?;
         assert_eq!(args.display_rotation, DisplayRotation::Deg0);
 
         Ok(())
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn check_font_size() -> Result<(), Error> {
-        let vars: HashMap<String, String> = [("virtcon.font_size", "32.0")]
-            .iter()
-            .map(|(a, b)| (a.to_string(), b.to_string()))
-            .collect();
-        let proxy = serve_bootargs(vars)?;
-        let args = VirtualConsoleArgs::new_with_proxy(proxy).await?;
+    #[test]
+    fn check_font_size() -> Result<(), Error> {
+        let config = Config { font_size: "32.0".into(), ..new_config() };
+        let args = VirtualConsoleArgs::try_from(config)?;
         assert_eq!(args.font_size, 32.0);
 
-        let vars: HashMap<String, String> = [("virtcon.font_size", "1000000.0")]
-            .iter()
-            .map(|(a, b)| (a.to_string(), b.to_string()))
-            .collect();
-        let proxy = serve_bootargs(vars)?;
-        let args = VirtualConsoleArgs::new_with_proxy(proxy).await?;
+        let config = Config { font_size: "1000000.0".into(), ..new_config() };
+        let args = VirtualConsoleArgs::try_from(config)?;
         assert_eq!(args.font_size, MAX_FONT_SIZE);
 
         Ok(())
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn check_dpi() -> Result<(), Error> {
-        let vars: HashMap<String, String> = [("virtcon.dpi", "160,320,480,640")]
-            .iter()
-            .map(|(a, b)| (a.to_string(), b.to_string()))
-            .collect();
-        let proxy = serve_bootargs(vars)?;
-        let args = VirtualConsoleArgs::new_with_proxy(proxy).await?;
+    #[test]
+    fn check_dpi() -> Result<(), Error> {
+        let config = Config { dpi: vec![160, 320, 480, 640], ..new_config() };
+        let args = VirtualConsoleArgs::try_from(config)?;
         assert_eq!(args.dpi, vec![160, 320, 480, 640]);
 
         Ok(())
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn check_scrollback_rows() -> Result<(), Error> {
-        let vars: HashMap<String, String> = [("virtcon.scrollback_rows", "10000")]
-            .iter()
-            .map(|(a, b)| (a.to_string(), b.to_string()))
-            .collect();
-        let proxy = serve_bootargs(vars)?;
-        let args = VirtualConsoleArgs::new_with_proxy(proxy).await?;
+    #[test]
+    fn check_scrollback_rows() -> Result<(), Error> {
+        let config = Config { scrollback_rows: 10_000, ..new_config() };
+        let args = VirtualConsoleArgs::try_from(config)?;
         assert_eq!(args.scrollback_rows, 10_000);
 
         Ok(())
     }
 
-    #[fasync::run_singlethreaded(test)]
-    async fn check_buffer_count() -> Result<(), Error> {
-        let vars: HashMap<String, String> = [("virtcon.buffer_count", "2")]
-            .iter()
-            .map(|(a, b)| (a.to_string(), b.to_string()))
-            .collect();
-        let proxy = serve_bootargs(vars)?;
-        let args = VirtualConsoleArgs::new_with_proxy(proxy).await?;
+    #[test]
+    fn check_buffer_count() -> Result<(), Error> {
+        let config = Config { buffer_count: 2, ..new_config() };
+        let args = VirtualConsoleArgs::try_from(config)?;
         assert_eq!(args.buffer_count, 2);
 
         Ok(())

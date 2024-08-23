@@ -32,6 +32,7 @@
 #include "src/devices/sysmem/drivers/sysmem/snapshot_annotation_register.h"
 #include "src/devices/sysmem/drivers/sysmem/sysmem_config.h"
 #include "src/devices/sysmem/drivers/sysmem/sysmem_metrics.h"
+#include "src/devices/sysmem/drivers/sysmem/usage_pixel_format_cost.h"
 
 namespace sys {
 class ServiceDirectory;
@@ -44,6 +45,7 @@ class BufferCollectionToken;
 class LogicalBuffer;
 class LogicalBufferCollection;
 class Node;
+class ContiguousPooledMemoryAllocator;
 
 struct Settings {
   // Maximum size of a single allocation. Mainly useful for unit tests.
@@ -93,7 +95,7 @@ class Device final : public fdf::DriverBase,
       fuchsia_sysmem2::Heap heap, fidl::ClientEnd<fuchsia_hardware_sysmem::Heap> heap_connection);
   // Also called directly by a test.
   [[nodiscard]] zx_status_t RegisterSecureMemInternal(
-      fidl::ClientEnd<fuchsia_sysmem::SecureMem> secure_mem_connection);
+      fidl::ClientEnd<fuchsia_sysmem2::SecureMem> secure_mem_connection);
   // Also called directly by a test.
   [[nodiscard]] zx_status_t UnregisterSecureMemInternal();
 
@@ -201,11 +203,11 @@ class Device final : public fdf::DriverBase,
   // true - secure heaps are expected to exist (regardless of whether any of them currently exist)
   bool is_secure_mem_expected() const {
     std::lock_guard checker(*loop_checker_);
-    // Currently, we can base this on secure_allocators_ non-empty() since in all current cases
-    // there will be at least one secure allocator added before any clients can connect iff there
-    // will be any secure heaps available. Non-empty here does not imply that all secure heaps are
-    // already present and ready. For that, use is_secure_mem_ready().
-    return !secure_allocators_.empty();
+    // We can base this on pending_protected_allocator_ || secure_allocators_ non-empty() since
+    // there will be at least one secure allocator created before any clients can connect iff there
+    // will be any secure heaps available. A true result here does not imply that all secure heaps
+    // are already present and ready. For that, use is_secure_mem_ready().
+    return pending_protected_allocator_ || !secure_allocators_.empty();
   }
 
   // false - secure mem is expected, but is not yet ready
@@ -292,15 +294,23 @@ class Device final : public fdf::DriverBase,
   mutable std::optional<async::synchronization_checker> loop_checker_;
   fidl::ServerBindingGroup<fuchsia_hardware_sysmem::Sysmem>& BindingsForTest() { return bindings_; }
 
+  const UsagePixelFormatCost& usage_pixel_format_cost() {
+    ZX_DEBUG_ASSERT(usage_pixel_format_cost_.has_value());
+    return *usage_pixel_format_cost_;
+  }
+
+  // Iff callback returns false, stop iterating and return.
+  void ForeachSecureHeap(fit::function<bool(const fuchsia_sysmem2::Heap&)> callback);
+
  private:
   class SecureMemConnection {
    public:
-    SecureMemConnection(fidl::ClientEnd<fuchsia_sysmem::SecureMem> channel,
+    SecureMemConnection(fidl::ClientEnd<fuchsia_sysmem2::SecureMem> channel,
                         std::unique_ptr<async::Wait> wait_for_close);
-    const fidl::WireSyncClient<fuchsia_sysmem::SecureMem>& channel() const;
+    const fidl::SyncClient<fuchsia_sysmem2::SecureMem>& channel() const;
 
    private:
-    fidl::WireSyncClient<fuchsia_sysmem::SecureMem> connection_;
+    fidl::SyncClient<fuchsia_sysmem2::SecureMem> connection_;
     std::unique_ptr<async::Wait> wait_for_close_;
   };
 
@@ -325,6 +335,8 @@ class Device final : public fdf::DriverBase,
                            zx_status_t status);
 
   void DdkUnbindInternal() __TA_REQUIRES(*driver_checker_);
+
+  zx::result<fuchsia_sysmem2::Config> GetConfigFromFile();
 
   inspect::Inspector inspector_;
 
@@ -371,8 +383,6 @@ class Device final : public fdf::DriverBase,
       __TA_GUARDED(*loop_checker_);
 
   // This map contains only the secure allocators, if any.  The pointers are owned by allocators_.
-  //
-  // TODO(dustingreen): Consider unordered_map for this and some of above.
   std::unordered_map<fuchsia_sysmem2::Heap, MemoryAllocator*, HashHeap> secure_allocators_
       __TA_GUARDED(*loop_checker_);
 
@@ -406,7 +416,6 @@ class Device final : public fdf::DriverBase,
                                const protected_ranges::Range& range) override;
 
     fuchsia_sysmem2::Heap heap{};
-    fuchsia_sysmem::HeapType v1_heap_type{};
     Device* parent{};
     bool is_dynamic{};
     uint64_t range_granularity{};
@@ -465,6 +474,14 @@ class Device final : public fdf::DriverBase,
   compat::SyncInitializedDeviceServer compat_server_;
 
   fidl::SyncClient<fuchsia_driver_framework::NodeController> compat_node_controller_client_;
+
+  std::optional<const UsagePixelFormatCost> usage_pixel_format_cost_;
+
+  // We allocate protected_memory_size during sysmem driver Start, and then when the securemem
+  // driver calls sysmem, that triggers the rest of setting up this ContiguousPooledMemoryAllocator
+  // in secure_allocators_. At that point secure_allocators_ owns the allocator and we reset() this
+  // field.
+  std::unique_ptr<ContiguousPooledMemoryAllocator> pending_protected_allocator_;
 };
 
 }  // namespace sysmem_driver

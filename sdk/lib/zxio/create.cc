@@ -412,8 +412,24 @@ zx_status_t zxio_create_with_info(zx_handle_t raw_handle, const zx_info_handle_b
       // the seek value we had previously.
       const zx_status_t status = zx::stream::create(options, vmo, 0u, &stream);
       if (status != ZX_OK) {
-        zxio_default_init(&storage->io);
-        return status;
+        auto vmo_is_phys_or_contig = [&]() {
+          zx_info_vmo_t vmo_info;
+          const zx_status_t info_status =
+              vmo.get_info(ZX_INFO_VMO, &vmo_info, sizeof(vmo_info), nullptr, nullptr);
+          if (info_status == ZX_OK) {
+            if (!(vmo_info.flags & ZX_INFO_VMO_TYPE_PAGED) ||
+                (vmo_info.flags & ZX_INFO_VMO_CONTIGUOUS)) {
+              return true;
+            }
+          }
+          return false;
+        };
+        // Streams are not supported for physical or contiguous VMOs. In this case we will still
+        // succeed creation, but read/write operations will not work.
+        if (status != ZX_ERR_WRONG_TYPE || !vmo_is_phys_or_contig()) {
+          zxio_default_init(&storage->io);
+          return status;
+        }
       }
       return zxio_vmo_init(storage, std::move(vmo), std::move(stream));
     }

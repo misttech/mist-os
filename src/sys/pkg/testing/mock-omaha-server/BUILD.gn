@@ -4,17 +4,22 @@
 
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
-import("//build/rust/rustc_library.gni")
 
-rustc_library("mock-omaha-server") {
+config("fasync") {
+  rustflags = [ "--cfg=fasync" ]
+  visibility = [ ":*" ]
+}
+
+rustc_test("mock-omaha-server_lib_test") {
   edition = "2021"
-  with_unit_tests = true
+
+  source_root =
+      "//third_party/rust_crates/vendor/mock-omaha-server-0.3.1/src/lib.rs"
 
   deps = [
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-hyper",
     "//src/lib/fuchsia-sync",
-    "//src/sys/pkg/lib/fuchsia-merkle",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:derive_builder",
     "//third_party/rust_crates:futures",
@@ -35,19 +40,32 @@ rustc_library("mock-omaha-server") {
     ]
   }
 
-  features = [ "fasync" ]
+  inputs = [ "src/testing_keys/test_private_key.pem" ]
 
-  sources = [ "src/lib.rs" ]
-  configs += [ "//build/config/rust/lints:clippy_warn_all" ]
+  sources =
+      [ "//third_party/rust_crates/vendor/mock-omaha-server-0.3.1/src/lib.rs" ]
+
+  configs += [
+    ":fasync",
+    # TODO(https://fxbug.dev/359180225): Remove unnecessary use fuchsia_hyper
+    # "//build/config/rust/lints:clippy_warn_all",
+  ]
 }
 
-fuchsia_unittest_package("mock-omaha-server-lib-tests") {
+fuchsia_component("test-component") {
+  component_name = "mock-omaha-server-lib-test"
+  visibility = [ ":*" ]
+  testonly = true
   manifest = "meta/mock-omaha-server-lib-test.cml"
   deps = [
-    ":mock-omaha-server_test",
+    ":mock-omaha-server_lib_test",
     "//src/connectivity/network:netstack-for-tests",
     "//src/connectivity/network/dns:component",
   ]
+}
+
+fuchsia_test_package("mock-omaha-server-lib-tests") {
+  test_components = [ ":test-component" ]
   test_specs = {
     log_settings = {
       max_severity = "ERROR"
@@ -60,22 +78,28 @@ if (is_host) {
     output_name = "mock-omaha-server"
     edition = "2021"
 
+    source_root =
+        "//third_party/rust_crates/vendor/mock-omaha-server-0.3.1/src/main.rs"
+
     deps = [
-      ":mock-omaha-server",
       "//src/lib/fuchsia-async",
       "//src/lib/fuchsia-sync",
       "//third_party/rust_crates:anyhow",
       "//third_party/rust_crates:argh",
-      "//third_party/rust_crates:async-net",
+      "//third_party/rust_crates:mock-omaha-server",
       "//third_party/rust_crates:serde_json",
     ]
 
     inputs = [ "src/testing_keys/test_private_key.pem" ]
 
-    features = [ "fasync" ]
+    sources = [
+      "//third_party/rust_crates/vendor/mock-omaha-server-0.3.1/src/main.rs",
+    ]
 
-    sources = [ "src/main.rs" ]
-    configs += [ "//build/config/rust/lints:clippy_warn_all" ]
+    configs += [
+      ":fasync",
+      "//build/config/rust/lints:clippy_warn_all",
+    ]
   }
 }
 
@@ -85,8 +109,5 @@ group("bin-host") {
 
 group("tests") {
   testonly = true
-  public_deps = [
-    ":mock-omaha-server-lib-tests",
-    ":mock-omaha-server_test",
-  ]
+  public_deps = [ ":mock-omaha-server-lib-tests" ]
 }

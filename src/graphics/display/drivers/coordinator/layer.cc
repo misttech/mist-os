@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.math/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <zircon/assert.h>
 
 #include <algorithm>
@@ -29,7 +30,6 @@
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
 #include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
 #include "src/graphics/display/lib/api-types-cpp/rectangle.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace fhdt = fuchsia_hardware_display_types;
 
@@ -79,7 +79,7 @@ bool Layer::ResolvePendingLayerProperties() {
     current_image_config_gen_ = pending_image_config_gen_;
 
     if (pending_image_ == nullptr) {
-      zxlogf(ERROR, "Tried to apply configuration with missing image");
+      FDF_LOG(ERROR, "Tried to apply configuration with missing image");
       return false;
     }
 
@@ -99,7 +99,7 @@ bool Layer::ResolvePendingImage(FenceCollection* fences, ConfigStamp stamp) {
   if (pending_image_) {
     auto wait_fence = fences->GetFence(pending_wait_event_id_);
     if (wait_fence && wait_fence->InContainer()) {
-      zxlogf(ERROR, "Tried to wait with a busy event");
+      FDF_LOG(ERROR, "Tried to wait with a busy event");
       return false;
     }
     pending_image_->PrepareFences(std::move(wait_fence),

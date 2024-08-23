@@ -25,7 +25,10 @@ fn make_socket_pair() -> Result<(fasync::Socket, zx::Socket), Error> {
 }
 
 fn wait_socket_empty(socket: &fasync::Socket) {
-    socket.as_handle_ref().wait(zx::Signals::SOCKET_WRITE_THRESHOLD, zx::Time::INFINITE).unwrap();
+    socket
+        .as_handle_ref()
+        .wait(zx::Signals::SOCKET_WRITE_THRESHOLD, zx::MonotonicTime::INFINITE)
+        .unwrap();
 }
 
 async fn test_read_write<'a>(
@@ -93,7 +96,9 @@ async fn main() -> Result<(), Error> {
     test_read_write(&mut data_stream, &client_end).await?;
 
     client_end.shutdown()?;
-    data_stream.as_handle_ref().wait(zx::Signals::SOCKET_PEER_CLOSED, zx::Time::INFINITE)?;
+    data_stream
+        .as_handle_ref()
+        .wait(zx::Signals::SOCKET_PEER_CLOSED, zx::MonotonicTime::INFINITE)?;
 
     // Wait for a connection
     let AcceptorRequest::Accept { addr: _, responder } =
@@ -103,7 +108,9 @@ async fn main() -> Result<(), Error> {
 
     // Send data then wait for other end to shut us down.
     test_read_write(&mut data_stream, &client_end).await?;
-    data_stream.as_handle_ref().wait(zx::Signals::SOCKET_PEER_CLOSED, zx::Time::INFINITE)?;
+    data_stream
+        .as_handle_ref()
+        .wait(zx::Signals::SOCKET_PEER_CLOSED, zx::MonotonicTime::INFINITE)?;
 
     // Get next connection
     let AcceptorRequest::Accept { addr: _, responder } =

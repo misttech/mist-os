@@ -4,6 +4,7 @@
 
 #include "src/ui/scenic/lib/screenshot/flatland_screenshot.h"
 
+#include <fidl/fuchsia.ui.composition/cpp/hlcpp_conversion.h>
 #include <lib/fdio/directory.h>
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/errors.h>
@@ -11,7 +12,6 @@
 
 #include <optional>
 
-#include "fuchsia/ui/composition/cpp/fidl.h"
 #include "src/ui/scenic/lib/allocation/allocator.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
 #include "src/ui/scenic/lib/flatland/buffers/util.h"
@@ -20,15 +20,12 @@
 #include "zircon/system/ulib/fbl/include/fbl/algorithm.h"
 
 using allocation::Allocator;
-using fuchsia::ui::composition::FrameInfo;
-using fuchsia::ui::composition::GetNextFrameArgs;
-using fuchsia::ui::composition::ScreenCaptureConfig;
-using fuchsia::ui::composition::ScreenCaptureError;
-using fuchsia::ui::composition::ScreenshotFormat;
-using fuchsia::ui::composition::ScreenshotTakeFileResponse;
-using fuchsia::ui::composition::ScreenshotTakeRequest;
-using fuchsia::ui::composition::ScreenshotTakeResponse;
-using image_compression::ImageCompression;
+using fuchsia_ui_composition::GetNextFrameArgs;
+using fuchsia_ui_composition::ScreenCaptureConfig;
+using fuchsia_ui_composition::ScreenshotFormat;
+using fuchsia_ui_composition::ScreenshotTakeFileResponse;
+using fuchsia_ui_composition::ScreenshotTakeRequest;
+using fuchsia_ui_composition::ScreenshotTakeResponse;
 using screen_capture::ScreenCapture;
 
 namespace {
@@ -111,39 +108,36 @@ FlatlandScreenshot::FlatlandScreenshot(
   buffer_collection->SetName(std::move(set_name_request));
 
   // Initialize Flatland allocator state.
-  fuchsia::ui::composition::RegisterBufferCollectionArgs args = {};
-  args.set_export_token(std::move(ref_pair.export_token));
-  args.set_buffer_collection_token(fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
-      dup_token.Unbind().TakeChannel()));
-  args.set_usages(fuchsia::ui::composition::RegisterBufferCollectionUsages::SCREENSHOT);
+  fuchsia_ui_composition::RegisterBufferCollectionArgs args;
+  args.export_token(fidl::HLCPPToNatural(std::move(ref_pair.export_token)));
+  args.buffer_collection_token(
+      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(dup_token.Unbind().TakeChannel()));
+  args.usages(fuchsia_ui_composition::RegisterBufferCollectionUsages::kScreenshot);
 
-  flatland_allocator_->RegisterBufferCollection(
-      std::move(args),
-      [](fuchsia::ui::composition::Allocator_RegisterBufferCollection_Result result) {
-        FX_DCHECK(!result.is_err());
-      });
+  flatland_allocator_->RegisterBufferCollection(std::move(args),
+                                                [](auto result) { FX_DCHECK(!result.is_error()); });
 
   ScreenCaptureConfig sc_args;
-  sc_args.set_import_token(std::move(ref_pair.import_token));
-  sc_args.set_buffer_count(1);
-  sc_args.set_size({display_size_.width, display_size_.height});
+  sc_args.import_token(fidl::HLCPPToNatural(std::move(ref_pair.import_token)));
+  sc_args.buffer_count(1);
+  sc_args.size(fuchsia_math::SizeU{display_size_.width, display_size_.height});
 
   switch (display_rotation_) {
     case 0:
-      sc_args.set_rotation(fuchsia::ui::composition::Rotation::CW_0_DEGREES);
+      sc_args.rotation(fuchsia_ui_composition::Rotation::kCw0Degrees);
       break;
     // If the display in rotated by 90 degrees, we need to apply a clockwise rotation of 270 degrees
     // in order to cancel the overall rotation and render the correct screenshot.
     case 90:
-      sc_args.set_rotation(fuchsia::ui::composition::Rotation::CW_270_DEGREES);
+      sc_args.rotation(fuchsia_ui_composition::Rotation::kCw270Degrees);
       break;
     case 180:
-      sc_args.set_rotation(fuchsia::ui::composition::Rotation::CW_180_DEGREES);
+      sc_args.rotation(fuchsia_ui_composition::Rotation::kCw180Degrees);
       break;
       // If the display in rotated by 270 degrees, we need to apply a clockwise rotation of 90
       // degrees in order to cancel the overall rotation and render the correct screenshot.
     case 270:
-      sc_args.set_rotation(fuchsia::ui::composition::Rotation::CW_90_DEGREES);
+      sc_args.rotation(fuchsia_ui_composition::Rotation::kCw90Degrees);
       break;
     default:
       FX_LOGS(ERROR) << "Invalid display rotation value: " << display_rotation_;
@@ -162,22 +156,25 @@ FlatlandScreenshot::FlatlandScreenshot(
             std::move(*wait_result.response().mutable_buffer_collection_info());
         buffer_collection->Release();
 
-        weak_ptr->screen_capturer_->Configure(
-            std::move(sc_args),
-            [weak_ptr = std::move(weak_ptr)](fpromise::result<void, ScreenCaptureError> result) {
-              FX_DCHECK(!result.is_error());
-              if (!weak_ptr) {
-                return;
-              }
-              weak_ptr->init_event_.signal(0u, ZX_EVENT_SIGNALED);
-            });
+        weak_ptr->screen_capturer_->Configure(std::move(sc_args),
+                                              [weak_ptr = std::move(weak_ptr)](auto result) {
+                                                FX_DCHECK(!result.is_error());
+                                                if (!weak_ptr) {
+                                                  return;
+                                                }
+                                                weak_ptr->init_event_.signal(0u, ZX_EVENT_SIGNALED);
+                                              });
       });
 }
 
-FlatlandScreenshot::~FlatlandScreenshot() {}
+void FlatlandScreenshot::Take(TakeRequest& request, TakeCompleter::Sync& completer) {
+  Take(std::move(request), [completer = completer.ToAsync()](auto result) mutable {
+    completer.Reply(std::move(result));
+  });
+}
 
-void FlatlandScreenshot::Take(fuchsia::ui::composition::ScreenshotTakeRequest params,
-                              TakeCallback callback) {
+void FlatlandScreenshot::Take(fuchsia_ui_composition::ScreenshotTakeRequest params,
+                              fit::function<void(ScreenshotTakeResponse)> callback) {
   // Check if there is already a Take() call pending. Either the setup is done (|init_wait_| is
   // signaled) or the setup is still in progress.
   //
@@ -228,7 +225,7 @@ void FlatlandScreenshot::Take(fuchsia::ui::composition::ScreenshotTakeRequest pa
         FX_DCHECK(take_callback_);
         zx::vmo raw_vmo = weak_ptr->HandleFrameRender();
 
-        if (params.format() == ScreenshotFormat::PNG) {
+        if (params.format() == ScreenshotFormat::kPng) {
           zx::vmo response_vmo;
           zx::vmo response_vmo_copy;
           const auto response_vmo_size =
@@ -269,9 +266,9 @@ void FlatlandScreenshot::Take(fuchsia::ui::composition::ScreenshotTakeRequest pa
 }
 
 void FlatlandScreenshot::FinishTake(zx::vmo response_vmo) {
-  fuchsia::ui::composition::ScreenshotTakeResponse response;
-  response.set_vmo(std::move(response_vmo));
-  response.set_size({display_size_.width, display_size_.height});
+  ScreenshotTakeResponse response;
+  response.vmo(std::move(response_vmo));
+  response.size(fuchsia_math::SizeU{display_size_.width, display_size_.height});
   take_callback_(std::move(response));
 
   take_callback_ = nullptr;
@@ -363,14 +360,23 @@ void FlatlandScreenshot::GetNextFrame() {
   render_event_.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup);
 
   GetNextFrameArgs frame_args;
-  frame_args.set_event(std::move(dup));
-
+  frame_args.event(std::move(dup));
   FX_LOGS(INFO) << "Capturing next frame for screenshot.";
-  screen_capturer_->GetNextFrame(std::move(frame_args), [](auto result) {});
+  screen_capturer_->GetNextFrame(std::move(frame_args), [](auto result) {
+    if (result.is_error()) {
+      FX_LOGS(ERROR) << "Error in GetNextFrame.";
+    }
+  });
 }
 
-void FlatlandScreenshot::TakeFile(fuchsia::ui::composition::ScreenshotTakeFileRequest params,
-                                  TakeFileCallback callback) {
+void FlatlandScreenshot::TakeFile(TakeFileRequest& request, TakeFileCompleter::Sync& completer) {
+  TakeFile(std::move(request), [completer = completer.ToAsync()](auto result) mutable {
+    completer.Reply(std::move(result));
+  });
+}
+
+void FlatlandScreenshot::TakeFile(fuchsia_ui_composition::ScreenshotTakeFileRequest params,
+                                  fit::function<void(ScreenshotTakeFileResponse)> callback) {
   if (take_file_callback_ != nullptr) {
     FX_LOGS(ERROR)
         << "Screenshot::TakeFile() already in progress, closing connection. Wait for return "
@@ -418,7 +424,7 @@ void FlatlandScreenshot::TakeFile(fuchsia::ui::composition::ScreenshotTakeFileRe
 
         zx::vmo raw_vmo = weak_ptr->HandleFrameRender();
 
-        if (params.format() == ScreenshotFormat::PNG) {
+        if (params.format() == ScreenshotFormat::kPng) {
           zx::vmo response_vmo;
           zx::vmo response_vmo_copy;
           // Make |resonpnse_vmo| large enough to hold any potential PNG encoding of |raw_vmo|.
@@ -461,9 +467,8 @@ void FlatlandScreenshot::TakeFile(fuchsia::ui::composition::ScreenshotTakeFileRe
 }
 
 void FlatlandScreenshot::FinishTakeFile(zx::vmo response_vmo) {
-  fuchsia::ui::composition::ScreenshotTakeFileResponse response;
-  fidl::InterfaceHandle<fuchsia::io::File> file_client;
-  fidl::InterfaceRequest<fuchsia::io::File> file_server = file_client.NewRequest();
+  ScreenshotTakeFileResponse response;
+  auto [file_client, file_server] = fidl::Endpoints<fuchsia_io::File>::Create();
 
   if (!file_server.is_valid()) {
     FX_LOGS(ERROR) << "Cannot create file server channel";
@@ -473,8 +478,8 @@ void FlatlandScreenshot::FinishTakeFile(zx::vmo response_vmo) {
   const size_t screenshot_index = served_screenshots_next_id_++;
   if (ServeScreenshot(file_server.TakeChannel(), std::move(response_vmo), screenshot_index,
                       &served_screenshots_)) {
-    response.set_file(std::move(file_client));
-    response.set_size({display_size_.width, display_size_.height});
+    response.file() = std::move(file_client);
+    response.size() = {display_size_.width, display_size_.height};
   }
 
   take_file_callback_(std::move(response));

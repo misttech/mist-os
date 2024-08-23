@@ -5,7 +5,9 @@
 #ifndef SRC_STORAGE_BLOBFS_ITERATOR_BLOCK_ITERATOR_PROVIDER_H_
 #define SRC_STORAGE_BLOBFS_ITERATOR_BLOCK_ITERATOR_PROVIDER_H_
 
-#include <memory>
+#include <lib/zx/result.h>
+
+#include <cstdint>
 
 #include "src/storage/blobfs/iterator/block_iterator.h"
 

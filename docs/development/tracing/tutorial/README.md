@@ -1,30 +1,30 @@
 # Tutorial on Fuchsia tracing
 
-This tutorial walks through how to register a Fuchsia component to paticipate
-in tracing and add tracing events in the component's code. Once a component
-is configured for tracing, you can use the [`ffx trace start`][record-traces]
-command to record a trace on a Fuchsia device and visualize the trace results
-for analysis.
+Tracing is a powerful observability tool that can assist in quickly getting a
+high level overview of a running system to find and diagnose issues. You can
+think of tracing like visualizable, queryable, and toggleable printf debugging.
 
-The [Fuchsia tracing system][fuchsia-tracing-system] provides a mechanism for
-collecting and visualizing diagnostic tracing information from user space processes
-and the Zircon kernel on a Fuchsia device. The Fuchsia tracing system is made up of
-a trace manager, a memory buffer, and one or more trace providers. A trace provider
-is a component that generates trace data as it runs on the device.
+![A Busy Fuchsia Trace](images/perfetto-overview.png "A busy Fuchsia trace
+displayed in the Perfetto Viewer"){: width="600"}
 
-Many existing Fuchsia components are already registered as trace providers, whose
-trace data often provide a sufficient overview of the system. For this reason,
-if you only need to record a general trace (for instance, to include details in
-a bug report), you may skip directly to the
-[Record and visualize a trace][record-and-visualize-a-trace] step. However,
-if you want to collect additional, customized trace events from a specific
-component, complete the tutorial from the start.
+By enabling various categories, you can visualize the following (and more):
 
-The steps are:
+- High granularity breakdown of which threads are scheduled on each core
+- Customizable per component trace events and spans
+- FIDL calls between processes and threads
+- A record of every single syscall
+- Network and file system activity
+- High level understanding of how a component operates and communicates
 
-1. [Register a trace provider][register-a-trace-provider].
-2. [Add tracing in your code][add-tracing-in-your-code].
-3. [Record and visualize a trace][record-and-visualize-a-trace].
+Step 1 of this tutorial walks through through how to take a trace, what's
+available to trace, and how to visualize it.
+
+You can unlock deeper analysis by adding custom trace points to your component
+as well. Steps 2 and 3 explain how to add new trace points to a component.
+
+1. [Record and visualize a trace][record-and-visualize-a-trace].
+2. [Register a trace provider][register-a-trace-provider].
+3. [Add tracing in your code][add-tracing-in-your-code].
 
 <!-- Reference links -->
 
@@ -33,3 +33,4 @@ The steps are:
 [register-a-trace-provider]: /docs/development/tracing/tutorial/register-a-trace-provider.md
 [add-tracing-in-your-code]: /docs/development/tracing/tutorial/add-tracing-in-code.md
 [record-and-visualize-a-trace]: /docs/development/tracing/tutorial/record-and-visualize-a-trace.md
+[intro-to-fuchsia-tracing]: /docs/development/tracing/tutorial/intro-to-fuchsia-tracing.md

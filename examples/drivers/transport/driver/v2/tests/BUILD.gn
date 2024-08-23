@@ -5,8 +5,8 @@
 import("//build/components.gni")
 import("//build/test.gni")
 
-test("child-driver-test") {
-  output_name = "driver_transport_example_test"
+test("child-driver-transport-test") {
+  output_name = "child_driver_transport_example_test"
   sources = [
     "//examples/drivers/transport/driver/v2/child-driver.cc",
     "child-driver-test.cc",
@@ -18,7 +18,26 @@ test("child-driver-test") {
   ]
 }
 
-fuchsia_unittest_package("child-driver-hermetic-test-pkg") {
-  package_name = "driver_transport_example_test"
-  deps = [ ":child-driver-test" ]
+test("parent-driver-transport-test") {
+  output_name = "parent_driver_transport_example_test"
+  sources = [
+    "//examples/drivers/transport/driver/v2/parent-driver.cc",
+    "parent-driver-test.cc",
+  ]
+  deps = [
+    "//sdk/fidl/fuchsia.hardware.i2cimpl:fuchsia.hardware.i2cimpl_cpp",
+    "//sdk/lib/driver/compat/cpp",
+    "//sdk/lib/driver/testing/cpp",
+    "//src/lib/fxl/test:gtest_main",
+  ]
+}
+
+fuchsia_unittest_package("child-driver-transport-hermetic-test-pkg") {
+  package_name = "child_driver_transport_example_test"
+  deps = [ ":child-driver-transport-test" ]
+}
+
+fuchsia_unittest_package("parent-driver-transport-hermetic-test-pkg") {
+  package_name = "parent_driver_transport_example_test"
+  deps = [ ":parent-driver-transport-test" ]
 }

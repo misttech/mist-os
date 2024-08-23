@@ -37,8 +37,10 @@ source_set("service") {
   public_deps = [
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_cpp",
     "//sdk/lib/component/outgoing/cpp",
+    "//sdk/lib/driver/testing/cpp:scoped_global_logger",
     "//sdk/lib/sys/cpp",
     "//src/graphics/display/drivers/fake:fake-display-stack",
+    "//src/graphics/display/lib/driver-framework-migration-utils/logging:logging-dfv2",
   ]
 
   visibility = [

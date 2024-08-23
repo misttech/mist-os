@@ -98,6 +98,13 @@ void LowEnergyPeripheralServer::AdvertisementInstance::StartAdvertising() {
   peripheral_server_->StartAdvertisingInternal(parameters_, std::move(status_cb), self->id_);
 }
 
+void LowEnergyPeripheralServer::ListenL2cap(fble::ChannelListenerRegistryListenL2capRequest request,
+                                            ListenL2capCallback callback) {
+  // TODO(https://fxbug.dev/42178956): Implement ListenL2cap.
+  fble::ChannelListenerRegistry_ListenL2cap_Result result;
+  callback(std::move(result.set_err(ZX_ERR_NOT_SUPPORTED)));
+}
+
 void LowEnergyPeripheralServer::AdvertisementInstance::Register(
     bt::gap::AdvertisementInstance instance) {
   BT_ASSERT(!instance_);

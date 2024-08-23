@@ -6,6 +6,8 @@
 
 #include <lib/ddk/binding_driver.h>
 
+#include <bind/fuchsia/cpp/bind.h>
+
 namespace auto_bind {
 
 zx_status_t AutoBind::Bind(void* ctx, zx_device_t* dev) {
@@ -20,12 +22,12 @@ zx_status_t AutoBind::Bind(void* ctx, zx_device_t* dev) {
 
 zx_status_t AutoBind::Bind() {
   is_bound.Set(true);
-  zx_device_prop_t props[] = {
-      {BIND_PCI_VID, 0, 3},
+  zx_device_str_prop_t props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PCI_VID, 3u),
   };
   uint32_t flags = DEVICE_ADD_NON_BINDABLE;
   return DdkAdd(ddk::DeviceAddArgs("autobind")
-                    .set_props(props)
+                    .set_str_props(props)
                     .set_flags(flags)
                     .set_inspect_vmo(inspect_.DuplicateVmo()));
 }

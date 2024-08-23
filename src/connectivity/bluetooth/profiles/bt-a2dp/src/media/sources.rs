@@ -21,7 +21,7 @@ pub struct SawWaveStream {
     frequency_hops: Vec<f32>,
     next_frame_timer: fasync::Timer,
     /// the last time we delivered frames.
-    last_frame_time: Option<zx::Time>,
+    last_frame_time: Option<zx::MonotonicTime>,
     inspect_node: inspect::Node,
 }
 
@@ -42,7 +42,7 @@ impl futures::Stream for SawWaveStream {
     type Item = fuchsia_audio_device::Result<Vec<u8>>;
 
     fn poll_next(mut self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        let now = zx::Time::get_monotonic();
+        let now = zx::MonotonicTime::get();
         if self.last_frame_time.is_none() {
             self.last_frame_time = Some(now - 1.second());
         }

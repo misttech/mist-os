@@ -36,18 +36,19 @@ TEST(SingletonDisplayService, GetMetrics) {
   float dpr_y = 0.f;
   uint32_t refresh_rate = 0;
 
-  singleton->GetMetrics([&](::fuchsia::ui::display::singleton::Metrics info) {
-    ASSERT_TRUE(info.has_extent_in_px());
-    width_in_px = info.extent_in_px().width;
-    height_in_px = info.extent_in_px().height;
-    ASSERT_TRUE(info.has_extent_in_mm());
-    width_in_mm = info.extent_in_mm().width;
-    height_in_mm = info.extent_in_mm().height;
-    ASSERT_TRUE(info.has_recommended_device_pixel_ratio());
-    dpr_x = info.recommended_device_pixel_ratio().x;
-    dpr_y = info.recommended_device_pixel_ratio().y;
-    ASSERT_TRUE(info.has_maximum_refresh_rate_in_millihertz());
-    refresh_rate = info.maximum_refresh_rate_in_millihertz();
+  singleton->GetMetrics([&](auto response) {
+    auto& info = response.info();
+    ASSERT_TRUE(info.extent_in_px().has_value());
+    width_in_px = info.extent_in_px()->width();
+    height_in_px = info.extent_in_px()->height();
+    ASSERT_TRUE(info.extent_in_mm().has_value());
+    width_in_mm = info.extent_in_mm()->width();
+    height_in_mm = info.extent_in_mm()->height();
+    ASSERT_TRUE(info.recommended_device_pixel_ratio().has_value());
+    dpr_x = info.recommended_device_pixel_ratio()->x();
+    dpr_y = info.recommended_device_pixel_ratio()->y();
+    ASSERT_TRUE(info.maximum_refresh_rate_in_millihertz().has_value());
+    refresh_rate = info.maximum_refresh_rate_in_millihertz().value();
   });
 
   EXPECT_EQ(width_in_px, kWidthInPx);
@@ -73,9 +74,10 @@ TEST(SingletonDisplayService, DevicePixelRatioChange) {
 
   float dpr_x = 0.f;
   float dpr_y = 0.f;
-  singleton->GetMetrics([&](::fuchsia::ui::display::singleton::Metrics info) {
-    dpr_x = info.recommended_device_pixel_ratio().x;
-    dpr_y = info.recommended_device_pixel_ratio().y;
+  singleton->GetMetrics([&](auto response) {
+    auto& dpr = response.info().recommended_device_pixel_ratio();
+    dpr_x = dpr->x();
+    dpr_y = dpr->y();
   });
 
   EXPECT_EQ(dpr_x, kDPRx);
@@ -88,7 +90,10 @@ TEST(SingletonDisplayService, GetOwnershipEvent) {
   auto singleton = std::make_unique<SingletonDisplayService>(display);
 
   std::optional<zx::event> event;
-  singleton->GetEvent([&](zx::event e) { event = std::move(e); });
+  singleton->GetEvent(
+      [&](fuchsia_ui_composition_internal::DisplayOwnershipGetEventResponse response) {
+        event = std::move(response.ownership_event());
+      });
   EXPECT_EQ(fsl::GetKoid(event->get()), fsl::GetKoid(display->ownership_event().get()));
 }
 

@@ -236,13 +236,13 @@ std::optional<android_emb::A2dpCodecType> FidlToCodecType(
 
 bt::StaticPacket<android_emb::A2dpScmsTEnableWriter> FidlToScmsTEnable(bool scms_t_enable);
 
-android_emb::A2dpSamplingFrequency FidlToSamplingFrequency(
+std::optional<android_emb::A2dpSamplingFrequency> FidlToSamplingFrequency(
     fuchsia::bluetooth::bredr::AudioSamplingFrequency sampling_frequency);
 
-android_emb::A2dpBitsPerSample FidlToBitsPerSample(
+std::optional<android_emb::A2dpBitsPerSample> FidlToBitsPerSample(
     fuchsia::bluetooth::bredr::AudioBitsPerSample bits_per_sample);
 
-android_emb::A2dpChannelMode FidlToChannelMode(
+std::optional<android_emb::A2dpChannelMode> FidlToChannelMode(
     fuchsia::bluetooth::bredr::AudioChannelMode channel_mode);
 
 bt::StaticPacket<android_emb::SbcCodecInformationWriter> FidlToEncoderSettingsSbc(

@@ -49,14 +49,14 @@ class DlImplTests : public Base {
   fit::result<Error> DlClose(void* module) {
     // At minimum check that a valid handle was passed and present in the
     // dynamic linker's list of modules.
-    if (auto* m = static_cast<ModuleHandle*>(module); dynamic_linker_.FindModule(m->name())) {
+    if (auto* m = static_cast<RuntimeModule*>(module); dynamic_linker_.FindModule(m->name())) {
       return fit::ok();
     }
     return fit::error<Error>{"Invalid library handle %p", module};
   }
 
   fit::result<Error, void*> DlSym(void* module, const char* ref) {
-    return dynamic_linker_.LookupSymbol(static_cast<ModuleHandle*>(module), ref);
+    return dynamic_linker_.LookupSymbol(static_cast<RuntimeModule*>(module), ref);
   }
 
   // TODO(https://fxbug.dev/354043838): Remove these when these functions can

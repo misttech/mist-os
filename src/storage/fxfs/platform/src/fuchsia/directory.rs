@@ -560,6 +560,7 @@ impl MutableDirectory for FxDirectory {
             )
             .await
             .map_err(map_to_status)?;
+        // TODO(https://fxbug.dev/298128836): atime can be updated but is not properly supported.
         self.directory
             .update_attributes(&mut transaction, Some(&attributes), 0, Some(Timestamp::now()))
             .await

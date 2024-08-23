@@ -6,8 +6,9 @@ use fidl_fuchsia_fxfs::{BlobCreatorMarker, BlobReaderMarker};
 use fuchsia_component_test::{Capability, ChildOptions, ChildRef, RealmBuilder, Ref, Route};
 use std::collections::HashMap;
 use {
-    fidl_fuchsia_fshost as ffshost, fidl_fuchsia_io as fio, fidl_fuchsia_logger as flogger,
-    fidl_fuchsia_process as fprocess, fidl_fuchsia_update_verify as ffuv,
+    fidl_fuchsia_fshost as ffshost, fidl_fuchsia_fxfs as ffxfs, fidl_fuchsia_io as fio,
+    fidl_fuchsia_logger as flogger, fidl_fuchsia_process as fprocess,
+    fidl_fuchsia_update_verify as ffuv,
 };
 
 pub trait IntoValueSpec {
@@ -158,6 +159,7 @@ impl FshostBuilder {
                     .capability(Capability::protocol::<ffshost::AdminMarker>())
                     .capability(Capability::protocol::<ffshost::BlockWatcherMarker>())
                     .capability(Capability::protocol::<ffuv::BlobfsVerifierMarker>())
+                    .capability(Capability::protocol::<ffxfs::CryptManagementMarker>())
                     .capability(Capability::protocol::<BlobCreatorMarker>())
                     .capability(Capability::protocol::<BlobReaderMarker>())
                     .capability(Capability::directory("blob").rights(fio::RW_STAR_DIR))

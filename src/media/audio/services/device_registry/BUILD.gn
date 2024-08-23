@@ -167,6 +167,7 @@ source_set("device_registry_lib") {
     "//src/lib/fsl",
     "//src/media/audio/lib/clock",
     "//src/media/audio/services/common",
+    "//zircon/system/ulib/trace-provider",
   ]
 
   deps = [

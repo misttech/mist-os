@@ -846,7 +846,9 @@ pub struct PacketCapture {
 
 impl Drop for PacketCapture {
     fn drop(&mut self) {
-        self.sync_proxy.stop_capture(zx::Time::INFINITE).expect("failed to stop packet capture")
+        self.sync_proxy
+            .stop_capture(zx::MonotonicTime::INFINITE)
+            .expect("failed to stop packet capture")
     }
 }
 

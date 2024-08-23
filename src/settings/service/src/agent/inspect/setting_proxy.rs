@@ -453,7 +453,7 @@ mod tests {
     use crate::display::types::SetDisplayInfo;
     use crate::intl::types::{IntlInfo, LocaleId, TemperatureUnit};
     use diagnostics_assertions::{assert_data_tree, TreeAssertion};
-    use fuchsia_zircon::Time;
+    use fuchsia_zircon::MonotonicTime;
     use std::collections::HashSet;
 
     /// The `RequestProcessor` handles sending a request through a MessageHub
@@ -521,7 +521,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn test_inspect_grouped_responses() {
         // Set the clock so that timestamps can be controlled.
-        clock::mock::set(Time::from_nanos(0));
+        clock::mock::set(MonotonicTime::from_nanos(0));
 
         let inspector = inspect::Inspector::default();
         let condense_node = inspector.root().create_child(REQUEST_RESPONSE_NODE_NAME);
@@ -543,7 +543,7 @@ mod tests {
             .await;
 
         // Increment clock and send a request to turn on auto brightness.
-        clock::mock::set(Time::from_nanos(100));
+        clock::mock::set(MonotonicTime::from_nanos(100));
         request_processor
             .send_and_receive(
                 SettingType::Display,
@@ -556,7 +556,7 @@ mod tests {
 
         // Increment clock and send the same request as the first one. The two should be grouped
         // together.
-        clock::mock::set(Time::from_nanos(200));
+        clock::mock::set(MonotonicTime::from_nanos(200));
         request_processor.send_and_receive(SettingType::Display, turn_off_auto_brightness).await;
 
         assert_data_tree!(inspector, root: contains {
@@ -603,7 +603,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn test_inspect_mixed_request_types() {
         // Set the clock so that timestamps can be controlled.
-        clock::mock::set(Time::from_nanos(0));
+        clock::mock::set(MonotonicTime::from_nanos(0));
 
         let inspector = inspect::Inspector::default();
         let condense_node = inspector.root().create_child(REQUEST_RESPONSE_NODE_NAME);
@@ -627,11 +627,11 @@ mod tests {
             .await;
 
         // Set to a different time so that a response can correctly link to its request.
-        clock::mock::set(Time::from_nanos(100));
+        clock::mock::set(MonotonicTime::from_nanos(100));
         request_processor.send_and_receive(SettingType::Display, Request::Get).await;
 
         // Set to a different time so that a response can correctly link to its request.
-        clock::mock::set(Time::from_nanos(200));
+        clock::mock::set(MonotonicTime::from_nanos(200));
         request_processor
             .send_and_receive(
                 SettingType::Display,
@@ -642,7 +642,7 @@ mod tests {
             )
             .await;
 
-        clock::mock::set(Time::from_nanos(300));
+        clock::mock::set(MonotonicTime::from_nanos(300));
         request_processor.send_and_receive(SettingType::Display, Request::Get).await;
 
         assert_data_tree!(inspector, root: contains {
@@ -702,7 +702,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn test_pending_request() {
         // Set the clock so that timestamps can be controlled.
-        clock::mock::set(Time::from_nanos(0));
+        clock::mock::set(MonotonicTime::from_nanos(0));
 
         let inspector = inspect::Inspector::default();
         let condense_node = inspector.root().create_child(REQUEST_RESPONSE_NODE_NAME);
@@ -750,7 +750,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn test_response_counts_inspect() {
         // Set the clock so that timestamps can be controlled.
-        clock::mock::set(Time::from_nanos(0));
+        clock::mock::set(MonotonicTime::from_nanos(0));
 
         let inspector = inspect::Inspector::default();
         let condense_node = inspector.root().create_child(REQUEST_RESPONSE_NODE_NAME);
@@ -772,10 +772,10 @@ mod tests {
             )
             .await;
 
-        clock::mock::set(Time::from_nanos(100));
+        clock::mock::set(MonotonicTime::from_nanos(100));
         request_processor.send_and_receive(SettingType::Display, Request::Get).await;
 
-        clock::mock::set(Time::from_nanos(200));
+        clock::mock::set(MonotonicTime::from_nanos(200));
         request_processor
             .send_and_receive(
                 SettingType::Display,
@@ -786,7 +786,7 @@ mod tests {
             )
             .await;
 
-        clock::mock::set(Time::from_nanos(300));
+        clock::mock::set(MonotonicTime::from_nanos(300));
         request_processor.send_and_receive(SettingType::Display, Request::Get).await;
 
         assert_data_tree!(inspector, root: contains {
@@ -805,7 +805,7 @@ mod tests {
     #[fuchsia::test(allow_stalls = false)]
     async fn inspect_queue_test() {
         // Set the clock so that timestamps will always be 0.
-        clock::mock::set(Time::from_nanos(0));
+        clock::mock::set(MonotonicTime::from_nanos(0));
         let inspector = inspect::Inspector::default();
         let condense_node = inspector.root().create_child(REQUEST_RESPONSE_NODE_NAME);
         let response_counts_node = inspector.root().create_child(RESPONSE_COUNTS_NODE_NAME);

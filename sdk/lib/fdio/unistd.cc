@@ -2032,6 +2032,12 @@ ssize_t recvmsg(int fd, struct msghdr* msg, int flags) {
   auto& ioflag = io->ioflag();
   const bool blocking = ((ioflag & IOFLAG_NONBLOCK) | (flags & MSG_DONTWAIT)) == 0;
   flags &= ~MSG_DONTWAIT;
+  // The |flags| value MSG_NOSIGNAL is used to express intent *not* to issue
+  // SIGPIPE. Applications use this frequently to avoid having to install
+  // additional signal handlers to handle cases where connection has been
+  // closed by remote end. Signals aren't a notion on Fuchsia, so this flag can
+  // be safely ignored.
+  flags &= ~MSG_NOSIGNAL;
   const zx::time deadline = zx::deadline_after(io->rcvtimeo());
   for (;;) {
     size_t actual;

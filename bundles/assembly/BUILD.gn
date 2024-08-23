@@ -154,12 +154,6 @@ assembly_input_bundle("embeddable") {
       package_target = "//src/devices/bus/drivers/platform:package"
       driver_components = [ "meta/platform-bus.cm" ]
     },
-
-    # TODO: Move this to bootstrap after fixing pci to not depend on it.
-    {
-      package_target = "//src/devices/sysmem/drivers/sysmem:package"
-      driver_components = [ "meta/sysmem.cm" ]
-    },
   ]
 }
 
@@ -287,6 +281,10 @@ assembly_input_bundle("bootstrap") {
     {
       package_target = "//src/devices/spi/drivers/spi:package"
       driver_components = [ "meta/spi.cm" ]
+    },
+    {
+      package_target = "//src/devices/sysmem/drivers/sysmem:package"
+      driver_components = [ "meta/sysmem.cm" ]
     },
     {
       package_target = "//src/devices/usb/drivers/usb-bus:package"
@@ -441,6 +439,16 @@ assembly_input_bundle("bt_transport_uart_driver") {
 
 # AIB for the bus-pci driver
 assembly_input_bundle("bus_pci_driver") {
+  boot_driver_packages = [
+    {
+      package_target = "//src/devices/bus/drivers/pci:package"
+      driver_components = [ "meta/bus-pci.cm" ]
+    },
+  ]
+}
+
+# AIB for the realtek-8211f driver
+assembly_input_bundle("realtek_8211f_driver") {
 }
 
 # The most minimal AIB that is included in eng assembled systems that are meant
@@ -1519,6 +1527,28 @@ assembly_input_bundle("core_realm_development_access_rcs_no_usb") {
   ]
 }
 
+# Development and debug support tools for general networking
+assembly_input_bundle("development_support_tools_connectivity_networking") {
+  base_packages = [
+    "//src/connectivity/network/tools/nc",
+    "//src/connectivity/network/tools/sockscripter:package",
+    "//src/connectivity/network/mdns/util:mdns-util",
+    "//src/connectivity/network/net-cli",
+    "//third_party/iperf:iperf3_pkg",
+    "//third_party/tcpdump",
+  ]
+}
+
+# Development and debug support tools for wlan
+assembly_input_bundle("development_support_tools_connectivity_wlan") {
+  base_packages = [ "//src/connectivity/wlan/wlancfg/tool:donut" ]
+}
+
+# Development and debug support tools for the Thread protocol
+assembly_input_bundle("development_support_tools_connectivity_thread") {
+  flexible_packages = [ "//src/connectivity/lowpan/tools/lowpanctl" ]
+}
+
 assembly_input_bundle("radar_proxy_with_injector") {
   base_packages =
       [ "//src/devices/radar/bin/radar-proxy:radar-proxy-with-injector" ]
@@ -1969,32 +1999,6 @@ assembly_input_bundle("detect_user") {
 # have not been organized into specific features yet.
 assembly_input_bundle("input_group_one") {
   base_packages = [ "//src/sys/cache_manager" ]
-}
-
-assembly_input_bundle("input_group_two") {
-  kernel_cmdline = [ "kernel.render-dlog-to-crashlog=true" ]
-  flexible_packages = [
-    "//src/connectivity/location/emergency",
-    "//src/media/sessions:mediasession",
-  ]
-  if (current_cpu != "riscv64") {
-    flexible_packages += [ "//src/media/codec:codec_factory" ]
-  }
-  compiled_packages = [
-    {
-      name = "core"
-      components = [
-        {
-          component_name = "core"
-          shards = [
-            "//src/connectivity/location/emergency/meta/emergency.core_shard.cml",
-            "//src/media/codec/factory/meta/codec_factory.core_shard.cml",
-            "//src/media/sessions/meta/mediasession.core_shard.cml",
-          ]
-        },
-      ]
-    },
-  ]
 }
 
 ########
@@ -3259,6 +3263,25 @@ assembly_input_bundle("wlan_wlanix") {
   ]
 }
 
+# Emergency Location provider
+#
+# feature_set_levels: standard
+# build-types: all
+assembly_input_bundle("location_emergency") {
+  flexible_packages = [ "//src/connectivity/location/emergency" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/connectivity/location/emergency/meta/emergency.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
 # Support for interactive debugging/development of platform audio
 #
 # feature_set_levels: minimal
@@ -3456,6 +3479,49 @@ assembly_input_bundle("soundplayer") {
           shards = [
             "//src/media/sounds/soundplayer/meta/soundplayer.core_shard.cml",
           ]
+        },
+      ]
+    },
+  ]
+}
+
+# Platform-provided video and audio decoders and encoders.
+#
+# feature_set_levels: standard
+# build-types: all
+#
+assembly_input_bundle("media_codecs") {
+  if (current_cpu != "riscv64") {
+    flexible_packages = [ "//src/media/codec:codec_factory" ]
+  }
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards =
+              [ "//src/media/codec/factory/meta/codec_factory.core_shard.cml" ]
+        },
+      ]
+    },
+  ]
+}
+
+# Service that allows active media players (sessions) to be published and discovered.
+#
+# feature_set_levels: standard
+# build-types: all
+#
+assembly_input_bundle("media_sessions") {
+  flexible_packages = [ "//src/media/sessions:mediasession" ]
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [ "//src/media/sessions/meta/mediasession.core_shard.cml" ]
         },
       ]
     },
@@ -4019,6 +4085,22 @@ assembly_input_bundle("fonts_hermetic") {
   ]
 }
 
+assembly_input_bundle("tee_manager_shard_only") {
+  compiled_packages = [
+    {
+      name = "core"
+      components = [
+        {
+          component_name = "core"
+          shards = [
+            "//src/security/bin/tee_manager/meta/tee_manager.core_shard.cml",
+          ]
+        },
+      ]
+    },
+  ]
+}
+
 # Static resources files to make available to product assembly subsystems.
 assembly_resources_directory("resources") {
   sources = [
@@ -4108,6 +4190,10 @@ assembly_input_bundle("kernel_anonymous_memory_compression_eager_lru") {
 # level changes.
 assembly_input_bundle("kernel_evict_continuous") {
   kernel_cmdline = [ "kernel.oom.evict-continuous=true" ]
+}
+
+assembly_input_bundle("kernel_logs_in_reboot_info") {
+  kernel_cmdline = [ "kernel.render-dlog-to-crashlog=true" ]
 }
 
 # Assembly selects whether to include this AIB or not.

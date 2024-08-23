@@ -39,8 +39,6 @@ zx::result<zx::stream> VnodeFile::CreateStream(uint32_t stream_options) {
   return zx::ok(std::move(stream));
 }
 
-void VnodeFile::DidModifyStream() { UpdateModified(); }
-
 zx_status_t VnodeFile::GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) {
   std::lock_guard lock(mutex_);
   if (zx_status_t status = CreateBackingStoreIfNeeded(); status != ZX_OK) {
@@ -94,6 +92,7 @@ zx::result<fs::VnodeAttributes> VnodeFile::GetAttributes() const {
       .mode = mode_,
       .uid = uid_,
       .gid = gid_,
+      .rdev = rdev_,
   });
 }
 

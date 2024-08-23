@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <fuchsia/hardware/intelgpucore/c/banjo.h>
-#include <lib/ddk/driver.h>
 #include <lib/ddk/hw/inout.h>
 #include <lib/device-protocol/pci.h>
 #include <lib/driver/component/cpp/prepare_stop_completer.h>
@@ -54,7 +53,6 @@
 #include "src/graphics/display/drivers/intel-display/pci-ids.h"
 #include "src/graphics/display/drivers/intel-display/pipe-manager.h"
 #include "src/graphics/display/drivers/intel-display/pipe.h"
-#include "src/graphics/display/drivers/intel-display/poll-until.h"
 #include "src/graphics/display/drivers/intel-display/power-controller.h"
 #include "src/graphics/display/drivers/intel-display/power.h"
 #include "src/graphics/display/drivers/intel-display/registers-ddi.h"
@@ -63,6 +61,7 @@
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-display/registers.h"
 #include "src/graphics/display/drivers/intel-display/tiling.h"
+#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"

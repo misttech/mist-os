@@ -184,6 +184,18 @@ def compute_clang_features(clang_info, target_os, target_cpu):
         generate_linkmap_feature,
     ] + sanitizer_features
 
+    # TODO(https://fxbug.dev/356347441): Remove this once Bazel has been fixed.
+    #
+    # Adding this hard-coded feature to a C++ toolchain disables .d file processing.
+    # Surprisingly, this is currently required to avoid incremental Bazel build
+    # correctness issues that affect Bazel 7.2+ and 7.3.1, such as the one described
+    # in the associated bug.
+    no_dotd_file_feature = feature(
+        name = "no_dotd_file",
+        enabled = True,
+    )
+    features += [no_dotd_file_feature]
+
     return features
 
 # buildifier: disable=unnamed-macro

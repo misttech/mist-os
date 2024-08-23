@@ -16,6 +16,8 @@ from typing import AbstractSet, Any, Dict, Sequence
 _CPP_EXTENSIONS = [".cc", ".c", ".cpp"]
 _OPT_PATTERN = re.compile("[\W]+")
 
+_SHOULD_LOG = False
+
 
 class Action:
     """Represents an action that comes from aquery"""
@@ -145,6 +147,29 @@ def collect_actions(action_graph: Sequence[Dict]) -> Sequence[Action]:
     return actions
 
 
+def get_action_graph_from_labels(
+    bazel_exe: str, compilation_mode, labels: Sequence[str]
+) -> Sequence[Dict]:
+    all_actions = []
+    for label in labels:
+        info("Getting action graph for {}".format(label))
+        action_graph = json.loads(
+            run(
+                bazel_exe,
+                "aquery",
+                "mnemonic('CppCompile',deps({label}))".format(label=label),
+                compilation_mode,
+                "--output=jsonproto",
+                "--ui_event_filters=-info,-warning",
+                "--noshow_loading_progress",
+                "--noshow_progress",
+                "--show_result=0",
+            )
+        )
+        all_actions.extend(collect_actions(action_graph))
+    return all_actions
+
+
 def compilation_mode(args: Sequence[str]) -> str:
     # sometimes the optimization is escape quoted so we clean it up.
     opt = _OPT_PATTERN.sub("", args.optimization)
@@ -156,6 +181,77 @@ def compilation_mode(args: Sequence[str]) -> str:
         return "--compilation_mode=fastbuild"
 
 
+def assert_arg_label_is_fuchsia_package(args: argparse.Namespace):
+    results = collect_labels_from_scope(args.bazel, args.label)
+    if len(results) == 0:
+        fail(
+            "Provided label '{}' is not a valid fuchsia_package label. Please provide a label that points to a valid fuchsia package or use --dir instead.".format(
+                args.label
+            )
+        )
+
+
+def collect_labels_from_dir(args: argparse.Namespace) -> Sequence[str]:
+    # Clean up the scope so it matches what bazel expects.
+    dir = args.dir.removeprefix("//").removesuffix("...").removesuffix("/")
+    if dir == "":
+        scope = "//..."
+    else:
+        scope = "//{}/...".format(dir)
+
+    return collect_labels_from_scope(args.bazel, scope)
+
+
+def collect_labels_from_scope(bazel_exe: str, scope: str) -> Sequence[str]:
+    # The debug_agent causes bazel queries to fail. This line can be
+    # removed when it is fixed.
+    scope = scope + " - //src/developer/debug/debug_agent:pkg_fuchsia_package"
+
+    try:
+        return run(
+            bazel_exe,
+            "query",
+            'kind("_build_fuchsia.*package rule", {})'.format(scope),
+            "--ui_event_filters=-info,-warning",
+            "--noshow_loading_progress",
+            "--noshow_progress",
+        ).splitlines()
+    except:
+        fail(
+            """Unable to find any labels in {}.
+
+        This can occur when the scope is too broad and bazel tries to query
+        paths that are not compatible with bazel. For example, if you try to
+        query the root directory it will pick up the prebuilt directory which
+        contains files that cause the query to fail.
+
+        Try the query again with a more limited scope.
+        """.format(
+                scope
+            )
+        )
+
+
+def fail(msg: str, exit_code=1):
+    print("ERROR: ", msg)
+    sys.exit(exit_code)
+
+
+def info(msg: str):
+    if _SHOULD_LOG:
+        print("INFO: ", msg)
+
+
+def init_logger(args):
+    global _SHOULD_LOG
+    if args.verbose:
+        _SHOULD_LOG = True
+
+
+def is_none(obj: Any) -> bool:
+    return obj == None
+
+
 def main(argv: Sequence[str]):
     parser = argparse.ArgumentParser(description="Refresh bazel compdb")
 
@@ -164,29 +260,47 @@ def main(argv: Sequence[str]):
         "--build-dir", required=True, help="The build directory"
     )
     parser.add_argument(
-        "--label", required=True, help="The bazel label to query"
+        "--label",
+        help="The bazel label to query. This label must point to a fuchsia_package or one of its test variants.",
+    )
+    parser.add_argument(
+        "--dir",
+        help="""A directory to search for labels relative to //
+
+        This path must be a path that we can run `fx bazel query` on. Some paths
+        are not compatible with bazel queries and will fail.""",
     )
     parser.add_argument(
         "--optimization", required=True, help="The build level optimization"
     )
-    args = parser.parse_args(argv)
-
-    action_graph = json.loads(
-        run(
-            args.bazel,
-            "aquery",
-            "mnemonic('CppCompile',deps({label}))".format(label=args.label),
-            compilation_mode(args),
-            "--output=jsonproto",
-            "--ui_event_filters=-info,-warning",
-            "--noshow_loading_progress",
-            "--noshow_progress",
-            "--show_result=0",
-        )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        required=False,
+        help="If we should print info logs",
+        default=False,
+        action="store_true",
     )
+    args = parser.parse_args(argv)
+    init_logger(args)
 
-    actions = collect_actions(
-        action_graph,
+    if is_none(args.label) and is_none(args.dir):
+        fail("Either --label or --dir must be set.")
+
+    labels = []
+    if args.label:
+        info("Verifying label '{}' is valid".format(args.label))
+        assert_arg_label_is_fuchsia_package(args)
+        labels.append(args.label)
+
+    if args.dir:
+        info("Finding all labels in dir '{}'".format(args.dir))
+        labels.extend(collect_labels_from_dir(args))
+
+    actions = get_action_graph_from_labels(
+        args.bazel,
+        compilation_mode(args),
+        labels,
     )
 
     output_base = run(args.bazel, "info", "output_base")

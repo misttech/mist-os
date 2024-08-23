@@ -53,6 +53,7 @@ source_set("kernel") {
     "//zircon/kernel/lib/topology",
     "//zircon/kernel/lib/userabi",
     "//zircon/kernel/lib/version",
+    "//zircon/kernel/lib/wake-vector",
     "//zircon/kernel/object",
     "//zircon/kernel/vm",
     "//zircon/system/ulib/affine",

@@ -86,6 +86,10 @@ pub struct DeveloperOnlyOptions {
     /// a package server cannot be run.
     #[serde(default)]
     pub all_packages_in_base: bool,
+
+    /// Whether to enable netboot mode for assembly.
+    #[serde(default)]
+    pub netboot_mode: bool,
 }
 
 /// Kernel options and settings that are only to be used in the context of local

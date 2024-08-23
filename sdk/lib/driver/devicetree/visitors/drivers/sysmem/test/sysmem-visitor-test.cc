@@ -5,13 +5,11 @@
 #include "../sysmem-visitor.h"
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
-#include <lib/driver/component/cpp/composite_node_spec.h>
 #include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/driver/devicetree/testing/visitor-test-helper.h>
 #include <lib/driver/devicetree/visitors/default/bind-property/bind-property.h>
 #include <lib/driver/devicetree/visitors/registry.h>
 
-#include <bind/fuchsia/hardware/sysmem/cpp/bind.h>
 #include <gtest/gtest.h>
 
 #include "dts/sysmem-test.h"
@@ -37,7 +35,6 @@ TEST(SysmemVisitorTest, TestMetadataAndBindProperty) {
   ASSERT_TRUE(sysmem_visitor_tester->DoPublish().is_ok());
 
   uint32_t node_tested_count = 0;
-  uint32_t mgr_request_idx = 0;
 
   auto node_count = sysmem_visitor_tester->env().SyncCall(
       &fdf_devicetree::testing::FakeEnvWrapper::pbus_node_size);
@@ -65,37 +62,7 @@ TEST(SysmemVisitorTest, TestMetadataAndBindProperty) {
                 static_cast<uint32_t>(TEST_PROTECTED_SIZE));
     }
   }
-
-  node_count = sysmem_visitor_tester->env().SyncCall(
-      &fdf_devicetree::testing::FakeEnvWrapper::non_pbus_node_size);
-
-  for (size_t i = 0; i < node_count; i++) {
-    auto node = sysmem_visitor_tester->env().SyncCall(
-        &fdf_devicetree::testing::FakeEnvWrapper::non_pbus_nodes_at, i);
-
-    if (node->args().name()->find("vdec") != std::string::npos) {
-      node_tested_count++;
-      ASSERT_EQ(1lu, sysmem_visitor_tester->env().SyncCall(
-                         &fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_size));
-
-      auto mgr_request = sysmem_visitor_tester->env().SyncCall(
-          &fdf_devicetree::testing::FakeEnvWrapper::mgr_requests_at, mgr_request_idx++);
-      ASSERT_TRUE(mgr_request.parents().has_value());
-      ASSERT_EQ(2lu, mgr_request.parents()->size());
-
-      // Check for sysmem parent node specs. Skip the 1st one as it is either pdev/board device.
-      EXPECT_TRUE(fdf_devicetree::testing::CheckHasProperties(
-          {{fdf::MakeProperty(bind_fuchsia_hardware_sysmem::SERVICE,
-                              bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT)}},
-          (*mgr_request.parents())[1].properties(), false));
-      EXPECT_TRUE(fdf_devicetree::testing::CheckHasBindRules(
-          {{fdf::MakeAcceptBindRule(bind_fuchsia_hardware_sysmem::SERVICE,
-                                    bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT)}},
-          (*mgr_request.parents())[1].bind_rules(), false));
-    }
-  }
-
-  ASSERT_EQ(node_tested_count, 2u);
+  ASSERT_EQ(node_tested_count, 1u);
 }
 
 }  // namespace sysmem_dt

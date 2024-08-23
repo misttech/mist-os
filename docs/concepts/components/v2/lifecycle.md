@@ -113,6 +113,48 @@ Concretely, there are two ways that `A` can bind to `B`:
 Note: For more details on running components during development, see
 [Run components][doc-run].
 
+### Shutdown ordering
+
+When the component framework decides to [shut down](#shutdown) a component, it will
+shut down the component and its children in an order determined by their dependencies.
+This behavior is recursive which means that shutting down a component will shut
+down the full topology under that component.
+
+Components within a realm are shut down in a specific order, which is based on
+the strong dependencies between those components. The dependencies between components form
+a Directed Acyclical Graph (DAG), and components are shut down in target-to-source order.
+
+All capabilities are considered in the dependency graph. Capabilities are
+offered as a strong dependency by default, but a client can offer a dependency
+by specifying [`dependency: weak`](#weak).
+
+As an example, imagine a realm with components `A`, `B`, `C`, `D`.
+There are the following offers:
+
+- `A` strongly offers a capability to `B` and `C`.
+- `B` strongly offers a capability to `C`.
+- `C` weakly offers a capability to `B`.
+
+Here is a drawing of the realm in question:
+
+![Component shutdown example](images/component_shutdown_example.png){: width="662"}
+
+The shutdown ordering would be the following:
+
+- `D` and `C` can be shut down in any order as they have no dependents.
+- `B` can then be shut down after `C`.
+- `A` can then be shut down after `B`.
+
+#### Weak dependencies {#weak}
+
+Remember that the component dependencies forms a DAG, meaning there are no
+cycles. This means that in the example above, `C` cannot strongly offer a
+capability to `A`.
+
+However, `C` is allowed to offer a capability to `A` with `dependency: "weak"`.
+A weak dependency is not considered to be a part of the dependency DAG and it will
+not affect shutdown ordering.
+
 [binder.fidl]: https://fuchsia.dev/reference/fidl/fuchsia.component#Binder
 [doc-framework-protocol]: capabilities/protocol.md#framework
 [doc-collections]: realms.md#collections

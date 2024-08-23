@@ -49,6 +49,9 @@ std::shared_ptr<fcdecl::Offer> CreateFidlServiceOfferDecl(std::string_view sourc
   offer.set_target(std::move(*target));
   offer.set_target_name(std::string(target_name));
   offer.set_availability(fcdecl::Availability::REQUIRED);
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
+  offer.set_dependency_type(fcdecl::DependencyType::STRONG);
+#endif
 
   return std::make_shared<fcdecl::Offer>(fcdecl::Offer::WithService(std::move(offer)));
 }

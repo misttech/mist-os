@@ -7,7 +7,8 @@ use crate::bootfs::BootfsSvc;
 use anyhow::{anyhow, Context, Error};
 use fidl_fuchsia_time as ftime;
 use fuchsia_fs::{file, OpenFlags};
-use fuchsia_zircon::{Clock, ClockOpts, HandleBased, Rights, Time};
+use fuchsia_runtime::{UtcClock, UtcTime};
+use fuchsia_zircon::{ClockOpts, HandleBased, Rights};
 use futures::prelude::*;
 use std::sync::Arc;
 
@@ -16,11 +17,11 @@ use std::sync::Arc;
 /// Consumers of this protocol are meant to keep the clock synchronized
 /// with external time sources.
 pub struct UtcTimeMaintainer {
-    utc_clock: Arc<Clock>,
+    utc_clock: Arc<UtcClock>,
 }
 
 impl UtcTimeMaintainer {
-    pub fn new(utc_clock: Arc<Clock>) -> Self {
+    pub fn new(utc_clock: Arc<UtcClock>) -> Self {
         UtcTimeMaintainer { utc_clock }
     }
 
@@ -31,13 +32,13 @@ impl UtcTimeMaintainer {
         while let Some(ftime::MaintenanceRequest::GetWritableUtcClock { responder }) =
             stream.try_next().await?
         {
-            responder.send(self.utc_clock.duplicate_handle(Rights::SAME_RIGHTS)?)?;
+            responder.send(self.utc_clock.duplicate_handle(Rights::SAME_RIGHTS)?.downcast())?;
         }
         Ok(())
     }
 }
 
-async fn read_utc_backstop(path: &str, bootfs: &Option<BootfsSvc>) -> Result<Time, Error> {
+async fn read_utc_backstop(path: &str, bootfs: &Option<BootfsSvc>) -> Result<UtcTime, Error> {
     let file_contents: String;
     if bootfs.is_none() {
         let file_proxy = file::open_in_namespace(path, OpenFlags::RIGHT_READABLE)
@@ -61,7 +62,7 @@ async fn read_utc_backstop(path: &str, bootfs: &Option<BootfsSvc>) -> Result<Tim
     }
     let parsed_time =
         file_contents.trim().parse::<i64>().context("failed to parse backstop time")?;
-    Ok(Time::from_nanos(
+    Ok(UtcTime::from_nanos(
         parsed_time
             .checked_mul(1_000_000_000)
             .ok_or_else(|| anyhow!("backstop time is too large"))?,
@@ -69,9 +70,9 @@ async fn read_utc_backstop(path: &str, bootfs: &Option<BootfsSvc>) -> Result<Tim
 }
 
 /// Creates a UTC kernel clock with a backstop time configured by /boot.
-pub async fn create_utc_clock(bootfs: &Option<BootfsSvc>) -> Result<Clock, Error> {
+pub async fn create_utc_clock(bootfs: &Option<BootfsSvc>) -> Result<UtcClock, Error> {
     let backstop = read_utc_backstop("/boot/config/build_info/minimum_utc_stamp", &bootfs).await?;
-    let clock = Clock::create(ClockOpts::empty(), Some(backstop))
+    let clock = UtcClock::create(ClockOpts::empty(), Some(backstop))
         .map_err(|s| anyhow!("failed to create UTC clock: {}", s))?;
     Ok(clock)
 }

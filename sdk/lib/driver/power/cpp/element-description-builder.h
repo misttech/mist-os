@@ -5,11 +5,42 @@
 #ifndef LIB_DRIVER_POWER_CPP_ELEMENT_DESCRIPTION_BUILDER_H_
 #define LIB_DRIVER_POWER_CPP_ELEMENT_DESCRIPTION_BUILDER_H_
 
+#include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
-
-#include "sdk/lib/driver/power/cpp/power-support.h"
+#include <fidl/fuchsia.power.broker/cpp/fidl.h>
 
 namespace fdf_power {
+class ParentElementHasher final {
+ public:
+  /// Make a unique string as our hash key.
+  size_t operator()(const fuchsia_hardware_power::ParentElement& element) const;
+};
+
+using TokenMap =
+    std::unordered_map<fuchsia_hardware_power::ParentElement, zx::event, ParentElementHasher>;
+
+using ElementDependencyMap =
+    std::unordered_map<fuchsia_hardware_power::ParentElement,
+                       std::vector<fuchsia_power_broker::LevelDependency>, ParentElementHasher>;
+
+struct ElementDesc {
+  fuchsia_hardware_power::wire::PowerElementConfiguration element_config_;
+  TokenMap tokens;
+  zx::event assertive_token;
+  zx::event opportunistic_token;
+  std::pair<fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>,
+            fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>>
+      level_control_servers;
+  fidl::ServerEnd<fuchsia_power_broker::Lessor> lessor_server;
+  fidl::ServerEnd<fuchsia_power_broker::ElementControl> element_control_server;
+
+  // The below are created if the caller did not supply their corresponding server end
+  std::optional<fidl::ClientEnd<fuchsia_power_broker::CurrentLevel>> current_level_client;
+  std::optional<fidl::ClientEnd<fuchsia_power_broker::RequiredLevel>> required_level_client;
+  std::optional<fidl::ClientEnd<fuchsia_power_broker::Lessor>> lessor_client;
+  std::optional<fidl::ClientEnd<fuchsia_power_broker::ElementControl>> element_control_client;
+};
+
 class ElementDescBuilder {
  public:
   explicit ElementDescBuilder(fuchsia_hardware_power::wire::PowerElementConfiguration config,

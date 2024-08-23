@@ -169,7 +169,7 @@ async fn file_get_executable_memory_with_insufficient_rights() {
 #[fuchsia::test]
 async fn file_get_backing_memory_shared_buffer() {
     let harness = TestHarness::new().await;
-    if !harness.config.supports_get_backing_memory {
+    if !harness.config.supports_get_backing_memory || !harness.config.supports_mutable_file {
         return;
     }
 

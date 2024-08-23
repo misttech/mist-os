@@ -5,10 +5,13 @@
 #include <endian.h>
 #include <errno.h>
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
+#include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysinfo/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/loop.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fzl/vmo-mapper.h>
 #include <lib/stdcompat/span.h>
@@ -37,10 +40,12 @@
 #include <fbl/vector.h>
 
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
+#include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
 #include "src/graphics/display/lib/api-types-cpp/image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
+#include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
 #include "src/graphics/display/testing/client-utils/display.h"
 #include "src/graphics/display/testing/client-utils/virtual-layer.h"
 
@@ -55,9 +60,75 @@ using display_test::Display;
 using display_test::PrimaryLayer;
 using display_test::VirtualLayer;
 
+// Listens to [`fuchsia.hardware.display/CoordinatorListener`] requests.
+//
+// This class is thread-unsafe. It must be accessed from a single thread or a
+// dispatcher running on that thread.
+class CoordinatorListener final : public fidl::WireServer<fhd::CoordinatorListener> {
+ public:
+  CoordinatorListener() = default;
+
+  CoordinatorListener(const CoordinatorListener&) = delete;
+  CoordinatorListener(CoordinatorListener&&) = delete;
+  CoordinatorListener& operator=(const CoordinatorListener&) = delete;
+  CoordinatorListener& operator=(CoordinatorListener&&) = delete;
+
+  void Bind(fidl::ServerEnd<fhd::CoordinatorListener> server, async_dispatcher_t& dispatcher) {
+    ZX_DEBUG_ASSERT(!binding_.has_value());
+    binding_ = fidl::BindServer(&dispatcher, std::move(server), this);
+  }
+
+  // fidl::Server<fuchsia_hardware_display::CoordinatorListener>:
+  void OnDisplaysChanged(OnDisplaysChangedRequestView request,
+                         OnDisplaysChangedCompleter::Sync& completer) override {
+    fidl::Arena arena;
+    for (const fhd::wire::Info& display : request->added) {
+      displays_.emplace(display::ToDisplayId(display.id), display);
+    }
+    for (const fhdt::wire::DisplayId& display_id : request->removed) {
+      displays_.erase(display::ToDisplayId(display_id));
+    }
+  }
+  void OnVsync(OnVsyncRequestView request, OnVsyncCompleter::Sync& completer) override {
+    vsync_count_++;
+    latest_config_stamp_ = display::ToConfigStamp(request->applied_config_stamp);
+    if (display::ToVsyncAckCookie(request->cookie) != display::kInvalidVsyncAckCookie) {
+      pending_vsync_cookie_ = display::ToVsyncAckCookie(request->cookie);
+    }
+  }
+  void OnClientOwnershipChange(OnClientOwnershipChangeRequestView request,
+                               OnClientOwnershipChangeCompleter::Sync& completer) override {
+    has_ownership_ = request->has_ownership;
+  }
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fhd::CoordinatorListener> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override {
+    completer.Close(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  const std::unordered_map<display::DisplayId, Display>& displays() { return displays_; }
+  bool has_ownership() const { return has_ownership_; }
+  int64_t vsync_count() const { return vsync_count_; }
+  display::ConfigStamp latest_config_stamp() const { return latest_config_stamp_; }
+
+  display::VsyncAckCookie TakePendingVsyncCookie() {
+    display::VsyncAckCookie to_take = pending_vsync_cookie_;
+    pending_vsync_cookie_ = display::kInvalidVsyncAckCookie;
+    return to_take;
+  }
+
+ private:
+  std::unordered_map<display::DisplayId, Display> displays_;
+  bool has_ownership_ = false;
+  int64_t vsync_count_ = 0;
+  display::ConfigStamp latest_config_stamp_ = display::kInvalidConfigStamp;
+  display::VsyncAckCookie pending_vsync_cookie_ = display::kInvalidVsyncAckCookie;
+
+  std::optional<fidl::ServerBindingRef<fhd::CoordinatorListener>> binding_;
+};
+
+static CoordinatorListener g_coordinator_listener;
 static zx_handle_t device_handle;
 static fidl::WireSyncClient<fhd::Coordinator> dc;
-static bool has_ownership;
 
 constexpr display::EventId kEventId(13);
 constexpr display::BufferCollectionId kBufferCollectionId(12);
@@ -92,7 +163,8 @@ fbl::StringBuffer<sysinfo::wire::kBoardNameLen> board_name;
 Platforms GetPlatform();
 void Usage();
 
-static bool bind_display(const char* coordinator, fbl::Vector<Display>* displays) {
+static bool bind_display(const char* coordinator, async::Loop& coordinator_listener_loop,
+                         fbl::Vector<Display>* displays) {
   printf("Opening coordinator\n");
   zx::result provider = component::Connect<fhd::Provider>(coordinator);
   if (provider.is_error()) {
@@ -100,62 +172,43 @@ static bool bind_display(const char* coordinator, fbl::Vector<Display>* displays
     return false;
   }
 
-  zx::result dc_endpoints = fidl::CreateEndpoints<fhd::Coordinator>();
-  if (dc_endpoints.is_error()) {
-    printf("Failed to create coordinator channel %d (%s)\n", dc_endpoints.error_value(),
-           dc_endpoints.status_string());
-    return false;
-  }
+  auto [coordinator_client, coordinator_server] = fidl::Endpoints<fhd::Coordinator>::Create();
+  auto [listener_client, listener_server] = fidl::Endpoints<fhd::CoordinatorListener>::Create();
 
+  fidl::Arena arena;
+  auto open_coordinator_request =
+      fhd::wire::ProviderOpenCoordinatorWithListenerForPrimaryRequest::Builder(arena)
+          .coordinator(std::move(coordinator_server))
+          .coordinator_listener(std::move(listener_client))
+          .Build();
   fidl::WireResult open_response =
-      fidl::WireCall(provider.value())->OpenCoordinatorForPrimary(std::move(dc_endpoints->server));
+      fidl::WireCall(provider.value())
+          ->OpenCoordinatorWithListenerForPrimary(std::move(open_coordinator_request));
   if (!open_response.ok()) {
     printf("Failed to call service handle: %s\n", open_response.FormatDescription().c_str());
     return false;
   }
-  if (open_response.value().s != ZX_OK) {
-    printf("Failed to open coordinator %d (%s)\n", open_response.value().s,
-           zx_status_get_string(open_response.value().s));
+  if (open_response.value().is_error()) {
+    printf("Failed to open coordinator %d (%s)\n", open_response.value().error_value(),
+           zx_status_get_string(open_response.value().error_value()));
     return false;
   }
 
-  dc = fidl::WireSyncClient(std::move(dc_endpoints->client));
+  dc = fidl::WireSyncClient(std::move(coordinator_client));
+  g_coordinator_listener.Bind(std::move(listener_server), *coordinator_listener_loop.dispatcher());
 
-  class EventHandler : public fidl::WireSyncEventHandler<fhd::Coordinator> {
-   public:
-    EventHandler(fbl::Vector<Display>* displays, bool& has_ownership)
-        : displays_(displays), has_ownership_(has_ownership) {}
-
-    bool invalid_message() const { return invalid_message_; }
-
-    void OnDisplaysChanged(fidl::WireEvent<fhd::Coordinator::OnDisplaysChanged>* event) override {
-      for (size_t i = 0; i < event->added.count(); i++) {
-        displays_->push_back(Display(/*info=*/event->added[i]));
-      }
-    }
-
-    void OnVsync(fidl::WireEvent<fhd::Coordinator::OnVsync>* event) override {
-      invalid_message_ = true;
-    }
-
-    void OnClientOwnershipChange(
-        fidl::WireEvent<fhd::Coordinator::OnClientOwnershipChange>* event) override {
-      has_ownership_ = event->has_ownership;
-    }
-
-   private:
-    fbl::Vector<Display>* const displays_;
-    bool& has_ownership_;
-    bool invalid_message_ = false;
-  };
-
-  EventHandler event_handler(displays, has_ownership);
-  while (displays->is_empty()) {
+  while (g_coordinator_listener.displays().empty()) {
     printf("Waiting for display\n");
-    if (!dc.HandleOneEvent(event_handler).ok() || event_handler.invalid_message()) {
+    zx_status_t status = coordinator_listener_loop.Run(zx::time::infinite(), /*once=*/true);
+    if (status != ZX_OK || g_coordinator_listener.vsync_count() > 0) {
       printf("Got unexpected message\n");
       return false;
     }
+  }
+
+  *displays = {};
+  for (const auto& [id, display] : g_coordinator_listener.displays()) {
+    displays->push_back(display);
   }
 
   if (!dc->EnableVsync(true).ok()) {
@@ -256,53 +309,31 @@ std::optional<fhdt::wire::ConfigStamp> apply_config() {
   return config_stamp_result.value().stamp;
 }
 
-zx_status_t wait_for_vsync(fhdt::wire::ConfigStamp expected_stamp) {
-  class EventHandler : public fidl::WireSyncEventHandler<fhd::Coordinator> {
-   public:
-    explicit EventHandler(fhdt::wire::ConfigStamp expected_stamp)
-        : expected_stamp_(expected_stamp) {}
-
-    zx_status_t status() const { return status_; }
-
-    void OnDisplaysChanged(fidl::WireEvent<fhd::Coordinator::OnDisplaysChanged>* event) override {
-      printf("Display disconnected\n");
-      status_ = ZX_ERR_STOP;
-    }
-
-    void OnVsync(fidl::WireEvent<fhd::Coordinator::OnVsync>* event) override {
-      // Acknowledge cookie if non-zero
-      if (event->cookie) {
-        // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
-        (void)dc->AcknowledgeVsync(event->cookie);
-      }
-
-      if (event->applied_config_stamp.value >= expected_stamp_.value) {
-        status_ = ZX_OK;
-      } else {
-        status_ = ZX_ERR_NEXT;
-      }
-    }
-
-    void OnClientOwnershipChange(
-        fidl::WireEvent<fhd::Coordinator::OnClientOwnershipChange>* event) override {
-      has_ownership = event->has_ownership;
-      status_ = ZX_ERR_NEXT;
-    }
-
-   private:
-    fhdt::wire::ConfigStamp expected_stamp_;
-    zx_status_t status_ = ZX_OK;
-  };
-
-  EventHandler event_handler(expected_stamp);
-  const fidl::Status status = dc.HandleOneEvent(event_handler);
-  if (!status.ok()) {
-    if (status.reason() == fidl::Reason::kUnexpectedMessage) {
-      return ZX_ERR_STOP;
-    }
-    return status.status();
+zx_status_t wait_for_vsync(async::Loop& coordinator_listener_loop,
+                           fhdt::wire::ConfigStamp expected_stamp) {
+  zx_status_t status = coordinator_listener_loop.Run(zx::time::infinite(), /*once=*/true);
+  if (status != ZX_OK) {
+    printf("Failed to run coordinator listener loop: %s", zx_status_get_string(status));
+    return status;
   }
-  return event_handler.status();
+  if (!g_coordinator_listener.has_ownership()) {
+    return ZX_ERR_NEXT;
+  }
+  if (g_coordinator_listener.displays().empty()) {
+    printf("Display disconnected\n");
+    return ZX_ERR_STOP;
+  }
+
+  // Received a Vsync event
+  display::VsyncAckCookie pending_vsync_cookie = g_coordinator_listener.TakePendingVsyncCookie();
+  if (pending_vsync_cookie != display::kInvalidVsyncAckCookie) {
+    (void)dc->AcknowledgeVsync(pending_vsync_cookie.value());
+  }
+
+  if (g_coordinator_listener.latest_config_stamp() < display::ToConfigStamp(expected_stamp)) {
+    return ZX_ERR_NEXT;
+  }
+  return ZX_OK;
 }
 
 zx_status_t set_minimum_rgb(uint8_t min_rgb) {
@@ -720,6 +751,7 @@ int main(int argc, const char* argv[]) {
   bool capture = false;
   bool verify_capture = false;
   std::optional<std::string> coordinator_path_override = std::nullopt;
+  async::Loop coordinator_listener_loop(&kAsyncLoopConfigNeverAttachToThread);
 
   platform = GetPlatform();
 
@@ -761,7 +793,7 @@ int main(int argc, const char* argv[]) {
   }
   printf("Display coordinator device: %s\n", coordinator_path.c_str());
 
-  if (!bind_display(coordinator_path.c_str(), &displays)) {
+  if (!bind_display(coordinator_path.c_str(), coordinator_listener_loop, &displays)) {
     usage();
     return -1;
   }
@@ -1175,7 +1207,8 @@ int main(int argc, const char* argv[]) {
     }
 
     zx_status_t status = ZX_OK;
-    while (layers.size() != 0 && (status = wait_for_vsync(expected_stamp)) == ZX_ERR_NEXT) {
+    while (layers.size() != 0 &&
+           (status = wait_for_vsync(coordinator_listener_loop, expected_stamp)) == ZX_ERR_NEXT) {
     }
     ZX_ASSERT(status == ZX_OK);
     if (capture) {

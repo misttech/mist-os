@@ -20,6 +20,8 @@ use fuchsia_zircon::Status;
 use futures::future::{BoxFuture, FutureExt};
 use futures::task::{waker_ref, ArcWake};
 
+pub use crate::fdf_sys::fdf_dispatcher_t;
+
 pub trait ShutdownObserverFn: Fn(DispatcherRef<'_>) + Send + Sync + 'static {}
 impl<T> ShutdownObserverFn for T where T: Fn(DispatcherRef<'_>) + Send + Sync + 'static {}
 
@@ -154,6 +156,17 @@ unsafe impl Send for Dispatcher {}
 unsafe impl Sync for Dispatcher {}
 
 impl Dispatcher {
+    /// Creates a dispatcher ref from a raw handle.
+    ///
+    /// # Safety
+    ///
+    /// Caller is responsible for ensuring that the given handle is valid and
+    /// not owned by any other wrapper that will free it at an arbitrary
+    /// time.
+    pub(crate) unsafe fn from_raw(handle: NonNull<fdf_dispatcher_t>) -> Self {
+        Self(handle)
+    }
+
     pub fn post_task_sync(&self, p: impl TaskCallback) -> Result<(), Status> {
         // SAFETY: the fdf dispatcher is valid by construction and can provide an async dispatcher.
         let async_dispatcher = unsafe { fdf_dispatcher_get_async_dispatcher(self.0.as_ptr()) };
@@ -221,7 +234,27 @@ impl Drop for Dispatcher {
 /// An unowned reference to a driver runtime dispatcher such as is produced by calling
 /// [`Dispatcher::release`]. When this object goes out of scope it won't shut down the dispatcher,
 /// leaving that up to the driver runtime or another owner.
+#[derive(Debug)]
 pub struct DispatcherRef<'a>(ManuallyDrop<Dispatcher>, PhantomData<&'a Dispatcher>);
+
+impl<'a> DispatcherRef<'a> {
+    /// Creates a dispatcher ref from a raw handle.
+    ///
+    /// # Safety
+    ///
+    /// Caller is responsible for ensuring that the given handle is valid for
+    /// the lifetime `'a`.
+    pub unsafe fn from_raw(handle: NonNull<fdf_dispatcher_t>) -> Self {
+        // SAFETY: Caller promises the handle is valid.
+        Self(ManuallyDrop::new(unsafe { Dispatcher::from_raw(handle) }), PhantomData)
+    }
+}
+
+impl<'a> Clone for DispatcherRef<'a> {
+    fn clone(&self) -> Self {
+        Self(ManuallyDrop::new(Dispatcher(self.0 .0)), PhantomData)
+    }
+}
 
 impl<'a> core::ops::Deref for DispatcherRef<'a> {
     type Target = Dispatcher;

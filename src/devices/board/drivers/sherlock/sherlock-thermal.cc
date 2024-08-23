@@ -73,14 +73,14 @@ const std::vector<fpbus::Mmio> thermal_mmios_ddr{
 const std::vector<fpbus::Irq> thermal_irqs_pll{
     {{
         .irq = T931_TS_PLL_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
 };
 
 const std::vector<fpbus::Irq> thermal_irqs_ddr{
     {{
         .irq = T931_TS_DDR_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
 };
 
@@ -302,13 +302,13 @@ zx_status_t Sherlock::ThermalInit() {
   // function 3 which puts in PWM_D mode. A53 cluster (Small)
   gpio_init_steps_.push_back(GpioFunction(T931_GPIOE(1), kPwmDFn));
 
-  gpio_init_steps_.push_back(GpioConfigOut(T931_GPIOE(1), 0));
+  gpio_init_steps_.push_back(GpioOutput(T931_GPIOE(1), false));
 
   // Configure the GPIO to be Output & set it to alternate
   // function 3 which puts in PWM_D mode. A73 cluster (Big)
   gpio_init_steps_.push_back(GpioFunction(T931_GPIOE(2), kPwmDFn));
 
-  gpio_init_steps_.push_back(GpioConfigOut(T931_GPIOE(2), 0));
+  gpio_init_steps_.push_back(GpioOutput(T931_GPIOE(2), false));
 
   // The PLL sensor is controlled by a legacy thermal device, which performs DVFS.
   fidl::Arena<> fidl_arena;

@@ -12,6 +12,14 @@ toc:
   path: /docs/concepts/packages/package_url.md
 - title: "Developing with Fuchsia packages"
   path: /docs/concepts/packages/package_update.md
+- title: "Running Package Servers"
+  section:
+  - title: "Starting package servers"
+    path: /docs/concepts/packages/package_server_start.md
+  - title: "Listing running package servers"
+    path: /docs/concepts/packages/package_server_list.md
+  - title: "Stopping package servers"
+    path: /docs/concepts/packages/package_server_stop.md
 - title: "Merkle roots"
   path:  /docs/concepts/packages/merkleroot.md
 - title: "Garbage collection"

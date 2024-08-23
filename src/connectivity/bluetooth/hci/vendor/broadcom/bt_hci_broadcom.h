@@ -58,6 +58,7 @@ class BtHciBroadcom final
   static const std::unordered_map<uint16_t, std::string> kFirmwareMap;
 
   // fuchsia_hardware_bluetooth::Vendor protocol interface implementations.
+  void GetFeatures(GetFeaturesCompleter::Sync& completer) override;
   void EncodeCommand(EncodeCommandRequestView request,
                      EncodeCommandCompleter::Sync& completer) override;
   void OpenHci(OpenHciCompleter::Sync& completer) override;

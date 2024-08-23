@@ -55,6 +55,7 @@ class TestHarness : public fidl::Server<fio_test::Io1Harness> {
     config.supports_remote_dir(true);
     config.supports_get_token(true);
     config.supports_open3(true);
+    config.supports_mutable_file(true);
     config.supported_attributes(fio::NodeAttributesQuery::kContentSize |
                                 fio::NodeAttributesQuery::kStorageSize);
     // TODO(https://fxbug.dev/324112857): Support append mode when adding open3 support.
@@ -124,7 +125,8 @@ class TestHarness : public fidl::Server<fio_test::Io1Harness> {
 };
 
 int main(int argc, const char** argv) {
-  fuchsia_logging::SetTags({"io_conformance_harness_cppvfs"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"io_conformance_harness_cppvfs"}).BuildAndInitialize();
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   component::OutgoingDirectory outgoing = component::OutgoingDirectory(loop.dispatcher());

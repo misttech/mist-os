@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/bazel/bazel_inputs.gni")
 import("//build/group_with_inputs.gni")
 import("//build/python/python_action.gni")
 import("//src/developer/ffx/build/ffx_action.gni")
@@ -60,8 +59,14 @@ import("//src/developer/ffx/build/ffx_action.gni")
 #    - cpu_manager: configuration for the cpu_manager system.
 #    - power_manager: configuration for the power_manager system.
 #    - power_metrics_recorder: configuration for power_metrics_recorder system.
+#    - system_power_mode: configuration of the system power modes.
 #    - thermal: configuration of the thermal management system.
 #    - thread_roles: files defining thread roles
+#    - sysmem_format_costs: configuration of format costs for sysmem. This is a
+#      list of build targets. Each outputs a .format_costs_persistent_fidl
+#      file (one file per target). These targets are compiled_action(s) with an
+#      output filename of the form
+#      {target_out_dir}/{target_name}.format_costs_persistent_fidl.
 #
 #  Outputs
 #    A directory structure and manifest
@@ -271,6 +276,14 @@ template("board_input_bundle") {
       ]
     }
 
+    if (defined(configuration.system_power_mode)) {
+      creation_inputs += [ configuration.system_power_mode ]
+      creation_args += [
+        "--system-power-mode-config",
+        rebase_path(configuration.system_power_mode, root_build_dir),
+      ]
+    }
+
     if (defined(configuration.thermal)) {
       creation_inputs += [ configuration.thermal ]
       creation_args += [
@@ -285,6 +298,21 @@ template("board_input_bundle") {
         creation_args += [
           "--thread-roles",
           rebase_path(thread_roles_file, root_build_dir),
+        ]
+      }
+    }
+
+    if (defined(configuration.sysmem_format_costs)) {
+      foreach(format_costs_target, configuration.sysmem_format_costs) {
+        _format_costs_persistent_fidl =
+            get_label_info(format_costs_target, "target_out_dir") + "/" +
+            get_label_info(format_costs_target, "name") +
+            ".format_costs_persistent_fidl"
+        creation_deps += [ format_costs_target ]
+        creation_inputs += [ _format_costs_persistent_fidl ]
+        creation_args += [
+          "--sysmem-format-costs-config",
+          rebase_path(_format_costs_persistent_fidl, root_build_dir),
         ]
       }
     }
@@ -341,13 +369,5 @@ template("board_input_bundle") {
         },
       ]
     }
-  }
-
-  # Make board configuration and board input bundle available to Bazel
-  bazel_input_resource_directory("${target_name}.bazel_input") {
-    forward_variables_from(invoker, [ "testonly" ])
-    source_dir = files.bundle_dir
-    dest_dir = rebase_path(files.bundle_dir, root_out_dir)
-    deps = [ ":${labels.main_target}" ]
   }
 }

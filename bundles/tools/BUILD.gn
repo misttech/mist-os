@@ -9,7 +9,6 @@ group("tools") {
   testonly = true
   public_deps = [
     "//src/camera:tools",
-    "//src/connectivity:tools",
     "//src/connectivity/bluetooth/tools",
     "//src/developer/debug/debug_agent",
     "//src/developer/debug/zxdb:zxdb_host",

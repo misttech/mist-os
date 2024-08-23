@@ -21,9 +21,9 @@ use {
 
 pub use diagnostics_assertions;
 
-/// Returns the current time as an i64 for InputReports and zx::Time for InputEvents.
-pub fn event_times() -> (i64, zx::Time) {
-    let event_time = zx::Time::get_monotonic();
+/// Returns the current time as an i64 for InputReports and zx::MonotonicTime for InputEvents.
+pub fn event_times() -> (i64, zx::MonotonicTime) {
+    let event_time = zx::MonotonicTime::get();
     (event_time.into_nanos(), event_time)
 }
 
@@ -55,7 +55,7 @@ pub fn create_keyboard_input_report(
 pub fn create_input_event(
     keyboard_event: keyboard_binding::KeyboardEvent,
     device_descriptor: &input_device::InputDeviceDescriptor,
-    event_time: zx::Time,
+    event_time: zx::MonotonicTime,
     handled: input_device::Handled,
 ) -> input_device::InputEvent {
     input_device::InputEvent {
@@ -81,7 +81,7 @@ pub fn create_keyboard_event_with_handled(
     key: fidl_fuchsia_input::Key,
     event_type: fidl_fuchsia_ui_input3::KeyEventType,
     modifiers: Option<fidl_ui_input3::Modifiers>,
-    event_time: zx::Time,
+    event_time: zx::MonotonicTime,
     device_descriptor: &input_device::InputDeviceDescriptor,
     keymap: Option<String>,
     key_meaning: Option<fidl_fuchsia_ui_input3::KeyMeaning>,
@@ -109,7 +109,7 @@ pub fn create_keyboard_event_with_key_meaning_and_repeat_sequence(
     key: fidl_fuchsia_input::Key,
     event_type: fidl_fuchsia_ui_input3::KeyEventType,
     modifiers: Option<fidl_ui_input3::Modifiers>,
-    event_time: zx::Time,
+    event_time: zx::MonotonicTime,
     device_descriptor: &input_device::InputDeviceDescriptor,
     keymap: Option<String>,
     key_meaning: Option<fidl_fuchsia_ui_input3::KeyMeaning>,
@@ -136,7 +136,7 @@ pub fn create_keyboard_event_with_key_meaning(
     key: fidl_fuchsia_input::Key,
     event_type: fidl_fuchsia_ui_input3::KeyEventType,
     modifiers: Option<fidl_ui_input3::Modifiers>,
-    event_time: zx::Time,
+    event_time: zx::MonotonicTime,
     device_descriptor: &input_device::InputDeviceDescriptor,
     keymap: Option<String>,
     key_meaning: Option<fidl_fuchsia_ui_input3::KeyMeaning>,
@@ -166,7 +166,7 @@ pub fn create_keyboard_event_with_time(
     key: fidl_fuchsia_input::Key,
     event_type: fidl_fuchsia_ui_input3::KeyEventType,
     modifiers: Option<fidl_ui_input3::Modifiers>,
-    event_time: zx::Time,
+    event_time: zx::MonotonicTime,
     device_descriptor: &input_device::InputDeviceDescriptor,
     keymap: Option<String>,
 ) -> input_device::InputEvent {
@@ -200,7 +200,7 @@ pub fn create_keyboard_event(
         key,
         event_type,
         modifiers,
-        zx::Time::get_monotonic(),
+        zx::MonotonicTime::get(),
         device_descriptor,
         keymap,
     )
@@ -208,7 +208,7 @@ pub fn create_keyboard_event(
 
 /// Creates a fake input event with the given event time.  Please do not
 /// read into other event fields.
-pub fn create_fake_input_event(event_time: zx::Time) -> input_device::InputEvent {
+pub fn create_fake_input_event(event_time: zx::MonotonicTime) -> input_device::InputEvent {
     input_device::InputEvent {
         event_time,
         device_event: input_device::InputDeviceEvent::Fake,
@@ -220,7 +220,7 @@ pub fn create_fake_input_event(event_time: zx::Time) -> input_device::InputEvent
 
 /// Creates a fake handled input event with the given event time.  Please do not
 /// read into other event fields.
-pub fn create_fake_handled_input_event(event_time: zx::Time) -> input_device::InputEvent {
+pub fn create_fake_handled_input_event(event_time: zx::MonotonicTime) -> input_device::InputEvent {
     input_device::InputEvent {
         event_time,
         device_event: input_device::InputDeviceEvent::Fake,
@@ -281,7 +281,7 @@ pub fn create_consumer_control_input_report(
 /// - `handled`: Whether the event has been consumed.
 pub fn create_consumer_controls_event_with_handled(
     pressed_buttons: Vec<fidl_input_report::ConsumerControlButton>,
-    event_time: zx::Time,
+    event_time: zx::MonotonicTime,
     device_descriptor: &input_device::InputDeviceDescriptor,
     handled: input_device::Handled,
 ) -> input_device::InputEvent {
@@ -304,7 +304,7 @@ pub fn create_consumer_controls_event_with_handled(
 /// - `device_descriptor`: The device descriptor to add to the event.
 pub fn create_consumer_controls_event(
     pressed_buttons: Vec<fidl_input_report::ConsumerControlButton>,
-    event_time: zx::Time,
+    event_time: zx::MonotonicTime,
     device_descriptor: &input_device::InputDeviceDescriptor,
 ) -> input_device::InputEvent {
     create_consumer_controls_event_with_handled(
@@ -400,7 +400,7 @@ pub fn create_mouse_event_with_handled(
     phase: mouse_binding::MousePhase,
     affected_buttons: HashSet<mouse_binding::MouseButton>,
     pressed_buttons: HashSet<mouse_binding::MouseButton>,
-    event_time: zx::Time,
+    event_time: zx::MonotonicTime,
     device_descriptor: &input_device::InputDeviceDescriptor,
     handled: input_device::Handled,
 ) -> input_device::InputEvent {
@@ -440,7 +440,7 @@ pub fn create_mouse_event(
     phase: mouse_binding::MousePhase,
     affected_buttons: HashSet<mouse_binding::MouseButton>,
     pressed_buttons: HashSet<mouse_binding::MouseButton>,
-    event_time: zx::Time,
+    event_time: zx::MonotonicTime,
     device_descriptor: &input_device::InputDeviceDescriptor,
 ) -> input_device::InputEvent {
     create_mouse_event_with_handled(
@@ -480,7 +480,7 @@ pub fn create_mouse_pointer_sample_event_with_wheel_physical_pixel(
     wheel_delta_v_physical_pixel: Option<f64>,
     wheel_delta_h_physical_pixel: Option<f64>,
     is_precision_scroll: Option<bool>,
-    event_time: zx::Time,
+    event_time: zx::MonotonicTime,
 ) -> pointerinjector::Event {
     let pointer_sample = pointerinjector::PointerSample {
         pointer_id: Some(0),
@@ -523,7 +523,7 @@ pub fn create_mouse_pointer_sample_event(
     wheel_delta_v: Option<i64>,
     wheel_delta_h: Option<i64>,
     is_precision_scroll: Option<bool>,
-    event_time: zx::Time,
+    event_time: zx::MonotonicTime,
 ) -> pointerinjector::Event {
     create_mouse_pointer_sample_event_with_wheel_physical_pixel(
         phase,
@@ -578,7 +578,7 @@ pub fn create_touch_contact(id: u32, position: Position) -> touch_binding::Touch
 /// - `handled`: Whether the event has been consumed.
 pub fn create_touch_screen_event_with_handled(
     mut contacts: HashMap<fidl_ui_input::PointerEventPhase, Vec<touch_binding::TouchContact>>,
-    event_time: zx::Time,
+    event_time: zx::MonotonicTime,
     device_descriptor: &input_device::InputDeviceDescriptor,
     handled: input_device::Handled,
 ) -> input_device::InputEvent {
@@ -615,7 +615,7 @@ pub fn create_touch_screen_event_with_handled(
 /// - `device_descriptor`: The device descriptor to add to the event.
 pub fn create_touch_screen_event(
     contacts: HashMap<fidl_ui_input::PointerEventPhase, Vec<touch_binding::TouchContact>>,
-    event_time: zx::Time,
+    event_time: zx::MonotonicTime,
     device_descriptor: &input_device::InputDeviceDescriptor,
 ) -> input_device::InputEvent {
     create_touch_screen_event_with_handled(
@@ -637,7 +637,7 @@ pub fn create_touch_screen_event(
 pub fn create_touchpad_event_with_handled(
     injector_contacts: Vec<touch_binding::TouchContact>,
     pressed_buttons: HashSet<mouse_binding::MouseButton>,
-    event_time: zx::Time,
+    event_time: zx::MonotonicTime,
     device_descriptor: &input_device::InputDeviceDescriptor,
     handled: input_device::Handled,
 ) -> input_device::InputEvent {
@@ -663,7 +663,7 @@ pub fn create_touchpad_event_with_handled(
 pub fn create_touchpad_event(
     contacts: Vec<touch_binding::TouchContact>,
     pressed_buttons: HashSet<mouse_binding::MouseButton>,
-    event_time: zx::Time,
+    event_time: zx::MonotonicTime,
     device_descriptor: &input_device::InputDeviceDescriptor,
 ) -> input_device::InputEvent {
     create_touchpad_event_with_handled(
@@ -686,7 +686,7 @@ pub fn create_touch_pointer_sample_event(
     phase: pointerinjector::EventPhase,
     contact: &touch_binding::TouchContact,
     position: crate::utils::Position,
-    event_time: zx::Time,
+    event_time: zx::MonotonicTime,
 ) -> pointerinjector::Event {
     let pointer_sample = pointerinjector::PointerSample {
         pointer_id: Some(contact.id),

@@ -33,6 +33,7 @@ class DebugAgentServer : public fidl::Server<fuchsia_debugger::DebugAgent>,
   void AttachTo(AttachToRequest& request, AttachToCompleter::Sync& completer) override;
   void GetProcessInfo(GetProcessInfoRequest& request,
                       GetProcessInfoCompleter::Sync& completer) override;
+  void GetMinidumps(GetMinidumpsRequest& request, GetMinidumpsCompleter::Sync& completer) override;
 
   void OnUnboundFn(DebugAgentServer* impl, fidl::UnbindInfo info,
                    fidl::ServerEnd<fuchsia_debugger::DebugAgent> server_end);

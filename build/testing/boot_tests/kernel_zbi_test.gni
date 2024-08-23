@@ -77,7 +77,6 @@ template("_cuckoo_product_bundle") {
     image_name = "fuchsia"
     kernel_zbi = assembly_kernel_zbi
     kernel_image_name = assembly_kernel_image_name
-    bootfs_labels = board_bootfs_labels
     base_packages =
         board_package_labels + [
           # This package is needed to provide a fake intl_services

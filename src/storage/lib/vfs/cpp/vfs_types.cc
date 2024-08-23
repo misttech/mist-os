@@ -348,6 +348,9 @@ zx::result<fio::wire::NodeAttributes2> NodeAttributeBuilder::Build(const Vnode& 
   if (query & fio::NodeAttributesQuery::kGid && attributes.gid) {
     mutable_builder.gid(*attributes.gid);
   }
+  if (query & fio::NodeAttributesQuery::kRdev && attributes.rdev) {
+    mutable_builder.rdev(ExternalView(*attributes.rdev));
+  }
 #endif
 
   // Build the wire table, which is now valid as long as this object remains in scope.

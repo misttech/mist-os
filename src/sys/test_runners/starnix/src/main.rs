@@ -9,6 +9,7 @@ mod helpers;
 mod ltp;
 mod results_parser;
 mod runner;
+mod selinux;
 mod test_suite;
 
 use anyhow::Error;

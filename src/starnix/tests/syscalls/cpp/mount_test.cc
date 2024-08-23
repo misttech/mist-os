@@ -349,6 +349,31 @@ TEST_F(MountTest, NoDev) {
   ASSERT_THAT(umount(dir.c_str()), SyscallSucceeds());
 }
 
+TEST_F(MountTest, UmountIsNotRecursive) {
+  // Test that by itself, umount should not umount nested mounts.
+  ASSERT_SUCCESS(MakeDir("a"));
+  auto dir = TestPath("a");
+  ASSERT_THAT(mount(nullptr, dir.c_str(), "tmpfs", 0, nullptr), SyscallSucceeds());
+  ASSERT_SUCCESS(MakeDir("a/b"));
+  auto nested_dir = TestPath("a/b");
+  ASSERT_THAT(mount(nullptr, nested_dir.c_str(), "tmpfs", 0, nullptr), SyscallSucceeds());
+  EXPECT_THAT(umount(dir.c_str()), SyscallFailsWithErrno(EBUSY));
+  EXPECT_THAT(umount(nested_dir.c_str()), SyscallSucceeds());
+  EXPECT_THAT(umount(dir.c_str()), SyscallSucceeds());
+}
+
+TEST_F(MountTest, UmountWithMntAttachIsRecursive) {
+  // Test that when umount is called with `MNT_DETACH` it will umount nested
+  // mounts.
+  ASSERT_SUCCESS(MakeDir("a"));
+  auto dir = TestPath("a");
+  ASSERT_THAT(mount(nullptr, dir.c_str(), "tmpfs", 0, nullptr), SyscallSucceeds());
+  ASSERT_SUCCESS(MakeDir("a/b"));
+  auto nested_dir = TestPath("a/b");
+  ASSERT_THAT(mount(nullptr, nested_dir.c_str(), "tmpfs", 0, nullptr), SyscallSucceeds());
+  EXPECT_THAT(umount2(dir.c_str(), MNT_DETACH), SyscallSucceeds());
+}
+
 class ProcMountsTest : public ProcTestBase {
   // Note that these tests can be affected by those in other suites e.g. a
   // MountTest above that doesn't clean up its mounts may change the value of

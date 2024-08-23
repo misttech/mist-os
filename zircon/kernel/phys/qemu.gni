@@ -4,6 +4,7 @@
 # license that can be found in the LICENSE file or at
 # https://opensource.org/licenses/MIT
 
+import("//build/testing/environments.gni")
 import("//zircon/kernel/phys/phys_executable.gni")
 
 # zbi_test() $timeout value for short-running tests launched via QEMU.
@@ -37,6 +38,10 @@ qemu_short_timeout = 30
 #     - Optional: A .gni file that defines the $target_type template.
 #     - Type: path
 #
+#   * supported_environments
+#     - Required: List as for the $environments parameter to boot_test().
+#     - Type: list(scope)
+#
 #   * target_second_environment
 #     - Optional: A second build environment in which the phys_executable()
 #       (or $target_type()) target should also be evaluated.
@@ -58,7 +63,25 @@ qemu_boot_formats = []
 qemu_default_boot_format = ""
 
 if (current_cpu == "x64") {
-  qemu_default_boot_format = "multiboot"
+  qemu_default_boot_format = "linuxbiboot"
+
+  # The multiboot x86-32 protocol is supported by QEMU and AEMU.
+  multiboot_environments = [
+    qemu_env,
+    aemu_env,
+  ]
+
+  # The Linux/x86 16-bit/32-bit protocol is supported by QEMU and AEMU.
+  linuxboot32_environments = [
+    qemu_env,
+    aemu_env,
+  ]
+
+  # The Linux/x86 64-bit protocol is supported by CrosVM.
+  linuxboot64_environments = [
+    # TODO(https://fxbug.dev/335547883): crosvm_env
+  ]
+
   qemu_boot_formats += [
     {
       name = "multiboot"
@@ -67,37 +90,40 @@ if (current_cpu == "x64") {
       shim_deps = [
         "//zircon/kernel/arch/x86/phys/boot-shim:multiboot-shim($environment)",
       ]
-
-      # TODO(mcgrathr): Use root_out_dir of environment, multiboot-shim
-      # when nothing cares.
-      shim_path = "$root_build_dir/multiboot.bin"
       timeout = qemu_short_timeout
+
+      supported_environments = multiboot_environments
     },
     {
       name = "linuxboot"
       environment = "//zircon/kernel/arch/x86/phys:kernel.phys32"
       deps = [ "//zircon/kernel/arch/x86/phys:linuxboot" ]
-      shim_deps = [ "//zircon/kernel/arch/x86/phys/boot-shim:linux-x86-boot-shim($environment)" ]
+      shim_deps = [ "//zircon/kernel/arch/x86/phys/boot-shim:linux-x86-32-boot-shim($environment)" ]
       timeout = qemu_short_timeout
+
+      supported_environments = linuxboot32_environments
     },
     {
       name = "linuxboot64"
-      disabled = true  # Only for experimentation.
       environment = phys_toolchain
       deps = [ "//zircon/kernel/arch/x86/phys:linuxboot64" ]
       shim_deps = [ "//zircon/kernel/arch/x86/phys/boot-shim:linux-x86-64-boot-shim($environment)" ]
       timeout = qemu_short_timeout
+
+      supported_environments = linuxboot64_environments
     },
     {
       name = "linuxbiboot"
-      disabled = true  # Only for experimentation.
       environment = "//zircon/kernel/arch/x86/phys:kernel.phys32"
       import = "//zircon/kernel/arch/x86/phys/linuxbiboot_executable.gni"
       target_type = "linuxbiboot_executable"
       target_second_environment = phys_toolchain
       deps = []
-      shim_deps = [ "//zircon/kernel/arch/x86/phys/boot-shim:linux-x86-bi-boot-shim($environment)" ]
+      shim_deps = [ "//zircon/kernel/arch/x86/phys/boot-shim:linux-x86-boot-shim($environment)" ]
       timeout = qemu_short_timeout
+
+      supported_environments =
+          linuxboot32_environments + linuxboot64_environments
     },
   ]
 } else {
@@ -108,6 +134,8 @@ if (current_cpu == "x64") {
       environment = phys_toolchain
       deps = [ "//zircon/kernel/phys:qemu-header" ]
       timeout = qemu_short_timeout
+
+      supported_environments = [ qemu_env ]
     },
   ]
 }
@@ -120,6 +148,11 @@ if (current_cpu == "arm64" || current_cpu == "riscv64") {
       deps = [ "//zircon/kernel/arch/$current_cpu/phys:linuxboot" ]
       shim_deps = [ "//zircon/kernel/arch/${current_cpu}/phys/boot-shim:linux-${current_cpu}-boot-shim($environment)" ]
       timeout = qemu_short_timeout
+
+      supported_environments = [ qemu_env ]
+      if (current_cpu == "arm64") {
+        supported_environments += [ aemu_env ]
+      }
     },
   ]
 }
@@ -169,6 +202,7 @@ foreach(qemu, qemu_boot_formats) {
         path = get_label_info("${deps[0]}", "root_out_dir") + "/" +
                get_label_info(deps[0], "name") + ".bin"
       }
+      supported_environments = qemu.supported_environments
     }
   }
 }

@@ -327,7 +327,7 @@
         {
             directory: "dev-class",
             from: "parent",
-            as: "dev-composite",
+            as: "dev-audio-composite",
             to: "#test_manager",
             subdir: "audio-composite",
         },

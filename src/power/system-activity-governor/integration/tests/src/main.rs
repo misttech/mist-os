@@ -1923,7 +1923,7 @@ async fn test_element_info_provider() -> Result<()> {
                     },
                     fbroker::PowerLevelName {
                         level: Some(1),
-                        name: Some("WakeHandling".into()),
+                        name: Some("Suspending".into()),
                         ..Default::default()
                     },
                     fbroker::PowerLevelName {

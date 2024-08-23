@@ -9,17 +9,13 @@
             environment: "#core-env",
         },
     ],
-    capabilities: [
-        {
-            protocol: [ "fuchsia.profiling.Controller" ],
-        },
-    ],
     offer: [
         {
             protocol: [
                 "fuchsia.kernel.DebugResource",
                 "fuchsia.kernel.RootJob",
                 "fuchsia.logger.Log",
+                "fuchsia.sys2.LifecycleController",
                 "fuchsia.sys2.LifecycleController.root",
             ],
             from: "parent",

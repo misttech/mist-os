@@ -45,10 +45,6 @@ async fn set_up_test_driver_realm(
     let driver_registar =
         instance.root.connect_to_protocol_at_exposed_dir::<fdr::DriverRegistrarMarker>()?;
 
-    // Make sure we wait until all the drivers are bound before returning.
-    let dev = instance.driver_test_realm_connect_to_dev()?;
-    device_watcher::recursive_wait(&dev, "sys/test/sample_driver").await?;
-
     Ok((instance, driver_dev, driver_registar))
 }
 

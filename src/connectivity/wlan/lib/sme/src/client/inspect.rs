@@ -120,7 +120,7 @@ pub struct PulseNode {
 
 impl PulseNode {
     fn new(node: Node) -> Self {
-        let now = zx::Time::get_monotonic();
+        let now = zx::MonotonicTime::get();
         let started = node.create_time_at("started", now);
         let last_updated = node.create_time_at("last_updated", now);
         Self {
@@ -134,7 +134,7 @@ impl PulseNode {
     }
 
     pub fn update(&mut self, new_status: ClientSmeStatus) {
-        let now = zx::Time::get_monotonic();
+        let now = zx::MonotonicTime::get();
         self.last_updated.set_at(now);
 
         // This method is always called when there's a state transition, so even if the client is
@@ -193,6 +193,7 @@ impl ClientSmeStatusNode {
         let status_str = match new_status {
             ClientSmeStatus::Connected(_) => "connected",
             ClientSmeStatus::Connecting(_) => "connecting",
+            ClientSmeStatus::Roaming(_) => "roaming",
             ClientSmeStatus::Idle => IDLE_STR,
         };
         self.status_str.set(status_str);
@@ -221,7 +222,9 @@ impl ClientSmeStatusNode {
                     ));
                 }
             },
-            ClientSmeStatus::Connecting(_) | ClientSmeStatus::Idle => {
+            ClientSmeStatus::Connecting(_)
+            | ClientSmeStatus::Roaming(_)
+            | ClientSmeStatus::Idle => {
                 self.connected_to = None;
             }
         }
@@ -234,7 +237,7 @@ impl ClientSmeStatusNode {
                         Some(ConnectingToNode::new(self.node.create_child("connecting_to"), &ssid));
                 }
             },
-            ClientSmeStatus::Connected(_) | ClientSmeStatus::Idle => {
+            ClientSmeStatus::Connected(_) | ClientSmeStatus::Roaming(_) | ClientSmeStatus::Idle => {
                 self.connecting_to = None;
             }
         }

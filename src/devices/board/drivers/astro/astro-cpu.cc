@@ -119,7 +119,7 @@ static const fpbus::Node cpu_dev = []() {
 namespace astro {
 
 zx_status_t Astro::CpuInit() {
-  gpio_init_steps_.push_back(GpioConfigOut(S905D2_PWM_D_PIN, 0));
+  gpio_init_steps_.push_back(GpioOutput(S905D2_PWM_D_PIN, false));
 
   // Configure the GPIO to be Output & set it to alternate
   // function 3 which puts in PWM_D mode.

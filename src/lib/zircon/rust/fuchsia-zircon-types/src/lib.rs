@@ -2119,8 +2119,8 @@ pub struct zx_smc_result_t {
     pub arg6: u64,
 }
 
-const ZX_CPU_SET_MAX_CPUS: usize = 512;
-const ZX_CPU_SET_BITS_PER_WORD: usize = 64;
+pub const ZX_CPU_SET_MAX_CPUS: usize = 512;
+pub const ZX_CPU_SET_BITS_PER_WORD: usize = 64;
 
 #[repr(C)]
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -2209,7 +2209,7 @@ multiconst!(zx_processor_power_control_t, [
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct zx_processor_power_level_t {
     pub options: zx_processor_power_level_options_t,
-    pub procesing_rate: u64,
+    pub processing_rate: u64,
     pub power_coefficient_nw: u64,
     pub control_interface: zx_processor_power_control_t,
     pub control_argument: u64,
@@ -2220,10 +2220,11 @@ pub struct zx_processor_power_level_t {
 #[repr(C)]
 #[derive(Debug, Default, Copy, Clone, Eq, PartialEq)]
 pub struct zx_processor_power_level_transition_t {
-    pub from: u32,
-    pub to: u32,
+    pub from: u8,
+    pub to: u8,
     pub latency: zx_duration_t,
     pub energy: u64,
+    pub padding: [u8; 6],
 }
 
 #[repr(C)]
@@ -2241,6 +2242,14 @@ pub struct zx_processor_power_level_transition_info_t {
     pub power_domain: u64,
     pub context: u64,
 }
+
+multiconst!(u32, [
+    ZX_BTI_PERM_READ = 1 << 0;
+    ZX_BTI_PERM_WRITE = 1 << 1;
+    ZX_BTI_PERM_EXECUTE = 1 << 2;
+    ZX_BTI_COMPRESS = 1 << 3;
+    ZX_BTI_CONTIGUOUS = 1 << 4;
+]);
 
 #[cfg(test)]
 mod test {

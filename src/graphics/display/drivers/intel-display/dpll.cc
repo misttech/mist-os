@@ -14,11 +14,11 @@
 
 #include "src/graphics/display/drivers/intel-display/dpll-config.h"
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
-#include "src/graphics/display/drivers/intel-display/poll-until.h"
 #include "src/graphics/display/drivers/intel-display/registers-ddi.h"
 #include "src/graphics/display/drivers/intel-display/registers-dpll.h"
 #include "src/graphics/display/drivers/intel-display/registers-typec.h"
 #include "src/graphics/display/drivers/intel-display/registers.h"
+#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
 
 namespace intel_display {
 

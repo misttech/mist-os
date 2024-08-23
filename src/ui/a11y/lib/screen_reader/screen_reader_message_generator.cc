@@ -245,9 +245,23 @@ void ScreenReaderMessageGenerator::MaybeAddDoubleTapHint(
   FX_DCHECK(node);
 
   if (NodeIsClickable(node)) {
+    // Don't add the tap hint for disabled nodes.
+    if (node->has_states() && node->states().has_enabled_state() &&
+        node->states().enabled_state() ==
+            fuchsia::accessibility::semantics::EnabledState::DISABLED) {
+      return;
+    }
     auto delay = description.empty() ? zx::msec(0) : kLongDelay;
 
     description.emplace_back(GenerateUtteranceByMessageId(MessageIds::DOUBLE_TAP_HINT, delay));
+  }
+}
+
+void ScreenReaderMessageGenerator::MaybeAddDisabledDescriptor(
+    const Node* node, std::vector<UtteranceAndContext>& description) {
+  if (node->has_states() && node->states().has_enabled_state() &&
+      node->states().enabled_state() == fuchsia::accessibility::semantics::EnabledState::DISABLED) {
+    description.emplace_back(GenerateUtteranceByMessageId(MessageIds::ELEMENT_DISABLED));
   }
 }
 
@@ -259,6 +273,7 @@ void ScreenReaderMessageGenerator::DescribeTypicalNode(
   MaybeAddGenericSelectedDescriptor(node, &description);
   MaybeAddLabelDescriptor(node, description);
   MaybeAddRoleDescriptor(node, description);
+  MaybeAddDisabledDescriptor(node, description);
   MaybeAddDoubleTapHint(node, description);
 }
 
@@ -284,6 +299,7 @@ void ScreenReaderMessageGenerator::DescribeButton(
     description.emplace_back(GenerateUtteranceByMessageId(message_id));
   }
 
+  MaybeAddDisabledDescriptor(node, description);
   MaybeAddDoubleTapHint(node, description);
 }
 
@@ -305,6 +321,7 @@ void ScreenReaderMessageGenerator::DescribeRadioButton(
   description.emplace_back(
       GenerateUtteranceByMessageId(message_id, zx::msec(0), {"name"}, {label}));
 
+  MaybeAddDisabledDescriptor(node, description);
   MaybeAddDoubleTapHint(node, description);
 }
 
@@ -338,6 +355,7 @@ void ScreenReaderMessageGenerator::DescribeCheckBox(
   }
 
   MaybeAddRoleDescriptor(node, description);
+  MaybeAddDisabledDescriptor(node, description);
   MaybeAddDoubleTapHint(node, description);
 }
 
@@ -368,6 +386,7 @@ void ScreenReaderMessageGenerator::DescribeToggleSwitch(
           : MessageIds::ELEMENT_TOGGLED_OFF;
 
   description.emplace_back(GenerateUtteranceByMessageId(message_id));
+  MaybeAddDisabledDescriptor(node, description);
 }
 
 void ScreenReaderMessageGenerator::DescribeSlider(
@@ -391,6 +410,7 @@ void ScreenReaderMessageGenerator::DescribeSlider(
   description.emplace_back(UtteranceAndContext{.utterance = std::move(utterance)});
 
   MaybeAddRoleDescriptor(node, description);
+  MaybeAddDisabledDescriptor(node, description);
   MaybeAddDoubleTapHint(node, description);
 }
 
@@ -401,8 +421,8 @@ ScreenReaderMessageGenerator::DescribeCharacterForSpelling(const std::string& ch
     return GenerateUtteranceByMessageId(it->second);
   }
 
-  // TODO(https://fxbug.dev/42170854): Logic to detect uppercase letters may lead to bugs in non English
-  // locales. Checks if this character is uppercase.
+  // TODO(https://fxbug.dev/42170854): Logic to detect uppercase letters may lead to bugs in non
+  // English locales. Checks if this character is uppercase.
   if (character.size() == 1 && std::isupper(character[0])) {
     return GenerateUtteranceByMessageId(MessageIds::CAPITALIZED_LETTER, zx::msec(0), {"letter"},
                                         {character});

@@ -9,6 +9,7 @@ visibility_list = [
   "//src/graphics/magma/*",
   "//src/graphics/drivers/*",
   "//third_party/imgtec-pvr-rgx-km/*",
+  "//src/power/testing/system-integration/msd-arm-mali/*",
   "//vendor/google/*",
 ]
 
@@ -74,6 +75,7 @@ source_set("short_macros") {
     "//src/graphics/magma/lib/magma_service/sys_driver/tests:*",
     "//src/graphics/magma/tests/msd_conformance_tests:*",
     "//src/graphics/magma/tests/unit_tests:*",
+    "//src/power/testing/system-integration/msd-arm-mali/*",
     "//third_party/imgtec-pvr-rgx-km/*",
   ]
   sources = [ "short_macros.h" ]

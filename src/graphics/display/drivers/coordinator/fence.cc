@@ -5,6 +5,7 @@
 #include "src/graphics/display/drivers/coordinator/fence.h"
 
 #include <lib/async/cpp/wait.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/function.h>
 #include <lib/fit/thread_checker.h>
@@ -23,7 +24,6 @@
 #include <fbl/ref_ptr.h>
 
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace display {
 
@@ -186,7 +186,7 @@ zx_status_t FenceCollection::ImportEvent(zx::event event, EventId id) {
     if (ac.check() && new_fence->CreateRef()) {
       fences_.insert_or_find(std::move(new_fence));
     } else {
-      zxlogf(ERROR, "Failed to allocate fence ref for event#%ld", id.value());
+      FDF_LOG(ERROR, "Failed to allocate fence ref for event#%ld", id.value());
       return ZX_ERR_NO_MEMORY;
     }
     return ZX_OK;
@@ -194,10 +194,10 @@ zx_status_t FenceCollection::ImportEvent(zx::event event, EventId id) {
 
   // Ref an existing fence
   if (fence->event() != event.get()) {
-    zxlogf(ERROR, "Cannot reuse event#%ld for zx::event %u", id.value(), event.get());
+    FDF_LOG(ERROR, "Cannot reuse event#%ld for zx::event %u", id.value(), event.get());
     return ZX_ERR_INVALID_ARGS;
   } else if (!fence->CreateRef()) {
-    zxlogf(ERROR, "Failed to allocate fence ref for event#%ld", id.value());
+    FDF_LOG(ERROR, "Failed to allocate fence ref for event#%ld", id.value());
     return ZX_ERR_NO_MEMORY;
   }
   return ZX_OK;

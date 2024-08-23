@@ -684,7 +684,7 @@ where
         self.requests.maybe_respond_ready().await?;
         while self.requests.wait_for_buffer().await.is_ok() {
             self.stats.add_request();
-            let start_time = zx::Time::get_monotonic();
+            let start_time = zx::MonotonicTime::get();
             let trace_id = ftrace::Id::random();
             let _trace_guard = ftrace::async_enter!(
                 trace_id,
@@ -726,7 +726,7 @@ where
                 }
                 self.stats.add_terminal();
             }
-            self.stats.global_stats().record_batch_duration(zx::Time::get_monotonic() - start_time);
+            self.stats.global_stats().record_batch_duration(zx::MonotonicTime::get() - start_time);
             if self.requests.write(batch).await.is_err() {
                 // Peer closed, end the stream.
                 break;

@@ -11,33 +11,25 @@ use anyhow::{anyhow, Error};
 use bstr::BString;
 #[cfg(not(feature = "starnix_lite"))]
 use fuchsia_zircon as zx;
-#[cfg(not(feature = "starnix_lite"))]
-use gpu::gpu_device_init;
-#[cfg(not(feature = "starnix_lite"))]
-use gralloc::gralloc_device_init;
-#[cfg(not(feature = "starnix_lite"))]
-use input_device::uinput::register_uinput_device;
-#[cfg(not(feature = "starnix_lite"))]
-use input_device::InputDevice;
-#[cfg(not(feature = "starnix_lite"))]
-use magma_device::magma_device_init;
 use selinux_core::security_server;
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_core::device::android::bootloader_message_store::android_bootloader_message_store_init;
 #[cfg(not(feature = "starnix_lite"))]
-use starnix_core::device::ashmem::ashmem_device_init;
-#[cfg(not(feature = "starnix_lite"))]
 use starnix_core::device::framebuffer::{fb_device_init, AspectRatio};
 #[cfg(not(feature = "starnix_lite"))]
-use starnix_core::device::perfetto_consumer::start_perfetto_consumer_thread;
-#[cfg(not(feature = "starnix_lite"))]
 use starnix_core::device::remote_block_device::remote_block_device_init;
-#[cfg(not(feature = "starnix_lite"))]
-use starnix_core::device::touch_power_policy_device::TouchPowerPolicyDevice;
 use starnix_core::task::{CurrentTask, Kernel, KernelFeatures};
 #[cfg(not(feature = "starnix_lite"))]
 use starnix_core::vfs::FsString;
 use starnix_logging::log_error;
+use starnix_modules_ashmem::ashmem_device_init;
+use starnix_modules_gpu::gpu_device_init;
+use starnix_modules_gralloc::gralloc_device_init;
+use starnix_modules_input::uinput::register_uinput_device;
+use starnix_modules_input::InputDevice;
+use starnix_modules_magma::magma_device_init;
+use starnix_modules_perfetto_consumer::start_perfetto_consumer_thread;
+use starnix_modules_touch_power_policy::TouchPowerPolicyDevice;
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::error;
 use starnix_uapi::errors::Errno;

@@ -72,6 +72,13 @@ import("//build/python/python_action.gni")
 #    [GN Label] The GN label of the devicetree binary for this board. This
 #    should be a devicetree() target.
 #
+#  trusted_app_guids (optional)
+#    [list; strings of valid GUIDs] The GUIDs of optee Trusted Applications
+#    coordinated tee_manager and which tee_manager should expose. Specifying
+#    anything in this list will cause tee_manager to be included in the core
+#    realm and have the protocols specified routed to the /core/trusted_apps
+#    realm.
+#
 #  Outputs
 #    A directory structure and manifest
 #
@@ -357,6 +364,7 @@ template("board_configuration") {
                              "provided_features",
                              "kernel",
                              "platform",
+                             "tee_trusted_app_guids",
                            ])
   }
 

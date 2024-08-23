@@ -26,7 +26,8 @@ constexpr char kFloatFormatSwitch[] = "float";
 }  // namespace
 
 int main(int argc, const char** argv) {
-  fuchsia_logging::SetTags({"sync_sine"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"sync_sine"}).BuildAndInitialize();
 
   const auto command_line = fxl::CommandLineFromArgcArgv(argc, argv);
 

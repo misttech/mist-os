@@ -23,7 +23,7 @@ fn main() -> Result<(), Error> {
             .context("Failed to connect to simple service")?;
         println!("Outgoing connection enabled");
 
-        let res = simple.add(config.augend, config.addend, zx::Time::INFINITE)?;
+        let res = simple.add(config.augend, config.addend, zx::MonotonicTime::INFINITE)?;
         println!("Response: {:?}", res);
     }
 

@@ -795,7 +795,7 @@ mod tests {
     }
 
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO,
+        timestamp: zx::MonotonicTime::ZERO,
         pressed_buttons: vec![1],
         contacts: vec![
             make_touch_contact(1, Position{x: 1.0, y: 1.0}),
@@ -804,7 +804,7 @@ mod tests {
         filtered_palm_contacts: vec![],
     };"button down")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO,
+        timestamp: zx::MonotonicTime::ZERO,
         pressed_buttons: vec![],
         contacts: vec![],
         filtered_palm_contacts: vec![],
@@ -832,7 +832,7 @@ mod tests {
         });
 
         let event = TouchpadEvent {
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             pressed_buttons: vec![],
             contacts: vec![make_touch_contact(1, Position { x: 1.0, y: 1.0 })],
             filtered_palm_contacts: vec![],
@@ -853,7 +853,7 @@ mod tests {
         });
 
         let event = TouchpadEvent {
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             pressed_buttons: vec![],
             contacts: vec![
                 make_touch_contact(1, Position { x: 1.0, y: 1.0 }),
@@ -868,7 +868,7 @@ mod tests {
     }
 
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO,
+        timestamp: zx::MonotonicTime::ZERO,
         pressed_buttons: vec![1],
         contacts: vec![
             make_touch_contact(1, Position{x: 1.0, y: 1.0}),
@@ -876,13 +876,13 @@ mod tests {
         filtered_palm_contacts: vec![],
     };"button down")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO,
+        timestamp: zx::MonotonicTime::ZERO,
         pressed_buttons: vec![],
         contacts: vec![],
         filtered_palm_contacts: vec![],
     };"0 fingers")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO,
+        timestamp: zx::MonotonicTime::ZERO,
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 1.0, y: 7.0}),
@@ -890,7 +890,7 @@ mod tests {
         filtered_palm_contacts: vec![],
     };"> motion threshold")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO,
+        timestamp: zx::MonotonicTime::ZERO,
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 1.0, y: 7.0}),
@@ -899,7 +899,7 @@ mod tests {
         filtered_palm_contacts: vec![],
     };"2 finger and > motion threshold")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO,
+        timestamp: zx::MonotonicTime::ZERO,
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(2, Position{x: 1.0, y: 5.0}),
@@ -921,7 +921,7 @@ mod tests {
     }
 
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO,
+        timestamp: zx::MonotonicTime::ZERO,
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 1.0, y: 1.0}),
@@ -929,7 +929,7 @@ mod tests {
         filtered_palm_contacts: vec![],
     };"hold")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO,
+        timestamp: zx::MonotonicTime::ZERO,
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 1.0, y: 2.0}),
@@ -963,7 +963,7 @@ mod tests {
         });
 
         let event = TouchpadEvent {
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             pressed_buttons: vec![],
             contacts: vec![
                 make_touch_contact(1, Position { x: 1.0, y: 1.0 }),
@@ -978,7 +978,7 @@ mod tests {
     }
 
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO,
+        timestamp: zx::MonotonicTime::ZERO,
         pressed_buttons: vec![1],
         contacts: vec![
             make_touch_contact(1, Position{x: 1.0, y: 1.0}),
@@ -987,13 +987,13 @@ mod tests {
         filtered_palm_contacts: vec![],
     };"button down")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO,
+        timestamp: zx::MonotonicTime::ZERO,
         pressed_buttons: vec![],
         contacts: vec![],
         filtered_palm_contacts: vec![],
     };"0 fingers")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO,
+        timestamp: zx::MonotonicTime::ZERO,
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 1.0, y: 1.0}),
@@ -1001,7 +1001,7 @@ mod tests {
         filtered_palm_contacts: vec![],
     };"1 fingers")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO,
+        timestamp: zx::MonotonicTime::ZERO,
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 20.0, y: 20.0}),
@@ -1010,7 +1010,7 @@ mod tests {
         filtered_palm_contacts: vec![],
     };"> max movement no direction")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO,
+        timestamp: zx::MonotonicTime::ZERO,
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 1.0, y: 21.0}),
@@ -1035,7 +1035,7 @@ mod tests {
     }
 
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO,
+        timestamp: zx::MonotonicTime::ZERO,
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 1.0, y: 1.0}),
@@ -1044,7 +1044,7 @@ mod tests {
         filtered_palm_contacts: vec![],
     };"finger hold")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO,
+        timestamp: zx::MonotonicTime::ZERO,
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 2.0, y: 1.0}),
@@ -1053,7 +1053,7 @@ mod tests {
         filtered_palm_contacts: vec![],
     };"2 finger move less than threshold")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO,
+        timestamp: zx::MonotonicTime::ZERO,
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 12.0, y: 1.0}),
@@ -1062,7 +1062,7 @@ mod tests {
         filtered_palm_contacts: vec![],
     };"both finger move, 1 finger move less than threshold")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO,
+        timestamp: zx::MonotonicTime::ZERO,
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 10.0, y: 10.0}),
@@ -1071,7 +1071,7 @@ mod tests {
         filtered_palm_contacts: vec![],
     };"no direction")]
     #[test_case(TouchpadEvent{
-        timestamp: zx::Time::ZERO,
+        timestamp: zx::MonotonicTime::ZERO,
         pressed_buttons: vec![],
         contacts: vec![
             make_touch_contact(1, Position{x: 1.0, y: 11.0}),
@@ -1111,7 +1111,7 @@ mod tests {
         });
 
         let event = TouchpadEvent {
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             pressed_buttons: vec![],
             contacts: vec![
                 make_touch_contact(1, Position { x: 1.0, y: 11.0 }),
@@ -1125,21 +1125,21 @@ mod tests {
 
     #[test_case(
         TouchpadEvent{
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             pressed_buttons: vec![1],
             contacts: vec![make_touch_contact(1, Position{x: 1.0, y: 1.0})],
             filtered_palm_contacts: vec![],
         };"button down")]
     #[test_case(
         TouchpadEvent{
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             pressed_buttons: vec![],
             contacts: vec![],
             filtered_palm_contacts: vec![],
         };"0 fingers")]
     #[test_case(
         TouchpadEvent{
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             pressed_buttons: vec![],
             contacts: vec![
                 make_touch_contact(1, Position{x: 1.0, y: 1.0}),
@@ -1148,7 +1148,7 @@ mod tests {
         };"1 fingers")]
     #[test_case(
         TouchpadEvent{
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             pressed_buttons: vec![],
             contacts: vec![
                 make_touch_contact(1, Position{x: 1.0, y: 1.0}),
@@ -1158,7 +1158,7 @@ mod tests {
         };"finger hold")]
     #[test_case(
         TouchpadEvent{
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             pressed_buttons: vec![],
             contacts: vec![
                 make_touch_contact(1, Position{x: 10.0, y: 10.0}),
@@ -1168,7 +1168,7 @@ mod tests {
         };"no direction")]
     #[test_case(
         TouchpadEvent{
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             pressed_buttons: vec![],
             contacts: vec![
                 make_touch_contact(1, Position{x: 1.0, y: 11.0}),
@@ -1178,7 +1178,7 @@ mod tests {
         };"different direction")]
     #[test_case(
         TouchpadEvent{
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             pressed_buttons: vec![],
             contacts: vec![
                 make_touch_contact(1, Position{x: 1.0, y: 11.0}),
@@ -1202,7 +1202,7 @@ mod tests {
     }
 
     #[test_case(TouchpadEvent{
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             pressed_buttons: vec![],
             contacts: vec![
                 make_touch_contact(1, Position{x: 1.0, y: -11.0}),
@@ -1238,7 +1238,7 @@ mod tests {
 
         let got = contender.process_buffered_events(vec![
             TouchpadEvent {
-                timestamp: zx::Time::from_nanos(1),
+                timestamp: zx::MonotonicTime::from_nanos(1),
                 pressed_buttons: vec![],
                 contacts: vec![
                     make_touch_contact(1, Position { x: 1.0, y: 1.0 }),
@@ -1247,7 +1247,7 @@ mod tests {
                 filtered_palm_contacts: vec![],
             },
             TouchpadEvent {
-                timestamp: zx::Time::from_nanos(2),
+                timestamp: zx::MonotonicTime::from_nanos(2),
                 pressed_buttons: vec![],
                 contacts: vec![
                     make_touch_contact(1, Position { x: 1.0, y: 1.0 }),
@@ -1256,7 +1256,7 @@ mod tests {
                 filtered_palm_contacts: vec![],
             },
             TouchpadEvent {
-                timestamp: zx::Time::from_nanos(3),
+                timestamp: zx::MonotonicTime::from_nanos(3),
                 pressed_buttons: vec![],
                 contacts: vec![
                     make_touch_contact(1, Position { x: 1.0, y: 2.0 }),
@@ -1265,7 +1265,7 @@ mod tests {
                 filtered_palm_contacts: vec![],
             },
             TouchpadEvent {
-                timestamp: zx::Time::from_nanos(4),
+                timestamp: zx::MonotonicTime::from_nanos(4),
                 pressed_buttons: vec![],
                 contacts: vec![
                     make_touch_contact(1, Position { x: 1.0, y: -11.0 }),
@@ -1280,7 +1280,7 @@ mod tests {
             vec![
                 // Finger hold, expect no scroll delta.
                 MouseEvent {
-                    timestamp: zx::Time::from_nanos(2),
+                    timestamp: zx::MonotonicTime::from_nanos(2),
                     mouse_data: mouse_binding::MouseEvent::new(
                         mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                             millimeters: Position { x: 0.0, y: 0.0 },
@@ -1295,7 +1295,7 @@ mod tests {
                 },
                 // Finger move to wrong direction, expect no scroll delta.
                 MouseEvent {
-                    timestamp: zx::Time::from_nanos(3),
+                    timestamp: zx::MonotonicTime::from_nanos(3),
                     mouse_data: mouse_binding::MouseEvent::new(
                         mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                             millimeters: Position { x: 0.0, y: 0.0 },
@@ -1309,7 +1309,7 @@ mod tests {
                     ),
                 },
                 MouseEvent {
-                    timestamp: zx::Time::from_nanos(4),
+                    timestamp: zx::MonotonicTime::from_nanos(4),
                     mouse_data: mouse_binding::MouseEvent::new(
                         mouse_binding::MouseLocation::Relative(mouse_binding::RelativeLocation {
                             millimeters: Position { x: 0.0, y: 0.0 },
@@ -1338,7 +1338,7 @@ mod tests {
             },
         });
         let event = TouchpadEvent {
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             pressed_buttons: vec![],
             contacts: vec![],
             filtered_palm_contacts: vec![],
@@ -1350,14 +1350,14 @@ mod tests {
 
     #[test_case(
         TouchpadEvent{
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             pressed_buttons: vec![1],
             contacts: vec![make_touch_contact(1, Position{x: 1.0, y: 1.0})],
             filtered_palm_contacts: vec![],
         };"button down")]
     #[test_case(
         TouchpadEvent{
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             pressed_buttons: vec![],
             contacts: vec![
                 make_touch_contact(1, Position{x: 1.0, y: 1.0}),
@@ -1366,7 +1366,7 @@ mod tests {
         };"1 fingers")]
     #[test_case(
         TouchpadEvent{
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             pressed_buttons: vec![],
             contacts: vec![
                 make_touch_contact(1, Position{x: 1.0, y: 11.0}),
@@ -1376,7 +1376,7 @@ mod tests {
         };"1 finger reverse direction")]
     #[test_case(
         TouchpadEvent{
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             pressed_buttons: vec![],
             contacts: vec![
                 make_touch_contact(1, Position{x: 1.0, y: 11.0}),
@@ -1404,7 +1404,7 @@ mod tests {
 
     #[test_case(
         TouchpadEvent{
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             pressed_buttons: vec![],
             contacts: vec![
                 make_touch_contact(1, Position{x: 1.0, y: 1.0}),
@@ -1412,7 +1412,7 @@ mod tests {
             ],
             filtered_palm_contacts: vec![],
         } => MouseEvent {
-            timestamp: zx::Time::from_nanos(0),
+            timestamp: zx::MonotonicTime::from_nanos(0),
             mouse_data: mouse_binding::MouseEvent {
                 location: mouse_binding::MouseLocation::Relative(
                     mouse_binding::RelativeLocation {
@@ -1429,7 +1429,7 @@ mod tests {
         };"finger hold")]
     #[test_case(
         TouchpadEvent{
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             pressed_buttons: vec![],
             contacts: vec![
                 make_touch_contact(1, Position{x: 10.0, y: -10.0}),
@@ -1437,7 +1437,7 @@ mod tests {
             ],
             filtered_palm_contacts: vec![],
         } => MouseEvent {
-            timestamp: zx::Time::from_nanos(0),
+            timestamp: zx::MonotonicTime::from_nanos(0),
             mouse_data: mouse_binding::MouseEvent {
                 location: mouse_binding::MouseLocation::Relative(
                     mouse_binding::RelativeLocation {
@@ -1454,7 +1454,7 @@ mod tests {
         };"direction contact1 only")]
     #[test_case(
         TouchpadEvent{
-            timestamp: zx::Time::ZERO,
+            timestamp: zx::MonotonicTime::ZERO,
             pressed_buttons: vec![],
             contacts: vec![
                 make_touch_contact(1, Position{x: 1.0, y: -11.0}),
@@ -1462,7 +1462,7 @@ mod tests {
             ],
             filtered_palm_contacts: vec![],
         } => MouseEvent {
-            timestamp: zx::Time::from_nanos(0),
+            timestamp: zx::MonotonicTime::from_nanos(0),
             mouse_data: mouse_binding::MouseEvent {
                 location: mouse_binding::MouseLocation::Relative(
                     mouse_binding::RelativeLocation {

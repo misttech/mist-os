@@ -274,6 +274,10 @@ pub enum MappingName {
     /// name and can be reset to the unnamed state by passing NULL to
     /// prctl(PR_SET_VMA, PR_SET_VMA_ANON_NAME, ...).
     Vma(FsString),
+
+    /// The name associated with the mapping of an ashmem region.  Set by ioctl(fd, ASHMEM_SET_NAME, ...).
+    /// By default "dev/ashmem".
+    Ashmem(FsString),
 }
 
 #[derive(Debug, Eq, PartialEq, Clone)]
@@ -347,9 +351,10 @@ struct Mapping {
 
     /// The name for this mapping.
     ///
-    /// This may be a reference to the filesystem node backing this mapping or a userspace-assigned name.
-    /// The existence of this field is orthogonal to whether this mapping is anonymous - mappings of the
-    /// file '/dev/zero' are treated as anonymous mappings and anonymous mappings may have a name assigned.
+    /// This may be a reference to the filesystem node backing this mapping or a userspace-assigned
+    /// name.  The existence of this field is orthogonal to whether this mapping is anonymous -
+    /// mappings of the file '/dev/zero' are treated as anonymous mappings and anonymous mappings
+    /// may have a name assigned.
     ///
     /// Because of this exception, avoid using this field to check if a mapping is anonymous.
     /// Instead, check if `options` bitfield contains `MappingOptions::ANONYMOUS`.
@@ -402,7 +407,8 @@ impl Mapping {
             MappingBacking::Memory(backing) => backing.address_to_offset(addr),
             #[cfg(feature = "alternate_anon_allocs")]
             MappingBacking::PrivateAnonymous => {
-                // For private, anonymous allocations the virtual address is the offset in the backing memory object.
+                // For private, anonymous allocations the virtual address is the offset in the
+                // backing memory object.
                 addr.ptr() as u64
             }
         }
@@ -462,14 +468,8 @@ pub enum DumpPolicy {
 }
 
 pub struct MemoryManagerState {
-    /// The VMAR in which userspace mappings occur.
-    ///
-    /// We map userspace memory in this child VMAR so that we can destroy the
-    /// entire VMAR during exec.
-    user_vmar: zx::Vmar,
-
-    /// Cached VmarInfo for user_vmar.
-    user_vmar_info: zx::VmarInfo,
+    /// The vmars for the user.
+    user_vmars: Vmars,
 
     /// The memory mappings currently used by this address space.
     ///
@@ -486,12 +486,196 @@ pub struct MemoryManagerState {
     pub aio_contexts: AioContexts,
 }
 
+struct Vmars {
+    /// The VMAR in which userspace mappings occur.
+    ///
+    /// We map userspace memory in this child VMAR so that we can destroy the
+    /// entire VMAR during exec.
+    vmar: zx::Vmar,
+
+    /// Cached VmarInfo for vmar.
+    vmar_info: zx::VmarInfo,
+
+    /// TODO(https://fxbug.dev/359302155): Remove this hack. There are parts of Android that want to
+    /// allocate memory in the lower 4 GiB and it does this by probing addresses in that range until
+    /// it finds something free.  To help, we create a sub-vmar so that other allocations don't fill
+    /// up this region.  NOTE: This is different to LOWER_32BIT which, confusingly, only applies to
+    /// the lower *2 GiB*.
+    lower_4gb: Option<zx::Vmar>,
+}
+
+const LOWER_4GB_LIMIT: UserAddress = UserAddress::const_from(0x1_0000_0000);
+
+impl Vmars {
+    fn new(vmar: zx::Vmar, vmar_info: zx::VmarInfo) -> Self {
+        let lower_4gb = if vmar_info.base < LOWER_4GB_LIMIT.ptr() {
+            let len = LOWER_4GB_LIMIT.ptr() - vmar_info.base;
+            if len <= vmar_info.len {
+                vmar.allocate(0, len, user_vmar_flags())
+                    .inspect_err(|error| {
+                        log_warn!(?error, "Unable to create lower 4 GiB vmar");
+                    })
+                    .map(|(vmar, _)| vmar)
+                    .ok()
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        Self { vmar, vmar_info, lower_4gb }
+    }
+
+    fn vmar_for_addr(&self, addr: UserAddress) -> &zx::Vmar {
+        match &self.lower_4gb {
+            Some(vmar) if addr < LOWER_4GB_LIMIT => vmar,
+            _ => &self.vmar,
+        }
+    }
+
+    fn map(
+        &self,
+        addr: DesiredAddress,
+        memory: &MemoryObject,
+        memory_offset: u64,
+        length: usize,
+        flags: MappingFlags,
+        populate: bool,
+    ) -> Result<UserAddress, Errno> {
+        profile_duration!("MapInVmar");
+        let mut profile = ProfileDuration::enter("MapInVmarArgs");
+
+        let base_addr = UserAddress::from_ptr(self.vmar_info.base);
+        let (vmar_offset, vmar_extra_flags, vmar) = match addr {
+            DesiredAddress::Any if flags.contains(MappingFlags::LOWER_32BIT) => {
+                // MAP_32BIT specifies that the memory allocated will
+                // be within the first 2 GB of the process address space.
+                (
+                    0x8000_0000 - base_addr.ptr(),
+                    zx::VmarFlags::OFFSET_IS_UPPER_LIMIT,
+                    self.lower_4gb.as_ref().unwrap_or(&self.vmar),
+                )
+            }
+            DesiredAddress::Any => (0, zx::VmarFlags::empty(), &self.vmar),
+            DesiredAddress::Hint(addr) | DesiredAddress::Fixed(addr) => {
+                (addr - base_addr, zx::VmarFlags::SPECIFIC, self.vmar_for_addr(addr))
+            }
+            DesiredAddress::FixedOverwrite(addr) => {
+                (addr - base_addr, ZX_VM_SPECIFIC_OVERWRITE, self.vmar_for_addr(addr))
+            }
+        };
+
+        if populate {
+            profile_duration!("MmapPopulate");
+            let op = if flags.contains(MappingFlags::WRITE) {
+                // Requires ZX_RIGHT_WRITEABLE which we should expect when the mapping is writeable.
+                zx::VmoOp::COMMIT
+            } else {
+                // When we don't expect to have ZX_RIGHT_WRITEABLE, fall back to a VMO op that
+                // doesn't need it.
+                zx::VmoOp::PREFETCH
+            };
+            trace_duration!(CATEGORY_STARNIX_MM, c"MmapCommitPages");
+            let _ = memory.op_range(op, memory_offset, length as u64);
+            // "The mmap() call doesn't fail if the mapping cannot be populated."
+        }
+
+        let vmar_maybe_map_range =
+            if populate && !vmar_extra_flags.contains(ZX_VM_SPECIFIC_OVERWRITE) {
+                zx::VmarFlags::MAP_RANGE
+            } else {
+                zx::VmarFlags::empty()
+            };
+        let vmar_flags = flags.prot_flags().to_vmar_flags()
+            | zx::VmarFlags::ALLOW_FAULTS
+            | vmar_extra_flags
+            | vmar_maybe_map_range;
+
+        profile.pivot("VmarMapSyscall");
+        let mut map_result =
+            memory.map_in_vmar(vmar, vmar_offset, memory_offset, length, vmar_flags);
+
+        // Retry mapping if the target address was a Hint.
+        profile.pivot("MapInVmarResults");
+        if map_result.is_err() {
+            let offset = vmar_offset + self.vmar_info.base;
+            if offset < LOWER_4GB_LIMIT.ptr() && offset + length > LOWER_4GB_LIMIT.ptr() {
+                log_warn!(
+                    "Attempt to map across 4GB bit boundary 0x{offset:x?}..0x{:x?}",
+                    offset + length
+                );
+            }
+
+            if let DesiredAddress::Hint(_) = addr {
+                let vmar_flags = vmar_flags - zx::VmarFlags::SPECIFIC;
+                map_result = memory.map_in_vmar(vmar, 0, memory_offset, length, vmar_flags);
+            }
+        }
+
+        let mapped_addr = map_result.map_err(MemoryManager::get_errno_for_map_err)?;
+
+        Ok(UserAddress::from_ptr(mapped_addr))
+    }
+
+    unsafe fn unmap(&self, addr: UserAddress, length: usize) -> Result<(), zx::Status> {
+        self.vmar_for_addr(addr).unmap(addr.ptr(), length)
+    }
+
+    unsafe fn protect(
+        &self,
+        addr: UserAddress,
+        length: usize,
+        vmar_flags: zx::VmarFlags,
+    ) -> Result<(), zx::Status> {
+        self.vmar_for_addr(addr).protect(addr.ptr(), length, vmar_flags)
+    }
+
+    fn address_range(&self) -> Range<UserAddress> {
+        UserAddress::from_ptr(self.vmar_info.base)
+            ..UserAddress::from_ptr(self.vmar_info.base + self.vmar_info.len)
+    }
+
+    fn raw_map(
+        &self,
+        memory: &MemoryObject,
+        vmar_offset: usize,
+        memory_offset: u64,
+        len: usize,
+        flags: zx::VmarFlags,
+    ) -> Result<usize, zx::Status> {
+        memory.map_in_vmar(
+            &self.vmar_for_addr(UserAddress::from_ptr(vmar_offset + self.vmar_info.base)),
+            vmar_offset,
+            memory_offset,
+            len,
+            flags,
+        )
+    }
+
+    unsafe fn destroy(&self) -> Result<(), zx::Status> {
+        // This will also destroy mappings in lower_4gb.
+        self.vmar.destroy()
+    }
+
+    fn get_random_base(&self, length: usize) -> UserAddress {
+        // Allocate a vmar of the correct size, get the random location, then immediately destroy
+        // it.  This randomizes the load address without loading into a sub-vmar and breaking
+        // mprotect.  This is different from how Linux actually lays out the address space. We might
+        // need to rewrite it eventually.
+        let (temp_vmar, base) = self.vmar.allocate(0, length, zx::VmarFlags::empty()).unwrap();
+        // SAFETY: This is safe because the vmar is not in the current process.
+        unsafe { temp_vmar.destroy().unwrap() };
+        UserAddress::from_ptr(base)
+    }
+}
+
 #[cfg(feature = "alternate_anon_allocs")]
 struct PrivateAnonymousMemoryManager {
     /// Memory object backing private, anonymous memory allocations in this address space.
     backing: Arc<MemoryObject>,
 
-    /// Memory object used to make address allocations for private, anonymous memory allocations in this address space.
+    /// Memory object used to make address allocations for private, anonymous memory allocations in
+    /// this address space.
     allocation: MemoryObject,
 }
 
@@ -501,8 +685,8 @@ impl PrivateAnonymousMemoryManager {
         let backing = Arc::new(MemoryObject::from(
             zx::Vmo::create(backing_size).unwrap().replace_as_executable(&VMEX_RESOURCE).unwrap(),
         ));
-        // The allocation memory object is mapped to find available address ranges. Pages in it are never
-        // modified and the actual size does not matter. To allow creating mappings that might
+        // The allocation memory object is mapped to find available address ranges. Pages in it are
+        // never modified and the actual size does not matter. To allow creating mappings that might
         // fault (if permissions were to allow) this mapping has to be resizable. It will never be
         // resized.
         let allocation =
@@ -528,19 +712,6 @@ impl PrivateAnonymousMemoryManager {
             .op_range(zx::VmoOp::ZERO, addr.ptr() as u64, length as u64)
             .map_err(|_| errno!(EFAULT))?;
         Ok(length)
-    }
-
-    fn allocate_address_range(
-        &self,
-        user_vmar: &zx::Vmar,
-        user_vmar_info: &zx::VmarInfo,
-        addr: DesiredAddress,
-        length: usize,
-        options: MappingOptions,
-    ) -> Result<UserAddress, Errno> {
-        // Create a mapping with no protection in order to allocate address space for this mapping.
-        let flags = MappingFlags::from_prot_flags_and_options(ProtectionFlags::empty(), options);
-        map_in_vmar(user_vmar, user_vmar_info, addr, &self.allocation, 0, length, flags, false)
     }
 
     fn move_pages(
@@ -615,75 +786,6 @@ impl DerefMut for MemoryManagerState {
     }
 }
 
-fn map_in_vmar(
-    vmar: &zx::Vmar,
-    vmar_info: &zx::VmarInfo,
-    addr: DesiredAddress,
-    memory: &MemoryObject,
-    memory_offset: u64,
-    length: usize,
-    flags: MappingFlags,
-    populate: bool,
-) -> Result<UserAddress, Errno> {
-    profile_duration!("MapInVmar");
-    let mut profile = ProfileDuration::enter("MapInVmarArgs");
-
-    let base_addr = UserAddress::from_ptr(vmar_info.base);
-    let (vmar_offset, vmar_extra_flags) = match addr {
-        DesiredAddress::Any if flags.contains(MappingFlags::LOWER_32BIT) => {
-            // MAP_32BIT specifies that the memory allocated will
-            // be within the first 2 GB of the process address space.
-            (0x80000000 - base_addr.ptr(), zx::VmarFlags::OFFSET_IS_UPPER_LIMIT)
-        }
-        DesiredAddress::Any => (0, zx::VmarFlags::empty()),
-        DesiredAddress::Hint(addr) | DesiredAddress::Fixed(addr) => {
-            (addr - base_addr, zx::VmarFlags::SPECIFIC)
-        }
-        DesiredAddress::FixedOverwrite(addr) => (addr - base_addr, ZX_VM_SPECIFIC_OVERWRITE),
-    };
-
-    if populate {
-        profile_duration!("MmapPopulate");
-        let op = if flags.contains(MappingFlags::WRITE) {
-            // Requires ZX_RIGHT_WRITEABLE which we should expect when the mapping is writeable.
-            zx::VmoOp::COMMIT
-        } else {
-            // When we don't expect to have ZX_RIGHT_WRITEABLE, fall back to a VMO op that doesn't
-            // need it.
-            zx::VmoOp::PREFETCH
-        };
-        trace_duration!(CATEGORY_STARNIX_MM, c"MmapCommitPages");
-        let _ = memory.op_range(op, memory_offset, length as u64);
-        // "The mmap() call doesn't fail if the mapping cannot be populated."
-    }
-
-    let vmar_maybe_map_range = if populate && !vmar_extra_flags.contains(ZX_VM_SPECIFIC_OVERWRITE) {
-        zx::VmarFlags::MAP_RANGE
-    } else {
-        zx::VmarFlags::empty()
-    };
-    let vmar_flags = flags.prot_flags().to_vmar_flags()
-        | zx::VmarFlags::ALLOW_FAULTS
-        | vmar_extra_flags
-        | vmar_maybe_map_range;
-
-    profile.pivot("VmarMapSyscall");
-    let mut map_result = memory.map_in_vmar(vmar, vmar_offset, memory_offset, length, vmar_flags);
-
-    // Retry mapping if the target address was a Hint.
-    profile.pivot("MapInVmarResults");
-    if map_result.is_err() {
-        if let DesiredAddress::Hint(_) = addr {
-            let vmar_flags = vmar_flags - zx::VmarFlags::SPECIFIC;
-            map_result = memory.map_in_vmar(vmar, 0, memory_offset, length, vmar_flags);
-        }
-    }
-
-    let mapped_addr = map_result.map_err(MemoryManager::get_errno_for_map_err)?;
-
-    Ok(UserAddress::from_ptr(mapped_addr))
-}
-
 impl MemoryManagerState {
     // Map the memory without updating `self.mappings`.
     fn map_internal(
@@ -695,16 +797,7 @@ impl MemoryManagerState {
         flags: MappingFlags,
         populate: bool,
     ) -> Result<UserAddress, Errno> {
-        map_in_vmar(
-            &self.user_vmar,
-            &self.user_vmar_info,
-            addr,
-            memory,
-            memory_offset,
-            length,
-            flags,
-            populate,
-        )
+        self.user_vmars.map(addr, memory, memory_offset, length, flags, populate)
     }
 
     fn validate_addr(&self, addr: DesiredAddress, length: usize) -> Result<(), Errno> {
@@ -775,13 +868,8 @@ impl MemoryManagerState {
     ) -> Result<UserAddress, Errno> {
         self.validate_addr(addr, length)?;
 
-        let target_addr = self.private_anonymous.allocate_address_range(
-            &self.user_vmar,
-            &self.user_vmar_info,
-            addr,
-            length,
-            options,
-        )?;
+        let target_addr =
+            self.allocate_address_range(addr, &self.private_anonymous.allocation, length, options)?;
 
         let backing_memory_offset = target_addr.ptr();
 
@@ -1116,10 +1204,9 @@ impl MemoryManagerState {
             }
             #[cfg(feature = "alternate_anon_allocs")]
             MappingBacking::PrivateAnonymous => {
-                let dst_addr = self.private_anonymous.allocate_address_range(
-                    &self.user_vmar,
-                    &self.user_vmar_info,
+                let dst_addr = self.allocate_address_range(
                     dst_addr_for_map,
+                    &self.private_anonymous.allocation,
                     dst_length,
                     src_mapping.flags.options(),
                 )?;
@@ -1240,7 +1327,7 @@ impl MemoryManagerState {
 
         // Unmap the range, including the the tail of any range that would have been split. This
         // operation is safe because we're operating on another process.
-        match unsafe { self.user_vmar.unmap(addr.ptr(), length) } {
+        match unsafe { self.user_vmars.unmap(addr, length) } {
             Ok(_) => (),
             Err(zx::Status::NOT_FOUND) => (),
             Err(zx::Status::INVALID_ARGS) => return error!(EINVAL),
@@ -1400,7 +1487,7 @@ impl MemoryManagerState {
 
         // Make one call to mprotect to update all the zircon protections.
         // SAFETY: This is safe because the vmar belongs to a different process.
-        unsafe { self.user_vmar.protect(addr.ptr(), length, vmar_flags) }.map_err(|s| match s {
+        unsafe { self.user_vmars.protect(addr, length, vmar_flags) }.map_err(|s| match s {
             zx::Status::INVALID_ARGS => errno!(EINVAL),
             zx::Status::NOT_FOUND => {
                 track_stub!(
@@ -1550,16 +1637,15 @@ impl MemoryManagerState {
     }
 
     fn max_address(&self) -> UserAddress {
-        UserAddress::from_ptr(self.user_vmar_info.base + self.user_vmar_info.len)
+        self.user_vmars.address_range().end
     }
 
     fn user_address_to_vmar_offset(&self, addr: UserAddress) -> Result<usize, ()> {
-        if !(self.user_vmar_info.base..self.user_vmar_info.base + self.user_vmar_info.len)
-            .contains(&addr.ptr())
-        {
+        let range = self.user_vmars.address_range();
+        if !range.contains(&addr) {
             return Err(());
         }
-        Ok((addr - self.user_vmar_info.base).ptr())
+        Ok(addr - range.start)
     }
 
     fn get_mappings_for_vmsplice(
@@ -1708,8 +1794,9 @@ impl MemoryManagerState {
         let vmar_offset = self
             .user_address_to_vmar_offset(low_addr)
             .map_err(|_| anyhow!("Address outside of user range"))?;
-        let mapped_address = memory
-            .map_in_vmar(&self.user_vmar, vmar_offset, 0, length, vmar_flags)
+        let mapped_address = self
+            .user_vmars
+            .raw_map(&memory, vmar_offset, 0, length, vmar_flags)
             .map_err(MemoryManager::get_errno_for_map_err)?;
         if mapped_address != low_addr.ptr() {
             return Err(anyhow!("Could not map extension of mapping to desired location."));
@@ -1950,16 +2037,16 @@ impl MemoryManagerState {
     }
 }
 
+fn user_vmar_flags() -> zx::VmarFlags {
+    zx::VmarFlags::SPECIFIC
+        | zx::VmarFlags::CAN_MAP_SPECIFIC
+        | zx::VmarFlags::CAN_MAP_READ
+        | zx::VmarFlags::CAN_MAP_WRITE
+        | zx::VmarFlags::CAN_MAP_EXECUTE
+}
+
 fn create_user_vmar(vmar: &zx::Vmar, vmar_info: &zx::VmarInfo) -> Result<zx::Vmar, zx::Status> {
-    let (vmar, ptr) = vmar.allocate(
-        0,
-        vmar_info.len,
-        zx::VmarFlags::SPECIFIC
-            | zx::VmarFlags::CAN_MAP_SPECIFIC
-            | zx::VmarFlags::CAN_MAP_READ
-            | zx::VmarFlags::CAN_MAP_WRITE
-            | zx::VmarFlags::CAN_MAP_EXECUTE,
-    )?;
+    let (vmar, ptr) = vmar.allocate(0, vmar_info.len, user_vmar_flags())?;
     assert_eq!(ptr, vmar_info.base);
     Ok(vmar)
 }
@@ -2718,8 +2805,7 @@ impl MemoryManager {
             base_addr: UserAddress::from_ptr(user_vmar_info.base),
             futex: FutexTable::<PrivateFutexKey>::default(),
             state: RwLock::new(MemoryManagerState {
-                user_vmar,
-                user_vmar_info,
+                user_vmars: Vmars::new(user_vmar, user_vmar_info),
                 mappings: RangeMap::new(),
                 #[cfg(feature = "alternate_anon_allocs")]
                 private_anonymous: PrivateAnonymousMemoryManager::new(backing_size),
@@ -2805,11 +2891,9 @@ impl MemoryManager {
                 #[cfg(feature = "alternate_anon_allocs")]
                 {
                     if state
-                        .private_anonymous
                         .allocate_address_range(
-                            &state.user_vmar,
-                            &state.user_vmar_info,
                             DesiredAddress::FixedOverwrite(new_end),
+                            &state.private_anonymous.allocation,
                             delta,
                             MappingOptions::ANONYMOUS,
                         )
@@ -3055,9 +3139,7 @@ impl MemoryManager {
                                     *memory_size,
                                     basic_info.rights,
                                 )?);
-                            map_in_vmar(
-                                &state.user_vmar,
-                                &state.user_vmar_info,
+                            state.user_vmars.map(
                                 DesiredAddress::FixedOverwrite(range.start),
                                 replaced_memory,
                                 memory_offset,
@@ -3097,9 +3179,7 @@ impl MemoryManager {
                     }
 
                     let target_memory_offset = range.start.ptr() as u64;
-                    map_in_vmar(
-                        &target_state.user_vmar,
-                        &target_state.user_vmar_info,
+                    target_state.user_vmars.map(
                         DesiredAddress::FixedOverwrite(range.start),
                         &target_state.private_anonymous.backing,
                         target_memory_offset,
@@ -3130,9 +3210,10 @@ impl MemoryManager {
             let mut state = self.state.write();
             let info = self.root_vmar.info()?;
             // SAFETY: This operation is safe because the VMAR is for another process.
-            unsafe { state.user_vmar.destroy()? }
-            state.user_vmar = create_user_vmar(&self.root_vmar, &info)?;
-            state.user_vmar_info = state.user_vmar.info()?;
+            unsafe { state.user_vmars.destroy()? }
+            let vmar = create_user_vmar(&self.root_vmar, &info)?;
+            let info = vmar.info()?;
+            state.user_vmars = Vmars::new(vmar, info);
             state.brk = None;
             state.executable_node = Some(exe_node);
 
@@ -3566,16 +3647,7 @@ impl MemoryManager {
     }
 
     pub fn get_random_base(&self, length: usize) -> UserAddress {
-        let state = self.state.read();
-        // Allocate a vmar of the correct size, get the random location, then immediately destroy it.
-        // This randomizes the load address without loading into a sub-vmar and breaking mprotect.
-        // This is different from how Linux actually lays out the address space. We might need to
-        // rewrite it eventually.
-        let (temp_vmar, base) =
-            state.user_vmar.allocate(0, length, zx::VmarFlags::empty()).unwrap();
-        // SAFETY: This is safe because the vmar is not in the current process.
-        unsafe { temp_vmar.destroy().unwrap() };
-        UserAddress::from_ptr(base)
+        self.state.read().user_vmars.get_random_base(length)
     }
 
     pub fn extend_growsdown_mapping_to_address(
@@ -3770,6 +3842,11 @@ fn write_map(
             sink.write(b"[anon:");
             sink.write(name.as_bytes());
             sink.write(b"]");
+        }
+        MappingName::Ashmem(name) => {
+            fill_to_name(sink);
+            sink.write(b"/dev/ashmem/");
+            sink.write(name.as_bytes());
         }
     }
     sink.write(b"\n");
@@ -4891,7 +4968,7 @@ mod tests {
 
         // Create a thread to service the port where we will receive pager requests.
         let thread = std::thread::spawn(move || loop {
-            let packet = port_clone.wait(zx::Time::INFINITE).expect("wait failed");
+            let packet = port_clone.wait(zx::MonotonicTime::INFINITE).expect("wait failed");
             match packet.contents() {
                 zx::PacketContents::Pager(contents) => {
                     if contents.command() == ZX_PAGER_VMO_READ {

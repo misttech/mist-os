@@ -130,19 +130,12 @@ class PageQueues::LruIsolate {
             continue;
           }
         }
-        list_node_t freed_list = LIST_INITIAL_VALUE(freed_list);
-        if (uint64_t count = backlink.cow->ReclaimPage(backlink.page, backlink.offset,
-                                                       VmCowPages::EvictionHintAction::Follow,
-                                                       &freed_list, compressor);
-            count > 0) {
-          if (backlink.cow->can_evict()) {
-            pq_lru_pages_evicted.Add(count);
-          } else if (backlink.cow->is_discardable()) {
-            pq_lru_pages_discarded.Add(count);
-          } else {
-            pq_lru_pages_compressed.Add(count);
-          }
-          pmm_free(&freed_list);
+        if (VmCowPages::ReclaimCounts count = backlink.cow->ReclaimPage(
+                backlink.page, backlink.offset, VmCowPages::EvictionHintAction::Follow, compressor);
+            count.Total() > 0) {
+          pq_lru_pages_evicted.Add(count.evicted_non_loaned + count.evicted_loaned);
+          pq_lru_pages_discarded.Add(count.discarded);
+          pq_lru_pages_compressed.Add(count.compressed);
         }
       }
     }
@@ -777,12 +770,11 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessLruQueueHelper(
       uint64_t page_offset = page->object.get_page_offset();
       DEBUG_ASSERT(cow);
 
-      // We may be racing with destruction of VMO. As we currently hold our lock we know that our
-      // back pointer is correct in so far as the VmCowPages has not yet had completed running its
-      // destructor, so we know it is safe to attempt to upgrade it to a RefPtr. If upgrading
-      // fails we assume the page is about to be removed from the page queue once the VMO
-      // destructor gets a chance to run.
-      return VmoBacklink{fbl::MakeRefPtrUpgradeFromRaw(cow, lock_), page, page_offset};
+      // Upgrading to a refptr can never fail as all pages are removed from a VmCowPages, and hence
+      // from the page queues here, prior to the last reference to a cow pages being dropped.
+      fbl::RefPtr<VmCowPages> cow_pages = fbl::MakeRefPtrUpgradeFromRaw(cow, lock_);
+      DEBUG_ASSERT(cow_pages);
+      return VmoBacklink{ktl::move(cow_pages), page, page_offset};
     } else {
       // Force it into our target queue, don't care about races. If we happened to access it at
       // the same time then too bad.
@@ -848,13 +840,12 @@ ktl::optional<PageQueues::VmoBacklink> PageQueues::ProcessDontNeedList(list_node
       if (peek) {
         VmCowPages* cow = reinterpret_cast<VmCowPages*>(page->object.get_object());
         DEBUG_ASSERT(cow);
-        // We may be racing with destruction of VMO. As we currently hold our lock we know that our
-        // back pointer is correct in so far as the VmCowPages has not yet had completed running its
-        // destructor, so we know it is safe to attempt to upgrade it to a RefPtr. If upgrading
-        // fails we assume the page is about to be removed from the page queue once the VMO
-        // destructor gets a chance to run.
-        return VmoBacklink{fbl::MakeRefPtrUpgradeFromRaw(cow, lock_), page,
-                           page->object.get_page_offset()};
+        // Upgrading to a refptr can never fail as all pages are removed from a VmCowPages, and
+        // hence from the page queues here, prior to the last reference to a cow pages being
+        // dropped.
+        fbl::RefPtr<VmCowPages> cow_pages = fbl::MakeRefPtrUpgradeFromRaw(cow, lock_);
+        DEBUG_ASSERT(cow_pages);
+        return VmoBacklink{ktl::move(cow_pages), page, page->object.get_page_offset()};
       }
     } else {
       // Only reason for a page to be in the DontNeed list and have the wrong queue is if it was

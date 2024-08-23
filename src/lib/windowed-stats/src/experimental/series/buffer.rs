@@ -181,7 +181,7 @@ where
     A: Into<u64> + Unsigned,
 {
     fn with_capacity(capacity: usize) -> Self {
-        let ring_buffer = Simple8bRleRingBuffer::with_nearest_capacity(capacity);
+        let ring_buffer = Simple8bRleRingBuffer::with_min_samples(capacity);
         Simple8bRle(ring_buffer)
     }
 
@@ -192,15 +192,15 @@ where
     fn sampling_intervals(profile: &SamplingProfile) -> Vec1<SamplingInterval> {
         match profile {
             SamplingProfile::Granular => [
-                SamplingInterval::new(116, 1, Duration::from_seconds(10)),
-                SamplingInterval::new(116, 1, Duration::from_minutes(1)),
+                SamplingInterval::new(720, 1, Duration::from_seconds(10)),
+                SamplingInterval::new(3600, 1, Duration::from_minutes(1)),
             ]
             .into(),
             SamplingProfile::Balanced => [
-                SamplingInterval::new(58, 1, Duration::from_seconds(10)),
-                SamplingInterval::new(58, 1, Duration::from_minutes(1)),
-                SamplingInterval::new(58, 1, Duration::from_minutes(10)),
-                SamplingInterval::new(58, 1, Duration::from_hours(1)),
+                SamplingInterval::new(120, 1, Duration::from_seconds(10)),
+                SamplingInterval::new(120, 1, Duration::from_minutes(1)),
+                SamplingInterval::new(120, 1, Duration::from_minutes(5)),
+                SamplingInterval::new(120, 1, Duration::from_minutes(30)),
             ]
             .into(),
         }
@@ -357,8 +357,8 @@ mod tests {
     #[test_case(
         SamplingProfile::Granular,
         [
-            SamplingInterval::new(116, 1, Duration::from_seconds(10)),
-            SamplingInterval::new(116, 1, Duration::from_minutes(1)),
+            SamplingInterval::new(720, 1, Duration::from_seconds(10)),
+            SamplingInterval::new(3600, 1, Duration::from_minutes(1)),
         ]
         .into();
         "granular_sampling_profile"
@@ -366,11 +366,11 @@ mod tests {
     #[test_case(
         SamplingProfile::Balanced,
         [
-            SamplingInterval::new(58, 1, Duration::from_seconds(10)),
-            SamplingInterval::new(58, 1, Duration::from_minutes(1)),
-            SamplingInterval::new(58, 1, Duration::from_minutes(10)),
-            SamplingInterval::new(58, 1, Duration::from_hours(1)),
-    ]
+            SamplingInterval::new(120, 1, Duration::from_seconds(10)),
+            SamplingInterval::new(120, 1, Duration::from_minutes(1)),
+            SamplingInterval::new(120, 1, Duration::from_minutes(5)),
+            SamplingInterval::new(120, 1, Duration::from_minutes(30)),
+        ]
         .into();
         "balanced_sampling_profile"
     )]

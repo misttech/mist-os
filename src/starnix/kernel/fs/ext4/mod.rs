@@ -10,7 +10,7 @@ use crate::vfs::{
     fs_node_impl_not_dir, fs_node_impl_symlink, fs_node_impl_xattr_delegate, CacheConfig,
     CacheMode, DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle,
     FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-    MemoryFileObject, SeekTarget, SymlinkTarget, XattrOp,
+    MemoryFileObject, SeekTarget, SymlinkTarget, XattrOp, XattrStorage,
 };
 use ext4_read_only::parser::{Parser as ExtParser, XattrMap as ExtXattrMap};
 use ext4_read_only::readers::VmoReader;
@@ -114,7 +114,9 @@ impl ExtNode {
         let xattrs = fs.parser.inode_xattrs(inode_num).unwrap_or_default();
         Ok(ExtNode { inode_num, inode, xattrs })
     }
+}
 
+impl XattrStorage for ExtNode {
     fn list_xattrs(&self) -> Result<Vec<FsString>, Errno> {
         Ok(self.xattrs.keys().map(|k| k.clone().into()).collect())
     }

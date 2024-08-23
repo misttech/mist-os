@@ -2,9 +2,11 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::availability::AvailabilityMetadata;
 use crate::error::RoutingError;
 use async_trait::async_trait;
 use cm_types::Availability;
+use fidl_fuchsia_component_sandbox as fsandbox;
 use moniker::ExtendedMoniker;
 use sandbox::{Capability, Request, Router};
 
@@ -16,14 +18,25 @@ struct AvailabilityRouter {
 
 #[async_trait]
 impl sandbox::Routable for AvailabilityRouter {
-    async fn route(&self, mut request: Request) -> Result<Capability, router_error::RouterError> {
+    async fn route(&self, request: Request) -> Result<Capability, router_error::RouterError> {
+        let AvailabilityRouter { router, availability, moniker } = self;
         // The availability of the request must be compatible with the
         // availability of this step of the route.
-        match crate::availability::advance(&self.moniker, request.availability, self.availability) {
+        let request_availability = request
+            .metadata
+            .get_availability()
+            .ok_or(fsandbox::RouterError::InvalidArgs)
+            .inspect_err(|e| {
+                tracing::error!(
+                    "request {:?} did not have availability metadata: {e:?}",
+                    request.target
+                )
+            })?;
+        match crate::availability::advance(moniker, request_availability, *availability) {
             Ok(updated) => {
-                request.availability = updated;
+                request.metadata.set_availability(updated);
                 // Everything checks out, forward the request.
-                self.router.route(request).await
+                router.route(request).await
             }
             Err(e) => Err(RoutingError::from(e).into()),
         }
@@ -79,13 +92,10 @@ mod tests {
         let base = Router::new(source);
         let proxy =
             base.with_availability(ExtendedMoniker::ComponentManager, Availability::Optional);
+        let metadata = Dict::new();
+        metadata.set_availability(Availability::Optional);
         let capability = proxy
-            .route(Request {
-                availability: Availability::Optional,
-                target: FakeComponentToken::new(),
-                debug: false,
-                metadata: Dict::new(),
-            })
+            .route(Request { target: FakeComponentToken::new(), debug: false, metadata })
             .await
             .unwrap();
         let capability = match capability {
@@ -101,13 +111,10 @@ mod tests {
         let base = Router::new(source);
         let proxy =
             base.with_availability(ExtendedMoniker::ComponentManager, Availability::Optional);
+        let metadata = Dict::new();
+        metadata.set_availability(Availability::Required);
         let error = proxy
-            .route(Request {
-                availability: Availability::Required,
-                target: FakeComponentToken::new(),
-                debug: false,
-                metadata: Dict::new(),
-            })
+            .route(Request { target: FakeComponentToken::new(), debug: false, metadata })
             .await
             .unwrap_err();
         assert_matches!(

@@ -4,6 +4,7 @@
 
 use argh::{ArgsInfo, FromArgs};
 use ffx_core::ffx_command;
+use ffx_repository_serve::DEFAULT_REPO_NAME;
 use std::path::PathBuf;
 
 #[ffx_command()]
@@ -14,10 +15,11 @@ use std::path::PathBuf;
     description = "Make the daemon aware of a specific pm-built repository"
 )]
 pub struct AddFromPmCommand {
+    // LINT.IfChange
     /// repositories will be named `NAME`. Defaults to `devhost`.
-    #[argh(option, short = 'r', default = "default_repository()")]
+    #[argh(option, short = 'r', default = "DEFAULT_REPO_NAME.into()")]
     pub repository: String,
-
+    // LINT.ThenChange(../../serve/src/lib.rs)
     /// alias this repository to these names when this repository is registered on a target.
     #[argh(option, long = "alias")]
     pub aliases: Vec<String>,
@@ -25,8 +27,4 @@ pub struct AddFromPmCommand {
     /// path to the pm-built package repository.
     #[argh(positional)]
     pub pm_repo_path: PathBuf,
-}
-
-fn default_repository() -> String {
-    "devhost".to_string()
 }

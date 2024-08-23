@@ -9,8 +9,10 @@
 #error Fuchsia-only Header
 #endif
 
+#include <cstdint>
 #include <memory>
 
+#include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/blob_verifier.h"
 #include "src/storage/blobfs/compression/seekable_decompressor.h"
 

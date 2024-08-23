@@ -15,7 +15,8 @@
 // levels defined and used by fuchsia_hardware_fan::Device::Set/GetFanLevel().
 
 int main(int argc, const char* argv[], char* envp[]) {
-  fuchsia_logging::SetTags({"fan-controller"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"fan-controller"}).BuildAndInitialize();
 
   auto result = component::Connect<fuchsia_thermal::ClientStateConnector>();
   if (result.is_error()) {

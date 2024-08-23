@@ -10,6 +10,7 @@ use crate::time_source::{
 };
 use fidl_fuchsia_time_external::{Status, Urgency};
 use fuchsia_async::{self as fasync, TimeoutExt};
+use fuchsia_runtime::UtcTime;
 use fuchsia_zircon as zx;
 use futures::{FutureExt as _, StreamExt as _};
 use std::sync::Arc;
@@ -37,15 +38,15 @@ const SOURCE_KEEPALIVE: zx::Duration = zx::Duration::from_minutes(60);
 /// A provider of monotonic times.
 pub trait MonotonicProvider: Send + Sync {
     /// Returns the current monotonic time.
-    fn now(&mut self) -> zx::Time;
+    fn now(&mut self) -> zx::MonotonicTime;
 }
 
 /// A provider of true monotonic times from the kernel.
 pub struct KernelMonotonicProvider();
 
 impl MonotonicProvider for KernelMonotonicProvider {
-    fn now(&mut self) -> zx::Time {
-        zx::Time::get_monotonic()
+    fn now(&mut self) -> zx::MonotonicTime {
+        zx::MonotonicTime::get()
     }
 }
 
@@ -79,7 +80,7 @@ struct PushSourceManager<D: Diagnostics, M: MonotonicProvider> {
     /// The role of the time source being managed.
     role: Role,
     /// The backstop time that samples must not come before.
-    backstop: zx::Time,
+    backstop: UtcTime,
     /// Whether the time source restart delay and minimum update delay should be enabled.
     delays_enabled: bool,
     /// A source of monotonic time.
@@ -95,7 +96,7 @@ struct PushSourceManager<D: Diagnostics, M: MonotonicProvider> {
     /// The most recent status received from the time source in its current execution.
     last_status: Option<Status>,
     /// The monotonic time at which the most recently accepted Sample arrived.
-    last_accepted_sample_arrival: Option<zx::Time>,
+    last_accepted_sample_arrival: Option<zx::MonotonicTime>,
 }
 
 impl<D: Diagnostics, M: MonotonicProvider> PushSourceManager<D, M> {
@@ -153,8 +154,8 @@ impl<D: Diagnostics, M: MonotonicProvider> PushSourceManager<D, M> {
             // changes) within SOURCE_KEEPALIVE. This doesn't apply to sources that are not
             // OK (e.g. those waiting indefinitely for network availability).
             let timeout = match self.last_status {
-                Some(Status::Ok) => zx::Time::after(SOURCE_KEEPALIVE),
-                _ => zx::Time::INFINITE,
+                Some(Status::Ok) => zx::MonotonicTime::after(SOURCE_KEEPALIVE),
+                _ => zx::MonotonicTime::INFINITE,
             };
 
             let event = event_stream
@@ -210,11 +211,14 @@ impl<D: Diagnostics, M: MonotonicProvider> PushSourceManager<D, M> {
 
     /// Validates the supplied time sample against the current state. Returns the current
     /// monotonic time on success so it may be used as an arrival time.
-    fn validate_sample(&mut self, sample: &Sample) -> Result<zx::Time, SampleValidationError> {
+    fn validate_sample(
+        &mut self,
+        sample: &Sample,
+    ) -> Result<zx::MonotonicTime, SampleValidationError> {
         let current_monotonic = self.monotonic.now();
         let earliest_allowed_arrival = match self.last_accepted_sample_arrival {
             Some(previous_arrival) if self.delays_enabled => previous_arrival + MIN_UPDATE_DELAY,
-            _ => zx::Time::INFINITE_PAST,
+            _ => zx::MonotonicTime::INFINITE_PAST,
         };
 
         if sample.utc < self.backstop {
@@ -234,7 +238,7 @@ impl<D: Diagnostics, M: MonotonicProvider> PushSourceManager<D, M> {
 impl<D: Diagnostics> TimeSourceManager<D, KernelMonotonicProvider> {
     /// Constructs a new `TimeSourceManager` that reads monotonic times from the kernel.
     pub fn new(
-        backstop: zx::Time,
+        backstop: UtcTime,
         role: Role,
         time_source: TimeSource,
         diagnostics: Arc<D>,
@@ -279,7 +283,7 @@ impl<D: Diagnostics> TimeSourceManager<D, KernelMonotonicProvider> {
     /// the restart delay and minimum update delay set to zero. This makes the behavior more
     /// amenable to use in tests.
     pub fn new_with_delays_disabled(
-        backstop: zx::Time,
+        backstop: UtcTime,
         role: Role,
         time_source: TimeSource,
         diagnostics: Arc<D>,
@@ -321,7 +325,7 @@ struct PullSourceManager<D: Diagnostics, M: MonotonicProvider> {
     /// The role of the time source being managed.
     role: Role,
     /// The backstop time that samples must not come before.
-    backstop: zx::Time,
+    backstop: UtcTime,
     /// Whether the time source restart delay and minimum update delay should be enabled.
     delays_enabled: bool,
     /// A source of monotonic time.
@@ -333,7 +337,7 @@ struct PullSourceManager<D: Diagnostics, M: MonotonicProvider> {
     diagnostics: Arc<D>,
 
     /// The monotonic time at which the last sample was requested.
-    last_sample_request_time: Option<zx::Time>,
+    last_sample_request_time: Option<zx::MonotonicTime>,
 
     /// If the manager ever received a sample.
     received_sample: bool,
@@ -469,18 +473,18 @@ mod test {
     /// A provider of artificial monotonic times that increment by a fixed duration each call.
     struct FakeMonotonicProvider {
         increment: zx::Duration,
-        last_time: zx::Time,
+        last_time: zx::MonotonicTime,
     }
 
     impl FakeMonotonicProvider {
         /// Constructs a new `FakeMonotonicProvider` that increments by `increment` on each call.
         pub fn new(increment: zx::Duration) -> Self {
-            FakeMonotonicProvider { increment, last_time: zx::Time::ZERO }
+            FakeMonotonicProvider { increment, last_time: zx::MonotonicTime::ZERO }
         }
     }
 
     impl MonotonicProvider for FakeMonotonicProvider {
-        fn now(&mut self) -> zx::Time {
+        fn now(&mut self) -> zx::MonotonicTime {
             self.last_time += self.increment;
             self.last_time
         }
@@ -495,7 +499,7 @@ mod test {
     ) -> TimeSourceManager<FakeDiagnostics, FakeMonotonicProvider> {
         let manager = TimeManager::Push(PushSourceManager {
             role: TEST_ROLE,
-            backstop: zx::Time::ZERO + (MIN_UPDATE_DELAY * BACKSTOP_FACTOR),
+            backstop: UtcTime::ZERO + (MIN_UPDATE_DELAY * BACKSTOP_FACTOR),
             delays_enabled: true,
             monotonic: FakeMonotonicProvider::new(MIN_UPDATE_DELAY),
             time_source: Box::new(time_source),
@@ -516,7 +520,7 @@ mod test {
     ) -> TimeSourceManager<FakeDiagnostics, FakeMonotonicProvider> {
         let manager = TimeManager::Pull(PullSourceManager {
             role: TEST_ROLE,
-            backstop: zx::Time::ZERO + (MIN_UPDATE_DELAY * BACKSTOP_FACTOR),
+            backstop: UtcTime::ZERO + (MIN_UPDATE_DELAY * BACKSTOP_FACTOR),
             delays_enabled: true,
             monotonic: FakeMonotonicProvider::new(MIN_UPDATE_DELAY),
             time_source: Box::new(time_source),
@@ -538,7 +542,7 @@ mod test {
         diagnostics: Arc<FakeDiagnostics>,
     ) -> TimeSourceManager<FakeDiagnostics, FakeMonotonicProvider> {
         let manager = TimeManager::Push(PushSourceManager {
-            backstop: zx::Time::ZERO + (MIN_UPDATE_DELAY * BACKSTOP_FACTOR),
+            backstop: UtcTime::ZERO + (MIN_UPDATE_DELAY * BACKSTOP_FACTOR),
             role: TEST_ROLE,
             delays_enabled: false,
             monotonic: FakeMonotonicProvider::new(MIN_UPDATE_DELAY),
@@ -556,8 +560,8 @@ mod test {
     /// accept between samples.rate at hence the rate we choose our fake monotonic clock to tick at.
     fn create_sample(utc_factor: i64, monotonic_factor: i64) -> Sample {
         Sample {
-            utc: zx::Time::ZERO + (MIN_UPDATE_DELAY * utc_factor),
-            monotonic: zx::Time::ZERO + (MIN_UPDATE_DELAY * monotonic_factor),
+            utc: UtcTime::ZERO + (MIN_UPDATE_DELAY * utc_factor),
+            monotonic: zx::MonotonicTime::ZERO + (MIN_UPDATE_DELAY * monotonic_factor),
             std_dev: STD_DEV,
         }
     }
@@ -597,7 +601,7 @@ mod test {
 
         assert_eq!(
             push_manager.last_accepted_sample_arrival,
-            Some(zx::Time::ZERO + MIN_UPDATE_DELAY * 3)
+            Some(zx::MonotonicTime::ZERO + MIN_UPDATE_DELAY * 3)
         );
 
         diagnostics.assert_events(&[
@@ -717,7 +721,7 @@ mod test {
         let time_source = FakePushTimeSource::failing();
         let diagnostics = Arc::new(FakeDiagnostics::new());
         let mut manager = TimeSourceManager::new(
-            zx::Time::ZERO,
+            UtcTime::ZERO,
             TEST_ROLE,
             time_source.into(),
             Arc::clone(&diagnostics),
@@ -730,7 +734,7 @@ mod test {
             manager
                 .next_sample()
                 .map(|_| true)
-                .on_timeout(zx::Time::after(zx::Duration::from_millis(50)), || false)
+                .on_timeout(zx::MonotonicTime::after(zx::Duration::from_millis(50)), || false)
                 .await,
             false
         );
@@ -745,12 +749,8 @@ mod test {
     async fn restart_on_launch_failure_pull_source() {
         let time_source = FakePullTimeSource::failing().into();
         let diagnostics = Arc::new(FakeDiagnostics::new());
-        let mut manager = TimeSourceManager::new(
-            zx::Time::ZERO,
-            TEST_ROLE,
-            time_source,
-            Arc::clone(&diagnostics),
-        );
+        let mut manager =
+            TimeSourceManager::new(UtcTime::ZERO, TEST_ROLE, time_source, Arc::clone(&diagnostics));
 
         // Calling next sample on this manager with the restart delay enabled should lead to
         // failed launch and then a few minute cooldown period before relaunch. We test for this by
@@ -759,7 +759,7 @@ mod test {
             manager
                 .next_sample()
                 .map(|_| true)
-                .on_timeout(zx::Time::after(zx::Duration::from_millis(50)), || false)
+                .on_timeout(zx::MonotonicTime::after(zx::Duration::from_millis(50)), || false)
                 .await,
             false
         );
@@ -783,7 +783,7 @@ mod test {
         // we try to validate a sample.
         assert_eq!(
             push_manager.validate_sample(&create_sample(BACKSTOP_FACTOR, 1)),
-            Ok(zx::Time::ZERO + MIN_UPDATE_DELAY)
+            Ok(zx::MonotonicTime::ZERO + MIN_UPDATE_DELAY)
         );
         assert_eq!(
             push_manager.validate_sample(&create_sample(BACKSTOP_FACTOR - 1, 2)),
@@ -800,7 +800,7 @@ mod test {
         // On the next call the monontonic should be a factor of 5, trick the manager into thinking
         // it already accepted an update at 4.5
         push_manager.last_accepted_sample_arrival =
-            Some(zx::Time::from_nanos(MIN_UPDATE_DELAY.into_nanos() / 2 * 9));
+            Some(zx::MonotonicTime::from_nanos(MIN_UPDATE_DELAY.into_nanos() / 2 * 9));
         assert_eq!(
             push_manager.validate_sample(&create_sample(BACKSTOP_FACTOR, 5)),
             Err(SVE::TooCloseToPrevious)
@@ -808,10 +808,10 @@ mod test {
         // But if we disable delays an accepted update of 5.5 at a monotonic of 6 is accepted.
         push_manager.delays_enabled = false;
         push_manager.last_accepted_sample_arrival =
-            Some(zx::Time::from_nanos(MIN_UPDATE_DELAY.into_nanos() / 2 * 11));
+            Some(zx::MonotonicTime::from_nanos(MIN_UPDATE_DELAY.into_nanos() / 2 * 11));
         assert_eq!(
             push_manager.validate_sample(&create_sample(BACKSTOP_FACTOR, 6)),
-            Ok(zx::Time::ZERO + MIN_UPDATE_DELAY * 6)
+            Ok(zx::MonotonicTime::ZERO + MIN_UPDATE_DELAY * 6)
         );
     }
 
@@ -822,7 +822,7 @@ mod test {
             Arc::new(FakeDiagnostics::new()),
         );
         let mut pull_manager = assert_pull_manager!(manager);
-        pull_manager.last_sample_request_time = Some(zx::Time::ZERO);
+        pull_manager.last_sample_request_time = Some(zx::MonotonicTime::ZERO);
 
         // The monotonic our manager sees will start at a factor of 1 and increment by 1 each time
         // we try to validate a sample.

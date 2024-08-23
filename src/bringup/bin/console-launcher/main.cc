@@ -18,6 +18,7 @@
 #include <lib/fdio/spawn.h>
 #include <lib/fit/defer.h>
 #include <lib/stdcompat/string_view.h>
+#include <lib/sync/cpp/completion.h>
 #include <lib/syslog/cpp/log_settings.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/debuglog.h>
@@ -29,12 +30,12 @@
 
 #include <algorithm>
 #include <future>
-#include <latch>
 #include <utility>
 
 #include <fbl/ref_ptr.h>
 
 #include "src/bringup/bin/console-launcher/console_launcher.h"
+#include "src/bringup/bin/console-launcher/console_launcher_config.h"
 #include "src/lib/fxl/strings/split_string.h"
 #include "src/lib/loader_service/loader_service.h"
 #include "src/storage/lib/vfs/cpp/managed_vfs.h"
@@ -301,7 +302,9 @@ int main(int argv, char** argc) {
         << "failed to connect to " << fidl::DiscoverableProtocolName<fuchsia_boot::Arguments>;
   }
 
-  zx::result get_args = console_launcher::GetArguments(boot_args.value());
+  auto config = console_launcher_config::Config::TakeFromStartupHandle();
+
+  zx::result get_args = console_launcher::GetArguments(boot_args.value(), config);
   if (get_args.is_error()) {
     FX_PLOGS(FATAL, get_args.status_value()) << "failed to get arguments";
   }
@@ -357,8 +360,8 @@ int main(int argv, char** argc) {
               return;
             }
             // Must run on the dispatcher thread to avoid racing with VFS dispatch.
-            std::latch mounted(1);
-            async::PostTask(dispatcher, [&mounted, &root, path,
+            libsync::Completion completion;
+            async::PostTask(dispatcher, [&completion, &root, path,
                                          client_end = std::move(client_end)]() mutable {
               const std::vector components = fxl::SplitString(path, "/", fxl::kKeepWhitespace,
                                                               fxl::SplitResult::kSplitWantNonEmpty);
@@ -370,9 +373,8 @@ int main(int argv, char** argc) {
                   if (fragment_len < 0) {
                     const void* path_ptr = path.data();
                     const void* component_ptr = component.data();
-                    FX_LOGS(FATAL) << "expected overlapping memory:"
-                                   << " path@" << path_ptr << "=" << path << " component@"
-                                   << component_ptr << "=" << component;
+                    FX_LOGS(FATAL) << "expected overlapping memory:" << " path@" << path_ptr << "="
+                                   << path << " component@" << component_ptr << "=" << component;
                   }
                   return std::string_view{path.data(), static_cast<size_t>(fragment_len)};
                 }();
@@ -398,9 +400,9 @@ int main(int argv, char** argc) {
                 current = next;
               }
               FX_LOGS(INFO) << "mounted '" << path << "'";
-              mounted.count_down();
+              completion.Signal();
             });
-            mounted.wait();
+            completion.Wait();
           },
           [&](fidl::WireEvent<fuchsia_io::Directory::OnRepresentation>* event) {
             FX_PLOGS(FATAL, ZX_ERR_NOT_SUPPORTED) << "unexpected OnRepresentation";
@@ -442,7 +444,7 @@ int main(int argv, char** argc) {
 
   std::vector<std::thread> workers;
 
-  if (!args.virtcon_disable) {
+  if (!args.virtcon_disabled) {
     zx_status_t status = [&]() {
       zx::result virtcon = component::Connect<fuchsia_virtualconsole::SessionManager>();
       if (virtcon.is_error()) {

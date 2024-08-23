@@ -548,7 +548,7 @@ fit::result<const fuchsia_hardware_hrtimer::DriverError> AmlHrtimerServer::Start
       return fit::error(fuchsia_hardware_hrtimer::DriverError::kInternalError);
   }
   timers_[timer_index].last_ticks = current_ticks;
-  FDF_LOG(DEBUG, "Timer id: %zu started, start ticks left: %lu last ticks: %lu", id,
+  FDF_LOG(INFO, "Timer id: %zu started, start ticks left: %lu last ticks: %lu", id,
           timers_[timer_index].start_ticks_left, timers_[timer_index].last_ticks);
   return fit::success();
 }

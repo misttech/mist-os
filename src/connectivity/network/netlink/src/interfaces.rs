@@ -31,10 +31,11 @@ use futures::StreamExt as _;
 use linux_uapi::{
     net_device_flags_IFF_LOOPBACK, net_device_flags_IFF_LOWER_UP, net_device_flags_IFF_RUNNING,
     net_device_flags_IFF_UP, rtnetlink_groups_RTNLGRP_IPV4_IFADDR,
-    rtnetlink_groups_RTNLGRP_IPV6_IFADDR, rtnetlink_groups_RTNLGRP_LINK, ARPHRD_6LOWPAN,
-    ARPHRD_ETHER, ARPHRD_LOOPBACK, ARPHRD_PPP, ARPHRD_VOID,
+    rtnetlink_groups_RTNLGRP_IPV6_IFADDR, rtnetlink_groups_RTNLGRP_LINK,
+    rtnetlink_groups_RTNLGRP_ND_USEROPT, ARPHRD_6LOWPAN, ARPHRD_ETHER, ARPHRD_LOOPBACK, ARPHRD_PPP,
+    ARPHRD_VOID,
 };
-use net_types::ip::{AddrSubnetEither, IpVersion};
+use net_types::ip::{AddrSubnetEither, IpVersion, Ipv6Addr};
 use netlink_packet_core::{NetlinkMessage, NLM_F_MULTIPART};
 use netlink_packet_route::address::{
     AddressAttribute, AddressFlags, AddressHeader, AddressHeaderFlags, AddressMessage,
@@ -42,7 +43,13 @@ use netlink_packet_route::address::{
 use netlink_packet_route::link::{
     LinkAttribute, LinkFlags, LinkHeader, LinkLayerType, LinkMessage, State,
 };
+use netlink_packet_route::neighbour_discovery_user_option::{
+    NeighbourDiscoveryIcmpType, NeighbourDiscoveryIcmpV6Type, NeighbourDiscoveryUserOptionHeader,
+    NeighbourDiscoveryUserOptionMessage, Nla,
+};
 use netlink_packet_route::{AddressFamily, RouteNetlinkMessage};
+use packet::records::RecordBuilder;
+use packet_formats::icmp::ndp;
 
 use crate::client::{ClientTable, InternalClient};
 use crate::errors::WorkerInitializationError;
@@ -341,6 +348,46 @@ pub(crate) struct PendingRequest<S: Sender<<NetlinkRoute as ProtocolFamily>::Inn
     completer: oneshot::Sender<Result<(), RequestError>>,
 }
 
+fn build_stub_nduseropt_message(interface_index: u32) -> NetlinkMessage<RouteNetlinkMessage> {
+    // These are Google's Public DNS64 servers.
+    // https://developers.google.com/speed/public-dns/docs/dns64
+    const STUBBED_IPV6_DNS_SERVERS: [Ipv6Addr; 2] = [
+        net_declare::net_ip_v6!("2001:4860:4860::6464"),
+        net_declare::net_ip_v6!("2001:4860:4860::64"),
+    ];
+
+    let ndp_option =
+        ndp::options::NdpOptionBuilder::RecursiveDnsServer(ndp::options::RecursiveDnsServer::new(
+            ndp::options::RecursiveDnsServer::INFINITE_LIFETIME,
+            &STUBBED_IPV6_DNS_SERVERS,
+        ));
+
+    // NB: It's important to use [`RecordBuilder`] rather than
+    // [`packet::records::options::OptionBuilder`] to ensure that `serialized_len`
+    // and `serialize_into` include the kind and length bytes.
+    let mut buf = vec![0u8; RecordBuilder::serialized_len(&ndp_option)];
+    RecordBuilder::serialize_into(&ndp_option, &mut buf[..]);
+
+    let mut message: NetlinkMessage<RouteNetlinkMessage> =
+        RouteNetlinkMessage::NewNeighbourDiscoveryUserOption(
+            NeighbourDiscoveryUserOptionMessage::new(
+                NeighbourDiscoveryUserOptionHeader::new(
+                    interface_index,
+                    NeighbourDiscoveryIcmpType::Inet6(
+                        NeighbourDiscoveryIcmpV6Type::RouterAdvertisement,
+                    ),
+                ),
+                buf,
+                vec![Nla::SourceLinkLocalAddress(
+                    net_declare::net_ip_v6!("fe80::1").ipv6_bytes().to_vec(),
+                )],
+            ),
+        )
+        .into();
+    message.finalize();
+    message
+}
+
 impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMessage>>
     InterfacesWorkerState<H, S>
 {
@@ -471,7 +518,7 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                         id: _,
                         name: _,
                         has_default_ipv4_route: _,
-                        has_default_ipv6_route: _,
+                        has_default_ipv6_route: previously_had_default_ipv6_route,
                         port_class: _,
                         ..
                     },
@@ -483,10 +530,34 @@ impl<H: InterfacesHandler, S: Sender<<NetlinkRoute as ProtocolFamily>::InnerMess
                         port_class: _,
                         online: _,
                         has_default_ipv4_route: _,
-                        has_default_ipv6_route: _,
+                        has_default_ipv6_route,
                     },
                 state: InterfaceState { addresses: interface_addresses, link_address, control: _ },
             } => {
+                let previously_did_not_have_default_ipv6_route =
+                    previously_had_default_ipv6_route.map(|prev| prev == false).unwrap_or(false);
+
+                // If we've newly acquired a default IPv6 route, send a fake NDUSEROPT message with
+                // a fake RDNSS record to prompt clients that we've achieved upstream IPv6
+                // connectivity.
+                // TODO(https://fxbug.dev/341759423): Rather than constructing a stub NDUSEROPT
+                // message from a fake RDNSS record, consume real data on this from the netstack
+                // once it is exposed.
+                if *has_default_ipv6_route && previously_did_not_have_default_ipv6_route {
+                    let message = build_stub_nduseropt_message(
+                        u32::try_from(id.get()).expect("should fit in u32"),
+                    );
+
+                    log_debug!(
+                        "detected newly-acquired default route for interface {id}, \
+                         sending stub NDUSEROPT message"
+                    );
+                    self.route_clients.send_message_to_group(
+                        message,
+                        ModernGroup(rtnetlink_groups_RTNLGRP_ND_USEROPT),
+                    );
+                }
+
                 if online.is_some() {
                     if let Some(message) =
                         NetlinkLinkMessage::optionally_from(current, link_address)
@@ -1539,6 +1610,7 @@ pub(crate) mod testutil {
                         unreachable!()
                     },
                 };
+                #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336606)
                 match event_loop_result {
                     Ok(never) => match never {},
                     Err(e) => {
@@ -2042,6 +2114,7 @@ mod tests {
                 ModernGroup(rtnetlink_groups_RTNLGRP_LINK),
                 ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_IFADDR),
                 ModernGroup(rtnetlink_groups_RTNLGRP_IPV4_IFADDR),
+                ModernGroup(rtnetlink_groups_RTNLGRP_ND_USEROPT),
             ],
         );
         let Setup {
@@ -2184,6 +2257,11 @@ mod tests {
                     addresses: Some(Vec::new()),
                     ..Default::default()
                 }),
+                fnet_interfaces::Event::Changed(fnet_interfaces::Properties {
+                    id: Some(WLAN_INTERFACE_ID),
+                    has_default_ipv6_route: Some(true),
+                    ..Default::default()
+                }),
             ],
         );
         let ((), (), err) =
@@ -2316,6 +2394,10 @@ mod tests {
             .to_rtnl_del_addr(UNSPECIFIED_SEQUENCE_NUMBER),
             ModernGroup(rtnetlink_groups_RTNLGRP_IPV6_IFADDR),
         );
+        let nduseropt = SentMessage::multicast(
+            build_stub_nduseropt_message(WLAN_INTERFACE_ID.try_into().unwrap()),
+            ModernGroup(rtnetlink_groups_RTNLGRP_ND_USEROPT),
+        );
         assert_eq!(
             &addr6_sink.take_messages()[..],
             &[wlan_v6_addr.clone(), lo_v6_addr.clone(), eth_v6_addr.clone(), ppp_v6_addr.clone(),],
@@ -2336,6 +2418,7 @@ mod tests {
                 eth_link,
                 ppp_v4_addr,
                 ppp_v6_addr,
+                nduseropt,
             ],
         );
         assert_eq!(&other_sink.take_messages()[..], &[]);

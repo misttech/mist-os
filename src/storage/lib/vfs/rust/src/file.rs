@@ -50,25 +50,8 @@ pub fn read_only(content: impl AsRef<[u8]>) -> Arc<simple::SimpleFile> {
     simple::SimpleFile::read_only(content)
 }
 
-/// Creates a new read-write `SimpleFile` with the specified `content`.
-///
-/// ## Examples
-/// ```
-/// // Initially empty file:
-/// let empty = read_write("");
-/// // File created with contents:
-/// let sized = read_write("Hello world!");
-/// ```
-#[cfg(not(target_os = "fuchsia"))]
-pub fn read_write(content: impl AsRef<[u8]>) -> Arc<simple::SimpleFile> {
-    simple::SimpleFile::read_write(content)
-}
-
 #[cfg(target_os = "fuchsia")]
 pub use vmo::read_only;
-
-#[cfg(target_os = "fuchsia")]
-pub use vmo::read_write;
 
 /// FileOptions include options that are relevant after the file has been opened. Flags like
 /// `TRUNCATE`, which only applies during open time, are not included.
@@ -171,7 +154,9 @@ pub trait File: Node {
     /// This is used to calculate seek offset relative to the end.
     fn get_size(&self) -> impl Future<Output = Result<u64, Status>> + Send;
 
-    /// Set the attributes of this file based on the values in `attributes`.
+    /// Set the mutable attributes of this file based on the values in `attributes`. If the file
+    /// does not support updating *all* of the specified attributes, implementations should fail
+    /// with `ZX_ERR_NOT_SUPPORTED`.
     fn update_attributes(
         &self,
         attributes: fio::MutableNodeAttributes,
@@ -278,7 +263,7 @@ pub trait FileIo: Send + Sync {
 }
 
 /// Trait for dispatching read, write, and seek FIDL requests for a given connection. The
-/// implementater of this trait is responsible for maintaning the per connection state.
+/// implementer of this trait is responsible for maintaining the per connection state.
 ///
 /// Files that support Streams should handle reads and writes via a Pager instead of implementing
 /// this trait.

@@ -34,7 +34,7 @@ source_set("gpioimpl") {
     "//src/lib/ddk:ddk-metadata-headers",
   ]
   public_deps = [
-    "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_cpp",
+    "//sdk/fidl/fuchsia.hardware.pinimpl:fuchsia.hardware.pinimpl_cpp",
     "//sdk/lib/driver/devicetree/visitors:driver-visitor",
   ]
 }

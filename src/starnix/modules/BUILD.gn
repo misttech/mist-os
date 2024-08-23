@@ -1,0 +1,40 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/rust/rustc_library.gni")
+
+group("tests") {
+  testonly = true
+  deps = [
+    "input:tests",
+    "loop:tests",
+  ]
+}
+
+rustc_library("modules") {
+  name = "starnix-modules"
+  edition = "2021"
+  version = "0.1.0"
+  source_root = "lib.rs"
+
+  sources = [ "lib.rs" ]
+
+  deps = [
+    "//src/starnix/kernel:starnix_core",
+    "//src/starnix/lib/starnix-sync",
+    "//src/starnix/lib/starnix-uapi",
+    "//src/starnix/modules/loop",
+    "//src/starnix/modules/zram",
+  ]
+
+  if (is_mistos) {
+    deps -= [ "//src/starnix/kernel:starnix_core" ]
+    deps += [ "//src/starnix_lite/kernel:starnix_lite_core" ]
+  }
+
+  features = []
+  if (is_mistos) {
+    features += [ "starnix_lite" ]
+  }
+}

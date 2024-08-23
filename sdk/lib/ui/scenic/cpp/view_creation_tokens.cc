@@ -15,4 +15,15 @@ ViewCreationTokenPair ViewCreationTokenPair::New() {
   return {.view_token = std::move(child_token), .viewport_token = std::move(parent_token)};
 }
 
+namespace cpp {
+
+ViewCreationTokenPair ViewCreationTokenPair::New() {
+  fuchsia_ui_views::ViewportCreationToken parent_token;
+  fuchsia_ui_views::ViewCreationToken child_token;
+  zx::channel::create(0, &parent_token.value(), &child_token.value());
+  return {.view_token = std::move(child_token), .viewport_token = std::move(parent_token)};
+}
+
+}  // namespace cpp
+
 }  // namespace scenic

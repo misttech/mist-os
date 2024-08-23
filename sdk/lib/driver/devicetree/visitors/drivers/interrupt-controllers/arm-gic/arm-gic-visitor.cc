@@ -95,25 +95,25 @@ class InterruptPropertyV2 {
   //        2 = high-to-low edge triggered (invalid for SPI)
   //        4 = active high level-sensitive
   //        8 = active low level-sensitive (invalid for SPI).
-  zx::result<uint32_t> mode() {
+  zx::result<fuchsia_hardware_platform_bus::ZirconInterruptMode> mode() {
     uint64_t mode = *interrupt_cells_[0][2];
     switch (mode & kModeMask) {
       case GIC_IRQ_MODE_EDGE_RISING:
-        return zx::ok(ZX_INTERRUPT_MODE_EDGE_HIGH);
+        return zx::ok(fuchsia_hardware_platform_bus::ZirconInterruptMode::kEdgeHigh);
       case GIC_IRQ_MODE_EDGE_FALLING:
         if (is_spi()) {
           FDF_LOG(ERROR, "Edge low mode not supported for SPI interrupt");
           return zx::error(ZX_ERR_INVALID_ARGS);
         }
-        return zx::ok(ZX_INTERRUPT_MODE_EDGE_LOW);
+        return zx::ok(fuchsia_hardware_platform_bus::ZirconInterruptMode::kEdgeLow);
       case GIC_IRQ_MODE_LEVEL_HIGH:
-        return zx::ok(ZX_INTERRUPT_MODE_LEVEL_HIGH);
+        return zx::ok(fuchsia_hardware_platform_bus::ZirconInterruptMode::kLevelHigh);
       case GIC_IRQ_MODE_LEVEL_LOW:
         if (is_spi()) {
           FDF_LOG(ERROR, "Level low mode not supported for SPI interrupt");
           return zx::error(ZX_ERR_INVALID_ARGS);
         }
-        return zx::ok(ZX_INTERRUPT_MODE_LEVEL_LOW);
+        return zx::ok(fuchsia_hardware_platform_bus::ZirconInterruptMode::kLevelLow);
       default:
         break;
     }

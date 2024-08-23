@@ -58,7 +58,7 @@ impl Drop for FullmacDriverFixture {
         tracing::info!("FullmacDriverFixture deleting fullmac driver {:?}...", self.id);
         let testcontroller_sync_proxy = self.realm.take_sync_testcontroller_proxy();
         testcontroller_sync_proxy
-            .delete_fullmac(self.id, zx::Time::INFINITE)
+            .delete_fullmac(self.id, zx::MonotonicTime::INFINITE)
             .expect("FIDL error when calling DeleteFullmac")
             .expect("TestController error when calling DeleteFullmac");
     }

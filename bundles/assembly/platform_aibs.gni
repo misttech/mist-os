@@ -38,6 +38,7 @@ bootstrap_user_platform_aib_names = [
   # Kernel args
   "kernel_args_user",
   "kernel_contiguous_physical_pages",
+  "kernel_logs_in_reboot_info",
 
   # RCS live usb support
   "live_usb",
@@ -175,6 +176,8 @@ user_platform_aib_names =
       "audio_device_registry",
       "soundplayer",
       "camera",
+      "media_codecs",
+      "media_sessions",
 
       # Diagnostics
       "diagnostics_triage_detect_mali",
@@ -200,6 +203,9 @@ user_platform_aib_names =
       "socket-proxy-disabled",
       "socket_proxy_packages",
       "socket_proxy_packages_gub",
+
+      # Location
+      "location_emergency",
 
       # WLAN
       "wlan_legacy_privacy_support",
@@ -229,7 +235,6 @@ user_platform_aib_names =
 
       # Opaque input groups.
       "input_group_one",
-      "input_group_two",
 
       # ICU-specific version of intl_services
 
@@ -286,6 +291,9 @@ user_platform_aib_names =
 
       # The tzif zoneinfo files
       "zoneinfo",
+
+      # Security / Trusted Execution
+      "tee_manager_shard_only",
     ]
 
 # The names of all userdebug-allowed platform Assembly Input Bundles
@@ -304,6 +312,11 @@ _userdebug_aib_names = bootstrap_userdebug_platform_aib_names + [
                          "radar_proxy_with_injector",
                          "sl4f",
                          "wlan_development",
+
+                         # Development and Debug tools for connectivity
+                         "development_support_tools_connectivity_networking",
+                         "development_support_tools_connectivity_wlan",
+                         "development_support_tools_connectivity_thread",
                        ]
 
 userdebug_platform_aib_names = user_platform_aib_names + _userdebug_aib_names

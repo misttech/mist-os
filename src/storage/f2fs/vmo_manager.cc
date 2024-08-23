@@ -188,31 +188,21 @@ zx::result<VmoMapping *> VmoManager::GetVmoNodeUnsafe(const pgoff_t index) {
 }
 
 void VmoManager::ZeroBlocks(fs::PagedVfs &vfs, pgoff_t start, pgoff_t end) {
+  // There is no usecase for VmoMode::kPaged
+  if (mode_ != VmoMode::kDiscardable) {
+    return;
+  }
   fs::SharedLock lock(mutex_);
   if (unlikely(start >= size_in_blocks_ || start >= end)) {
     return;
   }
-  if (mode_ == VmoMode::kPaged) {
-    // For punch-a-hole operations, it zeroes the area.
-    if (page_to_address(end) < GetContentSizeUnsafe(true)) {
-      for (pgoff_t i = start; i < end; i += node_size_in_blocks_) {
-        size_t offset = page_to_address(i);
-        auto ret = DirtyPagesUnsafe(vfs, offset, offset + node_size_);
-        // If the vmo at |i| is not supplied, do nothing.
-        if (ret.is_ok()) {
-          ZX_ASSERT(vmo_.op_range(ZX_VMO_OP_ZERO, offset, node_size_, nullptr, 0) == ZX_OK);
-        }
-      }
-    }
-  } else {
-    end = std::min(end, size_in_blocks_);
-    if (start < end) {
-      pgoff_t end_node = fbl::round_up(end, node_size_in_blocks_);
-      for (pgoff_t i = start; i < end_node; i = GetVmoNodeKey(i + node_size_in_blocks_)) {
-        if (auto vmo_node_or = FindVmoNodeUnsafe(GetVmoNodeKey(i)); vmo_node_or.is_ok()) {
-          size_t len = std::min(end - i, node_size_in_blocks_ - GetOffsetInVmoNode(i));
-          ZX_ASSERT(vmo_node_or->Zero(GetOffsetInVmoNode(i), len) == ZX_OK);
-        }
+  end = std::min(end, size_in_blocks_);
+  if (start < end) {
+    pgoff_t end_node = fbl::round_up(end, node_size_in_blocks_);
+    for (pgoff_t i = start; i < end_node; i = GetVmoNodeKey(i + node_size_in_blocks_)) {
+      if (auto vmo_node_or = FindVmoNodeUnsafe(GetVmoNodeKey(i)); vmo_node_or.is_ok()) {
+        size_t len = std::min(end - i, node_size_in_blocks_ - GetOffsetInVmoNode(i));
+        ZX_ASSERT(vmo_node_or->Zero(GetOffsetInVmoNode(i), len) == ZX_OK);
       }
     }
   }
@@ -354,49 +344,6 @@ pgoff_t VmoManager::GetOffsetInVmoNode(pgoff_t page_index) const {
 
 pgoff_t VmoManager::GetVmoNodeKey(pgoff_t page_index) const {
   return fbl::round_down(page_index, node_size_in_blocks_);
-}
-
-VmoCleaner::VmoCleaner(bool bSync, fbl::RefPtr<VnodeF2fs> vnode, const pgoff_t start,
-                       const pgoff_t end)
-    : vnode_(std::move(vnode)), sync_(bSync), offset_(page_to_address(start)) {
-  ZX_ASSERT(start < end);
-  size_t end_offset = end;
-  if (end < kPgOffMax) {
-    end_offset = page_to_address(end);
-  }
-  end_offset = std::min(end_offset, vnode_->GetVmoManager().GetContentSize(true));
-  if (start >= end_offset) {
-    return;
-  }
-  end_offset_ = end_offset;
-  if (sync_) {
-    ZX_ASSERT(
-        vnode_->GetVmoManager().WritebackBegin(*vnode_->fs()->vfs(), offset_, end_offset_).is_ok());
-  } else {
-    auto wb_begin_task = fpromise::make_promise([vnode = vnode_, offset = offset_,
-                                                 end_offset = end_offset_]() {
-      ZX_ASSERT(
-          vnode->GetVmoManager().WritebackBegin(*vnode->fs()->vfs(), offset, end_offset).is_ok());
-    });
-    vnode_->fs()->ScheduleWriter(std::move(wb_begin_task));
-  }
-}
-
-VmoCleaner::~VmoCleaner() {
-  if (!end_offset_) {
-    return;
-  }
-  if (sync_) {
-    ZX_ASSERT(vnode_->GetVmoManager().WritebackEnd(*vnode_->fs()->vfs(), offset_, end_offset_) ==
-              ZX_OK);
-  } else {
-    auto wb_end_task =
-        fpromise::make_promise([vnode = vnode_, offset = offset_, end_offset = end_offset_]() {
-          ZX_ASSERT(vnode->GetVmoManager().WritebackEnd(*vnode->fs()->vfs(), offset, end_offset) ==
-                    ZX_OK);
-        });
-    vnode_->fs()->ScheduleWriter(std::move(wb_end_task));
-  }
 }
 
 }  // namespace f2fs

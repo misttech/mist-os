@@ -153,6 +153,7 @@ type Options = table {
 };
 
 /// Options used when opening a node.
+@available(removed=NEXT)
 type NodeOptions = table {
     1: flags @generated_name("NodeFlags") flexible bits : uint64 {
         /// Requests that an [`Node.OnRepresentation`] event be sent as the first message on the
@@ -308,6 +309,7 @@ closed protocol Directory2 {
     ///
     /// * error `ZX_ERR_ACCESS_DENIED` if the requested rights exceeds what is allowed.
     /// * error `ZX_ERR_BAD_PATH` if `path` is invalid.
+    @available(removed=NEXT)
     @selector("fuchsia.io/Directory.Open")
     strict Open2(resource struct {
         /// Identifies the node to open.

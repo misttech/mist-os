@@ -54,5 +54,4 @@ fuchsia_product_bundle(
     partitions_config = "//build/bazel/assembly/partitions_configurations:vim3",
     product_bundle_name = "power_testing",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
-    update_epoch = "1",
 )

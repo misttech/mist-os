@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fidl/cpp/wire/channel.h>
 
 #include <memory>
@@ -40,10 +41,6 @@ class FakeDisplayCoordinatorConnector : public fidl::Server<fuchsia_hardware_dis
   FakeDisplayCoordinatorConnector operator=(FakeDisplayCoordinatorConnector&&) = delete;
 
   // `fidl::Server<fuchsia_hardware_display::Provider>`
-  void OpenCoordinatorForVirtcon(OpenCoordinatorForVirtconRequest& request,
-                                 OpenCoordinatorForVirtconCompleter::Sync& completer) override;
-  void OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequest& request,
-                                 OpenCoordinatorForPrimaryCompleter::Sync& completer) override;
   void OpenCoordinatorWithListenerForVirtcon(
       OpenCoordinatorWithListenerForVirtconRequest& request,
       OpenCoordinatorWithListenerForVirtconCompleter::Sync& completer) override;
@@ -60,6 +57,7 @@ class FakeDisplayCoordinatorConnector : public fidl::Server<fuchsia_hardware_dis
   struct OpenCoordinatorRequest {
     bool is_virtcon;
     fidl::ServerEnd<fuchsia_hardware_display::Coordinator> coordinator_request;
+    fidl::ClientEnd<fuchsia_hardware_display::CoordinatorListener> coordinator_listener_client_end;
     fit::function<void(zx_status_t)> on_coordinator_opened;
   };
 
@@ -127,6 +125,7 @@ class FakeDisplayCoordinatorConnector : public fidl::Server<fuchsia_hardware_dis
   // Must be called from `state->dispatcher` thread.
   static void ConnectClient(OpenCoordinatorRequest request, const std::shared_ptr<State>& state);
 
+  fdf_testing::ScopedGlobalLogger logger_;
   std::shared_ptr<State> state_;
 };
 

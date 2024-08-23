@@ -35,40 +35,40 @@ FakeDisplayCoordinatorConnector::~FakeDisplayCoordinatorConnector() {
   state_->fake_display_stack->SyncShutdown();
 }
 
-void FakeDisplayCoordinatorConnector::OpenCoordinatorForPrimary(
-    OpenCoordinatorForPrimaryRequest& request,
-    OpenCoordinatorForPrimaryCompleter::Sync& completer) {
-  ConnectOrDeferClient(OpenCoordinatorRequest{
-      .is_virtcon = false,
-      .coordinator_request = std::move(request.coordinator()),
-      .on_coordinator_opened =
-          [async_completer = completer.ToAsync()](zx_status_t status) mutable {
-            async_completer.Reply({{.s = status}});
-          },
-  });
-}
-
-void FakeDisplayCoordinatorConnector::OpenCoordinatorForVirtcon(
-    OpenCoordinatorForVirtconRequest& request,
-    OpenCoordinatorForVirtconCompleter::Sync& completer) {
-  ConnectOrDeferClient(OpenCoordinatorRequest{
-      .is_virtcon = true,
-      .coordinator_request = std::move(request.coordinator()),
-      .on_coordinator_opened = [async_completer = completer.ToAsync()](zx_status_t status) mutable {
-        async_completer.Reply({{.s = status}});
-      }});
-}
-
 void FakeDisplayCoordinatorConnector::OpenCoordinatorWithListenerForPrimary(
     OpenCoordinatorWithListenerForPrimaryRequest& request,
     OpenCoordinatorWithListenerForPrimaryCompleter::Sync& completer) {
-  completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+  ConnectOrDeferClient(OpenCoordinatorRequest{
+      .is_virtcon = false,
+      .coordinator_request = std::move(*request.coordinator()),
+      .coordinator_listener_client_end = std::move(*request.coordinator_listener()),
+      .on_coordinator_opened =
+          [async_completer = completer.ToAsync()](zx_status_t status) mutable {
+            if (status == ZX_OK) {
+              async_completer.Reply(fit::ok());
+            } else {
+              async_completer.Reply(fit::error(status));
+            }
+          },
+  });
 }
 
 void FakeDisplayCoordinatorConnector::OpenCoordinatorWithListenerForVirtcon(
     OpenCoordinatorWithListenerForVirtconRequest& request,
     OpenCoordinatorWithListenerForVirtconCompleter::Sync& completer) {
-  completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
+  ConnectOrDeferClient(OpenCoordinatorRequest{
+      .is_virtcon = true,
+      .coordinator_request = std::move(*request.coordinator()),
+      .coordinator_listener_client_end = std::move(*request.coordinator_listener()),
+      .on_coordinator_opened =
+          [async_completer = completer.ToAsync()](zx_status_t status) mutable {
+            if (status == ZX_OK) {
+              async_completer.Reply(fit::ok());
+            } else {
+              async_completer.Reply(fit::error(status));
+            }
+          },
+  });
 }
 
 void FakeDisplayCoordinatorConnector::ConnectOrDeferClient(OpenCoordinatorRequest req) {
@@ -112,7 +112,8 @@ void FakeDisplayCoordinatorConnector::ConnectClient(OpenCoordinatorRequest reque
       request.is_virtcon ? ClientPriority::kVirtcon : ClientPriority::kPrimary;
   zx_status_t status = state->fake_display_stack->coordinator_controller()->CreateClient(
       client_priority, std::move(request.coordinator_request),
-      /*on_client_dead=*/
+      std::move(request.coordinator_listener_client_end),
+      /*on_client_disconnected=*/
       [state_weak_ptr, use_virtcon_coordinator]() mutable {
         std::shared_ptr<State> state = state_weak_ptr.lock();
         if (!state) {
@@ -120,8 +121,8 @@ void FakeDisplayCoordinatorConnector::ConnectClient(OpenCoordinatorRequest reque
         }
         // Redispatch `ReleaseCoordinatorAndConnectToNextQueuedClient()` back
         // to the state async dispatcher (where it is only allowed to run),
-        // since the `on_client_dead` callback may not be expected to run on
-        // that dispatcher.
+        // since the `on_client_disconnected` callback may not be expected to
+        // run on that dispatcher.
         async::PostTask(state->dispatcher, [state_weak_ptr, use_virtcon_coordinator]() mutable {
           if (std::shared_ptr<State> state = state_weak_ptr.lock(); state) {
             ReleaseCoordinatorAndConnectToNextQueuedClient(use_virtcon_coordinator,

@@ -4,6 +4,7 @@
 
 #include "src/graphics/display/lib/edid/edid.h"
 
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/fit/result.h>
 #include <zircon/assert.h>
 
@@ -20,7 +21,6 @@
 #include <fbl/string_buffer.h>
 
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/graphics/display/lib/edid/eisa_vid_lut.h"
 #include "src/graphics/display/lib/edid/timings.h"
 
@@ -65,15 +65,15 @@ std::string UnpackIdManufacturerName(uint8_t byte_08h, uint8_t byte_09h) {
   // Some EDIDs may contain invalid manufacturer name codes. We replace the
   // invalid characters with the fallback character 'A'.
   if (compressed_character1 < 1 || compressed_character1 > 26) {
-    zxlogf(WARNING, "Invalid manufacturer name code character #1: %d", compressed_character1);
+    FDF_LOG(WARNING, "Invalid manufacturer name code character #1: %d", compressed_character1);
     compressed_character1 = 1;
   }
   if (compressed_character2 < 1 || compressed_character2 > 26) {
-    zxlogf(WARNING, "Invalid manufacturer name code character #2: %d", compressed_character2);
+    FDF_LOG(WARNING, "Invalid manufacturer name code character #2: %d", compressed_character2);
     compressed_character2 = 1;
   }
   if (compressed_character3 < 1 || compressed_character3 > 26) {
-    zxlogf(WARNING, "Invalid manufacturer name code character #3: %d", compressed_character3);
+    FDF_LOG(WARNING, "Invalid manufacturer name code character #3: %d", compressed_character3);
     compressed_character3 = 1;
   }
 
@@ -451,7 +451,7 @@ display::DisplayTiming DetailedTimingDescriptorToDisplayTiming(
   if (dtd.type() != TYPE_DIGITAL_SEPARATE) {
     // TODO(https://fxbug.dev/42086615): Displays using composite syncs are not
     // supported. We treat them as if they were using separate sync signals.
-    zxlogf(WARNING, "The detailed timing descriptor uses composite sync; this is not supported.");
+    FDF_LOG(WARNING, "The detailed timing descriptor uses composite sync; this is not supported.");
   }
 
   return display::DisplayTiming{
@@ -491,8 +491,9 @@ std::optional<display::DisplayTiming> StandardTimingDescriptorToDisplayTiming(
   int32_t v_rate = static_cast<int32_t>(std.vertical_freq()) + 60;
 
   if (!width || !height || !v_rate) {
-    zxlogf(WARNING, "Invalid standard timing descriptor: %" PRId32 " x %" PRId32 "@ %" PRId32 " Hz",
-           width, height, v_rate);
+    FDF_LOG(WARNING,
+            "Invalid standard timing descriptor: %" PRId32 " x %" PRId32 "@ %" PRId32 " Hz", width,
+            height, v_rate);
     return std::nullopt;
   }
 
@@ -503,11 +504,12 @@ std::optional<display::DisplayTiming> StandardTimingDescriptorToDisplayTiming(
     }
   }
 
-  zxlogf(WARNING,
-         "This EDID contains a non-DMT standard timing (%" PRIu32 "x%" PRIu32 " @%" PRIu32
-         "Hz). The timing is not supported and will be ignored. See https://fxbug.dev/42085380 for "
-         "details.",
-         width, height, v_rate);
+  FDF_LOG(
+      WARNING,
+      "This EDID contains a non-DMT standard timing (%" PRIu32 "x%" PRIu32 " @%" PRIu32
+      "Hz). The timing is not supported and will be ignored. See https://fxbug.dev/42085380 for "
+      "details.",
+      width, height, v_rate);
   return std::nullopt;
 }
 

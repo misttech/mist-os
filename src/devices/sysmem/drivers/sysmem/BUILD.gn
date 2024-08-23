@@ -28,11 +28,11 @@ driver_bind_rules("sysmem_bind") {
 }
 
 # These build args are not the correct place to configure sysmem (outside of
-# local experiments). Instead, use PlatformSysmemConfig via the assembly tool.
-# PlatformSysmemConfig fields can be set at board info level (if/when it makes
-# sense for a board definition to provide sysmem defaults) or at platform config
-# level (when configuring sysmem for a product / when configuring fuchsia via
-# fuchsia SDK).
+# local experiments). Instead, use BoardSysmemConfig and/or PlatformSysmemConfig
+# via the assembly tool. The settings in PlatformSysmemConfig can override
+# settings in the BoardSysmemConfig. See also
+# BoardProvidedConfig.sysmem_format_costs which can also be specified for the
+# board.
 #
 # TODO(b/347090887): Remove these when developer overrides are wired up for
 # bazel-based builds.
@@ -102,11 +102,6 @@ source_set("sysmem_common_srcs") {
     "//sdk/lib/fidl",
     "//sdk/lib/fit",
     "//sdk/lib/sys/cpp:cpp",
-
-    # TODO(b/42113093): Remove this dep on AmLogic-specific heap names in sysmem code. The dep is
-    # currently needed for secure heap names only, which is why a dep for goldfish heap names isn't
-    # here.
-    "//src/devices/bind/fuchsia.amlogic.platform.sysmem.heap:fuchsia.amlogic.platform.sysmem.heap_cpp",
     "//src/devices/bind/fuchsia.sysmem.heap:fuchsia.sysmem.heap_cpp",
     "//src/devices/lib/driver:driver_runtime",
     "//src/devices/sysmem/metrics",
@@ -137,6 +132,7 @@ fuchsia_driver("sysmem-driver") {
   configs += [
     "//build/config:all_source",
     "//build/config/fuchsia:enable_zircon_asserts",
+    "//build/config/fuchsia:fdio_config",
   ]
   if (is_fuchsia) {
     fdio_config = [ "//build/config/fuchsia:fdio_config" ]
@@ -146,8 +142,14 @@ fuchsia_driver("sysmem-driver") {
   }
 
   if (is_mistos) {
-    configs -= [ "//build/config/fuchsia:enable_zircon_asserts" ]
-    configs += [ "//build/config/mistos:enable_zircon_asserts" ]
+    configs -= [
+      "//build/config/fuchsia:enable_zircon_asserts",
+      "//build/config/fuchsia:fdio_config",
+    ]
+    configs += [
+      "//build/config/mistos:enable_zircon_asserts",
+      "//build/config/mistos:fdio_config",
+    ]
 
     fdio_config = [ "//build/config/mistos:fdio_config" ]
     if (configs + fdio_config - fdio_config != configs) {
@@ -251,8 +253,37 @@ test("sysmem-unittest-bin") {
   ]
 }
 
+template("test_format_costs_file") {
+  resource(target_name) {
+    _input = invoker.format_costs
+    deps = [ _input ]
+    sources =
+        [ get_label_info(_input, "target_out_dir") + "/" +
+          get_label_info(_input, "name") + ".format_costs_persistent_fidl" ]
+    outputs = "data/format_costs/" + get_label_info(_input, "name") +
+              ".format_costs_persistent_fidl"
+  }
+}
+
+test_format_costs_file("test_format_costs_arm_mali") {
+  format_costs = "//src/devices/sysmem/format_costs/arm_mali"
+}
+
+test_format_costs_file("test_format_costs_intel") {
+  format_costs = "//src/devices/sysmem/format_costs/intel"
+}
+
+test_format_costs_file("test_format_costs_video_decoder_nv12") {
+  format_costs = "//src/devices/sysmem/format_costs/video_decoder_nv12"
+}
+
 fuchsia_unittest_package("sysmem-unittest") {
-  deps = [ ":sysmem-unittest-bin" ]
+  deps = [
+    ":sysmem-unittest-bin",
+    ":test_format_costs_arm_mali",
+    ":test_format_costs_intel",
+    ":test_format_costs_video_decoder_nv12",
+  ]
   test_specs = {
     log_settings = {
       max_severity = "ERROR"

@@ -209,7 +209,7 @@ pub trait IpPacket<B: ByteSlice, I: IpExt>:
         buffer: BV,
         header: Vec<u8>,
         body_fragments: IT,
-    ) -> IpParseResult<I, Self>
+    ) -> IpParseResult<I, ()>
     where
         B: ByteSliceMut;
 
@@ -258,7 +258,7 @@ impl<B: ByteSlice> IpPacket<B, Ipv4> for Ipv4Packet<B> {
         buffer: BV,
         header: Vec<u8>,
         body_fragments: IT,
-    ) -> IpParseResult<Ipv4, Ipv4Packet<B>>
+    ) -> IpParseResult<Ipv4, ()>
     where
         B: ByteSliceMut,
     {
@@ -309,7 +309,7 @@ impl<B: ByteSlice> IpPacket<B, Ipv6> for Ipv6Packet<B> {
         buffer: BV,
         header: Vec<u8>,
         body_fragments: IT,
-    ) -> IpParseResult<Ipv6, Ipv6Packet<B>>
+    ) -> IpParseResult<Ipv6, ()>
     where
         B: ByteSliceMut,
     {

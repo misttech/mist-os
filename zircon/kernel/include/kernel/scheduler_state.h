@@ -502,11 +502,6 @@ class SchedulerState {
   // is added to the run queue.
   uint64_t generation_{0};
 
-  // The thread which ran just before this thread was scheduled.  Used by
-  // Scheduler::LockHandoff to release the previous thread's lock after a
-  // context switch operation has fully completed.
-  Thread* previous_thread_{nullptr};
-
   // The current sched_latency flow id for this thread.
   uint64_t flow_id_{0};
 

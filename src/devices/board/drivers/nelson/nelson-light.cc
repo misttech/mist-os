@@ -115,7 +115,7 @@ zx_status_t Nelson::LightInit() {
 
   // GPIO must be set to default out otherwise could cause light to not work
   // on certain reboots.
-  gpio_init_steps_.push_back(GpioConfigOut(GPIO_AMBER_LED_PWM, 1));
+  gpio_init_steps_.push_back(GpioOutput(GPIO_AMBER_LED_PWM, true));
 
   auto amber_led_gpio_bind_rules = std::vector{
       fdf::MakeAcceptBindRule(bind_fuchsia_hardware_gpio::SERVICE,

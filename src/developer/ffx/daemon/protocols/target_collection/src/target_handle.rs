@@ -144,7 +144,7 @@ pub(crate) async fn wait_for_rcs(
     // This setup here is due to the events not having a proper streaming implementation. The
     // closure is intended to have a static lifetime, which forces this to happen to extract an
     // event.
-    let seen_event = Rc::new(RefCell::new(None));
+    let seen_event = Rc::new(RefCell::new(Option::<SshError>::None));
 
     Ok(loop {
         if let Some(rcs) = t.rcs() {
@@ -159,6 +159,7 @@ pub(crate) async fn wait_for_rcs(
                     break Err(host_pipe_err_to_fidl(err));
                 }
             });
+            break Err(host_pipe_err_to_fidl(err));
         } else {
             tracing::trace!("RCS dropped after event fired. Waiting again.");
         }

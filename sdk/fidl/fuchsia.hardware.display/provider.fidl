@@ -15,34 +15,6 @@ using zx;
 closed protocol Provider {
     /// Opens a Virtcon client connection to the display coordinator.
     ///
-    /// On success, `coordinator` will be bound to the display
-    /// coordinator, as the Virtcon client.
-    ///
-    /// Returns `ZX_ERR_ALREADY_BOUND` if the display coordinator already has a
-    /// connected Virtcon client.
-    @selector("OpenVirtconController")
-    strict OpenCoordinatorForVirtcon(resource struct {
-        coordinator server_end:Coordinator;
-    }) -> (struct {
-        s zx.Status;
-    });
-
-    /// Opens a main client connection to the display coordinator.
-    ///
-    /// On success, `coordinator` will be bound to the display
-    /// coordinator, as the main client.
-    ///
-    /// Returns `ZX_ERR_ALREADY_BOUND` if the display coordinator already has a
-    /// connected main client.
-    @selector("OpenController")
-    strict OpenCoordinatorForPrimary(resource struct {
-        coordinator server_end:Coordinator;
-    }) -> (struct {
-        s zx.Status;
-    });
-
-    /// Opens a Virtcon client connection to the display coordinator.
-    ///
     /// On success, `coordinator` and `coordinator_listener` will be bound to
     /// the display coordinator, as the Virtcon client.
     ///

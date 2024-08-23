@@ -431,6 +431,7 @@ zx::result<LockedPage> NodeManager::GetLockedDnodePage(NodePath &node_path, bool
       }
       new_nids.push_back(nid);
       node_page = std::move(*page_or);
+      parent.WaitOnWriteback();
       parent.GetPage<NodePage>().SetNid(offset[i], nid);
       parent.SetDirty();
       ++node_path.num_new_nodes;

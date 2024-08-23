@@ -49,9 +49,9 @@ class KernelSampler : public Sampler {
   zx::result<> Stop() override;
 
  private:
-  void AddThread(std::vector<const zx_koid_t> job_path, zx_koid_t pid, zx_koid_t tid,
+  void AddThread(std::vector<zx_koid_t> job_path, zx_koid_t pid, zx_koid_t tid,
                  zx::thread t) override;
-  void RemoveThread(std::vector<const zx_koid_t> job_path, zx_koid_t pid, zx_koid_t tid) override;
+  void RemoveThread(std::vector<zx_koid_t> job_path, zx_koid_t pid, zx_koid_t tid) override;
 
   std::unique_ptr<KernelSamplerSession> session_;
   size_t buffer_size_bytes_;

@@ -28,9 +28,6 @@ declare_args() {
   # board definition rather than the product definition.
   board_recovery_package_labels = []
 
-  # A list of binary labels to include in the ZBI.
-  board_bootfs_labels = []
-
   # Core realm shards specific to this board. See //src/sys/core for more
   # context.
   board_core_realm_shards = []
@@ -53,16 +50,14 @@ declare_args() {
   # The label for the board configuration target to use with Product Assembly
   board_configuration_label = false
 
-  # Whether or not the board supports emulator/physical devices.
+  # Whether or not the board supports emulator devices.
   # This is used to determine if product bundle metadata should generate a
-  # physical/virtual device spec or both.
+  # virtual device spec or both.
   board_is_emu = false
-  board_is_phys = true
 
   # The partitions config information used to create an update package and
   # product bundle.
   partitions_config_label = false
-  partitions_config_contents = []
 }
 
 declare_args() {

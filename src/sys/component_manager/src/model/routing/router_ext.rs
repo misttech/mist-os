@@ -8,6 +8,7 @@ use cm_rust::CapabilityTypeName;
 use cm_types::Name;
 use futures::future::BoxFuture;
 use router_error::{Explain, RouterError};
+use routing::availability::AvailabilityMetadata;
 use routing::bedrock::request_metadata::{METADATA_KEY_TYPE, TYPE_PROTOCOL};
 use sandbox::{
     Capability, Dict, DirEntry, RemotableCapability, Request, Router, WeakInstanceToken,
@@ -98,14 +99,11 @@ impl RouterExt for Router {
                             )
                             .unwrap();
                     }
-                    let request = Request {
-                        target: weak_component.clone(),
-                        // Use the weakest availability, so that it gets immediately upgraded to
-                        // the availability in `router`.
-                        availability: cm_types::Availability::Transitional,
-                        debug: false,
-                        metadata,
-                    };
+                    // Use the weakest availability, so that it gets immediately upgraded to
+                    // the availability in `router`.
+                    metadata.set_availability(cm_types::Availability::Transitional);
+                    let request =
+                        Request { target: weak_component.clone(), debug: false, metadata };
                     // TODO: Should we convert the Open to a Directory here if the Router wraps a
                     // Dict?
                     Capability::DirEntry(DirEntry::new(router.into_directory_entry(
@@ -176,7 +174,10 @@ impl RouterExt for Router {
                 let _guard = open_request.scope().active_guard();
 
                 // Request a capability from the `router`.
-                let result = self.router.route(self.request.clone()).await;
+                let result = self
+                    .router
+                    .route(self.request.try_clone().map_err(|_e| zx::Status::INVALID_ARGS)?)
+                    .await;
                 let error = match result {
                     Ok(capability) => {
                         let capability = match capability {

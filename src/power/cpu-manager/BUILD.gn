@@ -127,7 +127,10 @@ fuchsia_package("package") {
 
 group("tests") {
   testonly = true
-  deps = [ ":cpu-manager-tests" ]
+  deps = [
+    ":cpu-manager-tests",
+    "energy_model_config:tests",
+  ]
 }
 
 fuchsia_unittest_package("cpu-manager-tests") {

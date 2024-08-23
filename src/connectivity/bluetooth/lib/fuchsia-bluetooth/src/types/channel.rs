@@ -9,6 +9,7 @@ use std::fmt;
 use std::pin::Pin;
 use std::sync::{Arc, Mutex};
 use std::task::{Context, Poll};
+use tracing::warn;
 use {
     fidl_fuchsia_bluetooth as fidl_bt, fidl_fuchsia_bluetooth_bredr as bredr,
     fuchsia_async as fasync, fuchsia_zircon as zx,
@@ -52,15 +53,21 @@ impl From<A2dpDirection> for bredr::A2dpDirectionPriority {
     }
 }
 
-impl From<fidl_bt::ChannelMode> for ChannelMode {
-    fn from(fidl: fidl_bt::ChannelMode) -> Self {
+impl TryFrom<fidl_bt::ChannelMode> for ChannelMode {
+    type Error = Error;
+    fn try_from(fidl: fidl_bt::ChannelMode) -> Result<Self, Error> {
         match fidl {
-            fidl_bt::ChannelMode::Basic => ChannelMode::Basic,
-            fidl_bt::ChannelMode::EnhancedRetransmission => ChannelMode::EnhancedRetransmissionMode,
-            fidl_bt::ChannelMode::LeCreditBasedFlowControl => ChannelMode::LeCreditBasedFlowControl,
-            fidl_bt::ChannelMode::EnhancedCreditBasedFlowControl => {
-                ChannelMode::EnhancedCreditBasedFlowControl
+            fidl_bt::ChannelMode::Basic => Ok(ChannelMode::Basic),
+            fidl_bt::ChannelMode::EnhancedRetransmission => {
+                Ok(ChannelMode::EnhancedRetransmissionMode)
             }
+            fidl_bt::ChannelMode::LeCreditBasedFlowControl => {
+                Ok(ChannelMode::LeCreditBasedFlowControl)
+            }
+            fidl_bt::ChannelMode::EnhancedCreditBasedFlowControl => {
+                Ok(ChannelMode::EnhancedCreditBasedFlowControl)
+            }
+            x => Err(Error::FailedConversion(format!("Unsupported channel mode type: {x:?}"))),
         }
     }
 }
@@ -241,9 +248,17 @@ impl TryFrom<fidl_fuchsia_bluetooth_bredr::Channel> for Channel {
     type Error = zx::Status;
 
     fn try_from(fidl: bredr::Channel) -> Result<Self, Self::Error> {
+        let channel = match fidl.channel_mode.unwrap_or(fidl_bt::ChannelMode::Basic).try_into() {
+            Err(e) => {
+                warn!("Unsupported channel mode type: {e:?}");
+                return Err(zx::Status::INTERNAL);
+            }
+            Ok(c) => c,
+        };
+
         Ok(Self {
             socket: fasync::Socket::from_socket(fidl.socket.ok_or(zx::Status::INVALID_ARGS)?),
-            mode: fidl.channel_mode.unwrap_or(fidl_bt::ChannelMode::Basic).into(),
+            mode: channel,
             max_tx_size: fidl.max_tx_sdu_size.ok_or(zx::Status::INVALID_ARGS)? as usize,
             flush_timeout: Arc::new(Mutex::new(fidl.flush_timeout.map(zx::Duration::from_nanos))),
             audio_direction_ext: fidl.ext_direction.and_then(|e| e.into_proxy().ok()),

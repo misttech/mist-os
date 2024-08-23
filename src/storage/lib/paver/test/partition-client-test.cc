@@ -379,15 +379,17 @@ class FixedOffsetBlockPartitionClientTest : public zxtest::Test {
 
   // Creates a BlockPartitionClient which will read/write the entire device.
   zx::result<std::unique_ptr<paver::BlockPartitionClient>> RawClient() {
-    return paver::BlockPartitionClient::Create(gpt_dev_->block_controller_interface());
+    return paver::BlockPartitionClient::Create(
+        std::make_unique<paver::DevfsVolumeConnector>(gpt_dev_->ConnectToController()));
   }
 
   // Creates a FixedOffsetBlockPartitionClient which will read/write with a partition
   // and buffer offset
   zx::result<std::unique_ptr<paver::FixedOffsetBlockPartitionClient>> FixedOffsetClient(
       size_t partition_offset, size_t buffer_offset) {
-    return paver::FixedOffsetBlockPartitionClient::Create(gpt_dev_->block_controller_interface(),
-                                                          partition_offset, buffer_offset);
+    return paver::FixedOffsetBlockPartitionClient::Create(
+        std::make_unique<paver::DevfsVolumeConnector>(gpt_dev_->ConnectToController()),
+        partition_offset, buffer_offset);
   }
 
   fidl::ClientEnd<fuchsia_io::Directory> GetSvcRoot() { return devmgr_.fshost_svc_dir(); }

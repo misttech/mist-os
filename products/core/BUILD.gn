@@ -33,6 +33,14 @@ _platform_configuration_base = {
   # Include sl4f on all core products until tests transition to other APIs.
   development_support = {
     include_sl4f = true
+
+    tools = {
+      connectivity = {
+        enable_networking = true
+        enable_wlan = true
+        enable_thread = true
+      }
+    }
   }
 
   input_groups = {
@@ -49,6 +57,8 @@ _platform_configuration_base = {
       full_stack = {
       }
     }
+    enable_codecs = true
+    enable_sessions = true
   }
 
   setui = {

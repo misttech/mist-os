@@ -189,7 +189,7 @@ impl InvalidStoredMessage {
         // When we fail to parse a message set a WARN for it and use the timestamp for when the
         // message was received. We'll be adding an error for this.
         let severity = Severity::Warn;
-        let timestamp = zx::Time::get_monotonic().into_nanos();
+        let timestamp = zx::MonotonicTime::get().into_nanos();
         InvalidStoredMessage { err, severity, timestamp, stats }
     }
 }

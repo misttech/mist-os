@@ -24,6 +24,7 @@ rustc_test("bin") {
   sources = [ "test.rs" ]
   deps = [
     "fidl:fuchsia.crashdriver.test_rust",
+    "//sdk/fidl/fuchsia.component.test:fuchsia.component.test_rust",
     "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_rust",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/lib/driver_test_realm/realm_builder/rust",

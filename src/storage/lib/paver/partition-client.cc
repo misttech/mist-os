@@ -13,12 +13,14 @@
 #include <zircon/status.h>
 
 #include <cstdint>
+#include <memory>
 #include <numeric>
 
 #include <fbl/algorithm.h>
 #include <fbl/unique_fd.h>
 #include <storage/buffer/owned_vmoid.h>
 
+#include "lib/fidl/cpp/wire/channel.h"
 #include "src/storage/lib/paver/pave-logging.h"
 
 namespace paver {
@@ -26,27 +28,15 @@ namespace paver {
 namespace block = fuchsia_hardware_block;
 
 zx::result<std::unique_ptr<BlockPartitionClient>> BlockPartitionClient::Create(
-    fidl::UnownedClientEnd<fuchsia_device::Controller> partition_controller) {
-  fidl::ClientEnd<fuchsia_device::Controller> controller;
-  zx::result controller_server = fidl::CreateEndpoints(&controller);
-  if (fidl::OneWayStatus status =
-          fidl::WireCall(partition_controller)->ConnectToController(std::move(*controller_server));
-      !status.ok()) {
-    return zx::error(status.status());
+    std::unique_ptr<VolumeConnector> connector) {
+  zx::result partition_client_end = connector->Connect();
+  if (partition_client_end.is_error()) {
+    return partition_client_end.take_error();
   }
-
-  fidl::ClientEnd<fuchsia_hardware_block::Block> partition;
-  zx::result server = fidl::CreateEndpoints(&partition);
-  if (server.is_error()) {
-    return server.take_error();
-  }
-  if (fidl::OneWayStatus status =
-          fidl::WireCall(partition_controller)->ConnectToDeviceFidl(server->TakeChannel());
-      !status.ok()) {
-    return zx::error(status.status());
-  }
-  return zx::ok(
-      std::make_unique<BlockPartitionClient>(std::move(controller), std::move(partition)));
+  fidl::WireSyncClient<fuchsia_hardware_block::Block> partition(
+      fidl::ClientEnd<fuchsia_hardware_block::Block>(partition_client_end->TakeChannel()));
+  return zx::ok(std::unique_ptr<BlockPartitionClient>(
+      new BlockPartitionClient(std::move(connector), std::move(partition))));
 }
 
 zx::result<std::reference_wrapper<fuchsia_hardware_block::wire::BlockInfo>>
@@ -243,38 +233,18 @@ zx::result<> BlockPartitionClient::Flush() {
   return zx::make_result(client_->Transaction(&request, 1));
 }
 
-fidl::UnownedClientEnd<fuchsia_hardware_block::Block> BlockPartitionClient::block_channel() {
-  return partition_.client_end().borrow();
-}
-
-fidl::UnownedClientEnd<fuchsia_device::Controller> BlockPartitionClient::controller_channel() {
-  return controller_.client_end().borrow();
-}
-
 zx::result<std::unique_ptr<FixedOffsetBlockPartitionClient>>
-FixedOffsetBlockPartitionClient::Create(
-    fidl::UnownedClientEnd<fuchsia_device::Controller> partition_controller,
-    size_t offset_partition_in_blocks, size_t offset_buffer_in_blocks) {
-  fidl::ClientEnd<fuchsia_device::Controller> controller;
-  zx::result controller_server = fidl::CreateEndpoints(&controller);
-  if (fidl::OneWayStatus status =
-          fidl::WireCall(partition_controller)->ConnectToController(std::move(*controller_server));
-      !status.ok()) {
-    return zx::error(status.status());
+FixedOffsetBlockPartitionClient::Create(std::unique_ptr<VolumeConnector> connector,
+                                        size_t offset_partition_in_blocks,
+                                        size_t offset_buffer_in_blocks) {
+  zx::result partition_client_end = connector->Connect();
+  if (partition_client_end.is_error()) {
+    return partition_client_end.take_error();
   }
-
-  fidl::ClientEnd<fuchsia_hardware_block::Block> partition;
-  zx::result server = fidl::CreateEndpoints(&partition);
-  if (server.is_error()) {
-    return server.take_error();
-  }
-  if (fidl::OneWayStatus status =
-          fidl::WireCall(partition_controller)->ConnectToDeviceFidl(server->TakeChannel());
-      !status.ok()) {
-    return zx::error(status.status());
-  }
+  fidl::WireSyncClient<fuchsia_hardware_block::Block> block(
+      fidl::ClientEnd<fuchsia_hardware_block::Block>(partition_client_end->TakeChannel()));
   return zx::ok(std::make_unique<FixedOffsetBlockPartitionClient>(
-      std::move(controller), std::move(partition), offset_partition_in_blocks,
+      BlockPartitionClient(std::move(connector), std::move(block)), offset_partition_in_blocks,
       offset_buffer_in_blocks));
 }
 

@@ -75,7 +75,16 @@ class UsbDevice : public UsbDeviceType,
                          ConnectToEndpointCompleter::Sync& completer) override {
     auto result =
         hci_new_->ConnectToEndpoint(device_id_, request.ep_addr(), std::move(request.ep()));
+    if (!result.ok()) {
+      zxlogf(ERROR, "(framework) Failed to connect to endpoint: %s",
+             zx_status_get_string(result.error().status()));
+
+      completer.Reply(fit::as_error(result.status()));
+      return;
+    }
     if (result->is_error()) {
+      zxlogf(ERROR, "Failed to connect to endpoint: %s",
+             zx_status_get_string(result->error_value()));
       completer.Reply(fit::as_error(result->error_value()));
       return;
     }

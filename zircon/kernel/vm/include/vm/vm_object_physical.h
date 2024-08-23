@@ -57,6 +57,11 @@ class VmObjectPhysical final : public VmObject {
     // Unpin is a no-op for physical VMOs as they are always pinned.
   }
 
+  void SetUserContentSize(fbl::RefPtr<ContentSizeManager> csm) override {
+    // Physical VMOs have no operations that can be told to use the user content size, so can safely
+    // just ignore this request.
+  }
+
   // Physical VMOs are implicitly pinned.
   bool DebugIsRangePinned(uint64_t offset, uint64_t len) override { return true; }
 

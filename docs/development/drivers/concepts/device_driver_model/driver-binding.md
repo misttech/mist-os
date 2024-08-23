@@ -181,14 +181,14 @@ An example composite bind rule file can be found at
 [//tools/bindc/examples/composite-gizmo.bind](/tools/bindc/examples/composite-gizmo.bind).
 
 ```
-composite gizmo_sysmem;
+composite gizmo_pci;
 
+using fuchsia.pci;
 using fuchsia.platform;
-using fuchsia.sysmem;
 using fuchsia.tee;
 
-primary node "sysmem" {
-  fuchsia.BIND_PROTOCOL == fuchsia.sysmem.BIND_PROTOCOL.DEVICE;
+primary node "pci" {
+  fuchsia.BIND_PROTOCOL == fuchsia.pci.BIND_PROTOCOL.DEVICE;
 }
 
 node "tee" {
@@ -274,17 +274,17 @@ bind rules match a device with the listed properties.
 ```
 [
     {
-        "node": "sysmem",
+        "node": "pci",
         "tests": [
             {
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.sysmem.BIND_PROTOCOL.DEVICE"
+                    "fuchsia.BIND_PROTOCOL": "fuchsia.pci.BIND_PROTOCOL.DEVICE"
                 }
             },
             {
-                "name": "Abort sysmem",
+                "name": "Abort pci",
                 "expected": "abort",
                 "device": {
                     "fuchsia.BIND_PROTOCOL": "fuchsia.tee.BIND_PROTOCOL.DEVICE"

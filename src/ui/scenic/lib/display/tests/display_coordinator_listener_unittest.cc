@@ -4,49 +4,34 @@
 
 #include "src/ui/scenic/lib/display/display_coordinator_listener.h"
 
-#include <fuchsia/hardware/display/cpp/fidl.h>
-#include <fuchsia/hardware/display/types/cpp/fidl.h>
-#include <fuchsia/images2/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.display/cpp/fidl.h>
+#include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/channel.h>
 
 #include <gtest/gtest.h>
 
-#include "lib/fidl/cpp/comparison.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 #include "src/ui/scenic/lib/display/tests/mock_display_coordinator.h"
 
-namespace scenic_impl {
-namespace display {
-namespace test {
+namespace scenic_impl::display::test {
 
 namespace {
 
-struct ChannelPair {
-  zx::channel server;
-  zx::channel client;
-};
-
-ChannelPair CreateChannelPair() {
-  ChannelPair c;
-  FX_CHECK(ZX_OK == zx::channel::create(0, &c.server, &c.client));
-  return c;
-}
-
-}  // namespace
-
 class DisplayCoordinatorListenerTest : public gtest::TestLoopFixture {
  public:
-  void SetUp() {
-    ChannelPair coordinator_channel = CreateChannelPair();
+  void SetUp() override {
+    auto [coordinator_client, coordinator_server] =
+        fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
+    auto [listener_client, listener_server] =
+        fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
 
     mock_display_coordinator_ =
-        std::make_unique<MockDisplayCoordinator>(fuchsia::hardware::display::Info{});
-    mock_display_coordinator_->Bind(std::move(coordinator_channel.server));
+        std::make_unique<MockDisplayCoordinator>(fuchsia_hardware_display::Info{});
+    mock_display_coordinator_->Bind(std::move(coordinator_server), std::move(listener_client));
 
-    auto coordinator = std::make_shared<fuchsia::hardware::display::CoordinatorSyncPtr>();
-    coordinator->Bind(std::move(coordinator_channel.client));
-    display_coordinator_listener_ = std::make_unique<DisplayCoordinatorListener>(coordinator);
+    listener_server_end_ = std::move(listener_server);
   }
 
   DisplayCoordinatorListener* display_coordinator_listener() {
@@ -58,87 +43,67 @@ class DisplayCoordinatorListenerTest : public gtest::TestLoopFixture {
 
   MockDisplayCoordinator* mock_display_coordinator() { return mock_display_coordinator_.get(); }
 
+  // Must be called no more than once per test case.
+  fidl::ServerEnd<fuchsia_hardware_display::CoordinatorListener> TakeListenerServerEnd() {
+    FX_DCHECK(listener_server_end_.is_valid());
+    return std::move(listener_server_end_);
+  }
+
  private:
   std::unique_ptr<MockDisplayCoordinator> mock_display_coordinator_;
   std::unique_ptr<DisplayCoordinatorListener> display_coordinator_listener_;
+
+  fidl::ServerEnd<fuchsia_hardware_display::CoordinatorListener> listener_server_end_;
 };
 
 using DisplayCoordinatorListenerBasicTest = gtest::TestLoopFixture;
 
 // Verify the documented constructor behavior doesn't cause any crash.
 TEST_F(DisplayCoordinatorListenerBasicTest, ConstructorArgs) {
-  // Valid arguments.
-  ChannelPair coordinator_channel = CreateChannelPair();
-
-  auto coordinator = std::make_shared<fuchsia::hardware::display::CoordinatorSyncPtr>();
-  coordinator->Bind(std::move(coordinator_channel.client));
-  DisplayCoordinatorListener listener(coordinator);
-}
-
-// Verify that DisplayCoordinator connects to the FIDL service and the
-// connection can be torn down when the coordinator server channel is closed.
-TEST_F(DisplayCoordinatorListenerTest, ConnectAndDisconnect) {
-  display_coordinator_listener()->InitializeCallbacks(/*displays_changed_cb=*/nullptr,
-                                                      /*client_ownership_change_cb=*/nullptr);
-
-  EXPECT_TRUE(mock_display_coordinator()->binding().is_bound());
-  RunLoopUntilIdle();
-  EXPECT_TRUE(mock_display_coordinator()->binding().is_bound());
-
-  mock_display_coordinator()->ResetCoordinatorBinding();
-  RunLoopUntilIdle();
-
-  // Expect no crashes on teardown.
-  ResetDisplayCoordinatorListener();
-  RunLoopUntilIdle();
+  auto [listener_client, listener_server] =
+      fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
+  DisplayCoordinatorListener listener(std::move(listener_server), /*on_displays_changed=*/nullptr,
+                                      /*on_vsync=*/nullptr, /*on_client_ownership_change=*/nullptr);
 }
 
 TEST_F(DisplayCoordinatorListenerTest, OnDisplaysChanged) {
-  std::vector<fuchsia::hardware::display::Info> displays_added;
-  std::vector<fuchsia::hardware::display::types::DisplayId> displays_removed;
-  auto displays_changed_cb =
-      [&displays_added, &displays_removed](
-          std::vector<fuchsia::hardware::display::Info> added,
-          std::vector<fuchsia::hardware::display::types::DisplayId> removed) {
-        displays_added = added;
-        displays_removed = removed;
-      };
+  std::vector<fuchsia_hardware_display::Info> displays_added;
+  std::vector<fuchsia_hardware_display_types::DisplayId> displays_removed;
+  auto displays_changed_cb = [&displays_added, &displays_removed](
+                                 std::vector<fuchsia_hardware_display::Info> added,
+                                 std::vector<fuchsia_hardware_display_types::DisplayId> removed) {
+    displays_added = added;
+    displays_removed = removed;
+  };
 
-  display_coordinator_listener()->InitializeCallbacks(std::move(displays_changed_cb),
-                                                      /*client_ownership_change_cb=*/nullptr);
-  fuchsia::hardware::display::Mode test_mode;
-  test_mode.horizontal_resolution = 1024;
-  test_mode.vertical_resolution = 800;
-  test_mode.refresh_rate_e2 = 60;
-  test_mode.flags = 0;
-  fuchsia::hardware::display::Info test_display;
-  test_display.id = {.value = 1};
-  test_display.modes = {test_mode};
-  test_display.pixel_format = {fuchsia::images2::PixelFormat::B8G8R8A8};
-  test_display.manufacturer_name = "fake_manufacturer_name";
-  test_display.monitor_name = "fake_monitor_name";
-  test_display.monitor_serial = "fake_monitor_serial";
+  DisplayCoordinatorListener listener(TakeListenerServerEnd(), std::move(displays_changed_cb),
+                                      /*on_vsync=*/nullptr, /*on_client_ownership_change=*/nullptr);
 
-  mock_display_coordinator()->events().OnDisplaysChanged(/*added=*/{test_display},
-                                                         /*removed=*/{{.value = 2u}});
+  fuchsia_hardware_display::Mode test_mode = {{
+      .horizontal_resolution = 1024,
+      .vertical_resolution = 800,
+      .refresh_rate_e2 = 60,
+      .flags = 0,
+  }};
+  fuchsia_hardware_display::Info test_display = {{
+      .id = fuchsia_hardware_display_types::DisplayId(1),
+      .modes = {test_mode},
+      .pixel_format = {fuchsia_images2::PixelFormat::kB8G8R8A8},
+      .manufacturer_name = "fake_manufacturer_name",
+      .monitor_name = "fake_monitor_name",
+      .monitor_serial = "fake_monitor_serial",
+  }};
+  fit::result<fidl::OneWayError> result = mock_display_coordinator()->listener()->OnDisplaysChanged(
+      {{.added = {test_display}, .removed = {2u}}});
+  ASSERT_TRUE(result.is_ok());
+
   ASSERT_EQ(0u, displays_added.size());
   ASSERT_EQ(0u, displays_removed.size());
   RunLoopUntilIdle();
   ASSERT_EQ(1u, displays_added.size());
   ASSERT_EQ(1u, displays_removed.size());
-  EXPECT_TRUE(fidl::Equals(displays_added[0], test_display));
-  EXPECT_EQ(displays_removed[0].value, 2u);
-
-  // Verify we stop getting callbacks after ClearCallbacks().
-  display_coordinator_listener()->ClearCallbacks();
-  mock_display_coordinator()->events().OnDisplaysChanged(/*added=*/{},
-                                                         /*removed=*/{{.value = 3u}});
-  RunLoopUntilIdle();
-
-  // Expect that nothing changed.
-  ASSERT_EQ(1u, displays_added.size());
-  ASSERT_EQ(1u, displays_removed.size());
-  EXPECT_EQ(displays_removed[0].value, 2u);
+  EXPECT_EQ(displays_added[0], test_display);
+  EXPECT_EQ(displays_removed[0].value(), 2u);
 
   // Expect no crashes on teardown.
   ResetDisplayCoordinatorListener();
@@ -149,19 +114,15 @@ TEST_F(DisplayCoordinatorListenerTest, OnClientOwnershipChangeCallback) {
   bool has_ownership = false;
   auto client_ownership_change_cb = [&has_ownership](bool ownership) { has_ownership = ownership; };
 
-  display_coordinator_listener()->InitializeCallbacks(
-      /*displays_changed_cb=*/nullptr, std::move(client_ownership_change_cb));
+  DisplayCoordinatorListener listener(TakeListenerServerEnd(), /*on_displays_changed=*/nullptr,
+                                      /*on_vsync=*/nullptr, std::move(client_ownership_change_cb));
 
-  mock_display_coordinator()->events().OnClientOwnershipChange(true);
+  fit::result<fidl::OneWayStatus> result =
+      mock_display_coordinator()->listener()->OnClientOwnershipChange(true);
+  ASSERT_TRUE(result.is_ok());
+
   EXPECT_FALSE(has_ownership);
   RunLoopUntilIdle();
-  EXPECT_TRUE(has_ownership);
-
-  // Verify we stop getting callbacks after ClearCallbacks().
-  display_coordinator_listener()->ClearCallbacks();
-  mock_display_coordinator()->events().OnClientOwnershipChange(false);
-  RunLoopUntilIdle();
-  // Expect that nothing changed.
   EXPECT_TRUE(has_ownership);
 
   // Expect no crashes on teardown.
@@ -170,46 +131,44 @@ TEST_F(DisplayCoordinatorListenerTest, OnClientOwnershipChangeCallback) {
 }
 
 TEST_F(DisplayCoordinatorListenerTest, OnVsyncCallback) {
-  fuchsia::hardware::display::types::DisplayId last_display_id = {
-      .value = fuchsia::hardware::display::types::INVALID_DISP_ID};
-  uint64_t last_timestamp = 0u;
-  fuchsia::hardware::display::types::ConfigStamp last_config_stamp = {
-      .value = fuchsia::hardware::display::types::INVALID_CONFIG_STAMP_VALUE};
+  fuchsia_hardware_display_types::DisplayId last_display_id = {
+      {.value = fuchsia_hardware_display_types::kInvalidDispId}};
+  zx::time last_timestamp = zx::time::infinite_past();
+  fuchsia_hardware_display_types::ConfigStamp last_config_stamp = {
+      {.value = fuchsia_hardware_display_types::kInvalidConfigStampValue}};
 
-  auto vsync_cb = [&](fuchsia::hardware::display::types::DisplayId display_id, uint64_t timestamp,
-                      fuchsia::hardware::display::types::ConfigStamp stamp, uint64_t cookie) {
+  auto vsync_cb = [&](fuchsia_hardware_display_types::DisplayId display_id, zx::time timestamp,
+                      fuchsia_hardware_display_types::ConfigStamp stamp,
+                      fuchsia_hardware_display::VsyncAckCookie cookie) {
     last_display_id = display_id;
     last_timestamp = timestamp;
     last_config_stamp = std::move(stamp);
   };
-  display_coordinator_listener()->InitializeCallbacks(
-      /*displays_changed_cb=*/nullptr,
-      /*client_ownership_change_cb=*/nullptr);
-  display_coordinator_listener()->SetOnVsyncCallback(std::move(vsync_cb));
+  DisplayCoordinatorListener listener(TakeListenerServerEnd(), /*on_displays_changed=*/nullptr,
+                                      std::move(vsync_cb), /*on_client_ownership_change=*/nullptr);
 
-  constexpr fuchsia::hardware::display::types::DisplayId kTestDisplayId = {.value = 1};
-  constexpr fuchsia::hardware::display::types::DisplayId kInvalidDisplayId = {.value = 2};
-  const uint64_t kTestTimestamp = 111111u;
-  const fuchsia::hardware::display::types::ConfigStamp kConfigStamp = {.value = 2u};
-  mock_display_coordinator()->events().OnVsync(kTestDisplayId, kTestTimestamp, kConfigStamp, 0);
-  ASSERT_EQ(fuchsia::hardware::display::types::INVALID_CONFIG_STAMP_VALUE, last_config_stamp.value);
+  const fuchsia_hardware_display_types::DisplayId kTestDisplayId = {{.value = 1}};
+  const fuchsia_hardware_display_types::DisplayId kInvalidDisplayId = {{.value = 2}};
+  const zx::time kTestTimestamp(111111);
+  const fuchsia_hardware_display_types::ConfigStamp kConfigStamp = {{.value = 2u}};
+
+  fit::result<fidl::OneWayStatus> result = mock_display_coordinator()->listener()->OnVsync({{
+      .display_id = kTestDisplayId,
+      .timestamp = kTestTimestamp.get(),
+      .applied_config_stamp = kConfigStamp,
+      .cookie = 0,
+  }});
+  ASSERT_EQ(fuchsia_hardware_display_types::kInvalidConfigStampValue, last_config_stamp.value());
   RunLoopUntilIdle();
-  EXPECT_EQ(kTestDisplayId.value, last_display_id.value);
+  EXPECT_EQ(kTestDisplayId, last_display_id);
   EXPECT_EQ(kTestTimestamp, last_timestamp);
-  EXPECT_EQ(last_config_stamp.value, kConfigStamp.value);
-
-  // Verify we stop getting callbacks after ClearCallbacks().
-  display_coordinator_listener()->ClearCallbacks();
-  mock_display_coordinator()->events().OnVsync(kInvalidDisplayId, kTestTimestamp, kConfigStamp, 0);
-  // Expect that nothing changed.
-  RunLoopUntilIdle();
-  EXPECT_EQ(kTestDisplayId.value, last_display_id.value);
+  EXPECT_EQ(last_config_stamp, kConfigStamp);
 
   // Expect no crashes on teardown.
   ResetDisplayCoordinatorListener();
   RunLoopUntilIdle();
 }
 
-}  // namespace test
-}  // namespace display
-}  // namespace scenic_impl
+}  // namespace
+
+}  // namespace scenic_impl::display::test

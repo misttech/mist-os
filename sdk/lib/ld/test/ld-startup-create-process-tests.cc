@@ -49,8 +49,8 @@ void LdStartupCreateProcessTestsBase::FinishLoad(std::string_view executable_nam
 LdStartupCreateProcessTestsBase::~LdStartupCreateProcessTestsBase() = default;
 
 int64_t LdStartupCreateProcessTestsBase::Run() {
-  return LdLoadZirconProcessTestsBase::Run(&bootstrap(), stack_size_, thread_, entry_, vdso_base_,
-                                           root_vmar());
+  return LdLoadZirconProcessTestsBase::Run(&bootstrap(), {}, stack_size_, thread_, entry_,
+                                           vdso_base_, root_vmar());
 }
 
 }  // namespace ld::testing

@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, ensure, Error};
 use async_trait::async_trait;
 use block_client::{BlockClient, BufferSlice, MutableBufferSlice, VmoId};
 use std::collections::BTreeMap;
@@ -44,7 +43,7 @@ impl FakeBlockClient {
 
 #[async_trait]
 impl BlockClient for FakeBlockClient {
-    async fn attach_vmo(&self, vmo: &zx::Vmo) -> Result<VmoId, Error> {
+    async fn attach_vmo(&self, vmo: &zx::Vmo) -> Result<VmoId, zx::Status> {
         let len = vmo.get_size()?;
         let vmo = vmo.create_child(zx::VmoChildOptions::SLICE, 0, len)?;
         let mut inner = self.inner.lock().unwrap();
@@ -55,14 +54,14 @@ impl BlockClient for FakeBlockClient {
                 return Ok(VmoId::new(id));
             }
         }
-        Err(anyhow!("Out of vmoids"))
+        Err(zx::Status::NO_RESOURCES)
     }
 
-    async fn detach_vmo(&self, vmo_id: VmoId) -> Result<(), Error> {
+    async fn detach_vmo(&self, vmo_id: VmoId) -> Result<(), zx::Status> {
         let mut inner = self.inner.lock().unwrap();
         let id = vmo_id.into_id();
         if let None = inner.vmo_registry.remove(&id) {
-            Err(anyhow!("Removed nonexistent vmoid {}", id))
+            Err(zx::Status::NOT_FOUND)
         } else {
             Ok(())
         }
@@ -72,24 +71,29 @@ impl BlockClient for FakeBlockClient {
         &self,
         buffer_slice: MutableBufferSlice<'_>,
         device_offset: u64,
-    ) -> Result<(), Error> {
-        ensure!(device_offset % self.block_size as u64 == 0, "bad alignment");
+    ) -> Result<(), zx::Status> {
+        if device_offset % self.block_size as u64 != 0 {
+            return Err(zx::Status::INVALID_ARGS);
+        }
         let device_offset = device_offset as usize;
         let inner = &mut *self.inner.lock().unwrap();
         match buffer_slice {
             MutableBufferSlice::VmoId { vmo_id, offset, length } => {
-                ensure!(offset % self.block_size as u64 == 0, "Bad alignment");
-                ensure!(length % self.block_size as u64 == 0, "Bad alignment");
-                let vmo = inner
-                    .vmo_registry
-                    .get(&vmo_id.id())
-                    .ok_or(anyhow!("Invalid vmoid {:?}", vmo_id))?;
+                if offset % self.block_size as u64 != 0 {
+                    return Err(zx::Status::INVALID_ARGS);
+                }
+                if length % self.block_size as u64 != 0 {
+                    return Err(zx::Status::INVALID_ARGS);
+                }
+                let vmo = inner.vmo_registry.get(&vmo_id.id()).ok_or(zx::Status::INVALID_ARGS)?;
                 vmo.write(&inner.data[device_offset..device_offset + length as usize], offset)?;
                 Ok(())
             }
             MutableBufferSlice::Memory(slice) => {
                 let len = slice.len();
-                ensure!(device_offset + len <= inner.data.len(), "Invalid range");
+                if device_offset + len > inner.data.len() {
+                    return Err(zx::Status::OUT_OF_RANGE);
+                }
                 slice.copy_from_slice(&inner.data[device_offset..device_offset + len]);
                 Ok(())
             }
@@ -100,46 +104,57 @@ impl BlockClient for FakeBlockClient {
         &self,
         buffer_slice: BufferSlice<'_>,
         device_offset: u64,
-    ) -> Result<(), Error> {
-        ensure!(device_offset % self.block_size as u64 == 0, "bad alignment");
+    ) -> Result<(), zx::Status> {
+        if device_offset % self.block_size as u64 != 0 {
+            return Err(zx::Status::INVALID_ARGS);
+        }
         let device_offset = device_offset as usize;
         let inner = &mut *self.inner.lock().unwrap();
         match buffer_slice {
             BufferSlice::VmoId { vmo_id, offset, length } => {
-                ensure!(offset % self.block_size as u64 == 0, "Bad alignment");
-                ensure!(length % self.block_size as u64 == 0, "Bad alignment");
-                let vmo = inner
-                    .vmo_registry
-                    .get(&vmo_id.id())
-                    .ok_or(anyhow!("Invalid vmoid {:?}", vmo_id))?;
+                if offset % self.block_size as u64 != 0 {
+                    return Err(zx::Status::INVALID_ARGS);
+                }
+                if length % self.block_size as u64 != 0 {
+                    return Err(zx::Status::INVALID_ARGS);
+                }
+                let vmo = inner.vmo_registry.get(&vmo_id.id()).ok_or(zx::Status::INVALID_ARGS)?;
                 vmo.read(&mut inner.data[device_offset..device_offset + length as usize], offset)?;
                 Ok(())
             }
             BufferSlice::Memory(slice) => {
                 let len = slice.len();
-                ensure!(device_offset + len <= inner.data.len(), "Invalid range");
+                if device_offset + len > inner.data.len() {
+                    return Err(zx::Status::OUT_OF_RANGE);
+                }
                 inner.data[device_offset..device_offset + len].copy_from_slice(slice);
                 Ok(())
             }
         }
     }
 
-    async fn trim(&self, range: Range<u64>) -> Result<(), Error> {
-        ensure!(range.start % self.block_size as u64 == 0, "bad alignment");
-        ensure!(range.end % self.block_size as u64 == 0, "bad alignment");
+    async fn trim(&self, range: Range<u64>) -> Result<(), zx::Status> {
+        if range.start % self.block_size as u64 != 0 {
+            return Err(zx::Status::INVALID_ARGS);
+        }
+        if range.end % self.block_size as u64 != 0 {
+            return Err(zx::Status::INVALID_ARGS);
+        }
         // Blast over the range to simulate it being reused.
         let inner = &mut *self.inner.lock().unwrap();
-        ensure!(range.end as usize <= inner.data.len(), "bad range");
+        if range.end as usize > inner.data.len() {
+            return Err(zx::Status::OUT_OF_RANGE);
+        }
         inner.data[range.start as usize..range.end as usize].fill(0xab);
         Ok(())
     }
 
-    async fn flush(&self) -> Result<(), Error> {
+    async fn flush(&self) -> Result<(), zx::Status> {
         self.flush_count.fetch_add(1, atomic::Ordering::Relaxed);
         Ok(())
     }
 
-    async fn close(&self) -> Result<(), Error> {
+    async fn close(&self) -> Result<(), zx::Status> {
         Ok(())
     }
 

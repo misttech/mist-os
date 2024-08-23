@@ -2,6 +2,17 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+# Used by Honeydew's Fuchsia Controller WLAN affordance
+wlan_fidls_allowlist = [
+  "//sdk/fidl/fuchsia.wlan.device.service:fuchsia.wlan.device.service",
+  "//sdk/fidl/fuchsia.wlan.mlme:fuchsia.wlan.mlme",
+  "//sdk/fidl/fuchsia.wlan.internal:fuchsia.wlan.internal",
+  "//sdk/fidl/fuchsia.wlan.minstrel:fuchsia.wlan.minstrel",
+  "//sdk/fidl/fuchsia.wlan.stats:fuchsia.wlan.stats",
+  "//sdk/fidl/fuchsia.wlan.sme:fuchsia.wlan.sme",
+  "//sdk/fidl/fuchsia.wlan.common.security:fuchsia.wlan.common.security",
+]
+
 # These are FIDL libraries that are temporarily allowed to be depended on by the
 # Lacewing framework (and tests that are SDK-bound). Ideally, we'll be able to
 # remove this list altogether when Honeydew is only using SDK-supported FIDL
@@ -11,10 +22,11 @@
 # entries in the list.
 #
 # TODO(https://fxbug.dev/326090508): Add these to the SDK or remove usage.
-host_test_fidl_allowlist = [
-  # Used by Fuchsia Controller
-  "//src/developer/ffx/fidl:fuchsia.developer.ffx",
+host_test_fidl_allowlist =
+    [
+      # Used by Fuchsia Controller
+      "//src/developer/ffx/fidl:fuchsia.developer.ffx",
 
-  # Used by Honeydew's Fuchsia Controller Tracing affordance
-  "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller",
-]
+      # Used by Honeydew's Fuchsia Controller Tracing affordance
+      "//sdk/fidl/fuchsia.tracing.controller:fuchsia.tracing.controller",
+    ] + wlan_fidls_allowlist

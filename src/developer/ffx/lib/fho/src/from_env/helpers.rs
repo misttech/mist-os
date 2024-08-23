@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use super::FhoEnvironment;
+use crate::from_env::TryFromEnv;
 use ffx_command::{Error, FfxContext, Result};
 use fidl::endpoints::{DiscoverableProtocolMarker, Proxy, ServerEnd};
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
@@ -25,7 +26,7 @@ pub async fn connect_to_rcs(env: &FhoEnvironment) -> Result<RemoteControlProxy> 
     // configurable instead.
     loop {
         tries += 1;
-        let res = env.injector.remote_factory().await;
+        let res = RemoteControlProxy::try_from_env(env).await;
         if res.is_ok() || tries > retry_count {
             break res;
         }

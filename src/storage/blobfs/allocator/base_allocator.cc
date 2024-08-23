@@ -4,26 +4,27 @@
 
 #include "src/storage/blobfs/allocator/base_allocator.h"
 
-#include <lib/syslog/cpp/macros.h>
 #include <lib/zx/result.h>
+#include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
 #include <algorithm>
+#include <cstddef>
 #include <cstdint>
+#include <memory>
 #include <mutex>
 #include <utility>
 #include <vector>
 
-#include <bitmap/raw-bitmap.h>
 #include <bitmap/rle-bitmap.h>
+#include <id_allocator/id_allocator.h>
 #include <safemath/safe_conversions.h>
 
 #include "src/storage/blobfs/allocator/extent_reserver.h"
 #include "src/storage/blobfs/allocator/node_reserver.h"
 #include "src/storage/blobfs/common.h"
 #include "src/storage/blobfs/format.h"
-#include "src/storage/blobfs/node_finder.h"
 
 namespace blobfs {
 

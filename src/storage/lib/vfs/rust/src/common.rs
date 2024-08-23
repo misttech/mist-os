@@ -262,74 +262,12 @@ macro_rules! immutable_attributes {
     )
 }
 
-/// Wrapper for [`fio::CreationMode`] which replaces [`fio::OpenMode`] at API level 19. Can be
-/// removed when we stop supporting API level 18, and replaced with [`fio::CreationMode`] directly.
+/// Represents if and how objects should be created with an open request.
 #[derive(PartialEq, Eq)]
 pub enum CreationMode {
     Never,
     AllowExisting,
     Always,
-}
-
-#[cfg(fuchsia_api_level_less_than = "19")]
-impl From<fio::OpenMode> for CreationMode {
-    fn from(value: fio::OpenMode) -> Self {
-        match value {
-            fio::OpenMode::OpenExisting => CreationMode::Never,
-            fio::OpenMode::MaybeCreate => CreationMode::AllowExisting,
-            fio::OpenMode::AlwaysCreate => CreationMode::Always,
-        }
-    }
-}
-
-#[cfg(fuchsia_api_level_less_than = "19")]
-impl From<CreationMode> for fio::OpenMode {
-    fn from(value: CreationMode) -> Self {
-        match value {
-            CreationMode::Never => fio::OpenMode::OpenExisting,
-            CreationMode::AllowExisting => fio::OpenMode::MaybeCreate,
-            CreationMode::Always => fio::OpenMode::AlwaysCreate,
-        }
-    }
-}
-
-#[cfg(fuchsia_api_level_at_least = "19")]
-impl From<fio::CreationMode> for CreationMode {
-    fn from(value: fio::CreationMode) -> Self {
-        match value {
-            fio::CreationMode::Never | fio::CreationMode::NeverDeprecated => CreationMode::Never,
-            fio::CreationMode::AllowExisting => CreationMode::AllowExisting,
-            fio::CreationMode::Always => CreationMode::Always,
-        }
-    }
-}
-
-#[cfg(fuchsia_api_level_at_least = "19")]
-impl From<CreationMode> for fio::CreationMode {
-    fn from(value: CreationMode) -> Self {
-        match value {
-            CreationMode::Never => fio::CreationMode::Never,
-            CreationMode::AllowExisting => fio::CreationMode::AllowExisting,
-            CreationMode::Always => fio::CreationMode::Always,
-        }
-    }
-}
-
-#[cfg(fuchsia_api_level_at_least = "19")]
-type CreationModeFidl = fio::CreationMode;
-#[cfg(fuchsia_api_level_less_than = "19")]
-type CreationModeFidl = fio::OpenMode;
-
-impl PartialEq<CreationModeFidl> for CreationMode {
-    fn eq(&self, other: &CreationModeFidl) -> bool {
-        *self == CreationMode::from(*other)
-    }
-}
-
-impl PartialEq<CreationMode> for CreationModeFidl {
-    fn eq(&self, other: &CreationMode) -> bool {
-        CreationMode::from(*self) == *other
-    }
 }
 
 /// Used to translate fuchsia.io/Node.SetAttr calls (io1) to fuchsia.io/Node.UpdateAttributes (io2).
@@ -454,6 +392,35 @@ pub async fn io2_to_io1_attrs<T: Node>(
             modification_time: mut_attrs.modification_time.unwrap_or_default(),
         },
     )
+}
+
+pub fn mutable_node_attributes_to_query(
+    attributes: &fio::MutableNodeAttributes,
+) -> fio::NodeAttributesQuery {
+    let mut query = fio::NodeAttributesQuery::empty();
+
+    if attributes.creation_time.is_some() {
+        query |= fio::NodeAttributesQuery::CREATION_TIME;
+    }
+    if attributes.modification_time.is_some() {
+        query |= fio::NodeAttributesQuery::MODIFICATION_TIME;
+    }
+    if attributes.access_time.is_some() {
+        query |= fio::NodeAttributesQuery::ACCESS_TIME;
+    }
+    if attributes.mode.is_some() {
+        query |= fio::NodeAttributesQuery::MODE;
+    }
+    if attributes.uid.is_some() {
+        query |= fio::NodeAttributesQuery::UID;
+    }
+    if attributes.gid.is_some() {
+        query |= fio::NodeAttributesQuery::GID;
+    }
+    if attributes.rdev.is_some() {
+        query |= fio::NodeAttributesQuery::RDEV;
+    }
+    query
 }
 
 #[cfg(test)]

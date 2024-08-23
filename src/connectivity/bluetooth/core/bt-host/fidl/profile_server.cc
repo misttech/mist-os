@@ -402,16 +402,34 @@ ProfileServer::AudioOffloadExt::AudioOffloadConfigFromFidl(
   std::unique_ptr<bt::l2cap::A2dpOffloadManager::Configuration> config =
       std::make_unique<bt::l2cap::A2dpOffloadManager::Configuration>();
 
+  std::optional<android_emb::A2dpSamplingFrequency> sampling_frequency =
+      fidl_helpers::FidlToSamplingFrequency(audio_offload_configuration.sampling_frequency());
+  if (!sampling_frequency.has_value()) {
+    bt_log(WARN, "fidl", "Invalid sampling frequency");
+    return nullptr;
+  }
+
+  std::optional<android_emb::A2dpBitsPerSample> audio_bits_per_sample =
+      fidl_helpers::FidlToBitsPerSample(audio_offload_configuration.bits_per_sample());
+  if (!audio_bits_per_sample.has_value()) {
+    bt_log(WARN, "fidl", "Invalid audio bits per sample");
+    return nullptr;
+  }
+
+  std::optional<android_emb::A2dpChannelMode> audio_channel_mode =
+      fidl_helpers::FidlToChannelMode(audio_offload_configuration.channel_mode());
+  if (!audio_channel_mode.has_value()) {
+    bt_log(WARN, "fidl", "Invalid channel mode");
+    return nullptr;
+  }
+
   config->codec = codec.value();
   config->max_latency = audio_offload_configuration.max_latency();
   config->scms_t_enable =
       fidl_helpers::FidlToScmsTEnable(audio_offload_configuration.scms_t_enable());
-  config->sampling_frequency =
-      fidl_helpers::FidlToSamplingFrequency(audio_offload_configuration.sampling_frequency());
-  config->bits_per_sample =
-      fidl_helpers::FidlToBitsPerSample(audio_offload_configuration.bits_per_sample());
-  config->channel_mode =
-      fidl_helpers::FidlToChannelMode(audio_offload_configuration.channel_mode());
+  config->sampling_frequency = sampling_frequency.value();
+  config->bits_per_sample = audio_bits_per_sample.value();
+  config->channel_mode = audio_channel_mode.value();
   config->encoded_audio_bit_rate = audio_offload_configuration.encoded_bit_rate();
 
   if (audio_offload_configuration.encoder_settings().is_sbc()) {

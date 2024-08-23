@@ -283,7 +283,7 @@ impl EventRegistry {
         events: &HashSet<UseEventStreamDecl>,
     ) -> Result<RouteEventsResult, ModelError> {
         let top_instance = self.top_instance.upgrade().ok_or(EventsError::ModelNotAvailable)?;
-        let component = top_instance.root().await.find_and_maybe_resolve(target_moniker).await?;
+        let component = top_instance.root().find_and_maybe_resolve(target_moniker).await?;
         let decl = {
             let state = component.lock_state().await;
             match *state {
@@ -424,7 +424,7 @@ mod tests {
                 name: "foo".to_string(),
                 receiver,
             },
-            timestamp: zx::Time::get_monotonic(),
+            timestamp: zx::MonotonicTime::get(),
         };
         sender.send(Message { channel: capability_server_end }).unwrap();
         registry.dispatch(&event).await;
@@ -435,7 +435,7 @@ mod tests {
             target_moniker: ExtendedMoniker::ComponentInstance(Moniker::root()),
             component_url: "fuchsia-pkg://root".parse().unwrap(),
             payload: EventPayload::Unresolved,
-            timestamp: zx::Time::get_monotonic(),
+            timestamp: zx::MonotonicTime::get(),
         };
         registry.dispatch(&event).await;
     }

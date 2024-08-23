@@ -91,7 +91,7 @@ impl DowncastErrorForTest for dyn Explain {
             Some(value) => value,
             None => {
                 let expected = std::any::type_name::<E>();
-                panic!("Cannot downcast `{self}` to the {expected} error type!");
+                panic!("Cannot downcast `{self:?}` to the {expected:?} error type!");
             }
         }
     }

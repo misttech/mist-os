@@ -143,7 +143,7 @@ zx_status_t Nelson::Spi0Init() {
   static const std::vector<fpbus::Irq> spi_0_irqs{
       {{
           .irq = S905D3_SPICC0_IRQ,
-          .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+          .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
       }},
   };
 
@@ -180,11 +180,10 @@ zx_status_t Nelson::Spi0Init() {
   gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_SPI_A_MISO, 2500));
 
   gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_SPI_A_SS0, 0));
-  gpio_init_steps_.push_back(GpioConfigOut(GPIO_SOC_SPI_A_SS0, 1));  // SS0
+  gpio_init_steps_.push_back(GpioOutput(GPIO_SOC_SPI_A_SS0, true));  // SS0
 
   // SCLK must be pulled down to prevent SPI bit errors.
-  gpio_init_steps_.push_back(
-      GpioConfigIn(GPIO_SOC_SPI_A_SCLK, fuchsia_hardware_gpio::GpioFlags::kPullDown));
+  gpio_init_steps_.push_back(GpioPull(GPIO_SOC_SPI_A_SCLK, fuchsia_hardware_pin::Pull::kDown));
   gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_SPI_A_SCLK, 5));  // SCLK
   gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_SPI_A_SCLK, 2500));
 
@@ -248,7 +247,7 @@ zx_status_t Nelson::Spi1Init() {
   static const std::vector<fpbus::Irq> spi_1_irqs{
       {{
           .irq = S905D3_SPICC1_IRQ,
-          .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+          .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
       }},
   };
 
@@ -300,7 +299,7 @@ zx_status_t Nelson::Spi1Init() {
   gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_SPI_B_MISO, 3));  // MISO
   gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_SPI_B_MISO, 2500));
 
-  gpio_init_steps_.push_back(GpioConfigOut(GPIO_SOC_SPI_B_SS0, 1));  // SS0
+  gpio_init_steps_.push_back(GpioOutput(GPIO_SOC_SPI_B_SS0, true));  // SS0
 
   gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_SPI_B_SCLK, 3));  // SCLK
   gpio_init_steps_.push_back(GpioDriveStrength(GPIO_SOC_SPI_B_SCLK, 2500));

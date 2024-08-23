@@ -1483,7 +1483,20 @@ async fn replies_to_ping(name: &str, unicast: bool) {
         None,
         name,
         DEFAULT_NETSVC_ARGS,
-        |realm| async move { realm.icmp_socket::<Ipv6>().await.expect("icmp socket") }.boxed(),
+        |realm| {
+            async move {
+                let sock = realm.icmp_socket::<Ipv6>().await.expect("icmp socket");
+                // Disable looping multicast packets back to us; That prevents
+                // us from seeing, and resonding to, our own generated ping
+                // requests.
+                let () = sock
+                    .as_ref()
+                    .set_multicast_loop_v6(false)
+                    .expect("failed to disable multicast loop");
+                sock
+            }
+            .boxed()
+        },
         |sock, scope_id, icmp_socket| async move {
             let device = discover(&sock, scope_id).await;
 

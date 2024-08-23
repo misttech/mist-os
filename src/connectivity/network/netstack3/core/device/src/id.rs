@@ -11,7 +11,9 @@ use core::num::NonZeroU64;
 
 use derivative::Derivative;
 use netstack3_base::sync::{DynDebugReferences, PrimaryRc, StrongRc};
-use netstack3_base::{Device, DeviceIdentifier, StrongDeviceIdentifier, WeakDeviceIdentifier};
+use netstack3_base::{
+    Device, DeviceIdentifier, DeviceWithName, StrongDeviceIdentifier, WeakDeviceIdentifier,
+};
 use netstack3_filter as filter;
 
 use crate::internal::base::{
@@ -305,13 +307,15 @@ impl<BT: DeviceLayerTypes> Debug for DeviceId<BT> {
     }
 }
 
+impl<BT: DeviceLayerTypes> DeviceWithName for DeviceId<BT> {
+    fn name_matches(&self, name: &str) -> bool {
+        self.bindings_id().name_matches(name)
+    }
+}
+
 impl<BT: DeviceLayerTypes> filter::InterfaceProperties<BT::DeviceClass> for DeviceId<BT> {
     fn id_matches(&self, id: &NonZeroU64) -> bool {
         self.bindings_id().id_matches(id)
-    }
-
-    fn name_matches(&self, name: &str) -> bool {
-        self.bindings_id().name_matches(name)
     }
 
     fn device_class_matches(&self, device_class: &BT::DeviceClass) -> bool {

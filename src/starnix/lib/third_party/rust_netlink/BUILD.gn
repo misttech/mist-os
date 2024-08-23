@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-group("lib") {
+group("rust_netlink") {
   deps = [
     "netlink_packet_core",
     "netlink_packet_generic",

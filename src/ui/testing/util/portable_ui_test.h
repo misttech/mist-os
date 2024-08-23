@@ -22,7 +22,9 @@
 
 namespace ui_testing {
 
+using component_testing::Route;
 using fuchsia_ui_composition::ScreenshotFormat;
+using ChildName = std::string;
 
 class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
  public:
@@ -137,7 +139,20 @@ class PortableUITest : public ::loop_fixture::RealLoop, public ::testing::Test {
   void SetUpRealmBase();
 
   // Configures the test-specific component topology.
-  virtual void ExtendRealm() = 0;
+  virtual void ExtendRealm() {}
+
+  // Subclass should implement these methods to add eager components to the base test realm.
+  // This is useful for components that connect to the Scene graph using
+  // fuchsia.element.GraphicalPresenter/PresentView.
+  virtual std::vector<std::pair<ChildName, std::string>> GetEagerTestComponents() { return {}; }
+
+  // Subclass should implement these methods to add components to the base test realm.
+  virtual std::vector<std::pair<ChildName, std::string>> GetTestComponents() { return {}; }
+
+  // Subclass should implement this method to add capability routes to the test realm.
+  // This is to provide routing for the components added via `GetEagerTestComponents`,
+  // `GetTestComponents`, or `ExtendRealm`.
+  virtual std::vector<Route> GetTestRoutes() { return {}; }
 
   // Returns the test-ui-stack component url to use in this test.
   virtual std::string GetTestUIStackUrl() = 0;

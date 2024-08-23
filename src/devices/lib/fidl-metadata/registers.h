@@ -26,7 +26,7 @@ template <typename T>
 struct Register {
   std::string name;
   uint32_t mmio_id;
-  std::vector<const Mask<T>> masks;
+  std::vector<Mask<T>> masks;
 };
 
 using Register8 = Register<uint8_t>;

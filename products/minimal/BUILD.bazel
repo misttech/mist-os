@@ -127,6 +127,7 @@ fuchsia_product_bundle(
     recovery = "//products/zedboot:vim3",
     repository_keys = "//src/sys/pkg/repositories/devhost/keys",
     update_epoch = "1",
+    update_version_file = "//build/info:version",
 )
 
 fuchsia_product(

@@ -13,7 +13,7 @@ use crate::view::strategies::base::ViewStrategyParams;
 use crate::view::{ViewAssistantPtr, ViewController, ViewKey};
 use crate::IdGenerator2;
 use anyhow::{bail, format_err, Context as _, Error};
-use fidl_fuchsia_hardware_display::{CoordinatorEvent, VirtconMode};
+use fidl_fuchsia_hardware_display::{CoordinatorListenerRequest, VirtconMode};
 use fidl_fuchsia_input_report as hid_input_report;
 use fuchsia_async::{self as fasync, DurationExt, Timer};
 use fuchsia_component::{self as component};
@@ -424,7 +424,7 @@ pub(crate) enum MessageInternal {
     FlatlandOnFramePresented(ViewKey, fidl_fuchsia_scenic_scheduling::FramePresentedInfo),
     FlatlandOnError(ViewKey, fuchsia_scenic::flatland::FlatlandError),
     NewDisplayCoordinator(PathBuf),
-    DisplayCoordinatorEvent(CoordinatorEvent),
+    DisplayCoordinatorListenerRequest(CoordinatorListenerRequest),
     SetVirtconMode(VirtconMode),
     UserInputMessage(ViewKey, UserInputMessage),
 }
@@ -594,13 +594,13 @@ impl App {
             MessageInternal::NewDisplayCoordinator(display_path) => {
                 self.strategy.handle_new_display_coordinator(display_path).await;
             }
-            MessageInternal::DisplayCoordinatorEvent(event) => match event {
-                CoordinatorEvent::OnVsync { display_id, .. } => {
+            MessageInternal::DisplayCoordinatorListenerRequest(request) => match request {
+                CoordinatorListenerRequest::OnVsync { display_id, .. } => {
                     if let Some(view_key) =
                         self.strategy.get_visible_view_key_for_display(display_id.into())
                     {
                         if let Ok(view) = self.get_view(view_key) {
-                            view.handle_display_coordinator_event(event).await;
+                            view.handle_display_coordinator_listener_request(request).await;
                         } else {
                             // We seem to get two vsyncs after the display is removed.
                             // Log it to help run down why that is.
@@ -609,7 +609,7 @@ impl App {
                     }
                 }
 
-                _ => self.strategy.handle_display_coordinator_event(event).await,
+                _ => self.strategy.handle_display_coordinator_event(request).await,
             },
             MessageInternal::SetVirtconMode(virtcon_mode) => {
                 self.strategy.set_virtcon_mode(virtcon_mode);

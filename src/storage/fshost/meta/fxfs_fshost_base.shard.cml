@@ -9,6 +9,11 @@
             durability: "transient",
         },
     ],
+    capabilities: [
+        {
+            protocol: [ "fuchsia.fxfs.CryptManagement" ],
+        },
+    ],
     use: [
         {
             protocol: "fuchsia.fs.startup.Startup",
@@ -42,18 +47,17 @@
             from: "#fxfs",
         },
         {
+            directory: "partitions",
+            from: "void",
+            availability: "optional",
+        },
+        {
             protocol: "fuchsia.fs.startup.Volumes",
             from: "#fxfs",
         },
         {
-            protocol: "fuchsia.fxfs.BlobCreator",
-            from: "void",
-            availability: "optional",
-        },
-        {
-            protocol: "fuchsia.fxfs.BlobReader",
-            from: "void",
-            availability: "optional",
+            protocol: "fuchsia.fxfs.CryptManagement",
+            from: "self",
         },
     ],
 }

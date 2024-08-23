@@ -70,7 +70,7 @@ type StatePublisher = Publisher<State, NotifierWatchStateResponder, NotifyFn>;
 struct StateTransitioner {
     idle_threshold_ms: zx::Duration,
     idle_transition_task: Cell<Option<Task<()>>>,
-    last_event_time: RefCell<zx::Time>,
+    last_event_time: RefCell<zx::MonotonicTime>,
 
     // To support power management, the caller must provide `Some` value for
     // `lease_holder`. The existence of a `LeaseHolder` implies power framework
@@ -81,7 +81,7 @@ struct StateTransitioner {
 
 impl StateTransitioner {
     pub fn new(
-        initial_timestamp: zx::Time,
+        initial_timestamp: zx::MonotonicTime,
         idle_threshold_ms: zx::Duration,
         state_publisher: StatePublisher,
         lease_holder: Option<Rc<RefCell<LeaseHolder>>>,
@@ -116,7 +116,7 @@ impl StateTransitioner {
     }
 
     pub fn create_idle_transition_task(
-        timeout: zx::Time,
+        timeout: zx::MonotonicTime,
         state_publisher: StatePublisher,
         lease_holder: Option<Rc<RefCell<LeaseHolder>>>,
     ) -> Task<()> {
@@ -127,7 +127,7 @@ impl StateTransitioner {
         })
     }
 
-    pub async fn transition_to_idle_after_new_time(&self, event_time: zx::Time) {
+    pub async fn transition_to_idle_after_new_time(&self, event_time: zx::MonotonicTime) {
         if *self.last_event_time.borrow() > event_time {
             return;
         }
@@ -186,7 +186,7 @@ impl ActivityManager {
 
         Self::new_internal(
             idle_threshold_ms,
-            zx::Time::get_monotonic(),
+            zx::MonotonicTime::get(),
             suspend_enabled,
             lease_holder,
         )
@@ -200,12 +200,18 @@ impl ActivityManager {
         suspend_enabled: bool,
         lease_holder: Option<Rc<RefCell<LeaseHolder>>>,
     ) -> Rc<Self> {
-        Self::new_internal(idle_threshold_ms, zx::Time::ZERO, suspend_enabled, lease_holder).await
+        Self::new_internal(
+            idle_threshold_ms,
+            zx::MonotonicTime::ZERO,
+            suspend_enabled,
+            lease_holder,
+        )
+        .await
     }
 
     async fn new_internal(
         idle_threshold_ms: zx::Duration,
-        initial_timestamp: zx::Time,
+        initial_timestamp: zx::MonotonicTime,
         suspend_enabled: bool,
         lease_holder: Option<Rc<RefCell<LeaseHolder>>>,
     ) -> Rc<Self> {
@@ -242,8 +248,8 @@ impl ActivityManager {
                     // Note: We use the global executor to get the current time instead
                     // of the kernel so that we do not unnecessarily clamp
                     // test-injected times.
-                    let event_time = zx::Time::from_nanos(event_time)
-                        .clamp(zx::Time::ZERO, fuchsia_async::Time::now().into_zx());
+                    let event_time = zx::MonotonicTime::from_nanos(event_time)
+                        .clamp(zx::MonotonicTime::ZERO, fuchsia_async::Time::now().into_zx());
 
                     self.state_transitioner.transition_to_idle_after_new_time(event_time).await;
 

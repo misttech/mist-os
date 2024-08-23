@@ -363,7 +363,7 @@ where
 ///
 /// If there is a `numbered_handles` of type `HandleType::User0`, that is
 /// interpreted as the server end of the ShellController protocol.
-fn parse_numbered_handles(
+pub fn parse_numbered_handles(
     current_task: &CurrentTask,
     numbered_handles: Option<Vec<fprocess::HandleInfo>>,
     files: &FdTable,
@@ -452,7 +452,7 @@ impl MountRecord {
             };
         }
 
-        let (status, rights) = directory.get_flags(zx::Time::INFINITE)?;
+        let (status, rights) = directory.get_flags(zx::MonotonicTime::INFINITE)?;
         zx::Status::ok(status)?;
 
         let (client_end, server_end) = zx::Channel::create();

@@ -157,11 +157,11 @@ zx_status_t Dir::ConvertInlineDir() {
   block_t data_blkaddr = ipage->GetBlockAddr(ofs_in_dnode);
   ZX_DEBUG_ASSERT(data_blkaddr == kNullAddr);
 
-  if (zx_status_t err = ReserveNewBlock(*ipage, ofs_in_dnode); err != ZX_OK) {
+  if (zx_status_t err = ReserveNewBlock(dnode_page, ofs_in_dnode); err != ZX_OK) {
     return err;
   }
 
-  page->WaitOnWriteback();
+  page.WaitOnWriteback();
   page.Zero();
 
   DentryBlock *dentry_blk = page->GetAddress<DentryBlock>();
@@ -176,7 +176,7 @@ zx_status_t Dir::ConvertInlineDir() {
 
   page.SetDirty();
   // clear inline dir and flag after data writeback
-  dnode_page->WaitOnWriteback();
+  dnode_page.WaitOnWriteback();
   dnode_page.Zero(InlineDataOffset(), InlineDataOffset() + MaxInlineData());
   ClearFlag(InodeInfoFlag::kInlineDentry);
 
@@ -209,7 +209,7 @@ zx::result<bool> Dir::AddInlineEntry(std::string_view name, VnodeF2fs *vnode) {
     ZX_DEBUG_ASSERT(bits.is_ok());
     size_t bit_pos = RoomInInlineDir(*bits, slots);
     if (bit_pos + slots <= MaxInlineDentry()) {
-      ipage->WaitOnWriteback();
+      ipage.WaitOnWriteback();
 
       if (zx_status_t err = InitInodeMetadata(vnode); err != ZX_OK) {
         if (TestFlag(InodeInfoFlag::kUpdateDir)) {
@@ -249,7 +249,7 @@ zx::result<bool> Dir::AddInlineEntry(std::string_view name, VnodeF2fs *vnode) {
 
 void Dir::DeleteInlineEntry(const DentryInfo &info, fbl::RefPtr<Page> &page, VnodeF2fs *vnode) {
   LockedPage lock_page(page);
-  lock_page->WaitOnWriteback();
+  lock_page.WaitOnWriteback();
 
   ZX_DEBUG_ASSERT(info.page_index == kCachedInlineDirEntryPageIndex);
   DirEntry &dentry = InlineDentryArray(lock_page.get(), *this)[info.bit_pos];
@@ -379,16 +379,16 @@ zx_status_t File::ConvertInlineData() {
   block_t data_blkaddr = ipage->GetBlockAddr(ofs_in_dnode);
   ZX_DEBUG_ASSERT(data_blkaddr == kNullAddr);
 
-  if (zx_status_t err = ReserveNewBlock(*ipage, ofs_in_dnode); err != ZX_OK) {
+  if (zx_status_t err = ReserveNewBlock(dnode_page, ofs_in_dnode); err != ZX_OK) {
     return err;
   }
 
   if (TestFlag(InodeInfoFlag::kDataExist)) {
-    page->WaitOnWriteback();
+    page.WaitOnWriteback();
     page->Write(ipage->GetAddress<uint8_t>() + InlineDataOffset(), 0, GetSize());
     page.SetDirty();
 
-    dnode_page->WaitOnWriteback();
+    dnode_page.WaitOnWriteback();
     dnode_page.Zero(InlineDataOffset(), InlineDataOffset() + MaxInlineData());
   }
   ClearFlag(InodeInfoFlag::kInlineData);
@@ -405,7 +405,7 @@ zx_status_t File::WriteInline(const void *data, size_t len, size_t offset, size_
     return ret;
   }
 
-  inline_page->WaitOnWriteback();
+  inline_page.WaitOnWriteback();
   inline_page->Write(data, InlineDataOffset() + offset, len);
 
   SetSize(std::max(GetSize(), offset + len));
@@ -426,7 +426,7 @@ zx_status_t File::TruncateInline(size_t len, bool is_recover) {
     return ret;
   }
 
-  inline_page->WaitOnWriteback();
+  inline_page.WaitOnWriteback();
 
   size_t size = GetSize();
   size_t size_diff = (len > size) ? (len - size) : (size - len);
@@ -468,7 +468,7 @@ zx_status_t File::RecoverInlineData(NodePage &page) {
         return err;
       }
       BlockBuffer block;
-      ipage->WaitOnWriteback();
+      ipage.WaitOnWriteback();
       page.Read(block.get(), InlineDataOffset(), MaxInlineData());
       ipage->Write(block.get(), InlineDataOffset(), MaxInlineData());
 

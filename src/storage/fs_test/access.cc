@@ -15,6 +15,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <zircon/errors.h>
+#include <zircon/status.h>
 #include <zircon/syscalls.h>
 #include <zircon/types.h>
 
@@ -22,6 +23,7 @@
 
 #include <fbl/unique_fd.h>
 
+#include "gtest/gtest.h"
 #include "src/storage/fs_test/fs_test_fixture.h"
 
 namespace fs_test {
@@ -187,7 +189,7 @@ void CloneFdAsReadOnlyHelper(fbl::unique_fd in_fd, fbl::unique_fd* out_fd) {
 
   auto clone_result =
       fidl::WireCall(fdio_caller.borrow_as<fio::Node>())
-          ->Clone(fio::wire::OpenFlags::kRightReadable, std::move(std::move(endpoints.server)));
+          ->Clone(fio::wire::OpenFlags::kRightReadable, std::move(endpoints.server));
   ASSERT_EQ(clone_result.status(), ZX_OK);
 
   // Turn the handle back to an fd to test posix functions
@@ -195,7 +197,7 @@ void CloneFdAsReadOnlyHelper(fbl::unique_fd in_fd, fbl::unique_fd* out_fd) {
     int tmp_fd = -1;
     zx_status_t status = fdio_fd_create(endpoints.client.TakeChannel().release(), &tmp_fd);
     EXPECT_GT(tmp_fd, 0);
-    EXPECT_EQ(status, ZX_OK);
+    EXPECT_EQ(status, ZX_OK) << zx_status_get_string(status);
     return fbl::unique_fd(tmp_fd);
   })();
   ASSERT_TRUE(fd.is_valid());
@@ -232,7 +234,7 @@ TEST_P(DirectoryPermissionTest, TestCloneCannotIncreaseRights) {
   ASSERT_GT(foo_fd.get(), 0);
 
   fbl::unique_fd foo_readonly;
-  CloneFdAsReadOnlyHelper(std::move(foo_fd), &foo_readonly);
+  ASSERT_NO_FATAL_FAILURE(CloneFdAsReadOnlyHelper(std::move(foo_fd), &foo_readonly));
 
   // Attempt to clone the read-only fd back to read-write.
   fdio_cpp::FdioCaller fdio_caller(std::move(foo_readonly));
@@ -263,7 +265,7 @@ TEST_P(DirectoryPermissionTest, TestFaccessat) {
   EXPECT_EQ(faccessat(foo_fd.get(), "sub_dir/sub_file", R_OK | W_OK, 0), 0);
 
   fbl::unique_fd rdonly_fd;
-  CloneFdAsReadOnlyHelper(std::move(foo_fd), &rdonly_fd);
+  ASSERT_NO_FATAL_FAILURE(CloneFdAsReadOnlyHelper(std::move(foo_fd), &rdonly_fd));
 
   // Verify the tree is read-only
   EXPECT_EQ(faccessat(rdonly_fd.get(), "bar_file", R_OK, 0), 0);
@@ -290,7 +292,7 @@ TEST_P(DirectoryPermissionTest, TestRestrictDirectoryAccess) {
   ASSERT_GT(foo_fd.get(), 0);
 
   fbl::unique_fd rdonly_fd;
-  CloneFdAsReadOnlyHelper(std::move(foo_fd), &rdonly_fd);
+  ASSERT_NO_FATAL_FAILURE(CloneFdAsReadOnlyHelper(std::move(foo_fd), &rdonly_fd));
 
   // Verify the tree is read-only
   int bar_file_fd = openat(rdonly_fd.get(), "bar_file", O_RDONLY, 0644);
@@ -328,7 +330,7 @@ TEST_P(DirectoryPermissionTest, TestModifyingFileTime) {
 
   // Clone foo_fd it as read-only.
   fbl::unique_fd rdonly_fd;
-  CloneFdAsReadOnlyHelper(std::move(foo_fd), &rdonly_fd);
+  ASSERT_NO_FATAL_FAILURE(CloneFdAsReadOnlyHelper(std::move(foo_fd), &rdonly_fd));
 
   // futimens on the read-only clone is not allowed
   ASSERT_LT(futimens(rdonly_fd.get(), ts), 0);

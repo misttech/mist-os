@@ -190,14 +190,14 @@ mod tests {
                         bssid: Some([0, 0, 0, 0, 0, 0]),
                         rssi: Some(0),
                         frequency: Some(CENTER_FREQ_CHAN_1),
-                        timestamp_nanos: Some(zx::Time::get_monotonic().into_nanos()),
+                        timestamp_nanos: Some(zx::MonotonicTime::get().into_nanos()),
                         ..Default::default()
                     },
                     fidl_policy::Bss {
                         bssid: Some([7, 8, 9, 10, 11, 12]),
                         rssi: Some(13),
                         frequency: Some(CENTER_FREQ_CHAN_11),
-                        timestamp_nanos: Some(zx::Time::get_monotonic().into_nanos()),
+                        timestamp_nanos: Some(zx::MonotonicTime::get().into_nanos()),
                         ..Default::default()
                     },
                 ]),
@@ -213,7 +213,7 @@ mod tests {
                     bssid: Some([1, 2, 3, 4, 5, 6]),
                     rssi: Some(7),
                     frequency: Some(CENTER_FREQ_CHAN_8),
-                    timestamp_nanos: Some(zx::Time::get_monotonic().into_nanos()),
+                    timestamp_nanos: Some(zx::MonotonicTime::get().into_nanos()),
                     ..Default::default()
                 }]),
                 compatibility: Some(fidl_policy::Compatibility::Supported),
@@ -332,7 +332,7 @@ mod tests {
                     types::Bss {
                         bssid: types::Bssid::from([0, 0, 0, 0, 0, 0]),
                         signal: types::Signal { rssi_dbm: 0, snr_db: 1 },
-                        timestamp: zx::Time::from_nanos(
+                        timestamp: zx::MonotonicTime::from_nanos(
                             fidl_aps[0].entries.as_ref().unwrap()[0].timestamp_nanos.unwrap(),
                         ),
                         channel: types::WlanChan::new(1, types::Cbw::Cbw20),
@@ -353,7 +353,7 @@ mod tests {
                     types::Bss {
                         bssid: types::Bssid::from([7, 8, 9, 10, 11, 12]),
                         signal: types::Signal { rssi_dbm: 13, snr_db: 3 },
-                        timestamp: zx::Time::from_nanos(
+                        timestamp: zx::MonotonicTime::from_nanos(
                             fidl_aps[0].entries.as_ref().unwrap()[1].timestamp_nanos.unwrap(),
                         ),
                         channel: types::WlanChan::new(11, types::Cbw::Cbw20),
@@ -378,7 +378,7 @@ mod tests {
                 entries: vec![types::Bss {
                     bssid: types::Bssid::from([1, 2, 3, 4, 5, 6]),
                     signal: types::Signal { rssi_dbm: 7, snr_db: 2 },
-                    timestamp: zx::Time::from_nanos(
+                    timestamp: zx::MonotonicTime::from_nanos(
                         fidl_aps[1].entries.as_ref().unwrap()[0].timestamp_nanos.unwrap(),
                     ),
                     channel: types::WlanChan::new(8, types::Cbw::Cbw20),

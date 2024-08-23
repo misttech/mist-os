@@ -46,7 +46,7 @@ impl<Key: FutexKey> FutexTable<Key> {
         addr: UserAddress,
         value: u32,
         mask: u32,
-        deadline: zx::Time,
+        deadline: zx::MonotonicTime,
     ) -> Result<(), Errno> {
         if !addr.is_aligned(4) {
             return error!(EINVAL);
@@ -146,7 +146,7 @@ impl<Key: FutexKey> FutexTable<Key> {
         &self,
         current_task: &CurrentTask,
         addr: UserAddress,
-        deadline: zx::Time,
+        deadline: zx::MonotonicTime,
     ) -> Result<(), Errno> {
         if !addr.is_aligned(4) {
             return error!(EINVAL);

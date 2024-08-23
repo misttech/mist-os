@@ -152,6 +152,7 @@ impl Broker {
         let permissions = match dependency_type {
             DependencyType::Assertive => Permissions::MODIFY_ASSERTIVE_DEPENDENT,
             DependencyType::Opportunistic => Permissions::MODIFY_OPPORTUNISTIC_DEPENDENT,
+            _ => todo!("Support other dependency types"),
         };
         match self
             .credentials
@@ -1062,6 +1063,7 @@ impl Broker {
                 }
                 self.catalog.topology.add_opportunistic_dependency(&dependency)
             }
+            _ => todo!("Support other dependency types"),
         }
     }
 }
@@ -1512,6 +1514,7 @@ impl ClaimLookup {
     }
 
     fn remove(&mut self, id: &ClaimID) -> Option<Claim> {
+        self.remove_from_claims_to_deactivate(id);
         let Some(claim) = self.claims.remove(id) else {
             return None;
         };
@@ -1529,7 +1532,6 @@ impl ClaimLookup {
                 self.claims_by_lease.remove(&claim.lease_id);
             }
         }
-        self.remove_from_claims_to_deactivate(id);
         Some(claim)
     }
 
@@ -1905,6 +1907,28 @@ mod tests {
             },
             &LeaseID::new(),
         )
+    }
+
+    #[fuchsia::test]
+    fn test_claim_lookup_add_remove() {
+        let mut lookup = ClaimLookup::new();
+
+        let claim_a_1_b_1 = create_test_claim("A".into(), 1, "B".into(), 1);
+        let claim_a_2_b_2 = create_test_claim("A".into(), 2, "B".into(), 2);
+
+        lookup.add(claim_a_1_b_1.clone());
+        lookup.add(claim_a_2_b_2.clone());
+
+        lookup.mark_to_deactivate(&claim_a_2_b_2.id);
+
+        assert_eq!(lookup.remove(&claim_a_1_b_1.id), Some(claim_a_1_b_1.clone()));
+        assert_eq!(lookup.remove(&claim_a_2_b_2.id), Some(claim_a_2_b_2.clone()));
+        assert_eq!(lookup.remove(&claim_a_2_b_2.id), None);
+
+        assert_eq!(lookup.claims.len(), 0);
+        assert_eq!(lookup.claims_by_required_element_id.len(), 0);
+        assert_eq!(lookup.claims_by_lease.len(), 0);
+        assert_eq!(lookup.claims_to_deactivate_by_element_id.len(), 0);
     }
 
     #[fuchsia::test]
@@ -2897,7 +2921,7 @@ mod tests {
     fn test_broker_lease_transitive() {
         // Create a topology of a child element with two chained transitive
         // dependencies.
-        // C -> P -> GP
+        // C => P => GP
         let inspect = fuchsia_inspect::component::inspector();
         let inspect_node = inspect.root().create_child("test");
         let mut broker = Broker::new(inspect_node);
@@ -3021,17 +3045,17 @@ mod tests {
     fn test_broker_lease_shared() {
         // Create a topology of two child elements with a shared
         // parent and grandparent
-        // C1 \
-        //     > P -> GP
-        // C2 /
+        // C1 \\
+        //      > P => GP
+        // C2 //
         // Child 1 requires Parent at 50 to support its own level of 5.
         // Parent requires Grandparent at 200 to support its own level of 50.
-        // C1 -> P -> GP
-        //  5 -> 50 -> 200
+        // C1 => P => GP
+        //  5 => 50 => 200
         // Child 2 requires Parent at 30 to support its own level of 3.
         // Parent requires Grandparent at 90 to support its own level of 30.
-        // C2 -> P -> GP
-        //  3 -> 30 -> 90
+        // C2 =>  P => GP
+        //  3 => 30 => 90
         // Grandparent has a minimum required level of 10.
         // All other elements have a minimum of 0.
         let inspect = fuchsia_inspect::component::inspector();
@@ -6339,8 +6363,8 @@ mod tests {
         // Storage's Hardware (HW) and Wake-on-request (WOR) elements, and
         // System Activity Governor's Wake Handling (WH) and Execution State
         // elements.
-        // HW has a passive dep on Execution State: Wake Handling (1)
-        // WOR has an active dep on Wake Handling: Active, which has an active dep on ES: WH
+        // HW has an opportunistic dep on Execution State: Wake Handling (1)
+        // WOR has an assertive dep on Wake Handling: Active, which has an assertive dep on ES: WH
         // A persistent lease is held on HW that should be activated whenever ES is at WH or higher.
         // HW -> ES(WH)
         // WOR => WH(A)

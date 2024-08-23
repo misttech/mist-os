@@ -5,36 +5,42 @@
 #include "src/storage/blobfs/blob_loader.h"
 
 #include <lib/fit/defer.h>
-#include <lib/fzl/owned-vmo-mapper.h>
+#include <lib/stdcompat/span.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/result.h>
+#include <lib/zx/vmo.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
-#include <zircon/syscalls.h>
+#include <zircon/syscalls/object.h>
+#include <zircon/types.h>
 
 #include <algorithm>
+#include <cstdint>
+#include <cstring>
 #include <memory>
+#include <utility>
 #include <vector>
 
-#include <fbl/string_buffer.h>
-#include <safemath/checked_math.h>
-#include <storage/buffer/owned_vmoid.h>
+#include <storage/buffer/resizeable_vmo_buffer.h>
+#include <storage/operation/operation.h>
 
-#include "src/lib/digest/digest.h"
 #include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/blob_verifier.h"
+#include "src/storage/blobfs/blobfs_metrics.h"
 #include "src/storage/blobfs/common.h"
 #include "src/storage/blobfs/compression/chunked.h"
-#include "src/storage/blobfs/compression/decompressor.h"
+#include "src/storage/blobfs/compression/external_decompressor.h"
 #include "src/storage/blobfs/compression/seekable_decompressor.h"
 #include "src/storage/blobfs/compression_settings.h"
 #include "src/storage/blobfs/format.h"
 #include "src/storage/blobfs/iterator/block_iterator.h"
+#include "src/storage/blobfs/iterator/block_iterator_provider.h"
+#include "src/storage/blobfs/loader_info.h"
+#include "src/storage/blobfs/node_finder.h"
+#include "src/storage/blobfs/transaction_manager.h"
 #include "src/storage/blobfs/transfer_buffer.h"
 #include "src/storage/lib/trace/trace.h"
-#include "src/storage/lib/vfs/cpp/transaction/buffered_operations_builder.h"
-#include "storage/operation/operation.h"
 
 namespace blobfs {
 
@@ -148,7 +154,7 @@ zx::result<LoaderInfo> BlobLoader::LoadBlob(uint32_t node_index) {
 zx::result<std::unique_ptr<BlobVerifier>> BlobLoader::CreateBlobVerifier(
     uint32_t node_index, const Inode& inode, const BlobLayout& blob_layout) {
   if (blob_layout.MerkleTreeSize() == 0) {
-    return BlobVerifier::CreateWithoutTree(digest::Digest(inode.merkle_root_hash), metrics_,
+    return BlobVerifier::CreateWithoutTree(Digest(inode.merkle_root_hash), metrics_,
                                            inode.blob_size);
   }
 
@@ -160,8 +166,7 @@ zx::result<std::unique_ptr<BlobVerifier>> BlobLoader::CreateBlobVerifier(
     FX_LOGS(ERROR) << "Failed to load Merkle tree: " << blocks.status_string();
     return blocks.take_error();
   } else {
-    return BlobVerifier::Create(digest::Digest(inode.merkle_root_hash), metrics_, *blocks,
-                                blob_layout);
+    return BlobVerifier::Create(Digest(inode.merkle_root_hash), metrics_, *blocks, blob_layout);
   }
 }
 

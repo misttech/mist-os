@@ -184,14 +184,18 @@ closed protocol Registry {
     /// Register for notification when one or more devices are added.
     /// The `devices` vector will always contain at least one `Info` entry.
     strict WatchDevicesAdded() -> (table {
-        /// Devices added since `WatchDevicesAdded` was last called. This method
-        /// returns all audio devices when called for the first time.
+        /// Devices added since `WatchDevicesAdded` was last called. When called
+        /// for the first time, this method returns all available audio devices
+        /// (even an empty vector, if no audio devices are present). Subsequent
+        /// calls will pend until additional devices become available.
         1: devices vector<Info>:MAX_COUNT_DEVICES;
     }) error RegistryWatchDevicesAddedError;
 
     /// Register for notification when an (active, added) device is removed.
     /// Because the method only notifies of one removal, upon completion it
     /// should immediately be re-called, in case other removals have occurred.
+    /// Calls to this method will pend until the removal of a device that was
+    /// included in a previous `WatchDevicesAdded` response.
     strict WatchDeviceRemoved() -> (table {
         /// The token of the device least-recently removed.
         1: token_id TokenId;

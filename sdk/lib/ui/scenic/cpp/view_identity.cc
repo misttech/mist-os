@@ -13,4 +13,16 @@ fuchsia::ui::views::ViewIdentityOnCreation NewViewIdentityOnCreation() {
           .view_ref_control = std::move(view_ref_pair.control_ref)};
 }
 
+namespace cpp {
+
+// For fuchsia_ui_composition.Flatland.CreateView() call.
+fuchsia_ui_views::ViewIdentityOnCreation NewViewIdentityOnCreation() {
+  auto view_ref_pair = ViewRefPair::New();
+  return fuchsia_ui_views::ViewIdentityOnCreation(
+      {.view_ref = std::move(view_ref_pair.view_ref),
+       .view_ref_control = std::move(view_ref_pair.control_ref)});
+}
+
+}  // namespace cpp
+
 }  // namespace scenic

@@ -246,7 +246,7 @@ zx_status_t PlatformDevice::PDevGetInterrupt(uint32_t index, uint32_t flags,
     return ZX_ERR_INTERNAL;
   }
   if (flags == 0) {
-    flags = irq.mode().value();
+    flags = static_cast<uint32_t>(irq.mode().value());
   }
   auto vector = irq.irq().value();
   zxlogf(INFO, "Creating interrupt with vector %u for platform device \"%s\"", vector, name_);

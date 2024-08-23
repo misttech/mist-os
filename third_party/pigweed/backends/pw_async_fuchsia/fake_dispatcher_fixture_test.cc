@@ -11,19 +11,19 @@
 
 using namespace std::chrono_literals;
 
-namespace pw::async::fuchsia {
+namespace pw::async_fuchsia {
 namespace {
 
 using FakeDispatcherFuchsiaFixture = async::test::FakeDispatcherFixture;
 
 TEST_F(FakeDispatcherFuchsiaFixture, PostTasks) {
   int c = 0;
-  auto inc_count = [&c](Context& /*ctx*/, Status status) {
+  auto inc_count = [&c](async::Context& /*ctx*/, Status status) {
     ASSERT_OK(status);
     ++c;
   };
 
-  Task task(inc_count);
+  async::Task task(inc_count);
   dispatcher().Post(task);
 
   ASSERT_EQ(c, 0);
@@ -33,15 +33,15 @@ TEST_F(FakeDispatcherFuchsiaFixture, PostTasks) {
 
 TEST_F(FakeDispatcherFuchsiaFixture, DelayedTasks) {
   int c = 0;
-  pw::async::Task first([&c](pw::async::Context& ctx, Status status) {
+  async::Task first([&c](async::Context& ctx, Status status) {
     ASSERT_OK(status);
     c = c * 10 + 1;
   });
-  pw::async::Task second([&c](pw::async::Context& ctx, Status status) {
+  async::Task second([&c](async::Context& ctx, Status status) {
     ASSERT_OK(status);
     c = c * 10 + 2;
   });
-  pw::async::Task third([&c](pw::async::Context& ctx, Status status) {
+  async::Task third([&c](async::Context& ctx, Status status) {
     ASSERT_OK(status);
     c = c * 10 + 3;
   });
@@ -55,7 +55,7 @@ TEST_F(FakeDispatcherFuchsiaFixture, DelayedTasks) {
 }
 
 TEST_F(FakeDispatcherFuchsiaFixture, CancelTask) {
-  pw::async::Task task([](pw::async::Context& ctx, Status status) { FAIL(); });
+  async::Task task([](async::Context& ctx, Status status) { FAIL(); });
   dispatcher().Post(task);
   EXPECT_TRUE(dispatcher().Cancel(task));
 
@@ -65,7 +65,7 @@ TEST_F(FakeDispatcherFuchsiaFixture, CancelTask) {
 TEST_F(FakeDispatcherFuchsiaFixture, HeapAllocatedTasks) {
   int c = 0;
   for (int i = 0; i < 3; i++) {
-    pw_async_fuchsia::Post(&dispatcher(), [&c](Context& ctx, Status status) {
+    Post(&dispatcher(), [&c](async::Context& ctx, Status status) {
       ASSERT_OK(status);
       c++;
     });
@@ -78,13 +78,13 @@ TEST_F(FakeDispatcherFuchsiaFixture, HeapAllocatedTasks) {
 TEST_F(FakeDispatcherFuchsiaFixture, ChainedTasks) {
   int c = 0;
 
-  pw_async_fuchsia::Post(&dispatcher(), [&c](Context& ctx, Status status) {
+  Post(&dispatcher(), [&c](async::Context& ctx, Status status) {
     ASSERT_OK(status);
     c++;
-    pw_async_fuchsia::Post(ctx.dispatcher, [&c](Context& ctx, Status status) {
+    Post(ctx.dispatcher, [&c](async::Context& ctx, Status status) {
       ASSERT_OK(status);
       c++;
-      pw_async_fuchsia::Post(ctx.dispatcher, [&c](Context& ctx, Status status) {
+      Post(ctx.dispatcher, [&c](async::Context& ctx, Status status) {
         ASSERT_OK(status);
         c++;
       });
@@ -97,22 +97,22 @@ TEST_F(FakeDispatcherFuchsiaFixture, ChainedTasks) {
 
 TEST_F(FakeDispatcherFuchsiaFixture, DestroyLoopInsideTask) {
   int c = 0;
-  auto inc_count = [&c](Context& ctx, Status status) {
+  auto inc_count = [&c](async::Context& ctx, Status status) {
     ASSERT_CANCELLED(status);
     ++c;
   };
 
   // These tasks are never executed and cleaned up in DestroyLoop().
-  Task task0(inc_count), task1(inc_count);
+  async::Task task0(inc_count), task1(inc_count);
   dispatcher().PostAfter(task0, 20ms);
   dispatcher().PostAfter(task1, 21ms);
 
-  Task stop_task([&c](Context& ctx, Status status) {
+  async::Task stop_task([&c](async::Context& ctx, Status status) {
     ASSERT_OK(status);
     ++c;
-    static_cast<test::FakeDispatcher*>(ctx.dispatcher)->RequestStop();
+    static_cast<async::test::FakeDispatcher*>(ctx.dispatcher)->RequestStop();
     // Stop has been requested; now drive the Dispatcher so it destroys the loop.
-    static_cast<test::FakeDispatcher*>(ctx.dispatcher)->RunUntilIdle();
+    static_cast<async::test::FakeDispatcher*>(ctx.dispatcher)->RunUntilIdle();
   });
   dispatcher().Post(stop_task);
 
@@ -121,4 +121,4 @@ TEST_F(FakeDispatcherFuchsiaFixture, DestroyLoopInsideTask) {
 }
 
 }  // namespace
-}  // namespace pw::async::fuchsia
+}  // namespace pw::async_fuchsia

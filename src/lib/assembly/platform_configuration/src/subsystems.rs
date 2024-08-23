@@ -483,7 +483,10 @@ fn configure_subsystems(
 
     tee_clients::TeeClientsConfig::define_configuration(
         &context_base.for_subsystem("tee_clients"),
-        &product.tee_clients,
+        &(
+            &product.tee_clients,
+            &context_base.for_subsystem("tee_clients").board_info.tee_trusted_app_guids,
+        ),
         builder,
     )
     .context("configuring the 'tee_clients' subsystem")?;

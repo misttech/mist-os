@@ -7,21 +7,31 @@ import("//build/components.gni")
 import("//build/drivers.gni")
 import("//tools/cmc/build/expect_includes.gni")
 
-group("driver_test_realm") {
+# WARNING: Prefer to use the realm-builder variants, unless you have a very basic use case and
+# don't need hermeticity in your test.
+#
+# This is the static driver_test_realm. It is a layer on top of the driver_test_realm, that
+# adds it as a static component in the test. This is done by bringing in the client_includes
+# which is an expect_includes target with a client shard that the test must include in its cml.
+# This client shard contains a child entry for the driver-test-realm component. This is provided
+# with some default capabilities that simple tests can utilize (eg. the devfs directory), but it
+# can't be customized any further to add more capabilities (like a test specific driver service).
+#
+# See the realm-builder libraries if any customization outside of what currently exists in the
+# client shard is needed.
+group("static") {
   testonly = true
   deps = [
     ":client_includes",
-    ":driver_manager_test",
-    ":driver_test_realm_component",
-    ":fake_resolver",
-    ":test_realm_manifest",
-    "//src/devices/bin/devfs:component-for-test",
-    "//src/devices/bin/driver-index:component",
-    "//src/devices/bin/driver_host:component",
+    ":driver_test_realm",
   ]
 }
 
-group("realm_builder_version") {
+# This is the main driver_test_realm group. It contains the driver-test-realm component that
+# configures the realm, as well as the inner components that are part of the inner realm.
+# Generally this should not be depended on directly, instead either the static target or the
+# realm_builder libraries should be depended on and they bring in this dependency.
+group("driver_test_realm") {
   deps = [
     ":driver_manager_test",
     ":driver_test_realm_component",
@@ -36,7 +46,7 @@ group("realm_builder_version") {
 group("tests") {
   testonly = true
   deps = [
-    ":package",
+    ":static_package",
     "platform:tests",
     "simple:tests",
     "tests",
@@ -52,6 +62,7 @@ executable("bin") {
     "//sdk/fidl/fuchsia.component.decl:fuchsia.component.decl_cpp",
     "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_cpp",
     "//sdk/fidl/fuchsia.device.manager:fuchsia.device.manager_cpp",
+    "//sdk/fidl/fuchsia.driver.development:fuchsia.driver.development_cpp",
     "//sdk/fidl/fuchsia.driver.framework:fuchsia.driver.framework_cpp",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_cpp",
     "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
@@ -151,8 +162,16 @@ expect_includes("client_includes") {
   includes = [ "meta/client.shard.cml" ]
 }
 
-fuchsia_package("package") {
+fuchsia_package("static_package") {
   testonly = true
+  package_name = "static_driver_test_realm"
+  deps = [
+    ":static",
+    "//src/devices/misc/drivers/test-parent",
+  ]
+}
+
+fuchsia_package("package") {
   package_name = "driver_test_realm"
   deps = [
     ":driver_test_realm",
@@ -160,16 +179,8 @@ fuchsia_package("package") {
   ]
 }
 
-fuchsia_package("realm_builder_version-package") {
-  package_name = "driver_test_realm_realm_builder_version"
-  deps = [
-    ":realm_builder_version",
-    "//src/devices/misc/drivers/test-parent",
-  ]
-}
-
 # Define Bazel input resource so it can be used
-export_fuchsia_package_to_bazel("realm-builder-version-package-bazel") {
-  package = ":realm_builder_version-package"
+export_fuchsia_package_to_bazel("package-bazel") {
+  package = ":package"
   package_name = "driver_test_realm"
 }

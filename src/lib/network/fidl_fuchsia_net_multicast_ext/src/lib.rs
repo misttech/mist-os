@@ -208,6 +208,7 @@ pub enum AddRouteError {
     RequiredRouteFieldsMissing,
     InterfaceNotFound,
     InputCannotBeOutput,
+    DuplicateOutput,
 }
 
 impl From<AddRouteError> for fnet_multicast_admin::Ipv4RoutingTableControllerAddRouteError {
@@ -218,6 +219,7 @@ impl From<AddRouteError> for fnet_multicast_admin::Ipv4RoutingTableControllerAdd
             AddRouteError::RequiredRouteFieldsMissing => RequiredRouteFieldsMissing,
             AddRouteError::InterfaceNotFound => InterfaceNotFound,
             AddRouteError::InputCannotBeOutput => InputCannotBeOutput,
+            AddRouteError::DuplicateOutput => DuplicateOutput,
         }
     }
 }
@@ -230,6 +232,7 @@ impl From<AddRouteError> for fnet_multicast_admin::Ipv6RoutingTableControllerAdd
             AddRouteError::RequiredRouteFieldsMissing => RequiredRouteFieldsMissing,
             AddRouteError::InterfaceNotFound => InterfaceNotFound,
             AddRouteError::InputCannotBeOutput => InputCannotBeOutput,
+            AddRouteError::DuplicateOutput => DuplicateOutput,
         }
     }
 }
@@ -444,6 +447,11 @@ mod tests {
         fnet_multicast_admin::Ipv4RoutingTableControllerAddRouteError::InputCannotBeOutput;
         "input_cannot_be_output"
     )]
+    #[test_case(
+        AddRouteError::DuplicateOutput =>
+        fnet_multicast_admin::Ipv4RoutingTableControllerAddRouteError::DuplicateOutput;
+        "duplicate_output"
+    )]
     fn ipv4_add_route_error(
         err: AddRouteError,
     ) -> fnet_multicast_admin::Ipv4RoutingTableControllerAddRouteError {
@@ -469,6 +477,11 @@ mod tests {
         AddRouteError::InputCannotBeOutput =>
         fnet_multicast_admin::Ipv6RoutingTableControllerAddRouteError::InputCannotBeOutput;
         "input_cannot_be_output"
+    )]
+    #[test_case(
+        AddRouteError::DuplicateOutput =>
+        fnet_multicast_admin::Ipv6RoutingTableControllerAddRouteError::DuplicateOutput;
+        "duplicate_output"
     )]
     fn ipv6_add_route_error(
         err: AddRouteError,

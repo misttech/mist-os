@@ -116,7 +116,7 @@ impl SomeProtocolSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::Time) -> Result<SomeProtocolEvent, fidl::Error> {
+    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<SomeProtocolEvent, fidl::Error> {
         SomeProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
 }

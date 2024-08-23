@@ -6,7 +6,7 @@
 //!
 //! Each file within `/sys/fs/nmfs` represents a network and its properties.
 
-use crate::task::CurrentTask;
+use crate::task::{CurrentTask, Kernel};
 use crate::vfs::fs_args::parse;
 use crate::vfs::{
     BytesFile, BytesFileOps, CacheMode, FileOps, FileSystem, FileSystemHandle, FileSystemOps,
@@ -23,6 +23,7 @@ use starnix_uapi::vfs::default_statfs;
 use starnix_uapi::{errno, error, statfs};
 use std::borrow::Cow;
 use std::net::{Ipv4Addr, Ipv6Addr};
+use std::sync::Arc;
 
 use {fidl_fuchsia_net as fnet, fidl_fuchsia_netpol_socketproxy as fnp_socketproxy};
 
@@ -51,8 +52,7 @@ pub(crate) enum VersionedProperties {
 
 pub struct Nmfs;
 impl Nmfs {
-    pub fn new_fs(current_task: &CurrentTask, options: FileSystemOptions) -> FileSystemHandle {
-        let kernel = current_task.kernel();
+    pub fn new_fs(kernel: &Arc<Kernel>, options: FileSystemOptions) -> FileSystemHandle {
         let fs = FileSystem::new(kernel, CacheMode::Permanent, Nmfs, options)
             .expect("nmfs constructed with valid options");
 
@@ -75,8 +75,8 @@ impl FileSystemOps for Nmfs {
     }
 }
 
-pub fn nmfs(current_task: &CurrentTask, options: FileSystemOptions) -> &FileSystemHandle {
-    current_task.kernel().nmfs.get_or_init(|| Nmfs::new_fs(current_task, options))
+pub fn nmfs(kernel: &Arc<Kernel>, options: FileSystemOptions) -> Result<FileSystemHandle, Errno> {
+    Ok(kernel.nmfs.get_or_init(|| Nmfs::new_fs(kernel, options)).clone())
 }
 
 pub struct NetworkDirectoryNode;

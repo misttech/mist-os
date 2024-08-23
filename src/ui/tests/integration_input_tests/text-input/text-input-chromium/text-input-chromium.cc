@@ -41,18 +41,15 @@ class WebApp : public integration_tests::WebAppBase {
     RunLoopUntil(
         [&] { return nav_listener_.title_.find("text_input_focused") != std::string::npos; });
 
-    // Send `ReportReady` to the test fixture, and wait until the call is
-    // acknowledged.
-    auto keyboard_input_listener_connect =
-        component::Connect<fuchsia_ui_test_input::KeyboardInputListener>();
-    ZX_ASSERT_OK(keyboard_input_listener_connect);
-    fidl::SyncClient keyboard_input_listener(std::move(keyboard_input_listener_connect.value()));
-
     ZX_ASSERT_OK(test_app_status_listener->ReportStatus(
         {fuchsia_ui_test_input::TestAppStatus::kElementFocused}));
 
     // Watch for any changes in the text area, and forward repeatedly to the
     // response listener in the test fixture.
+    auto keyboard_input_listener_connect =
+        component::Connect<fuchsia_ui_test_input::KeyboardInputListener>();
+    ZX_ASSERT_OK(keyboard_input_listener_connect);
+    fidl::SyncClient keyboard_input_listener(std::move(keyboard_input_listener_connect.value()));
     for (;;) {
       // This WebMessage comes from the Javascript code (below).
       std::optional<fuchsia_web::WebMessage> received;

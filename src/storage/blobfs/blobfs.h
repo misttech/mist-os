@@ -12,24 +12,26 @@
 #error Fuchsia-only Header
 #endif
 
-#include <fidl/fuchsia.fs/cpp/wire.h>
 #include <fidl/fuchsia.hardware.block/cpp/wire.h>
-#include <fidl/fuchsia.io/cpp/wire.h>
+#include <lib/async/dispatcher.h>
 #include <lib/fzl/resizeable-vmo-mapper.h>
+#include <lib/zx/event.h>
 #include <lib/zx/resource.h>
 #include <lib/zx/result.h>
 #include <lib/zx/vmo.h>
+#include <zircon/types.h>
 
+#include <cstddef>
+#include <cstdint>
 #include <memory>
+#include <optional>
 #include <shared_mutex>
+#include <vector>
 
-#include <bitmap/raw-bitmap.h>
-#include <fbl/algorithm.h>
-#include <fbl/auto_lock.h>
 #include <fbl/macros.h>
-#include <fbl/ref_counted.h>
 #include <fbl/ref_ptr.h>
-#include <storage/operation/unbuffered_operations_builder.h>
+#include <storage/buffer/vmoid_registry.h>
+#include <storage/operation/operation.h>
 
 #include "src/storage/blobfs/allocator/allocator.h"
 #include "src/storage/blobfs/allocator/extent_reserver.h"
@@ -37,6 +39,7 @@
 #include "src/storage/blobfs/blob_loader.h"
 #include "src/storage/blobfs/blobfs_inspect_tree.h"
 #include "src/storage/blobfs/blobfs_metrics.h"
+#include "src/storage/blobfs/cache_policy.h"
 #include "src/storage/blobfs/common.h"
 #include "src/storage/blobfs/compression/external_decompressor.h"
 #include "src/storage/blobfs/compression_settings.h"
@@ -44,12 +47,17 @@
 #include "src/storage/blobfs/iterator/block_iterator.h"
 #include "src/storage/blobfs/iterator/block_iterator_provider.h"
 #include "src/storage/blobfs/mount.h"
+#include "src/storage/blobfs/node_finder.h"
 #include "src/storage/blobfs/page_loader.h"
 #include "src/storage/blobfs/transaction.h"
 #include "src/storage/blobfs/transaction_manager.h"
 #include "src/storage/lib/block_client/cpp/block_device.h"
+#include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
+#include "src/storage/lib/vfs/cpp/inspect/node_operations.h"
 #include "src/storage/lib/vfs/cpp/journal/journal.h"
+#include "src/storage/lib/vfs/cpp/journal/superblock.h"
 #include "src/storage/lib/vfs/cpp/paged_vfs.h"
+#include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace blobfs {
@@ -122,7 +130,7 @@ class Blobfs : public TransactionManager, public BlockIteratorProvider {
   static constexpr size_t WriteBufferBlockCount() {
     // Hardcoded to 10 MB; may be replaced by a more device-specific option
     // in the future.
-    return 10 * (1 << 20) / kBlobfsBlockSize;
+    return 10ul * (1 << 20) / kBlobfsBlockSize;
   }
 
   Writability writability() const { return writability_; }
@@ -176,7 +184,7 @@ class Blobfs : public TransactionManager, public BlockIteratorProvider {
   }
 
   // Optional root VM resource. This is necessary to allow executable blobs to be created. It will
-  // be a null resource if this blobfs instance does not have access (msotly happens in tests) in
+  // be a null resource if this blobfs instance does not have access (mostly happens in tests) in
   // which case it will be impossible to create executable memory mappings.
   const zx::resource& vmex_resource() const { return vmex_resource_; }
 
@@ -267,7 +275,7 @@ class Blobfs : public TransactionManager, public BlockIteratorProvider {
   // to be sure that all transactions leave the file system in a good state.
   void FsckAtEndOfTransaction();
 
-  // Sequentually migrates blobfs to the latest oldest_minor_version.
+  // Sequentially migrates blobfs to the latest oldest_minor_version.
   // Performs zero or more passes which each migrate blobfs from oldest_minor_version N -> N+1 by
   // performing some reparative action. See MigrateToRevN.
   zx_status_t Migrate();

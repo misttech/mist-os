@@ -17,6 +17,7 @@ test("test") {
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture",
     "//src/power/system-activity-governor/fake/fidl:test.sagcontrol_cpp",
+    "//src/power/testing/system-integration/util",
   ]
 }
 

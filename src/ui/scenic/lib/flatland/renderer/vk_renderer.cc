@@ -4,6 +4,7 @@
 
 #include "src/ui/scenic/lib/flatland/renderer/vk_renderer.h"
 
+#include <fidl/fuchsia.ui.composition/cpp/hlcpp_conversion.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <lib/async/cpp/wait.h>
 #include <lib/async/default.h>
@@ -33,7 +34,7 @@
 namespace {
 
 using allocation::BufferCollectionUsage;
-using fuchsia::ui::composition::ImageFlip;
+using fuchsia_ui_composition::ImageFlip;
 
 // TODO(https://fxbug.dev/42072347): We support two framebuffer formats and warmup for both.
 // * RGBA is the only supported format for AFBC on mali. Should be the default in production.
@@ -109,13 +110,13 @@ constexpr float clamp(float v, float lo, float hi) { return (v < lo) ? lo : (hi 
 
 std::array<size_t, 4> GetFlippedIndices(const ImageFlip flip_type) {
   switch (flip_type) {
-    case ImageFlip::NONE:
+    case ImageFlip::kNone:
       return {0, 1, 2, 3};
-    case ImageFlip::LEFT_RIGHT:
+    case ImageFlip::kLeftRight:
       // The indices are sorted in a clockwise order starting at the top-left, and the left
       // indices must be swapped with the right.
       return {1, 0, 3, 2};
-    case ImageFlip::UP_DOWN:
+    case ImageFlip::kUpDown:
       // The indices are sorted in a clockwise order starting at the top-left, and the top indices
       // must be swapped with the bottom.
       return {3, 2, 1, 0};
@@ -846,8 +847,7 @@ void VkRenderer::Render(const ImageMetadata& render_target,
     // When we are not in protected mode, replace any protected content with black solid color.
     if (!render_in_protected_mode && texture_ptr->image()->use_protected_memory()) {
       textures.emplace_back(local_texture_map.at(allocation::kInvalidImageId));
-      color_data.emplace_back(escher::RectangleCompositor::ColorData(
-          kProtectedReplacementColorInRGBA, /*is_opaque=*/true));
+      color_data.emplace_back(kProtectedReplacementColorInRGBA, /*is_opaque=*/true);
       continue;
     }
 
@@ -856,8 +856,7 @@ void VkRenderer::Render(const ImageMetadata& render_target,
 
     const glm::vec4 multiply(image.multiply_color[0], image.multiply_color[1],
                              image.multiply_color[2], image.multiply_color[3]);
-    color_data.emplace_back(escher::RectangleCompositor::ColorData(
-        multiply, image.blend_mode == fuchsia::ui::composition::BlendMode::SRC));
+    color_data.emplace_back(multiply, image.blend_mode == fuchsia_ui_composition::BlendMode::kSrc);
   }
 
   // Grab the output image and use it to generate a depth texture. The depth texture needs to

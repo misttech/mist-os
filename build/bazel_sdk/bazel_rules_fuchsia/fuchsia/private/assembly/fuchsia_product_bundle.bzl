@@ -6,6 +6,11 @@
 
 load("//fuchsia/private:ffx_tool.bzl", "get_ffx_product_bundle_inputs", "get_ffx_scrutiny_inputs")
 load(
+    "//fuchsia/private:fuchsia_debug_symbols.bzl",
+    "fuchsia_collect_all_debug_symbols_infos_aspect",
+    "transform_collected_debug_symbols_infos",
+)
+load(
     "//fuchsia/private/workflows:fuchsia_product_bundle_tasks.bzl",
     "fuchsia_product_bundle_tasks",
     "product_bundles_help_executable",
@@ -660,7 +665,10 @@ def _build_fuchsia_product_bundle_impl(ctx):
         inputs.extend(ctx.files.recovery)
 
     # If update info is supplied, add it to the product bundle.
-    if ctx.file.update_version_file != None:
+    if ctx.file.update_version_file != None or ctx.attr.update_epoch != "":
+        # both the update version and the update epoch need to be set
+        if ctx.file.update_version_file == None:
+            fail("'update_version_file' must be supplied in order to build an update package.")
         if ctx.attr.repository_keys == None:
             fail("Repository keys must be supplied in order to build an update package")
         ffx_invocation.extend([
@@ -668,7 +676,7 @@ def _build_fuchsia_product_bundle_impl(ctx):
             "--update-package-epoch $UPDATE_EPOCH",
         ])
         env["UPDATE_VERSION_FILE"] = ctx.file.update_version_file.path
-        env["UPDATE_EPOCH"] = ctx.attr.update_epoch
+        env["UPDATE_EPOCH"] = ctx.attr.update_epoch or "1"
         inputs.append(ctx.file.update_version_file)
 
     # If a repository is supplied, add it to the product bundle.
@@ -718,6 +726,11 @@ def _build_fuchsia_product_bundle_impl(ctx):
         recovery_scrutiny_config = ctx.attr.recovery_scrutiny_config[FuchsiaScrutinyConfigInfo]
         deps += _scrutiny_validation(ctx, ffx_tool, ffx_scrutiny_inputs, pb_out_dir, recovery_scrutiny_config, platform_scrutiny_config, True)
 
+    fuchsia_debug_symbols_infos = transform_collected_debug_symbols_infos(
+        ctx.attr.main,
+        ctx.attr.recovery,
+    )
+
     return [
         DefaultInfo(
             executable = product_bundles_help_executable(ctx),
@@ -733,8 +746,9 @@ def _build_fuchsia_product_bundle_impl(ctx):
         FuchsiaSizeCheckerInfo(
             size_report = size_report,
         ),
+        fuchsia_debug_symbols_infos,
         OutputGroupInfo(
-            build_id_dirs = depset(transitive = build_id_dirs),
+            build_id_dirs = depset(transitive = fuchsia_debug_symbols_infos.build_id_dirs.values()),
         ),
     ]
 
@@ -766,10 +780,12 @@ _build_fuchsia_product_bundle = rule(
         "main": attr.label(
             doc = "fuchsia_product target to put in slot A.",
             providers = [FuchsiaProductImageInfo],
+            aspects = [fuchsia_collect_all_debug_symbols_infos_aspect],
         ),
         "recovery": attr.label(
             doc = "fuchsia_product target to put in slot R.",
             providers = [FuchsiaProductImageInfo],
+            aspects = [fuchsia_collect_all_debug_symbols_infos_aspect],
         ),
         "repository_keys": attr.label(
             doc = "A fuchsia_repository_keys target, which must be specified when update_version_file is specified.",
@@ -783,7 +799,6 @@ _build_fuchsia_product_bundle = rule(
         ),
         "update_epoch": attr.string(
             doc = "Epoch needed to create update package.",
-            default = "1",
         ),
         "main_scrutiny_config": attr.label(
             doc = "Scrutiny config for slot A.",

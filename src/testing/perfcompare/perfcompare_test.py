@@ -417,8 +417,8 @@ class StatisticsTest(TempDirTestCase):
         error = (
             "^The following metrics had an unexpected sample size"
             " \(expected 99\):\n"
-            "example_suite: ExampleTest \(got 2\)\n"
-            "example_suite: ExampleTest \(got 3\)$"
+            "  example_suite: ExampleTest \(got 2\)\n"
+            "  example_suite: ExampleTest \(got 3\)$"
         )
         with self.assertRaisesRegex(AssertionError, error):
             ComparePerf([dir1_path, dir2_path], expected_sample_size=99)
@@ -426,7 +426,7 @@ class StatisticsTest(TempDirTestCase):
         error = (
             "^The following metrics had an unexpected sample size"
             " \(expected 99\):\n"
-            "example_suite: ExampleTest \(got 2\)$"
+            "  example_suite: ExampleTest \(got 2\)$"
         )
         with self.assertRaisesRegex(AssertionError, error):
             ComparePerf([dir1_path], expected_sample_size=99)

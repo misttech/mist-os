@@ -164,12 +164,9 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // On success, all |Read|, |Write|, and |Append| operations will be directed to the returned
   // stream rather than to the |Read|, |Write|, and |Append| methods on the vnode.
   //
-  // If |SupportsClientSideStreams| is true then the |zx::stream| will be transported to a remote
-  // process to improve performance. The |zx::vmo| backing the |zx::stream| will itself need to be
-  // |zx::pager| backed in order to detect writes made to the |zx::stream|.
-  //
-  // If |SupportsClientSideStreams| is false then the node will be notified of writes made to the
-  // |zx::stream| via |DidModifyStream|.
+  // The |zx::stream| will be duplicated and transported to a remote process to improve performance.
+  // The |zx::vmo| backing the |zx::stream| will itself need to be |zx::pager| backed in order to
+  // detect writes made to the |zx::stream|.
   //
   // Implementations should pass the given |stream_options| as the options to |zx::stream::create|.
   // These options ensure that the created |zx::stream| object has the appropriate rights for the
@@ -190,9 +187,6 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   // 1) The file by writing to the mapping, or
   // 2) The mapping by writing to the underlying file.
   virtual zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo);
-
-  // Returns the name of the device backing the filesystem, if one exists.
-  virtual zx::result<std::string> GetDevicePath() const;
 
   // If |IsRemote()| returns true, requests to open this Vnode using fuchsia.io/Openable.Open will
   // be forwarded to this function.
@@ -245,19 +239,6 @@ class Vnode : public VnodeRefCounted<Vnode>, public fbl::Recyclable<Vnode> {
   //
   // See |CreateStream| for a mechanism to offload |Append| to a |zx::stream| object.
   virtual zx_status_t Append(const void* data, size_t len, size_t* out_end, size_t* out_actual);
-
-  // The data for this node was modified via the |zx::stream| returned by |CreateStream|.
-  //
-  // When a client writes to the |zx::stream| returned by |CreateStream|, there is currently no
-  // mechanism for the node to observe this modification and update its internal state (e.g., the
-  // modification time of the file represented by this node). This method provides that notification
-  // for the time being. In the future, we might switch to using a usermode pager to provide that
-  // notification.
-  virtual void DidModifyStream();
-
-  // Indicates if the |zx::stream| returned by |CreateStream| can be transported to another process
-  // to improve performance.
-  virtual bool SupportsClientSideStreams() const;
 
   // Change the size of the vnode.
   virtual zx_status_t Truncate(size_t len);

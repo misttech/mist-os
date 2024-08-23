@@ -195,6 +195,12 @@ class VmObjectPaged final : public VmObject {
     return cow_pages_locked()->WritebackEndLocked(offset, len);
   }
 
+  // See VmObject::SetUserContentSize
+  void SetUserContentSize(fbl::RefPtr<ContentSizeManager> csm) override {
+    Guard<CriticalMutex> guard{lock()};
+    cow_pages_locked()->SetUserContentSizeLocked(ktl::move(csm));
+  }
+
   void Dump(uint depth, bool verbose) override {
     Guard<CriticalMutex> guard{lock()};
     DumpLocked(depth, verbose);

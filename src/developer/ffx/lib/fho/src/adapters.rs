@@ -26,7 +26,12 @@ macro_rules! embedded_plugin {
                 $crate::macro_deps::return_bug!("global env context unavailable")
             };
             let injector = injector.clone();
-            let env = $crate::FhoEnvironment { ffx, context, injector };
+            let env = $crate::FhoEnvironment {
+                behavior: $crate::connection_behavior(&ffx, &injector, &context).await?,
+                ffx,
+                context,
+                injector,
+            };
 
             // Create the writer, and if the schema is flag is set,
             // try to print it and then exit.
@@ -46,7 +51,11 @@ macro_rules! embedded_plugin {
 
             let tool = <$tool as $crate::FfxTool>::from_env(env.clone(), cmd).await?;
             env.update_log_file(tool.log_basename())?;
-            $crate::FfxMain::main(tool, writer).await
+            let res = $crate::FfxMain::main(tool, writer).await;
+            // The env must not be dropped entirely until after the main function has completed, as
+            // the underlying backing connection is kept inside the environment (in the case of
+            // direct connections via `crate::connector::DefaultConnector`.
+            env.maybe_wrap_connection_errors(res).await
         }
 
         pub fn ffx_plugin_is_machine_supported() -> bool {

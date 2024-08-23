@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use crate::connector::{DirectConnector, Overnet};
 use async_trait::async_trait;
 use errors::FfxError;
 use ffx_command::{return_bug, return_user_error, FfxCommandLine, FfxContext, Result};
@@ -45,10 +46,44 @@ pub trait TryFromEnvWith: 'static {
 }
 
 #[derive(Clone)]
+pub enum FhoConnectionBehavior {
+    DaemonConnector(Arc<dyn Injector>),
+    DirectConnector(Rc<dyn DirectConnector>),
+}
+
+#[derive(Clone)]
 pub struct FhoEnvironment {
     pub ffx: FfxCommandLine,
     pub context: EnvironmentContext,
     pub injector: Arc<dyn Injector>,
+    pub behavior: FhoConnectionBehavior,
+}
+
+impl FhoEnvironment {
+    /// This attempts to wrap errors around a potential failure in the underlying connection being
+    /// used to facilitate FIDL protocols. This should NOT be used by developers, this is intended
+    /// to be used outside of the scope of an ffx subtool (outside of the `main` function).
+    pub async fn maybe_wrap_connection_errors<T>(&self, res: Result<T>) -> Result<T> {
+        match (res, &self.behavior) {
+            (Err(e), FhoConnectionBehavior::DirectConnector(dc)) => {
+                return Err(dc.wrap_connection_errors(e).await);
+            }
+            (r, _) => r,
+        }
+    }
+}
+
+pub async fn connection_behavior(
+    ffx: &FfxCommandLine,
+    injector: &Arc<dyn Injector>,
+    env: &EnvironmentContext,
+) -> Result<FhoConnectionBehavior> {
+    if ffx.global.core {
+        let connector = Overnet::<ffx_target::ssh_connector::SshConnector>::new(env).await?;
+        Ok(crate::from_env::FhoConnectionBehavior::DirectConnector(Rc::new(connector)))
+    } else {
+        Ok(crate::from_env::FhoConnectionBehavior::DaemonConnector(injector.clone()))
+    }
 }
 
 impl FhoEnvironment {
@@ -538,16 +573,19 @@ impl TryFromEnv for ffx_fidl::TargetProxy {
 #[async_trait(?Send)]
 impl TryFromEnv for fidl_fuchsia_developer_remotecontrol::RemoteControlProxy {
     async fn try_from_env(env: &FhoEnvironment) -> Result<Self> {
-        match env.injector.remote_factory().await {
-            Ok(p) => Ok(p),
-            Err(e) => {
-                if let Some(ffx_e) = &e.downcast_ref::<FfxError>() {
-                    let message = format!("{ffx_e} when creating remotecontrol proxy");
-                    Err(e).user_message(message)
-                } else {
-                    Err(e).user_message("Failed to create remote control proxy")
+        match &env.behavior {
+            FhoConnectionBehavior::DirectConnector(dc) => dc.rcs_proxy().await,
+            FhoConnectionBehavior::DaemonConnector(dc) => match dc.remote_factory().await {
+                Ok(p) => Ok(p),
+                Err(e) => {
+                    if let Some(ffx_e) = &e.downcast_ref::<FfxError>() {
+                        let message = format!("{ffx_e} when creating remotecontrol proxy");
+                        Err(e).user_message(message)
+                    } else {
+                        Err(e).user_message("Failed to create remote control proxy")
+                    }
                 }
-            }
+            },
         }
     }
 }
@@ -603,7 +641,7 @@ mod tests {
         }
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_deferred_err() {
         let config_env = ffx_config::test_init().await.unwrap();
         let tool_env = crate::testing::ToolEnv::new().make_environment(config_env.context.clone());

@@ -41,17 +41,7 @@ impl GenerateValueManifest {
         let bounded_name = cm_types::Name::new(name).unwrap();
         for use_ in &component.uses {
             if let cm_rust::UseDecl::Config(config) = use_ {
-                // This destructuring here will force us to update this logic when
-                // dictionaries are added.
-                let cm_rust::UseConfigurationDecl {
-                    source_name: _,
-                    source: _,
-                    target_name,
-                    availability: _,
-                    type_: _,
-                    default: _,
-                } = config;
-                if target_name == &bounded_name {
+                if config.target_name == bounded_name {
                     return Some(config.clone());
                 }
             }
@@ -91,6 +81,7 @@ impl GenerateValueManifest {
                 cm_rust::ExposeDecl::Config(cm_rust::ExposeConfigurationDecl {
                     source: cm_rust::ExposeSource::Self_,
                     source_name: config.name.clone(),
+                    source_dictionary: ".".parse().unwrap(),
                     target: cm_rust::ExposeTarget::Parent,
                     target_name: config.name.clone(),
                     availability: cm_rust::Availability::Required,

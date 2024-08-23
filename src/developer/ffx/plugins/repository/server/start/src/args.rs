@@ -26,21 +26,32 @@ pub struct StartCommand {
     #[argh(option)]
     pub address: Option<SocketAddr>,
 
+    /// run server as a background process. This is mutually
+    /// exclusive with --daemon and --foreground.
+    #[argh(switch)]
+    pub background: bool,
+
     /// run server in as part of the ffx daemon. This is the
     /// default mode. This switch is mutually exclusive with
-    /// --foreground.
+    /// --background and --foreground.
     #[argh(switch)]
     pub daemon: bool,
 
-    /// run server in as a foreground process.
+    /// run server as a foreground process. This is mutually
+    /// exclusive with --daemon and --background.
     #[argh(switch)]
     pub foreground: bool,
 
+    /// option used to indicate running as a detached process. Hidden from help.
+    #[argh(switch, hidden_help)]
+    pub disconnected: bool,
+
+    // LINT.IfChange
     #[argh(option, short = 'r')]
     /// register this repository.
     /// Default is `devhost`.
     pub repository: Option<String>,
-
+    // LINT.ThenChange(../../../serve/src/lib.rs)
     /// path to the root metadata that was used to sign the
     /// repository TUF metadata. This establishes the root of
     /// trust for this repository. If the TUF metadata was not

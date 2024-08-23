@@ -9,7 +9,6 @@
 #include <lib/stdcompat/span.h>
 #include <zircon/compiler.h>
 
-#include <ddktl/device.h>
 #include <fbl/mutex.h>
 
 #include "src/graphics/display/drivers/virtio-gpu-display/display-coordinator-events-interface.h"

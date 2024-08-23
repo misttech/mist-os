@@ -39,6 +39,11 @@ fuchsia_test_component("system_monitor_integration_test_component") {
 fuchsia_test_package("system_monitor_integration_test") {
   test_components = [ ":system_monitor_integration_test_component" ]
   deps = [ "//src/cobalt/bin/system-metrics:cobalt_system_metrics_component" ]
+  test_specs = {
+    log_settings = {
+      max_severity = "ERROR"
+    }
+  }
 }
 
 executable("system_monitor_unittest_bin") {

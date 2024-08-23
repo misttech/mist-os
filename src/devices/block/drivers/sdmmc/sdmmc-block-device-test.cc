@@ -333,8 +333,8 @@ class FakePowerTokenProvider : public fidl::Server<fuchsia_hardware_power::Power
   void GetToken(GetTokenCompleter::Sync& completer) override {
     zx::event token;
     ASSERT_OK(zx::event::create(0, &token));
-    completer.Reply(fit::success(fuchsia_hardware_power::PowerTokenProviderGetTokenResponse{
-        std::move(token), SdmmcBlockDevice::kHardwarePowerElementName}));
+    completer.Reply(
+        fit::success(fuchsia_hardware_power::PowerTokenProviderGetTokenResponse{std::move(token)}));
   }
 
   void handle_unknown_method(

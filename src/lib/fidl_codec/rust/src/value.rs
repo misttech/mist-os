@@ -78,6 +78,7 @@ impl Value {
 
     /// Cast a `Value<Forbid>` to a `Value<T>` for any `T`
     pub fn upcast<T>(self) -> Value<T> {
+        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336530)
         match self {
             Value::Null => Value::Null,
             Value::Bool(a) => Value::Bool(a),

@@ -6,7 +6,7 @@
 # before making changes to this file, and add a member of the fuchsia.dev
 # team as reviewer.
 toc:
-- title: "Overview"
+- title: "Overview and Tutorial"
   path: /docs/development/tracing/tutorial
   step_group: tracing_tutorial
 - title: "1. Register a trace provider"

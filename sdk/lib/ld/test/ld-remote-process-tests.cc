@@ -39,14 +39,28 @@ void LdRemoteProcessTests::Init(std::initializer_list<std::string_view> args,
             ZX_OK);
 }
 
-void LdRemoteProcessTests::Start(zx::channel bootstrap_receiver) {
+void LdRemoteProcessTests::MakeBootstrapChannel(zx::channel& bootstrap_receiver) {
+  // Create the bootstrap channel and keep the sender's end for test logic that
+  // uses it to communicate with the test process.
+  ASSERT_FALSE(bootstrap_sender_);
+  zx_status_t status = zx::channel::create(0, &bootstrap_sender_, &bootstrap_receiver);
+  ASSERT_EQ(status, ZX_OK) << "zx_channel_create: " << zx_status_get_string(status);
+}
+
+void LdRemoteProcessTests::Start() {
+  zx::channel bootstrap_receiver;
+  ASSERT_NO_FATAL_FAILURE(MakeBootstrapChannel(bootstrap_receiver));
   LdLoadZirconProcessTestsBase::Start(nullptr, std::move(bootstrap_receiver), stack_size_, thread_,
                                       entry_, vdso_base_, root_vmar());
 }
 
 int64_t LdRemoteProcessTests::Run() {
-  return LdLoadZirconProcessTestsBase::Run(nullptr, stack_size_, thread_, entry_, vdso_base_,
-                                           root_vmar());
+  zx::channel bootstrap_receiver;
+  MakeBootstrapChannel(bootstrap_receiver);
+  return bootstrap_receiver ? LdLoadZirconProcessTestsBase::Run(
+                                  nullptr, std::move(bootstrap_receiver), stack_size_, thread_,
+                                  entry_, vdso_base_, root_vmar())
+                            : -1;
 }
 
 }  // namespace ld::testing

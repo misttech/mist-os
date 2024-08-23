@@ -282,6 +282,7 @@ fn example_cml_integration_test() {
             target: Some(Ref::Collection(CollectionRef { name: "modular".to_string() })),
             target_name: Some("fuchsia.logger.Log".to_string()),
             availability: Some(Availability::Required),
+            dependency_type: Some(DependencyType::Strong),
             ..Default::default()
         }),
         Offer::Protocol(OfferProtocol {

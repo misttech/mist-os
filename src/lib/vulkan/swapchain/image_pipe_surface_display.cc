@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "image_pipe_surface_display.h"
+#include "src/lib/vulkan/swapchain/image_pipe_surface_display.h"
 
 #include <dirent.h>
 #include <errno.h>
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
+#include <fidl/fuchsia.hardware.display/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.display/cpp/hlcpp_conversion.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/hardware/display/types/cpp/fidl.h>
@@ -15,21 +17,23 @@
 #include <lib/async/cpp/task.h>
 #include <lib/fdio/cpp/caller.h>
 #include <lib/fdio/directory.h>
+#include <lib/fidl/cpp/hlcpp_conversion.h>
 #include <limits.h>
 #include <stdio.h>
 #include <string.h>
 #include <vk_dispatch_table_helper.h>
+#include <zircon/rights.h>
 #include <zircon/status.h>
 
 #include <deque>
 
 #include <fbl/unique_fd.h>
 #include <vulkan/vk_layer.h>
+#include <vulkan/vulkan_fuchsia.h>
 
 #include "src/lib/fsl/handles/object_info.h"
+#include "src/lib/vulkan/swapchain/display_coordinator_listener.h"
 #include "src/lib/vulkan/swapchain/vulkan_utils.h"
-#include "vulkan/vulkan_fuchsia.h"
-#include "zircon/rights.h"
 
 namespace image_pipe_swapchain {
 
@@ -113,34 +117,43 @@ bool ImagePipeSurfaceDisplay::Init() {
       return false;
     }
 
-    zx::result dc_endpoints = fidl::CreateEndpoints<fuchsia_hardware_display::Coordinator>();
-    if (dc_endpoints.is_error()) {
-      fprintf(stderr, "%s: Failed to create coordinator channel %d (%s)\n", kTag,
-              dc_endpoints.error_value(), dc_endpoints.status_string());
-      return false;
-    }
+    auto [coordinator_client, coordinator_server] =
+        fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
+    auto [listener_client, listener_server] =
+        fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
 
-    fidl::WireResult result = fidl::WireCall(provider->client)
-                                  ->OpenCoordinatorForPrimary(std::move(dc_endpoints->server));
+    fidl::Arena arena;
+    auto open_coordinator_request =
+        fuchsia_hardware_display::wire::ProviderOpenCoordinatorWithListenerForPrimaryRequest::
+            Builder(arena)
+                .coordinator(std::move(coordinator_server))
+                .coordinator_listener(std::move(listener_client))
+                .Build();
+    fidl::WireResult result =
+        fidl::WireCall(provider->client)
+            ->OpenCoordinatorWithListenerForPrimary(std::move(open_coordinator_request));
     if (!result.ok()) {
       fprintf(stderr, "%s: Failed to call service handle %d (%s)\n", kTag, result.status(),
               result.status_string());
       return false;
     }
-    if (result->s != ZX_OK) {
-      fprintf(stderr, "%s: Failed to open coordinator %d (%s)\n", kTag, result->s,
-              zx_status_get_string(result->s));
+    if (result.value().is_error()) {
+      fprintf(stderr, "%s: Failed to open coordinator %d (%s)\n", kTag,
+              result.value().error_value(), zx_status_get_string(result.value().error_value()));
       return false;
     }
 
-    display_coordinator_.Bind(dc_endpoints->client.TakeChannel(), loop_.dispatcher());
+    display_coordinator_.Bind(coordinator_client.TakeChannel(), loop_.dispatcher());
+    display_coordinator_listener_ = std::make_unique<DisplayCoordinatorListener>(
+        std::move(listener_server),
+        fit::bind_member(this, &ImagePipeSurfaceDisplay::ControllerOnDisplaysChanged),
+        /* on_vsync= */ nullptr,
+        /* on_client_ownership_change= */ nullptr, *loop_.dispatcher());
   }
 
   display_coordinator_.set_error_handler(
       fit::bind_member(this, &ImagePipeSurfaceDisplay::ControllerError));
 
-  display_coordinator_.events().OnDisplaysChanged =
-      fit::bind_member(this, &ImagePipeSurfaceDisplay::ControllerOnDisplaysChanged);
   while (!have_display_) {
     loop_.Run(zx::time::infinite(), true);
     if (display_connection_exited_)
@@ -162,16 +175,18 @@ bool ImagePipeSurfaceDisplay::WaitForAsyncMessage() {
 }
 
 void ImagePipeSurfaceDisplay::ControllerOnDisplaysChanged(
-    std::vector<fuchsia::hardware::display::Info> info,
-    std::vector<fuchsia::hardware::display::types::DisplayId>) {
+    std::vector<fuchsia_hardware_display::Info> info,
+    std::vector<fuchsia_hardware_display_types::DisplayId>) {
   if (info.size() == 0)
     return;
-  width_ = info[0].modes[0].horizontal_resolution;
-  height_ = info[0].modes[0].vertical_resolution;
-  display_id_ = info[0].id;
+
+  fuchsia::hardware::display::Info hlcpp_info = fidl::NaturalToHLCPP(info[0]);
+  width_ = hlcpp_info.modes[0].horizontal_resolution;
+  height_ = hlcpp_info.modes[0].vertical_resolution;
+  display_id_ = hlcpp_info.id;
   std::deque<VkSurfaceFormatKHR> formats;
 
-  for (fuchsia::images2::PixelFormat pixel_format : info[0].pixel_format) {
+  for (fuchsia::images2::PixelFormat pixel_format : hlcpp_info.pixel_format) {
     switch (pixel_format) {
       case fuchsia::images2::PixelFormat::B8G8R8A8:
         formats.push_back({VK_FORMAT_B8G8R8A8_UNORM, VK_COLORSPACE_SRGB_NONLINEAR_KHR});

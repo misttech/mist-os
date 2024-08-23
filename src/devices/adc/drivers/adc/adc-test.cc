@@ -7,6 +7,8 @@
 #include <lib/ddk/metadata.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 
+#include <cmath>
+
 #include <gtest/gtest.h>
 
 #include "src/devices/adc/metadata/metadata.h"

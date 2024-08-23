@@ -19,4 +19,5 @@
     power_topology_integration_enabled: false,
     serve_test_protocols: true,
     has_real_time_clock: true,
+    utc_start_at_startup_when_invalid_rtc: false,
 }

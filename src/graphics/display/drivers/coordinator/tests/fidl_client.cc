@@ -8,18 +8,19 @@
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <zircon/assert.h>
 
 #include <fbl/auto_lock.h>
 #include <gtest/gtest.h>
 
+#include "src/graphics/display/drivers/coordinator/client-priority.h"
 #include "src/graphics/display/lib/api-types-cpp/buffer-collection-id.h"
 #include "src/graphics/display/lib/api-types-cpp/event-id.h"
 #include "src/graphics/display/lib/api-types-cpp/image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/layer-id.h"
 #include "src/graphics/display/lib/api-types-cpp/vsync-ack-cookie.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/lib/testing/predicates/status.h"
 #include "zircon/status.h"
 
@@ -49,28 +50,46 @@ TestFidlClient::Display::Display(const fhd::wire::Info& info) {
 
 DisplayId TestFidlClient::display_id() const { return displays_[0].id_; }
 
-bool TestFidlClient::CreateChannel(const fidl::WireSyncClient<fhd::Provider>& provider,
-                                   bool is_vc) {
+zx::result<> TestFidlClient::OpenCoordinator(const fidl::WireSyncClient<fhd::Provider>& provider,
+                                             ClientPriority client_priority,
+                                             async_dispatcher_t& coordinator_listener_dispatcher) {
   auto [dc_client, dc_server] = fidl::Endpoints<fhd::Coordinator>::Create();
-  zxlogf(INFO, "Opening coordinator");
-  if (is_vc) {
-    auto response = provider->OpenCoordinatorForVirtcon(std::move(dc_server));
+  auto [coordinator_listener_client, coordinator_listener_server] =
+      fidl::Endpoints<fhd::CoordinatorListener>::Create();
+  FDF_LOG(INFO, "Opening coordinator");
+  if (client_priority == ClientPriority::kVirtcon) {
+    fidl::Arena arena;
+    auto request =
+        fidl::WireRequest<fhd::Provider::OpenCoordinatorWithListenerForVirtcon>::Builder(arena)
+            .coordinator(std::move(dc_server))
+            .coordinator_listener(std::move(coordinator_listener_client))
+            .Build();
+    auto response = provider->OpenCoordinatorWithListenerForVirtcon(std::move(request));
     if (!response.ok()) {
-      zxlogf(ERROR, "Could not open Virtcon coordinator, error=%s",
-             response.FormatDescription().c_str());
-      return false;
+      FDF_LOG(ERROR, "Could not open Virtcon coordinator, error=%s",
+              response.FormatDescription().c_str());
+      return zx::make_result(response.status());
     }
   } else {
-    auto response = provider->OpenCoordinatorForPrimary(std::move(dc_server));
+    ZX_DEBUG_ASSERT(client_priority == ClientPriority::kPrimary);
+    fidl::Arena arena;
+    auto request =
+        fidl::WireRequest<fhd::Provider::OpenCoordinatorWithListenerForPrimary>::Builder(arena)
+            .coordinator(std::move(dc_server))
+            .coordinator_listener(std::move(coordinator_listener_client))
+            .Build();
+    auto response = provider->OpenCoordinatorWithListenerForPrimary(std::move(request));
     if (!response.ok()) {
-      zxlogf(ERROR, "Could not open coordinator, error=%s", response.FormatDescription().c_str());
-      return false;
+      FDF_LOG(ERROR, "Could not open coordinator, error=%s", response.FormatDescription().c_str());
+      return zx::make_result(response.status());
     }
   }
 
   fbl::AutoLock lock(mtx());
   dc_.Bind(std::move(dc_client));
-  return true;
+  coordinator_listener_.Bind(std::move(coordinator_listener_server),
+                             coordinator_listener_dispatcher);
+  return zx::ok();
 }
 
 zx::result<ImageId> TestFidlClient::CreateImage() {
@@ -91,10 +110,10 @@ zx::result<LayerId> TestFidlClient::CreateLayerLocked() {
   ZX_DEBUG_ASSERT(dc_);
   auto reply = dc_->CreateLayer();
   if (!reply.ok()) {
-    zxlogf(ERROR, "Failed to create layer (fidl=%d)", reply.status());
+    FDF_LOG(ERROR, "Failed to create layer (fidl=%d)", reply.status());
     return zx::error(reply.status());
   } else if (reply.value().is_error() != ZX_OK) {
-    zxlogf(ERROR, "Failed to create layer: %s", zx_status_get_string(reply.value().error_value()));
+    FDF_LOG(ERROR, "Failed to create layer: %s", zx_status_get_string(reply.value().error_value()));
     return zx::error(reply.value().error_value());
   }
   EXPECT_EQ(
@@ -106,27 +125,27 @@ zx::result<LayerId> TestFidlClient::CreateLayerLocked() {
 zx::result<TestFidlClient::EventInfo> TestFidlClient::CreateEventLocked() {
   zx::event event;
   if (auto status = zx::event::create(0u, &event); status != ZX_OK) {
-    zxlogf(ERROR, "Failed to create zx::event: %d", status);
+    FDF_LOG(ERROR, "Failed to create zx::event: %d", status);
     return zx::error(status);
   }
 
   zx_info_handle_basic_t info;
   if (auto status = event.get_info(ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
       status != ZX_OK) {
-    zxlogf(ERROR, "Failed to get zx handle (%u) info: %d", event.get(), status);
+    FDF_LOG(ERROR, "Failed to get zx handle (%u) info: %d", event.get(), status);
     return zx::error(status);
   }
 
   zx::event dup;
   if (auto status = event.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup); status != ZX_OK) {
-    zxlogf(ERROR, "Failed to duplicate zx event (%u): %d", event.get(), status);
+    FDF_LOG(ERROR, "Failed to duplicate zx event (%u): %d", event.get(), status);
     return zx::error(status);
   }
 
   const EventId event_id(info.koid);
   auto import_result = dc_->ImportEvent(std::move(event), ToFidlEventId(event_id));
   if (!import_result.ok()) {
-    zxlogf(ERROR, "Failed to import event to display controller: %d", import_result.status());
+    FDF_LOG(ERROR, "Failed to import event to display controller: %d", import_result.status());
   }
 
   return zx::ok(EventInfo{
@@ -135,130 +154,16 @@ zx::result<TestFidlClient::EventInfo> TestFidlClient::CreateEventLocked() {
   });
 }
 
-bool TestFidlClient::Bind(async_dispatcher_t* dispatcher) {
-  dispatcher_ = dispatcher;
-  while (displays_.is_empty() || !has_ownership_) {
-    fbl::AutoLock lock(mtx());
-    class EventHandler : public fidl::WireSyncEventHandler<fhd::Coordinator> {
-     public:
-      explicit EventHandler(TestFidlClient* client) : client_(client) {}
+bool TestFidlClient::HasOwnershipAndValidDisplay() const {
+  return has_ownership_ && !displays_.is_empty();
+}
 
-      bool ok() const { return ok_; }
-
-      void OnDisplaysChanged(fidl::WireEvent<fhd::Coordinator::OnDisplaysChanged>* event) override {
-        for (size_t i = 0; i < event->added.count(); i++) {
-          client_->displays_.push_back(Display(event->added[i]));
-        }
-      }
-
-      void OnVsync(fidl::WireEvent<fhd::Coordinator::OnVsync>* event) override { ok_ = false; }
-
-      void OnClientOwnershipChange(
-          fidl::WireEvent<fhd::Coordinator::OnClientOwnershipChange>* event) override {
-        client_->has_ownership_ = event->has_ownership;
-      }
-
-     private:
-      TestFidlClient* const client_;
-      bool ok_ = true;
-    };
-
-    EventHandler event_handler(this);
-    auto result = dc_.HandleOneEvent(event_handler);
-    if (!result.ok() || !event_handler.ok()) {
-      zxlogf(ERROR, "Got unexpected message");
-      return false;
-    }
-  }
-
+zx::result<> TestFidlClient::EnableVsync() {
   fbl::AutoLock lock(mtx());
-  EXPECT_TRUE(has_ownership_);
-  EXPECT_FALSE(displays_.is_empty());
-
-  event_msg_wait_event_.set_object(dc_.client_end().channel().get());
-  event_msg_wait_event_.set_trigger(ZX_CHANNEL_READABLE);
-  EXPECT_OK(event_msg_wait_event_.Begin(dispatcher));
-  return dc_->EnableVsync(true).ok();
+  return zx::make_result(dc_->EnableVsync(true).status());
 }
 
-void TestFidlClient::OnEventMsgAsync(async_dispatcher_t* dispatcher, async::WaitBase* self,
-                                     zx_status_t status, const zx_packet_signal_t* signal) {
-  if (status != ZX_OK) {
-    return;
-  }
-
-  if (!(signal->observed & ZX_CHANNEL_READABLE)) {
-    return;
-  }
-
-  fbl::AutoLock lock(mtx());
-  class EventHandler : public fidl::WireSyncEventHandler<fhd::Coordinator> {
-   public:
-    explicit EventHandler(TestFidlClient* client) : client_(client) {}
-
-    void OnDisplaysChanged(fidl::WireEvent<fhd::Coordinator::OnDisplaysChanged>* event) override {}
-
-    // The FIDL bindings do not know that the caller holds mtx(), so we can't TA_REQ(mtx()) here.
-    void OnVsync(fidl::WireEvent<fhd::Coordinator::OnVsync>* event) override
-        TA_NO_THREAD_SAFETY_ANALYSIS {
-      client_->vsync_count_++;
-      client_->recent_presented_config_stamp_ = event->applied_config_stamp;
-      VsyncAckCookie vsync_ack_cookie = ToVsyncAckCookie(event->cookie);
-      if (vsync_ack_cookie != kInvalidVsyncAckCookie) {
-        client_->vsync_ack_cookie_ = vsync_ack_cookie;
-      }
-    }
-
-    void OnClientOwnershipChange(
-        fidl::WireEvent<fhd::Coordinator::OnClientOwnershipChange>* message) override {}
-
-   private:
-    TestFidlClient* const client_;
-  };
-
-  EventHandler event_handler(this);
-  auto result = dc_.HandleOneEvent(event_handler);
-
-  if (!result.ok()) {
-    zxlogf(ERROR, "Failed to handle events: %s", result.FormatDescription().c_str());
-    return;
-  }
-
-  if (event_msg_wait_event_.object() == ZX_HANDLE_INVALID) {
-    return;
-  }
-  // Re-arm the wait.
-  self->Begin(dispatcher);
-}
-
-TestFidlClient::~TestFidlClient() {
-  if (dispatcher_) {
-    // Cancel must be issued from the dispatcher thread.
-    sync_completion_t done;
-    auto task = new async::Task();
-    task->set_handler(
-        [this, done_ptr = &done](async_dispatcher_t*, async::Task* task_ptr, zx_status_t) {
-          // Ensures that `task` gets deleted when the handler completes.
-          std::unique_ptr<async::Task> task(task_ptr);
-
-          event_msg_wait_event_.Cancel();
-          event_msg_wait_event_.set_object(ZX_HANDLE_INVALID);
-
-          sync_completion_signal(done_ptr);
-        });
-    if (task->Post(dispatcher_) != ZX_OK) {
-      delete task;
-      event_msg_wait_event_.Cancel();
-      event_msg_wait_event_.set_object(ZX_HANDLE_INVALID);
-    } else {
-      while (true) {
-        if (sync_completion_wait(&done, ZX_MSEC(10)) == ZX_OK) {
-          break;
-        }
-      }
-    }
-  }
-}
+TestFidlClient::~TestFidlClient() = default;
 
 zx_status_t TestFidlClient::PresentLayers(std::vector<PresentLayerInfo> present_layers) {
   fbl::AutoLock l(mtx());
@@ -332,7 +237,7 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
     allocate_shared_request.token_request(std::move(server));
     auto result = sysmem_->AllocateSharedCollection(allocate_shared_request.Build());
     if (!result.ok()) {
-      zxlogf(ERROR, "Failed to allocate shared collection: %s", result.status_string());
+      FDF_LOG(ERROR, "Failed to allocate shared collection: %s", result.status_string());
       return zx::error(result.status());
     }
     local_token = fidl::WireSyncClient<sysmem2::BufferCollectionToken>(std::move(client));
@@ -345,7 +250,7 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
     duplicate_request.rights_attenuation_mask(ZX_RIGHT_SAME_RIGHTS);
     duplicate_request.token_request(std::move(server));
     if (auto result = local_token->Duplicate(duplicate_request.Build()); !result.ok()) {
-      zxlogf(ERROR, "Failed to duplicate token: %s", result.FormatDescription().c_str());
+      FDF_LOG(ERROR, "Failed to duplicate token: %s", result.FormatDescription().c_str());
       return zx::error(ZX_ERR_NO_MEMORY);
     }
   }
@@ -354,8 +259,8 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
   static BufferCollectionId next_display_collection_id(0);
   const BufferCollectionId display_collection_id = ++next_display_collection_id;
   if (auto result = local_token->Sync(); !result.ok()) {
-    zxlogf(ERROR, "Failed to sync token %d %s", result.status(),
-           result.FormatDescription().c_str());
+    FDF_LOG(ERROR, "Failed to sync token %d %s", result.status(),
+            result.FormatDescription().c_str());
     return zx::error(result.status());
   }
 
@@ -365,13 +270,13 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
       fidl_display_collection_id,
       fidl::ClientEnd<sysmem1::BufferCollectionToken>(client.TakeChannel()));
   if (!result.ok()) {
-    zxlogf(ERROR, "Failed to call FIDL ImportBufferCollection %lu (%s)",
-           display_collection_id.value(), result.status_string());
+    FDF_LOG(ERROR, "Failed to call FIDL ImportBufferCollection %lu (%s)",
+            display_collection_id.value(), result.status_string());
     return zx::error(result.status());
   }
   if (result.value().is_error()) {
-    zxlogf(ERROR, "Failed to import buffer collection %lu (%s)", display_collection_id.value(),
-           zx_status_get_string(result.value().error_value()));
+    FDF_LOG(ERROR, "Failed to import buffer collection %lu (%s)", display_collection_id.value(),
+            zx_status_get_string(result.value().error_value()));
     return zx::error(result.value().error_value());
   }
 
@@ -383,14 +288,14 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
       dc_->SetBufferCollectionConstraints(fidl_display_collection_id, image_buffer_usage);
 
   if (!set_constraints_result.ok()) {
-    zxlogf(ERROR, "Failed to call FIDL SetBufferCollectionConstraints %lu (%s)",
-           display_collection_id.value(), set_constraints_result.status_string());
+    FDF_LOG(ERROR, "Failed to call FIDL SetBufferCollectionConstraints %lu (%s)",
+            display_collection_id.value(), set_constraints_result.status_string());
     (void)dc_->ReleaseBufferCollection(fidl_display_collection_id);
     return zx::error(set_constraints_result.status());
   }
   if (set_constraints_result.value().is_error()) {
-    zxlogf(ERROR, "Failed to set buffer collection constraints: %s",
-           zx_status_get_string(set_constraints_result.value().error_value()));
+    FDF_LOG(ERROR, "Failed to set buffer collection constraints: %s",
+            zx_status_get_string(set_constraints_result.value().error_value()));
     (void)dc_->ReleaseBufferCollection(fidl_display_collection_id);
     return zx::error(set_constraints_result.value().error_value());
   }
@@ -406,7 +311,7 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
     bind_shared_request.token(local_token.TakeClientEnd());
     bind_shared_request.buffer_collection_request(std::move(server));
     if (auto result = sysmem_->BindSharedCollection(bind_shared_request.Build()); !result.ok()) {
-      zxlogf(ERROR, "Failed to bind shared collection: %s", result.FormatDescription().c_str());
+      FDF_LOG(ERROR, "Failed to bind shared collection: %s", result.FormatDescription().c_str());
       return zx::error(result.status());
     }
     sysmem_collection = fidl::WireSyncClient<sysmem2::BufferCollection>(std::move(client));
@@ -433,14 +338,14 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
   set_constraints_request.constraints(constraints.Build());
   zx_status_t status = sysmem_collection->SetConstraints(set_constraints_request.Build()).status();
   if (status != ZX_OK) {
-    zxlogf(ERROR, "Unable to set constraints (%d)", status);
+    FDF_LOG(ERROR, "Unable to set constraints (%d)", status);
     return zx::error(status);
   }
   // Wait for the buffers to be allocated.
   auto info_result = sysmem_collection->WaitForAllBuffersAllocated();
   if (!info_result.ok()) {
-    zxlogf(ERROR, "Waiting for buffers failed (fidl=%d res=%u)", info_result.status(),
-           fidl::ToUnderlying(info_result->error_value()));
+    FDF_LOG(ERROR, "Waiting for buffers failed (fidl=%d res=%u)", info_result.status(),
+            fidl::ToUnderlying(info_result->error_value()));
     zx_status_t status = info_result.status();
     if (status == ZX_OK) {
       status = sysmem::V1CopyFromV2Error(info_result->error_value());
@@ -450,7 +355,7 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
 
   auto& info = info_result.value()->buffer_collection_info();
   if (info.buffers().count() < 1) {
-    zxlogf(ERROR, "Incorrect buffer collection count %zu", info.buffers().count());
+    FDF_LOG(ERROR, "Incorrect buffer collection count %zu", info.buffers().count());
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -464,19 +369,39 @@ zx::result<ImageId> TestFidlClient::ImportImageWithSysmemLocked(
                        },
                        fidl_image_id);
   if (!import_result.ok()) {
-    zxlogf(ERROR, "Failed to call FIDL ImportImage %" PRIu64 " (%s)", fidl_image_id.value,
-           import_result.status_string());
+    FDF_LOG(ERROR, "Failed to call FIDL ImportImage %" PRIu64 " (%s)", fidl_image_id.value,
+            import_result.status_string());
     return zx::error(import_result.status());
   }
   if (import_result.value().is_error()) {
-    zxlogf(ERROR, "Failed to import image %" PRIu64 " (%s)", fidl_image_id.value,
-           zx_status_get_string(import_result.value().error_value()));
+    FDF_LOG(ERROR, "Failed to import image %" PRIu64 " (%s)", fidl_image_id.value,
+            zx_status_get_string(import_result.value().error_value()));
     return zx::error(import_result.value().error_value());
   }
 
   // TODO(https://fxbug.dev/42180237) Consider handling the error instead of ignoring it.
   (void)sysmem_collection->Release();
   return zx::ok(image_id);
+}
+
+void TestFidlClient::OnDisplaysChanged(
+    std::vector<fuchsia_hardware_display::wire::Info> added_displays,
+    std::vector<DisplayId> removed_display_ids) {
+  for (const fuchsia_hardware_display::wire::Info& added_display : added_displays) {
+    displays_.push_back(Display(added_display));
+  }
+}
+
+void TestFidlClient::OnClientOwnershipChange(bool has_ownership) { has_ownership_ = has_ownership; }
+
+void TestFidlClient::OnVsync(DisplayId display_id, zx::time timestamp,
+                             ConfigStamp applied_config_stamp, VsyncAckCookie vsync_ack_cookie) {
+  fbl::AutoLock lock(mtx());
+  vsync_count_++;
+  recent_presented_config_stamp_ = applied_config_stamp;
+  if (vsync_ack_cookie != kInvalidVsyncAckCookie) {
+    vsync_ack_cookie_ = vsync_ack_cookie;
+  }
 }
 
 }  // namespace display

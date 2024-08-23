@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
-#include <fuchsia/hardware/display/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
 #include <lib/async/dispatcher.h>
 #include <lib/zx/time.h>
@@ -79,7 +78,7 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // state at the same time as the DisplayCompositor without making use of locks.
   DisplayCompositor(
       async_dispatcher_t* main_dispatcher,
-      std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> hlcpp_display_coordinator,
+      std::shared_ptr<fidl::SyncClient<fuchsia_hardware_display::Coordinator>> display_coordinator,
       const std::shared_ptr<Renderer>& renderer,
       fuchsia::sysmem2::AllocatorSyncPtr sysmem_allocator, bool enable_display_composition,
       uint32_t max_display_layers);
@@ -245,13 +244,16 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
       FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Takes a solid color rectangle and directly composites it to a hardware layer on the display.
-  void ApplyLayerColor(fuchsia_hardware_display::LayerId layer_id, ImageRect rectangle,
-                       allocation::ImageMetadata image) FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  void ApplyLayerColor(const fuchsia_hardware_display::LayerId& layer_id,
+                       const ImageRect& rectangle, const allocation::ImageMetadata& image)
+      FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Takes an image and directly composites it to a hardware layer on the display.
-  void ApplyLayerImage(fuchsia_hardware_display::LayerId layer_id, ImageRect rectangle,
-                       allocation::ImageMetadata image, scenic_impl::DisplayEventId wait_id,
-                       scenic_impl::DisplayEventId signal_id) FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
+  void ApplyLayerImage(const fuchsia_hardware_display::LayerId& layer_id,
+                       const ImageRect& rectangle, const allocation::ImageMetadata& image,
+                       const scenic_impl::DisplayEventId& wait_id,
+                       const scenic_impl::DisplayEventId& signal_id)
+      FXL_EXCLUSIVE_LOCKS_REQUIRED(lock_);
 
   // Checks if the display coordinator is capable of applying the configuration settings that
   // have been set up until that point.
@@ -282,20 +284,14 @@ class DisplayCompositor final : public allocation::BufferCollectionImporter,
   // coordinator, or something else.
   mutable std::mutex lock_;
 
-  // Handle to the display coordinator interface.
-  // Must outlive `display_coordinator_`.
-  //
-  // TODO(https://fxbug.dev/42156059): We keep this field because
-  // `DisplayManager` still uses the HLCPP sync clients. Code should
-  // only use the new C++ binding client `display_coordinator_`.
-  std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> hlcpp_display_coordinator_
+  // References the coordinator to keep it alive. Don't use; instead use `display_coordinator_`.
+  const std::shared_ptr<fidl::SyncClient<fuchsia_hardware_display::Coordinator>>
+      display_coordinator_shared_ptr_ FXL_GUARDED_BY(lock_);
+
+  // Reference to the `display_coordinator_shared_ptr_`.
+  fidl::SyncClient<fuchsia_hardware_display::Coordinator>& display_coordinator_
       FXL_GUARDED_BY(lock_);
 
-  // Borrowed new C++ binding reference to `hlcpp_display_coordinator_`.
-  fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator> display_coordinator_
-      FXL_GUARDED_BY(lock_);
-
-  // Maps the flatland global image id to the events used by the display coordinator.
   std::unordered_map<allocation::GlobalImageId, ImageEventData> image_event_map_
       FXL_GUARDED_BY(lock_);
 

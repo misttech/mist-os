@@ -4,6 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use crate::util;
+use anyhow::ensure;
 use assembly_config_schema::platform_config::media_config::{AudioConfig, PlatformMediaConfig};
 
 pub(crate) struct MediaSubsystem;
@@ -58,6 +59,22 @@ impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {
             if *context.build_type == BuildType::Eng {
                 builder.core_shard(&context.get_resource("multizone_leader.core_shard_eng.cml"));
             }
+        }
+
+        if media_config.enable_codecs {
+            ensure!(
+                *context.feature_set_level == FeatureSupportLevel::Standard,
+                "Codecs can only be enabled in the 'standard' feature set level."
+            );
+            builder.platform_bundle("media_codecs");
+        }
+
+        if media_config.enable_sessions {
+            ensure!(
+                *context.feature_set_level == FeatureSupportLevel::Standard,
+                "Media sessions can only be enabled in the 'standard' feature set level."
+            );
+            builder.platform_bundle("media_sessions");
         }
 
         Ok(())

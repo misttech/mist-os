@@ -713,7 +713,9 @@ mod tests {
     use {fidl_fuchsia_component_decl as fcdecl, fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
     fn is_closed(handle: impl fidl::AsHandleRef) -> bool {
-        handle.wait_handle(zx::Signals::OBJECT_PEER_CLOSED, zx::Time::from_nanos(0)).is_ok()
+        handle
+            .wait_handle(zx::Signals::OBJECT_PEER_CLOSED, zx::MonotonicTime::from_nanos(0))
+            .is_ok()
     }
 
     async fn realm_query(test: &TestModelResult) -> (fsys::RealmQueryProxy, RealmQuery) {

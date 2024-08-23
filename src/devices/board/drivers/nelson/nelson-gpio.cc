@@ -47,35 +47,35 @@ static const std::vector<fpbus::Mmio> gpio_mmios{
 static const std::vector<fpbus::Irq> gpio_irqs{
     {{
         .irq = S905D3_GPIO_IRQ_0,
-        .mode = ZX_INTERRUPT_MODE_DEFAULT,
+        .mode = fpbus::ZirconInterruptMode::kDefault,
     }},
     {{
         .irq = S905D3_GPIO_IRQ_1,
-        .mode = ZX_INTERRUPT_MODE_DEFAULT,
+        .mode = fpbus::ZirconInterruptMode::kDefault,
     }},
     {{
         .irq = S905D3_GPIO_IRQ_2,
-        .mode = ZX_INTERRUPT_MODE_DEFAULT,
+        .mode = fpbus::ZirconInterruptMode::kDefault,
     }},
     {{
         .irq = S905D3_GPIO_IRQ_3,
-        .mode = ZX_INTERRUPT_MODE_DEFAULT,
+        .mode = fpbus::ZirconInterruptMode::kDefault,
     }},
     {{
         .irq = S905D3_GPIO_IRQ_4,
-        .mode = ZX_INTERRUPT_MODE_DEFAULT,
+        .mode = fpbus::ZirconInterruptMode::kDefault,
     }},
     {{
         .irq = S905D3_GPIO_IRQ_5,
-        .mode = ZX_INTERRUPT_MODE_DEFAULT,
+        .mode = fpbus::ZirconInterruptMode::kDefault,
     }},
     {{
         .irq = S905D3_GPIO_IRQ_6,
-        .mode = ZX_INTERRUPT_MODE_DEFAULT,
+        .mode = fpbus::ZirconInterruptMode::kDefault,
     }},
     {{
         .irq = S905D3_GPIO_IRQ_7,
-        .mode = ZX_INTERRUPT_MODE_DEFAULT,
+        .mode = fpbus::ZirconInterruptMode::kDefault,
     }},
 };
 
@@ -210,9 +210,9 @@ static const fpbus::Node gpio_c_dev = []() {
 
 zx_status_t Nelson::GpioInit() {
   // Enable mute LED so it will be controlled by mute switch.
-  gpio_init_steps_.push_back(GpioConfigOut(GPIO_AMBER_LED_PWM, 1));
+  gpio_init_steps_.push_back(GpioOutput(GPIO_AMBER_LED_PWM, true));
 
-  fuchsia_hardware_gpioimpl::InitMetadata metadata{{std::move(gpio_init_steps_)}};
+  fuchsia_hardware_pinimpl::Metadata metadata{{std::move(gpio_init_steps_)}};
   gpio_init_steps_.clear();
 
   const fit::result encoded_metadata = fidl::Persist(metadata);

@@ -16,6 +16,7 @@ import (
 
 	"gvisor.dev/gvisor/pkg/tcpip"
 	"gvisor.dev/gvisor/pkg/tcpip/stack"
+	tcpipstack "gvisor.dev/gvisor/pkg/tcpip/stack"
 )
 
 const bufferCapacity = int(admin.MaxRoutingEvents)
@@ -163,4 +164,23 @@ func (m *multicastEventDispatcher) OnUnexpectedInputInterface(context stack.Mult
 		context: context,
 	}
 	m.onEvent(event)
+}
+
+// MulticastRouteHasDuplicateOutputs returns true if the given multicast route
+// lists the same output interface multiple times.
+func MulticastRouteHasDuplicateOutputs(m *tcpipstack.MulticastRoute) bool {
+	// NB: Search for duplicates by doing a naive n^2 comparison. This is
+	// expected to be more performant than other approaches (e.g.
+	// sort + dedup, or collecting into a hash map) given how small the vec
+	// is expected to be.
+	for i, outgoingInterface := range m.OutgoingInterfaces {
+		// NB: Only check the interfaces that occur after the current interface.
+		// The interfaces before this one were checked in previous iterations.
+		for _, otherOutgoingInterface := range m.OutgoingInterfaces[i+1:] {
+			if outgoingInterface.ID == otherOutgoingInterface.ID {
+				return true
+			}
+		}
+	}
+	return false
 }

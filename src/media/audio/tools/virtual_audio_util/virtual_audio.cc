@@ -1870,7 +1870,8 @@ void VirtualAudioUtil::EnsureTypesExist() {
 }  // namespace virtual_audio
 
 int main(int argc, const char** argv) {
-  fuchsia_logging::SetTags({"virtual_audio_util"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"virtual_audio_util"}).BuildAndInitialize();
 
   fxl::CommandLine command_line = fxl::CommandLineFromArgcArgv(argc, argv);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);

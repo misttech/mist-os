@@ -4,15 +4,24 @@
 
 #include "src/storage/blobfs/fsck.h"
 
+#include <lib/async-loop/cpp/loop.h>
+#include <lib/async-loop/default.h>
+#include <lib/async/cpp/task.h>
+#include <lib/fit/defer.h>
+#include <lib/sync/completion.h>
 #include <lib/syslog/cpp/macros.h>
-#include <zircon/status.h>
+#include <zircon/errors.h>
+#include <zircon/time.h>
+#include <zircon/types.h>
 
 #include <memory>
+#include <utility>
 
 #include "src/storage/blobfs/blobfs.h"
 #include "src/storage/blobfs/blobfs_checker.h"
+#include "src/storage/blobfs/mount.h"
+#include "src/storage/lib/block_client/cpp/block_device.h"
 #include "src/storage/lib/vfs/cpp/paged_vfs.h"
-#include "zircon/errors.h"
 
 namespace blobfs {
 
@@ -25,7 +34,7 @@ namespace blobfs {
 zx_status_t Fsck(std::unique_ptr<block_client::BlockDevice> device, const MountOptions& options) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   if (zx_status_t status = loop.StartThread(); status != ZX_OK) {
-    FX_LOGS(ERROR) << "Cannot initialize dispatch loop: " << zx_status_get_string(status);
+    FX_PLOGS(ERROR, status) << "Cannot initialize dispatch loop";
     return status;
   }
 
@@ -37,7 +46,7 @@ zx_status_t Fsck(std::unique_ptr<block_client::BlockDevice> device, const MountO
 
   auto blobfs_or = Blobfs::Create(loop.dispatcher(), std::move(device), vfs.get(), options);
   if (blobfs_or.is_error()) {
-    FX_LOGS(ERROR) << "Cannot create filesystem for checking: " << blobfs_or.status_string();
+    FX_PLOGS(ERROR, blobfs_or.status_value()) << "Cannot create filesystem for checking";
     return blobfs_or.status_value();
   }
   Blobfs* blobfs = blobfs_or.value().get();

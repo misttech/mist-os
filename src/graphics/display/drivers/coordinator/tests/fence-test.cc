@@ -7,6 +7,7 @@
 #include <lib/async-testing/test_loop.h>
 #include <lib/async/default.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 
 #include <fbl/vector.h>
 #include <gtest/gtest.h>
@@ -38,6 +39,9 @@ class FenceTest : public testing::Test {
   TestCallback& cb() { return cb_; }
 
  protected:
+  // `logger_` must outlive `driver_runtime_` to allow for any
+  // logging in driver de-initialization code.
+  fdf_testing::ScopedGlobalLogger logger_;
   fdf_testing::DriverRuntime runtime_;
   async::TestLoop loop_;
   fbl::RefPtr<Fence> fence_;

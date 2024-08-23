@@ -6,7 +6,11 @@
 #define SRC_STORAGE_BLOBFS_SERVICE_LIFECYCLE_H_
 
 #include <fidl/fuchsia.process.lifecycle/cpp/wire.h>
-#include <lib/async-loop/default.h>
+#include <lib/async/dispatcher.h>
+#include <lib/fidl/cpp/wire/channel.h>
+#include <lib/fit/function.h>
+
+#include <utility>
 
 #include "src/storage/lib/vfs/cpp/fuchsia_vfs.h"
 

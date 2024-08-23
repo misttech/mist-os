@@ -2594,6 +2594,7 @@ mod tests {
             route_clients.add_client(other_client);
             route_clients
         });
+        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336606)
         let mut event_loop_fut = pin!(event_loop
             .run()
             .map(|res| match res {

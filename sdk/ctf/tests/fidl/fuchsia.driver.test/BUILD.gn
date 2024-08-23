@@ -8,9 +8,14 @@ import("//sdk/ctf/build/ctf.gni")
 group("tests") {
   testonly = true
   deps = [
+    ":ctf-tests",
     ":fuchsia-driver-test_tests-package",
-    ":fuchsia-driver-test_tests_archive",
   ]
+}
+
+group("ctf-tests") {
+  testonly = true
+  deps = [ ":fuchsia-driver-test_tests_archive" ]
 }
 
 executable("bin") {
@@ -47,7 +52,7 @@ fuchsia_test_package("fuchsia-driver-test_tests-package") {
   test_components = [ ":test-root" ]
   subpackages = [ ":fuchsia-driver-test_tests" ]
   deps = [
-    "//sdk/lib/driver_test_realm",
+    "//sdk/lib/driver_test_realm:static",
     "//src/devices/misc/drivers/test-parent",
   ]
   test_specs = {

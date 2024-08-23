@@ -31,6 +31,7 @@
 #include <kernel/lockdep.h>
 #include <kernel/mutex.h>
 #include <ktl/move.h>
+#include <vm/content_size_manager.h>
 #include <vm/page.h>
 #include <vm/vm.h>
 #include <vm/vm_page_list.h>
@@ -282,6 +283,13 @@ enum class VmObjectReadWriteOptions : uint8_t {
   // If set, attempts to read past the end of a VMO will not cause a failure and only copy the
   // existing bytes instead (i.e. the requested length will be trimmed to the actual VMO size).
   TrimLength = (1 << 0),
+
+  // If set the read or write operation is allowed (although not required) to assume that any VMO
+  // offsets above any supplied user content size (via SetUserContentSize) are zero. This also
+  // permits a write operation to actively zero this portion. Zeroing something that is going to get
+  // written to is beneficial when writing to partial pages of a pager backed VMO, where otherwise
+  // the contents of the rest of the page would have to be unnecessarily fetched.
+  ZeroAboveUserSize = (1 << 1),
 };
 FBL_ENABLE_ENUM_BITS(VmObjectReadWriteOptions)
 
@@ -458,7 +466,7 @@ class VmObject : public VmHierarchyBase,
     return ZX_ERR_NOT_SUPPORTED;
   }
   virtual zx_status_t WriteUserVector(user_in_iovec_t vec, uint64_t offset, size_t len,
-                                      size_t* out_actual,
+                                      VmObjectReadWriteOptions options, size_t* out_actual,
                                       const OnWriteBytesTransferredCallback& on_bytes_transferred);
 
   // Removes the pages from this vmo in the range [offset, offset + len) and returns
@@ -554,6 +562,13 @@ class VmObject : public VmHierarchyBase,
   virtual void CommitHighPriorityPages(uint64_t offset, uint64_t len) TA_EXCL(lock()) {
     // This does nothing by default.
   }
+
+  // Provides the VMO with a user defined queryable byte aligned size. This provided size can then
+  // be referenced in other operations, but otherwise has no effect. The VMO will never read or act
+  // on this value unless instructed by user operations, and it is therefore the responsibility of
+  // the user to ensure any synchronization of the reported value with the operation being
+  // requested.
+  virtual void SetUserContentSize(fbl::RefPtr<ContentSizeManager> csm) = 0;
 
   // The associated VmObjectDispatcher will set an observer to notify user mode.
   void SetChildObserver(VmObjectChildObserver* child_observer);

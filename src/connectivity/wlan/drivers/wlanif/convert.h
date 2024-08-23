@@ -89,9 +89,6 @@ void ConvertScanEnd(const fuchsia_wlan_fullmac::wire::WlanFullmacScanEnd& in,
 void ConvertConnectConfirm(const fuchsia_wlan_fullmac::wire::WlanFullmacConnectConfirm& in,
                            wlan_fullmac_connect_confirm_t* out);
 
-void ConvertRoamConfirm(const fuchsia_wlan_fullmac::wire::WlanFullmacRoamConfirm& in,
-                        wlan_fullmac_roam_confirm_t* out);
-
 void ConvertAuthInd(const fuchsia_wlan_fullmac::wire::WlanFullmacAuthInd& in,
                     wlan_fullmac_auth_ind_t* out);
 

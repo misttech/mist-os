@@ -14,7 +14,7 @@ use crate::fdf_sys::*;
 
 /// A struct that holds both an arena along with a data buffer that is allocated within that arena.
 #[derive(Debug)]
-pub struct Message<T: ?Sized> {
+pub struct Message<T: ?Sized + 'static> {
     data: Option<ArenaBox<'static, T>>,
     // note: `[Option<MixedHandle>]` is byte-equivalent to a C array of `fdf_handle_t`.
     handles: Option<ArenaBox<'static, [Option<MixedHandle>]>>,
@@ -56,6 +56,45 @@ impl<T: ?Sized> Message<T> {
         });
         // SAFETY: We just checked that both boxes were allocated from the arena.
         unsafe { Self::new_unchecked(arena.clone(), data, handles) }
+    }
+
+    /// Given the [`Arena`], allocates a new [`Message`] and runs the given `f` to allow the caller
+    /// to allocate data and handles into the [`Message`] without requiring a check that the
+    /// correct [`Arena`] was used to allocate the data.
+    ///
+    /// Note that it may be possible to sneak an `ArenaBox<'static, T>` into this [`Message`]
+    /// object with this function by using an [`Arena`] with static lifetime to allocate it. This
+    /// will not cause any unsoundness, but if you try to send that message through a [`Channel`]
+    /// it will cause a runtime error when the arenas don't match.
+    pub fn new_with<F>(arena: Arena, f: F) -> Self
+    where
+        F: for<'a> FnOnce(
+            &'a Arena,
+        )
+            -> (Option<ArenaBox<'a, T>>, Option<ArenaBox<'a, [Option<MixedHandle>]>>),
+    {
+        let (data, handles) = f(&arena);
+        // SAFETY: The `for<'a>` in the callback definition makes it so that the caller must
+        // (without resorting to unsafe themselves) allocate the [`ArenaBox`] from the given
+        // [`Arena`].
+        Self {
+            data: data.map(|data| unsafe { ArenaBox::erase_lifetime(data) }),
+            handles: handles.map(|handles| unsafe { ArenaBox::erase_lifetime(handles) }),
+            arena,
+            _p: PhantomData,
+        }
+    }
+
+    /// A shorthand for [`Self::new_with`] when there's definitely a data body and nothing else.
+    pub fn new_with_data<F>(arena: Arena, f: F) -> Self
+    where
+        F: for<'a> FnOnce(&'a Arena) -> ArenaBox<'a, T>,
+    {
+        // SAFETY: The `for<'a>` in the callback definition makes it so that the caller must
+        // (without resorting to unsafe themselves) allocate the [`ArenaBox`] from the given
+        // [`Arena`].
+        let data = Some(unsafe { ArenaBox::erase_lifetime(f(&arena)) });
+        Self { data, handles: None, arena, _p: PhantomData }
     }
 
     /// As with [`Self::new`], this consumes the arguments to produce a message object that holds
@@ -290,11 +329,28 @@ mod test {
         let arena = Arena::new().unwrap();
         let zircon_handle =
             MixedHandle::from_zircon_handle(fuchsia_zircon::Port::create().into_handle());
-        let handles = arena.insert_boxed_slice(Box::new([zircon_handle]));
+        let (driver_handle1, driver_handle2) = Channel::create().unwrap();
+        driver_handle2
+            .write(Message::new_with_data(arena.clone(), |arena| arena.insert(1)))
+            .unwrap();
+
+        let handles = arena
+            .insert_boxed_slice(Box::new([zircon_handle, Some(MixedHandle::from(driver_handle1))]));
         let message = Message::<()>::new(&arena, None, Some(handles));
+
         let mut arena = None;
-        let (_, handles) = message.into_arena_boxes(&mut arena);
-        assert_eq!(handles.unwrap().len(), 1);
+        let (_, Some(mut handles)) = message.into_arena_boxes(&mut arena) else {
+            panic!("didn't get handles back");
+        };
+        assert_eq!(handles.len(), 2);
+        let MixedHandleType::Zircon(_zircon_handle) = handles[0].take().unwrap().resolve() else {
+            panic!("first handle in the handle set wasn't a zircon handle");
+        };
+        let MixedHandleType::Driver(driver_handle1) = handles[1].take().unwrap().resolve() else {
+            panic!("second handle in the handle set wasn't a driver handle");
+        };
+        let driver_handle1 = unsafe { Channel::<i32>::from_driver_handle(driver_handle1) };
+        assert_eq!(driver_handle1.try_read().unwrap().unwrap().data().unwrap(), &1);
     }
 
     #[test]

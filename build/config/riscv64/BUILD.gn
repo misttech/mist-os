@@ -25,6 +25,9 @@ config("riscv64") {
     cflags = [ "-msmall-data-limit=0" ]
   }
   configs = [ ":abi" ]
+
+  # TODO(https://fxbug.dev/360955800): remove the SCS option once the rustc driver can set it by default for Fuchsia targets
+  rustflags = [ "-Zsanitizer=shadow-call-stack" ]
 }
 
 riscv64_abi_config("no-vector") {

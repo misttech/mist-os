@@ -324,7 +324,8 @@ impl NetworkManager {
                 fidl_fuchsia_posix_socket::OptionalUint32::Unset(fidl_fuchsia_posix_socket::Empty)
             }
         };
-        Ok(starnix_networks.set_default(&network_id, zx::Time::after(self.proxy_timeout))??)
+        Ok(starnix_networks
+            .set_default(&network_id, zx::MonotonicTime::after(self.proxy_timeout))??)
     }
 
     // Call `add` on `StarnixNetworks`.
@@ -333,7 +334,7 @@ impl NetworkManager {
         network: fnp_socketproxy::Network,
     ) -> Result<(), NetworkManagerError> {
         let starnix_networks = self.starnix_networks()?;
-        Ok(starnix_networks.add(&network, zx::Time::after(self.proxy_timeout))??)
+        Ok(starnix_networks.add(&network, zx::MonotonicTime::after(self.proxy_timeout))??)
     }
 
     // Call `update` on `StarnixNetworks`.
@@ -342,13 +343,13 @@ impl NetworkManager {
         network: fnp_socketproxy::Network,
     ) -> Result<(), NetworkManagerError> {
         let starnix_networks = self.starnix_networks()?;
-        Ok(starnix_networks.update(&network, zx::Time::after(self.proxy_timeout))??)
+        Ok(starnix_networks.update(&network, zx::MonotonicTime::after(self.proxy_timeout))??)
     }
 
     // Call `remove` on `StarnixNetworks`.
     fn fidl_remove_network(&self, network_id: &u32) -> Result<(), NetworkManagerError> {
         let starnix_networks = self.starnix_networks()?;
-        Ok(starnix_networks.remove(*network_id, zx::Time::after(self.proxy_timeout))??)
+        Ok(starnix_networks.remove(*network_id, zx::MonotonicTime::after(self.proxy_timeout))??)
     }
 }
 

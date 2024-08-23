@@ -87,8 +87,7 @@ open protocol Socket {
         handle Hid;
         socket_message flexible union {
             1: data vector<uint8>;
-            2: error Error;
-            3: socket_read_stopped struct {};
+            2: stopped AioStopped;
         };
     });
 };

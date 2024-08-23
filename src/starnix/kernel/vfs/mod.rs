@@ -32,6 +32,7 @@ pub mod directory_file;
 pub mod eventfd;
 pub mod file_server;
 pub mod fs_args;
+pub mod fs_registry;
 pub mod fsverity;
 pub mod fuse;
 pub mod inotify;
@@ -41,6 +42,7 @@ pub mod pipe;
 pub mod rw_queue;
 pub mod socket;
 pub mod syscalls;
+pub mod timer;
 
 pub use aio::*;
 pub use anon_node::*;
@@ -71,7 +73,7 @@ pub use wd_number::*;
 pub use xattr::*;
 
 #[cfg(not(feature = "starnix_lite"))]
-use crate::device::BinderDriver;
+use crate::device::binder::BinderDriver;
 use crate::task::CurrentTask;
 use starnix_lifecycle::{ObjectReleaser, ReleaserAction};
 use starnix_uapi::ownership::{Releasable, ReleaseGuard};

@@ -38,6 +38,12 @@
 
         // These system capabilities are offered for use by the google tests.
         {
+            protocol: [ "fuchsia.mediacodec.CodecFactory" ],
+            from: "parent",
+            to: "#google-tests",
+            availability: "optional",
+        },
+        {
             protocol: [
                 "fuchsia.device.NameProvider",
                 "fuchsia.intl.PropertyProvider",

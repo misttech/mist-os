@@ -50,14 +50,14 @@ static const std::vector<fpbus::Mmio> thermal_mmios_ddr{
 static const std::vector<fpbus::Irq> thermal_irqs_pll{
     {{
         .irq = S905D2_TS_PLL_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
 };
 
 static const std::vector<fpbus::Irq> thermal_irqs_ddr{
     {{
         .irq = S905D2_TS_DDR_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
 };
 

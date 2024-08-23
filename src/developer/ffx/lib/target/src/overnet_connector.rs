@@ -95,7 +95,7 @@ impl OvernetConnection {
             }
         };
         let main_task = async move {
-            let copy_fut = futures_lite::future::zip(copy_in, copy_out);
+            let copy_fut = futures_lite::future::or(copy_in, copy_out);
             let overall_fut = futures_lite::future::zip(copy_fut, error_reader);
             if let Some(t) = self.main_task {
                 let _ = futures_lite::future::zip(overall_fut, t).await;

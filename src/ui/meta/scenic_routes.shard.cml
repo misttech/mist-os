@@ -52,8 +52,8 @@
         {
             protocol: [
                 "fuchsia.inspect.InspectSink",
-                "fuchsia.media.ProfileProvider",
                 "fuchsia.metrics.MetricEventLoggerFactory",
+                "fuchsia.scheduler.RoleManager",
             ],
             from: "parent",
             to: [ "#scenic" ],

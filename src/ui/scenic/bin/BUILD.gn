@@ -18,7 +18,6 @@ executable("bin") {
     "//sdk/lib/inspect/component/cpp",
     "//sdk/lib/scheduler/cpp",
     "//src/graphics/display/lib/coordinator-getter:client",
-    "//src/lib/async-watchdog",
     "//src/ui/scenic:scenic_structured_config",
     "//src/ui/scenic/lib/display",
     "//src/ui/scenic/lib/display:singleton_display_service",

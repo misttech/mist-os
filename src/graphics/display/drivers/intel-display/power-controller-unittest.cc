@@ -17,7 +17,7 @@
 #include <gtest/gtest.h>
 #include <mock-mmio-range/mock-mmio-range.h>
 
-#include "src/graphics/display/drivers/intel-display/scoped-value-change.h"
+#include "src/graphics/display/drivers/intel-display/util/scoped-value-change.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace intel_display {

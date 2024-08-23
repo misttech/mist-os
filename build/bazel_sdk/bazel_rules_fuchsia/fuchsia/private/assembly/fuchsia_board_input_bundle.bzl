@@ -42,11 +42,12 @@ def _fuchsia_board_input_bundle_impl(ctx):
 
     creation_args = ["--drivers", driver_list_file.path]
 
-    # Add configs
+    # Add single-file configs
     for (arg, file) in [
         ("--cpu-manager-config", "cpu_manager_config"),
         ("--power-manager-config", "power_manager_config"),
         ("--power-metrics-recorder-config", "power_metrics_recorder_config"),
+        ("--system-power-mode-config", "system_power_mode_config"),
         ("--thermal-config", "thermal_config"),
     ]:
         config_file = getattr(ctx.file, file)
@@ -59,14 +60,19 @@ def _fuchsia_board_input_bundle_impl(ctx):
                 ],
             )
 
-    thread_role_files = getattr(ctx.files, "thread_roles")
-    if thread_role_files:
-        for config_file in thread_role_files:
-            creation_inputs.append(config_file)
-            creation_args.extend([
-                "--thread-roles",
-                config_file.path,
-            ])
+    # Add multi-file configs
+    for (arg, files) in [
+        ("--thread-roles", "thread_roles"),
+        ("--sysmem-format-costs-config", "sysmem_format_costs_config"),
+    ]:
+        config_files = getattr(ctx.files, files)
+        if config_files:
+            for config_file in config_files:
+                creation_inputs.append(config_file)
+                creation_args.extend([
+                    arg,
+                    config_file.path,
+                ])
 
     # Add package entries
     for dep in ctx.attr.base_packages:
@@ -164,12 +170,21 @@ fuchsia_board_input_bundle = rule(
             doc = "Path to power_metrics_recorder configuration",
             allow_single_file = True,
         ),
+        "system_power_mode_config": attr.label(
+            doc = "Path to system power mode configuration",
+            allow_single_file = True,
+        ),
         "thermal_config": attr.label(
             doc = "Path to thermal configuration",
             allow_single_file = True,
         ),
         "thread_roles": attr.label_list(
             doc = "Path to thread role configuration files",
+            default = [],
+            allow_files = True,
+        ),
+        "sysmem_format_costs_config": attr.label_list(
+            doc = "Path to sysmem format costs files",
             default = [],
             allow_files = True,
         ),

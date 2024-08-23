@@ -28,13 +28,13 @@ rustc_test("driver") {
     "//src/sys/pkg/lib/isolated-swd",
     "//src/sys/pkg/testing/blobfs-ramdisk",
     "//src/sys/pkg/testing/isolated-ota-env",
-    "//src/sys/pkg/testing/mock-omaha-server",
     "//src/sys/pkg/testing/mock-paver",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:assert_matches",
     "//third_party/rust_crates:async-trait",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:http",
+    "//third_party/rust_crates:mock-omaha-server",
     "//third_party/rust_crates:pretty_assertions",
   ]
 

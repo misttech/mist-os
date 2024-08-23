@@ -406,6 +406,7 @@ async fn wait_for_connect_result(
 fn connect_txn_event_name(event: &fidl_sme::ConnectTransactionEvent) -> &'static str {
     match event {
         fidl_sme::ConnectTransactionEvent::OnConnectResult { .. } => "OnConnectResult",
+        fidl_sme::ConnectTransactionEvent::OnRoamResult { .. } => "OnRoamResult",
         fidl_sme::ConnectTransactionEvent::OnDisconnect { .. } => "OnDisconnect",
         fidl_sme::ConnectTransactionEvent::OnSignalReport { .. } => "OnSignalReport",
         fidl_sme::ConnectTransactionEvent::OnChannelSwitched { .. } => "OnChannelSwitched",

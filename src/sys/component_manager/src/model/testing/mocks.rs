@@ -13,7 +13,6 @@ use async_trait::async_trait;
 use cm_rust::{ComponentDecl, ConfigValuesData};
 use fidl::endpoints::{create_endpoints, ClientEnd, RequestStream, ServerEnd};
 use fidl::epitaph::ChannelEpitaphExt;
-use fidl::prelude::*;
 use fidl_fuchsia_diagnostics_types::{
     ComponentDiagnostics, ComponentTasks, Task as DiagnosticsTask,
 };
@@ -308,10 +307,10 @@ impl MockRunner {
     pub fn send_on_stop_info(&self, koid: &Koid, info: fcrunner::ComponentStopInfo) {
         let state = self.inner.lock().unwrap();
         let handle = state.controller_control_handles.get(koid).expect("koid was not available");
-        handle.send_on_stop_info(info).unwrap();
+        handle.send_on_stop(info).unwrap();
     }
 
-    async fn start(
+    fn start(
         &self,
         start_info: fcrunner::ComponentStartInfo,
         server_end: ServerEnd<fcrunner::ComponentControllerMarker>,
@@ -384,6 +383,16 @@ impl MockRunner {
             }
         }
     }
+
+    pub async fn handle_stream(
+        self: Arc<Self>,
+        mut stream: fcrunner::ComponentRunnerRequestStream,
+    ) {
+        while let Ok(Some(request)) = stream.try_next().await {
+            let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } = request;
+            self.start(start_info, controller);
+        }
+    }
 }
 
 impl BuiltinRunnerFactory for MockRunner {
@@ -392,20 +401,10 @@ impl BuiltinRunnerFactory for MockRunner {
         checker: ScopedPolicyChecker,
         open_request: OpenRequest<'_>,
     ) -> Result<(), zx::Status> {
-        {
-            let mut state = self.inner.lock().unwrap();
-            state.last_checker = Some(checker);
-        }
+        self.inner.lock().unwrap().last_checker = Some(checker);
         open_request.open_service(endpoint(move |scope, server_end| {
-            let mut stream = fcrunner::ComponentRunnerRequestStream::from_channel(server_end);
-            let runner = self.clone();
-            scope.spawn(async move {
-                while let Ok(Some(request)) = stream.try_next().await {
-                    let fcrunner::ComponentRunnerRequest::Start { start_info, controller, .. } =
-                        request;
-                    runner.start(start_info, controller).await;
-                }
-            });
+            let stream = fcrunner::ComponentRunnerRequestStream::from_channel(server_end);
+            scope.spawn(self.clone().handle_stream(stream));
         }))
     }
 }
@@ -430,6 +429,8 @@ pub struct MockController {
     stop_resp: ControllerActionResponse,
     kill_resp: ControllerActionResponse,
 }
+
+pub const MOCK_EXIT_CODE: i64 = 42;
 
 impl MockController {
     /// Create a `MockController` that listens to the `server_end` and inserts
@@ -472,6 +473,14 @@ impl MockController {
         }
     }
 
+    fn ok_on_stop_info() -> fcrunner::ComponentStopInfo {
+        fcrunner::ComponentStopInfo {
+            termination_status: Some(zx::Status::OK.into_raw()),
+            exit_code: Some(MOCK_EXIT_CODE),
+            ..Default::default()
+        }
+    }
+
     /// Create a future which takes ownership of `server_end` and inserts
     /// `ControlMessage`s into `messages` based on events sent on the
     /// `ComponentController` channel.
@@ -479,8 +488,8 @@ impl MockController {
         let job_dup = fuchsia_runtime::job_default()
             .duplicate_handle(zx::Rights::SAME_RIGHTS)
             .expect("duplicate default job");
-        self.request_stream
-            .control_handle()
+        let control = self.request_stream.control_handle();
+        control
             .send_on_publish_diagnostics(ComponentDiagnostics {
                 tasks: Some(ComponentTasks {
                     component_task: Some(DiagnosticsTask::Job(job_dup)),
@@ -494,8 +503,9 @@ impl MockController {
         async move {
             self.messages.lock().await.insert(self.koid, Vec::new());
             while let Ok(Some(request)) = self.request_stream.try_next().await {
+                let control = control.clone();
                 match request {
-                    fcrunner::ComponentControllerRequest::Stop { control_handle: c } => {
+                    fcrunner::ComponentControllerRequest::Stop { control_handle: _ } => {
                         self.messages
                             .lock()
                             .await
@@ -505,19 +515,20 @@ impl MockController {
                         if let Some(delay) = self.stop_resp.delay {
                             let delay_copy = delay.clone();
                             let close_channel = self.stop_resp.close_channel;
+                            let control = control.clone();
                             fasync::Task::spawn(async move {
                                 fasync::Timer::new(fasync::Time::after(delay_copy)).await;
                                 if close_channel {
-                                    c.shutdown_with_epitaph(zx::Status::OK);
+                                    let _ = control.send_on_stop(Self::ok_on_stop_info());
                                 }
                             })
                             .detach();
                         } else if self.stop_resp.close_channel {
-                            c.shutdown_with_epitaph(zx::Status::OK);
+                            let _ = control.send_on_stop(Self::ok_on_stop_info());
                             break;
                         }
                     }
-                    fcrunner::ComponentControllerRequest::Kill { control_handle: c } => {
+                    fcrunner::ComponentControllerRequest::Kill { control_handle: _ } => {
                         self.messages
                             .lock()
                             .await
@@ -530,7 +541,7 @@ impl MockController {
                             fasync::Task::spawn(async move {
                                 fasync::Timer::new(fasync::Time::after(delay_copy)).await;
                                 if close_channel {
-                                    c.shutdown_with_epitaph(zx::Status::OK);
+                                    let _ = control.send_on_stop(Self::ok_on_stop_info());
                                 }
                             })
                             .detach();
@@ -538,7 +549,7 @@ impl MockController {
                                 break;
                             }
                         } else if self.kill_resp.close_channel {
-                            c.shutdown_with_epitaph(zx::Status::OK);
+                            let _ = control.send_on_stop(Self::ok_on_stop_info());
                             break;
                         }
                     }

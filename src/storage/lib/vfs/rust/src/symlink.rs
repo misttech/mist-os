@@ -285,7 +285,11 @@ impl<T: Symlink> Representation for Connection<T> {
         requested_attributes: fio::NodeAttributesQuery,
     ) -> Result<fio::Representation, Status> {
         Ok(fio::Representation::Symlink(fio::SymlinkInfo {
-            attributes: Some(self.symlink.get_attributes(requested_attributes).await?),
+            attributes: if requested_attributes.is_empty() {
+                None
+            } else {
+                Some(self.symlink.get_attributes(requested_attributes).await?)
+            },
             target: Some(self.symlink.read_target().await?),
             ..Default::default()
         }))

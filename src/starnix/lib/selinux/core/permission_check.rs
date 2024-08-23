@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::access_vector_cache::{Fixed, Locked, Query, QueryMut, DEFAULT_SHARED_SIZE};
+use super::access_vector_cache::{Fixed, Locked, Query, DEFAULT_SHARED_SIZE};
 use super::security_server::SecurityServer;
 use super::SecurityId;
 
@@ -14,9 +14,6 @@ use std::sync::Weak;
 mod private {
     /// Public super-trait to seal [`super::PermissionCheck`].
     pub trait PermissionCheck {}
-
-    /// Public super-trait to seal [`super::PermissionCheckMut`].
-    pub trait PermissionCheckMut {}
 }
 
 /// Extension of [`Query`] that integrates sealed `has_permission()` trait method.
@@ -28,25 +25,22 @@ pub trait PermissionCheck: AccessVectorComputer + Query + private::PermissionChe
     ///
     /// *Do not provide alternative implementations of this trait.* There must be one consistent
     /// way of computing `has_permission()` in terms of `Query::query()`.
-    fn has_permissions<P: ClassPermission + Into<Permission> + Clone + 'static>(
+    fn has_permission<P: ClassPermission + Into<Permission> + Clone + 'static>(
         &self,
         source_sid: SecurityId,
         target_sid: SecurityId,
-        permissions: &[P],
+        permission: P,
     ) -> bool {
-        let target_class = match permissions.first() {
-            Some(permission) => permission.class(),
-            None => return true,
-        };
-        let has_permissions = if let Some(permissions_access_vector) =
-            self.access_vector_from_permissions(permissions)
+        let target_class = permission.class();
+        let has_permission = if let Some(permission_access_vector) =
+            self.access_vector_from_permissions(&[permission])
         {
             let permitted_access_vector = self.query(source_sid, target_sid, target_class.into());
-            permissions_access_vector & permitted_access_vector == permissions_access_vector
+            permission_access_vector & permitted_access_vector == permission_access_vector
         } else {
             false
         };
-        if !has_permissions {
+        if !has_permission {
             // TODO(b/331375792): Failures should be audit-logged, even if permitted.
             if !self.is_permissive(target_class) {
                 return false;
@@ -62,42 +56,6 @@ impl<Q: AccessVectorComputer + Query> private::PermissionCheck for Q {}
 /// Every [`AccessVectorComputer`] + [`Query`] implements [`PermissionCheck`] *without overriding
 /// associated functions*.
 impl<Q: AccessVectorComputer + Query> PermissionCheck for Q {}
-
-/// Extension of [`QueryMut`] that integrates sealed `has_permission()` trait method.
-pub trait PermissionCheckMut:
-    AccessVectorComputer + QueryMut + private::PermissionCheckMut
-{
-    /// Returns true if and only if all `permissions` are granted to `source_sid` acting on
-    /// `target_sid` as a `target_class`.
-    ///
-    /// # Singleton trait implementation
-    ///
-    /// *Do not provide alternative implementations of this trait.* There must be one consistent
-    /// way of computing `has_permission()` in terms of `QueryMut::query()`.
-    fn has_permissions<P: ClassPermission + Into<Permission> + Clone + 'static>(
-        &mut self,
-        source_sid: SecurityId,
-        target_sid: SecurityId,
-        permissions: &[P],
-    ) -> bool {
-        let target_class = match permissions.first() {
-            Some(permission) => permission.class(),
-            None => return true,
-        };
-        if let Some(permissions_access_vector) = self.access_vector_from_permissions(permissions) {
-            let permitted_access_vector = self.query(source_sid, target_sid, target_class.into());
-            permissions_access_vector & permitted_access_vector == permissions_access_vector
-        } else {
-            false
-        }
-    }
-}
-
-/// Every [`QueryMut`] implements [`private::PermissionCheckMut`].
-impl<QM: AccessVectorComputer + QueryMut> private::PermissionCheckMut for QM {}
-
-/// Every [`QueryMut`] implements [`PermissionCheckMut`] *without overriding associated functions*.
-impl<QM: AccessVectorComputer + QueryMut> PermissionCheckMut for QM {}
 
 pub struct PermissionCheckImpl<'a> {
     security_server: &'a SecurityServer,
@@ -248,8 +206,8 @@ mod tests {
 
     #[fuchsia::test]
     fn has_permission_both() {
-        let mut deny_all: DenyAllPermissions = Default::default();
-        let mut allow_all: AllowAllPermissions = Default::default();
+        let deny_all: DenyAllPermissions = Default::default();
+        let allow_all: AllowAllPermissions = Default::default();
 
         // Use permissions that are mapped to access vector bits in
         // `access_vector_from_permission`.
@@ -258,110 +216,23 @@ mod tests {
             // DenyAllPermissions denies.
             assert_eq!(
                 false,
-                PermissionCheck::has_permissions(
+                PermissionCheck::has_permission(
                     &deny_all,
                     *A_TEST_SID,
                     *A_TEST_SID,
-                    &[permission.clone()]
-                )
-            );
-            assert_eq!(
-                false,
-                PermissionCheckMut::has_permissions(
-                    &mut deny_all,
-                    *A_TEST_SID,
-                    *A_TEST_SID,
-                    &[permission.clone()]
+                    permission.clone()
                 )
             );
             // AllowAllPermissions allows.
             assert_eq!(
                 true,
-                PermissionCheck::has_permissions(
+                PermissionCheck::has_permission(
                     &allow_all,
                     *A_TEST_SID,
                     *A_TEST_SID,
-                    &[permission.clone()]
-                )
-            );
-            assert_eq!(
-                true,
-                PermissionCheckMut::has_permissions(
-                    &mut allow_all,
-                    *A_TEST_SID,
-                    *A_TEST_SID,
-                    &[permission.clone()]
+                    permission.clone()
                 )
             );
         }
-
-        // DenyAllPermissions denies.
-        assert_eq!(
-            false,
-            PermissionCheck::has_permissions(&deny_all, *A_TEST_SID, *A_TEST_SID, &permissions)
-        );
-        assert_eq!(
-            false,
-            PermissionCheckMut::has_permissions(
-                &mut deny_all,
-                *A_TEST_SID,
-                *A_TEST_SID,
-                &permissions
-            )
-        );
-
-        // AllowAllPermissions allows.
-        assert_eq!(
-            true,
-            PermissionCheck::has_permissions(&allow_all, *A_TEST_SID, *A_TEST_SID, &permissions)
-        );
-        assert_eq!(
-            true,
-            PermissionCheckMut::has_permissions(
-                &mut allow_all,
-                *A_TEST_SID,
-                *A_TEST_SID,
-                &permissions
-            )
-        );
-
-        // DenyAllPermissions and AllowAllPermissions vacuously accept empty permissions collection.
-        let empty_permissions = [] as [ProcessPermission; 0];
-        assert_eq!(
-            true,
-            PermissionCheck::has_permissions(
-                &deny_all,
-                *A_TEST_SID,
-                *A_TEST_SID,
-                &empty_permissions
-            )
-        );
-        assert_eq!(
-            true,
-            PermissionCheckMut::has_permissions(
-                &mut deny_all,
-                *A_TEST_SID,
-                *A_TEST_SID,
-                &empty_permissions
-            )
-        );
-        assert_eq!(
-            true,
-            PermissionCheck::has_permissions(
-                &allow_all,
-                *A_TEST_SID,
-                *A_TEST_SID,
-                &empty_permissions
-            )
-        );
-        assert_eq!(
-            true,
-            PermissionCheckMut::has_permissions(
-                &mut allow_all,
-                *A_TEST_SID,
-                *A_TEST_SID,
-                &empty_permissions
-            )
-        );
     }
 }

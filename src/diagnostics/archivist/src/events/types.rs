@@ -36,7 +36,7 @@ impl AsRef<str> for EventType {
 pub struct Event {
     /// The contents of the event.
     pub payload: EventPayload,
-    pub timestamp: zx::Time,
+    pub timestamp: zx::MonotonicTime,
 }
 
 impl Event {
@@ -124,7 +124,7 @@ impl TryFrom<fcomponent::Event> for Event {
                                 ServerEnd::<flogger::LogSinkMarker>::new(capability)
                                     .into_stream()?;
                             Ok(Event {
-                                timestamp: zx::Time::from_nanos(event.header.timestamp),
+                                timestamp: zx::MonotonicTime::from_nanos(event.header.timestamp),
                                 payload: EventPayload::LogSinkRequested(LogSinkRequestedPayload {
                                     component: Arc::new(identity),
                                     request_stream,
@@ -138,7 +138,7 @@ impl TryFrom<fcomponent::Event> for Event {
                                 ServerEnd::<finspect::InspectSinkMarker>::new(capability)
                                     .into_stream()?;
                             Ok(Event {
-                                timestamp: zx::Time::from_nanos(event.header.timestamp),
+                                timestamp: zx::MonotonicTime::from_nanos(event.header.timestamp),
                                 payload: EventPayload::InspectSinkRequested(
                                     InspectSinkRequestedPayload {
                                         component: Arc::new(identity),
@@ -184,7 +184,7 @@ mod tests {
                 event_type: Some(fcomponent::EventType::CapabilityRequested),
                 moniker: Some(target_moniker),
                 component_url: Some(target_url),
-                timestamp: Some(zx::Time::get_monotonic().into_nanos()),
+                timestamp: Some(zx::MonotonicTime::get().into_nanos()),
                 ..Default::default()
             }),
             payload: Some(fcomponent::EventPayload::CapabilityRequested(

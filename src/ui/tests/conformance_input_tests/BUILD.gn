@@ -35,9 +35,11 @@ source_set("conformance-test-base") {
   ]
   output_name = "conformance-test-base"
   public_deps = [
-    "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_hlcpp",
-    "//sdk/fidl/fuchsia.ui.test.context:fuchsia.ui.test.context_hlcpp",
-    "//sdk/lib/sys/cpp",
+    "//sdk/fidl/fuchsia.testing.harness:fuchsia.testing.harness_cpp",
+    "//sdk/fidl/fuchsia.ui.test.context:fuchsia.ui.test.context_cpp",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/syslog/cpp",
+    "//src/ui/testing/util:fidl_cpp_helpers",
     "//src/ui/testing/util:loop_fixture",
     "//src/ui/testing/util:zxtest_helpers",
     "//zircon/system/ulib/zxtest",
@@ -139,14 +141,13 @@ ctf_components_packages("touch-conformance-test") {
   test_subject = "touch"
   deps = [
     ":conformance-test-base",
-    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
-    "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
-    "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_hlcpp",
-    "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_hlcpp",
-    "//sdk/fidl/fuchsia.ui.test.conformance:fuchsia.ui.test.conformance_hlcpp",
-    "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_hlcpp",
-    "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_hlcpp",
-    "//sdk/lib/syslog/cpp",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_cpp",
+    "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_cpp",
+    "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_cpp",
+    "//sdk/fidl/fuchsia.ui.pointer:fuchsia.ui.pointer_cpp",
+    "//sdk/fidl/fuchsia.ui.test.conformance:fuchsia.ui.test.conformance_cpp",
+    "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_cpp",
+    "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_cpp",
     "//sdk/lib/ui/scenic/cpp",
   ]
 }
@@ -155,13 +156,12 @@ ctf_components_packages("mouse-conformance-test") {
   test_subject = "mouse"
   deps = [
     ":conformance-test-base",
-    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
-    "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
-    "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_hlcpp",
-    "//sdk/fidl/fuchsia.ui.test.conformance:fuchsia.ui.test.conformance_hlcpp",
-    "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_hlcpp",
-    "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_hlcpp",
-    "//sdk/lib/syslog/cpp",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_cpp",
+    "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_cpp",
+    "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_cpp",
+    "//sdk/fidl/fuchsia.ui.test.conformance:fuchsia.ui.test.conformance_cpp",
+    "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_cpp",
+    "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_cpp",
     "//sdk/lib/ui/scenic/cpp",
   ]
 }
@@ -170,14 +170,13 @@ ctf_components_packages("key-conformance-test") {
   test_subject = "key"
   deps = [
     ":conformance-test-base",
-    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
-    "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
-    "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_hlcpp",
-    "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_hlcpp",
-    "//sdk/fidl/fuchsia.ui.test.conformance:fuchsia.ui.test.conformance_hlcpp",
-    "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_hlcpp",
-    "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_hlcpp",
-    "//sdk/lib/syslog/cpp",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_cpp",
+    "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_cpp",
+    "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_cpp",
+    "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_cpp",
+    "//sdk/fidl/fuchsia.ui.test.conformance:fuchsia.ui.test.conformance_cpp",
+    "//sdk/fidl/fuchsia.ui.test.input:fuchsia.ui.test.input_cpp",
+    "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_cpp",
     "//sdk/lib/ui/scenic/cpp",
     "//src/lib/fsl",
   ]
@@ -187,13 +186,12 @@ ctf_components_packages("focus-conformance-test") {
   test_subject = "focus"
   deps = [
     ":conformance-test-base",
-    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
-    "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
-    "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_hlcpp",
-    "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_hlcpp",
-    "//sdk/fidl/fuchsia.ui.test.conformance:fuchsia.ui.test.conformance_hlcpp",
-    "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_hlcpp",
-    "//sdk/lib/syslog/cpp",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_cpp",
+    "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_cpp",
+    "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_cpp",
+    "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_cpp",
+    "//sdk/fidl/fuchsia.ui.test.conformance:fuchsia.ui.test.conformance_cpp",
+    "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_cpp",
     "//sdk/lib/ui/scenic/cpp",
     "//src/lib/fsl",
   ]
@@ -203,15 +201,14 @@ ctf_components_packages("media-button-conformance-test") {
   test_subject = "media-button"
   deps = [
     ":conformance-test-base",
-    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_hlcpp",
-    "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_hlcpp",
-    "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_hlcpp",
-    "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_hlcpp",
-    "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_hlcpp",
-    "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_hlcpp",
-    "//sdk/fidl/fuchsia.ui.test.conformance:fuchsia.ui.test.conformance_hlcpp",
-    "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_hlcpp",
-    "//sdk/lib/syslog/cpp",
+    "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_cpp",
+    "//sdk/fidl/fuchsia.ui.display.singleton:fuchsia.ui.display.singleton_cpp",
+    "//sdk/fidl/fuchsia.ui.focus:fuchsia.ui.focus_cpp",
+    "//sdk/fidl/fuchsia.ui.input:fuchsia.ui.input_cpp",
+    "//sdk/fidl/fuchsia.ui.input3:fuchsia.ui.input3_cpp",
+    "//sdk/fidl/fuchsia.ui.policy:fuchsia.ui.policy_cpp",
+    "//sdk/fidl/fuchsia.ui.test.conformance:fuchsia.ui.test.conformance_cpp",
+    "//sdk/fidl/fuchsia.ui.test.scene:fuchsia.ui.test.scene_cpp",
     "//sdk/lib/ui/scenic/cpp",
     "//src/lib/fostr/fidl/fuchsia.ui.input",
     "//src/lib/fsl",

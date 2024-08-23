@@ -30,6 +30,8 @@ class ParentTransportDriver : public fdf::DriverBase,
   void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_i2cimpl::Device> metadata,
                              fidl::UnknownMethodCompleter::Sync& completer) override;
 
+  uint32_t bitrate() const { return bitrate_; }
+
  private:
   fidl::WireClient<fuchsia_driver_framework::NodeController> controller_;
 

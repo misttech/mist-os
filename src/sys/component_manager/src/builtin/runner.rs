@@ -28,6 +28,7 @@ pub trait BuiltinRunnerFactory: Send + Sync {
 }
 
 /// Provides a hook for routing built-in runners to realms.
+#[derive(Clone)]
 pub struct BuiltinRunner {
     name: Name,
     factory: Arc<dyn BuiltinRunnerFactory>,
@@ -41,6 +42,14 @@ impl BuiltinRunner {
         security_policy: Arc<SecurityPolicy>,
     ) -> Self {
         Self { name, factory, security_policy }
+    }
+
+    pub fn name(&self) -> &Name {
+        &self.name
+    }
+
+    pub fn factory(&self) -> &Arc<dyn BuiltinRunnerFactory> {
+        &self.factory
     }
 }
 

@@ -465,7 +465,7 @@ impl SystemActivityGovernorControl {
                     fctrl::SetSystemActivityGovernorStateError::Internal
                 })?;
             }
-            ExecutionStateLevel::WakeHandling => {
+            ExecutionStateLevel::Suspending => {
                 if *self.boot_complete.lock().await == false
                     || required_application_activity_level != ApplicationActivityLevel::Inactive
                     || (required_full_wake_handling_level == FullWakeHandlingLevel::Inactive

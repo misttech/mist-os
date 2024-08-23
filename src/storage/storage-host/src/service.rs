@@ -169,12 +169,12 @@ impl StorageHostService {
 #[cfg(test)]
 mod tests {
     use super::StorageHostService;
-    use crate::gpt::format::testing::{format_gpt, PartitionDescriptor};
     use fake_block_server::FakeServer;
     use fidl::endpoints::{create_endpoints, Proxy as _, RequestStream as _};
     use fidl_fuchsia_process_lifecycle::LifecycleMarker;
     use fuchsia_component::client::connect_to_protocol_at_dir_svc;
     use futures::{FutureExt as _, StreamExt as _};
+    use gpt_testing::{format_gpt, PartitionDescriptor};
     use std::sync::Arc;
     use {
         fidl_fuchsia_device as fdevice, fidl_fuchsia_hardware_block_volume as fvolume,

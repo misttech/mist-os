@@ -283,7 +283,7 @@ impl ProcessingTimeTracker {
 
         let make_entry = || {
             let n = parent_node.create_child(moniker.to_string());
-            n.record_int("@time", zx::Time::get_monotonic().into_nanos());
+            n.record_int("@time", zx::MonotonicTime::get().into_nanos());
             n.record_double("duration_seconds", time_ns as f64 / 1e9);
             (time_ns, n)
         };

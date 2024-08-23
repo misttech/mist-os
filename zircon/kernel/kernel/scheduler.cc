@@ -1764,8 +1764,8 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
     // becoming scheduled.  The next thread needs to know which thread preceded
     // it in order to drop its lock before unwinding, and our current stack is
     // not going to be available to it.
-    DEBUG_ASSERT(next_thread->scheduler_state().previous_thread_ == nullptr);
-    next_thread->scheduler_state().previous_thread_ = current_thread;
+    DEBUG_ASSERT(previous_thread_ == nullptr);
+    previous_thread_ = current_thread;
     arch_context_switch(current_thread, next_thread);
 
     // We made it to the other side of the switch.  We have switched stacks, so
@@ -1813,10 +1813,11 @@ void Scheduler::TrampolineLockHandoff() { SchedulerUtils::TrampolineLockHandoff(
 void Scheduler::LockHandoffInternal(const kconcurrent::RescheduleContext& ctx,
                                     Thread* const current_thread) {
   DEBUG_ASSERT(arch_ints_disabled());
-  Thread* const previous_thread = current_thread->scheduler_state().previous_thread_;
+  Scheduler* scheduler = Scheduler::Get();
+  Thread* const previous_thread = scheduler->previous_thread_;
   DEBUG_ASSERT(previous_thread != nullptr);
 
-  current_thread->scheduler_state().previous_thread_ = nullptr;
+  scheduler->previous_thread_ = nullptr;
   previous_thread->get_lock().AssertAcquired();
   SchedulerUtils::PostContextSwitchLockHandoff(ctx, previous_thread);
 }
@@ -2671,7 +2672,7 @@ void Scheduler::MigrateUnpinnedThreads() {
           // After stage of the migration function will be called on the new CPU the
           // next time the thread becomes scheduled.
           MarkInFindActiveSchedulerForThreadCbk(*thread, *target);
-          (void)current; // We cannot annotate 'current' with [[maybe_unused]] in the capture list,
+          (void)current;  // We cannot annotate 'current' with [[maybe_unused]] in the capture list,
                           // so suppress the warning using the old school void-cast trick.
           DEBUG_ASSERT(target != current);
           target->FinishTransition(now, thread);

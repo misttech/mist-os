@@ -5,15 +5,18 @@
 #include "src/storage/blobfs/iterator/node_populator.h"
 
 #include <stdint.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
 #include <zircon/types.h>
 
+#include <cstddef>
+#include <utility>
 #include <vector>
 
-#include <safemath/safe_conversions.h>
-
 #include "src/storage/blobfs/allocator/base_allocator.h"
+#include "src/storage/blobfs/allocator/extent_reserver.h"
+#include "src/storage/blobfs/allocator/node_reserver.h"
 #include "src/storage/blobfs/format.h"
-#include "src/storage/blobfs/iterator/extent_iterator.h"
 
 namespace blobfs {
 

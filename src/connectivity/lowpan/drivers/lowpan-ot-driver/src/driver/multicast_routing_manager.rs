@@ -160,7 +160,8 @@ impl MulticastRoutingManager {
 
                                 fnet_mcast::Ipv6RoutingTableControllerAddRouteError::InvalidAddress |
                                 fnet_mcast::Ipv6RoutingTableControllerAddRouteError::RequiredRouteFieldsMissing |
-                                fnet_mcast::Ipv6RoutingTableControllerAddRouteError::InputCannotBeOutput
+                                fnet_mcast::Ipv6RoutingTableControllerAddRouteError::InputCannotBeOutput |
+                                fnet_mcast::Ipv6RoutingTableControllerAddRouteError::DuplicateOutput
                                     => panic!("Unexpected error `{err:?}` trying to add {route:?} for address {:?}",
                                               PiiWrap(&addresses)),
                             }

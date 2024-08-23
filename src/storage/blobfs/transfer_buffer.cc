@@ -5,10 +5,32 @@
 #include "src/storage/blobfs/transfer_buffer.h"
 
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/result.h>
+#include <lib/zx/vmo.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/syscalls.h>
+#include <zircon/types.h>
 
-#include <safemath/safe_conversions.h>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <utility>
+#include <vector>
 
+#include <fbl/algorithm.h>
+#include <storage/buffer/owned_vmoid.h>
+#include <storage/operation/operation.h>
+
+#include "src/storage/blobfs/blobfs_metrics.h"
+#include "src/storage/blobfs/compression_settings.h"
+#include "src/storage/blobfs/format.h"
+#include "src/storage/blobfs/iterator/block_iterator.h"
+#include "src/storage/blobfs/iterator/block_iterator_provider.h"
+#include "src/storage/blobfs/loader_info.h"
+#include "src/storage/blobfs/transaction_manager.h"
 #include "src/storage/lib/trace/trace.h"
+#include "src/storage/lib/vfs/cpp/ticker.h"
 
 namespace blobfs {
 
@@ -28,19 +50,19 @@ zx::result<std::unique_ptr<StorageBackedTransferBuffer>> StorageBackedTransferBu
     size_t size, TransactionManager* txn_manager, BlockIteratorProvider* block_iter_provider,
     BlobfsMetrics* metrics) {
   ZX_DEBUG_ASSERT(metrics != nullptr && txn_manager != nullptr && block_iter_provider != nullptr);
-  if (size % kBlobfsBlockSize != 0 || size % PAGE_SIZE != 0) {
+  if (size % kBlobfsBlockSize != 0 || size % zx_system_get_page_size() != 0) {
     return zx::error(ZX_ERR_INVALID_ARGS);
   }
   zx::vmo vmo;
   zx_status_t status = zx::vmo::create(size, 0, &vmo);
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Cannot create pager transfer buffer: " << zx_status_get_string(status);
+    FX_PLOGS(ERROR, status) << "Cannot create pager transfer buffer";
     return zx::error(status);
   }
   storage::OwnedVmoid vmoid(txn_manager);
   status = vmoid.AttachVmo(vmo);
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to attach pager transfer vmo: " << zx_status_get_string(status);
+    FX_PLOGS(ERROR, status) << "Failed to attach pager transfer vmo";
     return zx::error(status);
   }
 
@@ -76,15 +98,14 @@ zx::result<> StorageBackedTransferBuffer::Populate(uint64_t offset, uint64_t len
   if (zx_status_t status =
           vmo_.op_range(ZX_VMO_OP_COMMIT, 0, block_count * kBlobfsBlockSize, nullptr, 0);
       status != ZX_OK) {
-    FX_LOGS(WARNING) << "Failed to commit vmo: " << zx_status_get_string(status);
+    FX_PLOGS(WARNING, status) << "Failed to commit vmo";
     // This is only an optimization, it's fine it it fails.
   }
 
   // Navigate to the start block.
   zx_status_t status = IterateToBlock(&block_iter.value(), start_block);
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to navigate to start block " << start_block << ": "
-                   << zx_status_get_string(status);
+    FX_PLOGS(ERROR, status) << "Failed to navigate to start block " << start_block;
     return zx::error(status);
   }
 
@@ -103,14 +124,14 @@ zx::result<> StorageBackedTransferBuffer::Populate(uint64_t offset, uint64_t len
                           return ZX_OK;
                         });
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to enqueue read operations: " << zx_status_get_string(status);
+    FX_PLOGS(ERROR, status) << "Failed to enqueue read operations";
     return zx::error(status);
   }
 
   // Issue the read.
   status = txn_manager_->RunRequests(operations);
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to transact read operations: " << zx_status_get_string(status);
+    FX_PLOGS(ERROR, status) << "Failed to transact read operations";
     return zx::error(status);
   }
 

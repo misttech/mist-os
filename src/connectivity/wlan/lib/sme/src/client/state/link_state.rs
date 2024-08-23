@@ -52,7 +52,7 @@ pub struct EstablishingRsna {
 #[derive(Debug)]
 pub struct LinkUp {
     pub protection: Protection,
-    pub since: zx::Time,
+    pub since: zx::MonotonicTime,
 }
 
 statemachine!(

@@ -31,7 +31,7 @@ impl Controller {
     pub fn new(
         control: &fnet_filter::ControlSynchronousProxy,
         ControllerId(id): &ControllerId,
-        deadline: zx::Time,
+        deadline: zx::MonotonicTime,
     ) -> Result<Self, ControllerCreationError> {
         let (controller, server_end) = fidl::endpoints::create_sync_proxy();
         control.open_controller(id, server_end).map_err(ControllerCreationError::OpenController)?;
@@ -48,7 +48,7 @@ impl Controller {
     pub fn push_changes(
         &mut self,
         changes: Vec<Change>,
-        deadline: zx::Time,
+        deadline: zx::MonotonicTime,
     ) -> Result<(), PushChangesError> {
         let fidl_changes = changes.iter().cloned().map(Into::into).collect::<Vec<_>>();
         let result = self
@@ -66,18 +66,18 @@ impl Controller {
     pub fn commit_with_options(
         &mut self,
         options: fnet_filter::CommitOptions,
-        deadline: zx::Time,
+        deadline: zx::MonotonicTime,
     ) -> Result<(), CommitError> {
         let committed_changes = std::mem::take(&mut self.pending_changes);
         let result = self.controller.commit(options, deadline).map_err(CommitError::CallMethod)?;
         handle_commit_result(result, committed_changes)
     }
 
-    pub fn commit(&mut self, deadline: zx::Time) -> Result<(), CommitError> {
+    pub fn commit(&mut self, deadline: zx::MonotonicTime) -> Result<(), CommitError> {
         self.commit_with_options(fnet_filter::CommitOptions::default(), deadline)
     }
 
-    pub fn commit_idempotent(&mut self, deadline: zx::Time) -> Result<(), CommitError> {
+    pub fn commit_idempotent(&mut self, deadline: zx::MonotonicTime) -> Result<(), CommitError> {
         self.commit_with_options(
             fnet_filter::CommitOptions {
                 idempotent: Some(true),
@@ -116,16 +116,19 @@ mod tests {
             .await;
         });
 
-        let mut controller =
-            Controller::new(&control_sync, &ControllerId(String::from("test")), zx::Time::INFINITE)
-                .expect("create controller");
+        let mut controller = Controller::new(
+            &control_sync,
+            &ControllerId(String::from("test")),
+            zx::MonotonicTime::INFINITE,
+        )
+        .expect("create controller");
         let result = controller.push_changes(
             vec![
                 Change::Create(test_resource()),
                 Change::Create(invalid_resource()),
                 Change::Remove(test_resource_id()),
             ],
-            zx::Time::INFINITE,
+            zx::MonotonicTime::INFINITE,
         );
 
         assert_matches!(
@@ -162,9 +165,12 @@ mod tests {
             .await;
         });
 
-        let mut controller =
-            Controller::new(&control_sync, &ControllerId(String::from("test")), zx::Time::INFINITE)
-                .expect("create controller");
+        let mut controller = Controller::new(
+            &control_sync,
+            &ControllerId(String::from("test")),
+            zx::MonotonicTime::INFINITE,
+        )
+        .expect("create controller");
         controller
             .push_changes(
                 vec![
@@ -172,11 +178,11 @@ mod tests {
                     Change::Remove(unknown_resource_id()),
                     Change::Remove(test_resource_id()),
                 ],
-                zx::Time::INFINITE,
+                zx::MonotonicTime::INFINITE,
             )
             .expect("push changes");
 
-        let result = controller.commit(zx::Time::INFINITE);
+        let result = controller.commit(zx::MonotonicTime::INFINITE);
         assert_matches!(
             result,
             Err(CommitError::ErrorOnChange(errors)) if errors == vec![(

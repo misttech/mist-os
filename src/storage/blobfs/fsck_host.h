@@ -8,7 +8,7 @@
 #ifndef SRC_STORAGE_BLOBFS_FSCK_HOST_H_
 #define SRC_STORAGE_BLOBFS_FSCK_HOST_H_
 
-#include <memory>
+#include <zircon/types.h>
 
 #include "src/storage/blobfs/host.h"
 

@@ -104,7 +104,7 @@ fn repeatability(key_meaning: Option<KeyMeaning>) -> Repeatability {
 #[derive(Debug, Clone)]
 enum AnyEvent {
     // A keyboard input event.
-    Keyboard(KeyboardEvent, InputDeviceDescriptor, zx::Time, Handled),
+    Keyboard(KeyboardEvent, InputDeviceDescriptor, zx::MonotonicTime, Handled),
     // An input event other than keyboard.
     NonKeyboard(InputEvent),
     // A timer event.
@@ -498,7 +498,7 @@ mod tests {
             key,
             event_type,
             /*modifiers=*/ None,
-            /*event_time*/ zx::Time::ZERO,
+            /*event_time*/ zx::MonotonicTime::ZERO,
             &InputDeviceDescriptor::Fake,
             /*keymap=*/ None,
             key_meaning,
@@ -543,7 +543,7 @@ mod tests {
                     InputEvent {
                         device_event,
                         device_descriptor,
-                        event_time: zx::Time::ZERO,
+                        event_time: zx::MonotonicTime::ZERO,
                         handled,
                         trace_id: None,
                     }

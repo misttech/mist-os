@@ -7,6 +7,9 @@
 
 #include <lib/zx/result.h>
 
+#include <cstdint>
+#include <memory>
+
 #include "src/storage/blobfs/format.h"
 
 namespace blobfs {

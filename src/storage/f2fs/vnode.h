@@ -137,8 +137,7 @@ class VnodeF2fs : public fs::PagedVnode,
   zx_status_t GetNewDataPage(pgoff_t index, bool new_i_size, LockedPage *out)
       __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
 
-  // Caller should ensure node_page is locked.
-  zx_status_t ReserveNewBlock(NodePage &node_page, size_t ofs_in_node);
+  zx_status_t ReserveNewBlock(LockedPage &node_page, size_t ofs_in_node);
 
   zx::result<block_t> FindDataBlkAddr(pgoff_t index);
   // This function returns block addresses and LockedPages for requested offsets. If there is no

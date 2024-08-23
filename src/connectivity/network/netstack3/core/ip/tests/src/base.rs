@@ -594,9 +594,11 @@ where
     assert_eq!(ctx.core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet.get(), 0);
 }
 
+// TODO(https://fxbug.dev/345814518): Once we don't reassemble on forwarding,
+// this test should ensure that we forward fragments without touching them.
 #[netstack3_macros::context_ip_bounds(I, FakeBindingsCtx)]
 #[ip_test(I)]
-fn test_ip_reassembly_only_at_destination_host<I: TestIpExt + IpExt>() {
+fn test_ip_reassembly_when_forwarding<I: TestIpExt + IpExt>() {
     // Create a new network with two parties (alice & bob) and enable IP
     // packet routing for alice.
     let a = "alice";
@@ -624,24 +626,22 @@ fn test_ip_reassembly_only_at_destination_host<I: TestIpExt + IpExt>() {
 
     let fragment_id = 5;
 
-    // Test that packets only get reassembled and dispatched at the
-    // destination. In this test, Alice is receiving packets from some
-    // source that is actually destined for Bob. Alice should simply forward
-    // the packets without attempting to process or reassemble the
-    // fragments.
+    // Test that forwarded packets are reassembled at the router before being
+    // received by the destination. In this test, Alice is receiving packets
+    // from some source that is actually destined for Bob.
 
     // Process fragment #0
     net.with_context("alice", |ctx| {
         process_ip_fragment::<I>(ctx, &alice_device_id, fragment_id, 0, 3);
     });
-    // Make sure the packet got sent from alice to bob
-    assert!(!net.step().is_idle());
+    // Make sure the fragment was not sent from alice to bob.
+    assert_eq!(net.context("alice").core_ctx.common_ip::<I>().counters().forward.get(), 0);
 
     // Process fragment #1
     net.with_context("alice", |ctx| {
         process_ip_fragment::<I>(ctx, &alice_device_id, fragment_id, 1, 3);
     });
-    assert!(!net.step().is_idle());
+    assert_eq!(net.context("alice").core_ctx.common_ip::<I>().counters().forward.get(), 0);
 
     // Make sure no packets got dispatched yet.
     assert_eq!(
@@ -657,10 +657,12 @@ fn test_ip_reassembly_only_at_destination_host<I: TestIpExt + IpExt>() {
     net.with_context("alice", |ctx| {
         process_ip_fragment::<I>(ctx, &alice_device_id, fragment_id, 2, 3);
     });
+    // Now that the last fragment has arrived, Alice should have forwarded the
+    // reassembled packet.
     assert!(!net.step().is_idle());
+    assert_eq!(net.context("alice").core_ctx.common_ip::<I>().counters().forward.get(), 1);
 
-    // Make sure the packet finally got dispatched now that the final
-    // fragment has been received by bob.
+    // Make sure the packet finally got dispatched once Bob received the whole packet.
     assert_eq!(
         net.context("alice").core_ctx.common_ip::<I>().counters().dispatch_receive_ip_packet.get(),
         0

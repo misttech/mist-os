@@ -5,24 +5,45 @@
 #include "src/storage/blobfs/delivery_blob.h"
 
 #include <lib/cksum.h>
+#include <lib/stdcompat/span.h>
+#include <lib/zx/result.h>
 #include <zircon/assert.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
 
+#include <algorithm>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <filesystem>
+#include <iterator>
+#include <memory>
+#include <optional>
+#include <string>
+#include <string_view>
+#include <thread>
+#include <type_traits>
+#include <utility>
+
+#include <fbl/algorithm.h>
+#include <fbl/array.h>
+#include <safemath/safe_conversions.h>
+
+#include "src/lib/chunked-compression/chunked-compressor.h"
 #include "src/lib/chunked-compression/chunked-decompressor.h"
+#include "src/lib/chunked-compression/compression-params.h"
 #include "src/lib/chunked-compression/multithreaded-chunked-compressor.h"
+#include "src/lib/chunked-compression/status.h"
 #include "src/lib/digest/merkle-tree.h"
 #include "src/storage/blobfs/compression/configs/chunked_compression_params.h"
 #include "src/storage/blobfs/delivery_blob_private.h"
+#include "src/storage/blobfs/format.h"
 
 #ifndef __APPLE__
 #include <endian.h>
 #else
 #include <machine/endian.h>
 #endif
-#include <filesystem>
-#include <thread>
-#include <type_traits>
-
-#include <safemath/safe_conversions.h>
 
 namespace {
 
@@ -197,7 +218,7 @@ zx::result<fbl::Array<uint8_t>> GenerateDeliveryBlobType1(cpp20::span<const uint
   return zx::ok(std::move(delivery_blob));
 }
 
-zx::result<digest::Digest> CalculateDeliveryBlobDigest(cpp20::span<const uint8_t> data) {
+zx::result<Digest> CalculateDeliveryBlobDigest(cpp20::span<const uint8_t> data) {
   zx::result header = DeliveryBlobHeader::FromBuffer(data);
   if (header.is_error()) {
     return header.take_error();
@@ -243,7 +264,7 @@ zx::result<digest::Digest> CalculateDeliveryBlobDigest(cpp20::span<const uint8_t
   // Calculate Merkle root of `payload` which points to the uncompressed blob data (may be empty).
   std::unique_ptr<uint8_t[]> unused_tree;
   size_t unused_tree_len;
-  digest::Digest root;
+  Digest root;
 
   if (zx_status_t status = digest::MerkleTreeCreator::Create(payload.data(), payload.size(),
                                                              &unused_tree, &unused_tree_len, &root);

@@ -16,7 +16,6 @@ use fuchsia_zircon::{
 };
 use futures::channel::oneshot;
 use futures::{FutureExt, StreamExt};
-use starnix_core::device::init_common_devices;
 use starnix_core::execution::execute_task_with_prerun_result;
 use starnix_core::fs::fuchsia::create_remotefs_filesystem;
 use starnix_core::fs::layeredfs::LayeredFs;
@@ -25,15 +24,15 @@ use starnix_core::fs::tmpfs::TmpFs;
 use starnix_core::security;
 use starnix_core::task::{CurrentTask, ExitStatus, Kernel, Task};
 use starnix_core::vfs::{FileSystemOptions, FsContext, LookupContext, Namespace, WhatToMount};
-use starnix_lite_kernel_config::Config;
 use starnix_logging::{
-    log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
+    log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
 };
+use starnix_modules::{init_common_devices, register_common_file_systems};
 use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::errors::{SourceContext, ENOENT};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
-use starnix_uapi::{errno, rlimit};
+use starnix_uapi::rlimit;
 use std::collections::BTreeMap;
 use std::ffi::CString;
 use std::ops::DerefMut;
@@ -43,30 +42,39 @@ use {
     fuchsia_runtime as fruntime,
 };
 
-/// A temporary wrapper struct that contains both a `Config` for the container, as well as optional
-/// handles for the container's component controller and `/pkg` directory.
-///
-/// When using structured_config, the `component_controller` handle will not be set. When all
-/// containers are run as components, by starnix_runner, the `component_controller` will always
-/// exist.
-struct ConfigWrapper {
-    config: Config,
+pub struct Config {
+    /// The features enabled for this container.
+    pub features: Vec<String>,
+
+    /// The command line for the initial process for this container.
+    pub init: Vec<String>,
+
+    /// The command line for the kernel.
+    pub kernel_cmdline: String,
+
+    /// The specifications for the file system mounts for this container.
+    pub mounts: Vec<String>,
+
+    /// The resource limits to apply to this container.
+    pub rlimits: Vec<String>,
+
+    /// The name of this container.
+    pub name: String,
+
+    /// The path that the container will wait until exists before considering itself to have started.
+    pub startup_file_path: String,
+
+    /// The remote block devices to use for the container.
+    pub remote_block_devices: Vec<String>,
 
     /// The `/pkg` directory of the container.
-    pkg_dir: Option<zx::Channel>,
+    pub pkg_dir: Option<zx::Channel>,
 
     /// The svc directory of the container, used to access protocols from the container.
-    svc_dir: Option<zx::Channel>,
+    pub svc_dir: Option<zx::Channel>,
 
     /// The data directory of the container, used to persist data.
-    data_dir: Option<zx::Channel>,
-}
-
-impl std::ops::Deref for ConfigWrapper {
-    type Target = Config;
-    fn deref(&self) -> &Self::Target {
-        &self.config
-    }
+    pub data_dir: Option<zx::Channel>,
 }
 
 // Creates a CString from a String. Calling this with an invalid CString will panic.
@@ -76,6 +84,7 @@ fn to_cstr(str: &str) -> CString {
 
 #[must_use = "The container must run serve on this config"]
 pub struct ContainerServiceConfig {
+    //config: Config,
     receiver: oneshot::Receiver<Result<ExitStatus, Error>>,
 }
 
@@ -142,25 +151,20 @@ fn open_pkg_dir_from_boot() -> zx::Channel {
 pub async fn create_container_from_config(
     config: Config,
 ) -> Result<(Container, ContainerServiceConfig), Error> {
-    let mut config_wrapper = ConfigWrapper {
-        config: config,
-        pkg_dir: Some(open_pkg_dir_from_boot()),
-        svc_dir: None,
-        data_dir: None,
-    };
+    let mut config =
+        Config { pkg_dir: Some(open_pkg_dir_from_boot()), svc_dir: None, data_dir: None, ..config };
 
     let (sender, receiver) = oneshot::channel::<TaskResult>();
-    let container =
-        create_container(&mut config_wrapper, sender).await.with_source_context(|| {
-            format!("creating container \"{}\"", &config_wrapper.config.name)
-        })?;
+    let container = create_container(&mut config, sender)
+        .await
+        .with_source_context(|| format!("creating container \"{}\"", &config.name))?;
     let service_config = ContainerServiceConfig { receiver };
 
     return Ok((container, service_config));
 }
 
 async fn create_container(
-    config: &mut ConfigWrapper,
+    config: &mut Config,
     task_complete: oneshot::Sender<TaskResult>,
 ) -> Result<Container, Error> {
     trace_duration!(CATEGORY_STARNIX, NAME_CREATE_CONTAINER);
@@ -231,6 +235,7 @@ async fn create_container(
 
     // Register common devices and add them in sysfs and devtmpfs.
     init_common_devices(kernel.kthreads.unlocked_for_async().deref_mut(), &system_task);
+    register_common_file_systems(kernel.kthreads.unlocked_for_async().deref_mut(), &kernel);
 
     mount_filesystems(
         kernel.kthreads.unlocked_for_async().deref_mut(),
@@ -288,11 +293,7 @@ async fn create_container(
         kernel.kthreads.unlocked_for_async().deref_mut(),
         init_task,
         move |locked, init_task| {
-            parse_numbered_handles(init_task, None, &init_task.files).map_err(|e| {
-                log_error!("Error while parsing the numbered handles: {e:?}");
-                errno!(EINVAL)
-            })?;
-
+            parse_numbered_handles(init_task, None, &init_task.files).expect("");
             init_task.exec(locked, executable, argv[0].clone(), argv.clone(), vec![])
         },
         move |result| {
@@ -313,7 +314,7 @@ fn create_fs_context<L>(
     locked: &mut Locked<'_, L>,
     kernel: &Arc<Kernel>,
     features: &Features,
-    config: &ConfigWrapper,
+    config: &Config,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
 ) -> Result<Arc<FsContext>, Error>
 where
@@ -411,7 +412,7 @@ fn parse_rlimits(rlimits: &[String]) -> Result<Vec<(Resource, u64)>, Error> {
 fn mount_filesystems<L>(
     locked: &mut Locked<'_, L>,
     system_task: &CurrentTask,
-    config: &ConfigWrapper,
+    config: &Config,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
 ) -> Result<(), Error>
 where

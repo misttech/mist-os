@@ -35,6 +35,7 @@ use netstack3_core::socket::{
     SocketInfo,
 };
 use netstack3_core::sync::Mutex as CoreMutex;
+use netstack3_core::udp::UdpPacketMeta;
 use netstack3_core::{icmp, udp, IpExt};
 use packet::{Buf, BufferMut};
 use packet_formats::ip::DscpAndEcn;
@@ -616,10 +617,11 @@ impl<I: IpExt> DatagramSocketExternalData<I> {
     pub(crate) fn receive_udp<B: BufferMut>(
         &self,
         device_id: &DeviceId<BindingsCtx>,
-        (dst_ip, dst_port): (<I>::Addr, NonZeroU16),
-        (src_ip, src_port): (<I>::Addr, Option<NonZeroU16>),
+        meta: UdpPacketMeta<I>,
         body: &B,
     ) {
+        // TODO(https://fxbug.dev/326102014): Store `UdpPacketMeta` in `AvailableMessage`.
+        let UdpPacketMeta { src_ip, src_port, dst_ip, dst_port, .. } = meta;
         self.message_queue.lock().receive(AvailableMessage {
             interface_id: device_id.bindings_id().id,
             source_addr: src_ip,
@@ -673,7 +675,7 @@ where
     type SetSocketDeviceError = SocketError;
     type SetMulticastMembershipError = NotSupportedError;
     type MulticastInterfaceError = NotSupportedError;
-    type MulticastLoopError = NotSupportedError;
+    type MulticastLoopError = NotDualStackCapableError;
     type SetBroadcastError = NotSupportedError;
     type SetReuseAddrError = NotSupportedError;
     type SetReusePortError = NotSupportedError;
@@ -913,20 +915,36 @@ where
     }
 
     fn set_multicast_loop(
-        _ctx: &mut Ctx,
-        _id: &Self::SocketId,
-        _value: bool,
-        _ip_version: IpVersion,
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        value: bool,
+        ip_version: IpVersion,
     ) -> Result<(), Self::MulticastLoopError> {
-        Err(NotSupportedError)
+        // Disallow setting multicast loop when its version doesn't match the
+        // socket's version. This matches Linux's behavior for IPv4 sockets, but
+        // diverges from Linux's behavior for IPv6 sockets. Rejecting setting
+        // the IPv4 multicast loop for IPv6 sockets more accurately reflects
+        // that ICMP sockets do not support dual stack operations.
+        if I::VERSION != ip_version {
+            return Err(NotDualStackCapableError);
+        }
+        Ok(ctx.api().icmp_echo().set_multicast_loop(id, value))
     }
 
     fn get_multicast_loop(
-        _ctx: &mut Ctx,
-        _id: &Self::SocketId,
-        _ip_version: IpVersion,
+        ctx: &mut Ctx,
+        id: &Self::SocketId,
+        ip_version: IpVersion,
     ) -> Result<bool, Self::MulticastLoopError> {
-        Err(NotSupportedError)
+        // Disallow fetching multicast loop when its version doesn't match the
+        // socket's version. This matches Linux's behavior for IPv4 sockets, but
+        // diverges from Linux's behavior for IPv6 sockets. Rejecting fetches of
+        // the IPv4 multicast loop for IPv6 sockets more accurately reflects
+        // that ICMP sockets do not support dual stack operations.
+        if I::VERSION != ip_version {
+            return Err(NotDualStackCapableError);
+        }
+        Ok(ctx.api().icmp_echo().get_multicast_loop(id))
     }
 
     fn set_broadcast(
@@ -2468,7 +2486,7 @@ mod tests {
             .build()
             .await;
 
-        let (proxy, event) = get_socket_and_event::<A>(t.get(0), proto).await;
+        let (proxy, event) = get_socket_and_event::<A>(t.get_mut(0), proto).await;
         (t, proxy, event)
     }
 
@@ -2653,7 +2671,7 @@ mod tests {
     #[fixture::teardown(TestSetup::shutdown)]
     async fn bind<A: TestSockAddr, T>(proto: fposix_socket::DatagramSocketProtocol) {
         let (mut t, socket, _event) = prepare_test::<A>(proto).await;
-        let stack = t.get(0);
+        let stack = t.get_mut(0);
         // Can bind to local address.
         let () = socket.bind(&A::create(A::LOCAL_ADDR, 200)).await.unwrap().expect("bind succeeds");
 
@@ -2810,7 +2828,7 @@ mod tests {
             .build()
             .await;
 
-        let alice = t.get(0);
+        let alice = t.get_mut(0);
         let (alice_socket, alice_events) = get_socket_and_event::<A>(alice, proto).await;
 
         // Verify that Alice has no local or peer addresses bound
@@ -2854,14 +2872,14 @@ mod tests {
         );
         assert_eq!(
             alice_events
-                .wait_handle(ZXSIO_SIGNAL_INCOMING, zx::Time::from_nanos(0))
+                .wait_handle(ZXSIO_SIGNAL_INCOMING, zx::MonotonicTime::from_nanos(0))
                 .expect_err("Alice incoming event should not be signaled"),
             zx::Status::TIMED_OUT
         );
 
         // Setup Bob as a client, bound to REMOTE_ADDR:300
         println!("Configuring bob...");
-        let bob = t.get(1);
+        let bob = t.get_mut(1);
         let (bob_socket, bob_events) = get_socket_and_event::<A>(bob, proto).await;
         let () = bob_socket
             .bind(&A::create(A::REMOTE_ADDR, 300))
@@ -2906,7 +2924,7 @@ mod tests {
         // We don't care which signals are on, only that SIGNAL_OUTGOING is, we
         // can ignore the return value.
         let _signals = bob_events
-            .wait_handle(ZXSIO_SIGNAL_OUTGOING, zx::Time::from_nanos(0))
+            .wait_handle(ZXSIO_SIGNAL_OUTGOING, zx::MonotonicTime::from_nanos(0))
             .expect("Bob outgoing event should be signaled");
 
         // Send datagram from Bob's socket.
@@ -2981,7 +2999,7 @@ mod tests {
         domain: fposix_socket::Domain,
         proto: fposix_socket::DatagramSocketProtocol,
     ) {
-        let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await;
+        let t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await;
         let test_stack = t.get(0);
         let socket_provider = test_stack.connect_socket_provider();
         let response = socket_provider
@@ -3019,7 +3037,7 @@ mod tests {
         domain: fposix_socket::Domain,
         proto: fposix_socket::DatagramSocketProtocol,
     ) {
-        let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await;
+        let t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await;
         let test_stack = t.get(0);
         let socket_provider = test_stack.connect_socket_provider();
         let response = socket_provider
@@ -3076,7 +3094,7 @@ mod tests {
             .build()
             .await;
 
-        let (alice_socket, alice_events) = get_socket_and_event::<A>(t.get(0), proto).await;
+        let (alice_socket, alice_events) = get_socket_and_event::<A>(t.get_mut(0), proto).await;
         let alice_cloned = socket_clone(&alice_socket);
         let fposix_socket::SynchronousDatagramSocketDescribeResponse { event: alice_event, .. } =
             alice_cloned.describe().await.expect("Describe call succeeds");
@@ -3093,7 +3111,7 @@ mod tests {
             A::create(A::LOCAL_ADDR, 200)
         );
 
-        let (bob_socket, bob_events) = get_socket_and_event::<A>(t.get(1), proto).await;
+        let (bob_socket, bob_events) = get_socket_and_event::<A>(t.get_mut(1), proto).await;
         let bob_cloned = socket_clone(&bob_socket);
         let () = bob_cloned
             .bind(&A::create(A::REMOTE_ADDR, 200))
@@ -3208,7 +3226,7 @@ mod tests {
 
                 // Make sure the sockets are still in the stack.
                 for i in 0..2 {
-                    t.get(i).with_ctx(|ctx| {
+                    t.get_mut(i).with_ctx(|ctx| {
                         assert_matches!(
                             &<T as Transport<IpFromSockAddr<A>>>::collect_all_sockets(ctx)[..],
                             [_]
@@ -3231,7 +3249,7 @@ mod tests {
 
                 // But the sockets should have gone here.
                 for i in 0..2 {
-                    t.get(i).with_ctx(|ctx| {
+                    t.get_mut(i).with_ctx(|ctx| {
                         assert_matches!(
                             &<T as Transport<IpFromSockAddr<A>>>::collect_all_sockets(ctx)[..],
                             []
@@ -3264,7 +3282,7 @@ mod tests {
         // Make sure we cannot close twice from the same channel so that we
         // maintain the correct refcount.
         let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await;
-        let test_stack = t.get(0);
+        let test_stack = t.get_mut(0);
         let socket = get_socket::<A>(test_stack, proto).await;
         let cloned = socket_clone(&socket);
         let () = socket
@@ -3310,7 +3328,7 @@ mod tests {
         T: Transport<<A::AddrType as IpAddress>::Version>,
     {
         let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await;
-        let test_stack = t.get(0);
+        let test_stack = t.get_mut(0);
         let cloned = {
             let socket = get_socket::<A>(test_stack, proto).await;
             socket_clone(&socket)
@@ -3341,7 +3359,7 @@ mod tests {
         T: Transport<<A::AddrType as IpAddress>::Version>,
     {
         let mut t = TestSetupBuilder::new().add_endpoint().add_empty_stack().build().await;
-        let test_stack = t.get(0);
+        let test_stack = t.get_mut(0);
         let socket = get_socket::<A>(test_stack, proto).await;
         let () = socket
             .close()
@@ -3371,7 +3389,7 @@ mod tests {
             .build()
             .await;
 
-        let (socket, events) = get_socket_and_event::<A>(t.get(0), proto).await;
+        let (socket, events) = get_socket_and_event::<A>(t.get_mut(0), proto).await;
         let local = A::create(A::LOCAL_ADDR, 200);
         let remote = A::create(A::REMOTE_ADDR, 300);
         assert_eq!(
@@ -3494,7 +3512,7 @@ mod tests {
     {
         let mut t = TestSetupBuilder::new().add_stack(StackSetupBuilder::new()).build().await;
 
-        let (socket, _events) = get_socket_and_event::<A>(t.get(0), proto).await;
+        let (socket, _events) = get_socket_and_event::<A>(t.get_mut(0), proto).await;
         let addr =
             A::create(<<A::AddrType as IpAddress>::Version as Ip>::LOOPBACK_ADDRESS.get(), 200);
         socket.bind(&addr).await.unwrap().expect("bind should succeed");
@@ -3521,7 +3539,7 @@ mod tests {
         }
 
         // Wait for all packets to be delivered before changing the buffer size.
-        let stack = t.get(0);
+        let stack = t.get_mut(0);
         let has_all_delivered = |messages: &MessageQueue<_>| {
             messages.available_messages().len() == usize::from(SENT_PACKETS)
         };
@@ -3668,7 +3686,7 @@ mod tests {
     async fn multicast_join_receive<A: TestSockAddr, T>(
         proto: fposix_socket::DatagramSocketProtocol,
     ) {
-        let (mut t, proxy, event) = prepare_test::<A>(proto).await;
+        let (t, proxy, event) = prepare_test::<A>(proto).await;
 
         let mcast_addr = <<A::AddrType as IpAddress>::Version as Ip>::MULTICAST_SUBNET.network();
         let id = t.get(0).get_endpoint_id(1);
@@ -3722,7 +3740,7 @@ mod tests {
         );
 
         let _signals = event
-            .wait_handle(ZXSIO_SIGNAL_INCOMING, zx::Time::INFINITE)
+            .wait_handle(ZXSIO_SIGNAL_INCOMING, zx::MonotonicTime::INFINITE)
             .expect("socket should receive");
 
         let (_addr, data, _control, truncated) = proxy
@@ -3878,6 +3896,75 @@ mod tests {
     declare_tests!(get_hop_limit_wrong_type);
 
     #[fixture::teardown(TestSetup::shutdown)]
+    async fn set_get_multicast_loop<A: TestSockAddr, T>(
+        proto: fposix_socket::DatagramSocketProtocol,
+    ) {
+        let (t, proxy, _event) = prepare_test::<A>(proto).await;
+
+        for multicast_loop in [false, true] {
+            match <<A::AddrType as IpAddress>::Version as Ip>::VERSION {
+                IpVersion::V4 => proxy.set_ip_multicast_loopback(multicast_loop),
+                IpVersion::V6 => proxy.set_ipv6_multicast_loopback(multicast_loop),
+            }
+            .await
+            .unwrap()
+            .expect("set multicast loop should succeed");
+
+            assert_eq!(
+                match <<A::AddrType as IpAddress>::Version as Ip>::VERSION {
+                    IpVersion::V4 => proxy.get_ip_multicast_loopback(),
+                    IpVersion::V6 => proxy.get_ipv6_multicast_loopback(),
+                }
+                .await
+                .unwrap()
+                .expect("get multicast loop should succeed"),
+                multicast_loop
+            );
+        }
+
+        t
+    }
+
+    declare_tests!(set_get_multicast_loop);
+
+    #[fixture::teardown(TestSetup::shutdown)]
+    async fn set_get_multicast_loop_wrong_type<A: TestSockAddr, T>(
+        proto: fposix_socket::DatagramSocketProtocol,
+    ) {
+        let (t, proxy, _event) = prepare_test::<A>(proto).await;
+
+        const MULTICAST_LOOP: bool = false;
+        let (get_result, set_result) = match <<A::AddrType as IpAddress>::Version as Ip>::VERSION {
+            IpVersion::V4 => (
+                proxy.get_ipv6_multicast_loopback().await.unwrap(),
+                proxy.set_ipv6_multicast_loopback(MULTICAST_LOOP).await.unwrap(),
+            ),
+            IpVersion::V6 => (
+                proxy.get_ip_multicast_loopback().await.unwrap(),
+                proxy.set_ip_multicast_loopback(MULTICAST_LOOP).await.unwrap(),
+            ),
+        };
+
+        match (proto, <<A::AddrType as IpAddress>::Version as Ip>::VERSION) {
+            // UDPv6 is a dualstack capable protocol, so it allows getting &
+            // setting the IP_MULTICAST_LOOP of IPv6 sockets.
+            (fposix_socket::DatagramSocketProtocol::Udp, IpVersion::V6) => {
+                assert_matches!(get_result, Ok(_));
+                assert_matches!(set_result, Ok(_));
+            }
+            // All other [protocol, ip_version] are not dualstack capable.
+            (_, _) => {
+                assert_matches!(get_result, Err(_));
+                assert_matches!(set_result, Err(_));
+            }
+        }
+
+        t
+    }
+
+    declare_tests!(set_get_multicast_loop_wrong_type);
+
+    #[fixture::teardown(TestSetup::shutdown)]
     async fn receive_original_destination_address<A: TestSockAddr, T>(
         proto: fposix_socket::DatagramSocketProtocol,
     ) {
@@ -3897,7 +3984,7 @@ mod tests {
             .build()
             .await;
 
-        let alice = t.get(0);
+        let alice = t.get_mut(0);
         let (alice_socket, alice_events) = get_socket_and_event::<A>(alice, proto).await;
 
         // Setup Alice as a server, bound to LOCAL_ADDR:200
@@ -3910,7 +3997,7 @@ mod tests {
 
         // Setup Bob as a client, bound to REMOTE_ADDR:300
         println!("Configuring bob...");
-        let bob = t.get(1);
+        let bob = t.get_mut(1);
         let bob_socket = get_socket::<A>(bob, proto).await;
         let () = bob_socket
             .bind(&A::create(A::REMOTE_ADDR, 300))

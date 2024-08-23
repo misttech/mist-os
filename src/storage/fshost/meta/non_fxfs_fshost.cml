@@ -31,12 +31,12 @@
             from: "self",
         },
         {
-            protocol: "fuchsia.fxfs.BlobReader",
+            directory: "partitions",
             from: "void",
             availability: "optional",
         },
         {
-            protocol: "fuchsia.fxfs.BlobCreator",
+            protocol: "fuchsia.fxfs.CryptManagement",
             from: "void",
             availability: "optional",
         },

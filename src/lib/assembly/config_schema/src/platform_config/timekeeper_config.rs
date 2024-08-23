@@ -21,6 +21,9 @@ pub struct TimekeeperConfig {
     /// If set, Timekeeper will serve test-only protocols from the library
     /// `fuchsia.time.test`.
     pub serve_test_protocols: bool,
+    /// If set, the UTC clock will be started if we attempt to read the RTC,
+    /// but the reading of the RTC is known invalid.
+    pub utc_start_at_startup_when_invalid_rtc: bool,
 }
 
 impl Default for TimekeeperConfig {
@@ -31,6 +34,7 @@ impl Default for TimekeeperConfig {
             first_sampling_delay_sec: 0,
             time_source_endpoint_url: "https://clients3.google.com/generate_204".into(),
             serve_test_protocols: false,
+            utc_start_at_startup_when_invalid_rtc: false,
         }
     }
 }

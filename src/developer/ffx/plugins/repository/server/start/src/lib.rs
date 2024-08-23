@@ -3,20 +3,23 @@
 // found in the LICENSE file.
 
 use async_trait::async_trait;
+use daemonize::daemonize;
 use ffx_config::EnvironmentContext;
+use ffx_repository_serve::{serve_impl_validate_args, DEFAULT_REPO_NAME};
 use ffx_repository_server_start_args::StartCommand;
 use ffx_target::TargetProxy;
 use fho::{
-    daemon_protocol, return_bug, return_user_error, Connector, Error, FfxContext, FfxMain, FfxTool,
-    Result, VerifiedMachineWriter,
+    bug, daemon_protocol, return_bug, return_user_error, Connector, Error, FfxContext, FfxMain,
+    FfxTool, Result, VerifiedMachineWriter,
 };
 use fidl_fuchsia_developer_ffx as ffx;
 use fidl_fuchsia_developer_ffx_ext::RepositoryError;
 use fidl_fuchsia_developer_remotecontrol::RemoteControlProxy;
 use fidl_fuchsia_net_ext::SocketAddress;
-use pkg::config as pkg_config;
+use pkg::{config as pkg_config, ServerMode};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use std::io::Write as _;
 
 mod server;
 
@@ -55,19 +58,76 @@ fho::embedded_plugin!(ServerStartTool);
 impl FfxMain for ServerStartTool {
     type Writer = VerifiedMachineWriter<CommandStatus>;
     async fn main(self, mut writer: Self::Writer) -> fho::Result<()> {
-        let result = match (self.cmd.daemon, self.cmd.foreground) {
-            (true, false) | (false, false) => start_daemon_server(self.cmd, self.repos).await,
-            (false, true) => {
+        let result = match (
+            self.cmd.background,
+            self.cmd.daemon,
+            self.cmd.foreground || self.cmd.disconnected,
+        ) {
+            // Daemon server mode
+            (false, true, false) | (false, false, false) => {
+                start_daemon_server(self.cmd, self.repos).await
+            }
+            // Foreground server mode
+            (false, false, true) => {
+                let mode = if self.cmd.disconnected {
+                    ServerMode::Background
+                } else {
+                    ServerMode::Foreground
+                };
                 return server::run_foreground_server(
                     self.cmd,
                     self.context,
                     self.target_proxy_connector,
                     self.rcs_proxy_connector,
                     writer,
+                    mode,
                 )
-                .await
+                .await;
             }
-            (true, true) => return_user_error!("--daemon and --foreground are mutually exclusive"),
+            // Background server mode
+            (true, false, false) => {
+                // Validate the cmd args before processing. This allows good error messages to
+                // be presented to the user when running in Background mode. If the server is
+                // already running, this returns Ok.
+                if let Some(running) =
+                    serve_impl_validate_args(&server::to_serve_command(&self.cmd), &self.context)?
+                {
+                    // The server that matches the cmd is already running.
+                    writeln!(
+                        writer,
+                        "A server named {} is serving on address {} the repo path: {}",
+                        running.name, running.address, running.repo_path
+                    )
+                    .map_err(|e| bug!(e))?;
+                    return Ok(());
+                }
+
+                let mut args = vec![
+                    "repository".to_string(),
+                    "server".to_string(),
+                    "start".to_string(),
+                    "--disconnected".to_string(),
+                ];
+                args.extend(server::to_argv(&self.cmd));
+
+                if let Some(log_basename) = self.log_basename() {
+                    return daemonize(&args, log_basename, self.context.clone(), true)
+                        .await
+                        .map_err(Into::into);
+                } else {
+                    return_bug!("Cannot daemonize repository server without a log file basename");
+                }
+            }
+            // Invalid switch combinations.
+            (_, true, true) => {
+                return_user_error!("--daemon and --foreground are mutually exclusive")
+            }
+            (true, true, _) => {
+                return_user_error!("--daemon and --background are mutually exclusive")
+            }
+            (true, _, true) => {
+                return_user_error!("--background and --foreground are mutually exclusive")
+            }
         };
 
         match result {
@@ -89,13 +149,14 @@ impl FfxMain for ServerStartTool {
         }
     }
     fn log_basename(&self) -> Option<String> {
-        match (self.cmd.daemon, self.cmd.foreground) {
+        match (self.cmd.daemon, self.cmd.foreground, self.cmd.background, self.cmd.disconnected) {
             // Daemon based servers are logged with ffx.daemon.log.
-            (true, _) | (false, false) => return None,
+            (true, _, _, _) | (false, false, false, false) => return None,
             _ => {
-                //TODO(https://fxbug.dev/359534719): Move devhost usages to a constant.
-                let basename =
-                    format!("repo_{}", self.cmd.repository.clone().unwrap_or("devhost".into()));
+                let basename = format!(
+                    "repo_{}",
+                    self.cmd.repository.clone().unwrap_or(DEFAULT_REPO_NAME.into())
+                );
                 Some(basename)
             }
         }
@@ -246,8 +307,10 @@ mod tests {
         let env = tool_env.make_environment(test_env.context.clone());
         let tool = ServerStartTool {
             cmd: StartCommand {
+                background: false,
                 daemon: true,
                 foreground: false,
+                disconnected: false,
                 address: None,
                 repository: None,
                 trusted_root: None,
@@ -309,8 +372,10 @@ mod tests {
         let env = tool_env.make_environment(test_env.context.clone());
         let tool = ServerStartTool {
             cmd: StartCommand {
+                background: false,
                 daemon: true,
                 foreground: false,
+                disconnected: false,
                 address: Some("127.0.0.1:8084".parse().unwrap()),
                 repository: None,
                 trusted_root: None,
@@ -379,8 +444,10 @@ mod tests {
         let env = tool_env.make_environment(test_env.context.clone());
         let tool = ServerStartTool {
             cmd: StartCommand {
+                background: false,
                 daemon: true,
                 foreground: false,
+                disconnected: false,
                 address: None,
                 repository: None,
                 trusted_root: None,
@@ -449,8 +516,10 @@ mod tests {
 
         let tool = ServerStartTool {
             cmd: StartCommand {
+                background: false,
                 daemon: true,
                 foreground: false,
+                disconnected: false,
                 address: None,
                 repository: None,
                 trusted_root: None,
@@ -525,8 +594,10 @@ mod tests {
 
         let tool = ServerStartTool {
             cmd: StartCommand {
+                background: false,
                 daemon: true,
                 foreground: false,
+                disconnected: false,
                 address: None,
                 repository: None,
                 trusted_root: None,

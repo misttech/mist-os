@@ -13,6 +13,7 @@
 #include <cinttypes>
 #include <limits>
 
+#include <bind/fuchsia/amlogic/platform/sysmem/heap/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <safemath/safe_math.h>
 
@@ -61,7 +62,7 @@ bool VerifyRange(uint64_t physical_address, size_t size_bytes, uint32_t required
   return true;
 }
 
-bool ValidateSecureHeapRange(const fuchsia_sysmem::wire::SecureHeapRange& range) {
+bool ValidateSecureHeapRange(const fuchsia_sysmem2::wire::SecureHeapRange& range) {
   if (!range.has_physical_address()) {
     LOG(INFO, "!range.has_physical_address()");
     return false;
@@ -90,21 +91,28 @@ bool ValidateSecureHeapRange(const fuchsia_sysmem::wire::SecureHeapRange& range)
   return true;
 }
 
-bool ValidateSecureHeapAndRange(const fuchsia_sysmem::wire::SecureHeapAndRange& heap_range,
+bool ValidateSecureHeapAndRange(const fuchsia_sysmem2::wire::SecureHeapAndRange& heap_range,
                                 bool is_zeroing) {
   if (!heap_range.has_heap()) {
     LOG(INFO, "!heap_range.has_heap()");
     return false;
   }
 
+  if (heap_range.heap().has_id() && heap_range.heap().id() != 0) {
+    LOG(INFO, "heap id not 0");
+    return false;
+  }
+
+  std::string heap_type(heap_range.heap().heap_type().data(), heap_range.heap().heap_type().size());
+
   if (is_zeroing) {
-    if (heap_range.heap() != fuchsia_sysmem::wire::HeapType::kAmlogicSecure &&
-        heap_range.heap() != fuchsia_sysmem::wire::HeapType::kAmlogicSecureVdec) {
-      LOG(INFO, "heap_range.heap() != kAmLogicSecure && heap_range.heap() != kAmlogicSecureVdec");
+    if (heap_type != bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE &&
+        heap_type != bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE_VDEC) {
+      LOG(INFO, "heap_range.heap() != AMLogic secure && heap_range.heap() != AMLogic secure VDEC");
       return false;
     }
   } else {
-    if (heap_range.heap() != fuchsia_sysmem::wire::HeapType::kAmlogicSecure) {
+    if (heap_type != bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE) {
       LOG(INFO, "heap_range.heap() != kAmlogicSecure");
       return false;
     }
@@ -123,13 +131,16 @@ bool ValidateSecureHeapAndRange(const fuchsia_sysmem::wire::SecureHeapAndRange& 
 }
 
 bool ValidateSecureHeapAndRangeModification(
-    const fuchsia_sysmem::wire::SecureHeapAndRangeModification& range_modification) {
+    const fuchsia_sysmem2::wire::SecureHeapAndRangeModification& range_modification) {
   if (!range_modification.has_heap()) {
     LOG(INFO, "!range_modification.has_heap()");
     return false;
   }
 
-  if (range_modification.heap() != fuchsia_sysmem::wire::HeapType::kAmlogicSecure) {
+  std::string heap_type(range_modification.heap().heap_type().data(),
+                        range_modification.heap().heap_type().size());
+
+  if (heap_type != bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE) {
     LOG(INFO, "heap_range.heap() != kAmlogicSecure");
     return false;
   }
@@ -198,7 +209,7 @@ SysmemSecureMemServer::~SysmemSecureMemServer() {
 }
 
 void SysmemSecureMemServer::Bind(
-    fidl::ServerEnd<fuchsia_sysmem::SecureMem> sysmem_secure_mem_server,
+    fidl::ServerEnd<fuchsia_sysmem2::SecureMem> sysmem_secure_mem_server,
     SecureMemServerOnUnbound secure_mem_server_on_unbound) {
   ZX_DEBUG_ASSERT(sysmem_secure_mem_server);
   ZX_DEBUG_ASSERT(secure_mem_server_on_unbound);
@@ -221,14 +232,29 @@ void SysmemSecureMemServer::GetPhysicalSecureHeaps(
     GetPhysicalSecureHeapsCompleter::Sync& completer) {
   std::scoped_lock lock{checker_};
   fidl::Arena allocator;
-  fuchsia_sysmem::wire::SecureHeapsAndRanges heaps;
-  zx_status_t status = GetPhysicalSecureHeapsInternal(&allocator, &heaps);
-  if (status != ZX_OK) {
-    LOG(ERROR, "GetPhysicalSecureHeapsInternal() failed - status: %d", status);
-    completer.ReplyError(status);
+  fuchsia_sysmem2::wire::SecureMemGetPhysicalSecureHeapsResponse response;
+  auto get_result = GetPhysicalSecureHeapsInternal(&allocator, &response);
+  if (!get_result.is_ok()) {
+    LOG(ERROR, "GetPhysicalSecureHeapsInternal() failed: %u",
+        fidl::ToUnderlying(get_result.error_value()));
+    completer.ReplyError(get_result.error_value());
     return;
   }
-  completer.ReplySuccess(heaps);
+
+  completer.ReplySuccess(std::move(response));
+}
+
+void SysmemSecureMemServer::GetDynamicSecureHeaps(GetDynamicSecureHeapsCompleter::Sync& completer) {
+  std::scoped_lock lock{checker_};
+  fidl::Arena allocator;
+  fuchsia_sysmem2::wire::SecureMemGetDynamicSecureHeapsResponse response;
+  auto get_result = GetDynamicSecureHeapsInternal(&allocator, &response);
+  if (!get_result.is_ok()) {
+    LOG(ERROR, "GetDynamicSecureHeaps() failed: %u", fidl::ToUnderlying(get_result.error_value()));
+    completer.ReplyError(get_result.error_value());
+    return;
+  }
+  completer.ReplySuccess(std::move(response));
 }
 
 void SysmemSecureMemServer::GetPhysicalSecureHeapProperties(
@@ -237,15 +263,16 @@ void SysmemSecureMemServer::GetPhysicalSecureHeapProperties(
   std::scoped_lock lock{checker_};
   // must out-live Reply()
   fidl::Arena allocator;
-  fuchsia_sysmem::wire::SecureHeapProperties properties;
-  zx_status_t status =
-      GetPhysicalSecureHeapPropertiesInternal(request->entire_heap, allocator, &properties);
-  if (status != ZX_OK) {
-    LOG(INFO, "GetPhysicalSecureHeapPropertiesInternal() failed - status: %d", status);
-    completer.ReplyError(status);
+  fuchsia_sysmem2::wire::SecureMemGetPhysicalSecureHeapPropertiesResponse response;
+  auto get_result =
+      GetPhysicalSecureHeapPropertiesInternal(request->entire_heap(), allocator, &response);
+  if (!get_result.is_ok()) {
+    LOG(INFO, "GetPhysicalSecureHeapPropertiesInternal() failed: %u",
+        fidl::ToUnderlying(get_result.error_value()));
+    completer.ReplyError(get_result.error_value());
     return;
   }
-  completer.ReplySuccess(properties);
+  completer.ReplySuccess(std::move(response));
 }
 
 void SysmemSecureMemServer::AddSecureHeapPhysicalRange(
@@ -254,10 +281,11 @@ void SysmemSecureMemServer::AddSecureHeapPhysicalRange(
   std::scoped_lock lock{checker_};
   // must out-live Reply()
   fidl::Arena allocator;
-  zx_status_t status = AddSecureHeapPhysicalRangeInternal(request->heap_range);
-  if (status != ZX_OK) {
-    LOG(INFO, "AddSecureHeapPhysicalRangeInternal() failed - status: %d", status);
-    completer.ReplyError(status);
+  auto add_result = AddSecureHeapPhysicalRangeInternal(request->heap_range());
+  if (!add_result.is_ok()) {
+    LOG(INFO, "AddSecureHeapPhysicalRangeInternal() failed: %u",
+        fidl::ToUnderlying(add_result.error_value()));
+    completer.ReplyError(add_result.error_value());
     return;
   }
   completer.ReplySuccess();
@@ -269,10 +297,11 @@ void SysmemSecureMemServer::DeleteSecureHeapPhysicalRange(
   std::scoped_lock lock{checker_};
   // must out-live Reply()
   fidl::Arena allocator;
-  zx_status_t status = DeleteSecureHeapPhysicalRangeInternal(request->heap_range);
-  if (status != ZX_OK) {
-    LOG(INFO, "DeleteSecureHeapPhysicalRangesInternal() failed - status: %d", status);
-    completer.ReplyError(status);
+  auto delete_result = DeleteSecureHeapPhysicalRangeInternal(request->heap_range());
+  if (!delete_result.is_ok()) {
+    LOG(INFO, "DeleteSecureHeapPhysicalRangesInternal() failed: %u",
+        fidl::ToUnderlying(delete_result.error_value()));
+    completer.ReplyError(delete_result.error_value());
     return;
   }
   completer.ReplySuccess();
@@ -284,10 +313,11 @@ void SysmemSecureMemServer::ModifySecureHeapPhysicalRange(
   std::scoped_lock lock{checker_};
   // must out-live Reply()
   fidl::Arena allocator;
-  zx_status_t status = ModifySecureHeapPhysicalRangeInternal(request->range_modification);
-  if (status != ZX_OK) {
-    LOG(INFO, "ModifySecureHeapPhysicalRangesInternal() failed - status: %d", status);
-    completer.ReplyError(status);
+  auto modify_result = ModifySecureHeapPhysicalRangeInternal(request->range_modification());
+  if (!modify_result.is_ok()) {
+    LOG(INFO, "ModifySecureHeapPhysicalRangesInternal() failed: %u",
+        fidl::ToUnderlying(modify_result.error_value()));
+    completer.ReplyError(modify_result.error_value());
     return;
   }
   completer.ReplySuccess();
@@ -298,14 +328,20 @@ void SysmemSecureMemServer::ZeroSubRange(ZeroSubRangeRequestView request,
   std::scoped_lock lock{checker_};
   // must out-live Reply()
   fidl::Arena allocator;
-  zx_status_t status =
-      ZeroSubRangeInternal(request->is_covering_range_explicit, request->heap_range);
-  if (status != ZX_OK) {
-    LOG(INFO, "ZeroSubRangeInternal() failed - status: %d", status);
-    completer.ReplyError(status);
+  auto zero_result =
+      ZeroSubRangeInternal(request->is_covering_range_explicit(), request->heap_range());
+  if (!zero_result.is_ok()) {
+    LOG(INFO, "ZeroSubRangeInternal() failed: %u", fidl::ToUnderlying(zero_result.error_value()));
+    completer.ReplyError(zero_result.error_value());
     return;
   }
   completer.ReplySuccess();
+}
+
+void SysmemSecureMemServer::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_sysmem2::SecureMem> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  LOG(WARNING, "unknown method: %" PRId64, metadata.method_ordinal);
 }
 
 bool SysmemSecureMemServer::TrySetupSecmemSession() {
@@ -355,82 +391,131 @@ void SysmemSecureMemServer::OnUnbound(bool is_success) {
   }
 }
 
-zx_status_t SysmemSecureMemServer::GetPhysicalSecureHeapsInternal(
-    fidl::AnyArena* allocator, fuchsia_sysmem::wire::SecureHeapsAndRanges* heaps_and_ranges) {
+fit::result<fuchsia_sysmem2::wire::Error> SysmemSecureMemServer::GetPhysicalSecureHeapsInternal(
+    fidl::AnyArena* allocator,
+    fuchsia_sysmem2::wire::SecureMemGetPhysicalSecureHeapsResponse* response) {
   std::scoped_lock lock{checker_};
 
   if (is_get_physical_secure_heaps_called_) {
     LOG(ERROR, "GetPhysicalSecureHeaps may only be called at most once - reply status: %d",
         ZX_ERR_BAD_STATE);
-    return ZX_ERR_BAD_STATE;
+    return fit::error(fuchsia_sysmem2::wire::Error::kProtocolDeviation);
   }
   is_get_physical_secure_heaps_called_ = true;
 
   if (!TrySetupSecmemSession()) {
     // Logging handled in `TrySetupSecmemSession`
-    return ZX_ERR_INTERNAL;
+    return fit::error(fuchsia_sysmem2::wire::Error::kUnspecified);
   }
 
   uint64_t vdec_phys_base;
   size_t vdec_size;
   zx_status_t status = SetupVdec(&vdec_phys_base, &vdec_size);
   if (status != ZX_OK) {
-    LOG(ERROR, "SetupVdec failed - status: %d", status);
-    return status;
+    LOG(ERROR, "SetupVdec failed: %s", zx_status_get_string(status));
+    return fit::error(fuchsia_sysmem2::wire::Error::kUnspecified);
   }
 
-  auto builder = fuchsia_sysmem::wire::SecureHeapsAndRanges::Builder(*allocator);
-  auto heaps = fidl::VectorView<fuchsia_sysmem::wire::SecureHeapAndRanges>(*allocator, 1);
-  auto heap_builder = fuchsia_sysmem::wire::SecureHeapAndRanges::Builder(*allocator);
-  heap_builder.heap(fuchsia_sysmem::wire::HeapType::kAmlogicSecureVdec);
-  auto ranges = fidl::VectorView<fuchsia_sysmem::wire::SecureHeapRange>(*allocator, 1);
-  auto range_builder = fuchsia_sysmem::wire::SecureHeapRange::Builder(*allocator);
+  auto heaps = fidl::VectorView<fuchsia_sysmem2::wire::SecureHeapAndRanges>(*allocator, 1);
+  auto heap_and_ranges_builder = fuchsia_sysmem2::wire::SecureHeapAndRanges::Builder(*allocator);
+
+  auto heap_builder = fuchsia_sysmem2::wire::Heap::Builder(*allocator);
+  heap_builder.heap_type(bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE_VDEC);
+  heap_builder.id(0);
+
+  heap_and_ranges_builder.heap(heap_builder.Build());
+
+  auto ranges = fidl::VectorView<fuchsia_sysmem2::wire::SecureHeapRange>(*allocator, 1);
+  auto range_builder = fuchsia_sysmem2::wire::SecureHeapRange::Builder(*allocator);
   range_builder.physical_address(vdec_phys_base);
   range_builder.size_bytes(vdec_size);
 
   ranges[0] = range_builder.Build();
-  heap_builder.ranges(ranges);
-  heaps[0] = heap_builder.Build();
-  builder.heaps(heaps);
+  heap_and_ranges_builder.ranges(ranges);
+  heaps[0] = heap_and_ranges_builder.Build();
 
-  *heaps_and_ranges = builder.Build();
+  *response = fuchsia_sysmem2::wire::SecureMemGetPhysicalSecureHeapsResponse::Builder(*allocator)
+                  .heaps(std::move(heaps))
+                  .Build();
 
-  return ZX_OK;
+  return fit::ok();
 }
 
-zx_status_t SysmemSecureMemServer::GetPhysicalSecureHeapPropertiesInternal(
-    const fuchsia_sysmem::wire::SecureHeapAndRange& entire_heap, fidl::AnyArena& allocator,
-    fuchsia_sysmem::wire::SecureHeapProperties* properties) {
+fit::result<fuchsia_sysmem2::Error> SysmemSecureMemServer::GetDynamicSecureHeapsInternal(
+    fidl::AnyArena* allocator,
+    fuchsia_sysmem2::wire::SecureMemGetDynamicSecureHeapsResponse* response) {
+  std::scoped_lock lock(checker_);
+
+  if (is_get_dynamic_secure_heaps_called_) {
+    LOG(ERROR, "GetDynamicSecureHeaps may only be called at most once.");
+    return fit::error(fuchsia_sysmem2::Error::kProtocolDeviation);
+  }
+  is_get_dynamic_secure_heaps_called_ = true;
+
+  if (!TrySetupSecmemSession()) {
+    // Logging handled in `TrySetupSecmemSession`
+    return fit::error(fuchsia_sysmem2::Error::kUnspecified);
+  }
+
+  auto response_builder =
+      fuchsia_sysmem2::wire::SecureMemGetDynamicSecureHeapsResponse::Builder(*allocator);
+  auto heaps = fidl::VectorView<fuchsia_sysmem2::wire::DynamicSecureHeap>(*allocator, 1);
+  auto dynamic_heap = fuchsia_sysmem2::wire::DynamicSecureHeap::Builder(*allocator);
+
+  auto heap = fuchsia_sysmem2::wire::Heap::Builder(*allocator);
+  heap.heap_type(bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE);
+  heap.id(0);
+
+  dynamic_heap.heap(heap.Build());
+
+  heaps[0] = dynamic_heap.Build();
+  response_builder.heaps(std::move(heaps));
+
+  *response = response_builder.Build();
+
+  return fit::ok();
+}
+
+fit::result<fuchsia_sysmem2::Error> SysmemSecureMemServer::GetPhysicalSecureHeapPropertiesInternal(
+    const fuchsia_sysmem2::wire::SecureHeapAndRange& entire_heap, fidl::AnyArena& allocator,
+    fuchsia_sysmem2::wire::SecureMemGetPhysicalSecureHeapPropertiesResponse* response) {
   std::scoped_lock lock{checker_};
 
   if (!entire_heap.has_heap()) {
     LOG(INFO, "!entire_heap.has_heap()");
-    return ZX_ERR_INVALID_ARGS;
+    return fit::error(fuchsia_sysmem2::Error::kProtocolDeviation);
   }
 
   if (!entire_heap.has_range()) {
     LOG(INFO, "!entire_heap.has_range()");
-    return ZX_ERR_INVALID_ARGS;
+    return fit::error(fuchsia_sysmem2::Error::kProtocolDeviation);
   }
 
   if (!entire_heap.range().has_physical_address()) {
     LOG(INFO, "!entire_heap.range().has_physical_address()");
-    return ZX_ERR_INVALID_ARGS;
+    return fit::error(fuchsia_sysmem2::Error::kProtocolDeviation);
   }
 
   if (!entire_heap.range().has_size_bytes()) {
     LOG(INFO, "!entire_heap.range().has_size_bytes()");
-    return ZX_ERR_INVALID_ARGS;
+    return fit::error(fuchsia_sysmem2::Error::kProtocolDeviation);
   }
 
   if (!TrySetupSecmemSession()) {
     // Logging in TrySetupSecmemSession
-    return ZX_ERR_INTERNAL;
+    return fit::error(fuchsia_sysmem2::Error::kUnspecified);
   }
 
-  if (entire_heap.heap() != fuchsia_sysmem::wire::HeapType::kAmlogicSecure) {
-    LOG(INFO, "heap != kAmlogicSecure");
-    return ZX_ERR_INVALID_ARGS;
+  std::string heap_type(entire_heap.heap().heap_type().data(),
+                        entire_heap.heap().heap_type().size());
+
+  if (heap_type != bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE) {
+    LOG(INFO, "heap_type != AMLogic secure");
+    return fit::error(fuchsia_sysmem2::Error::kNotFound);
+  }
+  if (entire_heap.heap().id() != 0) {
+    LOG(INFO, "heap id != 0");
+    return fit::error(fuchsia_sysmem2::Error::kNotFound);
   }
 
   is_dynamic_ = secmem_session_->DetectIsAdjustAndSkipDeviceSecureModeUpdateAvailable();
@@ -438,70 +523,79 @@ zx_status_t SysmemSecureMemServer::GetPhysicalSecureHeapPropertiesInternal(
   max_range_count_ = secmem_session_->GetMaxClientUsableProtectedRangeCount(
       entire_heap.range().physical_address(), entire_heap.range().size_bytes());
 
-  auto builder = fuchsia_sysmem::wire::SecureHeapProperties::Builder(allocator);
-  builder.heap(fuchsia_sysmem::wire::HeapType::kAmlogicSecure);
+  auto builder = fuchsia_sysmem2::wire::SecureHeapProperties::Builder(allocator);
+  auto heap = fuchsia_sysmem2::wire::Heap::Builder(allocator);
+
+  heap.heap_type(bind_fuchsia_amlogic_platform_sysmem_heap::HEAP_TYPE_SECURE);
+  heap.id(0);
+
+  builder.heap(heap.Build());
+
   builder.dynamic_protection_ranges(is_dynamic_);
   builder.protected_range_granularity(kProtectedRangeGranularity);
   builder.max_protected_range_count(max_range_count_);
   builder.is_mod_protected_range_available(is_dynamic_);
 
-  *properties = builder.Build();
+  *response =
+      fuchsia_sysmem2::wire::SecureMemGetPhysicalSecureHeapPropertiesResponse::Builder(allocator)
+          .properties(builder.Build())
+          .Build();
 
-  return ZX_OK;
+  return fit::ok();
 }
 
-zx_status_t SysmemSecureMemServer::AddSecureHeapPhysicalRangeInternal(
-    fuchsia_sysmem::wire::SecureHeapAndRange heap_range) {
+fit::result<fuchsia_sysmem2::Error> SysmemSecureMemServer::AddSecureHeapPhysicalRangeInternal(
+    fuchsia_sysmem2::wire::SecureHeapAndRange heap_range) {
   std::scoped_lock lock{checker_};
   ZX_DEBUG_ASSERT(ranges_.size() <= max_range_count_);
 
   if (!TrySetupSecmemSession()) {
     // Logging in TrySetupSecmemSession
-    return ZX_ERR_INTERNAL;
+    return fit::error(fuchsia_sysmem2::Error::kUnspecified);
   }
 
   if (!is_dynamic_checked_) {
     LOG(INFO, "!is_dynamic_checked_");
-    return ZX_ERR_BAD_STATE;
+    return fit::error(fuchsia_sysmem2::Error::kProtocolDeviation);
   }
 
   if (!ValidateSecureHeapAndRange(heap_range, false)) {
     // Logging in ValidateSecureHeapAndRange
-    return ZX_ERR_INVALID_ARGS;
+    return fit::error(fuchsia_sysmem2::Error::kProtocolDeviation);
   }
 
   ZX_DEBUG_ASSERT(ranges_.size() <= max_range_count_);
   if (ranges_.size() == max_range_count_) {
     LOG(INFO, "range_count_ == max_range_count_");
-    return ZX_ERR_BAD_STATE;
+    return fit::error(fuchsia_sysmem2::Error::kProtocolDeviation);
   }
 
   const auto range = heap_range.range();
   zx_status_t status = ProtectMemoryRange(range.physical_address(), range.size_bytes(), true);
   if (status != ZX_OK) {
     LOG(ERROR, "ProtectMemoryRange(true) failed - status: %d", status);
-    return status;
+    return fit::error(fuchsia_sysmem2::Error::kUnspecified);
   }
 
   const Range new_range = Range::BeginLength(range.physical_address(), range.size_bytes());
   ranges_.insert(new_range);
 
-  return ZX_OK;
+  return fit::ok();
 }
 
-zx_status_t SysmemSecureMemServer::DeleteSecureHeapPhysicalRangeInternal(
-    fuchsia_sysmem::wire::SecureHeapAndRange heap_range) {
+fit::result<fuchsia_sysmem2::Error> SysmemSecureMemServer::DeleteSecureHeapPhysicalRangeInternal(
+    fuchsia_sysmem2::wire::SecureHeapAndRange heap_range) {
   std::scoped_lock lock{checker_};
   ZX_DEBUG_ASSERT(ranges_.size() <= max_range_count_);
 
   if (!TrySetupSecmemSession()) {
     // Logging in TrySetupSecmemSession
-    return ZX_ERR_INTERNAL;
+    return fit::error(fuchsia_sysmem2::Error::kUnspecified);
   }
 
   if (!is_dynamic_checked_) {
     LOG(INFO, "!is_dynamic_checked_");
-    return ZX_ERR_BAD_STATE;
+    return fit::error(fuchsia_sysmem2::Error::kProtocolDeviation);
   }
 
   if (!is_dynamic_) {
@@ -509,12 +603,12 @@ zx_status_t SysmemSecureMemServer::DeleteSecureHeapPhysicalRangeInternal(
         "DeleteSecureHeapPhysicalRangesInternal() can't be called when !dynamic - reply "
         "status: %d",
         ZX_ERR_BAD_STATE);
-    return ZX_ERR_BAD_STATE;
+    return fit::error(fuchsia_sysmem2::Error::kProtocolDeviation);
   }
 
   if (!ValidateSecureHeapAndRange(heap_range, false)) {
     // Logging in ValidateSecureHeapAndRange
-    return ZX_ERR_INVALID_ARGS;
+    return fit::error(fuchsia_sysmem2::Error::kProtocolDeviation);
   }
 
   const Range to_delete =
@@ -522,7 +616,7 @@ zx_status_t SysmemSecureMemServer::DeleteSecureHeapPhysicalRangeInternal(
   auto to_delete_iter = ranges_.find(to_delete);
   if (to_delete_iter == ranges_.end()) {
     LOG(INFO, "ranges_.find(to_delete) == ranges_.end()");
-    return ZX_ERR_NOT_FOUND;
+    return fit::error(fuchsia_sysmem2::Error::kNotFound);
   }
 
   // We could optimize this to only search a portion of ranges_, but the size limit is quite small
@@ -567,7 +661,7 @@ zx_status_t SysmemSecureMemServer::DeleteSecureHeapPhysicalRangeInternal(
                                            static_cast<uint32_t>(range.size_bytes()), false, false);
     if (status != ZX_OK) {
       LOG(INFO, "AdjustMemoryRange() failed - status: %d", status);
-      return status;
+      return fit::error(fuchsia_sysmem2::Error::kUnspecified);
     }
   } else {
     // No need for incremental zeroing since no zeroing will occur.  We can just make one call to
@@ -576,28 +670,28 @@ zx_status_t SysmemSecureMemServer::DeleteSecureHeapPhysicalRangeInternal(
     zx_status_t status = ProtectMemoryRange(range.physical_address(), range.size_bytes(), false);
     if (status != ZX_OK) {
       LOG(ERROR, "ProtectMemoryRange(false) failed - status: %d", status);
-      return status;
+      return fit::error(fuchsia_sysmem2::Error::kUnspecified);
     }
   }
 
   ranges_.erase(to_delete);
 
-  return ZX_OK;
+  return fit::ok();
 }
 
-zx_status_t SysmemSecureMemServer::ZeroSubRangeInternal(
-    bool is_covering_range_explicit, fuchsia_sysmem::wire::SecureHeapAndRange heap_range) {
+fit::result<fuchsia_sysmem2::Error> SysmemSecureMemServer::ZeroSubRangeInternal(
+    bool is_covering_range_explicit, fuchsia_sysmem2::wire::SecureHeapAndRange heap_range) {
   std::scoped_lock lock{checker_};
   ZX_DEBUG_ASSERT(ranges_.size() <= max_range_count_);
 
   if (!TrySetupSecmemSession()) {
     // Logging in TrySetupSecmemSession
-    return ZX_ERR_INTERNAL;
+    return fit::error(fuchsia_sysmem2::Error::kUnspecified);
   }
 
   if (!is_dynamic_checked_) {
     LOG(INFO, "!is_dynamic_checked_");
-    return ZX_ERR_BAD_STATE;
+    return fit::error(fuchsia_sysmem2::Error::kProtocolDeviation);
   }
 
   if (!is_dynamic_) {
@@ -605,12 +699,12 @@ zx_status_t SysmemSecureMemServer::ZeroSubRangeInternal(
         "ZeroSubRangeInternal() can't be called when !dynamic - reply "
         "status: %d",
         ZX_ERR_BAD_STATE);
-    return ZX_ERR_BAD_STATE;
+    return fit::error(fuchsia_sysmem2::Error::kProtocolDeviation);
   }
 
   if (!ValidateSecureHeapAndRange(heap_range, true)) {
     // Logging in ValidateSecureHeapAndRange
-    return ZX_ERR_INVALID_ARGS;
+    return fit::error(fuchsia_sysmem2::Error::kProtocolDeviation);
   }
 
   const Range to_zero =
@@ -636,7 +730,7 @@ zx_status_t SysmemSecureMemServer::ZeroSubRangeInternal(
         LOG(ERROR, "range: begin: 0x%" PRIx64 " length: 0x%" PRIx64 " end: 0x%" PRIx64,
             range.begin(), range.length(), range.end());
       }
-      return ZX_ERR_NOT_FOUND;
+      return fit::error(fuchsia_sysmem2::Error::kNotFound);
     }
 
     // Similar for validating that there's no other range that overlaps - checking here is useful
@@ -657,7 +751,7 @@ zx_status_t SysmemSecureMemServer::ZeroSubRangeInternal(
     }
     if (found_another_overlapping) {
       LOG(ERROR, "ZeroSubRangeInternal() found a second range that overlaps; this isn't allowed");
-      return ZX_ERR_INVALID_ARGS;
+      return fit::error(fuchsia_sysmem2::Error::kProtocolDeviation);
     }
   }
 
@@ -667,25 +761,25 @@ zx_status_t SysmemSecureMemServer::ZeroSubRangeInternal(
                                                  range.physical_address(), range.size_bytes());
   if (status != ZX_OK) {
     LOG(ERROR, "ZeroSubRangeIncermentally() failed - status: %d", status);
-    return status;
+    return fit::error(fuchsia_sysmem2::Error::kUnspecified);
   }
 
-  return ZX_OK;
+  return fit::ok();
 }
 
-zx_status_t SysmemSecureMemServer::ModifySecureHeapPhysicalRangeInternal(
-    fuchsia_sysmem::wire::SecureHeapAndRangeModification range_modification) {
+fit::result<fuchsia_sysmem2::Error> SysmemSecureMemServer::ModifySecureHeapPhysicalRangeInternal(
+    fuchsia_sysmem2::wire::SecureHeapAndRangeModification range_modification) {
   std::scoped_lock lock{checker_};
   ZX_DEBUG_ASSERT(ranges_.size() <= max_range_count_);
 
   if (!TrySetupSecmemSession()) {
     // Logging in TrySetupSecmemSession
-    return ZX_ERR_INTERNAL;
+    return fit::error(fuchsia_sysmem2::Error::kUnspecified);
   }
 
   if (!is_dynamic_checked_) {
     LOG(INFO, "!is_dynamic_checked_");
-    return ZX_ERR_BAD_STATE;
+    return fit::error(fuchsia_sysmem2::Error::kProtocolDeviation);
   }
 
   if (!is_dynamic_) {
@@ -693,12 +787,12 @@ zx_status_t SysmemSecureMemServer::ModifySecureHeapPhysicalRangeInternal(
         "ModifySecureHeapPhysicalRangesInternal() can't be called when !dynamic - reply "
         "status: %d",
         ZX_ERR_BAD_STATE);
-    return ZX_ERR_BAD_STATE;
+    return fit::error(fuchsia_sysmem2::Error::kProtocolDeviation);
   }
 
   if (!ValidateSecureHeapAndRangeModification(range_modification)) {
     // Logging in ValidateSecureHeapAndRangeModification
-    return ZX_ERR_INVALID_ARGS;
+    return fit::error(fuchsia_sysmem2::Error::kProtocolDeviation);
   }
 
   const auto& old_range_in = range_modification.old_range();
@@ -706,7 +800,7 @@ zx_status_t SysmemSecureMemServer::ModifySecureHeapPhysicalRangeInternal(
       Range::BeginLength(old_range_in.physical_address(), old_range_in.size_bytes());
   if (ranges_.find(old_range) == ranges_.end()) {
     LOG(INFO, "ranges_.find(old_range) == ranges_.end()");
-    return ZX_ERR_NOT_FOUND;
+    return fit::error(fuchsia_sysmem2::Error::kNotFound);
   }
   const auto& new_range_in = range_modification.new_range();
   const Range new_range =
@@ -740,7 +834,7 @@ zx_status_t SysmemSecureMemServer::ModifySecureHeapPhysicalRangeInternal(
                         static_cast<uint32_t>(adjustment_magnitude), at_start, longer);
   if (status != ZX_OK) {
     LOG(INFO, "AdjustMemoryRange() failed - status: %d", status);
-    return status;
+    return fit::error(fuchsia_sysmem2::Error::kUnspecified);
   }
 
   ranges_.erase(old_range);
@@ -748,7 +842,7 @@ zx_status_t SysmemSecureMemServer::ModifySecureHeapPhysicalRangeInternal(
     ranges_.insert(new_range);
   }
 
-  return ZX_OK;
+  return fit::ok();
 }
 
 zx_status_t SysmemSecureMemServer::SetupVdec(uint64_t* physical_address, size_t* size_bytes) {

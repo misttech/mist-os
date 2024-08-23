@@ -14,6 +14,7 @@
 #include <lib/sys/component/cpp/testing/realm_builder_types.h>
 #include <lib/zx/result.h>
 
+#include <cmath>
 #include <numeric>
 
 #include <virtio/gpu.h>

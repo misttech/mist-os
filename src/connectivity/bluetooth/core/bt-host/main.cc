@@ -13,6 +13,7 @@
 #include "fidl/fuchsia.hardware.bluetooth/cpp/fidl.h"
 #include "host.h"
 #include "lib/component/incoming/cpp/protocol.h"
+#include "pw_log_sink/log_sink.h"
 #include "src/connectivity/bluetooth/core/bt-host/bt_host_config.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/log.h"
 #include "util.h"
@@ -74,6 +75,7 @@ class LifecycleHandler : public fuchsia::process::lifecycle::Lifecycle,
 
 int main() {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
+  pw_log_sink::InitializeLogging(loop.dispatcher());
 
   bt_log(INFO, "bt-host", "Starting bt-host");
 

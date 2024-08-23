@@ -4,6 +4,9 @@
 
 #include "src/ui/scenic/lib/screen_capture2/tests/common.h"
 
+#include <fidl/fuchsia.ui.composition/cpp/fidl.h>
+#include <fidl/fuchsia.ui.composition/cpp/hlcpp_conversion.h>
+
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
@@ -17,8 +20,6 @@ using testing::_;
 
 using allocation::Allocator;
 using allocation::BufferCollectionImporter;
-using fuchsia::ui::composition::RegisterBufferCollectionArgs;
-using fuchsia::ui::composition::RegisterBufferCollectionUsages;
 using screen_capture::ScreenCaptureBufferCollectionImporter;
 
 namespace screen_capture2 {
@@ -39,17 +40,15 @@ void CreateBufferCollectionInfoWithConstraints(
     allocation::BufferCollectionExportToken export_token,
     std::shared_ptr<Allocator> flatland_allocator,
     fuchsia::sysmem2::Allocator_Sync* sysmem_allocator) {
-  RegisterBufferCollectionArgs rbc_args = {};
-
   zx_status_t status;
   // Create Sysmem tokens.
   auto [local_token, dup_token] = utils::CreateSysmemTokens(sysmem_allocator);
 
-  rbc_args.set_export_token(std::move(export_token));
-  rbc_args.set_buffer_collection_token(
-      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
-          dup_token.Unbind().TakeChannel()));
-  rbc_args.set_usages(RegisterBufferCollectionUsages::SCREENSHOT);
+  fuchsia_ui_composition::RegisterBufferCollectionArgs rbc_args;
+  rbc_args.export_token(fidl::HLCPPToNatural(std::move(export_token)));
+  rbc_args.buffer_collection_token(
+      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(dup_token.Unbind().TakeChannel()));
+  rbc_args.usages(fuchsia_ui_composition::RegisterBufferCollectionUsages::kScreenshot);
 
   fuchsia::sysmem2::BufferCollectionSyncPtr buffer_collection;
   fuchsia::sysmem2::AllocatorBindSharedCollectionRequest bind_shared_request;
@@ -64,13 +63,11 @@ void CreateBufferCollectionInfoWithConstraints(
   EXPECT_EQ(status, ZX_OK);
 
   bool processed_callback = false;
-  flatland_allocator->RegisterBufferCollection(
-      std::move(rbc_args),
-      [&processed_callback](
-          fuchsia::ui::composition::Allocator_RegisterBufferCollection_Result result) {
-        EXPECT_EQ(false, result.is_err());
-        processed_callback = true;
-      });
+  flatland_allocator->RegisterBufferCollection(std::move(rbc_args),
+                                               [&processed_callback](auto result) {
+                                                 EXPECT_TRUE(result.is_ok());
+                                                 processed_callback = true;
+                                               });
 
   // Wait for allocation.
   fuchsia::sysmem2::BufferCollection_WaitForAllBuffersAllocated_Result wait_result;

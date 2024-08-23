@@ -60,25 +60,30 @@
 
 // Standard prologue sequence for FP setup, with CFI.
 .macro .prologue.fp frame_extra_size=0, rareg=ra
-  add sp, sp, -(16 + \frame_extra_size)
+  // The RISC-V psABI defines the frame pointer convention:
+  // https://github.com/riscv-non-isa/riscv-elf-psabi-doc/blob/master/riscv-cc.adoc#frame-pointer-convention
+  // fp must point to CFA.
+  // ra must reside at fp - XLEN/8.
+  // Previous fp must reside at fp - x * XLEN/8.
+  add sp, sp, -(16 + (\frame_extra_size))
   // The CFA is still computed relative to the SP so code will
   // continue to use .cfi_adjust_cfa_offset for pushes and pops.
-  .cfi_adjust_cfa_offset 16 + \frame_extra_size
-  sd s0, 0(sp)
-  .cfi_offset s0, 0 - (16 + \frame_extra_size)
-  sd \rareg, 8(sp)
-  .cfi_offset \rareg, 8 - (16 + \frame_extra_size)
-  mv s0, sp
+  .cfi_adjust_cfa_offset 16 + (\frame_extra_size)
+  sd fp, (\frame_extra_size)(sp)
+  .cfi_rel_offset fp, \frame_extra_size
+  sd \rareg, (8 + (\frame_extra_size))(sp)
+  .cfi_rel_offset \rareg, 8 + (\frame_extra_size)
+  add fp, sp, (16 + (\frame_extra_size))
 .endm
 
 // Epilogue sequence to match .prologue.fp with the same argument.
 .macro .epilogue.fp frame_extra_size=0, rareg=ra
-  ld s0, 0(sp)
-  .cfi_same_value s0
-  ld \rareg, 8(sp)
+  ld fp, (\frame_extra_size)(sp)
+  .cfi_same_value fp
+  ld \rareg, (8 + (\frame_extra_size))(sp)
   .cfi_same_value \rareg
-  add sp, sp, 16 + \frame_extra_size
-  .cfi_adjust_cfa_offset -(16 + \frame_extra_size)
+  add sp, sp, 16 + (\frame_extra_size)
+  .cfi_adjust_cfa_offset -(16 + (\frame_extra_size))
 .endm
 
 // Helper defining the encoding for setting rules requiring

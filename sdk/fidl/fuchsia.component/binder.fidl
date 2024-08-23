@@ -13,8 +13,5 @@ library fuchsia.component;
 /// will be started if it's not already running. Upon a failure to start, the
 /// component framework will close the server end of the channel with a
 /// zx.Status epitaph.
-///
-/// Note: The component doesn't need to serve this protocol, it is implemented
-/// by the framework.
-@discoverable
+@discoverable(server="platform")
 closed protocol Binder {};

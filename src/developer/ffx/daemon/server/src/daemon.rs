@@ -347,9 +347,13 @@ pub struct Daemon {
 impl Daemon {
     #[tracing::instrument]
     pub fn new(socket_path: PathBuf) -> Daemon {
-        tracing::debug!("About to create Daemon");
-        let target_collection = Rc::new(TargetCollection::new());
+        tracing::debug!("About to create Daemon, starting with Target Collection");
+        let target_collection = TargetCollection::new();
+        tracing::debug!("Wrapping TC in Rc");
+        let target_collection = Rc::new(target_collection);
+        tracing::debug!("Creating new event queue");
         let event_queue = events::Queue::new(&target_collection);
+        tracing::debug!("Attaching event queue to TC");
         target_collection.set_event_queue(event_queue.clone());
 
         tracing::debug!("Creating Daemon structure");

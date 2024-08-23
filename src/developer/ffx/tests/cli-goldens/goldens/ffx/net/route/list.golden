@@ -1,6 +1,6 @@
 {
   "name": "list",
-  "description": "lists devices (supports ffx machine output)",
+  "description": "lists routes (supports ffx machine output)",
   "examples": [],
   "flags": [
     {

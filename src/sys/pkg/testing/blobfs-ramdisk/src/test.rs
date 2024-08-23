@@ -393,13 +393,19 @@ async fn open_for_create_wait_for_signal() -> Result<(), Error> {
     let (blob1, event) = open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::RIGHT_READABLE).await?;
     let () = blob0.resize(BLOB_CONTENTS.len() as u64).await?.map_err(Status::from_raw)?;
     assert_matches!(
-        event.wait_handle(zx::Signals::all(), zx::Time::after(zx::Duration::from_seconds(0))),
+        event.wait_handle(
+            zx::Signals::all(),
+            zx::MonotonicTime::after(zx::Duration::from_seconds(0))
+        ),
         Err(zx::Status::TIMED_OUT)
     );
     write_blob(&blob0, BLOB_CONTENTS).await?;
 
     assert_eq!(
-        event.wait_handle(zx::Signals::all(), zx::Time::after(zx::Duration::from_seconds(0)))?,
+        event.wait_handle(
+            zx::Signals::all(),
+            zx::MonotonicTime::after(zx::Duration::from_seconds(0))
+        )?,
         zx::Signals::USER_0
     );
     verify_blob(&blob1, BLOB_CONTENTS).await?;
@@ -418,13 +424,19 @@ async fn open_resize_wait_for_signal() -> Result<(), Error> {
     let () = blob0.resize(BLOB_CONTENTS.len() as u64).await?.map_err(Status::from_raw)?;
     let (blob1, event) = open_blob(&root_dir, BLOB_MERKLE, fio::OpenFlags::RIGHT_READABLE).await?;
     assert_matches!(
-        event.wait_handle(zx::Signals::all(), zx::Time::after(zx::Duration::from_seconds(0))),
+        event.wait_handle(
+            zx::Signals::all(),
+            zx::MonotonicTime::after(zx::Duration::from_seconds(0))
+        ),
         Err(zx::Status::TIMED_OUT)
     );
     write_blob(&blob0, BLOB_CONTENTS).await?;
 
     assert_eq!(
-        event.wait_handle(zx::Signals::all(), zx::Time::after(zx::Duration::from_seconds(0)))?,
+        event.wait_handle(
+            zx::Signals::all(),
+            zx::MonotonicTime::after(zx::Duration::from_seconds(0))
+        )?,
         zx::Signals::USER_0
     );
     verify_blob(&blob1, BLOB_CONTENTS).await?;
@@ -448,7 +460,10 @@ async fn empty_blob_readable_after_resize() {
     let (blob1, event) =
         open_blob(&root_dir, &empty_hash, fio::OpenFlags::RIGHT_READABLE).await.unwrap();
     assert_matches!(
-        event.wait_handle(zx::Signals::all(), zx::Time::after(zx::Duration::from_seconds(0))),
+        event.wait_handle(
+            zx::Signals::all(),
+            zx::MonotonicTime::after(zx::Duration::from_seconds(0))
+        ),
         Ok(zx::Signals::USER_0)
     );
     verify_blob(&blob1, &[]).await.unwrap();

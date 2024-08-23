@@ -4,23 +4,35 @@
 
 #include "src/storage/blobfs/blob_verifier.h"
 
+#include <lib/stdcompat/span.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/result.h>
+#include <zircon/errors.h>
 #include <zircon/status.h>
+#include <zircon/types.h>
+
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
+#include <memory>
+#include <mutex>
+#include <utility>
 
 #include <safemath/checked_math.h>
 
-#include "src/lib/digest/digest.h"
-#include "src/lib/digest/merkle-tree.h"
 #include "src/storage/blobfs/blob_layout.h"
+#include "src/storage/blobfs/blobfs_metrics.h"
+#include "src/storage/blobfs/format.h"
 #include "src/storage/lib/trace/trace.h"
+#include "src/storage/lib/vfs/cpp/ticker.h"
 
 namespace blobfs {
 
-BlobVerifier::BlobVerifier(digest::Digest digest, std::shared_ptr<BlobfsMetrics> metrics)
+BlobVerifier::BlobVerifier(Digest digest, std::shared_ptr<BlobfsMetrics> metrics)
     : digest_(std::move(digest)), metrics_(std::move(metrics)) {}
 
 zx::result<std::unique_ptr<BlobVerifier>> BlobVerifier::Create(
-    digest::Digest digest, std::shared_ptr<BlobfsMetrics> metrics,
+    Digest digest, std::shared_ptr<BlobfsMetrics> metrics,
     cpp20::span<const uint8_t> merkle_data_blocks, const BlobLayout& layout) {
   std::unique_ptr<BlobVerifier> verifier(new BlobVerifier(std::move(digest), std::move(metrics)));
   verifier->tree_verifier_.SetUseCompactFormat(ShouldUseCompactMerkleTreeFormat(layout.Format()));
@@ -56,7 +68,7 @@ zx::result<std::unique_ptr<BlobVerifier>> BlobVerifier::Create(
 }
 
 zx::result<std::unique_ptr<BlobVerifier>> BlobVerifier::CreateWithoutTree(
-    digest::Digest digest, std::shared_ptr<BlobfsMetrics> metrics, size_t data_size) {
+    Digest digest, std::shared_ptr<BlobfsMetrics> metrics, size_t data_size) {
   std::unique_ptr<BlobVerifier> verifier(new BlobVerifier(std::move(digest), std::move(metrics)));
 
   if (zx_status_t status = verifier->tree_verifier_.SetDataLength(data_size); status != ZX_OK) {

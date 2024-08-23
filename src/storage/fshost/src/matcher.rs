@@ -424,7 +424,7 @@ mod tests {
         FUCHSIA_FVM_PARTITION_LABEL, FVM_DRIVER_PATH, FVM_PARTITION_LABEL, GPT_DRIVER_PATH,
         LEGACY_DATA_PARTITION_LABEL, NAND_BROKER_DRIVER_PATH,
     };
-    use crate::environment::Filesystem;
+    use crate::environment::{Filesystem, FilesystemQueue};
     use anyhow::{anyhow, Error};
     use async_trait::async_trait;
     use fidl_fuchsia_device::ControllerProxy;
@@ -682,7 +682,7 @@ mod tests {
                 true,
                 "Unexpected call to format_data"
             );
-            Ok(Filesystem::Queue(vec![]))
+            Ok(Filesystem::Queue(FilesystemQueue::default()))
         }
 
         fn bind_data(&mut self, mut _fs: Filesystem) -> Result<(), Error> {

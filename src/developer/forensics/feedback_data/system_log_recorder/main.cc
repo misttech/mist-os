@@ -30,7 +30,8 @@ constexpr zx::duration kWritePeriod = zx::sec(1);
 
 int main() {
   async::Loop main_loop(&kAsyncLoopConfigAttachToCurrentThread);
-  fuchsia_logging::SetTags({"forensics", "feedback"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"forensics", "feedback"}).BuildAndInitialize();
 
   // We receive a channel that we interpret as a fuchsia.process.lifecycle.Lifecycle
   // connection.

@@ -122,6 +122,18 @@
     {
       "kind": {
         "Option": {
+          "arg_name": "system-power-mode-config"
+        }
+      },
+      "optionality": "optional",
+      "long": "--system-power-mode-config",
+      "short": null,
+      "description": "system power modes configuration",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
           "arg_name": "thermal-config"
         }
       },
@@ -141,6 +153,18 @@
       "long": "--thread-roles",
       "short": null,
       "description": "thread role configuration files",
+      "hidden": false
+    },
+    {
+      "kind": {
+        "Option": {
+          "arg_name": "sysmem-format-costs-config"
+        }
+      },
+      "optionality": "repeating",
+      "long": "--sysmem-format-costs-config",
+      "short": null,
+      "description": "sysmem format costs configuration files Each file's content bytes are a persistent fidl fuchsia.sysmem2.FormatCosts. Normally json[5] would be preferable for config, but we generate this config in rust using FIDL types (to avoid repetition and to take advantage of FIDL rust codegen), and there's no json schema for FIDL types.",
       "hidden": false
     }
   ],

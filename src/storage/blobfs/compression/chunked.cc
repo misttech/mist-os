@@ -4,16 +4,27 @@
 
 #include "src/storage/blobfs/compression/chunked.h"
 
+#include <lib/stdcompat/span.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/result.h>
+#include <zircon/assert.h>
+#include <zircon/compiler.h>
 #include <zircon/errors.h>
 #include <zircon/types.h>
 
-#include <src/lib/chunked-compression/chunked-archive.h>
-#include <src/lib/chunked-compression/status.h>
-#include <src/lib/chunked-compression/streaming-chunked-compressor.h>
+#include <cstddef>
+#include <cstdint>
+#include <memory>
+#include <optional>
+#include <utility>
 
+#include "src/lib/chunked-compression/chunked-archive.h"
+#include "src/lib/chunked-compression/chunked-decompressor.h"
+#include "src/lib/chunked-compression/compression-params.h"
+#include "src/lib/chunked-compression/status.h"
+#include "src/lib/chunked-compression/streaming-chunked-compressor.h"
 #include "src/storage/blobfs/compression/configs/chunked_compression_params.h"
+#include "src/storage/blobfs/compression/seekable_decompressor.h"
 #include "src/storage/blobfs/compression_settings.h"
 #include "src/storage/lib/trace/trace.h"
 

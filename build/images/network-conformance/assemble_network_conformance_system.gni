@@ -117,7 +117,5 @@ template("assemble_network_conformance_system") {
     allow_eng_platform_bundle_use = true
 
     cmdline = [ "kernel.halt-on-panic=true" ]
-
-    bootfs_labels = [ "//build/input:bootfs" ]
   }
 }

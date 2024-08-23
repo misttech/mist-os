@@ -15,7 +15,6 @@ driver_bind_rules("amlogic_display_bind") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib",
-    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.devicetree",
     "//src/devices/bind/fuchsia.display",
@@ -113,6 +112,7 @@ source_set("common_srcs") {
     "//src/graphics/display/lib/device-protocol-display",
     "//src/graphics/display/lib/driver-framework-migration-utils/dispatcher",
     "//src/graphics/display/lib/mipi-dsi",
+    "//src/lib/ddk:ddk_metadata_only",
     "//src/lib/fxl",
     "//zircon/system/ulib/async:async-cpp",
     "//zircon/system/ulib/fbl",

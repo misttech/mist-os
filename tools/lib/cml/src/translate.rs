@@ -435,6 +435,8 @@ fn translate_use(
                 availability: Some(availability),
                 type_: Some(translate_value_type(&type_).0),
                 default,
+                #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                source_dictionary,
                 ..Default::default()
             }));
         } else {
@@ -638,23 +640,21 @@ fn translate_expose(
                 for (source_name, target_name) in
                     source_names.into_iter().zip(target_names.into_iter())
                 {
-                    let DerivedSourceInfo {
-                        source,
-                        #[cfg(fuchsia_api_level_at_least = "HEAD")]
-                            source_dictionary: _,
-                        availability,
-                    } = derive_source_and_availability(
-                        expose.availability.as_ref(),
-                        source.clone(),
-                        source_dictionary.clone(),
-                        expose.source_availability.as_ref(),
-                        all_capability_names,
-                        all_children,
-                        all_collections,
-                    );
+                    let DerivedSourceInfo { source, source_dictionary, availability } =
+                        derive_source_and_availability(
+                            expose.availability.as_ref(),
+                            source.clone(),
+                            source_dictionary.clone(),
+                            expose.source_availability.as_ref(),
+                            all_capability_names,
+                            all_children,
+                            all_collections,
+                        );
                     out_exposes.push(fdecl::Expose::Config(fdecl::ExposeConfiguration {
                         source: Some(source.clone()),
                         source_name: Some(source_name.clone().into()),
+                        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                        source_dictionary,
                         target: Some(target.clone()),
                         target_name: Some(target_name.clone().into()),
                         availability: Some(availability),
@@ -842,6 +842,10 @@ fn translate_offer(
                     target: Some(target),
                     target_name: Some(target_name.into()),
                     availability: Some(availability),
+                    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                    dependency_type: Some(
+                        offer.dependency.clone().unwrap_or(cm::DependencyType::Strong).into(),
+                    ),
                     ..Default::default()
                 }));
             }
@@ -1094,7 +1098,7 @@ fn translate_offer(
                     all_collections,
                 )?;
                 for (source, source_dictionary, source_name, target, target_name) in entries {
-                    let DerivedSourceInfo { source, source_dictionary: _, availability } =
+                    let DerivedSourceInfo { source, source_dictionary, availability } =
                         derive_source_and_availability(
                             offer.availability.as_ref(),
                             source,
@@ -1110,6 +1114,8 @@ fn translate_offer(
                         target: Some(target),
                         target_name: Some(target_name.into()),
                         availability: Some(availability),
+                        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                        source_dictionary,
                         ..Default::default()
                     }));
                 }
@@ -3033,6 +3039,7 @@ mod tests {
                     { "protocol": "fuchsia.sys2.DebugProto", "from": "debug" },
                     { "protocol": "fuchsia.sys2.DictionaryProto", "from": "#logger/in/dict" },
                     { "protocol": "fuchsia.sys2.Echo", "from": "self", "availability": "transitional" },
+                    { "service": "fuchsia.sys2.EchoService", "from": "parent/dict", },
                     { "directory": "assets", "rights" : ["read_bytes"], "path": "/data/assets" },
                     {
                         "directory": "config",
@@ -3151,6 +3158,18 @@ mod tests {
                             source_name: Some("fuchsia.sys2.Echo".to_string()),
                             target_path: Some("/svc/fuchsia.sys2.Echo".to_string()),
                             availability: Some(fdecl::Availability::Transitional),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Use::Service (
+                        fdecl::UseService {
+                            dependency_type: Some(fdecl::DependencyType::Strong),
+                            source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                            source_dictionary: Some("dict".into()),
+                            source_name: Some("fuchsia.sys2.EchoService".to_string()),
+                            target_path: Some("/svc/fuchsia.sys2.EchoService".to_string()),
+                            availability: Some(fdecl::Availability::Required),
                             ..Default::default()
                         }
                     ),
@@ -3296,6 +3315,10 @@ mod tests {
                         "as": "E",
                     },
                     {
+                        "service": "F",
+                        "from": "#logger/in/dict",
+                    },
+                    {
                         "service": "svc",
                         "from": [ "#logger", "#coll", "self" ],
                     },
@@ -3408,6 +3431,21 @@ mod tests {
                             source_name: Some("D".to_string()),
                             target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
                             target_name: Some("E".to_string()),
+                            availability: Some(fdecl::Availability::Required),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Expose::Service (
+                        fdecl::ExposeService {
+                            source: Some(fdecl::Ref::Child(fdecl::ChildRef {
+                                name: "logger".into(),
+                                collection: None,
+                            })),
+                            source_name: Some("F".into()),
+                            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                            source_dictionary: Some("in/dict".into()),
+                            target: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            target_name: Some("F".into()),
                             availability: Some(fdecl::Availability::Required),
                             ..Default::default()
                         }
@@ -4031,6 +4069,12 @@ mod tests {
                         "to": "#netstack",
                     },
                     {
+                        "service": "fuchsia.sys2.FromDictService",
+                        "from": [ "parent/in/dict"],
+                        "to": "#modular",
+                        "dependency": "weak",
+                    },
+                    {
                         "directory": "assets",
                         "from": "parent",
                         "to": [ "#netstack" ],
@@ -4240,6 +4284,7 @@ mod tests {
                             })),
                             target_name: Some("svc".into()),
                             availability: Some(fdecl::Availability::Required),
+                            dependency_type: Some(fdecl::DependencyType::Strong),
                             ..Default::default()
                         }
                     ),
@@ -4253,6 +4298,7 @@ mod tests {
                             })),
                             target_name: Some("svc".into()),
                             availability: Some(fdecl::Availability::Required),
+                            dependency_type: Some(fdecl::DependencyType::Strong),
                             ..Default::default()
                         }
                     ),
@@ -4269,6 +4315,7 @@ mod tests {
                             })),
                             target_name: Some("svc".into()),
                             availability: Some(fdecl::Availability::Required),
+                            dependency_type: Some(fdecl::DependencyType::Strong),
                             ..Default::default()
                         }
                     ),
@@ -4284,6 +4331,22 @@ mod tests {
                             })),
                             target_name: Some("svc".into()),
                             availability: Some(fdecl::Availability::Required),
+                            dependency_type: Some(fdecl::DependencyType::Strong),
+                            ..Default::default()
+                        }
+                    ),
+                    fdecl::Offer::Service (
+                        fdecl::OfferService {
+                            source: Some(fdecl::Ref::Parent(fdecl::ParentRef {})),
+                            source_name: Some("fuchsia.sys2.FromDictService".into()),
+                            #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                            source_dictionary: Some("in/dict".into()),
+                            target: Some(fdecl::Ref::Collection(fdecl::CollectionRef {
+                                name: "modular".into(),
+                            })),
+                            target_name: Some("fuchsia.sys2.FromDictService".to_string()),
+                            availability: Some(fdecl::Availability::Required),
+                            dependency_type: Some(fdecl::DependencyType::Weak),
                             ..Default::default()
                         }
                     ),
@@ -4715,6 +4778,7 @@ mod tests {
                             })),
                             target_name: Some("C".into()),
                             availability: Some(fdecl::Availability::Required),
+                            dependency_type: Some(fdecl::DependencyType::Strong),
                             ..Default::default()
                         }
                     ),

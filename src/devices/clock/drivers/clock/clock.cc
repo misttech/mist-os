@@ -15,6 +15,7 @@
 #include <memory>
 
 #include <bind/fuchsia/clock/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
 #include <ddk/metadata/clock.h>
 #include <fbl/alloc_checker.h>
 
@@ -166,8 +167,8 @@ zx_status_t ClockDevice::Create(void* ctx, zx_device_t* parent) {
 
     char name[20];
     snprintf(name, sizeof(name), "clock-%u", clock_id);
-    zx_device_prop_t props[] = {
-        {BIND_CLOCK_ID, 0, clock_id},
+    zx_device_str_prop_t props[] = {
+        ddk::MakeStrProperty(bind_fuchsia::CLOCK_ID, clock_id),
     };
 
     zx::result endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
@@ -188,7 +189,7 @@ zx_status_t ClockDevice::Create(void* ctx, zx_device_t* parent) {
 
     status = dev->DdkAdd(ddk::DeviceAddArgs(name)
                              .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
-                             .set_props(props)
+                             .set_str_props(props)
                              .set_fidl_service_offers(offers)
                              .set_outgoing_dir(endpoints->client.TakeChannel()));
     if (status != ZX_OK) {
@@ -223,13 +224,13 @@ void ClockInitDevice::Create(zx_device_t* parent, const ClockImplProxy& clock) {
     return;
   }
 
-  zx_device_prop_t props[] = {
-      {BIND_INIT_STEP, 0, bind_fuchsia_clock::BIND_INIT_STEP_CLOCK},
+  zx_device_str_prop_t props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::INIT_STEP, bind_fuchsia_clock::BIND_INIT_STEP_CLOCK),
   };
 
   zx_status_t status = device->DdkAdd(ddk::DeviceAddArgs("clock-init")
                                           .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
-                                          .set_props(props));
+                                          .set_str_props(props));
   if (status == ZX_OK) {
     [[maybe_unused]] auto _ = device.release();
   } else {

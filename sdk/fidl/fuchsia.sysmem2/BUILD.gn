@@ -14,10 +14,12 @@ fidl("fuchsia.sysmem2") {
   sources = [
     "allocator.fidl",
     "collection.fidl",
+    "config.fidl",
     "constraints.fidl",
     "error.fidl",
     "overview.fidl",
     "results.fidl",
+    "secure_mem.fidl",
     "usages.fidl",
   ]
   public_deps = [

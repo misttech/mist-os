@@ -21,16 +21,21 @@
     use: [
         {
             protocol: [
-                "fuchsia.boot.Arguments",
                 "fuchsia.boot.Items",
                 "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.driver.framework.CompositeNodeManager",
                 "fuchsia.driver.framework.DeviceGroupManager",
-                "fuchsia.kernel.IommuResource",
                 "fuchsia.kernel.IrqResource",
                 "fuchsia.kernel.MmioResource",
                 "fuchsia.kernel.SmcResource",
             ],
+        },
+        {
+            protocol: [
+                "fuchsia.boot.Arguments",
+                "fuchsia.kernel.IommuResource",
+            ],
+            availability: "optional",
         },
     ],
     expose: [

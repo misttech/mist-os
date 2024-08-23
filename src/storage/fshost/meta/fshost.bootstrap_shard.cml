@@ -105,6 +105,11 @@
             from: "#fshost",
         },
         {
+            directory: [ "partitions" ],
+            from: "#fshost",
+            availability: "optional",
+        },
+        {
             protocol: [
                 "fuchsia.fshost.Admin",
                 "fuchsia.fshost.BlockWatcher",
@@ -114,6 +119,11 @@
         {
             protocol: "fuchsia.update.verify.BlobfsVerifier",
             from: "#fshost",
+        },
+        {
+            protocol: "fuchsia.fxfs.CryptManagement",
+            from: "#fshost",
+            availability: "optional",
         },
     ],
     environments: [

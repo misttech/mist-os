@@ -462,8 +462,8 @@ std::optional<int> HandleCommandLine(const fxl::CommandLine& command_line) {
 
 int main(int argc, const char** argv) {
   auto command_line = fxl::CommandLineFromArgcArgv(argc, argv);
-  fuchsia_logging::SetTags({command_line.argv0()});
-
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({command_line.argv0()}).BuildAndInitialize();
   if (auto has_cmdline_args = HandleCommandLine(command_line); has_cmdline_args.has_value()) {
     return *has_cmdline_args;
   }

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use anyhow::{anyhow, Context, Result};
+use anyhow::{anyhow, bail, Context, Result};
 use assembly_config_capabilities::CapabilityNamedMap;
 use assembly_config_schema::assembly_config::CompiledPackageDefinition;
 use camino::{Utf8Path, Utf8PathBuf};
@@ -95,6 +95,17 @@ impl FeatureSupportLevel {
     }
 }
 
+impl std::fmt::Display for FeatureSupportLevel {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            FeatureSupportLevel::Embeddable => f.write_str("embeddable"),
+            FeatureSupportLevel::Bootstrap => f.write_str("bootstrap"),
+            FeatureSupportLevel::Utility => f.write_str("utility"),
+            FeatureSupportLevel::Standard => f.write_str("standard"),
+        }
+    }
+}
+
 /// A trait for subsystems to implement to provide the configuration for their
 /// subsystem's components.
 pub(crate) trait DefineSubsystemConfiguration<T> {
@@ -119,6 +130,43 @@ pub(crate) struct ConfigurationContext<'a> {
     pub ramdisk_image: bool,
     pub gendir: Utf8PathBuf,
     pub resource_dir: Utf8PathBuf,
+}
+
+impl<'a> ConfigurationContext<'a> {
+    /// Ensure that the configuration context matches the given set of
+    /// build-types and feature-set-levels
+    ///
+    /// Returns an error if they do not, and Ok(()) if they do.
+    pub fn ensure_build_type_and_feature_set_level(
+        &self,
+        build_types: &[BuildType],
+        feature_set_levels: &[FeatureSupportLevel],
+        item_name: &str,
+    ) -> anyhow::Result<()> {
+        if !build_types.contains(self.build_type) {
+            bail!(
+                "{} can only be enabled on the following build types, not '{}': [{}]",
+                item_name,
+                self.build_type,
+                build_types.iter().map(|b| b.to_string()).collect::<Vec<String>>().join(", ")
+            );
+        }
+
+        if !feature_set_levels.contains(self.feature_set_level) {
+            bail!(
+                "{} can only be enabled on the following feature sets, not '{}': [{}]",
+                item_name,
+                self.feature_set_level,
+                feature_set_levels
+                    .iter()
+                    .map(|b| b.to_string())
+                    .collect::<Vec<String>>()
+                    .join(", ")
+            );
+        }
+
+        Ok(())
+    }
 }
 
 /// A struct for collecting multiple kinds of platform configuration.
@@ -235,6 +283,13 @@ pub(crate) trait DomainConfigDirectoryBuilder {
         &mut self,
         destination: &str,
         contents: &str,
+    ) -> Result<&mut dyn DomainConfigDirectoryBuilder>;
+
+    /// Add a file to the directory using the binary contents provided.
+    fn entry_from_binary_contents(
+        &mut self,
+        destination: &str,
+        contents: Vec<u8>,
     ) -> Result<&mut dyn DomainConfigDirectoryBuilder>;
 }
 
@@ -455,6 +510,7 @@ pub struct DomainConfig {
 pub enum FileOrContents {
     File(FileEntry<String>),
     Contents(String),
+    BinaryContents(Vec<u8>),
 }
 
 #[derive(Clone, Debug, PartialEq, Serialize)]
@@ -588,6 +644,17 @@ impl DomainConfigDirectoryBuilder for DomainConfigDirectory {
                 destination.to_string(),
                 FileOrContents::Contents(contents.to_string()),
             )
+            .context("A config destination can only be set once for a domain config")?;
+        Ok(self)
+    }
+
+    fn entry_from_binary_contents(
+        &mut self,
+        destination: &str,
+        contents: Vec<u8>,
+    ) -> Result<&mut dyn DomainConfigDirectoryBuilder> {
+        self.entries
+            .try_insert_unique(destination.to_string(), FileOrContents::BinaryContents(contents))
             .context("A config destination can only be set once for a domain config")?;
         Ok(self)
     }
@@ -1079,5 +1146,79 @@ mod tests {
     fn check_icu_map() {
         assert!(ICU_CONFIG_INFO.commit_id_for_revision(&Revision::Latest).is_some());
         assert!(ICU_CONFIG_INFO.commit_id_for_revision(&Revision::Default).is_some());
+    }
+
+    #[test]
+    fn test_ensure_build_type_and_feature_set() {
+        let context = ConfigurationContext {
+            feature_set_level: &FeatureSupportLevel::Bootstrap,
+            build_type: &BuildType::Eng,
+            board_info: &BoardInformation {
+                name: "sample".to_owned(),
+                provided_features: vec!["feature_a".into(), "feature_b".into()],
+                ..Default::default()
+            },
+            ramdisk_image: false,
+            gendir: "gendir".into(),
+            resource_dir: "resources".into(),
+        };
+        let result = context.ensure_build_type_and_feature_set_level(
+            &[BuildType::Eng],
+            &[FeatureSupportLevel::Bootstrap],
+            "feature",
+        );
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn test_ensure_build_type_and_feature_set_bails_on_bad_build_type() {
+        let context = ConfigurationContext {
+            feature_set_level: &FeatureSupportLevel::Bootstrap,
+            build_type: &BuildType::Eng,
+            board_info: &BoardInformation {
+                name: "sample".to_owned(),
+                provided_features: vec!["feature_a".into(), "feature_b".into()],
+                ..Default::default()
+            },
+            ramdisk_image: false,
+            gendir: "gendir".into(),
+            resource_dir: "resources".into(),
+        };
+        let result = context.ensure_build_type_and_feature_set_level(
+            &[BuildType::User, BuildType::UserDebug],
+            &[FeatureSupportLevel::Bootstrap],
+            "My feature",
+        );
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "My feature can only be enabled on the following build types, not 'eng': [user, userdebug]"
+        )
+    }
+
+    #[test]
+    fn test_ensure_build_type_and_feature_set_bails_on_bad_feature_set_level() {
+        let context = ConfigurationContext {
+            feature_set_level: &FeatureSupportLevel::Bootstrap,
+            build_type: &BuildType::Eng,
+            board_info: &BoardInformation {
+                name: "sample".to_owned(),
+                provided_features: vec!["feature_a".into(), "feature_b".into()],
+                ..Default::default()
+            },
+            ramdisk_image: false,
+            gendir: "gendir".into(),
+            resource_dir: "resources".into(),
+        };
+        let result = context.ensure_build_type_and_feature_set_level(
+            &[BuildType::Eng],
+            &[FeatureSupportLevel::Utility, FeatureSupportLevel::Standard],
+            "My feature",
+        );
+        assert!(result.is_err());
+        assert_eq!(
+            result.unwrap_err().to_string(),
+            "My feature can only be enabled on the following feature sets, not 'bootstrap': [utility, standard]"
+        )
     }
 }

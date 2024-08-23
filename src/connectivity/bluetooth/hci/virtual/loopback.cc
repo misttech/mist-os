@@ -157,12 +157,6 @@ void LoopbackDevice::SnoopServer::handle_unknown_method(
 }
 
 void LoopbackDevice::Connect(fidl::ServerEnd<fuchsia_hardware_bluetooth::Vendor> request) {
-  fit::result<fidl::OneWayError> result =
-      fidl::SendEvent(request)->OnFeatures(fuchsia_hardware_bluetooth::VendorFeatures());
-  if (result.is_error()) {
-    FDF_LOG(ERROR, "Failed to send vendor features: %s", result.error_value().status_string());
-    return;
-  }
   vendor_binding_group_.AddBinding(dispatcher_, std::move(request), this,
                                    fidl::kIgnoreBindingClosure);
 }
@@ -247,6 +241,10 @@ void LoopbackDevice::WriteLoopbackChannel(PacketIndicator indicator, uint8_t* bu
     snoop_->QueueSnoopPacket(buffer, length, indicator,
                              fuchsia_hardware_bluetooth::PacketDirection::kHostToController);
   }
+}
+
+void LoopbackDevice::GetFeatures(GetFeaturesCompleter::Sync& completer) {
+  completer.Reply(fuchsia_hardware_bluetooth::VendorFeatures());
 }
 
 void LoopbackDevice::EncodeCommand(EncodeCommandRequest& request,

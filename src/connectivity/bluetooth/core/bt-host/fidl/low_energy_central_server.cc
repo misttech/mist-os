@@ -8,6 +8,7 @@
 
 #include <utility>
 
+#include "fuchsia/bluetooth/le/cpp/fidl.h"
 #include "gatt_client_server.h"
 #include "helpers.h"
 #include "src/connectivity/bluetooth/core/bt-host/fidl/measure_tape/hlcpp_measure_tape_for_peer.h"
@@ -546,6 +547,13 @@ void LowEnergyCentralServer::DisconnectPeripheral(::std::string identifier,
   }
 
   callback(Status());
+}
+
+void LowEnergyCentralServer::ListenL2cap(fble::ChannelListenerRegistryListenL2capRequest request,
+                                         ListenL2capCallback callback) {
+  // TODO(https://fxbug.dev/42178956): Implement ListenL2cap.
+  fble::ChannelListenerRegistry_ListenL2cap_Result result;
+  callback(std::move(result.set_err(ZX_ERR_NOT_SUPPORTED)));
 }
 
 void LowEnergyCentralServer::OnScanResult(const bt::gap::Peer& peer) {

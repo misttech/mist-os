@@ -55,7 +55,6 @@ impl SystemController {
                         .upgrade()
                         .ok_or(format_err!("model is dropped"))?
                         .root()
-                        .await
                         .clone();
 
                     // Kick off a background task to log when shutdown is taking too long.

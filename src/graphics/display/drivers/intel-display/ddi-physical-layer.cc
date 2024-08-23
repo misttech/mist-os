@@ -18,10 +18,10 @@
 #include "src/graphics/display/drivers/intel-display/ddi-physical-layer-internal.h"
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
 #include "src/graphics/display/drivers/intel-display/intel-display.h"
-#include "src/graphics/display/drivers/intel-display/poll-until.h"
 #include "src/graphics/display/drivers/intel-display/power-controller.h"
 #include "src/graphics/display/drivers/intel-display/registers-ddi-phy-tiger-lake.h"
 #include "src/graphics/display/drivers/intel-display/registers-typec.h"
+#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
 
 namespace intel_display {
 

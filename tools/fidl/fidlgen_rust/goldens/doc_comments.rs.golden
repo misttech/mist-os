@@ -360,7 +360,7 @@ impl InterfaceSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::Time) -> Result<InterfaceEvent, fidl::Error> {
+    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<InterfaceEvent, fidl::Error> {
         InterfaceEvent::decode(self.client.wait_for_event(deadline)?)
     }
 

@@ -73,6 +73,23 @@ lib/libunwind.so.1=dffab54d807a4352e088529a7a2112b651042bf511e7df7d2adca40aaec77
 
 Note: For more details on packages and their contents, see [Structure of a package][pkg-struct].
 
+## Package servers
+
+Virtually all software running on Fuchsia is collected into Fuchsia Packages.
+
+Beyond the base packages that comprise the foundation of the Fuchsia platform,
+additional packages can be downloaded from a Fuchsia package server. The Fuchsia
+package server is an HTTP(S) server managing the Fuchsia packages using TUF (the
+update framework). This framework uses cryptographically signed BLOBs to
+securely distribute updated packages to a device running Fuchsia.
+
+For information about how to start, stop, and list package servers running
+in your development environment See:
+
+* [Starting the package server](/docs/concepts/packages/package_server_start.md)
+* [Listing running package server instances](/docs/concepts/packages/package_server_list.md)
+* [Stopping running package server instances](/docs/concepts/packages/package_server_stop.md)
+
 ## Connecting host and target
 
 The Fuchsia source contains a simple HTTP server that serves static files. The

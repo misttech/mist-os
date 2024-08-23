@@ -7,13 +7,13 @@
 #ifndef ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_INTERRUPT_DISPATCHER_H_
 #define ZIRCON_KERNEL_OBJECT_INCLUDE_OBJECT_INTERRUPT_DISPATCHER_H_
 
+#include <lib/wake-vector.h>
 #include <lib/zircon-internal/thread_annotations.h>
 #include <sys/types.h>
 #include <zircon/rights.h>
 #include <zircon/types.h>
 
 #include <kernel/event.h>
-#include <kernel/idle_power_thread.h>
 #include <kernel/spinlock.h>
 #include <object/dispatcher.h>
 #include <object/port_dispatcher.h>
@@ -28,12 +28,14 @@ enum class InterruptState {
 
 // Note that unlike most Dispatcher subclasses, this one is further
 // subclassed, and so cannot be final.
-class InterruptDispatcher
-    : public SoloDispatcher<InterruptDispatcher, ZX_DEFAULT_INTERRUPT_RIGHTS> {
+class InterruptDispatcher : public SoloDispatcher<InterruptDispatcher, ZX_DEFAULT_INTERRUPT_RIGHTS>,
+                            public wake_vector::WakeVector {
  public:
   InterruptDispatcher& operator=(const InterruptDispatcher&) = delete;
   zx_obj_type_t get_type() const final { return ZX_OBJ_TYPE_INTERRUPT; }
   uint32_t get_flags() const { return flags_; }
+
+  bool is_wake_vector() const { return flags_ & INTERRUPT_WAKE_VECTOR; }
 
   zx_status_t WaitForInterrupt(zx_time_t* out_timestamp);
   zx_status_t Trigger(zx_time_t timestamp);
@@ -45,24 +47,41 @@ class InterruptDispatcher
 
   void on_zero_handles() final;
 
+  // Default wake vector diagnostics for interrupt dispatchers.
+  void GetDiagnostics(WakeVector::Diagnostics& diagnostics_out) const override {
+    diagnostics_out.enabled = false;
+    diagnostics_out.koid = get_koid();
+  }
+
  protected:
   virtual void MaskInterrupt() = 0;
   virtual void UnmaskInterrupt() = 0;
   virtual void DeactivateInterrupt() = 0;
   virtual void UnregisterInterruptHandler() = 0;
 
-  InterruptDispatcher();
+  // It is an error to specify both INTERRUPT_UNMASK_PREWAIT and INTERRUPT_UNMASK_PREWAIT_UNLOCKED.
+  explicit InterruptDispatcher(uint32_t flags);
   void Signal() { event_.Signal(); }
-  zx_status_t set_flags(uint32_t flags);
   bool SendPacketLocked(zx_time_t timestamp) TA_REQ(spinlock_);
+
+  // Allow subclasses to add/remove the wake event instance from the global diagnostics list at the
+  // appropriate times during initialization and teardown. These methods do not need to be called
+  // unless the subclass needs to be able to wake the system from suspend. See lib/wake-vector.h for
+  // the specific requirements regarding when to initialize and destroy the wake event.
+  void InitializeWakeEvent() TA_REQ(spinlock_) { wake_event_.Initialize(); }
+  void DestroyWakeEvent() TA_REQ(spinlock_) { wake_event_.Destroy(); }
 
   // Bits for Interrupt.flags
   // The interrupt is virtual.
   static constexpr uint32_t INTERRUPT_VIRTUAL = (1u << 0);
   // The interrupt should be unmasked before waiting on the event.
+  //
+  // Mutually exclusive with INTERRUPT_UNMASK_PREWAIT_UNLOCKED.
   static constexpr uint32_t INTERRUPT_UNMASK_PREWAIT = (1u << 1);
   // The same as |INTERRUPT_UNMASK_PREWAIT| except release the dispatcher
   // spinlock before waiting.
+  //
+  // Mutually exclusive with INTERRUPT_UNMASK_PREWAIT.
   static constexpr uint32_t INTERRUPT_UNMASK_PREWAIT_UNLOCKED = (1u << 2);
   // The interrupt should be masked following waiting.
   static constexpr uint32_t INTERRUPT_MASK_POSTWAIT = (1u << 4);
@@ -74,14 +93,14 @@ class InterruptDispatcher
  private:
   AutounsignalEvent event_;
   // Interrupt Flags
-  uint32_t flags_;
+  const uint32_t flags_;
 
   zx_time_t timestamp_ TA_GUARDED(spinlock_);
   // Current state of the interrupt object
   InterruptState state_ TA_GUARDED(spinlock_);
   PortInterruptPacket port_packet_ TA_GUARDED(spinlock_) = {};
   fbl::RefPtr<PortDispatcher> port_dispatcher_ TA_GUARDED(spinlock_);
-  IdlePowerThread::WakeEvent wake_event_ TA_GUARDED(spinlock_);
+  wake_vector::WakeEvent wake_event_ TA_GUARDED(spinlock_);
 
   // Controls the access to Interrupt properties
   DECLARE_SPINLOCK(InterruptDispatcher) spinlock_;

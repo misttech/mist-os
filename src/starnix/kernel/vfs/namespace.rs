@@ -2,15 +2,9 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#[cfg(not(feature = "starnix_lite"))]
-use crate::bpf::fs::BpfFs;
-#[cfg(not(feature = "starnix_lite"))]
-use crate::device::BinderFs;
-use crate::fs::devpts::dev_pts_fs;
 use crate::fs::devtmpfs::dev_tmp_fs;
 use crate::fs::ext4::ExtFilesystem;
 use crate::fs::functionfs::FunctionFs;
-use crate::fs::nmfs::nmfs;
 use crate::fs::overlayfs::OverlayFs;
 use crate::fs::proc::proc_fs;
 use crate::fs::sysfs::sys_fs;
@@ -21,6 +15,7 @@ use crate::security;
 use crate::task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, Waiter};
 use crate::time::utc;
 use crate::vfs::buffers::InputBuffer;
+use crate::vfs::fs_registry::FsRegistry;
 use crate::vfs::fuse::{new_fuse_fs, new_fusectl_fs};
 use crate::vfs::socket::{SocketAddress, SocketHandle, UnixSocket};
 use crate::vfs::{
@@ -497,8 +492,10 @@ impl Mount {
     }
 
     pub fn unmount(&self, flags: UnmountFlags, propagate: bool) -> Result<(), Errno> {
-        if !flags.contains(UnmountFlags::DETACH) && self.active_clients() > 0 {
-            return error!(EBUSY);
+        if !flags.contains(UnmountFlags::DETACH) {
+            if self.active_clients() > 0 || !self.state.read().submounts.is_empty() {
+                return error!(EBUSY);
+            }
         }
         let mountpoint = self.mountpoint().ok_or_else(|| errno!(EINVAL))?;
         let parent_mount = mountpoint.mount.as_ref().expect("a mountpoint must be part of a mount");
@@ -734,11 +731,12 @@ impl FileSystemCreator for Arc<Kernel> {
         L: LockBefore<FileOpsCore>,
         L: LockBefore<DeviceOpen>,
     {
+        if let Some(result) =
+            self.expando.get::<FsRegistry>().create(self, fs_type, options.clone())
+        {
+            return result;
+        }
         Ok(match &**fs_type {
-            #[cfg(not(feature = "starnix_lite"))]
-            b"binder" => BinderFs::new_fs(self, options)?,
-            #[cfg(not(feature = "starnix_lite"))]
-            b"bpf" => BpfFs::new_fs(self, options)?,
             b"remotefs" => crate::fs::fuchsia::create_remotefs_filesystem(
                 self,
                 self.container_data_dir
@@ -776,11 +774,9 @@ impl FileSystemCreator for CurrentTask {
         match &**fs_type {
             b"fuse" => new_fuse_fs(self, options),
             b"fusectl" => new_fusectl_fs(self, options),
-            b"devpts" => Ok(dev_pts_fs(self, options).clone()),
             b"devtmpfs" => Ok(dev_tmp_fs(locked, self).clone()),
             b"ext4" => ExtFilesystem::new_fs(locked, kernel, self, options),
             b"functionfs" => FunctionFs::new_fs(self, options),
-            b"nmfs" => Ok(nmfs(self, options).clone()),
             b"overlay" => OverlayFs::new_fs(locked, self, options),
             b"proc" => Ok(proc_fs(self, options).clone()),
             b"tracefs" => Ok(trace_fs(self, options).clone()),

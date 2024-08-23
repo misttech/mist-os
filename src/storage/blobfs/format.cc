@@ -4,336 +4,112 @@
 
 #include "src/storage/blobfs/format.h"
 
-#include <lib/cksum.h>
-#include <lib/stdcompat/span.h>
-#include <lib/syslog/cpp/macros.h>
+#include <cstddef>
 
-#include <iterator>
-#include <optional>
-#include <utility>
-
-#include <fbl/ref_ptr.h>
-#include <safemath/checked_math.h>
-#include <storage/buffer/owned_vmoid.h>
-
-#include "src/storage/blobfs/common.h"
-#include "src/storage/blobfs/mkfs.h"
-#include "src/storage/fvm/client.h"
-#include "src/storage/lib/vfs/cpp/journal/initializer.h"
+// This file tests the on-disk structures of Blobfs.
 
 namespace blobfs {
-namespace {
 
-using ::block_client::BlockDevice;
+// clang-format off
 
-std::optional<fuchsia_hardware_block_volume::wire::VolumeManagerInfo> TryGetVolumeManagerInfo(
-    const BlockDevice& device) {
-  fuchsia_hardware_block_volume::wire::VolumeManagerInfo fvm_manager_info = {};
-  fuchsia_hardware_block_volume::wire::VolumeInfo volume_info = {};
-  zx_status_t status = device.VolumeGetInfo(&fvm_manager_info, &volume_info);
-  if (status != ZX_OK) {
-    return std::nullopt;
-  }
-  return fvm_manager_info;
-}
+#define PADDING_LENGTH(type, prev, next)                                                 \
+    (offsetof(type, next) - (offsetof(type, prev) + sizeof(type{}.prev)))
 
-// Generates a superblock that will cover the entire device described by |block_info|.
-zx::result<Superblock> FormatSuperblock(const fuchsia_hardware_block::wire::BlockInfo& block_info,
-                                        const FilesystemOptions& options) {
-  uint64_t blocks = (block_info.block_size * block_info.block_count) / kBlobfsBlockSize;
-  Superblock superblock;
-  if (zx_status_t status = InitializeSuperblock(blocks, options, &superblock); status != ZX_OK) {
-    return zx::error(status);
-  }
+// Ensure that the members don't change their offsets within the structure
+static_assert(offsetof(Superblock, magic0) ==                           0x0);
+static_assert(offsetof(Superblock, magic1) ==                           0x8);
+static_assert(offsetof(Superblock, major_version) ==                    0x10);
+static_assert(offsetof(Superblock, flags) ==                            0x14);
+static_assert(offsetof(Superblock, block_size) ==                       0x18);
+static_assert(offsetof(Superblock, data_block_count) ==                 0x20);
+static_assert(offsetof(Superblock, journal_block_count) ==              0x28);
+static_assert(offsetof(Superblock, inode_count) ==                      0x30);
+static_assert(offsetof(Superblock, alloc_block_count) ==                0x38);
+static_assert(offsetof(Superblock, alloc_inode_count) ==                0x40);
+static_assert(offsetof(Superblock, reserved2) ==                        0x48);
+static_assert(offsetof(Superblock, slice_size) ==                       0x50);
+static_assert(offsetof(Superblock, deprecated1) ==                      0x58);
+static_assert(offsetof(Superblock, abm_slices) ==                       0x60);
+static_assert(offsetof(Superblock, ino_slices) ==                       0x64);
+static_assert(offsetof(Superblock, dat_slices) ==                       0x68);
+static_assert(offsetof(Superblock, journal_slices) ==                   0x6c);
+static_assert(offsetof(Superblock, oldest_minor_version) ==             0x78);
 
-  zx_status_t status = CheckSuperblock(&superblock, blocks);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Check superblock failed: " << status;
-    return zx::error(status);
-  }
-  return zx::ok(superblock);
-}
+// Ensure that the padding between two members doesn't change
+static_assert(PADDING_LENGTH(Superblock, magic0,                 magic1) ==                 0);
+static_assert(PADDING_LENGTH(Superblock, magic1,                 major_version) ==          0);
+static_assert(PADDING_LENGTH(Superblock, major_version,          flags) ==                  0);
+static_assert(PADDING_LENGTH(Superblock, flags,                  block_size) ==             0);
+static_assert(PADDING_LENGTH(Superblock, block_size,             data_block_count) ==       4);
+static_assert(PADDING_LENGTH(Superblock, data_block_count,       journal_block_count) ==    0);
+static_assert(PADDING_LENGTH(Superblock, journal_block_count,    inode_count) ==            0);
+static_assert(PADDING_LENGTH(Superblock, inode_count,            alloc_block_count) ==      0);
+static_assert(PADDING_LENGTH(Superblock, alloc_block_count,      alloc_inode_count) ==      0);
+static_assert(PADDING_LENGTH(Superblock, alloc_inode_count,      reserved2) ==              0);
+static_assert(PADDING_LENGTH(Superblock, reserved2,              slice_size) ==             0);
+static_assert(PADDING_LENGTH(Superblock, slice_size,             deprecated1) ==            0);
+static_assert(PADDING_LENGTH(Superblock, deprecated1,            abm_slices) ==             0);
+static_assert(PADDING_LENGTH(Superblock, abm_slices,             ino_slices) ==             0);
+static_assert(PADDING_LENGTH(Superblock, ino_slices,             dat_slices) ==             0);
+static_assert(PADDING_LENGTH(Superblock, dat_slices,             journal_slices) ==         0);
+static_assert(PADDING_LENGTH(Superblock, journal_slices,         oldest_minor_version) ==   8);
+static_assert(PADDING_LENGTH(Superblock, oldest_minor_version,   reserved) ==               0);
 
-// Generates a FVM-aware superblock with the minimum number of slices reserved for each metadata
-// region.
-zx::result<Superblock> FormatSuperblockFVM(
-    BlockDevice* device, const fuchsia_hardware_block_volume::wire::VolumeManagerInfo& fvm_info,
-    const FilesystemOptions& options) {
-  Superblock superblock;
-  InitializeSuperblockOptions(options, &superblock);
+// Ensure that the padding at the end of structure doesn't change
+static_assert(sizeof(Superblock) ==
+              offsetof(Superblock, reserved) + sizeof(Superblock{}.reserved));
 
-  superblock.slice_size = fvm_info.slice_size;
-  superblock.flags |= kBlobFlagFVM;
 
-  if (superblock.slice_size % kBlobfsBlockSize) {
-    FX_LOGS(ERROR) << "mkfs: Slice size not multiple of blobfs block";
-    return zx::error(ZX_ERR_IO_INVALID);
-  }
+// Ensure that the members don't change their offsets within the structure
+static_assert(offsetof(NodePrelude, flags) ==               0x0);
+static_assert(offsetof(NodePrelude, version) ==             0x02);
+static_assert(offsetof(NodePrelude, next_node) ==           0x4);
 
-  zx_status_t status = fvm::ResetAllSlices(device);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "mkfs: Failed to reset slices";
-    return zx::error(status);
-  }
+// Ensure that the padding between two members doesn't change
+static_assert(PADDING_LENGTH(NodePrelude, flags,        version) ==         0);
+static_assert(PADDING_LENGTH(NodePrelude, version,      next_node) ==       0);
 
-  const size_t blocks_per_slice = superblock.slice_size / kBlobfsBlockSize;
-  // Converts blocks to slices, rounding up to the nearest slice size.
-  auto BlocksToSlices = [blocks_per_slice](uint64_t blocks) {
-    return fbl::round_up(blocks, blocks_per_slice) / blocks_per_slice;
-  };
+// Ensure that the padding at the end of structure doesn't change
+static_assert(sizeof(NodePrelude) ==
+              offsetof(NodePrelude, next_node) + sizeof(NodePrelude{}.next_node));
 
-  uint64_t data_blocks = fbl::round_up(kMinimumDataBlocks, blocks_per_slice);
+// Ensure that the members don't change their offsets within the structure
+static_assert(offsetof(Inode, header) == 0x00);
+static_assert(offsetof(Inode, merkle_root_hash) == 0x08);
+static_assert(offsetof(Inode, blob_size) == 0x28);
+static_assert(offsetof(Inode, block_count) == 0x30);
+static_assert(offsetof(Inode, extent_count) == 0x34);
+static_assert(offsetof(Inode, reserved) == 0x36);
+static_assert(offsetof(Inode, extents) == 0x38);
 
-  // Allocate the minimum number of blocks for a minimal bitmap.
-  uint64_t offset = kFVMBlockMapStart / blocks_per_slice;
-  uint64_t length = BlocksToSlices(BlocksRequiredForBits(data_blocks));
-  superblock.abm_slices = safemath::checked_cast<decltype(superblock.abm_slices)>(length);
-  status = device->VolumeExtend(offset, superblock.abm_slices);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "mkfs: Failed to allocate block map";
-    return zx::error(status);
-  }
+// Ensure that the padding between two members doesn't change
+static_assert(PADDING_LENGTH(Inode, header,                     merkle_root_hash) == 0);
+static_assert(PADDING_LENGTH(Inode, merkle_root_hash,           blob_size) == 0);
+static_assert(PADDING_LENGTH(Inode, blob_size,                  block_count) == 0);
+static_assert(PADDING_LENGTH(Inode, block_count,                extent_count) == 0);
+static_assert(PADDING_LENGTH(Inode, extent_count,               reserved) == 0);
+static_assert(PADDING_LENGTH(Inode, reserved,                   extents) == 0);
 
-  // Allocate the requested number of node blocks in FVM.
-  offset = kFVMNodeMapStart / blocks_per_slice;
-  length = BlocksToSlices(BlocksRequiredForInode(options.num_inodes));
-  superblock.ino_slices = safemath::checked_cast<decltype(superblock.ino_slices)>(length);
-  status = device->VolumeExtend(offset, superblock.ino_slices);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "mkfs: Failed to allocate node map";
-    return zx::error(status);
-  }
+// Ensure that the padding at the end of structure doesn't change
+static_assert(sizeof(Inode) == offsetof(Inode, extents) + sizeof(Inode{}.extents));
 
-  // Allocate the minimum number of journal blocks in FVM.
-  offset = kFVMJournalStart / blocks_per_slice;
-  length = BlocksToSlices(kMinimumJournalBlocks);
-  superblock.journal_slices = safemath::checked_cast<decltype(superblock.journal_slices)>(length);
-  status = device->VolumeExtend(offset, superblock.journal_slices);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "mkfs: Failed to allocate journal blocks";
-    return zx::error(status);
-  }
+// Ensure that the members don't change their offsets within the structure
+static_assert(offsetof(ExtentContainer, header) == 0x00);
+static_assert(offsetof(ExtentContainer, previous_node) == 0x08);
+static_assert(offsetof(ExtentContainer, extent_count) == 0x0c);
+static_assert(offsetof(ExtentContainer, reserved) == 0x0e);
+static_assert(offsetof(ExtentContainer, extents) == 0x10);
 
-  // Allocate the minimum number of data blocks in the FVM.
-  offset = kFVMDataStart / blocks_per_slice;
-  length = BlocksToSlices(kMinimumDataBlocks);
-  superblock.dat_slices = safemath::checked_cast<decltype(superblock.dat_slices)>(length);
-  status = device->VolumeExtend(offset, superblock.dat_slices);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "mkfs: Failed to allocate data blocks";
-    return zx::error(status);
-  }
+// Ensure that the padding between two members doesn't change
+static_assert(PADDING_LENGTH(ExtentContainer, header,           previous_node) == 0);
+static_assert(PADDING_LENGTH(ExtentContainer, previous_node,    extent_count) == 0);
+static_assert(PADDING_LENGTH(ExtentContainer, extent_count,     reserved) == 0);
+static_assert(PADDING_LENGTH(ExtentContainer, reserved,         extents) == 0);
 
-  superblock.inode_count = safemath::checked_cast<decltype(superblock.inode_count)>(
-      superblock.ino_slices * superblock.slice_size / kBlobfsInodeSize);
-  superblock.data_block_count = safemath::checked_cast<decltype(superblock.data_block_count)>(
-      superblock.dat_slices * superblock.slice_size / kBlobfsBlockSize);
-  superblock.journal_block_count = safemath::checked_cast<decltype(superblock.journal_block_count)>(
-      superblock.journal_slices * superblock.slice_size / kBlobfsBlockSize);
+// Ensure that the padding at the end of structure doesn't change
+static_assert(sizeof(ExtentContainer) ==
+              offsetof(ExtentContainer, extents) + sizeof(ExtentContainer{}.extents));
 
-  // Now that we've allocated some slices, re-query FVM for the number of blocks assigned to the
-  // partition. We'll use this as a sanity check in CheckSuperblock.
-  fuchsia_hardware_block::wire::BlockInfo block_info = {};
-  status = device->BlockGetInfo(&block_info);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Cannot acquire block info: " << status;
-    return zx::error(status);
-  }
-  uint64_t blocks = (block_info.block_count * block_info.block_size) / kBlobfsBlockSize;
-
-  status = CheckSuperblock(&superblock, blocks);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Check superblock failed: " << status;
-    return zx::error(status);
-  }
-  return zx::ok(superblock);
-}
-
-// Take the contents of the filesystem, generated in-memory, and transfer them to the underlying
-// device.
-zx_status_t WriteFilesystemToDisk(BlockDevice* device, const Superblock& superblock,
-                                  const RawBitmap& block_bitmap, uint64_t block_size) {
-  uint64_t blockmap_blocks = BlockMapBlocks(superblock);
-  uint64_t nodemap_blocks = NodeMapBlocks(superblock);
-
-  // All in-memory structures have been created successfully. Dump everything to disk.
-  uint64_t superblock_blocks = SuperblockBlocks(superblock);
-  uint64_t journal_blocks = JournalBlocks(superblock);
-  uint64_t total_blocks = superblock_blocks + blockmap_blocks + nodemap_blocks + journal_blocks;
-
-  zx::vmo vmo;
-  zx_status_t status = zx::vmo::create(kBlobfsBlockSize * total_blocks, 0, &vmo);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  storage::OwnedVmoid vmoid;
-  status = device->BlockAttachVmo(vmo, &vmoid.GetReference(device));
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  // Write the root block.
-  status = vmo.write(&superblock, 0, kBlobfsBlockSize);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  // Write allocation bitmap.
-  for (uint64_t n = 0; n < blockmap_blocks; n++) {
-    uint64_t offset = kBlobfsBlockSize * (superblock_blocks + n);
-    uint64_t length = kBlobfsBlockSize;
-    status = vmo.write(GetRawBitmapData(block_bitmap, n), offset, length);
-    if (status != ZX_OK) {
-      return status;
-    }
-  }
-
-  // Write node map.
-  uint8_t block[kBlobfsBlockSize];
-  memset(block, 0, sizeof(block));
-  for (uint64_t n = 0; n < nodemap_blocks; n++) {
-    uint64_t offset = kBlobfsBlockSize * (superblock_blocks + blockmap_blocks + n);
-    uint64_t length = kBlobfsBlockSize;
-    status = vmo.write(block, offset, length);
-    if (status != ZX_OK) {
-      return status;
-    }
-  }
-
-  // Write the journal.
-
-  auto base_offset = superblock_blocks + blockmap_blocks + nodemap_blocks;
-  fs::WriteBlocksFn write_blocks_fn = [&vmo, &superblock, base_offset](
-                                          cpp20::span<const uint8_t> buffer, uint64_t block_offset,
-                                          uint64_t block_count) {
-    uint64_t offset =
-        safemath::CheckMul<uint64_t>(safemath::CheckAdd(base_offset, block_offset).ValueOrDie(),
-                                     kBlobfsBlockSize)
-            .ValueOrDie();
-    uint64_t size = safemath::CheckMul<uint64_t>(block_count, kBlobfsBlockSize).ValueOrDie();
-    ZX_ASSERT((block_offset + block_count) <= JournalBlocks(superblock));
-    ZX_ASSERT(buffer.size() >= size);
-    return vmo.write(buffer.data(), offset, size);
-  };
-  status = fs::MakeJournal(journal_blocks, write_blocks_fn);
-  if (status != ZX_OK) {
-    return status;
-  }
-
-  auto FsToDeviceBlocks = [disk_block = block_size](uint64_t block) -> uint64_t {
-    return block * (kBlobfsBlockSize / disk_block);
-  };
-
-  block_fifo_request_t requests[5] = {};
-  using RequestLengthType = decltype(block_fifo_request_t::length);
-  static_assert(
-      std::is_same_v<RequestLengthType, uint32_t>,
-      "Type of length field for block FIFO request has changed, validate conversions below.");
-
-  requests[0].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
-  requests[0].vmoid = vmoid.get();
-  requests[0].length =
-      safemath::checked_cast<RequestLengthType>(FsToDeviceBlocks(superblock_blocks));
-  requests[0].vmo_offset = FsToDeviceBlocks(0);
-  requests[0].dev_offset = FsToDeviceBlocks(0);
-
-  requests[1].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
-  requests[1].vmoid = vmoid.get();
-  requests[1].length = safemath::checked_cast<RequestLengthType>(FsToDeviceBlocks(blockmap_blocks));
-  requests[1].vmo_offset = FsToDeviceBlocks(superblock_blocks);
-  requests[1].dev_offset = FsToDeviceBlocks(BlockMapStartBlock(superblock));
-
-  requests[2].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
-  requests[2].vmoid = vmoid.get();
-  requests[2].length = safemath::checked_cast<RequestLengthType>(FsToDeviceBlocks(nodemap_blocks));
-  requests[2].vmo_offset = FsToDeviceBlocks(superblock_blocks + blockmap_blocks);
-  requests[2].dev_offset = FsToDeviceBlocks(NodeMapStartBlock(superblock));
-
-  requests[3].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
-  requests[3].vmoid = vmoid.get();
-  requests[3].length = safemath::checked_cast<RequestLengthType>(FsToDeviceBlocks(journal_blocks));
-  requests[3].vmo_offset = FsToDeviceBlocks(superblock_blocks + blockmap_blocks + nodemap_blocks);
-  requests[3].dev_offset = FsToDeviceBlocks(JournalStartBlock(superblock));
-
-  int count = 4;
-  if (superblock.flags & kBlobFlagFVM) {
-    requests[4].command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0};
-    requests[4].vmoid = vmoid.get();
-    requests[4].length =
-        safemath::checked_cast<RequestLengthType>(FsToDeviceBlocks(superblock_blocks));
-    requests[4].vmo_offset = FsToDeviceBlocks(0);
-    requests[4].dev_offset = FsToDeviceBlocks(kFVMBackupSuperblockOffset);
-    ++count;
-  }
-
-  status = device->FifoTransaction(requests, count);
-  if (status != ZX_OK)
-    return status;
-
-  block_fifo_request_t flush_request = {
-      .command = {.opcode = BLOCK_OPCODE_FLUSH, .flags = 0},
-  };
-  return device->FifoTransaction(&flush_request, 1);
-}
-
-}  // namespace
-
-zx_status_t FormatFilesystem(BlockDevice* device, const FilesystemOptions& options) {
-  zx_status_t status;
-  fuchsia_hardware_block::wire::BlockInfo block_info = {};
-  status = device->BlockGetInfo(&block_info);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Cannot acquire block info: " << status;
-    return status;
-  }
-
-  if (block_info.flags & fuchsia_hardware_block::wire::Flag::kReadonly) {
-    FX_LOGS(ERROR) << "Cannot format read-only device";
-    return ZX_ERR_ACCESS_DENIED;
-  }
-  if (block_info.block_size == 0) {
-    FX_LOGS(ERROR) << "Device has zero-sized blocks";
-    return ZX_ERR_NO_SPACE;
-  }
-  if (kBlobfsBlockSize % block_info.block_size != 0) {
-    FX_LOGS(ERROR) << "Device block size " << block_info.block_size << " invalid";
-    return ZX_ERR_IO_INVALID;
-  }
-
-  zx::result<Superblock> superblock_or;
-  if (auto maybe_volume_info = TryGetVolumeManagerInfo(*device); maybe_volume_info.has_value()) {
-    superblock_or = FormatSuperblockFVM(device, maybe_volume_info.value(), options);
-  } else {
-    superblock_or = FormatSuperblock(block_info, options);
-  }
-  if (superblock_or.is_error()) {
-    return superblock_or.status_value();
-  }
-  const Superblock& superblock = superblock_or.value();
-
-  uint64_t blockmap_blocks = BlockMapBlocks(superblock);
-  RawBitmap block_bitmap;
-  if (block_bitmap.Reset(blockmap_blocks * kBlobfsBlockBits)) {
-    FX_LOGS(ERROR) << "Couldn't allocate block map";
-    return -1;
-  }
-  if (block_bitmap.Shrink(superblock.data_block_count)) {
-    FX_LOGS(ERROR) << "Couldn't shrink block map";
-    return -1;
-  }
-
-  // Reserve first |kStartBlockMinimum| data blocks
-  block_bitmap.Set(0, kStartBlockMinimum);
-
-  status = WriteFilesystemToDisk(device, superblock, block_bitmap, block_info.block_size);
-  if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "Failed to write to disk: " << status;
-    return status;
-  }
-
-  FX_LOGS(DEBUG) << "mkfs success";
-  return ZX_OK;
-}
+// clang-format on
 
 }  // namespace blobfs

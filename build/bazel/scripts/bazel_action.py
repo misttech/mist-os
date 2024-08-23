@@ -255,7 +255,9 @@ def get_input_starlark_file_path(filename: str) -> str:
     return result
 
 
-def copy_file_if_changed(src_path: str, dst_path: str) -> None:
+def copy_file_if_changed(
+    src_path: str, dst_path: str, bazel_output_base_dir: str
+) -> None:
     """Copy |src_path| to |dst_path| if they are different."""
     # NOTE: For some reason, filecmp.cmp() will return True if
     # dst_path does not exist, even if src_path is not empty!?
@@ -270,6 +272,11 @@ def copy_file_if_changed(src_path: str, dst_path: str) -> None:
             shutil.rmtree(dst_path)
         else:
             os.remove(dst_path)
+
+    def is_under_bazel_root(p):
+        return os.path.realpath(p).startswith(
+            os.path.abspath(bazel_output_base_dir)
+        )
 
     # See https://fxbug.dev/42072059 for context. This logic is kept here
     # to avoid incremental failures when performing copies across
@@ -286,11 +293,20 @@ def copy_file_if_changed(src_path: str, dst_path: str) -> None:
         if not is_src_readonly:
             try:
                 os.makedirs(os.path.dirname(dst_path), exist_ok=True)
-                os.link(src_path, dst_path)
+                # Get realpath of src_path to avoid symlink chains, which
+                # os.link does not handle properly even follow_symlinks=True.
+                #
+                # NOTE: it is important to link to the final real file because
+                # intermediate links can be temporary. For example, the
+                # gn_targets repository is repopulated in every bazel_action, so
+                # any links pointing to symlinks in gn_targets can be
+                # invalidated during the build.
+                os.link(os.path.realpath(src_path), dst_path)
                 # Update timestamp to avoid Ninja no-op failures that can
                 # happen because Bazel does not maintain consistent timestamps
                 # in the execroot when sandboxing or remote builds are enabled.
-                os.utime(dst_path)
+                if is_under_bazel_root(src_path):
+                    os.utime(dst_path)
                 do_copy = False
             except OSError as e:
                 if e.errno != errno.EXDEV:
@@ -382,7 +398,7 @@ assert is_likely_build_id_path("/src/.build-id/ae/23094.so")
 assert not is_likely_build_id_path("/src/.build-id/log.txt")
 
 
-def copy_build_id_dir(build_id_dir: str) -> None:
+def copy_build_id_dir(build_id_dir: str, bazel_output_base_dir: str) -> None:
     """Copy debug symbols from a source .build-id directory, to the top-level one."""
     for path in os.listdir(build_id_dir):
         bid_path = os.path.join(build_id_dir, path)
@@ -390,7 +406,7 @@ def copy_build_id_dir(build_id_dir: str) -> None:
             for obj in os.listdir(bid_path):
                 src_path = os.path.join(bid_path, obj)
                 dst_path = os.path.join(_BUILD_ID_PREFIX, path, obj)
-                copy_file_if_changed(src_path, dst_path)
+                copy_file_if_changed(src_path, dst_path, bazel_output_base_dir)
 
 
 def is_likely_content_hash_path(path: str) -> bool:
@@ -414,16 +430,19 @@ assert is_likely_content_hash_path("/src/.build-id/ae/23094.so")
 assert not is_likely_content_hash_path("/src/.build-id/log.txt")
 
 
+def find_bazel_output_base(workspace_dir: str) -> str:
+    """Return the path of the Bazel output base."""
+    return os.path.normpath(
+        os.path.join(os.path.dirname(workspace_dir), "output_base")
+    )
+
+
 def find_bazel_execroot(workspace_dir: str) -> str:
     """Return the path of the Bazel execroot."""
-    return os.path.normpath(
-        os.path.join(
-            workspace_dir,
-            "..",
-            "output_base",
-            "execroot",
-            _BAZEL_ROOT_WORKSPACE_NAME,
-        )
+    return os.path.join(
+        find_bazel_output_base(workspace_dir),
+        "execroot",
+        _BAZEL_ROOT_WORKSPACE_NAME,
     )
 
 
@@ -913,7 +932,7 @@ def main() -> int:
     parser.add_argument(
         "--directory-outputs",
         action=DirectoryOutputsAction,
-        help="3 or more arguments to specify a single Bazel output directory. Begins with (bazel_path, ninja_path) values, followed by one or more tracked relative file",
+        help="4 or more arguments to specify a single Bazel output directory. Begins with (bazel_path, ninja_path, copy_debug_symbols) values, followed by one or more tracked relative file",
     )
     parser.add_argument(
         "--package-outputs",
@@ -966,6 +985,7 @@ def main() -> int:
         ninja_inputs_manifest = json.load(f)
 
     current_dir = os.getcwd()
+    bazel_output_base_dir = find_bazel_output_base(args.workspace_dir)
 
     def relative_workspace_dir(path: str) -> str:
         """Convert path relative to the workspace root to the path relative to current directory."""
@@ -1245,13 +1265,15 @@ def main() -> int:
         file_copies.append((src_path, dst_path))
 
         if dir_output.copy_debug_symbols:
+            bazel_execroot = find_bazel_execroot(args.workspace_dir)
             debug_symbol_dirs = run_starlark_cquery(
                 args.bazel_targets[0],
                 "FuchsiaDebugSymbolInfo_debug_symbol_dirs.cquery",
             )
             for debug_symbol_dir in debug_symbol_dirs:
                 copy_build_id_dir(
-                    os.path.join(bazel_execroot, debug_symbol_dir)
+                    os.path.join(bazel_execroot, debug_symbol_dir),
+                    bazel_output_base_dir,
                 )
 
     if unwanted_files:
@@ -1309,11 +1331,12 @@ def main() -> int:
                 )
                 for debug_symbol_dir in debug_symbol_dirs:
                     copy_build_id_dir(
-                        os.path.join(bazel_execroot, debug_symbol_dir)
+                        os.path.join(bazel_execroot, debug_symbol_dir),
+                        bazel_output_base_dir,
                     )
 
     for src_path, dst_path in file_copies:
-        copy_file_if_changed(src_path, dst_path)
+        copy_file_if_changed(src_path, dst_path, bazel_output_base_dir)
 
     if args.path_mapping:
         # When determining source path of the copied output, follow links to get

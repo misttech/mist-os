@@ -9,6 +9,8 @@
 #include <zircon/assert.h>
 #include <zircon/errors.h>
 
+#include <optional>
+
 #include <src/lib/chunked-compression/compression-params.h>
 
 #include "src/storage/blobfs/format.h"
@@ -41,7 +43,7 @@ zx::result<CompressionAlgorithm> AlgorithmForInode(const Inode& inode) {
   }
 }
 
-uint16_t CompressionInodeHeaderFlags(const CompressionAlgorithm& algorithm) {
+uint16_t CompressionInodeHeaderFlags(CompressionAlgorithm algorithm) {
   switch (algorithm) {
     case CompressionAlgorithm::kUncompressed:
       return 0;
@@ -53,7 +55,7 @@ uint16_t CompressionInodeHeaderFlags(const CompressionAlgorithm& algorithm) {
   return 0;
 }
 
-void SetCompressionAlgorithm(Inode* inode, const CompressionAlgorithm algorithm) {
+void SetCompressionAlgorithm(Inode* inode, CompressionAlgorithm algorithm) {
   uint16_t* flags = &(inode->header.flags);
   *flags &= ~kBlobFlagMaskAnyCompression;
   *flags |= CompressionInodeHeaderFlags(algorithm);

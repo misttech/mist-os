@@ -21,7 +21,6 @@ class VnodeFile final : public Vnode {
   fuchsia_io::NodeProtocolKinds GetProtocols() const final;
 
   zx::result<zx::stream> CreateStream(uint32_t stream_options) final;
-  void DidModifyStream() final;
 
   zx_status_t Truncate(size_t len) final;
   zx::result<fs::VnodeAttributes> GetAttributes() const final;
@@ -29,7 +28,6 @@ class VnodeFile final : public Vnode {
   zx_status_t GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) final;
   zx_status_t CloseNode() final;
   void Sync(SyncCallback closure) final;
-  bool SupportsClientSideStreams() const final { return true; }
 
  private:
   zx_status_t CreateBackingStoreIfNeeded() __TA_REQUIRES(mutex_);

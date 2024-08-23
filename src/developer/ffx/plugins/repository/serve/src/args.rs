@@ -19,10 +19,11 @@ use std::path::PathBuf;
 )]
 pub struct ServeCommand {
     #[argh(option, short = 'r')]
+    // LINT.IfChange
     /// register this repository.
     /// Default is `devhost`.
     pub repository: Option<String>,
-
+    // LINT.ThenChange(lib.rs)
     /// path to the root metadata that was used to sign the
     /// repository TUF metadata. This establishes the root of
     /// trust for this repository. If the TUF metadata was not

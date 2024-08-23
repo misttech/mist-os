@@ -29,11 +29,17 @@ fuchsia_board_input_bundle(
     ],
 )
 
+fuchsia_board_input_bundle(
+    name = "paver",
+    bootfs_packages = ["//src/bringup/bin/paver:package-vim3"],
+)
+
 fuchsia_board_configuration(
     name = "emac",
     board_input_bundles = [
         ":board_driver",
         ":main_bundle",
+        ":paver",
     ],
     board_name = "emac",
     devicetree = "@gn_targets//src/devices/board/drivers/vim3-devicetree:vim3-dtb",
@@ -54,8 +60,30 @@ fuchsia_board_configuration(
             "size_checker_maximum_bytes": 5216665600,
         },
     },
+    kernel = {
+        "contiguous_physical_pages": True,
+    },
+    platform = {
+        "connectivity": {
+            "network": {
+                "netsvc_interface": "/dwmac-ff3f0000_group/dwmac/Designware-MAC/network-device",
+            },
+        },
+        "development_support": {
+            "enable_debug_access_port_for_soc": "amlogic-a311d",
+        },
+        "sysmem_defaults": {
+            "contiguous_guard_pages_unused": False,
+            "contiguous_memory_size": {
+                "fixed": 209715200,
+            },
+            "protected_memory_size": {
+                "fixed": 0,
+            },
+        },
+    },
     provided_features = [
-        "fuchsia::driver_framework_v2_support",
+        "fuchsia::paver",
         "fuchsia::usb_peripheral_support",
     ],
 )

@@ -441,11 +441,15 @@ impl ImageAssemblyConfigBuilder {
             // When the all_packages_in_base developer override option is
             // enabled, that takes precedence over all the rest on eng and userdebug
             // build-types.
-            (_, BuildType::Eng, Some(DeveloperOnlyOptions { all_packages_in_base: true }))
+            (
+                _,
+                BuildType::Eng,
+                Some(DeveloperOnlyOptions { all_packages_in_base: true, netboot_mode: _ }),
+            )
             | (
                 _,
                 BuildType::UserDebug,
-                Some(DeveloperOnlyOptions { all_packages_in_base: true }),
+                Some(DeveloperOnlyOptions { all_packages_in_base: true, netboot_mode: _ }),
             ) => PackageSet::Base,
 
             // The Flexible package set is in Cache for eng builds, and base
@@ -695,7 +699,7 @@ impl ImageAssemblyConfigBuilder {
             board_driver_arguments,
             configuration_capabilities,
             devicetree,
-            developer_only_options: _,
+            developer_only_options,
         } = self;
 
         let cmc_tool = tools.get_tool("cmc")?;
@@ -892,6 +896,9 @@ impl ImageAssemblyConfigBuilder {
             .map(|e| FileEntry { source: e.source.clone(), destination: e.destination.to_string() })
             .collect();
 
+        let netboot_mode =
+            developer_only_options.is_some() && developer_only_options.unwrap().netboot_mode;
+
         // Construct a single "partial" config from the combined fields, and
         // then pass this to the ImageAssemblyConfig::try_from_partials() to get the
         // final validation that it's complete.
@@ -911,6 +918,7 @@ impl ImageAssemblyConfigBuilder {
             images_config: Default::default(),
             board_driver_arguments,
             devicetree,
+            netboot_mode,
         };
         Ok(image_assembly_config)
     }

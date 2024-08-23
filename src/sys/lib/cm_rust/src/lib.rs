@@ -464,34 +464,19 @@ impl UseDeclCommon for UseRunnerDecl {
 
 #[cfg(fuchsia_api_level_at_least = "20")]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
-#[derive(FidlDecl, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::UseConfiguration", source_path = "name_only")]
+#[derive(FidlDecl, UseDeclCommon, Debug, Clone, PartialEq, Eq)]
+#[fidl_decl(fidl_table = "fdecl::UseConfiguration", source_path = "dictionary")]
 pub struct UseConfigurationDecl {
     pub source: UseSource,
     pub source_name: Name,
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    #[fidl_decl(default_preserve_none)]
+    pub source_dictionary: RelativePath,
     pub target_name: Name,
     #[fidl_decl(default)]
     pub availability: Availability,
     pub type_: ConfigValueType,
     pub default: Option<ConfigValue>,
-}
-
-#[cfg(fuchsia_api_level_at_least = "20")]
-impl SourceName for UseConfigurationDecl {
-    fn source_name(&self) -> &Name {
-        &self.source_name
-    }
-}
-
-#[cfg(fuchsia_api_level_at_least = "20")]
-impl UseDeclCommon for UseConfigurationDecl {
-    fn source(&self) -> &UseSource {
-        &self.source
-    }
-
-    fn availability(&self) -> &Availability {
-        &self.availability
-    }
 }
 
 #[cfg_attr(
@@ -568,6 +553,9 @@ pub struct OfferServiceDecl {
     pub renamed_instances: Option<Vec<NameMapping>>,
     #[fidl_decl(default)]
     pub availability: Availability,
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    #[fidl_decl(default)]
+    pub dependency_type: DependencyType,
 }
 
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
@@ -672,10 +660,13 @@ pub struct OfferDictionaryDecl {
 #[cfg(fuchsia_api_level_at_least = "20")]
 #[cfg_attr(feature = "serde", derive(Deserialize, Serialize))]
 #[derive(FidlDecl, OfferDeclCommon, Debug, Clone, PartialEq, Eq)]
-#[fidl_decl(fidl_table = "fdecl::OfferConfiguration", source_path = "name_only")]
+#[fidl_decl(fidl_table = "fdecl::OfferConfiguration", source_path = "dictionary")]
 pub struct OfferConfigurationDecl {
     pub source: OfferSource,
     pub source_name: Name,
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    #[fidl_decl(default_preserve_none)]
+    pub source_dictionary: RelativePath,
     pub target: OfferTarget,
     pub target_name: Name,
     #[fidl_decl(default)]
@@ -1056,6 +1047,9 @@ pub struct ExposeConfigurationDecl {
     pub source_name: Name,
     pub target: ExposeTarget,
     pub target_name: Name,
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
+    #[fidl_decl(default_preserve_none)]
+    pub source_dictionary: RelativePath,
     #[fidl_decl(default)]
     pub availability: Availability,
 }
@@ -1940,6 +1934,12 @@ fidl_translations_from_into!(cm_types::AllowedOffers, fdecl::AllowedOffers);
 pub enum DependencyType {
     Strong,
     Weak,
+}
+
+impl Default for DependencyType {
+    fn default() -> Self {
+        Self::Strong
+    }
 }
 
 fidl_translations_symmetrical_enums!(fdecl::DependencyType, DependencyType, Strong, Weak);
@@ -3132,6 +3132,7 @@ mod tests {
                         )),
                         target_name: Some("mynetstack1".to_string()),
                         availability: Some(fdecl::Availability::Required),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
                         ..Default::default()
                     }),
                     fdecl::Offer::Service(fdecl::OfferService {
@@ -3146,6 +3147,7 @@ mod tests {
                         )),
                         target_name: Some("mynetstack2".to_string()),
                         availability: Some(fdecl::Availability::Optional),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
                         ..Default::default()
                     }),
                     fdecl::Offer::Service(fdecl::OfferService {
@@ -3162,6 +3164,7 @@ mod tests {
                         source_instance_filter: Some(vec!["allowedinstance".to_string()]),
                         renamed_instances: Some(vec![fdecl::NameMapping{source_name: "default".to_string(), target_name: "allowedinstance".to_string()}]),
                         availability: Some(fdecl::Availability::Required),
+                        dependency_type: Some(fdecl::DependencyType::Strong),
                         ..Default::default()
                     }),
                     fdecl::Offer::Dictionary(fdecl::OfferDictionary {
@@ -3438,6 +3441,7 @@ mod tests {
                             availability: Availability::Required,
                             type_: ConfigValueType::Bool,
                             default: None,
+                            source_dictionary: ".".parse().unwrap(),
                         }),
                     ],
                     exposes: vec![
@@ -3549,6 +3553,7 @@ mod tests {
                             target: offer_target_static_child("echo"),
                             target_name: "mynetstack1".parse().unwrap(),
                             availability: Availability::Required,
+                            dependency_type: Default::default(),
                         }),
                         OfferDecl::Service(OfferServiceDecl {
                             source: OfferSource::Parent,
@@ -3559,6 +3564,7 @@ mod tests {
                             target: offer_target_static_child("echo"),
                             target_name: "mynetstack2".parse().unwrap(),
                             availability: Availability::Optional,
+                            dependency_type: Default::default(),
                         }),
                         OfferDecl::Service(OfferServiceDecl {
                             source: OfferSource::Parent,
@@ -3569,6 +3575,7 @@ mod tests {
                             target: offer_target_static_child("echo"),
                             target_name: "mynetstack3".parse().unwrap(),
                             availability: Availability::Required,
+                            dependency_type: Default::default(),
                         }),
                         OfferDecl::Dictionary(OfferDictionaryDecl {
                             source: OfferSource::Parent,

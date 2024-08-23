@@ -38,10 +38,8 @@ zx::result<fidl::ClientEnd<fuchsia_device::Controller>> TryBindToFvmDriver(
 // Formats the FVM within the provided partition if it is not already formatted.
 // Returns a connection to the FVM's device.
 zx::result<fidl::ClientEnd<fuchsia_device::Controller>> FvmPartitionFormat(
-    const fbl::unique_fd& devfs_root,
-    fidl::UnownedClientEnd<fuchsia_hardware_block::Block> partition,
-    fidl::UnownedClientEnd<fuchsia_device::Controller> partition_controller,
-    const fvm::SparseImage& header, BindOption option, FormatResult* format_result = nullptr);
+    const fbl::unique_fd& devfs_root, BlockPartitionClient& block, const fvm::SparseImage& header,
+    BindOption option, FormatResult* format_result = nullptr);
 
 // Allocates empty partitions inside the volume manager. Note that the partitions
 // are simply allocated; the actual size of each partition (number of slices etc)

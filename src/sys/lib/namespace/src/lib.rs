@@ -417,7 +417,7 @@ mod tests {
             .into_channel()
             .signal_peer(zx::Signals::empty(), zx::Signals::USER_0)
             .unwrap();
-        server_end.wait_handle(zx::Signals::USER_0, zx::Time::INFINITE).unwrap();
+        server_end.wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE).unwrap();
     }
 
     #[test]
@@ -429,6 +429,6 @@ mod tests {
         let entries = namespace.flatten();
         assert!(entries.is_empty());
         client_end.into_channel().signal_peer(zx::Signals::empty(), zx::Signals::USER_0).unwrap();
-        server_end.wait_handle(zx::Signals::USER_0, zx::Time::INFINITE).unwrap();
+        server_end.wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE).unwrap();
     }
 }

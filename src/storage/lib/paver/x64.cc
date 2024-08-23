@@ -41,14 +41,14 @@ constexpr char kOldEfiName[] = "efi-system";
 }  // namespace
 
 zx::result<std::unique_ptr<DevicePartitioner>> EfiDevicePartitioner::Initialize(
-    fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-    fidl::ClientEnd<fuchsia_device::Controller> block_device, std::shared_ptr<Context> context) {
+    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+    Arch arch, fidl::ClientEnd<fuchsia_device::Controller> block_device,
+    std::shared_ptr<Context> context) {
   if (arch != Arch::kX64) {
     return zx::error(ZX_ERR_NOT_FOUND);
   }
 
-  auto status =
-      GptDevicePartitioner::InitializeGpt(std::move(devfs_root), svc_root, std::move(block_device));
+  auto status = GptDevicePartitioner::InitializeGpt(devices, svc_root, std::move(block_device));
   if (status.is_error()) {
     return status.take_error();
   }
@@ -314,17 +314,18 @@ zx::result<> EfiDevicePartitioner::OnStop() const {
 }
 
 zx::result<std::unique_ptr<DevicePartitioner>> X64PartitionerFactory::New(
-    fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-    std::shared_ptr<Context> context, fidl::ClientEnd<fuchsia_device::Controller> block_device) {
-  return EfiDevicePartitioner::Initialize(std::move(devfs_root), svc_root, arch,
-                                          std::move(block_device), std::move(context));
+    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+    Arch arch, std::shared_ptr<Context> context,
+    fidl::ClientEnd<fuchsia_device::Controller> block_device) {
+  return EfiDevicePartitioner::Initialize(devices, svc_root, arch, std::move(block_device),
+                                          std::move(context));
 }
 
 zx::result<std::unique_ptr<abr::Client>> X64AbrClientFactory::New(
-    fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     std::shared_ptr<paver::Context> context) {
-  auto partitioner = EfiDevicePartitioner::Initialize(std::move(devfs_root), std::move(svc_root),
-                                                      GetCurrentArch(), {}, std::move(context));
+  auto partitioner =
+      EfiDevicePartitioner::Initialize(devices, svc_root, GetCurrentArch(), {}, std::move(context));
 
   if (partitioner.is_error()) {
     return partitioner.take_error();

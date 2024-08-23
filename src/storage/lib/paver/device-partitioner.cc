@@ -154,8 +154,8 @@ DevicePartitionerFactory::registered_factory_list() {
 }
 
 zx::result<std::unique_ptr<DevicePartitioner>> DevicePartitionerFactory::Create(
-    fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-    std::shared_ptr<Context> context, BlockAndController block_device) {
+    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+    Arch arch, std::shared_ptr<Context> context, BlockAndController block_device) {
   for (auto& factory : *registered_factory_list()) {
     fidl::ClientEnd<fuchsia_device::Controller> controller;
     if (block_device.controller) {
@@ -169,8 +169,8 @@ zx::result<std::unique_ptr<DevicePartitioner>> DevicePartitionerFactory::Create(
       }
       controller = std::move(controller_client);
     }
-    if (auto status = factory->New(devfs_root.duplicate(), svc_root, arch, std::move(context),
-                                   std::move(controller));
+    if (auto status =
+            factory->New(devices, svc_root, arch, std::move(context), std::move(controller));
         status.is_ok()) {
       return zx::ok(std::move(status.value()));
     }
@@ -189,12 +189,12 @@ void DevicePartitionerFactory::Register(std::unique_ptr<DevicePartitionerFactory
 constexpr PartitionScheme kFixedDevicePartitionScheme = PartitionScheme::kLegacy;
 
 zx::result<std::unique_ptr<DevicePartitioner>> FixedDevicePartitioner::Initialize(
-    fbl::unique_fd devfs_root) {
-  if (HasSkipBlockDevice(devfs_root)) {
+    const paver::BlockDevices& devices) {
+  if (HasSkipBlockDevice(devices)) {
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
   LOG("Successfully initialized FixedDevicePartitioner Device Partitioner\n");
-  return zx::ok(new FixedDevicePartitioner(std::move(devfs_root)));
+  return zx::ok(new FixedDevicePartitioner(devices.Duplicate()));
 }
 
 bool FixedDevicePartitioner::SupportsPartition(const PartitionSpec& spec) const {
@@ -231,18 +231,16 @@ zx::result<std::unique_ptr<PartitionClient>> FixedDevicePartitioner::FindPartiti
   }
   Uuid type = type_or.value();
 
-  zx::result partition = OpenBlockPartition(devfs_root_, std::nullopt, type, ZX_SEC(5));
+  zx::result partition = OpenBlockPartition(devices_, std::nullopt, type, ZX_SEC(5));
   if (partition.is_error()) {
     return partition.take_error();
   }
 
-  return zx::ok(new BlockPartitionClient(
-      std::move(partition->controller),
-      fidl::ClientEnd<fuchsia_hardware_block::Block>(std::move(partition->device))));
+  return BlockPartitionClient::Create(std::move(partition.value()));
 }
 
 zx::result<> FixedDevicePartitioner::WipeFvm() const {
-  if (auto status = WipeBlockPartition(devfs_root_, std::nullopt, Uuid(GUID_FVM_VALUE));
+  if (auto status = WipeBlockPartition(devices_, std::nullopt, Uuid(GUID_FVM_VALUE));
       status.is_error()) {
     ERROR("Failed to wipe FVM.\n");
   } else {
@@ -271,9 +269,10 @@ zx::result<> FixedDevicePartitioner::ValidatePayload(const PartitionSpec& spec,
 }
 
 zx::result<std::unique_ptr<DevicePartitioner>> DefaultPartitionerFactory::New(
-    fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-    std::shared_ptr<Context> context, fidl::ClientEnd<fuchsia_device::Controller> block_device) {
-  return FixedDevicePartitioner::Initialize(std::move(devfs_root));
+    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+    Arch arch, std::shared_ptr<Context> context,
+    fidl::ClientEnd<fuchsia_device::Controller> block_device) {
+  return FixedDevicePartitioner::Initialize(devices);
 }
 
 }  // namespace paver

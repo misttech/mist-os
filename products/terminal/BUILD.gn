@@ -37,6 +37,14 @@ product_assembly_configuration("terminal") {
         authorized_ssh_keys_path =
             rebase_path(authorized_ssh_keys_path, root_build_dir)
       }
+
+      tools = {
+        connectivity = {
+          enable_networking = true
+          enable_wlan = true
+          enable_thread = true
+        }
+      }
     }
 
     ui = {
@@ -53,6 +61,8 @@ product_assembly_configuration("terminal") {
         full_stack = {
         }
       }
+      enable_codecs = true
+      enable_sessions = true
     }
 
     fonts = {

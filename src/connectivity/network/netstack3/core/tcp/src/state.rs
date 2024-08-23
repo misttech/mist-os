@@ -25,7 +25,7 @@ use packet_formats::utils::NonZeroDuration;
 use replace_with::{replace_with, replace_with_and};
 
 use crate::internal::base::{
-    BufferSizes, ConnectionError, KeepAlive, OptionalBufferSizes, SocketOptions, TcpCountersInner,
+    BufferSizes, BuffersRefMut, ConnectionError, KeepAlive, SocketOptions, TcpCountersInner,
 };
 use crate::internal::buffer::{Assembler, BufferLimits, IntoBuffers, ReceiveBuffer, SendBuffer};
 use crate::internal::congestion::CongestionControl;
@@ -588,6 +588,7 @@ impl<I: Instant, R: ReceiveBuffer, S: SendBuffer, ActiveOpen> From<SynRcvd<I, In
             snd_wnd_scale,
         }: SynRcvd<I, Infallible>,
     ) -> Self {
+        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
         match simultaneous_open {
             None => State::SynRcvd(SynRcvd {
                 iss,
@@ -869,18 +870,6 @@ impl<I: Instant, R: ReceiveBuffer> Recv<I, R> {
             wnd_scale: *wnd_scale,
             last_window_update: *last_window_update,
         }
-    }
-
-    fn set_capacity(&mut self, size: usize) {
-        let Self { buffer, assembler: _, timer: _, mss: _, wnd_scale: _, last_window_update: _ } =
-            self;
-        buffer.request_capacity(size)
-    }
-
-    fn target_capacity(&self) -> usize {
-        let Self { buffer, assembler: _, timer: _, mss: _, wnd_scale: _, last_window_update: _ } =
-            self;
-        buffer.target_capacity()
     }
 
     fn poll_send(&mut self, snd_max: SeqNum, now: I) -> Option<Segment<()>> {
@@ -1360,44 +1349,6 @@ impl<I: Instant, S: SendBuffer, const FIN_QUEUED: bool> Send<I, S, FIN_QUEUED> {
             ..*self
         }
     }
-
-    fn set_capacity(&mut self, size: usize) {
-        let Self {
-            nxt: _,
-            max: _,
-            una: _,
-            wnd: _,
-            wl1: _,
-            wl2: _,
-            buffer,
-            last_seq_ts: _,
-            rtt_estimator: _,
-            timer: _,
-            congestion_control: _,
-            wnd_scale: _,
-            wnd_max: _,
-        } = self;
-        buffer.request_capacity(size)
-    }
-
-    fn target_capacity(&self) -> usize {
-        let Self {
-            nxt: _,
-            max: _,
-            una: _,
-            wnd: _,
-            wl1: _,
-            wl2: _,
-            buffer,
-            last_seq_ts: _,
-            rtt_estimator: _,
-            timer: _,
-            congestion_control: _,
-            wnd_scale: _,
-            wnd_max: _,
-        } = self;
-        buffer.target_capacity()
-    }
 }
 
 impl<I: Instant, S: SendBuffer> Send<I, S, { FinQueued::NO }> {
@@ -1729,6 +1680,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                                 snd_wnd_scale,
                             },
                         ) => {
+                            #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
                             match simultaneous_open {
                                 None => {
                                     self.transition_to_state(
@@ -1752,7 +1704,7 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
                         }
                         ListenOnSegmentDisposition::SendRst(rst) => Some(rst),
                         ListenOnSegmentDisposition::Ignore => None,
-                    }
+                    };
                 }
                 State::SynSent(synsent) => {
                     return match synsent.on_segment(incoming, now) {
@@ -2686,138 +2638,27 @@ impl<I: Instant + 'static, R: ReceiveBuffer, S: SendBuffer, ActiveOpen: Debug>
         reply
     }
 
-    pub(crate) fn set_send_buffer_size(&mut self, size: usize) {
+    pub(crate) fn buffers_mut(&mut self) -> BuffersRefMut<'_, R, S> {
         match self {
-            State::FinWait2(_) | State::TimeWait(_) | State::Closed(_) => (),
-            State::Listen(Listen {
-                iss: _,
-                buffer_sizes: BufferSizes { send, receive: _ },
-                device_mss: _,
-                default_mss: _,
-                user_timeout: _,
+            State::TimeWait(_) | State::Closed(_) => BuffersRefMut::NoBuffers,
+            State::Listen(Listen { buffer_sizes, .. })
+            | State::SynRcvd(SynRcvd { buffer_sizes, .. })
+            | State::SynSent(SynSent { buffer_sizes, .. }) => BuffersRefMut::Sizes(buffer_sizes),
+            State::Established(Established {
+                snd: Send { buffer: send, .. },
+                rcv: Recv { buffer: recv, .. },
             })
-            | State::SynRcvd(SynRcvd {
-                iss: _,
-                irs: _,
-                timestamp: _,
-                retrans_timer: _,
-                simultaneous_open: _,
-                buffer_sizes: BufferSizes { send, receive: _ },
-                smss: _,
-                rcv_wnd_scale: _,
-                snd_wnd_scale: _,
-            })
-            | State::SynSent(SynSent {
-                iss: _,
-                timestamp: _,
-                retrans_timer: _,
-                active_open: _,
-                buffer_sizes: BufferSizes { send, receive: _ },
-                device_mss: _,
-                default_mss: _,
-                rcv_wnd_scale: _,
-            }) => *send = size,
-            State::Established(Established { snd, rcv: _ }) => snd.set_capacity(size),
-            State::FinWait1(FinWait1 { snd, rcv: _ }) => snd.set_capacity(size),
-            State::Closing(Closing { snd, last_ack: _, last_wnd: _, last_wnd_scale: _ })
-            | State::LastAck(LastAck { snd, last_ack: _, last_wnd: _ }) => snd.set_capacity(size),
-            State::CloseWait(CloseWait { snd, last_ack: _, last_wnd: _ }) => snd.set_capacity(size),
-        }
-    }
-
-    pub(crate) fn set_receive_buffer_size(&mut self, size: usize) {
-        match self {
-            State::Closing(_)
-            | State::LastAck(_)
-            | State::CloseWait(_)
-            | State::TimeWait(_)
-            | State::Closed(_) => (),
-            State::Listen(Listen {
-                iss: _,
-                buffer_sizes: BufferSizes { send: _, receive },
-                device_mss: _,
-                default_mss: _,
-                user_timeout: _,
-            })
-            | State::SynRcvd(SynRcvd {
-                iss: _,
-                irs: _,
-                timestamp: _,
-                retrans_timer: _,
-                simultaneous_open: _,
-                buffer_sizes: BufferSizes { send: _, receive },
-                smss: _,
-                rcv_wnd_scale: _,
-                snd_wnd_scale: _,
-            })
-            | State::SynSent(SynSent {
-                iss: _,
-                timestamp: _,
-                retrans_timer: _,
-                active_open: _,
-                buffer_sizes: BufferSizes { send: _, receive },
-                device_mss: _,
-                default_mss: _,
-                rcv_wnd_scale: _,
-            }) => *receive = size,
-            State::Established(Established { snd: _, rcv }) => rcv.set_capacity(size),
-            State::FinWait1(FinWait1 { snd: _, rcv })
-            | State::FinWait2(FinWait2 { last_seq: _, rcv, timeout_at: _ }) => {
-                rcv.set_capacity(size)
+            | State::FinWait1(FinWait1 {
+                snd: Send { buffer: send, .. },
+                rcv: Recv { buffer: recv, .. },
+            }) => BuffersRefMut::Both { send, recv },
+            State::FinWait2(FinWait2::<I, R> { rcv: Recv { buffer, .. }, .. }) => {
+                BuffersRefMut::RecvOnly(buffer)
             }
-        }
-    }
-
-    pub(crate) fn target_buffer_sizes(&self) -> OptionalBufferSizes {
-        match self {
-            State::TimeWait(_) | State::Closed(_) => {
-                OptionalBufferSizes { send: None, receive: None }
-            }
-            State::Listen(Listen {
-                iss: _,
-                buffer_sizes,
-                device_mss: _,
-                default_mss: _,
-                user_timeout: _,
-            })
-            | State::SynRcvd(SynRcvd {
-                iss: _,
-                irs: _,
-                timestamp: _,
-                retrans_timer: _,
-                simultaneous_open: _,
-                buffer_sizes,
-                smss: _,
-                rcv_wnd_scale: _,
-                snd_wnd_scale: _,
-            })
-            | State::SynSent(SynSent {
-                iss: _,
-                timestamp: _,
-                retrans_timer: _,
-                active_open: _,
-                buffer_sizes,
-                device_mss: _,
-                default_mss: _,
-                rcv_wnd_scale: _,
-            }) => buffer_sizes.into_optional(),
-            State::Established(Established { snd, rcv }) => OptionalBufferSizes {
-                send: Some(snd.target_capacity()),
-                receive: Some(rcv.target_capacity()),
-            },
-            State::FinWait1(FinWait1 { snd, rcv }) => OptionalBufferSizes {
-                send: Some(snd.target_capacity()),
-                receive: Some(rcv.target_capacity()),
-            },
-            State::FinWait2(FinWait2 { last_seq: _, rcv, timeout_at: _ }) => {
-                OptionalBufferSizes { send: None, receive: Some(rcv.target_capacity()) }
-            }
-            State::Closing(Closing { snd, last_ack: _, last_wnd: _, last_wnd_scale: _ })
-            | State::LastAck(LastAck { snd, last_ack: _, last_wnd: _ }) => {
-                OptionalBufferSizes { send: Some(snd.target_capacity()), receive: None }
-            }
-            State::CloseWait(CloseWait { snd, last_ack: _, last_wnd: _ }) => {
-                OptionalBufferSizes { send: Some(snd.target_capacity()), receive: None }
+            State::Closing(Closing::<I, S> { snd: Send { buffer, .. }, .. })
+            | State::LastAck(LastAck::<I, S> { snd: Send { buffer, .. }, .. })
+            | State::CloseWait(CloseWait::<I, S> { snd: Send { buffer, .. }, .. }) => {
+                BuffersRefMut::SendOnly(buffer)
             }
         }
     }

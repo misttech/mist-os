@@ -75,7 +75,7 @@ class Gatt2RemoteServiceServerTest : public bt::fidl::testing::FakeGattFixture {
   fbg::RemoteServicePtr proxy_;
   bt::gatt::RemoteService::WeakPtr service_;
   bt::gatt::testing::FakeClient::WeakPtr fake_client_;
-  pw::async::fuchsia::FuchsiaDispatcher pw_dispatcher_{dispatcher()};
+  pw::async_fuchsia::FuchsiaDispatcher pw_dispatcher_{dispatcher()};
   pw::async::HeapDispatcher heap_dispatcher_{pw_dispatcher_};
 
   BT_DISALLOW_COPY_ASSIGN_AND_MOVE(Gatt2RemoteServiceServerTest);

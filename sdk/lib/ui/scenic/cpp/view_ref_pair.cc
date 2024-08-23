@@ -29,4 +29,35 @@ ViewRefPair ViewRefPair::New() {
   return ref_pair;
 }
 
+namespace cpp {
+
+ViewRefPair ViewRefPair::New() {
+  ViewRefPair ref_pair;
+
+  auto status = zx::eventpair::create(/*options*/ 0u, &ref_pair.control_ref.reference(),
+                                      &ref_pair.view_ref.reference());
+  // Assert even in non-debug builds, because eventpair creation can fail under
+  // normal operation.  Failure can occur for example, if the job creation
+  // policy governing this process forbids eventpair creation.
+  //
+  // It is unlikely that a well-behaved Scenic client would crash here; if you
+  // hit this, it means something is very abnormal.
+  ZX_ASSERT(status == ZX_OK);
+
+  // Remove duplication from control_ref; Scenic requires it.
+  ref_pair.control_ref.reference().replace(ZX_DEFAULT_EVENTPAIR_RIGHTS & (~ZX_RIGHT_DUPLICATE),
+                                           &ref_pair.control_ref.reference());
+
+  // Remove signaling from view_ref; Scenic requires it.
+  ref_pair.view_ref.reference().replace(ZX_RIGHTS_BASIC, &ref_pair.view_ref.reference());
+  return ref_pair;
+}
+
+fuchsia_ui_views::ViewRef CloneViewRef(const fuchsia_ui_views::ViewRef& view_ref) {
+  auto reference = fidl::Clone(view_ref.reference());
+  return fuchsia_ui_views::ViewRef(std::move(reference));
+}
+
+}  // namespace cpp
+
 }  // namespace scenic

@@ -20,7 +20,7 @@ pub trait NodeExt {
     fn create_time_at<'b>(
         &self,
         name: impl Into<StringReference>,
-        timestamp: zx::Time,
+        timestamp: zx::MonotonicTime,
     ) -> TimeProperty;
 
     /// Records a new property holding the current monotonic timestamp.
@@ -29,19 +29,19 @@ pub trait NodeExt {
 
 impl NodeExt for Node {
     fn create_time(&self, name: impl Into<StringReference>) -> TimeProperty {
-        self.create_time_at(name, zx::Time::get_monotonic())
+        self.create_time_at(name, zx::MonotonicTime::get())
     }
 
     fn create_time_at<'b>(
         &self,
         name: impl Into<StringReference>,
-        timestamp: zx::Time,
+        timestamp: zx::MonotonicTime,
     ) -> TimeProperty {
         TimeProperty { inner: self.create_int(name, timestamp.into_nanos()) }
     }
 
     fn record_time(&self, name: impl Into<StringReference>) {
-        self.record_int(name, zx::Time::get_monotonic().into_nanos());
+        self.record_int(name, zx::MonotonicTime::get().into_nanos());
     }
 }
 
@@ -54,11 +54,11 @@ pub struct TimeProperty {
 impl TimeProperty {
     /// Updates the underlying property with the current monotonic timestamp.
     pub fn update(&self) {
-        self.set_at(zx::Time::get_monotonic());
+        self.set_at(zx::MonotonicTime::get());
     }
 
     /// Updates the underlying property with the given timestamp.
-    pub fn set_at(&self, timestamp: zx::Time) {
+    pub fn set_at(&self, timestamp: zx::MonotonicTime) {
         Property::set(&self.inner, timestamp.into_nanos());
     }
 }
@@ -77,13 +77,13 @@ mod tests {
         let inspector = Inspector::default();
 
         let time_property =
-            inspector.root().create_time_at("time", zx::Time::from_nanos(123_456_700_000));
+            inspector.root().create_time_at("time", zx::MonotonicTime::from_nanos(123_456_700_000));
         let t1 = validate_inspector_get_time(&inspector, 123_456_700_000i64);
 
-        time_property.set_at(zx::Time::from_nanos(333_005_000_000));
+        time_property.set_at(zx::MonotonicTime::from_nanos(333_005_000_000));
         let t2 = validate_inspector_get_time(&inspector, 333_005_000_000i64);
 
-        time_property.set_at(zx::Time::from_nanos(333_444_000_000));
+        time_property.set_at(zx::MonotonicTime::from_nanos(333_444_000_000));
         let t3 = validate_inspector_get_time(&inspector, 333_444_000_000i64);
 
         assert_lt!(t1, t2);
@@ -108,7 +108,7 @@ mod tests {
 
     #[fuchsia::test]
     fn test_record_time() {
-        let before_time = zx::Time::get_monotonic().into_nanos();
+        let before_time = zx::MonotonicTime::get().into_nanos();
         let inspector = Inspector::default();
         inspector.root().record_time("time");
         let after_time = validate_inspector_get_time(&inspector, AnyProperty);

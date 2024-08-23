@@ -263,8 +263,7 @@ impl BlockDevicePayloadStreamer {
                     if let Err(e) =
                         unwrapped.device.read_at(buffer_slice, unwrapped.device_read as u64).await
                     {
-                        responder
-                            .send(&ReadResult::Err { 0: e.downcast::<zx::Status>()?.into_raw() })?;
+                        responder.send(&ReadResult::Err { 0: e.into_raw() })?;
                         return Ok(());
                     }
                     unwrapped.device_vmo_read = 0;
@@ -298,7 +297,7 @@ impl BlockDevicePayloadStreamer {
     async fn close(&self) -> Result<(), Error> {
         let unwrapped = self.inner.lock().await;
         unwrapped.device.detach_vmo(unwrapped.device_vmo_id.take()).await?;
-        unwrapped.device.close().await
+        Ok(unwrapped.device.close().await?)
     }
 }
 

@@ -67,9 +67,9 @@ pub(crate) trait ViewStrategy {
     ) {
     }
 
-    async fn handle_display_coordinator_event(
+    async fn handle_display_coordinator_listener_request(
         &mut self,
-        _event: fidl_fuchsia_hardware_display::CoordinatorEvent,
+        _event: fidl_fuchsia_hardware_display::CoordinatorListenerRequest,
     ) {
     }
 

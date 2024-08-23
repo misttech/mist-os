@@ -13,7 +13,7 @@
         {
             directory: "dev-class",
             from: "parent",
-            as: "dev-class-bluetooth",
+            as: "dev-bt-hci",
             to: "#bt-fct-hci",
             rights: [ "r*" ],
             subdir: "bt-hci",

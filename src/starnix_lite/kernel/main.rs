@@ -24,8 +24,9 @@ use fuchsia_runtime::{swap_utc_clock_handle, take_startup_handle, HandleInfo, Ha
 use futures::prelude::*;
 use mistos_logger::klog;
 use starnix_core::mm::{init_usercopy, zxio_maybe_faultable_copy_impl};
-use starnix_lite_kernel_config::Config;
-use starnix_lite_kernel_runner::{create_container_from_config, Container, ContainerServiceConfig};
+use starnix_lite_kernel_runner::{
+    create_container_from_config, Config, Container, ContainerServiceConfig,
+};
 use starnix_logging::{log_error, log_info, log_warn};
 use {
     fidl_fuchsia_boot as fuchsia_boot, fuchsia_async as fasync, fuchsia_runtime as fruntime,
@@ -112,6 +113,9 @@ fn main() -> Result<(), Error> {
         name: "starnix_lite".to_owned(),
         startup_file_path: Default::default(),
         remote_block_devices: Default::default(),
+        pkg_dir: None,
+        svc_dir: None,
+        data_dir: None,
     };
 
     let mut executor = fasync::LocalExecutor::new();

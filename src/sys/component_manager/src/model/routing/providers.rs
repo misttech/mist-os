@@ -14,6 +14,7 @@ use cm_util::TaskGroup;
 use errors::{CapabilityProviderError, OpenError};
 use moniker::Moniker;
 use router_error::RouterError;
+use routing::availability::AvailabilityMetadata;
 use routing::bedrock::request_metadata::METADATA_KEY_TYPE;
 use routing::error::{ComponentInstanceError, RoutingError};
 use sandbox::{Dict, RemotableCapability, Request, WeakInstanceToken};
@@ -70,6 +71,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
                 )
                 .unwrap();
         }
+        metadata.set_availability(Availability::Transitional);
         let capability = source
             .get_program_output_dict()
             .await?
@@ -79,7 +81,6 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
                 // Routers in `program_output_dict` do not check availability but we need a
                 // request to run hooks.
                 Request {
-                    availability: Availability::Transitional,
                     target: WeakInstanceToken::new_component(self.target.clone()),
                     debug: false,
                     metadata,
@@ -87,7 +88,7 @@ impl CapabilityProvider for DefaultComponentCapabilityProvider {
             )
             .await?
             .ok_or_else(|| RoutingError::BedrockNotPresentInDictionary {
-                moniker: self.target.moniker.clone(),
+                moniker: self.target.moniker.clone().into(),
                 name: self.name.to_string(),
             })
             .map_err(RouterError::from)?;

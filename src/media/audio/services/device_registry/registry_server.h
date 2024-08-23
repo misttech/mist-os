@@ -57,6 +57,7 @@ class RegistryServer
   void ReplyWithNextRemovedDevice();
 
   std::shared_ptr<AudioDeviceRegistry> parent_;
+  bool responded_to_initial_watch_devices_added_ = false;
 
   std::vector<fuchsia_audio_device::Info> devices_added_since_notify_;
   std::optional<WatchDevicesAddedCompleter::Async> watch_devices_added_completer_;

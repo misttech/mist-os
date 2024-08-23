@@ -83,6 +83,14 @@ template("clang_toolchain") {
     enable_rust =
         support_rust && (!defined(invoker.enable_rust) || invoker.enable_rust)
 
+    prefix = rebased_clang_prefix
+    if (defined(invoker.prefix)) {
+      prefix = invoker.prefix
+    }
+    if (cxx_rbe_full_toolchain || link_rbe_full_toolchain) {
+      _toolchain_dir = string_replace(prefix, "/bin", "")  # remove suffix
+    }
+
     compiler_prefix_list = []
     if (enable_rust) {
       if (defined(invoker.rust_rbe_enable)) {
@@ -159,6 +167,22 @@ template("clang_toolchain") {
         # re-client has built-in support for write-if-changed behavior
         compiler_prefix_list += [ "--preserve_unchanged_output_mtime" ]
       }
+
+      # When debugging or working around unexpected differences between
+      # local and remote execution, upload the entire toolchain to see
+      # if differences are resolved.
+      if (cxx_rbe_full_toolchain) {
+        if (cxx_rbe_minimalist_wrapper) {  # rewrapper expects paths relative to
+                                           # exec_root, which is the source dir
+          _toolchain_dir_arg = rebase_path(_toolchain_dir, "//", root_build_dir)
+        } else {  # The python wrapper already adjusts paths accordingly.
+          _toolchain_dir_arg = _toolchain_dir
+        }
+        compiler_prefix_list += [
+          "--inputs",
+          _toolchain_dir_arg,
+        ]
+      }
       compiler_prefix_list += [ "--" ]
     } else {
       if (defined(invoker.use_ccache)) {
@@ -170,11 +194,6 @@ template("clang_toolchain") {
       _cxx_concurrent_jobs = concurrent_jobs.local
     }
     compiler_prefix = string_join(" ", compiler_prefix_list) + " "
-
-    prefix = rebased_clang_prefix
-    if (defined(invoker.prefix)) {
-      prefix = invoker.prefix
-    }
 
     if (_link_rbe_enable) {
       _link_rbe_exec_strategy_flags =
@@ -1053,9 +1072,13 @@ template("clang_toolchain") {
           _linker_prefix_list += _link_rbe_exec_strategy_flags
           _link_concurrent_jobs = concurrent_jobs.remote
         }
+        _linker_input_args = [ "\"$rspfile\"" ]
+        if (link_rbe_full_toolchain) {
+          _linker_input_args += [ _toolchain_dir ]
+        }
         _linker_prefix_list += [
           "--inputs",
-          "\"$rspfile\"",
+          string_join(",", _linker_input_args),
           "--input_list_paths",
           "\"$rspfile\"",
           "--output_files",
@@ -1149,6 +1172,12 @@ template("clang_toolchain") {
               "--output-is-executable",  # workaround for b/285030257
             ]  # The remote link wrapper will download everything except the
                # main output.
+          }
+          if (link_rbe_full_toolchain) {
+            _linker_prefix_list += [
+              "--inputs",
+              _toolchain_dir,
+            ]
           }
           _linker_prefix_list += [
             "--preserve_unchanged_output_mtime",

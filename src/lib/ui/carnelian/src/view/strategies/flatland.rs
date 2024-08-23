@@ -26,7 +26,7 @@ use fuchsia_framebuffer::sysmem::BufferCollectionAllocator;
 use fuchsia_framebuffer::{FrameSet, FrameUsage, ImageId};
 use fuchsia_scenic::BufferCollectionTokenPair;
 use fuchsia_trace::{duration, instant};
-use fuchsia_zircon::{self as zx, Event, HandleBased, Signals, Time};
+use fuchsia_zircon::{self as zx, Event, HandleBased, MonotonicTime, Signals};
 use futures::channel::mpsc::UnboundedSender;
 use futures::prelude::*;
 use futures::{StreamExt, TryStreamExt};
@@ -488,7 +488,7 @@ impl FlatlandViewStrategy {
         image_id: ImageId,
         image_index: u32,
         app_sender: UnboundedSender<MessageInternal>,
-        presentation_time: Time,
+        presentation_time: MonotonicTime,
     ) -> ViewAssistantContext {
         ViewAssistantContext {
             key: view_details.key,
@@ -515,7 +515,7 @@ impl FlatlandViewStrategy {
             image_id,
             image_index,
             app_sender,
-            Time::get_monotonic(),
+            MonotonicTime::get(),
         )
     }
 
@@ -595,7 +595,7 @@ impl FlatlandViewStrategy {
                 available,
                 *available_index,
                 self.app_sender.clone(),
-                Time::from_nanos(presentation_time.presentation_time),
+                MonotonicTime::from_nanos(presentation_time.presentation_time),
             );
             let buffer_ready_event = Event::create();
             view_assistant

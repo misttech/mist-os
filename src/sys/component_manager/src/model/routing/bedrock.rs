@@ -37,10 +37,9 @@ impl UseRouteRequest {
         match self {
             Self::UseProtocol(decl) => {
                 let request = Request {
-                    availability: decl.availability,
                     target: WeakInstanceToken::new_component(target.clone()),
                     debug,
-                    metadata: protocol_metadata(),
+                    metadata: protocol_metadata(decl.availability),
                 };
                 let Some(capability) = program_input_dict.get_capability(&decl.target_path) else {
                     panic!(
@@ -109,10 +108,9 @@ impl RouteRequest {
             Self::Use(r) => r.into_router(target, &sandbox.program_input.namespace, debug),
             Self::ExposeProtocol(decl) => {
                 let request = Request {
-                    availability: decl.availability,
                     target: WeakInstanceToken::new_component(target.clone()),
                     debug,
-                    metadata: protocol_metadata(),
+                    metadata: protocol_metadata(decl.availability),
                 };
                 let Some(capability) =
                     sandbox.component_output_dict.get_capability(&decl.target_name)

@@ -84,6 +84,11 @@ impl DomainConfigPackage {
                             .add_contents_to_far(&destination, &contents, &outdir)
                             .with_context(|| format!("adding config to {destination}"))?;
                     }
+                    FileOrContents::BinaryContents(contents) => {
+                        builder
+                            .add_contents_to_far(&destination, &contents, &outdir)
+                            .with_context(|| format!("adding binary config to {destination}"))?;
+                    }
                 }
             }
         }

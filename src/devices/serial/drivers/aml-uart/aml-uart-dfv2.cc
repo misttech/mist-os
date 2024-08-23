@@ -10,6 +10,9 @@
 #include <lib/driver/power/cpp/element-description-builder.h>
 #include <lib/driver/power/cpp/power-support.h>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/serial/cpp/bind.h>
+
 namespace serial {
 
 namespace {
@@ -170,10 +173,10 @@ zx_status_t AmlUartV2::GetPowerConfiguration(
     return ZX_ERR_INTERNAL;
   }
 
-  element_control_client_end_ = std::move(*description.element_control_client_);
-  lessor_client_end_ = std::move(*description.lessor_client_);
-  current_level_client_end_ = std::move(*description.current_level_client_);
-  required_level_client_end_ = std::move(*description.required_level_client_);
+  element_control_client_end_ = std::move(*description.element_control_client);
+  lessor_client_end_ = std::move(*description.lessor_client);
+  current_level_client_end_ = std::move(*description.current_level_client);
+  required_level_client_end_ = std::move(*description.required_level_client);
   return ZX_OK;
 }
 
@@ -293,9 +296,10 @@ void AmlUartV2::OnDeviceServerInitialized(zx::result<> device_server_init_result
       {
           .name = std::string(child_name),
           .properties = {{
-              fdf::MakeProperty(0x0001 /*BIND_PROTOCOL*/, ZX_PROTOCOL_SERIAL_IMPL_ASYNC),
-              fdf::MakeProperty(0x0600 /*BIND_SERIAL_CLASS*/,
-                                static_cast<uint8_t>(aml_uart_->serial_port_info().serial_class)),
+              fdf::MakeProperty(bind_fuchsia::PROTOCOL,
+                                bind_fuchsia_serial::BIND_PROTOCOL_IMPL_ASYNC),
+              fdf::MakeProperty(bind_fuchsia::SERIAL_CLASS,
+                                static_cast<uint32_t>(aml_uart_->serial_port_info().serial_class)),
           }},
           .offers2 = std::move(offers),
       },

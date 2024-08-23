@@ -55,7 +55,7 @@ fn create_named_deadline_rust(deadline: &DeadlineId<'_>, duration: zx::Duration)
         )
     };
     match time_valid {
-        true => zx::Time::from_nanos(time).into(),
+        true => zx::MonotonicTime::from_nanos(time).into(),
         false => fasync::Time::now() + duration,
     }
 }

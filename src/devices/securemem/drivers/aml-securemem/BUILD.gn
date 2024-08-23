@@ -12,7 +12,6 @@ driver_bind_rules("aml-securemem-bind") {
   bind_output = "aml-securemem.bindbc"
   tests = "meta/aml-securemem-bind-test.json"
   deps = [
-    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
     "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.platform",
@@ -49,6 +48,7 @@ fuchsia_driver("aml-securemem-driver") {
     "//sdk/fidl/fuchsia.tee:fuchsia.tee_hlcpp",
     "//sdk/lib/async_patterns/cpp",
     "//sdk/lib/fit-promise",
+    "//src/devices/bind/fuchsia.amlogic.platform.sysmem.heap:fuchsia.amlogic.platform.sysmem.heap_cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/driver",
     "//src/devices/lib/driver:driver_runtime",
@@ -96,6 +96,7 @@ test("aml-securemem-test-bin") {
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/driver/runtime:driver_runtime_env",
     "//sdk/lib/fit-promise",
+    "//src/devices/bind/fuchsia.amlogic.platform.sysmem.heap:fuchsia.amlogic.platform.sysmem.heap_cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/bus/testing/fake-pdev",
     "//src/devices/lib/driver:driver_runtime",

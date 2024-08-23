@@ -15,9 +15,6 @@ impl DefineSubsystemConfiguration<InputGroupsConfig> for InputGroupsSubsystem {
         if config.group1 {
             builder.platform_bundle("input_group_one");
         }
-        if config.group2 {
-            builder.platform_bundle("input_group_two");
-        }
         Ok(())
     }
 }

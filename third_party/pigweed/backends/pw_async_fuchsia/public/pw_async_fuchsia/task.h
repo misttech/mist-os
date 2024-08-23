@@ -10,12 +10,12 @@
 #include "pw_async/task_function.h"
 #include "pw_chrono/system_clock.h"
 
-namespace pw::async::fuchsia {
+namespace pw::async_fuchsia {
 
 // NativeTask friend forward declaration.
 class FuchsiaDispatcher;
 
-}  // namespace pw::async::fuchsia
+}  // namespace pw::async_fuchsia
 
 namespace pw::async::test::backend {
 
@@ -28,7 +28,7 @@ namespace pw::async::backend {
 
 class NativeTask final : public async_task_t {
  private:
-  friend class ::pw::async::fuchsia::FuchsiaDispatcher;
+  friend class ::pw::async_fuchsia::FuchsiaDispatcher;
   friend class ::pw::async::test::backend::NativeFakeDispatcher;
   friend class ::pw::async::Task;
 

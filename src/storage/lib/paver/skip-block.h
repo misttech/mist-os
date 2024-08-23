@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.hardware.skipblock/cpp/wire.h>
 
 #include "src/lib/uuid/uuid.h"
+#include "src/storage/lib/paver/block-devices.h"
 #include "src/storage/lib/paver/device-partitioner.h"
 #include "src/storage/lib/paver/partition-client.h"
 
@@ -21,8 +22,7 @@ class SkipBlockPartitionClient;
 // ZIRCON-R).
 class SkipBlockDevicePartitioner {
  public:
-  explicit SkipBlockDevicePartitioner(fbl::unique_fd devfs_root)
-      : devfs_root_(std::move(devfs_root)) {}
+  explicit SkipBlockDevicePartitioner(paver::BlockDevices devices) : devices_(std::move(devices)) {}
 
   zx::result<std::unique_ptr<SkipBlockPartitionClient>> FindPartition(const uuid::Uuid& type) const;
 
@@ -30,10 +30,8 @@ class SkipBlockDevicePartitioner {
 
   zx::result<> WipeFvm() const;
 
-  fbl::unique_fd& devfs_root() { return devfs_root_; }
-
  private:
-  fbl::unique_fd devfs_root_;
+  BlockDevices devices_;
 };
 
 class SkipBlockPartitionClient : public PartitionClient {

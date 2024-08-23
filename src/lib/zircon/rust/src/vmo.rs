@@ -474,11 +474,11 @@ mod tests {
 
     #[test]
     fn vmo_create_contiguous() {
-        use fuchsia_zircon::{Channel, HandleBased, Time};
+        use fuchsia_zircon::{Channel, HandleBased, MonotonicTime};
         let (client_end, server_end) = Channel::create();
         connect_channel_to_protocol::<fkernel::IommuResourceMarker>(server_end).unwrap();
         let service = fkernel::IommuResourceSynchronousProxy::new(client_end);
-        let resource = service.get(Time::INFINITE).expect("couldn't get iommu resource");
+        let resource = service.get(MonotonicTime::INFINITE).expect("couldn't get iommu resource");
         // This test and fuchsia-zircon are different crates, so we need
         // to use from_raw to convert between the fuchsia_zircon handle and this test handle.
         // See https://fxbug.dev/42173139 for details.
@@ -730,7 +730,7 @@ mod tests {
 
     #[test]
     fn vmo_replace_as_executeable() {
-        use fuchsia_zircon::{Channel, HandleBased, Time};
+        use fuchsia_zircon::{Channel, HandleBased, MonotonicTime};
 
         let vmo = Vmo::create(16).unwrap();
 
@@ -740,7 +740,7 @@ mod tests {
         let (client_end, server_end) = Channel::create();
         connect_channel_to_protocol::<fkernel::VmexResourceMarker>(server_end).unwrap();
         let service = fkernel::VmexResourceSynchronousProxy::new(client_end);
-        let resource = service.get(Time::INFINITE).expect("couldn't get vmex resource");
+        let resource = service.get(MonotonicTime::INFINITE).expect("couldn't get vmex resource");
         let resource = unsafe { crate::Resource::from(Handle::from_raw(resource.into_raw())) };
 
         let exec_vmo = vmo.replace_as_executable(&resource).unwrap();

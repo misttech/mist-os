@@ -4,7 +4,16 @@
 
 #include "src/storage/blobfs/transaction.h"
 
+#include <lib/fit/function.h>
+#include <lib/fpromise/promise.h>
 #include <lib/syslog/cpp/macros.h>
+#include <zircon/errors.h>
+#include <zircon/status.h>
+#include <zircon/types.h>
+
+#include <utility>
+
+#include "src/storage/lib/vfs/cpp/journal/journal.h"
 
 namespace blobfs {
 
@@ -20,7 +29,7 @@ void BlobTransaction::Commit(fs::Journal& journal, fpromise::promise<void, zx_st
   });
   // We can't do much except log the error.
   if (status != ZX_OK) {
-    FX_LOGS(ERROR) << "BlobTransaction::Commit failed: " << zx_status_get_string(status);
+    FX_PLOGS(ERROR, status) << "BlobTransaction::Commit failed";
   }
 }
 

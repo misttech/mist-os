@@ -97,7 +97,7 @@ impl SchedulingLib for ThroughputScheduler {
         PresentParameters {
             expected_latch_point: latch_point,
             expected_presentation_time: presentation_time,
-            requested_presentation_time: zx::Time::from_nanos(0),
+            requested_presentation_time: zx::MonotonicTime::from_nanos(0),
             unsquashable: false,
         }
     }
@@ -176,16 +176,16 @@ mod tests {
         sched.on_next_frame_begin(
             10,
             vec![PresentationInfo {
-                latch_point: zx::Time::from_nanos(1),
-                presentation_time: zx::Time::from_nanos(1),
+                latch_point: zx::MonotonicTime::from_nanos(1),
+                presentation_time: zx::MonotonicTime::from_nanos(1),
             }],
         );
         assert_eq!(
             exec.run_until_stalled(&mut fut),
             Poll::Ready(PresentParameters {
-                expected_latch_point: zx::Time::from_nanos(1),
-                expected_presentation_time: zx::Time::from_nanos(1),
-                requested_presentation_time: zx::Time::from_nanos(0),
+                expected_latch_point: zx::MonotonicTime::from_nanos(1),
+                expected_presentation_time: zx::MonotonicTime::from_nanos(1),
+                requested_presentation_time: zx::MonotonicTime::from_nanos(0),
                 unsquashable: false,
             })
         );

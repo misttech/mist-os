@@ -755,8 +755,8 @@ impl<
         mut buffer: B,
         meta: ReceiveIpPacketMeta<Ipv4>,
     ) -> Result<(), (B, TransportReceiveError)> {
-        let ReceiveIpPacketMeta { broadcast: _, transport_override } = &meta;
-        if let Some(delivery) = transport_override {
+        let ReceiveIpPacketMeta { broadcast: _, transparent_override, dscp_and_ecn: _ } = &meta;
+        if let Some(delivery) = transparent_override {
             unreachable!(
                 "cannot perform transparent local delivery {delivery:?} to an ICMP socket; \
                 transparent proxy rules can only be configured for TCP and UDP packets"
@@ -1542,8 +1542,8 @@ impl<
         mut buffer: B,
         meta: ReceiveIpPacketMeta<Ipv6>,
     ) -> Result<(), (B, TransportReceiveError)> {
-        let ReceiveIpPacketMeta { broadcast: _, transport_override } = &meta;
-        if let Some(delivery) = transport_override {
+        let ReceiveIpPacketMeta { broadcast: _, transparent_override, dscp_and_ecn: _ } = &meta;
+        if let Some(delivery) = transparent_override {
             unreachable!(
                 "cannot perform transparent local delivery {delivery:?} to an ICMP socket; \
                 transparent proxy rules can only be configured for TCP and UDP packets"

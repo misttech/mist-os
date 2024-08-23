@@ -142,9 +142,12 @@ constexpr uint8_t RebootModeToByte(RebootMode m) { return static_cast<uint8_t>(m
 // Set reboot mode. Returns true if succeeds, false otherwise.
 bool SetRebootMode(RebootMode mode);
 
-// Get reboot mode.
+// Gets the reboot mode indicated by the commandline, or std::nullopt if none was found.
+std::optional<RebootMode> GetCommandlineRebootMode();
+
+// Get the reboot mode indicated by |one_shot_flags| and/or the bootbyte data.
 // Returns std::nullopt on failure
-std::optional<RebootMode> GetRebootMode(AbrDataOneShotFlags one_shot_flags);
+std::optional<RebootMode> GetOneShotRebootMode(AbrDataOneShotFlags one_shot_flags);
 
 // Convert hex string to `efi_guid`
 // Input string should be in RFC4122 "registry format"

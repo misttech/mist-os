@@ -82,12 +82,13 @@ class TestHarness : public fidl::Server<fio_test::Io1Harness> {
     config.supports_get_token(true);
     config.supports_append(true);
     config.supports_modify_directory(true);
+    config.supports_mutable_file(true);
     config.supported_attributes(
         fio::NodeAttributesQuery::kCreationTime | fio::NodeAttributesQuery::kModificationTime |
         fio::NodeAttributesQuery::kContentSize | fio::NodeAttributesQuery::kStorageSize |
         fio::NodeAttributesQuery::kId | fio::NodeAttributesQuery::kLinkCount |
         fio::NodeAttributesQuery::kMode | fio::NodeAttributesQuery::kUid |
-        fio::NodeAttributesQuery::kGid);
+        fio::NodeAttributesQuery::kGid | fio::NodeAttributesQuery::kRdev);
 
     completer.Reply(config);
   }
@@ -118,7 +119,8 @@ class TestHarness : public fidl::Server<fio_test::Io1Harness> {
 };
 
 int main(int argc, const char** argv) {
-  fuchsia_logging::SetTags({"io_conformance_harness_memfs"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"io_conformance_harness_memfs"}).BuildAndInitialize();
 
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   async_dispatcher_t* dispatcher = loop.dispatcher();

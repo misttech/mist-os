@@ -31,6 +31,7 @@ class LdLoadTestsBase {
   // An indicator to GTEST of whether the test fixture supports the following
   // features so that it may skip related tests if not supported.
   static constexpr bool kCanCollectLog = true;
+  static constexpr bool kRunsLdStartup = true;
 
   void InitLog(fbl::unique_fd& log_fd);
 

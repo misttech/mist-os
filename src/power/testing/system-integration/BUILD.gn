@@ -7,7 +7,10 @@ group("e2e_tests") {
   testonly = true
   deps = []
   if (current_cpu == "arm64") {
-    deps += [ "storage:e2e_tests" ]
+    deps += [
+      "msd-arm-mali:e2e_tests",
+      "storage:e2e_tests",
+    ]
   }
 }
 
@@ -16,7 +19,10 @@ group("e2e_tests") {
 group("bazel_inputs") {
   deps = []
   if (current_cpu == "arm64") {
-    deps += [ "storage:bazel_inputs" ]
+    deps += [
+      "msd-arm-mali:bazel_inputs",
+      "storage:bazel_inputs",
+    ]
   }
 }
 
@@ -27,6 +33,9 @@ group("bazel_test_inputs") {
   testonly = true
   deps = []
   if (current_cpu == "arm64") {
-    deps += [ "storage:bazel_test_inputs" ]
+    deps += [
+      "msd-arm-mali:bazel_test_inputs",
+      "storage:bazel_test_inputs",
+    ]
   }
 }

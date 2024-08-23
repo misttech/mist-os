@@ -27,13 +27,13 @@ const AVRCP_TARGET_URL: &str =
 /// without the underlying FIDL channel.
 enum Event {
     /// AVRCP service event.
-    Avrcp(Option<TargetHandlerProxy>),
+    Avrcp { _target_handler: Option<TargetHandlerProxy> },
     /// Media service event.
-    Media(Option<SessionsWatcherProxy>),
+    Media { _sessions_watcher: Option<SessionsWatcherProxy> },
     /// Component Framework Binder event.
-    Binder(Option<BinderProxy>),
+    Binder { _binder: Option<BinderProxy> },
     /// Battery Manager service connection.
-    BatteryManager(Option<BatteryManagerRequest>),
+    BatteryManager { _battery_manager: Option<BatteryManagerRequest> },
 }
 
 impl From<DiscoveryRequest> for Event {
@@ -42,7 +42,7 @@ impl From<DiscoveryRequest> for Event {
         match src {
             DiscoveryRequest::WatchSessions { session_watcher, .. } => {
                 let watcher = session_watcher.into_proxy().unwrap();
-                Self::Media(Some(watcher))
+                Self::Media { _sessions_watcher: Some(watcher) }
             }
             r => panic!("Expected Watch but got {:?}", r),
         }
@@ -56,7 +56,7 @@ impl From<PeerManagerRequest> for Event {
             PeerManagerRequest::RegisterTargetHandler { handler, responder, .. } => {
                 let handler = handler.into_proxy().unwrap();
                 responder.send(Ok(())).expect("Failed to respond");
-                Self::Avrcp(Some(handler))
+                Self::Avrcp { _target_handler: Some(handler) }
             }
             r => panic!("Expected RegisterTargetHandler but got: {:?}", r),
         }
@@ -67,7 +67,7 @@ impl From<BatteryManagerRequest> for Event {
     fn from(src: BatteryManagerRequest) -> Self {
         // BatteryManager requests don't need to be handled since the component-under-test is
         // resilient to unavailability.
-        Self::BatteryManager(Some(src))
+        Self::BatteryManager { _battery_manager: Some(src) }
     }
 }
 
@@ -77,7 +77,10 @@ async fn mock_avrcp_target_client(
     handles: LocalComponentHandles,
 ) -> Result<(), Error> {
     let binder_svc = handles.connect_to_protocol::<BinderMarker>()?;
-    sender.send(Event::Binder(Some(binder_svc))).await.expect("failed sending ack to test");
+    sender
+        .send(Event::Binder { _binder: Some(binder_svc) })
+        .await
+        .expect("failed sending ack to test");
     Ok(())
 }
 
@@ -216,10 +219,10 @@ async fn avrcp_tg_v2_connects_to_avrcp_service() {
     // Expect one request of each.
     let expected: HashSet<_> = HashSet::from_iter(
         vec![
-            Event::Avrcp(None),
-            Event::Media(None),
-            Event::BatteryManager(None),
-            Event::Binder(None),
+            Event::Avrcp { _target_handler: None },
+            Event::Media { _sessions_watcher: None },
+            Event::BatteryManager { _battery_manager: None },
+            Event::Binder { _binder: None },
         ]
         .iter()
         .map(std::mem::discriminant),

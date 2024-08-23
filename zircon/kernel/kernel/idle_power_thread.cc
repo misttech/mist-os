@@ -14,6 +14,7 @@
 #include <platform.h>
 #include <zircon/errors.h>
 #include <zircon/time.h>
+#include <zircon/types.h>
 
 #include <arch/interrupt.h>
 #include <arch/mp.h>
@@ -24,6 +25,8 @@
 #include <kernel/scheduler.h>
 #include <kernel/thread.h>
 #include <ktl/atomic.h>
+#include <lk/init.h>
+#include <object/interrupt_dispatcher.h>
 #include <platform/timer.h>
 
 namespace {
@@ -86,18 +89,6 @@ void IdlePowerThread::FlushAndHalt() {
   state_.store({State::Offline, State::Offline}, ktl::memory_order_release);
 
   arch_flush_state_and_halt(&complete_);
-}
-
-void IdlePowerThread::WakeEvent::DumpPending(FILE* f) {
-  Guard<SpinLock, IrqSave> guard(WakeEventListLock::Get());
-  for (const IdlePowerThread::WakeEvent& w : list_) {
-    const zx_koid_t koid = w.owner_koid_;
-    const zx_ticks_t ticks = w.last_trigger_ticks_.load(ktl::memory_order_relaxed);
-    if (ticks != ZX_TIME_INFINITE_PAST) {
-      const zx_time_t time = timer_get_ticks_to_time_ratio().Scale(ticks);
-      fprintf(f, "koid %" PRIu64 ", time %" PRIi64 "\n", koid, time);
-    }
-  }
 }
 
 int IdlePowerThread::Run(void* arg) {
@@ -237,7 +228,8 @@ zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_boot_time_t resume_
   // Prevent re-entrant calls to suspend.
   Guard<Mutex> guard{TransitionLock::Get()};
 
-  if (resume_at < current_boot_time()) {
+  const zx_boot_time_t suspend_request_boot_time = current_boot_time();
+  if (resume_at < suspend_request_boot_time) {
     return ZX_ERR_TIMED_OUT;
   }
 
@@ -255,7 +247,7 @@ zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_boot_time_t resume_
 
       // TODO(https://fxbug.dev/348668110): Revisit this logging.  Still needed?
       printf("begin dump of pending wake events\n");
-      WakeEvent::DumpPending(stdout);
+      WakeEvent::Dump(stdout, suspend_request_boot_time);
       printf("end dump of pending wake events\n");
 
       return ZX_ERR_BAD_STATE;
@@ -313,12 +305,11 @@ zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_boot_time_t resume_
       dprintf(INFO, "Setting boot CPU to resume at time %" PRId64 "\n", resume_at);
       resume_timer_.SetOneshot(
           resume_at,
-          +[](Timer* timer, zx_time_t now, void* resume_at_ptr) {
+          +[](Timer* timer, zx_boot_time_t now, void* resume_at_ptr) {
             // Verify this handler is running in the correct context.
             DEBUG_ASSERT(arch_curr_cpu_num() == BOOT_CPU_ID);
 
-            WakeEvent wake_event(Thread::Current::Get()->tid());
-            const WakeResult wake_result = wake_event.Trigger();
+            const WakeResult wake_result = resume_timer_wake_vector_->wake_event.Trigger();
             const char* message_prefix = wake_result == WakeResult::SuspendAborted
                                              ? "Wakeup before suspend completed. Aborting suspend"
                                              : "Resuming boot CPU";
@@ -369,8 +360,11 @@ zx_status_t IdlePowerThread::TransitionAllActiveToSuspend(zx_boot_time_t resume_
             active_to_suspend_result.status, ToString(active_to_suspend_result.starting_state));
     }
 
-    dprintf(INFO, "Pending wake events:\n");
-    WakeEvent::DumpPending(stdout);
+    dprintf(INFO, "Wake events triggered after/during suspend:\n");
+    WakeEvent::Dump(stdout, suspend_request_boot_time);
+
+    // Ack the suspend timeout wake event after reporting wake event diagnostics.
+    resume_timer_wake_vector_->wake_event.Acknowledge();
 
     // If the boot CPU is in the Wakeup state, set it to Active.
     StateMachine expected = kWakeup;
@@ -467,6 +461,17 @@ void IdlePowerThread::AcknowledgeSystemWakeEvent() {
   DEBUG_ASSERT_MSG(previous_pending_wake_events != 0, "Pending wake event count underflow!");
 }
 
+void IdlePowerThread::ResumeTimerWakeVector::GetDiagnostics(
+    WakeVector::Diagnostics& diagnostics_out) const {
+  diagnostics_out.enabled = true;
+  diagnostics_out.koid = ZX_KOID_KERNEL;
+  diagnostics_out.PrintExtra("suspend timeout");
+}
+
+// Register the resume timer wake event after global ctors have initialized the global list.
+void IdlePowerThread::InitHook(uint level) { resume_timer_wake_vector_.Initialize(); }
+LK_INIT_HOOK(idle_power_thread, IdlePowerThread::InitHook, LK_INIT_LEVEL_EARLIEST)
+
 #include <lib/console.h>
 
 static int cmd_suspend(int argc, const cmd_args* argv, uint32_t flags) {
@@ -502,6 +507,12 @@ static int cmd_suspend(int argc, const cmd_args* argv, uint32_t flags) {
 
     const zx_time_t resume_at = zx_time_add_duration(current_boot_time(), delay);
     return IdlePowerThread::TransitionAllActiveToSuspend(resume_at);
+  }
+
+  if (!strcmp(argv[1].str, "wake-events")) {
+    printf("Wake events:\n");
+    wake_vector::WakeEvent::Dump(stdout, 0);
+    return 0;
   }
 
   return 0;

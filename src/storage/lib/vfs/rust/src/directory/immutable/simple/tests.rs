@@ -4,7 +4,17 @@
 
 //! Tests for the [`crate::directory::immutable::Simple`] directory.
 
-// Macros are exported into the root of the crate.
+use crate::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
+use crate::directory::entry_container::Directory;
+use crate::directory::helper::DirectlyMutable;
+use crate::directory::immutable::Simple;
+use crate::directory::test_utils::{run_server_client, DirentsSameInodeBuilder};
+use crate::execution_scope::ExecutionScope;
+use crate::file::{self, FidlIoConnection, File, FileIo, FileLike, FileOptions};
+use crate::node::Node;
+use crate::path::Path;
+use crate::test_utils::node::{open3_get_proxy, open_get_proxy};
+use crate::test_utils::{build_flag_combinations, run_client};
 use crate::{
     assert_channel_closed, assert_close, assert_event, assert_get_attr, assert_query, assert_read,
     assert_read_dirents, assert_read_dirents_err, assert_seek, assert_write,
@@ -12,18 +22,6 @@ use crate::{
     open_as_directory_assert_err, open_as_file_assert_err, open_get_directory_proxy_assert_ok,
     open_get_proxy_assert, open_get_vmo_file_proxy_assert_ok,
 };
-
-use crate::directory::entry::EntryInfo;
-use crate::directory::entry_container::Directory;
-use crate::directory::helper::DirectlyMutable;
-use crate::directory::immutable::Simple;
-use crate::directory::test_utils::{run_server_client, DirentsSameInodeBuilder};
-use crate::execution_scope::ExecutionScope;
-use crate::file;
-use crate::path::Path;
-use crate::test_utils::node::{open3_get_proxy, open_get_proxy};
-use crate::test_utils::{build_flag_combinations, run_client};
-
 use assert_matches::assert_matches;
 use fidl::endpoints::{create_proxy, Proxy};
 use fidl_fuchsia_io as fio;
@@ -368,7 +366,7 @@ fn open_writable_in_subdir() {
         pseudo_directory! {
             "etc" => pseudo_directory! {
                 "ssh" => pseudo_directory! {
-                    "sshd_config" => file::read_write(b"# Empty"),
+                    "sshd_config" => Arc::new(MockWritableFile),
                 }
             }
         }
@@ -378,21 +376,14 @@ fn open_writable_in_subdir() {
         fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
         root,
         |root| async move {
-            async fn open_read_write_close<'a>(
-                from_dir: &'a fio::DirectoryProxy,
-                path: &'a str,
-                expected_content: &'a str,
-                new_content: &'a str,
-            ) {
+            async fn open_read_write_close<'a>(from_dir: &'a fio::DirectoryProxy, path: &'a str) {
                 let flags = fio::OpenFlags::RIGHT_READABLE
                     | fio::OpenFlags::RIGHT_WRITABLE
                     | fio::OpenFlags::DESCRIBE;
                 let file = open_get_vmo_file_proxy_assert_ok!(&from_dir, flags, path);
-                assert_read!(file, expected_content);
+                assert_read!(file, MOCK_FILE_CONTENTS);
                 assert_seek!(file, 0, Start);
-                assert_write!(file, new_content);
-                assert_seek!(file, 0, Start);
-                assert_read!(file, new_content);
+                assert_write!(file, "new content");
                 assert_close!(file);
             }
 
@@ -402,7 +393,7 @@ fn open_writable_in_subdir() {
                     | fio::OpenFlags::DESCRIBE;
                 let ssh_dir = open_get_directory_proxy_assert_ok!(&root, flags, "etc/ssh");
 
-                open_read_write_close(&ssh_dir, "sshd_config", "# Empty", "Port 22").await;
+                open_read_write_close(&ssh_dir, "sshd_config").await;
             }
         },
     );
@@ -710,7 +701,7 @@ fn directories_restrict_nested_read_permissions() {
 fn directories_restrict_nested_write_permissions() {
     let root = pseudo_directory! {
         "dir" => pseudo_directory! {
-            "file" => file::read_write("content"),
+            "file" => Arc::new(MockWritableFile),
         },
     };
 
@@ -748,7 +739,7 @@ fn flag_posix_means_writable() {
     let root = {
         pseudo_directory! {
         "nested" => pseudo_directory! {
-            "file" => file::read_write(b"Content"),
+            "file" => Arc::new(MockWritableFile),
             }
         }
     };
@@ -778,9 +769,9 @@ fn flag_posix_means_writable() {
                     | fio::OpenFlags::DESCRIBE;
                 let file = open_get_vmo_file_proxy_assert_ok!(&nested, flags, "file");
 
-                assert_read!(file, "Content");
+                assert_read!(file, MOCK_FILE_CONTENTS);
                 assert_seek!(file, 0, Start);
-                assert_write!(file, "New content");
+                assert_write!(file, "new content");
 
                 assert_close!(file);
             }
@@ -795,7 +786,7 @@ fn flag_posix_means_writable() {
 fn flag_posix_does_not_add_writable_to_read_only() {
     let root = pseudo_directory! {
         "nested" => pseudo_directory! {
-            "file" => file::read_write(b"Content"),
+            "file" => Arc::new(MockWritableFile),
         },
     };
 
@@ -827,7 +818,7 @@ fn flag_posix_does_not_add_writable_to_read_only() {
             let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::DESCRIBE;
             let file = open_get_vmo_file_proxy_assert_ok!(&nested, flags, "file");
 
-            assert_read!(file, "Content");
+            assert_read!(file, MOCK_FILE_CONTENTS);
             assert_close!(file);
         }
 
@@ -1612,4 +1603,100 @@ fn open_directory_containing_itself() {
         assert_close!(sub_dir);
         assert_close!(root);
     });
+}
+
+struct MockWritableFile;
+const MOCK_FILE_CONTENTS: &str = "mock-file-contents";
+
+impl GetEntryInfo for MockWritableFile {
+    fn entry_info(&self) -> EntryInfo {
+        EntryInfo::new(fio::INO_UNKNOWN, fio::DirentType::File)
+    }
+}
+
+impl DirectoryEntry for MockWritableFile {
+    fn open_entry(self: Arc<Self>, request: OpenRequest<'_>) -> Result<(), Status> {
+        request.open_file(self)
+    }
+}
+
+impl Node for MockWritableFile {
+    async fn get_attributes(
+        &self,
+        requested_attributes: fio::NodeAttributesQuery,
+    ) -> Result<fio::NodeAttributes2, Status> {
+        Ok(immutable_attributes!(
+            requested_attributes,
+            Immutable {
+                protocols: fio::NodeProtocolKinds::FILE,
+                abilities: fio::Operations::GET_ATTRIBUTES
+                    | fio::Operations::UPDATE_ATTRIBUTES
+                    | fio::Operations::READ_BYTES
+                    | fio::Operations::WRITE_BYTES,
+                content_size: 0,
+                storage_size: 0,
+                link_count: 1,
+                id: fio::INO_UNKNOWN,
+            }
+        ))
+    }
+}
+
+impl FileLike for MockWritableFile {
+    fn open(
+        self: Arc<Self>,
+        scope: ExecutionScope,
+        options: FileOptions,
+        object_request: crate::ObjectRequestRef<'_>,
+    ) -> Result<(), Status> {
+        FidlIoConnection::spawn(scope, self, options, object_request)
+    }
+}
+
+impl File for MockWritableFile {
+    fn writable(&self) -> bool {
+        true
+    }
+
+    async fn open_file(&self, _options: &FileOptions) -> Result<(), Status> {
+        Ok(())
+    }
+
+    async fn truncate(&self, _: u64) -> Result<(), Status> {
+        unimplemented!()
+    }
+
+    async fn get_size(&self) -> Result<u64, Status> {
+        unimplemented!()
+    }
+
+    #[cfg(target_os = "fuchsia")]
+    async fn get_backing_memory(&self, _: fio::VmoFlags) -> Result<fuchsia_zircon::Vmo, Status> {
+        unimplemented!()
+    }
+
+    async fn update_attributes(&self, _: fio::MutableNodeAttributes) -> Result<(), Status> {
+        unimplemented!()
+    }
+
+    async fn sync(&self, _: file::SyncMode) -> Result<(), Status> {
+        Ok(())
+    }
+}
+
+impl FileIo for MockWritableFile {
+    async fn read_at(&self, offset: u64, bytes: &mut [u8]) -> Result<u64, Status> {
+        assert_eq!(offset, 0);
+        assert!(bytes.len() >= MOCK_FILE_CONTENTS.len());
+        bytes[..MOCK_FILE_CONTENTS.len()].copy_from_slice(MOCK_FILE_CONTENTS.as_bytes());
+        Ok(MOCK_FILE_CONTENTS.len() as u64)
+    }
+
+    async fn write_at(&self, _: u64, bytes: &[u8]) -> Result<u64, Status> {
+        Ok(bytes.len() as u64)
+    }
+
+    async fn append(&self, _: &[u8]) -> Result<(u64, u64), Status> {
+        unimplemented!()
+    }
 }

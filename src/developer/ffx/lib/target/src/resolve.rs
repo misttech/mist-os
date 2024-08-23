@@ -521,6 +521,7 @@ impl QueryResolverT for QueryResolver {
 // particularly important for the rcs_proxy, which we may need when resolving
 // a manual target -- we don't want make an RCS connection just to resolve the
 // name, drop it, then re-establish it later.)
+#[derive(Debug)]
 enum ResolutionTarget {
     Addr(SocketAddr),
     Serial(String),
@@ -596,6 +597,7 @@ impl ResolutionTarget {
     }
 }
 
+#[derive(Debug)]
 pub struct Resolution {
     target: ResolutionTarget,
     discovered: Option<TargetHandle>,

@@ -325,7 +325,7 @@ mod tests {
     async fn start_and_get_timestamp(
         root_component: &Arc<ComponentInstance>,
         moniker: &Moniker,
-    ) -> zx::Time {
+    ) -> zx::MonotonicTime {
         let component = root_component
             .start_instance(moniker, &StartReason::Root)
             .await

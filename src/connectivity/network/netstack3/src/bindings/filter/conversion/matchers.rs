@@ -4,6 +4,8 @@
 
 use fidl_fuchsia_net_ext::IntoExt as _;
 use net_types::ip::{GenericOverIp, Ip};
+use netstack3_core::device::DeviceNameMatcher;
+use netstack3_core::ip::SubnetMatcher;
 use packet_formats::ip::{IpExt, IpProto, Ipv4Proto, Ipv6Proto};
 use {
     fidl_fuchsia_net as fnet, fidl_fuchsia_net_filter_ext as fnet_filter_ext,
@@ -81,7 +83,9 @@ impl TryConvertToCoreState for fnet_filter_ext::InterfaceMatcher {
     ) -> Result<ConversionResult<Self::CoreState<I>>, IpVersionMismatchError> {
         let matcher = match self {
             Self::Id(id) => netstack3_core::filter::InterfaceMatcher::Id(id),
-            Self::Name(name) => netstack3_core::filter::InterfaceMatcher::Name(name),
+            Self::Name(name) => {
+                netstack3_core::filter::InterfaceMatcher::Name(DeviceNameMatcher(name))
+            }
             Self::PortClass(port_class) => {
                 netstack3_core::filter::InterfaceMatcher::DeviceClass(port_class.into())
             }
@@ -118,7 +122,9 @@ impl TryConvertToCoreState for fnet_filter_ext::AddressMatcher {
                             let subnet = net_types::ip::Subnet::new(addr, prefix_len)
                                 .expect("subnet should be validated when change is pushed");
                             Wrap(Ok(ConversionResult::State(
-                                netstack3_core::filter::AddressMatcherType::Subnet(subnet),
+                                netstack3_core::filter::AddressMatcherType::Subnet(SubnetMatcher(
+                                    subnet,
+                                )),
                             )))
                         }
                         net_types::ip::IpAddr::V6(_) => {
@@ -133,7 +139,9 @@ impl TryConvertToCoreState for fnet_filter_ext::AddressMatcher {
                             let subnet = net_types::ip::Subnet::new(addr, prefix_len)
                                 .expect("subnet should be validated when change is pushed");
                             Wrap(Ok(ConversionResult::State(
-                                netstack3_core::filter::AddressMatcherType::Subnet(subnet),
+                                netstack3_core::filter::AddressMatcherType::Subnet(SubnetMatcher(
+                                    subnet,
+                                )),
                             )))
                         }
                     },

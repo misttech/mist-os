@@ -108,6 +108,13 @@ void BtHciBroadcom::Start(fdf::StartCompleter completer) {
 
 void BtHciBroadcom::PrepareStop(fdf::PrepareStopCompleter completer) { completer(zx::ok()); }
 
+void BtHciBroadcom::GetFeatures(GetFeaturesCompleter::Sync& completer) {
+  fidl::Arena arena;
+  auto builder = fhbt::wire::VendorFeatures::Builder(arena);
+  builder.acl_priority_command(true);
+  completer.Reply(builder.Build());
+}
+
 void BtHciBroadcom::EncodeCommand(EncodeCommandRequestView request,
                                   EncodeCommandCompleter::Sync& completer) {
   uint8_t data_buffer[kBcmSetAclPriorityCmdSize];
@@ -174,17 +181,6 @@ void BtHciBroadcom::handle_unknown_method(fidl::UnknownMethodMetadata<fhbt::Vend
 void BtHciBroadcom::Connect(fidl::ServerEnd<fhbt::Vendor> request) {
   vendor_binding_group_.AddBinding(dispatcher(), std::move(request), this,
                                    fidl::kIgnoreBindingClosure);
-
-  vendor_binding_group_.ForEachBinding([](const fidl::ServerBinding<fhbt::Vendor>& binding) {
-    fidl::Arena arena;
-    auto builder = fhbt::wire::VendorFeatures::Builder(arena);
-    builder.acl_priority_command(true);
-    fidl::Status status = fidl::WireSendEvent(binding)->OnFeatures(builder.Build());
-
-    if (status.status() != ZX_OK) {
-      FDF_LOG(ERROR, "Failed to send vendor features to bt-host: %s", status.status_string());
-    }
-  });
 }
 
 zx_status_t BtHciBroadcom::ConnectToHciTransportFidlProtocol() {
@@ -526,7 +522,7 @@ fpromise::promise<void, zx_status_t> BtHciBroadcom::SendVmoAsCommands(zx::vmo vm
   return SendCommand(buffer, length)
       .then([this, vmo = std::move(vmo), size,
              offset](fpromise::result<std::vector<uint8_t>, zx_status_t>& result) mutable
-            -> fpromise::promise<void, zx_status_t> {
+                -> fpromise::promise<void, zx_status_t> {
         if (result.is_error()) {
           FDF_LOG(ERROR, "SendCommand failed in firmware download: %s",
                   zx_status_get_string(result.error()));

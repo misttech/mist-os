@@ -12,6 +12,7 @@
 #include <type_traits>
 
 #include <gtest/gtest.h>
+#include <safemath/safe_conversions.h>
 
 #include "src/lib/digest/digest.h"
 #include "src/lib/digest/node-digest.h"

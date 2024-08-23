@@ -2,9 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fidl/fuchsia.component/cpp/fidl.h>
+#include <fidl/fuchsia.hardware.sensors.realm/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.sensors/cpp/fidl.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/incoming/cpp/protocol.h>
+#include <lib/fdio/directory.h>
+#include <lib/fdio/namespace.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/vmo.h>
 #include <zircon/syscalls.h>
@@ -14,8 +18,12 @@
 
 #include "src/sensors/playback/serialization.h"
 
+using fuchsia_component::Namespace;
+using fuchsia_component::NamespaceEntry;
+using fuchsia_component::NamespaceInputEntry;
 using fuchsia_hardware_sensors::Driver;
 using fuchsia_hardware_sensors::Playback;
+using fuchsia_hardware_sensors_realm::RealmFactory;
 using fuchsia_math::Vec3F;
 
 using fuchsia_hardware_sensors::ConfigureSensorRateError;
@@ -38,6 +46,99 @@ constexpr int kAccelEventLimit = 100;
 
 constexpr SensorId kGyroSensorId = 2;
 constexpr int kGyroEventLimit = 10;
+
+namespace {
+std::atomic_int32_t namespace_ctr{1};
+}  // namespace
+
+/* RealmFactory related boilerplate that will be replaced when there is a C++ client library */
+class InstalledNamespace {
+ public:
+  InstalledNamespace(std::string prefix, zx::channel realm_factory)
+      : prefix_(std::move(prefix)), realm_factory_(std::move(realm_factory)) {}
+  ~InstalledNamespace() {
+    fdio_ns_t* ns;
+    EXPECT_EQ(fdio_ns_get_installed(&ns), ZX_OK);
+    EXPECT_EQ(fdio_ns_unbind(ns, prefix_.c_str()), ZX_OK);
+  }
+
+  template <typename Interface>
+  zx_status_t Connect(
+      fidl::ServerEnd<Interface> request,
+      const std::string& interface_name = fidl::DiscoverableProtocolName<Interface>) const {
+    return Connect(interface_name, request.TakeChannel());
+  }
+
+  zx_status_t Connect(const std::string& interface_name, zx::channel request) const {
+    const std::string path = prefix_ + "/" + interface_name;
+    return fdio_service_connect(path.c_str(), request.release());
+  }
+
+ private:
+  std::string prefix_;
+  /// This is not used, but it keeps the RealmFactory connection alive.
+  ///
+  /// The RealmFactory server may use this connection to pin the lifetime of the realm created
+  /// for the test.
+  zx::channel realm_factory_;
+};
+
+template <typename Interface>
+InstalledNamespace ExtendNamespace(
+    fidl::ClientEnd<fuchsia_component_sandbox::Dictionary> dictionary,
+    fidl::ClientEnd<Interface> realm_factory) {
+  std::string prefix = std::string("/dict-") + std::to_string(namespace_ctr++);
+
+  zx::result namespace_client_end = component::Connect<Namespace>();
+  EXPECT_TRUE(namespace_client_end.is_ok());
+  fidl::SyncClient<Namespace> ns_client(std::move(*namespace_client_end));
+
+  std::vector<NamespaceInputEntry> entries;
+  entries.emplace_back(NamespaceInputEntry{{
+      .path = prefix,
+      .dictionary = std::move(dictionary),
+  }});
+  fidl::Result<Namespace::Create> namespace_create_result = ns_client->Create(std::move(entries));
+  EXPECT_TRUE(namespace_create_result.is_ok());
+
+  std::vector<NamespaceEntry> namespace_entries =
+      std::move(namespace_create_result.value().entries());
+  EXPECT_EQ(namespace_entries.size(), 1u);
+  auto& entry = namespace_entries[0];
+  EXPECT_TRUE(entry.path() && entry.directory());
+  EXPECT_EQ(entry.path(), prefix);
+
+  fdio_ns_t* ns;
+  EXPECT_EQ(fdio_ns_get_installed(&ns), ZX_OK);
+  zx_handle_t dir_handle = entry.directory()->TakeChannel().release();
+  EXPECT_EQ(fdio_ns_bind(ns, prefix.c_str(), dir_handle), ZX_OK);
+  return InstalledNamespace(std::move(prefix), realm_factory.TakeChannel());
+}
+/* End of RealmFactory boilerplate. */
+
+InstalledNamespace SetupNamespace() {
+  zx::result realm_factory_client_end = component::Connect<RealmFactory>();
+  EXPECT_TRUE(realm_factory_client_end.is_ok());
+  fidl::SyncClient<RealmFactory> realm_factory(std::move(*realm_factory_client_end));
+
+  auto [dictionary_client_end, dictionary_server_end] =
+      fidl::Endpoints<fuchsia_component_sandbox::Dictionary>::Create();
+  fidl::Result<RealmFactory::CreateRealm> create_realm_result =
+      realm_factory->CreateRealm(std::move(dictionary_server_end));
+  EXPECT_TRUE(create_realm_result.is_ok());
+
+  return ExtendNamespace(std::move(dictionary_client_end), realm_factory.TakeClientEnd());
+}
+
+std::pair<fidl::ClientEnd<Playback>, fidl::ClientEnd<Driver>> CreateStandardEndpoints(
+    InstalledNamespace& test_ns) {
+  auto [playback_client_end, playback_server_end] = fidl::Endpoints<Playback>::Create();
+  EXPECT_EQ(test_ns.Connect(std::move(playback_server_end)), ZX_OK);
+  auto [driver_client_end, driver_server_end] = fidl::Endpoints<Driver>::Create();
+  EXPECT_EQ(test_ns.Connect(std::move(driver_server_end)), ZX_OK);
+
+  return std::make_pair(std::move(playback_client_end), std::move(driver_client_end));
+}
 
 class PlaybackEventHandler : public fidl::AsyncEventHandler<Playback> {
  public:
@@ -256,7 +357,7 @@ PlaybackSourceConfig CreateFixedValuesPlaybackConfig(std::vector<SensorInfo>& se
   return PlaybackSourceConfig::WithFixedValuesConfig(fixed_config);
 }
 
-const char kTestDatasetInputPath[] = "/data/accel_gyro_dataset";
+const char kTestDatasetInputPath[] = "/pkg/data/accel_gyro_dataset";
 PlaybackSourceConfig CreateFilePlaybackConfig() {
   FilePlaybackConfig file_config;
   file_config.file_path(kTestDatasetInputPath);
@@ -345,9 +446,10 @@ TEST(SensorsPlaybackTest, MultiplePlaybackClientsRejected) {
   handler2.expecting_error(true);
 
   // Create first connection.
-  zx::result playback_client_end = component::Connect<Playback>();
-  ASSERT_TRUE(playback_client_end.is_ok());
-  fidl::Client playback_client(std::move(*playback_client_end), dispatcher, &handler);
+  auto test_ns = SetupNamespace();
+  auto [playback_client_end, playback_server_end] = fidl::Endpoints<Playback>::Create();
+  ASSERT_EQ(test_ns.Connect(std::move(playback_server_end)), ZX_OK);
+  fidl::Client playback_client(std::move(playback_client_end), dispatcher, &handler);
 
   // Run an operation on the connection to make sure this one is actually connected first.
   std::vector<SensorInfo> sensor_list;
@@ -365,9 +467,9 @@ TEST(SensorsPlaybackTest, MultiplePlaybackClientsRejected) {
   ASSERT_TRUE(*result_ok);
 
   // Create the second connection.
-  zx::result playback_client_end2 = component::Connect<Playback>();
-  ASSERT_TRUE(playback_client_end2.is_ok());
-  fidl::Client playback_client2(std::move(*playback_client_end2), dispatcher, &handler2);
+  auto [playback_client_end2, playback_server_end2] = fidl::Endpoints<Playback>::Create();
+  ASSERT_EQ(test_ns.Connect(std::move(playback_server_end2)), ZX_OK);
+  fidl::Client playback_client2(std::move(playback_client_end2), dispatcher, &handler2);
 
   // Let the looper run until we get the asynchronous Playback disconnect error.
   loop.Run();
@@ -385,11 +487,12 @@ TEST(SensorsPlaybackTest, MultipleDriverClientsRejected) {
   DriverEventHandler handler2(loop);
   handler2.expecting_error(true);
 
-  // Connect to the Playback protocol and set a valid config just to keep the flow nominal up till
+  // Connect to both protocols and set a valid config just to keep the flow nominal up till
   // the second Driver connection.
-  zx::result playback_client_end = component::Connect<Playback>();
-  ASSERT_TRUE(playback_client_end.is_ok());
-  fidl::Client playback_client(std::move(*playback_client_end), dispatcher, &playback_handler);
+  auto test_ns = SetupNamespace();
+  auto [playback_client_end, driver_client_end] = CreateStandardEndpoints(test_ns);
+  fidl::Client playback_client(std::move(playback_client_end), dispatcher, &playback_handler);
+  fidl::Client driver_client(std::move(driver_client_end), dispatcher, &handler);
 
   std::vector<SensorInfo> sensor_list;
   std::optional<bool> result_ok;
@@ -405,12 +508,7 @@ TEST(SensorsPlaybackTest, MultipleDriverClientsRejected) {
   ASSERT_TRUE(result_ok.has_value());
   ASSERT_TRUE(*result_ok);
 
-  // Create the first connection.
-  zx::result driver_client_end = component::Connect<Driver>();
-  ASSERT_TRUE(driver_client_end.is_ok());
-  fidl::Client driver_client(std::move(*driver_client_end), dispatcher, &handler);
-
-  // Run an operation on the connection to make sure this one is actually connected first.
+  // Run an operation on the driver connection to make sure it is actually connected first.
   result_ok = std::nullopt;
   handler.reset_error();
   driver_client->GetSensorsList().ThenExactlyOnce(
@@ -429,9 +527,9 @@ TEST(SensorsPlaybackTest, MultipleDriverClientsRejected) {
   ASSERT_FALSE(handler.saw_error());
 
   // Create the second connection.
-  zx::result driver_client_end2 = component::Connect<Driver>();
-  ASSERT_TRUE(driver_client_end2.is_ok());
-  fidl::Client driver_client2(std::move(*driver_client_end2), dispatcher, &handler2);
+  auto [driver_client_end2, driver_server_end2] = fidl::Endpoints<Driver>::Create();
+  ASSERT_EQ(test_ns.Connect(std::move(driver_server_end2)), ZX_OK);
+  fidl::Client driver_client2(std::move(driver_client_end2), dispatcher, &handler2);
 
   // Let the looper run until we get the asynchronous Driver disconnect error.
   loop.Run();
@@ -448,10 +546,11 @@ TEST(SensorsPlaybackTest, DriverDisconnectsIfPlaybackDisconnects) {
   DriverEventHandler handler(loop);
 
   // Connect to the Playback protocol and set a valid playback configuration.
-  zx::result playback_client_end = component::Connect<Playback>();
-  ASSERT_TRUE(playback_client_end.is_ok());
+  auto test_ns = SetupNamespace();
+  auto [playback_client_end, playback_server_end] = fidl::Endpoints<Playback>::Create();
+  ASSERT_EQ(test_ns.Connect(std::move(playback_server_end)), ZX_OK);
   std::optional<fidl::Client<Playback>> playback_client =
-      fidl::Client<Playback>(std::move(*playback_client_end), dispatcher);
+      fidl::Client<Playback>(std::move(playback_client_end), dispatcher);
 
   std::optional<bool> result_ok;
   std::vector<SensorInfo> sensor_list;
@@ -467,9 +566,10 @@ TEST(SensorsPlaybackTest, DriverDisconnectsIfPlaybackDisconnects) {
   ASSERT_TRUE(result_ok.has_value());
   ASSERT_TRUE(*result_ok);
 
-  zx::result driver_client_end = component::Connect<Driver>();
-  ASSERT_TRUE(driver_client_end.is_ok());
-  fidl::Client driver_client(std::move(*driver_client_end), dispatcher, &handler);
+  // Connect to the Driver protocol and call a method to make sure it's connected.
+  auto [driver_client_end, driver_server_end] = fidl::Endpoints<Driver>::Create();
+  ASSERT_EQ(test_ns.Connect(std::move(driver_server_end)), ZX_OK);
+  fidl::Client driver_client(std::move(driver_client_end), dispatcher, &handler);
 
   result_ok = std::nullopt;
   handler.reset_error();
@@ -488,9 +588,9 @@ TEST(SensorsPlaybackTest, DriverDisconnectsIfPlaybackDisconnects) {
   ASSERT_TRUE(*result_ok);
   ASSERT_FALSE(handler.saw_error());
 
-  // Let the Playback connection go out of scope. This will cause the playback configuration in
-  // the playback component to be cleared and the Driver connection to be closed remotely.
-  // Set the handler to expect an asynchronous error (the remote Driver connection closure).
+  // Destroy the Playback connection. This will cause the playback configuration in the playback
+  // component to be cleared and the Driver connection to be closed remotely. Set the handler to
+  // expect an asynchronous error (the remote Driver connection closure).
   handler.expecting_error(true);
   playback_client = std::nullopt;
 
@@ -509,17 +609,15 @@ TEST(SensorsPlaybackTest, FixedValues_Unbuffered_IdealScheduling) {
   async_dispatcher_t* dispatcher = loop.dispatcher();
   DriverEventHandler handler(loop);
 
-  zx::result playback_client_end = component::Connect<Playback>();
-  ASSERT_TRUE(playback_client_end.is_ok());
-  zx::result driver_client_end = component::Connect<Driver>();
-  ASSERT_TRUE(driver_client_end.is_ok());
+  auto test_ns = SetupNamespace();
+  auto [playback_client_end, driver_client_end] = CreateStandardEndpoints(test_ns);
 
-  fidl::Client playback_client(std::move(*playback_client_end), dispatcher);
-  fidl::Client driver_client(std::move(*driver_client_end), dispatcher, &handler);
+  fidl::Client playback_client(std::move(playback_client_end), dispatcher);
+  fidl::Client driver_client(std::move(driver_client_end), dispatcher, &handler);
 
   // Set fixed playback mode with the generated sensor list and set of events.
   std::vector<SensorInfo> sensor_list;
-  std::optional<bool> result_ok;
+  std::optional<bool> result_ok = std::nullopt;
   playback_client->ConfigurePlayback(CreateFixedValuesPlaybackConfig(sensor_list))
       .ThenExactlyOnce([&](fidl::Result<Playback::ConfigurePlayback>& result) {
         result_ok = result.is_ok();
@@ -679,7 +777,7 @@ TEST(SensorsPlaybackTest, FixedValues_Unbuffered_IdealScheduling) {
      above. This will ensure the general shape of the timing is correct but reduce flakes by being
      incredibly robust to all but the most massive and repeated test environment performance hiccups
      hiccups (theoretically anyways).
-   */
+  */
 
   // Outliers below the bottom bin should not be possible as all of the timestamp differences should
   // be positive.
@@ -711,13 +809,11 @@ TEST(SensorsPlaybackTest, FixedValues_Buffered_IdealScheduling) {
   async_dispatcher_t* dispatcher = loop.dispatcher();
   DriverEventHandler handler(loop);
 
-  zx::result playback_client_end = component::Connect<Playback>();
-  ASSERT_TRUE(playback_client_end.is_ok());
-  zx::result driver_client_end = component::Connect<Driver>();
-  ASSERT_TRUE(driver_client_end.is_ok());
+  auto test_ns = SetupNamespace();
+  auto [playback_client_end, driver_client_end] = CreateStandardEndpoints(test_ns);
 
-  fidl::Client playback_client(std::move(*playback_client_end), dispatcher);
-  fidl::Client driver_client(std::move(*driver_client_end), dispatcher, &handler);
+  fidl::Client playback_client(std::move(playback_client_end), dispatcher);
+  fidl::Client driver_client(std::move(driver_client_end), dispatcher, &handler);
 
   // Set fixed playback mode with the generated sensor list and set of events.
   std::vector<SensorInfo> sensor_list;
@@ -908,6 +1004,11 @@ TEST(SensorsPlaybackTest, FixedValues_Buffered_IdealScheduling) {
 // order to regenerate the file that the ProtoFile tests below expect.
 TEST(SensorsPlaybackTest, DISABLED_GenerateTestDatasetProtoFile) { CreateProtoDataFile(); }
 
+// Tests the following features of the playback component:
+// - Play back data recorded to a binary protobuf file.
+// - Uses the "receipt timestamps" of events in the dataset as "presentation timestamps" during
+//   playback.
+// This does not test sensor data buffering (max reporting latency is set to 0).
 TEST(SensorsPlaybackTest, ProtoFile_Unbuffered_PresentationTimeScheduling) {
   // Expected sensor data.
   std::vector<SensorInfo> sensor_list;
@@ -920,13 +1021,11 @@ TEST(SensorsPlaybackTest, ProtoFile_Unbuffered_PresentationTimeScheduling) {
   // Increase the event limits in the handler to make sure the file wraps a few times.
   DriverEventHandler handler(loop, 1000, 100);
 
-  zx::result playback_client_end = component::Connect<Playback>();
-  ASSERT_TRUE(playback_client_end.is_ok());
-  zx::result driver_client_end = component::Connect<Driver>();
-  ASSERT_TRUE(driver_client_end.is_ok());
+  auto test_ns = SetupNamespace();
+  auto [playback_client_end, driver_client_end] = CreateStandardEndpoints(test_ns);
 
-  fidl::Client playback_client(std::move(*playback_client_end), dispatcher);
-  fidl::Client driver_client(std::move(*driver_client_end), dispatcher, &handler);
+  fidl::Client playback_client(std::move(playback_client_end), dispatcher);
+  fidl::Client driver_client(std::move(driver_client_end), dispatcher, &handler);
 
   std::optional<bool> result_ok;
   playback_client->ConfigurePlayback(CreateFilePlaybackConfig())
@@ -1110,6 +1209,12 @@ TEST(SensorsPlaybackTest, ProtoFile_Unbuffered_PresentationTimeScheduling) {
   ASSERT_LT(hist.outliers_above, hist.bin_point_counts[0].second);
 }
 
+// Tests the following features of the playback component:
+// - Play back data recorded to a binary protobuf file.
+// - Uses the "receipt timestamps" of events in the dataset as "presentation timestamps" during
+//   playback.
+// - Simulate hardware buffering of sensor data (use a maximum reporting
+//   latency greater than 0).
 TEST(SensorsPlaybackTest, ProtoFile_Buffered_PresentationTimeScheduling) {
   // Expected sensor data.
   std::vector<SensorInfo> sensor_list;
@@ -1122,13 +1227,11 @@ TEST(SensorsPlaybackTest, ProtoFile_Buffered_PresentationTimeScheduling) {
   // Increase the event limits in the handler to make sure the file wraps a few times.
   DriverEventHandler handler(loop, 1000, 100);
 
-  zx::result playback_client_end = component::Connect<Playback>();
-  ASSERT_TRUE(playback_client_end.is_ok());
-  zx::result driver_client_end = component::Connect<Driver>();
-  ASSERT_TRUE(driver_client_end.is_ok());
+  auto test_ns = SetupNamespace();
+  auto [playback_client_end, driver_client_end] = CreateStandardEndpoints(test_ns);
 
-  fidl::Client playback_client(std::move(*playback_client_end), dispatcher);
-  fidl::Client driver_client(std::move(*driver_client_end), dispatcher, &handler);
+  fidl::Client playback_client(std::move(playback_client_end), dispatcher);
+  fidl::Client driver_client(std::move(driver_client_end), dispatcher, &handler);
 
   std::optional<bool> result_ok;
   playback_client->ConfigurePlayback(CreateFilePlaybackConfig())

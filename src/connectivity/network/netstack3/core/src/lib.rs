@@ -45,6 +45,7 @@ pub mod device {
     }
 
     // Re-exported types.
+    pub use netstack3_base::DeviceNameMatcher;
     pub use netstack3_device::ethernet::{
         EthernetCreationProperties, EthernetDeviceId, EthernetLinkDevice, EthernetWeakDeviceId,
         MaxEthernetFrameSize, RecvEthernetFrameMeta,
@@ -121,7 +122,7 @@ pub mod ip {
     }
 
     // Re-exported types.
-    pub use netstack3_base::WrapBroadcastMarker;
+    pub use netstack3_base::{SubnetMatcher, WrapBroadcastMarker};
     pub use netstack3_ip::device::{
         AddIpAddrSubnetError, AddrSubnetAndManualConfigEither, AddressRemovedReason,
         IpAddressState, IpDeviceConfiguration, IpDeviceConfigurationUpdate, IpDeviceEvent,
@@ -210,8 +211,8 @@ pub mod types {
 /// Methods for dealing with UDP sockets.
 pub mod udp {
     pub use netstack3_udp::{
-        SendError, SendToError, UdpBindingsTypes, UdpReceiveBindingsContext, UdpRemotePort,
-        UdpSocketId,
+        SendError, SendToError, UdpBindingsTypes, UdpPacketMeta, UdpReceiveBindingsContext,
+        UdpRemotePort, UdpSocketId,
     };
 }
 

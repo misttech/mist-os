@@ -8,7 +8,7 @@ use clonable_error::ClonableError;
 use cm_rust::CapabilityTypeName;
 use cm_types::Name;
 use moniker::{ChildName, ExtendedMoniker, Moniker};
-use router_error::{Explain, RouterError};
+use router_error::{DowncastErrorForTest, Explain, RouterError};
 use std::sync::Arc;
 use thiserror::Error;
 use {fidl_fuchsia_component as fcomponent, fuchsia_zircon_status as zx};
@@ -65,6 +65,12 @@ impl ComponentInstanceError {
 
     pub fn resolve_failed(moniker: Moniker, err: impl Into<anyhow::Error>) -> Self {
         Self::ResolveFailed { moniker, err: err.into().into() }
+    }
+}
+
+impl Explain for ComponentInstanceError {
+    fn as_zx_status(&self) -> zx::Status {
+        self.as_zx_status()
     }
 }
 
@@ -269,7 +275,7 @@ pub enum RoutingError {
     BedrockMemberAccessUnsupported { moniker: ExtendedMoniker },
 
     #[error("item `{name}` is not present in dictionary at component `{moniker}`")]
-    BedrockNotPresentInDictionary { name: String, moniker: Moniker },
+    BedrockNotPresentInDictionary { name: String, moniker: ExtendedMoniker },
 
     #[error("routed capability was the wrong type at component `{moniker}`. Was: {actual}, expected: {expected}")]
     BedrockWrongCapabilityType { actual: String, expected: String, moniker: ExtendedMoniker },
@@ -288,6 +294,9 @@ pub enum RoutingError {
         a capability in the source dictionary that has the same key at `{moniker}`"
     )]
     BedrockSourceDictionaryCollision { moniker: ExtendedMoniker },
+
+    #[error("failed to send message for capability `{capability_id}` from component `{moniker}`")]
+    BedrockFailedToSend { moniker: ExtendedMoniker, capability_id: String },
 
     #[error(transparent)]
     ComponentInstanceError(#[from] ComponentInstanceError),
@@ -355,6 +364,7 @@ impl Explain for RoutingError {
             | RoutingError::BedrockNotPresentInDictionary { .. }
             | RoutingError::BedrockSourceDictionaryExposeNotFound { .. }
             | RoutingError::BedrockSourceDictionaryCollision { .. }
+            | RoutingError::BedrockFailedToSend { .. }
             | RoutingError::BedrockWrongCapabilityType { .. }
             | RoutingError::BedrockRemoteCapability { .. }
             | RoutingError::BedrockNotCloneable { .. }
@@ -373,8 +383,7 @@ impl Explain for RoutingError {
 impl From<RoutingError> for ExtendedMoniker {
     fn from(err: RoutingError) -> ExtendedMoniker {
         match err {
-            RoutingError::BedrockNotPresentInDictionary { moniker, .. }
-            | RoutingError::BedrockRemoteCapability { moniker, .. }
+            RoutingError::BedrockRemoteCapability { moniker, .. }
             | RoutingError::BedrockSourceDictionaryExposeNotFound { moniker, .. }
             | RoutingError::CapabilityFromCapabilityNotFound { moniker, .. }
             | RoutingError::CapabilityFromFrameworkNotFound { moniker, .. }
@@ -404,8 +413,10 @@ impl From<RoutingError> for ExtendedMoniker {
             | RoutingError::UseFromSelfNotFound { moniker, .. } => moniker.into(),
 
             RoutingError::BedrockMemberAccessUnsupported { moniker }
+            | RoutingError::BedrockNotPresentInDictionary { moniker, .. }
             | RoutingError::BedrockNotCloneable { moniker }
             | RoutingError::BedrockSourceDictionaryCollision { moniker }
+            | RoutingError::BedrockFailedToSend { moniker, .. }
             | RoutingError::BedrockWrongCapabilityType { moniker, .. }
             | RoutingError::NonDebugRoutesUnsupported { moniker }
             | RoutingError::UnsupportedCapabilityType { moniker, .. }
@@ -430,6 +441,17 @@ impl From<RoutingError> for ExtendedMoniker {
 impl From<RoutingError> for RouterError {
     fn from(value: RoutingError) -> Self {
         Self::NotFound(Arc::new(value))
+    }
+}
+
+impl From<RouterError> for RoutingError {
+    fn from(value: RouterError) -> Self {
+        match value {
+            RouterError::NotFound(arc_dyn_explain) => {
+                arc_dyn_explain.downcast_for_test::<Self>().clone()
+            }
+            err => panic!("Cannot downcast {err} to RoutingError!"),
+        }
     }
 }
 

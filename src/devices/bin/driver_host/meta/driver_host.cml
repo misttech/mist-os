@@ -19,15 +19,13 @@
         { protocol: "fuchsia.driver.host.DriverHost" },
     ],
     use: [
+        { protocol: "fuchsia.device.manager.SystemStateTransition" },
         {
             protocol: [
                 "fuchsia.boot.WriteOnlyLog",
-                "fuchsia.device.manager.SystemStateTransition",
                 "fuchsia.scheduler.RoleManager",
+                "fuchsia.tracing.provider.Registry",
             ],
-        },
-        {
-            protocol: "fuchsia.tracing.provider.Registry",
             availability: "optional",
         },
     ],

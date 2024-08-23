@@ -119,7 +119,7 @@ The "push source puppet" is an endpoint that allows us to inject "fake"
 readings of the time source.
 
 ```
-let sample_monotonic = zx::Time::get_monotonic();
+let sample_monotonic = zx::MonotonicTime::get();
 let push_source_puppet = push_source_puppet_client_end.into_proxy().expect("infallible");
 ```
 

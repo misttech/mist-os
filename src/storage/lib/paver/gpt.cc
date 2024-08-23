@@ -16,6 +16,7 @@
 #include <gpt/c/gpt.h>
 
 #include "src/storage/lib/block_client/cpp/remote_block_device.h"
+#include "src/storage/lib/paver/block-devices.h"
 #include "src/storage/lib/paver/pave-logging.h"
 #include "src/storage/lib/paver/utils.h"
 
@@ -212,7 +213,7 @@ zx::result<std::vector<GptDevicePartitioner::GptClients>> GptDevicePartitioner::
 }
 
 zx::result<std::unique_ptr<GptDevicePartitioner>> GptDevicePartitioner::InitializeProvidedGptDevice(
-    fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     fidl::UnownedClientEnd<fuchsia_device::Controller> gpt_device) {
   auto pauser = BlockWatcherPauser::Create(svc_root);
   if (pauser.is_error()) {
@@ -288,28 +289,27 @@ zx::result<std::unique_ptr<GptDevicePartitioner>> GptDevicePartitioner::Initiali
       return zx::error(ZX_ERR_BAD_STATE);
     }
     if (zx::result status = RebindGptDriver(svc_root, gpt->device()); status.is_error()) {
-      ERROR("Failed to re-read GPT\n");
+      ERROR("Failed to rebind GPT\n");
       return status.take_error();
     }
-    printf("Rebound GPT driver successfully\n");
+    LOG("Rebound GPT driver successfully\n");
   }
 
-  return zx::ok(new GptDevicePartitioner(std::move(devfs_root), svc_root, std::move(gpt), info));
+  return zx::ok(new GptDevicePartitioner(devices.Duplicate(), svc_root, std::move(gpt), info));
 }
 
 zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::InitializeGpt(
-    fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     fidl::ClientEnd<fuchsia_device::Controller> block_controller) {
   if (block_controller) {
-    zx::result status =
-        InitializeProvidedGptDevice(std::move(devfs_root), svc_root, std::move(block_controller));
+    zx::result status = InitializeProvidedGptDevice(devices, svc_root, block_controller);
     if (status.is_error()) {
       return status.take_error();
     }
     return zx::ok(InitializeGptResult{std::move(status.value()), false});
   }
 
-  zx::result gpt_devices = FindGptDevices(devfs_root);
+  zx::result gpt_devices = FindGptDevices(devices.devfs_root());
   if (gpt_devices.is_error()) {
     ERROR("Failed to find GPT: %s\n", gpt_devices.status_string());
     return gpt_devices.take_error();
@@ -364,8 +364,8 @@ zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::Init
 
     non_removable_gpt_devices.push_back(std::move(controller));
 
-    auto partitioner = WrapUnique(
-        new GptDevicePartitioner(devfs_root.duplicate(), svc_root, std::move(gpt), info));
+    auto partitioner =
+        WrapUnique(new GptDevicePartitioner(devices.Duplicate(), svc_root, std::move(gpt), info));
 
     if (partitioner->FindPartition(IsFvmOrAndroidPartition).is_error()) {
       continue;
@@ -384,8 +384,7 @@ zx::result<GptDevicePartitioner::InitializeGptResult> GptDevicePartitioner::Init
 
   if (non_removable_gpt_devices.size() == 1) {
     // If we only find a single non-removable gpt device, we initialize it's partition table.
-    auto status = InitializeProvidedGptDevice(std::move(devfs_root), svc_root,
-                                              std::move(non_removable_gpt_devices[0]));
+    auto status = InitializeProvidedGptDevice(devices, svc_root, non_removable_gpt_devices[0]);
     if (status.is_error()) {
       return status.take_error();
     }
@@ -472,20 +471,20 @@ zx::result<Uuid> GptDevicePartitioner::CreateGptPartition(const char* name, cons
   if (zx_status_t status =
           gpt_->AddPartition(name, type.bytes(), guid.bytes(), offset, blocks, 0).status_value();
       status != ZX_OK) {
-    ERROR("Failed to add partition\n");
+    ERROR("Failed to add partition: %s", zx_status_get_string(status));
     return zx::error(status);
   }
   if (zx_status_t status = gpt_->Sync(); status != ZX_OK) {
-    ERROR("Failed to sync GPT\n");
+    ERROR("Failed to sync GPT: %s", zx_status_get_string(status));
     return zx::error(status);
   }
   if (auto status = zx::make_result(gpt_->ClearPartition(offset, 1)); status.is_error()) {
-    ERROR("Failed to clear first block of new partition\n");
+    ERROR("Failed to clear first block of new partition: %s", status.status_string());
     return status.take_error();
   }
   if (zx::result status = RebindGptDriver(svc_root_, gpt_->device()); status.is_error()) {
-    ERROR("Failed to rebind GPT\n");
-    return status.take_error();
+    ERROR("Failed to rebind GPT: %s", status.status_string());
+    return zx::error(ZX_ERR_BAD_STATE);
   }
 
   return zx::ok(guid);
@@ -525,14 +524,14 @@ zx::result<std::unique_ptr<PartitionClient>> GptDevicePartitioner::AddPartition(
   }
   LOG("Added partition, waiting for bind\n");
 
-  auto status_or_part = OpenBlockPartition(devfs_root_, status_or_guid.value(), type, ZX_SEC(15));
+  auto status_or_part = OpenBlockPartition(devices_, status_or_guid.value(), type, ZX_SEC(15));
   if (status_or_part.is_error()) {
     ERROR("Added partition, waiting for bind - NOT FOUND\n");
     return status_or_part.take_error();
   }
 
   LOG("Added partition, waiting for bind - OK\n");
-  return zx::ok(new BlockPartitionClient(std::move(status_or_part.value())));
+  return BlockPartitionClient::Create(std::move(status_or_part.value()));
 }
 
 zx::result<GptDevicePartitioner::FindPartitionResult> GptDevicePartitioner::FindPartition(
@@ -544,13 +543,16 @@ zx::result<GptDevicePartitioner::FindPartitionResult> GptDevicePartitioner::Find
     }
     if (filter(**p)) {
       LOG("Found partition in GPT, partition %u\n", i);
-      auto status = OpenBlockPartition(devfs_root_, Uuid((*p)->guid), Uuid((*p)->type), ZX_SEC(5));
+      auto status = OpenBlockPartition(devices_, Uuid((*p)->guid), Uuid((*p)->type), ZX_SEC(5));
       if (status.is_error()) {
         ERROR("Couldn't open partition: %s\n", status.status_string());
         return status.take_error();
       }
-      auto part = std::make_unique<BlockPartitionClient>(std::move(status.value()));
-      return zx::ok(FindPartitionResult{std::move(part), *p});
+      zx::result part = BlockPartitionClient::Create(std::move(status.value()));
+      if (part.is_error()) {
+        return part.take_error();
+      }
+      return zx::ok(FindPartitionResult{std::move(*part), *p});
     }
   }
   return zx::error(ZX_ERR_NOT_FOUND);
@@ -567,7 +569,7 @@ zx::result<> GptDevicePartitioner::WipePartitions(FilterCallback filter) const {
     modify = true;
 
     // Ignore the return status; wiping is a best-effort approach anyway.
-    static_cast<void>(WipeBlockPartition(devfs_root_, Uuid((*p)->guid), Uuid((*p)->type)));
+    static_cast<void>(WipeBlockPartition(devices_, Uuid((*p)->guid), Uuid((*p)->type)));
 
     if (gpt_->RemovePartition((*p)->guid) != ZX_OK) {
       ERROR("Warning: Could not remove partition\n");
@@ -588,7 +590,7 @@ zx::result<> GptDevicePartitioner::WipePartitions(FilterCallback filter) const {
 }
 
 zx::result<> GptDevicePartitioner::WipeFvm() const {
-  return WipeBlockPartition(devfs_root_, std::nullopt, Uuid(GUID_FVM_VALUE));
+  return WipeBlockPartition(devices_, std::nullopt, Uuid(GUID_FVM_VALUE));
 }
 
 zx::result<> GptDevicePartitioner::WipePartitionTables() const {

@@ -13,7 +13,6 @@ use fidl_fuchsia_pkg::{
 };
 use fidl_fuchsia_pkg_ext::{
     MirrorConfig, MirrorConfigBuilder, RepositoryConfig, RepositoryConfigBuilder, RepositoryKey,
-    RepositoryStorageType,
 };
 use fidl_fuchsia_pkg_rewrite::{
     EditTransactionRequest, EngineRequest, EngineRequestStream, RuleIteratorMarker,
@@ -30,7 +29,6 @@ use futures::prelude::*;
 use http::Uri;
 use shell_process::ProcessOutput;
 use std::fs::{create_dir, File};
-use std::io::Write;
 use std::path::PathBuf;
 use std::sync::Arc;
 use tempfile::TempDir;
@@ -563,47 +561,6 @@ fn make_test_repo_config() -> RepositoryConfig {
     .build()
 }
 
-// This builds a v2 RepositoryConfig that is expected to be in the repository manager add request
-// when pkgctl is provided with the V1_LEGACY_TEST_REPO_JSON structure below as input.
-fn make_v1_legacy_expected_test_repo_config(persist: bool) -> RepositoryConfig {
-    let storage_type = match persist {
-        true => RepositoryStorageType::Persistent,
-        false => RepositoryStorageType::Ephemeral,
-    };
-    RepositoryConfigBuilder::new(
-        RepositoryUrl::parse_host("legacy-repo".to_string()).expect("valid url"),
-    )
-    .add_root_key(RepositoryKey::Ed25519(vec![0u8]))
-    .add_mirror(
-        MirrorConfigBuilder::new("http://legacy.org".parse::<Uri>().unwrap())
-            .unwrap()
-            .subscribe(true)
-            .build(),
-    )
-    .repo_storage_type(storage_type)
-    .build()
-}
-
-const V1_LEGACY_TEST_REPO_JSON: &str = r#"{
-    "ID":"legacy_repo",
-    "RepoURL":"http://legacy.org",
-    "BlobRepoURL":"http://legacy.org/blobs",
-    "RatePeriod":60,
-    "RootKeys":[
-        {
-            "type":"ed25519",
-            "value":"00"
-        }
-    ],
-    "rootVersion":1,
-    "rootThreshold":1,
-    "StatusConfig":{
-        "Enabled":true
-    },
-    "Auto":true,
-    "BlobKey":null
-}"#;
-
 #[fasync::run_singlethreaded(test)]
 async fn test_repo() {
     let env = TestEnv::new();
@@ -728,48 +685,38 @@ async fn test_dump_dynamic() {
 }
 
 macro_rules! repo_add_tests {
-    ($($test_name:ident: $source:expr, $version:expr, $name:expr,)*) => {
+    ($($test_name:ident: $source:expr, $name:expr,)*) => {
         $(
             #[fasync::run_singlethreaded(test)]
             async fn $test_name() {
                 let env = TestEnv::new();
 
-                let repo_config = match $version {
-                    "1" =>  make_v1_legacy_expected_test_repo_config(false),
-                    _ => make_test_repo_config(),
-                };
+                let repo_config =  make_test_repo_config();
 
                 let output = match $source {
                     "file" => {
-                        let mut f =
-                            File::create(env.repo_config_arg_path.join("the-config")).expect("create repo config file");
-                        match $version {
-                            "1" => { f.write_all(V1_LEGACY_TEST_REPO_JSON.as_bytes()).expect("write v1 SourceConfig json"); },
-                            _ => { serde_json::to_writer(f, &repo_config).expect("write RepositoryConfig json"); }
-                        };
+                        let f = File::create(env.repo_config_arg_path.join("the-config")).expect("create repo config file");
+                        serde_json::to_writer(f, &repo_config).expect("write RepositoryConfig json");
                         let args = if $name == "" {
-                            vec!["repo", "add", $source, "-f", $version, "/repo-configs/the-config"]
+                            vec!["repo", "add", $source, "/repo-configs/the-config"]
                         } else {
-                            vec!["repo", "add", $source, "-f", $version, "-n", $name, "/repo-configs/the-config"]
+                            vec!["repo", "add", $source, "-n", $name, "/repo-configs/the-config"]
                         };
                         env.run_pkgctl(args).await
                     },
                     "url" => {
-                        let response = match $version {
-                            "1" => StaticResponse::ok_body(V1_LEGACY_TEST_REPO_JSON),
-                            _ => StaticResponse::ok_body(serde_json::to_string(&repo_config).unwrap()),
-                        };
+                        let response = StaticResponse::ok_body(serde_json::to_string(&repo_config).unwrap());
                         let server = TestServer::builder().handler(response).start().await;
                         let local_url = server.local_url_for_path("some/path").to_owned();
                         let args = if $name == "" {
-                            vec!["repo", "add", $source, "-f", $version, &local_url]
+                            vec!["repo", "add", $source, &local_url]
                         } else {
-                            vec!["repo", "add", $source, "-f", $version, "-n", $name, &local_url]
+                            vec!["repo", "add", $source, "-n", $name, &local_url]
                         };
                         env.run_pkgctl(args).await
                     },
                     // Unsupported source
-                    _ => env.run_pkgctl(vec!["repo", "add", $source, "-f", $version]).await,
+                    _ => env.run_pkgctl(vec!["repo", "add", $source]).await,
                 };
 
                 assert_stdout(&output, "");
@@ -782,31 +729,10 @@ macro_rules! repo_add_tests {
 }
 
 repo_add_tests! {
-    test_repo_add_v1_file: "file", "1", "",
-    test_repo_add_v1_file_with_name: "file", "1", "legacy-repo",
-    test_repo_add_v2_file: "file", "2", "",
-    test_repo_add_v2_file_with_name: "file", "2", "example.com",
-    test_repo_add_v1_url: "url", "1", "",
-    test_repo_add_v1_url_with_name: "url", "1", "legacy-repo",
-    test_repo_add_v2_url: "url", "2", "",
-    test_repo_add_v2_url_with_name: "url", "2", "example.com",
-}
-
-#[fasync::run_singlethreaded(test)]
-async fn test_repo_add_persistent_v1_url() {
-    let env = TestEnv::new();
-
-    let repo_config = make_v1_legacy_expected_test_repo_config(true);
-    let response = StaticResponse::ok_body(V1_LEGACY_TEST_REPO_JSON);
-    let server = TestServer::builder().handler(response).start().await;
-    let local_url = server.local_url_for_path("some/path").to_owned();
-    let args = vec!["repo", "add", "url", "-p", "-f", "1", &local_url];
-    let output = env.run_pkgctl(args).await;
-
-    assert_stdout(&output, "");
-    env.assert_only_repository_manager_called_with(vec![CapturedRepositoryManagerRequest::Add {
-        repo: repo_config,
-    }]);
+    test_repo_add_file: "file", "",
+    test_repo_add_file_with_name: "file", "example.com",
+    test_repo_add_url: "url", "",
+    test_repo_add_url_with_name: "url", "example.com",
 }
 
 #[fasync::run_singlethreaded(test)]

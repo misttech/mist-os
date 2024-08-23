@@ -38,6 +38,9 @@ def print_fences():
     print(
         "After fxr/1081759, Bazel build is non-incremental, see http://b/353592055"
     )
+    print(
+        "fxr/1098532 triggers a Bazel error where SDK header changes don't trigger rebuilds, see http://b/356347441"
+    )
     pass
 
 

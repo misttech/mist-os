@@ -5,7 +5,7 @@
 use anyhow::Error;
 use cm_rust::FidlIntoNative;
 use fidl::endpoints::ControlHandle;
-use fidl_fuchsia_media::ProfileProviderMarker;
+use fidl_fuchsia_scheduler::RoleManagerMarker;
 use fidl_fuchsia_ui_composition::{
     AllocatorMarker, FlatlandDisplayMarker, FlatlandMarker, ScreenCaptureMarker, ScreenshotMarker,
 };
@@ -99,16 +99,16 @@ async fn assemble_realm(
             .await
             .expect("Failed to create RealmBuilder.");
 
-    // Only fuchsia.media.ProfileProvider is not already included by scenic_no_config.cml.
+    // Only fuchsia.scheduler.RoleManager is not already included by scenic_no_config.cml.
     builder
         .add_route(
             Route::new()
-                .capability(Capability::protocol::<ProfileProviderMarker>())
+                .capability(Capability::protocol::<RoleManagerMarker>())
                 .from(Ref::parent())
                 .to(Ref::child(SCENIC)),
         )
         .await
-        .expect("Failed to route fuchsia.media.ProfileProvider capabilities.");
+        .expect("Failed to route fuchsia.scheduler.RoleManager capabilities.");
 
     let config = builder
         .add_child(CONFIG, CONFIG_URL, ChildOptions::new())

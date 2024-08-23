@@ -92,13 +92,13 @@
 #define DMA_INT_RWE                    (1 <<  9)  /* Rx Watchdog */
 #define DMA_INT_RSE                    (1 <<  8)  /* Rx Stopped */
 #define DMA_INT_RUE                    (1 <<  7)  /* Rx Buffer Unavailable */
-#define DMA_INT_RIE                    (1 <<  6)
-#define DMA_INT_UNE                    (1 <<  5)
-#define DMA_INT_OVE                    (1 <<  4)
-#define DMA_INT_TJE                    (1 <<  3)
-#define DMA_INT_TUE                    (1 <<  2)
-#define DMA_INT_TSE                    (1 <<  1)
-#define DMA_INT_TIE                    (1 <<  0)
+#define DMA_INT_RIE                    (1 <<  6)  /* Rx completed*/
+#define DMA_INT_UNE                    (1 <<  5)  /* Tx underflow */
+#define DMA_INT_OVE                    (1 <<  4)  /* Rx overflow */
+#define DMA_INT_TJE                    (1 <<  3)  /* Tx jabber */
+#define DMA_INT_TUE                    (1 <<  2)  /* Tx buffer unavailable */
+#define DMA_INT_TSE                    (1 <<  1)  /* Tx stopped */
+#define DMA_INT_TIE                    (1 <<  0)  /* Tx completed */
 
 
 #define DMA_STATUS_GLPII              (1 << 30)  /*GMAC LPI or GTMSI interrupt */

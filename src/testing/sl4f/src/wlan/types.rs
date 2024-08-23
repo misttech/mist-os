@@ -268,6 +268,7 @@ pub(crate) struct SmeEmptyDef;
 pub(crate) enum ClientStatusResponseDef {
     Connected(ServingApInfoDef),
     Connecting(Vec<u8>),
+    Roaming(Vec<u8>),
     #[serde(with = "SmeEmptyDef")]
     Idle(fidl_sme::Empty),
 }
@@ -277,6 +278,7 @@ impl From<fidl_sme::ClientStatusResponse> for ClientStatusResponseDef {
         match fidl_type {
             fidl_sme::ClientStatusResponse::Connected(info) => Self::Connected(info.into()),
             fidl_sme::ClientStatusResponse::Connecting(vec) => Self::Connecting(vec),
+            fidl_sme::ClientStatusResponse::Roaming(bssid) => Self::Roaming(bssid.to_vec()),
             fidl_sme::ClientStatusResponse::Idle(empty) => Self::Idle(empty),
         }
     }

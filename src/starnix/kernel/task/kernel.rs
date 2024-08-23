@@ -5,14 +5,12 @@
 
 #[cfg(not(feature = "starnix_lite"))]
 use crate::device::android::bootloader_message_store::AndroidBootloaderMessageStore;
+#[cfg(not(feature = "starnix_lite"))]
+use crate::device::binder::BinderDevice;
 use crate::device::device_mapper::DeviceMapperRegistry;
 #[cfg(not(feature = "starnix_lite"))]
 use crate::device::framebuffer::{AspectRatio, Framebuffer};
-use crate::device::loop_device::LoopDeviceRegistry;
 use crate::device::remote_block_device::RemoteBlockDeviceRegistry;
-#[cfg(not(feature = "starnix_lite"))]
-use crate::device::{BinderDevice, DeviceMode, DeviceRegistry};
-#[cfg(feature = "starnix_lite")]
 use crate::device::{DeviceMode, DeviceRegistry};
 use crate::execution::CrashReporter;
 use crate::fs::nmfs::NetworkManagerHandle;
@@ -38,6 +36,7 @@ use crate::vfs::{
     DelayedReleaser, FileHandle, FileOps, FileSystemHandle, FsNode, FsString, Mounts,
 };
 use bstr::BString;
+use expando::Expando;
 use fidl::endpoints::{
     create_endpoints, ClientEnd, DiscoverableProtocolMarker, ProtocolMarker, Proxy,
 };
@@ -99,6 +98,12 @@ pub struct Kernel {
     /// The processes and threads running in this kernel, organized by pid_t.
     pub pids: RwLock<PidTable>,
 
+    /// Subsystem-specific properties that hang off the Kernel object.
+    ///
+    /// Instead of adding yet another property to the Kernel object, consider storing the property
+    /// in an expando if that property is only used by one part of the system, such as a module.
+    pub expando: Expando,
+
     /// The default namespace for abstract AF_UNIX sockets in this kernel.
     ///
     /// Rather than use this default namespace, abstract socket addresses
@@ -145,11 +150,6 @@ pub struct Kernel {
 
     /// The data directory of the container.
     pub container_data_dir: Option<fio::DirectorySynchronousProxy>,
-
-    /// The registry of active loop devices.
-    ///
-    /// See <https://man7.org/linux/man-pages/man4/loop.4.html>
-    pub loop_device_registry: Arc<LoopDeviceRegistry>,
 
     /// The registry of active device mapper devices.
     pub device_mapper_registry: Arc<DeviceMapperRegistry>,
@@ -344,6 +344,7 @@ impl Kernel {
             kthreads: KernelThreads::new(kernel.clone()),
             features,
             pids: RwLock::new(PidTable::new()),
+            expando: Default::default(),
             default_abstract_socket_namespace: AbstractUnixSocketNamespace::new(unix_address_maker),
             default_abstract_vsock_namespace: AbstractVsockSocketNamespace::new(
                 vsock_address_maker,
@@ -364,7 +365,6 @@ impl Kernel {
             device_registry: DeviceRegistry::new(),
             container_svc,
             container_data_dir,
-            loop_device_registry: Default::default(),
             device_mapper_registry: Default::default(),
             remote_block_device_registry: Default::default(),
             #[cfg(not(feature = "starnix_lite"))]

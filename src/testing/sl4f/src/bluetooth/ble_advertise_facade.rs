@@ -142,6 +142,7 @@ impl BleAdvertiseFacade {
         let inner_clone = inner.clone();
         let stream_fut = async move {
             while let Some(event) = stream.next().await {
+                #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336801)
                 match event {
                     Ok(_) => {
                         debug!(tag = &with_line!(tag), "ignoring event for Connection");

@@ -5,10 +5,13 @@
 #include "src/storage/blobfs/allocator/extent_reserver.h"
 
 #include <stdint.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
 #include <zircon/types.h>
 
-#include <bitmap/rle-bitmap.h>
-#include <safemath/safe_conversions.h>
+#include <cstddef>
+#include <mutex>
+#include <utility>
 
 #include "src/storage/blobfs/format.h"
 

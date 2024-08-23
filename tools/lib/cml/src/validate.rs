@@ -41,6 +41,13 @@ pub(crate) fn validate_cml(
     res
 }
 
+fn offer_can_have_dependency(offer: &Offer) -> bool {
+    offer.directory.is_some() || offer.protocol.is_some() || offer.service.is_some()
+}
+
+fn offer_dependency(offer: &Offer) -> DependencyType {
+    offer.dependency.clone().unwrap_or(DependencyType::Strong)
+}
 struct ValidationContext<'a> {
     document: &'a Document,
     features: &'a FeatureSet,
@@ -841,10 +848,10 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             }
         }
 
-        // Ensure that dependency can only be provided for directories and protocols
-        if offer.dependency.is_some() && offer.directory.is_none() && offer.protocol.is_none() {
+        // Ensure that dependency is set for the right capabilities.
+        if !offer_can_have_dependency(offer) && offer.dependency.is_some() {
             return Err(Error::validate(
-                "Dependency can only be provided for protocol and directory capabilities",
+                "Dependency can only be provided for protocol, directory, and service capabilities",
             ));
         }
 
@@ -900,11 +907,8 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
                         }
                     } else {
                         for reference in offer.from.iter() {
-                            if (offer.directory.is_some() || offer.protocol.is_some())
-                                && (offer.dependency.as_ref().unwrap_or(&DependencyType::Strong)
-                                    != &DependencyType::Strong)
-                            {
-                                // Weak offers from a child to itself are acceptable.
+                            // Weak offers from a child to itself are acceptable.
+                            if offer_dependency(offer) == DependencyType::Weak {
                                 continue;
                             }
                             match reference {
@@ -953,13 +957,7 @@ to run your test in the correct test realm.", TEST_TYPE_FACET_KEY)));
             // Collect strong dependencies. We'll check for dependency cycles after all offer
             // declarations are validated.
             for from in offer.from.iter() {
-                let is_strong = if offer.directory.is_some() || offer.protocol.is_some() {
-                    offer.dependency.as_ref().unwrap_or(&DependencyType::Strong)
-                        == &DependencyType::Strong
-                } else {
-                    true
-                };
-                if is_strong {
+                if offer_dependency(offer) == DependencyType::Strong {
                     for source in self.expand_source_dependencies(offer.names(), &from.into()) {
                         let target = DependencyNode::offer_to_ref(to);
                         self.add_strong_dep(source, target);
@@ -3237,6 +3235,7 @@ mod tests {
             json!({
                 "capabilities": [
                     { "protocol": ["fuchsia.example.Protocol"] },
+                    { "service": ["fuchsia.example.Service"] },
                 ],
                 "children": [
                     {
@@ -3250,10 +3249,20 @@ mod tests {
                         "from": "#child",
                         "dependency": "weak",
                     },
+                    {
+                        "service": "fuchsia.example.Service",
+                        "from": "#child",
+                        "dependency": "weak",
+                    },
                 ],
                 "offer": [
                     {
                         "protocol": "fuchsia.example.Protocol",
+                        "from": "self",
+                        "to": [ "#child" ],
+                    },
+                    {
+                        "service": "fuchsia.example.Service",
                         "from": "self",
                         "to": [ "#child" ],
                     },
@@ -4642,7 +4651,7 @@ mod tests {
                         "url": "fuchsia-pkg://fuchsia.com/echo/stable#meta/echo_server.cm",
                     } ],
                 }),
-            Err(Error::Validate { err, .. }) if &err == "Dependency can only be provided for protocol and directory capabilities"
+            Err(Error::Validate { err, .. }) if err.starts_with("Dependency can only be provided for")
         ),
         test_cml_offer_dependency_cycle(
             json!({
@@ -4747,6 +4756,12 @@ mod tests {
                     "offer": [
                         {
                             "protocol": "fuchsia.logger.Log",
+                            "from": "#child_a",
+                            "to": [ "#child_b" ],
+                            "dependency": "weak"
+                        },
+                        {
+                            "service": "fuchsia.service.Test",
                             "from": "#child_a",
                             "to": [ "#child_b" ],
                             "dependency": "weak"

@@ -137,6 +137,7 @@ async fn run_device_control(
     let mut detached = false;
     let mut tasks = futures::stream::FuturesUnordered::new();
     let res = loop {
+        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
         let result = futures::select! {
             req = req_stream.try_next() => req,
             r = worker_fut => match r {
@@ -1151,7 +1152,7 @@ fn add_address(
     if params.temporary.unwrap_or(false) {
         todo!("https://fxbug.dev/42056881: support adding temporary addresses");
     }
-    const INFINITE_NANOS: i64 = zx::Time::INFINITE.into_nanos();
+    const INFINITE_NANOS: i64 = zx::MonotonicTime::INFINITE.into_nanos();
     let initial_properties =
         params.initial_properties.unwrap_or(fnet_interfaces_admin::AddressProperties::default());
     let valid_lifetime_end = initial_properties.valid_lifetime_end.unwrap_or(INFINITE_NANOS);

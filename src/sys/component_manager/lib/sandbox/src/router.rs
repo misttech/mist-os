@@ -4,7 +4,6 @@
 
 use crate::{Capability, Dict, WeakInstanceToken};
 use async_trait::async_trait;
-use cm_types::Availability;
 use fuchsia_zircon_status::Status;
 use futures::future::BoxFuture;
 use router_error::{Explain, RouterError};
@@ -21,11 +20,8 @@ pub trait Routable: Send + Sync {
 }
 
 /// [`Request`] contains metadata around how to obtain a capability.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Request {
-    /// The minimal availability strength of the capability demanded by the requestor.
-    pub availability: Availability,
-
     /// A reference to the requesting component.
     pub target: WeakInstanceToken,
 
@@ -34,6 +30,27 @@ pub struct Request {
 
     /// Metadata associated with the request.
     pub metadata: Dict,
+}
+
+impl Request {
+    /// Clones the [`Request`] where the metadata [`Dict`] is a shallow copy. As a
+    /// result, the metadata [`Dict`] must not contain a nested [`Dict`] otherwise a
+    /// [`RouterError::InvalidArgs`] error will be returned.
+    pub fn try_clone(&self) -> Result<Self, RouterError> {
+        self.metadata
+            .enumerate()
+            .find_map(|(_, v)| {
+                match v {
+                    // Since Dictionaries are shallow copied, throw an error if
+                    // there is a nested Dictionary.
+                    Ok(Capability::Dictionary(_)) => Some(Err::<Self, _>(RouterError::InvalidArgs)),
+                    _ => None,
+                }
+            })
+            .transpose()?;
+        let metadata = self.metadata.shallow_copy().map_err(|()| RouterError::InvalidArgs)?;
+        Ok(Self { target: self.target.clone(), debug: self.debug, metadata })
+    }
 }
 
 /// A [`Router`] is a capability that lets the holder obtain other capabilities
@@ -146,7 +163,8 @@ impl Routable for RouterError {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Connector, Message};
+    use crate::{Connector, Data, DictKey, Message};
+    use cm_types::Availability;
     use fidl::handle::Channel;
 
     #[derive(Debug)]
@@ -171,13 +189,15 @@ mod tests {
         let (receiver, sender) = Connector::new();
         let router = Router::new_ok(sender.clone());
 
+        let metadata = Dict::new();
+        metadata
+            .insert(
+                DictKey::new("availability").unwrap(),
+                Capability::Data(Data::String(Availability::Required.to_string())),
+            )
+            .unwrap();
         let capability = router
-            .route(Request {
-                availability: Availability::Required,
-                target: FakeInstanceToken::new(),
-                debug: false,
-                metadata: Dict::new(),
-            })
+            .route(Request { target: FakeInstanceToken::new(), debug: false, metadata })
             .await
             .unwrap();
         let sender = match capability {

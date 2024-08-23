@@ -50,7 +50,6 @@ rustc_library("fake-block-client") {
     ":block-client",
     "//sdk/fidl/fuchsia.hardware.block:fuchsia.hardware.block_rust",
     "//src/lib/zircon/rust:fuchsia-zircon",
-    "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:async-trait",
   ]
   sources = [ "src/fake_block_client.rs" ]

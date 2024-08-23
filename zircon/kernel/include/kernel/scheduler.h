@@ -1113,6 +1113,11 @@ class Scheduler {
   // cache performance.
   RelaxedAtomic<SchedDuration> exported_total_expected_runtime_ns_{SchedNs(0)};
   RelaxedAtomic<SchedUtilization> exported_total_deadline_utilization_{SchedUtilization{0}};
+
+  // The thread which ran just before this thread was scheduled.  Used by
+  // Scheduler::LockHandoff to release the previous thread's lock after a
+  // context switch operation has fully completed.
+  Thread* previous_thread_{nullptr};
 };
 
 #endif  // ZIRCON_KERNEL_INCLUDE_KERNEL_SCHEDULER_H_

@@ -523,7 +523,7 @@ impl DeviceOps for Arc<RwLock<DynRegistry>> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::device::mem::DevNull;
+    use crate::device::mem::{mem_device_init, DevNull};
     use crate::fs::sysfs::DeviceDirectory;
     use crate::testing::*;
     use crate::vfs::*;
@@ -701,6 +701,8 @@ mod tests {
     #[::fuchsia::test]
     async fn registery_unregister_device() {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
+        mem_device_init(&mut locked, &current_task);
+
         let registry = &kernel.device_registry;
         let node = FsNode::new_root(PanickingFsNode);
         let _ = registry

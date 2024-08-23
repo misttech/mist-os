@@ -137,6 +137,7 @@ impl<T, E> Try for Result<T, E> {
     }
 
     fn from_residual(residual: Self::Residual) -> Self {
+        #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336901)
         match residual {
             Err(error) => Err(error),
             _ => unreachable!(),

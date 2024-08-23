@@ -7,29 +7,18 @@
 #ifndef SRC_STORAGE_BLOBFS_FORMAT_H_
 #define SRC_STORAGE_BLOBFS_FORMAT_H_
 
-#include <assert.h>
-#include <stdbool.h>
 #include <stdint.h>
 #include <zircon/assert.h>
 #include <zircon/compiler.h>
-#include <zircon/types.h>
 
-#include <algorithm>
+#include <cstddef>
 #include <limits>
 #include <ostream>
 
 #include <fbl/algorithm.h>
-#include <fbl/macros.h>
-#include <safemath/safe_conversions.h>
-
-#include "src/storage/lib/vfs/cpp/journal/format.h"
-
-#ifdef __Fuchsia__
-#include <zircon/syscalls.h>
-#endif
 
 #include "src/lib/digest/digest.h"
-#include "src/lib/digest/merkle-tree.h"
+#include "src/storage/lib/vfs/cpp/journal/format.h"
 
 namespace blobfs {
 
@@ -402,7 +391,7 @@ static_assert(kMaxBlocksPerBlob <= std::numeric_limits<decltype(Inode::block_cou
 
 // This is inlined because format.cc only compiles on Fuchsia builds (not host).
 inline std::ostream& operator<<(std::ostream& stream, const Inode& inode) {
-  digest::Digest d(inode.merkle_root_hash);
+  Digest d(inode.merkle_root_hash);
   stream << "Inode {header:" << inode.header << " merkle:" << d.ToString()
          << " blob_size:" << inode.blob_size << " block_count:" << inode.block_count
          << " extent_count:" << inode.extent_count << " extents:" << inode.extents << "}";

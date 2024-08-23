@@ -19,12 +19,11 @@ Page::~Page() {
   ZX_DEBUG_ASSERT(InTreeContainer() == false);
   ZX_DEBUG_ASSERT(InListContainer() == false);
   ZX_DEBUG_ASSERT(IsDirty() == false);
-  ZX_DEBUG_ASSERT(IsLocked() == false);
 }
 
 void Page::RecyclePage() {
-  // Since active Pages are evicted only when having strong references,
-  // it is safe to call InContainer().
+  // Since a page is evicted only when it has any references or is a weak pointer.
+  // InTreeContainer() can be called without lock.
   if (InTreeContainer()) {
     ZX_ASSERT(VmoOpUnlock() == ZX_OK);
     file_cache_->Downgrade(this);
@@ -34,6 +33,13 @@ void Page::RecyclePage() {
 }
 
 F2fs *Page::fs() const { return file_cache_->fs(); }
+
+bool LockedPage::SetDirty() {
+  if (page_) {
+    return page_->SetDirty();
+  }
+  return true;
+}
 
 bool Page::SetDirty() {
   SetUptodate();
@@ -60,13 +66,12 @@ bool Page::SetDirty() {
   return true;
 }
 
-bool Page::ClearDirtyForIo() {
-  ZX_DEBUG_ASSERT(IsLocked());
-  VnodeF2fs &vnode = GetVnode();
-  if (IsDirty()) {
-    ClearFlag(PageFlag::kPageDirty);
+bool LockedPage::ClearDirtyForIo() {
+  if (page_ && page_->IsDirty()) {
+    VnodeF2fs &vnode = page_->GetVnode();
     vnode.DecreaseDirtyPageCount();
-    SuperblockInfo &superblock_info = fs()->GetSuperblockInfo();
+    page_->ClearFlag(PageFlag::kPageDirty);
+    SuperblockInfo &superblock_info = page_->fs()->GetSuperblockInfo();
     if (vnode.IsNode()) {
       superblock_info.DecreasePageCount(CountType::kDirtyNodes);
     } else if (vnode.IsDir()) {
@@ -83,7 +88,6 @@ bool Page::ClearDirtyForIo() {
 }
 
 zx_status_t Page::GetPage() {
-  ZX_DEBUG_ASSERT(IsLocked());
   auto committed_or = VmoOpLock();
   ZX_ASSERT(committed_or.is_ok());
   if (!committed_or.value()) {
@@ -94,46 +98,44 @@ zx_status_t Page::GetPage() {
   return committed_or.status_value();
 }
 
-void Page::Invalidate() {
-  ZX_DEBUG_ASSERT(IsLocked());
-  WaitOnWriteback();
-  ClearDirtyForIo();
-  ClearColdData();
-  ClearUptodate();
+void LockedPage::Invalidate() {
+  if (page_) {
+    ClearDirtyForIo();
+    page_->block_addr_ = kNullAddr;
+    page_->ClearColdData();
+    page_->ClearUptodate();
+  }
 }
 
 bool Page::IsUptodate() const {
-  ZX_DEBUG_ASSERT(IsLocked());
   if (!TestFlag(PageFlag::kPageUptodate)) {
     return false;
   }
   return !GetVmoManager().IsPaged() || IsDirty() || IsWriteback();
 }
 
-bool Page::SetUptodate() {
-  ZX_DEBUG_ASSERT(IsLocked());
-  return SetFlag(PageFlag::kPageUptodate);
-}
+bool Page::SetUptodate() { return SetFlag(PageFlag::kPageUptodate); }
 
-void Page::ClearUptodate() {
-  ZX_DEBUG_ASSERT(IsLocked());
-  // block_addr_ is valid only when the uptodate flag is set.
-  block_addr_ = kNullAddr;
-  ClearFlag(PageFlag::kPageUptodate);
-}
+void Page::ClearUptodate() { ClearFlag(PageFlag::kPageUptodate); }
 
-void Page::WaitOnWriteback() {
-  if (IsWriteback()) {
-    fs()->ScheduleWriter();
+void Page::WaitOnWriteback() { GetFileCache().WaitOnWriteback(*this); }
+
+void LockedPage::WaitOnWriteback() {
+  if (!page_) {
+    return;
   }
-  WaitOnFlag(PageFlag::kPageWriteback);
+  page_->WaitOnWriteback();
 }
 
-bool Page::SetWriteback() {
-  ZX_DEBUG_ASSERT(IsLocked());
-  bool ret = SetFlag(PageFlag::kPageWriteback);
+bool LockedPage::SetWriteback(block_t addr) {
+  bool ret = !page_ || page_->SetFlag(PageFlag::kPageWriteback);
   if (!ret) {
-    fs()->GetSuperblockInfo().IncreasePageCount(CountType::kWriteback);
+    page_->fs()->GetSuperblockInfo().IncreasePageCount(CountType::kWriteback);
+    page_->block_addr_ = addr;
+    size_t offset = page_->GetKey() * kPageSize;
+    ZX_ASSERT(page_->GetVmoManager()
+                  .WritebackBegin(*page_->fs()->vfs(), offset, offset + kPageSize)
+                  .is_ok());
   }
   return ret;
 }
@@ -141,8 +143,9 @@ bool Page::SetWriteback() {
 void Page::ClearWriteback() {
   if (IsWriteback()) {
     fs()->GetSuperblockInfo().DecreasePageCount(CountType::kWriteback);
+    size_t offset = GetKey() * kPageSize;
+    ZX_ASSERT(GetVmoManager().WritebackEnd(*fs()->vfs(), offset, offset + kPageSize) == ZX_OK);
     ClearFlag(PageFlag::kPageWriteback);
-    WakeupFlag(PageFlag::kPageWriteback);
   }
 }
 
@@ -155,17 +158,8 @@ bool Page::SetSync() { return SetFlag(PageFlag::kPageSync); }
 void Page::ClearSync() { ClearFlag(PageFlag::kPageSync); }
 
 void Page::SetColdData() {
-  ZX_DEBUG_ASSERT(IsLocked());
   ZX_DEBUG_ASSERT(!IsWriteback());
   SetFlag(PageFlag::kPageColdData);
-}
-
-zx::result<> Page::SetBlockAddr(block_t addr) {
-  if (IsLocked() && TestFlag(PageFlag::kPageUptodate)) {
-    block_addr_ = addr;
-    return zx::ok();
-  }
-  return zx::error(ZX_ERR_UNAVAILABLE);
 }
 
 bool Page::ClearColdData() {
@@ -177,11 +171,9 @@ bool Page::ClearColdData() {
 }
 
 zx_status_t Page::VmoOpUnlock(bool evict) {
-  ZX_DEBUG_ASSERT(InTreeContainer());
-  // Only clean pages can be subject to eviction
   if (evict && IsVmoLocked()) {
+    ZX_DEBUG_ASSERT(!IsWriteback());
     ZX_DEBUG_ASSERT(!IsDirty());
-    WaitOnWriteback();
     ClearFlag(PageFlag::kPageVmoLocked);
     return GetVmoManager().UnlockVmo(index_);
   }
@@ -190,7 +182,6 @@ zx_status_t Page::VmoOpUnlock(bool evict) {
 
 zx::result<bool> Page::VmoOpLock() {
   ZX_DEBUG_ASSERT(InTreeContainer());
-  ZX_DEBUG_ASSERT(IsLocked());
   if (!SetFlag(PageFlag::kPageVmoLocked)) {
     return GetVmoManager().CreateAndLockVmo(index_, addr_ ? nullptr : &addr_);
   }
@@ -220,13 +211,13 @@ zx_status_t Page::Write(const void *data, uint64_t offset, size_t len) {
 }
 
 void LockedPage::Zero(size_t start, size_t end) const {
-  if (start < end && end <= Page::Size()) {
+  if (start < end && end <= Page::Size() && page_) {
     page_->Write(kZeroBuffer_.data(), start, end - start);
   }
 }
 
 zx::result<> LockedPage::SetVmoDirty() {
-  if (!page_->IsDirty() && !page_->IsWriteback() && page_->GetVmoManager().IsPaged()) {
+  if (page_ && !page_->IsDirty() && !page_->IsWriteback() && page_->GetVmoManager().IsPaged()) {
     size_t start_offset = safemath::CheckMul(page_->GetKey(), kBlockSize).ValueOrDie();
     if (auto dirty_or = page_->GetVmoManager().DirtyPages(*page_->fs()->vfs(), start_offset,
                                                           start_offset + kBlockSize);
@@ -238,23 +229,16 @@ zx::result<> LockedPage::SetVmoDirty() {
   return zx::ok();
 }
 
-bool LockedPage::SetDirty() { return page_->SetDirty(); }
-
 FileCache::FileCache(VnodeF2fs *vnode, VmoManager *vmo_manager)
     : vnode_(vnode), vmo_manager_(vmo_manager) {}
 
 FileCache::~FileCache() {
   Reset();
-  {
-    std::lock_guard tree_lock(tree_lock_);
-    ZX_DEBUG_ASSERT(page_tree_.is_empty());
-  }
+  ZX_DEBUG_ASSERT(page_tree_.is_empty());
 }
 
 void FileCache::Downgrade(Page *raw_page) {
-  // We can downgrade multiple Pages simultaneously.
   fs::SharedLock tree_lock(tree_lock_);
-  // Resurrect |this|.
   raw_page->ResurrectRef();
   fbl::RefPtr<Page> page = fbl::ImportFromRawPtr(raw_page);
   // Leak it to keep alive in FileCache.
@@ -376,18 +360,16 @@ zx_status_t FileCache::FindPage(const pgoff_t index, fbl::RefPtr<Page> *out) {
 zx::result<LockedPage> FileCache::GetLockedPageFromRawUnsafe(Page *raw_page) {
   auto page = fbl::MakeRefPtrUpgradeFromRaw(raw_page, tree_lock_);
   if (page == nullptr) {
-    // Wait for it to be resurrected when it is being recycled.
     recycle_cvar_.wait(tree_lock_);
-    return zx::error(ZX_ERR_SHOULD_WAIT);
+    // It is being recycled. It is unavailable now.
+    return zx::error(ZX_ERR_UNAVAILABLE);
   }
   // Try to make LockedPage from |page|.
-  // If |page| has been already locked, it waits for it to be unlock and returns ZX_ERR_SHOULD_WAIT.
   auto locked_page_or = GetLockedPage(std::move(page));
   if (locked_page_or.is_error()) {
-    return zx::error(ZX_ERR_SHOULD_WAIT);
+    return locked_page_or.take_error();
   }
-  // Here, Page::ref_count should not be less than one.
-  return zx::ok(std::move(*locked_page_or));
+  return zx::ok(*std::move(locked_page_or));
 }
 
 zx::result<LockedPage> FileCache::GetPageUnsafe(const pgoff_t index) {
@@ -413,20 +395,20 @@ zx::result<LockedPage> FileCache::GetPageUnsafe(const pgoff_t index) {
 }
 
 zx::result<LockedPage> FileCache::GetLockedPage(fbl::RefPtr<Page> page) {
-  if (page->TryLock()) {
+  LockedPage locked_page = LockedPage(page, std::try_to_lock);
+  if (!locked_page) {
     tree_lock_.unlock();
     {
-      // If |page| is already locked, wait for it to be unlocked.
-      // Ensure that the references to |page| drop before |tree_lock_|.
-      // If |page| is the last reference, it enters Page::RecyclePage() and
-      // possibly acquires |tree_lock_|.
-      LockedPage locked_page(std::move(page));
+      // If |page| is already locked, it releases |tree_lock_|, which allows FileCache to serve
+      // other requests while waiting for the locked page.
+      locked_page = LockedPage(std::move(page));
     }
-    // It is not allowed to acquire |tree_lock_| with locked Pages.
     tree_lock_.lock();
-    return zx::error(ZX_ERR_SHOULD_WAIT);
   }
-  LockedPage locked_page(std::move(page), false);
+  // |page| can be evicted while it releases |tree_lock_| while waiting for the page lock.
+  if (!locked_page->InTreeContainer()) {
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
   return zx::ok(std::move(locked_page));
 }
 
@@ -497,24 +479,23 @@ std::vector<LockedPage> FileCache::GetLockedPagesUnsafe(const std::vector<pgoff_
   return pages;
 }
 
-std::vector<LockedPage> FileCache::CleanupPagesUnsafe(pgoff_t start, pgoff_t end) {
-  std::vector<LockedPage> pages = GetLockedPagesUnsafe(start, end);
-  for (auto &page : pages) {
-    page->Invalidate();
-    EvictUnsafe(page.get());
-  }
-  return pages;
-}
-
 std::vector<LockedPage> FileCache::InvalidatePages(pgoff_t start, pgoff_t end, bool zero) {
-  std::vector<LockedPage> pages;
-  {
-    std::lock_guard tree_lock(tree_lock_);
-    pages = CleanupPagesUnsafe(start, end);
-    if (zero) {
-      // Make sure that all pages in the range are zeroed.
-      vmo_manager_->ZeroBlocks(*vnode_->fs()->vfs(), start, end);
-    }
+  std::lock_guard tree_lock(tree_lock_);
+  std::vector<LockedPage> pages = GetLockedPagesUnsafe(start, end);
+  // Unlock |tree_lock_| to allow |page_tree_| to serve other requests while invalidating pages.
+  tree_lock_.unlock();
+  // Invalidate pages after waiting for their writeback.
+  for (auto &page : pages) {
+    WaitOnWriteback(*page);
+    page.Invalidate();
+  }
+  if (zero) {
+    // Make sure that all pages in the range are zeroed.
+    vmo_manager_->ZeroBlocks(*vnode_->fs()->vfs(), start, end);
+  }
+  tree_lock_.lock();
+  for (auto &page : pages) {
+    EvictUnsafe(page.get());
   }
   return pages;
 }
@@ -529,16 +510,12 @@ void FileCache::ClearDirtyPages() {
   }
   // Clear the dirty flag of all Pages.
   for (auto &page : pages) {
-    page->ClearDirtyForIo();
+    page.ClearDirtyForIo();
   }
 }
 
 void FileCache::Reset() {
-  std::vector<LockedPage> pages;
-  {
-    std::lock_guard tree_lock(tree_lock_);
-    pages = CleanupPagesUnsafe();
-  }
+  std::vector<LockedPage> pages = InvalidatePages(0, kPgOffMax, false);
   vmo_manager_->Reset();
 }
 
@@ -589,7 +566,6 @@ std::vector<LockedPage> FileCache::GetLockedDirtyPages(const WritebackOperation 
       ++current;
     } else {
       ++current;
-      ZX_DEBUG_ASSERT(!raw_page->IsLocked());
       ZX_DEBUG_ASSERT(!raw_page->IsWriteback());
       if (raw_page->IsDirty()) {
         ZX_DEBUG_ASSERT(raw_page->IsLastReference());
@@ -625,12 +601,27 @@ void FileCache::EvictCleanPages() {
     auto raw_page = current.CopyPointer();
     ++current;
     if (!raw_page->IsActive() && !raw_page->IsDirty()) {
-      ZX_DEBUG_ASSERT(!raw_page->IsLocked());
       ZX_DEBUG_ASSERT(!raw_page->IsWriteback());
       fbl::RefPtr<Page> evicted = fbl::ImportFromRawPtr(raw_page);
       EvictUnsafe(raw_page);
     }
   }
+}
+
+void FileCache::WaitOnWriteback(Page &page) {
+  fs::SharedLock lock(flag_lock_);
+  if (page.IsWriteback()) {
+    fs()->ScheduleWriter();
+  }
+  flag_cvar_.wait(lock, [&]() { return !page.IsWriteback(); });
+}
+
+void FileCache::NotifyWriteback(PageList pages) {
+  std::lock_guard lock(flag_lock_);
+  for (auto &page : pages) {
+    page.ClearWriteback();
+  }
+  flag_cvar_.notify_all();
 }
 
 }  // namespace f2fs

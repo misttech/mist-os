@@ -10,7 +10,8 @@
 #include "thermal_test_control.h"
 
 int main(int argc, const char** argv) {
-  fuchsia_logging::SetTags({"thermal_test_control"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"thermal_test_control"}).BuildAndInitialize();
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();

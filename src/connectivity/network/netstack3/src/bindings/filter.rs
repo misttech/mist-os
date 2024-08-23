@@ -18,7 +18,7 @@ use futures::future::FusedFuture as _;
 use futures::lock::Mutex;
 use futures::{FutureExt as _, StreamExt as _, TryStreamExt as _};
 use itertools::Itertools as _;
-use log::{error, info, warn};
+use log::{debug, error, info, warn};
 use thiserror::Error;
 use {
     fidl_fuchsia_net_filter as fnet_filter, fidl_fuchsia_net_filter_ext as fnet_filter_ext,
@@ -151,6 +151,43 @@ impl UpdateDispatcherInner {
             }
         })?;
 
+        if !events.is_empty() {
+            #[derive(Default, Debug)]
+            struct Counts {
+                // This field is seen as dead code by rustc because the `Default` and `Debug` impls
+                // are ignored during dead code analysis.
+                #[allow(dead_code)]
+                namespaces: usize,
+                routines: usize,
+                jump_actions: usize,
+                drop_actions: usize,
+                tproxy_actions: usize,
+                redirect_actions: usize,
+            }
+
+            let mut counts = Counts { namespaces: new_state.len(), ..Default::default() };
+            let _: &mut Counts = new_state.values().fold(&mut counts, |counts, namespace| {
+                counts.routines += namespace.routines.len();
+                for routine in namespace.routines.values() {
+                    for rule in routine.rules.values() {
+                        match rule.action {
+                            fnet_filter_ext::Action::Jump(_) => counts.jump_actions += 1,
+                            fnet_filter_ext::Action::Drop => counts.drop_actions += 1,
+                            fnet_filter_ext::Action::TransparentProxy(_) => {
+                                counts.tproxy_actions += 1
+                            }
+                            fnet_filter_ext::Action::Redirect { .. } => {
+                                counts.redirect_actions += 1
+                            }
+                            fnet_filter_ext::Action::Accept | fnet_filter_ext::Action::Return => {}
+                        }
+                    }
+                }
+                counts
+            });
+            info!("summary of updated filtering state for {controller_id:?}: {counts:?}");
+        }
+
         // Only if validation was successful do we actually commit the changes.
         // This ensures that the state will never be only partially updated.
         resources
@@ -160,7 +197,7 @@ impl UpdateDispatcherInner {
 
         // Notify all existing watchers of the update, if it was not a no-op.
         if !events.is_empty() {
-            info!("updated filtering state for {controller_id:?}: {events:?}");
+            debug!("changes to filtering state for {controller_id:?}: {events:?}");
 
             let events = events
                 .into_iter()

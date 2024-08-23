@@ -30,8 +30,9 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
         outdir,
         gendir,
         base_package_name,
-        mode,
+        mut mode,
     } = args;
+
     let gendir = gendir.unwrap_or_else(|| outdir.clone());
     let base_package_name =
         base_package_name.unwrap_or_else(|| PackageDestination::Base.to_string());
@@ -39,6 +40,10 @@ pub async fn create_system(args: CreateSystemArgs) -> Result<()> {
     let image_assembly_config: ImageAssemblyConfig = util::read_config(image_assembly_config)
         .context("Failed to read the image assembly config")?;
     let images_config = &image_assembly_config.images_config;
+
+    if image_assembly_config.netboot_mode {
+        mode = PackageMode::DiskImageInZbi;
+    }
 
     // Get the tool set.
     let tools = SdkToolProvider::try_new()?;

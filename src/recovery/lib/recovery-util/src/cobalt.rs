@@ -27,7 +27,7 @@ impl CobaltImpl {
         timeout_seconds: i64,
         proxy: AggregateAndUploadSynchronousProxy,
     ) -> Result<(), Error> {
-        let deadline = zx::Time::after(zx::Duration::from_seconds(timeout_seconds));
+        let deadline = zx::MonotonicTime::after(zx::Duration::from_seconds(timeout_seconds));
         proxy
             .aggregate_and_upload_metric_events(deadline)
             .map_err(|e| format_err!("AggregateAndUploadMetric returned an error: {:?}", e))

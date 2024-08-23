@@ -86,11 +86,8 @@ fhbt::ScoSampleRate ScoSampleRateToFidl(pw::bluetooth::Controller::ScoSampleRate
 
 }  // namespace
 
-VendorEventHandler::VendorEventHandler(
-    std::function<void(zx_status_t)> unbind_callback,
-    std::function<void(fhbt::VendorFeatures)> on_vendor_connected_callback)
-    : unbind_callback_(std::move(unbind_callback)),
-      on_vendor_connected_callback_(std::move(on_vendor_connected_callback)) {}
+VendorEventHandler::VendorEventHandler(std::function<void(zx_status_t)> unbind_callback)
+    : unbind_callback_(std::move(unbind_callback)) {}
 
 void VendorEventHandler::handle_unknown_event(fidl::UnknownEventMetadata<fhbt::Vendor> metadata) {
   bt_log(WARN, "controllers", "Unknown event from Vendor server: %lu", metadata.event_ordinal);
@@ -99,10 +96,6 @@ void VendorEventHandler::handle_unknown_event(fidl::UnknownEventMetadata<fhbt::V
 void VendorEventHandler::on_fidl_error(fidl::UnbindInfo error) {
   bt_log(ERROR, "controllers", "Vendor protocol closed: %s", error.FormatDescription().c_str());
   unbind_callback_(ZX_ERR_PEER_CLOSED);
-}
-
-void VendorEventHandler::OnFeatures(fidl::Event<fhbt::Vendor::OnFeatures>& event) {
-  on_vendor_connected_callback_(event);
 }
 
 HciEventHandler::HciEventHandler(
@@ -127,11 +120,7 @@ void HciEventHandler::on_fidl_error(fidl::UnbindInfo error) {
 
 FidlController::FidlController(fidl::ClientEnd<fhbt::Vendor> vendor_client_end,
                                async_dispatcher_t* dispatcher)
-    : vendor_event_handler_([this](zx_status_t status) { OnError(status); },
-                            [this](fhbt::VendorFeatures features) {
-                              vendor_features_ = features;
-                              ReportVendorFeaturesIfAvailable();
-                            }),
+    : vendor_event_handler_([this](zx_status_t status) { OnError(status); }),
       hci_event_handler_([this](zx_status_t status) { OnError(status); },
                          [this](fhbt::ReceivedPacket packet) { OnReceive(std::move(packet)); }),
       sco_event_handler_([this](zx_status_t status) { OnScoUnbind(status); },
@@ -301,8 +290,17 @@ void FidlController::ResetSco(pw::Callback<void(pw::Status)> callback) {
 }
 
 void FidlController::GetFeatures(pw::Callback<void(FidlController::FeaturesBits)> callback) {
-  get_features_callback_ = std::move(callback);
-  ReportVendorFeaturesIfAvailable();
+  vendor_->GetFeatures().Then(
+      [this, cb = std::move(callback)](fidl::Result<fhbt::Vendor::GetFeatures>& result) mutable {
+        if (result.is_error()) {
+          bt_log(WARN, "controllers", "GetFeatures(): %s", result.error_value().status_string());
+          OnError(ZX_ERR_BAD_STATE);
+          return;
+        }
+
+        FidlController::FeaturesBits features_bits = VendorFeaturesToFeaturesBits(result.value());
+        cb(features_bits);
+      });
 }
 
 void FidlController::EncodeVendorCommand(
@@ -406,19 +404,6 @@ void FidlController::OnScoUnbind(zx_status_t status) {
   sco_connection_.reset();
   reset_sco_cb_(pw::OkStatus());
   reset_sco_cb_ = nullptr;
-}
-
-void FidlController::ReportVendorFeaturesIfAvailable() {
-  if (!get_features_callback_ || !vendor_features_) {
-    return;
-  }
-
-  FidlController::FeaturesBits features_bits = VendorFeaturesToFeaturesBits(*vendor_features_);
-
-  (*get_features_callback_)(features_bits);
-  get_features_callback_.reset();
-  // Don't reset |vendor_features_| so that the controller reports the same features until it's
-  // updated from the driver.
 }
 
 void FidlController::OnError(zx_status_t status) {

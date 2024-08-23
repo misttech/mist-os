@@ -14,12 +14,14 @@
 
 #include <arch.h>
 #include <debug.h>
+#include <lib/console.h>
 #include <lib/counters.h>
 #include <lib/cxxabi-dynamic-init/cxxabi-dynamic-init.h>
 #include <lib/debuglog.h>
 #include <lib/heap.h>
 #include <lib/jtrace/jtrace.h>
 #include <lib/lockup_detector.h>
+#include <lib/userabi/userboot.h>
 #include <platform.h>
 #include <string.h>
 #include <zircon/compiler.h>
@@ -159,6 +161,8 @@ void lk_main(paddr_t handoff_paddr) {
   dprintf(SPEW, "creating bootstrap completion thread\n");
   Scheduler::SetCurrCpuActive(true);
   Thread* t = Thread::Create("bootstrap2", &bootstrap2, NULL, DEFAULT_PRIORITY);
+  // As this thread will initialize per-CPU state, ensure that it runs on the boot CPU.
+  t->SetCpuAffinity(cpu_num_to_mask(BOOT_CPU_ID));
   t->Detach();
   t->Resume();
 
@@ -169,19 +173,19 @@ void lk_main(paddr_t handoff_paddr) {
 static int bootstrap2(void*) {
   timeline_threading.Set(current_ticks());
 
-  // As this thread will initialize per-CPU state, ensure that it runs on the boot CPU.
-  Thread::Current::Get()->SetCpuAffinity(cpu_num_to_mask(BOOT_CPU_ID));
-
   dprintf(SPEW, "top of bootstrap2()\n");
 
   // Initialize the rest of the architecture and platform.
   lk_primary_cpu_init_level(LK_INIT_LEVEL_THREADING, LK_INIT_LEVEL_ARCH - 1);
+
+  dprintf(SPEW, "initializing arch\n");
   arch_init();
+  lk_primary_cpu_init_level(LK_INIT_LEVEL_ARCH, LK_INIT_LEVEL_PLATFORM - 1);
 
   dprintf(SPEW, "initializing platform\n");
-  lk_primary_cpu_init_level(LK_INIT_LEVEL_ARCH, LK_INIT_LEVEL_PLATFORM - 1);
   platform_init();
   DriverHandoffLate(*gPhysHandoff);
+  lk_primary_cpu_init_level(LK_INIT_LEVEL_PLATFORM, LK_INIT_LEVEL_ARCH_LATE - 1);
 
   // At this point, other cores in the system have been started (though may
   // not yet be online).
@@ -189,11 +193,17 @@ static int bootstrap2(void*) {
   // Perform per-CPU set up on the boot CPU.
   DEBUG_ASSERT(arch_curr_cpu_num() == BOOT_CPU_ID);
   dprintf(SPEW, "initializing late arch\n");
-  lk_primary_cpu_init_level(LK_INIT_LEVEL_PLATFORM, LK_INIT_LEVEL_ARCH_LATE - 1);
   arch_late_init_percpu();
+  lk_primary_cpu_init_level(LK_INIT_LEVEL_ARCH_LATE, LK_INIT_LEVEL_USER - 1);
+
+  // Give the kernel shell an opportunity to run. If it exits this function, continue booting.
+  kernel_shell_init();
+
+  dprintf(SPEW, "starting user space\n");
+  userboot_init();
 
   dprintf(SPEW, "moving to last init level\n");
-  lk_primary_cpu_init_level(LK_INIT_LEVEL_ARCH_LATE, LK_INIT_LEVEL_LAST);
+  lk_primary_cpu_init_level(LK_INIT_LEVEL_USER, LK_INIT_LEVEL_LAST);
 
   timeline_init.Set(current_ticks());
   return 0;
@@ -228,13 +238,14 @@ void lk_init_secondary_cpus(uint secondary_cpu_count) {
             SMP_MAX_CPUS);
     secondary_cpu_count = SMP_MAX_CPUS - 1;
   }
+
+  secondary_idle_thread_count = 0;
   for (uint i = 0; i < secondary_cpu_count; i++) {
     Thread* t = Thread::CreateIdleThread(i + 1);
     if (!t) {
       dprintf(CRITICAL, "could not allocate idle thread %u\n", i + 1);
-      secondary_idle_thread_count = i;
       break;
     }
+    secondary_idle_thread_count++;
   }
-  secondary_idle_thread_count = secondary_cpu_count;
 }

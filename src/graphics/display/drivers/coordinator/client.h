@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.display.types/cpp/wire.h>
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
-#include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/task.h>
 #include <lib/fit/function.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -111,11 +110,16 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
 
   ~Client() override;
 
-  // Binds the `Client` to the server-side channel of the `Coordinator` protocol.
+  // Binds the `Client` to the server-side channel of the `Coordinator`
+  // protocol.
   //
   // Must be called exactly once in production code.
+  //
+  // `coordinator_server_end` and `coordinator_listener_client_end` must be valid.
   fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator> Bind(
-      fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end,
+      fidl::ServerEnd<fuchsia_hardware_display::Coordinator> coordinator_server_end,
+      fidl::ClientEnd<fuchsia_hardware_display::CoordinatorListener>
+          coordinator_listener_client_end,
       fidl::OnUnboundFn<Client> unbound_callback);
 
   void OnDisplaysChanged(cpp20::span<const DisplayId> added_display_ids,
@@ -290,6 +294,7 @@ class Client final : public fidl::WireServer<fuchsia_hardware_display::Coordinat
                    std::vector<fuchsia_hardware_display::wire::ClientCompositionOp>* ops);
 
   std::optional<fidl::ServerBindingRef<fuchsia_hardware_display::Coordinator>> binding_;
+  fidl::WireSharedClient<fuchsia_hardware_display::CoordinatorListener> coordinator_listener_;
 
   // Capture related book keeping
   EventId capture_fence_id_ = kInvalidEventId;
@@ -321,9 +326,13 @@ class ClientProxy {
   ~ClientProxy();
 
   zx_status_t Init(inspect::Node* parent_node,
-                   fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end);
+                   fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end,
+                   fidl::ClientEnd<fuchsia_hardware_display::CoordinatorListener>
+                       coordinator_listener_client_end);
 
-  zx::result<> InitForTesting(fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end);
+  zx::result<> InitForTesting(fidl::ServerEnd<fuchsia_hardware_display::Coordinator> server_end,
+                              fidl::ClientEnd<fuchsia_hardware_display::CoordinatorListener>
+                                  coordinator_listener_client_end);
 
   // Schedule a task on the controller loop to close this ClientProxy and
   // have it be freed.

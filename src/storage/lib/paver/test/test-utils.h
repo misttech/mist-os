@@ -71,6 +71,16 @@ class BlockDevice {
         ramdisk_get_block_controller_interface(client_));
   }
 
+  fidl::ClientEnd<fuchsia_device::Controller> ConnectToController() const {
+    fidl::ClientEnd<fuchsia_device::Controller> controller;
+    zx::result controller_server = fidl::CreateEndpoints(&controller);
+    ZX_ASSERT(controller_server.is_ok());
+    fidl::OneWayStatus status = fidl::WireCall(block_controller_interface())
+                                    ->ConnectToController(std::move(*controller_server));
+    ZX_ASSERT(status.status() == ZX_OK);
+    return controller;
+  }
+
   // Block count and block size of this device.
   uint64_t block_count() const { return block_count_; }
   uint32_t block_size() const { return block_size_; }

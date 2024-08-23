@@ -26,7 +26,7 @@ use {
 };
 
 #[cfg(target_os = "fuchsia")]
-use {hex::ToHex, wlan_rsn::psk};
+use wlan_rsn::psk;
 
 pub mod opts;
 use crate::opts::*;
@@ -442,6 +442,9 @@ async fn print_iface_status(iface_id: u16, monitor_proxy: DeviceMonitor) -> Resu
                 fidl_sme::ClientStatusResponse::Connecting(ssid) => {
                     println!("Connecting to '{}'", String::from_utf8_lossy(&ssid));
                 }
+                fidl_sme::ClientStatusResponse::Roaming(bssid) => {
+                    println!("Roaming to '{}'", String::from_utf8_lossy(&bssid));
+                }
                 fidl_sme::ClientStatusResponse::Idle(_) => {
                     println!("Iface {}: Not connected to a network", iface_id)
                 }
@@ -571,9 +574,7 @@ async fn do_rsn(cmd: opts::RsnCmd) -> Result<(), Error> {
 #[cfg(target_os = "fuchsia")]
 fn generate_psk(passphrase: &str, ssid: &str) -> Result<String, Error> {
     let psk = psk::compute(passphrase.as_bytes(), &Ssid::try_from(ssid)?)?;
-    let mut psk_hex = String::new();
-    psk.write_hex(&mut psk_hex)?;
-    return Ok(psk_hex);
+    Ok(hex::encode(&psk))
 }
 
 fn print_scan_result(scan_result: fidl_sme::ClientSmeScanResult) {

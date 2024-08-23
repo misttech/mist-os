@@ -8,7 +8,7 @@ use std::collections::BTreeSet;
 use std::fmt;
 
 use crate::common::{PackageDetails, PackagedDriverDetails};
-use crate::platform_config::sysmem_config::PlatformSysmemConfig;
+use crate::platform_config::sysmem_config::BoardSysmemConfig;
 use assembly_file_relative_path::{FileRelativePathBuf, SupportsFileRelativePaths};
 use assembly_images_config::BoardFilesystemConfig;
 use serde::{Deserialize, Serialize};
@@ -78,6 +78,10 @@ pub struct BoardInformation {
     /// Configure platform related feature
     #[serde(default)]
     pub platform: PlatformConfig,
+
+    /// GUIDs for the TAs provided by this board's TEE driver.
+    #[serde(default)]
+    pub tee_trusted_app_guids: Vec<uuid::Uuid>,
 }
 
 /// This struct defines board-provided data for the 'fuchsia.hwinfo.Board' fidl
@@ -142,6 +146,10 @@ pub struct BoardProvidedConfig {
     #[file_relative_paths]
     pub power_metrics_recorder: Option<FileRelativePathBuf>,
 
+    /// System power modes configuration
+    #[file_relative_paths]
+    pub system_power_mode: Option<FileRelativePathBuf>,
+
     /// Thermal configuration for the power-manager service
     #[file_relative_paths]
     pub thermal: Option<FileRelativePathBuf>,
@@ -151,6 +159,18 @@ pub struct BoardProvidedConfig {
     #[serde(default)]
     #[file_relative_paths]
     pub thread_roles: Vec<FileRelativePathBuf>,
+
+    /// Sysmem format costs configuration for the board. The file content bytes
+    /// are a persistent fidl fuchsia.sysmem2.FormatCosts. Normally json[5]
+    /// would be preferable for config, but we generate this config in rust
+    /// using FIDL types (to avoid repetition and to take advantage of FIDL rust
+    /// codegen), and there's no json schema for FIDL types.
+    ///
+    /// See BoardInformation.platform.sysmem_defaults for other board-level
+    /// sysmem config.
+    #[serde(default)]
+    #[file_relative_paths]
+    pub sysmem_format_costs: Vec<FileRelativePathBuf>,
 }
 
 /// Where to print the serial logs.
@@ -181,10 +201,24 @@ pub struct BoardKernelConfig {
     /// Disable printing to the console during early boot (ie, make it quiet)
     #[serde(default)]
     pub quiet_early_boot: bool,
+
+    /// This controls what serial port is used.  If provided, it overrides the
+    /// serial port described by the system's bootdata.  The kernel debug serial
+    /// port is a reserved resource and may not be used outside of the kernel.
+    ///
+    /// If set to "none", the kernel debug serial port will be disabled and will
+    /// not be reserved, allowing the default serial port to be used outside the
+    /// kernel.
+    #[serde(default)]
+    pub serial: Option<String>,
+
+    /// The system will halt on a kernel panic instead of rebooting.
+    #[serde(default)]
+    pub halt_on_panic: bool,
 }
 
 /// This struct defines platform configurations specified by board.
-#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq, SupportsFileRelativePaths)]
 #[serde(deny_unknown_fields)]
 pub struct PlatformConfig {
     /// Configure connectivity related features
@@ -195,10 +229,18 @@ pub struct PlatformConfig {
     #[serde(default)]
     pub development_support: DevelopmentSupportConfig,
 
+    /// Configure development support related features
+    #[serde(default)]
+    pub graphics: GraphicsConfig,
+
     /// Sysmem board defaults. This can be overridden field-by-field by the same
     /// struct in platform config.
+    ///
+    /// We don't provide format_costs_persistent_fidl files via this struct, as
+    /// a BoardInputBundle provides the files via the BoardProvidedConfig
+    /// struct.
     #[serde(default)]
-    pub sysmem_defaults: PlatformSysmemConfig,
+    pub sysmem_defaults: BoardSysmemConfig,
 }
 
 /// This struct defines connectivity configurations.
@@ -259,6 +301,25 @@ pub struct NetworkConfig {
     /// determined from the shell by running the `lsdev` command on the device
     /// (e.g. `/dev/class/network/000` or `/dev/class/ethernet/000`).
     pub netsvc_interface: Option<String>,
+}
+
+/// This struct defines graphics configurations.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct GraphicsConfig {
+    /// Configure display related features.
+    pub display: DisplayConfig,
+}
+
+/// This struct defines display configurations.
+#[derive(Clone, Debug, Default, Deserialize, Serialize, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct DisplayConfig {
+    /// The number of degrees to the rotate the screen display by.
+    pub rotation: Option<u32>,
+
+    /// Whether the display has rounded corners.
+    pub rounded_corners: Option<bool>,
 }
 
 #[cfg(test)]
@@ -332,13 +393,16 @@ mod test {
                 contiguous_physical_pages: true,
                 serial_mode: SerialMode::NoOutput,
                 quiet_early_boot: false,
+                serial: None,
+                halt_on_panic: false,
             },
             platform: PlatformConfig {
                 connectivity: ConnectivityConfig::default(),
                 development_support: DevelopmentSupportConfig {
                     enable_debug_access_port_for_soc: Some(DapSoc::AmlogicT931g),
                 },
-                sysmem_defaults: PlatformSysmemConfig::default(),
+                graphics: GraphicsConfig::default(),
+                sysmem_defaults: BoardSysmemConfig::default(),
             },
             ..Default::default()
         };

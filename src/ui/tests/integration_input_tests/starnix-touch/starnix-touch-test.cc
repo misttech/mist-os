@@ -278,25 +278,13 @@ class StarnixTouchTest : public ui_testing::PortableUITest {
   // To satisfy ui_testing::PortableUITest
   std::string GetTestUIStackUrl() override { return "#meta/test-ui-stack.cm"; }
 
-  // To satisfy ui_testing::PortableUITest
-  void ExtendRealm() override {
-    for (const auto& [name, component] : GetTestComponents()) {
-      realm_builder().AddChild(name, component);
-    }
-
-    // Add the necessary routing for each of the extra components added above.
-    for (const auto& route : GetTestRoutes()) {
-      realm_builder().AddRoute(route);
-    }
-  }
-
-  std::vector<std::pair<ChildName, std::string>> GetTestComponents() {
+  std::vector<std::pair<ChildName, std::string>> GetTestComponents() override {
     return {
         std::make_pair(kDebianRealm, kDebianRealmUrl),
     };
   }
 
-  std::vector<Route> GetTestRoutes() {
+  std::vector<Route> GetTestRoutes() override {
     return {
         // Route global capabilities from parent to the Debian realm.
         {.capabilities = {Proto<fuchsia_kernel::VmexResource>(), Proto<fuchsia_sysmem::Allocator>(),

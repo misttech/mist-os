@@ -9,7 +9,7 @@
 
 #include "pw_chrono/system_clock.h"
 
-namespace pw_async_fuchsia {
+namespace pw::async_fuchsia {
 
 constexpr pw::chrono::SystemClock::time_point ZxTimeToTimepoint(zx::time time) {
   timespec ts = time.to_timespec();
@@ -25,6 +25,6 @@ constexpr zx::time TimepointToZxTime(pw::chrono::SystemClock::time_point tp) {
   return zx::time{timespec{seconds.time_since_epoch().count(), ns.count()}};
 }
 
-}  // namespace pw_async_fuchsia
+}  // namespace pw::async_fuchsia
 
 #endif  // THIRD_PARTY_PIGWEED_BACKENDS_PW_ASYNC_FUCHSIA_PUBLIC_PW_ASYNC_FUCHSIA_UTIL_H_

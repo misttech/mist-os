@@ -238,7 +238,7 @@ zx::result<DentryInfo> Dir::GetParentDentryInfo(fbl::RefPtr<Page> *out) {
 void Dir::SetLink(const DentryInfo &info, fbl::RefPtr<Page> &page, VnodeF2fs *vnode) {
   {
     LockedPage page_lock(page);
-    page->WaitOnWriteback();
+    page_lock.WaitOnWriteback();
     DirEntry &de = GetDirEntry(info, page);
     de.ino = CpuToLe(vnode->Ino());
     SetDirEntryType(de, *vnode);
@@ -259,21 +259,18 @@ void Dir::SetLinkSafe(const DentryInfo &info, fbl::RefPtr<Page> &page, VnodeF2fs
   SetLink(info, page, vnode);
 }
 
-void Dir::InitDentInode(VnodeF2fs *vnode, NodePage &ipage) {
+void Dir::InitDentInode(VnodeF2fs *vnode, LockedPage &ipage) {
   ipage.WaitOnWriteback();
 
   // copy name info. to this inode page
-  Inode &inode = ipage.GetAddress<Node>()->i;
+  Inode &inode = ipage->GetAddress<Node>()->i;
   std::string_view name = vnode->GetNameView();
   // double check |name|
   ZX_DEBUG_ASSERT(IsValidNameLength(name));
   auto size = safemath::checked_cast<uint32_t>(name.size());
   inode.i_namelen = CpuToLe(size);
   name.copy(reinterpret_cast<char *>(&inode.i_name[kCurrentBitPos]), size);
-
-  LockedPage lock_page(fbl::RefPtr<Page>(&ipage), false);
-  lock_page.SetDirty();
-  [[maybe_unused]] auto unused = lock_page.release(false);
+  ipage.SetDirty();
 }
 
 zx_status_t Dir::InitInodeMetadata(VnodeF2fs *vnode) {
@@ -281,7 +278,7 @@ zx_status_t Dir::InitInodeMetadata(VnodeF2fs *vnode) {
     if (auto page_or = vnode->NewInodePage(); page_or.is_error()) {
       return page_or.error_value();
     } else {
-      InitDentInode(vnode, (*page_or).GetPage<NodePage>());
+      InitDentInode(vnode, *page_or);
     }
 
     if (vnode->IsDir()) {
@@ -303,7 +300,7 @@ zx_status_t Dir::InitInodeMetadata(VnodeF2fs *vnode) {
     if (zx_status_t err = fs()->GetNodeManager().GetNodePage(vnode->Ino(), &ipage); err != ZX_OK) {
       return err;
     }
-    InitDentInode(vnode, ipage.GetPage<NodePage>());
+    InitDentInode(vnode, ipage);
   }
 
   if (vnode->TestFlag(InodeInfoFlag::kIncLink)) {
@@ -400,7 +397,7 @@ zx_status_t Dir::AddLink(std::string_view name, VnodeF2fs *vnode) {
       if (zx_status_t status = InitInodeMetadata(vnode); status != ZX_OK) {
         return status;
       }
-      dentry_page->WaitOnWriteback();
+      dentry_page.WaitOnWriteback();
 
       DirEntry &de = dentry_blk->dentry[bit_pos];
       de.hash_code = CpuToLe(dentry_hash);
@@ -437,7 +434,7 @@ void Dir::DeleteEntry(const DentryInfo &info, fbl::RefPtr<Page> &page, VnodeF2fs
   }
 
   LockedPage page_lock(page);
-  page->WaitOnWriteback();
+  page_lock.WaitOnWriteback();
 
   DentryBlock *dentry_blk = page->GetAddress<DentryBlock>();
   DirEntry &dentry = GetDirEntry(info, page);

@@ -71,7 +71,8 @@ impl DefineSubsystemConfiguration<TimekeeperConfig> for TimekeeperSubsystem {
             // TODO: b/295537795 - provide this setting somehow.
             .field("power_topology_integration_enabled", false)?
             .field("serve_test_protocols", serve_test_protocols)?
-            .field("has_real_time_clock", has_real_time_clock)?;
+            .field("has_real_time_clock", has_real_time_clock)?
+            .field("utc_start_at_startup_when_invalid_rtc", config.utc_start_at_startup_when_invalid_rtc)?;
 
         let mut time_source_config_builder = builder
             .package("httpsdate-time-source-pull")

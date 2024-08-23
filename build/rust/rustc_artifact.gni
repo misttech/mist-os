@@ -91,6 +91,9 @@ import("//build/toolchain/rbe.gni")
 #   disable_clippy (optional)
 #     Don't run clippy on this target.
 #
+#   emit_tool_path (optional)
+#     Exclude this target from tool_paths.json.
+#
 #   quiet_clippy (boolean, optional)
 #     Run clippy on this target, producing a JSON output but do not print the output or fail the
 #     target based on clippy's success. Intended for use when testing clippy itself, use in normal
@@ -223,6 +226,16 @@ template("rustc_artifact") {
     _local_inputs += rust_rbe_deps
   }
 
+  # only want to define rustdoc for targets that aren't
+  # configured to be disabled and in environments that have
+  # include_rustdoc = true
+  _disable_rustdoc =
+      (defined(invoker.disable_rustdoc) && invoker.disable_rustdoc) ||
+      invoker.target_type != "rust_library" || !include_rustdoc
+  if (!_disable_rustdoc) {
+    _rustdoc_name = "$_target_name.rustdoc"
+  }
+
   # Every rust target is actually a group of both target_name.actual and
   # optionally target_name.clippy (if include_clippy is set)
   group(_group_name) {
@@ -237,6 +250,15 @@ template("rustc_artifact") {
       test_component_manifest_program_barrier = [ ":$_target_name" ]
       link_output_barrier = [ ":$_target_name" ]
     }
+
+    if (!defined(data_deps)) {
+      data_deps = []
+    }
+
+    if (!_disable_rustdoc) {
+      data_deps += [ ":$_rustdoc_name" ]
+    }
+
     if (!_disable_clippy) {
       _outputs = get_target_outputs(":$_clippy_name")
       _original = get_label_info(":${invoker.original_target_name}",
@@ -254,7 +276,7 @@ template("rustc_artifact") {
       ]
 
       if (include_clippy) {
-        data_deps = [ ":$_clippy_name" ]
+        data_deps += [ ":$_clippy_name" ]
       }
     } else {
       not_needed(invoker, [ "original_target_name" ])
@@ -348,12 +370,31 @@ template("rustc_artifact") {
 
     forward_variables_from(invoker,
                            [
+                             "emit_tool_path",
                              "applicable_licenses",
                              "assert_no_deps",
                              "pool",
                              "testonly",
                              "visibility",
                            ])
+    if (!_disable_rustdoc) {
+      rustdoc_name = _rustdoc_name
+      forward_variables_from(invoker,
+                             [
+                               "zip_rustdoc_to",
+                               "rustdoc_args",
+                               "rustdoc_out_dir",
+                               "crate_info_json",
+                             ])
+    } else {
+      not_needed(invoker,
+                 [
+                   "zip_rustdoc_to",
+                   "rustdoc_args",
+                   "rustdoc_out_dir",
+                   "crate_info_json",
+                 ])
+    }
     if (defined(visibility)) {
       visibility += [ ":${_group_name}" ]
     }

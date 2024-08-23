@@ -30,6 +30,8 @@ test("xhci-unittest-bin") {
   output_name = "xhci-unittest"
   sources = [
     "../xhci-enumeration.cc",
+    "test-endpoint.cc",
+    "test-xhci.cc",
     "xhci-enumeration-test.cc",
   ]
   deps = [
@@ -72,6 +74,8 @@ test("xhci-event-ring-unittest-bin") {
   sources = [
     "../xhci-event-ring.cc",
     "../xhci-interrupter.cc",
+    "test-endpoint.cc",
+    "test-xhci.cc",
     "xhci-event-ring-test.cc",
   ]
   deps = [
@@ -91,6 +95,8 @@ test("xhci-transfer-ring-unittest-bin") {
   output_name = "xhci-transfer-ring-unittest"
   sources = [
     "../xhci-transfer-ring.cc",
+    "test-endpoint.cc",
+    "test-xhci.cc",
     "xhci-transfer-ring-test.cc",
   ]
   deps = [ ":test-libs" ]
@@ -106,6 +112,7 @@ test("xhci-endpoint-unittest-bin") {
   output_name = "xhci-endpoint-unittest"
   sources = [
     "../xhci-endpoint.cc",
+    "test-xhci.cc",
     "xhci-endpoint-test.cc",
   ]
   deps = [

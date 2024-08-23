@@ -1152,7 +1152,8 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectReturnsValidConnection) {
 
   fidl::InterfacePtr<fbt::Channel> conn = channel->mutable_connection()->Bind();
   int send_cb_count = 0;
-  conn->Send(std::vector<uint8_t>{0x02}, [&](fbt::Channel_Send_Result result) {
+  std::vector<fbt::Packet> packets{fbt::Packet{std::vector<uint8_t>{0x02}}};
+  conn->Send(std::move(packets), [&](fbt::Channel_Send_Result result) {
     EXPECT_TRUE(result.is_response());
     send_cb_count++;
   });
@@ -1294,7 +1295,8 @@ TEST_F(ProfileServerTestConnectedPeer, ConnectionReceiverReturnsValidConnection)
 
   fidl::InterfacePtr<fbt::Channel> conn = channel.mutable_connection()->Bind();
   int send_cb_count = 0;
-  conn->Send(std::vector<uint8_t>{0x02}, [&](fbt::Channel_Send_Result result) {
+  std::vector<fbt::Packet> packets{fbt::Packet{std::vector<uint8_t>{0x02}}};
+  conn->Send(std::move(packets), [&](fbt::Channel_Send_Result result) {
     EXPECT_TRUE(result.is_response());
     send_cb_count++;
   });

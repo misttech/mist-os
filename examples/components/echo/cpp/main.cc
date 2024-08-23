@@ -14,7 +14,8 @@
 
 // [START main]
 int main(int argc, const char* argv[], char* envp[]) {
-  fuchsia_logging::SetTags({"echo"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"echo"}).BuildAndInitialize();
   // Read program arguments, and exclude the binary name in argv[0]
   std::vector<std::string> arguments;
   for (int i = 1; i < argc; i++) {

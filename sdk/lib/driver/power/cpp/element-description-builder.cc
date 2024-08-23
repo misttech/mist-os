@@ -4,6 +4,7 @@
 
 #include "sdk/lib/driver/power/cpp/element-description-builder.h"
 
+#include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <lib/zx/event.h>
 
@@ -12,20 +13,20 @@ namespace fdf_power {
 ElementDesc ElementDescBuilder::Build() {
   ElementDesc to_return;
   to_return.element_config_ = element_config_;
-  to_return.tokens_ = std::move(tokens_);
+  to_return.tokens = std::move(tokens_);
 
   if (this->assertive_token_.has_value()) {
-    to_return.assertive_token_ = std::move(this->assertive_token_.value());
+    to_return.assertive_token = std::move(this->assertive_token_.value());
   } else {
     // make an event instead
-    zx::event::create(0, &to_return.assertive_token_);
+    zx::event::create(0, &to_return.assertive_token);
   }
 
   if (this->opportunistic_token_.has_value()) {
-    to_return.opportunistic_token_ = std::move(this->opportunistic_token_.value());
+    to_return.opportunistic_token = std::move(this->opportunistic_token_.value());
   } else {
     // make an event instead
-    zx::event::create(0, &to_return.opportunistic_token_);
+    zx::event::create(0, &to_return.opportunistic_token);
   }
 
   fidl::ServerEnd<fuchsia_power_broker::RequiredLevel> required_level_server;
@@ -53,29 +54,29 @@ ElementDesc ElementDescBuilder::Build() {
     current_level_client = std::move(endpoints.client);
   }
 
-  to_return.level_control_servers_ =
+  to_return.level_control_servers =
       std::make_pair(std::move(current_level_server), std::move(required_level_server));
-  to_return.current_level_client_ = std::move(current_level_client);
-  to_return.required_level_client_ = std::move(required_level_client);
+  to_return.current_level_client = std::move(current_level_client);
+  to_return.required_level_client = std::move(required_level_client);
 
   if (this->lessor_.has_value()) {
-    to_return.lessor_server_ = std::move(this->lessor_.value());
+    to_return.lessor_server = std::move(this->lessor_.value());
   } else {
     // make a channel instead, include it in output
     fidl::Endpoints<fuchsia_power_broker::Lessor> endpoints =
         fidl::CreateEndpoints<fuchsia_power_broker::Lessor>().value();
-    to_return.lessor_client_ = std::move(endpoints.client);
-    to_return.lessor_server_ = std::move(endpoints.server);
+    to_return.lessor_client = std::move(endpoints.client);
+    to_return.lessor_server = std::move(endpoints.server);
   }
 
   if (this->element_control_.has_value()) {
-    to_return.element_control_server_ = std::move(this->element_control_.value());
+    to_return.element_control_server = std::move(this->element_control_.value());
   } else {
     // make a channel instead, include it in output
     fidl::Endpoints<fuchsia_power_broker::ElementControl> endpoints =
         fidl::CreateEndpoints<fuchsia_power_broker::ElementControl>().value();
-    to_return.element_control_client_ = std::move(endpoints.client);
-    to_return.element_control_server_ = std::move(endpoints.server);
+    to_return.element_control_client = std::move(endpoints.client);
+    to_return.element_control_server = std::move(endpoints.server);
   }
 
   return to_return;

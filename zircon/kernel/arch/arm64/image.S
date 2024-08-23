@@ -50,6 +50,7 @@ END_DATA(_zbi_kernel_payload)
 
 // This code must be purely position-independent and have no relocs.
 // This is called with the desired runtime address of __code_start in x0.
+.balign 4
 FUNCTION(apply_fixups)
     // This is the constant address the kernel was linked for.
     movlit x9, KERNEL_BASE

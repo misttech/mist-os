@@ -667,16 +667,17 @@ bool ProtectedRangesTest::TestRangesOverlap(const TestRange& a, const TestRange&
 }
 
 // This is "mini" stress in the sense that we don't run it for a huge amount of time in CQ, and in
-// the sense that it's a unit test, not hooked to the rest of sysmem, aml-securemem, TEE, BL32, HW.
+// the sense that it's a unit test, not hooked to the rest of sysmem, securemem driver, TEE, BL32,
+// HW.
 //
 // However, given the single-threaded nature of sysmem, this unit test should do a good job finding
 // any cases that we're handling completely wrong.  This test is not intended to require big updates
 // if we change which ranges we choose to fix up first for optimization reasons, so this test does
 // not check if the intended optimizations are doing what's expected, only that incremental
-// optimization does complete without endlessly requesting more calls, and that invariants stay
-// true for every step.  In other words, this test is checking for a functionally correct
-// implementation, but not necessarily an optimizing implementation.  We can use other less-random
-// unit tests to cover the specific optimizations we want to validate one by one.
+// optimization does complete without endlessly requesting more calls, and that invariants stay true
+// for every step.  In other words, this test is checking for a functionally correct implementation,
+// but not necessarily an optimizing implementation.  We can use other less-random unit tests to
+// cover the specific optimizations we want to validate one by one.
 TEST_F(ProtectedRangesTest, MiniStress) {
   // Setup() called CheckInvariants().
 

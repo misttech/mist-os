@@ -38,7 +38,8 @@ fn init_session_listener(
         .into_sync_proxy();
     let (listener_client_end, mut listener_stream) =
         create_request_stream::<fsession::BlockingListenerMarker>().unwrap();
-    listener_registry.register_blocking_listener(listener_client_end, zx::Time::INFINITE)?;
+    listener_registry
+        .register_blocking_listener(listener_client_end, zx::MonotonicTime::INFINITE)?;
 
     let power_manager = power_manager.clone();
     system_task.kernel().kthreads.spawn_future(async move {
@@ -117,7 +118,7 @@ fn init_sag_listener(
             listener: Some(listener_client_end),
             ..Default::default()
         },
-        zx::Time::INFINITE,
+        zx::MonotonicTime::INFINITE,
     ) {
         log_error!("failed to register listener in sag {}", err)
     }

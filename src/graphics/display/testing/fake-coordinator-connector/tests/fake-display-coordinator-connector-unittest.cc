@@ -10,14 +10,11 @@
 #include <chrono>
 #include <thread>
 
-#include <gmock/gmock.h>
 #include <gtest/gtest.h>
 
-#include "src/devices/testing/mock-ddk/mock-device.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
 #include "src/graphics/display/testing/fake-coordinator-connector/service.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
-#include "src/lib/testing/predicates/status.h"
 
 namespace {
 
@@ -59,38 +56,35 @@ class FakeDisplayCoordinatorConnectorTest : public gtest::TestLoopFixture {
   std::unique_ptr<display::FakeDisplayCoordinatorConnector> coordinator_connector_;
 };
 
-fidl::Endpoints<fuchsia_hardware_display::Coordinator> NewCoordinatorEndpoints() {
-  zx::result<fidl::Endpoints<fuchsia_hardware_display::Coordinator>> endpoints_result =
-      fidl::CreateEndpoints<fuchsia_hardware_display::Coordinator>();
-  EXPECT_OK(endpoints_result.status_value());
-  return std::move(endpoints_result.value());
-}
-
-}  // anonymous namespace
-
 TEST_F(FakeDisplayCoordinatorConnectorTest, TeardownClientChannelAfterCoordinatorConnector) {
   // Count the number of connections that were ever made.
   int num_connections = 0;
 
-  std::vector<fidl::Result<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>>
-      primary_results;
+  std::optional<
+      fidl::Result<fuchsia_hardware_display::Provider::OpenCoordinatorWithListenerForPrimary>>
+      primary_result;
 
-  fidl::Endpoints<fuchsia_hardware_display::Coordinator> coordinator1 = NewCoordinatorEndpoints();
+  fidl::Endpoints<fuchsia_hardware_display::Coordinator> coordinator1 =
+      fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
+  fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener> listener1 =
+      fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
   provider_client()
-      ->OpenCoordinatorForPrimary(std::move(coordinator1.server))
-      .Then(
-          [&num_connections, &primary_results](
-              fidl::Result<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>& result) {
-            primary_results.push_back(std::move(result));
-            ++num_connections;
-          });
+      ->OpenCoordinatorWithListenerForPrimary({{
+          .coordinator = std::move(coordinator1.server),
+          .coordinator_listener = std::move(listener1.client),
+      }})
+      .Then([&num_connections, &primary_result](
+                fidl::Result<
+                    fuchsia_hardware_display::Provider::OpenCoordinatorWithListenerForPrimary>&
+                    result) {
+        primary_result.emplace(std::move(result));
+        ++num_connections;
+      });
 
   RunLoopUntilIdle();
 
-  EXPECT_THAT(primary_results,
-              testing::ElementsAre(
-                  fidl::Response<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>(
-                      {.s = ZX_OK})));
+  EXPECT_TRUE(primary_result.has_value());
+  EXPECT_TRUE(primary_result->is_ok());
 
   coordinator_connector_.reset();
   // Client connection is closed with epitaphs so the test loop should have
@@ -103,76 +97,109 @@ TEST_F(FakeDisplayCoordinatorConnectorTest, TeardownClientChannelAfterCoordinato
 }
 
 TEST_F(FakeDisplayCoordinatorConnectorTest, NoConflictWithVirtcon) {
-  std::vector<fidl::Result<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>>
-      primary_results;
-  std::vector<fidl::Result<fuchsia_hardware_display::Provider::OpenCoordinatorForVirtcon>>
-      virtcon_results;
+  std::optional<
+      fidl::Result<fuchsia_hardware_display::Provider::OpenCoordinatorWithListenerForPrimary>>
+      primary_result;
+  std::optional<
+      fidl::Result<fuchsia_hardware_display::Provider::OpenCoordinatorWithListenerForVirtcon>>
+      virtcon_result;
 
-  fidl::Endpoints<fuchsia_hardware_display::Coordinator> coordinator1 = NewCoordinatorEndpoints();
+  fidl::Endpoints<fuchsia_hardware_display::Coordinator> coordinator1 =
+      fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
+  fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener> listener1 =
+      fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
   provider_client()
-      ->OpenCoordinatorForPrimary(std::move(coordinator1.server))
+      ->OpenCoordinatorWithListenerForPrimary({{
+          .coordinator = std::move(coordinator1.server),
+          .coordinator_listener = std::move(listener1.client),
+      }})
       .Then(
-          [&](fidl::Result<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>& result) {
-            primary_results.push_back(std::move(result));
+          [&](fidl::Result<
+              fuchsia_hardware_display::Provider::OpenCoordinatorWithListenerForPrimary>& result) {
+            primary_result.emplace(std::move(result));
           });
 
-  fidl::Endpoints<fuchsia_hardware_display::Coordinator> coordinator2 = NewCoordinatorEndpoints();
+  fidl::Endpoints<fuchsia_hardware_display::Coordinator> coordinator2 =
+      fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
+  fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener> listener2 =
+      fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
   provider_client()
-      ->OpenCoordinatorForVirtcon(std::move(coordinator2.server))
+      ->OpenCoordinatorWithListenerForVirtcon({{
+          .coordinator = std::move(coordinator2.server),
+          .coordinator_listener = std::move(listener2.client),
+      }})
       .Then(
-          [&](fidl::Result<fuchsia_hardware_display::Provider::OpenCoordinatorForVirtcon>& result) {
-            virtcon_results.push_back(std::move(result));
+          [&](fidl::Result<
+              fuchsia_hardware_display::Provider::OpenCoordinatorWithListenerForVirtcon>& result) {
+            virtcon_result.emplace(std::move(result));
           });
 
   RunLoopUntilIdle();
 
-  EXPECT_THAT(primary_results,
-              testing::ElementsAre(
-                  fidl::Response<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>(
-                      {.s = ZX_OK})));
-  EXPECT_THAT(virtcon_results,
-              testing::ElementsAre(
-                  fidl::Response<fuchsia_hardware_display::Provider::OpenCoordinatorForVirtcon>(
-                      {.s = ZX_OK})));
+  EXPECT_TRUE(primary_result.has_value());
+  EXPECT_TRUE(primary_result->is_ok());
+
+  EXPECT_TRUE(virtcon_result.has_value());
+  EXPECT_TRUE(virtcon_result->is_ok());
 }
 
 TEST_F(FakeDisplayCoordinatorConnectorTest, MultipleConnections) {
-  std::vector<fidl::Result<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>>
-      primary_results_connection1, primary_results_connection2, primary_results_connection3;
+  std::optional<
+      fidl::Result<fuchsia_hardware_display::Provider::OpenCoordinatorWithListenerForPrimary>>
+      primary_result_connection1, primary_result_connection2, primary_result_connection3;
 
-  fidl::Endpoints<fuchsia_hardware_display::Coordinator> coordinator1 = NewCoordinatorEndpoints();
+  fidl::Endpoints<fuchsia_hardware_display::Coordinator> coordinator1 =
+      fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
+  fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener> listener1 =
+      fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
   provider_client()
-      ->OpenCoordinatorForPrimary(std::move(coordinator1.server))
+      ->OpenCoordinatorWithListenerForPrimary({{
+          .coordinator = std::move(coordinator1.server),
+          .coordinator_listener = std::move(listener1.client),
+      }})
       .Then(
-          [&](fidl::Result<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>& result) {
-            primary_results_connection1.push_back(std::move(result));
+          [&](fidl::Result<
+              fuchsia_hardware_display::Provider::OpenCoordinatorWithListenerForPrimary>& result) {
+            primary_result_connection1.emplace(std::move(result));
           });
 
-  fidl::Endpoints<fuchsia_hardware_display::Coordinator> coordinator2 = NewCoordinatorEndpoints();
+  fidl::Endpoints<fuchsia_hardware_display::Coordinator> coordinator2 =
+      fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
+  fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener> listener2 =
+      fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
   provider_client()
-      ->OpenCoordinatorForPrimary(std::move(coordinator2.server))
+      ->OpenCoordinatorWithListenerForPrimary({{
+          .coordinator = std::move(coordinator2.server),
+          .coordinator_listener = std::move(listener2.client),
+      }})
       .Then(
-          [&](fidl::Result<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>& result) {
-            primary_results_connection2.push_back(std::move(result));
+          [&](fidl::Result<
+              fuchsia_hardware_display::Provider::OpenCoordinatorWithListenerForPrimary>& result) {
+            primary_result_connection2.emplace(std::move(result));
           });
 
-  fidl::Endpoints<fuchsia_hardware_display::Coordinator> coordinator3 = NewCoordinatorEndpoints();
+  fidl::Endpoints<fuchsia_hardware_display::Coordinator> coordinator3 =
+      fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
+  fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener> listener3 =
+      fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
   provider_client()
-      ->OpenCoordinatorForPrimary(std::move(coordinator3.server))
+      ->OpenCoordinatorWithListenerForPrimary({{
+          .coordinator = std::move(coordinator3.server),
+          .coordinator_listener = std::move(listener3.client),
+      }})
       .Then(
-          [&](fidl::Result<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>& result) {
-            primary_results_connection3.push_back(std::move(result));
+          [&](fidl::Result<
+              fuchsia_hardware_display::Provider::OpenCoordinatorWithListenerForPrimary>& result) {
+            primary_result_connection3.emplace(std::move(result));
           });
 
   RunLoopUntilIdle();
 
-  EXPECT_THAT(primary_results_connection1,
-              testing::ElementsAre(
-                  fidl::Response<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>(
-                      {.s = ZX_OK})));
-  EXPECT_THAT(primary_results_connection2, testing::IsEmpty());
-  EXPECT_THAT(primary_results_connection3, testing::IsEmpty());
-  primary_results_connection1.clear();
+  EXPECT_TRUE(primary_result_connection1.has_value());
+  EXPECT_TRUE(primary_result_connection1->is_ok());
+  EXPECT_FALSE(primary_result_connection2.has_value());
+  EXPECT_FALSE(primary_result_connection3.has_value());
+  primary_result_connection1.reset();
 
   // Drop the first connection, which will enable the second connection to be made.
   coordinator1.client.reset();
@@ -183,13 +210,11 @@ TEST_F(FakeDisplayCoordinatorConnectorTest, MultipleConnections) {
     std::this_thread::sleep_for(kSleepTime);
   }
 
-  EXPECT_THAT(primary_results_connection1, testing::IsEmpty());
-  EXPECT_THAT(primary_results_connection2,
-              testing::ElementsAre(
-                  fidl::Response<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>(
-                      {.s = ZX_OK})));
-  EXPECT_THAT(primary_results_connection3, testing::IsEmpty());
-  primary_results_connection2.clear();
+  EXPECT_FALSE(primary_result_connection1.has_value());
+  EXPECT_TRUE(primary_result_connection2.has_value());
+  EXPECT_TRUE(primary_result_connection2->is_ok());
+  EXPECT_FALSE(primary_result_connection3.has_value());
+  primary_result_connection2.reset();
 
   // Drop the second connection, which will enable the third connection to be made.
   coordinator2.client.reset();
@@ -200,11 +225,11 @@ TEST_F(FakeDisplayCoordinatorConnectorTest, MultipleConnections) {
     std::this_thread::sleep_for(kSleepTime);
   }
 
-  EXPECT_THAT(primary_results_connection1, testing::IsEmpty());
-  EXPECT_THAT(primary_results_connection2, testing::IsEmpty());
-  EXPECT_THAT(primary_results_connection3,
-              testing::ElementsAre(
-                  fidl::Response<fuchsia_hardware_display::Provider::OpenCoordinatorForPrimary>(
-                      {.s = ZX_OK})));
-  primary_results_connection3.clear();
+  EXPECT_FALSE(primary_result_connection1.has_value());
+  EXPECT_FALSE(primary_result_connection2.has_value());
+  EXPECT_TRUE(primary_result_connection3.has_value());
+  EXPECT_TRUE(primary_result_connection3->is_ok());
+  primary_result_connection3.reset();
 }
+
+}  // namespace

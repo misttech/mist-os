@@ -14,6 +14,7 @@
 
 using FakeChannel = bt::l2cap::testing::FakeChannel;
 using Channel = fuchsia::bluetooth::Channel;
+namespace fbt = fuchsia::bluetooth;
 
 namespace bthost {
 namespace {
@@ -69,8 +70,29 @@ TEST_F(BrEdrConnectionServerChannelActivatedTest, SendTwoPackets) {
   fake_chan().SetSendCallback(std::move(chan_send_cb));
 
   const std::vector<uint8_t> packet_0 = {0x00, 0x01, 0x03};
+  const std::vector<uint8_t> packet_1 = {0x04, 0x05, 0x06};
   int send_cb_count = 0;
-  client()->Send(packet_0, [&](fuchsia::bluetooth::Channel_Send_Result result) {
+  std::vector<fbt::Packet> packets{fbt::Packet{packet_0}, fbt::Packet{packet_1}};
+  client()->Send(std::move(packets), [&](fuchsia::bluetooth::Channel_Send_Result result) {
+    EXPECT_TRUE(result.is_response());
+    send_cb_count++;
+  });
+  RunLoopUntilIdle();
+  EXPECT_EQ(send_cb_count, 1);
+  ASSERT_EQ(sent_packets.size(), 2u);
+  EXPECT_THAT(*sent_packets[0], bt::BufferEq(packet_0));
+  EXPECT_THAT(*sent_packets[1], bt::BufferEq(packet_1));
+}
+
+TEST_F(BrEdrConnectionServerChannelActivatedTest, SendTwoPacketsSeparately) {
+  std::vector<bt::ByteBufferPtr> sent_packets;
+  auto chan_send_cb = [&](bt::ByteBufferPtr buffer) { sent_packets.push_back(std::move(buffer)); };
+  fake_chan().SetSendCallback(std::move(chan_send_cb));
+
+  const std::vector<uint8_t> packet_0 = {0x00, 0x01, 0x03};
+  int send_cb_count = 0;
+  std::vector<fbt::Packet> packets_0{fbt::Packet{packet_0}};
+  client()->Send(std::move(packets_0), [&](fuchsia::bluetooth::Channel_Send_Result result) {
     EXPECT_TRUE(result.is_response());
     send_cb_count++;
   });
@@ -80,7 +102,8 @@ TEST_F(BrEdrConnectionServerChannelActivatedTest, SendTwoPackets) {
   EXPECT_THAT(*sent_packets[0], bt::BufferEq(packet_0));
 
   const std::vector<uint8_t> packet_1 = {0x04, 0x05, 0x06};
-  client()->Send(packet_1, [&](fuchsia::bluetooth::Channel_Send_Result result) {
+  std::vector<fbt::Packet> packets_1{fbt::Packet{packet_1}};
+  client()->Send(std::move(packets_1), [&](fuchsia::bluetooth::Channel_Send_Result result) {
     EXPECT_TRUE(result.is_response());
     send_cb_count++;
   });
@@ -96,8 +119,9 @@ TEST_F(BrEdrConnectionServerChannelActivatedTest, SendTooLargePacketDropsPacket)
   fake_chan().SetSendCallback(std::move(chan_send_cb));
 
   const std::vector<uint8_t> packet_0(/*count=*/bt::l2cap::kDefaultMTU + 1, /*value=*/0x03);
+  std::vector<fbt::Packet> packets_0{fbt::Packet{packet_0}};
   int send_cb_count = 0;
-  client()->Send(packet_0, [&](fuchsia::bluetooth::Channel_Send_Result result) {
+  client()->Send(packets_0, [&](fuchsia::bluetooth::Channel_Send_Result result) {
     EXPECT_TRUE(result.is_response());
     send_cb_count++;
   });
@@ -106,36 +130,41 @@ TEST_F(BrEdrConnectionServerChannelActivatedTest, SendTooLargePacketDropsPacket)
   ASSERT_EQ(sent_packets.size(), 0u);
 }
 
-TEST_F(BrEdrConnectionServerChannelActivatedTest,
-       ReceiveManyPacketsAndDropSomeAndWaitForAcksToSendMore) {
-  std::vector<std::vector<uint8_t>> packets;
-  client().events().OnReceive = [&](std::vector<uint8_t> packet) {
-    packets.push_back(std::move(packet));
-  };
-
-  for (uint8_t i = 0; i < 2 * BrEdrConnectionServer::kDefaultReceiveCredits; i++) {
+TEST_F(BrEdrConnectionServerChannelActivatedTest, ReceiveManyPacketsAndDropSome) {
+  for (uint8_t i = 0; i < 2 * BrEdrConnectionServer::kDefaultReceiveQueueLimit; i++) {
     bt::StaticByteBuffer packet(i, 0x01, 0x02);
     fake_chan().Receive(packet);
   }
-
   RunLoopUntilIdle();
-  ASSERT_EQ(packets.size(), BrEdrConnectionServer::kDefaultReceiveCredits);
-  for (uint8_t i = 0; i < BrEdrConnectionServer::kDefaultReceiveCredits; i++) {
-    bt::StaticByteBuffer packet(i, 0x01, 0x02);
-    EXPECT_THAT(packets[i], bt::BufferEq(packet));
+
+  std::vector<std::vector<fbt::Packet>> packets;
+  for (uint8_t i = 0; i < BrEdrConnectionServer::kDefaultReceiveQueueLimit; i++) {
+    client()->Receive([&packets](::fuchsia::bluetooth::Channel_Receive_Result result) {
+      ASSERT_TRUE(result.is_response());
+      packets.push_back(std::move(result.response().packets));
+    });
+    RunLoopUntilIdle();
+    ASSERT_EQ(packets.size(), static_cast<size_t>(i + 1));
   }
 
   // Some packets were dropped, so only the packets under the queue limit should be received.
-  size_t first_packet_in_q =
-      static_cast<size_t>(2 * BrEdrConnectionServer::kDefaultReceiveCredits) -
-      BrEdrConnectionServer::kDefaultReceiveQueueLimit;
+  size_t first_packet_in_q = BrEdrConnectionServer::kDefaultReceiveQueueLimit;
   for (size_t i = 0; i < BrEdrConnectionServer::kDefaultReceiveQueueLimit; i++) {
-    client()->AckReceive();
-    RunLoopUntilIdle();
-    ASSERT_EQ(packets.size(), BrEdrConnectionServer::kDefaultReceiveCredits + i + 1);
-    bt::StaticByteBuffer packet(first_packet_in_q + i, 0x01, 0x02);
-    EXPECT_THAT(packets[BrEdrConnectionServer::kDefaultReceiveCredits + i], bt::BufferEq(packet));
+    std::vector<uint8_t> packet{static_cast<uint8_t>(first_packet_in_q + i), 0x01, 0x02};
+    ASSERT_EQ(packets[i].size(), 1u);
+    EXPECT_EQ(packets[i][0].packet, packet);
   }
+}
+
+TEST_F(BrEdrConnectionServerChannelActivatedTest, ReceiveTwiceWithoutResponseClosesConnection) {
+  std::optional<zx_status_t> error;
+  client().set_error_handler([&](zx_status_t status) { error = status; });
+  client()->Receive([](::fuchsia::bluetooth::Channel_Receive_Result result) { FAIL(); });
+  client()->Receive([](::fuchsia::bluetooth::Channel_Receive_Result result) { FAIL(); });
+  RunLoopUntilIdle();
+  ASSERT_TRUE(error.has_value());
+  EXPECT_EQ(error.value(), ZX_ERR_BAD_STATE);
+  client().set_error_handler([](zx_status_t status) {});
 }
 
 TEST_F(BrEdrConnectionServerChannelActivatedTest, ChannelCloses) {

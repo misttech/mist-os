@@ -37,6 +37,8 @@ source "$script_dir"/../../build/rbe/common-setup.sh
 
 project_root="$default_project_root"
 
+readonly detail_diff="$project_root"/build/rbe/detail-diff.sh
+
 # json formatting (as pipe): jq . < stdin > stdout
 readonly jq="$project_root"/prebuilt/third_party/jq/"$HOST_PLATFORM"/bin/jq
 
@@ -72,7 +74,7 @@ function diff_text() {
 }
 
 function diff_binary() {
-  diff -q "$1" "$2"
+  "$detail_diff" "$1" "$2"
 }
 
 function exe_unstripped_expect() {
@@ -146,10 +148,7 @@ function diff_file_relpath() {
     # C++ object files (binary)
     # Nondeterminism due to __TIME__-stamping has been eliminated
     # and is continuously verified by another builder.
-    *.o) expect=match; diff_binary "$left" "$right"
-      # TODO(fangism): compare objdumps for details
-      # See build/rbe/detail-diff.sh.
-      ;;
+    *.o) expect=match; diff_binary "$left" "$right" ;;
     *.so) expect=match; diff_binary "$left" "$right" ;;
     *.dylib) expect=match; diff_binary "$left" "$right" ;;
 
@@ -303,6 +302,11 @@ function diff_file_relpath() {
         *) expect=unknown ;;
       esac
       ;;
+    uuid)  # uuids are unique and random
+      case "$common_path" in
+        */bazel-out/*.ffx/metrics) expect=ignore ;;
+      esac
+      ;;
 
     volatile-status.txt) expect=ignore ;;  # bears timestamp
 
@@ -337,11 +341,49 @@ function diff_file_relpath() {
     stdout-*) expect=ignore ;;
     stderr-*) expect=ignore ;;
 
+    # bazel runfile MANIFESTs contain absolute paths
+    MANIFEST)
+      case "$common_path" in
+        */bazel-out/*.runfiles) expect=ignore ;;
+      esac
+      ;;
+
+    *.runfiles_manifest)
+      case "$common_path" in
+        */bazel-out/*) expect=ignore ;;
+      esac
+      ;;
+
+    # bazel repo-mapping files seem to differ:
+    # rules_license only appears in remote builds.
+    # Don't know why, but these are not important build artifacts.
+    _repo_mapping)
+      case "$common_path" in
+        */bazel-out/*.runfiles) expect=ignore ;;
+      esac
+      ;;
+
+    *.repo_mapping)
+      case "$common_path" in
+        */bazel-out/*) expect=ignore ;;
+      esac
+      ;;
+
+      # These list hashes of binaries that are already being
+      # compared elsewhere, so this is redundant information.
+    *.ids_txt)
+      case "$common_path" in
+        */bazel-out/*) expect=ignore ;;
+      esac
+      ;;
+
     # Various binaries.
     *.blk) expect=unknown; diff_binary "$left" "$right" ;;
     *.vboot) expect=unknown; diff_binary "$left" "$right" ;;
     *.zbi) expect=unknown; diff_binary "$left" "$right" ;;
 
+    # These zip archives do match already.
+    lib_python3.*.zip) expect=match; diff_binary "$left" "$right" ;;
     # Most archives carry timestamp information of their contents.
     # One way to make this reproducible is to force a magic date/time
     # while archiving, which effectively removes time variance.

@@ -140,13 +140,14 @@ fn connect_to_device() -> Result<(fadb::DeviceSynchronousProxy, AdbHandle), Errn
         let (adb_proxy, server_end) =
             fidl::endpoints::create_sync_proxy::<fadb::UsbAdbImpl_Marker>();
         device_proxy
-            .start(server_end, zx::Time::INFINITE)
+            .start(server_end, zx::MonotonicTime::INFINITE)
             .map_err(|_| errno!(EINVAL))?
             .map_err(|_| errno!(EINVAL))?;
 
         loop {
-            let fadb::UsbAdbImpl_Event::OnStatusChanged { status } =
-                adb_proxy.wait_for_event(zx::Time::INFINITE).expect("failed to wait for event");
+            let fadb::UsbAdbImpl_Event::OnStatusChanged { status } = adb_proxy
+                .wait_for_event(zx::MonotonicTime::INFINITE)
+                .expect("failed to wait for event");
             if status == fadb::StatusFlags::ONLINE {
                 break;
             }
@@ -209,7 +210,7 @@ impl FunctionFsRootDir {
                 .device_proxy
                 .as_ref()
                 .expect("Device Proxy is required")
-                .stop(zx::Time::INFINITE)
+                .stop(zx::MonotonicTime::INFINITE)
                 .map_err(|_| errno!(EINVAL));
         }
     }
@@ -486,7 +487,7 @@ impl FileOps for FunctionFsInputEndpoint {
             .expect("failed to downcast functionfs root dir");
         let adb = rootdir.get_adb()?;
 
-        match adb.queue_tx(&bytes, zx::Time::INFINITE) {
+        match adb.queue_tx(&bytes, zx::MonotonicTime::INFINITE) {
             Err(err) => {
                 log_warn!("Failed to call UsbAdbImpl.QueueTx: {err}");
                 return error!(EINVAL);
@@ -539,7 +540,7 @@ impl FileOps for FunctionFsOutputFileObject {
             .expect("failed to downcast functionfs root dir");
         let adb = rootdir.get_adb()?;
 
-        match adb.receive(zx::Time::INFINITE) {
+        match adb.receive(zx::MonotonicTime::INFINITE) {
             Err(err) => {
                 log_warn!("Failed to call UsbAdbImpl.Receive: {err}");
                 return error!(EINVAL);
@@ -563,7 +564,7 @@ impl FileOps for FunctionFsOutputFileObject {
 
                     // Arbitrary non-empty and non-zero message that does not look like a real ADB message.
                     let garbage = [12, 23, 34, 45, 56, 67];
-                    match adb.queue_tx(&garbage, zx::Time::INFINITE) {
+                    match adb.queue_tx(&garbage, zx::MonotonicTime::INFINITE) {
                         Err(err) => {
                             log_warn!("Failed to call UsbAdbImpl.QueueTx: {err}");
                         }

@@ -7,7 +7,6 @@
 #include <fidl/fuchsia.hardware.pci/cpp/wire.h>
 #include <fidl/fuchsia.images2/cpp/wire.h>
 #include <fidl/fuchsia.sysmem/cpp/wire.h>
-#include <lib/async-loop/default.h>
 #include <lib/device-protocol/pci.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/image-format/image_format.h>
@@ -516,23 +515,21 @@ zx::result<> FramebufferDisplay::Initialize() {
   // Start heap server.
   auto arena = std::make_unique<fidl::Arena<512>>();
   fuchsia_hardware_sysmem::wire::HeapProperties heap_properties = GetHeapProperties(*arena.get());
-  async::PostTask(
-      loop_.dispatcher(), [server_end = std::move(heap_server), arena = std::move(arena),
-                           heap_properties = std::move(heap_properties), this]() mutable {
-        auto binding =
-            fidl::BindServer(loop_.dispatcher(), std::move(server_end), this,
-                             [](FramebufferDisplay* self, fidl::UnbindInfo info,
-                                fidl::ServerEnd<fuchsia_hardware_sysmem::Heap> server_end) {
-                               OnHeapServerClose(info, server_end.TakeChannel());
-                             });
-        auto result = fidl::WireSendEvent(binding)->OnRegister(std::move(heap_properties));
-        if (!result.ok()) {
-          FDF_LOG(ERROR, "OnRegister() failed: %s", result.FormatDescription().c_str());
-        }
-      });
+  async::PostTask(&dispatcher_, [server_end = std::move(heap_server), arena = std::move(arena),
+                                 heap_properties = std::move(heap_properties), this]() mutable {
+    auto binding = fidl::BindServer(&dispatcher_, std::move(server_end), this,
+                                    [](FramebufferDisplay* self, fidl::UnbindInfo info,
+                                       fidl::ServerEnd<fuchsia_hardware_sysmem::Heap> server_end) {
+                                      OnHeapServerClose(info, server_end.TakeChannel());
+                                    });
+    auto result = fidl::WireSendEvent(binding)->OnRegister(std::move(heap_properties));
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "OnRegister() failed: %s", result.FormatDescription().c_str());
+    }
+  });
 
   // Start vsync loop.
-  async::PostTask(loop_.dispatcher(), [this]() { OnPeriodicVSync(); });
+  async::PostTask(&dispatcher_, [this]() { OnPeriodicVSync(); });
 
   FDF_LOG(INFO,
           "Initialized display, %" PRId32 " x %" PRId32 " (stride=%" PRId32 " format=%" PRIu32 ")",
@@ -545,18 +542,15 @@ zx::result<> FramebufferDisplay::Initialize() {
 FramebufferDisplay::FramebufferDisplay(
     fidl::WireSyncClient<fuchsia_hardware_sysmem::Sysmem> hardware_sysmem,
     fidl::WireSyncClient<fuchsia_sysmem2::Allocator> sysmem, fdf::MmioBuffer framebuffer_mmio,
-    const DisplayProperties& properties)
+    const DisplayProperties& properties, async_dispatcher_t* dispatcher)
     : hardware_sysmem_(std::move(hardware_sysmem)),
       sysmem_(std::move(sysmem)),
-      loop_(&kAsyncLoopConfigNoAttachToCurrentThread),
+      dispatcher_(*dispatcher),
       has_image_(false),
       framebuffer_mmio_(std::move(framebuffer_mmio)),
       properties_(properties),
       next_vsync_time_(zx::clock::get_monotonic()) {
-  // Start thread. Heap server must be running on a separate
-  // thread as sysmem might be making synchronous allocation requests
-  // from the main thread.
-  loop_.StartThread("framebuffer-display");
+  ZX_DEBUG_ASSERT(dispatcher != nullptr);
 
   if (sysmem_) {
     zx_koid_t current_process_koid = GetCurrentProcessKoid();
@@ -582,7 +576,7 @@ void FramebufferDisplay::OnPeriodicVSync() {
     engine_listener_.OnDisplayVsync(banjo_display_id, next_vsync_time_.get(), &banjo_config_stamp);
   }
   next_vsync_time_ += kVSyncInterval;
-  async::PostTaskForTime(loop_.dispatcher(), [this]() { OnPeriodicVSync(); }, next_vsync_time_);
+  async::PostTaskForTime(&dispatcher_, [this]() { OnPeriodicVSync(); }, next_vsync_time_);
 }
 
 display_engine_protocol_t FramebufferDisplay::GetProtocol() {

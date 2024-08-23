@@ -133,9 +133,13 @@ pub struct PlatformConfig {
     #[file_relative_paths]
     pub storage: storage_config::StorageConfig,
 
-    /// Platform configuration options for sysmem (contiguous/protected memory support). These
-    /// override (field-by-field) any values set in sysmem_defaults in the board config.
+    /// Platform configuration options for sysmem (contiguous/protected memory
+    /// support). These override (field-by-field) any values set in
+    /// sysmem_defaults in the board config. See also
+    /// BoardProvidedConfig.sysmem_format_costs which can be specified for the
+    /// board.
     #[serde(default)]
+    #[file_relative_paths]
     pub sysmem: sysmem_config::PlatformSysmemConfig,
 
     /// Platform configuration options for the UI area.
@@ -265,6 +269,16 @@ pub enum BuildType {
 
     #[serde(rename = "user")]
     User,
+}
+
+impl std::fmt::Display for BuildType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BuildType::Eng => f.write_str("eng"),
+            BuildType::UserDebug => f.write_str("userdebug"),
+            BuildType::User => f.write_str("user"),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]

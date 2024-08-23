@@ -69,6 +69,7 @@
   TEE_IsAlgorithmSupported;
   TEE_DigestUpdate;
   TEE_DigestDoFinal;
+  TEE_DigestExtract;
   TEE_CipherInit;
   TEE_CipherUpdate;
   TEE_CipherDoFinal;
@@ -128,4 +129,9 @@
   TEE_BigIntConvertToFMM;
   TEE_BigIntConvertFromFMM;
   TEE_BigIntComputeFMM;
+  TEE_GetObjectInfo;
+  TEE_RestrictObjectUsage;
+  TEE_CopyObjectAttributes;
+  TEE_CloseAndDeletePersistentObject;
+  TEE_BigIntInitFMMContext;
 };

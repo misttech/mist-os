@@ -5,9 +5,9 @@
 #ifndef SRC_UI_SCENIC_LIB_SCREENSHOT_FLATLAND_SCREENSHOT_H_
 #define SRC_UI_SCENIC_LIB_SCREENSHOT_FLATLAND_SCREENSHOT_H_
 
+#include <fidl/fuchsia.ui.composition/cpp/fidl.h>
 #include <fidl/fuchsia.ui.compression.internal/cpp/fidl.h>
 #include <fuchsia/io/cpp/fidl.h>
-#include <fuchsia/ui/composition/cpp/fidl.h>
 
 #include <optional>
 
@@ -25,22 +25,28 @@ class FlatlandScreenshotTest;
 using allocation::Allocator;
 using screen_capture::ScreenCapture;
 
-class FlatlandScreenshot : public fuchsia::ui::composition::Screenshot {
+class FlatlandScreenshot : public fidl::Server<fuchsia_ui_composition::Screenshot> {
  public:
   FlatlandScreenshot(std::unique_ptr<ScreenCapture> screen_capturer,
                      std::shared_ptr<Allocator> allocator, fuchsia::math::SizeU display_size,
                      int display_rotation,
                      fidl::Client<fuchsia_ui_compression_internal::ImageCompressor> client,
                      fit::function<void(FlatlandScreenshot*)> destroy_instance_function);
+  ~FlatlandScreenshot() override = default;
 
-  ~FlatlandScreenshot() override;
+  // |fuchsia_ui_composition::Screenshot|
+  void Take(TakeRequest& request, TakeCompleter::Sync& completer) override;
+  void Take(fuchsia_ui_composition::ScreenshotTakeRequest params,
+            fit::function<void(fuchsia_ui_composition::ScreenshotTakeResponse)> callback);
 
-  // |fuchsia::ui::composition::Screenshot|
-  void Take(fuchsia::ui::composition::ScreenshotTakeRequest params, TakeCallback callback) override;
-  void TakeFile(fuchsia::ui::composition::ScreenshotTakeFileRequest params,
-                TakeFileCallback callback) override;
+  // |fuchsia_ui_composition::Screenshot|
+  void TakeFile(TakeFileRequest& request, TakeFileCompleter::Sync& completer) override;
+  void TakeFile(fuchsia_ui_composition::ScreenshotTakeFileRequest params,
+                fit::function<void(fuchsia_ui_composition::ScreenshotTakeFileResponse)> callback);
 
  private:
+  friend class test::FlatlandScreenshotTest;
+
   void FinishTake(zx::vmo response_vmo);
   void FinishTakeFile(zx::vmo response_vmo);
   zx::vmo HandleFrameRender();
@@ -64,8 +70,9 @@ class FlatlandScreenshot : public fuchsia::ui::composition::Screenshot {
   fit::function<void(FlatlandScreenshot*)> destroy_instance_function_;
 
   // The client-supplied callback to be fired after the screenshot occurs.
-  TakeCallback take_callback_ = nullptr;
-  TakeFileCallback take_file_callback_ = nullptr;
+  fit::function<void(fuchsia_ui_composition::ScreenshotTakeResponse)> take_callback_ = nullptr;
+  fit::function<void(fuchsia_ui_composition::ScreenshotTakeFileResponse)> take_file_callback_ =
+      nullptr;
 
   zx::event render_event_;
 
@@ -82,7 +89,7 @@ class FlatlandScreenshot : public fuchsia::ui::composition::Screenshot {
       served_screenshots_;
 
   size_t NumCurrentServedScreenshots() { return served_screenshots_.size(); }
-  friend class test::FlatlandScreenshotTest;
+
   // Should be last.
   fxl::WeakPtrFactory<FlatlandScreenshot> weak_factory_;
 };

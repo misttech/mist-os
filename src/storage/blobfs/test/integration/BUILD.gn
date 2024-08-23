@@ -331,6 +331,37 @@ wrap_with_decompressor("executable-mount") {
   test_type = "system"
 }
 
+test("blob-creator-test-bin") {
+  sources = [ "blob_creator_test.cc" ]
+  deps = [
+    ":blobfs_integration_fixtures",
+    "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/fidl/cpp/wire",
+    "//sdk/lib/stdcompat",
+    "//src/lib/fxl/test:gtest_main",
+    "//src/lib/testing/predicates",
+    "//src/storage/blobfs",
+    "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_cpp",
+    "//zircon/system/ulib/fbl",
+    "//zircon/system/ulib/zx",
+  ]
+}
+
+storage_driver_test_realm_v2_component("blob-creator-test-component") {
+  deps = [
+    ":blob-creator-test-bin",
+    ":decompressor_includes",
+  ]
+}
+
+wrap_with_decompressor("blob-creator-test") {
+  test_url = "fuchsia-pkg://fuchsia.com/blobfs-integration#meta/blob-creator-test-component.cm"
+  forwarded_protocols = [
+    "fuchsia.logger.LogSink",
+    "fuchsia.process.Launcher",
+  ]
+}
+
 template("blobfs_large_integration_test") {
   test_name = target_name
   bin_name = "${test_name}-bin"
@@ -446,6 +477,7 @@ fuchsia_test_package("blobfs-integration-package") {
   }
   package_name = "blobfs-integration"
   test_components = [
+    ":blob-creator-test",
     ":blobfs-component-runner-test",
     ":blobfs-integration",
     ":blobfs-mount",
@@ -456,6 +488,7 @@ fuchsia_test_package("blobfs-integration-package") {
     ":external-decompressor",
   ]
   deps = [
+    ":blob-creator-test-component",
     ":blobfs-component-runner-test-component",
     ":blobfs-integration-component",
     ":blobfs-mount-component",

@@ -17,6 +17,7 @@ executable("display-test") {
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/fidl",
     "//src/graphics/display/testing/client-utils",
+    "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/fbl",
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/sysmem-version",

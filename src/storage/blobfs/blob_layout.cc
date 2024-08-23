@@ -4,8 +4,10 @@
 #include "src/storage/blobfs/blob_layout.h"
 
 #include <lib/zx/result.h>
+#include <zircon/assert.h>
 #include <zircon/errors.h>
 
+#include <cstdint>
 #include <limits>
 #include <memory>
 
@@ -181,7 +183,8 @@ class PaddedMerkleTreeAtStartBlobLayout : public BlobLayout {
     }
 
     // The exact compressed size of a blob isn't stored.  An upper bound can be determined from the
-    // total number of blocks minus the number of Merkle tree blocks.  See https://fxbug.dev/42120973.
+    // total number of blocks minus the number of Merkle tree blocks.  See
+    // https://fxbug.dev/42120973.
     uint64_t merkle_tree_size = CalculateMerkleTreeSize(inode.blob_size);
     if (merkle_tree_size > MaxBytesThatCanFitInBlocks(blobfs_block_size)) {
       return zx::error(ZX_ERR_OUT_OF_RANGE);

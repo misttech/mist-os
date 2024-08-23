@@ -14,3 +14,8 @@ group("tests") {
 
   testonly = true
 }
+
+group("ctf-tests") {
+  testonly = true
+  deps = [ ":tests" ]
+}

@@ -8,6 +8,7 @@
 #include <lib/ddk/debug.h>
 #include <lib/ddk/metadata.h>
 
+#include <bind/fuchsia/cpp/bind.h>
 #include <fbl/alloc_checker.h>
 
 namespace pwm {
@@ -38,8 +39,8 @@ zx_status_t PwmDevice::Create(void* ctx, zx_device_t* parent) {
 
     char name[20];
     snprintf(name, sizeof(name), "pwm-%u", *pwm_channel.id());
-    zx_device_prop_t props[] = {
-        {BIND_PWM_ID, 0, *pwm_channel.id()},
+    zx_device_str_prop_t props[] = {
+        ddk::MakeStrProperty(bind_fuchsia::PWM_ID, *pwm_channel.id()),
     };
 
     auto endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
@@ -55,7 +56,7 @@ zx_status_t PwmDevice::Create(void* ctx, zx_device_t* parent) {
 
     status = dev->DdkAdd(ddk::DeviceAddArgs(name)
                              .set_flags(DEVICE_ADD_ALLOW_MULTI_COMPOSITE)
-                             .set_props(props)
+                             .set_str_props(props)
                              .set_fidl_service_offers(offers)
                              .set_outgoing_dir(endpoints->client.TakeChannel()));
     if (status != ZX_OK) {

@@ -75,6 +75,7 @@ Symbols:
   - { Name: TEE_IsAlgorithmSupported, Type: Func }
   - { Name: TEE_DigestUpdate, Type: Func }
   - { Name: TEE_DigestDoFinal, Type: Func }
+  - { Name: TEE_DigestExtract, Type: Func }
   - { Name: TEE_CipherInit, Type: Func }
   - { Name: TEE_CipherUpdate, Type: Func }
   - { Name: TEE_CipherDoFinal, Type: Func }

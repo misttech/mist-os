@@ -273,7 +273,10 @@ impl MediaButtonsHandler {
     }
 
     /// Reports the given event_time to the activity service, if available.
-    async fn report_media_buttons_activity(&self, event_time: zx::Time) -> Result<(), fidl::Error> {
+    async fn report_media_buttons_activity(
+        &self,
+        event_time: zx::MonotonicTime,
+    ) -> Result<(), fidl::Error> {
         if let Some(proxy) = self.aggregator_proxy.clone() {
             return proxy.report_discrete_activity(event_time.into_nanos()).await;
         }
@@ -480,7 +483,7 @@ mod tests {
     /// Tests that all supported buttons are sent.
     #[fasync::run_singlethreaded(test)]
     async fn listener_receives_all_buttons() {
-        let event_time = zx::Time::get_monotonic();
+        let event_time = zx::MonotonicTime::get();
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
         let inspect_status = InputHandlerStatus::new(
@@ -540,7 +543,7 @@ mod tests {
     /// Tests that multiple listeners are supported.
     #[fasync::run_singlethreaded(test)]
     async fn multiple_listeners_receive_event() {
-        let event_time = zx::Time::get_monotonic();
+        let event_time = zx::MonotonicTime::get();
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
         let inspect_status = InputHandlerStatus::new(
@@ -599,7 +602,7 @@ mod tests {
     fn unregister_listener_if_channel_closed() {
         let mut exec = fasync::TestExecutor::new();
 
-        let event_time = zx::Time::get_monotonic();
+        let event_time = zx::MonotonicTime::get();
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
         let inspect_status = InputHandlerStatus::new(
@@ -702,7 +705,7 @@ mod tests {
     /// Tests that handle_input_event returns even if reader gets stuck while sending event to listener
     #[fasync::run_singlethreaded(test)]
     async fn stuck_reader_wont_block_input_pipeline() {
-        let event_time = zx::Time::get_monotonic();
+        let event_time = zx::MonotonicTime::get();
         let inspector = fuchsia_inspect::Inspector::default();
         let test_node = inspector.root().create_child("test_node");
         let inspect_status = InputHandlerStatus::new(
@@ -940,7 +943,7 @@ mod tests {
                     ]),
                 ),
                 device_descriptor: descriptor.clone(),
-                event_time: zx::Time::get_monotonic(),
+                event_time: zx::MonotonicTime::get(),
                 handled: input_device::Handled::No,
                 trace_id: None,
             },
@@ -952,7 +955,7 @@ mod tests {
                     ]),
                 ),
                 device_descriptor: descriptor.clone(),
-                event_time: zx::Time::get_monotonic(),
+                event_time: zx::MonotonicTime::get(),
                 handled: input_device::Handled::Yes,
                 trace_id: None,
             },
@@ -963,7 +966,7 @@ mod tests {
                     ]),
                 ),
                 device_descriptor: descriptor.clone(),
-                event_time: zx::Time::get_monotonic(),
+                event_time: zx::MonotonicTime::get(),
                 handled: input_device::Handled::No,
                 trace_id: None,
             },

@@ -583,6 +583,38 @@ static bool deadline_after() {
   END_TEST;
 }
 
+static bool mono_to_raw_ticks_overflow() {
+  BEGIN_TEST;
+
+  // Verify that converting ZX_TIME_INFINITE and ZX_TIME_INFINTE - 1 returns ZX_TIME_INFINITE
+  // instead of overflowing.
+  ktl::optional<zx_ticks_t> raw_ticks = timer_convert_mono_to_raw_ticks(ZX_TIME_INFINITE);
+  ASSERT_TRUE(raw_ticks.has_value());
+  ASSERT_EQ(raw_ticks.value(), ZX_TIME_INFINITE);
+
+  raw_ticks = timer_convert_mono_to_raw_ticks(ZX_TIME_INFINITE - 1);
+  ASSERT_TRUE(raw_ticks.has_value());
+  ASSERT_GE(raw_ticks.value(), ZX_TIME_INFINITE - 1);
+
+  // Verify that 0 gives us a raw ticks greater than or equal to 0, as the conversion function
+  // should add an offset that is greater than or equal to 0.
+  raw_ticks = timer_convert_mono_to_raw_ticks(0);
+  ASSERT_TRUE(raw_ticks.has_value());
+  ASSERT_GE(raw_ticks.value(), 0);
+
+  // Verify that ZX_TIME_INFINITE_PAST and ZX_TIME_INFINITE_PAST + 1 return negative numbers,
+  // since the mono_ticks_modifier should be much smaller than this value.
+  raw_ticks = timer_convert_mono_to_raw_ticks(ZX_TIME_INFINITE_PAST);
+  ASSERT_TRUE(raw_ticks.has_value());
+  ASSERT_LT(raw_ticks.value(), 0);
+
+  raw_ticks = timer_convert_mono_to_raw_ticks(ZX_TIME_INFINITE_PAST + 1);
+  ASSERT_TRUE(raw_ticks.has_value());
+  ASSERT_LT(raw_ticks.value(), 0);
+
+  END_TEST;
+}
+
 UNITTEST_START_TESTCASE(timer_tests)
 UNITTEST("cancel_before_deadline", cancel_before_deadline)
 UNITTEST("cancel_after_fired", cancel_after_fired)
@@ -592,4 +624,5 @@ UNITTEST("trylock_or_cancel_canceled", trylock_or_cancel_canceled)
 UNITTEST("trylock_or_cancel_get_lock", trylock_or_cancel_get_lock)
 UNITTEST("print_timer_queue", print_timer_queues)
 UNITTEST("Deadline::after", deadline_after)
+UNITTEST("mono_to_raw_ticks_overflow", mono_to_raw_ticks_overflow)
 UNITTEST_END_TESTCASE(timer_tests, "timer", "timer tests")

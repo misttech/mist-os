@@ -220,7 +220,7 @@ template("fshost_integration_test_package") {
     if (defined(invoker.extra_deps)) {
       deps += invoker.extra_deps
     }
-    if (data_filesystem_variant == "fxblob") {
+    if (data_filesystem_format == "fxfs") {
       deps += [ "//src/storage/fxfs/fidl/fuchsia.fxfs:fuchsia.fxfs_rust" ]
     }
   }

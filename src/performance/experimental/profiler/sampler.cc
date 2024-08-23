@@ -166,7 +166,7 @@ zx::result<> profiler::Sampler::Start(size_t buffer_size_mb /* unused, we buffer
   // If a watched process launches a new thread, we want to add it to the set of monitored threads.
   zx::result<> res = targets_.ForEachProcess(
       [this](cpp20::span<const zx_koid_t> job_path, const ProcessTarget& p) -> zx::result<> {
-        std::vector<const zx_koid_t> saved_path{job_path.begin(), job_path.end()};
+        std::vector<zx_koid_t> saved_path{job_path.begin(), job_path.end()};
         auto process_watcher = std::make_unique<ProcessWatcher>(
             p.handle.borrow(),
             [saved_path, this](zx_koid_t pid, zx_koid_t tid, zx::thread t) {
@@ -268,15 +268,15 @@ zx::result<profiler::SymbolizationContext> profiler::Sampler::GetContexts() {
   return zx::ok(profiler::SymbolizationContext{contexts});
 }
 
-void profiler::Sampler::AddThread(std::vector<const zx_koid_t> job_path, zx_koid_t pid,
-                                  zx_koid_t tid, zx::thread t) {
+void profiler::Sampler::AddThread(std::vector<zx_koid_t> job_path, zx_koid_t pid, zx_koid_t tid,
+                                  zx::thread t) {
   zx::result res = targets_.AddThread(job_path, pid, ThreadTarget{std::move(t), tid});
   if (res.is_error()) {
     FX_PLOGS(ERROR, res.status_value()) << "Failed to add thread to session: " << tid;
   }
 }
 
-void profiler::Sampler::RemoveThread(std::vector<const zx_koid_t> job_path, zx_koid_t pid,
+void profiler::Sampler::RemoveThread(std::vector<zx_koid_t> job_path, zx_koid_t pid,
                                      zx_koid_t tid) {
   zx::result res = targets_.RemoveThread(job_path, pid, tid);
   if (res.is_error()) {

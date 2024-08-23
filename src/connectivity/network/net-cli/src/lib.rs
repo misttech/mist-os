@@ -8,16 +8,18 @@ use fidl_fuchsia_net_stack_ext::{self as fstack_ext, FidlReturn as _};
 use filter::{IpRoutines, NatRoutines};
 use fnet_filter_ext::{ControllerId, Rule};
 use futures::{FutureExt as _, StreamExt as _, TryFutureExt as _, TryStreamExt as _};
-use net_types::ip::{Ipv4, Ipv6};
+use net_types::ip::{Ip, Ipv4, Ipv6};
 use netfilter::FidlReturn as _;
 use prettytable::{cell, format, row, Row, Table};
 use ser::AddressAssignmentState;
 use serde_json::json;
 use serde_json::value::Value;
+use std::borrow::Cow;
 use std::collections::hash_map::HashMap;
 use std::collections::BTreeMap;
 use std::convert::TryFrom as _;
 use std::iter::FromIterator as _;
+use std::ops::Deref;
 use std::pin::pin;
 use std::str::FromStr as _;
 use tracing::{info, warn};
@@ -114,6 +116,9 @@ pub async fn do_root<C: NetCliDepsConnector>(
         }
         CommandEnum::Route(opts::Route { route_cmd: cmd }) => {
             do_route(&mut out, cmd, connector).await.context("failed during route command")
+        }
+        CommandEnum::Rule(opts::Rule { rule_cmd: cmd }) => {
+            do_rule(&mut out, cmd, connector).await.context("failed during rule command")
         }
         CommandEnum::FilterDeprecated(opts::FilterDeprecated { filter_cmd: cmd }) => {
             do_filter_deprecated(out, cmd, connector)
@@ -938,6 +943,198 @@ async fn do_route_list<C: NetCliDepsConnector>(
         v6_routes.sort();
         for route in v6_routes {
             write_route(&mut t, route);
+        }
+
+        let _lines_printed: usize = t.print(out)?;
+        out.line("")?;
+    }
+    Ok(())
+}
+
+async fn do_rule<C: NetCliDepsConnector>(
+    out: &mut ffx_writer::MachineWriter<serde_json::Value>,
+    cmd: opts::RuleEnum,
+    connector: &C,
+) -> Result<(), Error> {
+    match cmd {
+        opts::RuleEnum::List(opts::RuleList {}) => do_rule_list(out, connector).await,
+    }
+}
+
+async fn do_rule_list<C: NetCliDepsConnector>(
+    out: &mut ffx_writer::MachineWriter<serde_json::Value>,
+    connector: &C,
+) -> Result<(), Error> {
+    let ipv4_rule_event_stream = pin!({
+        let state_v4 = connect_with_context::<froutes::StateV4Marker, _>(connector)
+            .await
+            .context("failed to connect to fuchsia.net.routes/StateV4")?;
+        froutes_ext::rules::rule_event_stream_from_state::<Ipv4>(&state_v4)
+            .context("failed to initialize a `RuleWatcherV4` client")?
+            .fuse()
+    });
+    let ipv6_rule_event_stream = pin!({
+        let state_v6 = connect_with_context::<froutes::StateV6Marker, _>(connector)
+            .await
+            .context("failed to connect to fuchsia.net.routes/StateV6")?;
+        froutes_ext::rules::rule_event_stream_from_state::<Ipv6>(&state_v6)
+            .context("failed to initialize a `RuleWatcherV6` client")?
+            .fuse()
+    });
+    let (v4_rules, v6_rules) = futures::future::join(
+        froutes_ext::rules::collect_rules_until_idle::<Ipv4, Vec<_>>(ipv4_rule_event_stream),
+        froutes_ext::rules::collect_rules_until_idle::<Ipv6, Vec<_>>(ipv6_rule_event_stream),
+    )
+    .await;
+    let v4_rules = v4_rules.context("failed to collect all existing IPv4 rules")?;
+    let v6_rules = v6_rules.context("failed to collect all existing IPv6 rules")?;
+
+    fn format_selector(selector: froutes_ext::rules::MarkSelector) -> Cow<'static, str> {
+        match selector {
+            froutes_ext::rules::MarkSelector::Unmarked => Cow::Borrowed("unmarked"),
+            froutes_ext::rules::MarkSelector::Marked { mask, between } => {
+                format!("{mask:#010x}:{:#010x}..{:#010x}", between.start(), between.end()).into()
+            }
+        }
+    }
+
+    struct FormatRule {
+        rule_set_priority: u32,
+        index: u32,
+        from: Option<String>,
+        locally_generated: Option<String>,
+        bound_device: Option<String>,
+        mark_1_selector: Option<Cow<'static, str>>,
+        mark_2_selector: Option<Cow<'static, str>>,
+        action: Cow<'static, str>,
+    }
+
+    impl FormatRule {
+        fn from<I: Ip>(rule: froutes_ext::rules::InstalledRule<I>) -> Self {
+            let froutes_ext::rules::InstalledRule {
+                priority: rule_set_priority,
+                index,
+                selector:
+                    froutes_ext::rules::RuleSelector {
+                        from,
+                        locally_generated,
+                        bound_device,
+                        mark_1_selector,
+                        mark_2_selector,
+                    },
+                action,
+            } = rule;
+
+            let rule_set_priority = u32::from(rule_set_priority);
+            let index = u32::from(index);
+            let from = from.map(|from| from.to_string());
+            let locally_generated = locally_generated.map(|x| x.to_string());
+            let bound_device =
+                bound_device.map(|froutes_ext::rules::InterfaceSelector::DeviceName(name)| name);
+            let mark_1_selector = mark_1_selector.map(format_selector);
+            let mark_2_selector = mark_2_selector.map(format_selector);
+            let action = match action {
+                froutes_ext::rules::RuleAction::Unreachable => Cow::Borrowed("unreachable"),
+                froutes_ext::rules::RuleAction::Lookup(table_id) => {
+                    format!("lookup {table_id}").into()
+                }
+            };
+
+            FormatRule {
+                rule_set_priority,
+                index,
+                from,
+                locally_generated,
+                bound_device,
+                mark_1_selector,
+                mark_2_selector,
+                action,
+            }
+        }
+    }
+
+    if out.is_machine() {
+        fn rule_to_json<I: Ip>(rule: froutes_ext::rules::InstalledRule<I>) -> serde_json::Value {
+            let FormatRule {
+                rule_set_priority,
+                index,
+                from,
+                locally_generated,
+                bound_device,
+                mark_1_selector,
+                mark_2_selector,
+                action,
+            } = FormatRule::from(rule);
+
+            serde_json::json!({
+                "rule_set_priority": rule_set_priority,
+                "index": index,
+                "from": from,
+                "locally_generated": locally_generated,
+                "bound_device": bound_device,
+                "mark_1_selector": mark_1_selector,
+                "mark_2_selector": mark_2_selector,
+                "action": action,
+            })
+        }
+
+        let rules = v4_rules
+            .into_iter()
+            .map(rule_to_json)
+            .chain(v6_rules.into_iter().map(rule_to_json))
+            .collect::<Vec<_>>();
+        out.machine(&serde_json::Value::Array(rules)).context("serialize")?;
+    } else {
+        let mut t = Table::new();
+        t.set_format(format::FormatBuilder::new().padding(2, 2).build());
+        t.set_titles(row![
+            "RuleSetPriority",
+            "RuleIndex",
+            "From",
+            "LocallyGenerated",
+            "BoundDevice",
+            "Mark1Selector",
+            "Mark2Selector",
+            "Action"
+        ]);
+
+        fn option<D: Deref<Target = str>>(string: &Option<D>) -> &str {
+            string.as_ref().map_or("-", |s| s.deref())
+        }
+
+        fn write_rule<I: Ip>(t: &mut Table, rule: froutes_ext::rules::InstalledRule<I>) {
+            let FormatRule {
+                rule_set_priority,
+                index,
+                from,
+                locally_generated,
+                bound_device,
+                mark_1_selector,
+                mark_2_selector,
+                action,
+            } = FormatRule::from(rule);
+
+            add_row(
+                t,
+                row![
+                    rule_set_priority,
+                    index,
+                    option(&from),
+                    option(&locally_generated),
+                    option(&bound_device),
+                    option(&mark_1_selector),
+                    option(&mark_2_selector),
+                    action,
+                ],
+            );
+        }
+
+        for rule in v4_rules {
+            write_rule(&mut t, rule);
+        }
+
+        for rule in v6_rules {
+            write_rule(&mut t, rule);
         }
 
         let _lines_printed: usize = t.print(out)?;

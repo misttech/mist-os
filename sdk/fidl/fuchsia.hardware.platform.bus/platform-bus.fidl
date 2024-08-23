@@ -11,6 +11,17 @@ using fuchsia.hardware.power;
 const MAX_INFO_STRING_LENGTH uint32 = 32;
 const MAX_POWER_CONFIGS uint32 = 32;
 
+/// Mode for creating zircon interrupts. In sync with ZX_INTERRUPT_MODE_* values
+/// from //zircon/system/public/zircon/types.h.
+type ZirconInterruptMode = strict enum : uint32 {
+    DEFAULT = 0x0;
+    EDGE_LOW = 0x2;
+    EDGE_HIGH = 0x4;
+    LEVEL_LOW = 0x6;
+    LEVEL_HIGH = 0x8;
+    EDGE_BOTH = 0xA;
+};
+
 /// Definition of a MMIO resource for a platform device node.
 type Mmio = table {
     /// Physical address of MMIO region. Does not need to be page aligned.
@@ -26,8 +37,9 @@ type Mmio = table {
 
 type Irq = table {
     1: irq uint32;
-    /// `ZX_INTERRUPT_MODE_*` flags
-    2: mode uint32;
+
+    /// Bit flag for setting the interrupt mode.
+    2: mode ZirconInterruptMode;
 
     /// Properties for this interrupt's fragment. Only used in DFv2.
     3: properties
@@ -91,6 +103,7 @@ type BoardInfo = table {
 };
 
 /// Bootloader information set by the board driver.
+@available(added=HEAD)
 type BootloaderInfo = table {
     1: vendor string:MAX_INFO_STRING_LENGTH;
 };
@@ -142,17 +155,16 @@ type TemporaryBoardInfo = struct {
     board_revision uint32;
 };
 
-// Servers that implement this protocol can be registered to the platform
-// bus to receive callbacks on why the platform bus is suspending.
+/// Servers that implement this protocol can be registered to the platform
+/// bus to receive callbacks on why the platform bus is suspending.
+@available(added=HEAD)
 closed protocol SysSuspend {
-    // Invoked by the platform bus when its suspend hook is called.
+    /// Invoked by the platform bus when its suspend hook is called.
     strict Callback(struct {
-        requested_state uint8;
         enable_wake bool;
         suspend_reason uint8;
     }) -> (struct {
         out_status zx.Status;
-        out_state uint8;
     });
 };
 
@@ -178,11 +190,13 @@ open protocol PlatformBus {
     }) -> () error zx.Status;
 
     /// Board drivers may use this to set information about the bootloader.
+    @available(added=HEAD)
     strict SetBootloaderInfo(struct {
         info BootloaderInfo;
     }) -> () error zx.Status;
 
     /// Registers a callback that's invoked by the platform bus when it's suspending.
+    @available(added=HEAD)
     strict RegisterSysSuspendCallback(resource struct {
         suspend_cb client_end:SysSuspend;
     }) -> () error zx.Status;
@@ -201,6 +215,18 @@ open protocol PlatformBus {
     }) -> () error zx.Status;
 };
 
+@discoverable
+@transport("Driver")
+closed protocol Iommu {
+    strict GetBti(struct {
+        iommu_index uint32;
+        bti_id uint32;
+    }) -> (resource struct {
+        bti zx.Handle:BTI;
+    }) error zx.Status;
+};
+
 service Service {
     platform_bus client_end:PlatformBus;
+    iommu client_end:Iommu;
 };

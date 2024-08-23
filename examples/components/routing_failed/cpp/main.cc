@@ -15,7 +15,8 @@
 #include <string>
 
 int main(int argc, const char* argv[], char* envp[]) {
-  fuchsia_logging::SetTags({"echo_client"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"echo_client"}).BuildAndInitialize();
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 
   // Connect to the fidl.examples.routing.Echo protocol

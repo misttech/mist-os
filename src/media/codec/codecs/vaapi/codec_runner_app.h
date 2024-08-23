@@ -35,10 +35,11 @@ class CodecRunnerApp {
   void Init() {
     static const std::initializer_list<std::string> kLogTags = {"vaapi_codec_runner"};
 #ifdef NDEBUG
-    fuchsia_logging::SetTags(kLogTags);
+    fuchsia_logging::LogSettingsBuilder builder;
+    builder.WithTags(kLogTags).BuildAndInitialize();
 #else
     fuchsia_logging::LogSettingsBuilder builder;
-    builder.WithMinLogSeverity(fuchsia_logging::LOG_DEBUG).BuildAndInitializeWithTags(kLogTags);
+    builder.WithMinLogSeverity(fuchsia_logging::LOG_DEBUG).WithTags(kLogTags).BuildAndInitialize();
 #endif
 
     trace_provider_ =

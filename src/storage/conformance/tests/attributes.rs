@@ -284,7 +284,7 @@ async fn get_attributes_directory_query_all() {
 #[fuchsia::test]
 async fn update_attributes_file_unsupported() {
     let harness = TestHarness::new().await;
-    if harness.supports_mutable_attrs() {
+    if harness.supports_mutable_attrs() || !harness.config.supports_mutable_file {
         return;
     }
     let root = root_directory(vec![file(TEST_FILE, vec![])]);
@@ -363,6 +363,30 @@ async fn update_attributes_file_with_sufficient_rights() {
         .map_err(zx::Status::from_raw)
         .expect("get_attributes failed");
     assert_eq!(mutable_attrs, new_attrs);
+
+    // Test that we should not be able to update non-supported attributes
+    let unsupported_new_attrs = fio::MutableNodeAttributes {
+        creation_time: (!supported_attrs.contains(fio::NodeAttributesQuery::CREATION_TIME))
+            .then_some(111),
+        modification_time: (!supported_attrs.contains(fio::NodeAttributesQuery::MODIFICATION_TIME))
+            .then_some(222),
+        mode: (!supported_attrs.contains(fio::NodeAttributesQuery::MODE)).then_some(333),
+        uid: (!supported_attrs.contains(fio::NodeAttributesQuery::UID)).then_some(444),
+        gid: (!supported_attrs.contains(fio::NodeAttributesQuery::GID)).then_some(555),
+        rdev: (!supported_attrs.contains(fio::NodeAttributesQuery::RDEV)).then_some(666),
+        access_time: (!supported_attrs.contains(fio::NodeAttributesQuery::ACCESS_TIME))
+            .then_some(777),
+        ..Default::default()
+    };
+    if unsupported_new_attrs != fio::MutableNodeAttributes::default() {
+        let status = file_proxy
+            .update_attributes(&unsupported_new_attrs)
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::Status::from_raw)
+            .expect_err("update unsupported attributes passed");
+        assert_eq!(status, zx::Status::NOT_SUPPORTED);
+    }
 }
 
 #[fuchsia::test]
@@ -493,6 +517,30 @@ async fn update_attributes_directory_with_sufficient_rights() {
         .map_err(zx::Status::from_raw)
         .expect("get_attributes failed");
     assert_eq!(mutable_attrs, new_attrs);
+
+    // Test that we should not be able to update non-supported attributes
+    let unsupported_new_attrs = fio::MutableNodeAttributes {
+        creation_time: (!supported_attrs.contains(fio::NodeAttributesQuery::CREATION_TIME))
+            .then_some(111),
+        modification_time: (!supported_attrs.contains(fio::NodeAttributesQuery::MODIFICATION_TIME))
+            .then_some(222),
+        mode: (!supported_attrs.contains(fio::NodeAttributesQuery::MODE)).then_some(333),
+        uid: (!supported_attrs.contains(fio::NodeAttributesQuery::UID)).then_some(444),
+        gid: (!supported_attrs.contains(fio::NodeAttributesQuery::GID)).then_some(555),
+        rdev: (!supported_attrs.contains(fio::NodeAttributesQuery::RDEV)).then_some(666),
+        access_time: (!supported_attrs.contains(fio::NodeAttributesQuery::ACCESS_TIME))
+            .then_some(777),
+        ..Default::default()
+    };
+    if unsupported_new_attrs != fio::MutableNodeAttributes::default() {
+        let status = dir_proxy
+            .update_attributes(&unsupported_new_attrs)
+            .await
+            .expect("FIDL call failed")
+            .map_err(zx::Status::from_raw)
+            .expect_err("update unsupported attributes passed");
+        assert_eq!(status, zx::Status::NOT_SUPPORTED);
+    }
 }
 
 #[fuchsia::test]

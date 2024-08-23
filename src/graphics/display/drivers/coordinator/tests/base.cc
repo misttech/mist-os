@@ -6,6 +6,7 @@
 
 #include <fidl/fuchsia.hardware.sysmem/cpp/fidl.h>
 #include <lib/async/cpp/task.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <zircon/compiler.h>
 #include <zircon/status.h>
 
@@ -19,7 +20,6 @@
 #include "src/graphics/display/drivers/coordinator/post-display-task.h"
 #include "src/graphics/display/drivers/fake/fake-display.h"
 #include "src/graphics/display/drivers/fake/fake-sysmem-device-hierarchy.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/lib/testing/predicates/status.h"
 
 namespace display {
@@ -92,7 +92,7 @@ bool TestBase::PollUntilOnLoop(fit::function<bool()> predicate, zx::duration pol
           predicate_eval_state.signal.Signal();
         });
     if (post_task_result.is_error()) {
-      zxlogf(ERROR, "Failed to post task: %s", post_task_result.status_string());
+      FDF_LOG(ERROR, "Failed to post task: %s", post_task_result.status_string());
       return false;
     }
 
@@ -108,7 +108,7 @@ bool TestBase::PollUntilOnLoop(fit::function<bool()> predicate, zx::duration pol
 
     zx_status_t sleep_status = zx::nanosleep(zx::deadline_after(poll_interval));
     if (sleep_status != ZX_OK) {
-      zxlogf(ERROR, "Failed to sleep: %s", zx_status_get_string(sleep_status));
+      FDF_LOG(ERROR, "Failed to sleep: %s", zx_status_get_string(sleep_status));
       return false;
     }
   }

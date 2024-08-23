@@ -178,17 +178,34 @@ fuchsia_package("sensors_playback") {
   deps = [ ":sensors_playback_component" ]
 }
 
+resource("playback_integration_test_data") {
+  testonly = true
+  sources = [ "data/integration_test/accel_gyro_dataset" ]
+  outputs = [ "data/{{source_file_part}}" ]
+}
+
+fuchsia_package("sensors_playback_with_test_data") {
+  testonly = true
+  deps = [
+    ":playback_integration_test_data",
+    ":sensors_playback_component",
+  ]
+}
+
 executable("playback_integration_test_bin") {
   testonly = true
   sources = [ "playback_integration_test.cc" ]
   deps = [
     ":serialization",
+    "//sdk/fidl/fuchsia.component:fuchsia.component_cpp",
+    "//sdk/fidl/fuchsia.component.sandbox:fuchsia.component.sandbox_cpp",
     "//sdk/fidl/fuchsia.hardware.sensors:fuchsia.hardware.sensors_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/sys/cpp",
     "//sdk/lib/sys/cpp/testing:unit",
     "//sdk/lib/syslog/cpp",
     "//src/lib/fxl/test:gtest_main",
+    "//src/sensors/playback/realm_factory/fidl:fuchsia.hardware.sensors.realm_cpp",
     "//third_party/googletest:gtest",
     "//zircon/system/ulib/async-loop:async-loop-cpp",
     "//zircon/system/ulib/async-loop:async-loop-default",
@@ -196,23 +213,29 @@ executable("playback_integration_test_bin") {
   ]
 }
 
-resource("playback_integration_test_data") {
+fuchsia_component("playback_integration_test_driver_component") {
   testonly = true
-  sources = [ "data/integration_test/accel_gyro_dataset" ]
-  outputs = [ "data/{{source_file_part}}" ]
+  component_name = "playback_integration_test_driver"
+  manifest = "meta/playback_integration_test_driver.cml"
+  deps = [ ":playback_integration_test_bin" ]
 }
 
-fuchsia_component("playback_integration_test_component") {
+fuchsia_package("playback_integration_test_driver") {
+  package_name = "playback_integration_test_driver"
   testonly = true
-  component_name = "playback_integration_test"
-  manifest = "meta/playback_integration_test.cml"
-  deps = [
-    ":playback_integration_test_bin",
-    ":playback_integration_test_data",
-  ]
+  deps = [ ":playback_integration_test_driver_component" ]
+}
+
+fuchsia_test_component("playback_integration_test_root_component") {
+  testonly = true
+  component_name = "playback_integration_test_root_component"
+  manifest = "meta/playback_integration_test_root.cml"
 }
 
 fuchsia_test_package("playback_integration_test") {
-  test_components = [ ":playback_integration_test_component" ]
-  deps = [ ":sensors_playback_component" ]
+  test_components = [ ":playback_integration_test_root_component" ]
+  subpackages = [
+    "//src/sensors/playback/realm_factory:sensors_playback_realm_factory",
+    ":playback_integration_test_driver",
+  ]
 }

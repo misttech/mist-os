@@ -321,7 +321,7 @@ zx_status_t GcManager::GcNodeSegment(const SummaryBlock &sum_blk, uint32_t segno
       continue;
     }
 
-    node_page->WaitOnWriteback();
+    node_page.WaitOnWriteback();
     node_page.SetDirty();
   }
 
@@ -403,7 +403,7 @@ zx_status_t GcManager::GcDataSegment(const SummaryBlock &sum_blk, unsigned int s
       continue;
     }
 
-    data_page->WaitOnWriteback();
+    data_page.WaitOnWriteback();
     pgoff_t offset = safemath::CheckMul(data_page->GetKey(), kBlockSize).ValueOrDie();
     // Ask kernel to dirty the vmo area for |data_page|. If the regarding pages are not present, we
     // supply a vmo and dirty it again.
@@ -426,7 +426,7 @@ zx_status_t GcManager::GcDataSegment(const SummaryBlock &sum_blk, unsigned int s
         continue;
       }
       ZX_DEBUG_ASSERT(addr != kNewAddr);
-      data_page->SetWriteback();
+      data_page.SetWriteback(addr);
       pages_to_disk.push_back(data_page.release());
     }
   }

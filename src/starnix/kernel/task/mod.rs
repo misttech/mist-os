@@ -21,6 +21,7 @@ mod syslog;
 #[allow(clippy::module_inception)]
 mod task;
 mod thread_group;
+mod timeline;
 mod timers;
 mod uts_namespace;
 mod waiter;
@@ -43,6 +44,7 @@ pub use session::*;
 pub use syslog::*;
 pub use task::*;
 pub use thread_group::*;
+pub use timeline::*;
 pub use timers::*;
 pub use uts_namespace::*;
 pub use waiter::*;

@@ -28,6 +28,7 @@ build-info-service
 ?diagnostics-persistence
 ?display-coordinator-connector
 ?dns-resolver
+?donut
 ?element_manager
 ?emergency
 ?factory-reset-trigger
@@ -42,14 +43,19 @@ forensics
 ?hwinfo
 ?intl-services-small
 ?intl_services
+?iperf3
 ?log_listener_shell
 ?lowpan-ot-driver
+?lowpanctl
 ?lowpanservice
 ?mdns
+?mdns-util
 ?mediasession
 ?memory_monitor
 ?memory_sampler
 ?metrics-logger-standalone
+?nc
+?net-cli
 ?netcfg-advanced
 ?netcfg-basic
 ?netcfg-config
@@ -80,6 +86,7 @@ pkg-resolver
 ?shell-commands
 ?sl4f
 ?snapshot
+?sockscripter
 ?soundplayer
 ?sshd-host
 ?starnix
@@ -90,6 +97,7 @@ system-update-committer
 ?system-update-realm
 ?system-updater
 ?system_image
+?tcpdump
 ?tee-clients
 ?text_manager
 ?time-zone-info-service

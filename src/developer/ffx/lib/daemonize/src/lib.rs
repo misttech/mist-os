@@ -2,8 +2,59 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+use anyhow::{Context as _, Result};
+use ffx_config::logging::LogDirHandling;
+use ffx_config::EnvironmentContext;
 use std::os::unix::process::CommandExt;
-use std::process::Command;
+use std::path::PathBuf;
+use std::process::{Command, Stdio};
+
+/// Daemonize the given command. This is used for long running tools like the daemon
+///  and package serving. The args are the command line arguments, not including ffx, and any
+/// `--config` or `--env` options. The ffx path and isolation root, if any, are taken from
+///  the current invocation.
+pub async fn daemonize(
+    args: &[String],
+    log_basename: String,
+    context: EnvironmentContext,
+    keep_current_dir: bool,
+) -> Result<()> {
+    let mut cmd = context.rerun_prefix().await?;
+
+    let mut stdout = Stdio::null();
+    let mut stderr = Stdio::null();
+
+    if ffx_config::logging::is_enabled(&context).await {
+        let file = PathBuf::from(format!("{log_basename}.log"));
+        stdout = Stdio::from(
+            ffx_config::logging::log_file(&context, &file, LogDirHandling::WithDirWithRotate)
+                .await?,
+        );
+        // Third argument says not to rotate the logs.  We rotated the logs once
+        // for the call above, we shouldn't do it again.
+        stderr = Stdio::from(
+            ffx_config::logging::log_file(&context, &file, LogDirHandling::WithDirWithoutRotate)
+                .await?,
+        );
+    }
+
+    cmd.stdin(Stdio::null()).stdout(stdout).stderr(stderr).env("RUST_BACKTRACE", "full");
+    cmd.args(args);
+
+    tracing::info!(
+        "Starting new background process {:?} {:?}",
+        &cmd.get_program(),
+        &cmd.get_args()
+    );
+    // Run the command as a daemon process, keeping the current working directory
+    // for the daemon process.
+    daemonize_cmd(&mut cmd, keep_current_dir)
+        .spawn()
+        .context("spawning daemon start")?
+        .wait()
+        .map(|_| ())
+        .context("waiting for daemon start")
+}
 
 /// daemonize adds a pre_exec to call daemon(3) causing the spawned
 /// process to be forked again and detached from the controlling
@@ -19,16 +70,17 @@ use std::process::Command;
 /// many threads have been spawned, libraries have been used or files have been
 /// opened that may introduce CLOEXEC behaviors that could cause EXTBUSY outcomes in
 /// a Linux environment.
-pub fn daemonize(c: &mut Command) -> &mut Command {
+fn daemonize_cmd(c: &mut Command, keep_current_dir: bool) -> &mut Command {
+    let nochdir = if keep_current_dir { 1 } else { 0 };
     unsafe {
-        c.pre_exec(|| {
+        c.pre_exec(move || {
             // daemonize(3) is deprecated on macOS 10.15. The replacement is not
             // yet clear, we may want to replace this with a manual double fork
             // setsid, etc.
             #[allow(deprecated)]
             // First argument: chdir(/)
             // Second argument: do not close stdio (we use stdio to write to the daemon log file)
-            match libc::daemon(0, 1) {
+            match libc::daemon(nochdir, 1) {
                 0 => Ok(()),
                 x => Err(std::io::Error::from_raw_os_error(x)),
             }
@@ -56,7 +108,8 @@ mod test {
         // the program in question. There is a risk that this
         // implementation passes if sleep(1) is not found, which is also
         // not ideal.
-        let mut child = daemonize(Command::new("sleep").arg("10")).spawn().expect("child spawned");
+        let mut child =
+            daemonize_cmd(Command::new("sleep").arg("10"), false).spawn().expect("child spawned");
         child.wait().expect("child exited successfully");
         assert!(started.elapsed() < std::time::Duration::from_secs(10));
     }

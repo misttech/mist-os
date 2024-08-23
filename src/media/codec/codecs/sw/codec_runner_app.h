@@ -29,7 +29,8 @@ class CodecRunnerApp {
       : codec_admission_control_(std::make_unique<CodecAdmissionControl>(loop_.dispatcher())) {}
 
   void Run() {
-    fuchsia_logging::SetTags({"codec_runner"});
+    fuchsia_logging::LogSettingsBuilder builder;
+    builder.WithTags({"codec_runner"}).BuildAndInitialize();
 
     // Create trace provider
     trace::TraceProviderWithFdio trace_provider(loop_.dispatcher(), "codec_runner");

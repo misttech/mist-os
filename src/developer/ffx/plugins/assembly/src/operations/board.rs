@@ -25,10 +25,12 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
         bootfs_packages,
         kernel_boot_args,
         power_manager_config,
+        system_power_mode_config,
         cpu_manager_config,
         thermal_config,
         thread_roles,
         power_metrics_recorder_config,
+        sysmem_format_costs_config,
     } = args;
     let bundle_file_path = outdir.join("board_input_bundle.json");
 
@@ -75,6 +77,11 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
         copy_optional_config_file(&cpu_manager_config, "cpu_manager.json5", &config_files_dir)?;
     let power_manager_config =
         copy_optional_config_file(&power_manager_config, "power_manager.json5", &config_files_dir)?;
+    let system_power_mode_config = copy_optional_config_file(
+        &system_power_mode_config,
+        "system_power_mode_config.json5",
+        &config_files_dir,
+    )?;
     let power_metrics_recorder_config = copy_optional_config_file(
         &power_metrics_recorder_config,
         "power_metrics_recorder_config.json",
@@ -91,6 +98,17 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
             })?;
             copy_config_file(thread_roles_file, filename, &config_files_dir)
                 .context("copying thread roles file to config files dir")
+        })
+        .collect::<Result<Vec<FileRelativePathBuf>>>()?;
+
+    let sysmem_format_costs_config = sysmem_format_costs_config
+        .iter()
+        .map(|format_costs_file| {
+            let filename = format_costs_file.file_name().ok_or_else(|| {
+                anyhow!("Sysmem format costs file doesn't have a filename: {}", format_costs_file)
+            })?;
+            copy_config_file(format_costs_file, filename, &config_files_dir)
+                .context("copying sysmem format costs file to config files dir")
         })
         .collect::<Result<Vec<FileRelativePathBuf>>>()?;
 
@@ -145,18 +163,22 @@ pub fn board_input_bundle(args: BoardInputBundleArgs) -> Result<()> {
         drivers,
         packages,
         kernel_boot_args: kernel_boot_args.into_iter().collect(),
-        configuration: if power_manager_config.is_some()
-            || cpu_manager_config.is_some()
-            || thermal_config.is_some()
+        configuration: if cpu_manager_config.is_some()
+            || power_manager_config.is_some()
             || power_metrics_recorder_config.is_some()
+            || system_power_mode_config.is_some()
+            || thermal_config.is_some()
             || !thread_roles.is_empty()
+            || !sysmem_format_costs_config.is_empty()
         {
             Some(BoardProvidedConfig {
-                power_manager: power_manager_config,
                 cpu_manager: cpu_manager_config,
-                thermal: thermal_config,
+                power_manager: power_manager_config,
                 power_metrics_recorder: power_metrics_recorder_config,
+                system_power_mode: system_power_mode_config,
+                thermal: thermal_config,
                 thread_roles: thread_roles_config,
+                sysmem_format_costs: sysmem_format_costs_config,
             })
         } else {
             None

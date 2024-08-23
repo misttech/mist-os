@@ -11,6 +11,8 @@
 #include <lib/fdio/fd.h>
 #include <lib/zx/result.h>
 
+#include <memory>
+
 #include <zxtest/zxtest.h>
 
 #include "src/storage/fvm/format.h"
@@ -63,6 +65,12 @@ class FvmTest : public zxtest::Test {
     return device_->block_interface();
   }
 
+  std::unique_ptr<paver::BlockPartitionClient> CreateClient() const {
+    return paver::BlockPartitionClient::Create(
+               std::make_unique<paver::DevfsVolumeConnector>(device_->ConnectToController()))
+        .value();
+  }
+
   const fbl::unique_fd& devfs_root() { return devmgr_.devfs_root(); }
 
  protected:
@@ -72,42 +80,41 @@ class FvmTest : public zxtest::Test {
 
 TEST_F(FvmTest, FormatFvmEmpty) {
   ASSERT_NO_FAILURES(CreateRamdisk());
-  ASSERT_OK(FvmPartitionFormat(devfs_root(), device_->block_interface(),
-                               device_->block_controller_interface(),
-                               SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat));
+  ASSERT_OK(FvmPartitionFormat(devfs_root(), *CreateClient(), SparseHeaderForSliceSize(kSliceSize),
+                               paver::BindOption::Reformat));
 }
 
 TEST_F(FvmTest, TryBindEmpty) {
   ASSERT_NO_FAILURES(CreateRamdisk());
-  ASSERT_OK(FvmPartitionFormat(devfs_root(), device_->block_interface(),
-                               device_->block_controller_interface(),
+  ASSERT_OK(FvmPartitionFormat(devfs_root(), *CreateClient(),
+
                                SparseHeaderForSliceSize(kSliceSize), paver::BindOption::TryBind));
 }
 
 TEST_F(FvmTest, TryBindAlreadyFormatted) {
   ASSERT_NO_FAILURES(CreateRamdisk());
   ASSERT_OK(fs_management::FvmInit(block_interface(), kSliceSize));
-  ASSERT_OK(FvmPartitionFormat(devfs_root(), device_->block_interface(),
-                               device_->block_controller_interface(),
+  ASSERT_OK(FvmPartitionFormat(devfs_root(), *CreateClient(),
+
                                SparseHeaderForSliceSize(kSliceSize), paver::BindOption::TryBind));
 }
 
 TEST_F(FvmTest, TryBindAlreadyBound) {
   ASSERT_NO_FAILURES(CreateRamdisk());
-  ASSERT_OK(FvmPartitionFormat(devfs_root(), device_->block_interface(),
-                               device_->block_controller_interface(),
+  ASSERT_OK(FvmPartitionFormat(devfs_root(), *CreateClient(),
+
                                SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat));
 
-  ASSERT_OK(FvmPartitionFormat(devfs_root(), device_->block_interface(),
-                               device_->block_controller_interface(),
+  ASSERT_OK(FvmPartitionFormat(devfs_root(), *CreateClient(),
+
                                SparseHeaderForSliceSize(kSliceSize), paver::BindOption::TryBind));
 }
 
 TEST_F(FvmTest, TryBindAlreadyFormattedWrongSliceSize) {
   ASSERT_NO_FAILURES(CreateRamdisk());
   ASSERT_OK(fs_management::FvmInit(block_interface(), kSliceSize * 2));
-  ASSERT_OK(FvmPartitionFormat(devfs_root(), device_->block_interface(),
-                               device_->block_controller_interface(),
+  ASSERT_OK(FvmPartitionFormat(devfs_root(), *CreateClient(),
+
                                SparseHeaderForSliceSize(kSliceSize), paver::BindOption::TryBind));
 }
 
@@ -122,9 +129,8 @@ TEST_F(FvmTest, TryBindAlreadyFormattedWithSmallerSize) {
   fvm::SparseImage header =
       SparseHeaderForSliceSizeAndMaxDiskSize(kSliceSize, 2 * kBlockDeviceInitialSize);
   paver::FormatResult result;
-  ASSERT_OK(FvmPartitionFormat(devfs_root(), device_->block_interface(),
-                               device_->block_controller_interface(), header,
-                               paver::BindOption::TryBind, &result));
+  ASSERT_OK(FvmPartitionFormat(devfs_root(), *CreateClient(), header, paver::BindOption::TryBind,
+                               &result));
   ASSERT_EQ(paver::FormatResult::kPreserved, result);
 }
 
@@ -138,9 +144,8 @@ TEST_F(FvmTest, TryBindAlreadyFormattedWithBiggerSize) {
   // preallocated can have.
   fvm::SparseImage header = SparseHeaderForSliceSizeAndMaxDiskSize(kSliceSize, kBlockDeviceMaxSize);
   paver::FormatResult result;
-  ASSERT_OK(FvmPartitionFormat(devfs_root(), device_->block_interface(),
-                               device_->block_controller_interface(), header,
-                               paver::BindOption::TryBind, &result));
+  ASSERT_OK(FvmPartitionFormat(devfs_root(), *CreateClient(), header, paver::BindOption::TryBind,
+                               &result));
   ASSERT_EQ(paver::FormatResult::kReformatted, result);
 }
 
@@ -155,9 +160,9 @@ constexpr char kRamdisk1DataPath[] =
 
 TEST_F(FvmTest, AllocateEmptyPartitions) {
   ASSERT_NO_FAILURES(CreateRamdisk());
-  zx::result fvm = FvmPartitionFormat(
-      devfs_root(), device_->block_interface(), device_->block_controller_interface(),
-      SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat);
+  zx::result fvm =
+      FvmPartitionFormat(devfs_root(), *CreateClient(), SparseHeaderForSliceSize(kSliceSize),
+                         paver::BindOption::Reformat);
   ASSERT_OK(fvm);
 
   auto [volume, volume_server] =
@@ -185,9 +190,9 @@ TEST_F(FvmTest, AllocateEmptyPartitions) {
 
 TEST_F(FvmTest, WipeWithMultipleFvm) {
   ASSERT_NO_FAILURES(CreateRamdisk());
-  zx::result fvm1 = FvmPartitionFormat(
-      devfs_root(), device_->block_interface(), device_->block_controller_interface(),
-      SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat);
+  zx::result fvm1 =
+      FvmPartitionFormat(devfs_root(), *CreateClient(), SparseHeaderForSliceSize(kSliceSize),
+                         paver::BindOption::Reformat);
   ASSERT_OK(fvm1);
 
   auto [volume1, volume_server1] =
@@ -218,9 +223,9 @@ TEST_F(FvmTest, WipeWithMultipleFvm) {
   std::unique_ptr<BlockDevice> first_device = std::move(device_);
 
   ASSERT_NO_FAILURES(CreateRamdisk());
-  zx::result fvm2 = FvmPartitionFormat(
-      devfs_root(), device_->block_interface(), device_->block_controller_interface(),
-      SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat);
+  zx::result fvm2 =
+      FvmPartitionFormat(devfs_root(), *CreateClient(), SparseHeaderForSliceSize(kSliceSize),
+                         paver::BindOption::Reformat);
   ASSERT_OK(fvm2);
 
   auto [volume2, volume_server2] =
@@ -271,9 +276,9 @@ TEST_F(FvmTest, WipeWithMultipleFvm) {
 
 TEST_F(FvmTest, Unbind) {
   ASSERT_NO_FAILURES(CreateRamdisk());
-  zx::result fvm = FvmPartitionFormat(
-      devfs_root(), device_->block_interface(), device_->block_controller_interface(),
-      SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat);
+  zx::result fvm =
+      FvmPartitionFormat(devfs_root(), *CreateClient(), SparseHeaderForSliceSize(kSliceSize),
+                         paver::BindOption::Reformat);
   ASSERT_OK(fvm);
 
   auto [volume, volume_server] =
@@ -303,9 +308,9 @@ TEST_F(FvmTest, Unbind) {
 
 TEST_F(FvmTest, UnbindInvalidPath) {
   ASSERT_NO_FAILURES(CreateRamdisk());
-  zx::result fvm = FvmPartitionFormat(
-      devfs_root(), device_->block_interface(), device_->block_controller_interface(),
-      SparseHeaderForSliceSize(kSliceSize), paver::BindOption::Reformat);
+  zx::result fvm =
+      FvmPartitionFormat(devfs_root(), *CreateClient(), SparseHeaderForSliceSize(kSliceSize),
+                         paver::BindOption::Reformat);
   ASSERT_OK(fvm);
 
   auto [volume, volume_server] =

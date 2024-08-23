@@ -2,107 +2,110 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/input/report/cpp/fidl.h>
-#include <fuchsia/ui/display/singleton/cpp/fidl.h>
-#include <fuchsia/ui/focus/cpp/fidl.h>
-#include <fuchsia/ui/input/cpp/fidl.h>
-#include <fuchsia/ui/input3/cpp/fidl.h>
-#include <fuchsia/ui/policy/cpp/fidl.h>
-#include <fuchsia/ui/test/conformance/cpp/fidl.h>
-#include <fuchsia/ui/test/input/cpp/fidl.h>
-#include <fuchsia/ui/test/scene/cpp/fidl.h>
-#include <fuchsia/ui/views/cpp/fidl.h>
-#include <lib/fidl/cpp/binding.h>
+#include <fidl/fuchsia.input.report/cpp/fidl.h>
+#include <fidl/fuchsia.ui.display.singleton/cpp/fidl.h>
+#include <fidl/fuchsia.ui.focus/cpp/fidl.h>
+#include <fidl/fuchsia.ui.input/cpp/fidl.h>
+#include <fidl/fuchsia.ui.input/cpp/natural_ostream.h>
+#include <fidl/fuchsia.ui.input3/cpp/fidl.h>
+#include <fidl/fuchsia.ui.policy/cpp/fidl.h>
+#include <fidl/fuchsia.ui.test.conformance/cpp/fidl.h>
+#include <fidl/fuchsia.ui.test.input/cpp/fidl.h>
+#include <fidl/fuchsia.ui.test.scene/cpp/fidl.h>
+#include <fidl/fuchsia.ui.views/cpp/fidl.h>
+#include <lib/component/incoming/cpp/protocol.h>
+#include <lib/fidl/cpp/channel.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
-#include <zircon/errors.h>
 
 #include <sstream>
 #include <string>
 #include <utility>
 #include <vector>
 
-#include <src/lib/fostr/fidl/fuchsia/ui/input/formatting.h>
+#include <src/ui/testing/util/fidl_cpp_helpers.h>
+#include <src/ui/tests/conformance_input_tests/conformance-test-base.h>
 #include <zxtest/zxtest.h>
-
-#include "src/ui/tests/conformance_input_tests/conformance-test-base.h"
 
 namespace ui_conformance_testing {
 
-const std::string PUPPET_UNDER_TEST_FACTORY_SERVICE = "puppet-under-test-factory-service";
+const std::string PUPPET_UNDER_TEST_FACTORY_SERVICE = "/svc/puppet-under-test-factory-service";
 
-namespace futi = fuchsia::ui::test::input;
-namespace fir = fuchsia::input::report;
-namespace fui = fuchsia::ui::input;
-namespace fup = fuchsia::ui::policy;
-namespace futc = fuchsia::ui::test::conformance;
+namespace futi = fuchsia_ui_test_input;
+namespace fir = fuchsia_input_report;
+namespace fui = fuchsia_ui_input;
+namespace fup = fuchsia_ui_policy;
+namespace futc = fuchsia_ui_test_conformance;
 
-class ButtonsListener final : public fup::MediaButtonsListener {
+class ButtonsListener final : public fidl::Server<fup::MediaButtonsListener> {
  public:
-  ButtonsListener() : binding_(this) {}
-
   // |MediaButtonsListener|
-  void OnEvent(fui::MediaButtonsEvent event, OnEventCallback callback) override {
-    events_received_.push_back(std::move(event));
-    callback();
+  void OnEvent(OnEventRequest& request, OnEventCompleter::Sync& completer) override {
+    events_received_.push_back(std::move(request.event()));
+    completer.Reply();
   }
-  void OnMediaButtonsEvent(fuchsia::ui::input::MediaButtonsEvent event) override {
+
+  void OnMediaButtonsEvent(OnMediaButtonsEventRequest& request,
+                           OnMediaButtonsEventCompleter::Sync& completer) override {
     ZX_PANIC("Not Implemented");
   }
-  // Returns a client end bound to this object.
-  fidl::InterfaceHandle<fup::MediaButtonsListener> NewBinding() { return binding_.NewBinding(); }
+
+  fidl::ClientEnd<fup::MediaButtonsListener> ServeAndGetClientEnd(async_dispatcher_t* dispatcher) {
+    auto [client_end, server_end] = fidl::Endpoints<fup::MediaButtonsListener>::Create();
+    binding_.AddBinding(dispatcher, std::move(server_end), this, fidl::kIgnoreBindingClosure);
+    return std::move(client_end);
+  }
 
   const std::vector<fui::MediaButtonsEvent>& events_received() const { return events_received_; }
 
   void clear_events() { events_received_.clear(); }
 
  private:
-  fidl::Binding<fup::MediaButtonsListener> binding_;
+  fidl::ServerBindingGroup<fup::MediaButtonsListener> binding_;
   std::vector<fui::MediaButtonsEvent> events_received_;
 };
 
 class MediaButtonConformanceTest : public ui_conformance_test_base::ConformanceTest {
  public:
-  ~MediaButtonConformanceTest() override = default;
-
   void SetUp() override {
     ui_conformance_test_base::ConformanceTest::SetUp();
 
-    fuchsia::ui::views::ViewCreationToken root_view_token;
+    fuchsia_ui_views::ViewCreationToken root_view_token;
     {
       FX_LOGS(INFO) << "Creating root view token";
 
-      auto controller = ConnectSyncIntoRealm<fuchsia::ui::test::scene::Controller>();
+      auto controller = ConnectSyncIntoRealm<fuchsia_ui_test_scene::Controller>();
 
-      fuchsia::ui::test::scene::ControllerPresentClientViewRequest req;
-      auto [view_token, viewport_token] = scenic::ViewCreationTokenPair::New();
-      req.set_viewport_creation_token(std::move(viewport_token));
-      ASSERT_EQ(controller->PresentClientView(std::move(req)), ZX_OK);
+      fuchsia_ui_test_scene::ControllerPresentClientViewRequest req;
+      auto [view_token, viewport_token] = scenic::cpp::ViewCreationTokenPair::New();
+      req.viewport_creation_token(std::move(viewport_token));
+      ZX_ASSERT_OK(controller->PresentClientView(std::move(req)));
       root_view_token = std::move(view_token);
     }
 
     {
       FX_LOGS(INFO) << "Create puppet under test";
-      futc::PuppetFactorySyncPtr puppet_factory;
+      auto puppet_factory_connect =
+          component::Connect<futc::PuppetFactory>(PUPPET_UNDER_TEST_FACTORY_SERVICE);
+      ZX_ASSERT_OK(puppet_factory_connect);
 
-      ASSERT_EQ(LocalServiceDirectory()->Connect(puppet_factory.NewRequest(),
-                                                 PUPPET_UNDER_TEST_FACTORY_SERVICE),
-                ZX_OK);
+      puppet_factory_ = fidl::SyncClient(std::move(puppet_factory_connect.value()));
 
-      auto flatland = ConnectSyncIntoRealm<fuchsia::ui::composition::Flatland>();
-      auto keyboard = ConnectSyncIntoRealm<fuchsia::ui::input3::Keyboard>();
-
-      futc::PuppetFactoryCreateResponse resp;
+      auto flatland = ConnectIntoRealm<fuchsia_ui_composition::Flatland>();
+      auto keyboard = ConnectIntoRealm<fuchsia_ui_input3::Keyboard>();
+      auto [puppet_client_end, puppet_server_end] = fidl::Endpoints<futc::Puppet>::Create();
+      puppet_ = fidl::SyncClient(std::move(puppet_client_end));
 
       futc::PuppetCreationArgs creation_args;
-      creation_args.set_server_end(puppet_ptr_.NewRequest());
-      creation_args.set_view_token(std::move(root_view_token));
-      creation_args.set_flatland_client(std::move(flatland));
-      creation_args.set_keyboard_client(std::move(keyboard));
-      creation_args.set_device_pixel_ratio(DevicePixelRatio());
+      creation_args.server_end(std::move(puppet_server_end));
+      creation_args.view_token(std::move(root_view_token));
+      creation_args.flatland_client(std::move(flatland));
+      creation_args.keyboard_client(std::move(keyboard));
+      creation_args.device_pixel_ratio(DevicePixelRatio());
 
-      ASSERT_EQ(puppet_factory->Create(std::move(creation_args), &resp), ZX_OK);
-      ASSERT_EQ(resp.result(), futc::Result::SUCCESS);
+      auto res = puppet_factory_->Create(std::move(creation_args));
+      ZX_ASSERT_OK(res);
+      ASSERT_EQ(res.value().result(), futc::Result::kSuccess);
     }
 
     // Register fake media button.
@@ -111,38 +114,41 @@ class MediaButtonConformanceTest : public ui_conformance_test_base::ConformanceT
       auto input_registry = ConnectSyncIntoRealm<futi::Registry>();
 
       FX_LOGS(INFO) << "Registering fake media button device";
+      auto [client_end, server_end] = fidl::Endpoints<futi::MediaButtonsDevice>::Create();
+      media_buttons_ = fidl::SyncClient(std::move(client_end));
+
       futi::RegistryRegisterMediaButtonsDeviceRequest request;
-      request.set_device(media_buttons_.NewRequest());
-      ASSERT_EQ(input_registry->RegisterMediaButtonsDevice(std::move(request)), ZX_OK);
+      request.device(std::move(server_end));
+      ZX_ASSERT_OK(input_registry->RegisterMediaButtonsDevice(std::move(request)));
     }
   }
 
   void SimulatePress(fir::ConsumerControlButton button) {
     futi::MediaButtonsDeviceSimulateButtonPressRequest request;
-    request.set_button(button);
-    ASSERT_EQ(media_buttons_->SimulateButtonPress(std::move(request)), ZX_OK);
+    request.button(button);
+    ZX_ASSERT_OK(media_buttons_->SimulateButtonPress(request));
   }
 
   void SimulatePress(std::vector<fir::ConsumerControlButton> buttons) {
     futi::MediaButtonsDeviceSendButtonsStateRequest request;
-    request.set_buttons(std::move(buttons));
-    ASSERT_EQ(media_buttons_->SendButtonsState(std::move(request)), ZX_OK);
+    request.buttons(std::move(buttons));
+    ZX_ASSERT_OK(media_buttons_->SendButtonsState(request));
   }
 
  private:
-  futi::MediaButtonsDeviceSyncPtr media_buttons_;
-  futc::PuppetSyncPtr puppet_ptr_;
+  fidl::SyncClient<futi::MediaButtonsDevice> media_buttons_;
+  fidl::SyncClient<futc::Puppet> puppet_;
+  fidl::SyncClient<futc::PuppetFactory> puppet_factory_;
 };
 
 fui::MediaButtonsEvent MakeMediaButtonsEvent(int8_t volume, bool mic_mute, bool pause,
                                              bool camera_disable, bool power, bool function) {
-  fui::MediaButtonsEvent e;
-  e.set_volume(volume);
-  e.set_mic_mute(mic_mute);
-  e.set_pause(pause);
-  e.set_camera_disable(camera_disable);
-  e.set_power(power);
-  e.set_function(function);
+  fui::MediaButtonsEvent e({.volume = volume,
+                            .mic_mute = mic_mute,
+                            .pause = pause,
+                            .camera_disable = camera_disable,
+                            .power = power,
+                            .function = function});
   return e;
 }
 
@@ -188,10 +194,11 @@ TEST_F(MediaButtonConformanceTest, SimplePress) {
   auto device_listener_registry = ConnectSyncIntoRealm<fup::DeviceListenerRegistry>();
 
   ButtonsListener listener;
-  ASSERT_EQ(device_listener_registry->RegisterListener(listener.NewBinding()), ZX_OK);
+  auto listener_client_end = listener.ServeAndGetClientEnd(dispatcher());
+  ZX_ASSERT_OK(device_listener_registry->RegisterListener({std::move(listener_client_end)}));
 
   {
-    SimulatePress(fir::ConsumerControlButton::VOLUME_UP);
+    SimulatePress(fir::ConsumerControlButton::kVolumeUp);
     FX_LOGS(INFO) << "wait for button VOLUME_UP";
     RunLoopUntil([&listener]() { return listener.events_received().size() > 1; });
     EXPECT_EQ(listener.events_received().size(), 2u);
@@ -201,7 +208,7 @@ TEST_F(MediaButtonConformanceTest, SimplePress) {
   }
 
   {
-    SimulatePress(fir::ConsumerControlButton::VOLUME_DOWN);
+    SimulatePress(fir::ConsumerControlButton::kVolumeDown);
     FX_LOGS(INFO) << "wait for button VOLUME_DOWN";
     RunLoopUntil([&listener]() { return listener.events_received().size() > 1; });
     EXPECT_EQ(listener.events_received().size(), 2u);
@@ -211,7 +218,7 @@ TEST_F(MediaButtonConformanceTest, SimplePress) {
   }
 
   {
-    SimulatePress(fir::ConsumerControlButton::PAUSE);
+    SimulatePress(fir::ConsumerControlButton::kPause);
     FX_LOGS(INFO) << "wait for button PAUSE";
     RunLoopUntil([&listener]() { return listener.events_received().size() > 1; });
     EXPECT_EQ(listener.events_received().size(), 2u);
@@ -221,7 +228,7 @@ TEST_F(MediaButtonConformanceTest, SimplePress) {
   }
 
   {
-    SimulatePress(fir::ConsumerControlButton::MIC_MUTE);
+    SimulatePress(fir::ConsumerControlButton::kMicMute);
     FX_LOGS(INFO) << "wait for button MIC_MUTE";
     RunLoopUntil([&listener]() { return listener.events_received().size() > 1; });
     EXPECT_EQ(listener.events_received().size(), 2u);
@@ -231,7 +238,7 @@ TEST_F(MediaButtonConformanceTest, SimplePress) {
   }
 
   {
-    SimulatePress(fir::ConsumerControlButton::CAMERA_DISABLE);
+    SimulatePress(fir::ConsumerControlButton::kCameraDisable);
     FX_LOGS(INFO) << "wait for button CAMERA_DISABLE";
     RunLoopUntil([&listener]() { return listener.events_received().size() > 1; });
     EXPECT_EQ(listener.events_received().size(), 2u);
@@ -241,7 +248,7 @@ TEST_F(MediaButtonConformanceTest, SimplePress) {
   }
 
   {
-    SimulatePress(fir::ConsumerControlButton::FUNCTION);
+    SimulatePress(fir::ConsumerControlButton::kFunction);
     FX_LOGS(INFO) << "wait for button FUNCTION";
     RunLoopUntil([&listener]() { return listener.events_received().size() > 1; });
     EXPECT_EQ(listener.events_received().size(), 2u);
@@ -251,7 +258,7 @@ TEST_F(MediaButtonConformanceTest, SimplePress) {
   }
 
   {
-    SimulatePress(fir::ConsumerControlButton::POWER);
+    SimulatePress(fir::ConsumerControlButton::kPower);
     FX_LOGS(INFO) << "wait for button POWER";
     RunLoopUntil([&listener]() { return listener.events_received().size() > 1; });
     EXPECT_EQ(listener.events_received().size(), 2u);
@@ -262,7 +269,7 @@ TEST_F(MediaButtonConformanceTest, SimplePress) {
 
   // The following button types are not yet supported.
   {
-    SimulatePress(fir::ConsumerControlButton::REBOOT);
+    SimulatePress(fir::ConsumerControlButton::kReboot);
     FX_LOGS(INFO) << "wait for button REBOOT";
     RunLoopUntil([&listener]() { return listener.events_received().size() > 1; });
     EXPECT_EQ(listener.events_received().size(), 2u);
@@ -272,7 +279,7 @@ TEST_F(MediaButtonConformanceTest, SimplePress) {
   }
 
   {
-    SimulatePress(fir::ConsumerControlButton::FACTORY_RESET);
+    SimulatePress(fir::ConsumerControlButton::kFactoryReset);
     FX_LOGS(INFO) << "wait for button FACTORY_RESET";
     RunLoopUntil([&listener]() { return listener.events_received().size() > 1; });
     EXPECT_EQ(listener.events_received().size(), 2u);
@@ -286,15 +293,16 @@ TEST_F(MediaButtonConformanceTest, MultiPress) {
   auto device_listener_registry = ConnectSyncIntoRealm<fup::DeviceListenerRegistry>();
 
   ButtonsListener listener;
-  ASSERT_EQ(device_listener_registry->RegisterListener(listener.NewBinding()), ZX_OK);
+  auto listener_client_end = listener.ServeAndGetClientEnd(dispatcher());
+  ZX_ASSERT_OK(device_listener_registry->RegisterListener({std::move(listener_client_end)}));
 
   // press multi buttons.
   {
     auto buttons = std::vector<fir::ConsumerControlButton>{
-        fuchsia::input::report::ConsumerControlButton::CAMERA_DISABLE,
-        fuchsia::input::report::ConsumerControlButton::MIC_MUTE,
-        fuchsia::input::report::ConsumerControlButton::PAUSE,
-        fuchsia::input::report::ConsumerControlButton::VOLUME_UP,
+        fuchsia_input_report::ConsumerControlButton::kCameraDisable,
+        fuchsia_input_report::ConsumerControlButton::kMicMute,
+        fuchsia_input_report::ConsumerControlButton::kPause,
+        fuchsia_input_report::ConsumerControlButton::kVolumeUp,
     };
     SimulatePress(std::move(buttons));
     RunLoopUntil([&listener]() { return listener.events_received().size() > 0; });
@@ -318,13 +326,16 @@ TEST_F(MediaButtonConformanceTest, MultiListener) {
   auto device_listener_registry = ConnectSyncIntoRealm<fup::DeviceListenerRegistry>();
 
   ButtonsListener listener1;
+  auto listener_client_end1 = listener1.ServeAndGetClientEnd(dispatcher());
+  ZX_ASSERT_OK(device_listener_registry->RegisterListener({std::move(listener_client_end1)}));
+
   auto listener2 = std::make_unique<ButtonsListener>();
-  ASSERT_EQ(device_listener_registry->RegisterListener(listener1.NewBinding()), ZX_OK);
-  ASSERT_EQ(device_listener_registry->RegisterListener(listener2->NewBinding()), ZX_OK);
+  auto listener_client_end2 = listener2->ServeAndGetClientEnd(dispatcher());
+  ZX_ASSERT_OK(device_listener_registry->RegisterListener({std::move(listener_client_end2)}));
 
   // Both listener received events.
   {
-    SimulatePress(fir::ConsumerControlButton::VOLUME_UP);
+    SimulatePress(fir::ConsumerControlButton::kVolumeUp);
     FX_LOGS(INFO) << "wait for button VOLUME_UP";
     RunLoopUntil([&listener1]() { return listener1.events_received().size() > 1; });
     RunLoopUntil([&listener2]() { return listener2->events_received().size() > 1; });
@@ -339,7 +350,8 @@ TEST_F(MediaButtonConformanceTest, MultiListener) {
   }
 
   ButtonsListener listener3;
-  ASSERT_EQ(device_listener_registry->RegisterListener(listener3.NewBinding()), ZX_OK);
+  auto listener_client_end3 = listener3.ServeAndGetClientEnd(dispatcher());
+  ZX_ASSERT_OK(device_listener_registry->RegisterListener({std::move(listener_client_end3)}));
 
   // new listener receives the last event.
   {
@@ -351,7 +363,7 @@ TEST_F(MediaButtonConformanceTest, MultiListener) {
 
   // then new listener receive only new events.
   {
-    SimulatePress(fir::ConsumerControlButton::VOLUME_DOWN);
+    SimulatePress(fir::ConsumerControlButton::kVolumeDown);
     FX_LOGS(INFO) << "wait for button VOLUME_DOWN";
     RunLoopUntil([&listener1]() { return listener1.events_received().size() > 1; });
     RunLoopUntil([&listener2]() { return listener2->events_received().size() > 1; });
@@ -373,7 +385,7 @@ TEST_F(MediaButtonConformanceTest, MultiListener) {
   // drop listener2, and verify other listeners still working.
   listener2 = {};
   {
-    SimulatePress(fir::ConsumerControlButton::PAUSE);
+    SimulatePress(fir::ConsumerControlButton::kPause);
     FX_LOGS(INFO) << "wait for button PAUSE";
     RunLoopUntil([&listener1]() { return listener1.events_received().size() > 1; });
     RunLoopUntil([&listener3]() { return listener3.events_received().size() > 1; });

@@ -9,8 +9,8 @@
 #include <fbl/auto_lock.h>
 
 #include "src/graphics/display/drivers/intel-display/i2c/gmbus-gpio.h"
-#include "src/graphics/display/drivers/intel-display/poll-until.h"
 #include "src/graphics/display/drivers/intel-display/registers-gmbus.h"
+#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
 
 namespace intel_display {
 

@@ -5,11 +5,12 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
+#include "lib/console.h"
+
 #include <assert.h>
 #include <ctype.h>
 #include <debug.h>
 #include <lib/boot-options/boot-options.h>
-#include <lib/console.h>
 #include <lib/debuglog.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -54,7 +55,7 @@ namespace {
 DECLARE_SINGLETON_MUTEX(CommandLock);
 }  // namespace
 int lastresult;
-static bool abort_script;
+static bool exit_console;
 
 #if CONSOLE_ENABLE_HISTORY
 /* command history stuff */
@@ -83,9 +84,11 @@ static int cmd_boot_test_success(int argc, const cmd_args* argv, uint32_t flags)
 static int cmd_graceful_shutdown(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_and(int argc, const cmd_args* argv, uint32_t flags);
 static int cmd_repeat(int argc, const cmd_args* argv, uint32_t flags);
+static int cmd_exit(int argc, const cmd_args* argv, uint32_t flags);
 
 STATIC_COMMAND_START
 STATIC_COMMAND_MASKED("help", "this list", &cmd_help, CMD_AVAIL_ALWAYS)
+STATIC_COMMAND_MASKED("exit", "exit the command processor", &cmd_exit, CMD_AVAIL_NORMAL)
 STATIC_COMMAND_MASKED("echo", NULL, &cmd_echo, CMD_AVAIL_ALWAYS)
 STATIC_COMMAND_MASKED("and", "execute command if last command succeeded", &cmd_and,
                       CMD_AVAIL_ALWAYS)
@@ -516,6 +519,7 @@ static void convert_args(int argc, cmd_args* argv) {
 
 static zx_status_t command_loop(int (*get_line)(const char**, void*), void* get_line_cookie,
                                 bool showprompt, bool locked) TA_NO_THREAD_SAFETY_ANALYSIS {
+  zx_status_t ret = ZX_OK;
   bool exit;
 #if WITH_LIB_ENV
   bool report_result;
@@ -584,7 +588,7 @@ static zx_status_t command_loop(int (*get_line)(const char**, void*), void* get_
     if (!locked)
       CommandLock::Get()->lock().Acquire();
 
-    abort_script = false;
+    exit_console = false;
     lastresult = command->cmd_callback(argc, args, 0);
 
 #if WITH_LIB_ENV
@@ -603,10 +607,12 @@ static zx_status_t command_loop(int (*get_line)(const char**, void*), void* get_
     env_set_int("?", lastresult, true);
 #endif
 
-    // someone must have aborted the current script
-    if (abort_script)
+    // someone must have called console_exit() inside the command
+    if (exit_console) {
       exit = true;
-    abort_script = false;
+      exit_console = false;
+      ret = ZX_ERR_CANCELED;
+    }
 
     if (!locked)
       CommandLock::Get()->lock().Release();
@@ -614,10 +620,10 @@ static zx_status_t command_loop(int (*get_line)(const char**, void*), void* get_
 
   free(outbuf);
   free(args);
-  return ZX_OK;
+  return ret;
 }
 
-void console_abort_script(void) { abort_script = true; }
+void console_exit() { exit_console = true; }
 
 static void console_start(void) {
   debug_buffer = static_cast<char*>(malloc(LINE_LEN));
@@ -857,6 +863,12 @@ static int cmd_graceful_shutdown(int argc, const cmd_args* argv, uint32_t flags)
   platform_halt(HALT_ACTION_SHUTDOWN, ZirconCrashReason::NoCrash);
 }
 
+static int cmd_exit(int argc, const cmd_args* argv, uint32_t flags) {
+  console_exit();
+
+  return 0;
+}
+
 static int cmd_and(int argc, const cmd_args* argv, uint32_t flags) {
   if (argc < 2) {
     printf("Usage: and COMMAND...\n");
@@ -943,7 +955,7 @@ void RecurringCallback::Toggle() {
   }
 }
 
-static void kernel_shell_init(uint level) {
+void kernel_shell_init() {
   if (!gBootOptions->shell_script.empty()) {
     SmallString script = gBootOptions->shell_script;
     for (char* p = strchr(script.data(), '+'); p; p = strchr(p + 1, '+')) {
@@ -955,5 +967,3 @@ static void kernel_shell_init(uint level) {
     console_start();
   }
 }
-
-LK_INIT_HOOK(kernel_shell, kernel_shell_init, LK_INIT_LEVEL_USER)

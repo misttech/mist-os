@@ -8,11 +8,13 @@
 
 #include <utility>
 
+#include "fidl/fuchsia.debugger/cpp/natural_types.h"
 #include "src/developer/debug/debug_agent/backtrace_utils.h"
 #include "src/developer/debug/debug_agent/component_manager.h"
 #include "src/developer/debug/debug_agent/debug_agent.h"
 #include "src/developer/debug/debug_agent/debugged_process.h"
 #include "src/developer/debug/debug_agent/debugged_thread.h"
+#include "src/developer/debug/debug_agent/minidump_iterator.h"
 #include "src/developer/debug/debug_agent/process_info_iterator.h"
 #include "src/developer/debug/debug_agent/system_interface.h"
 #include "src/developer/debug/ipc/filter_utils.h"
@@ -320,8 +322,6 @@ void DebugAgentServer::GetProcessInfo(GetProcessInfoRequest& request,
                                       GetProcessInfoCompleter::Sync& completer) {
   FX_DCHECK(debug_agent_);
 
-  std::vector<DebuggedProcess*> processes;
-
   auto result = GetMatchingProcesses(request.options().filter());
   if (result.has_error()) {
     completer.Reply(fit::error(result.err()));
@@ -336,6 +336,22 @@ void DebugAgentServer::GetProcessInfo(GetProcessInfoRequest& request,
       fidl::ServerEnd<fuchsia_debugger::ProcessInfoIterator>(std::move(request.iterator())),
       std::make_unique<ProcessInfoIterator>(debug_agent_, result.take_value(),
                                             std::move(request.options().interest())));
+
+  completer.Reply(fit::success());
+}
+
+void DebugAgentServer::GetMinidumps(GetMinidumpsRequest& request,
+                                    GetMinidumpsCompleter::Sync& completer) {
+  auto result = GetMatchingProcesses(request.options().filter());
+  if (result.has_error()) {
+    completer.Reply(fit::error(result.err()));
+    return;
+  }
+
+  fidl::BindServer(
+      dispatcher_,
+      fidl::ServerEnd<fuchsia_debugger::MinidumpIterator>(std::move(request.iterator())),
+      std::make_unique<MinidumpIterator>(debug_agent_, result.take_value()));
 
   completer.Reply(fit::success());
 }

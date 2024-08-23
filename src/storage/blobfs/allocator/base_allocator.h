@@ -5,12 +5,15 @@
 #ifndef SRC_STORAGE_BLOBFS_ALLOCATOR_BASE_ALLOCATOR_H_
 #define SRC_STORAGE_BLOBFS_ALLOCATOR_BASE_ALLOCATOR_H_
 
-#include <lib/stdcompat/span.h>
+#include <lib/zx/result.h>
+#include <zircon/compiler.h>
+#include <zircon/types.h>
 
 #include <cstdint>
+#include <memory>
 #include <vector>
 
-#include <bitmap/raw-bitmap.h>
+#include <bitmap/rle-bitmap.h>
 #include <id_allocator/id_allocator.h>
 
 #include "src/storage/blobfs/allocator/extent_reserver.h"

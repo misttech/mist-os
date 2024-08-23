@@ -10,6 +10,7 @@
 #include <lib/fidl/cpp/enum.h>
 #include <lib/syslog/cpp/macros.h>
 
+#include <cmath>
 #include <optional>
 #include <string>
 

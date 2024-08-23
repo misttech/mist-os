@@ -48,7 +48,7 @@ static const std::vector<fpbus::Mmio> emmc_mmios{
 static const std::vector<fpbus::Irq> emmc_irqs{
     {{
         .irq = T931_SD_EMMC_C_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
 };
 
@@ -102,7 +102,7 @@ const std::vector<fdf::NodeProperty> kGpioInitProperties = std::vector{
 }  // namespace
 
 zx_status_t Sherlock::EmmcInit() {
-  using fuchsia_hardware_gpio::GpioFlags;
+  using fuchsia_hardware_pin::Pull;
 
   // set alternate functions to enable EMMC
   gpio_init_steps_.push_back(GpioFunction(T931_EMMC_D0, T931_EMMC_D0_FN));
@@ -131,18 +131,18 @@ zx_status_t Sherlock::EmmcInit() {
   gpio_init_steps_.push_back(GpioDriveStrength(T931_EMMC_CMD, 4000));
   gpio_init_steps_.push_back(GpioDriveStrength(T931_EMMC_DS, 4000));
 
-  gpio_init_steps_.push_back(GpioConfigIn(T931_EMMC_D0, GpioFlags::kPullUp));
-  gpio_init_steps_.push_back(GpioConfigIn(T931_EMMC_D1, GpioFlags::kPullUp));
-  gpio_init_steps_.push_back(GpioConfigIn(T931_EMMC_D2, GpioFlags::kPullUp));
-  gpio_init_steps_.push_back(GpioConfigIn(T931_EMMC_D3, GpioFlags::kPullUp));
-  gpio_init_steps_.push_back(GpioConfigIn(T931_EMMC_D4, GpioFlags::kPullUp));
-  gpio_init_steps_.push_back(GpioConfigIn(T931_EMMC_D5, GpioFlags::kPullUp));
-  gpio_init_steps_.push_back(GpioConfigIn(T931_EMMC_D6, GpioFlags::kPullUp));
-  gpio_init_steps_.push_back(GpioConfigIn(T931_EMMC_D7, GpioFlags::kPullUp));
-  gpio_init_steps_.push_back(GpioConfigIn(T931_EMMC_CLK, GpioFlags::kPullUp));
-  gpio_init_steps_.push_back(GpioConfigIn(T931_EMMC_RST, GpioFlags::kPullUp));
-  gpio_init_steps_.push_back(GpioConfigIn(T931_EMMC_CMD, GpioFlags::kPullUp));
-  gpio_init_steps_.push_back(GpioConfigIn(T931_EMMC_DS, GpioFlags::kPullDown));
+  gpio_init_steps_.push_back(GpioPull(T931_EMMC_D0, Pull::kUp));
+  gpio_init_steps_.push_back(GpioPull(T931_EMMC_D1, Pull::kUp));
+  gpio_init_steps_.push_back(GpioPull(T931_EMMC_D2, Pull::kUp));
+  gpio_init_steps_.push_back(GpioPull(T931_EMMC_D3, Pull::kUp));
+  gpio_init_steps_.push_back(GpioPull(T931_EMMC_D4, Pull::kUp));
+  gpio_init_steps_.push_back(GpioPull(T931_EMMC_D5, Pull::kUp));
+  gpio_init_steps_.push_back(GpioPull(T931_EMMC_D6, Pull::kUp));
+  gpio_init_steps_.push_back(GpioPull(T931_EMMC_D7, Pull::kUp));
+  gpio_init_steps_.push_back(GpioPull(T931_EMMC_CLK, Pull::kUp));
+  gpio_init_steps_.push_back(GpioPull(T931_EMMC_RST, Pull::kUp));
+  gpio_init_steps_.push_back(GpioPull(T931_EMMC_CMD, Pull::kUp));
+  gpio_init_steps_.push_back(GpioPull(T931_EMMC_DS, Pull::kDown));
 
   fidl::Arena<> fidl_arena;
 

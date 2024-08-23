@@ -87,7 +87,7 @@ class RiscvDevicetreeCpuTopologyItemTest
                                            boot_shim::testing::SyntheticDevicetreeTest> {
  public:
   static void SetUpTestSuite() {
-    TestMixin<RiscvDevicetreeTest>::SetUpTestSuite();
+    Mixin::SetUpTestSuite();
     auto loaded_dtb = LoadDtb("cpus_riscv.dtb");
     ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
     riscv_cpus_dtb_ = std::move(loaded_dtb).value();
@@ -104,7 +104,7 @@ class RiscvDevicetreeCpuTopologyItemTest
   static void TearDownTestSuite() {
     riscv_cpus_dtb_ = std::nullopt;
     riscv_cpus_no_cpu_map_dtb_ = std::nullopt;
-    TestMixin<RiscvDevicetreeTest>::TearDownTestSuite();
+    Mixin::TearDownTestSuite();
   }
 
   devicetree::Devicetree riscv_cpus() { return riscv_cpus_dtb_->fdt(); }

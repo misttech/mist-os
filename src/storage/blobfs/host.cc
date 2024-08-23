@@ -5,66 +5,54 @@
 #include "src/storage/blobfs/host.h"
 
 #include <fcntl.h>
-#include <inttypes.h>
-#include <lib/cksum.h>
+#include <lib/fpromise/result.h>
 #include <lib/stdcompat/span.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/result.h>
-#include <stdarg.h>
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
-#include <zircon/status.h>
+#include <zircon/types.h>
 
+#include <cerrno>
 #include <cstddef>
 #include <cstdint>
+#include <filesystem>
 #include <memory>
-#include <new>
-#include <optional>
 #include <string>
 #include <utility>
-#include <variant>
 #include <vector>
 
 #include <fbl/algorithm.h>
 #include <fbl/array.h>
-#include <fbl/macros.h>
 #include <fbl/unique_fd.h>
 #include <safemath/checked_math.h>
 #include <safemath/safe_conversions.h>
 
 #include "src/lib/chunked-compression/multithreaded-chunked-compressor.h"
-#include "src/lib/digest/digest.h"
 #include "src/lib/digest/merkle-tree.h"
-#include "src/lib/digest/node-digest.h"
 #include "src/storage/blobfs/allocator/extent_reserver.h"
 #include "src/storage/blobfs/allocator/host_allocator.h"
 #include "src/storage/blobfs/allocator/node_reserver.h"
 #include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/common.h"
 #include "src/storage/blobfs/compression/chunked.h"
-#include "src/storage/blobfs/compression/compressor.h"
 #include "src/storage/blobfs/compression/configs/chunked_compression_params.h"
-#include "src/storage/blobfs/compression/decompressor.h"
-#include "src/storage/blobfs/compression_settings.h"
 #include "src/storage/blobfs/format.h"
 #include "src/storage/blobfs/fsck_host.h"
 #include "src/storage/blobfs/iterator/allocated_extent_iterator.h"
 #include "src/storage/blobfs/iterator/block_iterator.h"
-#include "src/storage/blobfs/iterator/extent_iterator.h"
 #include "src/storage/blobfs/iterator/node_populator.h"
 #include "src/storage/blobfs/iterator/vector_extent_iterator.h"
 #include "src/storage/blobfs/node_finder.h"
-#include "src/storage/lib/host/common.h"
 #include "src/storage/lib/vfs/cpp/journal/initializer.h"
 #include "src/storage/lib/vfs/cpp/transaction/transaction_handler.h"
 
-using digest::Digest;
 using digest::MerkleTreeCreator;
 using digest::MerkleTreeVerifier;
 
@@ -498,7 +486,7 @@ zx_status_t blobfs_create_sparse(std::unique_ptr<Blobfs>* out, fbl::unique_fd fd
   extent_lengths[3] = extent_vector[3];
   extent_lengths[4] = extent_vector[4];
 
-  auto blobfs = Blobfs::Create(std::move(fd), /*start=*/0, info_block, extent_lengths);
+  auto blobfs = Blobfs::Create(std::move(fd), /*offset=*/0, info_block, extent_lengths);
   if (blobfs.is_error()) {
     FX_LOGS(ERROR) << "mount failed; could not create blobfs";
     return blobfs.status_value();
@@ -858,7 +846,7 @@ fpromise::result<std::vector<uint8_t>, std::string> Blobfs::LoadDataAndVerifyBlo
   const uint64_t block_size = GetBlockSize();
   zx_status_t status;
   auto make_error = [&](const std::string& error) {
-    digest::Digest digest(inode.merkle_root_hash);
+    Digest digest(inode.merkle_root_hash);
     auto digest_str = digest.ToString();
     return fpromise::error("Blob with merkle root hash of " +
                            std::string(digest_str.data(), digest_str.length()) +
@@ -974,7 +962,7 @@ fpromise::result<void, std::string> ExportBlobs(int output_dir, Blobfs& fs) {
   return fs.VisitBlobs([output_dir](Blobfs::BlobView view) -> fpromise::result<void, std::string> {
     uint8_t hash[digest::kSha256Length];
     memcpy(hash, view.merkle_hash.data(), digest::kSha256Length);
-    auto blob_name = digest::Digest(hash).ToString();
+    auto blob_name = Digest(hash).ToString();
     fbl::unique_fd file(openat(output_dir, blob_name.c_str(), O_CREAT | O_RDWR, 0644));
     if (!file.is_valid()) {
       return fpromise::error(

@@ -16,7 +16,7 @@ pub trait RingBuffer {
     /// Starts the ring buffer.
     ///
     /// Returns the CLOCK_MONOTONIC time at which it started.
-    async fn start(&self) -> Result<zx::Time, anyhow::Error>;
+    async fn start(&self) -> Result<zx::MonotonicTime, anyhow::Error>;
 
     /// Stops the ring buffer.
     async fn stop(&self) -> Result<(), anyhow::Error>;
@@ -67,9 +67,9 @@ impl HardwareRingBuffer {
 
 #[async_trait]
 impl RingBuffer for HardwareRingBuffer {
-    async fn start(&self) -> Result<zx::Time, anyhow::Error> {
+    async fn start(&self) -> Result<zx::MonotonicTime, anyhow::Error> {
         let start_time = self.proxy.start().await?;
-        Ok(zx::Time::from_nanos(start_time))
+        Ok(zx::MonotonicTime::from_nanos(start_time))
     }
 
     async fn stop(&self) -> Result<(), anyhow::Error> {
@@ -130,7 +130,7 @@ impl AudioDeviceRingBuffer {
 
 #[async_trait]
 impl RingBuffer for AudioDeviceRingBuffer {
-    async fn start(&self) -> Result<zx::Time, anyhow::Error> {
+    async fn start(&self) -> Result<zx::MonotonicTime, anyhow::Error> {
         let response = self
             .proxy
             .start(&Default::default())
@@ -138,7 +138,7 @@ impl RingBuffer for AudioDeviceRingBuffer {
             .context("failed to call Start")?
             .map_err(|err| anyhow!("failed to start ring buffer: {:?}", err))?;
         let start_time = response.start_time.ok_or_else(|| anyhow!("missing 'start_time'"))?;
-        Ok(zx::Time::from_nanos(start_time))
+        Ok(zx::MonotonicTime::from_nanos(start_time))
     }
 
     async fn stop(&self) -> Result<(), anyhow::Error> {

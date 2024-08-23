@@ -58,6 +58,7 @@ template("ffx_protocols") {
     deps = protocol_deps + [ ":" + protocols_macro_lib ] + [
              "//src/developer/ffx/lib/protocols:lib",
              "//src/lib/fidl/rust/fidl",
+             "//third_party/rust_crates:tracing",
            ]
 
     sources = protocol_sources

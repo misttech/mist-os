@@ -28,7 +28,8 @@ void Usage(char* name) {
 }
 
 int main(int argc, char** argv) {
-  fuchsia_logging::SetTags({"inspect_cpp_codelab", "client"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"inspect_cpp_codelab", "client"}).BuildAndInitialize();
 
   // If no url is specified, print the usage information and exit.
   if (argc < 2) {

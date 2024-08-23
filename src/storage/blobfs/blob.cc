@@ -4,32 +4,52 @@
 
 #include "src/storage/blobfs/blob.h"
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <fidl/fuchsia.io/cpp/natural_types.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
-#include <lib/sync/completion.h>
+#include <lib/fdio/vfs.h>
 #include <lib/syslog/cpp/macros.h>
+#include <lib/zx/event.h>
+#include <lib/zx/resource.h>
 #include <lib/zx/result.h>
+#include <lib/zx/vmo.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
+#include <zircon/rights.h>
 #include <zircon/status.h>
+#include <zircon/syscalls/object.h>
+#include <zircon/types.h>
 
-#include <algorithm>
-#include <iterator>
+#include <cstddef>
+#include <cstdint>
 #include <memory>
+#include <mutex>
+#include <optional>
 #include <utility>
 
+#include <fbl/ref_ptr.h>
+
+#include "src/storage/blobfs/blob_cache.h"
 #include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/blob_verifier.h"
 #include "src/storage/blobfs/blob_writer.h"
 #include "src/storage/blobfs/blobfs.h"
+#include "src/storage/blobfs/cache_node.h"
+#include "src/storage/blobfs/cache_policy.h"
 #include "src/storage/blobfs/common.h"
 #include "src/storage/blobfs/format.h"
-#include "src/storage/blobfs/format_assertions.h"
+#include "src/storage/blobfs/loader_info.h"
+#include "src/storage/blobfs/page_loader.h"
 #include "src/storage/blobfs/transaction.h"
 #include "src/storage/lib/trace/trace.h"
+#include "src/storage/lib/vfs/cpp/paged_vfs.h"
+#include "src/storage/lib/vfs/cpp/shared_mutex.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
+#include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace blobfs {
 
-zx::result<> VerifyNullBlob(Blobfs& blobfs, const digest::Digest& digest) {
+zx::result<> VerifyNullBlob(Blobfs& blobfs, const Digest& digest) {
   zx::result verifier = BlobVerifier::CreateWithoutTree(digest, blobfs.GetMetrics(), 0);
   if (verifier.is_error()) {
     return verifier.take_error();
@@ -47,13 +67,13 @@ uint64_t Blob::FileSize() const {
   return 0;
 }
 
-Blob::Blob(Blobfs& blobfs, const digest::Digest& digest, bool is_delivery_blob)
+Blob::Blob(Blobfs& blobfs, const Digest& digest, bool is_delivery_blob)
     : CacheNode(*blobfs.vfs(), digest), blobfs_(blobfs) {
   writer_ = std::make_unique<Blob::Writer>(*this, is_delivery_blob);
 }
 
 Blob::Blob(Blobfs& blobfs, uint32_t node_index, const Inode& inode)
-    : CacheNode(*blobfs.vfs(), digest::Digest(inode.merkle_root_hash)),
+    : CacheNode(*blobfs.vfs(), Digest(inode.merkle_root_hash)),
       blobfs_(blobfs),
       state_(BlobState::kReadable),
       syncing_state_(SyncingState::kDone),
@@ -226,11 +246,6 @@ zx_status_t Blob::LoadPagedVmosFromDisk() {
 }
 
 zx_status_t Blob::LoadVmosFromDisk() {
-  // We expect the file to be open in FIDL for this to be called. Whether the paged vmo is
-  // registered with the pager is dependent on the HasReferences() flag so this should not get
-  // out-of-sync.
-  ZX_DEBUG_ASSERT(HasReferences());
-
   if (IsDataLoaded())
     return ZX_OK;
 
@@ -494,10 +509,6 @@ zx_status_t Blob::Truncate(size_t len) {
   });
 }
 
-zx::result<std::string> Blob::GetDevicePath() const {
-  return blobfs_.Device()->GetTopologicalPath();
-}
-
 zx_status_t Blob::GetVmo(fuchsia_io::wire::VmoFlags flags, zx::vmo* out_vmo) {
   static_assert(sizeof flags == sizeof(uint32_t),
                 "Underlying type of |flags| has changed, update conversion below.");
@@ -743,6 +754,38 @@ zx_status_t Blob::OnWriteError(zx::error_result error) {
   }
   // Return the now latched write error.
   return writer_->status().error_value();
+}
+
+zx::result<zx::vmo> Blob::GetVmoForBlobReader() {
+  std::lock_guard lock(mutex_);
+  if (state_ != BlobState::kReadable) {
+    return zx::error(ZX_ERR_NOT_FOUND);
+  }
+  if (zx_status_t status = LoadVmosFromDisk(); status != ZX_OK) {
+    return zx::error(status);
+  }
+
+  zx::vmo child_vmo;
+  if (zx_status_t status =
+          paged_vmo().create_child(ZX_VMO_CHILD_SNAPSHOT_AT_LEAST_ON_WRITE | ZX_VMO_CHILD_NO_WRITE,
+                                   0, blob_size_, &child_vmo);
+      status != ZX_OK) {
+    return zx::error(status);
+  }
+  DidClonePagedVmo();
+
+  if (zx_status_t status = child_vmo.replace(
+          ZX_RIGHTS_BASIC | ZX_RIGHT_MAP | ZX_RIGHT_GET_PROPERTY | ZX_RIGHT_READ, &child_vmo);
+      status != ZX_OK) {
+    return zx::error(status);
+  }
+
+  return zx::ok(std::move(child_vmo));
+}
+
+bool Blob::IsReadable() {
+  std::lock_guard lock(mutex_);
+  return state_ == BlobState::kReadable;
 }
 
 }  // namespace blobfs

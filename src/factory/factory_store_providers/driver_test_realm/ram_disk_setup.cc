@@ -40,7 +40,8 @@ zx::result<storage::RamDisk> MakeRamdisk() {
 }
 
 int main() {
-  fuchsia_logging::SetTags({"factory_driver_test_realm"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"factory_driver_test_realm"}).BuildAndInitialize();
 
   auto client_end = component::Connect<fuchsia_driver_test::Realm>();
   if (!client_end.is_ok()) {
@@ -61,11 +62,6 @@ int main() {
   if (wire_result->is_error()) {
     FX_LOG_KV(ERROR, "Realm:Start failed", FX_KV("error", wire_result->error_value()));
     return 1;
-  }
-
-  zx::result channel = device_watcher::RecursiveWaitForFile("/dev/sys/platform/ram-disk/ramctl");
-  if (channel.is_error()) {
-    FX_LOG_KV(ERROR, "Failed to wait for ramctl", FX_KV("status", channel.status_value()));
   }
 
   auto result = MakeRamdisk();

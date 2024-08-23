@@ -226,7 +226,7 @@ mod tests {
                     create_proxy_and_stream::<InspectSinkMarker>().unwrap();
 
                 Arc::clone(&server).handle(Event {
-                    timestamp: zx::Time::get_monotonic(),
+                    timestamp: zx::MonotonicTime::get(),
                     payload: EventPayload::InspectSinkRequested(InspectSinkRequestedPayload {
                         component: Arc::clone(&id),
                         request_stream,

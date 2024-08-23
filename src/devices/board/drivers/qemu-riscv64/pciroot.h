@@ -4,7 +4,7 @@
 #ifndef SRC_DEVICES_BOARD_DRIVERS_QEMU_RISCV64_PCIROOT_H_
 #define SRC_DEVICES_BOARD_DRIVERS_QEMU_RISCV64_PCIROOT_H_
 
-#include <fuchsia/hardware/iommu/cpp/banjo.h>
+#include <fidl/fuchsia.hardware.platform.bus/cpp/driver/fidl.h>
 #include <fuchsia/hardware/pciroot/cpp/banjo.h>
 #include <lib/ddk/device.h>
 #include <lib/pci/pciroot.h>
@@ -44,17 +44,21 @@ class QemuRiscv64Pciroot : public QemuRiscv64PcirootType, public PcirootBase {
 
  private:
   QemuRiscv64Pciroot(PciRootHost* root_host, QemuRiscv64Pciroot::Context context,
-                     zx_device_t* parent, const char* name)
+                     zx_device_t* parent, const char* name,
+                     fdf::ClientEnd<fuchsia_hardware_platform_bus::Iommu> iommu)
       : QemuRiscv64PcirootType(parent),
         PcirootBase(root_host),
+
         context_(std::move(context)),
-        iommu_(parent) {}
+
+        iommu_(std::move(iommu)) {}
   zx::result<> CreateInterrupts();
 
+  async_dispatcher_t* dispatcher_ = fdf::Dispatcher::GetCurrent()->async_dispatcher();
   Context context_;
   std::vector<pci_legacy_irq_t> interrupts_;
   std::vector<pci_irq_routing_entry_t> irq_routing_entries_;
-  ddk::IommuProtocolClient iommu_;
+  fdf::ClientEnd<fuchsia_hardware_platform_bus::Iommu> iommu_;
 };
 
 }  // namespace board_qemu_riscv64

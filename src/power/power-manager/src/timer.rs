@@ -10,9 +10,9 @@ pub const DEADLINE_ID: DeadlineId<'static> =
 pub fn get_periodic_timer_stream(
     duration: fuchsia_zircon::Duration,
 ) -> std::pin::Pin<Box<impl futures::Stream<Item = ()>>> {
-    let next = fuchsia_zircon::Time::get_monotonic() + duration;
+    let next = fuchsia_zircon::MonotonicTime::get() + duration;
     let stream = futures::stream::unfold((next, duration), |(n, d)| async move {
-        NamedTimer::new(&DEADLINE_ID, n - fuchsia_zircon::Time::get_monotonic()).await;
+        NamedTimer::new(&DEADLINE_ID, n - fuchsia_zircon::MonotonicTime::get()).await;
         Some(((), (n + d, d)))
     });
     Box::pin(stream)

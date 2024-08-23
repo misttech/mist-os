@@ -6,6 +6,7 @@
 
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <lib/driver/compat/cpp/banjo_client.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
@@ -24,7 +25,6 @@
 #include "src/graphics/display/lib/api-types-cpp/image-buffer-usage.h"
 #include "src/graphics/display/lib/api-types-cpp/image-id.h"
 #include "src/graphics/display/lib/api-types-cpp/image-metadata.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 
 namespace display {
 
@@ -37,23 +37,23 @@ zx::result<std::unique_ptr<EngineDriverClient>> CreateFidlEngineDriverClient(
   zx::result<fdf::ClientEnd<fuchsia_hardware_display_engine::Engine>> connect_engine_client_result =
       incoming.Connect<fuchsia_hardware_display_engine::Service::Engine>();
   if (connect_engine_client_result.is_error()) {
-    zxlogf(WARNING, "Failed to connect to display engine FIDL client: %s",
-           connect_engine_client_result.status_string());
+    FDF_LOG(WARNING, "Failed to connect to display engine FIDL client: %s",
+            connect_engine_client_result.status_string());
     return connect_engine_client_result.take_error();
   }
   fdf::ClientEnd<fuchsia_hardware_display_engine::Engine> engine_client =
       std::move(connect_engine_client_result).value();
 
   if (!engine_client.is_valid()) {
-    zxlogf(WARNING, "Display engine FIDL device is invalid");
+    FDF_LOG(WARNING, "Display engine FIDL device is invalid");
     return zx::error(ZX_ERR_BAD_HANDLE);
   }
 
   fdf::Arena arena(kArenaTag);
   fdf::WireUnownedResult result = fdf::WireCall(engine_client).buffer(arena)->IsAvailable();
   if (!result.ok()) {
-    zxlogf(WARNING, "Display engine FIDL device is not available: %s",
-           result.FormatDescription().c_str());
+    FDF_LOG(WARNING, "Display engine FIDL device is not available: %s",
+            result.FormatDescription().c_str());
     return zx::error(result.status());
   }
 
@@ -61,7 +61,7 @@ zx::result<std::unique_ptr<EngineDriverClient>> CreateFidlEngineDriverClient(
   auto engine_driver_client =
       fbl::make_unique_checked<EngineDriverClient>(&alloc_checker, std::move(engine_client));
   if (!alloc_checker.check()) {
-    zxlogf(WARNING, "Failed to allocate memory for EngineDriverClient");
+    FDF_LOG(WARNING, "Failed to allocate memory for EngineDriverClient");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -72,12 +72,12 @@ zx::result<std::unique_ptr<EngineDriverClient>> CreateBanjoEngineDriverClient(
     std::shared_ptr<fdf::Namespace> incoming) {
   zx::result dc_result = compat::ConnectBanjo<ddk::DisplayEngineProtocolClient>(incoming);
   if (dc_result.is_error()) {
-    zxlogf(WARNING, "Failed to connect to Banjo server via the compat client: %s",
-           dc_result.status_string());
+    FDF_LOG(WARNING, "Failed to connect to Banjo server via the compat client: %s",
+            dc_result.status_string());
   }
   ddk::DisplayEngineProtocolClient dc = std::move(dc_result).value();
   if (!dc.is_valid()) {
-    zxlogf(WARNING, "Failed to get Banjo display controller protocol");
+    FDF_LOG(WARNING, "Failed to get Banjo display controller protocol");
     return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
@@ -85,7 +85,7 @@ zx::result<std::unique_ptr<EngineDriverClient>> CreateBanjoEngineDriverClient(
   auto engine_driver_client =
       fbl::make_unique_checked<EngineDriverClient>(&alloc_checker, std::move(dc));
   if (!alloc_checker.check()) {
-    zxlogf(WARNING, "Failed to allocate memory for EngineDriverClient");
+    FDF_LOG(WARNING, "Failed to allocate memory for EngineDriverClient");
     return zx::error(ZX_ERR_NO_MEMORY);
   }
 
@@ -103,18 +103,18 @@ zx::result<std::unique_ptr<EngineDriverClient>> EngineDriverClient::Create(
   zx::result<std::unique_ptr<EngineDriverClient>> fidl_engine_driver_client_result =
       CreateFidlEngineDriverClient(*incoming);
   if (fidl_engine_driver_client_result.is_ok()) {
-    zxlogf(INFO, "Using the FIDL Engine driver client");
+    FDF_LOG(INFO, "Using the FIDL Engine driver client");
     return fidl_engine_driver_client_result.take_value();
   }
-  zxlogf(WARNING, "Failed to create FIDL Engine driver client: %s; fallback to banjo",
-         fidl_engine_driver_client_result.status_string());
+  FDF_LOG(WARNING, "Failed to create FIDL Engine driver client: %s; fallback to banjo",
+          fidl_engine_driver_client_result.status_string());
 
   // Fallback to Banjo protocol.
   zx::result<std::unique_ptr<EngineDriverClient>> banjo_engine_driver_client_result =
       CreateBanjoEngineDriverClient(incoming);
   if (banjo_engine_driver_client_result.is_error()) {
-    zxlogf(ERROR, "Failed to create banjo Engine driver client: %s",
-           banjo_engine_driver_client_result.status_string());
+    FDF_LOG(ERROR, "Failed to create banjo Engine driver client: %s",
+            banjo_engine_driver_client_result.status_string());
   }
   return banjo_engine_driver_client_result;
 }
@@ -131,7 +131,7 @@ EngineDriverClient::EngineDriverClient(
 }
 
 EngineDriverClient::~EngineDriverClient() {
-  zxlogf(TRACE, "EngineDriverClient::~EngineDriverClient");
+  FDF_LOG(TRACE, "EngineDriverClient::~EngineDriverClient");
 }
 
 void EngineDriverClient::ReleaseImage(DriverImageId driver_image_id) {
@@ -140,7 +140,7 @@ void EngineDriverClient::ReleaseImage(DriverImageId driver_image_id) {
     fdf::WireUnownedResult result =
         fidl_engine_.buffer(arena)->ReleaseImage(ToFidlDriverImageId(driver_image_id));
     if (!result.ok()) {
-      zxlogf(ERROR, "ReleaseImage failed: %s", result.status_string());
+      FDF_LOG(ERROR, "ReleaseImage failed: %s", result.status_string());
     }
     return;
   }

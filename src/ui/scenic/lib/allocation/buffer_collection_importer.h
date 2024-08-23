@@ -5,8 +5,8 @@
 #ifndef SRC_UI_SCENIC_LIB_ALLOCATION_BUFFER_COLLECTION_IMPORTER_H_
 #define SRC_UI_SCENIC_LIB_ALLOCATION_BUFFER_COLLECTION_IMPORTER_H_
 
+#include <fidl/fuchsia.ui.composition/cpp/fidl.h>
 #include <fuchsia/sysmem/cpp/fidl.h>
-#include <fuchsia/ui/composition/cpp/fidl.h>
 
 #include "src/ui/scenic/lib/allocation/id.h"
 
@@ -47,10 +47,10 @@ struct ImageMetadata {
   std::array<float, 4> multiply_color = {1.f, 1.f, 1.f, 1.f};
 
   // The blend mode to use when compositing this image.
-  fuchsia::ui::composition::BlendMode blend_mode = fuchsia::ui::composition::BlendMode::SRC;
+  fuchsia_ui_composition::BlendMode blend_mode = fuchsia_ui_composition::BlendMode::kSrc;
 
   // The flip/reflection mode to use for this particular image.
-  fuchsia::ui::composition::ImageFlip flip = fuchsia::ui::composition::ImageFlip::NONE;
+  fuchsia_ui_composition::ImageFlip flip = fuchsia_ui_composition::ImageFlip::kNone;
 
   bool operator==(const ImageMetadata& meta) const {
     return (collection_id == meta.collection_id && vmo_index == meta.vmo_index &&
@@ -60,12 +60,12 @@ struct ImageMetadata {
 };
 
 inline std::ostream& operator<<(std::ostream& out,
-                                const fuchsia::ui::composition::BlendMode& blend_mode) {
+                                const fuchsia_ui_composition::BlendMode& blend_mode) {
   switch (blend_mode) {
-    case fuchsia::ui::composition::BlendMode::SRC:
+    case fuchsia_ui_composition::BlendMode::kSrc:
       out << "SRC";
       break;
-    case fuchsia::ui::composition::BlendMode::SRC_OVER:
+    case fuchsia_ui_composition::BlendMode::kSrcOver:
       out << "SRC_OVER";
       break;
   }

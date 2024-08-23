@@ -49,6 +49,8 @@ pub enum BootfsDestination {
     PowerManagerNodeConfig,
     /// The power manager thermal config.
     PowerManagerThermalConfig,
+    /// The power manager system power mode config.
+    SystemPowerModeConfig,
     /// SSH keys for development access.
     SshAuthorizedKeys,
     /// Thread roles configuration file.
@@ -75,6 +77,7 @@ impl std::fmt::Display for BootfsDestination {
                 Self::CpuManagerNodeConfig => "config/cpu_manager/node_config.json",
                 Self::PowerManagerNodeConfig => "config/power_manager/node_config.json",
                 Self::PowerManagerThermalConfig => "config/power_manager/thermal_config.json",
+                Self::SystemPowerModeConfig => "config/power_manager/system_power_mode_config.json",
                 Self::SshAuthorizedKeys => "data/ssh/authorized_keys",
                 Self::ThreadRoles(s) => return write!(f, "config/profiles/{}", s),
                 Self::Zxcrypt => "config/zxcrypt",
@@ -142,6 +145,8 @@ pub enum BootfsPackageDestination {
     ArchivistPipelines,
     /// The component config package.
     Config,
+    /// Sysmem configuration.
+    SysmemConfig,
     /// Variant specifically for making tests easier.
     ForTest,
     /// Any package that came from an AIB.
@@ -162,6 +167,7 @@ impl std::fmt::Display for BootfsPackageDestination {
                     return write!(f, "{}", s),
                 Self::ArchivistPipelines => "archivist-pipelines",
                 Self::Config => "config",
+                Self::SysmemConfig => "sysmem-config",
                 Self::ForTest => "for-test",
             }
         )

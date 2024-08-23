@@ -132,4 +132,15 @@ closed protocol Connection {
         /// the same CIG/CIS parameters.
         3: connection_stream server_end:IsochronousStream;
     });
+
+    /// Connect to an L2CAP LE connection-oriented channel.
+    @available(added=HEAD)
+    strict ConnectL2cap(resource table {
+        /// Parameters for the local side of the channel.
+        1: parameters bt.ChannelParameters;
+        /// The channel protocol to open.
+        2: channel server_end:bt.Channel;
+        /// The PSM of the remote side to connect to.
+        3: psm Psm;
+    });
 };

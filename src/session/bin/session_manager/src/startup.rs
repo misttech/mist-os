@@ -120,9 +120,9 @@ pub async fn launch_session(
 ) -> Result<fcomponent::ExecutionControllerProxy, StartupError> {
     info!(session_url, "Launching session");
 
-    let start_time = zx::Time::get_monotonic();
+    let start_time = zx::MonotonicTime::get();
     let controller = set_session(session_url, config_capabilities, realm, exposed_dir).await?;
-    let end_time = zx::Time::get_monotonic();
+    let end_time = zx::MonotonicTime::get();
 
     fasync::Task::local(async move {
         if let Ok(cobalt_logger) = cobalt::get_logger() {

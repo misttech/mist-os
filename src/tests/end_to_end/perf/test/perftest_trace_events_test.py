@@ -66,3 +66,7 @@ class PerfTestTraceEventsTest(fuchsia_base_test.FuchsiaBaseTest):
                 "test_teardown",
             ],
         )
+
+
+if __name__ == "__main__":
+    test_runner.main()

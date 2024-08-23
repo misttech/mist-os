@@ -4,6 +4,7 @@
 library fuchsia.sysmem2;
 
 /// Describes how a client will access the contents of a buffer.
+// LINT.IfChange
 @available(added=19)
 type BufferUsage = table {
     /// If the client sets this field, the client should not set any other
@@ -25,6 +26,7 @@ type BufferUsage = table {
     /// If set, holds video usage bits. See `VIDEO_USAGE_*` bits in usages.fidl.
     5: video uint32;
 };
+// LINT.ThenChange(//src/lib/assembly/config_schema/src/platform_config/sysmem_config.rs)
 
 // Flag for "none" usage.
 //

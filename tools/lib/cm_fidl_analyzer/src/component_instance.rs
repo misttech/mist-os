@@ -63,10 +63,14 @@ impl ComponentInstanceForAnalyzer {
         id_index: Arc<component_id_index::Index>,
         runner_registry: RunnerRegistry,
     ) -> Arc<Self> {
-        let environment =
-            EnvironmentForAnalyzer::new_root(runner_registry, &runtime_config, &top_instance);
+        let environment = EnvironmentForAnalyzer::new_root(
+            runner_registry.clone(),
+            &runtime_config,
+            &top_instance,
+        );
         let moniker = Moniker::root();
-        let root_component_input = build_root_component_input(&runtime_config, &policy);
+        let root_component_input =
+            build_root_component_input(&runtime_config, &policy, runner_registry);
         let parent = WeakExtendedInstanceInterface::from(&ExtendedInstanceInterface::AboveRoot(
             top_instance,
         ));

@@ -44,6 +44,7 @@ rustc_library("config_schema") {
     "//third_party/rust_crates:schemars",
     "//third_party/rust_crates:serde",
     "//third_party/rust_crates:serde_json",
+    "//third_party/rust_crates:uuid",
   ]
 
   test_deps = [ "//third_party/rust_crates:serde_json5" ]

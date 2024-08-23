@@ -4,9 +4,11 @@
 
 use anyhow::{anyhow, Error};
 use carnelian::{App, AppAssistantPtr};
-use fidl_fuchsia_boot::{ArgumentsMarker, ReadOnlyLogMarker};
+use fidl_fuchsia_boot::ReadOnlyLogMarker;
 use fuchsia_async::LocalExecutor;
 use fuchsia_component::client::connect_to_protocol;
+use std::convert::TryFrom;
+use virtcon_config::Config;
 use virtual_console_lib::{VirtualConsoleAppAssistant, VirtualConsoleArgs};
 
 fn main() -> Result<(), Error> {
@@ -15,18 +17,17 @@ fn main() -> Result<(), Error> {
     let init = async {
         // Redirect standard out to debuglog.
         stdout_to_debuglog::init().await?;
-
-        // Connect to boot arguments service.
-        let boot_args = connect_to_protocol::<ArgumentsMarker>()?;
-
-        // Get boot arguments.
-        VirtualConsoleArgs::new_with_proxy(boot_args).await
+        Ok::<(), Error>(())
     };
-
-    let args = {
+    {
         let mut executor = LocalExecutor::new();
-        executor.run_singlethreaded(init)?
-    };
+        executor.run_singlethreaded(init)?;
+    }
+
+    let config = Config::take_from_startup_handle();
+
+    // Parse config into args
+    let args = VirtualConsoleArgs::try_from(config)?;
 
     // Early out if virtcon should be disabled.
     if args.disable {

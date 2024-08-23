@@ -20,6 +20,7 @@ use crate::enums::{
     WriteRtcOutcome,
 };
 use fidl_fuchsia_time_external::Status;
+use fuchsia_runtime::UtcTime;
 use fuchsia_zircon as zx;
 
 /// A special `Duration` that will match any value during an `eq_with_any` operation.
@@ -28,7 +29,9 @@ pub const ANY_DURATION: zx::Duration = zx::Duration::from_nanos(i64::MIN);
 
 /// A special time that will match any value during an `eq_with_any` operation.
 #[cfg(test)]
-pub const ANY_TIME: zx::Time = zx::Time::from_nanos(i64::MIN);
+pub const fn any_time<T: zx::Timeline>() -> zx::Time<T> {
+    zx::Time::from_nanos(i64::MIN)
+}
 
 /// An event that is potentially worth recording in one or more diagnostics systems.
 #[derive(Clone, Debug, PartialEq)]
@@ -36,7 +39,7 @@ pub enum Event {
     /// Timekeeper has completed initialization.
     Initialized { clock_state: InitialClockState },
     /// An attempt was made to initialize and read from the real time clock.
-    InitializeRtc { outcome: InitializeRtcOutcome, time: Option<zx::Time> },
+    InitializeRtc { outcome: InitializeRtcOutcome, time: Option<UtcTime> },
     /// A time source failed, relaunch will be attempted.
     TimeSourceFailed { role: Role, error: TimeSourceError },
     /// A time source changed its state.
@@ -48,9 +51,9 @@ pub enum Event {
         /// The `Track` of the estimate.
         track: Track,
         /// The monotonic time at which the state applies.
-        monotonic: zx::Time,
+        monotonic: zx::MonotonicTime,
         /// The estimated UTC corresponding to monotonic.
-        utc: zx::Time,
+        utc: UtcTime,
         /// Square root of element [0,0] of the covariance matrix.
         sqrt_covariance: zx::Duration,
     },
@@ -61,7 +64,7 @@ pub enum Event {
         /// The `Track` of the estimate.
         track: Track,
         /// The monotonic time at which the state applies.
-        monotonic: zx::Time,
+        monotonic: zx::MonotonicTime,
         /// The estimated frequency as a PPM deviation from nominal. A positive number means UTC is
         /// running faster than monotonic, i.e. the oscillator is slow.
         rate_adjust_ppm: i32,

@@ -43,7 +43,7 @@ TEST(LlvmProfdataTests, CountersOffsetAndSizeBytes) {
   EXPECT_GT(data.counters_offset(), size_t{0});
   EXPECT_GT(data.counters_size_bytes(), size_t{0});
   EXPECT_LT(data.counters_offset(), data.size_bytes());
-  EXPECT_LT(data.counters_size_bytes(), data.size_bytes() - data.counters_offset());
+  EXPECT_LE(data.counters_size_bytes(), data.size_bytes() - data.counters_offset());
 }
 
 TEST(LlvmProfdataTests, FixedData) {

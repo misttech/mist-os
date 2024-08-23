@@ -21,7 +21,8 @@ void SetSyslogTag(fxl::CommandLine cmdline) {
     if (last_separator_index < tag.npos) {
       tag = tag.substr(last_separator_index + 1);
     }
-    fuchsia_logging::SetTags({tag});
+    fuchsia_logging::LogSettingsBuilder builder;
+    builder.WithTags({tag}).BuildAndInitialize();
   }
 }
 

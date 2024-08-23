@@ -55,7 +55,10 @@ class WlanFullmacImplIfcBridgeServer
     bridge_client_->ConnectConf(request).Then(
         ForwardResult<WlanFullmacImplIfc::ConnectConf>(completer.ToAsync()));
   }
-  void RoamConf(RoamConfRequest& request, RoamConfCompleter::Sync& completer) override {}
+  void RoamStartInd(RoamStartIndRequest& request, RoamStartIndCompleter::Sync& completer) override {
+  }
+  void RoamResultInd(RoamResultIndRequest& request,
+                     RoamResultIndCompleter::Sync& completer) override {}
   void AuthInd(AuthIndRequest& request, AuthIndCompleter::Sync& completer) override {
     WLAN_TRACE_DURATION();
     bridge_client_->AuthInd(request).Then(

@@ -118,7 +118,7 @@ TEST_F(LoggerIntegrationTest, ListenFiltered) {
       fuchsia_logging::LOG_ERROR,      // 0x50
   };
   fuchsia_logging::LogSettingsBuilder builder;
-  builder.WithMinLogSeverity(0).BuildAndInitializeWithTags({tag});
+  builder.WithMinLogSeverity(0).WithTags({tag}).BuildAndInitialize();
 
   for (auto severity : severities_in_use) {
     // Manual expansion of FX_LOGS to support custom severity levels

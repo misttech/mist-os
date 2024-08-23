@@ -159,7 +159,7 @@ impl<H: AsHandleRef + Unpin> Future for OnSignals<'_, H> {
     type Output = Result<zx::Signals, zx::Status>;
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         match &self.registration {
-            None => match self.handle.wait_handle(self.signals, zx::Time::INFINITE_PAST) {
+            None => match self.handle.wait_handle(self.signals, zx::MonotonicTime::INFINITE_PAST) {
                 Ok(signals) => Poll::Ready(Ok(signals)),
                 Err(zx::Status::TIMED_OUT) => {
                     let registration = self.register(Some(cx))?;
@@ -180,7 +180,7 @@ impl<H: AsHandleRef + Unpin> Future for OnSignals<'_, H> {
                     // incur a small performance penalty in the case that this future has been
                     // polled when no notification was actually received (such as can be the case
                     // with some futures combinators).
-                    match self.handle.wait_handle(self.signals, zx::Time::INFINITE_PAST) {
+                    match self.handle.wait_handle(self.signals, zx::MonotonicTime::INFINITE_PAST) {
                         Ok(signals) => Poll::Ready(Ok(signals)),
                         Err(_) => Poll::Pending,
                     }

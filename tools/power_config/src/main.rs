@@ -85,8 +85,6 @@ impl From<SagElement> for fidl_power::SagElement {
 #[derive(Deserialize, Debug)]
 #[serde(deny_unknown_fields)]
 enum ParentElement {
-    #[serde(alias = "name")]
-    Name(String),
     #[serde(alias = "sag")]
     Sag(SagElement),
     #[serde(alias = "instance_name")]
@@ -96,7 +94,6 @@ enum ParentElement {
 impl From<ParentElement> for fidl_power::ParentElement {
     fn from(value: ParentElement) -> Self {
         match value {
-            ParentElement::Name(s) => fidl_power::ParentElement::Name(s),
             ParentElement::InstanceName(s) => fidl_power::ParentElement::InstanceName(s),
             ParentElement::Sag(s) => fidl_power::ParentElement::Sag(s.into()),
         }

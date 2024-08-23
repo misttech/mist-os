@@ -67,6 +67,7 @@ zx::result<fs::VnodeAttributes> VnodeDir::GetAttributes() const {
       .mode = mode_,
       .uid = uid_,
       .gid = gid_,
+      .rdev = rdev_,
   });
 }
 

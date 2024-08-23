@@ -70,8 +70,8 @@ compile_commands: ## Generate ninja (with compile_commands.json to be imported b
 	$(NOECHO)$(NINJA) -C $(OUTPUT) kernel_x64/kernel.zbi -t compdb > compile_commands.json
 .PHONY: compile_commands
 
-it: gen info ## Build multiboot(bootloader) and kernel zircon binary image(zbi)
-	$(NOECHO)$(NINJA) -C $(OUTPUT) multiboot.bin kernel_x64/kernel.zbi
+it: gen info ## Build linux-x86-boot-shim(bootloader) and kernel zircon binary image(zbi)
+	$(NOECHO)$(NINJA) -C $(OUTPUT) kernel.phys32/linux-x86-boot-shim.bin kernel_x64/kernel.zbi
 .PHONY: it
 
 all: gen info ## Build all targets
@@ -80,15 +80,15 @@ all: gen info ## Build all targets
 
 rain: ## Run qemu with precompiled images (do not rebuild)
 	$(NOECHO) $(MISTOSROOT)/zircon/scripts/run-zircon-x64 -q $(MISTOSROOT)/prebuilt/third_party/qemu/$(HOST_OS)-$(HOST_ARCH)/bin \
-	-t $(OUTPUT)/multiboot.bin \
+	-t $(OUTPUT)/kernel.phys32/linux-x86-boot-shim.bin \
 	-z $(OUTPUT)/kernel_x64/kernel.zbi -c "kernel.shell=true" -- -no-reboot
 .PHONY: rain
 
 test: host_test gen info ## Run test kernel-unittests-boot-test.zbi
-	$(NOECHO)$(NINJA) -C $(OUTPUT) multiboot.bin kernel_x64/kernel.zbi kernel-unittests-boot-test
+	$(NOECHO)$(NINJA) -C $(OUTPUT) kernel.phys32/linux-x86-boot-shim.bin kernel_x64/kernel.zbi kernel-unittests-boot-test
 	$(NOECHO)$(MISTOSROOT)/zircon/scripts/run-zircon-x64 -q $(MISTOSROOT)/prebuilt/third_party/qemu/$(HOST_OS)-$(HOST_ARCH)/bin \
 	-s 1 \
-	-t $(OUTPUT)/multiboot.bin \
+	-t $(OUTPUT)/kernel.phys32/linux-x86-boot-shim.bin \
 	-z $(OUTPUT)/obj/zircon/kernel/kernel-unittests-boot-test.zbi \
 	-- -no-reboot || ([ $$? -eq 31 ] && echo "Success!")
 .PHONY: test

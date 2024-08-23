@@ -16,19 +16,10 @@
 #include <fbl/algorithm.h>
 #include <kernel/event.h>
 #include <ktl/iterator.h>
-#include <vm/loan_sweeper.h>
 #include <vm/physical_page_borrowing_config.h>
 #include <vm/pmm.h>
 
 #include <ktl/enforce.h>
-
-namespace {
-
-// Singleton
-static LoanSweeper loan_sweeper;
-bool loan_sweeper_init_called = false;
-
-}  // namespace
 
 static int cmd_ppb(int argc, const cmd_args* argv, uint32_t flags);
 
@@ -60,16 +51,6 @@ static void cmd_ppb_loaning_on() {
 static void cmd_ppb_loaning_off() {
   pmm_physical_page_borrowing_config()->set_loaning_enabled(false);
   printf("loaning disabled\n");
-}
-
-static void cmd_ppb_sweep() {
-  if (!loan_sweeper_init_called) {
-    loan_sweeper_init_called = true;
-    loan_sweeper.Init();
-  }
-  uint64_t freed_page_count = loan_sweeper.ForceSynchronousSweep();
-  printf("freed_page_count: %" PRIu64 " freed MiB: %" PRIu64 "\n", freed_page_count,
-         freed_page_count * PAGE_SIZE / MB);
 }
 
 static void cmd_ppb_stats() { pmm_print_physical_page_borrowing_stats(); }
@@ -120,7 +101,6 @@ static Cmd commands[] = {
     {"borrowing_off", cmd_ppb_borrowing_off},
     {"loaning_on", cmd_ppb_loaning_on},
     {"loaning_off", cmd_ppb_loaning_off},
-    {"sweep", cmd_ppb_sweep},
     {"stats", cmd_ppb_stats},
     {"stats_on", cmd_ppb_stats_on},
     {"stats_off", cmd_ppb_stats_off},
@@ -128,19 +108,15 @@ static Cmd commands[] = {
 
 // k ppb borrowing_on
 //   * this is the default on boot
-//   * enables page borrowing for new allocations (does not sweep)
+//   * enables page borrowing for new allocations
 //   * see also k ppb borrowing_off
 // k ppb borrowing_off
-//   * disables page borrowing for new allocations (does not sweep)
+//   * disables page borrowing for new allocations
 //   * see also k ppb borrowing_on
 // k ppb loaning_on
 //   * enables loaning when a contiguous VMO pages are decommitted
 // k ppb loaning_off
 //   * disables loaning when a contiguous VMO pages are decommitted
-// k ppb sweep
-//   * If ppb is on, borrows as many pages as possible in a single sweep
-//   * If ppb is off, un-borrows all borrowed pages (may cause OOM, depending)
-//   * The sweep also respects non_pager_on / non_pager_off, etc
 // k ppb stats
 //   * output ppb-related stats (once)
 // k ppb stats_on

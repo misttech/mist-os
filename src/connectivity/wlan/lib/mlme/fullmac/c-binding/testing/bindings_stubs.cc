@@ -10,7 +10,8 @@ namespace bindings_stubs {
 
 namespace {
 StartFullmacType DefaultStartFullmacStub =
-    [](rust_fullmac_device_interface_t raw_device) -> wlan_fullmac_mlme_handle_t * {
+    [](rust_fullmac_device_ffi_t raw_device,
+       zx_handle_t fullmac_client_end_handle) -> wlan_fullmac_mlme_handle_t * {
   static wlan_fullmac_mlme_handle_t handle;
   return &handle;
 };
@@ -32,11 +33,11 @@ FullmacMlmeBindingsStubs::~FullmacMlmeBindingsStubs() {
 
 }  // namespace bindings_stubs
 
-extern "C" wlan_fullmac_mlme_handle_t *start_fullmac_mlme(
-    rust_fullmac_device_interface_t raw_device) {
-  return bindings_stubs::FullmacMlmeBindingsStubs::start_fullmac_mlme_stub(raw_device);
+extern "C" wlan_fullmac_mlme_handle_t *start_fullmac_mlme(rust_fullmac_device_ffi_t raw_device,
+                                                          zx_handle_t fullmac_client_end_handle) {
+  return bindings_stubs::FullmacMlmeBindingsStubs::start_fullmac_mlme_stub(
+      raw_device, fullmac_client_end_handle);
 }
-
 extern "C" void stop_fullmac_mlme(wlan_fullmac_mlme_handle_t *mlme) {
   bindings_stubs::FullmacMlmeBindingsStubs::stop_fullmac_mlme_stub(mlme);
 }

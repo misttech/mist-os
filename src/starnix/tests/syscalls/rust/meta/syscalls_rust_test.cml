@@ -9,5 +9,12 @@
     program: {
         binary: "data/tests/syscalls_rust_test_bin",
         uid: "0",
+        environ: [ "MUTABLE_STORAGE={component_path}/data" ],
     },
+    use: [
+        {
+            storage: "data",
+            path: "/data",
+        },
+    ],
 }

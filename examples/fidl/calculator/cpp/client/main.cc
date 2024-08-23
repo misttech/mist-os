@@ -166,7 +166,8 @@ class CalculatorClient {
 };
 
 int main(int argc, const char** argv) {
-  fuchsia_logging::SetTags({"calculator_client"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"calculator_client"}).BuildAndInitialize();
 
   // Note the path starts with /pkg/ even though the build rule
   // `resource("input")` uses `data/input.txt`. At runtime, components are

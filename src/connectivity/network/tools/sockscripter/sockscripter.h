@@ -49,6 +49,10 @@ class SockScripter {
   bool CloseListener(char* arg);
   bool SetBroadcast(char* arg);
   bool LogBroadcast(char* arg);
+  bool SetRecvtclass(char* arg);
+  bool LogRecvtclass(char* arg);
+  bool SetRecvtos(char* arg);
+  bool LogRecvtos(char* arg);
   bool SetReuseaddr(char* arg);
   bool LogReuseaddr(char* arg);
   bool SetReuseport(char* arg);
@@ -110,6 +114,7 @@ class SockScripter {
   int RecvInternal(bool ping);
   bool Recv(char* arg);
   bool RecvPing(char* arg);
+  bool Recvmsg(char* arg);
   bool SetSendBufHex(char* arg);
   bool SetSendBufText(char* arg);
   bool Sleep(char* arg);

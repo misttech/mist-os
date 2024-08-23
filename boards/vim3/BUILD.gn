@@ -10,14 +10,18 @@ assert(current_toolchain == default_toolchain,
 assert(current_cpu == "arm64",
        "The vim3 board can only be defined in an arm64 toolchain.")
 
-board_configuration("vim3") {
+common_board_configuration = {
+  name = "vim3"
+
   provided_features = [
     "fuchsia::bt_transport_uart",
     "fuchsia::bus_pci",
-    "fuchsia::driver_framework_v2_support",
     "fuchsia::fan",
     "fuchsia::mali_gpu",
+    "fuchsia::paver",
     "fuchsia::pmm_checker",
+    "fuchsia::real_time_clock",
+    "fuchsia::realtek_8211f",
     "fuchsia::usb_peripheral_support",
     "fuchsia::wlan_fullmac",
   ]
@@ -25,6 +29,7 @@ board_configuration("vim3") {
   input_bundles = [
     ":devicetree_board_driver",
     ":main_bundle",
+    ":paver",
     ":vulkan_arm_mali",
     ":rtc_driver",
   ]
@@ -35,9 +40,8 @@ board_configuration("vim3") {
     connectivity = {
       network = {
         # Prefer using the built-in NIC to the CDC-ether interface.
-        # TODO(https://fxbug.dev/42068759): Update topopath when dwmac is off
-        # netdevice migration.
-        netsvc_interface = "/dwmac-ff3f0000_group/dwmac/Designware-MAC/netdevice-migration/network-device"
+        netsvc_interface =
+            "/dwmac-ff3f0000_group/dwmac/Designware-MAC/network-device"
       }
     }
     development_support = {
@@ -106,6 +110,34 @@ board_configuration("vim3") {
   kernel = {
     contiguous_physical_pages = true
   }
+}
+
+board_configuration("vim3") {
+  forward_variables_from(common_board_configuration, "*")
+}
+
+board_configuration("reduced_perf_variation") {
+  forward_variables_from(common_board_configuration, "*")
+
+  input_bundles += [ ":reduced_perf_variation_args" ]
+
+  # Disable serial console printing during early boot, a phase during which
+  # UART communication is single-threaded and synchronous. In production,
+  # the serial console will be disabled, and so early boot benchmarks that
+  # include this work is sensibly avoided.
+  kernel.quiet_early_boot = true
+}
+
+board_input_bundle("reduced_perf_variation_args") {
+  kernel_cmdline = [
+    # Disable page scanning in all its forms. Page scanning is intended to
+    # provide a memory benefit to final systems, but the operation of the
+    # scanner and its unpredictable de-duplication or eviction of memory in use
+    # by benchmarks could cause noticeable variation.
+    "kernel.page-scanner.start-at-boot=false",
+    "kernel.page-scanner.zero-page-scans-per-second=0",
+    "kernel.page-scanner.enable-eviction=false",
+  ]
 }
 
 board_input_bundle("main_bundle") {
@@ -277,11 +309,6 @@ board_input_bundle("main_bundle") {
 
     # arm64 common drivers
     {
-      package_target = "//src/devices/bus/drivers/pci:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/bus-pci.cm" ]
-    },
-    {
       package_target = "//src/devices/usb/drivers/xhci:package"
       package_set = "bootfs"
       driver_components = [ "meta/xhci.cm" ]
@@ -314,6 +341,13 @@ board_input_bundle("devicetree_board_driver") {
   configuration = {
     power_manager = "//src/power/power-manager/node_config/vim3_devicetree_node_config.json5"
     thermal = "//src/power/power-manager/thermal_config/vim3_devicetree.json5"
+    sysmem_format_costs = [
+      # order is significant; please don't alphabetize; correct order is:
+      # * arm_mali
+      # * video_decoder_nv12
+      "//src/devices/sysmem/format_costs/arm_mali",
+      "//src/devices/sysmem/format_costs/video_decoder_nv12",
+    ]
   }
   drivers = [
     {
@@ -340,10 +374,15 @@ board_input_bundle("rtc_driver") {
   ]
 }
 
+board_input_bundle("paver") {
+  bootfs_packages = [ "//src/bringup/bin/paver:package-vim3" ]
+}
+
 # Note: This group contains bazel built drivers that are defined in individual bazel_actions.
 # Adding this to your build graph will greatly reduce your build speed.
 group("vim3-release") {
   deps = [
+    "//src/connectivity/ethernet/drivers/aml-ethernet:package-archive",
     "//src/connectivity/ethernet/drivers/dwmac:package-archive",
     "//src/connectivity/ethernet/drivers/realtek-8211f:package-archive",
     "//src/devices/adc/drivers/aml-saradc:package-archive",

@@ -6,6 +6,10 @@ ffx/package/archive/create.golden
 ffx/package/archive/extract.golden
 ffx/package/archive/list.golden
 ffx/package/archive/remove.golden
+ffx/package/blob.golden
+ffx/package/blob/compress.golden
+ffx/package/blob/decompress.golden
+ffx/package/blob/hash.golden
 ffx/package/build.golden
 ffx/package/far.golden
 ffx/package/far/cat.golden

@@ -1011,7 +1011,7 @@ impl UnknownInteractionsAjarProtocolSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::Time,
+        deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsAjarProtocolEvent, fidl::Error> {
         UnknownInteractionsAjarProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
@@ -1032,7 +1032,7 @@ impl UnknownInteractionsAjarProtocolSynchronousProxy {
         )
     }
 
-    pub fn r#strict_two_way(&self, ___deadline: zx::Time) -> Result<(), fidl::Error> {
+    pub fn r#strict_two_way(&self, ___deadline: zx::MonotonicTime) -> Result<(), fidl::Error> {
         let _response =
             self.client.send_query::<fidl::encoding::EmptyPayload, fidl::encoding::EmptyPayload>(
                 (),
@@ -1043,7 +1043,7 @@ impl UnknownInteractionsAjarProtocolSynchronousProxy {
         Ok(_response)
     }
 
-    pub fn r#strict_two_way_fields(&self, ___deadline: zx::Time) -> Result<i32, fidl::Error> {
+    pub fn r#strict_two_way_fields(&self, ___deadline: zx::MonotonicTime) -> Result<i32, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
             UnknownInteractionsAjarProtocolStrictTwoWayFieldsResponse,
@@ -1058,7 +1058,7 @@ impl UnknownInteractionsAjarProtocolSynchronousProxy {
 
     pub fn r#strict_two_way_union(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsAjarProtocolStrictTwoWayUnionResponse, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
@@ -1074,7 +1074,7 @@ impl UnknownInteractionsAjarProtocolSynchronousProxy {
 
     pub fn r#strict_two_way_table(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsAjarProtocolStrictTwoWayTableResponse, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
@@ -1090,7 +1090,7 @@ impl UnknownInteractionsAjarProtocolSynchronousProxy {
 
     pub fn r#strict_two_way_err(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsAjarProtocolStrictTwoWayErrResult, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
@@ -1106,7 +1106,7 @@ impl UnknownInteractionsAjarProtocolSynchronousProxy {
 
     pub fn r#strict_two_way_fields_err(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsAjarProtocolStrictTwoWayFieldsErrResult, fidl::Error> {
         let _response = self
             .client
@@ -1121,7 +1121,7 @@ impl UnknownInteractionsAjarProtocolSynchronousProxy {
 
     pub fn r#strict_two_way_union_err(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsAjarProtocolStrictTwoWayUnionErrResult, fidl::Error> {
         let _response = self
             .client
@@ -1136,7 +1136,7 @@ impl UnknownInteractionsAjarProtocolSynchronousProxy {
 
     pub fn r#strict_two_way_table_err(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsAjarProtocolStrictTwoWayTableErrResult, fidl::Error> {
         let _response = self
             .client
@@ -2833,7 +2833,7 @@ impl UnknownInteractionsClosedProtocolSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::Time,
+        deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsClosedProtocolEvent, fidl::Error> {
         UnknownInteractionsClosedProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
@@ -2846,7 +2846,7 @@ impl UnknownInteractionsClosedProtocolSynchronousProxy {
         )
     }
 
-    pub fn r#strict_two_way(&self, ___deadline: zx::Time) -> Result<(), fidl::Error> {
+    pub fn r#strict_two_way(&self, ___deadline: zx::MonotonicTime) -> Result<(), fidl::Error> {
         let _response =
             self.client.send_query::<fidl::encoding::EmptyPayload, fidl::encoding::EmptyPayload>(
                 (),
@@ -2857,7 +2857,7 @@ impl UnknownInteractionsClosedProtocolSynchronousProxy {
         Ok(_response)
     }
 
-    pub fn r#strict_two_way_fields(&self, ___deadline: zx::Time) -> Result<i32, fidl::Error> {
+    pub fn r#strict_two_way_fields(&self, ___deadline: zx::MonotonicTime) -> Result<i32, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
             UnknownInteractionsClosedProtocolStrictTwoWayFieldsResponse,
@@ -2872,7 +2872,7 @@ impl UnknownInteractionsClosedProtocolSynchronousProxy {
 
     pub fn r#strict_two_way_union(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsClosedProtocolStrictTwoWayUnionResponse, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
@@ -2888,7 +2888,7 @@ impl UnknownInteractionsClosedProtocolSynchronousProxy {
 
     pub fn r#strict_two_way_table(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsClosedProtocolStrictTwoWayTableResponse, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
@@ -2904,7 +2904,7 @@ impl UnknownInteractionsClosedProtocolSynchronousProxy {
 
     pub fn r#strict_two_way_err(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsClosedProtocolStrictTwoWayErrResult, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
@@ -2920,7 +2920,7 @@ impl UnknownInteractionsClosedProtocolSynchronousProxy {
 
     pub fn r#strict_two_way_fields_err(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsClosedProtocolStrictTwoWayFieldsErrResult, fidl::Error> {
         let _response = self
             .client
@@ -2935,7 +2935,7 @@ impl UnknownInteractionsClosedProtocolSynchronousProxy {
 
     pub fn r#strict_two_way_union_err(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsClosedProtocolStrictTwoWayUnionErrResult, fidl::Error> {
         let _response = self
             .client
@@ -2950,7 +2950,7 @@ impl UnknownInteractionsClosedProtocolSynchronousProxy {
 
     pub fn r#strict_two_way_table_err(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsClosedProtocolStrictTwoWayTableErrResult, fidl::Error> {
         let _response = self
             .client
@@ -4494,7 +4494,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
     /// threads to make concurrent requests while waiting for an event.
     pub fn wait_for_event(
         &self,
-        deadline: zx::Time,
+        deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsProtocolEvent, fidl::Error> {
         UnknownInteractionsProtocolEvent::decode(self.client.wait_for_event(deadline)?)
     }
@@ -4515,7 +4515,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
         )
     }
 
-    pub fn r#strict_two_way(&self, ___deadline: zx::Time) -> Result<(), fidl::Error> {
+    pub fn r#strict_two_way(&self, ___deadline: zx::MonotonicTime) -> Result<(), fidl::Error> {
         let _response =
             self.client.send_query::<fidl::encoding::EmptyPayload, fidl::encoding::EmptyPayload>(
                 (),
@@ -4526,7 +4526,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
         Ok(_response)
     }
 
-    pub fn r#strict_two_way_fields(&self, ___deadline: zx::Time) -> Result<i32, fidl::Error> {
+    pub fn r#strict_two_way_fields(&self, ___deadline: zx::MonotonicTime) -> Result<i32, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
             UnknownInteractionsProtocolStrictTwoWayFieldsResponse,
@@ -4541,7 +4541,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
 
     pub fn r#strict_two_way_union(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsProtocolStrictTwoWayUnionResponse, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
@@ -4557,7 +4557,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
 
     pub fn r#strict_two_way_table(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsProtocolStrictTwoWayTableResponse, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
@@ -4573,7 +4573,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
 
     pub fn r#strict_two_way_err(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsProtocolStrictTwoWayErrResult, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
@@ -4589,7 +4589,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
 
     pub fn r#strict_two_way_fields_err(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsProtocolStrictTwoWayFieldsErrResult, fidl::Error> {
         let _response = self
             .client
@@ -4604,7 +4604,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
 
     pub fn r#strict_two_way_union_err(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsProtocolStrictTwoWayUnionErrResult, fidl::Error> {
         let _response = self
             .client
@@ -4619,7 +4619,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
 
     pub fn r#strict_two_way_table_err(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsProtocolStrictTwoWayTableErrResult, fidl::Error> {
         let _response = self
             .client
@@ -4632,7 +4632,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
         Ok(_response.map(|x| x))
     }
 
-    pub fn r#flexible_two_way(&self, ___deadline: zx::Time) -> Result<(), fidl::Error> {
+    pub fn r#flexible_two_way(&self, ___deadline: zx::MonotonicTime) -> Result<(), fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
             fidl::encoding::FlexibleType<fidl::encoding::EmptyStruct>,
@@ -4646,7 +4646,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
         Ok(_response)
     }
 
-    pub fn r#flexible_two_way_fields(&self, ___deadline: zx::Time) -> Result<i32, fidl::Error> {
+    pub fn r#flexible_two_way_fields(&self, ___deadline: zx::MonotonicTime) -> Result<i32, fidl::Error> {
         let _response =
             self.client
                 .send_query::<fidl::encoding::EmptyPayload, fidl::encoding::FlexibleType<
@@ -4660,7 +4660,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
 
     pub fn r#flexible_two_way_union(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsProtocolFlexibleTwoWayUnionResponse, fidl::Error> {
         let _response =
             self.client
@@ -4675,7 +4675,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
 
     pub fn r#flexible_two_way_table(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsProtocolFlexibleTwoWayTableResponse, fidl::Error> {
         let _response =
             self.client
@@ -4690,7 +4690,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
 
     pub fn r#flexible_two_way_err(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsProtocolFlexibleTwoWayErrResult, fidl::Error> {
         let _response = self.client.send_query::<
             fidl::encoding::EmptyPayload,
@@ -4707,7 +4707,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
 
     pub fn r#flexible_two_way_fields_err(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsProtocolFlexibleTwoWayFieldsErrResult, fidl::Error> {
         let _response = self
             .client
@@ -4723,7 +4723,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
 
     pub fn r#flexible_two_way_union_err(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsProtocolFlexibleTwoWayUnionErrResult, fidl::Error> {
         let _response = self
             .client
@@ -4739,7 +4739,7 @@ impl UnknownInteractionsProtocolSynchronousProxy {
 
     pub fn r#flexible_two_way_table_err(
         &self,
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
     ) -> Result<UnknownInteractionsProtocolFlexibleTwoWayTableErrResult, fidl::Error> {
         let _response = self
             .client

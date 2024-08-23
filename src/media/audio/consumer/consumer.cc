@@ -12,6 +12,8 @@
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/errors.h>
 
+#include <cmath>
+
 namespace media::audio {
 namespace {
 

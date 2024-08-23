@@ -23,7 +23,6 @@
 #include <bind/fuchsia/hardware/gpio/cpp/bind.h>
 #include <bind/fuchsia/hardware/i2c/cpp/bind.h>
 #include <bind/fuchsia/hardware/registers/cpp/bind.h>
-#include <bind/fuchsia/hardware/sysmem/cpp/bind.h>
 #include <bind/fuchsia/i2c/cpp/bind.h>
 #include <bind/fuchsia/isp/cpp/bind.h>
 #include <bind/fuchsia/register/cpp/bind.h>
@@ -62,7 +61,7 @@ static const std::vector<fpbus::Bti> ge2d_btis{
 static const std::vector<fpbus::Irq> ge2d_irqs{
     {{
         .irq = T931_MALI_GE2D_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
 };
 
@@ -101,7 +100,7 @@ static const std::vector<fpbus::Bti> gdc_btis{
 static const std::vector<fpbus::Irq> gdc_irqs{
     {{
         .irq = T931_MALI_GDC_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
 };
 
@@ -148,7 +147,7 @@ static const std::vector<fpbus::Mmio> isp_mmios{
 static const std::vector<fpbus::Irq> isp_irqs{
     {{
         .irq = T931_MALI_ISP_IRQ,
-        .mode = ZX_INTERRUPT_MODE_LEVEL_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kLevelHigh,
     }},
 };
 
@@ -198,7 +197,7 @@ static const std::vector<fpbus::Bti> mipi_btis{
 static const std::vector<fpbus::Irq> mipi_irqs{
     {{
         .irq = T931_MIPI_ADAPTER_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
 };
 
@@ -518,12 +517,6 @@ zx_status_t Sherlock::CameraInit() {
 
   };
 
-  const ddk::BindRule kSysmemRules[] = {
-      ddk::MakeAcceptBindRule(bind_fuchsia_hardware_sysmem::SERVICE,
-                              bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
-
-  };
-
   const device_bind_prop_t kIspProperties[] = {
       ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_isp::BIND_PROTOCOL_DEVICE),
   };
@@ -536,15 +529,9 @@ zx_status_t Sherlock::CameraInit() {
       ddk::MakeProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_camera::BIND_PROTOCOL_GE2D),
   };
 
-  const device_bind_prop_t kSysmemProperties[] = {
-      ddk::MakeProperty(bind_fuchsia_hardware_sysmem::SERVICE,
-                        bind_fuchsia_hardware_sysmem::SERVICE_ZIRCONTRANSPORT),
-  };
-
   auto node_group = ddk::CompositeNodeSpec(kIspRules, kIspProperties)
                         .AddParentSpec(kGdcRules, kGdcProperties)
-                        .AddParentSpec(kGe2dRules, kGe2dProperties)
-                        .AddParentSpec(kSysmemRules, kSysmemProperties);
+                        .AddParentSpec(kGe2dRules, kGe2dProperties);
 
   zx_status_t status = DdkAddCompositeNodeSpec("camera_controller", node_group);
   if (status != ZX_OK) {

@@ -10,12 +10,12 @@ static_assert(false, "Fuchsia only header");
 #endif
 
 #include <lib/fzl/owned-vmo-mapper.h>
+#include <lib/zx/vmo.h>
 #include <zircon/types.h>
 
+#include <cstddef>
 #include <memory>
 #include <optional>
-
-#include <fbl/macros.h>
 
 #include "src/storage/blobfs/compression/compressor.h"
 #include "src/storage/blobfs/compression_settings.h"

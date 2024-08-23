@@ -26,6 +26,7 @@
 #include <memory>
 
 #include <bind/fuchsia/acpi/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
 #include <ddktl/device.h>
 
 #include "lib/fidl/cpp/wire/connect_service.h"
@@ -214,14 +215,17 @@ static zx_status_t pci_init_child(zx_device_t* parent, uint32_t index,
 zx_status_t KernelPci::CreateComposite(zx_device_t* parent, kpci_device device, bool uses_acpi) {
   auto pci_bind_topo = static_cast<uint32_t>(
       BIND_PCI_TOPO_PACK(device.info.bus_id, device.info.dev_id, device.info.func_id));
-  zx_device_prop_t fragment_props[] = {
-      {BIND_PCI_VID, 0, device.info.vendor_id},
-      {BIND_PCI_DID, 0, device.info.device_id},
-      {BIND_PCI_CLASS, 0, device.info.base_class},
-      {BIND_PCI_SUBCLASS, 0, device.info.sub_class},
-      {BIND_PCI_INTERFACE, 0, device.info.program_interface},
-      {BIND_PCI_REVISION, 0, device.info.revision_id},
-      {BIND_PCI_TOPO, 0, pci_bind_topo},
+  zx_device_str_prop_t pci_device_props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PCI_VID, static_cast<uint32_t>(device.info.vendor_id)),
+      ddk::MakeStrProperty(bind_fuchsia::PCI_DID, static_cast<uint32_t>(device.info.device_id)),
+      ddk::MakeStrProperty(bind_fuchsia::PCI_CLASS, static_cast<uint32_t>(device.info.base_class)),
+      ddk::MakeStrProperty(bind_fuchsia::PCI_SUBCLASS,
+                           static_cast<uint32_t>(device.info.sub_class)),
+      ddk::MakeStrProperty(bind_fuchsia::PCI_INTERFACE,
+                           static_cast<uint32_t>(device.info.program_interface)),
+      ddk::MakeStrProperty(bind_fuchsia::PCI_REVISION,
+                           static_cast<uint32_t>(device.info.revision_id)),
+      ddk::MakeStrProperty(bind_fuchsia::PCI_TOPO, pci_bind_topo),
   };
 
   async_dispatcher_t* dispatcher =
@@ -244,7 +248,7 @@ zx_status_t KernelPci::CreateComposite(zx_device_t* parent, kpci_device device, 
   snprintf(device_name, sizeof(device_name), "%s_", device.name);
   status = kpci->DdkAdd(ddk::DeviceAddArgs(device_name)
                             .set_flags(DEVICE_ADD_MUST_ISOLATE)
-                            .set_props(fragment_props)
+                            .set_str_props(pci_device_props)
                             .set_fidl_service_offers(offers)
                             .set_outgoing_dir(endpoints->client.TakeChannel()));
   if (status != ZX_OK) {

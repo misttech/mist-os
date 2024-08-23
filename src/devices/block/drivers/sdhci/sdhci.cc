@@ -450,9 +450,6 @@ zx_status_t Sdhci::SdmmcRequest(const sdmmc_req_t* req, uint32_t out_response[4]
 
 zx::result<Sdhci::PendingRequest> Sdhci::StartRequest(const sdmmc_req_t& request,
                                                       DmaDescriptorBuilder<OwnedVmoInfo>& builder) {
-  using BlockSizeType = decltype(BlockSize::Get().FromValue(0).reg_value());
-  using BlockCountType = decltype(BlockCount::Get().FromValue(0).reg_value());
-
   // Every command requires that the Command Inhibit is unset.
   auto inhibit_mask = PresentState::Get().FromValue(0).set_command_inhibit_cmd(1);
 
@@ -1064,6 +1061,11 @@ zx_status_t Sdhci::Init() {
   }
   info_.caps |= SDMMC_HOST_CAP_AUTO_CMD12;
 
+  // Assumes typical block size of 512 bytes, though in theory the request could specify a different
+  // value.
+  constexpr size_t kBlockSize = 512;
+  info_.max_transfer_size_non_dma = std::numeric_limits<BlockCountType>::max() * kBlockSize;
+
   // allocate and setup DMA descriptor
   if (SupportsAdma2()) {
     auto host_control1 = HostControl1::Get().ReadFrom(&regs_mmio_buffer_);
@@ -1090,10 +1092,8 @@ zx_status_t Sdhci::Init() {
 
     host_control1.WriteTo(&regs_mmio_buffer_);
   } else {
-    // no maximum if only PIO supported
-    info_.max_transfer_size = fuchsia_hardware_block::wire::kMaxTransferUnbounded;
+    info_.max_transfer_size = info_.max_transfer_size_non_dma;
   }
-  info_.max_transfer_size_non_dma = fuchsia_hardware_block::wire::kMaxTransferUnbounded;
 
   // Configure the clock.
   clock.ReadFrom(&regs_mmio_buffer_).set_internal_clock_enable(1);

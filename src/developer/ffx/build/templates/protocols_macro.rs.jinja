@@ -52,6 +52,7 @@ pub fn generate_protocol_map(_item: TokenStream) -> TokenStream {
             use protocols::{FidlStreamHandler, FidlProtocol};
             use protocols::NameToStreamHandlerMap;
             let mut map = NameToStreamHandlerMap::new();
+            tracing::debug!("Building protocol map");
             {% for dep in deps %}
             map.insert(
                 <<{{ dep.lib }}::ProtocolType as FidlProtocol>::Protocol as DiscoverableProtocolMarker>::PROTOCOL_NAME.to_owned(),

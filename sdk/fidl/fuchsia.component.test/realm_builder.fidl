@@ -21,6 +21,7 @@ const LOCAL_COMPONENT_NAME_KEY string = "LOCAL_COMPONENT_NAME";
 
 /// This protocol can be used to instruct the Realm Builder Server to begin
 /// creating a new realm.
+// Realm Builder Server is built both in tree and as part of the SDK.
 @discoverable
 closed protocol RealmBuilderFactory {
     /// Creates a new RealmBuilder. The client end of `realm_server_end` can be

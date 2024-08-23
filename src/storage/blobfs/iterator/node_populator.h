@@ -6,15 +6,16 @@
 #define SRC_STORAGE_BLOBFS_ITERATOR_NODE_POPULATOR_H_
 
 #include <lib/fit/function.h>
-#include <stdbool.h>
 #include <stdint.h>
 #include <zircon/types.h>
 
 #include <vector>
 
+#include <fbl/macros.h>
+
 #include "src/storage/blobfs/allocator/base_allocator.h"
 #include "src/storage/blobfs/allocator/extent_reserver.h"
-#include "src/storage/blobfs/format.h"
+#include "src/storage/blobfs/allocator/node_reserver.h"
 
 namespace blobfs {
 

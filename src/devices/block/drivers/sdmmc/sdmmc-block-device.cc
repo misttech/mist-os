@@ -320,27 +320,26 @@ zx::result<> SdmmcBlockDevice::ConfigurePowerManagement() {
     if (config.element().name().get() == kHardwarePowerElementName) {
       hardware_power_element_control_client_ =
           fidl::WireSyncClient<fuchsia_power_broker::ElementControl>(
-              std::move(description.element_control_client_.value()));
+              std::move(description.element_control_client.value()));
       hardware_power_lessor_client_ = fidl::WireSyncClient<fuchsia_power_broker::Lessor>(
-          std::move(description.lessor_client_.value()));
+          std::move(description.lessor_client.value()));
       hardware_power_current_level_client_ =
           fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel>(
-              std::move(description.current_level_client_.value()));
+              std::move(description.current_level_client.value()));
       hardware_power_required_level_client_ = fidl::WireClient<fuchsia_power_broker::RequiredLevel>(
-          std::move(description.required_level_client_.value()),
-          parent_->driver_async_dispatcher());
+          std::move(description.required_level_client.value()), parent_->driver_async_dispatcher());
     } else if (config.element().name().get() == kSystemWakeOnRequestPowerElementName) {
       wake_on_request_element_control_client_ =
           fidl::WireSyncClient<fuchsia_power_broker::ElementControl>(
-              std::move(description.element_control_client_.value()));
+              std::move(description.element_control_client.value()));
       wake_on_request_lessor_client_ = fidl::WireSyncClient<fuchsia_power_broker::Lessor>(
-          std::move(description.lessor_client_.value()));
+          std::move(description.lessor_client.value()));
       wake_on_request_current_level_client_ =
           fidl::WireSyncClient<fuchsia_power_broker::CurrentLevel>(
-              std::move(description.current_level_client_.value()));
+              std::move(description.current_level_client.value()));
       wake_on_request_required_level_client_ =
           fidl::WireClient<fuchsia_power_broker::RequiredLevel>(
-              std::move(description.required_level_client_.value()),
+              std::move(description.required_level_client.value()),
               parent_->driver_async_dispatcher());
     } else {
       FDF_LOGL(ERROR, logger(), "Unexpected power element: %s",

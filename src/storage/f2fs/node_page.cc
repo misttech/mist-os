@@ -64,8 +64,6 @@ bool NodePage::IsDnode() const {
 }
 
 void NodePage::SetNid(size_t off, nid_t nid) {
-  WaitOnWriteback();
-
   if (IsInode()) {
     node().i.i_nid[off - kNodeDir1Block] = CpuToLe(nid);
   } else {
@@ -183,13 +181,10 @@ void NodePage::SetBlockAddr(const size_t offset, const block_t new_addr) const {
 }
 
 void NodePage::SetDataBlkaddr(size_t ofs_in_node, block_t new_addr) {
-  WaitOnWriteback();
-  ZX_DEBUG_ASSERT(IsLocked());
   ZX_DEBUG_ASSERT((new_addr == kNewAddr && GetBlockAddr(ofs_in_node) == kNullAddr) ||
                   (new_addr != kNewAddr && GetBlockAddr(ofs_in_node) != kNullAddr));
 
   SetBlockAddr(ofs_in_node, new_addr);
-  SetDirty();
 }
 
 }  // namespace f2fs

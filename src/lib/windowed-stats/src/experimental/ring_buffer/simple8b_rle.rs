@@ -2,65 +2,79 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::RingBuffer;
 use byteorder::{LittleEndian, WriteBytesExt};
+use std::collections::VecDeque;
 use std::{io, iter};
 
 const SELECTORS_PER_BYTE: usize = 2;
 const BITS_PER_BYTE: usize = 8;
 const BITS_PER_SELECTOR: usize = BITS_PER_BYTE / SELECTORS_PER_BYTE;
 
-/// This is a ring buffer that packs 4-bit values into a u8's; primarily intended
-/// to hold a ring buffer of selectors.
+/// This is a VecDeque that packs 4-bit values into a u8's; primarily intended
+/// to hold a sequence of selectors.
 #[derive(Clone, Debug)]
-struct PackedU4RingBuffer {
-    u8_buffer: Vec<u8>,
-    // head_index, len, and capacity are based on the number of selectors, not the number
+struct PackedU4VecDeque {
+    u8_buffer: VecDeque<u8>,
+    // head_index and len are based on the number of selectors, not the number
     // of bytes
     head_index: usize,
     len: usize,
-    capacity: usize,
 }
 
-impl PackedU4RingBuffer {
-    const fn new(capacity: usize) -> Self {
-        Self { u8_buffer: vec![], head_index: 0, len: 0, capacity }
+impl PackedU4VecDeque {
+    const fn new() -> Self {
+        Self { u8_buffer: VecDeque::new(), head_index: 0, len: 0 }
     }
 
     fn len(&self) -> usize {
         self.len
     }
 
-    fn capacity(&self) -> usize {
-        self.capacity
+    fn pop_front(&mut self) -> Option<u8> {
+        let val = self.front();
+        if val.is_some() {
+            self.head_index = (self.head_index + 1) % SELECTORS_PER_BYTE;
+            if self.head_index == 0 {
+                self.u8_buffer.pop_front();
+            }
+        }
+        val
     }
 
-    fn push(&mut self, selector: u8) {
+    fn front(&self) -> Option<u8> {
+        if self.len == 0 {
+            None
+        } else {
+            let selector = if self.head_index == 0 {
+                self.u8_buffer[0] & 0x0f
+            } else {
+                (self.u8_buffer[0] & 0xf0) >> BITS_PER_SELECTOR
+            };
+            Some(selector)
+        }
+    }
+
+    fn push_back(&mut self, selector: u8) {
         let selector = selector & 0x0f;
-        if self.len / SELECTORS_PER_BYTE == self.u8_buffer.len() && self.len < self.capacity {
-            self.u8_buffer.push(selector);
-            self.len += 1;
-            return;
-        }
-
-        let index = (self.head_index + self.len) % self.capacity;
-        let u8_index = index / SELECTORS_PER_BYTE;
-        self.u8_buffer[u8_index] = if index % SELECTORS_PER_BYTE == 0 {
-            (self.u8_buffer[u8_index] & 0xf0) | selector
+        if (self.head_index + self.len) % SELECTORS_PER_BYTE == 0 {
+            self.u8_buffer.push_back(selector);
         } else {
-            (selector << BITS_PER_SELECTOR) | (self.u8_buffer[u8_index] & 0x0f)
+            let i = self.u8_buffer.len() - 1;
+            self.u8_buffer[i] = (selector << BITS_PER_SELECTOR) | (self.u8_buffer[i] & 0x0f);
         };
-        if self.len < self.capacity {
-            self.len += 1;
-        } else {
-            self.head_index += 1;
-        }
+        self.len += 1;
     }
 
-    fn pop(&mut self) -> Option<u8> {
+    fn pop_back(&mut self) -> Option<u8> {
         let val = self.back();
         if val.is_some() {
             self.len -= 1;
+            if (self.head_index + self.len) % SELECTORS_PER_BYTE == 0 {
+                self.u8_buffer.pop_back();
+            } else if self.head_index == 1 && self.len == 0 {
+                self.u8_buffer.pop_back();
+                self.head_index = 0;
+            }
         }
         val
     }
@@ -69,19 +83,18 @@ impl PackedU4RingBuffer {
         if self.len == 0 {
             None
         } else {
-            let index = (self.head_index + self.len - 1) % self.capacity();
-            let byte = self.u8_buffer[index / SELECTORS_PER_BYTE];
-            let selector = if index % SELECTORS_PER_BYTE == 0 {
-                byte & 0x0f
-            } else {
+            let byte = self.u8_buffer[self.u8_buffer.len() - 1];
+            let selector = if (self.head_index + self.len) % SELECTORS_PER_BYTE == 0 {
                 (byte & 0xf0) >> BITS_PER_SELECTOR
+            } else {
+                byte & 0x0f
             };
             Some(selector)
         }
     }
 
-    fn buffer(&self) -> &[u8] {
-        &self.u8_buffer[..]
+    fn iter(&self) -> impl Iterator<Item = &u8> {
+        self.u8_buffer.iter()
     }
 }
 
@@ -109,6 +122,18 @@ const _: () = {
 struct Simple8bRleBlock {
     pub selector: u8,
     pub data: u64,
+}
+
+impl Simple8bRleBlock {
+    /// Get the number of values encoded by this block, assuming that the block is a
+    /// complete encoding.
+    fn num_values(&self) -> usize {
+        if self.selector == RLE_SELECTOR {
+            ((self.data & RLE_LEN_BITMASK) >> RLE_DATA_NUM_BITS) as usize
+        } else {
+            (u64::BITS / SIMPLE8B_SELECTOR_BIT_COUNTS[self.selector as usize]) as usize
+        }
+    }
 }
 
 /// Simple8bRleRingBuffer is a ringbuffer that uses a modified combination of simple8b
@@ -140,27 +165,23 @@ struct Simple8bRleBlock {
 /// encoded is tracked by the `current_block_num_values` field.
 #[derive(Clone, Debug)]
 pub struct Simple8bRleRingBuffer {
-    selectors: PackedU4RingBuffer,
-    value_blocks: RingBuffer<u64>,
+    selectors: PackedU4VecDeque,
+    value_blocks: VecDeque<u64>,
+    min_samples: usize,
+    num_samples: usize,
     current_block_num_values: u32,
 }
 
 impl Simple8bRleRingBuffer {
-    /// Create a new Simple8bRleRingBuffer with the given |capacity|.
-    /// |capacity| is rounded up to the nearest number that's divisible by 2,
-    /// unless it's `usize::MAX`, in which case it's rounded down.
-    /// Because selectors are only 4 bits, we need even capacity for selectors to
-    /// take up a full byte.
-    pub const fn with_nearest_capacity(mut capacity: usize) -> Self {
-        if capacity == usize::MAX {
-            capacity = capacity - 1;
-        } else if capacity % 2 != 0 {
-            capacity = capacity + 1;
-        }
-
+    /// Create a new Simple8bRleRingBuffer that holds at least |min_samples|
+    /// The buffer would continually grow and only evict data if it wouldn't
+    /// cause the number of samples to fall below |min_samples|.
+    pub const fn with_min_samples(min_samples: usize) -> Self {
         Self {
-            selectors: PackedU4RingBuffer::new(capacity),
-            value_blocks: RingBuffer::new(capacity),
+            selectors: PackedU4VecDeque::new(),
+            value_blocks: VecDeque::new(),
+            min_samples,
+            num_samples: 0,
             current_block_num_values: 0,
         }
     }
@@ -171,8 +192,10 @@ impl Simple8bRleRingBuffer {
         buffer.write_u16::<LittleEndian>(self.selectors.head_index as u16)?;
         buffer.write_u8(self.current_block_num_values as u8)?;
 
-        buffer.write_all(self.selectors.buffer())?;
-        for value_block in &self.value_blocks.buffer {
+        for selector in self.selectors.iter() {
+            buffer.write_u8(*selector)?;
+        }
+        for value_block in &self.value_blocks {
             buffer.write_u64::<LittleEndian>(*value_block)?;
         }
         Ok(())
@@ -188,6 +211,11 @@ impl Simple8bRleRingBuffer {
     /// multiple blocks might be evicted, an arbitrary number of data points might
     /// be evicted due to this call.
     pub fn push(&mut self, value: u64) {
+        self.num_samples += 1;
+        self.push_back(value);
+    }
+
+    fn push_back(&mut self, value: u64) {
         let current_block = match self.back() {
             Some(block) => block,
             _ => {
@@ -300,7 +328,7 @@ impl Simple8bRleRingBuffer {
                 // Safe to unwrap because we just pushed one value in `remaining_values`
                 self.push_value_onto_new_block(remaining_values.next().unwrap());
                 while let Some(v) = remaining_values.next() {
-                    self.push(v);
+                    self.push_back(v);
                 }
                 return;
             }
@@ -309,6 +337,13 @@ impl Simple8bRleRingBuffer {
         // Fall off case: we cannot fit the new value into the existing block, and the existing
         // block is already complete, so we just need to put the new value into a new block.
         self.push_value_onto_new_block(value);
+    }
+
+    fn front(&self) -> Option<Simple8bRleBlock> {
+        self.selectors
+            .front()
+            .zip(self.value_blocks.front())
+            .map(|(selector, data)| Simple8bRleBlock { selector, data: *data })
     }
 
     fn back(&self) -> Option<Simple8bRleBlock> {
@@ -321,25 +356,37 @@ impl Simple8bRleRingBuffer {
     fn push_value_onto_new_block(&mut self, value: u64) {
         self.current_block_num_values = 1;
         let bits_needed = repr_bits_needed(value);
-        let block = if bits_needed as u64 <= RLE_DATA_NUM_BITS {
+        let new_block = if bits_needed as u64 <= RLE_DATA_NUM_BITS {
             rle_block_from_value(value, self.current_block_num_values)
         } else {
             Simple8bRleBlock { selector: U64_SELECTOR, data: value }
         };
-        self.push_block(block);
+        self.push_block(new_block);
+
+        // Evict the oldest block if we still have at least `min_samples` by doing so
+        // and if there are more than one block.
+        if self.value_blocks.len() > 1 {
+            if let Some(block) = self.front() {
+                if self.num_samples - block.num_values() >= self.min_samples {
+                    self.selectors.pop_front();
+                    self.value_blocks.pop_front();
+                    self.num_samples -= block.num_values();
+                }
+            }
+        }
     }
 
     fn push_block(&mut self, block: Simple8bRleBlock) {
-        self.selectors.push(block.selector);
-        self.value_blocks.push(block.data);
+        self.selectors.push_back(block.selector);
+        self.value_blocks.push_back(block.data);
     }
 
     fn replace_back(&mut self, block: Simple8bRleBlock) {
         if self.back().is_none() {
             return;
         }
-        self.selectors.pop();
-        self.value_blocks.pop();
+        self.selectors.pop_back();
+        self.value_blocks.pop_back();
         self.push_block(block);
     }
 }
@@ -479,12 +526,11 @@ impl Iterator for Simple8bIter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use test_case::test_case;
 
-    #[test_case(1; "odd capacity")]
-    #[test_case(2; "even capacity")]
-    fn test_ring_buffer_rotates_out_old_values(capacity: usize) {
-        let mut ring_buffer = Simple8bRleRingBuffer::with_nearest_capacity(capacity);
+    const MIN_SAMPLES: usize = 120;
+
+    fn test_ring_buffer_rotates_out_old_values() {
+        let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(2);
         ring_buffer.push(u64::MAX);
         ring_buffer.push(u64::MAX - 1);
 
@@ -507,19 +553,34 @@ mod tests {
             2, 0, // length
             1, 0,    // selector head index
             1,    // last block's # of values
-            0xef, // first block: 64-bit selector, second block: RLE selector
+            0xee, // first block: 64-bit selector
             // Note that because selector head index is 1, the first block selector is at
-            // bits 4-7
+            // bits 4-7. Bits 0-3 above are ignored.
+            0x00, // second block: RLE selector
             0xfe, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // first block
             1, 0, 0, 0, 0, 0, // second block: value
             1, 0, // second block: length
+        ];
+        assert_eq!(&buffer[..], expected_bytes);
+
+        ring_buffer.push(u64::MAX - 2);
+        let mut buffer = vec![];
+        ring_buffer.serialize(&mut buffer).expect("serialize should succeed");
+        let expected_bytes = &[
+            2, 0, // length
+            1, 0,    // selector head index
+            1,    // last block's # of values
+            0xe0, // first block: RLE selector, second block: 64-bit selector
+            1, 0, 0, 0, 0, 0, // first block: value
+            1, 0, // first block: length
+            0xfd, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, // second block
         ];
         assert_eq!(&buffer[..], expected_bytes);
     }
 
     #[test]
     fn test_encode_new_block_rle() {
-        let mut ring_buffer = Simple8bRleRingBuffer::with_nearest_capacity(2);
+        let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
         ring_buffer.push((1 << 48) - 1);
 
         let mut buffer = vec![];
@@ -537,7 +598,7 @@ mod tests {
 
     #[test]
     fn test_encode_new_block_simple8b() {
-        let mut ring_buffer = Simple8bRleRingBuffer::with_nearest_capacity(2);
+        let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
         ring_buffer.push(1 << 48);
 
         let mut buffer = vec![];
@@ -554,7 +615,7 @@ mod tests {
 
     #[test]
     fn test_encode_rle() {
-        let mut ring_buffer = Simple8bRleRingBuffer::with_nearest_capacity(2);
+        let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
         for _i in 0..258 {
             ring_buffer.push(1);
         }
@@ -575,7 +636,7 @@ mod tests {
 
     #[test]
     fn test_encode_simple8b() {
-        let mut ring_buffer = Simple8bRleRingBuffer::with_nearest_capacity(2);
+        let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
         ring_buffer.push(0x0e);
         ring_buffer.push(1);
         ring_buffer.push(0);
@@ -597,7 +658,7 @@ mod tests {
 
     #[test]
     fn test_reencode_rle_to_simple8b() {
-        let mut ring_buffer = Simple8bRleRingBuffer::with_nearest_capacity(2);
+        let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
         for _i in 0..4 {
             ring_buffer.push(1);
         }
@@ -630,7 +691,7 @@ mod tests {
 
     #[test]
     fn test_reencode_simple8b_to_simple8b() {
-        let mut ring_buffer = Simple8bRleRingBuffer::with_nearest_capacity(2);
+        let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
 
         ring_buffer.push(0x0e);
         ring_buffer.push(1);
@@ -664,10 +725,11 @@ mod tests {
 
     #[test]
     fn test_encode_new_block_because_rle_block_max_len() {
-        let mut ring_buffer = Simple8bRleRingBuffer::with_nearest_capacity(2);
+        let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
 
         ring_buffer.push(1);
         ring_buffer.current_block_num_values = 0xfffe;
+        ring_buffer.num_samples = ring_buffer.current_block_num_values as usize;
         ring_buffer.push(1);
 
         let mut buffer = vec![];
@@ -702,7 +764,7 @@ mod tests {
 
     #[test]
     fn test_encode_new_block_because_not_fit_into_current_simple8b_block() {
-        let mut ring_buffer = Simple8bRleRingBuffer::with_nearest_capacity(2);
+        let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
 
         ring_buffer.push((1 << 32) - 1);
         ring_buffer.push(2);
@@ -735,7 +797,7 @@ mod tests {
 
     #[test]
     fn test_encode_new_block_because_no_space_to_reencode_rle_to_simple8b() {
-        let mut ring_buffer = Simple8bRleRingBuffer::with_nearest_capacity(2);
+        let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
         for _i in 0..4 {
             ring_buffer.push(1);
         }
@@ -771,7 +833,7 @@ mod tests {
 
     #[test]
     fn test_encode_new_block_because_no_space_to_reencode_simple8b_to_simple8b() {
-        let mut ring_buffer = Simple8bRleRingBuffer::with_nearest_capacity(2);
+        let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
 
         ring_buffer.push(0x0e);
         ring_buffer.push(1);
@@ -814,7 +876,7 @@ mod tests {
     // leads to 3 fully encoded blocks and 1 newly encoded block
     #[test]
     fn test_chain_reencode_four_block_scenario() {
-        let mut ring_buffer = Simple8bRleRingBuffer::with_nearest_capacity(4);
+        let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
 
         // Push 63 one-bit values
         ring_buffer.push(0);
@@ -860,7 +922,7 @@ mod tests {
 
     #[test]
     fn test_chain_reencode_new_value_goes_with_excess_value() {
-        let mut ring_buffer = Simple8bRleRingBuffer::with_nearest_capacity(4);
+        let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
 
         // Push 63 one-bit values
         ring_buffer.push(0);
@@ -900,7 +962,7 @@ mod tests {
 
     #[test]
     fn test_chain_reencode_rle_wins() {
-        let mut ring_buffer = Simple8bRleRingBuffer::with_nearest_capacity(4);
+        let mut ring_buffer = Simple8bRleRingBuffer::with_min_samples(MIN_SAMPLES);
 
         // Push 63 one-bit values
         for _i in 0..62 {

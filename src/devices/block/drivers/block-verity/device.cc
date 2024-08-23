@@ -20,11 +20,11 @@ namespace block_verity {
 // in the underlying device, based on the block allocation.
 Device::Device(zx_device_t* parent, DeviceInfo&& info)
     : DeviceType(parent), info_(std::move(info)) {
-  zxlogf(INFO, "mutable constructor");
+  zxlogf(DEBUG, "mutable constructor");
 }
 
 zx_status_t Device::DdkGetProtocol(uint32_t proto_id, void* out) {
-  zxlogf(INFO, "mutable DdkGetProtocol");
+  zxlogf(DEBUG, "mutable DdkGetProtocol");
   auto* proto = static_cast<ddk::AnyProtocol*>(out);
   proto->ctx = this;
   switch (proto_id) {
@@ -39,17 +39,17 @@ zx_status_t Device::DdkGetProtocol(uint32_t proto_id, void* out) {
 }
 
 void Device::DdkUnbind(ddk::UnbindTxn txn) {
-  zxlogf(INFO, "mutable DdkUnbind");
+  zxlogf(DEBUG, "mutable DdkUnbind");
   txn.Reply();
 }
 
 void Device::DdkRelease() {
-  zxlogf(INFO, "mutable DdkRelease");
+  zxlogf(DEBUG, "mutable DdkRelease");
   delete this;
 }
 
 void Device::BlockImplQuery(block_info_t* out_info, size_t* out_op_size) {
-  zxlogf(INFO, "mutable BlockImplQuery");
+  zxlogf(DEBUG, "mutable BlockImplQuery");
 
   info_.block_protocol.Query(out_info, out_op_size);
   // Overwrite block_count with just the number of blocks we're exposing as data

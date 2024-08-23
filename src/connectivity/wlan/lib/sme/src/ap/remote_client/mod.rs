@@ -200,7 +200,7 @@ impl RemoteClient {
     pub fn schedule_at(
         &mut self,
         ctx: &mut Context,
-        deadline: zx::Time,
+        deadline: zx::MonotonicTime,
         event: ClientEvent,
     ) -> EventId {
         ctx.timer.schedule_at(deadline, Event::Client { addr: self.addr.clone(), event })
@@ -475,7 +475,7 @@ mod tests {
         let (mut ctx, _, mut time_stream) = make_env();
         let timeout_event_id = r_sta.schedule_at(
             &mut ctx,
-            zx::Time::after(zx::Duration::from_seconds(2)),
+            zx::MonotonicTime::after(zx::Duration::from_seconds(2)),
             ClientEvent::AssociationTimeout,
         );
         let (_, timed_event) = time_stream.try_next().unwrap().expect("expected timed event");

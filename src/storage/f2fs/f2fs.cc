@@ -150,12 +150,12 @@ zx::result<> F2fs::MakeReadOperation(LockedPage& page, block_t blk_addr, PageTyp
   }
   std::vector<block_t> addrs = {blk_addr};
   std::vector<LockedPage> pages;
-  pages.emplace_back(page.CopyRefPtr(), false);
+  pages.push_back(std::move(page));
   auto status = MakeReadOperations(pages, addrs, type, is_sync);
-  [[maybe_unused]] auto locked_page = pages[0].release(false);
   if (status.is_error()) {
     return status.take_error();
   }
+  page = std::move(pages[0]);
   return zx::ok();
 }
 

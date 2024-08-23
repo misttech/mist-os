@@ -5,8 +5,10 @@
 
 import("//build/config/clang/clang.gni")
 import("//build/config/compiler.gni")
+import("//build/config/current_target_tuple.gni")
 import("//build/config/sysroot.gni")
 import("//build/fidl/toolchain.gni")
+import("//build/rust/include_rustdoc.gni")
 
 default_rustc_prefix = "//prebuilt/third_party/rust/${host_platform}"
 
@@ -69,6 +71,8 @@ declare_args() {
   # `fx set`, but is defaulted off in GN so it won't be on in infra.
   include_clippy = false
 
+  # See related config in //build/rust/include_rustdoc.gni
+
   # By default building clippy targets prints lints as well as any rustc diagnostics
   # that were emitted by check-building the crate. This flag makes the output in the
   # build only contain lints to avoid duplicating the diagnostics from rustc
@@ -76,6 +80,11 @@ declare_args() {
   # will still emit rustc diagnostics alongside clippy lints, they just wont show
   # up in ninja's stderr
   clippy_ignore_rustc = false
+
+  # Final destination of docs generated with `fx rustdoc-link`, as a URL. May
+  # use the file:/// scheme for local testing. Rustdoc will generate links
+  # relative to this path.
+  rustdoc_extern_html_root_url = "https://fuchsia-docs.firebaseapp.com/rust/rustdoc_index/$current_target_tuple/"
 }
 
 if (rustc_prefix == default_rustc_prefix &&

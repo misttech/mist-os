@@ -93,7 +93,6 @@ if (is_fuchsia) {
     include_shell_commands = include_shell_commands_package
 
     board_config_label = board_configuration_label
-    cmdline_deps = [ "//build/input:bootfs" ]
 
     base_packages = [
       "//:developer_base_packages",
@@ -107,7 +106,6 @@ if (is_fuchsia) {
       "//:legacy_cache_packages",
     ]
     universe_packages = [ "//:developer_universe_packages" ]
-    bootfs_labels = [ "//build/input:bootfs" ]
     bootfs_package_labels = product_bootfs_packages
 
     if (generate_fvm) {

@@ -67,7 +67,6 @@ template("sherlock_driver") {
     ]
 
     deps = [
-      "//sdk/banjo/fuchsia.hardware.iommu:fuchsia.hardware.iommu_banjo_cpp",
       "//sdk/banjo/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc_banjo_cpp",
       "//sdk/fidl/fuchsia.hardware.adc:fuchsia.hardware.adc_bindlib_cpp",
       "//sdk/fidl/fuchsia.hardware.adcimpl:fuchsia.hardware.adcimpl_cpp",
@@ -76,12 +75,12 @@ template("sherlock_driver") {
       "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib_cpp",
       "//sdk/fidl/fuchsia.hardware.clockimpl:fuchsia.hardware.clockimpl_cpp",
       "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_bindlib_cpp",
-      "//sdk/fidl/fuchsia.hardware.gpioimpl:fuchsia.hardware.gpioimpl_cpp",
       "//sdk/fidl/fuchsia.hardware.gpt.metadata:fuchsia.hardware.gpt.metadata_cpp",
       "//sdk/fidl/fuchsia.hardware.gpu.amlogic:fuchsia.hardware.gpu.amlogic_cpp",
       "//sdk/fidl/fuchsia.hardware.gpu.mali:fuchsia.hardware.gpu.mali_bindlib_cpp",
       "//sdk/fidl/fuchsia.hardware.i2c:fuchsia.hardware.i2c_bindlib_cpp",
       "//sdk/fidl/fuchsia.hardware.light:fuchsia.hardware.light_cpp",
+      "//sdk/fidl/fuchsia.hardware.pinimpl:fuchsia.hardware.pinimpl_cpp",
       "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_bindlib_cpp",
       "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
       "//sdk/fidl/fuchsia.hardware.pwm:fuchsia.hardware.pwm_bindlib_cpp",

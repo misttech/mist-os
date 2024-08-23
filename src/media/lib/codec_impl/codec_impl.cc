@@ -1625,10 +1625,27 @@ void CodecImpl::SetBufferSettingsCommon(
     FailLocked("partial_settings do not have buffer constraints version ordinal");
     return;
   }
-  if (!partial_settings->has_sysmem_token() || !partial_settings->sysmem_token().is_valid()) {
+  if ((!partial_settings->has_sysmem_token() || !partial_settings->sysmem_token().is_valid()) &&
+      (!partial_settings->has_sysmem2_token() || !partial_settings->sysmem2_token().is_valid())) {
     LogEvent(media_metrics::StreamProcessorEvents2MigratedMetricDimensionEvent_ClientProtocolError);
-    FailLocked("partial_settings missing valid sysmem_token");
+    FailLocked("partial_settings missing valid sysmem2_token (sysmem_token also missing)");
     return;
+  }
+  if (partial_settings->has_sysmem_token() && partial_settings->has_sysmem2_token()) {
+    LogEvent(media_metrics::StreamProcessorEvents2MigratedMetricDimensionEvent_ClientProtocolError);
+    FailLocked(
+        "partial_settings must have only sysmem2_token or sysmem_token, not both (prefer sysmem2_token)");
+    return;
+  }
+  if (partial_settings->has_sysmem_token() && !partial_settings->has_sysmem2_token()) {
+    LOG(WARNING,
+        "client is using deprecated sysmem_token field; client should switch to sysemm2_token field");
+    // Token channels served by sysmem serve both sysmem(1) and sysmem2 BufferCollectionToken on the
+    // same channel.
+    partial_settings->set_sysmem2_token(
+        fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken>(
+            partial_settings->mutable_sysmem_token()->TakeChannel()));
+    partial_settings->clear_sysmem_token();
   }
 
   ZX_DEBUG_ASSERT(
@@ -1709,6 +1726,7 @@ void CodecImpl::SetBufferSettingsCommon(
   // We intentionally don't want to hand the sysmem token directly to the core
   // codec, at least for now (maybe later it'll be necessary).
   ZX_DEBUG_ASSERT(!port_settings_[port]->partial_settings().has_sysmem_token());
+  ZX_DEBUG_ASSERT(!port_settings_[port]->partial_settings().has_sysmem2_token());
   fuchsia_sysmem2::BufferCollectionConstraints buffer_collection_constraints =
       [this, port, &lock, &stream_constraints]() {
         // port_settings_[port] can only change on this thread so are safe to
@@ -2066,7 +2084,7 @@ bool CodecImpl::ValidatePartialBufferSettingsVsConstraintsLocked(
           "false (deprecated; obsolete)");
     }
   }
-  ZX_DEBUG_ASSERT(partial_settings.sysmem_token().is_valid());
+  ZX_DEBUG_ASSERT(partial_settings.sysmem2_token().is_valid());
   return true;
 }
 
@@ -3928,11 +3946,11 @@ const fuchsia::media::StreamBufferPartialSettings& CodecImpl::PortSettings::part
 }
 
 fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> CodecImpl::PortSettings::TakeToken() {
-  ZX_DEBUG_ASSERT(partial_settings_->has_sysmem_token());
-  fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> token =
-      fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>(
-          partial_settings_->mutable_sysmem_token()->TakeChannel());
-  partial_settings_->clear_sysmem_token();
+  ZX_DEBUG_ASSERT(!partial_settings_->has_sysmem_token());
+  ZX_DEBUG_ASSERT(partial_settings_->has_sysmem2_token());
+  auto token = fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken>(
+      partial_settings_->mutable_sysmem2_token()->TakeChannel());
+  partial_settings_->clear_sysmem2_token();
   return token;
 }
 
@@ -4041,6 +4059,7 @@ fuchsia_sysmem2::BufferCollectionConstraints CodecImpl::CoreCodecGetBufferCollec
   // because it doesn't really need to participate directly that way, and this
   // lets us keep direct interaction with sysmem in CodecImpl instead of each
   // core codec.
+  ZX_DEBUG_ASSERT(!partial_settings.has_sysmem2_token());
   ZX_DEBUG_ASSERT(!partial_settings.has_sysmem_token());
   return codec_adapter_->CoreCodecGetBufferCollectionConstraints2(port, stream_buffer_constraints,
                                                                   partial_settings);

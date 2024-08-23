@@ -6,7 +6,7 @@
 
 use crate::{
     ok, AsHandleRef, Handle, HandleBased, HandleDisposition, HandleInfo, HandleOp, HandleRef,
-    ObjectType, Peered, Rights, Status, Time,
+    MonotonicTime, ObjectType, Peered, Rights, Status,
 };
 use fuchsia_zircon_sys as sys;
 use std::mem::{self, MaybeUninit};
@@ -327,7 +327,7 @@ impl Channel {
     /// [read]: struct.Channel.html#method.read
     pub fn call(
         &self,
-        timeout: Time,
+        timeout: MonotonicTime,
         bytes: &[u8],
         handles: &mut [Handle],
         buf: &mut MessageBuf,
@@ -398,7 +398,7 @@ impl Channel {
     /// [read_etc]: struct.Channel.html#method.read_etc
     pub fn call_etc(
         &self,
-        timeout: Time,
+        timeout: MonotonicTime,
         bytes: &[u8],
         handle_dispositions: &mut [HandleDisposition<'_>],
         buf: &mut MessageBufEtc,
@@ -835,7 +835,7 @@ mod tests {
     fn channel_call_too_many_bytes() {
         Channel::create()
             .0
-            .call(Time::INFINITE, &too_many_bytes(), &mut vec![], &mut MessageBuf::new())
+            .call(MonotonicTime::INFINITE, &too_many_bytes(), &mut vec![], &mut MessageBuf::new())
             .unwrap_err();
     }
 
@@ -843,7 +843,12 @@ mod tests {
     fn channel_call_too_many_handles() {
         Channel::create()
             .0
-            .call(Time::INFINITE, &vec![], &mut too_many_handles()[..], &mut MessageBuf::new())
+            .call(
+                MonotonicTime::INFINITE,
+                &vec![],
+                &mut too_many_handles()[..],
+                &mut MessageBuf::new(),
+            )
             .unwrap_err();
     }
 
@@ -851,7 +856,12 @@ mod tests {
     fn channel_call_etc_too_many_bytes() {
         Channel::create()
             .0
-            .call_etc(Time::INFINITE, &too_many_bytes(), &mut vec![], &mut MessageBufEtc::new())
+            .call_etc(
+                MonotonicTime::INFINITE,
+                &too_many_bytes(),
+                &mut vec![],
+                &mut MessageBufEtc::new(),
+            )
             .unwrap_err();
     }
 
@@ -860,7 +870,7 @@ mod tests {
         Channel::create()
             .0
             .call_etc(
-                Time::INFINITE,
+                MonotonicTime::INFINITE,
                 &vec![],
                 &mut too_many_dispositions()[..],
                 &mut MessageBufEtc::new(),
@@ -919,7 +929,7 @@ mod tests {
         let mut handles_to_send: Vec<Handle> = vec![duplicate_vmo_handle];
         let mut buf = MessageBuf::new();
         assert_eq!(
-            p1.call(Time::after(ten_ms), b"0000call", &mut handles_to_send, &mut buf),
+            p1.call(MonotonicTime::after(ten_ms), b"0000call", &mut handles_to_send, &mut buf),
             Err(Status::TIMED_OUT)
         );
         // Despite not getting a response, the handles were sent so the handle slice
@@ -946,7 +956,7 @@ mod tests {
         let mut empty: Vec<HandleDisposition<'_>> = vec![];
         let mut buf = MessageBufEtc::new();
         assert_eq!(
-            p1.call_etc(Time::after(ten_ms), b"0000call", &mut empty, &mut buf),
+            p1.call_etc(MonotonicTime::after(ten_ms), b"0000call", &mut empty, &mut buf),
             Err(Status::TIMED_OUT)
         );
 
@@ -970,7 +980,7 @@ mod tests {
             let mut buf = MessageBuf::new();
             // if either the read or the write fail, this thread will panic,
             // resulting in tx being dropped, which will be noticed by the rx.
-            p2.wait_handle(Signals::CHANNEL_READABLE, Time::after(1.seconds()))
+            p2.wait_handle(Signals::CHANNEL_READABLE, MonotonicTime::after(1.seconds()))
                 .expect("callee wait error");
             p2.read(&mut buf).expect("callee read error");
 
@@ -994,7 +1004,7 @@ mod tests {
         // stalling forever if a developer makes a mistake locally in this
         // crate. Tests of Zircon behavior or virtualization behavior should be
         // covered elsewhere. See https://fxbug.dev/42106187.
-        p1.call(Time::after(30.seconds()), b"txidcall", &mut vec![], &mut buf)
+        p1.call(MonotonicTime::after(30.seconds()), b"txidcall", &mut vec![], &mut buf)
             .expect("channel call error");
         assert_eq!(&buf.bytes()[4..], b"response");
         assert_eq!(buf.n_handles(), 0);
@@ -1016,7 +1026,7 @@ mod tests {
             let mut buf = MessageBuf::new();
             // if either the read or the write fail, this thread will panic,
             // resulting in tx being dropped, which will be noticed by the rx.
-            p2.wait_handle(Signals::CHANNEL_READABLE, Time::after(1.seconds()))
+            p2.wait_handle(Signals::CHANNEL_READABLE, MonotonicTime::after(1.seconds()))
                 .expect("callee wait error");
             p2.read(&mut buf).expect("callee read error");
 
@@ -1047,8 +1057,13 @@ mod tests {
         // stalling forever if a developer makes a mistake locally in this
         // crate. Tests of Zircon behavior or virtualization behavior should be
         // covered elsewhere. See https://fxbug.dev/42106187.
-        p1.call_etc(Time::after(30.seconds()), b"txidcall", &mut handle_dispositions, &mut buf)
-            .expect("channel call error");
+        p1.call_etc(
+            MonotonicTime::after(30.seconds()),
+            b"txidcall",
+            &mut handle_dispositions,
+            &mut buf,
+        )
+        .expect("channel call error");
         assert_eq!(&buf.bytes()[4..], b"response");
         assert_eq!(buf.n_handle_infos(), 1);
         assert_ne!(buf.handle_infos[0].handle.raw_handle(), 0);

@@ -22,6 +22,9 @@ use fuchsia_zircon::{self as zx, HandleBased};
 use futures::FutureExt;
 use {fidl_fuchsia_fshost as fshost, fidl_fuchsia_io as fio, fuchsia_async as fasync};
 
+#[cfg(feature = "fxfs")]
+use fidl_fuchsia_fxfs::CryptManagementMarker;
+
 #[cfg(feature = "fxblob")]
 use {
     blob_writer::BlobWriter,
@@ -1015,6 +1018,27 @@ async fn verify_blobs() {
         .await
         .expect("FIDL failure")
         .expect("verify failure");
+
+    fixture.tear_down().await;
+}
+
+#[fuchsia::test]
+#[cfg(feature = "fxfs")]
+async fn add_wrapping_key() {
+    let mut builder = new_builder();
+    builder.with_disk().format_volumes(volumes_spec()).format_data(data_fs_spec());
+    let fixture = builder.build().await;
+
+    let crypt_management = fixture
+        .realm
+        .root
+        .connect_to_protocol_at_exposed_dir::<CryptManagementMarker>()
+        .expect("connect_to_protcol_at_exposed_dir failed");
+    crypt_management
+        .add_wrapping_key(2, &[1; 32])
+        .await
+        .expect("FIDL failure")
+        .expect("add wrapping key failed");
 
     fixture.tear_down().await;
 }

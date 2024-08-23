@@ -53,7 +53,7 @@ void NodeRemovalTracker::Notify(NodeId id, NodeState state) {
 }
 
 void NodeRemovalTracker::OnRemovalTimeout() {
-  LOGF(INFO, "Node removal hanging: %zu pkg %zu all remaining", remaining_pkg_node_count(),
+  LOGF(INFO, "Removal hanging, nodes remaining: %zu pkg, %zu pkg+boot", remaining_pkg_node_count(),
        remaining_node_count());
   for (auto& [id, node] : nodes_) {
     if (node.state == NodeState::kStopped) {

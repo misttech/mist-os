@@ -4,12 +4,10 @@
 #ifndef SRC_DEVELOPER_VSOCK_SSHD_HOST_DATA_DIR_H_
 #define SRC_DEVELOPER_VSOCK_SSHD_HOST_DATA_DIR_H_
 
-#include <lib/async-loop/cpp/loop.h>
+#include <fbl/ref_ptr.h>
 
-#include "src/storage/memfs/memfs.h"
-#include "src/storage/memfs/vnode_dir.h"
+#include "src/storage/lib/vfs/cpp/pseudo_dir.h"
 
-zx::result<> BuildDataDir(async::Loop& loop, memfs::Memfs* memfs,
-                          fbl::RefPtr<memfs::VnodeDir> root);
+fbl::RefPtr<fs::PseudoDir> BuildDataDir();
 
 #endif  // SRC_DEVELOPER_VSOCK_SSHD_HOST_DATA_DIR_H_

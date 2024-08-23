@@ -100,9 +100,9 @@ TEST(PowerElementVisitorTest, TestMetadataAndBindProperty) {
                       static_cast<fuchsia_hardware_power::RequirementType>(2u));
           }
         }
-        if (dependency.parent()->name().has_value()) {
+        if (dependency.parent()->instance_name().has_value()) {
           dependencies_tested++;
-          EXPECT_EQ(dependency.parent()->name().value(), "rail-1");
+          EXPECT_EQ(dependency.parent()->instance_name().value(), "rail-1");
           EXPECT_EQ(dependency.level_deps()->at(0).child_level(), 2u);
           EXPECT_EQ(dependency.level_deps()->at(0).parent_level(), 0u);
           EXPECT_EQ(dependency.strength(),

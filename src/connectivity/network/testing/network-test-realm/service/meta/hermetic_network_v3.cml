@@ -35,5 +35,12 @@
             protocol: "fuchsia.net.dhcp.ClientProvider",
             from: "#dhcp-client",
         },
+        {
+            protocol: [
+                "fuchsia.net.routes.admin.RuleTableV4",
+                "fuchsia.net.routes.admin.RuleTableV6",
+            ],
+            from: "#netstack",
+        },
     ],
 }

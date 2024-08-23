@@ -16,6 +16,7 @@ class Reader {
   Reader(const Reader &&) = delete;
   Reader &operator=(const Reader &&) = delete;
 
+  // TODO(b/354796037): need to handle larger I/Os
   // It makes read operations from |buffer_| and passes them to RunReqeusts()
   // synchronously.
   zx::result<> ReadBlocks(std::vector<LockedPage> &pages, std::vector<block_t> &addrs);

@@ -53,7 +53,8 @@ impl Device for BlockDevice {
         assert_eq!(offset % self.block_size() as u64, 0);
         assert_eq!(buffer.range().start % self.block_size() as usize, 0);
         assert_eq!((offset + buffer.len() as u64) % self.block_size() as u64, 0);
-        self.remote
+        Ok(self
+            .remote
             .read_at(
                 MutableBufferSlice::new_with_vmo_id(
                     &self.vmoid,
@@ -62,7 +63,7 @@ impl Device for BlockDevice {
                 ),
                 offset,
             )
-            .await
+            .await?)
     }
 
     async fn write(&self, offset: u64, buffer: BufferRef<'_>) -> Result<(), Error> {
@@ -76,7 +77,8 @@ impl Device for BlockDevice {
         assert_eq!(offset % self.block_size() as u64, 0);
         assert_eq!(buffer.range().start % self.block_size() as usize, 0);
         assert_eq!((offset + buffer.len() as u64) % self.block_size() as u64, 0);
-        self.remote
+        Ok(self
+            .remote
             .write_at(
                 BufferSlice::new_with_vmo_id(
                     &self.vmoid,
@@ -85,7 +87,7 @@ impl Device for BlockDevice {
                 ),
                 offset,
             )
-            .await
+            .await?)
     }
 
     async fn trim(&self, range: Range<u64>) -> Result<(), Error> {
@@ -94,17 +96,17 @@ impl Device for BlockDevice {
         }
         assert_eq!(range.start % self.block_size() as u64, 0);
         assert_eq!(range.end % self.block_size() as u64, 0);
-        self.remote.trim(range).await
+        Ok(self.remote.trim(range).await?)
     }
 
     async fn close(&self) -> Result<(), Error> {
         // We can leak the VMO id because we are closing the device.
         self.vmoid.take().into_id();
-        self.remote.close().await
+        Ok(self.remote.close().await?)
     }
 
     async fn flush(&self) -> Result<(), Error> {
-        self.remote.flush().await
+        Ok(self.remote.flush().await?)
     }
 
     fn is_read_only(&self) -> bool {

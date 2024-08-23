@@ -1803,14 +1803,14 @@ zx_status_t SimFirmware::ReassocToDifferentAp(
 
   // Send the REASSOC event with a delay.
   SendEventToDriver(0, nullptr, BRCMF_E_REASSOC, BRCMF_E_STATUS_SUCCESS, kClientIfidx, nullptr, 0,
-                    0, assoc_state_.opts->bssid, kReassocEventDelay);
+                    0, assoc_state_.reassoc_opts->bssid, kReassocEventDelay);
   // Send the LINK event with a delay.
   SendEventToDriver(0, nullptr, BRCMF_E_LINK, BRCMF_E_STATUS_SUCCESS, kClientIfidx, nullptr,
-                    BRCMF_EVENT_MSG_LINK, 0, assoc_state_.opts->bssid, kLinkEventDelay);
+                    BRCMF_EVENT_MSG_LINK, 0, assoc_state_.reassoc_opts->bssid, kLinkEventDelay);
   // Send the ROAM event with a delay.
   SendEventToDriver(0, nullptr, BRCMF_E_ROAM, BRCMF_E_STATUS_SUCCESS, kClientIfidx, nullptr, 0, 0,
-                    assoc_state_.opts->bssid, kRoamEventDelay);
-  // Set the Assoc state only after REASSOC event is sent to the driver.
+                    assoc_state_.reassoc_opts->bssid, kRoamEventDelay);
+  // Set the Assoc state just after REASSOC event is sent to the driver.
   hw_.RequestCallback(
       [this, bss_type] {
         if (assoc_state_.reassoc_opts) {
@@ -1820,7 +1820,7 @@ zx_status_t SimFirmware::ReassocToDifferentAp(
           SetAssocState(AssocState::ASSOCIATED);
         }
       },
-      kReassocEventDelay);
+      kReassocEventDelay + zx::msec(1));
   if (softap_ifidx_ != std::nullopt) {
     // Send the AP_STARTED event to the SoftAp IF after a delay. This event is sent to the
     // SoftAP IF in case its channel changed (to sync up to the client's channel).
@@ -1894,11 +1894,9 @@ void SimFirmware::RxWnmActionFrame(std::shared_ptr<const simulation::SimWnmActio
 }
 
 void SimFirmware::RxBtmReqFrame(std::shared_ptr<const simulation::SimBtmReqFrame> btm_req_frame) {
-  const uint32_t kRoamEngineDisabled = 1;
   const uint32_t kWnmDisabled = 0;
-  if (roam_off_ == kRoamEngineDisabled || wnm_ == kWnmDisabled) {
-    // Necessary features are not enabled, so ignore this frame.
-    BRCMF_DBG(SIM, "Ignoring BTM request frame, features are not enabled");
+  if (wnm_ == kWnmDisabled) {
+    BRCMF_DBG(SIM, "Ignoring BTM request frame, WNM offload feature is not enabled");
     return;
   }
   const uint32_t kWnmAlwaysBtmRoam = 0x0;
@@ -1920,7 +1918,7 @@ void SimFirmware::RxBtmReqFrame(std::shared_ptr<const simulation::SimBtmReqFrame
   // TODO(karlward) CBW is hard-coded here; add CBW to Sim reassoc handling.
   wlan_common::WlanChannel chan{.primary = candidate_list[0].channel_number,
                                 .cbw = wlan_common::ChannelBandwidth::kCbw20};
-  reassoc_opts->bssid = candidate_list[0].bssid;
+  memcpy(reassoc_opts->bssid.byte, candidate_list[0].bssid.byte, ETH_ALEN);
   // Must remember which channel original BSS was on, for future communication with it.
   wlan_common::WlanChannel orig_bss_channel;
   chanspec_to_channel(&d11_inf_, iface_tbl_[kClientIfidx].chanspec, &orig_bss_channel);
@@ -2056,7 +2054,6 @@ void SimFirmware::ReassocInit(std::unique_ptr<ReassocOpts> reassoc_opts,
     BRCMF_WARN("Cannot reassociate because STA is not associated");
     return;
   }
-
   assoc_state_.reassoc_opts = std::move(reassoc_opts);
 
   // BSS info struct and IE buffer construction.
@@ -2077,7 +2074,7 @@ void SimFirmware::ReassocInit(std::unique_ptr<ReassocOpts> reassoc_opts,
       .ie_length = static_cast<uint32_t>(target_bss_ie_span.size()),
       .SNR = 0x3b,
   };
-  memcpy(target_bss_info.BSSID, &assoc_state_.reassoc_opts->bssid, ETH_ALEN);
+  memcpy(target_bss_info.BSSID, assoc_state_.reassoc_opts->bssid.byte, ETH_ALEN);
   SetTargetBssInfo(target_bss_info, target_bss_ie_span);
 
   SetAssocState(AssocState::REASSOCIATING);

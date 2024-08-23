@@ -18,10 +18,10 @@
 
 #if defined(__aarch64__)
 
-  mov x0, sp
 #ifdef IN_PROCESS_TEST
   b TestStart
 #else
+  .prologue.fp
   bl TestStart
   // Return value in x0 is argument.
   bl _exit
@@ -30,10 +30,10 @@
 
 #elif defined(__riscv)
 
-  mv a0, sp
 #ifdef IN_PROCESS_TEST
   b TestStart
 #else
+  .prologue.fp
   call TestStart
   // Return value in a0 is argument.
   call _exit
@@ -42,7 +42,6 @@
 
 #elif defined(__x86_64__)
 
-  mov %rsp, %rdi
 #ifdef IN_PROCESS_TEST
   // If called by ld-startup-tests.cc code, the return address is already in
   // the word just below %rsp.  Simulate what calling TestStart directly would
@@ -50,6 +49,10 @@
   sub $8, %rsp
   jmp TestStart
 #else
+  // There's no caller so push a placeholder return address to appear in
+  // the frame pointer record.
+  pushq $0
+  .prologue.fp
   call TestStart
   // Move the return value into the argument register.
   mov %rax, %rdi
@@ -61,4 +64,6 @@
 #error "unsupported machine"
 #endif
 
+// The backtrace.cc test code needs this.
+.label _start_end, global
 .end_function

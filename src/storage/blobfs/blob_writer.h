@@ -9,25 +9,31 @@
 #error Fuchsia-only Header
 #endif
 
-#include <lib/stdcompat/span.h>
+#include <lib/fzl/owned-vmo-mapper.h>
 #include <lib/zx/result.h>
 #include <zircon/assert.h>
-#include <zircon/status.h>
+#include <zircon/compiler.h>
 
+#include <cstddef>
+#include <cstdint>
+#include <memory>
 #include <optional>
+#include <vector>
 
 #include <fbl/array.h>
-#include <fbl/macros.h>
 #include <safemath/checked_math.h>
 
+#include "src/lib/chunked-compression/chunked-archive.h"
 #include "src/lib/digest/digest.h"
 #include "src/lib/digest/merkle-tree.h"
 #include "src/storage/blobfs/allocator/extent_reserver.h"
 #include "src/storage/blobfs/allocator/node_reserver.h"
 #include "src/storage/blobfs/blob.h"
+#include "src/storage/blobfs/blob_layout.h"
 #include "src/storage/blobfs/blobfs.h"
 #include "src/storage/blobfs/compression/blob_compressor.h"
 #include "src/storage/blobfs/compression/streaming_chunked_decompressor.h"
+#include "src/storage/blobfs/compression_settings.h"
 #include "src/storage/blobfs/delivery_blob.h"
 #include "src/storage/blobfs/delivery_blob_private.h"
 #include "src/storage/blobfs/iterator/block_iterator.h"
@@ -169,16 +175,16 @@ class Blob::Writer {
 
   // Mapped VMO which we write incoming data into. When performing streaming writes, we decommit
   // pages which are no longer required to save memory (see kCacheFlushThreshold).
-  fzl::OwnedVmoMapper buffer_ = {};
+  fzl::OwnedVmoMapper buffer_;
 
   // Helper to stream data blocks to disk.
   std::unique_ptr<fs::DataStreamer> streamer_ = nullptr;
 
   // The extents we reserved for this blob from the filesystem's allocator.
-  std::vector<ReservedExtent> extents_ = {};
+  std::vector<ReservedExtent> extents_;
 
   // The nodes we reserved for this blob from the filesystem's allocator.
-  std::vector<ReservedNode> node_indices_ = {};
+  std::vector<ReservedNode> node_indices_;
 
   // If true, indicates we are streaming the current blob to disk as written. Streaming writes are
   // only supported when compression is disabled or we are writing a pre-compressed delivery blob.
@@ -204,7 +210,7 @@ class Blob::Writer {
 
   // The merkle tree creator stores the rest of the tree here. The buffer must include at least one
   // block's worth of space for padding (see `merkle_tree()` for details).
-  fbl::Array<uint8_t> merkle_tree_buffer_ = {};
+  fbl::Array<uint8_t> merkle_tree_buffer_;
 
   // On-disk layout of the blob itself. Can only be initialized once we know the actual size of the
   // blob (i.e. the blob is compressed).
@@ -253,7 +259,7 @@ class Blob::Writer {
 
   // Buffer to store decompressed data in when we will not save any space persisting compressed data
   // to disk (i.e. the decompressed size is smaller than one block). Must be block aligned.
-  fbl::Array<uint8_t> decompressed_data_ = {};
+  fbl::Array<uint8_t> decompressed_data_;
 };
 
 }  // namespace blobfs

@@ -63,7 +63,7 @@ impl Model {
         )
         .await;
         let top_instance = params.top_instance;
-        top_instance.init(root.clone()).await;
+        top_instance.init(root.clone());
         Ok(Arc::new(Model { root, context, top_instance }))
     }
 

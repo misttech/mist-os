@@ -109,18 +109,6 @@ type WlanFullmacConnectConfirm = struct {
     association_ies vector<uint8>:MAX;
 };
 
-/// Result of a roam attempt.
-/// Note that an unsuccessful roam attempt does not imply disassociation. Where a roam
-/// failure causes a fullmac driver to disassociate, the fullmac driver must explicitly
-/// disassociate.
-type WlanFullmacRoamConfirm = struct {
-    target_bssid ieee80211.MacAddr;
-    result_code ieee80211.StatusCode;
-    /// Full BSS description.
-    /// This field is only valid if the result is success.
-    selected_bss fuchsia.wlan.internal.BssDescription;
-};
-
 type WlanAuthResult = flexible enum : uint8 {
     SUCCESS = 0;
     REFUSED = 1;
@@ -441,9 +429,44 @@ closed protocol WlanFullmacImplIfc {
     strict ConnectConf(struct {
         resp WlanFullmacConnectConfirm;
     }) -> ();
-    /// Result of a roam attempt.
-    strict RoamConf(struct {
-        resp WlanFullmacRoamConfirm;
+    /// Report that a fullmac-initiated roam attempt is in progress.
+    /// Fullmac must send this start indication for all roam attempts.
+    strict RoamStartInd(table {
+        /// BSSID of the target BSS. Required.
+        1: selected_bssid ieee80211.MacAddr;
+        /// Full BSS description of the target BSS. Required.
+        /// If the data in BssDescription is incorrect or incomplete, the roam cannot succeed,
+        /// because higher layers will not be able to complete required actions (e.g. SAE).
+        2: selected_bss fuchsia.wlan.internal.BssDescription;
+        /// Whether the original BSS association has been maintained at the start of a roam attempt.
+        /// Required. 802.11 dictates that a STA can only be associated with a single BSS, so a roam
+        /// attempt typically incurs disassociation at the start of the roam attempt. However,
+        /// 802.11 also provides a mechanism (i.e. Fast BSS Transition) that allows a device to
+        /// maintain association with the original BSS while establishing authentication with the
+        /// target BSS, in order to avoid losing the original association if authentication with the
+        /// target BSS fails.
+        3: original_association_maintained bool;
+    }) -> ();
+    /// Report the result of a fullmac-initiated roam attempt.
+    strict RoamResultInd(table {
+        /// BSSID of the target BSS. Required.
+        1: selected_bssid ieee80211.MacAddr;
+        /// Result of the roam attempt. Required.
+        2: status_code ieee80211.StatusCode;
+        /// Whether the original BSS association has been maintained through the roam attempt. Required.
+        /// A successful roam always incurs disassociation from the original BSS, so if `status_code` is
+        /// success then this field must be set to false; a roam failure typically incurs disassociation
+        /// from the original BSS, but may not in some cases (e.g. in some Fast BSS Transition scenarios).
+        3: original_association_maintained bool;
+        /// Whether the client is authenticated with the target BSS. If `status_code` is success, then
+        /// this field must be set to true; if the roam attempt failed, this field may be true or false.
+        /// This allows higher layers to decide how to clean up connection state after a failed roam
+        /// attempt.
+        4: target_bss_authenticated bool;
+        /// Association ID for this association with the AP. Required if `status_code` is success.
+        5: association_id uint16;
+        /// IEs for this association with the AP. Required if `status_code` is success.
+        6: association_ies vector<uint8>:MAX;
     }) -> ();
     strict AuthInd(struct {
         resp WlanFullmacAuthInd;

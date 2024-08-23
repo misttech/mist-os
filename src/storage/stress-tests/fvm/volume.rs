@@ -22,16 +22,6 @@ fn fidl_to_status(result: Result<i32, fidl::Error>) -> Result<(), zx::Status> {
     }
 }
 
-fn anyhow_to_status(result: Result<(), anyhow::Error>) -> Result<(), zx::Status> {
-    match result {
-        Ok(()) => Ok(()),
-        Err(e) => match e.downcast::<zx::Status>() {
-            Ok(s) => Err(s),
-            Err(e) => panic!("Unrecoverable connection error: {:?}", e),
-        },
-    }
-}
-
 /// Represents a connection to a particular FVM volume.
 /// Using this struct one can perform I/O, extend, shrink or destroy the volume.
 pub struct VolumeConnection {
@@ -58,8 +48,7 @@ impl VolumeConnection {
         assert_eq!(data.len() as u64, self.slice_size);
 
         let buffer_slice = BufferSlice::from(data);
-        let result = self.block_device.write_at(buffer_slice, offset).await;
-        return anyhow_to_status(result);
+        self.block_device.write_at(buffer_slice, offset).await
     }
 
     // Reads a slice worth of data from the given offset.
@@ -71,11 +60,7 @@ impl VolumeConnection {
         assert_eq!(data.len() as u64, self.slice_size);
 
         let buffer_slice = MutableBufferSlice::from(data.as_mut_slice());
-        let result = self.block_device.read_at(buffer_slice, offset).await;
-        let result = anyhow_to_status(result);
-        let result = result.map(|_| data);
-
-        return result;
+        self.block_device.read_at(buffer_slice, offset).await.map(|_| data)
     }
 
     // Adds slices to the volume at a given offset.

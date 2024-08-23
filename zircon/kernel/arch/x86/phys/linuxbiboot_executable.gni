@@ -145,6 +145,13 @@ template("linuxbiboot_executable") {
       # overrides a symbol from linuxboot32.ld.
       libs = get_target_outputs(":$ld_target")
       deps += [ ":$ld_target" ]
+
+      metadata = {
+        # The linuxboot64 image may have its own metadata for when it's used as
+        # an image in its own right.  But don't let that show through when the
+        # linuxbiboot image embedding it is being used.
+        images_barrier = []
+      }
     }
   } else {
     # Outside of kernel.phys32, just redirect to the real kernel.phys32 target.

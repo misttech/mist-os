@@ -53,6 +53,7 @@ dts_synthetic = [
   "synthetic/plic_riscv.dts",
   "synthetic/psci-hvc.dts",
   "synthetic/psci-smc.dts",
+  "synthetic/ramoops.dts",
   "synthetic/reserved_memory.dts",
   "synthetic/simple_with_properties.dts",
   "synthetic/qcom_msm_watchdog.dts",

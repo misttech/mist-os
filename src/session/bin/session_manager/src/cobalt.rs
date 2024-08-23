@@ -50,8 +50,8 @@ pub fn get_logger() -> Result<MetricEventLoggerProxy, Error> {
 /// `Ok` if the time elapsed was logged successfully.
 pub async fn log_session_launch_time(
     logger_proxy: MetricEventLoggerProxy,
-    start_time: zx::Time,
-    end_time: zx::Time,
+    start_time: zx::MonotonicTime,
+    end_time: zx::MonotonicTime,
 ) -> Result<(), Error> {
     let elapsed_time = (end_time - start_time).into_micros();
     if elapsed_time < 0 {
@@ -86,8 +86,8 @@ mod tests {
         let (logger_proxy, mut logger_server) =
             create_proxy_and_stream::<MetricEventLoggerMarker>()
                 .expect("Failed to create Logger FIDL.");
-        let start_time = zx::Time::from_nanos(0);
-        let end_time = zx::Time::from_nanos(5000);
+        let start_time = zx::MonotonicTime::from_nanos(0);
+        let end_time = zx::MonotonicTime::from_nanos(5000);
 
         fasync::Task::spawn(async move {
             let _ = log_session_launch_time(logger_proxy, start_time, end_time).await;
@@ -115,8 +115,8 @@ mod tests {
     async fn test_log_session_launch_time_swap_start_end_time() {
         let (logger_proxy, _logger_server) = create_proxy_and_stream::<MetricEventLoggerMarker>()
             .expect("Failed to create Logger FIDL.");
-        let start_time = zx::Time::from_nanos(0);
-        let end_time = zx::Time::from_nanos(5000);
+        let start_time = zx::MonotonicTime::from_nanos(0);
+        let end_time = zx::MonotonicTime::from_nanos(5000);
 
         assert!(log_session_launch_time(logger_proxy, end_time, start_time).await.is_err());
     }

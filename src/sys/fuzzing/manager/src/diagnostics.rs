@@ -94,12 +94,12 @@ impl ArtifactHandler {
 
 struct Message {
     data: Vec<u8>,
-    expiration: zx::Time,
+    expiration: zx::MonotonicTime,
 }
 
 impl Message {
     fn new(data: Vec<u8>) -> Self {
-        let mut expiration = zx::Time::get_monotonic();
+        let mut expiration = zx::MonotonicTime::get();
         expiration += zx::Duration::from_seconds(DEFAULT_TIMEOUT_IN_SECONDS);
         Self { data, expiration }
     }
@@ -158,7 +158,7 @@ trait ArtifactBridgeInternal: ArtifactBridge {
         let mut socket = None;
         let socket_receiver_rc = Rc::new(RefCell::new(socket_receiver));
         while let Some(msg) = msg_receiver.next().await {
-            let now = zx::Time::get_monotonic();
+            let now = zx::MonotonicTime::get();
             if msg.expiration < now {
                 continue;
             }

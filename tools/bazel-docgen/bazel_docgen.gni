@@ -2,17 +2,18 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/bazel/bazel_build_action.gni")
+import("//build/bazel/bazel_build_group.gni")
 import("//build/compiled_action.gni")
 
 # Provides a mechanism for creating a zip file containing all of the
 # documentation defined in the bazel build rules.
 #
 # Args:
-#   textproto_targets: (required)
-#     The set of targets that generate the text protos.
-#     This target should be an `extract_bazel_doc_textproto()` target.
-#     Type: list of strings (GN labels)
+#   bazel_targets: (required)
+#     The set of Bazel targets that generate the text protos.
+#     These targets should be `starlark_doc_extract()` targets and should not
+#     include the textproto ending.
+#     Type: list of strings (Bazel labels)
 #
 #   docset_name: (required)
 #     The name of the docset to generate.
@@ -34,13 +35,44 @@ import("//build/compiled_action.gni")
 #   visibility:
 #     Usual GN meaning.
 template("bazel_docgen") {
-  assert(defined(invoker.textproto_targets),
-         "textproto_targets must be defined")
+  assert(defined(invoker.bazel_targets), "bazel_targets must be defined")
   assert(defined(invoker.docset_name), "docset_name must be defined")
   assert(defined(invoker.reference_repo_path),
          "reference_repo_path must be defined")
   assert(defined(invoker.docsite_base_path),
          "docsite_base_path must be defined")
+
+  _protos = []
+  _bazel_targets = []
+  _gn_copy_targets = []
+  foreach(bazel_target, invoker.bazel_targets) {
+    _bazel_target_name = get_label_info(bazel_target, "name")
+    _output_name = "${_bazel_target_name}.docs.textproto"
+    _gn_target_name = "${target_name}.${_output_name}"
+    _gn_copy_targets += [ ":${_gn_target_name}" ]
+    _bazel_targets += [
+      {
+        bazel_target = "${bazel_target}.textproto"
+        gn_target_name = _gn_target_name
+        copy_outputs = [
+          {
+            bazel = "{{BAZEL_TARGET_OUT_PATH}}"
+            ninja = _output_name
+          },
+        ]
+      },
+    ]
+    _protos += [ "${target_out_dir}/${_output_name}" ]
+  }
+
+  bazel_build_group("${target_name}.bazel_build_group") {
+    forward_variables_from(invoker,
+                           [
+                             "testonly",
+                             "visibility",
+                           ])
+    subtargets = _bazel_targets
+  }
 
   compiled_action(target_name) {
     tool = "//tools/bazel-docgen:bin"
@@ -53,15 +85,10 @@ template("bazel_docgen") {
                            ])
 
     proto_args = []
-
-    foreach(target, invoker.textproto_targets) {
-      gen_dir = get_label_info(target, "target_out_dir")
-      file_name = get_label_info(target, "name") + ".docs.textproto"
-      proto = rebase_path(gen_dir + "/" + file_name, root_build_dir)
-
+    foreach(_proto, _protos) {
       proto_args += [
         "--proto",
-        proto,
+        rebase_path(_proto, root_build_dir),
       ]
     }
 
@@ -80,7 +107,7 @@ template("bazel_docgen") {
 
     outputs = [ out_zip ]
 
-    deps = invoker.textproto_targets
+    deps = _gn_copy_targets
     if (defined(invoker.deps)) {
       deps += invoker.deps
     }
@@ -97,39 +124,5 @@ template("bazel_docgen") {
         },
       ]
     }
-  }
-}
-
-# Wraps a `starlark_doc_extract()` in a `BUILD.bazel` file.
-# Use this template to create a textproto from the given target.
-#
-# Args:
-#   bazel_target: (required)
-#     Bazel target to wrap.
-#     This target should be a `starlark_doc_extract()` target and should not
-#     include the textproto ending.
-#
-#   deps:
-#   testonly:
-#   visibility:
-#     Usual GN meaning.
-template("extract_bazel_doc_textproto") {
-  assert(defined(invoker.bazel_target), "bazel_target must be defined")
-
-  bazel_build_action(target_name) {
-    forward_variables_from(invoker,
-                           [
-                             "deps",
-                             "metadata",
-                             "testonly",
-                             "visibility",
-                           ])
-    bazel_target = invoker.bazel_target + ".textproto"
-    copy_outputs = [
-      {
-        bazel = "{{BAZEL_TARGET_OUT_DIR}}/{{BAZEL_TARGET_NAME}}"
-        ninja = "${target_name}.docs.textproto"
-      },
-    ]
   }
 }

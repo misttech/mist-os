@@ -2,9 +2,12 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <fcntl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
 #include <lib/ddk/platform-defs.h>
+#include <sys/stat.h>
+#include <unistd.h>
 
 #include <gtest/gtest.h>
 
@@ -13,7 +16,57 @@
 namespace sysmem_driver {
 namespace {
 
+std::vector<uint8_t> LoadFile(const char* filename) {
+  int fd = open(filename, O_RDONLY);
+  struct stat file_stat;
+  int fstat_result = fstat(fd, &file_stat);
+  ZX_ASSERT(fstat_result == 0);
+  size_t size = file_stat.st_size;
+  std::vector<uint8_t> data(size);
+  ssize_t read_size = read(fd, data.data(), data.size());
+  ZX_ASSERT(read_size == static_cast<ssize_t>(size));
+  close(fd);
+  return data;
+}
+
+std::vector<fuchsia_sysmem2::FormatCostEntry> LoadCostEntries(std::vector<const char*> filenames) {
+  std::vector<fuchsia_sysmem2::FormatCostEntry> result;
+
+  for (auto cost_filename : filenames) {
+    auto data = LoadFile(cost_filename);
+
+    auto unpersist_result = fidl::Unpersist<fuchsia_sysmem2::FormatCosts>(data);
+    ZX_ASSERT(unpersist_result.is_ok());
+    auto& format_costs = unpersist_result.value();
+    auto format_cost_entries = std::move(format_costs.format_costs().value());
+
+    for (auto& entry : format_cost_entries) {
+      result.emplace_back(std::move(entry));
+    }
+  }
+
+  return result;
+}
+
+std::vector<fuchsia_sysmem2::FormatCostEntry> LoadArmCostEntries() {
+  return LoadCostEntries(std::vector{
+      "/pkg/data/format_costs/intel.format_costs_persistent_fidl",
+      "/pkg/data/format_costs/arm_mali.format_costs_persistent_fidl",
+      "/pkg/data/format_costs/video_decoder_nv12.format_costs_persistent_fidl",
+  });
+}
+
+std::vector<fuchsia_sysmem2::FormatCostEntry> LoadGenericCostEntries() {
+  return LoadCostEntries(std::vector{
+      // For historical reasons the "intel" format costs are treated as "generic" for tests.
+      "/pkg/data/format_costs/intel.format_costs_persistent_fidl",
+  });
+}
+
 TEST(PixelFormatCost, Afbc) {
+  UsagePixelFormatCost arm_costs(LoadArmCostEntries());
+  UsagePixelFormatCost generic_costs(LoadGenericCostEntries());
+
   for (uint32_t is_x = 0; is_x < 2; ++is_x) {
     fuchsia_sysmem2::BufferCollectionConstraints constraints;
     constraints.image_format_constraints().emplace(2);
@@ -40,24 +93,15 @@ TEST(PixelFormatCost, Afbc) {
       constraints.image_format_constraints()->at(1) = std::move(image_format_constraints);
     }
 
-    uint32_t amlogic_pids[] = {
-        PDEV_PID_AMLOGIC_S912,
-        PDEV_PID_AMLOGIC_S905D2,
-        PDEV_PID_AMLOGIC_T931,
-        PDEV_PID_AMLOGIC_A311D,
-    };
-    for (uint32_t pid : amlogic_pids) {
-      EXPECT_LT(0, UsagePixelFormatCost::Compare(PDEV_VID_AMLOGIC, pid, constraints, 0, 1));
-      EXPECT_GT(0, UsagePixelFormatCost::Compare(PDEV_VID_AMLOGIC, pid, constraints, 1, 0));
-    }
-    EXPECT_EQ(0, UsagePixelFormatCost::Compare(0u, PDEV_PID_AMLOGIC_S912, constraints, 0, 1));
-    EXPECT_EQ(0, UsagePixelFormatCost::Compare(0u, PDEV_PID_AMLOGIC_S912, constraints, 1, 0));
+    EXPECT_LT(0, arm_costs.Compare(constraints, 0, 1));
+    EXPECT_GT(0, arm_costs.Compare(constraints, 1, 0));
+    EXPECT_EQ(0, generic_costs.Compare(constraints, 0, 1));
+    EXPECT_EQ(0, generic_costs.Compare(constraints, 1, 0));
   }
 }
 
 TEST(PixelFormatCost, IntelTiling) {
-  constexpr uint32_t kUnknownPid = 0;
-  constexpr uint32_t kUnknownVid = 0;
+  UsagePixelFormatCost generic_costs(LoadGenericCostEntries());
 
   for (uint32_t is_x = 0; is_x < 2; ++is_x) {
     fuchsia_sysmem2::BufferCollectionConstraints constraints;
@@ -91,21 +135,15 @@ TEST(PixelFormatCost, IntelTiling) {
         }
         constraints.image_format_constraints()->at(1) = std::move(image_format_constraints);
       }
-      EXPECT_LT(0, UsagePixelFormatCost::Compare(kUnknownVid, kUnknownPid, constraints, 0, 1));
-      EXPECT_GT(0, UsagePixelFormatCost::Compare(kUnknownVid, kUnknownPid, constraints, 1, 0));
-      // Intel tiled formats aren't necessarily useful on AMLOGIC, but if some hardware supported
-      // them they should probably be used anyway.
-      EXPECT_LT(0, UsagePixelFormatCost::Compare(PDEV_VID_AMLOGIC, PDEV_PID_AMLOGIC_S912,
-                                                 constraints, 0, 1));
-      EXPECT_GT(0, UsagePixelFormatCost::Compare(PDEV_VID_AMLOGIC, PDEV_PID_AMLOGIC_S912,
-                                                 constraints, 1, 0));
+      EXPECT_LT(0, generic_costs.Compare(constraints, 0, 1));
+      EXPECT_GT(0, generic_costs.Compare(constraints, 1, 0));
 
       // Explicit linear should be treated the same as no format modifier value.
       constraints.image_format_constraints()->at(0).pixel_format_modifier() =
           fuchsia_images2::PixelFormatModifier::kLinear;
 
-      EXPECT_LT(0, UsagePixelFormatCost::Compare(kUnknownVid, kUnknownPid, constraints, 0, 1));
-      EXPECT_GT(0, UsagePixelFormatCost::Compare(kUnknownVid, kUnknownPid, constraints, 1, 0));
+      EXPECT_LT(0, generic_costs.Compare(constraints, 0, 1));
+      EXPECT_GT(0, generic_costs.Compare(constraints, 1, 0));
 
       // Explicit linear should be treated the same as no format modifier value.
       {
@@ -114,8 +152,8 @@ TEST(PixelFormatCost, IntelTiling) {
                             : fuchsia_images2::PixelFormat::kB8G8R8A8;
         constraints.image_format_constraints()->at(0).pixel_format() = pixel_format;
       }
-      EXPECT_LT(0, UsagePixelFormatCost::Compare(kUnknownVid, kUnknownPid, constraints, 0, 1));
-      EXPECT_GT(0, UsagePixelFormatCost::Compare(kUnknownVid, kUnknownPid, constraints, 1, 0));
+      EXPECT_LT(0, generic_costs.Compare(constraints, 0, 1));
+      EXPECT_GT(0, generic_costs.Compare(constraints, 1, 0));
     }
 
     // Formats are in ascending preference order (descending cost order).
@@ -144,15 +182,16 @@ TEST(PixelFormatCost, IntelTiling) {
     }
 
     for (uint32_t i = 1; i < modifier_list.size(); ++i) {
-      EXPECT_LT(0, UsagePixelFormatCost::Compare(kUnknownVid, kUnknownPid, constraints, i - 1, i))
-          << "i=" << i;
-      EXPECT_GT(0, UsagePixelFormatCost::Compare(kUnknownVid, kUnknownPid, constraints, i, i - 1))
-          << "i=" << i;
+      EXPECT_LT(0, generic_costs.Compare(constraints, i - 1, i)) << "i=" << i;
+      EXPECT_GT(0, generic_costs.Compare(constraints, i, i - 1)) << "i=" << i;
     }
   }
 }
 
 TEST(PixelFormatCost, ArmTransactionElimination) {
+  auto arm_costs = UsagePixelFormatCost(LoadArmCostEntries());
+  auto generic_costs = UsagePixelFormatCost(LoadGenericCostEntries());
+
   for (uint32_t is_x = 0; is_x < 2; ++is_x) {
     fuchsia_sysmem2::BufferCollectionConstraints constraints;
     constraints.image_format_constraints().emplace(2);
@@ -181,16 +220,17 @@ TEST(PixelFormatCost, ArmTransactionElimination) {
       constraints.image_format_constraints()->at(1) = std::move(image_format_constraints);
     }
 
-    EXPECT_LT(0, UsagePixelFormatCost::Compare(PDEV_VID_AMLOGIC, PDEV_PID_AMLOGIC_S912, constraints,
-                                               0, 1));
-    EXPECT_GT(0, UsagePixelFormatCost::Compare(PDEV_VID_AMLOGIC, PDEV_PID_AMLOGIC_S912, constraints,
-                                               1, 0));
-    EXPECT_EQ(0, UsagePixelFormatCost::Compare(0u, PDEV_PID_AMLOGIC_S912, constraints, 0, 1));
-    EXPECT_EQ(0, UsagePixelFormatCost::Compare(0u, PDEV_PID_AMLOGIC_S912, constraints, 1, 0));
+    EXPECT_LT(0, arm_costs.Compare(constraints, 0, 1));
+    EXPECT_GT(0, arm_costs.Compare(constraints, 1, 0));
+    EXPECT_EQ(0, generic_costs.Compare(constraints, 0, 1));
+    EXPECT_EQ(0, generic_costs.Compare(constraints, 1, 0));
   }
 }
 
 TEST(PixelFormatCost, AfbcWithFlags) {
+  auto arm_costs = UsagePixelFormatCost(LoadArmCostEntries());
+  auto generic_costs = UsagePixelFormatCost(LoadGenericCostEntries());
+
   for (uint32_t is_x = 0; is_x < 2; ++is_x) {
     // Formats are in ascending preference order (descending cost order).
     std::array modifier_list = {
@@ -220,14 +260,10 @@ TEST(PixelFormatCost, AfbcWithFlags) {
     }
 
     for (uint32_t i = 1; i < modifier_list.size(); ++i) {
-      EXPECT_LT(0, UsagePixelFormatCost::Compare(PDEV_VID_AMLOGIC, PDEV_PID_AMLOGIC_S912,
-                                                 constraints, i - 1, i))
-          << "i=" << i;
-      EXPECT_GT(0, UsagePixelFormatCost::Compare(PDEV_VID_AMLOGIC, PDEV_PID_AMLOGIC_S912,
-                                                 constraints, i, i - 1))
-          << "i=%d" << i;
-      EXPECT_EQ(0, UsagePixelFormatCost::Compare(0u, PDEV_PID_AMLOGIC_S912, constraints, i - 1, i));
-      EXPECT_EQ(0, UsagePixelFormatCost::Compare(0u, PDEV_PID_AMLOGIC_S912, constraints, i, i - 1));
+      EXPECT_LT(0, arm_costs.Compare(constraints, i - 1, i)) << "i=" << i;
+      EXPECT_GT(0, arm_costs.Compare(constraints, i, i - 1)) << "i=%d" << i;
+      EXPECT_EQ(0, generic_costs.Compare(constraints, i - 1, i));
+      EXPECT_EQ(0, generic_costs.Compare(constraints, i, i - 1));
     }
   }
 }

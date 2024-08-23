@@ -26,10 +26,6 @@ executable("libvulkan_test_bin") {
   output_name = "libvulkan_test"
 
   deps = [ ":src" ]
-
-  # Temporarily disable UBSAN while we roll some changes to types.
-  # TODO(https://fxbug.dev/356893475): Re-enable.
-  exclude_toolchain_tags = [ "instrumented" ]
 }
 
 executable("fake_vulkan_loader_bin") {

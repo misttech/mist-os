@@ -314,7 +314,7 @@ TEST_F(FileTest, WritebackWhileTruncate) {
   file->Truncate(0);
   for (size_t i = 0; i < written_blocks; ++i) {
     LockedPage page;
-    ASSERT_EQ(file->GrabCachePage(i * Page::Size(), &page), ZX_OK);
+    ASSERT_EQ(file->GrabCachePage(i, &page), ZX_OK);
     ASSERT_EQ(page->GetBlockAddr(), kNullAddr);
   }
 

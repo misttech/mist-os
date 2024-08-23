@@ -4,6 +4,7 @@
 
 #include "src/ui/tests/integration_input_tests/web-test-base/web-app-base.h"
 
+#include <fidl/fuchsia.element/cpp/fidl.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/syslog/cpp/macros.h>
@@ -76,10 +77,7 @@ void WebAppBase::Setup(const std::string& web_app_name, const std::string& js_co
                        fuchsia_web::ContextFeatureFlags context_feature_flags) {
   ZX_ASSERT_OK(outgoing_directory_.ServeFromStartupInfo());
   SetupWebEngine(web_app_name, context_feature_flags);
-  SetupViewProvider();
-
-  FX_LOGS(INFO) << "Wait for CreateView2 called.";
-  RunLoopUntil([&]() { return create_view2_called_; });
+  PresentView();
   SetupWebPage(js_code);
 }
 
@@ -115,15 +113,6 @@ void WebAppBase::SetupWebEngine(const std::string& web_app_name,
 
   // Setup log level in JS to get logs.
   ZX_ASSERT_OK(web_frame_->SetJavaScriptLogLevel({fuchsia_web::ConsoleLogLevel::kInfo}));
-}
-
-void WebAppBase::SetupViewProvider() {
-  ZX_ASSERT_OK(outgoing_directory_.AddUnmanagedProtocol<fuchsia_ui_app::ViewProvider>(
-      [&](fidl::ServerEnd<fuchsia_ui_app::ViewProvider> server_end) {
-        FX_LOGS(INFO) << "fuchsia_ui_app::ViewProvider connect";
-        view_provider_bindings_.AddBinding(loop_.dispatcher(), std::move(server_end), this,
-                                           fidl::kIgnoreBindingClosure);
-      }));
 }
 
 void WebAppBase::SetupWebPage(const std::string& js_code) {
@@ -192,20 +181,30 @@ void WebAppBase::SendMessageToWebPage(fidl::ServerEnd<fuchsia_web::MessagePort> 
   ZX_ASSERT_OK(web_frame_->PostMessage({/*target_origin=*/"*", std::move(web_message)}));
 }
 
-// |fuchsia_ui_app::ViewProvider|
-void WebAppBase::CreateViewWithViewRef(CreateViewWithViewRefRequest& request,
-                                       CreateViewWithViewRefCompleter::Sync& completer) {
-  // Flatland only use |CreateView2|.
-  FX_LOGS(FATAL) << "CreateViewWithViewRef() is not implemented.";
-}
+void WebAppBase::PresentView() {
+  auto presenter_connect = component::Connect<fuchsia_element::GraphicalPresenter>();
+  ZX_ASSERT_OK(presenter_connect);
+  presenter_ = fidl::Client(std::move(presenter_connect.value()), loop_.dispatcher());
 
-// |fuchsia_ui_app::ViewProvider|
-void WebAppBase::CreateView2(CreateView2Request& req, CreateView2Completer::Sync& completer) {
-  FX_LOGS(INFO) << "Call CreateView2";
-  fuchsia_web::CreateView2Args args2(
-      {.view_creation_token = std::move(req.args().view_creation_token())});
-  ZX_ASSERT_OK(web_frame_->CreateView2(std::move(args2)));
-  create_view2_called_ = true;
+  fuchsia_ui_views::ViewCreationToken child_token;
+  fuchsia_ui_views::ViewportCreationToken parent_token;
+  zx::channel::create(0, &parent_token.value(), &child_token.value());
+
+  fuchsia_element::ViewSpec view_spec;
+  view_spec.viewport_creation_token() = std::move(parent_token);
+  fuchsia_element::GraphicalPresenterPresentViewRequest request;
+  request.view_spec() = std::move(view_spec);
+  FX_LOGS(INFO) << "PresentView call";
+  presenter_->PresentView(std::move(request))
+      .Then([](fidl::Result<fuchsia_element::GraphicalPresenter::PresentView>& result) {
+        if (!result.is_ok()) {
+          FX_LOGS(FATAL) << "PresentView failed";
+        }
+      });
+
+  FX_LOGS(INFO) << "Call fuchsia.web.Frame/CreateView2";
+  fuchsia_web::CreateView2Args args({.view_creation_token = std::move(child_token)});
+  ZX_ASSERT_OK(web_frame_->CreateView2(std::move(args)));
 }
 
 }  // namespace integration_tests

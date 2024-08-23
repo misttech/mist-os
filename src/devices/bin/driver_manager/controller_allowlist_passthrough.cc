@@ -39,6 +39,7 @@ const std::unordered_map<std::string, std::unordered_set<std::string_view>> kCon
          "block",               // Allow qemu to boot
          "driver_runner_test",  // driver_runner_death_test
          "nand",                // Some internal bot
+         "skip-block",          // Temporary usage for paver
          "No_class_name_but_driver_url_is_fuchsia-boot:///dtr#meta/fvm.cm",  // paver-test
          "No_class_name_but_driver_url_is_fuchsia-boot:///fvm#meta/fvm.cm",  // installer_test.sh
          "No_class_name_but_driver_url_is_fuchsia-boot:///gpt#meta/gpt.cm",  // storage-verity-benchmarks

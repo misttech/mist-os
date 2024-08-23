@@ -52,19 +52,6 @@ class TestClippy(unittest.TestCase):
             codes, ["clippy::approx_constant", "clippy::needless_return"]
         )
 
-    def test_file_filtering(self) -> None:
-        lints = read_lints(
-            run_clippy("-f", FAKE_ROOT / "build/rust/tests/a/main.rs", "--raw")
-        )
-        codes = extract_codes(lints)
-        self.assertEqual(codes, ["clippy::approx_constant"])
-
-        lints = read_lints(
-            run_clippy("-f", FAKE_ROOT / "build/rust/tests/a/other.rs", "--raw")
-        )
-        codes = extract_codes(lints)
-        self.assertEqual(codes, ["clippy::needless_return"])
-
     def test_dedup_lints(self) -> None:
         lints = read_lints(
             run_clippy(

@@ -34,8 +34,6 @@ namespace sherlock {
 namespace fpbus = fuchsia_hardware_platform_bus;
 
 zx_status_t Sherlock::Create(void* ctx, zx_device_t* parent) {
-  iommu_protocol_t iommu;
-
   auto endpoints = fdf::CreateEndpoints<fpbus::PlatformBus>();
   if (endpoints.is_error()) {
     return endpoints.error_value();
@@ -50,13 +48,8 @@ zx_status_t Sherlock::Create(void* ctx, zx_device_t* parent) {
 
   fdf::WireSyncClient<fpbus::PlatformBus> pbus(std::move(endpoints->client));
 
-  status = device_get_protocol(parent, ZX_PROTOCOL_IOMMU, &iommu);
-  if (status != ZX_OK) {
-    return status;
-  }
-
   fbl::AllocChecker ac;
-  auto board = fbl::make_unique_checked<Sherlock>(&ac, parent, pbus.TakeClientEnd(), &iommu);
+  auto board = fbl::make_unique_checked<Sherlock>(&ac, parent, pbus.TakeClientEnd());
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }

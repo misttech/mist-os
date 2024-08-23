@@ -27,12 +27,12 @@ type BinaryPowerLevel = strict enum : PowerLevel {
 ///
 /// See https://fuchsia.dev/fuchsia-src/contribute/governance/rfcs/0250_power_topology#dependency_types
 /// for more details on these definitions.
-type DependencyType = strict enum {
+type DependencyType = flexible enum {
     ASSERTIVE = 1;
     OPPORTUNISTIC = 2;
 };
 
-const MAX_ELEMENT_NAME_LEN uint16 = 1024;
+const MAX_ELEMENT_NAME_LEN uint8 = 64;
 
 /// A token that represents the right to add a dependency upon another
 /// element. Should first be registered with Power Broker via

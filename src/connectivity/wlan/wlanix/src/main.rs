@@ -499,6 +499,37 @@ async fn handle_client_connect_transactions<C: ClientIface>(
                     ),
                 }
             }
+            Ok(fidl_sme::ConnectTransactionEvent::OnRoamResult { result }) => {
+                match result.status_code {
+                    fidl_fuchsia_wlan_ieee80211::StatusCode::Success => {
+                        info!("Connection roamed successfully");
+                        // TODO(https://fxbug.dev/352557875): Plumb SME RoamResult into wlanix.
+                    }
+                    _ => {
+                        info!("Connection failed to roam");
+                        let source = match result.disconnect_info {
+                            Some(disconnect_info) => disconnect_info.disconnect_source,
+                            None => {
+                                error!("RoamResult indicates failure, but disconnect source is missing");
+                                fidl_sme::DisconnectSource::Mlme(fidl_sme::DisconnectCause {
+                                    mlme_event_name:
+                                        fidl_sme::DisconnectMlmeEventName::RoamResultIndication,
+                                    reason_code:
+                                        fidl_fuchsia_wlan_ieee80211::ReasonCode::UnspecifiedReason,
+                                })
+                            }
+                        };
+                        send_disconnect_event(
+                            &source,
+                            &ctx,
+                            &sta_iface_state.lock(),
+                            &wifi_state.lock(),
+                            &*iface,
+                            iface_id,
+                        );
+                    }
+                }
+            }
             Ok(fidl_sme::ConnectTransactionEvent::OnDisconnect { info }) => {
                 let connected_duration = fasync::Time::now() - ctx.most_recent_connect_time;
                 telemetry_sender.send(TelemetryEvent::Disconnect {

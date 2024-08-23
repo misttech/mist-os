@@ -56,10 +56,11 @@ re-generated manually whenever the API changes.
    * `rustc` 1.73.0-nightly
    * `cbindgen` 0.24.5
 
-3. Run the generation script in this directory:
+3. Run the generation script in this directory (this requires a host Python
+   installation):
 
    ```shell
-   ./cbindgen.py
+   $ python3 cbindgen.py
    ```
 
 4. Switch back the stable Rust toolchain (optional)

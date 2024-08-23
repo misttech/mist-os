@@ -5,13 +5,13 @@
 #ifndef SRC_STORAGE_BLOBFS_ALLOCATOR_EXTENT_RESERVER_H_
 #define SRC_STORAGE_BLOBFS_ALLOCATOR_EXTENT_RESERVER_H_
 
-#include <stdbool.h>
 #include <stdint.h>
-#include <zircon/types.h>
+#include <zircon/compiler.h>
 
 #include <mutex>
 
 #include <bitmap/rle-bitmap.h>
+#include <fbl/macros.h>
 
 #include "src/storage/blobfs/format.h"
 

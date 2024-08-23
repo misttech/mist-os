@@ -15,7 +15,8 @@ int main(int argc, char** argv) {
   }
 
   testing::InitGoogleTest(&argc, argv);
-  fuchsia_logging::SetTags({"forensics", "test"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"forensics", "test"}).BuildAndInitialize();
 
   return RUN_ALL_TESTS();
 }

@@ -24,6 +24,9 @@
     "fuchsia.graphics.drivers.msd-vsi-vip.device": { "priority": 25 },
     "fuchsia.graphics.drivers.msd-vsi-vip.vsi-interrupt": { "priority": 25 },
 
+    // Arm Mali CMAR profiles.
+    "arm.drivers.graphics.mali.cmar-backend-rt": { "capacity": "8ms", "deadline": "16666us", "period": "16666us" },
+
     // Virtualization profiles.
     "fuchsia.virtualization.virtio_sound": { "capacity": "500us", "deadline": "5ms", "period": "5ms" },
 

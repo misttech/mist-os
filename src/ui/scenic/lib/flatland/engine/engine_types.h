@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
 #include <fidl/fuchsia.images2/cpp/fidl.h>
 #include <fidl/fuchsia.math/cpp/fidl.h>
+#include <fidl/fuchsia.ui.composition/cpp/fidl.h>
 
 #include "src/ui/scenic/lib/allocation/buffer_collection_importer.h"
 #include "src/ui/scenic/lib/flatland/flatland_types.h"
@@ -59,7 +60,7 @@ struct DisplaySrcDstFrames {
 // transform enum.
 fuchsia_hardware_display_types::CoordinateTransformation GetDisplayTransformFromOrientationAndFlip(
     fuchsia::ui::composition::Orientation orientation,
-    fuchsia::ui::composition::ImageFlip image_flip);
+    fuchsia_ui_composition::ImageFlip image_flip);
 
 }  // namespace flatland
 

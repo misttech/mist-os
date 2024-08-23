@@ -9,7 +9,7 @@ use crate::parse::{OptionCodeMap, OptionRequested};
 use anyhow::Context as _;
 use dhcp_protocol::{AtLeast, AtMostBytes, CLIENT_PORT, SERVER_PORT};
 use futures::channel::mpsc;
-use futures::{select, FutureExt as _, Stream, StreamExt as _, TryStreamExt as _};
+use futures::{select, select_biased, FutureExt as _, Stream, StreamExt as _, TryStreamExt as _};
 use net_types::ethernet::Mac;
 use net_types::{SpecifiedAddr, Witness as _};
 use rand::Rng as _;
@@ -1012,14 +1012,7 @@ impl<I: deps::Instant> Selecting<I> {
         })
         .fuse());
 
-        select! {
-            send_discovers_result = send_fut => {
-                send_discovers_result?;
-                unreachable!("should never stop retransmitting DHCPDISCOVER unless we hit an error");
-            },
-            () = stop_receiver.select_next_some() => {
-                Ok(SelectingOutcome::GracefulShutdown)
-            },
+        select_biased! {
             fields_to_use_in_request_result = offer_fields_stream.select_next_some() => {
                 let (src_addr, fields_from_offer_to_use_in_request) =
                     fields_to_use_in_request_result?;
@@ -1037,6 +1030,13 @@ impl<I: deps::Instant> Selecting<I> {
                     fields_from_offer_to_use_in_request,
                     start_time: *start_time,
                 }))
+            },
+            () = stop_receiver.select_next_some() => {
+                Ok(SelectingOutcome::GracefulShutdown)
+            },
+            send_discovers_result = send_fut => {
+                send_discovers_result?;
+                unreachable!("should never stop retransmitting DHCPDISCOVER unless we hit an error");
             }
         }
     }
@@ -1197,16 +1197,16 @@ impl<I: deps::Instant> Requesting<I> {
         })
         .fuse());
 
-        let (src_addr, fields_to_retain) = select! {
-            send_requests_result = send_fut => {
-                send_requests_result?;
-                return Ok(RequestingOutcome::RanOutOfRetransmits)
+        let (src_addr, fields_to_retain) = select_biased! {
+            fields_to_retain_result = ack_or_nak_stream.select_next_some() => {
+                fields_to_retain_result?
             },
             () = stop_receiver.select_next_some() => {
                 return Ok(RequestingOutcome::GracefulShutdown)
             },
-            fields_to_retain_result = ack_or_nak_stream.select_next_some() => {
-                fields_to_retain_result?
+            send_requests_result = send_fut => {
+                send_requests_result?;
+                return Ok(RequestingOutcome::RanOutOfRetransmits)
             }
         };
 
@@ -1514,17 +1514,17 @@ impl<I: deps::Instant> Renewing<I> {
 
         let mut timeout_fut = pin!(time.wait_until(t2).fuse());
 
-        let response = select! {
-            () = timeout_fut => return Ok(RenewingOutcome::Rebinding(
-                    Rebinding { bound: bound.clone() }
-                )),
-            () = stop_receiver.select_next_some() => return Ok(RenewingOutcome::GracefulShutdown),
+        let response = select_biased! {
             response = responses_stream.select_next_some() => {
                 response?
-            }
+            },
+            () = stop_receiver.select_next_some() => return Ok(RenewingOutcome::GracefulShutdown),
             send_result = send_fut => {
                 return Err(send_result.expect_err("send_fut should never complete without error"))
-            }
+            },
+            () = timeout_fut => return Ok(RenewingOutcome::Rebinding(
+                    Rebinding { bound: bound.clone() }
+                ))
         };
 
         match response {
@@ -1734,15 +1734,15 @@ impl<I: deps::Instant> Rebinding<I> {
 
         let mut timeout_fut = pin!(time.wait_until(lease_expiry).fuse());
 
-        let response = select! {
-            () = timeout_fut => return Ok(RebindingOutcome::TimedOut),
-            () = stop_receiver.select_next_some() => return Ok(RebindingOutcome::GracefulShutdown),
+        let response = select_biased! {
             response = responses_stream.select_next_some() => {
                 response?
-            }
+            },
+            () = stop_receiver.select_next_some() => return Ok(RebindingOutcome::GracefulShutdown),
             send_result = send_fut => {
                 return Err(send_result.expect_err("send_fut should never complete without error"))
-            }
+            },
+            () = timeout_fut => return Ok(RebindingOutcome::TimedOut)
         };
 
         match response {

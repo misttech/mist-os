@@ -5,8 +5,6 @@
 #include "src/ui/scenic/lib/display/display_power_manager.h"
 
 #include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.display.types/cpp/hlcpp_conversion.h>
-#include <fuchsia/hardware/display/types/cpp/fidl.h>
 #include <fuchsia/ui/display/internal/cpp/fidl.h>
 #include <zircon/errors.h>
 #include <zircon/status.h>
@@ -44,14 +42,12 @@ void DisplayPowerManager::SetDisplayPower(bool power_on, SetDisplayPowerCallback
   // the DisplayPowerManager will only control power of the default display.
   // Once Scenic and DisplayManager supports multiple displays, this needs to
   // be updated to control power of all available displays.
-  std::shared_ptr<fuchsia::hardware::display::CoordinatorSyncPtr> hlcpp_coordinator =
+  std::shared_ptr<fidl::SyncClient<fuchsia_hardware_display::Coordinator>> coordinator =
       display_manager_.default_display_coordinator();
-  FX_DCHECK(hlcpp_coordinator);
-  fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator> coordinator =
-      scenic_impl::GetUnowned(*hlcpp_coordinator);
+  FX_DCHECK(coordinator);
   fuchsia_hardware_display_types::DisplayId id = display_manager_.default_display()->display_id();
 
-  fit::result set_display_power_result = fidl::Call(coordinator)
+  fit::result set_display_power_result = (*coordinator)
                                              ->SetDisplayPower({{
                                                  .display_id = id,
                                                  .power_on = power_on,

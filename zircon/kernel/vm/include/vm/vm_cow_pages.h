@@ -24,6 +24,7 @@
 #include <fbl/ref_ptr.h>
 #include <kernel/mutex.h>
 #include <vm/compressor.h>
+#include <vm/content_size_manager.h>
 #include <vm/page_source.h>
 #include <vm/physical_page_borrowing_config.h>
 #include <vm/pmm.h>
@@ -342,6 +343,11 @@ class VmCowPages final : public VmHierarchyBase,
   zx_status_t PrepareForWriteLocked(uint64_t offset, uint64_t len, LazyPageRequest* page_request,
                                     uint64_t* dirty_len_out) TA_REQ(lock());
 
+  // See VmObject::SetUserContentSize
+  void SetUserContentSizeLocked(fbl::RefPtr<ContentSizeManager> csm) TA_REQ(lock()) {
+    user_content_size_ = ktl::move(csm);
+  }
+
   class LookupCursor;
   // See VmObjectPaged::GetLookupCursorLocked
   zx::result<LookupCursor> GetLookupCursorLocked(uint64_t offset, uint64_t max_len) TA_REQ(lock());
@@ -461,10 +467,17 @@ class VmCowPages final : public VmHierarchyBase,
   // If the |compressor| is non-null then it must have just had |Arm| called on it.
   // |hint_action| indicates whether the |always_need| eviction hint should be respected or ignored.
   //
-  // The actual number of pages reclaimed is returned and ownership of the pages is given by
-  // appending to the passed in |freed_list|.
-  uint64_t ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintAction hint_action,
-                       list_node* freed_list, VmCompressor* compressor);
+  // The actual number of pages reclaimed is returned.
+  struct ReclaimCounts {
+    uint64_t evicted_non_loaned = 0;
+    uint64_t evicted_loaned = 0;
+    uint64_t discarded = 0;
+    uint64_t compressed = 0;
+
+    uint64_t Total() const { return compressed + discarded + evicted_non_loaned + evicted_loaned; }
+  };
+  ReclaimCounts ReclaimPage(vm_page_t* page, uint64_t offset, EvictionHintAction hint_action,
+                            VmCompressor* compressor);
 
   // If any pages in the specified range are loaned pages, replaces them with non-loaned pages
   // (which requires providing a |page_request|). The specified range should be fully committed
@@ -567,10 +580,8 @@ class VmCowPages final : public VmHierarchyBase,
   bool DebugIsHighMemoryPriority() const TA_EXCL(lock());
 
   // Discard all the pages from a discardable vmo in the |kReclaimable| state. If successful, the
-  // |discardable_state_| is set to |kDiscarded|. The pages are removed from the vmo and appended to
-  // the |freed_list| passed in; the caller takes ownership of the removed pages and is responsible
-  // for freeing them. Returns the number of pages discarded.
-  uint64_t DiscardPages(list_node_t* freed_list) TA_EXCL(lock());
+  // |discardable_state_| is set to |kDiscarded|. Returns the number of pages discarded.
+  uint64_t DiscardPages() TA_EXCL(lock());
 
   // See DiscardableVmoTracker::DebugDiscardablePageCounts().
   struct DiscardablePageCounts {
@@ -598,7 +609,7 @@ class VmCowPages final : public VmHierarchyBase,
   // Eviction wrapper, unlike ReclaimPage this wrapper can assume it just needs to evict, and has no
   // requirements on updating any reclamation lists. Exposed for the physical page provider to
   // reclaim loaned pages.
-  bool RemovePageForEviction(vm_page_t* page, uint64_t offset);
+  bool ReclaimPageForEviction(vm_page_t* page, uint64_t offset);
 
   // Potentially transitions from Alive->Dead if the cow pages is unreachable (i.e. has no
   // paged_ref_ and no children). Used by the VmObjectPaged when it unlinks the paged_ref_, but
@@ -929,19 +940,14 @@ class VmCowPages final : public VmHierarchyBase,
                             VmPageOrMarker* released_page, bool do_range_update = true)
       TA_REQ(lock());
 
-  // Unmaps and removes all the committed pages in the specified range.
-  // Called from DecommitRangeLocked() to perform the actual decommit action after some of the
-  // initial sanity checks have succeeded. Also called from DiscardPages() to reclaim pages from a
-  // discardable VMO. Upon success the removed pages are placed in |freed_list|. The caller has
-  // ownership of these pages and is responsible for freeing them.
+  // Unmaps and frees all the committed pages in the specified range.
+  // Upon success the removed pages are freed and the number of pages freed is returned.
   //
   // Unlike DecommitRangeLocked(), this function only operates on |this| node, which must have no
   // parent.
   // |offset| must be page aligned. |len| must be less than or equal to |size_ - offset|. If |len|
   // is less than |size_ - offset| it must be page aligned.
-  // Optionally returns the number of pages removed if |pages_freed_out| is not null.
-  zx_status_t UnmapAndRemovePagesLocked(uint64_t offset, uint64_t len, list_node_t* freed_list,
-                                        uint64_t* pages_freed_out = nullptr) TA_REQ(lock());
+  zx::result<uint64_t> UnmapAndFreePagesLocked(uint64_t offset, uint64_t len) TA_REQ(lock());
 
   // internal check if any pages in a range are pinned
   bool AnyPagesPinnedLocked(uint64_t offset, size_t len) TA_REQ(lock());
@@ -1240,33 +1246,42 @@ class VmCowPages final : public VmHierarchyBase,
 
   // Internal helper for performing reclamation via eviction on pager backed VMOs.
   // Assumes that the page is owned by this VMO at the specified offset.
-  bool RemovePageForEvictionLocked(vm_page_t* page, uint64_t offset, EvictionHintAction hint_action)
-      TA_REQ(lock());
+  ReclaimCounts ReclaimPageForEvictionLocked(vm_page_t* page, uint64_t offset,
+                                             EvictionHintAction hint_action) TA_REQ(lock());
 
   // Internal helper for performing reclamation via compression on an anonymous VMO. Assumes that
   // the page is owned by this VMO at the specified offset.
   // Assumes that the provided |compressor| is not-null.
   //
   // Borrows the guard for |lock_| and may drop the lock temporarily during execution.
-  bool RemovePageForCompressionLocked(vm_page_t* page, uint64_t offset, VmCompressor* compressor,
-                                      Guard<CriticalMutex>& guard) TA_REQ(lock());
+  ReclaimCounts ReclaimPageForCompressionLocked(vm_page_t* page, uint64_t offset,
+                                                VmCompressor* compressor,
+                                                Guard<CriticalMutex>& guard) TA_REQ(lock());
 
   // Internal helper for performing reclamation against a discardable VMO. Assumes that the page is
-  // owned by this VMO at the specified offset. If any discarding happens |freed_list| is given
-  // ownership of any reclaimed pages and the number of pages is returned. The passed in |page|
-  // must be the first page in the discardable VMO to trigger a discard, otherwise it will fail.
-  zx::result<uint64_t> ReclaimDiscardableLocked(vm_page_t* page, uint64_t offset,
-                                                list_node_t* freed_list) TA_REQ(lock());
+  // owned by this VMO at the specified offset. If any discarding happens the number of pages is
+  // returned. The passed in |page| must be the first page in the discardable VMO to trigger a
+  // discard, otherwise it will fail.
+  zx::result<uint64_t> ReclaimDiscardableLocked(vm_page_t* page, uint64_t offset) TA_REQ(lock());
 
-  // Internal helper for discarding a VMO. Will discard if VMO is unlocked, putting pages in
-  // |freed_list| and returning the count.
-  zx::result<uint64_t> DiscardPagesLocked(list_node_t* freed_list) TA_REQ(lock());
+  // Internal helper for discarding a VMO. Will discard if VMO is unlocked returning the count.
+  zx::result<uint64_t> DiscardPagesLocked() TA_REQ(lock());
 
   // Internal helper for modifying just this value of high_priority_count_ without performing any
   // propagating.
   // Returns any delta that needs to be applied to the parent. If a zero value is returned then
   // propagation can be halted.
   int64_t ChangeSingleHighPriorityCountLocked(int64_t delta) TA_REQ(lock());
+
+  // Specialized internal version of ZeroPagesLocked that only operates for a VMO where
+  // |is_source_preserving_page_content| is true. The |only_zero_gaps| flags can be set to true to
+  // indicate that existing pages do not need to be zeroed, in which case no pages requests will be
+  // generated and no pages freed, allowing those respective parameters to be passed as nullptr.
+  // Otherwise the parameters, operation and return values are same as ZeroPagesLocked.
+  zx_status_t ZeroPagesPreservingContentLocked(uint64_t page_start_base, uint64_t page_end_base,
+                                               bool only_zero_gaps, list_node_t* freed_list,
+                                               MultiPageRequest* page_request,
+                                               uint64_t* processed_len_out) TA_REQ(lock());
 
   // magic value
   fbl::Canary<fbl::magic("VMCP")> canary_;
@@ -1330,6 +1345,10 @@ class VmCowPages final : public VmHierarchyBase,
 
   // The page source, if any.
   const fbl::RefPtr<PageSource> page_source_;
+
+  // A user supplied content size that can be queried. By itself this has no semantic meaning and is
+  // only read and used specifically when requested by the user. See VmObject::SetUserContentSize.
+  fbl::RefPtr<ContentSizeManager> user_content_size_ TA_GUARDED(lock());
 
   // Count reclamation events so that we can report them to the user.
   uint64_t reclamation_event_count_ TA_GUARDED(lock()) = 0;
@@ -1519,6 +1538,10 @@ class VmCowPages::LookupCursor {
   // Indicates that any existing pages that are returned should not be considered accessed and have
   // their accessed times updated.
   void DisableMarkAccessed() { mark_accessed_ = false; }
+
+  // Indicates that pages above the user content size can be assumed/made to be zero. See
+  // VmObject::VmObjectReadWriteOptions::ZeroAboveUserSize.
+  void ZeroAboveUserSize() { zero_above_user_size_ = true; }
 
   // Exposed for lock assertions.
   Lock<CriticalMutex>* lock() const TA_RET_CAP(target_->lock_ref()) { return target_->lock(); }
@@ -1742,6 +1765,10 @@ class VmCowPages::LookupCursor {
 
   // Whether existing pages should be have their access time updated when they are returned.
   bool mark_accessed_ = true;
+
+  // Tracks whether any pages above the targets user_content_size_ can be read or set as zero. See
+  // VmObject::VmObjectReadWriteOptions::ZeroAboveUserSize for more.
+  bool zero_above_user_size_ = false;
 
   // Optional allocation list that will be used for any page allocations.
   list_node_t* alloc_list_ = nullptr;

@@ -8,6 +8,9 @@
 
 #include <gtest/gtest.h>
 
+// This unit test verifies that the ChildTransportDriver is able to interact with a
+// fuchsia.hardware.i2cimpl server.
+
 namespace testing {
 
 namespace {
@@ -15,7 +18,9 @@ constexpr uint32_t kTestMaxTransferSize = 0x1234567;
 constexpr uint32_t kTestBitrate = 0x5;
 }  // namespace
 
-class FakeI2cImplServer : public fdf::WireServer<fuchsia_hardware_i2cimpl::Device> {
+// A fuchsia.hardware.i2cimpl server that the underlying ChildDriver instance in the
+// test will connect and interact with.
+class TestI2cImplServer : public fdf::WireServer<fuchsia_hardware_i2cimpl::Device> {
  public:
   void GetMaxTransferSize(fdf::Arena& arena,
                           GetMaxTransferSizeCompleter::Sync& completer) override {
@@ -46,6 +51,8 @@ class FakeI2cImplServer : public fdf::WireServer<fuchsia_hardware_i2cimpl::Devic
 
 class DriverTransportTestEnvironment : public fdf_testing::Environment {
  public:
+  // To serve the TestI2cImplServer to the driver-under-test, we need to set up the server
+  // bindings and add it to the outgoing directory in Serve().
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
     fuchsia_hardware_i2cimpl::Service::InstanceHandler handler({
         .device = server_bindings_.CreateHandler(&server_, fdf::Dispatcher::GetCurrent()->get(),
@@ -60,7 +67,8 @@ class DriverTransportTestEnvironment : public fdf_testing::Environment {
   uint32_t GetBitrate() const { return server_.bitrate; }
 
  private:
-  FakeI2cImplServer server_;
+  // The test fuchsia.hardware.i2cimpl server that is served to the underlying ChildTransportDriver.
+  TestI2cImplServer server_;
   fdf::ServerBindingGroup<fuchsia_hardware_i2cimpl::Device> server_bindings_;
 };
 
@@ -83,13 +91,17 @@ class ChildTransportDriverTest : public ::testing::Test {
   fdf_testing::ForegroundDriverTest<FixtureConfig>& driver_test() { return driver_test_; }
 
  private:
+  // Since the test calls the ChildTransportDriver's function directly, it wraps the driver
+  // with ForegroundDriverTest.
   fdf_testing::ForegroundDriverTest<FixtureConfig> driver_test_;
 };
 
 TEST_F(ChildTransportDriverTest, VerifyQueryValues) {
-  // Verify that the queried values match the fake parent driver server.
+  // Verify the max transfer size.
   EXPECT_EQ(kTestMaxTransferSize, driver_test().driver()->max_transfer_size());
 
+  // Set the bitrate for the driver and verify that the test server reflect the changes.
+  driver_test().driver()->SetBitrate(kTestBitrate);
   driver_test().RunInEnvironmentTypeContext(
       [&](DriverTransportTestEnvironment& env) { EXPECT_EQ(kTestBitrate, env.GetBitrate()); });
 }

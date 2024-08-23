@@ -404,10 +404,17 @@ fn print_developer_overrides_banner(
     println!();
     println!("WARNING!:  Adding the following via developer overrides from: {overrides_target}");
 
-    if overrides.developer_only_options.all_packages_in_base {
+    let all_packages_in_base = overrides.developer_only_options.all_packages_in_base;
+    let netboot_mode = overrides.developer_only_options.netboot_mode;
+    if all_packages_in_base || netboot_mode {
         println!();
         println!("  Options:");
-        println!("    all_packages_in_base: enabled")
+        if all_packages_in_base {
+            println!("    all_packages_in_base: enabled")
+        }
+        if netboot_mode {
+            println!("    netboot_mode: enabled")
+        }
     }
 
     if overrides.platform.as_object().is_some_and(|p| !p.is_empty()) {

@@ -5,6 +5,7 @@
 use argh::{ArgsInfo, FromArgs};
 use camino::Utf8PathBuf;
 use ffx_core::ffx_command;
+use ffx_repository_serve::DEFAULT_REPO_NAME;
 
 #[ffx_command()]
 #[derive(ArgsInfo, FromArgs, PartialEq, Debug)]
@@ -14,15 +15,12 @@ use ffx_core::ffx_command;
     description = "Make the daemon aware of specific product bundle repositories"
 )]
 pub struct AddCommand {
+    // LINT.IfChange
     /// repositories will have the prefix `NAME`. Defaults to `devhost`.
-    #[argh(option, short = 'p', default = "default_prefix()")]
+    #[argh(option, short = 'p', default = "DEFAULT_REPO_NAME.into()")]
     pub prefix: String,
-
+    // LINT.ThenChange(../../serve/src/lib.rs)
     /// path to the product bundle directory.
     #[argh(positional)]
     pub product_bundle_dir: Utf8PathBuf,
-}
-
-fn default_prefix() -> String {
-    "devhost".to_string()
 }

@@ -1,6 +1,6 @@
 {
   "name": "activity",
-  "description": "Controls the metrics-logger component to log network activity. Logged samples will be available in syslog, via iquery under core/metrics-logger and via tracing in the network category.",
+  "description": "Controls the metrics-logger component to log network activity. Logged samples will be available in syslog, via iquery under core/metrics-logger and via tracing in the `metrics_logger` category.",
   "examples": [
     "To poll network activity every 500 ms indefinitely:\n\n    $ ffx profile network activity start --interval 500ms\n\nTo poll network activity every 1 second for 30 seconds with output-to-syslog enabled:\n\n    $ ffx profile network activity start --interval 1s -d 30s --output-to-syslog"
   ],

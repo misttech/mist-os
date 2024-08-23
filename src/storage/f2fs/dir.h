@@ -90,7 +90,7 @@ class Dir : public VnodeF2fs, public fbl::Recyclable<Dir> {
       __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
   zx_status_t MakeEmptyInlineDir(VnodeF2fs *vnode) __TA_REQUIRES(mutex_)
       __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
-  void InitDentInode(VnodeF2fs *vnode, NodePage &page) __TA_REQUIRES(mutex_);
+  void InitDentInode(VnodeF2fs *vnode, LockedPage &page) __TA_REQUIRES(mutex_);
   size_t RoomInInlineDir(const PageBitmap &bits, size_t slots) __TA_REQUIRES_SHARED(mutex_);
   size_t RoomForFilename(const PageBitmap &bits, size_t slots) __TA_REQUIRES_SHARED(mutex_);
 

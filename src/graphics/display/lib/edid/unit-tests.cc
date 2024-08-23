@@ -2,6 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/stdcompat/span.h>
 
 #include <algorithm>
@@ -15,6 +16,8 @@
 #include "src/graphics/display/lib/edid-values/edid-values.h"
 #include "src/graphics/display/lib/edid/edid.h"
 
+namespace {
+
 TEST(EdidTest, CaeValidationDtdOverflow) {
   edid::CeaEdidTimingExtension cea = {};
   cea.tag = edid::CeaEdidTimingExtension::kTag;
@@ -27,8 +30,6 @@ TEST(EdidTest, EisaVidLookup) {
   EXPECT_TRUE(!strcmp(edid::GetEisaVendorName(0x1e6d), "GOLDSTAR COMPANY LTD"));
   EXPECT_TRUE(!strcmp(edid::GetEisaVendorName(0x5a63), "VIEWSONIC CORPORATION"));
 }
-
-namespace {
 
 // The I2C address for writing the DDC segment.
 // VESA Enhanced Display Data Channel (E-DDC) Standard version 1.3 revised
@@ -196,7 +197,10 @@ class FakeDdcMemory {
   size_t total_bytes_read_ = 0;
 };
 
-}  // namespace
+class EdidTest : public ::testing::Test {
+ private:
+  fdf_testing::ScopedGlobalLogger logger_;
+};
 
 TEST(EdidTest, ReadEdid_OneBlockOneSegment) {
   // One EDID blocks without extensions.
@@ -396,3 +400,5 @@ TEST(EdidTest, GetDisplayProductSerialWithoutSerialDescriptor) {
   // So the serial number is 0x04030201 = 67305985.
   EXPECT_EQ(edid.GetDisplayProductSerialNumber(), std::string("67305985"));
 }
+
+}  // namespace

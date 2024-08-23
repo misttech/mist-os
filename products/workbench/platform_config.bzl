@@ -27,6 +27,15 @@ workbench_platform_config = {
             "include_tun": True,
         },
     },
+    "development_support": {
+        "tools": {
+            "connectivity": {
+                "enable_networking": True,
+                "enable_wlan": True,
+                "enable_thread": True,
+            },
+        },
+    },
     "forensics": {
         "feedback": {
             "low_memory": True,

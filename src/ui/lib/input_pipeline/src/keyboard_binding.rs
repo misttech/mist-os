@@ -201,7 +201,10 @@ impl KeyboardEvent {
 
     /// Centralizes the conversion from [KeyboardEvent] to `KeyEvent`.
     #[cfg(test)]
-    pub(crate) fn from_key_event_at_time(&self, event_time: zx::Time) -> fidl_ui_input3::KeyEvent {
+    pub(crate) fn from_key_event_at_time(
+        &self,
+        event_time: zx::MonotonicTime,
+    ) -> fidl_ui_input3::KeyEvent {
         fidl_ui_input3::KeyEvent {
             timestamp: Some(event_time.into_nanos()),
             type_: Some(self.event_type),
@@ -478,7 +481,7 @@ impl KeyboardBinding {
             &new_keys,
             &previous_keys,
             device_descriptor.clone(),
-            zx::Time::get_monotonic(),
+            zx::MonotonicTime::get(),
             input_event_sender.clone(),
             inspect_sender,
             metrics_logger,
@@ -516,7 +519,7 @@ impl KeyboardBinding {
         new_keys: &Vec<fidl_fuchsia_input::Key>,
         previous_keys: &Vec<fidl_fuchsia_input::Key>,
         device_descriptor: input_device::InputDeviceDescriptor,
-        event_time: zx::Time,
+        event_time: zx::MonotonicTime,
         input_event_sender: UnboundedSender<input_device::InputEvent>,
         inspect_sender: UnboundedSender<input_device::InputEvent>,
         metrics_logger: &metrics::MetricsLogger,
@@ -527,7 +530,7 @@ impl KeyboardBinding {
         fn dispatch_events(
             key_events: Vec<(fidl_fuchsia_input::Key, fidl_fuchsia_ui_input3::KeyEventType)>,
             device_descriptor: input_device::InputDeviceDescriptor,
-            event_time: zx::Time,
+            event_time: zx::MonotonicTime,
             input_event_sender: UnboundedSender<input_device::InputEvent>,
             inspect_sender: UnboundedSender<input_device::InputEvent>,
             metrics_logger: metrics::MetricsLogger,
@@ -798,7 +801,7 @@ mod tests {
             .into_with_repeat_sequence(42)
             .into_with_key_meaning(Some(KeyMeaning::NonPrintableKey(NonPrintableKey::Tab)));
 
-        let actual = event.from_key_event_at_time(zx::Time::from_nanos(42));
+        let actual = event.from_key_event_at_time(zx::MonotonicTime::from_nanos(42));
         assert_eq!(
             actual,
             fidl_fuchsia_ui_input3::KeyEvent {

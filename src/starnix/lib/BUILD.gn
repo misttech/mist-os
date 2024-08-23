@@ -10,6 +10,7 @@ group("lib") {
     "starnix-lifecycle",
     "starnix-uapi",
     "syncio",
+    "third_party",
   ]
 
   if (is_mistos) {
@@ -22,6 +23,7 @@ group("tests") {
 
   deps = [
     "ebpf:tests",
+    "expando:tests",
     "extended_pstate:tests",
     "range_map:tests",
     "selinux:tests",

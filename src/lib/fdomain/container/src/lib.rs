@@ -165,8 +165,8 @@ impl ShuttingDownHandle {
                                 FDomainEvent::ChannelStreamingData(
                                     proto::ChannelOnChannelStreamingDataRequest {
                                         handle: hid,
-                                        channel_sent: proto::ChannelSent::ChannelReadStopped(
-                                            proto::ChannelReadStopped,
+                                        channel_sent: proto::ChannelSent::Stopped(
+                                            proto::AioStopped { error: None },
                                         ),
                                     },
                                 )
@@ -176,8 +176,8 @@ impl ShuttingDownHandle {
                                 FDomainEvent::SocketStreamingData(
                                     proto::SocketOnSocketStreamingDataRequest {
                                         handle: hid,
-                                        socket_message: proto::SocketMessage::SocketReadStopped(
-                                            proto::SocketReadStopped,
+                                        socket_message: proto::SocketMessage::Stopped(
+                                            proto::AioStopped { error: None },
                                         ),
                                     },
                                 )
@@ -497,17 +497,8 @@ impl HandleState {
                                 FDomainEvent::ChannelStreamingData(
                                     proto::ChannelOnChannelStreamingDataRequest {
                                         handle: self.hid,
-                                        channel_sent: proto::ChannelSent::ReadError(e),
-                                    },
-                                )
-                                .into(),
-                            );
-                            event_queue.push_back(
-                                FDomainEvent::ChannelStreamingData(
-                                    proto::ChannelOnChannelStreamingDataRequest {
-                                        handle: self.hid,
-                                        channel_sent: proto::ChannelSent::ChannelReadStopped(
-                                            proto::ChannelReadStopped,
+                                        channel_sent: proto::ChannelSent::Stopped(
+                                            proto::AioStopped { error: Some(Box::new(e)) },
                                         ),
                                     },
                                 )
@@ -541,17 +532,8 @@ impl HandleState {
                                 FDomainEvent::SocketStreamingData(
                                     proto::SocketOnSocketStreamingDataRequest {
                                         handle: self.hid,
-                                        socket_message: proto::SocketMessage::Error(e),
-                                    },
-                                )
-                                .into(),
-                            );
-                            event_queue.push_back(
-                                FDomainEvent::SocketStreamingData(
-                                    proto::SocketOnSocketStreamingDataRequest {
-                                        handle: self.hid,
-                                        socket_message: proto::SocketMessage::SocketReadStopped(
-                                            proto::SocketReadStopped,
+                                        socket_message: proto::SocketMessage::Stopped(
+                                            proto::AioStopped { error: Some(Box::new(e)) },
                                         ),
                                     },
                                 )

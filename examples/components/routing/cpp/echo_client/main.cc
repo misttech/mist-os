@@ -20,7 +20,8 @@ int main(int argc, const char* argv[], char* envp[]) {
   // TODO(https://fxbug.dev/42179369): Consider migrating to async FIDL API
   // [END_EXCLUDE]
   // Set tags for logging.
-  fuchsia_logging::SetTags({"echo_client"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"echo_client"}).BuildAndInitialize();
 
   // Connect to FIDL protocol
   fidl::examples::routing::echo::EchoSyncPtr echo_proxy;

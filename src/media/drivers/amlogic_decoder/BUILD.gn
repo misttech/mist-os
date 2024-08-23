@@ -18,7 +18,6 @@ driver_bind_rules("amlogic_video_bind") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib",
-    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
     "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.clock",
@@ -35,7 +34,6 @@ driver_bind_rules("amlogic_video_test_bind") {
   deps = [
     "//sdk/fidl/fuchsia.hardware.amlogiccanvas:fuchsia.hardware.amlogiccanvas_bindlib",
     "//sdk/fidl/fuchsia.hardware.clock:fuchsia.hardware.clock_bindlib",
-    "//sdk/fidl/fuchsia.hardware.sysmem:fuchsia.hardware.sysmem_bindlib",
     "//sdk/fidl/fuchsia.hardware.tee:fuchsia.hardware.tee_bindlib",
     "//src/devices/bind/fuchsia.amlogic.platform",
     "//src/devices/bind/fuchsia.clock",

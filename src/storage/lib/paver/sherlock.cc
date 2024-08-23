@@ -27,15 +27,15 @@ constexpr size_t kMebibyte = kKibibyte * 1024;
 }  // namespace
 
 zx::result<std::unique_ptr<DevicePartitioner>> SherlockPartitioner::Initialize(
-    fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     fidl::ClientEnd<fuchsia_device::Controller> block_device) {
-  auto status = IsBoard(devfs_root, "sherlock");
+  auto status = IsBoard(devices.devfs_root(), "sherlock");
   if (status.is_error()) {
     return status.take_error();
   }
 
   auto status_or_gpt =
-      GptDevicePartitioner::InitializeGpt(std::move(devfs_root), svc_root, std::move(block_device));
+      GptDevicePartitioner::InitializeGpt(devices, svc_root, std::move(block_device));
   if (status_or_gpt.is_error()) {
     return status_or_gpt.take_error();
   }
@@ -105,25 +105,31 @@ zx::result<std::unique_ptr<PartitionClient>> SherlockPartitioner::FindPartition(
 
   switch (spec.partition) {
     case Partition::kBootloaderA: {
-      auto boot0_part = OpenBlockPartition(gpt_->devfs_root(), std::nullopt,
-                                           Uuid(GUID_EMMC_BOOT1_VALUE), ZX_SEC(5));
+      auto boot0_part =
+          OpenBlockPartition(gpt_->devices(), std::nullopt, Uuid(GUID_EMMC_BOOT1_VALUE), ZX_SEC(5));
       if (boot0_part.is_error()) {
         return boot0_part.take_error();
       }
-      std::unique_ptr boot0 =
-          std::make_unique<FixedOffsetBlockPartitionClient>(std::move(*boot0_part), 1, 0);
+      zx::result boot0 =
+          FixedOffsetBlockPartitionClient::Create(std::move(boot0_part.value()), 1, 0);
+      if (boot0.is_error()) {
+        return boot0.take_error();
+      }
 
-      auto boot1_part = OpenBlockPartition(gpt_->devfs_root(), std::nullopt,
-                                           Uuid(GUID_EMMC_BOOT2_VALUE), ZX_SEC(5));
+      auto boot1_part =
+          OpenBlockPartition(gpt_->devices(), std::nullopt, Uuid(GUID_EMMC_BOOT2_VALUE), ZX_SEC(5));
       if (boot1_part.is_error()) {
         return boot1_part.take_error();
       }
-      auto boot1 =
-          std::make_unique<FixedOffsetBlockPartitionClient>(std::move(boot1_part.value()), 1, 0);
+      zx::result boot1 =
+          FixedOffsetBlockPartitionClient::Create(std::move(boot1_part.value()), 2, 0);
+      if (boot1.is_error()) {
+        return boot1.take_error();
+      }
 
       std::vector<std::unique_ptr<PartitionClient>> partitions;
-      partitions.push_back(std::move(boot0));
-      partitions.push_back(std::move(boot1));
+      partitions.push_back(std::move(*boot0));
+      partitions.push_back(std::move(*boot1));
 
       return zx::ok(std::make_unique<PartitionCopyClient>(std::move(partitions)));
     }
@@ -318,16 +324,16 @@ zx::result<> SherlockPartitioner::ValidatePayload(const PartitionSpec& spec,
 }
 
 zx::result<std::unique_ptr<DevicePartitioner>> SherlockPartitionerFactory::New(
-    fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root, Arch arch,
-    std::shared_ptr<Context> context, fidl::ClientEnd<fuchsia_device::Controller> block_device) {
-  return SherlockPartitioner::Initialize(std::move(devfs_root), svc_root, std::move(block_device));
+    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+    Arch arch, std::shared_ptr<Context> context,
+    fidl::ClientEnd<fuchsia_device::Controller> block_device) {
+  return SherlockPartitioner::Initialize(devices, svc_root, std::move(block_device));
 }
 
 zx::result<std::unique_ptr<abr::Client>> SherlockAbrClientFactory::New(
-    fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     std::shared_ptr<paver::Context> context) {
-  auto partitioner =
-      SherlockPartitioner::Initialize(std::move(devfs_root), std::move(svc_root), {});
+  auto partitioner = SherlockPartitioner::Initialize(devices, svc_root, {});
 
   if (partitioner.is_error()) {
     return partitioner.take_error();

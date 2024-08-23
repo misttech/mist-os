@@ -67,10 +67,6 @@ enum class SagElement : uint32_t {
 class ParentElement {
  public:
   enum class Type {
-    // The parent element's access token should be available from a `PowerTokenProvider` capability
-    // in the incoming namespace and should provide this same string in the `GetToken` response.
-    kName,
-
     // The parent element is one of SAG's elements and the access token should be obtained from the
     // appropriate SAG-related protocol.
     kSag,
@@ -80,23 +76,15 @@ class ParentElement {
     kInstanceName,
   };
 
-  static ParentElement WithName(std::string name);
-
   static ParentElement WithSag(SagElement sag);
 
   static ParentElement WithInstanceName(std::string instance_name);
-
-  // Sets the type to `kName`.
-  void SetName(std::string name);
 
   // Sets the type to `kSag`.
   void SetSag(SagElement sag);
 
   // Sets the type to `kInstanceName`.
   void SetInstanceName(std::string instance_name);
-
-  // Returns nullopt if type is not `kName`.
-  std::optional<std::string> GetName() const;
 
   // Returns nullopt if type is not `kSag`.
   std::optional<SagElement> GetSag() const;
@@ -109,13 +97,12 @@ class ParentElement {
   bool operator==(const ParentElement& rhs) const;
 
  private:
-  using ValueType = std::variant<std::string, SagElement, std::string>;
+  using ValueType = std::variant<SagElement, std::string>;
 
   // The index of the value associated with `type` stored within `value_`. This index isn't stored
   // in `Type` because it is considered an implementation detail.
-  static constexpr size_t kNameIndex = 0;
-  static constexpr size_t kSagIndex = 1;
-  static constexpr size_t kInstanceNameIndex = 2;
+  static constexpr size_t kSagIndex = 0;
+  static constexpr size_t kInstanceNameIndex = 1;
 
   explicit ParentElement(Type type, ValueType value) : type_(type), value_(std::move(value)) {}
 

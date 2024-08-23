@@ -16,7 +16,6 @@
         {
             protocol: [
                 "fuchsia.net.filter.deprecated.Filter",
-                "fuchsia.net.multicast.admin.Ipv4RoutingTableController",
                 "fuchsia.net.stack.Log",
             ],
         },
@@ -43,7 +42,6 @@
         {
             protocol: [
                 "fuchsia.net.filter.deprecated.Filter",
-                "fuchsia.net.multicast.admin.Ipv4RoutingTableController",
                 "fuchsia.net.stack.Log",
             ],
             from: "self",

@@ -56,7 +56,7 @@ struct NameMatch {
 
 class Namer {
  public:
-  explicit Namer(const std::vector<const NameMatch>& name_matches);
+  explicit Namer(const std::vector<NameMatch>& name_matches);
 
   const std::string& NameForName(const std::string& name);
 
@@ -73,11 +73,11 @@ class Namer {
 class Summary {
  public:
   Summary(const Capture& capture, Namer* namer);
-  explicit Summary(const Capture& capture, const std::vector<const NameMatch>& name_matches =
-                                               std::vector<const NameMatch>());
+  explicit Summary(const Capture& capture,
+                   const std::vector<NameMatch>& name_matches = std::vector<NameMatch>());
   Summary(const Capture& capture, Namer* namer,
           const std::unordered_set<zx_koid_t>& undigested_vmos);
-  static const std::vector<const NameMatch> kNameMatches;
+  static const std::vector<NameMatch> kNameMatches;
 
   void SortProcessSummaries();
   zx_time_t time() const { return time_; }

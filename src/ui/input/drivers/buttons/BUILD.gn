@@ -27,12 +27,20 @@ fuchsia_driver("buttons-driver") {
   ]
 }
 
-fuchsia_driver_component("buttons") {
-  visibility = [ ":*" ]
+fuchsia_component_manifest("buttons-manifest") {
   component_name = "buttons"
+  manifest = "meta/buttons.cml"
+}
+
+fuchsia_driver_component("buttons") {
+  cm_label = ":buttons-manifest"
+  visibility = [ ":*" ]
   deps = [ ":buttons-driver" ]
   info = "meta/buttons-info.json"
-  manifest = "meta/buttons.cml"
+}
+
+fuchsia_structured_config_cpp_elf_lib("buttons-config") {
+  cm_label = ":buttons-manifest"
 }
 
 fuchsia_driver_package("package") {
@@ -48,8 +56,10 @@ source_set("common") {
   ]
 
   public_deps = [
+    ":buttons-config",
     "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
     "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
+    "//sdk/fidl/fuchsia.input.interaction.observation:fuchsia.input.interaction.observation_cpp",
     "//sdk/fidl/fuchsia.input.report:fuchsia.input.report_cpp",
     "//sdk/lib/driver/compat/cpp:cpp",
     "//sdk/lib/driver/component/cpp:cpp",

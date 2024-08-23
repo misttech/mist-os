@@ -11,6 +11,11 @@ group("tests") {
   deps = [ ":fuchsia-examples-cpp-tests-package" ]
 }
 
+group("ctf-tests") {
+  testonly = true
+  deps = [ ":fuchsia-examples-cpp-tests_archive" ]
+}
+
 executable("bin") {
   output_name = "ctf_fuchsia_examples_cpp_test"
   sources = [ "main.cc" ]

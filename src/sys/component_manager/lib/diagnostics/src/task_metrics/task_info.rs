@@ -154,8 +154,8 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> TaskInfo<T> {
         self.children.push(task);
     }
 
-    pub async fn most_recent_measurement(&self) -> Option<zx::Time> {
-        self.most_recent_measurement_nanos.lock().await.map(|t| zx::Time::from_nanos(t))
+    pub async fn most_recent_measurement(&self) -> Option<zx::MonotonicTime> {
+        self.most_recent_measurement_nanos.lock().await.map(|t| zx::MonotonicTime::from_nanos(t))
     }
 
     /// Takes the MeasurementsQueue from this task, replacing it with an empty one.
@@ -174,7 +174,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> TaskInfo<T> {
     /// Take a zero-valued measurement at timestamp `t`.
     ///
     /// Specifically meant for the very first measurement taken.
-    pub fn record_measurement_with_start_time(&mut self, t: zx::Time) {
+    pub fn record_measurement_with_start_time(&mut self, t: zx::MonotonicTime) {
         self.record_measurement(Measurement::empty(t));
     }
 
@@ -208,7 +208,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> TaskInfo<T> {
             if let Ok(runtime_info) = runtime_info_res {
                 let mut measurement = Measurement::from_runtime_info(
                     runtime_info,
-                    zx::Time::from_nanos(self.time_source.now()),
+                    zx::MonotonicTime::from_nanos(self.time_source.now()),
                 );
                 // Subtract all child measurements.
                 let mut alive_children = vec![];
@@ -238,7 +238,7 @@ impl<T: 'static + RuntimeStatsSource + Debug + Send + Sync> TaskInfo<T> {
     }
 
     // Add a measurement to this task's histogram.
-    fn add_to_histogram(&mut self, cpu_time_delta: zx::Duration, timestamp: zx::Time) {
+    fn add_to_histogram(&mut self, cpu_time_delta: zx::Duration, timestamp: zx::MonotonicTime) {
         if let Some(histogram) = &self.histogram {
             let time_value: i64 = timestamp.into_nanos();
             let elapsed_time = time_value - self.previous_histogram_timestamp;

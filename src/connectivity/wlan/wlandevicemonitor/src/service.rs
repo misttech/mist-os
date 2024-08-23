@@ -455,10 +455,17 @@ async fn destroy_iface(
         }
     };
     let phy_req = fidl_dev::DestroyIfaceRequest { id: phy_ownership.phy_assigned_id };
-    let destroy_iface_result = phy.proxy.destroy_iface(&phy_req).await.map_err(move |e| {
-        error!("Error sending 'DestroyIface' request to phy {:?}: {}", phy_ownership, e);
-        zx::Status::INTERNAL
-    })?;
+    let destroy_iface_result = match phy.proxy.destroy_iface(&phy_req).await {
+        Ok(result) => result,
+        Err(fidl::Error::ClientChannelClosed { .. }) => {
+            warn!("Failed to send 'DestroyIface' request to phy {:?}: client channel closed. Assuming phy removed.", phy_ownership);
+            Ok(())
+        }
+        Err(error) => {
+            error!("Error sending 'DestroyIface' request to phy {:?}: {}", phy_ownership, error);
+            return Err(zx::Status::INTERNAL);
+        }
+    };
 
     // If the removal is successful or the interface cannot be found, update the internal
     // accounting.
@@ -1854,6 +1861,34 @@ mod tests {
         assert_eq!(Poll::Ready(Err(zx::Status::NOT_FOUND)), exec.run_until_stalled(&mut fut));
 
         assert!(test_values.ifaces.get(&1).is_none());
+    }
+
+    #[fuchsia::test]
+    fn phy_removed_during_destroy_iface() {
+        let mut exec = fasync::TestExecutor::new();
+        let test_values = test_setup();
+        let mut phy_stream = fake_destroy_iface_env(&test_values.phys, &test_values.ifaces);
+
+        let destroy_fut = super::destroy_iface(
+            &test_values.phys,
+            &test_values.ifaces,
+            test_values.ifaces_node,
+            42,
+        );
+        let mut destroy_fut = pin!(destroy_fut);
+        assert_eq!(Poll::Pending, exec.run_until_stalled(&mut destroy_fut));
+
+        let (_req, responder) = assert_variant!(exec.run_until_stalled(&mut phy_stream.next()),
+            Poll::Ready(Some(Ok(fidl_dev::PhyRequest::DestroyIface { req, responder }))) => (req, responder)
+        );
+
+        // Emulate the phy shutting down.
+        drop(responder);
+        drop(phy_stream);
+        assert_eq!(Poll::Ready(Ok(())), exec.run_until_stalled(&mut destroy_fut));
+
+        // Verify iface was removed from available ifaces despite the closure.
+        assert!(test_values.ifaces.get(&42u16).is_none(), "iface expected to be deleted");
     }
 
     #[fuchsia::test]

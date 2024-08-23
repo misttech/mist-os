@@ -14,4 +14,9 @@ pub struct GraphicsConfig {
     /// UserDebug, false for User.
     #[serde(default)]
     pub enable_virtual_console: Option<bool>,
+
+    /// Specify the keymap for the virtual console. "qwerty" and "dvorak" are
+    /// supported.
+    #[serde(default)]
+    pub keymap: Option<String>,
 }

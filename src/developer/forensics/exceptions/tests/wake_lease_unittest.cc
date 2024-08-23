@@ -126,7 +126,7 @@ TEST_F(WakeLeaseTest, AcquiresLeaseSuccessfully) {
                 .front()
                 .requires_level_by_preference()
                 .front(),
-            fidl::ToUnderlying(fps::ExecutionStateLevel::kWakeHandling));
+            fidl::ToUnderlying(fps::ExecutionStateLevel::kSuspending));
 }
 
 TEST_F(WakeLeaseTest, AddsElementOnlyOnce) {
@@ -295,7 +295,7 @@ TEST_F(WakeLeaseTest, WaitsUntilRequiredLevelActive) {
                 .front()
                 .requires_level_by_preference()
                 .front(),
-            fidl::ToUnderlying(fps::ExecutionStateLevel::kWakeHandling));
+            fidl::ToUnderlying(fps::ExecutionStateLevel::kSuspending));
 
   EXPECT_FALSE(lease.has_value());
 

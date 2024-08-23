@@ -1,0 +1,219 @@
+# Copyright 2024 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import(
+    "//build/bazel/assembly/board_configurations/verify_board_configuration.gni")
+import(
+    "//build/bazel/assembly/partitions_configurations/verify_partitions_configuration.gni")
+import(
+    "//build/bazel/assembly/product_configurations/verify_product_configuration.gni")
+import("//build/bazel/bazel_build_group.gni")
+
+# Groups assembly-related configuration verifications to share one
+# bazel_build_group to reduce GN/Bazel overhead in the build.
+#
+# Parameters
+#
+#  product_configs (optional)
+#    A list of product configs to verify.
+#    Type: list of scope with the following fields.
+#
+#      name (required; string)
+#        A unique verification target name.
+#
+#      gn_target (required; GN label)
+#        A GN product config target used in verification.
+#
+#      bazel_target (required; Bazel label)
+#        A Bazel product config target used in verification.
+#
+#      config_data_to_ignore (optional; list of strings)
+#        List of config_data to ignore in the comparison. Each entry should be
+#        of the following form: "[package_name]:[destination path]".
+#
+#      deps
+#
+#  board_configs (optional)
+#    A list of board configs to verify.
+#    Type: list of scopes with the following fields.
+#
+#      name (required; string)
+#        A unique verification target name.
+#
+#      golden_json (required; path)
+#        A board config JSON file used in verification.
+#
+#      bazel_target (required; Bazel label)
+#        A Bazel board config target used in verification.
+#
+#      deps
+#
+#  partitions_configs (optional)
+#    A list of partitions configs to verify.
+#    Type: list of scopes with the following fields.
+#
+#      name (required; string)
+#        A unique verification target name.
+#
+#      gn_target (required; GN label)
+#        A GN partitions config target used in verification.
+#
+#      extra_copy_outputs (optional; list of strings)
+#        A list of extra Bazel output files to copy. These paths are relative to
+#        Bazel output directory.
+#
+#      bazel_target (required; Bazel label)
+#        A Bazel partitions config target used in verification.
+#
+#      deps
+#
+template("verify_assembly_configs") {
+  # Verify required fields first.
+  if (defined(invoker.product_configs)) {
+    foreach(c, invoker.product_configs) {
+      assert(defined(c.name), "name is required in product_configs")
+      assert(defined(c.bazel_target),
+             "bazel_target is required in product_configs")
+      assert(defined(c.gn_target), "gn_target is required in product_configs")
+    }
+  }
+  if (defined(invoker.board_configs)) {
+    foreach(c, invoker.board_configs) {
+      assert(defined(c.name), "name is required in board_configs")
+      assert(defined(c.bazel_target),
+             "bazel_target is required in board_configs")
+      assert(defined(c.golden_json), "golden_json is required in board_configs")
+    }
+  }
+
+  _bazel_targets = []
+  _all_verification_targets = []
+  _bazel_build_group_target = "${target_name}.bazel_build_group"
+
+  # Construct product config verifications.
+  if (defined(invoker.product_configs)) {
+    foreach(product_config, invoker.product_configs) {
+      _bazel_product_config_file =
+          "${target_name}/${product_config.name}.bazel_product_config.json"
+      _bazel_targets += [
+        {
+          bazel_target = product_config.bazel_target
+          gn_target_name = product_config.name
+          copy_outputs = [
+            {
+              bazel = "{{BAZEL_TARGET_OUT_PATH}}_product_config.json"
+              ninja = _bazel_product_config_file
+            },
+          ]
+          deps = []
+          if (defined(product_config.deps)) {
+            deps = product_config.deps
+          }
+        },
+      ]
+
+      _verification_target = "${target_name}.${product_config.name}.verify"
+      _all_verification_targets += [ ":${_verification_target}" ]
+      verify_product_configuration(_verification_target) {
+        forward_variables_from(invoker, [ "visibility" ])
+        forward_variables_from(product_config, [ "config_data_to_ignore" ])
+        gn_product_config_target = product_config.gn_target
+        bazel_product_config_file =
+            "${target_out_dir}/${_bazel_product_config_file}"
+        deps = [ ":${product_config.name}" ]
+      }
+    }
+  }
+
+  # Construct board config verifications.
+  if (defined(invoker.board_configs)) {
+    foreach(board_config, invoker.board_configs) {
+      _bazel_board_config_file =
+          "${target_name}/${board_config.name}.bazel_board_config.json"
+      _bazel_targets += [
+        {
+          bazel_target = board_config.bazel_target
+          gn_target_name = board_config.name
+          copy_outputs = [
+            {
+              bazel = "{{BAZEL_TARGET_OUT_PATH}}_board_config.json"
+              ninja = _bazel_board_config_file
+            },
+          ]
+          deps = []
+          if (defined(board_config.deps)) {
+            deps = board_config.deps
+          }
+        },
+      ]
+
+      _verification_target = "${target_name}.${board_config.name}.verify"
+      _all_verification_targets += [ ":${_verification_target}" ]
+      verify_board_configuration(_verification_target) {
+        forward_variables_from(invoker, [ "visibility" ])
+        bazel_board_config_file =
+            "${target_out_dir}/${_bazel_board_config_file}"
+        golden_json = board_config.golden_json
+        deps = [ ":${board_config.name}" ]
+      }
+    }
+  }
+
+  # Construct partitions config verifications.
+  if (defined(invoker.partitions_configs)) {
+    foreach(partitions_config, invoker.partitions_configs) {
+      _bazel_partitions_config_dir = "${target_name}/${partitions_config.name}"
+
+      _bazel_targets += [
+        {
+          bazel_target = partitions_config.bazel_target
+          gn_target_name = partitions_config.name
+          copy_outputs = [
+            {
+              bazel = "{{BAZEL_TARGET_OUT_PATH}}/partitions_config.json"
+              ninja = "${_bazel_partitions_config_dir}/partitions_config.json"
+            },
+          ]
+          if (defined(partitions_config.extra_copy_outputs)) {
+            foreach(path, partitions_config.extra_copy_outputs) {
+              copy_outputs += [
+                {
+                  bazel = "{{BAZEL_TARGET_OUT_PATH}}/${path}"
+                  ninja = "${_bazel_partitions_config_dir}/${path}"
+                },
+              ]
+            }
+          }
+          deps = []
+          if (defined(partitions_config.deps)) {
+            deps = partitions_config.deps
+          }
+        },
+      ]
+
+      _verification_target = "${target_name}.${partitions_config.name}.verify"
+      _all_verification_targets += [ ":${_verification_target}" ]
+      verify_partitions_configuration(_verification_target) {
+        forward_variables_from(invoker, [ "visibility" ])
+        partitions_config_file = "${target_out_dir}/${_bazel_partitions_config_dir}/partitions_config.json"
+        golden_partitions_config_target = partitions_config.gn_target
+        deps = [ ":${partitions_config.name}" ]
+      }
+    }
+  }
+
+  assert(_bazel_targets != [], "At least one verification entry is required.")
+
+  bazel_build_group(_bazel_build_group_target) {
+    forward_variables_from(invoker, [ "visibility" ])
+    testonly = true
+    subtargets = _bazel_targets
+  }
+
+  group(target_name) {
+    forward_variables_from(invoker, [ "visibility" ])
+    testonly = true
+    deps = _all_verification_targets
+  }
+}

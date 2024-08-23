@@ -76,4 +76,7 @@ constexpr uint32_t kProcessArgsMaxBytes = 128;
 
 }  // namespace userboot
 
+// Called at the end of the boot process in the main kernel initialization sequence.
+void userboot_init();
+
 #endif  // ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_USERBOOT_H_

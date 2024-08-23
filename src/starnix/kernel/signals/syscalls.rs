@@ -224,10 +224,10 @@ pub fn sys_rt_sigtimedwait(
     // Attempts to wait for `UNBLOCKABLE_SIGNALS` will be ignored.
     let unblock = set & !UNBLOCKABLE_SIGNALS;
     let deadline = if timeout_addr.is_null() {
-        zx::Time::INFINITE
+        zx::MonotonicTime::INFINITE
     } else {
         let timeout = current_task.read_object(timeout_addr)?;
-        zx::Time::after(duration_from_timespec(timeout)?)
+        zx::MonotonicTime::after(duration_from_timespec(timeout)?)
     };
 
     let signal_info = loop {

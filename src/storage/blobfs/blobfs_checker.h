@@ -5,13 +5,17 @@
 #ifndef SRC_STORAGE_BLOBFS_BLOBFS_CHECKER_H_
 #define SRC_STORAGE_BLOBFS_BLOBFS_CHECKER_H_
 
+#include <zircon/types.h>
+
+#include <cstdint>
+
+#include "src/storage/blobfs/format.h"
+
 #ifdef __Fuchsia__
 #include "src/storage/blobfs/blobfs.h"
 #else
 #include "src/storage/blobfs/host.h"
 #endif
-
-#include <memory>
 
 namespace blobfs {
 

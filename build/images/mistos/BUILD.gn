@@ -204,7 +204,6 @@ if (is_mistos) {
 
       # Kernel (starnix_kernel_package)
       "//src/starnix/containers:default_init",
-      "//src/starnix/kernel:kernel_config",
       "//src/starnix/kernel:starnix_kernel",
       "//src/starnix/kernel:starnix_kernel_manifest",
 

@@ -56,7 +56,7 @@ impl FxSymlink {
             .ok_or(FxfsError::NotFound)?;
         match item.value {
             ObjectValue::Object {
-                kind: ObjectKind::Symlink { refs, .. },
+                kind: ObjectKind::Symlink { refs, link },
                 attributes:
                     ObjectAttributes {
                         creation_time,
@@ -69,7 +69,8 @@ impl FxSymlink {
             } => Ok(ObjectProperties {
                 refs,
                 allocated_size: 0,
-                data_attribute_size: 0,
+                // For POSIX compatibility we report the target length as file size.
+                data_attribute_size: link.len() as u64,
                 creation_time,
                 modification_time,
                 access_time,

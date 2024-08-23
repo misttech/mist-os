@@ -2,6 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
+#include <lib/driver/testing/cpp/scoped_global_logger.h>
+
 #include <climits>
 #include <cstddef>
 #include <cstdint>
@@ -14,6 +16,7 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t* data, size_t size) {
     return 0;
   }
 
+  fdf_testing::ScopedGlobalLogger logger;
   fit::result<const char*, edid::Edid> result = edid::Edid::Create(cpp20::span(data, size));
   if (!result.is_ok()) {
     return 0;

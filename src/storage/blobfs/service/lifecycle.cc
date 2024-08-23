@@ -2,10 +2,17 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include "lifecycle.h"
+#include "src/storage/blobfs/service/lifecycle.h"
 
-#include <lib/fidl/cpp/wire/server.h>
+#include <fidl/fuchsia.process.lifecycle/cpp/markers.h>
+#include <lib/async/dispatcher.h>
+#include <lib/fidl/cpp/wire/channel.h>
 #include <lib/syslog/cpp/macros.h>
+#include <zircon/errors.h>
+#include <zircon/types.h>
+
+#include <memory>
+#include <utility>
 
 namespace blobfs {
 
@@ -24,7 +31,7 @@ void LifecycleServer::Stop(StopCompleter::Sync& completer) {
   FX_LOGS(INFO) << "received shutdown command over lifecycle interface";
   shutdown_([completer = completer.ToAsync()](zx_status_t status) mutable {
     if (status != ZX_OK) {
-      FX_LOGS(ERROR) << "shutdown failed: " << zx_status_get_string(status);
+      FX_PLOGS(ERROR, status) << "shutdown failed";
     } else {
       FX_LOGS(INFO) << "blobfs shutdown complete";
     }

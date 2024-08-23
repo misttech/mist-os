@@ -23,8 +23,7 @@ using zx;
 /// TEE, as the plumbing goes from the bootloader to the TEE.  However, this
 /// protocol intentionally doesn't care which heaps are dynamically-allocated
 /// and which are fixed-location.
-//
-// TODO(https://fxbug.dev/42065928): Move SecureMem from fuchsia.sysmem to fuchsia.sysmem2.
+@available(added=7, deprecated=NEXT)
 closed protocol SecureMem {
     /// Gets the physical address and length of any secure heap whose physical
     /// range is configured via the TEE.
@@ -32,8 +31,9 @@ closed protocol SecureMem {
     /// Presently, these will be fixed physical addresses and lengths, with the
     /// location plumbed via the TEE.
     ///
-    /// This is preferred over RegisterHeap() when there isn't any special
-    /// heap-specific per-VMO setup or teardown required.
+    /// This is preferred over ['fuchsia.hardware.sysmem.Sysmem/RegisterHeap']
+    /// when there isn't any special heap-specific per-VMO setup or teardown
+    /// required.
     ///
     /// The physical range must be secured/protected by the TEE before the
     /// securemem driver responds to this request with success.
@@ -45,8 +45,8 @@ closed protocol SecureMem {
     ///  * ZX_ERR_BAD_STATE - called more than once.
     ///  * ZX_ERR_INTERNAL - generic internal error (such as in communication
     ///    with TEE which doesn't generate zx_status_t errors).
-    ///  * other errors are possible, such as from communication failures or
-    ///    server propagation of zx_status_t failures
+    ///  * other errors are allowed; any other errors should be treated the same
+    ///    as ZX_ERR_INTERNAL.
     strict GetPhysicalSecureHeaps() -> (struct {
         heaps SecureHeapsAndRanges;
     }) error zx.Status;
@@ -218,6 +218,7 @@ closed protocol SecureMem {
     }) -> () error zx.Status;
 };
 
+@available(added=7, deprecated=NEXT)
 type SecureHeapProperties = table {
     /// The HeapType is repeated here for convenience.
     1: heap HeapType;
@@ -264,9 +265,12 @@ type SecureHeapProperties = table {
     5: is_mod_protected_range_available bool;
 };
 
+@available(added=7, deprecated=NEXT)
 const MAX_HEAPS_COUNT uint32 = 32;
+@available(added=7, deprecated=NEXT)
 const MAX_RANGES_COUNT uint32 = 128;
 
+@available(added=7, deprecated=NEXT)
 type SecureHeapRange = table {
     /// Must be aligned to at least heap_range_granularity.
     1: physical_address uint64;
@@ -275,6 +279,7 @@ type SecureHeapRange = table {
     2: size_bytes uint64;
 };
 
+@available(added=7, deprecated=NEXT)
 type SecureHeapAndRanges = table {
     /// This is which secure/protected heap.
     1: heap HeapType;
@@ -286,15 +291,18 @@ type SecureHeapAndRanges = table {
     2: ranges vector<SecureHeapRange>:MAX_RANGES_COUNT;
 };
 
+@available(added=7, deprecated=NEXT)
 type SecureHeapsAndRanges = table {
     1: heaps vector<SecureHeapAndRanges>:MAX_HEAPS_COUNT;
 };
 
+@available(added=7, deprecated=NEXT)
 type SecureHeapAndRange = table {
     1: heap HeapType;
     2: range SecureHeapRange;
 };
 
+@available(added=7, deprecated=NEXT)
 type SecureHeapAndRangeModification = table {
     1: heap HeapType;
     2: old_range SecureHeapRange;

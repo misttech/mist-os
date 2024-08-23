@@ -10,7 +10,6 @@ import("//build/toolchain/concurrent_jobs.gni")
 import("//src/starnix/kernel/starnix.gni")
 import("//src/starnix/lib/gzip/gzip.gni")
 import("//src/storage/fshost/generated_fshost_config.gni")
-import("//tools/protobuf/rust_proto_library.gni")
 import("args.gni")
 
 group("kernel") {
@@ -25,8 +24,6 @@ group("tests") {
     ":starnix_kernel_bin-tests",
     ":starnix_kernel_runner-tests",
     ":starnix_logging-tests",
-    ":starnix_sync-tests",
-    "device/input:tests",
   ]
 }
 
@@ -76,8 +73,6 @@ rustc_binary("starnix_kernel_bin") {
     ]
   }
 
-  non_rust_deps = [ ":restricted_trampoline" ]
-
   sources = [ "main.rs" ]
 
   configs += [ "//build/config/rust/lints:clippy_warn_all" ]
@@ -117,25 +112,18 @@ rustc_library("starnix_core") {
     "bpf/syscalls.rs",
     "device/android/bootloader_message_store.rs",
     "device/android/mod.rs",
-    "device/ashmem.rs",
     "device/binder.rs",
-    "device/device_init.rs",
     "device/device_mapper.rs",
     "device/framebuffer.rs",
     "device/framebuffer_server.rs",
     "device/kobject.rs",
-    "device/loop_device.rs",
     "device/mem.rs",
     "device/mod.rs",
-    "device/perfetto_consumer.rs",
     "device/registry.rs",
     "device/remote_binder.rs",
     "device/remote_block_device.rs",
-    "device/sync_file.rs",
     "device/terminal.rs",
-    "device/touch_power_policy_device.rs",
     "device/tun.rs",
-    "device/zram.rs",
     "dynamic_thread_spawner.rs",
     "execution/crash_reporter.rs",
     "execution/executor.rs",
@@ -147,6 +135,7 @@ rustc_library("starnix_core") {
     "fs/fuchsia/mod.rs",
     "fs/fuchsia/remote.rs",
     "fs/fuchsia/remote_bundle.rs",
+    "fs/fuchsia/sync_file.rs",
     "fs/fuchsia/syslog.rs",
     "fs/fuchsia/timer.rs",
     "fs/fuchsia/zxio.rs",
@@ -199,8 +188,8 @@ rustc_library("starnix_core") {
     "power/wakeup_count.rs",
     "security/hooks.rs",
     "security/mod.rs",
-    "security/selinux_hooks/fs.rs",
     "security/selinux_hooks/mod.rs",
+    "security/selinux_hooks/selinuxfs.rs",
     "security/selinux_hooks/task.rs",
     "security/selinux_hooks/testing.rs",
     "signals/mod.rs",
@@ -232,13 +221,13 @@ rustc_library("starnix_core") {
     "task/syslog.rs",
     "task/task.rs",
     "task/thread_group.rs",
+    "task/timeline.rs",
     "task/timers.rs",
     "task/uts_namespace.rs",
     "task/waiter.rs",
     "testing.rs",
     "time/mod.rs",
     "time/utc.rs",
-    "timer/mod.rs",
     "vdso/mod.rs",
     "vdso/vdso_loader.rs",
     "vfs/aio.rs",
@@ -263,6 +252,7 @@ rustc_library("starnix_core") {
     "vfs/fs_args.rs",
     "vfs/fs_context.rs",
     "vfs/fs_node.rs",
+    "vfs/fs_registry.rs",
     "vfs/fsverity.rs",
     "vfs/fuse.rs",
     "vfs/inotify.rs",
@@ -295,6 +285,7 @@ rustc_library("starnix_core") {
     "vfs/stubs.rs",
     "vfs/symlink_node.rs",
     "vfs/syscalls.rs",
+    "vfs/timer.rs",
     "vfs/vec_directory.rs",
     "vfs/wd_number.rs",
     "vfs/xattr.rs",
@@ -311,20 +302,17 @@ rustc_library("starnix_core") {
       "bpf/syscalls.rs",
       "device/android/bootloader_message_store.rs",
       "device/android/mod.rs",
-      "device/ashmem.rs",
       "device/binder.rs",
       "device/framebuffer.rs",
       "device/framebuffer_server.rs",
-      "device/perfetto_consumer.rs",
-      "device/touch_power_policy_device.rs",
+      "device/remote_binder.rs",
       "vfs/socket/socket_generic_netlink/nl80211.rs",
     ]
   }
 
   deps = [
-    ":perfetto_consumer_proto",
+    ":restricted_trampoline",
     ":starnix_logging",
-    ":starnix_sync",
     ":vdso-data($bionic_linux_toolchain)",
     "//sdk/fidl/fuchsia.buildinfo:fuchsia.buildinfo_rust",
     "//sdk/fidl/fuchsia.diagnostics:fuchsia.diagnostics_rust",
@@ -384,7 +372,6 @@ rustc_library("starnix_core") {
     "//src/lib/network/fidl_fuchsia_net_interfaces_ext",
     "//src/lib/process_builder",
     "//src/lib/trace/rust:trace",
-    "//src/lib/trace/rust:trace-observer",
     "//src/lib/ui/flatland-frame-scheduling:flatland-frame-scheduling-lib",
     "//src/lib/ui/fuchsia-framebuffer",
     "//src/lib/ui/fuchsia-scenic",
@@ -392,6 +379,7 @@ rustc_library("starnix_core") {
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/performance/memory/attribution/server",
     "//src/starnix/lib/ebpf",
+    "//src/starnix/lib/expando",
     "//src/starnix/lib/extended_pstate:lib",
     "//src/starnix/lib/filter_methods_macro",
     "//src/starnix/lib/linux_uapi",
@@ -399,6 +387,7 @@ rustc_library("starnix_core") {
     "//src/starnix/lib/selinux",
     "//src/starnix/lib/selinux/core",
     "//src/starnix/lib/starnix-lifecycle",
+    "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-syscalls",
     "//src/starnix/lib/starnix-uapi",
     "//src/starnix/lib/syncio",
@@ -436,7 +425,6 @@ rustc_library("starnix_core") {
     "//third_party/rust_crates:once_cell",
     "//third_party/rust_crates:paste",
     "//third_party/rust_crates:pin-project",
-    "//third_party/rust_crates:prost",
     "//third_party/rust_crates:rand",
     "//third_party/rust_crates:ref-cast",
     "//third_party/rust_crates:regex",
@@ -449,12 +437,12 @@ rustc_library("starnix_core") {
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing-mutex",
     "//third_party/rust_crates:utf8parse",
+    "//third_party/rust_crates:uuid",
     "//third_party/rust_crates:zerocopy",
   ]
 
   if (is_mistos) {
     deps -= [
-      ":perfetto_consumer_proto",
       ":vdso-data($bionic_linux_toolchain)",
       "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
       "//sdk/fidl/fuchsia.images2:fuchsia.images2_rust",
@@ -470,13 +458,11 @@ rustc_library("starnix_core") {
       "//src/connectivity/wlan/wlanix:fuchsia.wlan.wlanix_rust",
       "//src/graphics/lib/magma/src/libmagma",
       "//src/lib/fuchsia-fs",
-      "//src/lib/trace/rust:trace-observer",
       "//src/lib/ui/flatland-frame-scheduling:flatland-frame-scheduling-lib",
       "//src/lib/ui/fuchsia-framebuffer",
       "//src/lib/ui/fuchsia-scenic",
       "//src/lib/vulkan",
       "//src/starnix/lib/ebpf",
-      "//third_party/rust_crates:prost",
       "//third_party/rust_crates:slab",
     ]
   }
@@ -508,9 +494,6 @@ rustc_library("starnix_core") {
   }
   if (starnix_enable_alternate_anon_allocs) {
     features += [ "alternate_anon_allocs" ]
-  }
-  if (data_filesystem_format == "fxfs") {
-    features += [ "posix_attributes" ]
   }
   inputs = [
     "//src/starnix/lib/selinux/testdata/micro_policies/hooks_tests_policy.pp",
@@ -550,9 +533,7 @@ rustc_library("starnix_kernel_runner") {
 
   deps = [
     ":starnix_core",
-    ":starnix_kernel_config",
     ":starnix_logging",
-    ":starnix_sync",
     "//sdk/fidl/fuchsia.component:fuchsia.component_rust",
     "//sdk/fidl/fuchsia.component.runner:fuchsia.component.runner_rust",
     "//sdk/fidl/fuchsia.element:fuchsia.element_rust",
@@ -576,12 +557,17 @@ rustc_library("starnix_kernel_runner") {
     "//src/lib/fuchsia-runtime",
     "//src/lib/ui/fuchsia-scenic",
     "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/starnix/kernel/device/gpu",
-    "//src/starnix/kernel/device/gralloc",
-    "//src/starnix/kernel/device/input:input-device",
-    "//src/starnix/kernel/device/magma:magma-device",
     "//src/starnix/lib/selinux/core",
+    "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-uapi",
+    "//src/starnix/modules",
+    "//src/starnix/modules/ashmem",
+    "//src/starnix/modules/gpu",
+    "//src/starnix/modules/gralloc",
+    "//src/starnix/modules/input",
+    "//src/starnix/modules/magma",
+    "//src/starnix/modules/perfetto-consumer",
+    "//src/starnix/modules/touch-power-policy",
     "//src/sys/lib/runner",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bstr",
@@ -600,10 +586,14 @@ rustc_library("starnix_kernel_runner") {
       "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
       "//src/graphics/lib/magma/src/libmagma",
       "//src/lib/ui/fuchsia-scenic",
-      "//src/starnix/kernel/device/gpu",
-      "//src/starnix/kernel/device/gralloc",
-      "//src/starnix/kernel/device/input:input-device",
-      "//src/starnix/kernel/device/magma:magma-device",
+      "//src/starnix/modules",
+      "//src/starnix/modules/ashmem",
+      "//src/starnix/modules/gpu",
+      "//src/starnix/modules/gralloc",
+      "//src/starnix/modules/input",
+      "//src/starnix/modules/magma",
+      "//src/starnix/modules/perfetto-consumer",
+      "//src/starnix/modules/touch-power-policy",
     ]
   }
 
@@ -634,11 +624,11 @@ rustc_library("starnix_logging") {
   ]
 
   deps = [
-    ":starnix_sync",
     "//src/lib/diagnostics/inspect/contrib/rust",
     "//src/lib/diagnostics/inspect/rust",
     "//src/lib/trace/rust:trace",
     "//src/lib/zircon/rust:fuchsia-zircon",
+    "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-uapi",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bstr",
@@ -665,52 +655,6 @@ rustc_library("starnix_logging") {
   }
 
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
-}
-
-rustc_library("starnix_sync") {
-  name = "starnix_sync"
-  edition = "2021"
-  version = "0.1.0"
-  with_unit_tests = true
-  source_root = "sync/lib.rs"
-
-  deps = [
-    "//src/lib/fuchsia-sync",
-    "//src/lib/zircon/rust:fuchsia-zircon",
-    "//src/starnix/kernel/sync/lock_ordering_macro",
-    "//third_party/rust_crates:lock_api",
-    "//third_party/rust_crates:once_cell",
-    "//third_party/rust_crates:static_assertions",
-    "//third_party/rust_crates:tracing-mutex",
-  ]
-
-  test_deps = [
-    "//src/lib/fuchsia",
-    "//third_party/rust_crates:test-case",
-  ]
-
-  sources = [
-    "sync/atomic_time.rs",
-    "sync/interruptible_event.rs",
-    "sync/lib.rs",
-    "sync/lock_ordering.rs",
-    "sync/lock_relations.rs",
-    "sync/lock_sequence.rs",
-    "sync/lock_traits.rs",
-    "sync/locks.rs",
-    "sync/port_event.rs",
-  ]
-
-  configs += [ "//src/starnix/config:starnix_clippy_lints" ]
-}
-
-rust_proto_library("perfetto_consumer_proto") {
-  sources = [
-    "//third_party/perfetto/protos/perfetto/ipc/consumer_port.proto",
-    "//third_party/perfetto/protos/perfetto/ipc/wire_protocol.proto",
-  ]
-  packages = [ "perfetto.protos" ]
-  include_dirs = [ "//third_party/perfetto" ]
 }
 
 static_library("restricted_trampoline") {
@@ -805,11 +749,6 @@ fuchsia_component_manifest("starnix_kernel_manifest") {
   component_name = "starnix_kernel"
 }
 
-# The starnix kernel configuration library, used by the Rust binary to parse configuration.
-fuchsia_structured_config_rust_lib("starnix_kernel_config") {
-  cm_label = ":starnix_kernel_manifest"
-}
-
 gzip("gzip_android_5.10_kernel_config") {
   input = "data/config"
   output = "$target_gen_dir/config.gz"
@@ -826,17 +765,11 @@ fuchsia_component("starnix_kernel") {
   deps = [ ":starnix_kernel_bin" ]
 }
 
-fuchsia_structured_config_values("kernel_config") {
-  cm_label = ":starnix_kernel_manifest"
-  values_source = "//src/starnix/kernel/meta/config.json5"
-}
-
 # Packages
 
 fuchsia_package("starnix_kernel_package") {
   package_name = "starnix_kernel"
   deps = [
-    ":kernel_config",
     ":starnix_kernel",
     ":starnix_kernel_manifest",
     "//src/starnix/containers:default_init",
@@ -878,8 +811,4 @@ fuchsia_unittest_package("starnix_kernel_runner-tests") {
 
 fuchsia_unittest_package("starnix_logging-tests") {
   deps = [ ":starnix_logging_test" ]
-}
-
-fuchsia_unittest_package("starnix_sync-tests") {
-  deps = [ ":starnix_sync_test" ]
 }

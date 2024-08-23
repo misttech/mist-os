@@ -96,7 +96,14 @@ source_set("load-tests") {
   sources = [
     "ld-load-tests-base.cc",
     "ld-load-tests-base.h",
-    "load-tests.cc",
+    "load-tests-abi.cc",
+    "load-tests-basic.cc",
+    "load-tests-deps.cc",
+    "load-tests-failure.cc",
+    "load-tests-reloc.cc",
+    "load-tests-symbolizer.cc",
+    "load-tests-tls.cc",
+    "load-tests.h",
   ]
   deps = [
     ":load-test-modules-info",
@@ -121,9 +128,11 @@ source_set("load-tests") {
       "ld-startup-in-process-tests-zircon.h",
       "ld-startup-spawn-process-tests-zircon.cc",
       "ld-startup-spawn-process-tests-zircon.h",
+      "load-tests-llvm-profdata.cc",
       "remote-tests.cc",
     ]
     deps += [
+      "..:fuchsia-debugdata",
       "..:ld-stub.basic",
       "../testing",
       "//sdk/lib/fdio",
@@ -138,6 +147,10 @@ source_set("load-tests") {
     ]
     deps += [ ":test-chdir-guard" ]
   }
+
+  # Let gtest describe TYPED_TEST cases nicely.
+  configs += [ "//build/config:no_rtti" ]
+  configs -= [ "//build/config:no_rtti" ]
 }
 
 source_set("test-chdir-guard") {

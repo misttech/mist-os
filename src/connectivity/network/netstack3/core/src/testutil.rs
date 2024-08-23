@@ -65,7 +65,7 @@ use netstack3_ip::{
 };
 use netstack3_tcp::testutil::{ClientBuffers, ProvidedBuffers, TestSendBuffer};
 use netstack3_tcp::{BufferSizes, RingBuffer, TcpBindingsTypes};
-use netstack3_udp::{UdpBindingsTypes, UdpReceiveBindingsContext, UdpSocketId};
+use netstack3_udp::{UdpBindingsTypes, UdpPacketMeta, UdpReceiveBindingsContext, UdpSocketId};
 use packet::{Buf, BufferMut};
 use zerocopy::ByteSlice;
 
@@ -1231,9 +1231,8 @@ impl<I: IpExt> UdpReceiveBindingsContext<I, DeviceId<Self>> for FakeBindingsCtx 
     fn receive_udp<B: BufferMut>(
         &mut self,
         id: &UdpSocketId<I, WeakDeviceId<Self>, FakeBindingsCtx>,
-        _device: &DeviceId<Self>,
-        _dst_addr: (<I>::Addr, core::num::NonZeroU16),
-        _src_addr: (<I>::Addr, Option<core::num::NonZeroU16>),
+        _device_id: &DeviceId<Self>,
+        _meta: UdpPacketMeta<I>,
         body: &B,
     ) {
         let mut state = self.state_mut();

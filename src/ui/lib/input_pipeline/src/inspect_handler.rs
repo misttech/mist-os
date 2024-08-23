@@ -118,7 +118,12 @@ impl EventCounters {
         map.insert(event_type, new_counters);
     }
 
-    pub fn count_event(&self, time: zx::Time, event_time: zx::Time, handled: &Handled) {
+    pub fn count_event(
+        &self,
+        time: zx::MonotonicTime,
+        event_time: zx::MonotonicTime,
+        handled: &Handled,
+    ) {
         self.events_count.add(1);
         if *handled == Handled::Yes {
             self.handled_events_count.add(1);
@@ -210,7 +215,7 @@ pub struct InspectHandler<F> {
     health_node: RefCell<fuchsia_inspect::health::Node>,
 }
 
-impl<F: FnMut() -> zx::Time + 'static> Debug for InspectHandler<F> {
+impl<F: FnMut() -> zx::MonotonicTime + 'static> Debug for InspectHandler<F> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("InspectHandler")
             .field("node", &self.node)
@@ -225,7 +230,7 @@ impl<F: FnMut() -> zx::Time + 'static> Debug for InspectHandler<F> {
 }
 
 #[async_trait(?Send)]
-impl<F: FnMut() -> zx::Time + 'static> InputHandler for InspectHandler<F> {
+impl<F: FnMut() -> zx::MonotonicTime + 'static> InputHandler for InspectHandler<F> {
     async fn handle_input_event(self: Rc<Self>, input_event: InputEvent) -> Vec<InputEvent> {
         let event_time = input_event.event_time;
         let now = (self.now.borrow_mut())();
@@ -260,10 +265,10 @@ pub fn make_inspect_handler(
     node: inspect::Node,
     supported_input_devices: &HashSet<&InputDeviceType>,
     displays_recent_events: bool,
-) -> Rc<InspectHandler<fn() -> zx::Time>> {
+) -> Rc<InspectHandler<fn() -> zx::MonotonicTime>> {
     InspectHandler::new_internal(
         node,
-        zx::Time::get_monotonic,
+        zx::MonotonicTime::get,
         supported_input_devices,
         displays_recent_events,
     )
@@ -371,8 +376,8 @@ mod tests {
     use maplit::{hashmap, hashset};
     use test_case::test_case;
 
-    fn fixed_now() -> zx::Time {
-        zx::Time::ZERO + zx::Duration::from_nanos(42)
+    fn fixed_now() -> zx::MonotonicTime {
+        zx::MonotonicTime::ZERO + zx::Duration::from_nanos(42)
     }
 
     #[fasync::run_singlethreaded(test)]
@@ -380,14 +385,14 @@ mod tests {
         let mut circular_buffer = CircularBuffer::new(MAX_RECENT_EVENT_LOG_SIZE);
         assert_eq!(circular_buffer._size, MAX_RECENT_EVENT_LOG_SIZE);
 
-        let first_event_time = zx::Time::get_monotonic();
+        let first_event_time = zx::MonotonicTime::get();
         circular_buffer.push(create_fake_input_event(first_event_time));
-        let second_event_time = zx::Time::get_monotonic();
+        let second_event_time = zx::MonotonicTime::get();
         circular_buffer.push(create_fake_input_event(second_event_time));
 
         // Fill up `events` VecDeque
         for _i in 2..MAX_RECENT_EVENT_LOG_SIZE {
-            let curr_event_time = zx::Time::get_monotonic();
+            let curr_event_time = zx::MonotonicTime::get();
             circular_buffer.push(create_fake_input_event(curr_event_time));
             match circular_buffer._events.back() {
                 Some(event) => assert_eq!(event.event_time, curr_event_time),
@@ -402,7 +407,7 @@ mod tests {
         }
 
         // CircularBuffer `events` should be full, pushing another event should remove the first event.
-        let last_event_time = zx::Time::get_monotonic();
+        let last_event_time = zx::MonotonicTime::get();
         circular_buffer.push(create_fake_input_event(last_event_time));
         match circular_buffer._events.front() {
             Some(event) => assert_eq!(event.event_time, second_event_time),
@@ -473,7 +478,7 @@ mod tests {
                     fidl_fuchsia_input_report::ConsumerControlButton::FactoryReset,
                     fidl_fuchsia_input_report::ConsumerControlButton::Reboot,
                 ],
-                zx::Time::get_monotonic(),
+                zx::MonotonicTime::get(),
                 &consumer_controls_device_descriptor(),
             ),
             create_mouse_event(
@@ -490,7 +495,7 @@ mod tests {
                 MousePhase::Move,
                 HashSet::from([1u8]),
                 pressed_buttons.clone(),
-                zx::Time::get_monotonic(),
+                zx::MonotonicTime::get(),
                 &mouse_descriptor,
             ),
             create_touch_screen_event(
@@ -500,7 +505,7 @@ mod tests {
                     fidl_fuchsia_ui_input::PointerEventPhase::Move
                         => vec![create_touch_contact(1u32, Position { x: 11.0, y: 31.0 })],
                 },
-                zx::Time::get_monotonic(),
+                zx::MonotonicTime::get(),
                 &touch_screen_descriptor,
             ),
             create_touchpad_event(
@@ -509,7 +514,7 @@ mod tests {
                     create_touch_contact(2u32, Position { x: 10.0, y: 10.0 }),
                 ],
                 pressed_buttons,
-                zx::Time::get_monotonic(),
+                zx::MonotonicTime::get(),
                 &touchpad_descriptor,
             ),
             InputEvent {
@@ -525,7 +530,7 @@ mod tests {
                         sensor_layout: Rgbc { red: 1, green: 2, blue: 3, clear: 4 },
                     },
                 ),
-                event_time: zx::Time::get_monotonic(),
+                event_time: zx::MonotonicTime::get(),
                 handled: input_device::Handled::No,
                 trace_id: None,
             },
@@ -684,7 +689,7 @@ mod tests {
 
         handler
             .clone()
-            .handle_input_event(create_fake_input_event(zx::Time::from_nanos(43i64)))
+            .handle_input_event(create_fake_input_event(zx::MonotonicTime::from_nanos(43i64)))
             .await;
         assert_data_tree!(inspector, root: {
             test_node: contains {
@@ -738,7 +743,7 @@ mod tests {
 
         handler
             .clone()
-            .handle_input_event(create_fake_input_event(zx::Time::from_nanos(44i64)))
+            .handle_input_event(create_fake_input_event(zx::MonotonicTime::from_nanos(44i64)))
             .await;
         assert_data_tree!(inspector, root: {
             test_node: contains {
@@ -792,7 +797,7 @@ mod tests {
 
         handler
             .clone()
-            .handle_input_event(create_fake_handled_input_event(zx::Time::from_nanos(44)))
+            .handle_input_event(create_fake_handled_input_event(zx::MonotonicTime::from_nanos(44)))
             .await;
         assert_data_tree!(inspector, root: {
             test_node: contains {
@@ -917,7 +922,7 @@ mod tests {
 
         handler
             .clone()
-            .handle_input_event(create_fake_input_event(zx::Time::from_nanos(43i64)))
+            .handle_input_event(create_fake_input_event(zx::MonotonicTime::from_nanos(43i64)))
             .await;
         assert_data_tree!(inspector, root: {
             test_node: contains {
@@ -976,7 +981,7 @@ mod tests {
 
         handler
             .clone()
-            .handle_input_event(create_fake_input_event(zx::Time::from_nanos(44i64)))
+            .handle_input_event(create_fake_input_event(zx::MonotonicTime::from_nanos(44i64)))
             .await;
         assert_data_tree!(inspector, root: {
             test_node: contains {
@@ -1038,7 +1043,7 @@ mod tests {
 
         handler
             .clone()
-            .handle_input_event(create_fake_handled_input_event(zx::Time::from_nanos(44)))
+            .handle_input_event(create_fake_handled_input_event(zx::MonotonicTime::from_nanos(44)))
             .await;
         assert_data_tree!(inspector, root: {
             test_node: contains {
@@ -1116,7 +1121,8 @@ mod tests {
         let root = inspector.root();
         let test_node = root.create_child("test_node");
 
-        let mut seen_timestamps = latencies_nsec.clone().into_iter().map(zx::Time::from_nanos);
+        let mut seen_timestamps =
+            latencies_nsec.clone().into_iter().map(zx::MonotonicTime::from_nanos);
         let now = move || {
             seen_timestamps.next().expect("internal error: test has more events than latencies")
         };
@@ -1127,7 +1133,10 @@ mod tests {
             /* displays_recent_events = */ false,
         );
         for _latency in latencies_nsec.clone() {
-            handler.clone().handle_input_event(create_fake_input_event(zx::Time::ZERO)).await;
+            handler
+                .clone()
+                .handle_input_event(create_fake_input_event(zx::MonotonicTime::ZERO))
+                .await;
         }
 
         let mut histogram_assertion = diagnostics_assertions::HistogramAssertion::exponential(

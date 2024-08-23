@@ -8,10 +8,18 @@ import("//build/rust/rustc_binary.gni")
 import("//build/rust/rustc_library.gni")
 import("//src/bringup/bin/virtcon/virtcon_args.gni")
 
-# Mandatory portion of virtcon that's included in all products.
-fuchsia_component("component") {
+fuchsia_component_manifest("manifest") {
   component_name = "virtual-console"
   manifest = "meta/virtual-console.cml"
+}
+
+fuchsia_structured_config_rust_lib("virtcon_config") {
+  cm_label = ":manifest"
+}
+
+# Mandatory portion of virtcon that's included in all products.
+fuchsia_component("component") {
+  cm_label = ":manifest"
   deps = [ ":bin" ]
 }
 
@@ -74,7 +82,7 @@ rustc_library("lib") {
     "src/view.rs",
   ]
   deps = [
-    "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
+    ":virtcon_config",
     "//sdk/fidl/fuchsia.hardware.display:fuchsia.hardware.display_rust",
     "//sdk/fidl/fuchsia.hardware.power.statecontrol:fuchsia.hardware.power.statecontrol_rust",
     "//sdk/fidl/fuchsia.hardware.pty:fuchsia.hardware.pty_rust",
@@ -123,6 +131,7 @@ rustc_binary("bin") {
   sources = [ "src/main.rs" ]
   deps = [
     ":lib",
+    ":virtcon_config",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//src/lib/fuchsia-async",
     "//src/lib/fuchsia-component",

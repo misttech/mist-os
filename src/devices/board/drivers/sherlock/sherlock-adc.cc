@@ -33,7 +33,7 @@ static const std::vector<fuchsia_hardware_platform_bus::Mmio> saradc_mmios{
 static const std::vector<fuchsia_hardware_platform_bus::Irq> saradc_irqs{
     {{
         .irq = T931_SARADC_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fuchsia_hardware_platform_bus::ZirconInterruptMode::kEdgeHigh,
     }},
 };
 

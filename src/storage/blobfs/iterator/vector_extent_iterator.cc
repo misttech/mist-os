@@ -4,11 +4,13 @@
 
 #include "src/storage/blobfs/iterator/vector_extent_iterator.h"
 
+#include <lib/zx/result.h>
 #include <stdint.h>
-#include <zircon/types.h>
+#include <zircon/assert.h>
 
 #include <vector>
 
+#include "src/storage/blobfs/allocator/extent_reserver.h"
 #include "src/storage/blobfs/format.h"
 
 namespace blobfs {

@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.component.decl/cpp/fidl.h>
 #include <fidl/fuchsia.component.decl/cpp/hlcpp_conversion.h>
 #include <fidl/fuchsia.component/cpp/fidl.h>
+#include <fidl/fuchsia.element/cpp/fidl.h>
 #include <fidl/fuchsia.fonts/cpp/fidl.h>
 #include <fidl/fuchsia.input.report/cpp/fidl.h>
 #include <fidl/fuchsia.kernel/cpp/fidl.h>
@@ -19,7 +20,6 @@
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <fidl/fuchsia.session.scene/cpp/fidl.h>
 #include <fidl/fuchsia.tracing.provider/cpp/fidl.h>
-#include <fidl/fuchsia.ui.app/cpp/fidl.h>
 #include <fidl/fuchsia.ui.input/cpp/fidl.h>
 #include <fidl/fuchsia.ui.scenic/cpp/fidl.h>
 #include <fidl/fuchsia.ui.test.input/cpp/fidl.h>
@@ -69,16 +69,6 @@ using ChildName = std::string;
 // This value corresponds to the one used to instantiate the ClickDragHandler
 // registered by Input Pipeline in Scene Manager.
 constexpr int64_t kClickToDragThreshold = 16.0;
-
-// Combines all vectors in `vecs` into one.
-template <typename T>
-std::vector<T> merge(std::initializer_list<std::vector<T>> vecs) {
-  std::vector<T> result;
-  for (auto v : vecs) {
-    result.insert(result.end(), v.begin(), v.end());
-  }
-  return result;
-}
 
 int ButtonsToInt(const std::vector<fuchsia_ui_test_input::MouseButton>& buttons) {
   int result = 0;
@@ -199,14 +189,6 @@ class MouseInputBase : public ui_testing::PortableUITest {
     ASSERT_EQ(mouse_state_->SizeOfEvents(), 0u);
   }
 
-  // Subclass should implement this method to add v2 components to the test realm
-  // next to the base ones added.
-  virtual std::vector<std::pair<ChildName, std::string>> GetTestComponents() { return {}; }
-
-  // Subclass should implement this method to add capability routes to the test
-  // realm next to the base ones added.
-  virtual std::vector<Route> GetTestRoutes() { return {}; }
-
   // Helper method for checking the test.mouse.MouseInputListener response from the client app.
   static void VerifyEvent(
       fuchsia_ui_test_input::MouseInputListenerReportMouseInputRequest& pointer_data,
@@ -258,15 +240,6 @@ class MouseInputBase : public ui_testing::PortableUITest {
         kMouseInputListener, [d, mouse_state = mouse_state_, ready_to_inject = ready_to_inject_]() {
           return std::make_unique<MouseInputListenerServer>(d, mouse_state, ready_to_inject);
         });
-
-    for (const auto& [name, component] : GetTestComponents()) {
-      realm_builder().AddChild(name, component);
-    }
-
-    // Add the necessary routing for each of the extra components added above.
-    for (const auto& route : GetTestRoutes()) {
-      realm_builder().AddRoute(route);
-    }
   }
 
   std::shared_ptr<MouseInputState> mouse_state_;
@@ -284,17 +257,21 @@ class ChromiumInputTest : public MouseInputBase {
  public:
   void SetUp() override {
     MouseInputBase::SetUp();
-
-    LaunchClient();
+    WaitForViewPresentation();
 
     FX_LOGS(INFO) << "Wait for Chromium send out ready";
     RunLoopUntil([this]() { return *(ready_to_inject_); });
   }
 
  protected:
-  std::vector<std::pair<ChildName, std::string>> GetTestComponents() override {
+  std::vector<std::pair<ChildName, std::string>> GetEagerTestComponents() override {
     return {
         std::make_pair(kMouseInputChromium, kMouseInputChromiumUrl),
+    };
+  }
+
+  std::vector<std::pair<ChildName, std::string>> GetTestComponents() override {
+    return {
         std::make_pair(kBuildInfoProvider, kBuildInfoProviderUrl),
         std::make_pair(kFontsProvider, kFontsProviderUrl),
         std::make_pair(kMemoryPressureProvider, kMemoryPressureProviderUrl),
@@ -305,13 +282,7 @@ class ChromiumInputTest : public MouseInputBase {
   }
 
   std::vector<Route> GetTestRoutes() override {
-    return merge({GetChromiumRoutes(ChildRef{kMouseInputChromium}),
-                  {
-                      {.capabilities = {Protocol{
-                           fidl::DiscoverableProtocolName<fuchsia_ui_app::ViewProvider>}},
-                       .source = ChildRef{kMouseInputChromium},
-                       .targets = {ParentRef()}},
-                  }});
+    return GetChromiumRoutes(ChildRef{kMouseInputChromium});
   }
 
   // Routes needed to setup Chromium client.
@@ -321,6 +292,7 @@ class ChromiumInputTest : public MouseInputBase {
              {
                  Protocol{fidl::DiscoverableProtocolName<
                      fuchsia_accessibility_semantics::SemanticsManager>},
+                 Protocol{fidl::DiscoverableProtocolName<fuchsia_element::GraphicalPresenter>},
                  Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Allocator>},
                  Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Flatland>},
                  Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_scenic::Scenic>},

@@ -61,9 +61,6 @@ test("adb-file-sync-test-bin") {
     "//src/lib/testing/loop_fixture:gtest",
     "//third_party/googletest:gtest",
   ]
-
-  # TODO(https://fxbug.dev/42085293): delete the below and fix compiler warnings
-  configs += [ "//build/config:Wno-vla-cxx-extension" ]
 }
 
 fuchsia_component("adb-file-sync-test-component") {

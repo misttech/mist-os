@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 pub mod adapters;
+pub mod connector;
 mod from_env;
 mod subtool;
 pub mod testing;
@@ -31,5 +32,5 @@ pub mod macro_deps {
     pub use ffx_command::{bug, return_bug, return_user_error, Ffx, FfxCommandLine, ToolRunner};
     pub use ffx_config::{global_env_context, EnvironmentContext};
     pub use ffx_core::Injector;
-    pub use {anyhow, argh, ffx_writer, futures, serde};
+    pub use {anyhow, argh, async_lock, ffx_writer, futures, serde};
 }

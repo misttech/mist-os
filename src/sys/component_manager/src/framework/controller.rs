@@ -1,16 +1,16 @@
 // Copyright 2023 The Fuchsia Authors. All rights reserved>.
 // Use of this source code is governed by a BSD-style license that can be
-// found in the LICENSE file.cti
+// found in the LICENSE file.
 
-use crate::bedrock::program::StopInfo;
 use crate::model::actions::StopAction;
 use crate::model::component::{
     ExtendedInstance, IncomingCapabilities, StartReason, WeakComponentInstance,
 };
+use ::runner::component::StopInfo;
 use fidl::endpoints::{ProtocolMarker, RequestStream};
 use futures::prelude::*;
 use tracing::{error, warn};
-use {fidl_fuchsia_component as fcomponent, fuchsia_async as fasync, fuchsia_zircon as zx};
+use {fidl_fuchsia_component as fcomponent, fuchsia_async as fasync};
 
 pub async fn run_controller(
     weak_component_instance: WeakComponentInstance,
@@ -177,12 +177,7 @@ async fn execution_controller_task(
 pub struct ExecutionControllerTask {
     _task: fasync::Task<()>,
     control_handle: fcomponent::ExecutionControllerControlHandle,
-    stop_payload: Option<StopPayload>,
-}
-
-struct StopPayload {
-    status: zx::Status,
-    info: Option<StopInfo>,
+    stop_payload: Option<StopInfo>,
 }
 
 impl Drop for ExecutionControllerTask {
@@ -191,8 +186,8 @@ impl Drop for ExecutionControllerTask {
             Some(payload) => {
                 // There's not much we can do if the other end has closed their channel
                 let _ = self.control_handle.send_on_stop(&fcomponent::StoppedPayload {
-                    status: Some(payload.status.into_raw()),
-                    exit_code: payload.info.map(|info| info.exit_code).flatten(),
+                    status: Some(payload.termination_status.into_raw()),
+                    exit_code: payload.exit_code,
                     ..Default::default()
                 });
             }
@@ -205,7 +200,7 @@ impl Drop for ExecutionControllerTask {
 }
 
 impl ExecutionControllerTask {
-    pub fn set_stop_payload(&mut self, status: zx::Status, info: Option<StopInfo>) {
-        self.stop_payload = Some(StopPayload { status, info });
+    pub fn set_stop_payload(&mut self, info: StopInfo) {
+        self.stop_payload = Some(info);
     }
 }

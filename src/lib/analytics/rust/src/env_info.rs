@@ -127,6 +127,7 @@ fn copy_old_to_new(
 
 #[allow(dead_code)]
 fn xdg_data_home() -> PathBuf {
+    #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336471)
     match xdg_data_home_env_var() {
         Ok(path) => match PathBuf::from_str(&path) {
             Ok(pb) => pb,

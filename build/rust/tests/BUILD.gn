@@ -14,6 +14,9 @@ import("//build/testing/host_test_data.gni")
 group("tests") {
   testonly = true
   deps = [ ":clippy_test($host_toolchain)" ]
+  if (include_rustdoc) {
+    deps += [ "//build/rust/tests/rustdoc" ]
+  }
 }
 
 # The dep chain A->B->C will exercise the functionality of both direct and

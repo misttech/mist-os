@@ -6,8 +6,6 @@
 
 #include <fidl/fuchsia.hardware.display.types/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.display/cpp/fidl.h>
-#include <fidl/fuchsia.hardware.display/cpp/hlcpp_conversion.h>
-#include <lib/fidl/cpp/hlcpp_conversion.h>
 #include <lib/fidl/cpp/wire/status.h>
 #include <lib/fit/defer.h>
 #include <lib/syslog/cpp/macros.h>
@@ -21,19 +19,17 @@ namespace scenic_impl {
 
 bool ImportBufferCollection(
     allocation::GlobalBufferCollectionId buffer_collection_id,
-    fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator> display_coordinator,
+    const fidl::SyncClient<fuchsia_hardware_display::Coordinator>& display_coordinator,
     fidl::ClientEnd<fuchsia_sysmem2::BufferCollectionToken> token,
     const fuchsia_hardware_display_types::ImageBufferUsage& image_buffer_usage) {
   const fuchsia_hardware_display::BufferCollectionId display_buffer_collection_id =
       allocation::ToDisplayBufferCollectionId(buffer_collection_id);
 
-  fidl::Result import_buffer_collection_result =
-      fidl::Call(display_coordinator)
-          ->ImportBufferCollection({{
-              .buffer_collection_id = display_buffer_collection_id,
-              .buffer_collection_token =
-                  fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(token.TakeChannel()),
-          }});
+  fidl::Result import_buffer_collection_result = display_coordinator->ImportBufferCollection({{
+      .buffer_collection_id = display_buffer_collection_id,
+      .buffer_collection_token =
+          fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(token.TakeChannel()),
+  }});
   if (import_buffer_collection_result.is_error()) {
     FX_LOGS(ERROR) << "Failed to call FIDL ImportBufferCollection: "
                    << import_buffer_collection_result.error_value().FormatDescription();
@@ -41,14 +37,13 @@ bool ImportBufferCollection(
   }
 
   fidl::Result set_buffer_collection_constraints_result =
-      fidl::Call(display_coordinator)
-          ->SetBufferCollectionConstraints({{
-              .buffer_collection_id = display_buffer_collection_id,
-              .buffer_usage = image_buffer_usage,
-          }});
+      display_coordinator->SetBufferCollectionConstraints({{
+          .buffer_collection_id = display_buffer_collection_id,
+          .buffer_usage = image_buffer_usage,
+      }});
   auto release_buffer_collection_on_failure = fit::defer([&] {
     fit::result<fidl::OneWayStatus> release_result =
-        fidl::Call(display_coordinator)->ReleaseBufferCollection(display_buffer_collection_id);
+        display_coordinator->ReleaseBufferCollection(display_buffer_collection_id);
     if (release_result.is_error()) {
       FX_LOGS(ERROR) << "ReleaseBufferCollection failed: "
                      << release_result.error_value().FormatDescription();
@@ -66,9 +61,9 @@ bool ImportBufferCollection(
 }
 
 DisplayEventId ImportEvent(
-    fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator> display_coordinator,
+    const fidl::SyncClient<fuchsia_hardware_display::Coordinator>& display_coordinator,
     const zx::event& event) {
-  static uint64_t id_generator = fuchsia::hardware::display::types::INVALID_DISP_ID + 1;
+  static uint64_t id_generator = fuchsia_hardware_display_types::kInvalidDispId + 1;
 
   zx::event dup;
   if (event.duplicate(ZX_RIGHT_SAME_RIGHTS, &dup) != ZX_OK) {
@@ -82,7 +77,7 @@ DisplayEventId ImportEvent(
 
   auto before = zx::clock::get_monotonic();
   fit::result<fidl::OneWayStatus> import_result =
-      fidl::Call(display_coordinator)->ImportEvent({{.event = std::move(dup), .id = event_id}});
+      display_coordinator->ImportEvent({{.event = std::move(dup), .id = event_id}});
   if (import_result.is_error()) {
     auto after = zx::clock::get_monotonic();
     FX_LOGS(ERROR) << "Failed to import display controller event. Waited "
@@ -94,8 +89,8 @@ DisplayEventId ImportEvent(
 }
 
 bool IsCaptureSupported(
-    fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator> display_coordinator) {
-  fidl::Result result = fidl::Call(display_coordinator)->IsCaptureSupported();
+    const fidl::SyncClient<fuchsia_hardware_display::Coordinator>& display_coordinator) {
+  fidl::Result result = display_coordinator->IsCaptureSupported();
 
   if (result.is_error()) {
     FX_LOGS(ERROR) << "FIDL IsCaptureSupported call failed: " << result.error_value();
@@ -105,7 +100,7 @@ bool IsCaptureSupported(
 }
 
 zx_status_t ImportImageForCapture(
-    fidl::UnownedClientEnd<fuchsia_hardware_display::Coordinator> display_coordinator,
+    const fidl::SyncClient<fuchsia_hardware_display::Coordinator>& display_coordinator,
     const fuchsia_hardware_display_types::ImageMetadata& image_metadata,
     allocation::GlobalBufferCollectionId buffer_collection_id, uint32_t vmo_idx,
     allocation::GlobalImageId image_id) {
@@ -124,13 +119,12 @@ zx_status_t ImportImageForCapture(
   const fuchsia_hardware_display::ImageId fidl_image_id = allocation::ToFidlImageId(image_id);
 
   fidl::Result import_image_result =
-      fidl::Call(display_coordinator)
-          ->ImportImage({{.image_metadata = image_metadata,
-                          .buffer_id = {{
-                              .buffer_collection_id = display_buffer_collection_id,
-                              .buffer_index = vmo_idx,
-                          }},
-                          .image_id = fidl_image_id}});
+      display_coordinator->ImportImage({{.image_metadata = image_metadata,
+                                         .buffer_id = {{
+                                             .buffer_collection_id = display_buffer_collection_id,
+                                             .buffer_index = vmo_idx,
+                                         }},
+                                         .image_id = fidl_image_id}});
 
   if (import_image_result.is_error()) {
     const auto& error_value = import_image_result.error_value();

@@ -9,7 +9,7 @@ use futures::future::BoxFuture;
 use {fidl_fuchsia_pkg as fpkg, fuchsia_zircon as zx};
 
 fn now_monotonic_nanos() -> i64 {
-    zx::Time::get_monotonic().into_nanos()
+    zx::MonotonicTime::get().into_nanos()
 }
 
 /// Wraps the Inspect state of package resolves.

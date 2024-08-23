@@ -25,16 +25,15 @@ impl From<SshError> for OvernetConnectionError {
     fn from(ssh_err: SshError) -> Self {
         use SshError::*;
         match &ssh_err {
-            Unknown(_)
-            | Timeout
-            | ConnectionRefused
-            | UnknownNameOrService
-            | KeyVerificationFailure
-            | NoRouteToHost
-            | NetworkUnreachable
-            | InvalidArgument
-            | TargetIncompatible => OvernetConnectionError::NonFatal(ssh_err.into()),
-            PermissionDenied => OvernetConnectionError::Fatal(ssh_err.into()),
+            // These errors are considered potentially recoverable, as they can often surface when
+            // a device is actively rebooting while trying to reconnect to it.
+            Unknown(_) | Timeout | ConnectionRefused | UnknownNameOrService | NoRouteToHost
+            | NetworkUnreachable => OvernetConnectionError::NonFatal(ssh_err.into()),
+            // These errors are unrecoverable, as they are fundamental errors in an existing
+            // configuration.
+            PermissionDenied | KeyVerificationFailure | InvalidArgument | TargetIncompatible => {
+                OvernetConnectionError::Fatal(ssh_err.into())
+            }
         }
     }
 }
@@ -189,15 +188,15 @@ mod test {
         let err = UnknownNameOrService;
         assert!(matches!(OvernetConnectionError::from(err), OvernetConnectionError::NonFatal(_)));
         let err = KeyVerificationFailure;
-        assert!(matches!(OvernetConnectionError::from(err), OvernetConnectionError::NonFatal(_)));
+        assert!(matches!(OvernetConnectionError::from(err), OvernetConnectionError::Fatal(_)));
         let err = NoRouteToHost;
         assert!(matches!(OvernetConnectionError::from(err), OvernetConnectionError::NonFatal(_)));
         let err = NetworkUnreachable;
         assert!(matches!(OvernetConnectionError::from(err), OvernetConnectionError::NonFatal(_)));
         let err = InvalidArgument;
-        assert!(matches!(OvernetConnectionError::from(err), OvernetConnectionError::NonFatal(_)));
+        assert!(matches!(OvernetConnectionError::from(err), OvernetConnectionError::Fatal(_)));
         let err = TargetIncompatible;
-        assert!(matches!(OvernetConnectionError::from(err), OvernetConnectionError::NonFatal(_)));
+        assert!(matches!(OvernetConnectionError::from(err), OvernetConnectionError::Fatal(_)));
         let err = Timeout;
         assert!(matches!(OvernetConnectionError::from(err), OvernetConnectionError::NonFatal(_)));
     }

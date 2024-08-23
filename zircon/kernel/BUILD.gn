@@ -138,6 +138,8 @@ if (current_toolchain == default_toolchain) {
 
         "//zircon/kernel/lib/version:headers.config",
 
+        "//zircon/kernel/lib/wake-vector:headers.config",
+
         # <platform.h> has #include <lib/arch/ticks.h>.
         "//zircon/kernel/lib/arch/$kernel_cpu:headers.config",
         "//zircon/kernel/lib/arch:common-headers.config",

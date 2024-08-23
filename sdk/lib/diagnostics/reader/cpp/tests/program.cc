@@ -10,7 +10,8 @@
 #include <lib/syslog/cpp/macros.h>
 
 int main() {
-  fuchsia_logging::SetTags({"test_program"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"test_program"}).BuildAndInitialize();
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
   auto context = sys::ComponentContext::CreateAndServeOutgoingDirectory();
   auto inspector =

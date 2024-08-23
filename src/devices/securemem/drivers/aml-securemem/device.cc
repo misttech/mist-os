@@ -254,7 +254,7 @@ zx_status_t AmlogicSecureMemDevice::CreateAndServeSysmemTee() {
   }
 
   auto [sysmem_secure_mem_client, sysmem_secure_mem_server] =
-      fidl::Endpoints<fuchsia_sysmem::SecureMem>::Create();
+      fidl::Endpoints<fuchsia_sysmem2::SecureMem>::Create();
 
   sysmem_secure_mem_server_.AsyncCall(
       &SysmemSecureMemServer::Bind, std::move(sysmem_secure_mem_server),

@@ -28,6 +28,7 @@
 #include "src/devices/sysmem/drivers/sysmem/indent.h"
 #include "src/devices/sysmem/drivers/sysmem/logging.h"
 #include "src/devices/sysmem/drivers/sysmem/node_properties.h"
+#include "src/devices/sysmem/drivers/sysmem/usage_pixel_format_cost.h"
 #include "src/devices/sysmem/drivers/sysmem/utils.h"
 #include "src/devices/sysmem/drivers/sysmem/versions.h"
 
@@ -389,6 +390,10 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   };
 
   explicit LogicalBufferCollection(Device* parent_device);
+
+  const UsagePixelFormatCost& usage_pixel_format_cost() {
+    return parent_device_->usage_pixel_format_cost();
+  }
 
   // Will log an error, and then FailRoot().
   void LogAndFailRootNode(Location location, fuchsia_sysmem2::Error error, const char* format, ...)
@@ -838,6 +843,11 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
 
   bool FlattenPixelFormatAndModifiers(const fuchsia_sysmem2::BufferUsage& buffer_usage,
                                       fuchsia_sysmem2::BufferCollectionConstraints& constraints);
+
+  bool IsSecureHeap(const fuchsia_sysmem2::Heap& heap);
+  bool IsSecurePermitted(const fuchsia_sysmem2::BufferMemoryConstraints& constraints);
+  fpromise::result<fuchsia_sysmem2::Heap, zx_status_t> GetHeap(
+      const fuchsia_sysmem2::BufferMemoryConstraints& constraints, Device* device);
 
   Device* parent_device_ = nullptr;
 

@@ -244,22 +244,6 @@ class EventRingHarness : public zxtest::Test {
   std::optional<ddk_fake::FakeMmioRegRegion> region_;
 };
 
-void UsbXhci::ConnectToEndpoint(ConnectToEndpointRequest& request,
-                                ConnectToEndpointCompleter::Sync& completer) {
-  completer.Reply(fit::as_error(ZX_ERR_NOT_SUPPORTED));
-}
-
-void UsbXhci::UsbHciSetBusInterface(const usb_bus_interface_protocol_t* bus_intf) {}
-
-size_t UsbXhci::UsbHciGetMaxDeviceCount() { return 0; }
-
-zx_status_t UsbXhci::UsbHciEnableEndpoint(uint32_t device_id,
-                                          const usb_endpoint_descriptor_t* ep_desc,
-                                          const usb_ss_ep_comp_descriptor_t* ss_com_desc,
-                                          bool enable) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
 zx_status_t UsbXhci::InitThread() {
   fbl::AllocChecker ac;
   interrupters_ = fbl::MakeArray<Interrupter>(&ac, 1);
@@ -285,28 +269,6 @@ zx_status_t UsbXhci::InitThread() {
   return static_cast<EventRingHarness*>(GetTestHarness())->InitRing(&interrupters_[0].ring());
 }
 
-uint64_t UsbXhci::UsbHciGetCurrentFrame() { return 0; }
-
-zx_status_t UsbXhci::UsbHciConfigureHub(uint32_t device_id, usb_speed_t speed,
-                                        const usb_hub_descriptor_t* desc, bool multi_tt) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-zx_status_t UsbXhci::UsbHciHubDeviceAdded(uint32_t device_id, uint32_t port, usb_speed_t speed) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx_status_t UsbXhci::UsbHciHubDeviceRemoved(uint32_t device_id, uint32_t port) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx_status_t UsbXhci::UsbHciHubDeviceReset(uint32_t device_id, uint32_t port) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-zx_status_t UsbXhci::UsbHciResetEndpoint(uint32_t device_id, uint8_t ep_address) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
 fpromise::promise<void, zx_status_t> UsbXhci::UsbHciResetEndpointAsync(uint32_t device_id,
                                                                        uint8_t ep_address) {
   auto harness = static_cast<EventRingHarness*>(GetTestHarness());
@@ -320,17 +282,9 @@ fpromise::promise<void, zx_status_t> UsbXhci::UsbHciResetEndpointAsync(uint32_t 
   return bridge.consumer.promise().discard_value();
 }
 
-zx_status_t UsbXhci::UsbHciResetDevice(uint32_t hub_address, uint32_t device_id) {
-  return ZX_ERR_NOT_SUPPORTED;
-}
-
-size_t UsbXhci::UsbHciGetMaxTransferSize(uint32_t device_id, uint8_t ep_address) { return 0; }
-
 zx_status_t UsbXhci::UsbHciCancelAll(uint32_t device_id, uint8_t ep_address) {
   return ZX_ERR_NOT_SUPPORTED;
 }
-
-size_t UsbXhci::UsbHciGetRequestSize() { return Request::RequestSize(sizeof(usb_request_t)); }
 
 void UsbXhci::UsbHciRequestQueue(usb_request_t* usb_request,
                                  const usb_request_complete_callback_t* complete_cb) {}
@@ -367,10 +321,6 @@ fbl::DoublyLinkedList<std::unique_ptr<TRBContext>> TransferRing::TakePendingTRBs
   return empty;
 }
 
-fpromise::promise<void, zx_status_t> UsbXhci::DeviceOffline(uint32_t slot) {
-  return fpromise::make_error_promise<zx_status_t>(ZX_ERR_NOT_SUPPORTED);
-}
-
 fpromise::promise<void, zx_status_t> EnumerateDevice(UsbXhci* hci, uint8_t port,
                                                      std::optional<HubInfo> hub_info) {
   auto harness = static_cast<EventRingHarness*>(hci->GetTestHarness());
@@ -393,25 +343,6 @@ zx_status_t TransferRing::CompleteTRB(TRB* trb, std::unique_ptr<TRBContext>* con
 }
 
 zx_status_t TransferRing::DeinitIfActive() { return ZX_OK; }
-
-Endpoint::Endpoint(UsbXhci* hci, uint32_t device_id, uint8_t address)
-    : usb_endpoint::UsbEndpoint(hci->bti(), address), hci_(hci) {}
-zx_status_t Endpoint::Init(EventRing* event_ring, fdf::MmioBuffer* mmio) {
-  return transfer_ring_.Init(zx_system_get_page_size(), kFakeBti, event_ring, false, mmio, hci_);
-}
-void Endpoint::QueueRequests(QueueRequestsRequest& request,
-                             QueueRequestsCompleter::Sync& completer) {}
-void Endpoint::CancelAll(CancelAllCompleter::Sync& completer) {
-  completer.Reply(fit::as_error(ZX_ERR_NOT_SUPPORTED));
-}
-void Endpoint::OnUnbound(fidl::UnbindInfo info,
-                         fidl::ServerEnd<fuchsia_hardware_usb_endpoint::Endpoint> server_end) {}
-zx_status_t DeviceState::InitEndpoint(uint8_t ep_addr, EventRing* event_ring, fdf::MmioBuffer* mmio)
-    __TA_REQUIRES(transaction_lock_) {
-  rings_[ep_addr].emplace(hci_, device_id_, ep_addr);
-  return rings_[ep_addr]->Init(event_ring, mmio);
-}
-DeviceState::~DeviceState() = default;
 
 TEST_F(EventRingHarness, ShortTransferTest) {
   InitSlot(1);

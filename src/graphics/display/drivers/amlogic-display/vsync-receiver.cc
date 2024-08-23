@@ -6,7 +6,6 @@
 
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/async/cpp/task.h>
-#include <lib/ddk/driver.h>
 #include <lib/driver/logging/cpp/logger.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/sync/cpp/completion.h>

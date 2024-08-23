@@ -141,8 +141,8 @@ pub struct GuestManager {
     guest_descriptor: GuestDescriptor,
 
     // Start and stop time for a guest, used to calculate the guest's uptime.
-    start_time: zx::Time,
-    stop_time: zx::Time,
+    start_time: zx::MonotonicTime,
+    stop_time: zx::MonotonicTime,
 }
 
 impl GuestManager {
@@ -157,8 +157,8 @@ impl GuestManager {
             status: GuestStatus::NotStarted,
             last_error: None,
             guest_descriptor: GuestDescriptor::default(),
-            start_time: zx::Time::INFINITE_PAST,
-            stop_time: zx::Time::INFINITE_PAST,
+            start_time: zx::MonotonicTime::INFINITE_PAST,
+            stop_time: zx::MonotonicTime::INFINITE_PAST,
         }
     }
 

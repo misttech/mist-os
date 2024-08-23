@@ -1090,6 +1090,12 @@ TEST_P(BlobfsIntegrationTest, FailedWrite) {
   // do not interfere with the ramdisk block count.
   ASSERT_EQ(ftruncate(fd.get(), info->size_data), 0);
 
+  // There are transactions that are committed as part of mounting that are committed
+  // asynchronously.  Perform a Sync now to make sure they don't interfere with what follows.
+  fbl::unique_fd root_fd(open(fs().mount_path().c_str(), O_RDONLY));
+  ASSERT_TRUE(fd) << "Failed to open root dir";
+  ASSERT_EQ(fsync(root_fd.get()), 0) << strerror(errno);
+
   // Journal:
   // - One Superblock block
   // - One Inode table block

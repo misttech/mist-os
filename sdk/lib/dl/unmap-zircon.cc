@@ -4,11 +4,11 @@
 
 #include <lib/zx/vmar.h>
 
-#include "module.h"
+#include "runtime-module.h"
 
 namespace dl {
 
-ModuleHandle::~ModuleHandle() {
+RuntimeModule::~RuntimeModule() {
   if (vaddr_size() > 0) {
     zx::vmar::root_self()->unmap(abi_module_.vaddr_start, vaddr_size());
   }

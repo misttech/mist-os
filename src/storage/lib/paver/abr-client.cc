@@ -27,9 +27,12 @@
 
 #include <fbl/algorithm.h>
 
+#include "lib/fidl/cpp/wire/internal/transport_channel.h"
 #include "src/lib/uuid/uuid.h"
+#include "src/storage/lib/paver/block-devices.h"
 #include "src/storage/lib/paver/partition-client.h"
 #include "src/storage/lib/paver/pave-logging.h"
+#include "zircon/time.h"
 
 namespace abr {
 
@@ -54,66 +57,52 @@ zx::result<Configuration> CurrentSlotToConfiguration(std::string_view slot) {
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
-bool FindPartitionLabelByGuid(const fbl::unique_fd& devfs_root, const uint8_t* guid,
+bool FindPartitionLabelByGuid(const paver::BlockDevices& devices, const uint8_t* guid,
                               std::string& out) {
-  out.clear();
-  fbl::unique_fd d_fd;
-  if (zx_status_t status =
-          fdio_open_fd_at(devfs_root.get(), "class/block", 0, d_fd.reset_and_get_address());
-      status != ZX_OK) {
-    ERROR("Cannot inspect block devices: %s\n", zx_status_get_string(status));
-    return false;
-  }
-
-  DIR* d = fdopendir(d_fd.release());
-  if (d == nullptr) {
-    ERROR("Cannot inspect block devices\n");
-    return false;
-  }
-  const auto closer = fit::defer([&]() { closedir(d); });
-
-  struct dirent* de;
-  while ((de = readdir(d)) != nullptr) {
-    fdio_cpp::UnownedFdioCaller caller(dirfd(d));
-    zx::result channel = component::ConnectAt<partition::Partition>(caller.directory(), de->d_name);
-    if (channel.is_error()) {
-      continue;
-    }
-    {
-      auto result = fidl::WireCall(channel.value())->GetInstanceGuid();
-      if (!result.ok()) {
-        continue;
-      }
-      const auto& response = result.value();
-      if (response.status != ZX_OK) {
-        continue;
-      }
-      if (memcmp(response.guid->value.data_, guid, GPT_GUID_LEN) != 0) {
-        continue;
-      }
-    }
-
-    auto result = fidl::WireCall(channel.value())->GetName();
+  auto partition = devices.OpenPartition([&](const zx::channel& channel) {
+    auto client =
+        fidl::UnownedClientEnd<fuchsia_hardware_block_partition::Partition>((channel.borrow()));
+    auto result = fidl::WireCall(client)->GetInstanceGuid();
     if (!result.ok()) {
-      continue;
+      return false;
     }
-
     const auto& response = result.value();
     if (response.status != ZX_OK) {
-      continue;
+      return false;
     }
-    std::string_view name(response.name.data(), response.name.size());
-    out.append(name);
-    return true;
+    return memcmp(response.guid->value.data_, guid, GPT_GUID_LEN) == 0;
+  });
+  if (partition.is_error()) {
+    if (partition.status_value() != ZX_ERR_NOT_FOUND) {
+      ERROR("Failed to open partitions: %s\n", partition.status_string());
+    }
+    return false;
   }
 
-  return false;
+  zx::result client = partition->Connect();
+  if (client.is_error()) {
+    ERROR("Failed to connect to partition: %s\n", zx_status_get_string(client.status_value()));
+    return false;
+  }
+  auto result = fidl::WireCall(*client)->GetName();
+  if (!result.ok()) {
+    ERROR("Failed to call GetName on partition: %s\n", result.status_string());
+    return false;
+  }
+  const auto& response = result.value();
+  if (response.status != ZX_OK) {
+    ERROR("Failed to call GetName on partition: %s\n", zx_status_get_string(response.status));
+    return false;
+  }
+  std::string_view name(response.name.data(), response.name.size());
+  out = name;
+  return true;
 }
 
-zx::result<Configuration> PartitionUuidToConfiguration(const fbl::unique_fd& devfs_root,
+zx::result<Configuration> PartitionUuidToConfiguration(const paver::BlockDevices& devices,
                                                        uuid::Uuid uuid) {
   std::string name;
-  auto result = FindPartitionLabelByGuid(devfs_root, uuid.bytes(), name);
+  auto result = FindPartitionLabelByGuid(devices, uuid.bytes(), name);
   if (!result) {
     ERROR("Failed to get partition label by GUID\n");
     return zx::error(ZX_ERR_NOT_SUPPORTED);
@@ -150,7 +139,7 @@ zx::result<Configuration> PartitionUuidToConfiguration(const fbl::unique_fd& dev
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
 
-zx::result<Configuration> QueryBootConfig(const fbl::unique_fd& devfs_root,
+zx::result<Configuration> QueryBootConfig(const paver::BlockDevices& devices,
                                           fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root) {
   auto client_end = component::ConnectAt<fuchsia_boot::Arguments>(svc_root);
   if (!client_end.is_ok()) {
@@ -180,7 +169,7 @@ zx::result<Configuration> QueryBootConfig(const fbl::unique_fd& devfs_root,
       return zx::error(ZX_ERR_NOT_SUPPORTED);
     }
 
-    return PartitionUuidToConfiguration(devfs_root, uuid.value());
+    return PartitionUuidToConfiguration(devices, uuid.value());
   }
   if (!response->values[2].is_null()) {
     std::string_view prefix_str = response->values[2].get();
@@ -201,10 +190,9 @@ zx::result<Configuration> QueryBootConfig(const fbl::unique_fd& devfs_root,
 }
 
 namespace {
-
-zx::result<> SupportsVerifiedBoot(const fbl::unique_fd& devfs_root,
+zx::result<> SupportsVerifiedBoot(const paver::BlockDevices& devices,
                                   fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root) {
-  return zx::make_result(QueryBootConfig(devfs_root, svc_root).status_value());
+  return zx::make_result(QueryBootConfig(devices, svc_root).status_value());
 }
 }  // namespace
 
@@ -262,17 +250,18 @@ std::vector<std::unique_ptr<ClientFactory>>* ClientFactory::registered_factory_l
 }
 
 zx::result<std::unique_ptr<abr::Client>> ClientFactory::Create(
-    fbl::unique_fd devfs_root, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
+    const paver::BlockDevices& devices, fidl::UnownedClientEnd<fuchsia_io::Directory> svc_root,
     std::shared_ptr<paver::Context> context) {
-  if (auto status = SupportsVerifiedBoot(devfs_root, svc_root); status.is_error()) {
+  if (auto status = SupportsVerifiedBoot(devices, svc_root); status.is_error()) {
     ERROR("System doesn't support verified boot\n");
     return status.take_error();
   }
 
   for (auto& factory : *registered_factory_list()) {
-    if (auto status = factory->New(devfs_root.duplicate(), svc_root, std::move(context));
-        status.is_ok()) {
+    if (auto status = factory->New(devices, svc_root, std::move(context)); status.is_ok()) {
       return status.take_value();
+    } else if (status.status_value() != ZX_ERR_NOT_SUPPORTED) {
+      ERROR("Failed to create client: %s\n", status.status_string());
     }
   }
 

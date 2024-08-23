@@ -321,7 +321,7 @@ impl RoutingTest {
         {
             let name = ECHO_CAPABILITY.clone();
             let top_instance = model.top_instance();
-            let root = top_instance.root().await;
+            let root = top_instance.root();
             let state = root.lock_state().await;
             let InstanceState::Unresolved(state) = &*state else {
                 unreachable!();
@@ -1279,6 +1279,7 @@ pub mod capability_util {
             Ok(value) => Ok(value),
             Err(_) => {
                 let epitaph = echo_proxy.take_event_stream().next().await;
+                #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360336369)
                 match epitaph {
                     Some(Err(e)) => Err(Some(e)),
                     Some(Ok(v)) => panic!("unexpected ok event: {:?}", v),

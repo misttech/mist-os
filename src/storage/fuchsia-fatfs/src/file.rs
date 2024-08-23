@@ -284,9 +284,18 @@ impl VfsFile for FatFile {
         &self,
         attributes: fio::MutableNodeAttributes,
     ) -> Result<(), Status> {
+        const SUPPORTED_MUTABLE_ATTRIBUTES: fio::NodeAttributesQuery =
+            fio::NodeAttributesQuery::CREATION_TIME
+                .union(fio::NodeAttributesQuery::MODIFICATION_TIME);
+
+        if !SUPPORTED_MUTABLE_ATTRIBUTES
+            .contains(vfs::common::mutable_node_attributes_to_query(&attributes))
+        {
+            return Err(Status::NOT_SUPPORTED);
+        }
+
         let fs_lock = self.filesystem.lock().unwrap();
         let file = self.borrow_file_mut(&fs_lock).ok_or(Status::BAD_HANDLE)?;
-        // TODO(https://fxbug.dev/353768723): Reject unsupported attributes.
         let mut needs_flush = false;
         if let Some(creation_time) = attributes.creation_time {
             file.set_created(unix_to_dos_time(creation_time));
@@ -439,5 +448,20 @@ mod tests {
         );
         assert!(mutable_attributes.creation_time.is_some());
         assert!(mutable_attributes.modification_time.is_some());
+    }
+
+    #[fuchsia::test]
+    async fn test_update_attributes() {
+        let file = TestFile::new();
+
+        let new_time = std::time::SystemTime::now()
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .expect("SystemTime before UNIX EPOCH")
+            .as_nanos();
+        let new_attrs = fio::MutableNodeAttributes {
+            creation_time: Some(new_time.try_into().unwrap()),
+            ..Default::default()
+        };
+        file.update_attributes(new_attrs).await.expect("update attributes failed");
     }
 }

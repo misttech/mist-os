@@ -14,7 +14,8 @@
 
 int main(int argc, const char** argv) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  fuchsia_logging::SetTags({"forensics", "test"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"forensics", "test"}).BuildAndInitialize();
 
   FX_LOGS(INFO) << "Starting FakeCrashReporter";
 

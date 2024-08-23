@@ -183,7 +183,7 @@ std::optional<ParentElement> PowerElementVisitor::GetParentElementFromLevelRef(
     return std::nullopt;
   }
 
-  return ParentElement::WithName(*parent_name);
+  return ParentElement::WithInstanceName(*parent_name);
 }
 
 PowerDependency& PowerElementVisitor::GetPowerDependency(PowerElementConfiguration& element_config,

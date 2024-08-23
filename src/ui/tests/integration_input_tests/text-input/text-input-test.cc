@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.cobalt/cpp/fidl.h>
 #include <fidl/fuchsia.component.decl/cpp/hlcpp_conversion.h>
 #include <fidl/fuchsia.component/cpp/fidl.h>
+#include <fidl/fuchsia.element/cpp/fidl.h>
 #include <fidl/fuchsia.feedback/cpp/fidl.h>
 #include <fidl/fuchsia.fonts/cpp/fidl.h>
 #include <fidl/fuchsia.intl/cpp/fidl.h>
@@ -23,8 +24,6 @@
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fidl/fuchsia.tracing.provider/cpp/fidl.h>
-#include <fidl/fuchsia.ui.app/cpp/fidl.h>
-#include <fidl/fuchsia.ui.focus/cpp/fidl.h>
 #include <fidl/fuchsia.ui.input/cpp/fidl.h>
 #include <fidl/fuchsia.ui.input3/cpp/fidl.h>
 #include <fidl/fuchsia.ui.test.input/cpp/fidl.h>
@@ -73,51 +72,6 @@ using ChildName = std::string;
 // Max timeout in failure cases.
 // Set this as low as you can that still works across all test platforms.
 constexpr zx::duration kTimeout = zx::min(5);
-
-// Combines all vectors in `vecs` into one.
-template <typename T>
-std::vector<T> merge(std::initializer_list<std::vector<T>> vecs) {
-  std::vector<T> result;
-  for (auto v : vecs) {
-    result.insert(result.end(), v.begin(), v.end());
-  }
-  return result;
-}
-
-class FocusListener : public fidl::Server<fuchsia_ui_focus::FocusChainListener> {
- public:
-  // |fuchsia_ui_focus::FocusChainListener|
-  void OnFocusChange(OnFocusChangeRequest& req, OnFocusChangeCompleter::Sync& completer) override {
-    FX_LOGS(INFO) << "OnFocusChange";
-    last_focus_chain_ = std::move(req.focus_chain());
-    for (auto& view : last_focus_chain_.value().focus_chain().value()) {
-      FX_LOGS(INFO) << "focus: " << fsl::GetKoid(view.reference().get());
-    }
-    completer.Reply();
-  }
-
-  bool IsViewFocused(const zx_koid_t koid) const {
-    FX_LOGS(INFO) << "check if focus on: " << koid;
-    if (!last_focus_chain_) {
-      return false;
-    }
-
-    if (!last_focus_chain_->focus_chain()) {
-      return false;
-    }
-
-    if (last_focus_chain_->focus_chain()->empty()) {
-      return false;
-    }
-
-    // the new focus view store at the last slot.
-    return fsl::GetKoid(last_focus_chain_->focus_chain()->back().reference().get()) == koid;
-  }
-
- private:
-  // Holds the most recent focus chain update received.
-  std::optional<fuchsia_ui_focus::FocusChain> last_focus_chain_;
-};
 
 // Externalized test specific keyboard input state.
 //
@@ -250,19 +204,6 @@ class ChromiumInputBase : public ui_testing::PortableUITest {
     RegisterKeyboard();
   }
 
-  void TearDown() override {
-    focus_listener_bindings_.RemoveAll();
-    ui_testing::PortableUITest::TearDown();
-  }
-
-  // Subclass should implement this method to add v2 components to the test realm
-  // next to the base ones added.
-  virtual std::vector<std::pair<ChildName, std::string>> GetTestComponents() { return {}; }
-
-  // Subclass should implement this method to add capability routes to the test
-  // realm next to the base ones added.
-  virtual std::vector<Route> GetTestRoutes() { return {}; }
-
   void ExtendRealm() override {
     // Key part of service setup: have this test component vend the
     // |ResponseListener| service in the constructed realm.
@@ -270,23 +211,12 @@ class ChromiumInputBase : public ui_testing::PortableUITest {
                                   [d = dispatcher(), s = keyboard_input_state_]() {
                                     return std::make_unique<KeyboardInputListenerServer>(d, s);
                                   });
-
-    for (const auto& [name, component] : GetTestComponents()) {
-      realm_builder().AddChild(name, component);
-    }
-
-    // Add the necessary routing for each of the extra components added above.
-    for (const auto& route : GetTestRoutes()) {
-      realm_builder().AddRoute(route);
-    }
   }
 
   // Needs to outlive realm_ below.
   std::shared_ptr<KeyboardInputState> keyboard_input_state_;
 
   std::optional<async::Task> inject_retry_task_;
-
-  fidl::ServerBindingGroup<fuchsia_ui_focus::FocusChainListener> focus_listener_bindings_;
 };
 
 class ChromiumInputTest : public ChromiumInputBase {
@@ -321,9 +251,14 @@ class ChromiumInputTest : public ChromiumInputBase {
   static constexpr auto kIntl = "intl";
   static constexpr auto kIntlUrl = "#meta/intl_property_manager.cm";
 
-  std::vector<std::pair<ChildName, std::string>> GetTestComponents() override {
+  std::vector<std::pair<ChildName, std::string>> GetEagerTestComponents() override {
     return {
         std::make_pair(kTextInputChromium, kTextInputChromiumUrl),
+    };
+  }
+
+  std::vector<std::pair<ChildName, std::string>> GetTestComponents() override {
+    return {
         std::make_pair(kBuildInfoProvider, kBuildInfoProviderUrl),
         std::make_pair(kMemoryPressureProvider, kMemoryPressureProviderUrl),
         std::make_pair(kNetstack, kNetstackUrl),
@@ -335,13 +270,7 @@ class ChromiumInputTest : public ChromiumInputBase {
   }
 
   std::vector<Route> GetTestRoutes() override {
-    return merge({GetChromiumRoutes(ChildRef{kTextInputChromium}),
-                  {
-                      {.capabilities = {Protocol{
-                           fidl::DiscoverableProtocolName<fuchsia_ui_app::ViewProvider>}},
-                       .source = ChildRef{kTextInputChromium},
-                       .targets = {ParentRef()}},
-                  }});
+    return GetChromiumRoutes(ChildRef{kTextInputChromium});
   }
 
   // Routes needed to setup Chromium client.
@@ -367,6 +296,7 @@ class ChromiumInputTest : public ChromiumInputBase {
              {
                  Protocol{fidl::DiscoverableProtocolName<
                      fuchsia_accessibility_semantics::SemanticsManager>},
+                 Protocol{fidl::DiscoverableProtocolName<fuchsia_element::GraphicalPresenter>},
                  Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Allocator>},
                  Protocol{fidl::DiscoverableProtocolName<fuchsia_ui_composition::Flatland>},
              },
@@ -477,7 +407,7 @@ class ChromiumInputTest : public ChromiumInputBase {
   }
 
   void LaunchWebEngineClient() {
-    LaunchClient();
+    WaitForViewPresentation();
 
     FX_LOGS(INFO) << "Waiting on app ready to handle input events";
     RunLoopUntil([this]() { return keyboard_input_state_->IsReadyForInput(); });
@@ -485,26 +415,6 @@ class ChromiumInputTest : public ChromiumInputBase {
     // Not quite exactly the location of the text area under test, but since the
     // text area occupies all the screen, it's very likely within the text area.
     InjectTap(display_width() / 2, display_height() / 2);
-
-    // Register focus chain listener.
-    auto [focus_listener_client, focus_listener_server] =
-        fidl::Endpoints<fuchsia_ui_focus::FocusChainListener>::Create();
-
-    auto focus_listener_registry_connect =
-        realm_root()->component().Connect<fuchsia_ui_focus::FocusChainListenerRegistry>();
-    ZX_ASSERT_OK(focus_listener_registry_connect);
-    fidl::SyncClient focus_chain_listener_registry(
-        std::move(focus_listener_registry_connect.value()));
-
-    ZX_ASSERT_OK(focus_chain_listener_registry->Register({std::move(focus_listener_client)}));
-
-    FocusListener focus_listener;
-    focus_listener_bindings_.AddBinding(dispatcher(), std::move(focus_listener_server),
-                                        &focus_listener, fidl::kIgnoreBindingClosure);
-
-    FX_LOGS(INFO) << "Waiting on Fuchsia focused on Chromium";
-    RunLoopUntil(
-        [&]() { return focus_listener.IsViewFocused(client_root_view_ref_koid().value()); });
 
     FX_LOGS(INFO) << "Waiting on app focused on textarea: ready for key events";
     RunLoopUntil([this]() { return keyboard_input_state_->IsReadyForKey(); });

@@ -8,7 +8,55 @@
 //! Exposes fuchsia.netpol.socketproxy.StarnixNetworks and
 //! fuchsia.netpol.socketproxy.DnsServerWatcher.
 
+use fidl_fuchsia_posix_socket::{self as fposix_socket, OptionalUint32};
+use fuchsia_component::server::{ServiceFs, ServiceFsDir};
 use fuchsia_inspect::health::Reporter;
+use fuchsia_inspect_derive::{Inspect, WithInspect as _};
+use futures::channel::mpsc;
+use futures::lock::Mutex;
+use futures::StreamExt as _;
+use std::sync::Arc;
+use tracing::error;
+
+mod dns_watcher;
+mod registry;
+
+struct SocketMarks {
+    mark_1: OptionalUint32,
+    #[allow(unused)]
+    mark_2: OptionalUint32,
+}
+
+impl Default for SocketMarks {
+    fn default() -> Self {
+        Self {
+            mark_1: OptionalUint32::Unset(fposix_socket::Empty),
+            mark_2: OptionalUint32::Unset(fposix_socket::Empty),
+        }
+    }
+}
+
+#[derive(Inspect)]
+struct SocketProxy {
+    registry: registry::Registry,
+    dns_watcher: dns_watcher::DnsServerWatcher,
+}
+
+impl SocketProxy {
+    fn new() -> Self {
+        let mark = Arc::new(Mutex::new(SocketMarks::default()));
+        let (dns_tx, dns_rx) = mpsc::channel(1);
+        Self {
+            registry: registry::Registry::new(mark.clone(), dns_tx),
+            dns_watcher: dns_watcher::DnsServerWatcher::new(Arc::new(Mutex::new(dns_rx))),
+        }
+    }
+}
+
+enum IncomingService {
+    StarnixNetworks(fidl_fuchsia_netpol_socketproxy::StarnixNetworksRequestStream),
+    DnsServerWatcher(fidl_fuchsia_netpol_socketproxy::DnsServerWatcherRequestStream),
+}
 
 /// Main entry point for the network socket proxy.
 #[fuchsia::main(logging_tags = ["network_socket_proxy"])]
@@ -19,9 +67,26 @@ pub async fn main() -> Result<(), anyhow::Error> {
     let _inspect_server_task =
         inspect_runtime::publish(inspector, inspect_runtime::PublishOptions::default());
 
-    let _root_node = inspector.root();
+    let proxy = SocketProxy::new().with_inspect(inspector.root(), "root")?;
+
+    let mut fs = ServiceFs::new_local();
+    let _: &mut ServiceFsDir<'_, _> = fs
+        .dir("svc")
+        .add_fidl_service(IncomingService::StarnixNetworks)
+        .add_fidl_service(IncomingService::DnsServerWatcher);
+
+    let _: &mut ServiceFs<_> = fs.take_and_serve_directory_handle()?;
 
     fuchsia_inspect::component::health().set_ok();
+
+    fs.for_each_concurrent(100, |service| async {
+        match service {
+            IncomingService::StarnixNetworks(stream) => proxy.registry.run_starnix(stream).await,
+            IncomingService::DnsServerWatcher(stream) => proxy.dns_watcher.run(stream).await,
+        }
+        .unwrap_or_else(|e| error!("{e:?}"))
+    })
+    .await;
 
     Ok(())
 }

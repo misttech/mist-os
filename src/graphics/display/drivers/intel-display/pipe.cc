@@ -18,11 +18,11 @@
 #include <optional>
 
 #include "src/graphics/display/drivers/intel-display/hardware-common.h"
-#include "src/graphics/display/drivers/intel-display/poll-until.h"
 #include "src/graphics/display/drivers/intel-display/registers-pipe-scaler.h"
 #include "src/graphics/display/drivers/intel-display/registers-pipe.h"
 #include "src/graphics/display/drivers/intel-display/registers-transcoder.h"
 #include "src/graphics/display/drivers/intel-display/tiling.h"
+#include "src/graphics/display/drivers/intel-display/util/poll-until.h"
 #include "src/graphics/display/lib/api-types-cpp/config-stamp.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"

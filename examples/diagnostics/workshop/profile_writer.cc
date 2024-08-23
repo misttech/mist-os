@@ -24,7 +24,8 @@ void required_args() {
 }
 
 int main(int argc, const char **argv) {
-  fuchsia_logging::SetTags({"workshop", "writer"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"workshop", "writer"}).BuildAndInitialize();
 
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
 

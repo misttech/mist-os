@@ -99,7 +99,7 @@ void Connection::NodeClone(fio::OpenFlags flags, VnodeProtocol protocol,
 
 zx::result<> Connection::NodeUpdateAttributes(const VnodeAttributesUpdate& update) {
   FS_PRETTY_TRACE_DEBUG("[NodeSetAttr] our rights: ", rights(),
-                        ", setting attributes: ", update.AttributesQuery(),
+                        ", setting attributes: ", update.Query(),
                         ", supported attributes: ", vnode_->SupportedMutableAttributes());
   if (!(rights_ & fio::Rights::kUpdateAttributes)) {
     return zx::error(ZX_ERR_BAD_HANDLE);

@@ -34,13 +34,13 @@ impl<T: Routable + 'static> LazyGet for T {
         #[async_trait]
         impl<P: IterablePath + Debug + 'static> Routable for ScopedDictRouter<P> {
             async fn route(&self, request: Request) -> Result<Capability, RouterError> {
-                match self.router.route(request.clone()).await? {
+                match self.router.route(request.try_clone()?).await? {
                     Capability::Dictionary(dict) => {
                         let maybe_capability = dict
                             .get_with_request(
                                 self.not_found_error.clone(),
                                 &self.path,
-                                request.clone(),
+                                request.try_clone()?,
                             )
                             .await?;
                         maybe_capability.ok_or_else(|| self.not_found_error.clone().into())

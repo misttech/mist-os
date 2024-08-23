@@ -4,6 +4,7 @@
 
 #include <lib/elfldltl/vmo.h>
 #include <lib/elfldltl/zircon.h>
+#include <lib/ld/fuchsia-debugdata.h>
 #include <lib/llvm-profdata/llvm-profdata.h>
 #include <lib/trivial-allocator/new.h>
 #include <lib/trivial-allocator/zircon.h>
@@ -75,10 +76,10 @@ LoadExecutableResult LoadExecutable(Diagnostics& diag, StartupData& startup,
   }
 }
 
-zx::eventpair PublishProfdata(Diagnostics& diag, zx::unowned_vmar vmar,
-                              cpp20::span<const std::byte> build_id) {
+ld::Debugdata::Deferred PublishProfdata(Diagnostics& diag, zx::unowned_vmar vmar,
+                                        cpp20::span<const std::byte> build_id) {
 #if HAVE_LLVM_PROFDATA
-  auto error = [&diag](zx_status_t status, auto&&... args) -> zx::eventpair {
+  auto error = [&diag](zx_status_t status, auto&&... args) -> ld::Debugdata::Deferred {
     diag.SystemError(std::forward<decltype(args)>(args)..., elfldltl::ZirconError{status});
     return {};
   };
@@ -106,17 +107,13 @@ zx::eventpair PublishProfdata(Diagnostics& diag, zx::unowned_vmar vmar,
     LlvmProfdata::UseLiveData(live_data);
 
     // At this point the instrumentation will no longer touch the data segment.
-
-    zx::eventpair local_token, remote_token;
-    status = zx::eventpair::create(0, &local_token, &remote_token);
-    if (status != ZX_OK) {
-      return error(status, "zx_eventpair_create");
+    ld::Debugdata debugdata{LlvmProfdata::kDataSinkName, std::move(vmo)};
+    zx::result deferred = std::move(debugdata).DeferredPublish();
+    if (deferred.is_error()) {
+      return error(status, "cannot publish ", LlvmProfdata::kDataSinkName, " to fuchsia.debugdata");
     }
 
-    // TODO(https://fxbug.dev/42080826): Send the VMO and remote_token in a
-    // fuchsia.debugdata.Publisher/Publish message to ... somewhere.
-
-    return local_token;
+    return *std::move(deferred);
   }
 #endif
   return {};
@@ -124,11 +121,13 @@ zx::eventpair PublishProfdata(Diagnostics& diag, zx::unowned_vmar vmar,
 
 }  // namespace
 
-// This is returned to the _start assembly code, which hands off to the
-// returned entry point with the given argument register and the stack unwound
-// to the starting conditions when _start was called.
+// The _start assembly code saves the two argument registers passed by
+// zx_process_start, as well as passing them through to StartLd.  StartLd
+// returns this to give it the user entry point address to hand off to.  It
+// unwinds the stack to starting conditions and hands off with the same two
+// original argument register values, and the third argument register here.
 struct StartLdResult {
-  uintptr_t arg, entry;
+  uintptr_t entry, third_argument;
 };
 
 extern "C" StartLdResult StartLd(zx_handle_t handle, void* vdso) {
@@ -148,8 +147,7 @@ extern "C" StartLdResult StartLd(zx_handle_t handle, void* vdso) {
   CompleteBootstrapModule(self_module.module, page_size);
 
   // Read the bootstrap message.
-  zx::channel bootstrap{std::exchange(handle, {})};
-  StartupData startup = ReadBootstrap(bootstrap.borrow());
+  StartupData startup = ReadBootstrap(zx::unowned_channel{handle});
 
   // Now that things are bootstrapped, set up the main diagnostics object.
   Diagnostics diag{startup};
@@ -159,12 +157,16 @@ extern "C" StartLdResult StartLd(zx_handle_t handle, void* vdso) {
   // it's updating a VMO mapped elsewhere.  That VMO remains mapped after
   // startup just to avoid bothering with code to unmap it since that code and
   // the rest of the return path would have to be uninstrumented.  When the
-  // returned handle is closed by going out of scope at the end of startup,
-  // this will signal the data receiver that the VMO's data is ready.  It's
-  // still possible for either the last bit of instrumented code in the startup
-  // path, or just stray pointer writes in the process after startup will
-  // modify it, but will be ignored or will be tolerable noise in the data.
-  auto profdata = PublishProfdata(diag, startup.vmar.borrow(), self_module.module.build_id);
+  // debugdata.vmo_token handle is closed by going out of scope at the end of
+  // startup, this will signal the data receiver that the VMO's data is ready.
+  // It's still possible for either the last bit of instrumented code in the
+  // startup path, or just stray pointer writes in the process after startup
+  // will modify it, but will be ignored or will be tolerable noise in the
+  // data.  The debugdata.svc_server_end handle is returned to be passed on to
+  // the user entry point as its third argument.  Eventually, the user's libc
+  // will pass this to ld::Debugdata::Forward.
+  ld::Debugdata::Deferred debugdata =
+      PublishProfdata(diag, startup.vmar.borrow(), self_module.module.build_id);
 
   // Set up the allocators.  These objects hold zx::unowned_vmar copies but do
   // not own the VMAR handle.
@@ -203,7 +205,12 @@ extern "C" StartLdResult StartLd(zx_handle_t handle, void* vdso) {
   // Bail out before handoff if any errors have been detected.
   CheckErrors(diag);
 
-  return {.arg = bootstrap.release(), .entry = main.entry};
+  return {
+      .entry = main.entry,
+      // The two arguments to StartLd are the first two arguments to the user
+      // entry point, and this is the third.
+      .third_argument = debugdata.svc_server_end.release(),
+  };
 }
 
 }  // namespace ld

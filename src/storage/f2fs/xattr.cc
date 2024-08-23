@@ -128,7 +128,7 @@ void XattrOperator::WriteTo(LockedPage &ipage, LockedPage &xattr_page) {
     Inode &inode = ipage->GetAddress<Node>()->i;
     std::memcpy(&(inode.i_addr[kAddrsPerInode - kInlineXattrAddrs]), buffer_->data(),
                 safemath::checked_cast<size_t>(kXattrAlign * kInlineXattrAddrs));
-    ipage->SetDirty();
+    ipage.SetDirty();
   }
 
   if (xattr_page) {

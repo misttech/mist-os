@@ -23,17 +23,17 @@ const RFCOMM_URL: &str = "fuchsia-pkg://fuchsia.com/bt-rfcomm-smoke-test#meta/bt
 /// request is kept alive.
 enum Event {
     /// A fake RFCOMM client connecting to the Profile service.
-    Client(Option<ProfileProxy>),
+    Client { _client: Option<ProfileProxy> },
     /// A BR/EDR Profile service connection request was received - request was
     /// made by the RFCOMM component.
-    Profile(Option<ProfileRequestStream>),
+    Profile { _profile: Option<ProfileRequestStream> },
     /// A fake RFCOMM client connecting to the RfcommTest service.
-    Test(Option<RfcommTestProxy>),
+    Test { _test: Option<RfcommTestProxy> },
 }
 
 impl From<ProfileRequestStream> for Event {
     fn from(src: ProfileRequestStream) -> Self {
-        Self::Profile(Some(src))
+        Self::Profile { _profile: Some(src) }
     }
 }
 
@@ -43,10 +43,13 @@ async fn mock_rfcomm_client(
     handles: LocalComponentHandles,
 ) -> Result<(), Error> {
     let profile_svc = handles.connect_to_protocol::<ProfileMarker>()?;
-    sender.send(Event::Client(Some(profile_svc))).await.expect("failed sending ack to test");
+    sender
+        .send(Event::Client { _client: Some(profile_svc) })
+        .await
+        .expect("failed sending ack to test");
 
     let test_svc = handles.connect_to_protocol::<RfcommTestMarker>()?;
-    sender.send(Event::Test(Some(test_svc))).await.expect("failed sending ack to test");
+    sender.send(Event::Test { _test: Some(test_svc) }).await.expect("failed sending ack to test");
     Ok(())
 }
 
@@ -149,15 +152,21 @@ async fn rfcomm_v2_component_topology() {
     assert_eq!(events.len(), expected_number_of_events);
     let _mock_client_event = events
         .iter()
-        .find(|&p| std::mem::discriminant(p) == std::mem::discriminant(&Event::Client(None)))
+        .find(|&p| {
+            std::mem::discriminant(p) == std::mem::discriminant(&Event::Client { _client: None })
+        })
         .expect("Should receive client event");
     let _rfcomm_component_event = events
         .iter()
-        .find(|&p| std::mem::discriminant(p) == std::mem::discriminant(&Event::Profile(None)))
+        .find(|&p| {
+            std::mem::discriminant(p) == std::mem::discriminant(&Event::Profile { _profile: None })
+        })
         .expect("Should receive component event");
     let _rfcomm_test_event = events
         .iter()
-        .find(|&p| std::mem::discriminant(p) == std::mem::discriminant(&Event::Test(None)))
+        .find(|&p| {
+            std::mem::discriminant(p) == std::mem::discriminant(&Event::Test { _test: None })
+        })
         .expect("Should receive component event");
 
     info!("Finished RFCOMM smoke test");

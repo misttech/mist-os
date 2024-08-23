@@ -24,6 +24,7 @@ class ApiAbstraction {
   virtual ssize_t recv(int fd, void* buf, size_t len, int flags) = 0;
   virtual ssize_t recvfrom(int fd, void* buf, size_t buflen, int flags, struct sockaddr* addr,
                            socklen_t* addrlen) = 0;
+  virtual ssize_t recvmsg(int fd, struct msghdr* msg, int flags) = 0;
   virtual int getsockname(int fd, struct sockaddr* addr, socklen_t* len) = 0;
   virtual int getpeername(int fd, struct sockaddr* addr, socklen_t* len) = 0;
   virtual unsigned int if_nametoindex(const char* ifname) = 0;

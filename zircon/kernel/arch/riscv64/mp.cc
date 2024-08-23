@@ -262,7 +262,10 @@ extern "C" void riscv64_secondary_entry(uint32_t hart_id, uint cpu_num) {
 
   dprintf(INFO, "RISCV: secondary cpu %u coming up\n", cpu_num);
 
+  // Should not return upon success.
   lk_secondary_cpu_entry();
+
+  // Fall through back to start.S
 }
 
 zx_status_t riscv64_start_cpu(cpu_num_t cpu_num, uint32_t hart_id) {

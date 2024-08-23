@@ -37,6 +37,17 @@ inline fit::result<zx_status_t> FidlResult(zx_status_t status) {
   return fit::error(status);
 }
 
+fuchsia_hardware_gpio::GpioFlags PullToGpioFlags(fuchsia_hardware_pin::Pull pull) {
+  switch (pull) {
+    case fuchsia_hardware_pin::Pull::kDown:
+      return fuchsia_hardware_gpio::GpioFlags::kPullDown;
+    case fuchsia_hardware_pin::Pull::kUp:
+      return fuchsia_hardware_gpio::GpioFlags::kPullUp;
+    default:
+      return fuchsia_hardware_gpio::GpioFlags::kNoPull;
+  }
+}
+
 void GpioDevice::GetPin(GetPinCompleter::Sync& completer) { completer.ReplySuccess(pin_); }
 
 void GpioDevice::GetName(GetNameCompleter::Sync& completer) {
@@ -321,7 +332,7 @@ void GpioRootDevice::Start(fdf::StartCompleter completer) {
 
   fidl::Arena arena;
 
-  zx::result decoded = compat::GetMetadata<fuchsia_hardware_gpioimpl::wire::ControllerMetadata>(
+  zx::result decoded = compat::GetMetadata<fuchsia_hardware_pinimpl::wire::ControllerMetadata>(
       incoming(), arena, DEVICE_METADATA_GPIO_CONTROLLER);
   if (decoded.is_error()) {
     if (decoded.status_value() == ZX_ERR_NOT_FOUND) {
@@ -461,7 +472,7 @@ std::unique_ptr<GpioInitDevice> GpioInitDevice::Create(
   // Don't add the init device if anything goes wrong here, as the hardware may be in a state that
   // child devices don't expect.
   fdf::Arena arena('GPIO');
-  zx::result decoded = compat::GetMetadata<fuchsia_hardware_gpioimpl::wire::InitMetadata>(
+  zx::result decoded = compat::GetMetadata<fuchsia_hardware_pinimpl::wire::Metadata>(
       incoming, arena, DEVICE_METADATA_GPIO_INIT);
   if (!decoded.is_ok()) {
     if (decoded.status_value() == ZX_ERR_NOT_FOUND) {
@@ -471,9 +482,13 @@ std::unique_ptr<GpioInitDevice> GpioInitDevice::Create(
     }
     return {};
   }
+  if (!(*decoded)->has_init_steps()) {
+    FDF_LOG(INFO, "No init metadata provided");
+    return {};
+  }
 
   std::unique_ptr device = std::make_unique<GpioInitDevice>();
-  if (device->ConfigureGpios(**decoded, gpio) != ZX_OK) {
+  if (device->ConfigureGpios((*decoded)->init_steps(), gpio) != ZX_OK) {
     // Return without adding the init device if some GPIOs could not be configured. This will
     // prevent all drivers that depend on the initial state from binding, which should make it more
     // obvious that something has gone wrong.
@@ -497,83 +512,86 @@ std::unique_ptr<GpioInitDevice> GpioInitDevice::Create(
 }
 
 zx_status_t GpioInitDevice::ConfigureGpios(
-    const fuchsia_hardware_gpioimpl::wire::InitMetadata& metadata,
+    const fidl::VectorView<fuchsia_hardware_pinimpl::wire::InitStep>& init_steps,
     fdf::WireSharedClient<fuchsia_hardware_gpioimpl::GpioImpl>& gpio) {
   // Stop processing the list if any call returns an error so that GPIOs are not accidentally put
   // into an unexpected state.
-  for (const auto& step : metadata.steps) {
+  for (const auto& step : init_steps) {
     fdf::Arena arena('GPIO');
 
-    if (!step.has_call()) {
-      FDF_LOG(ERROR, "GPIO Init Metadata step is missing a call field");
+    if (step.is_delay()) {
+      zx::nanosleep(zx::deadline_after(zx::duration(step.delay())));
+      continue;
+    }
+    if (!step.is_call()) {
+      FDF_LOG(ERROR, "Invalid GPIO init metadata");
       return ZX_ERR_INVALID_ARGS;
     }
 
-    // Delay doesn't apply to any particular gpio ID so we enforce that the ID field is
-    // unset. Every other type of init call requires an ID so we enforce that ID is set.
-    if (step.call().is_delay() && step.has_index()) {
-      FDF_LOG(ERROR, "GPIO Init Delay calls must not have an ID, id = %u", step.index());
-      return ZX_ERR_INVALID_ARGS;
-    }
-    if (!step.call().is_delay() && !step.has_index()) {
-      FDF_LOG(ERROR, "GPIO init calls must have an ID");
-      return ZX_ERR_INVALID_ARGS;
-    }
+    if (step.call().call.is_pin_config()) {
+      const auto& config = step.call().call.pin_config();
 
-    if (step.call().is_input_flags()) {
-      auto result = gpio.sync().buffer(arena)->ConfigIn(step.index(), step.call().input_flags());
-      if (!result.ok()) {
-        FDF_LOG(ERROR, "Call to ConfigIn failed: %s", result.status_string());
-        return result.status();
+      if (config.has_pull()) {
+        auto result =
+            gpio.sync().buffer(arena)->ConfigIn(step.call().pin, PullToGpioFlags(config.pull()));
+        if (!result.ok()) {
+          FDF_LOG(ERROR, "Call to ConfigIn failed: %s", result.status_string());
+          return result.status();
+        }
+        if (result->is_error()) {
+          FDF_LOG(ERROR, "ConfigIn(%u) failed for %u: %s", static_cast<uint32_t>(config.pull()),
+                  step.call().pin, zx_status_get_string(result->error_value()));
+          return result->error_value();
+        }
       }
-      if (result->is_error()) {
-        FDF_LOG(ERROR, "ConfigIn(%u) failed for %u: %s",
-                static_cast<uint32_t>(step.call().input_flags()), step.index(),
-                zx_status_get_string(result->error_value()));
-        return result->error_value();
+
+      if (config.has_function()) {
+        auto result = gpio.sync().buffer(arena)->SetAltFunction(step.call().pin, config.function());
+        if (!result.ok()) {
+          FDF_LOG(ERROR, "Call to SetAltFunction failed: %s", result.status_string());
+          return result.status();
+        }
+        if (result->is_error()) {
+          FDF_LOG(ERROR, "SetAltFunction(%lu) failed for %u: %s", config.function(),
+                  step.call().pin, zx_status_get_string(result->error_value()));
+          return result->error_value();
+        }
       }
-    } else if (step.call().is_output_value()) {
-      auto result = gpio.sync().buffer(arena)->ConfigOut(step.index(), step.call().output_value());
+
+      if (config.has_drive_strength_ua()) {
+        auto result = gpio.sync().buffer(arena)->SetDriveStrength(step.call().pin,
+                                                                  config.drive_strength_ua());
+        if (!result.ok()) {
+          FDF_LOG(ERROR, "Call to SetDriveStrength failed: %s", result.status_string());
+          return result.status();
+        }
+        if (result->is_error()) {
+          FDF_LOG(ERROR, "SetDriveStrength(%lu) failed for %u: %s", config.drive_strength_ua(),
+                  step.call().pin, zx_status_get_string(result->error_value()));
+          return result->error_value();
+        }
+        if (result->value()->actual_ds_ua != config.drive_strength_ua()) {
+          FDF_LOG(WARNING, "Actual drive strength (%lu) doesn't match expected (%lu) for %u",
+                  result->value()->actual_ds_ua, config.drive_strength_ua(), step.call().pin);
+          return ZX_ERR_BAD_STATE;
+        }
+      }
+    } else if (step.call().call.is_buffer_mode()) {
+      // TODO(42082459): Support disabling output.
+      ZX_DEBUG_ASSERT(step.call().call.buffer_mode() != fuchsia_hardware_gpio::BufferMode::kInput);
+
+      const uint8_t value =
+          step.call().call.buffer_mode() == fuchsia_hardware_gpio::BufferMode::kOutputHigh ? 1 : 0;
+      auto result = gpio.sync().buffer(arena)->ConfigOut(step.call().pin, value);
       if (!result.ok()) {
         FDF_LOG(ERROR, "Call to ConfigOut failed: %s", result.status_string());
         return result.status();
       }
       if (result->is_error()) {
-        FDF_LOG(ERROR, "ConfigOut(%u) failed for %u: %s", step.call().output_value(), step.index(),
+        FDF_LOG(ERROR, "ConfigOut(%u) failed for %u: %s", value, step.call().pin,
                 zx_status_get_string(result->error_value()));
         return result->error_value();
       }
-    } else if (step.call().is_alt_function()) {
-      auto result =
-          gpio.sync().buffer(arena)->SetAltFunction(step.index(), step.call().alt_function());
-      if (!result.ok()) {
-        FDF_LOG(ERROR, "Call to SetAltFunction failed: %s", result.status_string());
-        return result.status();
-      }
-      if (result->is_error()) {
-        FDF_LOG(ERROR, "SetAltFunction(%lu) failed for %u: %s", step.call().alt_function(),
-                step.index(), zx_status_get_string(result->error_value()));
-        return result->error_value();
-      }
-    } else if (step.call().is_drive_strength_ua()) {
-      auto result = gpio.sync().buffer(arena)->SetDriveStrength(step.index(),
-                                                                step.call().drive_strength_ua());
-      if (!result.ok()) {
-        FDF_LOG(ERROR, "Call to SetDriveStrength failed: %s", result.status_string());
-        return result.status();
-      }
-      if (result->is_error()) {
-        FDF_LOG(ERROR, "SetDriveStrength(%lu) failed for %u: %s", step.call().drive_strength_ua(),
-                step.index(), zx_status_get_string(result->error_value()));
-        return result->error_value();
-      }
-      if (result->value()->actual_ds_ua != step.call().drive_strength_ua()) {
-        FDF_LOG(WARNING, "Actual drive strength (%lu) doesn't match expected (%lu) for %u",
-                result->value()->actual_ds_ua, step.call().drive_strength_ua(), step.index());
-        return ZX_ERR_BAD_STATE;
-      }
-    } else if (step.call().is_delay()) {
-      zx::nanosleep(zx::deadline_after(zx::duration(step.call().delay())));
     }
   }
 

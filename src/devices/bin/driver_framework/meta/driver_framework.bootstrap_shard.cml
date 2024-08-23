@@ -223,6 +223,12 @@
             to: "#boot-drivers",
         },
         {
+            protocol: [ "fuchsia.input.interaction.observation.Aggregator" ],
+            from: "parent",
+            to: "#boot-drivers",
+            availability: "optional",
+        },
+        {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
             from: "#role_manager",
             to: [

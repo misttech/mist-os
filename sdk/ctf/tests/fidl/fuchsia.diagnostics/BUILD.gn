@@ -5,6 +5,23 @@
 import("//build/components.gni")
 import("//sdk/ctf/build/ctf.gni")
 
+group("tests") {
+  testonly = true
+  deps = [
+    ":ctf-tests",
+    ":fuchsia-diagnostics-log-tests-latest",
+    ":fuchsia-diagnostics-tests-latest",
+  ]
+}
+
+group("ctf-tests") {
+  testonly = true
+  deps = [
+    ":fuchsia-diagnostics-log-tests_archive",
+    ":fuchsia-diagnostics-tests_archive",
+  ]
+}
+
 executable("inspect-publisher-bin") {
   output_name = "inspect-publisher"
   testonly = true
@@ -127,14 +144,4 @@ fuchsia_test_package("fuchsia-diagnostics-tests-latest") {
 fuchsia_test_package("fuchsia-diagnostics-log-tests-latest") {
   test_components = [ ":fuchsia-diagnostics-log-tests-root" ]
   subpackages = [ ":fuchsia-diagnostics-log-tests" ]
-}
-
-group("tests") {
-  testonly = true
-  deps = [
-    ":fuchsia-diagnostics-log-tests-latest",
-    ":fuchsia-diagnostics-log-tests_archive",
-    ":fuchsia-diagnostics-tests-latest",
-    ":fuchsia-diagnostics-tests_archive",
-  ]
 }

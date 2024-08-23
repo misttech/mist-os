@@ -411,6 +411,7 @@ mod tests {
                             })),
                             target_name: Some("agg.service.CollectionService".to_string()),
                             availability: Some(fdecl::Availability::SameAsTarget),
+                            dependency_type: Some(fdecl::DependencyType::Strong),
                             ..Default::default()
                         }
                     ),
@@ -424,6 +425,7 @@ mod tests {
                             })),
                             target_name: Some("agg.service.CollectionService".to_string()),
                             availability: Some(fdecl::Availability::SameAsTarget),
+                            dependency_type: Some(fdecl::DependencyType::Strong),
                             ..Default::default()
                         }
                     ),
@@ -439,6 +441,7 @@ mod tests {
                                 collection: None,
                             })),
                             target_name: Some("fuchsia.logger.Log".to_string()),
+                            dependency_type: Some(fdecl::DependencyType::Strong),
                             availability: Some(fdecl::Availability::Required),
                             ..Default::default()
                         }
@@ -455,6 +458,7 @@ mod tests {
                             })),
                             target_name: Some("fuchsia.logger.Log2".to_string()),
                             availability: Some(fdecl::Availability::Required),
+                            dependency_type: Some(fdecl::DependencyType::Strong),
                             ..Default::default()
                         }
                     ),
@@ -468,6 +472,7 @@ mod tests {
                             })),
                             target_name: Some("my.service.CollectionService".to_string()),
                             availability: Some(fdecl::Availability::Required),
+                            dependency_type: Some(fdecl::DependencyType::Strong),
                             ..Default::default()
                         }
                     ),
@@ -481,6 +486,7 @@ mod tests {
                             })),
                             target_name: Some("my.service.Service".to_string()),
                             availability: Some(fdecl::Availability::Required),
+                            dependency_type: Some(fdecl::DependencyType::Strong),
                             ..Default::default()
                         }
                     ),
@@ -494,6 +500,7 @@ mod tests {
                             })),
                             target_name: Some("my.service.Service2".to_string()),
                             availability: Some(fdecl::Availability::Required),
+                            dependency_type: Some(fdecl::DependencyType::Strong),
                             ..Default::default()
                         }
                     ),

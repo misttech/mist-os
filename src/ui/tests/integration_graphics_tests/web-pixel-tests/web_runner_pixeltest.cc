@@ -96,11 +96,6 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest,
 
  private:
   void ExtendRealm() override {
-    // Add child components.
-    for (auto [child, url] : GetTestComponents()) {
-      realm_builder().AddChild(child, url, {.startup_mode = component_testing::StartupMode::EAGER});
-    }
-
     // Add routes between components.
     for (auto route : GetWebEngineRoutes(ChildRef{kWebClient})) {
       realm_builder().AddRoute(route);
@@ -115,7 +110,7 @@ class WebRunnerPixelTest : public ui_testing::PortableUITest,
 
   virtual std::string HtmlForTestCase() = 0;
 
-  std::vector<std::pair<std::string, std::string>> GetTestComponents() {
+  std::vector<std::pair<std::string, std::string>> GetEagerTestComponents() override {
     return {
         std::make_pair(kBuildInfoProvider, kBuildInfoProviderUrl),
         std::make_pair(kFontsProvider, kFontsProviderUrl),

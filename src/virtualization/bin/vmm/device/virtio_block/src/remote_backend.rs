@@ -141,7 +141,7 @@ impl BlockBackend for RemoteBackend {
 
     async fn flush(&self, trace_id: ftrace::Id) -> Result<(), Error> {
         let _trace = ftrace::async_enter!(trace_id, c"machina", c"RemoteBackend::flush");
-        self.block_client.flush().await
+        Ok(self.block_client.flush().await?)
     }
 }
 

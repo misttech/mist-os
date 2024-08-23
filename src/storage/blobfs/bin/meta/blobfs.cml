@@ -35,6 +35,8 @@
         {
             protocol: [
                 "fuchsia.fs.Admin",
+                "fuchsia.fxfs.BlobCreator",
+                "fuchsia.fxfs.BlobReader",
                 "fuchsia.update.verify.BlobfsVerifier",
             ],
         },
@@ -100,6 +102,8 @@
             protocol: [
                 "fuchsia.fs.Admin",
                 "fuchsia.fs.startup.Startup",
+                "fuchsia.fxfs.BlobCreator",
+                "fuchsia.fxfs.BlobReader",
                 "fuchsia.update.verify.BlobfsVerifier",
             ],
             from: "self",

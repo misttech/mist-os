@@ -20,10 +20,10 @@ closed protocol Sysmem {
     });
 
     /// Takes the client end of a FIDL connection that'll serve
-    /// fuchsia.sysmem.SecureMem, which is a protocol that's specific to
+    /// fuchsia.sysmem2.SecureMem, which is a protocol that's specific to
     /// sysmem<->securemem concerns.
     strict RegisterSecureMem(resource struct {
-        secure_mem_connection client_end:fuchsia.sysmem.SecureMem;
+        secure_mem_connection client_end:fuchsia.sysmem2.SecureMem;
     });
 
     /// Informs sysmem that the channel previously passed to RegisterSecureMem()

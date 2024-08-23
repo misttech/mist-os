@@ -37,7 +37,7 @@ group("drivers") {
 
 group("benchmarks") {
   testonly = true
-  deps = [ "system-activity-governor:benchmarks" ]
+  deps = [ "bench" ]
 }
 
 group("tests") {
@@ -46,6 +46,7 @@ group("tests") {
     "battery-manager",
     "battery-manager:tests",
     "battery-manager/battery-cli:tests",
+    "bench:integration",
     "broker:tests",
     "cpu-manager:tests",
     "fake-powersource:tests",

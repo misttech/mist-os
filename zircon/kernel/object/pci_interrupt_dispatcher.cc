@@ -59,19 +59,8 @@ zx_status_t PciInterruptDispatcher::Create(const fbl::RefPtr<PcieDevice>& device
 
   Guard<CriticalMutex> guard{interrupt_dispatcher->get_lock()};
 
-  // The PcieDevice class contains a mutex that guards device access and can be
-  // contended between the PciInterruptDispatcher and the protocol methods used
-  // by the drivers downstream. For safe locking & scheduling considerations we
-  // need to ensure the InterruptDispatcher's spinlock is not held when calling
-  // into this dispatcher to unmask an interrupt. Masking is handled by the pci
-  // bus driver itself during operation.
-  zx_status_t status = interrupt_dispatcher->set_flags(INTERRUPT_UNMASK_PREWAIT_UNLOCKED);
-  if (status != ZX_OK) {
-    return status;
-  }
-
   // Register the interrupt
-  status = interrupt_dispatcher->RegisterInterruptHandler();
+  zx_status_t status = interrupt_dispatcher->RegisterInterruptHandler();
   if (status != ZX_OK) {
     return status;
   }
@@ -105,11 +94,11 @@ void PciInterruptDispatcher::UnmaskInterrupt() {
   }
 }
 
-void PciInterruptDispatcher::DeactivateInterrupt() { }
+void PciInterruptDispatcher::DeactivateInterrupt() {}
 
 PciInterruptDispatcher::PciInterruptDispatcher(const fbl::RefPtr<PcieDevice>& device,
                                                uint32_t vector, bool maskable)
-    : device_(device), vector_(vector), maskable_(maskable) {
+    : InterruptDispatcher(kFlags), device_(device), vector_(vector), maskable_(maskable) {
   kcounter_add(dispatcher_pci_interrupt_create_count, 1);
 }
 

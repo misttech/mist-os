@@ -29,7 +29,6 @@ board_description = "A generic emulated arm64 device."
 
 # Supports only virtual devices.
 board_is_emu = true
-board_is_phys = false
 
 # Build a UEFI image for virtualized platforms.
 build_uefi_disk = true
@@ -41,7 +40,6 @@ avb_key =
     "//third_party/android/platform/external/avb/test/data/testkey_atx_psk.pem"
 
 partitions_config_label = "//boards/partitions:arm64"
-partitions_config_contents = [ "$root_build_dir/fuchsia.esp.blk" ]
 
 blobfs_capacity = 10485760000  # 10000 MiB
 max_blob_contents_size =

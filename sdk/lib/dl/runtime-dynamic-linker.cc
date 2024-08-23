@@ -6,27 +6,17 @@
 
 namespace dl {
 
-ModuleHandle* RuntimeDynamicLinker::FindModule(Soname name) {
+RuntimeModule* RuntimeDynamicLinker::FindModule(Soname name) {
   if (auto it = std::find(modules_.begin(), modules_.end(), name); it != modules_.end()) {
     // TODO(https://fxbug.dev/328135195): increase reference count.
     // TODO(https://fxbug.dev/326120230): update flags
-    ModuleHandle& found = *it;
+    RuntimeModule& found = *it;
     return &found;
   }
   return nullptr;
 }
 
-fit::result<Error, ModuleHandle*> RuntimeDynamicLinker::CheckOpen(const char* file, int mode) {
-  if (mode & ~(kOpenSymbolScopeMask | kOpenBindingModeMask | kOpenFlagsMask)) {
-    return fit::error{Error{"invalid mode parameter"}};
-  }
-  if (!file || !strlen(file)) {
-    return fit::error{Error{"TODO(https://fxbug.dev/324136831): nullptr for file is unsupported."}};
-  }
-  return fit::ok(FindModule(Soname{file}));
-}
-
-fit::result<Error, void*> RuntimeDynamicLinker::LookupSymbol(ModuleHandle* module,
+fit::result<Error, void*> RuntimeDynamicLinker::LookupSymbol(RuntimeModule* module,
                                                              const char* ref) {
   Diagnostics diag;
   elfldltl::SymbolName name{ref};

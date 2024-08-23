@@ -136,9 +136,9 @@ async fn run<F: Future<Output = ()>>(
     .await
 }
 
-fn make_request(method: &str, url: String, deadline: Option<zx::Time>) -> http::Request {
+fn make_request(method: &str, url: String, deadline: Option<zx::MonotonicTime>) -> http::Request {
     // Unless specified by the caller, use an infinite timeout to avoid flakes.
-    let deadline = deadline.unwrap_or(zx::Time::INFINITE);
+    let deadline = deadline.unwrap_or(zx::MonotonicTime::INFINITE);
     http::Request {
         url: Some(url),
         method: Some(method.to_string()),
@@ -220,7 +220,7 @@ async fn test_fetch_http(behavior: &str) {
 async fn test_fetch_past_deadline(behavior: &str) {
     run(behavior, |loader, addr| async move {
         // Deadline expired 10 minutes ago!
-        let deadline = Some(zx::Time::after(zx::Duration::from_minutes(-10)));
+        let deadline = Some(zx::MonotonicTime::after(zx::Duration::from_minutes(-10)));
         let http::Response { error, body, .. } = loader
             .fetch(make_request("GET", format!("http://{}", addr), deadline))
             .await
@@ -238,7 +238,7 @@ async fn test_fetch_past_deadline(behavior: &str) {
 async fn test_fetch_response_too_slow(behavior: &str) {
     run(behavior, |loader, addr| async move {
         // Deadline expires 100ms from now.
-        let deadline = Some(zx::Time::after(zx::Duration::from_millis(100)));
+        let deadline = Some(zx::MonotonicTime::after(zx::Duration::from_millis(100)));
         let http::Response { error, body, .. } = loader
             .fetch(make_request("GET", format!("http://{}{}", addr, PENDING), deadline))
             .await

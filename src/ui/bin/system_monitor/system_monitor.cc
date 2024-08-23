@@ -15,12 +15,15 @@
 #include <iterator>
 #include <string>
 
+#include "rapidjson/schema.h"
 #include "src/lib/fsl/vmo/strings.h"
+#include "src/lib/json_parser/json_parser.h"
 
 namespace system_monitor {
 
 constexpr char kTarget[] = "platform_metrics";
 constexpr zx::duration kPrintFrequency = zx::sec(10);
+constexpr char kCpuData[] = "CPU MEAN ";
 
 SystemMonitor::SystemMonitor() {
   params_ = fuchsia::diagnostics::StreamParameters();
@@ -31,13 +34,9 @@ SystemMonitor::SystemMonitor() {
       fuchsia::diagnostics::ClientSelectorConfiguration::WithSelectAll(true));
 }
 
-void SystemMonitor::ConnectToArchiveAccessor(bool use_real_archive_accessor) {
+void SystemMonitor::ConnectToArchiveAccessor() {
   auto services = sys::ServiceDirectory::CreateFromNamespace();
-  if (use_real_archive_accessor) {
-    services->Connect(accessor_.NewRequest(), "fuchsia.diagnostics.RealArchiveAccessor");
-  } else {
-    services->Connect(accessor_.NewRequest());
-  }
+  services->Connect(accessor_.NewRequest());
 }
 
 void SystemMonitor::InitializeRenderer() { renderer_.Initialize(); }
@@ -65,13 +64,12 @@ std::vector<std::string> SystemMonitor::ParseBatch(
 }
 
 std::string SystemMonitor::GetTargetFromDiagnostics(std::vector<std::string> recent_diagnostics) {
-  std::string cpu_data;
   for (auto& content : recent_diagnostics) {
     if (content.find(kTarget) != std::string::npos) {
-      cpu_data = content;
+      return content;
     }
   }
-  return cpu_data;
+  return "";
 }
 
 std::string SystemMonitor::GetCPUData() {
@@ -84,8 +82,22 @@ std::string SystemMonitor::GetCPUData() {
 
 void SystemMonitor::PrintRecentDiagnostic() {
   UpdateRecentDiagnostic();
-  FX_LOGS(INFO) << "Recent Diagnostics: " << GetCPUData();
+  const std::string& recent_diag = GetCPUData();
+  FX_LOGS(INFO) << "Recent Diagnostics: " << recent_diag;
+  json_parser::JSONParser stringParser;
+  auto jsonDoc = stringParser.ParseFromString(recent_diag, "");
+  // Extract the mean values
+  const rapidjson::Value& meanValues =
+      jsonDoc["payload"]["root"]["platform_metrics"]["cpu"]["mean"];
 
+  // Print the mean values
+  double sum = 0.0;
+  for (rapidjson::SizeType i = 0; i < meanValues.Size(); ++i) {
+    sum += meanValues[i].GetDouble();
+  }
+  FX_LOGS(INFO) << "CPU mean: " << sum / meanValues.Size();
+  std::string cpu_data = kCpuData + std::to_string(sum / meanValues.Size());
+  renderer_.RenderFrame(cpu_data);
   async::PostDelayedTask(
       async_get_default_dispatcher(), [&] { PrintRecentDiagnostic(); }, kPrintFrequency);
 }

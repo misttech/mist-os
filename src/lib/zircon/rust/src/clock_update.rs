@@ -12,54 +12,69 @@
 //! clock.update(update).expect("update failed");
 //! ```
 
-use crate::Time;
+use crate::{MonotonicTime, SyntheticTimeline, Time, Timeline};
 use fuchsia_zircon_sys as sys;
 use std::fmt::Debug;
 
 /// A trait implemented by all components of a ClockUpdateBuilder's state.
 pub trait State {
-    /// Records the contents of the internal state to the supplied `clock_update_args_v2_t` struct.
-    fn add_args(&self, args: &mut sys::zx_clock_update_args_v2_t);
-
     /// Records the validity in the supplied bitfield.
     fn add_options(&self, options: &mut u64);
 }
 
 /// A trait implemented by states that describe how to set a clock value.
-pub trait ValueState: State {}
+pub trait ValueState: State {
+    type OutputTimeline: Timeline;
+    fn reference_value(&self) -> Option<MonotonicTime>;
+    fn synthetic_value(&self) -> Option<Time<Self::OutputTimeline>>;
+}
 
 /// A trait implemented by states that describe how to set a clock rate.
-pub trait RateState: State {}
+pub trait RateState: State {
+    fn rate_adjustment(&self) -> Option<i32>;
+}
 
 /// A trait implemented by states that describe how to set a clock error.
-pub trait ErrorState: State {}
+pub trait ErrorState: State {
+    fn error_bound(&self) -> Option<u64>;
+}
 
 /// A `ClockUpdateBuilder` state indicating no change.
-pub struct Null;
+pub struct Null<O>(std::marker::PhantomData<O>);
 
-impl State for Null {
-    fn add_args(&self, _: &mut sys::zx_clock_update_args_v2_t) {}
+impl<O: Timeline> State for Null<O> {
     fn add_options(&self, _: &mut u64) {}
 }
 
-impl ValueState for Null {}
-impl RateState for Null {}
-impl ErrorState for Null {}
+impl<O: Timeline> ValueState for Null<O> {
+    type OutputTimeline = O;
+    fn reference_value(&self) -> Option<MonotonicTime> {
+        None
+    }
+    fn synthetic_value(&self) -> Option<Time<O>> {
+        None
+    }
+}
+impl<O: Timeline> RateState for Null<O> {
+    fn rate_adjustment(&self) -> Option<i32> {
+        None
+    }
+}
+impl<O: Timeline> ErrorState for Null<O> {
+    fn error_bound(&self) -> Option<u64> {
+        None
+    }
+}
 
 /// A `ClockUpdateBuilder` state indicating value should be set using a
 /// (reference time, synthetic time) tuple.
-pub struct AbsoluteValue {
-    reference_value: Time,
-    synthetic_value: Time,
+pub struct AbsoluteValue<O> {
+    reference_value: MonotonicTime,
+    synthetic_value: Time<O>,
+    _output_marker: std::marker::PhantomData<O>,
 }
 
-impl State for AbsoluteValue {
-    #[inline]
-    fn add_args(&self, args: &mut sys::zx_clock_update_args_v2_t) {
-        args.reference_value = self.reference_value.into_nanos();
-        args.synthetic_value = self.synthetic_value.into_nanos();
-    }
-
+impl<O: Timeline + Copy> State for AbsoluteValue<O> {
     #[inline]
     fn add_options(&self, opts: &mut u64) {
         *opts |= sys::ZX_CLOCK_UPDATE_OPTION_REFERENCE_VALUE_VALID
@@ -67,41 +82,51 @@ impl State for AbsoluteValue {
     }
 }
 
-impl ValueState for AbsoluteValue {}
+impl<O: Timeline + Copy> ValueState for AbsoluteValue<O> {
+    type OutputTimeline = O;
+    fn reference_value(&self) -> Option<MonotonicTime> {
+        Some(self.reference_value)
+    }
+    fn synthetic_value(&self) -> Option<Time<O>> {
+        Some(self.synthetic_value)
+    }
+}
 
 /// A `ClockUpdateBuilder` state indicating value should be set using only a synthetic time.
-pub struct ApproximateValue(Time);
+pub struct ApproximateValue<O>(Time<O>);
 
-impl State for ApproximateValue {
-    #[inline]
-    fn add_args(&self, args: &mut sys::zx_clock_update_args_v2_t) {
-        args.synthetic_value = self.0.into_nanos();
-    }
-
+impl<O: Timeline + Copy> State for ApproximateValue<O> {
     #[inline]
     fn add_options(&self, opts: &mut u64) {
         *opts |= sys::ZX_CLOCK_UPDATE_OPTION_SYNTHETIC_VALUE_VALID;
     }
 }
 
-impl ValueState for ApproximateValue {}
+impl<O: Timeline + Copy> ValueState for ApproximateValue<O> {
+    type OutputTimeline = O;
+    fn reference_value(&self) -> Option<MonotonicTime> {
+        None
+    }
+    fn synthetic_value(&self) -> Option<Time<O>> {
+        Some(self.0)
+    }
+}
 
 /// A clock update state indicating the rate should be set using the contained ppm offset.
 pub struct Rate(i32);
 
 impl State for Rate {
     #[inline]
-    fn add_args(&self, args: &mut sys::zx_clock_update_args_v2_t) {
-        args.rate_adjust = self.0;
-    }
-
-    #[inline]
     fn add_options(&self, opts: &mut u64) {
         *opts |= sys::ZX_CLOCK_UPDATE_OPTION_RATE_ADJUST_VALID;
     }
 }
 
-impl RateState for Rate {}
+impl RateState for Rate {
+    fn rate_adjustment(&self) -> Option<i32> {
+        Some(self.0)
+    }
+}
 
 /// A clock update state indicating the clock error should be set using the contained bound in
 /// nanoseconds.
@@ -109,46 +134,53 @@ pub struct Error(u64);
 
 impl State for Error {
     #[inline]
-    fn add_args(&self, args: &mut sys::zx_clock_update_args_v2_t) {
-        args.error_bound = self.0;
-    }
-
-    #[inline]
     fn add_options(&self, opts: &mut u64) {
         *opts |= sys::ZX_CLOCK_UPDATE_OPTION_ERROR_BOUND_VALID;
     }
 }
 
-impl ErrorState for Error {}
+impl ErrorState for Error {
+    fn error_bound(&self) -> Option<u64> {
+        Some(self.0)
+    }
+}
 
 /// Builder to specify how zero or more properties of a clock should be updated.
 /// See [`Clock::update`].
 ///
 /// A `ClockUpdateBuilder` may be created using `ClockUpdate::builder()`.
 #[derive(Debug, Eq, PartialEq)]
-pub struct ClockUpdateBuilder<V: ValueState, R: RateState, E: ErrorState> {
+pub struct ClockUpdateBuilder<V, R, E, O> {
     value_state: V,
     rate_state: R,
     error_state: E,
+    _output_marker: std::marker::PhantomData<O>,
 }
 
-impl<V: ValueState, R: RateState, E: ErrorState> ClockUpdateBuilder<V, R, E> {
+impl<V: ValueState<OutputTimeline = O>, R: RateState, E: ErrorState, O: Timeline>
+    ClockUpdateBuilder<V, R, E, O>
+{
     /// Converts this `ClockUpdateBuilder` to a `ClockUpdate`.
     #[inline]
-    pub fn build(self) -> ClockUpdate {
+    pub fn build(self) -> ClockUpdate<O> {
         ClockUpdate::from(self)
     }
 }
 
-impl ClockUpdateBuilder<Null, Null, Null> {
+impl<O: Timeline> ClockUpdateBuilder<Null<O>, Null<O>, Null<O>, O> {
     /// Returns an empty `ClockUpdateBuilder`.
     #[inline]
     fn new() -> Self {
-        Self { value_state: Null, rate_state: Null, error_state: Null }
+        Self {
+            value_state: Null(std::marker::PhantomData),
+            rate_state: Null(std::marker::PhantomData),
+            error_state: Null(std::marker::PhantomData),
+            _output_marker: std::marker::PhantomData,
+        }
     }
 }
 
-impl<R: RateState, E: ErrorState> ClockUpdateBuilder<Null, R, E> {
+impl<R: RateState, E: ErrorState, O: Timeline> ClockUpdateBuilder<Null<O>, R, E, O> {
     /// Sets an absolute value for this `ClockUpdate` using a (reference time, synthetic time) pair.
     ///
     /// Reference time is typically monotonic and synthetic time is the time tracked by the clock.
@@ -156,18 +188,23 @@ impl<R: RateState, E: ErrorState> ClockUpdateBuilder<Null, R, E> {
     #[inline]
     pub fn absolute_value(
         self,
-        reference_value: Time,
-        synthetic_value: Time,
-    ) -> ClockUpdateBuilder<AbsoluteValue, R, E> {
+        reference_value: MonotonicTime,
+        synthetic_value: Time<O>,
+    ) -> ClockUpdateBuilder<AbsoluteValue<O>, R, E, O> {
         ClockUpdateBuilder {
-            value_state: AbsoluteValue { reference_value, synthetic_value },
+            value_state: AbsoluteValue {
+                reference_value,
+                synthetic_value,
+                _output_marker: std::marker::PhantomData,
+            },
             rate_state: self.rate_state,
             error_state: self.error_state,
+            _output_marker: std::marker::PhantomData,
         }
     }
 }
 
-impl<E: ErrorState> ClockUpdateBuilder<Null, Null, E> {
+impl<E: ErrorState, O: Timeline> ClockUpdateBuilder<Null<O>, Null<O>, E, O> {
     /// Sets an approximate value for this `ClockUpdateBuilder` using a synthetic time only.
     ///
     /// Synthetic time is the time tracked by the clock. The reference time will be set to current
@@ -178,69 +215,79 @@ impl<E: ErrorState> ClockUpdateBuilder<Null, Null, E> {
     #[inline]
     pub fn approximate_value(
         self,
-        synthetic_value: Time,
-    ) -> ClockUpdateBuilder<ApproximateValue, Null, E> {
+        synthetic_value: Time<O>,
+    ) -> ClockUpdateBuilder<ApproximateValue<O>, Null<O>, E, O> {
         ClockUpdateBuilder {
             value_state: ApproximateValue(synthetic_value),
             rate_state: self.rate_state,
             error_state: self.error_state,
+            _output_marker: std::marker::PhantomData,
         }
     }
 }
 
-impl<E: ErrorState> ClockUpdateBuilder<Null, Null, E> {
+impl<E: ErrorState, O: Timeline> ClockUpdateBuilder<Null<O>, Null<O>, E, O> {
     /// Adds a rate change in parts per million to this `ClockUpdateBuilder`.
     ///
     /// Adding a rate is only possible when the value is either not set or set to an absolute value
     /// and when no rate has been set previously.
     #[inline]
-    pub fn rate_adjust(self, rate_adjust_ppm: i32) -> ClockUpdateBuilder<Null, Rate, E> {
+    pub fn rate_adjust(self, rate_adjust_ppm: i32) -> ClockUpdateBuilder<Null<O>, Rate, E, O> {
         ClockUpdateBuilder {
             value_state: self.value_state,
             rate_state: Rate(rate_adjust_ppm),
             error_state: self.error_state,
+            _output_marker: std::marker::PhantomData,
         }
     }
 }
 
-impl<E: ErrorState> ClockUpdateBuilder<AbsoluteValue, Null, E> {
+impl<E: ErrorState, O: Timeline> ClockUpdateBuilder<AbsoluteValue<O>, Null<O>, E, O> {
     /// Adds a rate change in parts per million to this `ClockUpdateBuilder`.
     ///
     /// Adding a rate is only possible when the value is either not set or set to an absolute value
     /// and when no rate has been set previously.
     #[inline]
-    pub fn rate_adjust(self, rate_adjust_ppm: i32) -> ClockUpdateBuilder<AbsoluteValue, Rate, E> {
+    pub fn rate_adjust(
+        self,
+        rate_adjust_ppm: i32,
+    ) -> ClockUpdateBuilder<AbsoluteValue<O>, Rate, E, O> {
         ClockUpdateBuilder {
             value_state: self.value_state,
             rate_state: Rate(rate_adjust_ppm),
             error_state: self.error_state,
+            _output_marker: std::marker::PhantomData,
         }
     }
 }
 
-impl<V: ValueState, R: RateState> ClockUpdateBuilder<V, R, Null> {
+impl<V: ValueState, R: RateState, O: Timeline> ClockUpdateBuilder<V, R, Null<O>, O> {
     /// Adds an error bound in nanoseconds to this `ClockUpdateBuilder`.
     #[inline]
-    pub fn error_bounds(self, error_bound_ns: u64) -> ClockUpdateBuilder<V, R, Error> {
+    pub fn error_bounds(self, error_bound_ns: u64) -> ClockUpdateBuilder<V, R, Error, O> {
         ClockUpdateBuilder {
             value_state: self.value_state,
             rate_state: self.rate_state,
             error_state: Error(error_bound_ns),
+            _output_marker: std::marker::PhantomData,
         }
     }
 }
 
 /// Specifies an update to zero or more properties of a clock. See [`Clock::update`]
 #[derive(Debug, Eq, PartialEq)]
-pub struct ClockUpdate {
+pub struct ClockUpdate<Output = SyntheticTimeline> {
     options: u64,
-    args: sys::zx_clock_update_args_v2_t,
+    rate_adjust: i32,
+    synthetic_value: Time<Output>,
+    reference_value: MonotonicTime,
+    error_bound: u64,
 }
 
-impl ClockUpdate {
+impl<O: Timeline> ClockUpdate<O> {
     /// Returns a new, empty, `ClockUpdateBuilder`.
     #[inline]
-    pub fn builder() -> ClockUpdateBuilder<Null, Null, Null> {
+    pub fn builder() -> ClockUpdateBuilder<Null<O>, Null<O>, Null<O>, O> {
         ClockUpdateBuilder::new()
     }
 
@@ -252,35 +299,45 @@ impl ClockUpdate {
     }
 }
 
-impl<V: ValueState, R: RateState, E: ErrorState> From<ClockUpdateBuilder<V, R, E>> for ClockUpdate {
-    fn from(builder: ClockUpdateBuilder<V, R, E>) -> Self {
-        let mut args = sys::zx_clock_update_args_v2_t::default();
-        builder.value_state.add_args(&mut args);
-        builder.rate_state.add_args(&mut args);
-        builder.error_state.add_args(&mut args);
-
+impl<V: ValueState<OutputTimeline = O>, R: RateState, E: ErrorState, O: Timeline>
+    From<ClockUpdateBuilder<V, R, E, O>> for ClockUpdate<O>
+{
+    fn from(builder: ClockUpdateBuilder<V, R, E, O>) -> Self {
         let mut options = sys::ZX_CLOCK_ARGS_VERSION_2;
         builder.value_state.add_options(&mut options);
         builder.rate_state.add_options(&mut options);
         builder.error_state.add_options(&mut options);
 
-        Self { options, args }
+        Self {
+            options,
+            rate_adjust: builder.rate_state.rate_adjustment().unwrap_or_default(),
+            synthetic_value: builder.value_state.synthetic_value().unwrap_or_default(),
+            reference_value: builder.value_state.reference_value().unwrap_or_default(),
+            error_bound: builder.error_state.error_bound().unwrap_or_default(),
+        }
     }
 }
 
-impl From<ClockUpdate> for sys::zx_clock_update_args_v2_t {
-    fn from(clock_update: ClockUpdate) -> Self {
-        clock_update.args
+impl<Output: Timeline> From<ClockUpdate<Output>> for sys::zx_clock_update_args_v2_t {
+    fn from(clock_update: ClockUpdate<Output>) -> Self {
+        sys::zx_clock_update_args_v2_t {
+            rate_adjust: clock_update.rate_adjust,
+            padding1: Default::default(),
+            synthetic_value: clock_update.synthetic_value.into_nanos(),
+            reference_value: clock_update.reference_value.into_nanos(),
+            error_bound: clock_update.error_bound,
+        }
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::{SyntheticTime, SyntheticTimeline};
 
     #[test]
     fn empty_update() {
-        let update = ClockUpdateBuilder::new().build();
+        let update = ClockUpdateBuilder::<_, _, _, SyntheticTimeline>::new().build();
         assert_eq!(update.options(), sys::ZX_CLOCK_ARGS_VERSION_2);
         assert_eq!(
             sys::zx_clock_update_args_v2_t::from(update),
@@ -296,7 +353,8 @@ mod tests {
 
     #[test]
     fn rate_only() {
-        let update = ClockUpdate::from(ClockUpdateBuilder::new().rate_adjust(52));
+        let update =
+            ClockUpdate::<SyntheticTimeline>::from(ClockUpdateBuilder::new().rate_adjust(52));
         assert_eq!(
             update.options(),
             sys::ZX_CLOCK_ARGS_VERSION_2 | sys::ZX_CLOCK_UPDATE_OPTION_RATE_ADJUST_VALID
@@ -316,7 +374,7 @@ mod tests {
     #[test]
     fn approximate_value() {
         let update = ClockUpdateBuilder::new()
-            .approximate_value(Time::from_nanos(42))
+            .approximate_value(SyntheticTime::from_nanos(42))
             .error_bounds(62)
             .build();
         assert_eq!(
@@ -340,7 +398,7 @@ mod tests {
     #[test]
     fn absolute_value() {
         let update = ClockUpdateBuilder::new()
-            .absolute_value(Time::from_nanos(1000), Time::from_nanos(42))
+            .absolute_value(MonotonicTime::from_nanos(1000), SyntheticTime::from_nanos(42))
             .rate_adjust(52)
             .error_bounds(62)
             .build();

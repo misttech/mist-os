@@ -9,8 +9,7 @@ use cm_util::TaskGroup;
 use errors::RebootError;
 use fidl::endpoints::{self};
 use fuchsia_component::client;
-use futures::lock::Mutex;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use vfs::directory::entry::OpenRequest;
 use vfs::path::Path;
 use vfs::ToObjectRequest;
@@ -36,6 +35,7 @@ pub struct ComponentManagerInstance {
 }
 
 /// Mutable state for component manager's instance.
+#[derive(Debug)]
 pub struct ComponentManagerInstanceState {
     /// The root component instance, this instance's only child.
     root: Option<Arc<ComponentInstance>>,
@@ -63,20 +63,20 @@ impl ComponentManagerInstance {
     }
 
     #[cfg(test)]
-    pub async fn has_reboot_task(&self) -> bool {
-        self.state.lock().await.reboot_task.is_some()
+    pub fn has_reboot_task(&self) -> bool {
+        self.state.lock().unwrap().reboot_task.is_some()
     }
 
     /// Returns the root component instance.
     ///
     /// REQUIRES: The root has already been set. Otherwise panics.
-    pub async fn root(&self) -> Arc<ComponentInstance> {
-        self.state.lock().await.root.as_ref().expect("root not set").clone()
+    pub fn root(&self) -> Arc<ComponentInstance> {
+        self.state.lock().unwrap().root.as_ref().expect("root not set").clone()
     }
 
     /// Initializes the state of the instance. Panics if already initialized.
-    pub async fn init(&self, root: Arc<ComponentInstance>) {
-        let mut state = self.state.lock().await;
+    pub fn init(&self, root: Arc<ComponentInstance>) {
+        let mut state = self.state.lock().unwrap();
         assert!(state.root.is_none(), "child of top instance already set");
         state.root = Some(root);
     }
@@ -86,8 +86,8 @@ impl ComponentManagerInstance {
     ///
     /// Returns as soon as the call has been made. In the background, component_manager will wait
     /// on the `Reboot` call.
-    pub(super) async fn trigger_reboot(self: &Arc<Self>) {
-        let mut state = self.state.lock().await;
+    pub(super) fn trigger_reboot(self: &Arc<Self>) {
+        let mut state = self.state.lock().unwrap();
         if state.reboot_task.is_some() {
             // Reboot task was already scheduled, nothing to do.
             return;
@@ -120,7 +120,7 @@ impl ComponentManagerInstance {
     ) -> Result<fstatecontrol::AdminProxy, RebootError> {
         let (exposed_dir, server) =
             endpoints::create_proxy::<fio::DirectoryMarker>().expect("failed to create proxy");
-        let root = self.root().await;
+        let root = self.root();
         let mut object_request = fio::OpenFlags::empty().to_object_request(server);
         root.open_exposed(OpenRequest::new(
             root.execution_scope.clone(),

@@ -467,16 +467,16 @@ bool SystemMetricsDaemon::LogCpuToCobalt() {
   std::vector<MetricEvent> events;
   auto builder = MetricEventBuilder(fuchsia_system_metrics::kCpuPercentageMigratedMetricId);
   for (const auto& pair : activity_state_to_cpu_map_) {
-    std::vector<HistogramBucket> cpu_buckets_;
+    std::vector<HistogramBucket> cpu_buckets;
     for (const auto& bucket_pair : pair.second) {
       HistogramBucket bucket;
       bucket.index = bucket_pair.first;
       bucket.count = bucket_pair.second;
-      cpu_buckets_.push_back(std::move(bucket));
+      cpu_buckets.push_back(std::move(bucket));
     }
     events.push_back(builder.Clone()
                          .with_event_code(GetCobaltEventCodeForDeviceState<EventCode>(pair.first))
-                         .as_integer_histogram(cpu_buckets_));
+                         .as_integer_histogram(cpu_buckets));
   }
   // call cobalt FIDL
   fuchsia::metrics::MetricEventLogger_LogMetricEvents_Result result;

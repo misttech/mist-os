@@ -188,7 +188,6 @@ zx_status_t Nelson::Start() {
 void Nelson::DdkRelease() { delete this; }
 
 zx_status_t Nelson::Create(void* ctx, zx_device_t* parent) {
-  iommu_protocol_t iommu;
   auto endpoints = fdf::CreateEndpoints<fuchsia_hardware_platform_bus::PlatformBus>();
   if (endpoints.is_error()) {
     return endpoints.error_value();
@@ -201,13 +200,8 @@ zx_status_t Nelson::Create(void* ctx, zx_device_t* parent) {
     return status;
   }
 
-  status = device_get_protocol(parent, ZX_PROTOCOL_IOMMU, &iommu);
-  if (status != ZX_OK) {
-    return status;
-  }
-
   fbl::AllocChecker ac;
-  auto board = fbl::make_unique_checked<Nelson>(&ac, parent, std::move(endpoints->client), &iommu);
+  auto board = fbl::make_unique_checked<Nelson>(&ac, parent, std::move(endpoints->client));
   if (!ac.check()) {
     return ZX_ERR_NO_MEMORY;
   }

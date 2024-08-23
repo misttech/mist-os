@@ -56,7 +56,7 @@ pub struct LogsArtifactsContainer {
 
     /// The time when the container was created by the logging
     /// framework.
-    pub event_timestamp: zx::Time,
+    pub event_timestamp: zx::MonotonicTime,
 
     /// Current object ID used in place of a memory address
     /// used to uniquely identify an object in a BTreeMap.
@@ -116,7 +116,7 @@ impl LogsArtifactsContainer {
                 is_initializing: true,
             })),
             stats: Arc::new(stats),
-            event_timestamp: zx::Time::get_monotonic(),
+            event_timestamp: zx::MonotonicTime::get(),
             next_hanging_get_id: AtomicUsize::new(0),
             hanging_get_test_state: Arc::new(Mutex::new(TestState::NoRequest)),
         };

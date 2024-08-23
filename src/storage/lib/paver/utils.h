@@ -20,6 +20,7 @@
 #include <fbl/unique_fd.h>
 
 #include "src/lib/uuid/uuid.h"
+#include "src/storage/lib/paver/block-devices.h"
 
 namespace paver {
 
@@ -54,34 +55,20 @@ std::unique_ptr<T> WrapUnique(T* ptr) {
   return std::unique_ptr<T>(ptr);
 }
 
-struct PartitionConnection {
-  zx::channel device;
-  fidl::ClientEnd<fuchsia_device::Controller> controller;
-};
+zx::result<std::unique_ptr<VolumeConnector>> OpenBlockPartition(
+    const paver::BlockDevices& devices, std::optional<uuid::Uuid> unique_guid,
+    std::optional<uuid::Uuid> type_guid, zx_duration_t timeout);
 
-// Either opens a |fuchsia.hardware.block.partition/Partition|, or
-// |fuchsia.hardware.skipblock/SkipBlock|, depending on the filter rules
-// defined in |should_filter_file|.
-zx::result<PartitionConnection> OpenPartition(
-    const fbl::unique_fd& devfs_root, const char* path,
-    fit::function<bool(const zx::channel&)> should_filter_file, zx_duration_t timeout);
+zx::result<std::unique_ptr<VolumeConnector>> OpenSkipBlockPartition(
+    const paver::BlockDevices& devices, const uuid::Uuid& type_guid, zx_duration_t timeout);
 
-zx::result<PartitionConnection> OpenBlockPartition(const fbl::unique_fd& devfs_root,
-                                                   std::optional<uuid::Uuid> unique_guid,
-                                                   std::optional<uuid::Uuid> type_guid,
-                                                   zx_duration_t timeout);
-
-zx::result<PartitionConnection> OpenSkipBlockPartition(const fbl::unique_fd& devfs_root,
-                                                       const uuid::Uuid& type_guid,
-                                                       zx_duration_t timeout);
-
-bool HasSkipBlockDevice(const fbl::unique_fd& devfs_root);
+bool HasSkipBlockDevice(const paver::BlockDevices& devices);
 
 // Attempts to open and overwrite the first block of the underlying
 // partition. Does not rebind partition drivers.
 //
 // At most one of |unique_guid| and |type_guid| may be nullptr.
-zx::result<> WipeBlockPartition(const fbl::unique_fd& devfs_root,
+zx::result<> WipeBlockPartition(const paver::BlockDevices& devices,
                                 std::optional<uuid::Uuid> unique_guid,
                                 std::optional<uuid::Uuid> type_guid);
 

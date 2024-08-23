@@ -34,7 +34,6 @@ class File : public VnodeF2fs, public fbl::Recyclable<File> {
       __TA_EXCLUDES(mutex_, f2fs::GetGlobalLock());
   void VmoRead(uint64_t offset, uint64_t length) final __TA_EXCLUDES(mutex_);
   zx::result<zx::stream> CreateStream(uint32_t stream_options) final;
-  bool SupportsClientSideStreams() const final;
   block_t GetBlockAddr(LockedPage& page) final;
 
  private:

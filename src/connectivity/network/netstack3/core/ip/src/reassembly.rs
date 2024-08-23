@@ -137,7 +137,7 @@ pub trait FragmentHandler<I: IpExt, BC> {
         bindings_ctx: &mut BC,
         key: &FragmentCacheKey<I::Addr>,
         buffer: BV,
-    ) -> Result<I::Packet<B>, FragmentReassemblyError>;
+    ) -> Result<(), FragmentReassemblyError>;
 }
 
 impl<I: IpExt, BC: FragmentBindingsContext, CC: FragmentContext<I, BC>> FragmentHandler<I, BC>
@@ -177,7 +177,7 @@ impl<I: IpExt, BC: FragmentBindingsContext, CC: FragmentContext<I, BC>> Fragment
         bindings_ctx: &mut BC,
         key: &FragmentCacheKey<I::Addr>,
         buffer: BV,
-    ) -> Result<I::Packet<B>, FragmentReassemblyError> {
+    ) -> Result<(), FragmentReassemblyError> {
         self.with_state_mut(|cache| {
             let res = cache.reassemble_packet(key, buffer);
 
@@ -706,7 +706,7 @@ impl<I: IpExt, BT: FragmentBindingsTypes> IpPacketFragmentCache<I, BT> {
         &mut self,
         key: &FragmentCacheKey<I::Addr>,
         buffer: BV,
-    ) -> Result<I::Packet<B>, FragmentReassemblyError> {
+    ) -> Result<(), FragmentReassemblyError> {
         let entry = match self.cache.entry(*key) {
             Entry::Occupied(entry) => entry,
             Entry::Vacant(_) => return Err(FragmentReassemblyError::InvalidKey),
@@ -819,7 +819,7 @@ mod tests {
         TEST_ADDRS_V4, TEST_ADDRS_V6,
     };
     use netstack3_base::{CtxPair, IntoCoreTimerCtx};
-    use packet::{Buf, ParseBuffer, Serializer};
+    use packet::{Buf, ParsablePacket, ParseBuffer, Serializer};
     use packet_formats::ip::{IpProto, Ipv6ExtHdrType};
     use packet_formats::ipv4::Ipv4PacketBuilder;
     use packet_formats::ipv6::Ipv6PacketBuilder;
@@ -1137,8 +1137,10 @@ mod tests {
             I::TEST_ADDRS.local_ip.get(),
             fragment_id.into(),
         );
-        let packet =
-            FragmentHandler::reassemble_packet(core_ctx, bindings_ctx, &key, &mut buffer).unwrap();
+
+        FragmentHandler::reassemble_packet(core_ctx, bindings_ctx, &key, &mut buffer).unwrap();
+        let packet = I::Packet::parse_mut(&mut buffer, ()).unwrap();
+
         let expected_body = generate_body_fragment(fragment_id, 0, total_body_len);
         assert_eq!(packet.body(), &expected_body[..]);
     }
@@ -1562,9 +1564,9 @@ mod tests {
         validate_size(&core_ctx.state.cache);
         let mut buffer: Vec<u8> = vec![0; packet_len];
         let mut buffer = &mut buffer[..];
-        let packet =
-            FragmentHandler::reassemble_packet(&mut core_ctx, &mut bindings_ctx, &key, &mut buffer)
-                .unwrap();
+        FragmentHandler::reassemble_packet(&mut core_ctx, &mut bindings_ctx, &key, &mut buffer)
+            .unwrap();
+        let packet = Ipv4Packet::parse_mut(&mut buffer, ()).unwrap();
         let mut expected_body: Vec<u8> = Vec::new();
         expected_body.extend(0..15);
         assert_eq!(packet.body(), &expected_body[..]);
@@ -1640,9 +1642,9 @@ mod tests {
         validate_size(&core_ctx.state.cache);
         let mut buffer: Vec<u8> = vec![0; packet_len];
         let mut buffer = &mut buffer[..];
-        let packet =
-            FragmentHandler::reassemble_packet(&mut core_ctx, &mut bindings_ctx, &key, &mut buffer)
-                .unwrap();
+        FragmentHandler::reassemble_packet(&mut core_ctx, &mut bindings_ctx, &key, &mut buffer)
+            .unwrap();
+        let packet = Ipv6Packet::parse_mut(&mut buffer, ()).unwrap();
         let mut expected_body: Vec<u8> = Vec::new();
         expected_body.extend(0..15);
         assert_eq!(packet.body(), &expected_body[..]);

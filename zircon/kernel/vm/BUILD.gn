@@ -17,7 +17,6 @@ zx_library("vm") {
     "discardable_vmo_tracker.cc",
     "evictor.cc",
     "kstack.cc",
-    "loan_sweeper.cc",
     "lz4_compressor.cc",
     "mem_command.cc",
     "page.cc",

@@ -65,7 +65,8 @@ class FizzBuzz final : public fuchsia::examples::inspect::FizzBuzz {
 };
 
 int main(int argc, char** argv) {
-  fuchsia_logging::SetTags({"inspect_cpp_codelab", "fizzbuzz"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"inspect_cpp_codelab", "fizzbuzz"}).BuildAndInitialize();
 
   FX_LOGS(INFO) << "Starting up...";
 

@@ -295,7 +295,8 @@ function metrics-is-internal-user {
 }
 
 function metrics-sanitize-string {
-  local sanitized="${1//$USER/\$USER}"
+  local sanitized="${1//$FUCHSIA_DIR/\$FUCHSIA_DIR}"
+  sanitized="${sanitized//$USER/\$USER}"
   sanitized="${sanitized//$HOSTNAME/\$HOSTNAME}"
   echo "$sanitized"
 }

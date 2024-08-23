@@ -66,7 +66,7 @@ where
             None => {
                 return Err(RoutingError::BedrockNotPresentInDictionary {
                     name: use_config.target_name.to_string(),
-                    moniker: component.moniker().clone(),
+                    moniker: component.moniker().clone().into(),
                 }
                 .into());
             }
@@ -80,10 +80,9 @@ where
         .into());
     };
     let request = sandbox::Request {
-        availability: use_config.availability,
         target: component.as_weak().into(),
         debug: false,
-        metadata: request_metadata::config_metadata(),
+        metadata: request_metadata::config_metadata(use_config.availability),
     };
     let data = match router.route(request).await? {
         sandbox::Capability::Data(d) => d,

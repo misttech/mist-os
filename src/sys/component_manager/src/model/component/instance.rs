@@ -401,7 +401,7 @@ impl ResolvedInstanceState {
             }
         }
 
-        let program_escrow = if decl.program.is_some() {
+        let program_escrow = if decl.get_runner().is_some() {
             let (escrow, escrow_task) = escrow::Actor::new(component.as_weak());
             component.nonblocking_task_group().spawn(escrow_task);
             Some(escrow)
@@ -463,7 +463,7 @@ impl ResolvedInstanceState {
         component_decl: &ComponentDecl,
         capability_decl: &cm_rust::CapabilityDecl,
     ) -> Router {
-        if component_decl.program.is_none() {
+        if component_decl.get_runner().is_none() {
             return Router::new_error(OpenOutgoingDirError::InstanceNonExecutable);
         }
         let name = capability_decl.name();
@@ -1091,7 +1091,7 @@ pub struct StartedInstanceState {
     program: Option<ProgramRuntime>,
 
     /// Approximates when the component was started.
-    pub timestamp: zx::Time,
+    pub timestamp: zx::MonotonicTime,
 
     /// Describes why the component instance was started
     pub start_reason: StartReason,
@@ -1123,7 +1123,7 @@ impl StartedInstanceState {
         execution_controller_task: Option<controller::ExecutionControllerTask>,
         logger: Option<ScopedLogger>,
     ) -> Self {
-        let timestamp = zx::Time::get_monotonic();
+        let timestamp = zx::MonotonicTime::get();
         StartedInstanceState {
             program: program.map(|p| ProgramRuntime::new(p, component)),
             timestamp,
@@ -1152,14 +1152,10 @@ impl StartedInstanceState {
         let ret = if let Some(program) = program {
             program.stop(stop_timer, kill_timer).await
         } else {
-            Ok(StopConclusion {
-                disposition: StopDisposition::NoController,
-                escrow_request: None,
-                stop_info: None,
-            })
+            Ok(StopConclusion { disposition: StopDisposition::NoController, escrow_request: None })
         }?;
         if let Some(execution_controller_task) = self.execution_controller_task.as_mut() {
-            execution_controller_task.set_stop_payload(ret.disposition.status(), ret.stop_info);
+            execution_controller_task.set_stop_payload(ret.disposition.stop_info());
         }
         Ok(ret)
     }

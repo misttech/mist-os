@@ -10,6 +10,7 @@
 
 #include <lib/arch/ticks.h>
 #include <zircon/compiler.h>
+#include <zircon/time.h>
 #include <zircon/types.h>
 
 #include <fbl/enum_bits.h>
@@ -77,7 +78,7 @@ inline ktl::optional<zx_ticks_t> timer_convert_mono_to_raw_ticks(zx_ticks_t mono
   if (modifier > 0) {
     return ktl::nullopt;
   }
-  return ktl::optional<zx_ticks_t>(mono_ticks - modifier);
+  return ktl::optional<zx_ticks_t>(zx_ticks_sub_ticks(mono_ticks, modifier));
 }
 
 // Access the platform specific offset from the raw ticks timeline to the monotonic ticks

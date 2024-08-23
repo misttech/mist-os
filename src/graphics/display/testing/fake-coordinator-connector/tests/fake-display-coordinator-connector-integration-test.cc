@@ -14,7 +14,7 @@
 
 namespace {
 
-TEST(FakeDisplayCoordinatorConnector, ConnectToSvc) {
+TEST(FakeDisplayCoordinatorConnector, ConnectToSvcWithListener) {
   zx::result<fidl::ClientEnd<fuchsia_hardware_display::Provider>> provider_result =
       component::Connect<fuchsia_hardware_display::Provider>();
   ASSERT_OK(provider_result);
@@ -23,14 +23,18 @@ TEST(FakeDisplayCoordinatorConnector, ConnectToSvc) {
 
   auto [coordinator_client, coordinator_server] =
       fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
-  fidl::Result open_coordinator_result =
-      provider->OpenCoordinatorForPrimary(std::move(coordinator_server));
+  auto [listener_client, listener_server] =
+      fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
+  fidl::Result open_coordinator_result = provider->OpenCoordinatorWithListenerForPrimary({{
+      .coordinator = std::move(coordinator_server),
+      .coordinator_listener = std::move(listener_client),
+  }});
   EXPECT_TRUE(open_coordinator_result.is_ok())
       << "Failed to open coordinator: "
       << open_coordinator_result.error_value().FormatDescription();
 }
 
-TEST(FakeDisplayCoordinatorConnector, ConnectToDevfs) {
+TEST(FakeDisplayCoordinatorConnector, ConnectToDevfsWithListener) {
   static constexpr std::string_view kDevfsDirectory = "/dev/class/display-coordinator";
 
   zx::result<fidl::ClientEnd<fuchsia_io::Directory>> devfs_directory_result =
@@ -53,8 +57,12 @@ TEST(FakeDisplayCoordinatorConnector, ConnectToDevfs) {
 
   auto [coordinator_client, coordinator_server] =
       fidl::Endpoints<fuchsia_hardware_display::Coordinator>::Create();
-  fidl::Result open_coordinator_result =
-      provider->OpenCoordinatorForPrimary(std::move(coordinator_server));
+  auto [listener_client, listener_server] =
+      fidl::Endpoints<fuchsia_hardware_display::CoordinatorListener>::Create();
+  fidl::Result open_coordinator_result = provider->OpenCoordinatorWithListenerForPrimary({{
+      .coordinator = std::move(coordinator_server),
+      .coordinator_listener = std::move(listener_client),
+  }});
   EXPECT_TRUE(open_coordinator_result.is_ok())
       << "Failed to open coordinator: "
       << open_coordinator_result.error_value().FormatDescription();

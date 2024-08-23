@@ -88,7 +88,7 @@ impl {{ $protocol.SynchronousProxy }} {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::Time) -> Result<{{ $protocol.Event }}, fidl::Error> {
+    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<{{ $protocol.Event }}, fidl::Error> {
         {{ $protocol.Event }}::decode(self.client.wait_for_event(deadline)?)
     }
 
@@ -104,7 +104,7 @@ impl {{ $protocol.SynchronousProxy }} {
         mut {{ .Name }}: {{ .Type }},
         {{- end }}
         {{- if $method.HasResponse }}
-        ___deadline: zx::Time,
+        ___deadline: zx::MonotonicTime,
         {{- end }}
     ) -> Result<{{- or $method.Response.TupleType "()" }}, fidl::Error> {
         {{- if $method.HasResponse }}

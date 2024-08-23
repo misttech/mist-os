@@ -12,6 +12,7 @@ use crate::{
 };
 use bitflags::bitflags;
 use fuchsia_zircon_sys as sys;
+use std::mem::MaybeUninit;
 
 /// An object representing a Zircon
 /// [socket](https://fuchsia.dev/fuchsia-src/concepts/kernel/concepts#message_passing_sockets_and_channels)
@@ -219,6 +220,47 @@ impl Socket {
         ok(status).map(|()| actual)
     }
 
+    /// Like [`Socket::read_uninit_opts`] with default options.
+    pub fn read_uninit<'a>(
+        &self,
+        bytes: &'a mut [MaybeUninit<u8>],
+    ) -> Result<&'a mut [u8], Status> {
+        self.read_uninit_opts(bytes, SocketReadOpts::default())
+    }
+
+    /// Same as [Socket::read_opts], but reads into memory that might not be
+    /// initialized, returning an initialized slice of bytes on success.
+    pub fn read_uninit_opts<'a>(
+        &self,
+        bytes: &'a mut [MaybeUninit<u8>],
+        opts: SocketReadOpts,
+    ) -> Result<&'a mut [u8], Status> {
+        let mut actual = 0;
+        let status = unsafe {
+            sys::zx_socket_read(
+                self.raw_handle(),
+                opts.bits(),
+                // TODO(https://fxbug.dev/42079723) use
+                // MaybeUninit::slice_as_mut_ptr when stable.
+                bytes.as_mut_ptr() as *mut u8,
+                bytes.len(),
+                &mut actual,
+            )
+        };
+        ok(status).map(|()| {
+            // TODO(https://fxbug.dev/42079723) use
+            // MaybeUninit::slice_assume_init_mut when stable.
+            //
+            // SAFETY: We're transforming subslice of &mut [MaybeUninit<u8>] to
+            // &mut [u8], which is only valid to do if `actual` elements of
+            // `bytes` have actually been initialized. Here we have to trust
+            // that the kernel didn't lie when it says it wrote `actual` bytes,
+            // but as long as that assumption is valid them it's safe to assume
+            // this subslice is initialized.
+            unsafe { std::slice::from_raw_parts_mut(bytes.as_mut_ptr() as *mut u8, actual) }
+        })
+    }
+
     /// Close half of the socket, so attempts by the other side to write will fail.
     ///
     /// Implements the `ZX_SOCKET_DISPOSITION_WRITE_DISABLED` option of
@@ -270,6 +312,8 @@ unsafe_handle_properties!(object: Socket,
 
 #[cfg(test)]
 mod tests {
+    use std::mem::MaybeUninit;
+
     use super::*;
 
     fn socket_basic_helper(opts: SocketOpts) {
@@ -359,5 +403,15 @@ mod tests {
         assert_eq!(s1.set_disposition(None, None), Ok(()));
         assert_eq!(s2.write(PAYLOAD), Ok(PAYLOAD.len()));
         assert_eq!(s1.write(PAYLOAD), Err(Status::BAD_STATE));
+    }
+
+    #[test]
+    fn read_uninit() {
+        let (s1, s2) = Socket::create_stream();
+        let message = b"hello";
+        assert_eq!(s1.write(&message[..]).unwrap(), 5);
+        let mut recv = [MaybeUninit::<u8>::uninit(); 16];
+        let got = s2.read_uninit(&mut recv[..]).unwrap();
+        assert_eq!(got, &message[..]);
     }
 }

@@ -46,7 +46,7 @@ class SocketFactoryL2capIntegrationTest : public TestLoopFixture, public Testing
 
  private:
   std::unique_ptr<socket::SocketFactory<l2cap::Channel>> socket_factory_;
-  pw::async::fuchsia::FuchsiaDispatcher dispatcher_;
+  pw::async_fuchsia::FuchsiaDispatcher dispatcher_;
 
   BT_DISALLOW_COPY_ASSIGN_AND_MOVE(SocketFactoryL2capIntegrationTest);
 };

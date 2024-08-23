@@ -216,6 +216,5 @@ group("tests") {
   deps = [
     "bazel_sdk:tests",
     "scripts:tests",
-    "tests",
   ]
 }

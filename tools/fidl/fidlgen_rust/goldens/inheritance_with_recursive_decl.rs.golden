@@ -91,7 +91,7 @@ impl ChildSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::Time) -> Result<ChildEvent, fidl::Error> {
+    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<ChildEvent, fidl::Error> {
         ChildEvent::decode(self.client.wait_for_event(deadline)?)
     }
 
@@ -459,7 +459,7 @@ impl ParentSynchronousProxy {
 
     /// Waits until an event arrives and returns it. It is safe for other
     /// threads to make concurrent requests while waiting for an event.
-    pub fn wait_for_event(&self, deadline: zx::Time) -> Result<ParentEvent, fidl::Error> {
+    pub fn wait_for_event(&self, deadline: zx::MonotonicTime) -> Result<ParentEvent, fidl::Error> {
         ParentEvent::decode(self.client.wait_for_event(deadline)?)
     }
 

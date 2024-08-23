@@ -69,6 +69,7 @@ async fn run(mut stream: Io1HarnessRequestStream, fixture: &TestFixture) -> Resu
                     supports_link_into: true,
                     supports_append: true,
                     supports_modify_directory: true,
+                    supports_mutable_file: true,
                     supported_attributes: fio::NodeAttributesQuery::PROTOCOLS
                         | fio::NodeAttributesQuery::ABILITIES
                         | fio::NodeAttributesQuery::CONTENT_SIZE

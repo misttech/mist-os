@@ -1,6 +1,14 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
+
+/// This library defines a protocol for test clients to communicate with the metrics recorder,
+/// specifying:
+/// - Metrics type: e.g., temperature, CPU, GPU, network, power.
+/// - Test duration.
+/// - Sampling rate.
+/// - Record processed statistics: minimum, maximum, and average values.
+/// - Statistic processing interval (if applicable).
 @available(added=17)
 library fuchsia.power.metrics;
 

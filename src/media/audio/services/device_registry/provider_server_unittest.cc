@@ -154,17 +154,29 @@ TEST_F(ProviderServerCodecTest, AddThenWatch) {
 TEST_F(ProviderServerCodecTest, WatchThenAdd) {
   auto registry_wrapper = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
-  auto received_callback1 = false, received_callback2 = false;
+
+  auto received_callback_0 = false, received_callback_1 = false, received_callback_2 = false;
   registry_wrapper->client()->WatchDevicesAdded().Then(
-      [&received_callback1](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
-        received_callback1 = true;
+      [&received_callback_0](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        EXPECT_TRUE(result->devices()->empty());
+        received_callback_0 = true;
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback_0);
+
+  registry_wrapper->client()->WatchDevicesAdded().Then(
+      [&received_callback_1](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        received_callback_1 = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
       });
 
   RunLoopUntilIdle();
-  ASSERT_FALSE(received_callback1);
+  ASSERT_FALSE(received_callback_1);
   auto provider = CreateTestProviderServer();
   ASSERT_EQ(ProviderServer::count(), 1u);
   auto fake_driver = CreateFakeCodecOutput();
@@ -175,14 +187,14 @@ TEST_F(ProviderServerCodecTest, WatchThenAdd) {
           .device_type = fad::DeviceType::kCodec,
           .driver_client = fad::DriverClient::WithCodec(fake_driver->Enable()),
       }})
-      .Then([&received_callback2](fidl::Result<fad::Provider::AddDevice>& result) {
-        received_callback2 = true;
+      .Then([&received_callback_2](fidl::Result<fad::Provider::AddDevice>& result) {
+        received_callback_2 = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback1);
-  EXPECT_TRUE(received_callback2);
+  EXPECT_TRUE(received_callback_1);
+  EXPECT_TRUE(received_callback_2);
   EXPECT_EQ(adr_service()->devices().size(), 1u);
   EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
@@ -299,17 +311,29 @@ TEST_F(ProviderServerCompositeTest, AddThenWatch) {
 TEST_F(ProviderServerCompositeTest, WatchThenAdd) {
   auto registry_wrapper = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
-  auto received_callback1 = false, received_callback2 = false;
+
+  auto received_callback_0 = false, received_callback_1 = false, received_callback_2 = false;
   registry_wrapper->client()->WatchDevicesAdded().Then(
-      [&received_callback1](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
-        received_callback1 = true;
+      [&received_callback_0](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        EXPECT_TRUE(result->devices()->empty());
+        received_callback_0 = true;
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback_0);
+
+  registry_wrapper->client()->WatchDevicesAdded().Then(
+      [&received_callback_1](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        received_callback_1 = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
       });
 
   RunLoopUntilIdle();
-  ASSERT_FALSE(received_callback1);
+  ASSERT_FALSE(received_callback_1);
   auto provider = CreateTestProviderServer();
   ASSERT_EQ(ProviderServer::count(), 1u);
   auto fake_driver = CreateFakeComposite();
@@ -320,14 +344,14 @@ TEST_F(ProviderServerCompositeTest, WatchThenAdd) {
           .device_type = fad::DeviceType::kComposite,
           .driver_client = fad::DriverClient::WithComposite(fake_driver->Enable()),
       }})
-      .Then([&received_callback2](fidl::Result<fad::Provider::AddDevice>& result) {
-        received_callback2 = true;
+      .Then([&received_callback_2](fidl::Result<fad::Provider::AddDevice>& result) {
+        received_callback_2 = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback1);
-  EXPECT_TRUE(received_callback2);
+  EXPECT_TRUE(received_callback_1);
+  EXPECT_TRUE(received_callback_2);
   EXPECT_EQ(adr_service()->devices().size(), 1u);
   EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();
@@ -444,17 +468,29 @@ TEST_F(ProviderServerStreamConfigTest, AddThenWatch) {
 TEST_F(ProviderServerStreamConfigTest, WatchThenAdd) {
   auto registry_wrapper = CreateTestRegistryServer();
   ASSERT_EQ(RegistryServer::count(), 1u);
-  auto received_callback1 = false, received_callback2 = false;
+
+  auto received_callback_0 = false, received_callback_1 = false, received_callback_2 = false;
   registry_wrapper->client()->WatchDevicesAdded().Then(
-      [&received_callback1](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
-        received_callback1 = true;
+      [&received_callback_0](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        ASSERT_TRUE(result.is_ok()) << result.error_value();
+        ASSERT_TRUE(result->devices());
+        EXPECT_TRUE(result->devices()->empty());
+        received_callback_0 = true;
+      });
+
+  RunLoopUntilIdle();
+  ASSERT_TRUE(received_callback_0);
+
+  registry_wrapper->client()->WatchDevicesAdded().Then(
+      [&received_callback_1](fidl::Result<fad::Registry::WatchDevicesAdded>& result) mutable {
+        received_callback_1 = true;
         ASSERT_TRUE(result.is_ok()) << result.error_value();
         ASSERT_TRUE(result->devices());
         ASSERT_EQ(result->devices()->size(), 1u);
       });
 
   RunLoopUntilIdle();
-  ASSERT_FALSE(received_callback1);
+  ASSERT_FALSE(received_callback_1);
   auto provider = CreateTestProviderServer();
   ASSERT_EQ(ProviderServer::count(), 1u);
   auto fake_driver = CreateFakeStreamConfigOutput();
@@ -465,14 +501,14 @@ TEST_F(ProviderServerStreamConfigTest, WatchThenAdd) {
           .device_type = fad::DeviceType::kOutput,
           .driver_client = fad::DriverClient::WithStreamConfig(fake_driver->Enable()),
       }})
-      .Then([&received_callback2](fidl::Result<fad::Provider::AddDevice>& result) {
-        received_callback2 = true;
+      .Then([&received_callback_2](fidl::Result<fad::Provider::AddDevice>& result) {
+        received_callback_2 = true;
         EXPECT_TRUE(result.is_ok()) << result.error_value();
       });
 
   RunLoopUntilIdle();
-  EXPECT_TRUE(received_callback1);
-  EXPECT_TRUE(received_callback2);
+  EXPECT_TRUE(received_callback_1);
+  EXPECT_TRUE(received_callback_2);
   EXPECT_EQ(adr_service()->devices().size(), 1u);
   EXPECT_EQ(adr_service()->unhealthy_devices().size(), 0u);
   EXPECT_FALSE(provider_fidl_error_status().has_value()) << *provider_fidl_error_status();

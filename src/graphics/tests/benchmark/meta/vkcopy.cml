@@ -3,8 +3,8 @@
 // found in the LICENSE file.
 {
     include: [
-        "//src/graphics/tests/common/meta/vulkan.offer.shard.cml",
         "syslog/client.shard.cml",
+        "vulkan/offer.shard.cml",
     ],
     children: [
         {

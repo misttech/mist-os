@@ -11,7 +11,4 @@ use serde::{Deserialize, Serialize};
 pub struct InputGroupsConfig {
     #[serde(default)]
     pub group1: bool,
-
-    #[serde(default)]
-    pub group2: bool,
 }

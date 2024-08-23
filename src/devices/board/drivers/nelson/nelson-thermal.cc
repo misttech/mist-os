@@ -54,7 +54,7 @@ static const std::vector<fpbus::Mmio> thermal_mmios{
 static const std::vector<fpbus::Irq> thermal_irqs{
     {{
         .irq = S905D3_TS_PLL_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
 };
 
@@ -283,7 +283,7 @@ static const fpbus::Node thermal_dev = []() {
 zx_status_t Nelson::ThermalInit() {
   // Configure the GPIO to be Output & set it to alternate
   // function 3 which puts in PWM_D mode.
-  gpio_init_steps_.push_back(GpioConfigOut(S905D3_PWM_D_PIN, 0));
+  gpio_init_steps_.push_back(GpioOutput(S905D3_PWM_D_PIN, false));
 
   gpio_init_steps_.push_back(GpioFunction(S905D3_PWM_D_PIN, S905D3_PWM_D_FN));
 

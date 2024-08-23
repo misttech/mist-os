@@ -43,7 +43,7 @@ class AdapterTestFixture : public bt::testing::TestLoopFixture,
   bt::l2cap::testing::FakeL2cap* l2cap() const { return l2cap_; }
 
  private:
-  pw::async::fuchsia::FuchsiaDispatcher pw_dispatcher_;
+  pw::async_fuchsia::FuchsiaDispatcher pw_dispatcher_;
   std::unique_ptr<bt::gap::Adapter> adapter_;
   bt::l2cap::testing::FakeL2cap* l2cap_;
   std::unique_ptr<bt::gatt::testing::FakeLayer> gatt_;

@@ -4,7 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use crate::util;
-use anyhow::bail;
+use anyhow::{bail, ensure};
 use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::connectivity_config::{
     NetstackVersion, NetworkingConfig, PlatformConnectivityConfig, WlanPolicyLayer,
@@ -319,6 +319,14 @@ impl DefineSubsystemConfiguration<PlatformConnectivityConfig> for ConnectivitySu
         } else {
             builder
                 .set_config_capability("fuchsia.network.PrimaryInterface", Config::new_void())?;
+        }
+
+        if connectivity_config.location.enable_emergency_location_provider {
+            ensure!(
+                *context.feature_set_level == FeatureSupportLevel::Standard,
+                "Location services can only be enabled in the 'standard' feature set level."
+            );
+            builder.platform_bundle("location_emergency");
         }
 
         Ok(())

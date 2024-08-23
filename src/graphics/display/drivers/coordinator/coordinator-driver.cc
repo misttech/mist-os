@@ -54,6 +54,7 @@ zx::result<> CoordinatorDriver::Start() {
   }
 
   controller_ = std::move(create_controller_result).value();
+  InitInspectorExactlyOnce(controller_->inspector());
 
   // Create a node for devfs.
   zx::result<fidl::ClientEnd<fuchsia_device_fs::Connector>> bind_devfs_connector_result =

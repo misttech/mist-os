@@ -8,8 +8,6 @@
 #include <fidl/fuchsia.hardware.display/cpp/wire.h>
 #include <fuchsia/hardware/audiotypes/c/banjo.h>
 #include <fuchsia/hardware/display/controller/cpp/banjo.h>
-#include <lib/async-loop/cpp/loop.h>
-#include <lib/async-loop/default.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/fit/function.h>
 #include <lib/inspect/cpp/inspect.h>
@@ -166,16 +164,16 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
 
   // Typically called by OpenController/OpenVirtconController.  However, this is made public
   // for use by testing services which provide a fake display controller.
-  zx_status_t CreateClient(ClientPriority client_priority,
-                           fidl::ServerEnd<fuchsia_hardware_display::Coordinator> client,
-                           fit::function<void()> on_client_disconnected);
+  zx_status_t CreateClient(
+      ClientPriority client_priority,
+      fidl::ServerEnd<fuchsia_hardware_display::Coordinator> coordinator_server_end,
+      fidl::ClientEnd<fuchsia_hardware_display::CoordinatorListener>
+          coordinator_listener_client_end,
+      fit::function<void()> on_client_disconnected);
 
   display::DriverBufferCollectionId GetNextDriverBufferCollectionId();
 
-  void OpenCoordinatorForVirtcon(OpenCoordinatorForVirtconRequestView request,
-                                 OpenCoordinatorForVirtconCompleter::Sync& completer) override;
-  void OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequestView request,
-                                 OpenCoordinatorForPrimaryCompleter::Sync& completer) override;
+  // `fidl::WireServer<fuchsia_hardware_display::Provider>`:
   void OpenCoordinatorWithListenerForVirtcon(
       OpenCoordinatorWithListenerForVirtconRequestView request,
       OpenCoordinatorWithListenerForVirtconCompleter::Sync& completer) override;
@@ -199,6 +197,8 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
   inspect::Inspector inspector_;
   // Currently located at bootstrap/driver_manager:root/display.
   inspect::Node root_;
+
+  fdf::UnownedSynchronizedDispatcher client_dispatcher_;
 
   VsyncMonitor vsync_monitor_;
 
@@ -230,8 +230,6 @@ class Controller : public ddk::DisplayEngineListenerProtocol<Controller>,
 
   fuchsia_hardware_display::wire::VirtconMode virtcon_mode_ __TA_GUARDED(mtx()) =
       fuchsia_hardware_display::wire::VirtconMode::kInactive;
-
-  fdf::UnownedSynchronizedDispatcher client_dispatcher_;
 
   std::unique_ptr<EngineDriverClient> engine_driver_client_;
 

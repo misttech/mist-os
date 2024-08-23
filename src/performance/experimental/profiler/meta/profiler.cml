@@ -10,7 +10,10 @@
     },
     capabilities: [
         {
-            protocol: [ "fuchsia.cpu.profiler.Session" ],
+            protocol: [
+                "fuchsia.cpu.profiler.Session",
+                "fuchsia.profiling.Controller",
+            ],
         },
     ],
     use: [

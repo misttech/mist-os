@@ -79,14 +79,6 @@ pub async fn handle_fullmac_startup(
     fullmac_bridge_stream: &mut fidl_fullmac::WlanFullmacImpl_RequestStream,
     config: &config::FullmacDriverConfig,
 ) -> (fidl_fullmac::WlanFullmacImplIfcProxy, fidl_sme::GenericSmeProxy) {
-    assert_variant!(fullmac_bridge_stream.next().await,
-        Some(Ok(fidl_fullmac::WlanFullmacImpl_Request::QueryMacSublayerSupport { responder })) => {
-            responder
-                .send(Ok(&config.mac_sublayer_support))
-                .expect("Failed to respond to QueryMacSublayerSupport");
-        }
-    );
-
     let (usme_bootstrap_proxy, usme_bootstrap_server) =
         create_proxy::<fidl_sme::UsmeBootstrapMarker>()
             .expect("Could not craete usme_bootstrap proxy");

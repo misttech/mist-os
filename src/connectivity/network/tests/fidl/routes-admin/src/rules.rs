@@ -26,6 +26,7 @@ fn rule_set_err_stream<I: FidlRuleAdminIpExt>(
     #[generic_over_ip(I, Ip)]
     struct In<I: FidlRuleAdminIpExt>(<I::RuleSetMarker as ProtocolMarker>::Proxy);
 
+    #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
     let IpInvariant(err_stream) = net_types::map_ip_twice!(I, In(rule_set), |In(rule_set)| {
         IpInvariant(
             rule_set

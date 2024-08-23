@@ -89,6 +89,7 @@
                 "fuchsia.net.root.RoutesV4",
                 "fuchsia.net.root.RoutesV6",
                 "fuchsia.net.routes.admin.RouteTableV4",
+                "fuchsia.net.routes.admin.RouteTableV6",
                 "fuchsia.net.routes.State",
                 "fuchsia.net.routes.StateV4",
                 "fuchsia.net.routes.StateV6",

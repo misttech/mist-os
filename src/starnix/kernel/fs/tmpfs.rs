@@ -8,7 +8,7 @@ use crate::vfs::directory_file::MemoryDirectoryFile;
 use crate::vfs::{
     fs_args, fs_node_impl_not_dir, fs_node_impl_xattr_delegate, CacheMode, FileOps, FileSystem,
     FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo,
-    FsNodeOps, FsStr, MemoryFileNode, MemoryXattrStorage, SymlinkNode,
+    FsNodeOps, FsStr, MemoryFileNode, MemoryXattrStorage, SymlinkNode, XattrStorage as _,
 };
 use starnix_logging::{log_warn, track_stub};
 use starnix_sync::{FileOpsCore, Locked, Mutex, MutexGuard};

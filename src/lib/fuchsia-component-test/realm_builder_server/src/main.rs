@@ -1555,7 +1555,12 @@ fn get_offer_availability(availability: &Option<fcdecl::Availability>) -> cm_rus
     match availability {
         Some(fcdecl::Availability::Optional) => cm_rust::Availability::Optional,
         Some(fcdecl::Availability::SameAsTarget) => cm_rust::Availability::SameAsTarget,
-        _ => cm_rust::Availability::Required,
+        Some(fcdecl::Availability::Required) => cm_rust::Availability::Required,
+        Some(fcdecl::Availability::Transitional) => cm_rust::Availability::Transitional,
+        None => {
+            // Required is the default.
+            cm_rust::Availability::Required
+        }
     }
 }
 
@@ -1634,6 +1639,8 @@ fn create_offer_decl(
                 source_instance_filter: None,
                 renamed_instances: None,
                 availability,
+                #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                dependency_type: Default::default(),
             })
         }
         ftest::Capability::EventStream(event_stream) => {
@@ -1660,6 +1667,8 @@ fn create_offer_decl(
                 target,
                 target_name: try_into_target_name(&config.name, &config.as_)?,
                 availability,
+                #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                source_dictionary: ".".parse().unwrap(),
             })
         }
         #[cfg(fuchsia_api_level_at_least = "HEAD")]

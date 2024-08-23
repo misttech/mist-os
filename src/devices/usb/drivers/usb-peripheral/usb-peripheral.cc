@@ -430,6 +430,7 @@ zx_status_t UsbPeripheral::SetInterfaceOnParent() {
     zxlogf(DEBUG, "(framework) SetInterface(): %s", result.status_string());
   } else if (result->is_error() && result->error_value() == ZX_ERR_NOT_SUPPORTED) {
     zxlogf(DEBUG, "SetInterface(): %s", result.status_string());
+    dci_new_valid_ = false;
   } else if (result->is_error() && result->error_value() != ZX_ERR_NOT_SUPPORTED) {
     return result->error_value();
   } else {

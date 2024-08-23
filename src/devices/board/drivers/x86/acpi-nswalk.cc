@@ -65,8 +65,7 @@ acpi::status<UniquePtr<ACPI_DEVICE_INFO>> GetObjectInfo(ACPI_HANDLE obj) {
 
 }  // namespace acpi
 
-zx_status_t acpi_suspend(zx_device_t* device, uint8_t requested_state, bool enable_wake,
-                         uint8_t suspend_reason, uint8_t* out_state) {
+zx_status_t acpi_suspend(zx_device_t* device, bool enable_wake, uint8_t suspend_reason) {
   switch (suspend_reason & DEVICE_MASK_SUSPEND_REASON) {
     case DEVICE_SUSPEND_REASON_MEXEC: {
       AcpiTerminate();

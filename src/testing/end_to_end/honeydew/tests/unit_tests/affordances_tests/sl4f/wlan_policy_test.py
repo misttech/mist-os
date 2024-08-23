@@ -10,6 +10,7 @@ from unittest import mock
 
 from parameterized import param, parameterized
 
+from honeydew import errors
 from honeydew.affordances.sl4f.wlan import wlan_policy as sl4f_wlan_policy
 from honeydew.transports import sl4f as sl4f_transport
 from honeydew.typing.wlan import (
@@ -86,11 +87,27 @@ class WlanPolicySL4FTests(unittest.TestCase):
 
         self.sl4f_obj.run.assert_called()
 
+    def test_connect_failure_raise_honeydew_wlan_error(self) -> None:
+        """Test for WlanPolicy.connect()."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.HoneydewWlanError):
+            self.wlan_obj.connect(
+                target_ssid="test", security_type=SecurityType.NONE
+            )
+        self.sl4f_obj.run.assert_called()
+
     def test_create_client_controller(self) -> None:
         """Test for WlanPolicy.create_client_controller()."""
-
         self.wlan_obj.create_client_controller()
+        self.sl4f_obj.run.assert_called()
 
+    def test_create_client_controller_failure_raise_honeydew_wlan_error(
+        self,
+    ) -> None:
+        """Test for WlanPolicy.create_client_controller()."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.HoneydewWlanError):
+            self.wlan_obj.create_client_controller()
         self.sl4f_obj.run.assert_called()
 
     @parameterized.expand(
@@ -184,6 +201,15 @@ class WlanPolicySL4FTests(unittest.TestCase):
                 parameterized_dict["expected_value"],
             )
 
+        self.sl4f_obj.run.assert_called()
+
+    def test_get_saved_networks_failure_raise_honeydew_wlan_error(
+        self,
+    ) -> None:
+        """Test for WlanPolicy.get_saved_networks()."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.HoneydewWlanError):
+            self.wlan_obj.get_saved_networks()
         self.sl4f_obj.run.assert_called()
 
     @parameterized.expand(
@@ -306,29 +332,61 @@ class WlanPolicySL4FTests(unittest.TestCase):
 
         self.sl4f_obj.run.assert_called()
 
+    def test_get_update_failure_raise_honeydew_wlan_error(
+        self,
+    ) -> None:
+        """Test for WlanPolicy.get_update()."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.HoneydewWlanError):
+            self.wlan_obj.get_update()
+        self.sl4f_obj.run.assert_called()
+
     def test_remove_all_networks(self) -> None:
         """Test for WlanPolicy.remove_all_networks()."""
-
         self.wlan_obj.remove_all_networks()
+        self.sl4f_obj.run.assert_called()
 
+    def test_remove_all_networks_failure_raise_honeydew_wlan_error(
+        self,
+    ) -> None:
+        """Test for WlanPolicy.remove_all_networks()."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.HoneydewWlanError):
+            self.wlan_obj.remove_all_networks()
         self.sl4f_obj.run.assert_called()
 
     def test_remove_network(self) -> None:
         """Test for WlanPolicy.remove_network()."""
-
         self.wlan_obj.remove_network(
             target_ssid="test", security_type=SecurityType.NONE
         )
+        self.sl4f_obj.run.assert_called()
 
+    def test_remove_network_failure_raise_honeydew_wlan_error(
+        self,
+    ) -> None:
+        """Test for WlanPolicy.remove_network()."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.HoneydewWlanError):
+            self.wlan_obj.remove_network(
+                target_ssid="test", security_type=SecurityType.NONE
+            )
         self.sl4f_obj.run.assert_called()
 
     def test_save_network(self) -> None:
         """Test for WlanPolicy.save_network()."""
-
         self.wlan_obj.save_network(
             target_ssid="test", security_type=SecurityType.NONE
         )
+        self.sl4f_obj.run.assert_called()
 
+    def test_save_network_failure_raise_honeydew_wlan_error(self) -> None:
+        """Test for WlanPolicy.save_network()."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.HoneydewWlanError):
+            self.wlan_obj.save_network(
+                target_ssid="test", security_type=SecurityType.NONE
+            )
         self.sl4f_obj.run.assert_called()
 
     @parameterized.expand(
@@ -368,25 +426,53 @@ class WlanPolicySL4FTests(unittest.TestCase):
 
         self.sl4f_obj.run.assert_called()
 
-    def test_set_new_update_listener(self) -> None:
+    def test_scan_for_networks_failure_raise_honeydew_wlan_error(self) -> None:
+        """Test for WlanPolicy.scan_for_networks()."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.HoneydewWlanError):
+            self.wlan_obj.scan_for_networks()
+        self.sl4f_obj.run.assert_called()
+
+    def test_set_new_update_listener_(self) -> None:
         """Test for WlanPolicy.set_new_update_listener()."""
-
         self.wlan_obj.set_new_update_listener()
+        self.sl4f_obj.run.assert_called()
 
+    def test_set_new_update_listener_failure_raise_honeydew_wlan_error(
+        self,
+    ) -> None:
+        """Test for WlanPolicy.set_new_update_listener()."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.HoneydewWlanError):
+            self.wlan_obj.set_new_update_listener()
         self.sl4f_obj.run.assert_called()
 
     def test_start_client_connections(self) -> None:
         """Test for WlanPolicy.start_client_connections()."""
-
         self.wlan_obj.start_client_connections()
+        self.sl4f_obj.run.assert_called()
 
+    def test_start_client_connections_failure_raise_honeydew_wlan_error(
+        self,
+    ) -> None:
+        """Test for WlanPolicy.start_client_connections()."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.HoneydewWlanError):
+            self.wlan_obj.start_client_connections()
         self.sl4f_obj.run.assert_called()
 
     def test_stop_client_connections(self) -> None:
         """Test for WlanPolicy.stop_client_connections()."""
-
         self.wlan_obj.stop_client_connections()
+        self.sl4f_obj.run.assert_called()
 
+    def test_stop_client_connections_failure_raise_honeydew_wlan_error(
+        self,
+    ) -> None:
+        """Test for WlanPolicy.stop_client_connections()."""
+        self.sl4f_obj.run.side_effect = errors.Sl4fError("fail")
+        with self.assertRaises(errors.HoneydewWlanError):
+            self.wlan_obj.stop_client_connections()
         self.sl4f_obj.run.assert_called()
 
 

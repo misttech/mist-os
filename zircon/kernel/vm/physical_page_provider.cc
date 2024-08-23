@@ -224,9 +224,6 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event) {
           DEBUG_ASSERT(vmo_backlink.cow);
           auto& cow_container = vmo_backlink.cow;
 
-          // We stack-own loaned pages from RemovePageForEviction() to pmm_free_page().  This
-          // interval is for the benefit of asserts in vm_page_t, not for any functional purpose.
-          __UNINITIALIZED StackOwnedLoanedPagesInterval raii_interval;
           DEBUG_ASSERT(!page->object.always_need);
           bool needs_evict = true;
 
@@ -243,15 +240,13 @@ zx_status_t PhysicalPageProvider::WaitOnEvent(Event* event) {
           }
 
           if (needs_evict) {
-            bool evict_result = cow_container->RemovePageForEviction(page, vmo_backlink.offset);
+            bool evict_result = cow_container->ReclaimPageForEviction(page, vmo_backlink.offset);
             if (!evict_result) {
               // We must have raced and this page has already become free, or is currently in a
               // stack ownership somewhere else on the way to becoming free. For the second case we
               // wait until it's not stack owned, ensuring that the only possible state is that the
               // page is FREE_LOANED.
               StackOwnedLoanedPagesInterval::WaitUntilContiguousPageNotStackOwned(page);
-            } else {
-              pmm_free_page(page);
             }
           }
           // Either this thread made it FREE_LOANED, or this thread waited for it to be FREE_LOANED.

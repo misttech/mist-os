@@ -4,13 +4,13 @@
 
 #include "src/ui/scenic/lib/allocation/allocator.h"
 
+#include <fidl/fuchsia.ui.composition/cpp/fidl.h>
+#include <fidl/fuchsia.ui.composition/cpp/hlcpp_conversion.h>
 #include <lib/sys/cpp/testing/component_context_provider.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <gtest/gtest.h>
 
-#include "fuchsia/math/cpp/fidl.h"
-#include "fuchsia/ui/composition/cpp/fidl.h"
 #include "src/lib/fsl/handles/object_info.h"
 #include "src/lib/testing/loop_fixture/test_loop_fixture.h"
 #include "src/ui/scenic/lib/allocation/buffer_collection_import_export_tokens.h"
@@ -21,12 +21,11 @@ using ::testing::_;
 using ::testing::Return;
 
 using allocation::BufferCollectionUsage;
-using fuchsia::ui::composition::Allocator_RegisterBufferCollection_Result;
-using fuchsia::ui::composition::BufferCollectionExportToken;
-using fuchsia::ui::composition::BufferCollectionImportToken;
-using fuchsia::ui::composition::RegisterBufferCollectionArgs;
-using fuchsia::ui::composition::RegisterBufferCollectionUsage;
-using fuchsia::ui::composition::RegisterBufferCollectionUsages;
+using fuchsia_ui_composition::BufferCollectionExportToken;
+using fuchsia_ui_composition::BufferCollectionImportToken;
+using fuchsia_ui_composition::RegisterBufferCollectionArgs;
+using fuchsia_ui_composition::RegisterBufferCollectionUsage;
+using fuchsia_ui_composition::RegisterBufferCollectionUsages;
 
 namespace allocation {
 namespace test {
@@ -41,12 +40,11 @@ namespace test {
                BufferCollectionUsage, std::optional<fuchsia::math::SizeU>) { return true; })); \
   }                                                                                            \
   bool processed_callback = false;                                                             \
-  allocator->RegisterBufferCollection(                                                         \
-      CreateArgs(std::move(export_token), token, usage),                                       \
-      [&processed_callback](Allocator_RegisterBufferCollection_Result result) {                \
-        EXPECT_EQ(!expect_success, result.is_err());                                           \
-        processed_callback = true;                                                             \
-      });                                                                                      \
+  allocator->RegisterBufferCollection(CreateArgs(std::move(export_token), token, usage),       \
+                                      [&processed_callback](auto result) {                     \
+                                        EXPECT_EQ(expect_success, result.is_ok());             \
+                                        processed_callback = true;                             \
+                                      });                                                      \
   EXPECT_TRUE(processed_callback);
 
 RegisterBufferCollectionArgs CreateArgs(
@@ -54,12 +52,10 @@ RegisterBufferCollectionArgs CreateArgs(
     fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> buffer_collection_token,
     RegisterBufferCollectionUsage usage) {
   RegisterBufferCollectionArgs args;
-
-  args.set_export_token(std::move(export_token));
-  args.set_buffer_collection_token(fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(
+  args.export_token(fidl::HLCPPToNatural(std::move(export_token)));
+  args.buffer_collection_token(fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(
       buffer_collection_token.TakeChannel()));
-  args.set_usage(usage);
-
+  args.usage(usage);
   return args;
 }
 
@@ -85,7 +81,7 @@ class AllocatorTest : public gtest::TestLoopFixture {
     std::vector<std::shared_ptr<BufferCollectionImporter>> default_importers;
     std::vector<std::shared_ptr<BufferCollectionImporter>> screenshot_importers;
 
-    bool use_default_importer = (usage == RegisterBufferCollectionUsage::DEFAULT) ? true : false;
+    bool use_default_importer = (usage == RegisterBufferCollectionUsage::kDefault) ? true : false;
 
     if (use_default_importer)
       default_importers.push_back(buffer_collection_importer_);
@@ -95,6 +91,12 @@ class AllocatorTest : public gtest::TestLoopFixture {
     return std::make_shared<Allocator>(context_provider_.context(), default_importers,
                                        screenshot_importers,
                                        utils::CreateSysmemAllocatorSyncPtr("CreateAllocator"));
+  }
+
+  fidl::ClientEnd<fuchsia_ui_composition::Allocator> ConnectToAllocator() {
+    auto [client_end, server_end] = fidl::Endpoints<fuchsia_ui_composition::Allocator>::Create();
+    context_provider_.ConnectToPublicService(fidl::NaturalToHLCPP(std::move(server_end)));
+    return std::move(client_end);
   }
 
   fidl::InterfaceHandle<fuchsia::sysmem2::BufferCollectionToken> CreateToken() {
@@ -125,48 +127,46 @@ class AllocatorTestParameterized
       public testing::WithParamInterface<RegisterBufferCollectionUsage> {};
 
 INSTANTIATE_TEST_SUITE_P(, AllocatorTestParameterized,
-                         testing::Values(RegisterBufferCollectionUsage::DEFAULT,
-                                         RegisterBufferCollectionUsage::SCREENSHOT));
+                         testing::Values(RegisterBufferCollectionUsage::kDefault,
+                                         RegisterBufferCollectionUsage::kScreenshot));
 
 TEST_P(AllocatorTestParameterized, CreateAndDestroyAllocatorChannel) {
   const auto usage = GetParam();
   std::shared_ptr<Allocator> allocator = CreateAllocator(usage);
-  fuchsia::ui::composition::AllocatorPtr allocator_ptr;
-  context_provider_.ConnectToPublicService(allocator_ptr.NewRequest());
+  auto sync_client = fidl::SyncClient<fuchsia_ui_composition::Allocator>(ConnectToAllocator());
   RunLoopUntilIdle();
 
-  allocator_ptr.Unbind();
+  sync_client.TakeClientEnd().reset();
 }
 
 TEST_P(AllocatorTestParameterized, CreateAndDestroyMultipleAllocatorChannels) {
   const auto usage = GetParam();
   std::shared_ptr<Allocator> allocator = CreateAllocator(usage);
-  fuchsia::ui::composition::AllocatorPtr allocator_ptr1;
-  context_provider_.ConnectToPublicService(allocator_ptr1.NewRequest());
-  fuchsia::ui::composition::AllocatorPtr allocator_ptr2;
-  context_provider_.ConnectToPublicService(allocator_ptr2.NewRequest());
+  auto sync_client1 = fidl::SyncClient<fuchsia_ui_composition::Allocator>(ConnectToAllocator());
+  auto sync_client2 = fidl::SyncClient<fuchsia_ui_composition::Allocator>(ConnectToAllocator());
   RunLoopUntilIdle();
 
-  allocator_ptr1.Unbind();
-  allocator_ptr2.Unbind();
+  sync_client1.TakeClientEnd().reset();
+  sync_client2.TakeClientEnd().reset();
 }
 
 TEST_P(AllocatorTestParameterized, RegisterBufferCollectionThroughAllocatorChannel) {
   const auto usage = GetParam();
   std::shared_ptr<Allocator> allocator = CreateAllocator(usage);
 
-  fuchsia::ui::composition::AllocatorPtr allocator_ptr;
-  context_provider_.ConnectToPublicService(allocator_ptr.NewRequest());
+  auto allocator_ptr = fidl::Client<fuchsia_ui_composition::Allocator>(ConnectToAllocator(),
+                                                                       test_loop().dispatcher());
 
   bool processed_callback = false;
   BufferCollectionImportExportTokens ref_pair = BufferCollectionImportExportTokens::New();
   const auto koid = fsl::GetKoid(ref_pair.export_token.value.get());
   EXPECT_CALL(*mock_buffer_collection_importer_, ImportBufferCollection(koid, _, _, _, _))
       .WillOnce(Return(true));
-  allocator_ptr->RegisterBufferCollection(
-      CreateArgs(std::move(ref_pair.export_token), CreateToken(), usage),
-      [&processed_callback](Allocator_RegisterBufferCollection_Result result) {
-        EXPECT_FALSE(result.is_err());
+  fuchsia_ui_composition::AllocatorRegisterBufferCollectionRequest register_request;
+  register_request.args(CreateArgs(std::move(ref_pair.export_token), CreateToken(), usage));
+  allocator_ptr->RegisterBufferCollection(std::move(register_request))
+      .ThenExactlyOnce([&processed_callback](auto result) {
+        EXPECT_TRUE(result.is_ok());
         processed_callback = true;
       });
   RunLoopUntilIdle();
@@ -176,7 +176,7 @@ TEST_P(AllocatorTestParameterized, RegisterBufferCollectionThroughAllocatorChann
   // BufferCollectionImportToken.
   {
     EXPECT_CALL(*mock_buffer_collection_importer_, ReleaseBufferCollection(koid, _)).Times(0);
-    allocator_ptr.Unbind();
+    allocator_ptr.UnbindMaybeGetEndpoint()->reset();
   }
   // Destruction of Allocator instance triggers ReleaseBufferCollection.
   {
@@ -190,11 +190,10 @@ TEST_P(AllocatorTestParameterized, RegisterBufferCollectionThroughMultipleAlloca
   std::shared_ptr<Allocator> allocator = CreateAllocator(usage);
 
   const int kNumAllocators = 3;
-  std::vector<fuchsia::ui::composition::AllocatorPtr> allocator_ptrs;
+  std::vector<fidl::Client<fuchsia_ui_composition::Allocator>> allocator_ptrs;
   for (int i = 0; i < kNumAllocators; ++i) {
-    fuchsia::ui::composition::AllocatorPtr allocator_ptr;
-    context_provider_.ConnectToPublicService(allocator_ptr.NewRequest());
-    allocator_ptrs.push_back(std::move(allocator_ptr));
+    allocator_ptrs.push_back(fidl::Client<fuchsia_ui_composition::Allocator>(
+        ConnectToAllocator(), test_loop().dispatcher()));
   }
 
   for (auto& allocator_ptr : allocator_ptrs) {
@@ -203,10 +202,11 @@ TEST_P(AllocatorTestParameterized, RegisterBufferCollectionThroughMultipleAlloca
     const auto koid = fsl::GetKoid(ref_pair.export_token.value.get());
     EXPECT_CALL(*mock_buffer_collection_importer_, ImportBufferCollection(koid, _, _, _, _))
         .WillOnce(Return(true));
-    allocator_ptr->RegisterBufferCollection(
-        CreateArgs(std::move(ref_pair.export_token), CreateToken(), usage),
-        [&processed_callback](Allocator_RegisterBufferCollection_Result result) {
-          EXPECT_FALSE(result.is_err());
+    fuchsia_ui_composition::AllocatorRegisterBufferCollectionRequest register_request;
+    register_request.args(CreateArgs(std::move(ref_pair.export_token), CreateToken(), usage));
+    allocator_ptr->RegisterBufferCollection(std::move(register_request))
+        .ThenExactlyOnce([&processed_callback](auto result) {
+          EXPECT_TRUE(result.is_ok());
           processed_callback = true;
         });
     RunLoopUntilIdle();
@@ -286,7 +286,7 @@ TEST_P(AllocatorTestParameterized, RegisterBufferCollectionErrorCases) {
 // buffer collection from importer A.
 TEST_P(AllocatorTestParameterized, BufferCollectionImportPassesAndFailsOnDifferentImportersTest) {
   const auto usage = GetParam();
-  bool use_default_importer = (usage == RegisterBufferCollectionUsage::DEFAULT) ? true : false;
+  bool use_default_importer = (usage == RegisterBufferCollectionUsage::kDefault) ? true : false;
 
   // Create a second buffer collection importer.
   auto local_mock_buffer_collection_importer = new MockBufferCollectionImporter();
@@ -441,13 +441,12 @@ TEST_F(AllocatorTest, RegisterDefaultAndScreenshotBufferCollections) {
   EXPECT_CALL(*default_mock_buffer_collection_importer, ImportBufferCollection(koid, _, _, _, _))
       .WillOnce(Return(true));
   bool processed_callback = false;
-  allocator->RegisterBufferCollection(
-      CreateArgs(std::move(ref_pair.export_token), CreateToken(),
-                 RegisterBufferCollectionUsage::DEFAULT),
-      [&processed_callback](Allocator_RegisterBufferCollection_Result result) {
-        EXPECT_FALSE(result.is_err());
-        processed_callback = true;
-      });
+  allocator->RegisterBufferCollection(CreateArgs(std::move(ref_pair.export_token), CreateToken(),
+                                                 RegisterBufferCollectionUsage::kDefault),
+                                      [&processed_callback](auto result) {
+                                        EXPECT_TRUE(result.is_ok());
+                                        processed_callback = true;
+                                      });
   EXPECT_TRUE(processed_callback);
 
   // Register with the screenshot screenshot.
@@ -458,13 +457,12 @@ TEST_F(AllocatorTest, RegisterDefaultAndScreenshotBufferCollections) {
               ImportBufferCollection(koid2, _, _, _, _))
       .WillOnce(Return(true));
   processed_callback = false;
-  allocator->RegisterBufferCollection(
-      CreateArgs(std::move(ref_pair2.export_token), CreateToken(),
-                 RegisterBufferCollectionUsage::SCREENSHOT),
-      [&processed_callback](Allocator_RegisterBufferCollection_Result result) {
-        EXPECT_FALSE(result.is_err());
-        processed_callback = true;
-      });
+  allocator->RegisterBufferCollection(CreateArgs(std::move(ref_pair2.export_token), CreateToken(),
+                                                 RegisterBufferCollectionUsage::kScreenshot),
+                                      [&processed_callback](auto result) {
+                                        EXPECT_TRUE(result.is_ok());
+                                        processed_callback = true;
+                                      });
   EXPECT_TRUE(processed_callback);
 }
 
@@ -498,21 +496,20 @@ TEST_F(AllocatorTest, RegisterBufferCollectionCombined) {
       .WillOnce(Return(true));
 
   RegisterBufferCollectionUsages usages;
-  usages |= RegisterBufferCollectionUsages::DEFAULT;
-  usages |= RegisterBufferCollectionUsages::SCREENSHOT;
+  usages |= RegisterBufferCollectionUsages::kDefault;
+  usages |= RegisterBufferCollectionUsages::kScreenshot;
 
   RegisterBufferCollectionArgs args;
-  args.set_export_token(std::move(ref_pair.export_token));
-  args.set_buffer_collection_token(
-      fidl::InterfaceHandle<fuchsia::sysmem::BufferCollectionToken>(CreateToken().TakeChannel()));
-  args.set_usages(usages);
+  args.export_token(fidl::HLCPPToNatural(std::move(ref_pair.export_token)));
+  args.buffer_collection_token(
+      fidl::ClientEnd<fuchsia_sysmem::BufferCollectionToken>(CreateToken().TakeChannel()));
+  args.usages(usages);
 
   bool processed_callback = false;
-  allocator->RegisterBufferCollection(
-      std::move(args), [&processed_callback](Allocator_RegisterBufferCollection_Result result) {
-        EXPECT_FALSE(result.is_err());
-        processed_callback = true;
-      });
+  allocator->RegisterBufferCollection(std::move(args), [&processed_callback](auto result) {
+    EXPECT_TRUE(result.is_ok());
+    processed_callback = true;
+  });
   EXPECT_TRUE(processed_callback);
 
   // Cleanup.

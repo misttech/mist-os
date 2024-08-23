@@ -342,10 +342,16 @@ pub(crate) struct TestSetup {
 }
 
 impl TestSetup {
-    /// Gets the [`TestStack`] at index `i`.
+    /// Gets a mutable reference to the [`TestStack`] at index `i`.
     #[track_caller]
-    pub(crate) fn get(&mut self, i: usize) -> &mut TestStack {
+    pub(crate) fn get_mut(&mut self, i: usize) -> &mut TestStack {
         &mut self.stacks[i]
+    }
+
+    /// Gets a reference to the [`TestStack`] at index `i`.
+    #[track_caller]
+    pub(crate) fn get(&self, i: usize) -> &TestStack {
+        &self.stacks[i]
     }
 
     pub(crate) async fn get_endpoint(
@@ -625,7 +631,7 @@ impl StackSetupBuilder {
 async fn test_add_device_routes() {
     // create a stack and add a single endpoint to it so we have the interface
     // id:
-    let mut t = TestSetupBuilder::new()
+    let t = TestSetupBuilder::new()
         .add_endpoint()
         .add_stack(StackSetupBuilder::new().add_endpoint(1, None))
         .build()
@@ -734,7 +740,7 @@ async fn test_list_del_routes() {
     // create a stack and add a single endpoint to it so we have the interface
     // id:
     const EP_NAME: &str = "testep";
-    let mut t = TestSetupBuilder::new()
+    let t = TestSetupBuilder::new()
         .add_named_endpoint(EP_NAME)
         .add_stack(StackSetupBuilder::new().add_named_endpoint(EP_NAME, None))
         .build()
@@ -938,7 +944,7 @@ async fn test_ipv6_slaac_secret_stable() {
 
     let (endpoint, port_id) = t.get_endpoint(ENDPOINT).await;
 
-    let test_stack = t.get(0);
+    let test_stack = t.get_mut(0);
     let installer = test_stack.connect_interfaces_installer();
     let (device_control, server_end) = fidl::endpoints::create_proxy().expect("new proxy");
     installer.install_device(endpoint, server_end).expect("install device");
@@ -980,7 +986,7 @@ async fn test_neighbor_table_inspect() {
         .build()
         .await;
 
-    let test_stack = t.get(0);
+    let test_stack = t.get_mut(0);
     let bindings_id = test_stack.get_endpoint_id(EP_IDX);
     test_stack.with_ctx(|ctx| {
         let devices: &Devices<_> = ctx.bindings_ctx().as_ref();
@@ -1057,7 +1063,7 @@ impl IpExt for Ipv6 {
 #[fasync::run_singlethreaded]
 async fn add_remove_neighbor_entry<I: IpExt>() {
     const EP_IDX: usize = 1;
-    let mut t = TestSetupBuilder::new()
+    let t = TestSetupBuilder::new()
         .add_endpoint()
         .add_stack(StackSetupBuilder::new().add_endpoint(EP_IDX, None))
         .build()
@@ -1113,7 +1119,7 @@ async fn add_remove_neighbor_entry<I: IpExt>() {
 #[fasync::run_singlethreaded]
 async fn remove_dynamic_neighbor_entry<I: IpExt>() {
     const EP_IDX: usize = 1;
-    let mut t = TestSetupBuilder::new()
+    let t = TestSetupBuilder::new()
         .add_endpoint()
         .add_stack(StackSetupBuilder::new().add_endpoint(
             EP_IDX,
@@ -1160,7 +1166,7 @@ async fn remove_dynamic_neighbor_entry<I: IpExt>() {
 #[fasync::run_singlethreaded]
 async fn clear_entries<I: IpExt>() {
     const EP_IDX: usize = 1;
-    let mut t = TestSetupBuilder::new()
+    let t = TestSetupBuilder::new()
         .add_endpoint()
         .add_stack(StackSetupBuilder::new().add_endpoint(EP_IDX, None))
         .build()
@@ -1210,7 +1216,7 @@ async fn clear_entries<I: IpExt>() {
 async fn device_strong_ids_delay_clean_shutdown() {
     set_logger_for_test();
     let mut t = TestSetupBuilder::new().add_empty_stack().build().await;
-    let test_stack = t.get(0);
+    let test_stack = t.get_mut(0);
     let loopback_id = test_stack.wait_for_loopback_id().await;
     let loopback_id = test_stack.ctx().bindings_ctx().devices.get_core_id(loopback_id).unwrap();
 

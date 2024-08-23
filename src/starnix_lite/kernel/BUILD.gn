@@ -47,7 +47,6 @@ rustc_binary("starnix_lite_kernel_bin") {
   source_root = "main.rs"
   deps = [
     ":starnix_lite_core",
-    ":starnix_lite_kernel_config",
     ":starnix_lite_kernel_runner",
     "//sdk/fidl/fuchsia.boot:fuchsia.boot_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
@@ -75,8 +74,6 @@ rustc_binary("starnix_lite_kernel_bin") {
   ]
 
   test_deps = [ "//src/lib/fuchsia" ]
-
-  non_rust_deps = [ ":restricted_trampoline" ]
 
   sources = [
     "bootfs.rs",
@@ -118,18 +115,14 @@ rustc_library("starnix_lite_core") {
     "arch/${current_cpu}/syscalls.rs",
     "arch/${current_cpu}/task.rs",
     "arch/mod.rs",
-    "device/device_init.rs",
     "device/device_mapper.rs",
     "device/kobject.rs",
-    "device/loop_device.rs",
     "device/mem.rs",
     "device/mod.rs",
     "device/registry.rs",
     "device/remote_block_device.rs",
-    "device/sync_file.rs",
     "device/terminal.rs",
     "device/tun.rs",
-    "device/zram.rs",
     "dynamic_thread_spawner.rs",
     "execution/crash_reporter.rs",
     "execution/executor.rs",
@@ -141,6 +134,7 @@ rustc_library("starnix_lite_core") {
     "fs/fuchsia/mod.rs",
     "fs/fuchsia/remote.rs",
     "fs/fuchsia/remote_bundle.rs",
+    "fs/fuchsia/sync_file.rs",
     "fs/fuchsia/syslog.rs",
     "fs/fuchsia/timer.rs",
     "fs/fuchsia/zxio.rs",
@@ -193,8 +187,8 @@ rustc_library("starnix_lite_core") {
     "power/wakeup_count.rs",
     "security/hooks.rs",
     "security/mod.rs",
-    "security/selinux_hooks/fs.rs",
     "security/selinux_hooks/mod.rs",
+    "security/selinux_hooks/selinuxfs.rs",
     "security/selinux_hooks/task.rs",
     "security/selinux_hooks/testing.rs",
     "signals/mod.rs",
@@ -226,13 +220,13 @@ rustc_library("starnix_lite_core") {
     "task/syslog.rs",
     "task/task.rs",
     "task/thread_group.rs",
+    "task/timeline.rs",
     "task/timers.rs",
     "task/uts_namespace.rs",
     "task/waiter.rs",
     "testing.rs",
     "time/mod.rs",
     "time/utc.rs",
-    "timer/mod.rs",
     "vfs/aio.rs",
     "vfs/anon_node.rs",
     "vfs/buffers/io_buffers.rs",
@@ -255,6 +249,7 @@ rustc_library("starnix_lite_core") {
     "vfs/fs_args.rs",
     "vfs/fs_context.rs",
     "vfs/fs_node.rs",
+    "vfs/fs_registry.rs",
     "vfs/fsverity.rs",
     "vfs/fuse.rs",
     "vfs/inotify.rs",
@@ -286,6 +281,7 @@ rustc_library("starnix_lite_core") {
     "vfs/stubs.rs",
     "vfs/symlink_node.rs",
     "vfs/syscalls.rs",
+    "vfs/timer.rs",
     "vfs/vec_directory.rs",
     "vfs/wd_number.rs",
     "vfs/xattr.rs",
@@ -338,8 +334,9 @@ rustc_library("starnix_lite_core") {
     "//src/lib/trace/rust:trace",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/performance/memory/attribution/server",
+    "//src/starnix/kernel:restricted_trampoline",
     "//src/starnix/kernel:starnix_logging",
-    "//src/starnix/kernel:starnix_sync",
+    "//src/starnix/lib/expando",
     "//src/starnix/lib/extended_pstate:lib",
     "//src/starnix/lib/filter_methods_macro",
     "//src/starnix/lib/linux_uapi",
@@ -347,6 +344,7 @@ rustc_library("starnix_lite_core") {
     "//src/starnix/lib/selinux",
     "//src/starnix/lib/selinux/core",
     "//src/starnix/lib/starnix-lifecycle",
+    "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-syscalls",
     "//src/starnix/lib/starnix-uapi",
     "//src/starnix/lib/syncio",
@@ -395,6 +393,7 @@ rustc_library("starnix_lite_core") {
     "//third_party/rust_crates:thiserror",
     "//third_party/rust_crates:tracing-mutex",
     "//third_party/rust_crates:utf8parse",
+    "//third_party/rust_crates:uuid",
     "//third_party/rust_crates:zerocopy",
   ]
 
@@ -427,8 +426,8 @@ rustc_library("starnix_lite_core") {
     features += [ "alternate_anon_allocs" ]
   }
   inputs = [
-    "//src/starnix/lib/selinux/testdata/micro_policies/hooks_tests_policy.pp",
-    "//src/starnix/lib/selinux/testdata/composite_policies/compiled/bounded_transition_policy.pp",
+    "//src/starnix_lite/lib/selinux/testdata/micro_policies/hooks_tests_policy.pp",
+    "//src/starnix_lite/lib/selinux/testdata/composite_policies/compiled/bounded_transition_policy.pp",
   ]
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 
@@ -465,7 +464,6 @@ rustc_library("starnix_lite_kernel_runner") {
 
   deps = [
     ":starnix_lite_core",
-    ":starnix_lite_kernel_config",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
     "//sdk/fidl/fuchsia.process:fuchsia.process_rust",
     "//src/lib/diagnostics/inspect/contrib/rust",
@@ -476,9 +474,10 @@ rustc_library("starnix_lite_kernel_runner") {
     "//src/lib/fuchsia-runtime",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/starnix/kernel:starnix_logging",
-    "//src/starnix/kernel:starnix_sync",
     "//src/starnix/lib/selinux/core",
+    "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-uapi",
+    "//src/starnix/modules",
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:bstr",
     "//third_party/rust_crates:futures",
@@ -489,22 +488,7 @@ rustc_library("starnix_lite_kernel_runner") {
   configs += [ "//src/starnix/config:starnix_clippy_lints" ]
 }
 
-static_library("restricted_trampoline") {
-  sources = [ "execution/trampoline_${current_cpu}.S" ]
-}
-
 # Components
-
-# The starnix kernel manifest, used by all containers.
-fuchsia_component_manifest("starnix_lite_kernel_manifest") {
-  manifest = "meta/starnix_lite_kernel.cml"
-  component_name = "starnix_lite_kernel"
-}
-
-# The starnix kernel configuration library, used by the Rust binary to parse configuration.
-fuchsia_structured_config_rust_lib("starnix_lite_kernel_config") {
-  cm_label = ":starnix_lite_kernel_manifest"
-}
 
 # ZBIs
 

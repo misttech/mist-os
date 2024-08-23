@@ -152,7 +152,7 @@ escher::VulkanSwapchain CreateSwapchain(escher::Escher& escher, vk::SurfaceKHR s
 
 }  // namespace
 
-void SystemMonitorRenderer::RenderFrame() {
+void SystemMonitorRenderer::RenderFrame(std::string cpu_string) {
   static uint64_t frame_number = 1;
 
   swapchain_helper_->DrawFrame([&](const escher::ImagePtr& output_image,
@@ -172,9 +172,8 @@ void SystemMonitorRenderer::RenderFrame() {
         {vk::ImageSubresourceRange(vk::ImageAspectFlagBits::eColor, 0, 1, 0, 1)});
 
     std::string system_monitor_string = "SYSTEM MONITOR";
-
     debug_font_->Blit(frame->cmds(), system_monitor_string.c_str(), output_image, {0, 0}, 3);
-
+    debug_font_->Blit(frame->cmds(), cpu_string.c_str(), output_image, {0, 30}, 3);
     frame->cmds()->TransitionImageLayout(output_image, vk::ImageLayout::eTransferDstOptimal,
                                          vk::ImageLayout::ePresentSrcKHR);
 
@@ -242,8 +241,7 @@ void SystemMonitorRenderer::Initialize() {
     auto result = escher_->vk_device().waitIdle();
     FX_CHECK(result == vk::Result::eSuccess);
   }
-
-  RenderFrame();
+  RenderFrame("READY");
 }
 
 }  // namespace system_monitor

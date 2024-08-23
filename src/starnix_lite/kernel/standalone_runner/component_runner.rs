@@ -106,7 +106,7 @@ impl MountRecord {
             };
         }
 
-        let (status, rights) = directory.get_flags(zx::Time::INFINITE)?;
+        let (status, rights) = directory.get_flags(zx::MonotonicTime::INFINITE)?;
         zx::Status::ok(status)?;
 
         let (client_end, server_end) = zx::Channel::create();

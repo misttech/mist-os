@@ -41,7 +41,7 @@ class FakeGattFixture : public bt::testing::TestLoopFixture {
   std::unique_ptr<bt::gatt::testing::FakeLayer> gatt_;
   const bt::gatt::GATT::WeakPtr weak_gatt_;
   const bt::gatt::testing::FakeLayer::WeakPtr weak_fake_layer_;
-  pw::async::fuchsia::FuchsiaDispatcher pw_dispatcher_{dispatcher()};
+  pw::async_fuchsia::FuchsiaDispatcher pw_dispatcher_{dispatcher()};
 
   BT_DISALLOW_COPY_ASSIGN_AND_MOVE(FakeGattFixture);
 };

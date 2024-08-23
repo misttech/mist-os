@@ -45,10 +45,6 @@ class DevFsCoordinatorFactory : public fidl::Server<fuchsia_hardware_display::Pr
   DevFsCoordinatorFactory& operator=(DevFsCoordinatorFactory&&) = delete;
 
   // `fidl::Server<fuchsia_hardware_display::Provider>`
-  void OpenCoordinatorForVirtcon(OpenCoordinatorForVirtconRequest& request,
-                                 OpenCoordinatorForVirtconCompleter::Sync& completer) override;
-  void OpenCoordinatorForPrimary(OpenCoordinatorForPrimaryRequest& request,
-                                 OpenCoordinatorForPrimaryCompleter::Sync& completer) override;
   void OpenCoordinatorWithListenerForVirtcon(
       OpenCoordinatorWithListenerForVirtconRequest& request,
       OpenCoordinatorWithListenerForVirtconCompleter::Sync& completer) override;
@@ -59,10 +55,13 @@ class DevFsCoordinatorFactory : public fidl::Server<fuchsia_hardware_display::Pr
  private:
   // Opens fuchsia.hardware.display.Coordinator service for a primary client
   // at service located at "dir/filename" using the server end channel
-  // `coordinator_server`.
-  static zx_status_t OpenCoordinatorForPrimaryOnDevice(
+  // `coordinator_server` and listener client end channel `listener_client`.
+  //
+  // Both `coordinator_server` and `listener_client` must be valid.
+  static zx_status_t OpenCoordinatorWithListenerForPrimaryOnDevice(
       const fidl::ClientEnd<fuchsia_io::Directory>& dir, const std::string& filename,
-      fidl::ServerEnd<fuchsia_hardware_display::Coordinator> coordinator_server);
+      fidl::ServerEnd<fuchsia_hardware_display::Coordinator> coordinator_server,
+      fidl::ClientEnd<fuchsia_hardware_display::CoordinatorListener> listener_client);
 
   // The dispatcher where all async tasks are dispatched onto by the
   // `DevFsCoordinatorFactory`.

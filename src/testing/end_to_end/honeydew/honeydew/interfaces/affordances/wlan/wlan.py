@@ -34,6 +34,10 @@ class Wlan(abc.ABC):
 
         Returns:
             True on success otherwise false.
+
+        Raises:
+            HoneydewWlanError: Error from WLAN stack
+            NetworkInterfaceNotFoundError: No client WLAN interface found.
         """
 
     @abc.abstractmethod
@@ -49,6 +53,10 @@ class Wlan(abc.ABC):
 
         Returns:
             Iface id of newly created interface.
+
+        Raises:
+            HoneydewWlanError: Error from WLAN stack
+            ValueError: Invalid MAC address
         """
 
     @abc.abstractmethod
@@ -57,11 +65,18 @@ class Wlan(abc.ABC):
 
         Args:
             iface_id: The interface to destroy.
+
+        Raises:
+            HoneydewWlanError: Error from WLAN stack
         """
 
     @abc.abstractmethod
     def disconnect(self) -> None:
-        """Disconnect any current wifi connections."""
+        """Disconnect all client WLAN connections.
+
+        Raises:
+            HoneydewWlanError: Error from WLAN stack
+        """
 
     @abc.abstractmethod
     def get_iface_id_list(self) -> list[int]:
@@ -69,6 +84,9 @@ class Wlan(abc.ABC):
 
         Returns:
             A list of wlan iface IDs that are present on the device.
+
+        Raises:
+            HoneydewWlanError: Error from WLAN stack
         """
 
     @abc.abstractmethod
@@ -80,6 +98,9 @@ class Wlan(abc.ABC):
 
         Returns:
             The currently configured country code from `phy_id`.
+
+        Raises:
+            HoneydewWlanError: Error from WLAN stack
         """
 
     @abc.abstractmethod
@@ -87,7 +108,10 @@ class Wlan(abc.ABC):
         """Get list of phy ids on device.
 
         Returns:
-            A list of phy IDs that are present on the device.
+            A list of phy ids that is present on the device.
+
+        Raises:
+            HoneydewWlanError: Error from WLAN stack
         """
 
     @abc.abstractmethod
@@ -99,6 +123,9 @@ class Wlan(abc.ABC):
 
         Returns:
             QueryIfaceResponseWrapper from the SL4F server.
+
+        Raises:
+            HoneydewWlanError: DeviceMonitor.QueryIface error
         """
 
     @abc.abstractmethod
@@ -108,6 +135,10 @@ class Wlan(abc.ABC):
         Returns:
             A dict mapping each seen SSID to a list of BSS Description IE
             blocks, one for each BSS observed in the network
+
+        Raises:
+            HoneydewWlanError: Error from WLAN stack
+            NetworkInterfaceNotFoundError: No client WLAN interface found.
         """
 
     @abc.abstractmethod
@@ -116,13 +147,22 @@ class Wlan(abc.ABC):
 
         Args:
             region_code: 2-byte ASCII string.
+
+        Raises:
+            HoneydewWlanError: Error from WLAN stack
+            TypeError: Invalid region_code format
         """
 
     @abc.abstractmethod
     def status(self) -> ClientStatusResponse:
-        """Request client state and network status.
+        """Request connection status
 
         Returns:
-            ClientStatusResponse state summary and
-            status of various networks connections.
+            An implementation of the ClientStatusResponse protocol:
+            ClientStatusConnected, ClientStatusConnecting, or ClientStatusIdle.
+
+        Raises:
+            HoneydewWlanError: Error from WLAN stack
+            NetworkInterfaceNotFoundError: No client WLAN interface found.
+            TypeError: If any of the return values are not of the expected type.
         """

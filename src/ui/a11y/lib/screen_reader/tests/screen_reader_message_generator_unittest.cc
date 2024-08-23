@@ -101,6 +101,26 @@ TEST_F(ScreenReaderMessageGeneratorTest, NodeButtonHybridSemantics) {
   ASSERT_EQ(result[3].utterance.message(), "switch off");
 }
 
+TEST_F(ScreenReaderMessageGeneratorTest, NodeButtonDisabled) {
+  Node node;
+  node.mutable_attributes()->set_label("foo");
+  node.set_role(Role::BUTTON);
+  node.mutable_states()->set_enabled_state(
+      fuchsia::accessibility::semantics::EnabledState::DISABLED);
+  mock_message_formatter_ptr_->SetMessageForId(static_cast<uint64_t>(MessageIds::ROLE_BUTTON),
+                                               "button");
+  mock_message_formatter_ptr_->SetMessageForId(static_cast<uint64_t>(MessageIds::ELEMENT_DISABLED),
+                                               "disabled");
+  auto result = screen_reader_message_generator_->DescribeNode(&node);
+  ASSERT_EQ(result.size(), 3u);
+  ASSERT_TRUE(result[0].utterance.has_message());
+  ASSERT_EQ(result[0].utterance.message(), "foo");
+  ASSERT_TRUE(result[1].utterance.has_message());
+  ASSERT_EQ(result[1].utterance.message(), "button");
+  ASSERT_TRUE(result[2].utterance.has_message());
+  ASSERT_EQ(result[2].utterance.message(), "disabled");
+}
+
 TEST_F(ScreenReaderMessageGeneratorTest, NodeHeader) {
   Node node;
   node.mutable_attributes()->set_label("foo");
@@ -204,6 +224,27 @@ TEST_F(ScreenReaderMessageGeneratorTest, NodeSliderNoLabel) {
   ASSERT_EQ(result[1].utterance.message(), "slider");
 }
 
+TEST_F(ScreenReaderMessageGeneratorTest, NodeSliderDisabled) {
+  Node node;
+  node.set_role(Role::SLIDER);
+  node.set_states(States());
+  node.mutable_states()->set_range_value(10.0);
+  node.mutable_states()->set_enabled_state(
+      fuchsia::accessibility::semantics::EnabledState::DISABLED);
+  mock_message_formatter_ptr_->SetMessageForId(static_cast<uint64_t>(MessageIds::ROLE_SLIDER),
+                                               "slider");
+  mock_message_formatter_ptr_->SetMessageForId(static_cast<uint64_t>(MessageIds::ELEMENT_DISABLED),
+                                               "disabled");
+  auto result = screen_reader_message_generator_->DescribeNode(&node);
+  ASSERT_EQ(result.size(), 3u);
+  ASSERT_TRUE(result[0].utterance.has_message());
+  ASSERT_EQ(result[0].utterance.message(), ", 10");
+  ASSERT_TRUE(result[1].utterance.has_message());
+  ASSERT_EQ(result[1].utterance.message(), "slider");
+  ASSERT_TRUE(result[2].utterance.has_message());
+  ASSERT_EQ(result[2].utterance.message(), "disabled");
+}
+
 TEST_F(ScreenReaderMessageGeneratorTest, GenerateByMessageId) {
   mock_message_formatter_ptr_->SetMessageForId(static_cast<uint64_t>(MessageIds::ROLE_SLIDER),
                                                "slider");
@@ -280,6 +321,25 @@ TEST_F(ScreenReaderMessageGeneratorTest, NodeRadioButtonMessageFormatterReturnNu
   auto result = screen_reader_message_generator_->DescribeNode(&node);
   ASSERT_EQ(result.size(), 1u);
   ASSERT_FALSE(result[0].utterance.has_message());
+}
+
+TEST_F(ScreenReaderMessageGeneratorTest, NodeRadioButtonDisabled) {
+  Node node;
+  node.mutable_attributes()->set_label("");
+  node.set_role(Role::RADIO_BUTTON);
+  node.mutable_states()->set_selected(false);
+  node.mutable_states()->set_enabled_state(
+      fuchsia::accessibility::semantics::EnabledState::DISABLED);
+  mock_message_formatter_ptr_->SetMessageForId(
+      static_cast<uint64_t>(MessageIds::RADIO_BUTTON_UNSELECTED), "radio button unselected");
+  mock_message_formatter_ptr_->SetMessageForId(static_cast<uint64_t>(MessageIds::ELEMENT_DISABLED),
+                                               "disabled");
+  auto result = screen_reader_message_generator_->DescribeNode(&node);
+  ASSERT_EQ(result.size(), 2u);
+  ASSERT_TRUE(result[0].utterance.has_message());
+  ASSERT_EQ(result[0].utterance.message(), "radio button unselected");
+  ASSERT_TRUE(result[1].utterance.has_message());
+  ASSERT_EQ(result[1].utterance.message(), "disabled");
 }
 
 TEST_F(ScreenReaderMessageGeneratorTest, NodeLink) {
@@ -379,6 +439,26 @@ TEST_F(ScreenReaderMessageGeneratorTest, NodeCheckBoxWithStates) {
   ASSERT_EQ(result[1].utterance.message(), "check box");
 }
 
+TEST_F(ScreenReaderMessageGeneratorTest, NodeCheckboxDisabled) {
+  Node node;
+  node.mutable_attributes()->set_label("foo");
+  node.set_role(Role::CHECK_BOX);
+  node.mutable_states()->set_enabled_state(
+      fuchsia::accessibility::semantics::EnabledState::DISABLED);
+  mock_message_formatter_ptr_->SetMessageForId(static_cast<uint64_t>(MessageIds::ELEMENT_DISABLED),
+                                               "disabled");
+  mock_message_formatter_ptr_->SetMessageForId(static_cast<uint64_t>(MessageIds::ROLE_CHECKBOX),
+                                               "check box");
+  auto result = screen_reader_message_generator_->DescribeNode(&node);
+  ASSERT_EQ(result.size(), 3u);
+  ASSERT_TRUE(result[0].utterance.has_message());
+  ASSERT_EQ(result[0].utterance.message(), "foo");
+  ASSERT_TRUE(result[1].utterance.has_message());
+  ASSERT_EQ(result[1].utterance.message(), "check box");
+  ASSERT_TRUE(result[2].utterance.has_message());
+  ASSERT_EQ(result[2].utterance.message(), "disabled");
+}
+
 TEST_F(ScreenReaderMessageGeneratorTest, NodeToggleSwitchOn) {
   Node node;
   node.mutable_attributes()->set_label("foo");
@@ -448,6 +528,26 @@ TEST_F(ScreenReaderMessageGeneratorTest, NodeToggleSwitchMessageFormatterReturns
   auto result = screen_reader_message_generator_->DescribeNode(&node);
   ASSERT_EQ(result.size(), 1u);
   ASSERT_FALSE(result[0].utterance.has_message());
+}
+
+TEST_F(ScreenReaderMessageGeneratorTest, NodeToggleSwitchDisabled) {
+  Node node;
+  node.mutable_attributes()->set_label("");
+  node.set_role(Role::TOGGLE_SWITCH);
+  node.mutable_states()->set_toggled_state(
+      fuchsia::accessibility::semantics::ToggledState::INDETERMINATE);
+  node.mutable_states()->set_enabled_state(
+      fuchsia::accessibility::semantics::EnabledState::DISABLED);
+  mock_message_formatter_ptr_->SetMessageForId(static_cast<uint64_t>(MessageIds::ELEMENT_DISABLED),
+                                               "disabled");
+  mock_message_formatter_ptr_->SetMessageForId(
+      static_cast<uint64_t>(MessageIds::ELEMENT_TOGGLED_OFF), "switch off");
+  auto result = screen_reader_message_generator_->DescribeNode(&node);
+  ASSERT_EQ(result.size(), 2u);
+  ASSERT_TRUE(result[0].utterance.has_message());
+  ASSERT_EQ(result[0].utterance.message(), "switch off");
+  ASSERT_TRUE(result[1].utterance.has_message());
+  ASSERT_EQ(result[1].utterance.message(), "disabled");
 }
 
 TEST_F(ScreenReaderMessageGeneratorTest, DescribeCharacterForSpelling) {

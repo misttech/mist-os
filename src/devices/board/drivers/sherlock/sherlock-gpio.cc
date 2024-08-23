@@ -37,35 +37,35 @@ static const std::vector<fpbus::Mmio> gpio_mmios{
 static const std::vector<fpbus::Irq> gpio_irqs{
     {{
         .irq = T931_GPIO_IRQ_0,
-        .mode = ZX_INTERRUPT_MODE_DEFAULT,
+        .mode = fpbus::ZirconInterruptMode::kDefault,
     }},
     {{
         .irq = T931_GPIO_IRQ_1,
-        .mode = ZX_INTERRUPT_MODE_DEFAULT,
+        .mode = fpbus::ZirconInterruptMode::kDefault,
     }},
     {{
         .irq = T931_GPIO_IRQ_2,
-        .mode = ZX_INTERRUPT_MODE_DEFAULT,
+        .mode = fpbus::ZirconInterruptMode::kDefault,
     }},
     {{
         .irq = T931_GPIO_IRQ_3,
-        .mode = ZX_INTERRUPT_MODE_DEFAULT,
+        .mode = fpbus::ZirconInterruptMode::kDefault,
     }},
     {{
         .irq = T931_GPIO_IRQ_4,
-        .mode = ZX_INTERRUPT_MODE_DEFAULT,
+        .mode = fpbus::ZirconInterruptMode::kDefault,
     }},
     {{
         .irq = T931_GPIO_IRQ_5,
-        .mode = ZX_INTERRUPT_MODE_DEFAULT,
+        .mode = fpbus::ZirconInterruptMode::kDefault,
     }},
     {{
         .irq = T931_GPIO_IRQ_6,
-        .mode = ZX_INTERRUPT_MODE_DEFAULT,
+        .mode = fpbus::ZirconInterruptMode::kDefault,
     }},
     {{
         .irq = T931_GPIO_IRQ_7,
-        .mode = ZX_INTERRUPT_MODE_DEFAULT,
+        .mode = fpbus::ZirconInterruptMode::kDefault,
     }},
 };
 
@@ -220,7 +220,7 @@ zx_status_t Sherlock::GpioInit() {
   static_assert(std::size(gpio_pins) + std::size(gpio_c_pins) == GPIO_PIN_COUNT,
                 "Incorrect pin count.");
 
-  fuchsia_hardware_gpioimpl::InitMetadata metadata{{std::move(gpio_init_steps_)}};
+  fuchsia_hardware_pinimpl::Metadata metadata{{std::move(gpio_init_steps_)}};
   gpio_init_steps_.clear();
 
   const fit::result encoded_metadata = fidl::Persist(metadata);
@@ -269,8 +269,8 @@ zx_status_t Sherlock::GpioInit() {
     }
   }
 
-  // TODO(https://fxbug.dev/42081248): Add the GPIO C device after all init steps have been executed to ensure
-  // that there are no simultaneous accesses to these banks.
+  // TODO(https://fxbug.dev/42081248): Add the GPIO C device after all init steps have been executed
+  // to ensure that there are no simultaneous accesses to these banks.
   {
     fidl::Arena<> fidl_arena;
     fdf::Arena arena('GPIO');

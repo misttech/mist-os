@@ -898,6 +898,16 @@ where
         self.datagram().update_ip_hop_limit(id, SocketHopLimits::set_multicast(hop_limit))
     }
 
+    /// Gets the loopback multicast option.
+    pub fn get_multicast_loop(&mut self, id: &IcmpApiSocketId<I, C>) -> bool {
+        self.datagram().get_multicast_loop(id)
+    }
+
+    /// Sets the loopback multicast option.
+    pub fn set_multicast_loop(&mut self, id: &IcmpApiSocketId<I, C>, value: bool) {
+        self.datagram().set_multicast_loop(id, value);
+    }
+
     /// Sends an ICMP packet through a connection.
     ///
     /// The socket must be connected in order for the operation to succeed.
@@ -1034,7 +1044,7 @@ impl<
         mut buffer: B,
         meta: ReceiveIpPacketMeta<I>,
     ) -> Result<(), (B, TransportReceiveError)> {
-        if let Some(delivery) = meta.transport_override {
+        if let Some(delivery) = meta.transparent_override {
             unreachable!(
                 "cannot perform transparent local delivery {delivery:?} to an ICMP socket; \
                 transparent proxy rules can only be configured for TCP and UDP packets"

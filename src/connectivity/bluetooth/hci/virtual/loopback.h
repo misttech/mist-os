@@ -124,6 +124,7 @@ class LoopbackDevice : public fidl::Server<fuchsia_hardware_bluetooth::Vendor> {
   void WriteLoopbackChannel(PacketIndicator indicator, uint8_t* buffer, size_t length);
 
   // fuchsia_hardware_bluetooth::Vendor overrides:
+  void GetFeatures(GetFeaturesCompleter::Sync& completer) override;
   void EncodeCommand(EncodeCommandRequest& request,
                      EncodeCommandCompleter::Sync& completer) override;
   void OpenHci(OpenHciCompleter::Sync& completer) override;

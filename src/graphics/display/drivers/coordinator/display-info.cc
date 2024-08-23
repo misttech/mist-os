@@ -6,6 +6,7 @@
 
 #include <fuchsia/hardware/display/controller/c/banjo.h>
 #include <fuchsia/hardware/i2cimpl/cpp/banjo.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/stdcompat/span.h>
 #include <lib/zx/result.h>
 #include <lib/zx/time.h>
@@ -30,7 +31,6 @@
 #include "src/graphics/display/drivers/coordinator/migration-util.h"
 #include "src/graphics/display/lib/api-types-cpp/display-id.h"
 #include "src/graphics/display/lib/api-types-cpp/display-timing.h"
-#include "src/graphics/display/lib/driver-framework-migration-utils/logging/zxlogf.h"
 #include "src/graphics/display/lib/edid/edid.h"
 
 namespace display {
@@ -63,7 +63,8 @@ fit::result<const char*, DisplayInfo::Edid> InitEdidFromI2c(ddk::I2cImplProtocol
       return fit::ok(std::move(edid));
     }
     last_error = result.error_value();
-    zxlogf(WARNING, "Error %d/%d initializing edid: \"%s\"", attempt, kMaxEdidAttempts, last_error);
+    FDF_LOG(WARNING, "Error %d/%d initializing edid: \"%s\"", attempt, kMaxEdidAttempts,
+            last_error);
     zx::nanosleep(zx::deadline_after(zx::msec(5)));
   }
 
@@ -140,8 +141,8 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(
       CoordinatorPixelFormat::CreateFblVectorFromBanjoVector(cpp20::span(
           banjo_display_info.pixel_formats_list, banjo_display_info.pixel_formats_count));
   if (get_display_info_pixel_formats_result.is_error()) {
-    zxlogf(ERROR, "Cannot convert pixel formats to FIDL pixel format value: %s",
-           get_display_info_pixel_formats_result.status_string());
+    FDF_LOG(ERROR, "Cannot convert pixel formats to FIDL pixel format value: %s",
+            get_display_info_pixel_formats_result.status_string());
     return get_display_info_pixel_formats_result.take_error();
   }
   out->pixel_formats = std::move(get_display_info_pixel_formats_result.value());
@@ -177,14 +178,14 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(
   }();
 
   if (!edid_result.is_ok()) {
-    zxlogf(ERROR, "Failed to initialize EDID: %s", edid_result.error_value());
+    FDF_LOG(ERROR, "Failed to initialize EDID: %s", edid_result.error_value());
     return zx::error(ZX_ERR_INTERNAL);
   }
   out->edid = std::move(edid_result).value();
 
   // TODO(https://fxbug.dev/343872853): Parse audio information from EDID.
 
-  if (zxlog_level_enabled(DEBUG)) {
+  if (fdf::Logger::GlobalInstance()->GetSeverity() <= FUCHSIA_LOG_DEBUG) {
     const auto& edid = out->edid->base;
     std::string manufacturer_id = edid.GetManufacturerId();
     const char* manufacturer_name = edid.GetManufacturerName();
@@ -194,10 +195,10 @@ zx::result<fbl::RefPtr<DisplayInfo>> DisplayInfo::Create(
     std::string display_product_name = edid.GetDisplayProductName();
     std::string display_product_serial_number = edid.GetDisplayProductSerialNumber();
 
-    zxlogf(DEBUG, "Manufacturer \"%s\", product %d, name \"%s\", serial \"%s\"", manufacturer,
-           edid.product_code(), display_product_name.c_str(),
-           display_product_serial_number.c_str());
-    edid.Print([](const char* str) { zxlogf(DEBUG, "%s", str); });
+    FDF_LOG(DEBUG, "Manufacturer \"%s\", product %d, name \"%s\", serial \"%s\"", manufacturer,
+            edid.product_code(), display_product_name.c_str(),
+            display_product_serial_number.c_str());
+    edid.Print([](const char* str) { FDF_LOG(DEBUG, "%s", str); });
   }
   return zx::ok(std::move(out));
 }

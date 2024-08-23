@@ -9,7 +9,7 @@ use ffx_config::environment::EnvironmentKind;
 use ffx_config::EnvironmentContext;
 use ffx_repository_serve_args::ServeCommand;
 use ffx_target::{knock_target, TargetProxy};
-use fho::{return_user_error, Connector, FfxMain, FfxTool, Result, SimpleWriter};
+use fho::{bug, return_user_error, Connector, FfxMain, FfxTool, Result, SimpleWriter};
 use fidl_fuchsia_developer_ffx::{
     RepositoryStorageType, RepositoryTarget as FfxCliRepositoryTarget, TargetInfo,
 };
@@ -29,7 +29,9 @@ use futures::executor::block_on;
 use futures::{pin_mut, select, FutureExt, SinkExt, StreamExt};
 use package_tool::{cmd_repo_publish, RepoPublishCommand};
 use pkg::repo::register_target_with_fidl_proxies;
-use pkg::{write_instance_info, ServerMode};
+use pkg::{
+    write_instance_info, PkgServerInfo, PkgServerInstanceInfo as _, PkgServerInstances, ServerMode,
+};
 use signal_hook::consts::signal::{SIGHUP, SIGINT, SIGTERM};
 use signal_hook::iterator::Signals;
 use std::fs;
@@ -39,13 +41,20 @@ use std::time::Duration;
 use timeout::timeout;
 use tuf::metadata::RawSignedMetadata;
 
+// LINT.IfChange
+/// Default name used for package repositories in ffx. It is expected that there is no need to
+/// change this constant. But in case this is changed, ensure that it is consistent with the ffx
+/// developer documentation, see
+/// https://cs.opensource.google/search?q=devhost&sq=&ss=fuchsia%2Ffuchsia:src%2Fdeveloper%2Fffx%2F
+pub const DEFAULT_REPO_NAME: &str = "devhost";
+// LINT.ThenChange(args.rs)
+
 const REPO_CONNECT_TIMEOUT_CONFIG: &str = "repository.connect_timeout_secs";
 const DEFAULT_CONNECTION_TIMEOUT_SECS: u64 = 120;
 const MAX_CONSECUTIVE_CONNECT_ATTEMPTS: u8 = 10;
 const REPO_BACKGROUND_FEATURE_FLAG: &str = "repository.server.enabled";
 const REPOSITORY_MANAGER_MONIKER: &str = "/core/pkg-resolver";
 const ENGINE_MONIKER: &str = "/core/pkg-resolver";
-const DEFAULT_REPO_NAME: &str = "devhost";
 const REPO_PATH_RELATIVE_TO_BUILD_DIR: &str = "amber-files";
 
 #[derive(FfxTool)]
@@ -378,7 +387,7 @@ impl FfxMain for ServeTool {
         let bg: bool = self
             .context
             .get(REPO_BACKGROUND_FEATURE_FLAG)
-            .context("checking for background server flag")?;
+            .context("checking for daemon server flag")?;
         if bg {
             return_user_error!(
                 r#"The ffx setting '{}' and the foreground server are mutually incompatible.
@@ -395,10 +404,78 @@ $ ffx doctor --restart-daemon"#,
             self.cmd,
             self.context,
             writer,
+            ServerMode::Foreground,
         )
         .await?;
         Ok(())
     }
+}
+
+pub fn serve_impl_validate_args(
+    cmd: &ServeCommand,
+    context: &EnvironmentContext,
+) -> Result<Option<PkgServerInfo>> {
+    // Validate the repo-path vs. product bundle.
+    let repo_path = match (cmd.repo_path.clone(), cmd.product_bundle.clone()) {
+        (Some(_), Some(_)) => {
+            return_user_error!("Cannot specify both --repo-path and --product-bundle");
+        }
+        (None, Some(product_bundle)) => {
+            if cmd.repository.is_some() {
+                return_user_error!("--repository is not supported with --product-bundle");
+            }
+            if !product_bundle.exists() {
+                return_user_error!("product bundle {product_bundle:?} does not exist");
+            }
+            product_bundle
+        }
+        (repo_path, None) => {
+            if let Some(path) = repo_path {
+                if !path.exists() {
+                    return_user_error!("repo-path {path:?} does not exist");
+                }
+                path
+            // TODO(b/359927881): Use the configuration to read repo-path
+            // vs. constructing it from the build dir. This way it works with other EnvironmentKinds.
+            } else if let EnvironmentKind::InTree { build_dir: Some(build_dir), .. } =
+                context.env_kind()
+            {
+                let path = build_dir.join(REPO_PATH_RELATIVE_TO_BUILD_DIR);
+                if !path.exists() {
+                    return_user_error!("build directory relative path {path:?} does not exist");
+                }
+                Utf8Path::from_path(&path)
+                    .with_context(|| format!("converting repo path to UTF-8 {:?}", repo_path))?
+                    .into()
+            } else {
+                tracing::warn!("repo-path not found in env: {:?}", context.env_kind());
+                return_user_error!("Either --repo-path or --product-bundle need to be specified");
+            }
+        }
+    };
+
+    // Compare against running instances.
+    let instance_root =
+        context.get("repository.process_dir").map_err(|e: ffx_config::api::ConfigError| bug!(e))?;
+    let mgr = PkgServerInstances::new(instance_root);
+    let running_instances = mgr.list_instances()?;
+    let repo_name = cmd.repository.clone().unwrap_or(DEFAULT_REPO_NAME.to_string());
+    let addr = cmd.address.clone();
+    let duplicate = running_instances.iter().find(|instance| instance.address == addr);
+    if let Some(duplicate) = duplicate {
+        if repo_name != duplicate.name {
+            return_user_error!("repository server is already running on {addr}: named \"{}\"  serving {repo_path:?}\n Use `ffx  repository server list` to list running servers", duplicate.name);
+        }
+        return Ok(Some(duplicate.clone()));
+    }
+    let duplicate = running_instances.iter().find(|instance| instance.name == repo_name);
+    if let Some(duplicate) = duplicate {
+        if addr != duplicate.address {
+            return_user_error!("repository server named \"{repo_name}\" is already running: {} serving {repo_path:?}\n Use `ffx  repository server list` to list running servers", duplicate.address);
+        }
+        return Ok(Some(duplicate.clone()));
+    }
+    Ok(None)
 }
 
 pub async fn serve_impl<W: Write + 'static>(
@@ -407,11 +484,26 @@ pub async fn serve_impl<W: Write + 'static>(
     cmd: ServeCommand,
     context: EnvironmentContext,
     mut writer: W,
+    mode: ServerMode,
 ) -> Result<()> {
+    // Validate the cmd args before processing. This allows good error messages to be presented
+    // to the user when running in Background mode. If the server is already running, this returns
+    // Ok.
+    if let Some(running) = serve_impl_validate_args(&cmd, &context)? {
+        // The server that matches the cmd is already running.
+        writeln!(
+            writer,
+            "A server named {} is serving on address {} the repo path: {}",
+            running.name, running.address, running.repo_path
+        )
+        .map_err(|e| bug!(e))?;
+        return Ok(());
+    }
+
     let connect_timeout =
         context.get(REPO_CONNECT_TIMEOUT_CONFIG).unwrap_or(DEFAULT_CONNECTION_TIMEOUT_SECS);
-    let connect_timeout = std::time::Duration::from_secs(connect_timeout);
 
+    let connect_timeout = std::time::Duration::from_secs(connect_timeout);
     let repo_manager: Arc<RepositoryManager> = RepositoryManager::new();
 
     let repo_path = match (cmd.repo_path.clone(), cmd.product_bundle.clone()) {
@@ -435,8 +527,8 @@ pub async fn serve_impl<W: Write + 'static>(
                     .with_context(|| format!("Creating a repo client for {repo_name}"))?;
                 repo_manager.add(&repo_name, repo_client);
                 if let Err(e) = write_instance_info(
-                    None,
-                    ServerMode::Foreground,
+                    Some(context.clone()),
+                    mode.clone(),
                     &repo_name,
                     &cmd.address,
                     product_bundle.as_std_path().into(),
@@ -466,11 +558,14 @@ pub async fn serve_impl<W: Write + 'static>(
             } else if let EnvironmentKind::InTree { build_dir: Some(build_dir), .. } =
                 context.env_kind()
             {
+                // TODO(b/359927881): Use the configuration to read repo-path
+                // vs. constructing it from the build dir. This way it works with other EnvironmentKinds.
                 let build_dir = Utf8Path::from_path(build_dir)
                     .with_context(|| format!("converting repo path to UTF-8 {:?}", repo_path))?;
 
                 build_dir.join(REPO_PATH_RELATIVE_TO_BUILD_DIR)
             } else {
+                tracing::warn!("repo-path not found in env: {:?}", context.env_kind());
                 return_user_error!("Either --repo-path or --product-bundle need to be specified");
             };
 
@@ -494,8 +589,8 @@ pub async fn serve_impl<W: Write + 'static>(
             }
 
             if let Err(e) = write_instance_info(
-                None,
-                ServerMode::Foreground,
+                Some(context),
+                mode.clone(),
                 &repo_name,
                 &cmd.address,
                 repo_path.as_std_path().into(),
@@ -1145,6 +1240,7 @@ mod test {
                 },
                 env.context.clone(),
                 writer,
+                ServerMode::Foreground,
             )
             .await
             .unwrap()
@@ -1285,6 +1381,7 @@ mod test {
                 },
                 env.context.clone(),
                 writer,
+                ServerMode::Foreground,
             )
             .await
             .unwrap()
@@ -1425,6 +1522,7 @@ mod test {
                 },
                 test_env.context.clone(),
                 writer,
+                ServerMode::Foreground,
             )
             .await
             .unwrap()
@@ -1580,7 +1678,8 @@ mod test {
                 Connector::try_from_env(&env).await.expect("Could not make RCS test connector"),
                 serve_cmd_without_root,
                 test_env.context.clone(),
-                SimpleWriter::new()
+                SimpleWriter::new(),
+                ServerMode::Foreground
             )
             .await
             .is_err(),
@@ -1600,6 +1699,7 @@ mod test {
                 serve_cmd_with_root,
                 test_env.context.clone(),
                 writer,
+                ServerMode::Foreground,
             )
             .await
             .unwrap()

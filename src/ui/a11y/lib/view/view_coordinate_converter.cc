@@ -8,6 +8,8 @@
 #include <lib/syslog/cpp/macros.h>
 #include <zircon/status.h>
 
+#include <cmath>
+
 namespace a11y {
 
 // Used for floating point comparisons.

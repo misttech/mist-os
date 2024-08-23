@@ -34,7 +34,7 @@ static const std::vector<fpbus::Mmio> bt_uart_mmios{
 static const std::vector<fpbus::Irq> bt_uart_irqs{
     {{
         .irq = S905D2_UART_A_IRQ,
-        .mode = ZX_INTERRUPT_MODE_EDGE_HIGH,
+        .mode = fpbus::ZirconInterruptMode::kEdgeHigh,
     }},
 };
 

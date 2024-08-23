@@ -140,9 +140,10 @@ impl FileOps for SysRqFile {
                     // When this call succeeds with a production implementation it should never
                     // return. If it returns at all it is a sign the kernel either doesn't have the
                     // capability or there was a problem with the shutdown request.
-                    let reboot_res = connect_to_protocol_sync::<AdminMarker>()
-                        .unwrap()
-                        .reboot(RebootReason::CriticalComponentFailure, zx::Time::INFINITE);
+                    let reboot_res = connect_to_protocol_sync::<AdminMarker>().unwrap().reboot(
+                        RebootReason::CriticalComponentFailure,
+                        zx::MonotonicTime::INFINITE,
+                    );
 
                     // LINT.IfChange
                     panic!(

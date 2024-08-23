@@ -10,10 +10,6 @@ audio_core_package("audio_core") {
   package_deps = [ "//src/media/audio/effects/passthrough:audio_effects" ]
 }
 
-core_shard("core_shard") {
-  shard_file = "meta/audio_core.core_shard.cml"
-}
-
 executable("audio_core_bin") {
   output_name = "audio_core"
   deps = [

@@ -281,7 +281,7 @@
 
 - name: 'Power'
   api_primary: 'mbrunson@google.com'
-  api_secondary: ''
+  api_secondary: 'prashanthsw@google.com'
   description: |
     <p>
       The set of APIs for centralized power and thermal management, including

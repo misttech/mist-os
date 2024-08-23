@@ -148,7 +148,7 @@ pub(crate) fn ensure_dai_format_is_supported(
             return Ok(());
         }
     }
-    Err(format_err!("DAI does not support DAI format: {:?}", dai_format))
+    Err(format_err!("DAI does not support DAI format: {dai_format:?} not in {supported_formats:?}"))
 }
 
 #[cfg(test)]

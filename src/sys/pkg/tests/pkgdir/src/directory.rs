@@ -592,7 +592,7 @@ async fn verify_content_file_opened(
             // should be immediately readable here.
             if let Some(observer) = observer {
                 let _: zx::Signals = observer
-                    .wait_handle(zx::Signals::USER_0, zx::Time::INFINITE_PAST)
+                    .wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE_PAST)
                     .context("FILE_SIGNAL_READABLE not set")?;
             }
         }
@@ -609,7 +609,7 @@ async fn verify_content_file_opened(
                         // The blobs should be immediately readable here.
                         if let Some(event) = event {
                             let _: zx::Signals = event
-                                .wait_handle(zx::Signals::USER_0, zx::Time::INFINITE_PAST)
+                                .wait_handle(zx::Signals::USER_0, zx::MonotonicTime::INFINITE_PAST)
                                 .context("FILE_SIGNAL_READABLE not set")?;
                         }
                     } else {

@@ -7,12 +7,17 @@
 #ifndef SRC_STORAGE_BLOBFS_DIRECTORY_H_
 #define SRC_STORAGE_BLOBFS_DIRECTORY_H_
 
+#include <fidl/fuchsia.io/cpp/common_types.h>
+#include <lib/zx/result.h>
+#include <zircon/types.h>
+
+#include <cstddef>
 #include <string_view>
 
-#include <fbl/algorithm.h>
 #include <fbl/ref_ptr.h>
 
 #include "src/storage/lib/vfs/cpp/vfs.h"
+#include "src/storage/lib/vfs/cpp/vfs_types.h"
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace blobfs {
@@ -34,7 +39,6 @@ class Directory final : public fs::Vnode {
   zx_status_t Lookup(std::string_view name, fbl::RefPtr<fs::Vnode>* out) final;
   zx::result<fs::VnodeAttributes> GetAttributes() const final;
   zx::result<fbl::RefPtr<Vnode>> Create(std::string_view name, fs::CreationType type) final;
-  zx::result<std::string> GetDevicePath() const final;
   zx_status_t Unlink(std::string_view name, bool must_be_dir) final;
   void Sync(SyncCallback closure) final;
 

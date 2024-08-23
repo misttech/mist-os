@@ -24,16 +24,6 @@ use {
     fuchsia_async as fasync, fuchsia_zircon as zx,
 };
 
-fn map_to_status(err: Error) -> zx::Status {
-    if let Some(&status) = err.root_cause().downcast_ref::<zx::Status>() {
-        status
-    } else {
-        // Print the internal error if we re-map it because we will lose any context after this.
-        println!("Internal error: {:?}", err);
-        zx::Status::INTERNAL
-    }
-}
-
 struct BlockFile {
     block_client: RemoteBlockClient,
 }
@@ -104,26 +94,18 @@ impl File for BlockFile {
     }
 
     async fn sync(&self, _mode: SyncMode) -> Result<(), zx::Status> {
-        self.block_client.flush().await.map_err(map_to_status)
+        self.block_client.flush().await
     }
 }
 
 impl FileIo for BlockFile {
     async fn read_at(&self, offset: u64, buffer: &mut [u8]) -> Result<u64, zx::Status> {
-        let () = self
-            .block_client
-            .read_at(MutableBufferSlice::Memory(buffer), offset)
-            .await
-            .map_err(map_to_status)?;
+        let () = self.block_client.read_at(MutableBufferSlice::Memory(buffer), offset).await?;
         Ok(buffer.len().try_into().unwrap())
     }
 
     async fn write_at(&self, offset: u64, content: &[u8]) -> Result<u64, zx::Status> {
-        let () = self
-            .block_client
-            .write_at(BufferSlice::Memory(content), offset)
-            .await
-            .map_err(map_to_status)?;
+        let () = self.block_client.write_at(BufferSlice::Memory(content), offset).await?;
         Ok(content.len().try_into().unwrap())
     }
 

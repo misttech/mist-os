@@ -73,10 +73,10 @@
         {
             // The `audio_driver_tests` suite requires access to various audio driver types...
             directory: [
+                "dev-audio-composite",
                 "dev-audio-input",
                 "dev-audio-output",
                 "dev-codec",
-                "dev-composite",
                 "dev-dai",
             ],
             from: "parent",

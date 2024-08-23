@@ -5,12 +5,14 @@
 #include "sdk/lib/driver/power/cpp/power-support.h"
 
 #include <dirent.h>
+#include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/fidl.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/driver/incoming/cpp/namespace.h>
+#include <lib/driver/logging/cpp/logger.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
@@ -32,11 +34,6 @@
 namespace fdf_power {
 
 namespace {
-// Based on `dirent` as defined in
-// https://cs.opensource.google/fuchsia/fuchsia/+/9b3b47f13c3c8b41c4a00fe4a2d2a2688b9a807c:sdk/fidl/fuchsia.io/directory.fidl
-constexpr size_t kInoSize = 8;
-constexpr size_t kTypeSize = 1;
-constexpr size_t kNameSizeSize = 1;
 
 /// Given a `PowerDependency` extract the level dependency mappings and convert
 /// them into a vector of `LevelDependency` objects. This does not set the
@@ -52,6 +49,9 @@ fit::result<Error, std::vector<fuchsia_power_broker::LevelDependency>> ConvertPo
   }
 
   // See if this is an assertive or opportunistic dependency
+  // If we don't know the type, default to assertive. This possibly results in
+  // unintentionally high power consumption, but is more likely to preserve
+  // programmatic correctness.
   fuchsia_power_broker::DependencyType dep_type;
   switch (driver_config_deps->strength()) {
     case fuchsia_hardware_power::wire::RequirementType::kAssertive:
@@ -60,6 +60,12 @@ fit::result<Error, std::vector<fuchsia_power_broker::LevelDependency>> ConvertPo
     case fuchsia_hardware_power::wire::RequirementType::kOpportunistic:
       dep_type = fuchsia_power_broker::DependencyType::kOpportunistic;
       break;
+    default:
+      if (fdf::Logger::HasGlobalInstance()) {
+        FDF_LOGL(WARNING, *fdf::Logger::GlobalInstance(),
+                 "Dependency level not recognized, using assertive");
+      }
+      dep_type = fuchsia_power_broker::DependencyType::kAssertive;
   }
 
   // Go through each of the level dependencies and translate them
@@ -86,80 +92,17 @@ fit::result<Error, std::vector<fuchsia_power_broker::LevelDependency>> ConvertPo
 /// Returns Error::IO if there is a problem talking to capabilities.
 std::optional<Error> GetTokensFromParents(ElementDependencyMap& dependencies, TokenMap& tokens,
                                           const fidl::ClientEnd<fuchsia_io::Directory>& svcs_dir) {
-  const uint64_t dir_read_page_size = static_cast<const uint64_t>(8 * 1024);
-
-  std::vector<std::string> service_instances;
-
-  // Enumerate the list os service instances.
-  {
-    auto [client_end, server_end] = fidl::Endpoints<fuchsia_io::Node>::Create();
-
-    // Open the directory containing the services instances
-    fidl::OneWayStatus status = fidl::WireCall(svcs_dir)->Open(
-        ::fuchsia_io::wire::OpenFlags::kDirectory, ::fuchsia_io::wire::ModeType::kDoNotUse,
-        fuchsia_hardware_power::PowerTokenService::Name, std::move(server_end));
-
-    if (!status.ok()) {
-      return Error::TOKEN_SERVICE_CAPABILITY_NOT_FOUND;
+  // Find our tokens from the instances we have.
+  for (auto& dep : dependencies) {
+    if (!dep.first.instance_name()) {
+      continue;
     }
-
-    fidl::WireSyncClient<fuchsia_io::Directory> svcs(
-        fidl::ClientEnd<fuchsia_io::Directory>(client_end.TakeChannel()));
-
-    // TODO(https://fxbug.dev/328630967) Check if there are more granular errors we should return
-    fidl::WireResult<fuchsia_io::Directory::ReadDirents> read_result =
-        svcs->ReadDirents(dir_read_page_size);
-
-    // Peer closed is what we get if the service directory doesn't exist, we
-    // consider this okay
-    if (read_result.is_peer_closed()) {
-      return Error::TOKEN_SERVICE_CAPABILITY_NOT_FOUND;
-    }
-
-    if (read_result.status() != ZX_OK) {
-      // Some non-closed error happened indicating the service directory
-      // existed, but we couldn't access it
-      return Error::READ_INSTANCES;
-    }
-
-    // Build up the list of parent names which we can then match against parent
-    // power elements as expressed in the configuration.
-    auto contents = fidl::ToNatural(read_result.value()).dirents();
-    uint16_t offset = 0;
-    while (offset < contents.size()) {
-      // TODO(https://fxbug.dev/328660976) Maybe read into a struct instead of
-      // byte parsing.
-      // We don't care about the inode
-      offset += kInoSize;
-      uint8_t name_len = contents[offset];
-      // Read the length of the name, so move past it
-      offset += kNameSizeSize;
-      // We don't care about the type
-      offset += kTypeSize;
-      std::string name = std::string(&contents[offset], &contents[offset + name_len]);
-
-      // Make sure this isn't just the entry to the directory itself
-      if (std::string(".") != name) {
-        service_instances.emplace_back(std::move(name));
-      }
-
-      offset += name_len;
-    }
-  }
-
-  if (service_instances.size() == 0) {
-    return Error::NO_TOKEN_SERVICE_INSTANCES;
-  }
-
-  // Go through the service instances we have and ask for a token. For all
-  // GetToken calls that return a name in our list of parent names we need to
-  // insert that token in the map under the name provided by the parent
-  for (const std::string& instance : service_instances) {
     // Get the PowerTokenProvider for a particular service instance.
     fidl::WireSyncClient<fuchsia_hardware_power::PowerTokenProvider> token_client;
     {
       zx::result<fuchsia_hardware_power::PowerTokenService::ServiceClient> svc_instance =
-          component::OpenServiceAt<fuchsia_hardware_power::PowerTokenService>(svcs_dir, instance);
+          component::OpenServiceAt<fuchsia_hardware_power::PowerTokenService>(
+              svcs_dir, dep.first.instance_name().value());
       if (svc_instance.is_error()) {
         return Error::TOKEN_REQUEST;
       }
@@ -180,25 +123,14 @@ std::optional<Error> GetTokensFromParents(ElementDependencyMap& dependencies, To
 
     fuchsia_hardware_power::wire::PowerTokenProviderGetTokenResponse* resp_val =
         token_resp->value();
-    fuchsia_hardware_power::ParentElement parent = fuchsia_hardware_power::ParentElement::WithName(
-        std::string(resp_val->name.data(), resp_val->name.size()));
-
-    // Check that we depend on this element per our configuration
-    if (dependencies.find(parent) == dependencies.end()) {
-      // We didn't find it in the Name dependencies, maybe we can find it in the instance deps.
-      parent = fuchsia_hardware_power::ParentElement::WithInstanceName(instance);
-      if (dependencies.find(parent) == dependencies.end()) {
-        // Seems like we don't depend on this provider, oh well, let's keep looking.
-        continue;
-      }
-    }
 
     // Woohoo! We found something we depend upon, let's store it
     tokens.emplace(std::pair<fuchsia_hardware_power::ParentElement, zx::event>(
-        parent, std::move(resp_val->handle)));
+        dep.first, std::move(resp_val->handle)));
+  }
 
-    // Check this dependency off by removing it from the set of ones we need
-    dependencies.erase(parent);
+  for (auto& token : tokens) {
+    dependencies.erase(token.first);
   }
   return std::nullopt;
 }
@@ -304,9 +236,6 @@ size_t ParentElementHasher::operator()(const fuchsia_hardware_power::ParentEleme
     case fuchsia_hardware_power::ParentElement::Tag::kSag: {
       hash_str.append(std::to_string(static_cast<uint32_t>(element.sag().value())));
     } break;
-    case fuchsia_hardware_power::ParentElement::Tag::kName: {
-      hash_str.append(element.name().value());
-    } break;
     case fuchsia_hardware_power::ParentElement::Tag::kInstanceName: {
       hash_str.append(element.instance_name().value());
     } break;
@@ -405,15 +334,14 @@ fit::result<Error, TokenMap> GetDependencyTokens(
   bool have_sag_dep = false;
   for (const auto& [parent, deps] : dependencies) {
     switch (parent.Which()) {
-      case fuchsia_hardware_power::ParentElement::Tag::kName:
-        have_driver_dep = true;
-        break;
       case fuchsia_hardware_power::ParentElement::Tag::kSag:
         have_sag_dep = true;
         break;
       case fuchsia_hardware_power::ParentElement::Tag::kInstanceName:
         have_driver_dep = true;
         break;
+      default:
+        return fit::error(Error::INVALID_ARGS);
     }
     if (have_driver_dep && have_sag_dep) {
       break;
@@ -444,9 +372,8 @@ fit::result<Error, TokenMap> GetDependencyTokens(
   if (!elements.ok()) {
     if (elements.is_peer_closed()) {
       return fit::error(Error::ACTIVITY_GOVERNOR_UNAVAILABLE);
-    } else {
-      return fit::error(Error::ACTIVITY_GOVERNOR_REQUEST);
     }
+    return fit::error(Error::ACTIVITY_GOVERNOR_REQUEST);
   }
 
   // Track the parents we find so we can remove them from dependencies after
@@ -454,7 +381,7 @@ fit::result<Error, TokenMap> GetDependencyTokens(
   std::vector<fuchsia_hardware_power::ParentElement> found_parents = {};
 
   for (const auto& [parent, deps] : dependencies) {
-    if (parent.Which() == fuchsia_hardware_power::ParentElement::Tag::kName) {
+    if (parent.Which() != fuchsia_hardware_power::ParentElement::Tag::kSag) {
       continue;
     }
 
@@ -463,7 +390,7 @@ fit::result<Error, TokenMap> GetDependencyTokens(
     // be for all clients, but very soon we should modify the return types and
     // return the right tokens.
     switch (parent.sag().value()) {
-      case fuchsia_hardware_power::SagElement::kExecutionState: {
+      case fuchsia_hardware_power::SagElement::kExecutionState:
         if (elements->has_execution_state() &&
             elements->execution_state().has_opportunistic_dependency_token()) {
           zx::event copy;
@@ -473,8 +400,8 @@ fit::result<Error, TokenMap> GetDependencyTokens(
         } else {
           return fit::error(Error::DEPENDENCY_NOT_FOUND);
         }
-      } break;
-      case fuchsia_hardware_power::SagElement::kExecutionResumeLatency: {
+        break;
+      case fuchsia_hardware_power::SagElement::kExecutionResumeLatency:
         if (elements->has_execution_resume_latency() &&
             elements->execution_resume_latency().has_assertive_dependency_token()) {
           zx::event copy;
@@ -484,8 +411,8 @@ fit::result<Error, TokenMap> GetDependencyTokens(
         } else {
           return fit::error(Error::DEPENDENCY_NOT_FOUND);
         }
-      } break;
-      case fuchsia_hardware_power::SagElement::kWakeHandling: {
+        break;
+      case fuchsia_hardware_power::SagElement::kWakeHandling:
         if (elements->has_wake_handling() &&
             elements->wake_handling().has_assertive_dependency_token()) {
           zx::event copy;
@@ -495,8 +422,8 @@ fit::result<Error, TokenMap> GetDependencyTokens(
         } else {
           return fit::error(Error::DEPENDENCY_NOT_FOUND);
         }
-      } break;
-      case fuchsia_hardware_power::SagElement::kApplicationActivity: {
+        break;
+      case fuchsia_hardware_power::SagElement::kApplicationActivity:
         if (elements->has_application_activity() &&
             elements->application_activity().has_assertive_dependency_token()) {
           zx::event copy;
@@ -506,7 +433,9 @@ fit::result<Error, TokenMap> GetDependencyTokens(
         } else {
           return fit::error(Error::DEPENDENCY_NOT_FOUND);
         }
-      } break;
+        break;
+      default:
+        return fit::error(Error::INVALID_ARGS);
     }
 
     // Record that we found this parent
@@ -648,11 +577,11 @@ fit::result<Error> AddElement(
 
 fit::result<Error> AddElement(fidl::ClientEnd<fuchsia_power_broker::Topology>& power_broker,
                               ElementDesc& description) {
-  return AddElement(
-      power_broker, description.element_config_, std::move(description.tokens_),
-      description.assertive_token_.borrow(), description.opportunistic_token_.borrow(),
-      std::move(description.level_control_servers_), std::move(description.lessor_server_),
-      std::move(description.element_control_server_));
+  return AddElement(power_broker, description.element_config_, std::move(description.tokens),
+                    description.assertive_token.borrow(), description.opportunistic_token.borrow(),
+                    std::move(description.level_control_servers),
+                    std::move(description.lessor_server),
+                    std::move(description.element_control_server));
 }
 
 void LeaseHelper::AcquireLease(
@@ -718,6 +647,53 @@ CreateLeaseHelper(const fidl::ClientEnd<fuchsia_power_broker::Topology>& topolog
       std::move(element_control.client), std::move(lessor.client), std::move(required_level.client),
       std::move(current_level.client), dispatcher, std::move(error_callback));
   return fit::success(std::move(helper));
+}
+
+fit::result<Error, std::vector<ElementDesc>> ApplyPowerConfiguration(
+    const fdf::Namespace& ns,
+    fidl::VectorView<fuchsia_hardware_power::wire::PowerElementConfiguration> power_configs) {
+  if (power_configs.empty()) {
+    return fit::success(std::vector<ElementDesc>{});
+  }
+
+  zx::result<fidl::ClientEnd<fuchsia_power_broker::Topology>> topology_connection =
+      ns.Connect<fuchsia_power_broker::Topology>();
+  if (topology_connection.is_error() || !topology_connection->is_valid()) {
+    return fit::error(Error::TOPOLOGY_UNAVAILABLE);
+  }
+
+  std::vector<ElementDesc> descriptions{};
+  for (const fuchsia_hardware_power::wire::PowerElementConfiguration config : power_configs) {
+    fit::result<Error, TokenMap> token_request = GetDependencyTokens(ns, config);
+    if (token_request.is_error()) {
+      return fit::error(token_request.error_value());
+    }
+    ElementDesc description = ElementDescBuilder(config, std::move(token_request.value())).Build();
+    fit::result<Error> add_result = AddElement(topology_connection.value(), description);
+    if (add_result.is_error()) {
+      return fit::error(add_result.error_value());
+    }
+    descriptions.emplace_back(std::move(description));
+  }
+  return fit::success(std::move(descriptions));
+}
+
+fit::result<Error, std::vector<ElementDesc>> GetAndApplyPowerConfiguration(
+    const fdf::Namespace& ns,
+    const fidl::ClientEnd<fuchsia_hardware_platform_device::Device>& dev) {
+  fidl::WireResult<fuchsia_hardware_platform_device::Device::GetPowerConfiguration> result =
+      fidl::WireCall(dev)->GetPowerConfiguration();
+
+  if (!result.ok() || !result->is_ok()) {
+    return fit::error(Error::CONFIGURATION_UNAVAILABLE);
+  }
+
+  std::vector<ElementDesc> descriptions{};
+  if (result->value()->config.empty()) {
+    return fit::success(std::move(descriptions));
+  }
+
+  return ApplyPowerConfiguration(ns, result->value()->config);
 }
 
 }  // namespace fdf_power

@@ -28,7 +28,7 @@ async fn test_pause_advance() {
     assert_eq!(now_1, now_2);
 
     // Set a 24 hour timer then advance time 24 hours. The timer should complete.
-    let long_timeout = zx::Time::from_nanos(now_1) + ONE_DAY;
+    let long_timeout = zx::MonotonicTime::from_nanos(now_1) + ONE_DAY;
     let long_wait_fut = example.wait_until(long_timeout.into_nanos());
     let () = fake_time
         .advance(&Increment::Determined(ONE_DAY.into_nanos()))

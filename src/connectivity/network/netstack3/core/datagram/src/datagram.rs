@@ -4160,6 +4160,7 @@ where
                 return Err(SendError::NotWriteable);
             }
 
+            #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
             match operation {
                 Operation::SendToThisStack((SendParams { socket, ip, options }, core_ctx)) => {
                     let packet =
@@ -4466,6 +4467,7 @@ where
                 }
             }
 
+            #[allow(unreachable_patterns)] // TODO(https://fxbug.dev/360335974)
             match operation {
                 Operation::SendToThisStack((params, core_ctx)) => {
                     DatagramBoundStateContext::with_transport_context(core_ctx, |core_ctx| {

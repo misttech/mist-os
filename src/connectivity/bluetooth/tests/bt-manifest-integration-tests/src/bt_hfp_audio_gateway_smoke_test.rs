@@ -40,32 +40,32 @@ const HFP_CLIENT_MONIKER: &str = "fake-hfp-client";
 /// Proxy is preserved.
 enum Event {
     /// A BR/EDR Profile event.
-    Profile(Option<ProfileRequest>),
+    Profile { _profile: Option<ProfileRequest> },
     /// HFP service client connection.
-    Hfp(Option<HfpProxy>),
+    Hfp { _hfp: Option<HfpProxy> },
     /// HFP Test service client connection.
-    HfpTest(Option<HfpTestProxy>),
+    HfpTest { _hfp_test: Option<HfpTestProxy> },
     /// Battery Manager service connection.
-    BatteryManager(Option<BatteryManagerRequestStream>),
+    BatteryManager { _battery_manager: Option<BatteryManagerRequestStream> },
     /// AudioDeviceEnumerator service connection.
-    AudioDevice(Option<AudioDeviceEnumeratorRequestStream>),
+    AudioDevice { _audio_device: Option<AudioDeviceEnumeratorRequestStream> },
 }
 
 impl From<ProfileRequest> for Event {
     fn from(src: ProfileRequest) -> Self {
-        Self::Profile(Some(src))
+        Self::Profile { _profile: Some(src) }
     }
 }
 
 impl From<BatteryManagerRequestStream> for Event {
     fn from(src: BatteryManagerRequestStream) -> Self {
-        Self::BatteryManager(Some(src))
+        Self::BatteryManager { _battery_manager: Some(src) }
     }
 }
 
 impl From<AudioDeviceEnumeratorRequestStream> for Event {
     fn from(src: AudioDeviceEnumeratorRequestStream) -> Self {
-        Self::AudioDevice(Some(src))
+        Self::AudioDevice { _audio_device: Some(src) }
     }
 }
 
@@ -87,10 +87,13 @@ async fn mock_hfp_client(
     handles: LocalComponentHandles,
 ) -> Result<(), Error> {
     let hfp_svc = handles.connect_to_protocol::<HfpMarker>()?;
-    sender.send(Event::Hfp(Some(hfp_svc))).await.expect("failed sending ack to test");
+    sender.send(Event::Hfp { _hfp: Some(hfp_svc) }).await.expect("failed sending ack to test");
 
     let hfp_test_svc = handles.connect_to_protocol::<HfpTestMarker>()?;
-    sender.send(Event::HfpTest(Some(hfp_test_svc))).await.expect("failed sending ack to test");
+    sender
+        .send(Event::HfpTest { _hfp_test: Some(hfp_test_svc) })
+        .await
+        .expect("failed sending ack to test");
     Ok(())
 }
 
@@ -242,11 +245,11 @@ async fn hfp_audio_gateway_v2_capability_routing() {
     // Expect all events.
     let expected: HashSet<_> = HashSet::from_iter(
         vec![
-            Event::Profile(None),
-            Event::Hfp(None),
-            Event::HfpTest(None),
-            Event::AudioDevice(None),
-            Event::BatteryManager(None),
+            Event::Profile { _profile: None },
+            Event::Hfp { _hfp: None },
+            Event::HfpTest { _hfp_test: None },
+            Event::AudioDevice { _audio_device: None },
+            Event::BatteryManager { _battery_manager: None },
         ]
         .iter()
         .map(std::mem::discriminant),
@@ -257,7 +260,8 @@ async fn hfp_audio_gateway_v2_capability_routing() {
     assert_eq!(
         events
             .iter()
-            .filter(|&d| std::mem::discriminant(d) == std::mem::discriminant(&Event::Profile(None)))
+            .filter(|&d| std::mem::discriminant(d)
+                == std::mem::discriminant(&Event::Profile { _profile: None }))
             .count(),
         2
     );

@@ -2,7 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::diagnostics::{Diagnostics, Event, ANY_DURATION, ANY_TIME};
+use crate::diagnostics::{any_time, Diagnostics, Event, ANY_DURATION};
 use fuchsia_sync::Mutex;
 use fuchsia_zircon as zx;
 
@@ -19,13 +19,13 @@ impl FakeDiagnostics {
     }
 
     /// Panics if the supplied slice does not match the received events. When present in
-    /// expected, the special values ANY_TIME and ANY_DURATION will match any received value.
+    /// expected, the special values any_time() and ANY_DURATION will match any received value.
     pub fn assert_events(&self, expected: &[Event]) {
         self.assert_events_with_len(0, expected);
     }
 
     /// Panics if the supplied slice is not the prefix of the received events. When present in
-    /// expected, the special values ANY_TIME and ANY_DURATION will match any received value.
+    /// expected, the special values any_time() and ANY_DURATION will match any received value.
     /// See [assert_events] for details.
     pub fn assert_events_prefix(&self, expected: &[Event]) {
         self.assert_events_with_len(expected.len(), expected);
@@ -41,7 +41,7 @@ impl FakeDiagnostics {
         if !expected.eq_with_any(&events_lock[..len]) {
             // If we failed to match considering sentinels we are guaranteed to fail without
             // considering them; use the standard assert_eq to generate a nicely formatted error.
-            assert_eq!(*events_lock, expected);
+            assert_eq!(*events_lock, expected, "left=actual; right=expected");
         }
     }
 
@@ -75,9 +75,9 @@ impl EqWithAny for zx::Duration {
     }
 }
 
-impl EqWithAny for zx::Time {
+impl<T: zx::Timeline> EqWithAny for zx::Time<T> {
     fn eq_with_any(&self, other: &Self) -> bool {
-        *self == ANY_TIME || self == other
+        self == &any_time::<T>() || self == other
     }
 }
 
@@ -146,6 +146,7 @@ impl EqWithAny for Event {
 mod test {
     use super::*;
     use crate::enums::{InitialClockState, StartClockSource, Track};
+    use fuchsia_runtime::UtcTime;
 
     const INITIALIZATION_EVENT: Event =
         Event::Initialized { clock_state: InitialClockState::NotSet };
@@ -176,8 +177,8 @@ mod test {
         let diagnostics = FakeDiagnostics::new();
         let test_event = Event::KalmanFilterUpdated {
             track: Track::Monitor,
-            monotonic: zx::Time::from_nanos(1234_000_000_000),
-            utc: zx::Time::from_nanos(2345_000_000_000),
+            monotonic: zx::MonotonicTime::from_nanos(1234_000_000_000),
+            utc: UtcTime::from_nanos(2345_000_000_000),
             sqrt_covariance: zx::Duration::from_millis(321),
         };
 
@@ -186,29 +187,29 @@ mod test {
 
         diagnostics.assert_events(&[Event::KalmanFilterUpdated {
             track: Track::Monitor,
-            monotonic: ANY_TIME,
-            utc: zx::Time::from_nanos(2345_000_000_000),
+            monotonic: any_time(),
+            utc: UtcTime::from_nanos(2345_000_000_000),
             sqrt_covariance: zx::Duration::from_millis(321),
         }]);
 
         diagnostics.assert_events(&[Event::KalmanFilterUpdated {
             track: Track::Monitor,
-            monotonic: zx::Time::from_nanos(1234_000_000_000),
-            utc: ANY_TIME,
+            monotonic: zx::MonotonicTime::from_nanos(1234_000_000_000),
+            utc: any_time(),
             sqrt_covariance: zx::Duration::from_millis(321),
         }]);
 
         diagnostics.assert_events(&[Event::KalmanFilterUpdated {
             track: Track::Monitor,
-            monotonic: zx::Time::from_nanos(1234_000_000_000),
-            utc: zx::Time::from_nanos(2345_000_000_000),
+            monotonic: zx::MonotonicTime::from_nanos(1234_000_000_000),
+            utc: UtcTime::from_nanos(2345_000_000_000),
             sqrt_covariance: ANY_DURATION,
         }]);
 
         diagnostics.assert_events(&[Event::KalmanFilterUpdated {
             track: Track::Monitor,
-            monotonic: ANY_TIME,
-            utc: ANY_TIME,
+            monotonic: any_time(),
+            utc: any_time(),
             sqrt_covariance: ANY_DURATION,
         }]);
     }

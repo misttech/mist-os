@@ -25,7 +25,7 @@ use crate::bounded_queue::{CreatedAt, SizeOf};
 pub struct SnoopPacket {
     pub is_received: bool,
     pub format: PacketFormat,
-    pub timestamp: zx::Time,
+    pub timestamp: zx::MonotonicTime,
     pub original_len: usize,
     pub payload: Vec<u8>,
 }
@@ -34,7 +34,7 @@ impl SnoopPacket {
     pub fn new(
         is_received: bool,
         format: PacketFormat,
-        timestamp: zx::Time,
+        timestamp: zx::MonotonicTime,
         payload: Vec<u8>,
     ) -> Self {
         Self { is_received, format, timestamp, original_len: payload.len(), payload }
@@ -114,7 +114,7 @@ impl TryFrom<SnoopOnObservePacketRequest> for SnoopPacket {
     type Error = Error;
 
     fn try_from(value: SnoopOnObservePacketRequest) -> Result<Self, Self::Error> {
-        let time = zx::Time::get_monotonic();
+        let time = zx::MonotonicTime::get();
         let SnoopOnObservePacketRequest {
             packet: Some(packet), direction: Some(direction), ..
         } = value

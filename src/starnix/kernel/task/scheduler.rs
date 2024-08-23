@@ -301,7 +301,7 @@ pub fn set_thread_role(
         role: Some(RoleName { role: role_name.to_string() }),
         ..Default::default()
     };
-    let _ = role_manager.set_role(request, zx::Time::INFINITE).map_err(|err| {
+    let _ = role_manager.set_role(request, zx::MonotonicTime::INFINITE).map_err(|err| {
         log_warn!(?err, "Unable to set thread role.");
         errno!(EINVAL)
     })?;

@@ -6,13 +6,15 @@
 
 #include <lib/syslog/cpp/macros.h>
 #include <stdint.h>
+#include <zircon/assert.h>
+#include <zircon/errors.h>
 #include <zircon/types.h>
 
 #include <algorithm>
+#include <memory>
+#include <utility>
 
-#include <safemath/safe_conversions.h>
-
-#include "src/storage/blobfs/format.h"
+#include "src/storage/blobfs/iterator/extent_iterator.h"
 
 namespace blobfs {
 

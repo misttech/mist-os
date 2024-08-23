@@ -141,7 +141,7 @@ class AbiSpanImpl<T, N, Elf, Traits, std::void_t<decltype(AbiPtr<T, Elf, Traits>
 
   constexpr T* data() const { return this->AsSpan().ptr().get(); }
 
-  constexpr cpp20::span<T> get() const {
+  constexpr cpp20::span<T, N> get() const {
     const auto count = this->AsSpan().size();
     return cpp20::span<T, N>{data(), count};
   }

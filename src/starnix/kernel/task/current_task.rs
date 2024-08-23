@@ -376,7 +376,11 @@ impl CurrentTask {
         result
     }
 
-    pub fn block_until(&self, guard: EventWaitGuard<'_>, deadline: zx::Time) -> Result<(), Errno> {
+    pub fn block_until(
+        &self,
+        guard: EventWaitGuard<'_>,
+        deadline: zx::MonotonicTime,
+    ) -> Result<(), Errno> {
         self.run_in_state(RunState::Event(guard.event().clone()), move || {
             guard.block_until(deadline).map_err(|e| match e {
                 WakeReason::Interrupted => errno!(EINTR),

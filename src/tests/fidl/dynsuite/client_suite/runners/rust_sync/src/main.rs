@@ -47,7 +47,7 @@ async fn handle_runner_request(request: RunnerRequest) {
         // =====================================================================
         RunnerRequest::CallTwoWayNoPayload { target, responder } => {
             let client = ClosedTargetSynchronousProxy::new(target.into_channel());
-            match client.two_way_no_payload(zx::Time::INFINITE) {
+            match client.two_way_no_payload(zx::MonotonicTime::INFINITE) {
                 Ok(()) => responder.send(&EmptyResultClassification::Success(Empty)).unwrap(),
                 Err(err) => responder
                     .send(&EmptyResultClassification::FidlError(classify_error(err)))
@@ -56,7 +56,7 @@ async fn handle_runner_request(request: RunnerRequest) {
         }
         RunnerRequest::CallTwoWayStructPayload { target, responder } => {
             let client = ClosedTargetSynchronousProxy::new(target.into_channel());
-            match client.two_way_struct_payload(zx::Time::INFINITE) {
+            match client.two_way_struct_payload(zx::MonotonicTime::INFINITE) {
                 Ok(some_field) => responder
                     .send(&NonEmptyResultClassification::Success(NonEmptyPayload { some_field }))
                     .unwrap(),
@@ -67,7 +67,7 @@ async fn handle_runner_request(request: RunnerRequest) {
         }
         RunnerRequest::CallTwoWayTablePayload { target, responder } => {
             let client = ClosedTargetSynchronousProxy::new(target.into_channel());
-            match client.two_way_table_payload(zx::Time::INFINITE) {
+            match client.two_way_table_payload(zx::MonotonicTime::INFINITE) {
                 Ok(payload) => {
                     responder.send(&TableResultClassification::Success(payload)).unwrap()
                 }
@@ -78,7 +78,7 @@ async fn handle_runner_request(request: RunnerRequest) {
         }
         RunnerRequest::CallTwoWayUnionPayload { target, responder } => {
             let client = ClosedTargetSynchronousProxy::new(target.into_channel());
-            match client.two_way_union_payload(zx::Time::INFINITE) {
+            match client.two_way_union_payload(zx::MonotonicTime::INFINITE) {
                 Ok(payload) => {
                     responder.send(&UnionResultClassification::Success(payload)).unwrap()
                 }
@@ -89,7 +89,7 @@ async fn handle_runner_request(request: RunnerRequest) {
         }
         RunnerRequest::CallTwoWayStructPayloadErr { target, responder } => {
             let client = ClosedTargetSynchronousProxy::new(target.into_channel());
-            match client.two_way_struct_payload_err(zx::Time::INFINITE) {
+            match client.two_way_struct_payload_err(zx::MonotonicTime::INFINITE) {
                 Ok(Ok(some_field)) => responder
                     .send(&NonEmptyResultWithErrorClassification::Success(NonEmptyPayload {
                         some_field,
@@ -105,7 +105,7 @@ async fn handle_runner_request(request: RunnerRequest) {
         }
         RunnerRequest::CallTwoWayStructRequest { target, request, responder } => {
             let client = ClosedTargetSynchronousProxy::new(target.into_channel());
-            match client.two_way_struct_request(request.some_field, zx::Time::INFINITE) {
+            match client.two_way_struct_request(request.some_field, zx::MonotonicTime::INFINITE) {
                 Ok(()) => responder.send(&EmptyResultClassification::Success(Empty)).unwrap(),
                 Err(err) => responder
                     .send(&EmptyResultClassification::FidlError(classify_error(err)))
@@ -114,7 +114,7 @@ async fn handle_runner_request(request: RunnerRequest) {
         }
         RunnerRequest::CallTwoWayTableRequest { target, request, responder } => {
             let client = ClosedTargetSynchronousProxy::new(target.into_channel());
-            match client.two_way_table_request(&request, zx::Time::INFINITE) {
+            match client.two_way_table_request(&request, zx::MonotonicTime::INFINITE) {
                 Ok(()) => responder.send(&EmptyResultClassification::Success(Empty)).unwrap(),
                 Err(err) => responder
                     .send(&EmptyResultClassification::FidlError(classify_error(err)))
@@ -123,7 +123,7 @@ async fn handle_runner_request(request: RunnerRequest) {
         }
         RunnerRequest::CallTwoWayUnionRequest { target, request, responder } => {
             let client = ClosedTargetSynchronousProxy::new(target.into_channel());
-            match client.two_way_union_request(&request, zx::Time::INFINITE) {
+            match client.two_way_union_request(&request, zx::MonotonicTime::INFINITE) {
                 Ok(()) => responder.send(&EmptyResultClassification::Success(Empty)).unwrap(),
                 Err(err) => responder
                     .send(&EmptyResultClassification::FidlError(classify_error(err)))
@@ -190,7 +190,7 @@ async fn handle_runner_request(request: RunnerRequest) {
         }
         RunnerRequest::CallStrictTwoWay { target, responder } => {
             let client = OpenTargetSynchronousProxy::new(target.into_channel());
-            match client.strict_two_way(zx::Time::INFINITE) {
+            match client.strict_two_way(zx::MonotonicTime::INFINITE) {
                 Ok(()) => responder.send(&EmptyResultClassification::Success(Empty)).unwrap(),
                 Err(err) => responder
                     .send(&EmptyResultClassification::FidlError(classify_error(err)))
@@ -199,7 +199,7 @@ async fn handle_runner_request(request: RunnerRequest) {
         }
         RunnerRequest::CallStrictTwoWayFields { target, responder } => {
             let client = OpenTargetSynchronousProxy::new(target.into_channel());
-            match client.strict_two_way_fields(zx::Time::INFINITE) {
+            match client.strict_two_way_fields(zx::MonotonicTime::INFINITE) {
                 Ok(some_field) => responder
                     .send(&NonEmptyResultClassification::Success(NonEmptyPayload { some_field }))
                     .unwrap(),
@@ -210,7 +210,7 @@ async fn handle_runner_request(request: RunnerRequest) {
         }
         RunnerRequest::CallStrictTwoWayErr { target, responder } => {
             let client = OpenTargetSynchronousProxy::new(target.into_channel());
-            match client.strict_two_way_err(zx::Time::INFINITE) {
+            match client.strict_two_way_err(zx::MonotonicTime::INFINITE) {
                 Ok(Ok(())) => {
                     responder.send(&EmptyResultWithErrorClassification::Success(Empty)).unwrap()
                 }
@@ -224,7 +224,7 @@ async fn handle_runner_request(request: RunnerRequest) {
         }
         RunnerRequest::CallStrictTwoWayFieldsErr { target, responder } => {
             let client = OpenTargetSynchronousProxy::new(target.into_channel());
-            match client.strict_two_way_fields_err(zx::Time::INFINITE) {
+            match client.strict_two_way_fields_err(zx::MonotonicTime::INFINITE) {
                 Ok(Ok(some_field)) => responder
                     .send(&NonEmptyResultWithErrorClassification::Success(NonEmptyPayload {
                         some_field,
@@ -242,7 +242,7 @@ async fn handle_runner_request(request: RunnerRequest) {
         }
         RunnerRequest::CallFlexibleTwoWay { target, responder } => {
             let client = OpenTargetSynchronousProxy::new(target.into_channel());
-            match client.flexible_two_way(zx::Time::INFINITE) {
+            match client.flexible_two_way(zx::MonotonicTime::INFINITE) {
                 Ok(()) => responder.send(&EmptyResultClassification::Success(Empty)).unwrap(),
                 Err(err) => responder
                     .send(&EmptyResultClassification::FidlError(classify_error(err)))
@@ -251,7 +251,7 @@ async fn handle_runner_request(request: RunnerRequest) {
         }
         RunnerRequest::CallFlexibleTwoWayFields { target, responder } => {
             let client = OpenTargetSynchronousProxy::new(target.into_channel());
-            match client.flexible_two_way_fields(zx::Time::INFINITE) {
+            match client.flexible_two_way_fields(zx::MonotonicTime::INFINITE) {
                 Ok(some_field) => responder
                     .send(&NonEmptyResultClassification::Success(NonEmptyPayload { some_field }))
                     .unwrap(),
@@ -262,7 +262,7 @@ async fn handle_runner_request(request: RunnerRequest) {
         }
         RunnerRequest::CallFlexibleTwoWayErr { target, responder } => {
             let client = OpenTargetSynchronousProxy::new(target.into_channel());
-            match client.flexible_two_way_err(zx::Time::INFINITE) {
+            match client.flexible_two_way_err(zx::MonotonicTime::INFINITE) {
                 Ok(Ok(())) => {
                     responder.send(&EmptyResultWithErrorClassification::Success(Empty)).unwrap()
                 }
@@ -276,7 +276,7 @@ async fn handle_runner_request(request: RunnerRequest) {
         }
         RunnerRequest::CallFlexibleTwoWayFieldsErr { target, responder } => {
             let client = OpenTargetSynchronousProxy::new(target.into_channel());
-            match client.flexible_two_way_fields_err(zx::Time::INFINITE) {
+            match client.flexible_two_way_fields_err(zx::MonotonicTime::INFINITE) {
                 Ok(Ok(some_field)) => responder
                     .send(&NonEmptyResultWithErrorClassification::Success(NonEmptyPayload {
                         some_field,
@@ -302,7 +302,7 @@ async fn handle_runner_request(request: RunnerRequest) {
             std::thread::spawn(move || {
                 println!("Listening for ClosedTarget events...");
                 loop {
-                    let event = client.wait_for_event(zx::Time::INFINITE);
+                    let event = client.wait_for_event(zx::MonotonicTime::INFINITE);
                     match &event {
                         Ok(event) => {
                             println!("Received ClosedTarget event: {}", method_name(event))
@@ -343,7 +343,7 @@ async fn handle_runner_request(request: RunnerRequest) {
                 println!("Waiting for Reporter server to close channel");
                 reporter
                     .into_channel()
-                    .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::Time::INFINITE)
+                    .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::MonotonicTime::INFINITE)
                     .unwrap();
             });
             responder.send().unwrap();
@@ -354,7 +354,7 @@ async fn handle_runner_request(request: RunnerRequest) {
             std::thread::spawn(move || {
                 println!("Listening for AjarTarget events...");
                 loop {
-                    let event = client.wait_for_event(zx::Time::INFINITE);
+                    let event = client.wait_for_event(zx::MonotonicTime::INFINITE);
                     match &event {
                         Ok(event) => println!("Received AjarTarget event: {}", method_name(event)),
                         Err(err) => println!("Failed reading AjarTarget event: {}", err),
@@ -384,7 +384,7 @@ async fn handle_runner_request(request: RunnerRequest) {
                 println!("Waiting for Reporter server to close channel");
                 reporter
                     .into_channel()
-                    .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::Time::INFINITE)
+                    .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::MonotonicTime::INFINITE)
                     .unwrap();
             });
             responder.send().unwrap();
@@ -395,7 +395,7 @@ async fn handle_runner_request(request: RunnerRequest) {
             std::thread::spawn(move || {
                 println!("Listening for OpenTarget events...");
                 loop {
-                    let event = client.wait_for_event(zx::Time::INFINITE);
+                    let event = client.wait_for_event(zx::MonotonicTime::INFINITE);
                     match &event {
                         Ok(event) => println!("Received OpenTarget event: {}", method_name(event)),
                         Err(err) => println!("Failed reading OpenTarget event: {}", err),
@@ -431,7 +431,7 @@ async fn handle_runner_request(request: RunnerRequest) {
                 println!("Waiting for Reporter server to close channel");
                 reporter
                     .into_channel()
-                    .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::Time::INFINITE)
+                    .wait_handle(zx::Signals::CHANNEL_PEER_CLOSED, zx::MonotonicTime::INFINITE)
                     .unwrap();
             });
             responder.send().unwrap();

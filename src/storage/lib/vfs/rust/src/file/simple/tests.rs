@@ -3,25 +3,22 @@
 // found in the LICENSE file.
 
 use super::SimpleFile;
-
-// Macros are exported into the root of the crate.
-use crate::{
-    assert_close, assert_event, assert_get_attr, assert_read, assert_read_at, assert_read_at_err,
-    assert_read_err, assert_read_fidl_err_closed, assert_seek, assert_truncate,
-    assert_truncate_err, assert_write, assert_write_at, assert_write_at_err, assert_write_err,
-    assert_write_fidl_err_closed, clone_as_file_assert_err, clone_get_proxy_assert,
-};
-
 use crate::execution_scope::ExecutionScope;
 use crate::file::test_utils::*;
-use crate::ToObjectRequest;
-
+use crate::{
+    assert_close, assert_event, assert_get_attr, assert_read, assert_read_at,
+    assert_read_fidl_err_closed, assert_seek, assert_truncate_err, assert_write_err,
+    assert_write_fidl_err_closed, clone_as_file_assert_err, clone_get_proxy_assert,
+    ToObjectRequest,
+};
+use assert_matches::assert_matches;
 use fidl::endpoints::create_proxy;
 use fidl_fuchsia_io as fio;
 use fuchsia_async::TestExecutor;
+use fuchsia_zircon_status::Status;
+use futures::StreamExt;
 
 const S_IRUSR: u32 = libc::S_IRUSR as u32;
-const S_IWUSR: u32 = libc::S_IWUSR as u32;
 
 /// Verify that [`SimpleFile::read_only`] works with static and owned data. Compile-time test.
 #[test]
@@ -126,52 +123,27 @@ fn read_only_read_with_describe() {
 }
 
 #[test]
-fn read_write_no_write_flag() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE,
-        SimpleFile::read_write(b"Can read"),
-        |proxy| async move {
-            assert_read!(proxy, "Can read");
-            assert_write_err!(proxy, "Can write", Status::BAD_HANDLE);
-            assert_write_at_err!(proxy, 0, "Can write", Status::BAD_HANDLE);
-            assert_seek!(proxy, 0, Start);
-            assert_read!(proxy, "Can read");
-            assert_close!(proxy);
-        },
-    );
-}
+fn read_only_write_is_not_supported() {
+    let exec = TestExecutor::new();
+    let scope = ExecutionScope::new();
 
-#[test]
-fn read_write_no_read_flag() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_WRITABLE,
-        SimpleFile::read_write(""),
-        |proxy| async move {
-            assert_read_err!(proxy, Status::BAD_HANDLE);
-            assert_read_at_err!(proxy, 0, Status::BAD_HANDLE);
-            assert_write!(proxy, "Can write");
-            assert_close!(proxy);
-        },
-    );
-}
+    let server = SimpleFile::read_only(b"Read only test");
 
-#[test]
-fn open_truncate() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::TRUNCATE,
-        SimpleFile::read_write(b"Will be erased"),
-        |proxy| {
-            async move {
-                // Seek to the end to check the current size.
-                assert_seek!(proxy, 0, End, Ok(0));
-                assert_write!(proxy, "File content");
-                // Ensure remaining contents to not leak out of read call.
-                assert_seek!(proxy, 0, Start);
-                assert_read!(proxy, "File content");
-                assert_close!(proxy);
-            }
-        },
-    );
+    run_client(exec, || async move {
+        let (proxy, server_end) =
+            create_proxy::<fio::FileMarker>().expect("Failed to create connection endpoints");
+
+        let flags = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+        flags
+            .to_object_request(server_end)
+            .handle(|object_request| vfs::file::serve(server, scope, &flags, object_request));
+
+        let mut event_stream = proxy.take_event_stream();
+        assert_matches!(
+            event_stream.next().await,
+            Some(Err(fidl::Error::ClientChannelClosed { status: Status::ACCESS_DENIED, .. }))
+        );
+    });
 }
 
 #[test]
@@ -220,125 +192,6 @@ fn read_mixed_with_read_at() {
 }
 
 #[test]
-fn write_at_0() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        SimpleFile::read_write(b"File content"),
-        |proxy| async move {
-            assert_write_at!(proxy, 0, "New content!");
-            assert_seek!(proxy, 0, Start);
-            // Validate contents.
-            assert_read!(proxy, "New content!");
-            assert_close!(proxy);
-        },
-    );
-}
-
-#[test]
-fn write_at_overlapping() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        SimpleFile::read_write(b"012345678901234567"),
-        |proxy| async move {
-            assert_write_at!(proxy, 8, "le content");
-            assert_write_at!(proxy, 6, "file");
-            assert_write_at!(proxy, 0, "Whole file");
-            // Validate contents.
-            assert_seek!(proxy, 0, Start);
-            assert_read!(proxy, "Whole file content");
-            assert_close!(proxy);
-        },
-    );
-}
-
-#[test]
-fn write_mixed_with_write_at() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        SimpleFile::read_write(b"012345678901234567"),
-        |proxy| async move {
-            assert_write!(proxy, "whole");
-            assert_write_at!(proxy, 0, "Who");
-            assert_write!(proxy, " 1234 ");
-            assert_write_at!(proxy, 6, "file");
-            assert_write!(proxy, "content");
-            // Validate contents.
-            assert_seek!(proxy, 0, Start);
-            assert_read!(proxy, "Whole file content");
-            assert_close!(proxy);
-        },
-    );
-}
-
-#[test]
-fn appending_writes() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE | fio::OpenFlags::APPEND,
-        SimpleFile::read_write(b"data-1"),
-        |proxy| async move {
-            assert_write!(proxy, " data-2");
-            assert_read_at!(proxy, 0, "data-1 data-2");
-
-            // The seek offset is reset to the end of the file when writing.
-            assert_seek!(proxy, 0, Start);
-            assert_write!(proxy, " data-3");
-            assert_read_at!(proxy, 0, "data-1 data-2 data-3");
-
-            // The seek offset is reset to the end of the file when writing after a truncate.
-            assert_truncate!(proxy, 6);
-            assert_write!(proxy, " data-4");
-            assert_read_at!(proxy, 0, "data-1 data-4");
-            assert_seek!(proxy, 0, End, Ok(13));
-
-            assert_close!(proxy);
-        },
-    );
-}
-
-#[test]
-fn seek_read_write() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        SimpleFile::read_write(b"Initial"),
-        |proxy| {
-            async move {
-                assert_read!(proxy, "Init");
-                assert_write!(proxy, "l con");
-                // buffer: "Initl con"
-                assert_seek!(proxy, 0, Start);
-                assert_write!(proxy, "Fina");
-                // buffer: "Final con"
-                assert_seek!(proxy, 0, End, Ok(9));
-                assert_write!(proxy, "tent");
-                // Validate contents.
-                assert_seek!(proxy, 0, Start);
-                assert_read!(proxy, "Final content");
-                assert_close!(proxy);
-            }
-        },
-    );
-}
-
-#[test]
-fn write_after_seek_beyond_size_fills_gap_with_zeroes() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        SimpleFile::read_write(b"Before gap"),
-        |proxy| {
-            async move {
-                assert_seek!(proxy, 0, End, Ok(10));
-                assert_seek!(proxy, 4, Current, Ok(14)); // Four byte gap past original content.
-                assert_write!(proxy, "After gap");
-                // Validate contents.
-                assert_seek!(proxy, 0, Start);
-                assert_read!(proxy, "Before gap\0\0\0\0After gap");
-                assert_close!(proxy);
-            }
-        },
-    );
-}
-
-#[test]
 fn seek_valid_positions() {
     run_server_client(
         fio::OpenFlags::RIGHT_READABLE,
@@ -360,31 +213,10 @@ fn seek_valid_positions() {
 #[test]
 fn seek_valid_beyond_size() {
     run_server_client(
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        SimpleFile::read_write(b"Content"),
-        |proxy| {
-            async move {
-                assert_seek!(proxy, 7, Start);
-                assert_read!(proxy, "");
-                assert_write!(proxy, " ext");
-                //      "Content ext"));
-                assert_seek!(proxy, 3, Current, Ok(14));
-                assert_write!(proxy, "ed");
-                //      "Content ext000ed"));
-                assert_seek!(proxy, 4, End, Ok(20));
-                assert_write!(proxy, "ther");
-                //      "Content ext000ed0000ther"));
-                //       0         1         2
-                //       012345678901234567890123
-                assert_seek!(proxy, 11, Start);
-                assert_write!(proxy, "end");
-                assert_seek!(proxy, 16, Start);
-                assert_write!(proxy, " fur");
-                // Validate contents.
-                assert_seek!(proxy, 0, Start);
-                assert_read!(proxy, "Content extended further");
-                assert_close!(proxy);
-            }
+        fio::OpenFlags::RIGHT_READABLE,
+        SimpleFile::read_only(b"Content"),
+        |proxy| async move {
+            assert_seek!(proxy, 20, Start);
         },
     );
 }
@@ -424,41 +256,6 @@ fn seek_invalid_before_0() {
 }
 
 #[test]
-fn seek_after_expanding_truncate() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        SimpleFile::read_write(b"Content"),
-        |proxy| async move {
-            assert_truncate!(proxy, 12); // Increases size of the file to 12, padding with zeroes.
-            assert_seek!(proxy, 10, Start);
-            assert_write!(proxy, "end");
-            // Validate contents.
-            assert_seek!(proxy, 0, Start);
-            assert_read!(proxy, "Content\0\0\0end");
-            assert_close!(proxy);
-        },
-    );
-}
-
-#[test]
-fn seek_beyond_size_after_shrinking_truncate() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        SimpleFile::read_write(b"Content"),
-        |proxy| async move {
-            assert_truncate!(proxy, 4); // Decrease the size of the file to four.
-            assert_seek!(proxy, 0, End, Ok(4));
-            assert_seek!(proxy, 4, Current, Ok(8)); // Four bytes beyond the truncated end.
-            assert_write!(proxy, "end");
-            // Validate contents.
-            assert_seek!(proxy, 0, Start);
-            assert_read!(proxy, "Cont\0\0\0\0end");
-            assert_close!(proxy);
-        },
-    );
-}
-
-#[test]
 fn seek_empty_file() {
     run_server_client(
         fio::OpenFlags::RIGHT_READABLE,
@@ -487,28 +284,6 @@ fn seek_allowed_beyond_size() {
 }
 
 #[test]
-fn truncate_to_0() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        SimpleFile::read_write(b"Content"),
-        |proxy| {
-            async move {
-                assert_read!(proxy, "Content");
-                assert_truncate!(proxy, 0);
-                // truncate should not change the seek position.
-                assert_seek!(proxy, 0, Current, Ok(7));
-                assert_seek!(proxy, 0, Start);
-                assert_write!(proxy, "Replaced");
-                // Validate contents.
-                assert_seek!(proxy, 0, Start);
-                assert_read!(proxy, "Replaced");
-                assert_close!(proxy);
-            }
-        },
-    );
-}
-
-#[test]
 fn truncate_read_only_file() {
     run_server_client(
         fio::OpenFlags::RIGHT_READABLE,
@@ -530,29 +305,6 @@ fn get_attr_read_only() {
                 proxy,
                 fio::NodeAttributes {
                     mode: fio::MODE_TYPE_FILE | S_IRUSR,
-                    id: fio::INO_UNKNOWN,
-                    content_size: 7,
-                    storage_size: 7,
-                    link_count: 1,
-                    creation_time: 0,
-                    modification_time: 0,
-                }
-            );
-            assert_close!(proxy);
-        },
-    );
-}
-
-#[test]
-fn get_attr_read_write() {
-    run_server_client(
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-        SimpleFile::read_write(b"Content"),
-        |proxy| async move {
-            assert_get_attr!(
-                proxy,
-                fio::NodeAttributes {
-                    mode: fio::MODE_TYPE_FILE | S_IWUSR | S_IRUSR,
                     id: fio::INO_UNKNOWN,
                     content_size: 7,
                     storage_size: 7,

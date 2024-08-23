@@ -205,6 +205,16 @@ declare_args() {
   #
   cxx_rbe_check = "none"
 
+  # reclient owns the logic for deciding what inputs are needed for
+  # remote compilation, but in some cases, it may fall behind
+  # upstream toolchain development.
+  # This option forces the *entire* toolchain directory to be included
+  # as an input, which is generally guaranteed to work as it bears
+  # no assumptions about how the toolchain works, but it comes at the
+  # cost of performance overhead.
+  # Use this primarily for debugging and as an emergency workaround.
+  cxx_rbe_full_toolchain = false
+
   # When any of the {Rust,C++} {determinism,consistency} checks fail,
   # copy the artifacts' difference-pairs to this directory for exporting
   # from infra builds, and later inspection.
@@ -263,6 +273,16 @@ declare_args() {
   #       by running both and comparing results.
   #
   link_rbe_check = "none"
+
+  # reclient owns the logic for deciding what inputs are needed for
+  # remote linking, but in some cases, it may fall behind
+  # upstream toolchain development.
+  # This option forces the *entire* toolchain directory to be included
+  # as an input, which is generally guaranteed to work as it bears
+  # no assumptions about how the toolchain works, but it comes at the
+  # cost of performance overhead.
+  # Use this primarily for debugging and as an emergency workaround.
+  link_rbe_full_toolchain = false
 
   # Controls whether or not to download (often large) unstripped linker
   # outputs.  When downloading is disabled, the build produces stubs

@@ -79,7 +79,18 @@ if (is_host && has_board) {
     }
 
     # TODO(b/319276232): Reenable sherlock when the flake is fixed.
+    #
+    # Note that sherlock cannot run the Starnix tests, which happen to be the only e2e tests
+    # that currently run on these environments (see below).
     environments -= [ sherlock_env ]
+
+    # TODO(https://fxbug.dev/42109154): Re-enable astro/nelson when enabling non-Starnix
+    # breakpoint tests below. These environments cannot run the Starnix tests which are the
+    # only e2e tests that currently run on these environments.
+    environments -= [
+      astro_env,
+      nelson_env,
+    ]
 
     # TODO(https://fxbug.dev/319163754): This test doesn't pass on GCE.
     environments += [ gce_env ]

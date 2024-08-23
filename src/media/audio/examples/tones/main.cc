@@ -12,7 +12,8 @@
 #include "src/media/audio/examples/tones/tones.h"
 
 int main(int argc, const char** argv) {
-  fuchsia_logging::SetTags({"tones"});
+  fuchsia_logging::LogSettingsBuilder builder;
+  builder.WithTags({"tones"}).BuildAndInitialize();
 
   fxl::CommandLine command_line = fxl::CommandLineFromArgcArgv(argc, argv);
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);

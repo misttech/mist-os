@@ -6,6 +6,7 @@ import enum
 from collections.abc import Mapping
 from dataclasses import asdict
 
+from honeydew import errors
 from honeydew.interfaces.affordances.wlan import wlan
 from honeydew.transports.sl4f import SL4F
 from honeydew.typing.wlan import (
@@ -97,7 +98,8 @@ class Wlan(wlan.Wlan):
             True on success otherwise false.
 
         Raises:
-            errors.Sl4fError: Sl4f run command failed.
+            errors.HoneydewWlanError: Sl4f run command failed.
+            NetworkInterfaceNotFoundError: No client WLAN interface found.
             TypeError: Return value not a bool.
         """
         method_params = {
@@ -105,11 +107,24 @@ class Wlan(wlan.Wlan):
             "target_pwd": password,
             "target_bss_desc": asdict(bss_desc),
         }
-        resp: dict[str, object] = self._sl4f.run(
-            method=_Sl4fMethods.CONNECT, params=method_params
-        )
-        result = resp.get("result")
+        try:
+            resp: dict[str, object] = self._sl4f.run(
+                method=_Sl4fMethods.CONNECT, params=method_params
+            )
+        except errors.Sl4fError as e:
+            raise errors.HoneydewWlanError("Failed to connect") from e
 
+        error = str(resp.get("error"))
+        if "No wlan interface found" in error:
+            raise errors.NetworkInterfaceNotFoundError(
+                "No WLAN interface found"
+            )
+        elif "interface with role client not found" in error.lower():
+            raise errors.NetworkInterfaceNotFoundError(
+                "No client WLAN interface found"
+            )
+
+        result = resp.get("result")
         if not isinstance(result, bool):
             raise TypeError(f'Expected "result" to be bool, got {type(result)}')
 
@@ -129,7 +144,7 @@ class Wlan(wlan.Wlan):
             Iface id of newly created interface.
 
         Raises:
-            errors.Sl4fError: Sl4f run command failed.
+            errors.HoneydewWlanError: Sl4f run command failed.
             TypeError: Return value not an int.
         """
         method_params = {
@@ -137,9 +152,12 @@ class Wlan(wlan.Wlan):
             "role": role,
             "sta_addr": sta_addr,
         }
-        resp = self._sl4f.run(
-            method=_Sl4fMethods.CREATE_IFACE, params=method_params
-        )
+        try:
+            resp = self._sl4f.run(
+                method=_Sl4fMethods.CREATE_IFACE, params=method_params
+            )
+        except errors.Sl4fError as e:
+            raise errors.HoneydewWlanError("Failed to create_iface") from e
 
         return _get_int(resp, "result")
 
@@ -150,18 +168,26 @@ class Wlan(wlan.Wlan):
             iface_id: The interface to destroy.
 
         Raises:
-            errors.Sl4fError: Sl4f run command failed.
+            errors.HoneydewWlanError: Sl4f run command failed.
         """
         method_params = {"identifier": iface_id}
-        self._sl4f.run(method=_Sl4fMethods.DESTROY_IFACE, params=method_params)
+        try:
+            self._sl4f.run(
+                method=_Sl4fMethods.DESTROY_IFACE, params=method_params
+            )
+        except errors.Sl4fError as e:
+            raise errors.HoneydewWlanError("Failed to destroy_iface") from e
 
     def disconnect(self) -> None:
         """Disconnect any current wifi connections.
 
         Raises:
-            errors.Sl4fError: Sl4f run command failed.
+            errors.HoneydewWlanError: Sl4f run command failed.
         """
-        self._sl4f.run(method=_Sl4fMethods.DISCONNECT)
+        try:
+            self._sl4f.run(method=_Sl4fMethods.DISCONNECT)
+        except errors.Sl4fError as e:
+            raise errors.HoneydewWlanError("Failed to disconnect") from e
 
     def get_country(self, phy_id: int) -> CountryCode:
         """Queries the currently configured country code from phy `phy_id`.
@@ -173,14 +199,16 @@ class Wlan(wlan.Wlan):
             The currently configured country code from `phy_id`.
 
         Raises:
-            errors.Sl4fError: Sl4f run command failed.
+            errors.HoneydewWlanError: Sl4f run command failed.
             TypeError: Return value not a list.
         """
         method_params = {"phy_id": phy_id}
-
-        resp = self._sl4f.run(
-            method=_Sl4fMethods.GET_COUNTRY, params=method_params
-        )
+        try:
+            resp = self._sl4f.run(
+                method=_Sl4fMethods.GET_COUNTRY, params=method_params
+            )
+        except errors.Sl4fError as e:
+            raise errors.HoneydewWlanError("Failed to get_country") from e
         result = resp.get("result")
 
         if not isinstance(result, list):
@@ -197,12 +225,15 @@ class Wlan(wlan.Wlan):
             A list of wlan iface IDs that are present on the device.
 
         Raises:
-            errors.Sl4fError: On failure.
+            errors.HoneydewWlanError: On failure.
             TypeError: Return value not a list.
         """
-        resp: dict[str, object] = self._sl4f.run(
-            method=_Sl4fMethods.GET_IFACE_ID_LIST
-        )
+        try:
+            resp: dict[str, object] = self._sl4f.run(
+                method=_Sl4fMethods.GET_IFACE_ID_LIST
+            )
+        except errors.Sl4fError as e:
+            raise errors.HoneydewWlanError("Failed to get_iface_id_list") from e
         result: object = resp.get("result")
 
         if not isinstance(result, list):
@@ -217,12 +248,15 @@ class Wlan(wlan.Wlan):
             A list of phy ids that is present on the device.
 
         Raises:
-            errors.Sl4fError: On failure.
+            errors.HoneydewWlanError: On failure.
             TypeError: Return value not a list.
         """
-        resp: dict[str, object] = self._sl4f.run(
-            method=_Sl4fMethods.GET_PHY_ID_LIST
-        )
+        try:
+            resp: dict[str, object] = self._sl4f.run(
+                method=_Sl4fMethods.GET_PHY_ID_LIST
+            )
+        except errors.Sl4fError as e:
+            raise errors.HoneydewWlanError("Failed to get_phy_id_list") from e
         result: object = resp.get("result")
 
         if not isinstance(result, list):
@@ -240,14 +274,16 @@ class Wlan(wlan.Wlan):
             QueryIfaceResponseWrapper from the SL4F server.
 
         Raises:
-            errors.Sl4fError: On failure.
+            errors.HoneydewWlanError: On failure.
             TypeError: If any of the return values are not of the expected type.
         """
         method_params = {"iface_id": iface_id}
-
-        resp: dict[str, object] = self._sl4f.run(
-            method=_Sl4fMethods.QUERY_IFACE, params=method_params
-        )
+        try:
+            resp: dict[str, object] = self._sl4f.run(
+                method=_Sl4fMethods.QUERY_IFACE, params=method_params
+            )
+        except errors.Sl4fError as e:
+            raise errors.HoneydewWlanError("Failed to query_iface") from e
         result: object = resp.get("result")
 
         if not isinstance(result, dict):
@@ -275,14 +311,28 @@ class Wlan(wlan.Wlan):
             blocks, one for each BSS observed in the network
 
         Raises:
-            errors.Sl4fError: Sl4f run command failed.
+            errors.HoneydewWlanError: Sl4f run command failed.
+            NetworkInterfaceNotFoundError: No client WLAN interface found.
             TypeError: If any of the return values are not of the expected type.
         """
-        resp: dict[str, object] = self._sl4f.run(
-            method=_Sl4fMethods.SCAN_FOR_BSS_INFO
-        )
-        result: object = resp.get("result")
+        try:
+            resp: dict[str, object] = self._sl4f.run(
+                method=_Sl4fMethods.SCAN_FOR_BSS_INFO
+            )
+        except errors.Sl4fError as e:
+            raise errors.HoneydewWlanError("Failed to scan_for_bss_info") from e
 
+        error = str(resp.get("error"))
+        if "No wlan interface found" in error:
+            raise errors.NetworkInterfaceNotFoundError(
+                "No WLAN interface found"
+            )
+        elif "interface with role client not found" in error.lower():
+            raise errors.NetworkInterfaceNotFoundError(
+                "No client WLAN interface found"
+            )
+
+        result: object = resp.get("result")
         if not isinstance(result, dict):
             raise TypeError(f'Expected "result" to be dict, got {type(result)}')
 
@@ -343,10 +393,13 @@ class Wlan(wlan.Wlan):
             region_code: 2-byte ASCII string.
 
         Raises:
-            errors.Sl4fError: Sl4f run command failed.
+            errors.HoneydewWlanError: Sl4f run command failed.
         """
         method_params = {"region": region_code.value}
-        self._sl4f.run(method=_Sl4fMethods.SET_REGION, params=method_params)
+        try:
+            self._sl4f.run(method=_Sl4fMethods.SET_REGION, params=method_params)
+        except errors.Sl4fError as e:
+            raise errors.HoneydewWlanError("Failed to set_region") from e
 
     def status(self) -> ClientStatusResponse:
         """Request connection status
@@ -356,13 +409,27 @@ class Wlan(wlan.Wlan):
             ClientStatusConnected, ClientStatusConnecting, ClientStatusIdle.
 
         Raises:
-            errors.Sl4fError: On failure.
+            errors.HoneydewWlanError: On failure.
+            NetworkInterfaceNotFoundError: No client WLAN interface found.
             TypeError: If any of the return values are not of the expected type.
             ValueError: If none of the possible results are present.
         """
-        resp: dict[str, object] = self._sl4f.run(method=_Sl4fMethods.STATUS)
-        result: object = resp.get("result")
+        try:
+            resp: dict[str, object] = self._sl4f.run(method=_Sl4fMethods.STATUS)
+        except errors.Sl4fError as e:
+            raise errors.HoneydewWlanError("Failed to get status") from e
 
+        error = str(resp.get("error"))
+        if "No wlan interface found" in error:
+            raise errors.NetworkInterfaceNotFoundError(
+                "No WLAN interface found"
+            )
+        elif "interface with role client not found" in error.lower():
+            raise errors.NetworkInterfaceNotFoundError(
+                "No client WLAN interface found"
+            )
+
+        result: object = resp.get("result")
         if not isinstance(result, dict):
             raise TypeError(f'Expected "result" to be dict, got {type(result)}')
 

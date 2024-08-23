@@ -302,7 +302,7 @@ async fn test_set_valid_sag_states() -> Result<()> {
 
     let _ = sag_ctrl_state
         .set(&fctrl::SystemActivityGovernorState {
-            execution_state_level: Some(ExecutionStateLevel::WakeHandling),
+            execution_state_level: Some(ExecutionStateLevel::Suspending),
             application_activity_level: Some(ApplicationActivityLevel::Inactive),
             full_wake_handling_level: Some(FullWakeHandlingLevel::Active),
             ..Default::default()
@@ -312,7 +312,7 @@ async fn test_set_valid_sag_states() -> Result<()> {
         .unwrap();
 
     // Wait until SAG state changes to [1, 0, 1, 0].
-    current_state.execution_state_level.replace(ExecutionStateLevel::WakeHandling);
+    current_state.execution_state_level.replace(ExecutionStateLevel::Suspending);
     current_state.full_wake_handling_level.replace(FullWakeHandlingLevel::Active);
     current_state.application_activity_level.replace(ApplicationActivityLevel::Inactive);
     assert_eq!(sag_ctrl_state.watch().await.unwrap(), current_state);
@@ -366,7 +366,7 @@ async fn test_set_valid_sag_states() -> Result<()> {
 
     let _ = sag_ctrl_state
         .set(&fctrl::SystemActivityGovernorState {
-            execution_state_level: Some(ExecutionStateLevel::WakeHandling),
+            execution_state_level: Some(ExecutionStateLevel::Suspending),
             application_activity_level: Some(ApplicationActivityLevel::Inactive),
             full_wake_handling_level: Some(FullWakeHandlingLevel::Active),
             ..Default::default()
@@ -376,7 +376,7 @@ async fn test_set_valid_sag_states() -> Result<()> {
         .unwrap();
 
     // Wait until SAG state changes to [1, 0, 1, 0].
-    current_state.execution_state_level.replace(ExecutionStateLevel::WakeHandling);
+    current_state.execution_state_level.replace(ExecutionStateLevel::Suspending);
     current_state.application_activity_level.replace(ApplicationActivityLevel::Inactive);
     current_state.full_wake_handling_level.replace(FullWakeHandlingLevel::Active);
     assert_eq!(sag_ctrl_state.watch().await.unwrap(), current_state);
@@ -529,13 +529,13 @@ async fn test_set_invalid_sag_states() -> Result<()> {
         Err(fctrl::SetSystemActivityGovernorStateError::NotSupported)
     );
 
-    // When ExecutionState is WakeHandling, ApplicationActivity has to be
+    // When ExecutionState is Suspending, ApplicationActivity has to be
     // inactive, at least one of WakeHandling or FullWakeHandling needs to be
     // Active.
     assert_eq!(
         sag_ctrl_state
             .set(&fctrl::SystemActivityGovernorState {
-                execution_state_level: Some(ExecutionStateLevel::WakeHandling),
+                execution_state_level: Some(ExecutionStateLevel::Suspending),
                 application_activity_level: Some(ApplicationActivityLevel::Active),
                 full_wake_handling_level: Some(FullWakeHandlingLevel::Active),
                 wake_handling_level: Some(WakeHandlingLevel::Inactive),
@@ -549,7 +549,7 @@ async fn test_set_invalid_sag_states() -> Result<()> {
     assert_eq!(
         sag_ctrl_state
             .set(&fctrl::SystemActivityGovernorState {
-                execution_state_level: Some(ExecutionStateLevel::WakeHandling),
+                execution_state_level: Some(ExecutionStateLevel::Suspending),
                 application_activity_level: Some(ApplicationActivityLevel::Inactive),
                 full_wake_handling_level: Some(FullWakeHandlingLevel::Inactive),
                 wake_handling_level: Some(WakeHandlingLevel::Inactive),

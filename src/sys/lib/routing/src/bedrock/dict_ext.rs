@@ -146,7 +146,7 @@ impl DictExt for Dict {
             let Some(capability) = capability else { return Ok(None) };
 
             // Resolve the capability, this is a noop if it's not a router.
-            current_capability = capability.route(request.clone()).await?;
+            current_capability = capability.route(request.try_clone()?).await?;
         }
         Ok(Some(current_capability))
     }

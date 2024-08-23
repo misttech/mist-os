@@ -333,14 +333,16 @@ impl<R> TestEnv<R> {
             }),
             OmahaState::Manual(cfg) => Ok(UpdateUrlSource::OmahaConfig(cfg)),
             OmahaState::Auto(response) => {
+                // Amend the default struct with the expected package hash
+                let mut response = ResponseAndMetadata { response, ..Default::default() };
+                let p: Vec<_> = response.package_name.split("?hash=").collect();
+                assert_eq!(p.len(), 2);
+                response.package_name = format!("{}?hash={}", p[0], merkle);
                 let server = OmahaServerBuilder::default()
                     .responses_by_appid(
-                        vec![(
-                            "integration-test-appid".to_string(),
-                            ResponseAndMetadata { response, merkle, ..Default::default() },
-                        )]
-                        .into_iter()
-                        .collect::<ResponseMap>(),
+                        vec![("integration-test-appid".to_string(), response)]
+                            .into_iter()
+                            .collect::<ResponseMap>(),
                     )
                     .build()
                     .unwrap();

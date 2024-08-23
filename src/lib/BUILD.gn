@@ -7,9 +7,9 @@ group("tests") {
 
   deps = [
     "analytics:tests",
+    "android:tests",
     "async-gunzip:tests",
     "async-utils:tests",
-    "async-watchdog:tests",
     "backoff:tests",
     "callback:tests",
     "chunked-compression:tests",

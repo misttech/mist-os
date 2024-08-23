@@ -2,47 +2,48 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-#include <fuchsia/ui/display/singleton/cpp/fidl.h>
-#include <fuchsia/ui/focus/cpp/fidl.h>
-#include <fuchsia/ui/input3/cpp/fidl.h>
-#include <fuchsia/ui/test/conformance/cpp/fidl.h>
-#include <fuchsia/ui/test/scene/cpp/fidl.h>
-#include <fuchsia/ui/views/cpp/fidl.h>
-#include <lib/fidl/cpp/binding.h>
+#include <fidl/fuchsia.ui.display.singleton/cpp/fidl.h>
+#include <fidl/fuchsia.ui.focus/cpp/fidl.h>
+#include <fidl/fuchsia.ui.input3/cpp/fidl.h>
+#include <fidl/fuchsia.ui.test.conformance/cpp/fidl.h>
+#include <fidl/fuchsia.ui.test.scene/cpp/fidl.h>
+#include <fidl/fuchsia.ui.views/cpp/fidl.h>
+#include <lib/component/incoming/cpp/protocol.h>
+#include <lib/fidl/cpp/channel.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/ui/scenic/cpp/view_creation_tokens.h>
-#include <zircon/errors.h>
 
 #include <string>
 #include <utility>
 #include <vector>
 
+#include <src/lib/fsl/handles/object_info.h>
+#include <src/ui/tests/conformance_input_tests/conformance-test-base.h>
 #include <zxtest/zxtest.h>
-
-#include "src/lib/fsl/handles/object_info.h"
-#include "src/ui/tests/conformance_input_tests/conformance-test-base.h"
 
 namespace ui_conformance_testing {
 
-const std::string PUPPET_UNDER_TEST_FACTORY_SERVICE = "puppet-under-test-factory-service";
+const std::string PUPPET_UNDER_TEST_FACTORY_SERVICE = "/svc/puppet-under-test-factory-service";
 
-namespace futc = fuchsia::ui::test::conformance;
-namespace fui = fuchsia::ui::input3;
-namespace fuv = fuchsia::ui::views;
-namespace fuf = fuchsia::ui::focus;
+namespace futc = fuchsia_ui_test_conformance;
+namespace fui = fuchsia_ui_input3;
+namespace fuv = fuchsia_ui_views;
+namespace fuf = fuchsia_ui_focus;
 
-class FocusListener : public fuf::FocusChainListener {
+class FocusListener : public fidl::Server<fuf::FocusChainListener> {
  public:
-  FocusListener() : binding_(this) {}
-
-  // |fuchsia::ui::focus::FocusChainListener|
-  void OnFocusChange(fuf::FocusChain focus_chain, OnFocusChangeCallback callback) override {
-    focus_chain_updates_.push_back(std::move(focus_chain));
-    callback();
+  // |fuchsia_ui_focus::FocusChainListener|
+  void OnFocusChange(OnFocusChangeRequest& request,
+                     OnFocusChangeCompleter::Sync& completer) override {
+    focus_chain_updates_.push_back(std::move(request.focus_chain()));
+    completer.Reply();
   }
 
-  // Returns a client end bound to this object.
-  fidl::InterfaceHandle<fuf::FocusChainListener> NewBinding() { return binding_.NewBinding(); }
+  fidl::ClientEnd<fuf::FocusChainListener> ServeAndGetClientEnd(async_dispatcher_t* dispatcher) {
+    auto [client_end, server_end] = fidl::Endpoints<fuf::FocusChainListener>::Create();
+    binding_.AddBinding(dispatcher, std::move(server_end), this, fidl::kIgnoreBindingClosure);
+    return std::move(client_end);
+  }
 
   bool IsViewFocused(const fuv::ViewRef& view_ref) const {
     if (focus_chain_updates_.empty()) {
@@ -51,27 +52,77 @@ class FocusListener : public fuf::FocusChainListener {
 
     const auto& last_focus_chain = focus_chain_updates_.back();
 
-    if (!last_focus_chain.has_focus_chain()) {
+    if (!last_focus_chain.focus_chain().has_value()) {
       return false;
     }
 
-    if (last_focus_chain.focus_chain().empty()) {
+    if (last_focus_chain.focus_chain()->empty()) {
       return false;
     }
 
     // the new focus view store at the last slot.
-    return fsl::GetKoid(last_focus_chain.focus_chain().back().reference.get()) ==
-           fsl::GetKoid(view_ref.reference.get());
+    return fsl::GetKoid(last_focus_chain.focus_chain()->back().reference().get()) ==
+           fsl::GetKoid(view_ref.reference().get());
   }
 
   const std::vector<fuf::FocusChain>& focus_chain_updates() const { return focus_chain_updates_; }
 
  private:
-  fidl::Binding<fuf::FocusChainListener> binding_;
+  fidl::ServerBindingGroup<fuf::FocusChainListener> binding_;
   std::vector<fuf::FocusChain> focus_chain_updates_;
 };
 
-using FocusConformanceTest = ui_conformance_test_base::ConformanceTest;
+class FocusConformanceTest : public ui_conformance_test_base::ConformanceTest {
+ public:
+  void PresentAndAddPuppetView() {
+    // Present view.
+    fuv::ViewCreationToken root_view_token;
+    {
+      FX_LOGS(INFO) << "Creating root view token";
+
+      auto controller = ConnectSyncIntoRealm<fuchsia_ui_test_scene::Controller>();
+
+      fuchsia_ui_test_scene::ControllerPresentClientViewRequest req;
+      auto [view_token, viewport_token] = scenic::cpp::ViewCreationTokenPair::New();
+      req.viewport_creation_token(std::move(viewport_token));
+      ZX_ASSERT_OK(controller->PresentClientView(std::move(req)));
+      root_view_token = std::move(view_token);
+    }
+
+    // Add puppet view.
+    {
+      FX_LOGS(INFO) << "Create puppet under test";
+
+      auto puppet_factory_connect =
+          component::Connect<futc::PuppetFactory>(PUPPET_UNDER_TEST_FACTORY_SERVICE);
+      ZX_ASSERT_OK(puppet_factory_connect);
+
+      puppet_factory_ = fidl::SyncClient(std::move(puppet_factory_connect.value()));
+
+      auto flatland = ConnectIntoRealm<fuchsia_ui_composition::Flatland>();
+      auto keyboard = ConnectIntoRealm<fui::Keyboard>();
+      auto [puppet_client_end, puppet_server_end] = fidl::Endpoints<futc::Puppet>::Create();
+
+      futc::PuppetCreationArgs creation_args;
+      creation_args.server_end(std::move(puppet_server_end));
+      creation_args.view_token(std::move(root_view_token));
+      creation_args.flatland_client(std::move(flatland));
+      creation_args.keyboard_client(std::move(keyboard));
+      creation_args.device_pixel_ratio(DevicePixelRatio());
+
+      auto res = puppet_factory_->Create(std::move(creation_args));
+      ZX_ASSERT_OK(res);
+      ASSERT_EQ(res.value().result(), futc::Result::kSuccess);
+
+      puppet_view_ref_ = std::move(res.value().view_ref().value());
+    }
+  }
+
+  fuv::ViewRef puppet_view_ref_;
+
+ private:
+  fidl::SyncClient<futc::PuppetFactory> puppet_factory_;
+};
 
 // This test exercises the focus contract with the scene owner: the view offered to the
 // scene owner will have focus transferred to it.
@@ -80,59 +131,20 @@ TEST_F(FocusConformanceTest, ReceivesFocusTransfer) {
   FocusListener focus_listener;
   {
     auto focus_registry = ConnectSyncIntoRealm<fuf::FocusChainListenerRegistry>();
-    ASSERT_EQ(focus_registry->Register(focus_listener.NewBinding()), ZX_OK);
+    auto focus_listener_client_end = focus_listener.ServeAndGetClientEnd(dispatcher());
+
+    ZX_ASSERT_OK(focus_registry->Register({std::move(focus_listener_client_end)}));
   }
 
   RunLoopUntil([&focus_listener]() { return focus_listener.focus_chain_updates().size() > 0; });
 
   // No focus chain when no scene.
-  EXPECT_FALSE(focus_listener.focus_chain_updates().back().has_focus_chain());
+  EXPECT_FALSE(focus_listener.focus_chain_updates().back().focus_chain().has_value());
 
-  // Present view.
-  fuv::ViewCreationToken root_view_token;
-  {
-    FX_LOGS(INFO) << "Creating root view token";
-
-    auto controller = ConnectSyncIntoRealm<fuchsia::ui::test::scene::Controller>();
-
-    fuchsia::ui::test::scene::ControllerPresentClientViewRequest req;
-    auto [view_token, viewport_token] = scenic::ViewCreationTokenPair::New();
-    req.set_viewport_creation_token(std::move(viewport_token));
-    ASSERT_EQ(controller->PresentClientView(std::move(req)), ZX_OK);
-    root_view_token = std::move(view_token);
-  }
-
-  // Add puppet view.
-  fuv::ViewRef view_ref;
-  {
-    FX_LOGS(INFO) << "Create puppet under test";
-    futc::PuppetFactorySyncPtr puppet_factory;
-
-    ASSERT_EQ(LocalServiceDirectory()->Connect(puppet_factory.NewRequest(),
-                                               PUPPET_UNDER_TEST_FACTORY_SERVICE),
-              ZX_OK);
-
-    futc::PuppetFactoryCreateResponse resp;
-
-    auto flatland = ConnectSyncIntoRealm<fuchsia::ui::composition::Flatland>();
-    auto keyboard = ConnectSyncIntoRealm<fui::Keyboard>();
-    futc::PuppetSyncPtr puppet_ptr;
-
-    futc::PuppetCreationArgs creation_args;
-    creation_args.set_server_end(puppet_ptr.NewRequest());
-    creation_args.set_view_token(std::move(root_view_token));
-    creation_args.set_flatland_client(std::move(flatland));
-    creation_args.set_keyboard_client(std::move(keyboard));
-    creation_args.set_device_pixel_ratio(1.0);
-
-    ASSERT_EQ(puppet_factory->Create(std::move(creation_args), &resp), ZX_OK);
-    ASSERT_EQ(resp.result(), futc::Result::SUCCESS);
-
-    resp.view_ref().Clone(&view_ref);
-  }
+  PresentAndAddPuppetView();
 
   FX_LOGS(INFO) << "wait for focus";
-  RunLoopUntil([&focus_listener, &view_ref]() { return focus_listener.IsViewFocused(view_ref); });
+  RunLoopUntil([&]() { return focus_listener.IsViewFocused(puppet_view_ref_); });
 }
 
 // This test ensures that multiple clients can connect to the FocusChainListenerRegistry.
@@ -141,71 +153,32 @@ TEST_F(FocusConformanceTest, MultiListener) {
   FocusListener focus_listener_a;
   {
     auto focus_registry = ConnectSyncIntoRealm<fuf::FocusChainListenerRegistry>();
-    ASSERT_EQ(focus_registry->Register(focus_listener_a.NewBinding()), ZX_OK);
+    auto focus_listener_client_end = focus_listener_a.ServeAndGetClientEnd(dispatcher());
+
+    ZX_ASSERT_OK(focus_registry->Register({std::move(focus_listener_client_end)}));
   }
 
   RunLoopUntil([&focus_listener_a]() { return focus_listener_a.focus_chain_updates().size() > 0; });
 
   // No focus chain when no scene.
-  EXPECT_FALSE(focus_listener_a.focus_chain_updates().back().has_focus_chain());
-
-  // Present view.
-  fuv::ViewCreationToken root_view_token;
-  {
-    FX_LOGS(INFO) << "Creating root view token";
-
-    auto controller = ConnectSyncIntoRealm<fuchsia::ui::test::scene::Controller>();
-
-    fuchsia::ui::test::scene::ControllerPresentClientViewRequest req;
-    auto [view_token, viewport_token] = scenic::ViewCreationTokenPair::New();
-    req.set_viewport_creation_token(std::move(viewport_token));
-    ASSERT_EQ(controller->PresentClientView(std::move(req)), ZX_OK);
-    root_view_token = std::move(view_token);
-  }
+  EXPECT_FALSE(focus_listener_a.focus_chain_updates().back().focus_chain().has_value());
 
   // Setup focus listener b.
   FocusListener focus_listener_b;
   {
     auto focus_registry = ConnectSyncIntoRealm<fuf::FocusChainListenerRegistry>();
-    ASSERT_EQ(focus_registry->Register(focus_listener_b.NewBinding()), ZX_OK);
+    auto focus_listener_client_end = focus_listener_b.ServeAndGetClientEnd(dispatcher());
+
+    ZX_ASSERT_OK(focus_registry->Register({std::move(focus_listener_client_end)}));
   }
 
-  // Add puppet view.
-  fuv::ViewRef view_ref;
-  {
-    FX_LOGS(INFO) << "Create puppet under test";
-    futc::PuppetFactorySyncPtr puppet_factory;
-
-    ASSERT_EQ(LocalServiceDirectory()->Connect(puppet_factory.NewRequest(),
-                                               PUPPET_UNDER_TEST_FACTORY_SERVICE),
-              ZX_OK);
-
-    futc::PuppetFactoryCreateResponse resp;
-
-    auto flatland = ConnectSyncIntoRealm<fuchsia::ui::composition::Flatland>();
-    auto keyboard = ConnectSyncIntoRealm<fui::Keyboard>();
-    futc::PuppetSyncPtr puppet_ptr;
-
-    futc::PuppetCreationArgs creation_args;
-    creation_args.set_server_end(puppet_ptr.NewRequest());
-    creation_args.set_view_token(std::move(root_view_token));
-    creation_args.set_flatland_client(std::move(flatland));
-    creation_args.set_keyboard_client(std::move(keyboard));
-    creation_args.set_device_pixel_ratio(1.0);
-
-    ASSERT_EQ(puppet_factory->Create(std::move(creation_args), &resp), ZX_OK);
-    ASSERT_EQ(resp.result(), futc::Result::SUCCESS);
-
-    resp.view_ref().Clone(&view_ref);
-  }
+  PresentAndAddPuppetView();
 
   FX_LOGS(INFO) << "focus listener a receives focus transfer";
-  RunLoopUntil(
-      [&focus_listener_a, &view_ref]() { return focus_listener_a.IsViewFocused(view_ref); });
+  RunLoopUntil([&]() { return focus_listener_a.IsViewFocused(puppet_view_ref_); });
 
   FX_LOGS(INFO) << "focus listener b receives focus transfer";
-  RunLoopUntil(
-      [&focus_listener_b, &view_ref]() { return focus_listener_b.IsViewFocused(view_ref); });
+  RunLoopUntil([&]() { return focus_listener_b.IsViewFocused(puppet_view_ref_); });
 }
 
 }  //  namespace ui_conformance_testing

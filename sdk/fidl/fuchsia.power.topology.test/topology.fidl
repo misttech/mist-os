@@ -1,9 +1,15 @@
 // Copyright 2024 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-// Draft Prototype of Protocols to be used by Power Topology Testing, such as a test tool to allow
-// users to create power topology and even hold a wake lease to the system activity governor. The
-// protocols are not fully baked yet until the tool also lands.
+
+/// This library complements the Topology Test Daemon, facilitating power topology testing by
+/// enabling communication between the test client and daemon to:
+/// - Specify the topology graph for the test daemon to create.
+/// - Instruct the test daemon to perform actions like holding or dropping leases.
+/// - Instruct the test daemon to start or stop system activity.
+/// The Topology Test Daemon creates and manages power topology graphs with individual elements
+/// running on separate components. It also interacts with the System Activity Governor for
+/// wake lease control.
 @available(added=HEAD)
 library fuchsia.power.topology.test;
 using fuchsia.power.broker;

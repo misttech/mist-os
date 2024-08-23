@@ -16,4 +16,4 @@ pub mod messenger;
 pub mod receptor;
 
 /// Representation of time used for logging.
-pub type Timestamp = zx::Time;
+pub type Timestamp = zx::MonotonicTime;

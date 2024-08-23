@@ -151,7 +151,7 @@ impl RemoteControlService {
                 Ok(())
             }
             rcs::RemoteControlRequest::GetTime { responder } => {
-                responder.send(fuchsia_zircon::Time::get_monotonic().into_nanos())?;
+                responder.send(fuchsia_zircon::MonotonicTime::get().into_nanos())?;
                 Ok(())
             }
             rcs::RemoteControlRequest::_UnknownMethod { ordinal, .. } => {

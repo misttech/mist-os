@@ -1180,11 +1180,13 @@ zx_status_t VmObjectPaged::CommitRangeInternal(uint64_t offset, uint64_t len, bo
         if (wait_status != ZX_OK) {
           return wait_status;
         }
-        // Since we dropped the lock while waiting, things might have changed, so reattempt
-        // committing beyond the length we had successfully pinned before waiting.
-        if (replace_status == ZX_ERR_SHOULD_WAIT) {
-          continue;
-        }
+      }
+      // If we dropped the lock while waiting, things might have changed, so can reattempt
+      // committing beyond the length we had successfully pinned before waiting. Alternatively if we
+      // canceled that page request in favor of potentially making a dirty request we still have
+      // unfinished work and need to go around the loop again.
+      if (replace_status == ZX_ERR_SHOULD_WAIT) {
+        continue;
       }
     } else {
       // We were either not required to pin, or committed_len was 0. We need to update how much was
@@ -1491,6 +1493,9 @@ zx_status_t VmObjectPaged::ReadWriteInternalLocked(uint64_t offset, size_t len, 
     }
     // Performing explicit accesses by request of the user, so disable zero forking.
     cursor->DisableZeroFork();
+    if (!!(options & VmObjectReadWriteOptions::ZeroAboveUserSize)) {
+      cursor->ZeroAboveUserSize();
+    }
     AssertHeld(cursor->lock_ref());
 
     StatusType status = ZX_OK;

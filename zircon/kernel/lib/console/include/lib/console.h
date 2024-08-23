@@ -73,6 +73,7 @@ typedef struct {
 
 #endif  // LK_DEBUGLEVEL == 0
 
+// TODO: move somewhere else
 class RecurringCallback {
  public:
   using CallbackFunc = void (*)();
@@ -95,10 +96,14 @@ class RecurringCallback {
 /* external api */
 int console_run_script(const char* string);
 int console_run_script_locked(const char* string);  // special case from inside a command
-void console_abort_script(void);
+void console_exit();
 
 /* panic shell api */
-void panic_shell_start(void);
+void panic_shell_start();
+
+// Attempt to start the kernel shell.
+// Will return if shell is not started or if shell exits.
+void kernel_shell_init();
 
 extern int lastresult;
 

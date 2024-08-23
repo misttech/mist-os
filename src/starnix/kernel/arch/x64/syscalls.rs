@@ -51,6 +51,7 @@ pub fn sys_alarm(
     let duration = zx::Duration::from_seconds(duration.into());
     let new_value = timeval_from_duration(duration);
     let old_value = current_task.thread_group.set_itimer(
+        current_task,
         ITIMER_REAL,
         itimerval { it_value: new_value, it_interval: Default::default() },
     )?;
@@ -331,7 +332,7 @@ pub fn sys_pause(
     let event = InterruptibleEvent::new();
     let guard = event.begin_wait();
     let result = current_task.run_in_state(RunState::Event(event.clone()), || {
-        match guard.block_until(zx::Time::INFINITE) {
+        match guard.block_until(zx::MonotonicTime::INFINITE) {
             Err(WakeReason::Interrupted) => error!(ERESTARTNOHAND),
             Err(WakeReason::DeadlineExpired) => panic!("blocking forever cannot time out"),
             Ok(()) => Ok(()),
@@ -355,7 +356,7 @@ pub fn sys_poll(
     num_fds: i32,
     timeout: i32,
 ) -> Result<usize, Errno> {
-    let deadline = zx::Time::after(duration_from_poll_timeout(timeout)?);
+    let deadline = zx::MonotonicTime::after(duration_from_poll_timeout(timeout)?);
     poll(locked, current_task, user_fds, num_fds, None, deadline)
 }
 

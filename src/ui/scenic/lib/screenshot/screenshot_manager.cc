@@ -4,6 +4,7 @@
 
 #include "src/ui/scenic/lib/screenshot/screenshot_manager.h"
 
+#include <fidl/fuchsia.ui.composition/cpp/hlcpp_conversion.h>
 #include <lib/syslog/cpp/macros.h>
 
 #include <memory>
@@ -43,13 +44,17 @@ void ScreenshotManager::CreateBinding(
   CompressorEventHandler event_handler;
   fidl::Client client(std::move(*client_end), async_get_default_dispatcher(), &event_handler);
 
-  bindings_.AddBinding(std::make_unique<screenshot::FlatlandScreenshot>(
-                           std::move(screen_capture), allocator_, display_size_, display_rotation_,
-                           std::move(client),
-                           [this](screenshot::FlatlandScreenshot* sc) {
-                             bindings_.CloseBinding(sc, ZX_ERR_SHOULD_WAIT);
-                           }),
-                       std::move(request));
+  auto impl = std::make_unique<screenshot::FlatlandScreenshot>(
+      std::move(screen_capture), allocator_, display_size_, display_rotation_, std::move(client),
+      [this](screenshot::FlatlandScreenshot* sc) {
+        bindings_.CloseBindings(sc, ZX_ERR_SHOULD_WAIT);
+      });
+  screenshot::FlatlandScreenshot* impl_ptr = impl.get();
+  auto close_handler = [impl = std::move(impl)](fidl::UnbindInfo info) {
+    // Let |impl| fall out of scope.
+  };
+  bindings_.AddBinding(async_get_default_dispatcher(), fidl::HLCPPToNatural(std::move(request)),
+                       impl_ptr, std::move(close_handler));
 }
 
 }  // namespace screenshot

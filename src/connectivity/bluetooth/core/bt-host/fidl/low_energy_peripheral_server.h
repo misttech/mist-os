@@ -38,6 +38,10 @@ class LowEnergyPeripheralServer : public AdapterServerBase<fuchsia::bluetooth::l
                         ::fidl::InterfaceRequest<fuchsia::bluetooth::le::AdvertisingHandle> token,
                         StartAdvertisingCallback callback) override;
 
+  // fuchsia::bluetooth::le::ChannelListenerRegistry overrides:
+  void ListenL2cap(fuchsia::bluetooth::le::ChannelListenerRegistryListenL2capRequest request,
+                   ListenL2capCallback callback) override;
+
   // Returns the connection handle associated with the given |id|, or nullptr if the peer with
   // |id| is no longer connected. Should only be used for testing.
   const bt::gap::LowEnergyConnectionHandle* FindConnectionForTesting(bt::PeerId id) const;

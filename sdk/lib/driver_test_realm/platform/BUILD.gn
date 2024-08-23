@@ -11,7 +11,7 @@ group("platform") {
   deps = [
     ":client_includes",
     ":platform_component",
-    "//sdk/lib/driver_test_realm",
+    "//sdk/lib/driver_test_realm:static",
     "//src/devices/bus/drivers/platform",
   ]
 }

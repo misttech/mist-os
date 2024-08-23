@@ -4,15 +4,16 @@
 
 use crate::mm::MemoryAccessorExt;
 use crate::signals::{RunState, SignalEvent};
-use crate::task::{ClockId, CurrentTask, TimerId};
+use crate::task::{ClockId, CurrentTask, Timeline, TimerId, TimerWakeup};
 use crate::time::utc::utc_now;
-use crate::timer::Timeline;
 use fuchsia_inspect_contrib::profile_duration;
+use fuchsia_runtime::UtcTime;
 use fuchsia_zircon::{
     Task, {self as zx},
 };
 use starnix_logging::{log_trace, track_stub};
 use starnix_sync::{InterruptibleEvent, Locked, Unlocked, WakeReason};
+use starnix_uapi::auth::CAP_WAKE_ALARM;
 use starnix_uapi::errors::{Errno, EINTR};
 use starnix_uapi::time::{
     duration_from_timespec, duration_to_scheduler_clock, time_from_timespec,
@@ -78,7 +79,7 @@ pub fn sys_clock_gettime(
             }
             CLOCK_MONOTONIC | CLOCK_MONOTONIC_COARSE | CLOCK_MONOTONIC_RAW | CLOCK_BOOTTIME => {
                 profile_duration!("GetMonotonic");
-                zx::Time::get_monotonic().into_nanos()
+                zx::MonotonicTime::get().into_nanos()
             }
             CLOCK_THREAD_CPUTIME_ID => {
                 profile_duration!("GetThreadCpuTime");
@@ -182,7 +183,7 @@ pub fn sys_clock_nanosleep(
     let monotonic_deadline = if is_absolute {
         time_from_timespec(request)?
     } else {
-        zx::Time::after(duration_from_timespec(request)?)
+        zx::MonotonicTime::after(duration_from_timespec(request)?)
     };
 
     clock_nanosleep_monotonic_with_deadline(
@@ -235,8 +236,8 @@ fn clock_nanosleep_relative_to_utc(
 fn clock_nanosleep_monotonic_with_deadline(
     current_task: &mut CurrentTask,
     is_absolute: bool,
-    deadline: zx::Time,
-    original_utc_deadline: Option<zx::Time>,
+    deadline: zx::MonotonicTime,
+    original_utc_deadline: Option<UtcTime>,
     user_remaining: UserRef<timespec>,
 ) -> Result<(), Errno> {
     let event = InterruptibleEvent::new();
@@ -252,7 +253,7 @@ fn clock_nanosleep_monotonic_with_deadline(
             if !user_remaining.is_null() {
                 let remaining = match original_utc_deadline {
                     Some(original_utc_deadline) => original_utc_deadline - utc_now(),
-                    None => deadline - zx::Time::get_monotonic(),
+                    None => deadline - zx::MonotonicTime::get(),
                 };
                 let remaining =
                     timespec_from_duration(std::cmp::max(zx::Duration::from_nanos(0), remaining));
@@ -394,14 +395,8 @@ pub fn sys_timer_create(
         CLOCK_REALTIME => Timeline::RealTime,
         CLOCK_MONOTONIC => Timeline::Monotonic,
         CLOCK_BOOTTIME => Timeline::BootTime,
-        CLOCK_REALTIME_ALARM => {
-            track_stub!(TODO("https://fxbug.dev/349190823"), "timers w/ CLOCK_REALTIME_ALARM");
-            return error!(ENOTSUP);
-        }
-        CLOCK_BOOTTIME_ALARM => {
-            track_stub!(TODO("https://fxbug.dev/349191846"), "timers w/ CLOCK_BOOTTIME_ALARM");
-            return error!(ENOTSUP);
-        }
+        CLOCK_REALTIME_ALARM => Timeline::RealTime,
+        CLOCK_BOOTTIME_ALARM => Timeline::BootTime,
         CLOCK_TAI => {
             track_stub!(TODO("https://fxbug.dev/349191834"), "timers w/ TAI");
             return error!(ENOTSUP);
@@ -419,8 +414,17 @@ pub fn sys_timer_create(
             return error!(ENOTSUP);
         }
     };
+    let timer_wakeup = match clock_id as u32 {
+        CLOCK_BOOTTIME_ALARM | CLOCK_REALTIME_ALARM => {
+            if !current_task.creds().has_capability(CAP_WAKE_ALARM) {
+                return error!(EPERM);
+            }
+            TimerWakeup::Alarm
+        }
+        _ => TimerWakeup::Regular,
+    };
 
-    let id = &thread_group.timers.create(timeline, checked_signal_event)?;
+    let id = &thread_group.timers.create(timeline, timer_wakeup, checked_signal_event)?;
     current_task.write_object(timerid, &id)?;
     Ok(())
 }
@@ -431,7 +435,7 @@ pub fn sys_timer_delete(
     id: uapi::__kernel_timer_t,
 ) -> Result<(), Errno> {
     let timers = &current_task.thread_group.read().timers;
-    timers.delete(id)
+    timers.delete(current_task, id)
 }
 
 pub fn sys_timer_gettime(
@@ -468,8 +472,10 @@ pub fn sys_timer_settime(
     let new_value = current_task.read_object(user_new_value)?;
 
     // Return early if the user passes an obviously invalid pointer. This avoids changing the timer
-    // settings for common pointer errors. This check is not a guarantee.
-    current_task.mm().check_plausible(user_old_value.addr(), std::mem::size_of::<itimerspec>())?;
+    // settings for common pointer errors.
+    if !user_old_value.is_null() {
+        current_task.write_object(user_old_value, &Default::default())?;
+    }
 
     let timers = &current_task.thread_group.read().timers;
     let old_value = timers.set_time(current_task, id, flags, new_value)?;
@@ -500,7 +506,7 @@ pub fn sys_setitimer(
 ) -> Result<(), Errno> {
     let new_value = current_task.read_object(user_new_value)?;
 
-    let old_value = current_task.thread_group.set_itimer(which, new_value)?;
+    let old_value = current_task.thread_group.set_itimer(current_task, which, new_value)?;
 
     if !user_old_value.is_null() {
         current_task.write_object(user_old_value, &old_value)?;
@@ -527,7 +533,7 @@ pub fn sys_times(
         current_task.write_object(buf, &tms_result)?;
     }
 
-    Ok(duration_to_scheduler_clock(zx::Time::get_monotonic() - zx::Time::ZERO))
+    Ok(duration_to_scheduler_clock(zx::MonotonicTime::get() - zx::MonotonicTime::ZERO))
 }
 
 #[cfg(test)]
@@ -536,6 +542,7 @@ mod test {
     use crate::mm::PAGE_SIZE;
     use crate::testing::*;
     use crate::time::utc::UtcClockOverrideGuard;
+    use fuchsia_runtime::{UtcClock, UtcTimeline};
     use fuchsia_zircon::HandleBased;
     use starnix_uapi::ownership::OwnedRef;
     use starnix_uapi::signals;
@@ -581,13 +588,14 @@ mod test {
     async fn test_clock_nanosleep_relative_to_slow_clock() {
         let (_kernel, mut current_task, _) = create_kernel_task_and_unlocked();
 
-        let test_clock = zx::Clock::create(zx::ClockOpts::AUTO_START, None).unwrap();
+        let test_clock = UtcClock::create(zx::ClockOpts::AUTO_START, None).unwrap();
         let _test_clock_guard = UtcClockOverrideGuard::new(
             test_clock.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
         );
 
         // Slow |test_clock| down and verify that we sleep long enough.
-        let slow_clock_update = zx::ClockUpdate::builder().rate_adjust(-1000).build();
+        let slow_clock_update =
+            zx::ClockUpdate::<UtcTimeline>::builder().rate_adjust(-1000).build();
         test_clock.update(slow_clock_update).unwrap();
 
         let before = test_clock.read().unwrap();
@@ -605,13 +613,13 @@ mod test {
     async fn test_clock_nanosleep_interrupted_relative_to_fast_utc_clock() {
         let (_kernel, mut current_task, mut locked) = create_kernel_task_and_unlocked();
 
-        let test_clock = zx::Clock::create(zx::ClockOpts::AUTO_START, None).unwrap();
+        let test_clock = UtcClock::create(zx::ClockOpts::AUTO_START, None).unwrap();
         let _test_clock_guard = UtcClockOverrideGuard::new(
             test_clock.duplicate_handle(zx::Rights::SAME_RIGHTS).unwrap(),
         );
 
         // Speed |test_clock| up.
-        let slow_clock_update = zx::ClockUpdate::builder().rate_adjust(1000).build();
+        let slow_clock_update = zx::ClockUpdate::<UtcTimeline>::builder().rate_adjust(1000).build();
         test_clock.update(slow_clock_update).unwrap();
 
         let before = test_clock.read().unwrap();
@@ -625,7 +633,7 @@ mod test {
 
         // Interrupt the sleep roughly halfway through. The actual interruption might be before the
         // sleep starts, during the sleep, or after.
-        let interruption_target = zx::Time::get_monotonic() + zx::Duration::from_seconds(1);
+        let interruption_target = zx::MonotonicTime::get() + zx::Duration::from_seconds(1);
 
         let thread_group = OwnedRef::downgrade(&current_task.thread_group);
         let thread_join_handle = std::thread::Builder::new()

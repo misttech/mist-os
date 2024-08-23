@@ -397,8 +397,6 @@ zx::result<zx::stream> File::CreateStream(uint32_t stream_options) {
   return zx::ok(std::move(stream));
 }
 
-bool File::SupportsClientSideStreams() const { return true; }
-
 block_t File::GetBlockAddr(LockedPage &page) { return GetBlockAddrOnDataSegment(page); }
 
 }  // namespace f2fs

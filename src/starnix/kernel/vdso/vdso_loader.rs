@@ -6,6 +6,7 @@ use crate::arch::vdso::VDSO_SIGRETURN_NAME;
 use crate::mm::memory::MemoryObject;
 use crate::mm::PAGE_SIZE;
 use crate::time::utc::update_utc_clock;
+use fuchsia_runtime::{UtcTime, UtcTimeline};
 use fuchsia_zircon::{
     ClockTransformation, {self as zx},
 };
@@ -59,11 +60,15 @@ impl MemoryMappedVvar {
         vvar_data
     }
 
-    pub fn update_utc_data_transform(&self, new_transform: &ClockTransformation) {
+    pub fn update_utc_data_transform(&self, new_transform: &ClockTransformation<UtcTimeline>) {
         let vvar_data = self.get_pointer_to_memory_mapped_vvar();
         let old_transform = ClockTransformation {
-            reference_offset: vvar_data.mono_to_utc_reference_offset.load(Ordering::Acquire),
-            synthetic_offset: vvar_data.mono_to_utc_synthetic_offset.load(Ordering::Acquire),
+            reference_offset: zx::MonotonicTime::from_nanos(
+                vvar_data.mono_to_utc_reference_offset.load(Ordering::Acquire),
+            ),
+            synthetic_offset: UtcTime::from_nanos(
+                vvar_data.mono_to_utc_synthetic_offset.load(Ordering::Acquire),
+            ),
             rate: zx::sys::zx_clock_rate_t {
                 synthetic_ticks: vvar_data.mono_to_utc_synthetic_ticks.load(Ordering::Acquire),
                 reference_ticks: vvar_data.mono_to_utc_reference_ticks.load(Ordering::Acquire),
@@ -75,10 +80,10 @@ impl MemoryMappedVvar {
             debug_assert!(seq_num & 1 == 0);
             vvar_data
                 .mono_to_utc_reference_offset
-                .store(new_transform.reference_offset, Ordering::Release);
+                .store(new_transform.reference_offset.into_nanos(), Ordering::Release);
             vvar_data
                 .mono_to_utc_synthetic_offset
-                .store(new_transform.synthetic_offset, Ordering::Release);
+                .store(new_transform.synthetic_offset.into_nanos(), Ordering::Release);
             vvar_data
                 .mono_to_utc_reference_ticks
                 .store(new_transform.rate.reference_ticks, Ordering::Release);
@@ -168,7 +173,7 @@ fn load_vdso_from_file() -> Result<Arc<MemoryObject>, Errno> {
         &dir_proxy,
         VDSO_FILENAME,
         fidl_fuchsia_io::VmoFlags::READ,
-        zx::Time::INFINITE,
+        zx::MonotonicTime::INFINITE,
     )
     .map_err(|status| from_status_like_fdio!(status))?;
 
@@ -191,7 +196,7 @@ fn load_time_values_memory() -> Result<Arc<MemoryObject>, Errno> {
         &dir_proxy,
         FILENAME,
         fidl_fuchsia_io::VmoFlags::READ,
-        zx::Time::INFINITE,
+        zx::MonotonicTime::INFINITE,
     )
     .map_err(|status| from_status_like_fdio!(status))?;
 

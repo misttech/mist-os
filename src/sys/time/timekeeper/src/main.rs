@@ -28,6 +28,7 @@ use anyhow::{Context as _, Result};
 use chrono::prelude::*;
 use fidl::AsHandleRef;
 use fuchsia_component::server::ServiceFs;
+use fuchsia_runtime::{UtcClock, UtcTimeline};
 use futures::channel::mpsc;
 use futures::future::{self, OptionFuture};
 use futures::stream::StreamExt as _;
@@ -124,6 +125,10 @@ impl Config {
         self.source_config.utc_start_at_startup
     }
 
+    fn get_utc_start_at_startup_when_invalid_rtc(&self) -> bool {
+        self.source_config.utc_start_at_startup_when_invalid_rtc
+    }
+
     fn get_early_exit(&self) -> bool {
         self.source_config.early_exit
     }
@@ -174,16 +179,16 @@ const COBALT_EXPERIMENT: TimeMetricDimensionExperiment = TimeMetricDimensionExpe
 /// The information required to maintain UTC for the primary track.
 struct PrimaryTrack {
     time_source: TimeSource,
-    clock: Arc<zx::Clock>,
+    clock: Arc<UtcClock>,
 }
 
 /// The information required to maintain UTC for the monitor track.
 struct MonitorTrack {
     time_source: TimeSource,
-    clock: Arc<zx::Clock>,
+    clock: Arc<UtcClock>,
 }
 
-fn koid_of(c: &zx::Clock) -> u64 {
+fn koid_of(c: &UtcClock) -> u64 {
     c.as_handle_ref().get_koid().expect("infallible").raw_koid()
 }
 
@@ -198,12 +203,11 @@ async fn main() -> Result<()> {
     info!("retrieving UTC clock handle");
     let time_maintainer =
         fuchsia_component::client::connect_to_protocol::<ftime::MaintenanceMarker>().unwrap();
-    let utc_clock = zx::Clock::from(
-        time_maintainer
-            .get_writable_utc_clock()
-            .await
-            .context("failed to get UTC clock from maintainer")?,
-    );
+    let utc_clock = time_maintainer
+        .get_writable_utc_clock()
+        .await
+        .context("failed to get UTC clock from maintainer")?
+        .cast();
     debug!("utc_clock handle with koid: {}", koid_of(&utc_clock));
 
     let time_source_urls = TimeSourceUrls {
@@ -307,22 +311,22 @@ async fn main() -> Result<()> {
 
 /// Creates a new userspace clock for use in the monitor track, set to the same backstop time as
 /// the supplied primary clock.
-fn create_monitor_clock(primary_clock: &zx::Clock) -> zx::Clock {
-    // Note: Failure should not be possible from a valid zx::Clock.
+fn create_monitor_clock(primary_clock: &UtcClock) -> UtcClock {
+    // Note: Failure should not be possible from a valid UtcClock.
     let backstop = primary_clock.get_details().expect("failed to get UTC clock details").backstop;
     // Note: Only failure mode is an OOM which we handle via panic.
-    zx::Clock::create(zx::ClockOpts::empty(), Some(backstop))
+    UtcClock::create(zx::ClockOpts::empty(), Some(backstop))
         .expect("failed to create new monitor clock")
 }
 
 /// Determines whether the supplied clock has previously been set.
 /// Returns the clock state and the backstop.
-fn initial_clock_state(utc_clock: &zx::Clock) -> (InitialClockState, zx::ClockDetails) {
-    // Note: Failure should not be possible from a valid zx::Clock.
+fn initial_clock_state(utc_clock: &UtcClock) -> (InitialClockState, zx::ClockDetails<UtcTimeline>) {
+    // Note: Failure should not be possible from a valid UtcClock.
     let clock_details = utc_clock.get_details().expect("failed to get UTC clock details");
     // When the clock is first initialized to the backstop time, its synthetic offset should
     // be identical. Once the clock is updated, this is no longer true.
-    if clock_details.backstop.into_nanos() == clock_details.ticks_to_synthetic.synthetic_offset {
+    if clock_details.backstop == clock_details.ticks_to_synthetic.synthetic_offset {
         (InitialClockState::NotSet, clock_details)
     } else {
         (InitialClockState::PreviouslySet, clock_details)
@@ -331,14 +335,22 @@ fn initial_clock_state(utc_clock: &zx::Clock) -> (InitialClockState, zx::ClockDe
 
 /// Attempts to initialize a userspace clock from the current value of the real time clock.
 /// sending progress to diagnostics as appropriate.
+///
+/// Args:
+/// - `force_start`: if set, the clock will be force-started, even though RTC
+///   is present.  However, if the RTC reading shows a timestamp before backstop,
+///   we will be snapped to backstop before setting the UTC clock. This way,
+///   RTC setting remains broken, but UTC does not get set to time before
+///   backstop.
 async fn set_clock_from_rtc<R: Rtc, D: Diagnostics>(
     rtc: &R,
-    clock: &zx::Clock,
+    clock: &UtcClock,
     diagnostics: Arc<D>,
+    force_start: bool,
 ) {
     info!("reading initial RTC time.");
-    let mono_before = zx::Time::get_monotonic();
-    let rtc_time = match rtc.get().await {
+    let mono_before = zx::MonotonicTime::get();
+    let mut rtc_time = match rtc.get().await {
         Err(err) => {
             error!("failed to read RTC time: {}", err);
             diagnostics.record(Event::InitializeRtc {
@@ -349,10 +361,10 @@ async fn set_clock_from_rtc<R: Rtc, D: Diagnostics>(
         }
         Ok(time) => time,
     };
-    let mono_after = zx::Time::get_monotonic();
+    let mono_after = zx::MonotonicTime::get();
     let mono_time = mono_before + (mono_after - mono_before) / 2;
 
-    let rtc_chrono = Utc.timestamp_nanos(rtc_time.into_nanos());
+    let mut rtc_chrono = Utc.timestamp_nanos(rtc_time.into_nanos());
     let backstop = clock.get_details().expect("failed to get UTC clock details").backstop;
     let backstop_chrono = Utc.timestamp_nanos(backstop.into_nanos());
     if rtc_time < backstop {
@@ -361,7 +373,16 @@ async fn set_clock_from_rtc<R: Rtc, D: Diagnostics>(
             outcome: InitializeRtcOutcome::InvalidBeforeBackstop,
             time: Some(rtc_time),
         });
-        return;
+        if force_start {
+            // If we must start the clock from RTC when we know RTC is before
+            // backstop, we snap the RTC reading to backstop before starting
+            // the clock. We leave the RTC reading update for later.
+            info!("Snapping RTC reading (but not RTC content) to backstop: {}", backstop_chrono);
+            rtc_time = backstop;
+            rtc_chrono = backstop_chrono;
+        } else {
+            return;
+        }
     } else {
         debug!("RTC time {} is ahead of backstop {}, as expected", rtc_chrono, backstop_chrono);
     }
@@ -371,7 +392,7 @@ async fn set_clock_from_rtc<R: Rtc, D: Diagnostics>(
         time: Some(rtc_time),
     });
     if let Err(status) =
-        clock.update(zx::ClockUpdate::builder().absolute_value(mono_time, rtc_time))
+        clock.update(zx::ClockUpdate::<UtcTimeline>::builder().absolute_value(mono_time, rtc_time))
     {
         error!("failed to start UTC clock from RTC at time {}: {}", rtc_chrono, status);
     } else {
@@ -414,7 +435,13 @@ async fn maintain_utc<R: 'static, D: 'static>(
     if let Some(rtc) = optional_rtc.as_ref() {
         match initial_clock_state {
             InitialClockState::NotSet => {
-                set_clock_from_rtc(rtc, &primary.clock, Arc::clone(&diagnostics)).await;
+                set_clock_from_rtc(
+                    rtc,
+                    &primary.clock,
+                    Arc::clone(&diagnostics),
+                    config.get_utc_start_at_startup_when_invalid_rtc(),
+                )
+                .await;
             }
             InitialClockState::PreviouslySet => {
                 diagnostics.record(Event::InitializeRtc {
@@ -436,11 +463,11 @@ async fn maintain_utc<R: 'static, D: 'static>(
         let backstop = &clock_details.backstop;
         // Not possible to start at backstop, so we start just a bit after.
         let b1 = *backstop + zx::Duration::from_nanos(1);
-        let mono = zx::Time::get_monotonic();
+        let mono = zx::MonotonicTime::get();
         info!("starting the UTC clock from backstop time, to handle legacy programs");
         debug!("`- synthetic (backstop+1): {:?}, reference (monotonic): {:?}", &b1, &mono);
         if let Err(status) =
-            primary.clock.update(zx::ClockUpdate::builder().absolute_value(mono, b1))
+            primary.clock.update(zx::ClockUpdate::<UtcTimeline>::builder().absolute_value(mono, b1))
         {
             warn!("failed to start UTC clock from backstop time: {}", &status);
             // If we got here, the UTC clock is not started yet. We might have better luck with
@@ -525,6 +552,7 @@ mod tests {
     use crate::enums::WriteRtcOutcome;
     use crate::rtc::FakeRtc;
     use crate::time_source::{Event as TimeSourceEvent, FakePushTimeSource, Sample};
+    use fuchsia_runtime::UtcTime;
     use futures::FutureExt;
     use lazy_static::lazy_static;
     use std::matches;
@@ -535,9 +563,9 @@ mod tests {
     const OFFSET: zx::Duration = zx::Duration::from_seconds(1111_000);
     const OFFSET_2: zx::Duration = zx::Duration::from_seconds(1111_333);
     const STD_DEV: zx::Duration = zx::Duration::from_millis(44);
-    const INVALID_RTC_TIME: zx::Time = zx::Time::from_nanos(111111 * NANOS_PER_SECOND);
-    const BACKSTOP_TIME: zx::Time = zx::Time::from_nanos(222222 * NANOS_PER_SECOND);
-    const VALID_RTC_TIME: zx::Time = zx::Time::from_nanos(333333 * NANOS_PER_SECOND);
+    const INVALID_RTC_TIME: UtcTime = UtcTime::from_nanos(111111 * NANOS_PER_SECOND);
+    const BACKSTOP_TIME: UtcTime = UtcTime::from_nanos(222222 * NANOS_PER_SECOND);
+    const VALID_RTC_TIME: UtcTime = UtcTime::from_nanos(333333 * NANOS_PER_SECOND);
 
     lazy_static! {
         static ref CLOCK_OPTS: zx::ClockOpts = zx::ClockOpts::empty();
@@ -545,14 +573,20 @@ mod tests {
 
     /// Creates and starts a new clock with default options, returning a tuple of the clock and its
     /// initial update time in ticks.
-    fn create_clock() -> (Arc<zx::Clock>, i64) {
-        let clock = zx::Clock::create(*CLOCK_OPTS, Some(BACKSTOP_TIME)).unwrap();
-        clock.update(zx::ClockUpdate::builder().approximate_value(BACKSTOP_TIME)).unwrap();
+    fn create_clock() -> (Arc<UtcClock>, i64) {
+        let clock = UtcClock::create(*CLOCK_OPTS, Some(BACKSTOP_TIME)).unwrap();
+        clock
+            .update(zx::ClockUpdate::<UtcTimeline>::builder().approximate_value(BACKSTOP_TIME))
+            .unwrap();
         let initial_update_ticks = clock.get_details().unwrap().last_value_update_ticks;
         (Arc::new(clock), initial_update_ticks)
     }
 
-    pub fn make_test_config_with_params(delay: i64, serve_test_protocols: bool) -> Arc<Config> {
+    pub fn make_test_config_with_params(
+        delay: i64,
+        serve_test_protocols: bool,
+        force_start: bool,
+    ) -> Arc<Config> {
         Arc::new(Config::from(timekeeper_config::Config {
             disable_delays: true,
             oscillator_error_std_dev_ppm: 15,
@@ -564,7 +598,8 @@ mod tests {
             first_sampling_delay_sec: delay,
             monitor_time_source_url: "".to_string(),
             primary_uses_pull: false,
-            utc_start_at_startup: false,
+            utc_start_at_startup: force_start,
+            utc_start_at_startup_when_invalid_rtc: force_start,
             early_exit: false,
             power_topology_integration_enabled: false,
             serve_test_protocols,
@@ -573,7 +608,9 @@ mod tests {
     }
 
     pub fn make_test_config_with_delay(delay: i64) -> Arc<Config> {
-        make_test_config_with_params(delay, /*serve_test_protocols=*/ false)
+        make_test_config_with_params(
+            delay, /*serve_test_protocols=*/ false, /*force_start=*/ false,
+        )
     }
 
     pub fn make_test_config() -> Arc<Config> {
@@ -581,7 +618,15 @@ mod tests {
     }
 
     pub fn make_test_config_with_test_protocols() -> Arc<Config> {
-        make_test_config_with_params(/*delay=*/ 0, /*serve_test_protocols=*/ true)
+        make_test_config_with_params(
+            /*delay=*/ 0, /*serve_test_protocols=*/ true, /*force_start=*/ false,
+        )
+    }
+
+    pub fn make_test_config_with_force_start() -> Arc<Config> {
+        make_test_config_with_params(
+            /*delay=*/ 0, /*serve_test_protocols=*/ true, /* force_start=*/ true,
+        )
     }
 
     #[fuchsia::test]
@@ -593,7 +638,7 @@ mod tests {
         let diagnostics = Arc::new(FakeDiagnostics::new());
         let config = make_test_config();
 
-        let monotonic_ref = zx::Time::get_monotonic();
+        let monotonic_ref = zx::MonotonicTime::get();
 
         let (s, r) = mpsc::channel(1);
 
@@ -604,7 +649,7 @@ mod tests {
                 time_source: FakePushTimeSource::events(vec![
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Ok },
                     TimeSourceEvent::from(Sample::new(
-                        monotonic_ref + OFFSET,
+                        UtcTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                         monotonic_ref,
                         STD_DEV,
                     )),
@@ -617,7 +662,7 @@ mod tests {
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Network },
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Ok },
                     TimeSourceEvent::from(Sample::new(
-                        monotonic_ref + OFFSET_2,
+                        UtcTime::from_nanos((monotonic_ref + OFFSET_2).into_nanos()),
                         monotonic_ref,
                         STD_DEV,
                     )),
@@ -649,7 +694,7 @@ mod tests {
             Event::KalmanFilterUpdated {
                 track: Track::Primary,
                 monotonic: monotonic_ref,
-                utc: monotonic_ref + OFFSET,
+                utc: UtcTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                 sqrt_covariance: STD_DEV,
             },
             Event::StartClock {
@@ -662,7 +707,7 @@ mod tests {
             Event::KalmanFilterUpdated {
                 track: Track::Monitor,
                 monotonic: monotonic_ref,
-                utc: monotonic_ref + OFFSET_2,
+                utc: UtcTime::from_nanos((monotonic_ref + OFFSET_2).into_nanos()),
                 sqrt_covariance: STD_DEV,
             },
             Event::StartClock {
@@ -682,7 +727,7 @@ mod tests {
         let diagnostics = Arc::new(FakeDiagnostics::new());
         let config = make_test_config_with_delay(delay);
 
-        let monotonic_ref = zx::Time::get_monotonic();
+        let monotonic_ref = zx::MonotonicTime::get();
         let (s, r) = mpsc::channel(1);
 
         // Maintain UTC until no more work remains
@@ -692,7 +737,7 @@ mod tests {
                 time_source: FakePushTimeSource::events(vec![
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Ok },
                     TimeSourceEvent::from(Sample::new(
-                        monotonic_ref + OFFSET,
+                        UtcTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                         monotonic_ref,
                         STD_DEV,
                     )),
@@ -739,7 +784,7 @@ mod tests {
             Event::KalmanFilterUpdated {
                 track: Track::Primary,
                 monotonic: monotonic_ref,
-                utc: monotonic_ref + OFFSET,
+                utc: UtcTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                 sqrt_covariance: STD_DEV,
             },
             Event::StartClock {
@@ -758,7 +803,7 @@ mod tests {
         let diagnostics = Arc::new(FakeDiagnostics::new());
         let config = make_test_config_with_delay(1);
 
-        let monotonic_ref = zx::Time::get_monotonic();
+        let monotonic_ref = zx::MonotonicTime::get();
         let (s, r) = mpsc::channel(1);
 
         // Maintain UTC until no more work remains
@@ -768,7 +813,7 @@ mod tests {
                 time_source: FakePushTimeSource::events(vec![
                     TimeSourceEvent::StatusChange { status: ftexternal::Status::Ok },
                     TimeSourceEvent::from(Sample::new(
-                        monotonic_ref + OFFSET,
+                        UtcTime::from_nanos((monotonic_ref + OFFSET).into_nanos()),
                         monotonic_ref,
                         STD_DEV,
                     )),
@@ -844,6 +889,63 @@ mod tests {
     }
 
     #[fuchsia::test]
+    fn no_update_invalid_rtc_force_start() {
+        let mut executor = fasync::TestExecutor::new();
+        let (clock, initial_update_ticks) = create_clock();
+        let rtc = FakeRtc::valid(INVALID_RTC_TIME);
+        let diagnostics = Arc::new(FakeDiagnostics::new());
+
+        // Force start from backstop even if RTC is present.
+        let config = make_test_config_with_force_start();
+
+        let time_source = FakePushTimeSource::events(vec![TimeSourceEvent::StatusChange {
+            status: ftexternal::Status::Network,
+        }])
+        .into();
+        let (s, r) = mpsc::channel(1);
+
+        // Maintain UTC until no more work remains
+        let mut fut = maintain_utc(
+            PrimaryTrack { clock: Arc::clone(&clock), time_source },
+            None,
+            Some(rtc.clone()),
+            Arc::clone(&diagnostics),
+            Arc::clone(&config),
+            s,
+            r,
+        )
+        .boxed();
+        let _ = executor.run_until_stalled(&mut fut);
+
+        // Checking that the clock has not been updated yet
+        let last_value_update_ticks = clock.get_details().unwrap().last_value_update_ticks;
+        assert!(
+            initial_update_ticks < last_value_update_ticks,
+            "initial_update_ticks={}, last_value_update_ticks={}",
+            initial_update_ticks,
+            last_value_update_ticks
+        );
+        assert_eq!(rtc.last_set(), None);
+
+        // Checking that the correct diagnostic events were logged.
+        diagnostics.assert_events(&[
+            Event::Initialized { clock_state: InitialClockState::NotSet },
+            // RTC time was invalid...
+            Event::InitializeRtc {
+                outcome: InitializeRtcOutcome::InvalidBeforeBackstop,
+                time: Some(INVALID_RTC_TIME),
+            },
+            // ...But we initialized from backstop.
+            Event::InitializeRtc {
+                outcome: InitializeRtcOutcome::Succeeded,
+                time: Some(BACKSTOP_TIME),
+            },
+            Event::StartClock { track: Track::Primary, source: StartClockSource::Rtc },
+            Event::TimeSourceStatus { role: Role::Primary, status: ftexternal::Status::Network },
+        ]);
+    }
+
+    #[fuchsia::test]
     fn no_update_valid_rtc() {
         let mut executor = fasync::TestExecutor::new();
         let (clock, initial_update_ticks) = create_clock();
@@ -895,7 +997,7 @@ mod tests {
         let (clock, _) = create_clock();
         clock
             .update(
-                zx::ClockUpdate::builder()
+                zx::ClockUpdate::<UtcTimeline>::builder()
                     .approximate_value(BACKSTOP_TIME + zx::Duration::from_millis(1)),
             )
             .unwrap();
@@ -939,17 +1041,23 @@ mod tests {
     #[fuchsia::test]
     fn test_initial_clock_state() {
         let clock =
-            zx::Clock::create(zx::ClockOpts::empty(), Some(zx::Time::from_nanos(1_000))).unwrap();
+            UtcClock::create(zx::ClockOpts::empty(), Some(UtcTime::from_nanos(1_000))).unwrap();
         // The clock must be started with an initial value.
         clock
-            .update(zx::ClockUpdate::builder().approximate_value(zx::Time::from_nanos(1_000)))
+            .update(
+                zx::ClockUpdate::<UtcTimeline>::builder()
+                    .approximate_value(UtcTime::from_nanos(1_000)),
+            )
             .unwrap();
         let (state, _) = initial_clock_state(&clock);
         assert!(matches!(state, InitialClockState::NotSet));
 
         // Update the clock, which is already running.
         clock
-            .update(zx::ClockUpdate::builder().approximate_value(zx::Time::from_nanos(1_000_000)))
+            .update(
+                zx::ClockUpdate::<UtcTimeline>::builder()
+                    .approximate_value(UtcTime::from_nanos(1_000_000)),
+            )
             .unwrap();
         let (state, _) = initial_clock_state(&clock);
         assert_eq!(state, InitialClockState::PreviouslySet);

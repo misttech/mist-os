@@ -974,7 +974,7 @@ TEST_F(FastbootFlashTest, RebootNormal) {
   AbrOps abr_ops = mock_zb_ops().GetAbrOps();
   AbrDataOneShotFlags one_shot_flags;
   ASSERT_EQ(AbrGetAndClearOneShotFlags(&abr_ops, &one_shot_flags), kAbrResultOk);
-  std::optional<RebootMode> mode_option = GetRebootMode(one_shot_flags);
+  std::optional<RebootMode> mode_option = GetOneShotRebootMode(one_shot_flags);
   ASSERT_TRUE(mode_option);
   ASSERT_EQ(*mode_option, RebootMode::kNormal);
 }
@@ -1005,7 +1005,7 @@ TEST_F(FastbootFlashTest, RebootBootloader) {
   AbrOps abr_ops = mock_zb_ops().GetAbrOps();
   AbrDataOneShotFlags one_shot_flags;
   ASSERT_EQ(AbrGetAndClearOneShotFlags(&abr_ops, &one_shot_flags), kAbrResultOk);
-  std::optional<RebootMode> mode_option = GetRebootMode(one_shot_flags);
+  std::optional<RebootMode> mode_option = GetOneShotRebootMode(one_shot_flags);
   ASSERT_TRUE(mode_option);
   ASSERT_EQ(*mode_option, RebootMode::kBootloader);
 }
@@ -1036,7 +1036,7 @@ TEST_F(FastbootFlashTest, RebootRecovery) {
   AbrOps abr_ops = mock_zb_ops().GetAbrOps();
   AbrDataOneShotFlags one_shot_flags;
   ASSERT_EQ(AbrGetAndClearOneShotFlags(&abr_ops, &one_shot_flags), kAbrResultOk);
-  std::optional<RebootMode> mode_option = GetRebootMode(one_shot_flags);
+  std::optional<RebootMode> mode_option = GetOneShotRebootMode(one_shot_flags);
   ASSERT_TRUE(mode_option);
   ASSERT_EQ(*mode_option, RebootMode::kRecovery);
 }

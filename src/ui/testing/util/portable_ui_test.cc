@@ -93,7 +93,24 @@ void PortableUITest::SetUpRealmBase() {
 void PortableUITest::SetUp() {
   SetUpRealmBase();
 
+  // Add additional components configured by the subclass.
+  for (const auto& [name, component] : GetEagerTestComponents()) {
+    realm_builder_.AddChild(
+        name, component,
+        component_testing::ChildOptions{.startup_mode = component_testing::StartupMode::EAGER});
+  }
+
+  for (const auto& [name, component] : GetTestComponents()) {
+    realm_builder_.AddChild(name, component);
+  }
+
   ExtendRealm();
+
+  // Add the necessary routing for each of the extra components added above, including any in
+  // ExtendRealm.
+  for (const auto& route : GetTestRoutes()) {
+    realm_builder_.AddRoute(route);
+  }
 
   realm_ = realm_builder_.Build();
 

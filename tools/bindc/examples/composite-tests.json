@@ -1,16 +1,16 @@
 [
     {
-        "node": "sysmem",
+        "node": "pci",
         "tests": [
             {
                 "name": "Match",
                 "expected": "match",
                 "device": {
-                    "fuchsia.BIND_PROTOCOL": "fuchsia.sysmem.BIND_PROTOCOL.DEVICE"
+                    "fuchsia.hardware.pci.Service": "fuchsia.hardware.pci.Service.ZirconTransport"
                 }
             },
             {
-                "name": "Abort sysmem",
+                "name": "Abort pci",
                 "expected": "abort",
                 "device": {
                     "fuchsia.hardware.tee.Service": "fuchsia.hardware.tee.Service.ZirconTransport"

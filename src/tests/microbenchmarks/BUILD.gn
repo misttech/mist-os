@@ -9,6 +9,7 @@ import("//build/testing/perf/test.gni")
 import("//src/starnix/kernel/starnix.gni")
 import("//src/starnix/tests/build/starnix_host_test_component.gni")
 import("//src/starnix/tests/starnix_test_subpackages.gni")
+import("//src/storage/fshost/generated_fshost_config.gni")
 import("//zircon/vdso/vdso.gni")
 
 # This can be built as a Fuchsia executable or as a host executable.
@@ -343,7 +344,11 @@ group("tests") {
   deps = [ ":fuchsia_microbenchmarks" ]
   if (host_os == "linux") {
     deps += [ ":fuchsia_microbenchmarks_host($host_toolchain)" ]
-    if (!is_asan) {
+
+    # NOTE: Minfs does not support the POSIX attributes required to run Starnix.
+    # TODO(https://fxbug.dev/359323478): Figure out a better way to disable these tests on Minfs
+    # without relying on a global GN argument.
+    if (!is_asan && data_filesystem_format != "minfs") {
       deps += [
         ":starnix_microbenchmarks_perftestmode",
         ":starnix_microbenchmarks_unittestmode",
@@ -362,7 +367,9 @@ group("microbenchmarks") {
 group("benchmarks") {
   testonly = true
   deps = [ ":fuchsia_microbenchmarks_test" ]
-  if (!is_asan && host_os == "linux") {
+
+  # NOTE: Minfs does not support the POSIX attributes required to run Starnix.
+  if (!is_asan && host_os == "linux" && data_filesystem_format != "minfs") {
     deps += [ ":starnix_microbenchmarks_test" ]
   }
 }

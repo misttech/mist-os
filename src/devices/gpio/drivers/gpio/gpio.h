@@ -7,6 +7,7 @@
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
 #include <fidl/fuchsia.hardware.gpioimpl/cpp/driver/wire.h>
+#include <fidl/fuchsia.hardware.pinimpl/cpp/driver/wire.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/devfs/cpp/connector.h>
@@ -88,7 +89,7 @@ class GpioInitDevice {
 
  private:
   static zx_status_t ConfigureGpios(
-      const fuchsia_hardware_gpioimpl::wire::InitMetadata& metadata,
+      const fidl::VectorView<fuchsia_hardware_pinimpl::wire::InitStep>& init_steps,
       fdf::WireSharedClient<fuchsia_hardware_gpioimpl::GpioImpl>& gpio);
 
   fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
