@@ -534,7 +534,27 @@ where
             )?;
             Ok(collection_input.capabilities())
         }
-        OfferTarget::Capability(_) => unimplemented!(),
+        OfferTarget::Capability(dictionary_name) => {
+            // Offers targeting another capability are for adding the capability to a dictionary
+            // declared by the same component. These dictionaries are stored in the target's
+            // sandbox.
+            let target_sandbox = target.component_sandbox().await?;
+            let capability =
+                target_sandbox.declared_dictionaries.get(dictionary_name).ok().flatten().ok_or(
+                    RoutingError::BedrockNotPresentInDictionary {
+                        name: dictionary_name.to_string(),
+                        moniker: target.moniker().clone().into(),
+                    },
+                )?;
+            match capability {
+                Capability::Dictionary(dictionary) => Ok(dictionary),
+                other_type => Err(RoutingError::BedrockWrongCapabilityType {
+                    actual: other_type.debug_typename().to_string(),
+                    expected: "Dictionary".to_string(),
+                    moniker: target.moniker().clone().into(),
+                }),
+            }
+        }
     }
 }
 

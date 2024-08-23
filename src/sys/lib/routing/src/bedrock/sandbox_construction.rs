@@ -65,6 +65,9 @@ pub struct ComponentSandbox {
     /// capability. Currently this is only the storage admin protocol.
     pub capability_sourced_capabilities_dict: Dict,
 
+    /// The dictionary containing all dictionaries declared by this component.
+    pub declared_dictionaries: Dict,
+
     /// This set holds a component input dictionary for each child of a component. Each dictionary
     /// contains all capabilities the component has made available to a specific collection.
     pub child_inputs: StructuredDictMap<ComponentInput>,
@@ -88,6 +91,7 @@ impl ComponentSandbox {
             program_output_dict,
             framework_dict,
             capability_sourced_capabilities_dict,
+            declared_dictionaries,
             child_inputs,
             collection_inputs,
         } = sandbox;
@@ -100,6 +104,7 @@ impl ComponentSandbox {
             (&program_output_dict, &self.program_output_dict),
             (&framework_dict, &self.framework_dict),
             (&capability_sourced_capabilities_dict, &self.capability_sourced_capabilities_dict),
+            (&declared_dictionaries, &self.declared_dictionaries),
         ] {
             for (key, capability_res) in copy_from.enumerate() {
                 copy_to
@@ -295,6 +300,7 @@ pub fn build_component_sandbox<C: ComponentInstanceInterface + 'static>(
         program_output_dict,
         framework_dict,
         capability_sourced_capabilities_dict,
+        declared_dictionaries,
         child_inputs,
         collection_inputs,
     }
