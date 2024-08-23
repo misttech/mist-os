@@ -62,8 +62,12 @@ impl MemoryMappedVvar {
     pub fn update_utc_data_transform(&self, new_transform: &ClockTransformation) {
         let vvar_data = self.get_pointer_to_memory_mapped_vvar();
         let old_transform = ClockTransformation {
-            reference_offset: vvar_data.mono_to_utc_reference_offset.load(Ordering::Acquire),
-            synthetic_offset: vvar_data.mono_to_utc_synthetic_offset.load(Ordering::Acquire),
+            reference_offset: zx::MonotonicTime::from_nanos(
+                vvar_data.mono_to_utc_reference_offset.load(Ordering::Acquire),
+            ),
+            synthetic_offset: zx::SyntheticTime::from_nanos(
+                vvar_data.mono_to_utc_synthetic_offset.load(Ordering::Acquire),
+            ),
             rate: zx::sys::zx_clock_rate_t {
                 synthetic_ticks: vvar_data.mono_to_utc_synthetic_ticks.load(Ordering::Acquire),
                 reference_ticks: vvar_data.mono_to_utc_reference_ticks.load(Ordering::Acquire),
@@ -75,10 +79,10 @@ impl MemoryMappedVvar {
             debug_assert!(seq_num & 1 == 0);
             vvar_data
                 .mono_to_utc_reference_offset
-                .store(new_transform.reference_offset, Ordering::Release);
+                .store(new_transform.reference_offset.into_nanos(), Ordering::Release);
             vvar_data
                 .mono_to_utc_synthetic_offset
-                .store(new_transform.synthetic_offset, Ordering::Release);
+                .store(new_transform.synthetic_offset.into_nanos(), Ordering::Release);
             vvar_data
                 .mono_to_utc_reference_ticks
                 .store(new_transform.rate.reference_ticks, Ordering::Release);

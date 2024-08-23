@@ -81,8 +81,8 @@ impl From<&zx::Clock> for Transform {
             ((synthetic_ticks * MILLION as i64) / reference_ticks) - MILLION as i64;
 
         Transform {
-            monotonic_offset: details.mono_to_synthetic.reference_offset,
-            synthetic_offset: details.mono_to_synthetic.synthetic_offset,
+            monotonic_offset: details.mono_to_synthetic.reference_offset.into_nanos(),
+            synthetic_offset: details.mono_to_synthetic.synthetic_offset.into_nanos(),
             rate_adjust_ppm: rate_adjust_ppm as i32,
             // Zircon clocks don't document the change in error over time. Assume a fixed error.
             error_bound_at_offset: details.error_bounds,
@@ -100,8 +100,8 @@ pub fn time_at_monotonic(clock: &zx::Clock, monotonic: zx::MonotonicTime) -> zx:
     let details = clock.get_details().expect("failed to get clock details");
     // Calculate using the transform definition underlying a zircon clock.
     // Cast to i128 to avoid overflows in multiplication.
-    let reference_offset = details.mono_to_synthetic.reference_offset as i128;
-    let synthetic_offset = details.mono_to_synthetic.synthetic_offset as i128;
+    let reference_offset = details.mono_to_synthetic.reference_offset.into_nanos() as i128;
+    let synthetic_offset = details.mono_to_synthetic.synthetic_offset.into_nanos() as i128;
     let reference_ticks = details.mono_to_synthetic.rate.reference_ticks as i128;
     let synthetic_ticks = details.mono_to_synthetic.rate.synthetic_ticks as i128;
 

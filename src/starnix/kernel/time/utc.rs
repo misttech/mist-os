@@ -24,12 +24,12 @@ struct UtcClock {
 }
 
 impl UtcClock {
-    pub fn new(real_utc_clock: zx::Clock) -> Self {
+    pub fn new(real_utc_clock: zx::SyntheticClock) -> Self {
         let offset = real_utc_clock.get_details().unwrap().backstop.into_nanos()
             - zx::MonotonicTime::get().into_nanos();
         let current_transform = ClockTransformation {
-            reference_offset: 0,
-            synthetic_offset: offset,
+            reference_offset: zx::MonotonicTime::default(),
+            synthetic_offset: zx::SyntheticTime::from_nanos(offset),
             rate: zx::sys::zx_clock_rate_t { synthetic_ticks: 1, reference_ticks: 1 },
         };
         let mut utc_clock = Self {

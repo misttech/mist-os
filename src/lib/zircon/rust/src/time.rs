@@ -17,25 +17,25 @@ pub type SyntheticTime = Time<SyntheticTimeline>;
 #[repr(transparent)]
 pub struct Time<T>(sys::zx_time_t, std::marker::PhantomData<T>);
 
-impl<T: Timeline> Hash for Time<T> {
+impl<T> Hash for Time<T> {
     fn hash<H: Hasher>(&self, state: &mut H) {
         self.0.hash(state);
     }
 }
 
-impl<T: Timeline> PartialEq for Time<T> {
+impl<T> PartialEq for Time<T> {
     fn eq(&self, other: &Self) -> bool {
         self.0 == other.0
     }
 }
-impl<T: Timeline> Eq for Time<T> {}
+impl<T> Eq for Time<T> {}
 
-impl<T: Timeline> PartialOrd for Time<T> {
+impl<T> PartialOrd for Time<T> {
     fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
         self.0.partial_cmp(&other.0)
     }
 }
-impl<T: Timeline> Ord for Time<T> {
+impl<T> Ord for Time<T> {
     fn cmp(&self, other: &Self) -> std::cmp::Ordering {
         self.0.cmp(&other.0)
     }

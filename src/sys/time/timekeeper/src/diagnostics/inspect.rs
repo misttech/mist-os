@@ -140,8 +140,8 @@ impl From<zx::ClockDetails> for ClockDetails {
         ClockDetails {
             retrieval_monotonic: monotonic_time(),
             generation_counter: details.generation_counter,
-            monotonic_offset: details.mono_to_synthetic.reference_offset,
-            utc_offset: details.mono_to_synthetic.synthetic_offset,
+            monotonic_offset: details.mono_to_synthetic.reference_offset.into_nanos(),
+            utc_offset: details.mono_to_synthetic.synthetic_offset.into_nanos(),
             rate_ppm,
             error_bounds: details.error_bounds,
             reason: None,

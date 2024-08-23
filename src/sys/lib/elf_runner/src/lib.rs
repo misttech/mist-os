@@ -1550,7 +1550,8 @@ mod tests {
         );
 
         // Create a clock and pass it to the component as the UTC clock through numbered_handles.
-        let clock = zx::Clock::create(zx::ClockOpts::AUTO_START | zx::ClockOpts::MONOTONIC, None)?;
+        let clock =
+            zx::SyntheticClock::create(zx::ClockOpts::AUTO_START | zx::ClockOpts::MONOTONIC, None)?;
         let clock_koid = clock.get_koid().unwrap();
 
         let (_runtime_dir, runtime_dir_server) = create_proxy::<fio::DirectoryMarker>()?;

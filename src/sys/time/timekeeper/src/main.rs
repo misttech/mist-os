@@ -326,7 +326,7 @@ fn initial_clock_state(utc_clock: &zx::Clock) -> (InitialClockState, zx::ClockDe
     let clock_details = utc_clock.get_details().expect("failed to get UTC clock details");
     // When the clock is first initialized to the backstop time, its synthetic offset should
     // be identical. Once the clock is updated, this is no longer true.
-    if clock_details.backstop.into_nanos() == clock_details.ticks_to_synthetic.synthetic_offset {
+    if clock_details.backstop == clock_details.ticks_to_synthetic.synthetic_offset {
         (InitialClockState::NotSet, clock_details)
     } else {
         (InitialClockState::PreviouslySet, clock_details)

@@ -360,8 +360,7 @@ impl<R: Rtc, D: 'static + Diagnostics> ClockManager<R, D> {
         }
 
         let details = self.clock.get_details().expect("failed to get UTC clock details");
-        let mut clock_started =
-            details.backstop.into_nanos() != details.ticks_to_synthetic.synthetic_offset;
+        let mut clock_started = details.backstop != details.ticks_to_synthetic.synthetic_offset;
         std::mem::drop(details);
         let mut receiver = async_commands.fuse(); // Required by select! below.
 

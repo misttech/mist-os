@@ -5,7 +5,8 @@
 //! Type-safe bindings for Zircon clock objects.
 
 use crate::{
-    ok, AsHandleRef, ClockUpdate, Handle, HandleBased, HandleRef, MonotonicTime, SyntheticTime,
+    ok, AsHandleRef, ClockUpdate, Handle, HandleBased, HandleRef, MonotonicTime, SyntheticTimeline,
+    Time, Timeline,
 };
 use bitflags::bitflags;
 use fuchsia_zircon_status::Status;
@@ -23,14 +24,15 @@ use std::ptr;
 /// [clock monotonic]: https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_get_monotonic.md
 #[derive(Debug, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[repr(transparent)]
-pub struct Clock(Handle);
-impl_handle_based!(Clock);
+pub struct Clock<Output = SyntheticTimeline>(Handle, std::marker::PhantomData<Output>);
 
-impl Clock {
+pub type SyntheticClock = Clock<SyntheticTimeline>;
+
+impl<Output: Timeline> Clock<Output> {
     /// Create a new clock object with the provided arguments. Wraps the [zx_clock_create] syscall.
     ///
     /// [zx_clock_create]: https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_create
-    pub fn create(opts: ClockOpts, backstop: Option<SyntheticTime>) -> Result<Self, Status> {
+    pub fn create(opts: ClockOpts, backstop: Option<Time<Output>>) -> Result<Self, Status> {
         let mut out = 0;
         let status = match backstop {
             Some(backstop) => {
@@ -54,18 +56,18 @@ impl Clock {
     /// `ZX_RIGHT_READ` and that the clock has had an initial time established.
     ///
     /// [zx_clock_read]: https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_read
-    pub fn read(&self) -> Result<SyntheticTime, Status> {
+    pub fn read(&self) -> Result<Time<Output>, Status> {
         let mut now = 0;
         let status = unsafe { sys::zx_clock_read(self.raw_handle(), &mut now) };
         ok(status)?;
-        Ok(SyntheticTime::from_nanos(now))
+        Ok(Time::<Output>::from_nanos(now))
     }
 
     /// Get low level details of this clock's current status. Wraps the
     /// [zx_clock_get_details] syscall. Requires `ZX_RIGHT_READ`.
     ///
     /// [zx_clock_get_details]: https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_get_details
-    pub fn get_details(&self) -> Result<ClockDetails, Status> {
+    pub fn get_details(&self) -> Result<ClockDetails<Output>, Status> {
         let mut out_details = MaybeUninit::<sys::zx_clock_details_v1_t>::uninit();
         let status = unsafe {
             sys::zx_clock_get_details(
@@ -83,7 +85,7 @@ impl Clock {
     /// `ZX_RIGHT_WRITE`.
     ///
     /// [zx_clock_update]: https://fuchsia.dev/fuchsia-src/reference/syscalls/clock_update
-    pub fn update(&self, update: impl Into<ClockUpdate>) -> Result<(), Status> {
+    pub fn update(&self, update: impl Into<ClockUpdate<Output>>) -> Result<(), Status> {
         let update = update.into();
         let options = update.options();
         let args = sys::zx_clock_update_args_v2_t::from(update);
@@ -94,6 +96,26 @@ impl Clock {
         Ok(())
     }
 }
+
+impl<Output: Timeline> AsHandleRef for Clock<Output> {
+    fn as_handle_ref(&self) -> HandleRef<'_> {
+        self.0.as_handle_ref()
+    }
+}
+
+impl<Output: Timeline> From<Handle> for Clock<Output> {
+    fn from(handle: Handle) -> Self {
+        Clock(handle, std::marker::PhantomData)
+    }
+}
+
+impl<Output: Timeline> From<Clock<Output>> for Handle {
+    fn from(x: Clock<Output>) -> Handle {
+        x.0
+    }
+}
+
+impl<T: Timeline> HandleBased for Clock<T> {}
 
 bitflags! {
     #[repr(transparent)]
@@ -118,15 +140,15 @@ bitflags! {
 /// Fine grained details of a [`Clock`] object.
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct ClockDetails {
+pub struct ClockDetails<Output = SyntheticTimeline> {
     /// The minimum time the clock can ever be set to.
-    pub backstop: SyntheticTime,
+    pub backstop: Time<Output>,
 
     /// The current ticks to clock transformation.
-    pub ticks_to_synthetic: ClockTransformation,
+    pub ticks_to_synthetic: ClockTransformation<Output>,
 
     /// The current clock monotonic to clock transformation.
-    pub mono_to_synthetic: ClockTransformation,
+    pub mono_to_synthetic: ClockTransformation<Output>,
 
     /// The current symmetric error estimate (if any) for the clock, measured in nanoseconds.
     pub error_bounds: u64,
@@ -151,10 +173,10 @@ pub struct ClockDetails {
     pub generation_counter: u32,
 }
 
-impl From<sys::zx_clock_details_v1_t> for ClockDetails {
+impl<Output: Timeline> From<sys::zx_clock_details_v1_t> for ClockDetails<Output> {
     fn from(details: sys::zx_clock_details_v1_t) -> Self {
         ClockDetails {
-            backstop: SyntheticTime::from_nanos(details.backstop_time),
+            backstop: Time::from_nanos(details.backstop_time),
             ticks_to_synthetic: details.ticks_to_synthetic.into(),
             mono_to_synthetic: details.mono_to_synthetic.into(),
             error_bounds: details.error_bound,
@@ -172,21 +194,21 @@ impl From<sys::zx_clock_details_v1_t> for ClockDetails {
 ///
 /// [clock transformations]: https://fuchsia.dev/fuchsia-src/concepts/kernel/clock_transformations
 #[derive(Debug, Clone, Eq, PartialEq)]
-pub struct ClockTransformation {
+pub struct ClockTransformation<Output = SyntheticTimeline> {
     /// The offset on the reference timeline, measured in reference clock ticks.
-    pub reference_offset: i64,
+    pub reference_offset: MonotonicTime,
     /// The offset on the clock timeline, measured in clock ticks (typically normalized to
     /// nanoseconds).
-    pub synthetic_offset: i64,
+    pub synthetic_offset: Time<Output>,
     /// The ratio of the reference to clock rate.
     pub rate: sys::zx_clock_rate_t,
 }
 
-impl From<sys::zx_clock_transformation_t> for ClockTransformation {
+impl<Output: Timeline> From<sys::zx_clock_transformation_t> for ClockTransformation<Output> {
     fn from(ct: sys::zx_clock_transformation_t) -> Self {
         ClockTransformation {
-            reference_offset: ct.reference_offset,
-            synthetic_offset: ct.synthetic_offset,
+            reference_offset: MonotonicTime::from_nanos(ct.reference_offset),
+            synthetic_offset: Time::<Output>::from_nanos(ct.synthetic_offset),
             rate: ct.rate,
         }
     }
@@ -209,24 +231,24 @@ fn transform_clock(r: i64, r_offset: i64, c_offset: i64, r_rate: u32, c_rate: u3
 /// [Clock transformations](https://fuchsia.dev/fuchsia-src/concepts/kernel/clock_transformations)
 /// can be applied to convert a time from a reference time to a synthetic time. The inverse
 /// transformation can be applied to convert a synthetic time back to the reference time.
-impl ClockTransformation {
-    pub fn apply(&self, time: MonotonicTime) -> SyntheticTime {
+impl<Output: Timeline + Copy> ClockTransformation<Output> {
+    pub fn apply(&self, time: MonotonicTime) -> Time<Output> {
         let c = transform_clock(
             time.into_nanos(),
-            self.reference_offset,
-            self.synthetic_offset,
+            self.reference_offset.into_nanos(),
+            self.synthetic_offset.into_nanos(),
             self.rate.reference_ticks,
             self.rate.synthetic_ticks,
         );
 
-        SyntheticTime::from_nanos(c)
+        Time::from_nanos(c)
     }
 
-    pub fn apply_inverse(&self, time: SyntheticTime) -> MonotonicTime {
+    pub fn apply_inverse(&self, time: Time<Output>) -> MonotonicTime {
         let r = transform_clock(
             time.into_nanos(),
-            self.synthetic_offset,
-            self.reference_offset,
+            self.synthetic_offset.into_nanos(),
+            self.reference_offset.into_nanos(),
             self.rate.synthetic_ticks,
             self.rate.reference_ticks,
         );
@@ -238,53 +260,64 @@ impl ClockTransformation {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::SyntheticTime;
     use assert_matches::assert_matches;
 
     #[test]
     fn create_clocks() {
-        assert_matches!(Clock::create(ClockOpts::empty(), None), Ok(_));
-        assert_matches!(Clock::create(ClockOpts::MONOTONIC, None), Ok(_));
-        assert_matches!(Clock::create(ClockOpts::CONTINUOUS, None), Ok(_));
-        assert_matches!(Clock::create(ClockOpts::AUTO_START | ClockOpts::MONOTONIC, None), Ok(_));
-        assert_matches!(Clock::create(ClockOpts::AUTO_START | ClockOpts::CONTINUOUS, None), Ok(_));
-
-        // Now with backstop.
-        let backstop = Some(SyntheticTime::from_nanos(5500));
-        assert_matches!(Clock::create(ClockOpts::MONOTONIC, backstop), Ok(_));
-        assert_matches!(Clock::create(ClockOpts::CONTINUOUS, backstop), Ok(_));
+        assert_matches!(SyntheticClock::create(ClockOpts::empty(), None), Ok(_));
+        assert_matches!(SyntheticClock::create(ClockOpts::MONOTONIC, None), Ok(_));
+        assert_matches!(SyntheticClock::create(ClockOpts::CONTINUOUS, None), Ok(_));
         assert_matches!(
-            Clock::create(ClockOpts::AUTO_START | ClockOpts::MONOTONIC, backstop),
+            SyntheticClock::create(ClockOpts::AUTO_START | ClockOpts::MONOTONIC, None),
             Ok(_)
         );
         assert_matches!(
-            Clock::create(ClockOpts::AUTO_START | ClockOpts::CONTINUOUS, backstop),
+            SyntheticClock::create(ClockOpts::AUTO_START | ClockOpts::CONTINUOUS, None),
+            Ok(_)
+        );
+
+        // Now with backstop.
+        let backstop = Some(SyntheticTime::from_nanos(5500));
+        assert_matches!(SyntheticClock::create(ClockOpts::MONOTONIC, backstop), Ok(_));
+        assert_matches!(SyntheticClock::create(ClockOpts::CONTINUOUS, backstop), Ok(_));
+        assert_matches!(
+            SyntheticClock::create(ClockOpts::AUTO_START | ClockOpts::MONOTONIC, backstop),
+            Ok(_)
+        );
+        assert_matches!(
+            SyntheticClock::create(ClockOpts::AUTO_START | ClockOpts::CONTINUOUS, backstop),
             Ok(_)
         );
     }
 
     #[test]
     fn read_time() {
-        let clock = Clock::create(ClockOpts::MONOTONIC, None).expect("failed to create clock");
+        let clock =
+            SyntheticClock::create(ClockOpts::MONOTONIC, None).expect("failed to create clock");
         assert_matches!(clock.read(), Ok(_));
     }
 
     #[test]
     fn get_clock_details() {
         // No backstop.
-        let clock = Clock::create(ClockOpts::MONOTONIC, None).expect("failed to create clock");
+        let clock =
+            SyntheticClock::create(ClockOpts::MONOTONIC, None).expect("failed to create clock");
         let details = clock.get_details().expect("failed to get details");
         assert_eq!(details.backstop, SyntheticTime::from_nanos(0));
 
         // With backstop.
-        let clock = Clock::create(ClockOpts::MONOTONIC, Some(SyntheticTime::from_nanos(5500)))
-            .expect("failed to create clock");
+        let clock =
+            SyntheticClock::create(ClockOpts::MONOTONIC, Some(SyntheticTime::from_nanos(5500)))
+                .expect("failed to create clock");
         let details = clock.get_details().expect("failed to get details");
         assert_eq!(details.backstop, SyntheticTime::from_nanos(5500));
     }
 
     #[test]
     fn update_clock() {
-        let clock = Clock::create(ClockOpts::MONOTONIC, None).expect("failed to create clock");
+        let clock =
+            SyntheticClock::create(ClockOpts::MONOTONIC, None).expect("failed to create clock");
         let before_details = clock.get_details().expect("failed to get details");
         assert_eq!(before_details.last_value_update_ticks, 0);
         assert_eq!(before_details.last_rate_adjust_update_ticks, 0);
@@ -311,9 +344,9 @@ mod tests {
             after_details.last_error_bounds_update_ticks
         );
         assert_eq!(after_details.error_bounds, 52);
-        assert_eq!(after_details.ticks_to_synthetic.synthetic_offset, 42);
-        assert_eq!(after_details.mono_to_synthetic.reference_offset, 999);
-        assert_eq!(after_details.mono_to_synthetic.synthetic_offset, 42);
+        assert_eq!(after_details.ticks_to_synthetic.synthetic_offset.into_nanos(), 42);
+        assert_eq!(after_details.mono_to_synthetic.reference_offset.into_nanos(), 999);
+        assert_eq!(after_details.mono_to_synthetic.synthetic_offset.into_nanos(), 42);
 
         let before_details = after_details;
 
@@ -333,8 +366,8 @@ mod tests {
             after_details.last_value_update_ticks
         );
         assert_eq!(after_details.error_bounds, 100);
-        assert_eq!(after_details.ticks_to_synthetic.synthetic_offset, 42);
-        assert_eq!(after_details.mono_to_synthetic.synthetic_offset, 42);
+        assert_eq!(after_details.ticks_to_synthetic.synthetic_offset.into_nanos(), 42);
+        assert_eq!(after_details.mono_to_synthetic.synthetic_offset.into_nanos(), 42);
     }
 
     #[test]
@@ -342,8 +375,8 @@ mod tests {
         let t_0 = MonotonicTime::ZERO;
         // Identity clock transformation
         let xform = ClockTransformation {
-            reference_offset: 0,
-            synthetic_offset: 0,
+            reference_offset: MonotonicTime::from_nanos(0),
+            synthetic_offset: SyntheticTime::from_nanos(0),
             rate: sys::zx_clock_rate_t { synthetic_ticks: 1, reference_ticks: 1 },
         };
 
@@ -358,8 +391,8 @@ mod tests {
         let t_0 = MonotonicTime::ZERO;
         // Identity clock transformation
         let xform = ClockTransformation {
-            reference_offset: 3,
-            synthetic_offset: 2,
+            reference_offset: MonotonicTime::from_nanos(3),
+            synthetic_offset: SyntheticTime::from_nanos(2),
             rate: sys::zx_clock_rate_t { synthetic_ticks: 6, reference_ticks: 2 },
         };
 
@@ -377,8 +410,8 @@ mod tests {
         let t_0 = MonotonicTime::ZERO;
         // Arbitrary clock transformation
         let xform = ClockTransformation {
-            reference_offset: 196980085208,
-            synthetic_offset: 1616900096031887801,
+            reference_offset: MonotonicTime::from_nanos(196980085208),
+            synthetic_offset: SyntheticTime::from_nanos(1616900096031887801),
             rate: sys::zx_clock_rate_t { synthetic_ticks: 999980, reference_ticks: 1000000 },
         };
 
@@ -395,8 +428,8 @@ mod tests {
         // Arbitrary clock transformation where the synthetic clock is trailing behind the
         // reference clock.
         let xform = ClockTransformation {
-            reference_offset: 1616900096031887801,
-            synthetic_offset: 196980085208,
+            reference_offset: MonotonicTime::from_nanos(1616900096031887801),
+            synthetic_offset: SyntheticTime::from_nanos(196980085208),
             rate: sys::zx_clock_rate_t { synthetic_ticks: 1000000, reference_ticks: 999980 },
         };
 
@@ -412,8 +445,8 @@ mod tests {
         let t_0 = MonotonicTime::from_nanos(i64::MAX);
         // Clock transformation which will positively overflow t_0
         let xform = ClockTransformation {
-            reference_offset: 0,
-            synthetic_offset: 1,
+            reference_offset: MonotonicTime::from_nanos(0),
+            synthetic_offset: SyntheticTime::from_nanos(1),
             rate: sys::zx_clock_rate_t { synthetic_ticks: 1, reference_ticks: 1 },
         };
 
@@ -424,8 +457,8 @@ mod tests {
         let t_0 = MonotonicTime::from_nanos(i64::MIN);
         // Clock transformation which will negatively overflow t_0
         let xform = ClockTransformation {
-            reference_offset: 1,
-            synthetic_offset: 0,
+            reference_offset: MonotonicTime::from_nanos(1),
+            synthetic_offset: SyntheticTime::from_nanos(0),
             rate: sys::zx_clock_rate_t { synthetic_ticks: 1, reference_ticks: 1 },
         };
 
