@@ -305,16 +305,14 @@ foreach(driver, simple_drivers) {
     testonly = true
     output_name = "test-$driver"
     configs += [ "//build/config:all_source" ]
-    sources = [ "test/$driver.c" ]
+    sources = [ "test/$driver.cc" ]
     deps = [
       ":test-${driver}-bind",
-      "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
-      "//src/devices/lib/driver",
-      "//src/lib/ddk",
+      "//sdk/lib/driver/component/cpp",
+      "//src/devices/bind/fuchsia:fuchsia_cpp",
+      "//src/devices/bind/fuchsia.test.platform:fuchsia.test.platform_cpp",
+      "//src/devices/lib/driver:driver_runtime",
     ]
-
-    # TODO(https://fxbug.dev/42113849): Migrate to the new bind rules and delete this dep.
-    deps += [ "//src/lib/ddk:ddk-deprecated-binding-headers" ]
   }
 
   fuchsia_driver_component("test-$driver") {
