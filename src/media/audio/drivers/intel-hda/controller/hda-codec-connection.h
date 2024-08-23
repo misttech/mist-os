@@ -134,7 +134,7 @@ class HdaCodecConnection : public fbl::RefCounted<HdaCodecConnection>,
 
   // Device properties.
   const uint8_t codec_id_;
-  zx_device_prop_t dev_props_[PROP_COUNT];
+  zx_device_str_prop_t dev_props_[PROP_COUNT];
   zx_device_t* dev_node_ = nullptr;
   struct {
     uint16_t vid;

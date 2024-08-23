@@ -31,14 +31,6 @@
 // Internal use only.
 #define BIND_ACPI_ID 0x0401
 
-// Intel HDA Codec binding variables at 0x05XX
-#define BIND_IHDA_CODEC_VID 0x0500
-#define BIND_IHDA_CODEC_DID 0x0501
-#define BIND_IHDA_CODEC_MAJOR_REV 0x0502
-#define BIND_IHDA_CODEC_MINOR_REV 0x0503
-#define BIND_IHDA_CODEC_VENDOR_REV 0x0504
-#define BIND_IHDA_CODEC_VENDOR_STEP 0x0505
-
 // I2C binding variables at 0x0A0X
 #define BIND_I2C_CLASS 0x0A00
 #define BIND_I2C_BUS_ID 0x0A01

@@ -36,18 +36,6 @@ const char* BindParamName(uint32_t param_num) {
       return "PlatDev.PID";
     case BIND_PLATFORM_DEV_DID:
       return "PlatDev.DID";
-    case BIND_IHDA_CODEC_VID:
-      return "IHDA.Codec.VID";
-    case BIND_IHDA_CODEC_DID:
-      return "IHDA.Codec.DID";
-    case BIND_IHDA_CODEC_MAJOR_REV:
-      return "IHDACodec.MajorRev";
-    case BIND_IHDA_CODEC_MINOR_REV:
-      return "IHDACodec.MinorRev";
-    case BIND_IHDA_CODEC_VENDOR_REV:
-      return "IHDACodec.VendorRev";
-    case BIND_IHDA_CODEC_VENDOR_STEP:
-      return "IHDACodec.VendorStep";
     default:
       return NULL;
   }
