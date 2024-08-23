@@ -2,6 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/toolchain/variant_tags.gni")
+
 declare_args() {
   # Default [AddressSanitizer](https://clang.llvm.org/docs/AddressSanitizer.html)
   # options (before the `ASAN_OPTIONS` environment variable is read at
@@ -94,16 +96,18 @@ declare_args() {
   hwasan_default_options = [ "allocator_may_return_null=1" ]
 }
 
-# This lists the GN build arguments declared above.
-# sanitizer_default_options() targets must have one of these names.
-sanitizer_default_options_args = [
-  "asan_default_options",
-  "lsan_default_options",
-  "ubsan_default_options",
-  "scudo_default_options",
-  "tsan_default_options",
-  "hwasan_default_options",
+sanitizer_names = [
+  "asan",
+  "lsan",
+  "ubsan",
+  "tsan",
+  "hwasan",
 ]
+
+_unknown_names = sanitizer_names + all_variant_tags - all_variant_tags
+assert(
+    _unknown_names == [],
+    "Unknown sanitizer_names ${_unknown_names} in `sanitizer_default_options.gni` template.")
 
 # Adapt to being used in the Fuchsia GN build or in the Zircon build.
 if (zircon_toolchain == false) {
@@ -153,11 +157,13 @@ template("_sanitizer_default_options_target") {
                              "testonly",
                            ])
 
+    _output_name = "${invoker.sanitizer}_default_options"
+
     if (!invoker.default) {
       if (!defined(deps)) {
         deps = []
       }
-      deps += [ "${_sanitizer_config_dir}:${invoker.output_name}" ]
+      deps += [ "${_sanitizer_config_dir}:${_output_name}" ]
     }
 
     if (nonempty) {
@@ -179,7 +185,7 @@ template("_sanitizer_default_options_target") {
 
       defines = [
         "DEFINE_SANITIZER_DEFAULT_OPTIONS=${invoker.default}",
-        "SANITIZER_DEFAULT_OPTIONS_NAME=${invoker.output_name}",
+        "SANITIZER_DEFAULT_OPTIONS_NAME=${_output_name}",
         "SANITIZER_DEFAULT_OPTIONS_STRING=\"${string}\"",
       ]
 
@@ -194,7 +200,7 @@ template("_sanitizer_default_options_target") {
               sources,
               [ "{{source_out_dir}}/$target_name.{{source_file_part}}.o" ])
     } else {
-      not_needed(invoker, [ "output_name" ])
+      not_needed(invoker, [ "sanitizer" ])
     }
   }
 }
@@ -243,11 +249,19 @@ template("_sanitizer_default_options_target") {
 #     - Type: list(label_no_toolchain)
 #
 template("sanitizer_default_options") {
+  _targets_prefix = sanitizer_names + [ "scudo" ]
+
+  _sanitizer = false
+  foreach(prefix, _targets_prefix) {
+    if (target_name == "${prefix}_default_options") {
+      assert(_sanitizer == false)
+      _sanitizer = prefix
+    }
+  }
   assert(
-      sanitizer_default_options_args + [ target_name ] - [ target_name ] !=
-          sanitizer_default_options_args,
-      "sanitizer_default_options() target name must be listed in " +
-          "`sanitizer_default_options_args`: $sanitizer_default_options_args")
+      _sanitizer != false,
+      "sanitizer_default_options() target name must be one of ${_targets_prefix} followed by `_default_options`")
+
   _sanitizer_default_options_target(target_name) {
     forward_variables_from(invoker,
                            [
@@ -257,7 +271,7 @@ template("sanitizer_default_options") {
                            ])
 
     default = true
-    output_name = target_name
+    sanitizer = _sanitizer
 
     # Fetch the build argument's value.  The invoker scope inherited it from
     # the global scope after the declare_args() block defined it there, making
@@ -287,9 +301,9 @@ template("sanitizer_default_options") {
 #     - Type: list(string)
 #
 #
-#   * output_name
-#     - Required: Name of the GN build argument to affect.
-#     - Type: string (one of the `sanitizer_default_options_args` list).
+#   * sanitizer
+#     - Required: Name of the sanitizer to affect or "scudo".
+#     - Type: string (one of the `sanitizer_names` list or "scudo").
 #
 #   * tags
 #     - Required: The target defined is a no-op target in toolchains where
@@ -302,6 +316,9 @@ template("sanitizer_extra_options") {
          "sanitizer_extra_options() requires `args` (a list of strings)")
   assert(defined(invoker.tags),
          "sanitizer_extra_options() requires `tags` (a list of strings)")
+  assert(
+      defined(invoker.sanitizer),
+      "sanitizer_extra_options requires `sanitizer` (one of ${sanitizer_names})")
   if (_tags + invoker.tags - invoker.tags == _tags) {
     source_set(target_name) {
       forward_variables_from(invoker,
@@ -312,7 +329,7 @@ template("sanitizer_extra_options") {
       not_needed(invoker,
                  [
                    "args",
-                   "output_name",
+                   "sanitizer",
                  ])
     }
   } else {
@@ -320,11 +337,59 @@ template("sanitizer_extra_options") {
       forward_variables_from(invoker,
                              [
                                "args",
-                               "output_name",
+                               "sanitizer",
                                "visibility",
                                "testonly",
                              ])
       default = false
     }
+  }
+}
+
+# Provide additional default options for all sanitizers runtimes.
+#
+# This defines a target that acts like a set of sanitizer_extra_options()
+# targets for each and every sanitizer.
+# This target can then be used in `deps` target to get $args into the
+# runtime options list.
+#
+# Parameters
+#
+#   * args
+#     - Required: List of "option=value" strings for the sanitizer runtime.
+#     - Type: list(string)
+#
+template("extra_options_for_all_sanitizers") {
+  assert(
+      defined(invoker.args),
+      "extra_options_for_all_sanitizers() requires `args` (a list of strings)")
+
+  main_target = target_name
+  _extra_options_targets = []
+  foreach(_name, sanitizer_names) {
+    _target_name_helper =
+        "__extra_options_for_all_sanitizers.${target_name}.${_name}"
+
+    sanitizer_extra_options(_target_name_helper) {
+      forward_variables_from(invoker,
+                             [
+                               "args",
+                               "testonly",
+                             ])
+
+      visibility = [ ":${main_target}" ]
+      sanitizer = _name
+      tags = [ _name ]
+    }
+    _extra_options_targets += [ ":$_target_name_helper" ]
+  }
+
+  group(target_name) {
+    forward_variables_from(invoker,
+                           [
+                             "visibility",
+                             "testonly",
+                           ])
+    deps = _extra_options_targets
   }
 }

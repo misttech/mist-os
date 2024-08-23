@@ -150,7 +150,7 @@ sanitizer_extra_options("suppress-lsan.DO-NOT-USE-THIS") {
   ]
 
   args = [ "detect_leaks=0" ]
-  output_name = "lsan_default_options"
+  sanitizer = "lsan"
   tags = [ "lsan" ]
 }
 
@@ -161,7 +161,7 @@ sanitizer_extra_options("suppress-asan-stack-use-after-return") {
   ]
 
   args = [ "detect_stack_use_after_return=0" ]
-  output_name = "asan_default_options"
+  sanitizer = "asan"
   tags = [ "asan" ]
 }
 
@@ -176,7 +176,7 @@ sanitizer_extra_options("suppress-asan-container-overflow") {
   ]
 
   args = [ "detect_container_overflow=0" ]
-  output_name = "asan_default_options"
+  sanitizer = "asan"
   tags = [ "asan" ]
 }
 
@@ -191,8 +191,8 @@ sanitizer_extra_options(
   visibility = [ "//src/devices/tpm/drivers/tpm:tpm-driver-test-bin" ]
 
   args = [ "new_delete_type_mismatch=0" ]
-  output_name = "asan_default_options"
   tags = [ "asan" ]
+  sanitizer = "asan"
 }
 
 config("no_sanitizers") {
@@ -330,4 +330,8 @@ sanitizer_default_options("hwasan_default_options") {
     ":lsan_default_options",
     ":ubsan_default_options",
   ]
+}
+
+extra_options_for_all_sanitizers("sanitizers_use_symbolizer_markup") {
+  args = [ "enable_symbolizer_markup=1" ]
 }
