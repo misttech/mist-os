@@ -20,9 +20,4 @@ rustc_library("zram") {
     "//src/starnix/lib/starnix-sync",
     "//src/starnix/lib/starnix-uapi",
   ]
-
-  if (is_mistos) {
-    deps -= [ "//src/starnix/kernel:starnix_core" ]
-    deps += [ "//src/starnix_lite/kernel:starnix_lite_core" ]
-  }
 }

@@ -28,11 +28,6 @@ rustc_library("modules") {
     "//src/starnix/modules/zram",
   ]
 
-  if (is_mistos) {
-    deps -= [ "//src/starnix/kernel:starnix_core" ]
-    deps += [ "//src/starnix_lite/kernel:starnix_lite_core" ]
-  }
-
   features = []
   if (is_mistos) {
     features += [ "starnix_lite" ]
