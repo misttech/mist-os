@@ -2,7 +2,6 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/bazel/bazel_inputs.gni")
 import("//build/group_with_inputs.gni")
 import("//build/python/python_action.gni")
 import("//src/developer/ffx/build/ffx_action.gni")
@@ -370,13 +369,5 @@ template("board_input_bundle") {
         },
       ]
     }
-  }
-
-  # Make board configuration and board input bundle available to Bazel
-  bazel_input_resource_directory("${target_name}.bazel_input") {
-    forward_variables_from(invoker, [ "testonly" ])
-    source_dir = files.bundle_dir
-    dest_dir = rebase_path(files.bundle_dir, root_out_dir)
-    deps = [ ":${labels.main_target}" ]
   }
 }

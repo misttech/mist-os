@@ -2,9 +2,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/bazel/bazel_inputs.gni")
+import("//build/bazel/export_fuchsia_package_to_bazel.gni")
 import("//build/components.gni")
-import("//build/components/fuchsia_package_archive.gni")
 import("//build/fidl/fidl.gni")
 import("//build/rust/rustc_binary.gni")
 
@@ -89,17 +88,9 @@ fuchsia_package("element_manager") {
   ]
 }
 
-# Make `element_manager` available to products assembed with Bazel.
-#
-# TODO(https://fxbug.dev/42073448): Make this less verbose.
-fuchsia_package_archive("element_manager_archive") {
+# Make `element_manager` available to products assembled with Bazel.
+export_fuchsia_package_to_bazel("element_manager_bazel_inputs") {
   package = ":element_manager"
-}
-
-bazel_input_resource("element_manager_bazel_inputs") {
-  deps = [ ":element_manager_archive" ]
-  sources = get_target_outputs(":element_manager_archive")
-  outputs = [ "{{source_file_part}}" ]
 }
 
 fuchsia_unittest_package("element_manager_tests") {

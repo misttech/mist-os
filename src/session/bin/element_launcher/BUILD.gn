@@ -2,7 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import("//build/bazel/bazel_inputs.gni")
+import("//build/bazel/export_fuchsia_package_to_bazel.gni")
 import("//build/components.gni")
 import("//build/rust/rustc_binary.gni")
 
@@ -55,16 +55,8 @@ fuchsia_package("element_launcher") {
 }
 
 # Make `element_launcher` available to products assembled with Bazel.
-#
-# TODO(https://fxbug.dev/42073448): Make this less verbose.
-fuchsia_package_archive("element_launcher_archive") {
+export_fuchsia_package_to_bazel("element_launcher_bazel_inputs") {
   package = ":element_launcher"
-}
-
-bazel_input_resource("element_launcher_bazel_inputs") {
-  deps = [ ":element_launcher_archive" ]
-  sources = get_target_outputs(":element_launcher_archive")
-  outputs = [ "{{source_file_part}}" ]
 }
 
 fuchsia_unittest_package("element_launcher_tests") {
