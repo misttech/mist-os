@@ -12,5 +12,6 @@ fostr_fidl("fuchsia.media") {
     "//src/lib/fostr/fidl/fuchsia.images",
     "//src/lib/fostr/fidl/fuchsia.media.audio",
     "//src/lib/fostr/fidl/fuchsia.sysmem",
+    "//src/lib/fostr/fidl/fuchsia.sysmem2",
   ]
 }
