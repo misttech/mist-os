@@ -50,7 +50,7 @@ type Error = flexible enum : uint32 {
     /// This is also used when a message is received from the client in the
     /// wrong order or in some way inconsistent with protocol rules.
     //
-    // Previously conveyed using ZX_ERR_INVALID_ARGS.
+    // Previously conveyed using ZX_ERR_INVALID_ARGS or ZX_ERR_BAD_STATE.
     PROTOCOL_DEVIATION = 2;
 
     /// A client-specified object or ID was not found.

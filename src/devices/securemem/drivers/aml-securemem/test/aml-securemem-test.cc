@@ -52,7 +52,7 @@ class FakeSysmem : public fidl::testing::WireTestBase<fuchsia_hardware_sysmem::S
   }
 
  private:
-  fidl::ClientEnd<fuchsia_sysmem::SecureMem> tee_connection_;
+  fidl::ClientEnd<fuchsia_sysmem2::SecureMem> tee_connection_;
   fidl::ServerBindingGroup<fuchsia_hardware_sysmem::Sysmem> sysmem_bindings_;
 };
 

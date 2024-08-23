@@ -168,7 +168,7 @@ TEST_F(FakeDdkSysmem, Lifecycle) {
 
 // Test that creating and tearing down a SecureMem connection works correctly.
 TEST_F(FakeDdkSysmem, DummySecureMem) {
-  auto [client, server] = fidl::Endpoints<fuchsia_sysmem::SecureMem>::Create();
+  auto [client, server] = fidl::Endpoints<fuchsia_sysmem2::SecureMem>::Create();
   ASSERT_EQ(device_->RegisterSecureMemInternal(std::move(client)), ZX_OK);
 
   // This shouldn't deadlock waiting for a message on the channel.

@@ -95,7 +95,7 @@ class Device final : public fdf::DriverBase,
       fuchsia_sysmem2::Heap heap, fidl::ClientEnd<fuchsia_hardware_sysmem::Heap> heap_connection);
   // Also called directly by a test.
   [[nodiscard]] zx_status_t RegisterSecureMemInternal(
-      fidl::ClientEnd<fuchsia_sysmem::SecureMem> secure_mem_connection);
+      fidl::ClientEnd<fuchsia_sysmem2::SecureMem> secure_mem_connection);
   // Also called directly by a test.
   [[nodiscard]] zx_status_t UnregisterSecureMemInternal();
 
@@ -305,12 +305,12 @@ class Device final : public fdf::DriverBase,
  private:
   class SecureMemConnection {
    public:
-    SecureMemConnection(fidl::ClientEnd<fuchsia_sysmem::SecureMem> channel,
+    SecureMemConnection(fidl::ClientEnd<fuchsia_sysmem2::SecureMem> channel,
                         std::unique_ptr<async::Wait> wait_for_close);
-    const fidl::WireSyncClient<fuchsia_sysmem::SecureMem>& channel() const;
+    const fidl::SyncClient<fuchsia_sysmem2::SecureMem>& channel() const;
 
    private:
-    fidl::WireSyncClient<fuchsia_sysmem::SecureMem> connection_;
+    fidl::SyncClient<fuchsia_sysmem2::SecureMem> connection_;
     std::unique_ptr<async::Wait> wait_for_close_;
   };
 
@@ -416,7 +416,6 @@ class Device final : public fdf::DriverBase,
                                const protected_ranges::Range& range) override;
 
     fuchsia_sysmem2::Heap heap{};
-    fuchsia_sysmem::HeapType v1_heap_type{};
     Device* parent{};
     bool is_dynamic{};
     uint64_t range_granularity{};

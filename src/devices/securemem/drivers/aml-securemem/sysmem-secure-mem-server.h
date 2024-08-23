@@ -22,7 +22,7 @@
 // The dispatcher thread for this class must be separate from the ddk_dispatcher_thread_ so that
 // TEEC_* calls made by the |SysmemSecureMemServer| can be served by the fdf dispatcher without
 // deadlock.
-class SysmemSecureMemServer : public fidl::WireServer<fuchsia_sysmem::SecureMem> {
+class SysmemSecureMemServer : public fidl::WireServer<fuchsia_sysmem2::SecureMem> {
  public:
   using SecureMemServerOnUnbound = fit::callback<void(bool is_success)>;
 
@@ -30,11 +30,11 @@ class SysmemSecureMemServer : public fidl::WireServer<fuchsia_sysmem::SecureMem>
   SysmemSecureMemServer(async_dispatcher_t* dispatcher, zx::channel tee_client_channel);
   ~SysmemSecureMemServer() override;
 
-  void Bind(fidl::ServerEnd<fuchsia_sysmem::SecureMem> sysmem_secure_mem_server,
+  void Bind(fidl::ServerEnd<fuchsia_sysmem2::SecureMem> sysmem_secure_mem_server,
             SecureMemServerOnUnbound secure_mem_server_on_unbound);
   void Unbind();
 
-  // fidl::WireServer<fuchsia_sysmem::SecureMem> impl
+  // fidl::WireServer<fuchsia_sysmem2::SecureMem> impl
   void GetPhysicalSecureHeaps(GetPhysicalSecureHeapsCompleter::Sync& completer) override;
   void GetDynamicSecureHeaps(GetDynamicSecureHeapsCompleter::Sync& completer) override;
   void GetPhysicalSecureHeapProperties(
@@ -50,6 +50,8 @@ class SysmemSecureMemServer : public fidl::WireServer<fuchsia_sysmem::SecureMem>
       ModifySecureHeapPhysicalRangeCompleter::Sync& completer) override;
   void ZeroSubRange(ZeroSubRangeRequestView request,
                     ZeroSubRangeCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_sysmem2::SecureMem> metadata,
+                             fidl::UnknownMethodCompleter::Sync& completer) override;
 
  private:
   // We might want to extract the Range class into a lib used by aml-securemem and sysmem instead of
@@ -107,22 +109,23 @@ class SysmemSecureMemServer : public fidl::WireServer<fuchsia_sysmem::SecureMem>
   bool TrySetupSecmemSession();
   void OnUnbound(bool is_success);
 
-  zx_status_t GetPhysicalSecureHeapsInternal(
-      fidl::AnyArena* allocator, fuchsia_sysmem::wire::SecureHeapsAndRanges* heaps_and_ranges);
-  zx_status_t GetDynamicSecureHeapsInternal(
+  fit::result<fuchsia_sysmem2::Error> GetPhysicalSecureHeapsInternal(
       fidl::AnyArena* allocator,
-      fuchsia_sysmem::wire::SecureMemGetDynamicSecureHeapsResponse* response);
-  zx_status_t GetPhysicalSecureHeapPropertiesInternal(
-      const fuchsia_sysmem::wire::SecureHeapAndRange& entire_heap, fidl::AnyArena& allocator,
-      fuchsia_sysmem::wire::SecureHeapProperties* properties);
-  zx_status_t AddSecureHeapPhysicalRangeInternal(
-      fuchsia_sysmem::wire::SecureHeapAndRange heap_range);
-  zx_status_t DeleteSecureHeapPhysicalRangeInternal(
-      fuchsia_sysmem::wire::SecureHeapAndRange heap_range);
-  zx_status_t ModifySecureHeapPhysicalRangeInternal(
-      fuchsia_sysmem::wire::SecureHeapAndRangeModification range_modification);
-  zx_status_t ZeroSubRangeInternal(bool is_covering_range_explicit,
-                                   fuchsia_sysmem::wire::SecureHeapAndRange heap_range);
+      fuchsia_sysmem2::wire::SecureMemGetPhysicalSecureHeapsResponse* response);
+  fit::result<fuchsia_sysmem2::Error> GetDynamicSecureHeapsInternal(
+      fidl::AnyArena* allocator,
+      fuchsia_sysmem2::wire::SecureMemGetDynamicSecureHeapsResponse* response);
+  fit::result<fuchsia_sysmem2::Error> GetPhysicalSecureHeapPropertiesInternal(
+      const fuchsia_sysmem2::wire::SecureHeapAndRange& entire_heap, fidl::AnyArena& allocator,
+      fuchsia_sysmem2::wire::SecureMemGetPhysicalSecureHeapPropertiesResponse* reponse);
+  fit::result<fuchsia_sysmem2::Error> AddSecureHeapPhysicalRangeInternal(
+      fuchsia_sysmem2::wire::SecureHeapAndRange heap_range);
+  fit::result<fuchsia_sysmem2::Error> DeleteSecureHeapPhysicalRangeInternal(
+      fuchsia_sysmem2::wire::SecureHeapAndRange heap_range);
+  fit::result<fuchsia_sysmem2::Error> ModifySecureHeapPhysicalRangeInternal(
+      fuchsia_sysmem2::wire::SecureHeapAndRangeModification range_modification);
+  fit::result<fuchsia_sysmem2::Error> ZeroSubRangeInternal(
+      bool is_covering_range_explicit, fuchsia_sysmem2::wire::SecureHeapAndRange heap_range);
 
   // Call secmem TA to setup the one physical secure heap that's configured by the TEE Controller.
   zx_status_t SetupVdec(uint64_t* physical_address, uint64_t* size_bytes);
@@ -155,7 +158,7 @@ class SysmemSecureMemServer : public fidl::WireServer<fuchsia_sysmem::SecureMem>
 
   Ranges ranges_ __TA_GUARDED(checker_);
 
-  std::optional<fidl::ServerBinding<fuchsia_sysmem::SecureMem>> binding_;
+  std::optional<fidl::ServerBinding<fuchsia_sysmem2::SecureMem>> binding_;
   async::synchronization_checker checker_;
 };
 

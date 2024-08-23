@@ -19,6 +19,7 @@ fidl("fuchsia.sysmem2") {
     "error.fidl",
     "overview.fidl",
     "results.fidl",
+    "secure_mem.fidl",
     "usages.fidl",
   ]
   public_deps = [

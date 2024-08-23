@@ -1070,16 +1070,6 @@
         "resourceness": "resource"
     },
     {
-        "kind": "table/member",
-        "name": "fuchsia.sysmem/DynamicSecureHeap.heap",
-        "ordinal": "1",
-        "type": "fuchsia.sysmem/HeapType"
-    },
-    {
-        "kind": "table",
-        "name": "fuchsia.sysmem/DynamicSecureHeap"
-    },
-    {
         "kind": "const",
         "name": "fuchsia.sysmem/FORMAT_MODIFIER_ARM_AFBC_16X16",
         "type": "uint64",
@@ -2113,15 +2103,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.sysmem/SecureMem.GetDynamicSecureHeaps",
-        "strictness": "strict",
-        "ordinal": "1247876841549994553",
-        "direction": "two_way",
-        "response": "fuchsia.sysmem/SecureMem_GetDynamicSecureHeaps_Response",
-        "error": "int32"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.sysmem/SecureMem.GetPhysicalSecureHeapProperties",
         "strictness": "strict",
         "ordinal": "2756288888227435028",
@@ -2220,16 +2201,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.sysmem/SecureMemZeroSubRangeRequest"
-    },
-    {
-        "kind": "table/member",
-        "name": "fuchsia.sysmem/SecureMem_GetDynamicSecureHeaps_Response.heaps",
-        "ordinal": "1",
-        "type": "vector<fuchsia.sysmem/DynamicSecureHeap>:32"
-    },
-    {
-        "kind": "table",
-        "name": "fuchsia.sysmem/SecureMem_GetDynamicSecureHeaps_Response"
     },
     {
         "kind": "struct/member",
