@@ -227,7 +227,7 @@ class IperfServer:
             stderr=subprocess.PIPE,
         )
 
-    def dump_output_to_file(self, path: str) -> None:
+    def dump_output_to_file(self, path: str | os.PathLike[str]) -> None:
         self._process.kill()
         output, err = self._process.communicate()
         if err:
@@ -295,11 +295,16 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
                 ):
                     continue
 
+                dir = pathlib.Path(self.test_case_path) / (
+                    f"{message_size}bytes_{flows}flow"
+                    + ("s" if flows > 1 else "")
+                )
+                os.makedirs(dir)
                 try:
                     with self._device.tracing.trace_session(
                         categories=["system_metrics"],
                         download=True,
-                        directory=self.test_case_path,
+                        directory=dir,
                         trace_file="trace.fxt",
                     ):
                         if self._direction == Direction.LOOPBACK:
@@ -313,11 +318,6 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
                             ]
                             if self._netstack3:
                                 test_component_args.append("--netstack3")
-                            dir = (
-                                self.test_case_path
-                                + f"/{message_size}bytes_{flows}flow"
-                                + ("s" if flows > 1 else "")
-                            )
                             self._device.ffx.run_test_component(
                                 "fuchsia-pkg://fuchsia.com/iperf-benchmark#meta/iperf-benchmark-component.cm",
                                 ffx_test_args=[
@@ -329,9 +329,7 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
                             )
                             result_files = [
                                 str(path)
-                                for path in pathlib.Path(dir).rglob(
-                                    f"iperf_client_*.json"
-                                )
+                                for path in dir.rglob(f"iperf_client_*.json")
                             ]
                             asserts.assert_equal(len(result_files), flows)
                         else:
@@ -349,11 +347,10 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
                                     # traffic.
                                     self._device.ffx.get_target_ssh_address().ip,
                                     message_size,
+                                    dir,
                                 )
                             )
-                    cpu_results = self._get_cpu_results(
-                        os.path.join(self.test_case_path, "trace.fxt")
-                    )
+                    cpu_results = self._get_cpu_results(dir / "trace.fxt")
                     asserts.assert_equal(len(cpu_results), 1)
                     cpu_percentages = list(cpu_results[0].values)
                     results += self._iperf_results_to_fuchsiaperf(
@@ -366,10 +363,7 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
                         self._cleanup_iperf_tasks()
                         for i, server in enumerate(servers):
                             server.dump_output_to_file(
-                                os.path.join(
-                                    self.test_case_path,
-                                    f"iperf_server_{message_size}_{flows}_{i}.json",
-                                )
+                                dir / f"iperf_server_{i}.json"
                             )
         path = os.path.join(
             self.test_case_path, "netstack_iperf_results.fuchsiaperf.json"
@@ -380,7 +374,9 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
             [path], f"fuchsia.netstack.iperf_benchmarks.{self._label}.txt"
         )
 
-    def _get_cpu_results(self, path: str) -> list[trace_metrics.TestCaseResult]:
+    def _get_cpu_results(
+        self, path: str | os.PathLike[str]
+    ) -> list[trace_metrics.TestCaseResult]:
         json_trace_file: str = trace_importing.convert_trace_file_to_json(path)
         model: trace_model.Model = trace_importing.create_model_from_file_path(
             json_trace_file
@@ -444,6 +440,7 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
         flows: int,
         server_ip: ipaddress.IPv4Address | ipaddress.IPv6Address,
         message_size: int,
+        output_dir: str | os.PathLike[str],
     ) -> list[str]:
         loop = asyncio.get_running_loop()
         protocol_option: str = "--udp" if self._protocol == Protocol.UDP else ""
@@ -467,25 +464,28 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
             "--get-server-output",
         ]
         tasks = []
+        result_files = []
         for i in range(flows):
             cmd_args = command_args + ["--port", f"{FIRST_LISTEN_PORT + i}"]
+            result_path = os.path.join(output_dir, f"iperf_client_{i}.json")
+            result_files.append(result_path)
             tasks.append(
                 asyncio.create_task(
-                    self._run_host_iperf3_command(
-                        cmd_args, f"iperf_client_{i}.json"
-                    )
+                    self._run_host_iperf3_command(cmd_args, result_path)
                 )
             )
-        (result_files, pending) = await asyncio.wait(
+        (done, pending) = await asyncio.wait(
             tasks, return_when=asyncio.ALL_COMPLETED
         )
         asserts.assert_equal(len(pending), 0)
-        asserts.assert_equal(len(result_files), flows)
-        return [f.result() for f in result_files]
+        asserts.assert_equal(len(done), flows)
+        return result_files
 
     async def _run_host_iperf3_command(
-        self, cmd_args: list[str], output_filename: str
-    ) -> str:
+        self,
+        cmd_args: list[str],
+        results_path: str,
+    ) -> None:
         # Run iperf3 client from the host-tools
         with as_file(files(test_data).joinpath("iperf3")) as host_bin:
             host_bin.chmod(host_bin.stat().st_mode | stat.S_IEXEC)
@@ -504,13 +504,8 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
                 0,
                 f"output: {stdout_str} stderr: {stderr_str}",
             )
-            results_path = os.path.join(
-                self.test_case_path,
-                output_filename,
-            )
             with open(results_path, "wb") as f:
                 f.write(stdout)
-            return results_path
 
     def _iperf_results_to_fuchsiaperf(
         self,
