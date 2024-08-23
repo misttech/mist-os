@@ -174,8 +174,10 @@ impl Pipeline {
 
     pub fn add_component(&self, moniker: &ExtendedMoniker) -> Result<(), Error> {
         if let Some(selectors) = &self.static_selectors {
-            let matched_selectors =
-                moniker.match_against_selectors(selectors).map_err(Error::MatchComponentMoniker)?;
+            let matched_selectors = moniker
+                .match_against_selectors(selectors)
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(Error::MatchComponentMoniker)?;
 
             match &matched_selectors[..] {
                 [] => {}

@@ -289,6 +289,7 @@ impl ReaderServer {
                     .identity
                     .moniker
                     .match_against_selectors(configured_selectors.as_slice())
+                    .collect::<Result<Vec<_>, _>>()
                     .unwrap_or_else(|err| {
                         error!(
                             moniker = ?pumped_inspect_data.identity.moniker, ?err,

@@ -365,7 +365,7 @@ where
 /// Requires: hierarchy_path is not empty.
 ///           selectors contains valid Selectors.
 pub fn match_component_moniker_against_selector<T>(
-    moniker: &[T],
+    moniker: impl AsRef<[T]>,
     selector: &Selector,
 ) -> Result<bool, anyhow::Error>
 where
@@ -373,7 +373,7 @@ where
 {
     selector.validate()?;
 
-    if moniker.is_empty() {
+    if moniker.as_ref().is_empty() {
         return Err(format_err!(
             "Cannot have empty monikers, at least the component name is required."
         ));
@@ -382,7 +382,7 @@ where
     // Unwrap is safe because the validator ensures there is a component selector.
     let component_selector = selector.component_selector.as_ref().unwrap();
 
-    match_moniker_against_component_selector(moniker.iter(), component_selector)
+    match_moniker_against_component_selector(moniker.as_ref().iter(), component_selector)
 }
 
 /// Evaluates a component moniker against a list of selectors, returning
@@ -390,37 +390,24 @@ where
 ///
 /// Requires: hierarchy_path is not empty.
 ///           selectors contains valid Selectors.
-pub fn match_component_moniker_against_selectors<'a, T, S>(
-    moniker: &[T],
-    selectors: &'a [S],
-) -> Result<Vec<&'a Selector>, anyhow::Error>
-where
-    T: AsRef<str> + std::string::ToString,
-    S: Borrow<Selector>,
-{
-    if moniker.is_empty() {
-        return Err(format_err!(
-            "Cannot have empty monikers, at least the component name is required."
-        ));
-    }
-
-    let selectors = selectors
-        .iter()
+pub fn match_component_moniker_against_selectors<'a>(
+    moniker: Vec<String>,
+    selectors: impl IntoIterator<Item = &'a Selector>,
+) -> impl Iterator<Item = Result<&'a Selector, anyhow::Error>> {
+    selectors
+        .into_iter()
         .map(|selector| {
-            let component_selector = selector.borrow();
-            component_selector.validate()?;
-            Ok(component_selector)
+            selector.validate()?;
+            Ok(selector)
         })
-        .collect::<Result<Vec<&Selector>, anyhow::Error>>();
-
-    selectors?
-        .iter()
-        .filter_map(|selector| {
-            match_component_moniker_against_selector(moniker, selector)
-                .map(|is_match| if is_match { Some(*selector) } else { None })
+        .filter_map(move |selector| -> Option<Result<&'a Selector, anyhow::Error>> {
+            let Ok(selector) = selector else {
+                return Some(selector);
+            };
+            match_component_moniker_against_selector(moniker.as_slice(), selector)
+                .map(|is_match| if is_match { Some(selector) } else { None })
                 .transpose()
         })
-        .collect::<Result<Vec<&Selector>, anyhow::Error>>()
 }
 
 /// Evaluates a component moniker against a list of component selectors, returning
@@ -669,12 +656,10 @@ impl<'a> TokenBuilder<'a> {
 }
 
 pub trait SelectorExt {
-    fn match_against_selectors<'a, S>(
+    fn match_against_selectors<'a>(
         &self,
-        selectors: &'a [S],
-    ) -> Result<Vec<&'a Selector>, anyhow::Error>
-    where
-        S: Borrow<Selector>;
+        selectors: impl IntoIterator<Item = &'a Selector>,
+    ) -> impl Iterator<Item = Result<&'a Selector, anyhow::Error>>;
 
     fn match_against_component_selectors<'a, S>(
         &self,
@@ -696,22 +681,20 @@ pub trait SelectorExt {
 }
 
 impl SelectorExt for ExtendedMoniker {
-    fn match_against_selectors<'a, S>(
+    fn match_against_selectors<'a>(
         &self,
-        selectors: &'a [S],
-    ) -> Result<Vec<&'a Selector>, anyhow::Error>
-    where
-        S: Borrow<Selector>,
-    {
-        match self {
-            ExtendedMoniker::ComponentManager => match_component_moniker_against_selectors(
-                &[EXTENDED_MONIKER_COMPONENT_MANAGER_STR],
-                selectors,
-            ),
-            ExtendedMoniker::ComponentInstance(moniker) => {
-                moniker.match_against_selectors(selectors)
+        selectors: impl IntoIterator<Item = &'a Selector>,
+    ) -> impl Iterator<Item = Result<&'a Selector, anyhow::Error>> {
+        let s = match self {
+            ExtendedMoniker::ComponentManager => {
+                vec![EXTENDED_MONIKER_COMPONENT_MANAGER_STR.to_string()]
             }
-        }
+            ExtendedMoniker::ComponentInstance(moniker) => {
+                SegmentIterator::from(moniker).collect::<Vec<_>>()
+            }
+        };
+
+        match_component_moniker_against_selectors(s, selectors)
     }
 
     fn match_against_component_selectors<'a, S>(
@@ -785,15 +768,12 @@ impl SelectorExt for ExtendedMoniker {
 }
 
 impl SelectorExt for Moniker {
-    fn match_against_selectors<'a, S>(
+    fn match_against_selectors<'a>(
         &self,
-        selectors: &'a [S],
-    ) -> Result<Vec<&'a Selector>, anyhow::Error>
-    where
-        S: Borrow<Selector>,
-    {
+        selectors: impl IntoIterator<Item = &'a Selector>,
+    ) -> impl Iterator<Item = Result<&'a Selector, anyhow::Error>> {
         let s = SegmentIterator::from(self).collect::<Vec<_>>();
-        match_component_moniker_against_selectors(&s, selectors)
+        match_component_moniker_against_selectors(s, selectors)
     }
 
     fn match_against_component_selectors<'a, S>(

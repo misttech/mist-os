@@ -544,13 +544,14 @@ where
         let Some(hierarchy) = self.payload else {
             return Ok(None);
         };
-        let matching_selectors = match self.moniker.match_against_selectors(selectors) {
-            Ok(selectors) if selectors.is_empty() => return Ok(None),
-            Ok(selectors) => selectors,
-            Err(e) => {
-                return Err(Error::Internal(e));
-            }
-        };
+        let matching_selectors =
+            match self.moniker.match_against_selectors(selectors).collect::<Result<Vec<_>, _>>() {
+                Ok(selectors) if selectors.is_empty() => return Ok(None),
+                Ok(selectors) => selectors,
+                Err(e) => {
+                    return Err(Error::Internal(e));
+                }
+            };
 
         // TODO(https://fxbug.dev/300319116): Cache the `HierarchyMatcher`s
         let matcher: HierarchyMatcher = match matching_selectors.try_into() {

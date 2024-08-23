@@ -27,7 +27,11 @@ pub fn filter_json_schema_by_selectors(
         }
     };
 
-    match schema.moniker.match_against_selectors(selectors.as_slice()) {
+    match schema
+        .moniker
+        .match_against_selectors(selectors.as_slice())
+        .collect::<Result<Vec<_>, _>>()
+    {
         Ok(matched_selectors) => {
             if matched_selectors.is_empty() {
                 return None;
