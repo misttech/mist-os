@@ -128,10 +128,6 @@ class Device final : public fdf::DriverBase,
                          RegisterSecureMemCompleter::Sync& completer) override;
   void UnregisterSecureMem(UnregisterSecureMemCompleter::Sync& completer) override;
 
-  [[nodiscard]] uint32_t pdev_device_info_vid();
-
-  [[nodiscard]] uint32_t pdev_device_info_pid();
-
   // Track/untrack the token by the koid of the server end of its FIDL channel. TrackToken() is only
   // allowed after/during token->OnServerKoid(). UntrackToken() is allowed even if there was never a
   // token->OnServerKoid() (in which case it's a nop).
@@ -353,10 +349,6 @@ class Device final : public fdf::DriverBase,
 
   fidl::WireSyncClient<fuchsia_hardware_platform_device::Device> pdev_;
   zx::bti bti_;
-
-  // Initialize these to a value that won't be mistaken for a real vid or pid.
-  uint32_t pdev_device_info_vid_ = std::numeric_limits<uint32_t>::max();
-  uint32_t pdev_device_info_pid_ = std::numeric_limits<uint32_t>::max();
 
   // This map allows us to look up the BufferCollectionToken by the koid of
   // the server end of a BufferCollectionToken channel.

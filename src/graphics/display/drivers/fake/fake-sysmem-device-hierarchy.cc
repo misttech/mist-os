@@ -45,20 +45,6 @@ FakeSysmemDeviceHierarchy::FakeSysmemDeviceHierarchy() {
   config.use_fake_bti = true;
   fake_pdev_.SyncCall(&fake_pdev::FakePDevFidl::SetConfig, std::move(config));
 
-  const fuchsia_hardware_sysmem::Metadata kSysmemMetadata = [] {
-    fuchsia_hardware_sysmem::Metadata metadata;
-    metadata.vid() = PDEV_VID_QEMU;
-    metadata.pid() = PDEV_PID_QEMU;
-    return metadata;
-  }();
-  fit::result<fidl::Error, std::vector<uint8_t>> metadata_result = fidl::Persist(kSysmemMetadata);
-  ZX_ASSERT_MSG(metadata_result.is_ok(), "%s",
-                metadata_result.error_value().FormatDescription().c_str());
-  std::unordered_map<uint32_t, std::vector<uint8_t>> metadata_map;
-  metadata_map.insert(
-      {fuchsia_hardware_sysmem::wire::kMetadataType, std::move(metadata_result).value()});
-  fake_pdev_.SyncCall(&fake_pdev::FakePDevFidl::set_metadata, std::move(metadata_map));
-
   auto pdev_instance_handler = fake_pdev_.SyncCall(&fake_pdev::FakePDevFidl::GetInstanceHandler,
                                                    async_patterns::PassDispatcher);
   test_environment_.SyncCall([&pdev_instance_handler](fdf_testing::TestEnvironment* env) {

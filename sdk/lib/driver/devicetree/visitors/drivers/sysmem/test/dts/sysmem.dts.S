@@ -11,12 +11,13 @@
 		#address-cells = <2>;
 		#size-cells = <2>;
 
+		dummy_iommu:iommu {
+			#iommu-cells = <1>;
+		};
+
 		sysmem: fuchsia,sysmem {
 			compatible = "fuchsia,sysmem";
-			pid = <TEST_PID>;
-			vid = <TEST_VID>;
 			size = <0x00 0x00>;
-			contiguous-size = <0x00 TEST_CONTIGUOUS_SIZE>;
-			protected-size = <0x00 TEST_PROTECTED_SIZE>;
+			iommus = <&dummy_iommu TEST_BTI_ID>;
 		};
 };

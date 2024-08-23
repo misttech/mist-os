@@ -535,35 +535,6 @@ zx_status_t Device::Initialize() {
   int64_t protected_memory_size = kDefaultProtectedMemorySize;
   int64_t contiguous_memory_size = kDefaultContiguousMemorySize;
 
-  fidl::WireResult raw_metadata = pdev_->GetMetadata(fuchsia_hardware_sysmem::kMetadataType);
-  if (!raw_metadata.ok()) {
-    LOG(ERROR, "Failed to send GetMetadata request: %s", raw_metadata.status_string());
-    return raw_metadata.status();
-  }
-  if (raw_metadata->is_error()) {
-    if (raw_metadata->error_value() != ZX_ERR_NOT_FOUND) {
-      return raw_metadata->error_value();
-    }
-    LOG(WARNING, "Metadata not found.");
-  } else {
-    auto unpersist_result =
-        fidl::Unpersist<fuchsia_hardware_sysmem::Metadata>(raw_metadata->value()->metadata.get());
-    if (unpersist_result.is_error()) {
-      LOG(ERROR, "Failed fidl::Unpersist - status: %s",
-          zx_status_get_string(unpersist_result.error_value().status()));
-      return unpersist_result.error_value().status();
-    }
-    auto& metadata = unpersist_result.value();
-
-    // Default is zero when field un-set.
-    pdev_device_info_vid_ = metadata.vid().has_value() ? *metadata.vid() : 0;
-    pdev_device_info_pid_ = metadata.pid().has_value() ? *metadata.pid() : 0;
-    protected_memory_size =
-        metadata.protected_memory_size().has_value() ? *metadata.protected_memory_size() : 0;
-    contiguous_memory_size =
-        metadata.contiguous_memory_size().has_value() ? *metadata.contiguous_memory_size() : 0;
-  }
-
   sysmem_config::Config config = take_config<sysmem_config::Config>();
   if (config.contiguous_memory_size() >= 0) {
     contiguous_memory_size = config.contiguous_memory_size();
@@ -1103,16 +1074,6 @@ zx::result<zx::vmo> Device::CreatePhysicalVmo(uint64_t base, uint64_t size) {
     return zx::error(status);
   }
   return zx::ok(std::move(result_vmo));
-}
-
-uint32_t Device::pdev_device_info_vid() {
-  ZX_DEBUG_ASSERT(pdev_device_info_vid_ != std::numeric_limits<uint32_t>::max());
-  return pdev_device_info_vid_;
-}
-
-uint32_t Device::pdev_device_info_pid() {
-  ZX_DEBUG_ASSERT(pdev_device_info_pid_ != std::numeric_limits<uint32_t>::max());
-  return pdev_device_info_pid_;
 }
 
 void Device::TrackToken(BufferCollectionToken* token) {

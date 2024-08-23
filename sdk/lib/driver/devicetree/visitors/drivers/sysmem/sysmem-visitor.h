@@ -12,20 +12,12 @@ namespace sysmem_dt {
 
 class SysmemVisitor : public fdf_devicetree::DriverVisitor {
  public:
-  static constexpr char kVid[] = "vid";
-  static constexpr char kPid[] = "pid";
-  static constexpr char kContiguousSize[] = "contiguous-size";
-  static constexpr char kProtectedSize[] = "protected-size";
-
   SysmemVisitor();
   zx::result<> DriverVisit(fdf_devicetree::Node& node,
                            const devicetree::PropertyDecoder& decoder) override;
 
   zx::result<> Visit(fdf_devicetree::Node& node,
                      const devicetree::PropertyDecoder& decoder) override;
-
- private:
-  std::unique_ptr<fdf_devicetree::PropertyParser> parser_;
 };
 
 }  // namespace sysmem_dt

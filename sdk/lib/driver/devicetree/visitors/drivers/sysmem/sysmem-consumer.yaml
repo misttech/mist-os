@@ -31,8 +31,6 @@ examples:
     sysmem: fuchsia,sysmem {
       compatible = "fuchsia,sysmem";
       size = <0x00 0x00>;
-      contiguous-size = <0x00 0x10000>;
-      protected-size = <0x00 0x2000>;
     };
 
     vdec {

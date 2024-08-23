@@ -13,55 +13,10 @@
 
 namespace sysmem_dt {
 
-SysmemVisitor::SysmemVisitor() : DriverVisitor({"fuchsia,sysmem"}) {
-  fdf_devicetree::Properties properties = {};
-  properties.emplace_back(std::make_unique<fdf_devicetree::Uint32Property>(kVid));
-  properties.emplace_back(std::make_unique<fdf_devicetree::Uint32Property>(kPid));
-  properties.emplace_back(std::make_unique<fdf_devicetree::Uint64Property>(kContiguousSize));
-  properties.emplace_back(std::make_unique<fdf_devicetree::Uint64Property>(kProtectedSize));
-  parser_ = std::make_unique<fdf_devicetree::PropertyParser>(std::move(properties));
-}
+SysmemVisitor::SysmemVisitor() : DriverVisitor({"fuchsia,sysmem"}) {}
 
 zx::result<> SysmemVisitor::DriverVisit(fdf_devicetree::Node& node,
                                         const devicetree::PropertyDecoder& decoder) {
-  auto parser_output = parser_->Parse(node);
-  if (parser_output.is_error()) {
-    FDF_LOG(ERROR, "Sysmem visitor failed for node '%s' : %s", node.name().c_str(),
-            parser_output.status_string());
-    return parser_output.take_error();
-  }
-
-  fuchsia_hardware_sysmem::Metadata sysmem_metadata;
-  if (parser_output->find(kVid) != parser_output->end()) {
-    sysmem_metadata.vid() = parser_output->at(kVid)[0].AsUint32();
-  }
-  if (parser_output->find(kPid) != parser_output->end()) {
-    sysmem_metadata.pid() = parser_output->at(kPid)[0].AsUint32();
-  }
-
-  if (parser_output->find(kContiguousSize) != parser_output->end()) {
-    sysmem_metadata.contiguous_memory_size() = parser_output->at(kContiguousSize)[0].AsUint64();
-  }
-
-  if (parser_output->find(kProtectedSize) != parser_output->end()) {
-    sysmem_metadata.protected_memory_size() = parser_output->at(kProtectedSize)[0].AsUint64();
-  }
-
-  auto serialized_result = fidl::Persist(sysmem_metadata);
-  ZX_ASSERT(serialized_result.is_ok());
-  auto serialized = std::move(serialized_result.value());
-
-  fuchsia_hardware_platform_bus::Metadata metadata = {{
-      .type = fuchsia_hardware_sysmem::wire::kMetadataType,
-      .data = std::move(serialized),
-  }};
-
-  node.AddMetadata(metadata);
-  FDF_LOG(DEBUG, "Added sysmem metadata vid: %d pid: %d contiguous size: %ld protected size: %ld.",
-          sysmem_metadata.vid().value_or(0), sysmem_metadata.pid().value_or(0),
-          sysmem_metadata.contiguous_memory_size().value_or(0),
-          sysmem_metadata.protected_memory_size().value_or(0));
-
   // Sysmem should be published first so that it can reserve memory as needed.
   return node.ChangePublishOrder(1u);
 }
