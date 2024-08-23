@@ -13,6 +13,13 @@
     },
     use: [
         {
+            config: "fuchsia.virtcon.Disable",
+            key: "virtcon_disabled",
+            availability: "optional",
+            type: "bool",
+            default: false,
+        },
+        {
             directory: "bin",
             rights: [ "rx*" ],
             path: "/bin",

@@ -60,11 +60,13 @@
             from: "#config",
             to: "#bootstrap",
             config: [
+                "fuchsia.network.PrimaryInterface",
                 "fuchsia.sysmem.ContiguousGuardPagesUnused",
                 "fuchsia.sysmem.FixedContiguousMemorySize",
                 "fuchsia.sysmem.FixedProtectedMemorySize",
                 "fuchsia.sysmem.PercentContiguousMemorySize",
                 "fuchsia.sysmem.PercentProtectedMemorySize",
+                "fuchsia.virtcon.Disable",
             ],
             availability: "optional",
         },
@@ -160,7 +162,6 @@
                 "capability_requested",
                 "debug_started",
                 "destroyed",
-                "discovered",
                 "started",
                 "stopped",
             ],
@@ -186,7 +187,7 @@
             to: "#bootstrap",
         },
 
-        // Non-zircon services for archivist, pwrbtn-monitor, and console.
+        // Non-zircon services for archivist, pwrbtn-monitor, sysmem and console.
         {
             protocol: [
                 "fuchsia.component.PersistenceBinder",
