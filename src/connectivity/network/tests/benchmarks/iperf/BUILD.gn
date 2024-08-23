@@ -9,43 +9,75 @@ _test_configs = [
     label = "localhost_tcp"
     protocol = "tcp"
     direction = "loopback"
+    netstack = "netstack2"
+  },
+  {
+    label = "localhost_tcp"
+    protocol = "tcp"
+    direction = "loopback"
+    netstack = "netstack3"
   },
   {
     label = "localhost_udp"
     protocol = "udp"
     direction = "loopback"
+    netstack = "netstack2"
+  },
+  {
+    label = "localhost_udp"
+    protocol = "udp"
+    direction = "loopback"
+    netstack = "netstack3"
   },
   {
     label = "ethernet_tcp_send"
     protocol = "tcp"
     direction = "send"
+    netstack = "system"
   },
   {
     label = "ethernet_tcp_recv"
     protocol = "tcp"
     direction = "recv"
+    netstack = "system"
   },
   {
     label = "ethernet_udp_send"
     protocol = "udp"
     direction = "send"
+    netstack = "system"
   },
   {
     label = "ethernet_udp_recv"
     protocol = "udp"
     direction = "recv"
+    netstack = "system"
   },
 ]
 
-_benchmarks = []
+_benchmarks_hermetic = []
+_benchmarks_non_hermetic = []
 foreach(test_config, _test_configs) {
-  _test_label = "netstack_iperf_test_${test_config.label}"
+  if (test_config.netstack == "netstack3") {
+    _test_label = "netstack_iperf_test_${test_config.label}_netstack3"
+  } else {
+    _test_label = "netstack_iperf_test_${test_config.label}"
+  }
   _runtime_deps_label = "${_test_label}_runtime_deps"
-  _benchmarks += [ ":${_test_label}" ]
+  if (test_config.netstack == "netstack3") {
+    _metric_names_label = "${test_config.label}.netstack3"
+  } else {
+    _metric_names_label = "${test_config.label}"
+  }
+  if (test_config.direction == "loopback") {
+    _benchmarks_hermetic += [ ":${_test_label}" ]
+  } else {
+    _benchmarks_non_hermetic += [ ":${_test_label}" ]
+  }
 
   python_perf_test(_test_label) {
     main_source = "netstack_iperf_test.py"
-    expected_metric_names_filepaths = [ "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.netstack.iperf_benchmarks.${test_config.label}.txt" ]
+    expected_metric_names_filepaths = [ "//src/tests/end_to_end/perf/expected_metric_names/fuchsia.netstack.iperf_benchmarks.${_metric_names_label}.txt" ]
     libraries = [
       "//src/testing/end_to_end/mobly_base_tests:fuchsia_base_test",
       "//src/performance/lib/perf_publish",
@@ -57,6 +89,9 @@ foreach(test_config, _test_configs) {
     data_sources = [ "${root_out_dir}/iperf3" ]
 
     target_deps = [ "//third_party/iperf:iperf3_pkg" ]
+    if (test_config.direction == "loopback") {
+      target_deps += [ "//src/connectivity/network/tests/benchmarks/iperf-hermetic:iperf-benchmark" ]
+    }
 
     params = test_config
 
@@ -69,7 +104,12 @@ foreach(test_config, _test_configs) {
   }
 }
 
+group("benchmarks-non-hermetic") {
+  testonly = true
+  deps = _benchmarks_non_hermetic
+}
+
 group("benchmarks") {
   testonly = true
-  deps = _benchmarks
+  deps = _benchmarks_non_hermetic + _benchmarks_hermetic
 }

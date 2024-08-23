@@ -17,6 +17,7 @@ group("benchmarks") {
 group("tests") {
   testonly = true
   deps = [
+    "iperf-hermetic:tests",
     "resource-usage:tests",
     "socket-loopback:tests",
     "socket-tun:tests",
