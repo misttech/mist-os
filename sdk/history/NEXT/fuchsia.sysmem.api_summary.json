@@ -173,14 +173,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.sysmem/BufferCollection.GetAuxBuffers",
-        "strictness": "strict",
-        "ordinal": "7812808981908462165",
-        "direction": "two_way",
-        "response": "fuchsia.sysmem/BufferCollectionGetAuxBuffersResponse"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.sysmem/BufferCollection.GetNodeRef",
         "strictness": "strict",
         "ordinal": "5078789850020985732",
@@ -204,14 +196,6 @@
         "ordinal": "5592402040917795451",
         "direction": "one_way",
         "request": "fuchsia.sysmem/BufferCollectionSetConstraintsRequest"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.sysmem/BufferCollection.SetConstraintsAuxBuffers",
-        "strictness": "strict",
-        "ordinal": "1934311861550897175",
-        "direction": "one_way",
-        "request": "fuchsia.sysmem/BufferCollectionSetConstraintsAuxBuffersRequest"
     },
     {
         "kind": "protocol/member",
@@ -375,39 +359,6 @@
     },
     {
         "kind": "struct/member",
-        "name": "fuchsia.sysmem/BufferCollectionConstraintsAuxBuffers.allow_clear_aux_buffers_for_secure",
-        "ordinal": "2",
-        "type": "bool"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.sysmem/BufferCollectionConstraintsAuxBuffers.need_clear_aux_buffers_for_secure",
-        "ordinal": "1",
-        "type": "bool"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.sysmem/BufferCollectionConstraintsAuxBuffers"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.sysmem/BufferCollectionGetAuxBuffersResponse.buffer_collection_info_aux_buffers",
-        "ordinal": "2",
-        "type": "fuchsia.sysmem/BufferCollectionInfo_2"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.sysmem/BufferCollectionGetAuxBuffersResponse.status",
-        "ordinal": "1",
-        "type": "int32"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.sysmem/BufferCollectionGetAuxBuffersResponse",
-        "resourceness": "resource"
-    },
-    {
-        "kind": "struct/member",
         "name": "fuchsia.sysmem/BufferCollectionInfo.buffer_count",
         "ordinal": "1",
         "type": "uint32"
@@ -458,16 +409,6 @@
         "kind": "struct",
         "name": "fuchsia.sysmem/BufferCollectionInfo_2",
         "resourceness": "resource"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.sysmem/BufferCollectionSetConstraintsAuxBuffersRequest.constraints",
-        "ordinal": "1",
-        "type": "fuchsia.sysmem/BufferCollectionConstraintsAuxBuffers"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.sysmem/BufferCollectionSetConstraintsAuxBuffersRequest"
     },
     {
         "kind": "struct/member",
@@ -1024,50 +965,6 @@
         "name": "fuchsia.sysmem/ColorSpaceType",
         "strictness": "strict",
         "type": "uint32"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.sysmem/DriverConnector.Connect",
-        "strictness": "strict",
-        "ordinal": "7366281471101469060",
-        "direction": "one_way",
-        "request": "fuchsia.sysmem/DriverConnectorConnectRequest"
-    },
-    {
-        "kind": "protocol/member",
-        "name": "fuchsia.sysmem/DriverConnector.SetAuxServiceDirectory",
-        "strictness": "strict",
-        "ordinal": "6074137568747846023",
-        "direction": "one_way",
-        "request": "fuchsia.sysmem/DriverConnectorSetAuxServiceDirectoryRequest"
-    },
-    {
-        "kind": "protocol",
-        "name": "fuchsia.sysmem/DriverConnector",
-        "openness": "closed",
-        "transport": "channel"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.sysmem/DriverConnectorConnectRequest.allocator_request",
-        "ordinal": "1",
-        "type": "server_end:fuchsia.sysmem/Allocator"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.sysmem/DriverConnectorConnectRequest",
-        "resourceness": "resource"
-    },
-    {
-        "kind": "struct/member",
-        "name": "fuchsia.sysmem/DriverConnectorSetAuxServiceDirectoryRequest.service_directory",
-        "ordinal": "1",
-        "type": "fuchsia.io/Directory"
-    },
-    {
-        "kind": "struct",
-        "name": "fuchsia.sysmem/DriverConnectorSetAuxServiceDirectoryRequest",
-        "resourceness": "resource"
     },
     {
         "kind": "const",

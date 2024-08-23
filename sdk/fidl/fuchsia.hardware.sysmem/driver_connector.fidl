@@ -23,6 +23,8 @@ closed protocol DriverConnector {
     ///
     /// `allocator_request` will be served by the sysmem driver (or the channel
     /// will close).
+    // The "added" parameter value is fake - see overview.fidl comments.
+    @available(added=19, deprecated=NEXT)
     strict ConnectV1(resource struct {
         allocator_request server_end:fuchsia.sysmem.Allocator;
     });
