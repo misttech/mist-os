@@ -302,6 +302,19 @@ function fx-config-read {
   _FX_LOCK_FILE="${FUCHSIA_BUILD_DIR}.build_lock"
 }
 
+function _query_product_bundle_path {
+  local args_json_path="${FUCHSIA_BUILD_DIR}/args.json"
+  if [[ ! -f "${args_json_path}" ]]; then
+    return 0
+  fi
+  local product=$(fx-command-run jq .build_info_product ${args_json_path})
+  local board=$(fx-command-run jq .build_info_board ${args_json_path})
+  local product_name="\"${product//\"}.${board//\"}\""
+  local product_bundles_path="${FUCHSIA_BUILD_DIR}/product_bundles.json"
+  local product_bundle_path=$(fx-command-run jq ".[] | select(.name==${product_name}) | .path" ${product_bundles_path} | tr -d '"')
+  echo $product_bundle_path
+}
+
 function fx-change-build-dir {
   local build_dir="$1"
 
@@ -315,6 +328,16 @@ function fx-change-build-dir {
 
   _link_gen_artifacts
 
+  # Set relevant variables in the ffx build-level config file
+  json-config-set "${FUCHSIA_BUILD_DIR}.json" "repository.default" "$(ffx-default-repository-name)"
+  json-config-set "${FUCHSIA_BUILD_DIR}.json" "sdk.root" '$BUILD_DIR'
+  json-config-set "${FUCHSIA_BUILD_DIR}.json" "fidl.ir.path" '$BUILD_DIR/fidling/gen/ir_root'
+
+  local -r pb_path="$(_query_product_bundle_path)"
+  # Only set product bundle path if a product bundle is produced by the build.
+  if [[ -n "${pb_path}" ]]; then
+    json-config-set "${FUCHSIA_BUILD_DIR}.json" "product.path" "\$BUILD_DIR/${pb_path}"
+  fi
 }
 
 function ffx-default-repository-name {
