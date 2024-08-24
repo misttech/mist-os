@@ -402,7 +402,7 @@ where
     where
         F: Default,
     {
-        let sampling_intervals = F::sampling_intervals(&profile.into());
+        let sampling_intervals = profile.into().into_sampling_intervals();
         TimeMatrix::from_series_with(sampling_intervals.map_into(TimeSeries::new), || {
             interpolation.clone()
         })
@@ -414,7 +414,7 @@ where
         interpolation: P::State<F>,
         statistic: F,
     ) -> Self {
-        let sampling_intervals = F::sampling_intervals(&profile.into());
+        let sampling_intervals = profile.into().into_sampling_intervals();
         TimeMatrix::from_series_with(
             sampling_intervals
                 .map_into(|window| TimeSeries::with_statistic(window, statistic.clone())),
@@ -491,7 +491,7 @@ where
     where
         R: Clone,
     {
-        let sampling_intervals = PostAggregation::<F, R>::sampling_intervals(&profile.into());
+        let sampling_intervals = profile.into().into_sampling_intervals();
         TimeMatrix::from_series_with(
             sampling_intervals
                 .map_into(|window| TimeSeries::with_transform(window, transform.clone())),
@@ -586,18 +586,18 @@ mod tests {
         // Arithmetic mean time matrices.
         let _ = TimeMatrix::<MeanGauge<f32>, Constant>::default();
         let _ = TimeMatrix::<MeanGauge<f32>, LastSample>::new(
-            SamplingProfile::Balanced,
+            SamplingProfile::balanced(),
             LastSample::or(0.0f32),
         );
         let _ = TimeMatrix::<_, Constant>::with_statistic(
-            SamplingProfile::Balanced,
+            SamplingProfile::granular(),
             Constant::default(),
             MeanGauge::<f32>::default(),
         );
 
         // Discrete arithmetic mean time matrices.
         let mut matrix = TimeMatrix::<MeanGaugeTransform<f32, i64>, LastSample>::with_transform(
-            SamplingProfile::Granular,
+            SamplingProfile::highly_granular(),
             LastSample::or(0.0f32),
             |aggregation| aggregation.ceil() as i64,
         );
@@ -642,7 +642,7 @@ mod tests {
         let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(3_000_000_000));
         let mut time_matrix = TimeMatrix::<Max<Gauge<u64>>, Constant>::new(
-            SamplingProfile::Granular,
+            SamplingProfile::highly_granular(),
             Constant::default(),
         );
         let buffer = time_matrix.interpolate_and_get_buffers(Timestamp::now()).unwrap();

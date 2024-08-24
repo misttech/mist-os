@@ -351,7 +351,7 @@ impl ConnectDisconnectTimeSeriesImpl {
     pub fn new() -> Self {
         Self {
             wlan_connectivity_states: TimeMatrix::new(
-                SamplingProfile::Granular,
+                SamplingProfile::highly_granular(),
                 Constant::default(),
             ),
             connected_networks: TimeMatrix::default(),

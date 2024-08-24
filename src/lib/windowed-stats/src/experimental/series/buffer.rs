@@ -8,14 +8,12 @@ use num::Unsigned;
 use std::io::{self, Write};
 use tracing::warn;
 
-use crate::experimental::clock::Duration;
 use crate::experimental::ring_buffer::Simple8bRleRingBuffer;
 use crate::experimental::series::interpolation::{
     Constant, Interpolation, LastAggregation, LastSample,
 };
 use crate::experimental::series::statistic::Aggregation;
-use crate::experimental::series::{SamplingInterval, SamplingProfile};
-use crate::experimental::vec1::Vec1;
+use crate::experimental::series::SamplingInterval;
 
 /// A type that can construct a [`RingBuffer`] associated with an aggregation type and
 /// interpolation.
@@ -34,10 +32,6 @@ where
     /// Get the descriptive type of the buffer.
     fn buffer_type() -> RingBufferType {
         Self::Buffer::buffer_type()
-    }
-    /// Retrieve the sampling intervals given the sampling profile.
-    fn sampling_intervals(profile: &SamplingProfile) -> Vec1<SamplingInterval> {
-        Self::Buffer::sampling_intervals(profile)
     }
 }
 
@@ -85,8 +79,6 @@ pub trait RingBuffer<A> {
         Self: Sized;
 
     fn buffer_type() -> RingBufferType;
-
-    fn sampling_intervals(profile: &SamplingProfile) -> Vec1<SamplingInterval>;
 
     fn push(&mut self, item: A) {
         let _ = item;
@@ -154,23 +146,6 @@ impl RingBuffer<f32> for Uncompressed<f32> {
     fn buffer_type() -> RingBufferType {
         RingBufferType::Uncompressed(UncompressedSubtype::F32)
     }
-
-    fn sampling_intervals(profile: &SamplingProfile) -> Vec1<SamplingInterval> {
-        match profile {
-            SamplingProfile::Granular => [
-                SamplingInterval::new(240, 1, Duration::from_seconds(10)),
-                SamplingInterval::new(240, 1, Duration::from_minutes(1)),
-            ]
-            .into(),
-            SamplingProfile::Balanced => [
-                SamplingInterval::new(120, 1, Duration::from_seconds(10)),
-                SamplingInterval::new(120, 1, Duration::from_minutes(1)),
-                SamplingInterval::new(120, 1, Duration::from_minutes(10)),
-                SamplingInterval::new(120, 1, Duration::from_hours(1)),
-            ]
-            .into(),
-        }
-    }
 }
 
 #[derive(Clone, Debug)]
@@ -187,23 +162,6 @@ where
 
     fn buffer_type() -> RingBufferType {
         RingBufferType::Simple8bRle(Simple8bRleSubtype::Unsigned)
-    }
-
-    fn sampling_intervals(profile: &SamplingProfile) -> Vec1<SamplingInterval> {
-        match profile {
-            SamplingProfile::Granular => [
-                SamplingInterval::new(720, 1, Duration::from_seconds(10)),
-                SamplingInterval::new(3600, 1, Duration::from_minutes(1)),
-            ]
-            .into(),
-            SamplingProfile::Balanced => [
-                SamplingInterval::new(120, 1, Duration::from_seconds(10)),
-                SamplingInterval::new(120, 1, Duration::from_minutes(1)),
-                SamplingInterval::new(120, 1, Duration::from_minutes(5)),
-                SamplingInterval::new(120, 1, Duration::from_minutes(30)),
-            ]
-            .into(),
-        }
     }
 
     fn push(&mut self, item: A) {
@@ -234,11 +192,6 @@ where
     fn buffer_type() -> RingBufferType {
         RingBufferType::Simple8bRle(Simple8bRleSubtype::SignedZigzagEncoded)
     }
-
-    fn sampling_intervals(_profile: &SamplingProfile) -> Vec1<SamplingInterval> {
-        let placeholder = SamplingInterval::new(1, 1, Duration::from_hours(1));
-        [placeholder].into()
-    }
 }
 
 // TODO(https://fxbug.dev/352614791): Implement DeltaSimple8bRle ring buffer
@@ -259,11 +212,6 @@ where
     fn buffer_type() -> RingBufferType {
         RingBufferType::DeltaEncodedSimple8bRle(Simple8bRleSubtype::Unsigned)
     }
-
-    fn sampling_intervals(_profile: &SamplingProfile) -> Vec1<SamplingInterval> {
-        let placeholder = SamplingInterval::new(1, 1, Duration::from_hours(1));
-        [placeholder].into()
-    }
 }
 
 // TODO(https://fxbug.dev/352614791): Implement DeltaZigZagSimple8bRle ring buffer
@@ -282,11 +230,6 @@ impl RingBuffer<i64> for DeltaZigZagSimple8bRle {
     fn buffer_type() -> RingBufferType {
         RingBufferType::DeltaEncodedSimple8bRle(Simple8bRleSubtype::SignedZigzagEncoded)
     }
-
-    fn sampling_intervals(_profile: &SamplingProfile) -> Vec1<SamplingInterval> {
-        let placeholder = SamplingInterval::new(1, 1, Duration::from_hours(1));
-        [placeholder].into()
-    }
 }
 
 impl RingBuffer<u64> for DeltaZigZagSimple8bRle {
@@ -299,50 +242,11 @@ impl RingBuffer<u64> for DeltaZigZagSimple8bRle {
     fn buffer_type() -> RingBufferType {
         RingBufferType::DeltaEncodedSimple8bRle(Simple8bRleSubtype::SignedZigzagEncoded)
     }
-
-    fn sampling_intervals(_profile: &SamplingProfile) -> Vec1<SamplingInterval> {
-        let placeholder = SamplingInterval::new(1, 1, Duration::from_hours(1));
-        [placeholder].into()
-    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::experimental::series::Gauge;
-    use test_case::test_case;
-
-    #[test_case(
-        SamplingProfile::Granular,
-        [
-            SamplingInterval::new(240, 1, Duration::from_seconds(10)),
-            SamplingInterval::new(240, 1, Duration::from_minutes(1)),
-        ]
-        .into();
-        "granular_sampling_profile"
-    )]
-    #[test_case(
-        SamplingProfile::Balanced,
-        [
-            SamplingInterval::new(120, 1, Duration::from_seconds(10)),
-            SamplingInterval::new(120, 1, Duration::from_minutes(1)),
-            SamplingInterval::new(120, 1, Duration::from_minutes(10)),
-            SamplingInterval::new(120, 1, Duration::from_hours(1)),
-        ]
-        .into();
-        "balanced_sampling_profile"
-    )]
-    fn uncompressed_buffer_sampling_intervals(p: SamplingProfile, expect: Vec1<SamplingInterval>) {
-        assert_eq!(<f32 as BufferStrategy<f32, Constant>>::sampling_intervals(&p), expect);
-        assert_eq!(<f32 as BufferStrategy<f32, LastSample>>::sampling_intervals(&p), expect);
-        assert_eq!(<f32 as BufferStrategy<f32, LastAggregation>>::sampling_intervals(&p), expect);
-        assert_eq!(<Gauge<f32> as BufferStrategy<f32, Constant>>::sampling_intervals(&p), expect);
-        assert_eq!(<Gauge<f32> as BufferStrategy<f32, LastSample>>::sampling_intervals(&p), expect);
-        assert_eq!(
-            <Gauge<f32> as BufferStrategy<f32, LastAggregation>>::sampling_intervals(&p),
-            expect
-        );
-    }
 
     #[test]
     fn simple8b_rle_buffer() {
@@ -352,30 +256,5 @@ mod tests {
         let result = RingBuffer::<u64>::serialize(&buffer, &mut data);
         assert!(result.is_ok());
         assert!(!data.is_empty());
-    }
-
-    #[test_case(
-        SamplingProfile::Granular,
-        [
-            SamplingInterval::new(720, 1, Duration::from_seconds(10)),
-            SamplingInterval::new(3600, 1, Duration::from_minutes(1)),
-        ]
-        .into();
-        "granular_sampling_profile"
-    )]
-    #[test_case(
-        SamplingProfile::Balanced,
-        [
-            SamplingInterval::new(120, 1, Duration::from_seconds(10)),
-            SamplingInterval::new(120, 1, Duration::from_minutes(1)),
-            SamplingInterval::new(120, 1, Duration::from_minutes(5)),
-            SamplingInterval::new(120, 1, Duration::from_minutes(30)),
-        ]
-        .into();
-        "balanced_sampling_profile"
-    )]
-    fn simple8b_rle_buffer_sampling_intervals(p: SamplingProfile, expect: Vec1<SamplingInterval>) {
-        assert_eq!(<u64 as BufferStrategy<u64, Constant>>::sampling_intervals(&p), expect);
-        assert_eq!(<Gauge<u64> as BufferStrategy<u64, Constant>>::sampling_intervals(&p), expect);
     }
 }
