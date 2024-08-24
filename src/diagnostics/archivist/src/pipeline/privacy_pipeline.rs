@@ -3,17 +3,17 @@
 // found in the LICENSE file.
 use crate::diagnostics::AccessorStats;
 use crate::error::Error;
+use crate::pipeline::allowlist::StaticHierarchyAllowlist;
 use crate::{configs, constants};
-use diagnostics_hierarchy::HierarchyMatcher;
 use fidl::prelude::*;
-use fidl_fuchsia_diagnostics::{ArchiveAccessorMarker, Selector};
+use fidl_fuchsia_diagnostics::ArchiveAccessorMarker;
 use fuchsia_inspect as inspect;
 use fuchsia_sync::RwLock;
 use moniker::ExtendedMoniker;
-use selectors::SelectorExt;
-use std::collections::HashMap;
 use std::path::Path;
-use std::sync::Arc;
+
+#[cfg(test)]
+use fidl_fuchsia_diagnostics::Selector;
 
 struct PipelineParameters {
     has_config: bool,
@@ -39,11 +39,8 @@ pub struct Pipeline {
     /// Whether the pipeline had an error when being created.
     has_error: bool,
 
-    /// Static selectors that the pipeline uses. Loaded from configuration.
-    static_selectors: Option<Vec<Selector>>,
-
-    /// A hierarchy matcher for any selector present in the static selectors.
-    moniker_to_static_matcher_map: RwLock<HashMap<ExtendedMoniker, Arc<HierarchyMatcher>>>,
+    /// The statically declared allowlist for data exfiltration on this pipeline.
+    static_allowlist: RwLock<StaticHierarchyAllowlist>,
 }
 
 impl Pipeline {
@@ -119,8 +116,7 @@ impl Pipeline {
             protocol_name: "test",
             has_error: false,
             stats: AccessorStats::new(Default::default()),
-            moniker_to_static_matcher_map: RwLock::new(HashMap::new()),
-            static_selectors,
+            static_allowlist: RwLock::new(StaticHierarchyAllowlist::new(static_selectors)),
         }
     }
 
@@ -151,8 +147,7 @@ impl Pipeline {
             stats,
             protocol_name: parameters.protocol_name,
             has_error,
-            moniker_to_static_matcher_map: RwLock::new(HashMap::new()),
-            static_selectors,
+            static_allowlist: RwLock::new(StaticHierarchyAllowlist::new(static_selectors)),
         }
     }
 
@@ -169,39 +164,18 @@ impl Pipeline {
     }
 
     pub fn remove_component(&self, moniker: &ExtendedMoniker) {
-        self.moniker_to_static_matcher_map.write().remove(moniker);
+        self.static_allowlist.write().remove_component(moniker);
     }
 
     pub fn add_component(&self, moniker: &ExtendedMoniker) -> Result<(), Error> {
-        if let Some(selectors) = &self.static_selectors {
-            let matched_selectors = moniker
-                .match_against_selectors(selectors)
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(Error::MatchComponentMoniker)?;
-
-            match &matched_selectors[..] {
-                [] => {}
-                populated_vec => {
-                    let hierarchy_matcher = (populated_vec).try_into()?;
-                    self.moniker_to_static_matcher_map
-                        .write()
-                        .insert(moniker.clone(), Arc::new(hierarchy_matcher));
-                }
-            }
-        }
-        Ok(())
+        self.static_allowlist.write().add_component(moniker.clone())
     }
 
-    pub fn static_selectors_matchers(
-        &self,
-    ) -> Option<HashMap<ExtendedMoniker, Arc<HierarchyMatcher>>> {
-        if self.static_selectors.is_some() {
-            // TODO(https://fxbug.dev/42159044): can we avoid cloning here? This clone is not super expensive
-            // as it'll be just cloning arcs, but we could be more efficient here.
-            // Due to lock semantics we can't just return a reference at the moment as it leads to
-            // an ABBA lock between inspect insertion into the repo and inspect reading.
-            return Some(self.moniker_to_static_matcher_map.read().clone());
-        }
-        None
+    pub fn static_hierarchy_allowlist(&self) -> StaticHierarchyAllowlist {
+        // TODO(https://fxbug.dev/42159044): can we avoid cloning here? This clone is not super expensive
+        // as it'll be just cloning arcs, but we could be more efficient here.
+        // Due to lock semantics we can't just return a reference at the moment as it leads to
+        // an ABBA lock between inspect insertion into the repo and inspect reading.
+        self.static_allowlist.read().clone()
     }
 }

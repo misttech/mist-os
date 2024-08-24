@@ -5,9 +5,11 @@
 use crate::accessor::PerformanceConfig;
 use crate::diagnostics::{BatchIteratorConnectionStats, TRACE_CATEGORY};
 use crate::inspect::container::{ReadSnapshot, SnapshotData, UnpopulatedInspectDataContainer};
+use crate::pipeline::{ComponentAllowlist, PrivacyExplicitOption};
 use diagnostics_data::{self as schema, Data, Inspect, InspectDataBuilder, InspectHandleName};
 use diagnostics_hierarchy::{DiagnosticsHierarchy, HierarchyMatcher};
 use fidl_fuchsia_diagnostics::Selector;
+use fidl_fuchsia_inspect::DEFAULT_TREE_NAME;
 use fuchsia_inspect::reader::PartialNodeHierarchy;
 use futures::prelude::*;
 use selectors::SelectorExt;
@@ -119,19 +121,14 @@ impl ReaderServer {
 
     fn filter_single_components_snapshot(
         snapshot_data: SnapshotData,
-        static_matcher: Option<Arc<HierarchyMatcher>>,
+        static_allowlist: ComponentAllowlist,
         client_matcher: Option<HierarchyMatcher>,
         moniker: &str,
         parent_trace_id: ftrace::Id,
     ) -> Option<NodeHierarchyData> {
         let filename = snapshot_data.name.clone();
-        let node_hierarchy_data = match static_matcher {
-            // The only way we have a None value for the PopulatedDataContainer is
-            // if there were no provided static selectors, which is only valid in
-            // the AllAccess pipeline. For all other pipelines, if no static selectors
-            // matched, the data wouldn't have ended up in the repository to begin
-            // with.
-            None => {
+        let node_hierarchy_data = {
+            let unfiltered_node_hierarchy_data: NodeHierarchyData = {
                 let trace_id = ftrace::Id::random();
                 let _trace_guard = ftrace::async_enter!(
                     trace_id,
@@ -152,65 +149,52 @@ impl ReaderServer {
                             .unwrap_or("")
                 );
                 snapshot_data.into()
-            }
-            Some(static_matcher) => {
-                let node_hierarchy_data: NodeHierarchyData = {
+            };
+
+            let handle_name = unfiltered_node_hierarchy_data
+                .name
+                .as_ref()
+                .map(|name| name.as_ref())
+                .unwrap_or(DEFAULT_TREE_NAME);
+            match static_allowlist.matcher(handle_name) {
+                PrivacyExplicitOption::Found(matcher) => {
+                    let Some(node_hierarchy) = unfiltered_node_hierarchy_data.hierarchy else {
+                        return Some(unfiltered_node_hierarchy_data);
+                    };
                     let trace_id = ftrace::Id::random();
                     let _trace_guard = ftrace::async_enter!(
                         trace_id,
                         TRACE_CATEGORY,
-                        c"SnapshotData -> NodeHierarchyData",
+                        c"ReaderServer::filter_single_components_snapshot.filter_hierarchy",
                         // An async duration cannot have multiple concurrent child async durations
                         // so we include the nonce as metadata to manually determine relationship.
                         "parent_trace_id" => u64::from(parent_trace_id),
                         "trace_id" => u64::from(trace_id),
                         "moniker" => moniker,
-                        "filename" => filename
+                        "filename"  => unfiltered_node_hierarchy_data
+                                .name
                                 .as_ref()
                                 .and_then(InspectHandleName::as_filename)
                                 .unwrap_or(""),
-                        "name" => filename
+                        "name" => unfiltered_node_hierarchy_data
+                                .name
                                 .as_ref()
                                 .and_then(InspectHandleName::as_name)
-                                .unwrap_or("")
+                                .unwrap_or(""),
+                        "selector_type" => "static"
                     );
-                    snapshot_data.into()
-                };
-
-                let Some(node_hierarchy) = node_hierarchy_data.hierarchy else {
-                    return Some(node_hierarchy_data);
-                };
-                let trace_id = ftrace::Id::random();
-                let _trace_guard = ftrace::async_enter!(
-                    trace_id,
-                    TRACE_CATEGORY,
-                    c"ReaderServer::filter_single_components_snapshot.filter_hierarchy",
-                    // An async duration cannot have multiple concurrent child async durations
-                    // so we include the nonce as metadata to manually determine relationship.
-                    "parent_trace_id" => u64::from(parent_trace_id),
-                    "trace_id" => u64::from(trace_id),
-                    "moniker" => moniker,
-                    "filename"  => node_hierarchy_data
-                            .name
-                            .as_ref()
-                            .and_then(InspectHandleName::as_filename)
-                            .unwrap_or(""),
-                    "name" => node_hierarchy_data
-                            .name
-                            .as_ref()
-                            .and_then(InspectHandleName::as_name)
-                            .unwrap_or(""),
-                    "selector_type" => "static"
-                );
-                diagnostics_hierarchy::filter_hierarchy(node_hierarchy, &static_matcher).map(
-                    |filtered_hierarchy| NodeHierarchyData {
-                        name: node_hierarchy_data.name,
-                        timestamp: node_hierarchy_data.timestamp,
-                        errors: node_hierarchy_data.errors,
+                    let filtered_hierarchy =
+                        diagnostics_hierarchy::filter_hierarchy(node_hierarchy, matcher)?;
+                    NodeHierarchyData {
+                        name: unfiltered_node_hierarchy_data.name,
+                        timestamp: unfiltered_node_hierarchy_data.timestamp,
+                        errors: unfiltered_node_hierarchy_data.errors,
                         hierarchy: Some(filtered_hierarchy),
-                        escrowed: node_hierarchy_data.escrowed,
-                    },
-                )?
+                        escrowed: unfiltered_node_hierarchy_data.escrowed,
+                    }
+                }
+                PrivacyExplicitOption::NotFound => return None,
+                PrivacyExplicitOption::FilteringDisabled => unfiltered_node_hierarchy_data,
             }
         };
 
@@ -321,7 +305,7 @@ impl ReaderServer {
 
         let hierarchy_data = ReaderServer::filter_single_components_snapshot(
             pumped_inspect_data.snapshot,
-            pumped_inspect_data.inspect_matcher,
+            pumped_inspect_data.component_allowlist,
             client_selectors,
             identity.to_string().as_str(),
             parent_trace_id,
@@ -787,9 +771,9 @@ mod tests {
         };
 
         let trace_id = ftrace::Id::random();
-        let static_selectors_matchers = pipeline.static_selectors_matchers();
+        let static_hierarchy_allowlist = pipeline.static_hierarchy_allowlist();
         let reader_server = ReaderServer::stream(
-            inspect_repo.fetch_inspect_data(&None, static_selectors_matchers),
+            inspect_repo.fetch_inspect_data(&None, static_hierarchy_allowlist),
             test_performance_config,
             // No selectors
             None,
