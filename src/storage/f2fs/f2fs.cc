@@ -165,8 +165,8 @@ zx::result<> F2fs::MakeReadOperations(zx::vmo& vmo, std::vector<block_t>& addrs,
   if (ret.is_error()) {
     FX_LOGS(WARNING) << "failed to read blocks. " << ret.status_string();
     if (ret.status_value() == ZX_ERR_UNAVAILABLE || ret.status_value() == ZX_ERR_PEER_CLOSED) {
-      // It is not available when the block device is ZX_ERR_UNAVAILABLE or
-      // ZX_ERR_PEER_CLOSED state. Set kCpErrorFlag to enter read-only mode.
+      // The underlying block device is unavailable. Set kCpErrorFlag for f2fs to enter read-only
+      // mode.
       superblock_info_->SetCpFlags(CpFlag::kCpErrorFlag);
     }
   }
@@ -179,8 +179,8 @@ zx::result<> F2fs::MakeReadOperations(std::vector<LockedPage>& pages, std::vecto
   if (ret.is_error()) {
     FX_LOGS(WARNING) << "failed to read blocks. " << ret.status_string();
     if (ret.status_value() == ZX_ERR_UNAVAILABLE || ret.status_value() == ZX_ERR_PEER_CLOSED) {
-      // It is not available when the block device is ZX_ERR_UNAVAILABLE or
-      // ZX_ERR_PEER_CLOSED state. Set kCpErrorFlag to enter read-only mode.
+      // The underlying block device is unavailable. Set kCpErrorFlag for f2fs to enter read-only
+      // mode.
       superblock_info_->SetCpFlags(CpFlag::kCpErrorFlag);
     }
   }
@@ -377,12 +377,8 @@ zx_status_t F2fs::LoadSuper(std::unique_ptr<Superblock> sb) {
   node_vnode_ = std::make_unique<VnodeF2fs>(this, superblock_info_->GetNodeIno(), 0);
   meta_vnode_ = std::make_unique<VnodeF2fs>(this, superblock_info_->GetMetaIno(), 0);
 
-  reader_ = std::make_unique<Reader>(bc_.get(), kDefaultBlocksPerSegment);
-  writer_ = std::make_unique<Writer>(
-      bc_.get(),
-      safemath::CheckMul<size_t>(superblock_info_->GetActiveLogs(), kDefaultBlocksPerSegment)
-          .ValueOrDie());
-
+  reader_ = std::make_unique<Reader>(std::make_unique<StorageBufferPool>(bc_.get()));
+  writer_ = std::make_unique<Writer>(std::make_unique<StorageBufferPool>(bc_.get()));
   if (zx_status_t err = GetValidCheckpoint(); err != ZX_OK) {
     return err;
   }

@@ -11,7 +11,7 @@ namespace f2fs {
 
 // F2fs flushes dirty pages when the number of dirty data pages exceeds a half of
 // |kMaxDirtyDataPages|.
-// TODO: When memorypressure is available with tests, we can remove it.
+// TODO: When memorypressure is available on fs-tests, we can remove it.
 constexpr int kMaxDirtyDataPages = 51200;
 
 // This class is final because there might be background threads running when its destructor runs
@@ -19,41 +19,46 @@ constexpr int kMaxDirtyDataPages = 51200;
 // those background threads.
 class Writer final {
  public:
-  Writer(BcacheMapper *bcache_mapper, size_t capacity);
+  Writer(std::unique_ptr<StorageBufferPool>);
   Writer() = delete;
   Writer(const Writer &) = delete;
   Writer &operator=(const Writer &) = delete;
-  Writer(const Writer &&) = delete;
-  Writer &operator=(const Writer &&) = delete;
+  Writer(Writer &&) = delete;
+  Writer &operator=(Writer &&) = delete;
   ~Writer();
 
-  // For writeback tasks. Refer to F2fs::ScheduleWriteback().
+  // It schedules |task| on |writeback_executor_|.
   void ScheduleWriteback(fpromise::promise<> task);
-  // It moves |pages| to |pages_| and schedules a task to request write I/Os for |pages_|.
-  // If |completion| is set, it notifies the caller when the task is completed.
+
+  // It inserts |pages| to |pages_|, and calls GetTaskForWriteIO() that makes a task to write
+  // pages out to backing storage. Then, it schedules the task on |executor_|. All tasks execute
+  // in order they are scheduled by |sequencer_|.
   void ScheduleWriteBlocks(sync_completion_t *completion = nullptr, PageList pages = {},
-                           bool flush = true);
-  // It schedules a writeback operation for I/Os or VMO_PAGER_OP_WRITEBACK_BEGIN/END.
-  void ScheduleTask(fpromise::promise<> task);
+                           bool flush = true) __TA_EXCLUDES(mutex_);
+
+  // It returns after waiting for the storage operation for all pending pages to complete.
+  void Sync();
 
  private:
-  // It returns a task to be scheduled on |executor_| for write IOs.
-  // The task builds StorageOperations for write requests of |pages_| and passes them to
-  // RunRequests(). When RunRequests() is completed, it wakes waiters who tried to write the
-  // writeback pages that StorageOperations conveys. In addition, it signals |completion| if
-  // it is not null.
-  fpromise::promise<> GetTaskForWriteIO(sync_completion_t *completion);
-  // TODO(b/354796037): need to handle larger I/Os
-  StorageOperations MakeStorageOperations(PageList &to_submit) __TA_EXCLUDES(mutex_);
+  // It returns a task where it builds storage operations from pages and requests the operations to
+  // the storage driver server to write the storage operations out to backing storage. On the
+  // completion of the storage operations, the task notifies the waiters for writeback pages, and
+  // signals |completion| if it is not null.
+  fpromise::promise<> GetTaskForWriteIO(PageList to_submit, sync_completion_t *completion);
+  std::vector<storage::BufferedOperation> BuildBufferedOperation(OwnedStorageBuffer &buffer,
+                                                                 PageList &pages,
+                                                                 PageList &to_submit);
+  zx::result<storage::Operation> PageToOperation(OwnedStorageBuffer &buffer, Page &page);
 
+  const size_t max_block_address_;
   std::mutex mutex_;
   PageList pages_ __TA_GUARDED(mutex_);
-  std::unique_ptr<StorageBuffer> write_buffer_;
-  BcacheMapper *bcache_mapper_ = nullptr;
+  std::unique_ptr<StorageBufferPool> pool_;
+  BcacheMapper *const bcache_mapper_ = nullptr;
   fpromise::sequencer sequencer_;
-  // An executor to run tasks for disk write IOs.
+  // An executor for tasks that write writeback pages to backing storage.
   fs::BackgroundExecutor executor_;
-  // An executor to run writeback tasks. Refer to F2fs::ScheduleWriteback().
+  // An executor for tasks that allocate blocks for dirty pages.
   fs::BackgroundExecutor writeback_executor_;
 };
 

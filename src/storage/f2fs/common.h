@@ -69,9 +69,13 @@ constexpr uint32_t kF2fsSuperMagic = 0xF2F52010;
 constexpr uint32_t kCrcPolyLe = 0xedb88320;
 constexpr size_t kWriteTimeOut = 60;   // in seconds
 constexpr uint32_t kBlockSize = 4096;  // F2fs block size in byte
+constexpr block_t kNullAddr = 0x0U;
+constexpr block_t kNewAddr = -1U;
 
 // Checkpoint
 inline bool VerAfter(uint64_t a, uint64_t b) { return a > b; }
+
+inline bool IsValidBlockAddr(block_t addr) { return addr != kNullAddr && addr != kNewAddr; }
 
 // CRC
 inline uint32_t F2fsCalCrc32(uint32_t crc, void *buff, uint32_t len) {

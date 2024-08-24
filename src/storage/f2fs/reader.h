@@ -9,25 +9,25 @@ namespace f2fs {
 
 class Reader {
  public:
-  Reader(BcacheMapper *bc, size_t capacity);
+  explicit Reader(std::unique_ptr<StorageBufferPool> pool);
   Reader() = delete;
   Reader(const Reader &) = delete;
   Reader &operator=(const Reader &) = delete;
-  Reader(const Reader &&) = delete;
-  Reader &operator=(const Reader &&) = delete;
+  Reader(Reader &&) = delete;
+  Reader &operator=(Reader &&) = delete;
+  ~Reader() = default;
 
-  // TODO(b/354796037): need to handle larger I/Os
-  // It makes read operations from |buffer_| and passes them to RunReqeusts()
-  // synchronously.
+  // These methods build read operations from |addrs| and request them to underlying storage.
+  // On success, it copy read data to |pages| or |vmo|.
   zx::result<> ReadBlocks(std::vector<LockedPage> &pages, std::vector<block_t> &addrs);
   zx::result<> ReadBlocks(zx::vmo &vmo, std::vector<block_t> &addrs);
 
  private:
-  zx_status_t RunIO(StorageOperations &operation, OperationCallback callback);
-
-  BcacheMapper *bc_ = nullptr;
-  std::unique_ptr<StorageBuffer> buffer_;
-  static constexpr uint32_t kDefaultAllocationUnit_ = kDefaultReadaheadSize;
+  std::vector<storage::BufferedOperation> BuildBufferedOperations(OwnedStorageBuffer &buffer,
+                                                                  const std::vector<block_t> &addrs,
+                                                                  size_t &from);
+  BcacheMapper *const bcache_mapper_ = nullptr;
+  std::unique_ptr<StorageBufferPool> pool_;
 };
 
 }  // namespace f2fs

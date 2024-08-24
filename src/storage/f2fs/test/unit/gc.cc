@@ -48,8 +48,7 @@ class GcManagerTest : public F2fsFakeDevTestFixture {
         FileTester::AppendToFile(file_vn.get(), buf.data(), buf.size());
         file_names.push_back(file_name);
         EXPECT_EQ(file_vn->Close(), ZX_OK);
-        WritebackOperation op;
-        file_vn->Writeback(op);
+        file_vn->Writeback();
       }
       sync_completion_t completion;
       fs_->ScheduleWriter(&completion);

@@ -6,121 +6,77 @@
 
 namespace f2fs {
 
-StorageBuffer::StorageBuffer(BcacheMapper *bc, size_t blocks, uint32_t block_size,
-                             std::string_view label, uint32_t allocation_unit)
-    : max_blocks_(bc->Maxblk()), allocation_unit_(allocation_unit) {
-  ZX_DEBUG_ASSERT(allocation_unit >= 1 && allocation_unit <= blocks);
-  blocks = fbl::round_up(blocks, allocation_unit);
-  ZX_ASSERT(buffer_.Initialize(bc, blocks, block_size, label.data()) == ZX_OK);
-  Init();
+StorageBuffer::StorageBuffer(BcacheMapper *bc, size_t num_blocks, std::string_view label)
+    : allocated_blocks_(num_blocks) {
+  ZX_ASSERT(num_blocks >= 1);
+  ZX_ASSERT(buffer_.Initialize(bc, num_blocks, Page::Size(), label.data()) == ZX_OK);
 }
 
-void StorageBuffer::Init() {
-  std::lock_guard lock(mutex_);
-  for (size_t i = 0; i < buffer_.capacity(); i += allocation_unit_) {
-    auto key = std::make_unique<VmoBufferKey>(i);
-    free_keys_.push_back(std::move(key));
-  }
-}
-
-zx::result<size_t> StorageBuffer::ReserveWriteOperation(Page &page) {
-  ZX_DEBUG_ASSERT(page.GetBlockAddr() != kNullAddr);
-  if (page.GetBlockAddr() >= max_blocks_) {
-    return zx::error(ZX_ERR_OUT_OF_RANGE);
-  }
-  std::lock_guard lock(mutex_);
-  // No room in |buffer_|.
-  if (free_keys_.is_empty()) {
+zx::result<size_t> StorageBuffer::Reserve(size_t num_blocks) {
+  if (current_index_ + num_blocks > allocated_blocks_) {
     return zx::error(ZX_ERR_UNAVAILABLE);
   }
-
-  auto key = free_keys_.pop_front();
-  storage::OperationType type = storage::OperationType::kWrite;
-  if (page.IsCommit()) {
-    type = storage::OperationType::kWritePreflushAndFua;
-    page.ClearCommit();
-  } else if (page.IsSync()) {
-    type = storage::OperationType::kWriteFua;
-    page.ClearSync();
-  }
-  storage::Operation op = {
-      .type = type,
-      .vmo_offset = key->GetKey(),
-      .dev_offset = page.GetBlockAddr(),
-      .length = 1,
-  };
-  // Copy |page| to |buffer| at |key|.
-  page.Read(buffer_.Data(op.vmo_offset));
-  // Here, |operation| can be merged into a previous operation.
-  builder_.Add(op, &buffer_);
-  reserved_keys_.push_back(std::move(key));
-  return zx::ok(reserved_keys_.size());
+  size_t ret = current_index_;
+  current_index_ += num_blocks;
+  return zx::ok(ret);
 }
 
-zx::result<StorageOperations> StorageBuffer::MakeReadOperations(const std::vector<block_t> &addrs) {
-  VmoKeyList keys;
-  uint32_t allocate_index = 0;
-  fs::BufferedOperationsBuilder builder;
+void *StorageBuffer::Data(const size_t offset) {
+  ZX_ASSERT(offset < buffer_.capacity());
+  return buffer_.Data(offset);
+}
+
+StorageBufferPool::StorageBufferPool(BcacheMapper *bcache_mapper, size_t default_size,
+                                     size_t large_size, int num_pager_threads)
+    : buffer_size_(default_size),
+      large_buffer_size_(large_size),
+      num_buffers_(num_pager_threads),
+      bcache_mapper_(bcache_mapper) {
+  ZX_ASSERT(num_pager_threads > 0);
+  for (size_t i = 0; i < num_buffers_; ++i) {
+    std::string str = "StorgaeBuffer_" + std::to_string(buffer_size_) + "_" + std::to_string(i);
+    buffers(buffer_size_)
+        .push_back(std::make_unique<StorageBuffer>(bcache_mapper, buffer_size_, str));
+    str = "StorgaeBuffer_" + std::to_string(large_buffer_size_) + "_" + std::to_string(i);
+    buffers(large_buffer_size_)
+        .push_back(std::make_unique<StorageBuffer>(bcache_mapper, large_buffer_size_, str));
+  }
+}
+
+StorageBufferPool::~StorageBufferPool() {
+  for (size_t i = 0; i < num_buffers_; ++i) {
+    auto buffer = Retrieve(buffer_size_);
+    auto large_buffer = Retrieve(large_buffer_size_);
+  }
+}
+
+std::unique_ptr<StorageBuffer> StorageBufferPool::Retrieve(size_t size) {
+  ZX_ASSERT(var_.wait_for(mutex_, std::chrono::seconds(kWriteTimeOut),
+                          [this, &size]()
+                              TA_NO_THREAD_SAFETY_ANALYSIS { return !buffers(size).empty(); }));
+  auto owned_buffer = std::move(buffers(size).back());
+  buffers(size).pop_back();
+  return owned_buffer;
+}
+
+OwnedStorageBuffer StorageBufferPool::Get(size_t size) {
   std::lock_guard lock(mutex_);
-  for (auto addr : addrs) {
-    if (addr != kNullAddr && addr != kNewAddr) {
-      // If addr is invalid, free allocated keys.
-      if (addr >= max_blocks_) {
-        free_keys_.splice(free_keys_.end(), keys);
-        return zx::error(ZX_ERR_OUT_OF_RANGE);
-      }
+  ZX_ASSERT(var_.wait_for(mutex_, std::chrono::seconds(kWriteTimeOut),
+                          [this, &size]()
+                              TA_NO_THREAD_SAFETY_ANALYSIS { return !buffers(size).empty(); }));
 
-      if (allocate_index % allocation_unit_ == 0) {
-        allocate_index = 0;
-        // Wait until there is a room in |buffer_|.
-        while (free_keys_.is_empty()) {
-          if (auto wait_result = cvar_.wait_for(mutex_, std::chrono::seconds(kWriteTimeOut));
-              wait_result == std::cv_status::timeout) {
-            return zx::error(ZX_ERR_TIMED_OUT);
-          }
-        }
-        keys.push_back(free_keys_.pop_front());
-      }
-
-      storage::Operation op = {
-          .type = storage::OperationType::kRead,
-          .vmo_offset = keys.back().GetKey() + allocate_index,
-          .dev_offset = addr,
-          .length = 1,
-      };
-      builder.Add(op, &buffer_);
-      ++allocate_index;
-    }
-  }
-  return zx::ok(StorageOperations(*this, builder, keys));
+  auto owned_buffer = std::move(buffers(size).back());
+  buffers(size).pop_back();
+  return OwnedStorageBuffer(std::move(owned_buffer),
+                            [this](std::unique_ptr<StorageBuffer> buffer)
+                                __TA_EXCLUDES(mutex_) { Return(std::move(buffer)); });
 }
 
-void StorageBuffer::ReleaseBuffers(const StorageOperations &operation) {
-  if (!operation.IsEmpty()) {
-    auto keys = operation.TakeVmoKeys();
+void StorageBufferPool::Return(std::unique_ptr<StorageBuffer> buffer) {
+  if (buffer) {
     std::lock_guard lock(mutex_);
-    ZX_DEBUG_ASSERT(!keys.is_empty());
-    // Add vmo buffers of |operation| to |free_keys_| to allow waiters to reserve buffer_.
-    free_keys_.splice(free_keys_.end(), keys);
-    // TODO: When multi-qd is available, consider notify_all().
-    cvar_.notify_all();
-  }
-}
-
-StorageOperations StorageBuffer::TakeWriteOperations() {
-  std::lock_guard lock(mutex_);
-  return StorageOperations(*this, builder_, reserved_keys_);
-}
-
-StorageBuffer::~StorageBuffer() {
-  {
-    std::lock_guard lock(mutex_);
-    [[maybe_unused]] size_t num_keys = 0;
-    while (!free_keys_.is_empty()) {
-      ++num_keys;
-      free_keys_.pop_front();
-    }
-    ZX_DEBUG_ASSERT(num_keys == buffer_.capacity() / allocation_unit_);
+    buffers(buffer->Capacity()).push_back(std::move(buffer));
+    var_.notify_one();
   }
 }
 

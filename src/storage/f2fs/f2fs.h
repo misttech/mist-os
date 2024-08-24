@@ -230,7 +230,6 @@ class F2fs final {
                       bool flush = true) {
     writer_->ScheduleWriteBlocks(completion, std::move(pages), flush);
   }
-  void ScheduleWriter(fpromise::promise<> task) { writer_->ScheduleTask(std::move(task)); }
 
   void ScheduleWritebackAndReclaimPages(size_t num_pages = kDefaultBlocksPerSegment);
 
@@ -277,7 +276,7 @@ class F2fs final {
 
   void FlushDirsAndNodes() __TA_REQUIRES(f2fs::GetGlobalLock());
   pgoff_t FlushDirtyMetaPages(bool is_commit) __TA_REQUIRES(f2fs::GetGlobalLock());
-  pgoff_t FlushDirtyDataPages(WritebackOperation &operation, bool wait_writer = false)
+  pgoff_t FlushDirtyDataPages(WritebackOperation &operation)
       __TA_REQUIRES_SHARED(f2fs::GetGlobalLock());
   zx::result<pgoff_t> FlushDirtyNodePages(WritebackOperation &operation)
       __TA_REQUIRES(f2fs::GetGlobalLock());

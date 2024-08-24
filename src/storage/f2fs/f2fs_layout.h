@@ -16,9 +16,6 @@ constexpr uint32_t kMinLogSectorSize = 9;   // 9 bits for 512 byte
 constexpr uint32_t kMaxLogSectorSize = 12;  // 12 bits for 4096 byte
 constexpr int kMaxExtension = 64;           // # of extension entries
 
-constexpr block_t kNullAddr = 0x0U;
-constexpr block_t kNewAddr = -1U;
-
 // Superblock location.
 constexpr size_t kSuperblockStart = 0;
 constexpr size_t kSuperblockCopies = 2;
