@@ -4,7 +4,7 @@
 
 use crate::mm::memory::MemoryObject;
 use crate::mm::ProtectionFlags;
-use crate::task::{CurrentTask, Kernel};
+use crate::task::CurrentTask;
 use crate::vfs::{
     default_seek, fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
     fs_node_impl_not_dir, fs_node_impl_symlink, fs_node_impl_xattr_delegate, CacheConfig,
@@ -57,7 +57,6 @@ struct ExtNode {
 impl ExtFilesystem {
     pub fn new_fs<L>(
         locked: &mut Locked<'_, L>,
-        kernel: &Arc<Kernel>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno>
@@ -92,7 +91,12 @@ impl ExtFilesystem {
         let pager = Arc::new(Pager::new(vmo, parser.block_size().map_err(|e| errno!(EIO, e))?)?);
         let fs = Self { parser, pager: pager.clone() };
         let ops = ExtDirectory { inner: Arc::new(ExtNode::new(&fs, ROOT_INODE_NUM)?) };
-        let fs = FileSystem::new(kernel, CacheMode::Cached(CacheConfig::default()), fs, options)?;
+        let fs = FileSystem::new(
+            current_task.kernel(),
+            CacheMode::Cached(CacheConfig::default()),
+            fs,
+            options,
+        )?;
         let mut root = FsNode::new_root(ops);
         root.node_id = ROOT_INODE_NUM as ino_t;
         fs.set_root_node(root);

@@ -3,9 +3,9 @@
 // found in the LICENSE file.
 
 use crate::{
-    create_filesystem_from_spec, expose_root, get_serial_number, parse_features,
-    parse_numbered_handles, run_container_features, serve_component_runner,
-    serve_container_controller, serve_graphical_presenter, Features,
+    expose_root, get_serial_number, parse_features, parse_numbered_handles, run_container_features,
+    serve_component_runner, serve_container_controller, serve_graphical_presenter, Features,
+    MountAction,
 };
 use anyhow::{anyhow, bail, Error};
 use bstr::BString;
@@ -37,7 +37,7 @@ use starnix_logging::{
 };
 use starnix_modules::{init_common_devices, register_common_file_systems};
 use starnix_modules_magma::get_magma_params;
-use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
+use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked, Unlocked};
 use starnix_uapi::errors::{SourceContext, ENOENT};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
@@ -502,23 +502,18 @@ async fn create_container(
     Ok(Container { kernel, _node: node, _thread_bound: Default::default() })
 }
 
-fn create_fs_context<L>(
-    locked: &mut Locked<'_, L>,
+fn create_fs_context(
+    locked: &mut Locked<'_, Unlocked>,
     kernel: &Arc<Kernel>,
     features: &Features,
     config: &Config,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
-) -> Result<Arc<FsContext>, Error>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-    L: LockBefore<BeforeFsNodeAppend>,
-{
+) -> Result<Arc<FsContext>, Error> {
     // The mounts are applied in the order listed. Mounting will fail if the designated mount
     // point doesn't exist in a previous mount. The root must be first so other mounts can be
     // applied on top of it.
     let mut mounts_iter = config.mounts.iter();
-    let mut root = create_filesystem_from_spec(
+    let mut root = MountAction::new_for_root(
         locked,
         kernel,
         pkg_dir_proxy,
@@ -616,7 +611,7 @@ where
     // Skip the first mount, that was used to create the root filesystem.
     let _ = mounts_iter.next();
     for mount_spec in mounts_iter {
-        let action = create_filesystem_from_spec(locked, system_task, pkg_dir_proxy, mount_spec)
+        let action = MountAction::from_spec(locked, system_task, pkg_dir_proxy, mount_spec)
             .with_source_context(|| format!("creating filesystem from spec: {}", &mount_spec))?;
         let mount_point = system_task
             .lookup_path_from_root(action.path.as_ref())

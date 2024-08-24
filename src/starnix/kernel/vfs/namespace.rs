@@ -4,6 +4,7 @@
 
 use crate::fs::devtmpfs::dev_tmp_fs;
 use crate::fs::ext4::ExtFilesystem;
+use crate::fs::fuchsia::create_remotefs_filesystem;
 use crate::fs::functionfs::FunctionFs;
 use crate::fs::overlayfs::OverlayFs;
 use crate::fs::proc::proc_fs;
@@ -687,21 +688,6 @@ impl fmt::Debug for Mount {
     }
 }
 
-pub trait FileSystemCreator {
-    fn kernel(&self) -> &Arc<Kernel>;
-
-    fn create_filesystem<L>(
-        &self,
-        locked: &mut Locked<'_, L>,
-        fs_type: &FsStr,
-        options: FileSystemOptions,
-    ) -> Result<FileSystemHandle, Errno>
-    where
-        L: LockBefore<DeviceOpen>,
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<BeforeFsNodeAppend>;
-}
-
 impl Kernel {
     pub fn get_next_mount_id(&self) -> u64 {
         self.next_mount_id.next()
@@ -716,49 +702,8 @@ impl Kernel {
     }
 }
 
-impl FileSystemCreator for Arc<Kernel> {
-    fn kernel(&self) -> &Arc<Kernel> {
-        self
-    }
-
-    fn create_filesystem<L>(
-        &self,
-        _locked: &mut Locked<'_, L>,
-        fs_type: &FsStr,
-        options: FileSystemOptions,
-    ) -> Result<FileSystemHandle, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-    {
-        if let Some(result) =
-            self.expando.get::<FsRegistry>().create(self, fs_type, options.clone())
-        {
-            return result;
-        }
-        Ok(match &**fs_type {
-            b"remotefs" => crate::fs::fuchsia::create_remotefs_filesystem(
-                self,
-                self.container_data_dir
-                    .as_ref()
-                    .ok_or_else(|| errno!(EPERM, "Missing container data directory"))?,
-                options,
-                fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE,
-            )?,
-            b"tmpfs" => TmpFs::new_fs_with_options(self, options)?,
-            _ => {
-                return error!(ENODEV, fs_type);
-            }
-        })
-    }
-}
-
-impl FileSystemCreator for CurrentTask {
-    fn kernel(&self) -> &Arc<Kernel> {
-        (self as &Task).kernel()
-    }
-
-    fn create_filesystem<L>(
+impl CurrentTask {
+    pub fn create_filesystem<L>(
         &self,
         locked: &mut Locked<'_, L>,
         fs_type: &FsStr,
@@ -770,19 +715,35 @@ impl FileSystemCreator for CurrentTask {
         L: LockBefore<BeforeFsNodeAppend>,
     {
         let kernel = self.kernel();
+        if let Some(result) =
+            kernel.expando.get::<FsRegistry>().create(kernel, fs_type, options.clone())
+        {
+            return result;
+        }
+
+        let data_dir = || {
+            kernel
+                .container_data_dir
+                .as_ref()
+                .ok_or_else(|| errno!(EPERM, "Missing container data directory"))
+        };
+
+        let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
 
         match &**fs_type {
+            b"devtmpfs" => Ok(dev_tmp_fs(locked, self).clone()),
+            b"ext4" => ExtFilesystem::new_fs(locked, self, options),
+            b"functionfs" => FunctionFs::new_fs(self, options),
             b"fuse" => new_fuse_fs(self, options),
             b"fusectl" => new_fusectl_fs(self, options),
-            b"devtmpfs" => Ok(dev_tmp_fs(locked, self).clone()),
-            b"ext4" => ExtFilesystem::new_fs(locked, kernel, self, options),
-            b"functionfs" => FunctionFs::new_fs(self, options),
             b"overlay" => OverlayFs::new_fs(locked, self, options),
             b"proc" => Ok(proc_fs(self, options).clone()),
-            b"tracefs" => Ok(trace_fs(self, options).clone()),
+            b"remotefs" => create_remotefs_filesystem(kernel, data_dir()?, options, rights),
             b"selinuxfs" => security::new_selinux_fs(self, options),
             b"sysfs" => Ok(sys_fs(self, options).clone()),
-            _ => kernel.create_filesystem(locked, fs_type, options),
+            b"tmpfs" => TmpFs::new_fs_with_options(kernel, options),
+            b"tracefs" => Ok(trace_fs(self, options).clone()),
+            _ => error!(ENODEV, fs_type),
         }
     }
 }
