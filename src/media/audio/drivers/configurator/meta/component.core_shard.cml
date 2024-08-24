@@ -19,6 +19,7 @@
             protocol: [ "fuchsia.media.AudioDeviceEnumerator" ],
             from: "#audio_core",
             to: [ "#configurator" ],
+            source_availability: "unknown", // audio_core may not be available on all products
         },
         {
             directory: "dev-class",
