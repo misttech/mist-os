@@ -10,8 +10,20 @@ For the most part, you can use the writer as you would any implementation of
 macros against it for any unstructured string output.
 
 All writers also implement some convenience functions for basic writing needs
-like `print` and `line`. These functions will all only produce output if the
-command wasn't run in machine mode. Otherwise they will be ignored.
+like `print` and `line`. However, those convenience functions will only produce
+output if the command is not run in machine mode.
+
+For example:
+
+```rust
+writer.line("This is a human friendly message")?;
+writer.machine(&theMessageObject)?;
+```
+
+Only one of those lines will be written, depending whether the
+command is run in machine mode. If the command is not in machine mode, the
+line "This is a human friendly message" will be printed. If the command is
+in machine mode, the message referenced by `&theMessageObject` will be printed.
 
 All writers also implement `item`, which will either print the object
 given in machine mode, or use its `Display` implementation to output it in
