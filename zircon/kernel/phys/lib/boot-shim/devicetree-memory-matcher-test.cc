@@ -9,13 +9,16 @@
 #include <lib/boot-shim/testing/devicetree-test-fixture.h>
 #include <lib/zbitl/image.h>
 
+#include <optional>
+
 namespace {
 using boot_shim::testing::LoadDtb;
 using boot_shim::testing::LoadedDtb;
 using devicetree::MemoryReservation;
 
 class MemoryMatcherTest
-    : public boot_shim::testing::TestMixin<boot_shim::testing::RiscvDevicetreeTest,
+    : public boot_shim::testing::TestMixin<boot_shim::testing::SyntheticDevicetreeTest,
+                                           boot_shim::testing::RiscvDevicetreeTest,
                                            boot_shim::testing::ArmDevicetreeTest> {
  public:
   static void SetUpTestSuite() {
@@ -35,6 +38,10 @@ class MemoryMatcherTest
     loaded_dtb = LoadDtb("memory_complex.dtb");
     ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
     complex_ = std::move(loaded_dtb).value();
+
+    loaded_dtb = LoadDtb("ramoops.dtb");
+    ASSERT_TRUE(loaded_dtb.is_ok(), "%s", loaded_dtb.error_value().c_str());
+    ramoops_ = std::move(loaded_dtb).value();
   }
 
   static void TearDownTestSuite() {
@@ -42,6 +49,7 @@ class MemoryMatcherTest
     reserved_memory_ = std::nullopt;
     memreserve_ = std::nullopt;
     complex_ = std::nullopt;
+    ramoops_ = std::nullopt;
     Mixin::TearDownTestSuite();
   }
 
@@ -49,18 +57,21 @@ class MemoryMatcherTest
   devicetree::Devicetree reserved_memory() { return reserved_memory_->fdt(); }
   devicetree::Devicetree memreserve() { return memreserve_->fdt(); }
   devicetree::Devicetree complex() { return complex_->fdt(); }
+  devicetree::Devicetree ramoops() { return ramoops_->fdt(); }
 
  private:
   static std::optional<LoadedDtb> memory_;
   static std::optional<LoadedDtb> reserved_memory_;
   static std::optional<LoadedDtb> memreserve_;
   static std::optional<LoadedDtb> complex_;
+  static std::optional<LoadedDtb> ramoops_;
 };
 
 std::optional<LoadedDtb> MemoryMatcherTest::memory_ = std::nullopt;
 std::optional<LoadedDtb> MemoryMatcherTest::reserved_memory_ = std::nullopt;
 std::optional<LoadedDtb> MemoryMatcherTest::memreserve_ = std::nullopt;
 std::optional<LoadedDtb> MemoryMatcherTest::complex_ = std::nullopt;
+std::optional<LoadedDtb> MemoryMatcherTest::ramoops_ = std::nullopt;
 
 TEST_F(MemoryMatcherTest, ParseMemreserves) {
   std::vector<MemoryReservation> reservations;
@@ -394,23 +405,23 @@ TEST_F(MemoryMatcherTest, KhadasVim3) {
 
   ASSERT_TRUE(devicetree::Match(fdt, memory_matcher));
   auto ranges = memory_matcher.ranges();
-  ASSERT_EQ(ranges.size(), 4);
+  ASSERT_EQ(ranges.size(), 3);
 
   EXPECT_EQ(ranges[0].addr, 0x00);
   EXPECT_EQ(ranges[0].size, 0xf4e5b000);
   EXPECT_EQ(ranges[0].type, memalloc::Type::kFreeRam);
 
-  EXPECT_EQ(ranges[1].addr, 0xd000000);
-  EXPECT_EQ(ranges[1].size, 0x100000);
+  EXPECT_EQ(ranges[1].addr, 0x5000000);
+  EXPECT_EQ(ranges[1].size, 0x300000);
   EXPECT_EQ(ranges[1].type, memalloc::Type::kReserved);
 
-  EXPECT_EQ(ranges[2].addr, 0x5000000);
-  EXPECT_EQ(ranges[2].size, 0x300000);
+  EXPECT_EQ(ranges[2].addr, 0x5300000);
+  EXPECT_EQ(ranges[2].size, 0x2000000);
   EXPECT_EQ(ranges[2].type, memalloc::Type::kReserved);
 
-  EXPECT_EQ(ranges[3].addr, 0x5300000);
-  EXPECT_EQ(ranges[3].size, 0x2000000);
-  EXPECT_EQ(ranges[3].type, memalloc::Type::kReserved);
+  ASSERT_TRUE(memory_matcher.nvram());
+  EXPECT_EQ(memory_matcher.nvram()->base, 0xd000000);
+  EXPECT_EQ(memory_matcher.nvram()->length, 0x100000);
 }
 
 TEST_F(MemoryMatcherTest, BananaPiF3) {
@@ -474,6 +485,26 @@ TEST_F(MemoryMatcherTest, BananaPiF3) {
   EXPECT_EQ(ranges[12].addr, 0x2ff40000);
   EXPECT_EQ(ranges[12].size, 0xc0000);
   EXPECT_EQ(ranges[12].type, memalloc::Type::kReserved);
+}
+
+TEST_F(MemoryMatcherTest, NoNvramGeneratesNoItemWhenMissing) {
+  std::vector<memalloc::Range> storage(13);
+  boot_shim::DevicetreeMemoryMatcher matcher("test", stdout, storage);
+  auto fdt = empty_fdt();
+  ASSERT_TRUE(devicetree::Match(fdt, matcher));
+  ASSERT_FALSE(matcher.nvram());
+}
+
+TEST_F(MemoryMatcherTest, HasNvramGeneratesItemWhenPresent) {
+  std::vector<memalloc::Range> storage(13);
+
+  boot_shim::DevicetreeMemoryMatcher matcher("test", stdout, storage);
+  auto fdt = ramoops();
+  ASSERT_TRUE(devicetree::Match(fdt, matcher));
+  ASSERT_TRUE(matcher.nvram());
+
+  EXPECT_EQ(matcher.nvram()->base, 0x8f000000);
+  EXPECT_EQ(matcher.nvram()->length, 0x100000);
 }
 
 }  // namespace

@@ -103,6 +103,7 @@ if (toolchain_environment == "kernel.phys") {
       "//zircon/kernel/phys:zbitl-allocation",
       "//zircon/kernel/phys:zbitl-allocation",
       "//zircon/kernel/phys/lib/boot-shim",
+      "//zircon/kernel/phys/lib/memalloc",
       "//zircon/system/ulib/fbl",
     ]
 

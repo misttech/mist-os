@@ -364,6 +364,8 @@ class DevicetreeChosenNodeMatcher : public DevicetreeChosenNodeMatcherBase {
 //  '/reserved-memory'.
 //  * 'memreseve' represents the memory reservation block, which encodes pairs describing base
 //  address and length of reserved memory ranges.
+//  * `ramoops` node is a child of `reserverd-memory` node which is tracked as a special range.
+//  When present will eventually be used to generate `ZBI_TYPE_NVRAM`.
 //
 // For more information and examples of each source see :
 // '/memory' :
@@ -372,6 +374,8 @@ class DevicetreeChosenNodeMatcher : public DevicetreeChosenNodeMatcherBase {
 // https://devicetree-specification.readthedocs.io/en/latest/chapter3-devicenodes.html#reserved-memory-node
 // 'memreserve' :
 // https://devicetree-specification.readthedocs.io/en/latest/chapter5-flattened-format.html#memory-reservation-block
+// `ramoops`:
+// https://www.kernel.org/doc/Documentation/admin-guide/ramoops.rst'
 //
 class DevicetreeMemoryMatcher : public DevicetreeItemBase<DevicetreeMemoryMatcher, 1> {
  public:
@@ -394,7 +398,15 @@ class DevicetreeMemoryMatcher : public DevicetreeItemBase<DevicetreeMemoryMatche
     return {};
   }
 
+  // When valid `ramoops` node is found, then this range is filled.
+  constexpr const std::optional<zbi_nvram_t>& nvram() const { return nvram_; }
+
  private:
+  // Supports capturing `this`, a flag(whether there was an error) and the type
+  // of the memory range being generated, for `AppendRangesFromReg`.
+  using RangeVisitor =
+      fit::inline_function<bool(uint64_t address, uint64_t size), 4 * sizeof(void*)>;
+
   // Append special ranges to the memory regions. This will be used later for
   // initializing the pool allocation memory.
   constexpr bool AppendRange(const memalloc::Range& range) {
@@ -412,6 +424,8 @@ class DevicetreeMemoryMatcher : public DevicetreeItemBase<DevicetreeMemoryMatche
   bool AppendRangesFromReg(const devicetree::PropertyDecoder& decoder,
                            memalloc::Type memrange_type);
 
+  void OnEachRangeFromReg(const devicetree::PropertyDecoder& decoder, RangeVisitor range_visitor);
+
   devicetree::ScanState HandleMemoryNode(const devicetree::NodePath& path,
 
                                          const devicetree::PropertyDecoder& decoder);
@@ -420,6 +434,7 @@ class DevicetreeMemoryMatcher : public DevicetreeItemBase<DevicetreeMemoryMatche
 
   cpp20::span<memalloc::Range> ranges_;
   size_t ranges_count_ = 0;
+  std::optional<zbi_nvram_t> nvram_;
 };
 
 // This routine passes each memory reservation to a provided callback,
@@ -988,28 +1003,7 @@ class GenericWatchdogItemBase
 };
 
 using GenericWatchdogItem = WithAllWatchdogs<GenericWatchdogItemBase>;
-
-// Defines an item that will look for the `ramoops` reserved memory node, and will provide the ram
-// region provided for panic logging as a ZBI item. While the node itself provides much more
-// information that can be stored in the NVRAM item, most of that information is specific to the
-// logger being targetted. As for Zircon, it will treat it as a carved out memory region where data
-// can be preserved across reboots.
-//
-// See https://www.kernel.org/doc/Documentation/admin-guide/ramoops.rst
-class RamoopsMatcher : public DevicetreeItemBase<RamoopsMatcher, 1> {
- public:
-  RamoopsMatcher(const char* shim_name, FILE* log) : DevicetreeItemBase(shim_name, log) {}
-
-  // Matcher API.
-  devicetree::ScanState OnNode(const devicetree::NodePath& path,
-                               const devicetree::PropertyDecoder& decoder);
-  devicetree::ScanState OnScan() { return devicetree::ScanState::kDone; }
-
-  constexpr auto range() const { return range_; }
-
- private:
-  std::optional<zbi_nvram_t> range_;
-};
+using NvramItem = SingleOptionalItem<zbi_nvram_t, ZBI_TYPE_NVRAM>;
 
 }  // namespace boot_shim
 

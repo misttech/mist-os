@@ -8,8 +8,11 @@
 #define ZIRCON_KERNEL_PHYS_BOOT_SHIM_INCLUDE_PHYS_BOOT_SHIM_DEVICETREE_H_
 
 #include <lib/devicetree/devicetree.h>
+#include <lib/memalloc/range.h>
+#include <lib/zbi-format/memory.h>
 #include <lib/zbitl/view.h>
 
+#include <ktl/optional.h>
 #include <ktl/string_view.h>
 
 // Bootstrapping data from the devicetree blob.
@@ -22,6 +25,9 @@ struct DevicetreeBoot {
 
   // Devicetree span.
   devicetree::Devicetree fdt;
+
+  // Possible nvram range provided by the bootloader.
+  ktl::optional<zbi_nvram_t> nvram;
 };
 
 // Instance populated by InitMemory().

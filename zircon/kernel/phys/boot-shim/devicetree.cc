@@ -45,10 +45,9 @@ void InitMemory(void* dtb, AddressSpace* aspace) {
                                 std::numeric_limits<uintptr_t>::max());
   devicetree::Devicetree fdt(fdt_blob);
 
-  boot_shim::RamoopsMatcher ramoops("init-memory", stdout);
   boot_shim::DevicetreeMemoryMatcher memory("init-memory", stdout, range_storage);
   boot_shim::DevicetreeChosenNodeMatcher<> chosen("init-memory", stdout);
-  ZX_ASSERT(devicetree::Match(fdt, chosen, memory, ramoops));
+  ZX_ASSERT(devicetree::Match(fdt, chosen, memory));
 
   //
   // The following 'special' memory ranges are those that we already know are
@@ -79,10 +78,10 @@ void InitMemory(void* dtb, AddressSpace* aspace) {
     special_ranges = cpp20::span(special_range_storage).subspan(0, special_ranges.size() + 1);
   }
 
-  if (ramoops.range()) {
-    special_range_storage[special_ranges.size()] = memalloc::Range{
-        .addr = reinterpret_cast<uintptr_t>(ramoops.range()->base),
-        .size = ramoops.range()->length,
+  if (memory.nvram()) {
+    special_range_storage[special_ranges.size()] = {
+        .addr = memory.nvram()->base,
+        .size = memory.nvram()->length,
         .type = memalloc::Type::kNvram,
     };
     special_ranges = cpp20::span(special_range_storage).subspan(0, special_ranges.size() + 1);
@@ -139,5 +138,6 @@ void InitMemory(void* dtb, AddressSpace* aspace) {
       .cmdline = chosen.cmdline().value_or(""),
       .ramdisk = chosen.zbi(),
       .fdt = fdt,
+      .nvram = memory.nvram(),
   };
 }

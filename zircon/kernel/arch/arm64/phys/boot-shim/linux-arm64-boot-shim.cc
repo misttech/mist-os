@@ -59,10 +59,11 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   MainSymbolize symbolize(kShimName);
 
   // Memory has been initialized, we can finish up parsing the rest of the items from the boot shim.
-  boot_shim::DevicetreeBootShim<
-      boot_shim::UartItem<>, boot_shim::PoolMemConfigItem, boot_shim::ArmDevicetreePsciItem,
-      boot_shim::ArmDevicetreeGicItem, boot_shim::DevicetreeDtbItem,
-      boot_shim::ArmDevicetreeCpuTopologyItem, boot_shim::ArmDevicetreeTimerItem>
+  boot_shim::DevicetreeBootShim<boot_shim::UartItem<>, boot_shim::PoolMemConfigItem,
+                                boot_shim::NvramItem, boot_shim::ArmDevicetreePsciItem,
+                                boot_shim::ArmDevicetreeGicItem, boot_shim::DevicetreeDtbItem,
+                                boot_shim::ArmDevicetreeCpuTopologyItem,
+                                boot_shim::ArmDevicetreeTimerItem>
       shim(kShimName, gDevicetreeBoot.fdt);
   shim.set_mmio_observer([&](boot_shim::DevicetreeMmioRange mmio_range) {
     auto& pool = Allocation::GetPool();
@@ -85,10 +86,13 @@ void PhysMain(void* flat_devicetree_blob, arch::EarlyTicks ticks) {
   });
   shim.set_cmdline(gDevicetreeBoot.cmdline);
   shim.Get<boot_shim::UartItem<>>().Init(GetUartDriver().uart());
-  shim.Get<boot_shim::PoolMemConfigItem>().Init(Allocation::GetPool());
   shim.Get<boot_shim::DevicetreeDtbItem>().set_payload(
       {reinterpret_cast<const ktl::byte*>(gDevicetreeBoot.fdt.fdt().data()),
        gDevicetreeBoot.fdt.size_bytes()});
+  shim.Get<boot_shim::PoolMemConfigItem>().Init(Allocation::GetPool());
+  if (gDevicetreeBoot.nvram) {
+    shim.Get<boot_shim::NvramItem>().set_payload(*gDevicetreeBoot.nvram);
+  }
 
   // Mark the UART MMIO range as peripheral range.
   uart::internal::Visit(
