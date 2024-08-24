@@ -17,12 +17,6 @@ declare_args() {
   # A human readable product description.
   product_description = ""
 
-  # The following arguments are all used to configure the contents of the core
-  # component realm. See //src/sys/core/build/core.gni for documentation on what
-  # each field means.
-  # TODO: redo comments
-  core_realm_shards = []
-
   # Determines whether the fuchsia_async library used by many Rust targets will be compiled
   # with TRACE level log statements that increase binary size a measurable amount.
   # TODO(https://fxbug.dev/42161120) move this to a toolchain to allow multiple products to build together

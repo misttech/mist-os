@@ -6,7 +6,6 @@ import("//build/components.gni")
 import("//build/config.gni")
 import("//build/rust/rustc_binary.gni")
 import("//build/testing/environments.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 group("tests") {
   testonly = true
@@ -140,8 +139,4 @@ executable("optee_smoke_test_bin") {
 
   # TODO(https://fxbug.dev/42136089): delete the below and fix compiler warnings
   configs += [ "//build/config:Wno-conversion" ]
-}
-
-core_shard("core_shard") {
-  shard_file = "meta/tee_manager.core_shard.cml"
 }

@@ -5,15 +5,10 @@
 import("//build/assembly/product_assembly_configuration.gni")
 import("//build/assembly/sshd_config.gni")
 import("//build/info/info.gni")
-import("//src/sys/core/build/core_shard.gni")
 
 assert(
     is_fuchsia,
     "Product definitions and assemblies should only be defined in the fuchsia toolchain")
-
-core_shard("tiles_flatland_core_shard") {
-  shard_file = "tiles_flatland.core_shard.cml"
-}
 
 product_assembly_configuration("terminal") {
   platform = {

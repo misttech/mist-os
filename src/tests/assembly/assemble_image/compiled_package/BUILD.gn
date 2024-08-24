@@ -7,18 +7,8 @@ import("//build/testing/host_test.gni")
 import("//src/sys/core/build/core.gni")
 import("//src/tests/assembly/assemble_image/test_assembly_config.gni")
 
-if (is_fuchsia) {
-  # Create a minimal system image that specifies a compiled package containing
-  # a component composed of shards.
-  core_realm_definition("core_realm") {
-    # TODO try to remove once assembly fully handles SWD
-    deps = []
-  }
-}
-
 # The test_assembly_config() template needs to do some things on the
-# host toolchain, but only uses the core_realm_definition on the fuchsia
-# toolchain
+# host toolchain
 test_assembly_config("compiled_package") {
   platform = {
     feature_set_level = "utility"
@@ -40,7 +30,6 @@ test_assembly_config("compiled_package") {
       }
     }
   }
-  core_realm_definition = ":core_realm"
   additional_args = [
     "--config",
     "assembly_example_enabled=true",

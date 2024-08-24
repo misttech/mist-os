@@ -33,9 +33,6 @@ import("//build/testing/host_test.gni")
 #     Passed through to the product_assembly_configuration() template.
 #     See the documentation for product_assembly_configuration().
 #
-#   core_realm_definition (optional)
-#     [list of labels] label of a core_realm_definition template
-#
 template("test_assembly_config") {
   base_packages_param = []
   if (defined(invoker.base_packages)) {
@@ -98,7 +95,6 @@ template("test_assembly_config") {
                  "product",
                  "platform",
                  "base_driver_packages",
-                 "core_realm_definition",
                ])
   }
 
@@ -142,7 +138,6 @@ template("test_assembly_config") {
       testonly = true
       bundles_dir = outdir
       include_config_data = false
-      forward_variables_from(invoker, [ "core_realm_definition" ])
 
       supports_blobs = true
       base_packages = base_packages_param

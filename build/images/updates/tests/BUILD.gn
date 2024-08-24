@@ -23,10 +23,6 @@ if (is_fuchsia) {
   import("//build/product.gni")
   import("//src/sys/core/build/core.gni")
 
-  core_realm_definition("core_realm") {
-    testonly = true
-  }
-
   product_assembly_configuration("product_assembly_config") {
     testonly = true
     platform = {
@@ -62,7 +58,6 @@ if (is_fuchsia) {
     product_assembly_config_label = ":product_assembly_config"
     allow_eng_platform_bundle_use = true
 
-    core_realm_definition = ":core_realm"
     board_config_label = ":board_config"
 
     base_packages = []

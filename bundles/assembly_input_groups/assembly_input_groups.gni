@@ -23,10 +23,6 @@ _attr_list = [
 # Each input groups defines a set of attributes declaring the artifacts and how
 # they are bundled into an assembly_input_bundle() or an assembled_system().
 #
-# In addition, the `core_realm_shards` attribute is provided. Such that when
-# creating a system image, the core realm can be creating by the union of these
-# `core_realm_shards` groups.
-#
 # The template will generate a group for each attribute following the pattern
 # `$target_name.attribute_name`.
 #
@@ -48,15 +44,11 @@ template("assembly_input_groups") {
 
   foreach(attr, _attr_list) {
     group("${target_name}.$attr") {
-      if (attr == "core_realm_shards") {
-        forward_variables_from(invoker_with_defaults, [ "visibility" ])
-      } else {
-        forward_variables_from(invoker_with_defaults,
-                               [
-                                 "testonly",
-                                 "visibility",
-                               ])
-      }
+      forward_variables_from(invoker_with_defaults,
+                             [
+                               "testonly",
+                               "visibility",
+                             ])
       public_deps = invoker_with_defaults[attr]
     }
   }

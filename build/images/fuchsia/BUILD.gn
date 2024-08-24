@@ -99,8 +99,6 @@ if (is_fuchsia) {
       "//:legacy_base_packages",
     ]
 
-    core_realm_definition = ":core_realm"
-
     cache_packages = [
       "//:developer_cache_packages",
       "//:legacy_cache_packages",
@@ -120,10 +118,6 @@ if (is_fuchsia) {
       inputs = vboot_action.inputs
       generate_signed_zbi = true
     }
-  }
-
-  core_realm_definition("core_realm") {
-    deps = core_realm_shards
   }
 
   ##################################################
