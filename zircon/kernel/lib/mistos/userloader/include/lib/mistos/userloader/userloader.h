@@ -77,4 +77,7 @@ extern ktl::array<Handle*, userloader::kHandleCount> gHandles;
 
 }  // namespace userloader
 
+// Called at the end of the boot process in the main kernel initialization sequence.
+void userboot_init();
+
 #endif  // ZIRCON_KERNEL_LIB_MISTOS_USERLOADER_INCLUDE_LIB_MISTOS_USERLOADER_USERLOADER_H_

@@ -254,4 +254,7 @@ void userloader_init(uint) {  // zx_status_t status;
 
 }  // namespace
 
+// It is a dymmy in mist-os so far.
+void userboot_init() {}
+
 LK_INIT_HOOK(mist_os_userloader, userloader_init, LK_INIT_LEVEL_USER - 1)
