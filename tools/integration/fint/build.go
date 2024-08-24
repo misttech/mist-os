@@ -268,13 +268,13 @@ func buildImpl(
 
 	// Similar to `fx ninjatrace2json`, generate and collect ninja traces
 	// in each (sub)build dir where ninja is invoked.
-	ninjatraceToolPath, err := toolAbsPath(modules, buildDir, platform, "ninjatrace")
+	ninjatraceToolPath, err := toolAbsPath(modules, buildDir, platform, "ninjatrace_prebuilt")
 	if err != nil {
 		return artifacts, err
 	}
 
 	// Collect buildstats in each ninja (sub)build dir.
-	buildstatsToolPath, err := toolAbsPath(modules, buildDir, platform, "buildstats")
+	buildstatsToolPath, err := toolAbsPath(modules, buildDir, platform, "buildstats_prebuilt")
 	if err != nil {
 		return artifacts, err
 	}
