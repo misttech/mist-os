@@ -31,7 +31,7 @@ class InterruptEventDispatcher final : public InterruptDispatcher {
   void GetDiagnostics(WakeVector::Diagnostics& diagnostics_out) const final;
 
  private:
-  explicit InterruptEventDispatcher(uint32_t vector, uint32_t flags);
+  explicit InterruptEventDispatcher(uint32_t vector, Flags flags);
 
   void MaskInterrupt() final;
   void UnmaskInterrupt() final;

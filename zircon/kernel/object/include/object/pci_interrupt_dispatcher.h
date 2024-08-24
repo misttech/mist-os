@@ -37,7 +37,7 @@ class PciInterruptDispatcher final : public InterruptDispatcher {
   // need to ensure the InterruptDispatcher's spinlock is not held when calling
   // into this dispatcher to unmask an interrupt. Masking is handled by the pci
   // bus driver itself during operation.
-  static constexpr uint32_t kFlags = INTERRUPT_UNMASK_PREWAIT_UNLOCKED;
+  static constexpr Flags kFlags = INTERRUPT_UNMASK_PREWAIT_UNLOCKED;
 
   static pcie_irq_handler_retval_t IrqThunk(const PcieDevice& dev, uint irq_id, void* ctx);
   PciInterruptDispatcher(const fbl::RefPtr<PcieDevice>& device, uint32_t vector, bool maskable);
