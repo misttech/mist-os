@@ -6,13 +6,14 @@
 
 #include "test-start.h"
 
-// The generated .ifs file for missing-sym-dep-a creates a stub shared object
-// that defines the symbol `c` (see //sdk/lib/ld/test/modules:missing-sym-dep-a-ifs).
-// At link the time, the linker is satisfied that `c` exists.
-// That .ifs file specifies that it has the soname libld-dep-a.so, so the linker
-// adds a DT_NEEDED on libld-dep-a.so. That module doesn't define `c`, so at
-// runtime there will be a missing symbol error.
+// This file depends on a generated .ifs file (i.e. a stub shared object) that
+// says it defines `missing_sym` so that at link the time the linker is
+// satisfied that `missing_sym` exists.
+// That .ifs file specifies that it has the soname libld-dep-missing-sym-dep.so,
+// so the linker adds a DT_NEEDED on libld-dep-missing-sym-dep.so. The actual
+// libld-dep-missing-sym-dep doesn't define `missing_sym`, so at runtime there
+// will be a missing symbol error.
 
-extern "C" int64_t c();
+extern "C" int64_t missing_sym();
 
-extern "C" int64_t TestStart() { return c() + 4; }
+extern "C" int64_t TestStart() { return missing_sym() + 4; }

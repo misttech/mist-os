@@ -59,7 +59,10 @@ if (is_fuchsia) {
   executables += [ ":second-session" ]
 }
 
-modules = [ ":second-session-module" ]
+modules = [
+  ":second-session-module",
+  ":generate-host-test-data",
+]
 
 # Musl's dlclose does not unload the module, which prevents being able to reuse
 # the same test module in multiple dlopen tests that do not expect the module
@@ -909,28 +912,52 @@ test_executable("tls-desc") {
   shlib_deps = [ ":tls-desc-dep" ]
 }
 
+# This will generate the host-test-data for shlib_deps that are not used by any
+# executables/modules (but are used in tests).
+test_loadable_module("generate-host-test-data") {
+  shlib_deps = [
+    ":ld-dep-defines-missing-sym",
+    ":ld-dep-missing-sym-dep",
+  ]
+}
+
+# This test shlib will generate build artifacts for :missing-sym-dep.ifs, but
+# is not used directly in tests.
+test_dep("missing-sym-dep") {
+  symbol_name = "this_symbol_is_not_used"
+  value = 0
+}
+
+test_dep("defines-missing-sym") {
+  symbol_name = "missing_sym"
+  value = 2
+}
+
+# missing-sym: calls missing_sym()
+#   - libld-dep-missing-sym-dep -> does not define missing_sym()
 test_executable("missing-sym") {
   sources = [ "missing-sym.cc" ]
 
   # Note this isn't shlib_deps because there's no corresponding .host-test-data
   # subtarget, so instead we have explicit data_deps on the real runtime dep.
   # For Fuchsia this is implicit via the data_deps in ifs_shared_library().
-  deps = [ ":missing-sym-dep-a" ]
+  deps = [ ":missing-sym-dep.ifs" ]
   if (!is_fuchsia) {
-    data_deps = [ ":ld-dep-a.host-test-data($shlib_toolchain)" ]
+    data_deps = [ ":ld-dep-missing-sym-dep.host-test-data($shlib_toolchain)" ]
   }
 }
 
-test_ifs_shared_library("missing-sym-dep-a") {
-  soname = "libld-dep-a.so"
+# This is a stub for libld-dep-missing-sym-dep for :missing-sym
+test_ifs_shared_library("missing-sym-dep.ifs") {
+  soname = "libld-dep-missing-sym-dep.so"
   symbols = [
     {
-      name = "c"
+      name = "missing_sym"
       type = "Func"
     },
   ]
 
-  data_deps = [ ":ld-dep-a" ]
+  data_deps = [ ":ld-dep-missing-sym-dep" ]
 }
 
 # Includes a symbol provided by a DT_NEEDED (missing-dep-dep) that cannot be

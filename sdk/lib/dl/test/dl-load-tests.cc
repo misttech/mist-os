@@ -289,7 +289,7 @@ TYPED_TEST(DlTests, ManyDeps) {
 // provide the b symbol referenced by the root module, so relocation fails.
 TYPED_TEST(DlTests, MissingSymbol) {
   constexpr const char* kFile = "missing-sym.module.so";
-  constexpr const char* kDepFile = "libld-dep-a.so";
+  constexpr const char* kDepFile = "libld-dep-missing-sym-dep.so";
 
   // TODO(https://fxbug.dev/354043838): Fold into ExpectRootModule/Needed API.
   this->ExpectRootModuleNotLoaded(kFile);
@@ -301,14 +301,15 @@ TYPED_TEST(DlTests, MissingSymbol) {
   auto result = this->DlOpen(kFile, RTLD_NOW | RTLD_LOCAL);
   ASSERT_TRUE(result.is_error());
   if constexpr (TestFixture::kCanMatchExactError) {
-    EXPECT_EQ(result.error_value().take_str(), "missing-sym.module.so: undefined symbol: c");
+    EXPECT_EQ(result.error_value().take_str(),
+              "missing-sym.module.so: undefined symbol: missing_sym");
   } else {
     EXPECT_THAT(result.error_value().take_str(),
                 MatchesRegex(
                     // emitted by Fuchsia-musl
-                    "Error relocating missing-sym.module.so: c: symbol not found"
+                    "Error relocating missing-sym.module.so: missing_sym: symbol not found"
                     // emitted by Linux-glibc
-                    "|.*missing-sym.module.so: undefined symbol: c"));
+                    "|.*missing-sym.module.so: undefined symbol: missing_sym"));
   }
 }
 
@@ -316,8 +317,8 @@ TYPED_TEST(DlTests, MissingSymbol) {
 // symbol.
 // dlopen missing-transitive-symbol:
 //  - missing-transitive-sym
-//    - has-missing-sym is missing a()
-// call a() from missing-transitive-symbol, and expect symbol not found
+//    - has-missing-sym does not define missing_sym()
+// call missing_sym() from missing-transitive-symbol, and expect symbol not found
 
 // Try to load a module that has a (direct) dependency that cannot be found.
 TYPED_TEST(DlTests, MissingDependency) {
@@ -1115,14 +1116,15 @@ TYPED_TEST(DlTests, GlobalPrecedenceDeps) {
 
 // Test that missing dep will use global symbol if there's a loaded global
 // module with the same symbol
-// dlopen RTLD global dep-c -> c() returns 2
-// dlopen missing-sym -> TestStart() returns 2 + c():
-//  - dep-a (does not have c())
-// call c() from missing-sym and expect 6 (4 + 2 from previously loaded module).
+// dlopen RTLD global defines-missing-sym -> missing_sym() returns 2
+// dlopen missing-sym -> TestStart() returns 2 + missing_sym():
+//  - missing-sym-dep (does not have missing_sym())
+// call missing_sym() from missing-sym and expect 6 (4 + 2 from previously
+// loaded module).
 TYPED_TEST(DlTests, GlobalSatisfiesMissingSymbol) {
-  constexpr const char* kFile1 = "libld-dep-c.so";
+  constexpr const char* kFile1 = "libld-dep-defines-missing-sym.so";
   constexpr const char* kFile2 = "missing-sym.module.so";
-  constexpr const char* kDepFile = "libld-dep-a.so";
+  constexpr const char* kDepFile = "libld-dep-missing-sym-dep.so";
   constexpr int64_t kReturnValue = 6;
 
   if constexpr (!TestFixture::kSupportsGlobalMode) {
@@ -1153,15 +1155,15 @@ TYPED_TEST(DlTests, GlobalSatisfiesMissingSymbol) {
   EXPECT_EQ(RunFunction<int64_t>(sym2.value()), kReturnValue);
 
   // dlsym will not be able to find the global symbol from the local scope
-  auto sym3 = this->DlSym(res2.value(), "c");
+  auto sym3 = this->DlSym(res2.value(), "missing_sym");
   ASSERT_TRUE(sym3.is_error()) << sym3.error_value();
   if constexpr (TestFixture::kCanMatchExactError || TestFixture::kEmitsSymbolNotFound) {
-    EXPECT_EQ(sym3.error_value().take_str(), "Symbol not found: c");
+    EXPECT_EQ(sym3.error_value().take_str(), "Symbol not found: missing_sym");
   } else {
     // emitted by Linux-glibc
     EXPECT_THAT(sym3.error_value().take_str(),
                 // only the module name is captured from the full test path
-                MatchesRegex("|.*missing-sym.module.so: undefined symbol: c"));
+                MatchesRegex("|.*missing-sym.module.so: undefined symbol: missing_sym"));
   }
 
   ASSERT_TRUE(this->DlClose(res1.value()).is_ok());

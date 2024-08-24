@@ -26,13 +26,13 @@ constexpr std::pair<std::string_view, bool> NotFound(std::string_view name) {
 TYPED_TEST(LdLoadFailureTests, MissingSymbol) {
   ASSERT_NO_FATAL_FAILURE(this->Init());
 
-  ASSERT_NO_FATAL_FAILURE(this->Needed({"libld-dep-a.so"}));
+  ASSERT_NO_FATAL_FAILURE(this->Needed({"libld-dep-missing-sym-dep.so"}));
 
   ASSERT_NO_FATAL_FAILURE(  //
       this->LoadAndFail("missing-sym", ExpectedErrorList{
                                            ExpectReport{
                                                "undefined symbol: ",
-                                               "c",
+                                               "missing_sym",
                                            },
                                        }));
 }
