@@ -175,12 +175,11 @@ if (is_host) {
       depfile = "$target_gen_dir/$target_name.d"
       inputs = [ _package_manifest_list ]
 
-      # Typically the timestamp of a directory doesn't accurately reflect the state of its contents,
-      # but since this script writes a depfile including all outputs it's okay to to specify a
-      # single directory here as the output.
-      outputs = [ _copied_package_dir ]
+      outputs = [ "$target_out_dir/$target_name.populated" ]
       args = [
         "--working-dir",
+        rebase_path(_copied_package_dir, root_build_dir),
+        "--stamp-file",
         rebase_path(outputs[0], root_build_dir),
         "--depfile",
         rebase_path(depfile, root_build_dir),
@@ -269,10 +268,8 @@ if (is_host) {
   group("fx_publish_tests") {
     testonly = true
     public_deps = [
-      # Disabling tests until use of a directory as an output above is corrected.
-      #
-      # ":fx_publish_bazel_assembled_test",
-      # ":fx_publish_gn_assembled_test",
+      ":fx_publish_bazel_assembled_test",
+      ":fx_publish_gn_assembled_test",
     ]
   }
 }

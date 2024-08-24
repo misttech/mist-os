@@ -97,6 +97,11 @@ def main() -> int:
         help="The fx publish working directory to populate. Expects `{args.working_dir}/assembly_cache_packages.list` to already exist.",
     )
     parser.add_argument(
+        "--stamp-file",
+        required=True,
+        help="The file that's written to signal that the operation can been completed.",
+    )
+    parser.add_argument(
         "--depfile",
         help="If specified, write a depfile of the files that were touched.",
     )
@@ -114,6 +119,9 @@ def main() -> int:
         depfile.write_text(
             f'{" ".join([str(file) for file in OUTPUTS])}: {" ".join([str(file) for file in INPUTS])}'
         )
+
+    with open(args.stamp_file, "w") as stamp_file:
+        stamp_file.write("done")
 
     # Explicitly update the mtime of the output directory to avoid ninja convergence no-op flakes.
     # See https://fxbug.dev/361451367.
