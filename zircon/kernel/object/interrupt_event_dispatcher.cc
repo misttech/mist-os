@@ -87,8 +87,6 @@ zx_status_t InterruptEventDispatcher::Create(KernelHandle<InterruptDispatcher>* 
     return ZX_ERR_NO_MEMORY;
   }
 
-  Guard<CriticalMutex> guard{disp->get_lock()};
-
   // Remap the vector if we have been asked to do so.
   if (options & ZX_INTERRUPT_REMAP_IRQ) {
     vector = remap_interrupt(vector);

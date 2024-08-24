@@ -57,8 +57,6 @@ zx_status_t PciInterruptDispatcher::Create(const fbl::RefPtr<PcieDevice>& device
     return ZX_ERR_NO_MEMORY;
   }
 
-  Guard<CriticalMutex> guard{interrupt_dispatcher->get_lock()};
-
   // Register the interrupt
   zx_status_t status = interrupt_dispatcher->RegisterInterruptHandler();
   if (status != ZX_OK) {
