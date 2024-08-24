@@ -4,7 +4,7 @@
 
 use crate::subsystems::prelude::*;
 use crate::util;
-use anyhow::ensure;
+use anyhow::{bail, ensure};
 use assembly_config_schema::platform_config::media_config::{AudioConfig, PlatformMediaConfig};
 
 pub(crate) struct MediaSubsystem;
@@ -49,6 +49,10 @@ impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {
         }
 
         if let Some(url) = &media_config.multizone_leader.component_url {
+            let Some(AudioConfig::FullStack(_)) = media_config.audio else {
+                bail!("multizone_leader requires {{ 'audio': 'full_stack' }}");
+            };
+
             util::add_platform_declared_product_provided_component(
                 url,
                 "multizone_leader.core_shard.cml.template",
@@ -74,6 +78,10 @@ impl DefineSubsystemConfiguration<PlatformMediaConfig> for MediaSubsystem {
                 *context.feature_set_level == FeatureSupportLevel::Standard,
                 "Media sessions can only be enabled in the 'standard' feature set level."
             );
+            let Some(AudioConfig::FullStack(_)) = media_config.audio else {
+                bail!("media.enable_sessions requires {{ 'audio': 'full_stack' }}");
+            };
+
             builder.platform_bundle("media_sessions");
         }
 
