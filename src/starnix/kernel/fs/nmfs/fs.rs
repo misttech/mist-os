@@ -13,7 +13,7 @@ use crate::vfs::{
     FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, MemoryDirectoryFile,
 };
 use serde::{Deserialize, Serialize};
-use starnix_sync::{FileOpsCore, Locked};
+use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
@@ -75,7 +75,12 @@ impl FileSystemOps for Nmfs {
     }
 }
 
-pub fn nmfs(kernel: &Arc<Kernel>, options: FileSystemOptions) -> Result<FileSystemHandle, Errno> {
+pub fn nmfs(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    options: FileSystemOptions,
+) -> Result<FileSystemHandle, Errno> {
+    let kernel = current_task.kernel();
     Ok(kernel.nmfs.get_or_init(|| Nmfs::new_fs(kernel, options)).clone())
 }
 

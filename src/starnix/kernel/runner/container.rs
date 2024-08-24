@@ -37,7 +37,7 @@ use starnix_logging::{
 };
 use starnix_modules::{init_common_devices, register_common_file_systems};
 use starnix_modules_magma::get_magma_params;
-use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked, Unlocked};
+use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Unlocked};
 use starnix_uapi::errors::{SourceContext, ENOENT};
 use starnix_uapi::open_flags::OpenFlags;
 use starnix_uapi::resource_limits::Resource;
@@ -596,17 +596,12 @@ fn parse_rlimits(rlimits: &[String]) -> Result<Vec<(Resource, u64)>, Error> {
     Ok(res)
 }
 
-fn mount_filesystems<L>(
-    locked: &mut Locked<'_, L>,
+fn mount_filesystems(
+    locked: &mut Locked<'_, Unlocked>,
     system_task: &CurrentTask,
     config: &Config,
     pkg_dir_proxy: &fio::DirectorySynchronousProxy,
-) -> Result<(), Error>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-    L: LockBefore<BeforeFsNodeAppend>,
-{
+) -> Result<(), Error> {
     let mut mounts_iter = config.mounts.iter();
     // Skip the first mount, that was used to create the root filesystem.
     let _ = mounts_iter.next();

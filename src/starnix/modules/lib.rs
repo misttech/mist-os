@@ -10,6 +10,7 @@ use starnix_core::device::mem::{mem_device_init, DevRandom};
 use starnix_core::device::tun::DevTun;
 use starnix_core::device::{simple_device_ops, DeviceMode};
 use starnix_core::fs::devpts::{dev_pts_fs, tty_device_init};
+use starnix_core::fs::ext4::ExtFilesystem;
 use starnix_core::fs::nmfs::nmfs;
 use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::{CurrentTask, Kernel};
@@ -93,4 +94,5 @@ pub fn register_common_file_systems(_locked: &mut Locked<'_, Unlocked>, kernel: 
     registry.register(b"bpf".into(), BpfFs::new_fs);
     registry.register(b"devpts".into(), dev_pts_fs);
     registry.register(b"nmfs".into(), nmfs);
+    registry.register(b"ext4".into(), ExtFilesystem::new_fs);
 }

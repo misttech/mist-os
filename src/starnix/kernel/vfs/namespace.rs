@@ -3,7 +3,6 @@
 // found in the LICENSE file.
 
 use crate::fs::devtmpfs::dev_tmp_fs;
-use crate::fs::ext4::ExtFilesystem;
 use crate::fs::fuchsia::create_remotefs_filesystem;
 use crate::fs::functionfs::FunctionFs;
 use crate::fs::overlayfs::OverlayFs;
@@ -31,7 +30,7 @@ use macro_rules_attribute::apply;
 use ref_cast::RefCast;
 use starnix_logging::log_warn;
 use starnix_sync::{
-    BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, RwLock,
+    BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked, Mutex, RwLock, Unlocked,
 };
 use starnix_uapi::arc_key::{ArcKey, PtrKey, WeakKey};
 use starnix_uapi::auth::UserAndOrGroupId;
@@ -703,20 +702,15 @@ impl Kernel {
 }
 
 impl CurrentTask {
-    pub fn create_filesystem<L>(
+    pub fn create_filesystem(
         &self,
-        locked: &mut Locked<'_, L>,
+        locked: &mut Locked<'_, Unlocked>,
         fs_type: &FsStr,
         options: FileSystemOptions,
-    ) -> Result<FileSystemHandle, Errno>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-        L: LockBefore<BeforeFsNodeAppend>,
-    {
+    ) -> Result<FileSystemHandle, Errno> {
         let kernel = self.kernel();
         if let Some(result) =
-            kernel.expando.get::<FsRegistry>().create(kernel, fs_type, options.clone())
+            kernel.expando.get::<FsRegistry>().create(locked, self, fs_type, options.clone())
         {
             return result;
         }
@@ -732,7 +726,6 @@ impl CurrentTask {
 
         match &**fs_type {
             b"devtmpfs" => Ok(dev_tmp_fs(locked, self).clone()),
-            b"ext4" => ExtFilesystem::new_fs(locked, self, options),
             b"functionfs" => FunctionFs::new_fs(self, options),
             b"fuse" => new_fuse_fs(self, options),
             b"fusectl" => new_fusectl_fs(self, options),

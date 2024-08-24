@@ -9,7 +9,7 @@ use starnix_core::fs::tmpfs::TmpFs;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::fs_args::MountParams;
 use starnix_core::vfs::{FileSystemHandle, FileSystemOptions, FsString};
-use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked, Unlocked};
+use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::mount_flags::MountFlags;
 use std::sync::Arc;
 
@@ -43,17 +43,12 @@ impl MountAction {
         Ok(spec.into_action(fs))
     }
 
-    pub fn from_spec<L>(
-        locked: &mut Locked<'_, L>,
+    pub fn from_spec(
+        locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         pkg: &fio::DirectorySynchronousProxy,
         spec: &str,
-    ) -> Result<MountAction, Error>
-    where
-        L: LockBefore<FileOpsCore>,
-        L: LockBefore<DeviceOpen>,
-        L: LockBefore<BeforeFsNodeAppend>,
-    {
+    ) -> Result<MountAction, Error> {
         let (spec, options) = MountSpec::parse(spec)?;
         let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE;
 

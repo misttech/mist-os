@@ -2,15 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::Kernel;
+use crate::task::CurrentTask;
 use crate::vfs::{FileSystemHandle, FileSystemOptions, FsStr, FsString};
-use starnix_sync::Mutex;
+use starnix_sync::{Locked, Mutex, Unlocked};
 use starnix_uapi::errors::Errno;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
 type CreateFs = Arc<
-    dyn Fn(&Arc<Kernel>, FileSystemOptions) -> Result<FileSystemHandle, Errno>
+    dyn Fn(
+            &mut Locked<'_, Unlocked>,
+            &CurrentTask,
+            FileSystemOptions,
+        ) -> Result<FileSystemHandle, Errno>
         + Send
         + Sync
         + 'static,
@@ -24,7 +28,11 @@ pub struct FsRegistry {
 impl FsRegistry {
     pub fn register<F>(&self, fs_type: &FsStr, create_fs: F)
     where
-        F: Fn(&Arc<Kernel>, FileSystemOptions) -> Result<FileSystemHandle, Errno>
+        F: Fn(
+                &mut Locked<'_, Unlocked>,
+                &CurrentTask,
+                FileSystemOptions,
+            ) -> Result<FileSystemHandle, Errno>
             + Send
             + Sync
             + 'static,
@@ -35,11 +43,12 @@ impl FsRegistry {
 
     pub fn create(
         &self,
-        kernel: &Arc<Kernel>,
+        locked: &mut Locked<'_, Unlocked>,
+        current_task: &CurrentTask,
         fs_type: &FsStr,
         options: FileSystemOptions,
     ) -> Option<Result<FileSystemHandle, Errno>> {
         let maybe_create_fs = self.registry.lock().get(fs_type).map(Arc::clone);
-        maybe_create_fs.map(|create_fs| create_fs(kernel, options))
+        maybe_create_fs.map(|create_fs| create_fs(locked, current_task, options))
     }
 }

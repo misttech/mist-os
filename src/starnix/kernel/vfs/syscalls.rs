@@ -26,10 +26,7 @@ use crate::vfs::{
 use fuchsia_zircon as zx;
 use smallvec::smallvec;
 use starnix_logging::{log_trace, track_stub};
-use starnix_sync::{
-    BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, LockEqualOrBefore, Locked, Mutex,
-    Unlocked,
-};
+use starnix_sync::{FileOpsCore, LockEqualOrBefore, Locked, Mutex, Unlocked};
 use starnix_syscalls::{SyscallArg, SyscallResult, SUCCESS};
 use starnix_uapi::auth::{
     CAP_BLOCK_SUSPEND, CAP_DAC_READ_SEARCH, CAP_LEASE, CAP_SYS_ADMIN, CAP_WAKE_ALARM,
@@ -1758,20 +1755,15 @@ fn do_mount_change_propagation_type(
     Ok(())
 }
 
-fn do_mount_create<L>(
-    locked: &mut Locked<'_, L>,
+fn do_mount_create(
+    locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     source_addr: UserCString,
     target: NamespaceNode,
     filesystemtype_addr: UserCString,
     data_addr: UserCString,
     flags: MountFlags,
-) -> Result<(), Errno>
-where
-    L: LockBefore<FileOpsCore>,
-    L: LockBefore<DeviceOpen>,
-    L: LockBefore<BeforeFsNodeAppend>,
-{
+) -> Result<(), Errno> {
     let mut source_buf = [MaybeUninit::uninit(); PATH_MAX as usize];
     let source = if source_addr.is_null() {
         Default::default()
