@@ -59,24 +59,6 @@ if (is_fuchsia) {
   executables += [ ":second-session" ]
 }
 
-shlibs = [
-  ":ld-dep-a",
-  ":ld-dep-b",
-  ":ld-dep-c",
-  ":ld-dep-d",
-  ":ld-dep-e",
-  ":ld-dep-f",
-  ":indirect-deps-a",
-  ":indirect-deps-b",
-  ":indirect-deps-c",
-  ":tls-dep",
-  ":tls-ie-dep",
-  ":tls-desc-dep",
-  ":has-missing-dep",
-  ":second-session-module-deps-a",
-  ":zygote-dep",
-]
-
 modules = [ ":second-session-module" ]
 
 # Musl's dlclose does not unload the module, which prevents being able to reuse
@@ -96,22 +78,22 @@ per_test_modules = [
 ]
 
 per_test_suffices = [
-  ".DepOrder",
-  ".TransitiveDepOrder",
-  ".LoadedTransitiveDepOrder",
-  ".OpenDepDirectly",
-  ".LocalPrecedence",
-  ".LocalPrecedenceTransitiveDeps",
-  ".GlobalPrecedence",
-  ".GlobalPrecedenceDeps",
-  ".RelativeRelocPrecedence",
-  ".RootPrecedenceInDepResolution",
-  ".PrecedenceInDepResolution",
+  "DepOrder",
+  "TransitiveDepOrder",
+  "LoadedTransitiveDepOrder",
+  "OpenDepDirectly",
+  "LocalPrecedence",
+  "LocalPrecedenceTransitiveDeps",
+  "GlobalPrecedence",
+  "GlobalPrecedenceDeps",
+  "RelativeRelocPrecedence",
+  "RootPrecedenceInDepResolution",
+  "PrecedenceInDepResolution",
 ]
 
-foreach(module, per_test_modules) {
-  foreach(suffix, per_test_suffices) {
-    modules += [ "$module$suffix" ]
+foreach(suffix, per_test_suffices) {
+  foreach(module, per_test_modules) {
+    modules += [ "$module.$suffix.module" ]
   }
 }
 
@@ -538,14 +520,13 @@ config("nostdlibs") {
 template("test_dep") {
   test_shared_library("ld-dep-$target_name") {
     deps = []
-    test_deps = []
+    dep_symbols = []
+    shlib_deps = []
     forward_variables_from(invoker, "*")
 
-    shlib_deps = []
     decls = ""
     syms = ""
-    foreach(dep, test_deps) {
-      shlib_deps += [ ":ld-dep-$dep" ]
+    foreach(dep, dep_symbols) {
       decls += "extern \"C\" int64_t $dep();"
       syms += "$dep, "
     }
@@ -740,10 +721,15 @@ test_executable("symbolic-namespace") {
 test_dep("b") {
   symbol_name = "b"
   value = -2
-  test_deps = [
+  dep_symbols = [
     "a",
     "c",
     "d",
+  ]
+  shlib_deps = [
+    ":ld-dep-a",
+    ":ld-dep-c",
+    ":ld-dep-d",
   ]
 }
 
@@ -755,9 +741,13 @@ test_dep("c") {
 test_dep("d") {
   symbol_name = "d"
   value = -5
-  test_deps = [
+  dep_symbols = [
     "c",
     "e",
+  ]
+  shlib_deps = [
+    ":ld-dep-c",
+    ":ld-dep-e",
   ]
 }
 
@@ -1108,23 +1098,33 @@ test_executable("zygote-secondary") {
 
 # This loop generates a copy of each target with each suffix in
 # `per_test_suffices` appended to the target name.
-foreach(suffix, per_test_suffices) {
+foreach(test, [ "" ] + per_test_suffices) {
+  # Add appropriate delimiters to suffices used for filenames and symbols
+  suffix = test
+  sym_suffix = test
+  if (test != "") {
+    suffix = ".$test"
+    sym_suffix = "_$test"
+  }
+
   test_dep("foo-v1$suffix") {
-    symbol_name = "foo"
+    symbol_name = "foo$sym_suffix"
     value = 2
   }
 
   test_dep("foo-v2$suffix") {
-    symbol_name = "foo"
+    symbol_name = "foo$sym_suffix"
     value = 7
   }
 
   test_shared_library("has-foo-v1$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
     sources = [ "foo.cc" ]
     shlib_deps = [ ":ld-dep-foo-v1$suffix" ]
   }
 
   test_shared_library("has-foo-v2$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
     sources = [ "foo.cc" ]
     shlib_deps = [ ":ld-dep-foo-v2$suffix" ]
   }
@@ -1132,6 +1132,7 @@ foreach(suffix, per_test_suffices) {
   # bar-v1: bar_v1() calls foo()
   #   - foo-v1 -> foo() returns 2
   test_shared_library("bar-v1$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
     sources = [ "bar-v1.cc" ]
     shlib_deps = [ ":ld-dep-foo-v1$suffix" ]
   }
@@ -1139,6 +1140,7 @@ foreach(suffix, per_test_suffices) {
   # bar-v2: bar_v2() calls foo()
   #   - foo-v1 -> foo() returns 7
   test_shared_library("bar-v2$suffix") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
     sources = [ "bar-v2.cc" ]
     shlib_deps = [ ":ld-dep-foo-v2$suffix" ]
   }
@@ -1146,7 +1148,8 @@ foreach(suffix, per_test_suffices) {
   # multiple-foo-deps:
   #  - foo-v1 -> foo() returns 2
   #  - foo-v2 -> foo() returns 7
-  test_loadable_module("multiple-foo-deps$suffix") {
+  test_loadable_module("multiple-foo-deps$suffix.module") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
     sources = [ "foo.cc" ]
     shlib_deps = [
       ":ld-dep-foo-v1$suffix",
@@ -1158,7 +1161,8 @@ foreach(suffix, per_test_suffices) {
   #   - has-foo-v1:
   #     - foo-v1 -> foo() returns 2
   #   - foo-v2 -> foo() returns 7
-  test_loadable_module("transitive-foo-dep$suffix") {
+  test_loadable_module("transitive-foo-dep$suffix.module") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
     sources = [ "foo.cc" ]
     shlib_deps = [
       ":has-foo-v1$suffix",
@@ -1171,7 +1175,7 @@ foreach(suffix, per_test_suffices) {
   #     - foo-v1 -> foo() returns 2
   #   - has-foo-v2:
   #    - foo-v2 -> foo() returns 7
-  test_loadable_module("multiple-transitive-foo-deps$suffix") {
+  test_loadable_module("multiple-transitive-foo-deps$suffix.module") {
     shlib_deps = [
       ":has-foo-v1$suffix",
       ":has-foo-v2$suffix",
@@ -1179,7 +1183,8 @@ foreach(suffix, per_test_suffices) {
   }
 
   # relative-reloc-foo: foo() returns 17
-  test_loadable_module("relative-reloc-foo$suffix") {
+  test_loadable_module("relative-reloc-foo$suffix.module") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
     sources = [ "relative-reloc-foo.cc" ]
   }
 
@@ -1188,7 +1193,8 @@ foreach(suffix, per_test_suffices) {
   #    - foo-v1 -> foo() returns 2
   #   - bar-v2: bar_v2() calls foo()
   #    - foo-v2 -> foo() returns 7
-  test_loadable_module("root-precedence-in-dep-resolution$suffix") {
+  test_loadable_module("root-precedence-in-dep-resolution$suffix.module") {
+    defines = [ "TEST_SYMBOL_SUFFIX=$sym_suffix" ]
     sources = [ "relative-reloc-foo.cc" ]
     shlib_deps = [
       ":bar-v1$suffix",
@@ -1201,7 +1207,7 @@ foreach(suffix, per_test_suffices) {
   #    - foo-v1 -> foo() returns 2
   #   - bar-v2: bar_v2() calls foo()
   #    - foo-v2 -> foo() returns 7
-  test_loadable_module("precedence-in-dep-resolution$suffix") {
+  test_loadable_module("precedence-in-dep-resolution$suffix.module") {
     # This module does not have a source because it's only used to test the
     # resolution order for its dependencies.
     shlib_deps = [

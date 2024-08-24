@@ -4,11 +4,13 @@
 
 #include <stdint.h>
 
-// This template is useful for providing a function that calls foo from a
+#include "suffixed-symbol.h"
+
+// This template is useful for providing a function that calls a symbol from a
 // a dependency.
 
-extern "C" [[gnu::visibility("default")]] int64_t call_foo();
+extern "C" [[gnu::visibility("default")]] int64_t SUFFIXED_SYMBOL(call_foo)();
 
-extern "C" int64_t foo();
+extern "C" int64_t SUFFIXED_SYMBOL(foo)();
 
-extern "C" int64_t call_foo() { return foo(); }
+extern "C" int64_t SUFFIXED_SYMBOL(call_foo)() { return SUFFIXED_SYMBOL(foo)(); }

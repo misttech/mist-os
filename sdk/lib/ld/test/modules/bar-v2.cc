@@ -4,10 +4,12 @@
 
 #include <stdint.h>
 
+#include "suffixed-symbol.h"
+
 // Similar to foo.cc, except exports a different function name that calls foo().
 
-extern "C" [[gnu::visibility("default")]] int64_t bar_v2();
+extern "C" [[gnu::visibility("default")]] int64_t SUFFIXED_SYMBOL(bar_v2)();
 
-extern "C" int64_t foo();
+extern "C" int64_t SUFFIXED_SYMBOL(foo)();
 
-extern "C" int64_t bar_v2() { return foo(); }
+extern "C" int64_t SUFFIXED_SYMBOL(bar_v2)() { return SUFFIXED_SYMBOL(foo)(); }
