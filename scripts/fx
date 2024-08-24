@@ -254,6 +254,14 @@ while [[ $# -ne 0 ]]; do
         exit 1
       fi
       shift # Removes --dir.
+      # Check that the path to build directory is a subdirectory of $FUCHSIA_DIR/out.
+      regex='(out\/)|(^out$)'
+      if [[ ! "$1" =~ $regex ]]
+      then
+        error_message="Build directory (--dir BUILD_DIR) must be a subdirectory of $FUCHSIA_DIR/out.\nExamples: fx --dir out/<folder> ..., fx --dir ~/fuchsia/out/<folder> ..."
+        fx-error $error_message
+        exit 1
+      fi
       export _FX_BUILD_DIR="$1"
       if [[ "$_FX_BUILD_DIR" == //* ]]; then
         _FX_BUILD_DIR="${fuchsia_dir}/${_FX_BUILD_DIR#//}"
