@@ -972,7 +972,7 @@ be built, they should be included in the build graph through other means.
 
 **Current value (from the default):** `["//build/images:main_assembly"]`
 
-From //build/product.gni:56
+From //build/product.gni:50
 
 ### clang_embed_bitcode
 
@@ -1150,17 +1150,6 @@ Tells openweave to include files that require heap access.
 **Current value (from the default):** `true`
 
 From //third_party/openweave-core/config.gni:32
-
-### core_realm_shards
-
-The following arguments are all used to configure the contents of the core
-component realm. See //src/sys/core/build/core.gni for documentation on what
-each field means.
-TODO: redo comments
-
-**Current value (from the default):** `[]`
-
-From //build/product.gni:24
 
 ### crash_diagnostics_dir
 
@@ -2798,7 +2787,7 @@ From //BUILD.gn:98
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:48
+From //build/product.gni:42
 
 ### emu_window_size_width
 
@@ -2806,7 +2795,7 @@ Configuration to override the default window size for the virtual device in pixe
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:47
+From //build/product.gni:41
 
 ### enable_bazel_remote_rbe
 
@@ -3377,7 +3366,7 @@ TODO(https://fxbug.dev/42161120) move this to a toolchain to allow multiple prod
 
 **Current value (from the default):** `true`
 
-From //build/product.gni:29
+From //build/product.gni:23
 
 ### fuchsia_product_assembly_config_label
 
@@ -3388,7 +3377,7 @@ For Bazel products, netboot will only be available when this is supplied.
 
 **Current value (from the default):** `false`
 
-From //build/product.gni:35
+From //build/product.gni:29
 
 ### fuchsia_sdk_root
 
@@ -8625,7 +8614,7 @@ between similar virtual device's using different configuration's such as
 
 **Current value (from the default):** `""`
 
-From //build/product.gni:44
+From //build/product.gni:38
 
 ### vm_tracing_level
 
@@ -8755,7 +8744,7 @@ From //products/bringup.gni:29
 
 **Overridden from the default:** `false`
 
-From //build/product.gni:38
+From //build/product.gni:32
 
 **Current value for `target_cpu = "x64"`:** `"//products/zedboot"`
 
@@ -8763,7 +8752,7 @@ From //products/bringup.gni:29
 
 **Overridden from the default:** `false`
 
-From //build/product.gni:38
+From //build/product.gni:32
 
 ### zircon_a_partition
 
