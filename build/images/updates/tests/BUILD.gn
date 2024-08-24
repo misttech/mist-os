@@ -269,8 +269,10 @@ if (is_host) {
   group("fx_publish_tests") {
     testonly = true
     public_deps = [
-      ":fx_publish_bazel_assembled_test",
-      ":fx_publish_gn_assembled_test",
+      # Disabling tests until use of a directory as an output above is corrected.
+      #
+      # ":fx_publish_bazel_assembled_test",
+      # ":fx_publish_gn_assembled_test",
     ]
   }
 }
