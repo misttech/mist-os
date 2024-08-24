@@ -5,7 +5,6 @@
 
 import argparse
 import difflib
-import json
 import sys
 
 

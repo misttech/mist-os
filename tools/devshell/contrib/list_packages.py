@@ -6,13 +6,11 @@
 ### List which packages are built.
 
 import argparse
-import collections
 import json
 import os
-import pathlib
 import re
 import sys
-from typing import Callable, Dict, List
+from typing import Callable, List
 
 FUCHSIA_BUILD_DIR = os.environ.get("FUCHSIA_BUILD_DIR")
 

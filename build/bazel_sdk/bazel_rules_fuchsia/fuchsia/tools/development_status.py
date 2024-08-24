@@ -264,7 +264,7 @@ def show_build_info_status(args, target, print_pass, print_fail):
     build_info = build_info_for_target(args, target)
     if args.expected_sdk_version:
         try:
-            build_date = datetime.datetime.fromisoformat(build_info.sdk_version)
+            datetime.datetime.fromisoformat(build_info.sdk_version)
             print(f'Cannot determine SDK version for "{target}"')
             print(f"{target} is running a build from {build_info.sdk_version}")
         except:

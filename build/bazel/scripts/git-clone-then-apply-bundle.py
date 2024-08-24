@@ -5,7 +5,6 @@
 """Clone the content of a git repository, then apply a git bundle to it."""
 import argparse
 import os
-import shutil
 import subprocess
 import sys
 

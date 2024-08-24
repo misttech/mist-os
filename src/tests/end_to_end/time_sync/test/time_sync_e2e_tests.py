@@ -5,7 +5,6 @@
 import json
 import os
 import subprocess
-import sys
 import time
 import unittest
 import urllib.request as request
@@ -42,7 +41,7 @@ class Sl4fClient:
         try:
             with request.urlopen(self._url) as r:
                 return r.read() is not None
-        except IOError as e:
+        except IOError:
             return False
 
     def ssh(self, remote_cmd: str) -> subprocess.CompletedProcess[str]:
@@ -125,8 +124,6 @@ class Sl4fClient:
 class Sl4fError(Exception):
     """Encapsulates any Sl4f related runtime errors."""
 
-    pass
-
 
 class TimeSyncE2eTests(unittest.TestCase):
     _sl4f: Sl4fClient
@@ -155,7 +152,7 @@ class TimeSyncE2eTests(unittest.TestCase):
         assert remote_userspace_time < host_now_utc + MAX_HOST_DIFF
 
     def testUtcClocksAgree(self) -> None:
-        host_now_utc = datetime.utcnow()
+        datetime.utcnow()
         remote_system_time = self._sl4f.system_time()
         remote_system_time_offset = datetime.utcnow() - remote_system_time
         remote_userspace_time = self._sl4f.userspace_time()

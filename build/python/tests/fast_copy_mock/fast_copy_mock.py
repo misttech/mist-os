@@ -4,7 +4,7 @@
 
 import functools
 import os
-from typing import Any, Callable
+from typing import Any
 
 from assembly.common import FileEntry
 

@@ -8,7 +8,6 @@
 
 import argparse
 import os
-import string
 import sys
 
 

@@ -4,7 +4,6 @@
 
 import argparse
 import pathlib
-import subprocess
 import sys
 
 from run_assembly import run_product_assembly

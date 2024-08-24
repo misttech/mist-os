@@ -8,7 +8,7 @@ Similar to json_format.MessageToDict, but handles maps properly.
 This works on any proto Message subtype.
 """
 
-from typing import Any, Callable, Dict, Sequence, Tuple
+from typing import Any, Dict, Sequence
 
 from google.protobuf import descriptor, json_format, message, timestamp_pb2
 from google.protobuf.internal import containers as proto_containers

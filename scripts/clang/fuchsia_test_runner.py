@@ -8,7 +8,6 @@ The script for running LLVM Unit Test running for Fuchsia.
 
 import argparse
 import glob
-import hashlib
 import io
 import json
 import logging

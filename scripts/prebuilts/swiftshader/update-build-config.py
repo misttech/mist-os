@@ -15,7 +15,6 @@ from __future__ import print_function
 
 import argparse
 import base64
-import configparser
 import json
 import os
 import string
@@ -119,7 +118,6 @@ def parse_git_submodules(gitmodules_data):
     #       (i.e. read_string() always returns None), so do the parsing
     #       manually here.
     section_name = None
-    in_submodule_section = False
     submodule_name = None
     submodule_prefix = 'submodule "'
     urls = {}

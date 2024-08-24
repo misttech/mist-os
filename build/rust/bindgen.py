@@ -7,7 +7,6 @@ import datetime
 import os
 import re
 import subprocess
-import sys
 
 # All other paths are relative to here (main changes to this directory on startup).
 ROOT_PATH = os.path.join(os.path.dirname(__file__), "..", "..")

@@ -5,8 +5,7 @@
 __all__ = ["Deny", "Identifier", "ScopedIdentifier", "Style", "Use"]
 
 from dataclasses import dataclass, field
-from functools import reduce
-from typing import IO, Callable, List, Optional, Tuple
+from typing import IO, Callable, List, Tuple
 
 
 @dataclass

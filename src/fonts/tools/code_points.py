@@ -123,7 +123,6 @@ def main():
         print("")
     else:
         print(as_offset_string)
-    pass
 
 
 if __name__ == "__main__":

@@ -6,7 +6,6 @@
 
 import argparse
 import json
-import os
 
 
 def main():

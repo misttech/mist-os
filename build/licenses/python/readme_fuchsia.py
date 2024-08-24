@@ -5,7 +5,7 @@
 
 import dataclasses
 import logging
-from typing import Any, ClassVar, Dict, List, Set, Tuple
+from typing import ClassVar, Dict, List, Set, Tuple
 
 from file_access import FileAccess
 from gn_label import GnLabel

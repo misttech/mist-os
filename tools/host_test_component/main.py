@@ -7,7 +7,6 @@
 import os
 import sys
 import tempfile
-from typing import Iterable
 
 from command import Command
 from command_runner import run_command

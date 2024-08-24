@@ -10,7 +10,6 @@ The output of the script is used for correlating CTS C++ function coverage data
 
 import argparse
 import json
-import os
 import re
 import subprocess
 import sys

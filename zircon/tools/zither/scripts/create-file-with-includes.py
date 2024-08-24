@@ -4,7 +4,6 @@
 # found in the LICENSE file.
 
 import argparse
-import os
 import sys
 
 # Creates an empty C/C++/asm file with the given #includes.

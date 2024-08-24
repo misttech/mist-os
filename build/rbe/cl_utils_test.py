@@ -26,8 +26,6 @@ class ImmediateExit(Exception):
     Examples: os.exec*(), sys.exit()
     """
 
-    pass
-
 
 class AutoEnvPrefixCommandTests(unittest.TestCase):
     def test_empty(self) -> None:

@@ -982,7 +982,7 @@ def main() -> int:
         )
 
     with open(args.ninja_inputs_manifest) as f:
-        ninja_inputs_manifest = json.load(f)
+        json.load(f)
 
     current_dir = os.getcwd()
     bazel_output_base_dir = find_bazel_output_base(args.workspace_dir)

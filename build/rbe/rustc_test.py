@@ -106,7 +106,7 @@ class RustActionTests(unittest.TestCase):
         source = Path("../foo/lib.rs")
         r = rustc.RustAction(_strs([compiler, source]))
         with self.assertRaises(RuntimeError):
-            base = r._output_file_base
+            r._output_file_base
 
     def test_do_not_help(self) -> None:
         compiler = Path("../tools/rustc")

@@ -12,8 +12,7 @@ from argparse import ArgumentParser, BooleanOptionalAction, Namespace
 from os import walk
 from pathlib import Path
 from subprocess import run
-from sys import argv, exit
-from typing import Sequence
+from sys import argv
 from zipfile import ZipFile
 
 

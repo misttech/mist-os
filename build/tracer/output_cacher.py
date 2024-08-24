@@ -39,7 +39,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
-from typing import Any, Callable, Collection, Dict, Iterable, Sequence, Tuple
+from typing import Any, Callable, Dict, Iterable, Sequence, Tuple
 
 _SCRIPT_BASENAME = Path(__file__).name
 _SCRIPT_DIR = Path(__file__).parent
@@ -728,7 +728,7 @@ def main():
         return execute_main_command(args.command)
 
     # Otherwise, rewrite the command using temporary outputs.
-    outputs = set(args.outputs)
+    set(args.outputs)
 
     try:
         substitutions = [OutputSubstitution(x) for x in args.outputs]
