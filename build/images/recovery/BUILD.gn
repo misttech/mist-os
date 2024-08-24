@@ -79,11 +79,8 @@ if (is_fuchsia) {
   # TODO(122863) Remove use of transitional labels
   core_realm_aib_pkgs = []
   core_realm_aib_shards = []
-  core_realm_network_aib_pkgs = [
-    # Newtorking itself
-    "//src/connectivity/network:for_transition",
-    "//src/security/bin/root_ssl_certificates:for_transition",
-  ]
+  core_realm_network_aib_pkgs =
+      [ "//src/security/bin/root_ssl_certificates:for_transition" ]
   core_realm_eng_aib_pkgs = [
     # Enable ffx support.
     "//src/connectivity/network/mdns/bundles:services",  # group for transition
