@@ -85,17 +85,30 @@ zx_status_t pmm_get_arena_info(size_t count, uint64_t i, pmm_arena_info_t* buffe
 
 zx_status_t pmm_alloc_page(uint alloc_flags, paddr_t* pa) {
   VM_KTRACE_DURATION(3, "pmm_alloc_page", ("count", 1), ("alloc_flags", alloc_flags));
-  return pmm_node.AllocPage(alloc_flags, nullptr, pa);
+  zx::result<vm_page_t*> result = pmm_node.AllocPage(alloc_flags);
+  if (result.is_ok()) {
+    *pa = result.value()->paddr();
+  }
+  return result.status_value();
 }
 
 zx_status_t pmm_alloc_page(uint alloc_flags, vm_page_t** page) {
   VM_KTRACE_DURATION(3, "pmm_alloc_page", ("count", 1), ("alloc_flags", alloc_flags));
-  return pmm_node.AllocPage(alloc_flags, page, nullptr);
+  zx::result<vm_page_t*> result = pmm_node.AllocPage(alloc_flags);
+  if (result.is_ok()) {
+    *page = result.value();
+  }
+  return result.status_value();
 }
 
 zx_status_t pmm_alloc_page(uint alloc_flags, vm_page_t** page, paddr_t* pa) {
   VM_KTRACE_DURATION(3, "pmm_alloc_page", ("count", 1), ("alloc_flags", alloc_flags));
-  return pmm_node.AllocPage(alloc_flags, page, pa);
+  zx::result<vm_page_t*> result = pmm_node.AllocPage(alloc_flags);
+  if (result.is_ok()) {
+    *page = result.value();
+    *pa = (*page)->paddr();
+  }
+  return result.status_value();
 }
 
 zx_status_t pmm_alloc_pages(size_t count, uint alloc_flags, list_node* list) {
@@ -113,13 +126,13 @@ zx_status_t pmm_alloc_contiguous(size_t count, uint alloc_flags, uint8_t alignme
   VM_KTRACE_DURATION(3, "pmm_alloc_contiguous", ("count", count), ("alloc_flags", alloc_flags));
   // if we're called with a single page, just fall through to the regular allocation routine
   if (unlikely(count == 1 && alignment_log2 <= PAGE_SIZE_SHIFT)) {
-    vm_page_t* page;
-    zx_status_t status = pmm_node.AllocPage(alloc_flags, &page, pa);
-    if (status != ZX_OK) {
-      return status;
+    zx::result<vm_page_t*> result = pmm_node.AllocPage(alloc_flags);
+    if (result.is_ok()) {
+      vm_page_t* page = result.value();
+      list_add_tail(list, &page->queue_node);
+      *pa = page->paddr();
     }
-    list_add_tail(list, &page->queue_node);
-    return ZX_OK;
+    return result.status_value();
   }
 
   return pmm_node.AllocContiguous(count, alloc_flags, alignment_log2, pa, list);

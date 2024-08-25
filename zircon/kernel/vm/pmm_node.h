@@ -42,7 +42,7 @@ class PmmNode {
   vm_page_t* PaddrToPage(paddr_t addr) TA_NO_THREAD_SAFETY_ANALYSIS;
 
   // main allocator routines
-  zx_status_t AllocPage(uint alloc_flags, vm_page_t** page, paddr_t* pa);
+  zx::result<vm_page_t*> AllocPage(uint alloc_flags);
   zx_status_t AllocPages(size_t count, uint alloc_flags, list_node* list);
   zx_status_t AllocRange(paddr_t address, size_t count, list_node* list);
   zx_status_t AllocContiguous(size_t count, uint alloc_flags, uint8_t alignment_log2, paddr_t* pa,

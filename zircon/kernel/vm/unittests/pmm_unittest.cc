@@ -425,8 +425,9 @@ static bool pmm_node_free_mem_event_test() {
   list_node list = LIST_INITIAL_VALUE(list);
 
   for (size_t i = 1; i < ManagedPmmNode::kDefaultMemEventAlloc; i++) {
-    vm_page_t* page;
-    ASSERT_OK(node.node().AllocPage(0, &page, nullptr));
+    zx::result<vm_page_t*> result = node.node().AllocPage(0);
+    ASSERT_OK(result.status_value());
+    vm_page_t* page = *result;
     list_add_tail(&list, &page->queue_node);
     if (node.IsEventSignaled()) {
       printf("Event signaled at step %zu\n", i);
@@ -437,8 +438,9 @@ static bool pmm_node_free_mem_event_test() {
 
   // Allocate the last page, this should put us over the limit and set the event.
   {
-    vm_page_t* page;
-    ASSERT_OK(node.node().AllocPage(0, &page, nullptr));
+    zx::result<vm_page_t*> result = node.node().AllocPage(0);
+    ASSERT_OK(result.status_value());
+    vm_page_t* page = *result;
     list_add_tail(&list, &page->queue_node);
   }
   EXPECT_TRUE(node.IsEventSignaled());
@@ -448,8 +450,9 @@ static bool pmm_node_free_mem_event_test() {
   // the event.
   node.node().FreePage(list_remove_head_type(&list, vm_page_t, queue_node));
   {
-    vm_page_t* page;
-    ASSERT_OK(node.node().AllocPage(0, &page, nullptr));
+    zx::result<vm_page_t*> result = node.node().AllocPage(0);
+    ASSERT_OK(result.status_value());
+    vm_page_t* page = *result;
     list_add_tail(&list, &page->queue_node);
   }
   EXPECT_FALSE(node.IsEventSignaled());
@@ -484,9 +487,8 @@ static bool pmm_node_low_mem_alloc_failure_test() {
   // Should also have been signaled.
   EXPECT_TRUE(node.IsEventSignaled());
 
-  vm_page_t* page;
-  status = node.node().AllocPage(PMM_ALLOC_FLAG_CAN_WAIT, &page, nullptr);
-  EXPECT_EQ(status, ZX_ERR_SHOULD_WAIT);
+  zx::result<vm_page_t*> result = node.node().AllocPage(PMM_ALLOC_FLAG_CAN_WAIT);
+  EXPECT_EQ(ZX_ERR_SHOULD_WAIT, result.status_value());
 
   // Waiting for an allocation should block, although to only try with a very small timeout to not
   // make this test take too long.
@@ -497,8 +499,8 @@ static bool pmm_node_low_mem_alloc_failure_test() {
   node.node().FreeList(&list);
 
   // Allocations will still be delayed until we reset the trigger.
-  status = node.node().AllocPage(PMM_ALLOC_FLAG_CAN_WAIT, &page, nullptr);
-  EXPECT_EQ(status, ZX_ERR_SHOULD_WAIT);
+  result = node.node().AllocPage(PMM_ALLOC_FLAG_CAN_WAIT);
+  EXPECT_EQ(result.status_value(), ZX_ERR_SHOULD_WAIT);
 
   EXPECT_TRUE(node.ResetDefaultMemEvent());
 
@@ -519,8 +521,8 @@ static bool pmm_node_low_mem_alloc_failure_test() {
 
   // Allocate a single page and validate that allocations are now delayed.
   ASSERT_OK(node.node().AllocPages(1, 0, &list));
-  status = node.node().AllocPage(PMM_ALLOC_FLAG_CAN_WAIT, &page, nullptr);
-  EXPECT_EQ(status, ZX_ERR_SHOULD_WAIT);
+  result = node.node().AllocPage(PMM_ALLOC_FLAG_CAN_WAIT);
+  EXPECT_EQ(result.status_value(), ZX_ERR_SHOULD_WAIT);
   EXPECT_EQ(ZX_ERR_TIMED_OUT,
             node.node().WaitTillShouldRetrySingleAlloc(Deadline::after(ZX_MSEC(10))));
 
@@ -539,18 +541,17 @@ static bool pmm_node_explicit_should_wait_test() {
   EXPECT_TRUE(node.SetFreeMemorySignal(0, ManagedPmmNode::kNumPages, UINT64_MAX));
 
   // Allocations that can wait should be blocked.
-  vm_page_t* page;
-  zx_status_t status = node.node().AllocPage(PMM_ALLOC_FLAG_CAN_WAIT, &page, nullptr);
-  EXPECT_EQ(status, ZX_ERR_SHOULD_WAIT);
+  zx::result<vm_page_t*> result = node.node().AllocPage(PMM_ALLOC_FLAG_CAN_WAIT);
+  EXPECT_EQ(result.status_value(), ZX_ERR_SHOULD_WAIT);
   // Waiting for an allocation should block, although to only try with a very small timeout to not
   // make this test take too long.
   EXPECT_EQ(ZX_ERR_TIMED_OUT,
             node.node().WaitTillShouldRetrySingleAlloc(Deadline::after(ZX_MSEC(10))));
 
   // A regular allocation should work.
-  status = node.node().AllocPage(0, &page, nullptr);
-  ASSERT_OK(status);
-  node.node().FreePage(page);
+  result = node.node().AllocPage(0);
+  ASSERT_OK(result.status_value());
+  node.node().FreePage(*result);
 
   // Changing the delayed threshold should re-enable allocations.
   EXPECT_TRUE(node.ResetDefaultMemEvent());
@@ -1304,10 +1305,10 @@ static bool kasan_detects_use_after_free() {
 #if defined(__x86_64__)
   ManagedPmmNode node;
 
-  vm_page_t* page;
-  paddr_t paddr;
-  zx_status_t status = node.node().AllocPage(PMM_ALLOC_FLAG_ANY, &page, &paddr);
-  ASSERT_EQ(ZX_OK, status, "pmm_alloc_page one page");
+  zx::result<vm_page_t*> result = node.node().AllocPage(PMM_ALLOC_FLAG_ANY);
+  ASSERT_EQ(ZX_OK, result.status_value(), "pmm_alloc_page one page");
+  vm_page_t* page = result.value();
+  paddr_t paddr = page->paddr();
   ASSERT_NE(paddr, 0UL);
   EXPECT_EQ(0UL, asan_region_is_poisoned(reinterpret_cast<uintptr_t>(paddr_to_physmap(paddr)),
                                          PAGE_SIZE));

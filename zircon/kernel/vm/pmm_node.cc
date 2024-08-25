@@ -315,7 +315,7 @@ void PmmNode::AllocPageHelperLocked(vm_page_t* page) {
   page->set_state(vm_page_state::ALLOC);
 }
 
-zx_status_t PmmNode::AllocPage(uint alloc_flags, vm_page_t** page_out, paddr_t* pa_out) {
+zx::result<vm_page_t*> PmmNode::AllocPage(uint alloc_flags) {
   DEBUG_ASSERT(Thread::Current::memory_allocation_state().IsEnabled());
 
   vm_page* page = nullptr;
@@ -338,7 +338,7 @@ zx_status_t PmmNode::AllocPage(uint alloc_flags, vm_page_t** page_out, paddr_t* 
     // cannot be delayed.
     if ((alloc_flags & PMM_ALLOC_FLAG_CAN_WAIT) && ShouldDelayAllocationLocked()) {
       pmm_alloc_delayed.Add(1);
-      return ZX_ERR_SHOULD_WAIT;
+      return zx::error(ZX_ERR_SHOULD_WAIT);
     }
 
     page = list_remove_head_type(which_list, vm_page, queue_node);
@@ -347,7 +347,7 @@ zx_status_t PmmNode::AllocPage(uint alloc_flags, vm_page_t** page_out, paddr_t* 
         // Allocation failures from the regular free list are likely to become user-visible.
         ReportAllocFailureLocked();
       }
-      return ZX_ERR_NO_MEMORY;
+      return zx::error(ZX_ERR_NO_MEMORY);
     }
 
     DEBUG_ASSERT(use_loaned_list || !page->is_loaned());
@@ -364,15 +364,7 @@ zx_status_t PmmNode::AllocPage(uint alloc_flags, vm_page_t** page_out, paddr_t* 
     checker_.AssertPattern(page);
   }
 
-  if (pa_out) {
-    *pa_out = page->paddr();
-  }
-
-  if (page_out) {
-    *page_out = page;
-  }
-
-  return ZX_OK;
+  return zx::ok(page);
 }
 
 zx_status_t PmmNode::AllocPages(size_t count, uint alloc_flags, list_node* list) {
@@ -385,12 +377,12 @@ zx_status_t PmmNode::AllocPages(size_t count, uint alloc_flags, list_node* list)
   if (unlikely(count == 0)) {
     return ZX_OK;
   } else if (count == 1) {
-    vm_page* page;
-    zx_status_t status = AllocPage(alloc_flags, &page, nullptr);
-    if (likely(status == ZX_OK)) {
+    zx::result<vm_page_t*> result = AllocPage(alloc_flags);
+    if (result.is_ok()) {
+      vm_page_t* page = result.value();
       list_add_tail(list, &page->queue_node);
     }
-    return status;
+    return result.status_value();
   }
 
   bool free_list_had_fill_pattern = false;
