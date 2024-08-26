@@ -181,6 +181,7 @@
 
         // TODO(https://fxbug.dev/42167477): Clean this up
         { protocol: "fuchsia.component.resolution.Resolver" },
+        { protocol: "fuchsia.pkg.PackageResolver" },
         {
             directory: "debugdata",
             from: "#early_boot_instrumentation",

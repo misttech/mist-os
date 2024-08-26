@@ -9,7 +9,10 @@ use futures::StreamExt;
 use std::sync::Arc;
 use test_manager_lib::{constants, AboveRootCapabilitiesForTest, RootDiagnosticNode};
 use tracing::{info, warn};
-use {fidl_fuchsia_component_resolution as fresolution, fuchsia_async as fasync};
+use {
+    fidl_fuchsia_component_resolution as fresolution, fidl_fuchsia_pkg as fpkg,
+    fuchsia_async as fasync,
+};
 
 const DEFAULT_MANIFEST_NAME: &str = "test_manager.cm";
 
@@ -67,6 +70,14 @@ async fn main() -> Result<(), Error> {
     let resolver_for_test_case_enumerator = resolver_for_run_builder.clone();
     let resolver_for_suite_runner = resolver_for_run_builder.clone();
 
+    let pkg_resolver_for_run_builder = Arc::new(
+        connect_to_protocol::<fpkg::PackageResolverMarker>()
+            .expect("Cannot connect to pkg resolver"),
+    );
+    let pkg_resolver_for_query = pkg_resolver_for_run_builder.clone();
+    let pkg_resolver_for_test_case_enumerator = pkg_resolver_for_run_builder.clone();
+    let pkg_resolver_for_suite_runner = pkg_resolver_for_run_builder.clone();
+
     let root_inspect_for_run_builder = Arc::new(RootDiagnosticNode::new(
         fuchsia_inspect::component::inspector().root().clone_weak(),
     ));
@@ -77,6 +88,7 @@ async fn main() -> Result<(), Error> {
     fs.dir("svc")
         .add_fidl_service(move |stream| {
             let resolver = resolver_for_run_builder.clone();
+            let pkg_resolver = pkg_resolver_for_run_builder.clone();
             let routing_info = routing_info_for_run_builder.clone();
             let root_inspect = root_inspect_for_run_builder.clone();
 
@@ -84,6 +96,7 @@ async fn main() -> Result<(), Error> {
                 test_manager_lib::run_test_manager_run_builder_server(
                     stream,
                     resolver,
+                    pkg_resolver,
                     routing_info,
                     &*root_inspect,
                 )
@@ -94,6 +107,7 @@ async fn main() -> Result<(), Error> {
         })
         .add_fidl_service(move |stream| {
             let resolver = resolver_for_query.clone();
+            let pkg_resolver = pkg_resolver_for_query.clone();
             let routing_info = routing_info_for_query.clone();
             let root_inspect = root_inspect_for_query.clone();
 
@@ -101,6 +115,7 @@ async fn main() -> Result<(), Error> {
                 test_manager_lib::run_test_manager_query_server(
                     stream,
                     resolver,
+                    pkg_resolver,
                     routing_info,
                     &*root_inspect,
                 )
@@ -119,6 +134,7 @@ async fn main() -> Result<(), Error> {
         })
         .add_fidl_service(move |stream| {
             let resolver = resolver_for_test_case_enumerator.clone();
+            let pkg_resolver = pkg_resolver_for_test_case_enumerator.clone();
             let routing_info = routing_info_for_task_test_case_enumerator.clone();
             let root_inspect = root_inspect_for_test_case_enumerator.clone();
 
@@ -126,6 +142,7 @@ async fn main() -> Result<(), Error> {
                 test_manager_lib::run_test_manager_test_case_enumerator_server(
                     stream,
                     resolver,
+                    pkg_resolver,
                     routing_info,
                     &*root_inspect,
                 )
@@ -136,6 +153,7 @@ async fn main() -> Result<(), Error> {
         })
         .add_fidl_service(move |stream| {
             let resolver = resolver_for_suite_runner.clone();
+            let pkg_resolver = pkg_resolver_for_suite_runner.clone();
             let routing_info = routing_info_for_suite_runner.clone();
             let root_inspect = root_inspect_for_suite_runner.clone();
 
@@ -143,6 +161,7 @@ async fn main() -> Result<(), Error> {
                 test_manager_lib::run_test_manager_suite_runner_server(
                     stream,
                     resolver,
+                    pkg_resolver,
                     routing_info,
                     &*root_inspect,
                 )

@@ -15,6 +15,7 @@ use anyhow::Error;
 use fidl::endpoints::{ControlHandle, Responder};
 use fidl_fuchsia_component::RealmProxy;
 use fidl_fuchsia_component_resolution::ResolverProxy;
+use fidl_fuchsia_pkg::PackageResolverProxy;
 use ftest_manager::{
     LaunchError, RunControllerRequest, RunControllerRequestStream, SchedulingOptions,
     SuiteControllerRequest, SuiteControllerRequestStream,
@@ -43,6 +44,7 @@ pub(crate) struct Suite {
     pub options: ftest_manager::RunOptions,
     pub controller: SuiteControllerRequestStream,
     pub resolver: Arc<ResolverProxy>,
+    pub pkg_resolver: Arc<PackageResolverProxy>,
     pub above_root_capabilities_for_test: Arc<AboveRootCapabilitiesForTest>,
     pub facets: facet::ResolveStatus,
     pub realm: Option<SuiteRealm>,
@@ -453,6 +455,7 @@ async fn run_single_suite_for_suite_runner(
         options,
         controller,
         resolver,
+        pkg_resolver,
         above_root_capabilities_for_test,
         facets,
         realm: suite_realm,
@@ -494,6 +497,7 @@ async fn run_single_suite_for_suite_runner(
             &test_url,
             facets,
             resolver,
+            pkg_resolver,
             above_root_capabilities_for_test,
             debug_data_sender,
             &diagnostics,
@@ -549,6 +553,7 @@ pub(crate) async fn run_single_suite(
         options,
         controller,
         resolver,
+        pkg_resolver,
         above_root_capabilities_for_test,
         facets,
         realm: suite_realm,
@@ -590,6 +595,7 @@ pub(crate) async fn run_single_suite(
             &test_url,
             facets,
             resolver,
+            pkg_resolver,
             above_root_capabilities_for_test,
             debug_data_sender,
             &diagnostics,
@@ -844,6 +850,10 @@ mod tests {
             create_proxy_and_stream::<fresolution::ResolverMarker>()
                 .expect("create resolver proxy");
         let resolver_proxy = Arc::new(resolver_proxy);
+        let (pkg_resolver_proxy, _pkg_resolver_stream) =
+            create_proxy_and_stream::<fidl_fuchsia_pkg::PackageResolverMarker>()
+                .expect("create resolver proxy");
+        let pkg_resolver_proxy = Arc::new(pkg_resolver_proxy);
         let routing_info = Arc::new(AboveRootCapabilitiesForTest::new_empty_for_tests());
         Suite {
             realm: None,
@@ -859,6 +869,7 @@ mod tests {
             },
             controller: controller_stream,
             resolver: resolver_proxy,
+            pkg_resolver: pkg_resolver_proxy,
             above_root_capabilities_for_test: routing_info,
             facets: facet::ResolveStatus::Unresolved,
         }

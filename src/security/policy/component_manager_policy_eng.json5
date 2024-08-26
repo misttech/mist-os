@@ -274,6 +274,7 @@
                     "/core/process_resolver",
                     "/core/sshd-host/shell:**",
                     "/core/system-update-checker",
+                    "/core/test_manager",
                 ],
             },
             {
