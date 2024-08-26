@@ -28,6 +28,8 @@ type BufferMode = strict enum {
     OUTPUT_HIGH = 2;
 };
 
+type InterruptOptions = flexible bits {};
+
 type InterruptMode = strict enum {
     EDGE_LOW = 0;
     EDGE_HIGH = 1;
