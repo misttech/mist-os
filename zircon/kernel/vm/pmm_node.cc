@@ -3,7 +3,8 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
-#include "pmm_node.h"
+
+#include "vm/pmm_node.h"
 
 #include <align.h>
 #include <assert.h>
@@ -30,7 +31,6 @@
 #include <vm/pmm_checker.h>
 #include <vm/stack_owned_loaned_pages_interval.h>
 
-#include "vm/pmm.h"
 #include "vm_priv.h"
 
 #define LOCAL_TRACE VM_GLOBAL_TRACE(0)

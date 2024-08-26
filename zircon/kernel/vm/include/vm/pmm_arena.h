@@ -3,8 +3,8 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
-#ifndef ZIRCON_KERNEL_VM_PMM_ARENA_H_
-#define ZIRCON_KERNEL_VM_PMM_ARENA_H_
+#ifndef ZIRCON_KERNEL_VM_INCLUDE_VM_PMM_ARENA_H_
+#define ZIRCON_KERNEL_VM_INCLUDE_VM_PMM_ARENA_H_
 
 #include <lib/zx/result.h>
 #include <trace.h>
@@ -78,4 +78,4 @@ class PmmArena {
   uint64_t search_hint_ = 0;
 };
 
-#endif  // ZIRCON_KERNEL_VM_PMM_ARENA_H_
+#endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_PMM_ARENA_H_

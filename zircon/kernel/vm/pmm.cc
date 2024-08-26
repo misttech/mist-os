@@ -32,11 +32,11 @@
 #include <ktl/algorithm.h>
 #include <lk/init.h>
 #include <vm/physmap.h>
+#include <vm/pmm_arena.h>
 #include <vm/pmm_checker.h>
+#include <vm/pmm_node.h>
 #include <vm/vm.h>
 
-#include "pmm_arena.h"
-#include "pmm_node.h"
 #include "vm_priv.h"
 
 #if defined(__x86_64__)

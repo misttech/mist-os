@@ -3,7 +3,7 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
-#include "pmm_arena.h"
+#include "vm/pmm_arena.h"
 
 #include <align.h>
 #include <inttypes.h>
@@ -18,8 +18,8 @@
 #include <ktl/limits.h>
 #include <pretty/cpp/sizes.h>
 #include <vm/physmap.h>
+#include <vm/pmm_node.h>
 
-#include "pmm_node.h"
 #include "vm_priv.h"
 
 #include <ktl/enforce.h>

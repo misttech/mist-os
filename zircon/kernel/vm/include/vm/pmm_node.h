@@ -3,8 +3,8 @@
 // Use of this source code is governed by a MIT-style
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
-#ifndef ZIRCON_KERNEL_VM_PMM_NODE_H_
-#define ZIRCON_KERNEL_VM_PMM_NODE_H_
+#ifndef ZIRCON_KERNEL_VM_INCLUDE_VM_PMM_NODE_H_
+#define ZIRCON_KERNEL_VM_INCLUDE_VM_PMM_NODE_H_
 
 #include <lib/memalloc/range.h>
 
@@ -17,9 +17,8 @@
 #include <vm/compression.h>
 #include <vm/physical_page_borrowing_config.h>
 #include <vm/pmm.h>
+#include <vm/pmm_arena.h>
 #include <vm/pmm_checker.h>
-
-#include "pmm_arena.h"
 
 // Forward declaration; defined in <lib/memalloc/range.h>
 namespace memalloc {
@@ -352,4 +351,4 @@ inline vm_page_t* PmmNode::PaddrToPage(paddr_t addr) TA_NO_THREAD_SAFETY_ANALYSI
   return nullptr;
 }
 
-#endif  // ZIRCON_KERNEL_VM_PMM_NODE_H_
+#endif  // ZIRCON_KERNEL_VM_INCLUDE_VM_PMM_NODE_H_
