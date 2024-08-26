@@ -6,6 +6,7 @@
 
 import logging
 
+import fidl.fuchsia_bluetooth_gatt2 as f_gatt_controller
 import fidl.fuchsia_bluetooth_sys as f_btsys_controller
 from fidl import StopServer
 
@@ -58,3 +59,26 @@ class PairingDelegateImpl(f_btsys_controller.PairingDelegate.Server):
             "Pairing was successful. Calling StopServer to unblock execution."
         )
         raise StopServer
+
+
+class GattLocalServerImpl(f_gatt_controller.LocalService.Server):
+    """Gatt Local Server Implementation follows the FIDL SDK
+    fuchsia.bluetooth.gatt2/server.fidl:LocalService spec.
+    """
+
+    def read_value(
+        self, read_value_request: f_gatt_controller.LocalServiceReadValueRequest
+    ) -> list[int]:
+        """Read value implementation for Local Server implementation
+
+        Args:
+            read_value_request: a request to read the value on the Gatt Service
+
+        Return:
+            [1, 2, 3]: a list of ints representing mock values
+        """
+        _LOGGER.info(
+            "Reading value request from peer: %s",
+            read_value_request.peer_id,
+        )
+        return [1, 2, 3]

@@ -222,7 +222,7 @@ class BluetoothCommon(bluetooth_common.BluetoothCommon):
         _LOGGER.debug("Pairing Delegate has been set.")
 
     def connect_device(
-        self, identifier: Any, connection_type: BluetoothConnectionType = 1
+        self, identifier: str, connection_type: BluetoothConnectionType = 1
     ) -> None:
         """Connect to a peer device via Bluetooth.
 
