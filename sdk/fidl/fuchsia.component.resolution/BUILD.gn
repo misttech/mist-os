@@ -20,4 +20,5 @@ fidl("fuchsia.component.resolution") {
     "//sdk/fidl/fuchsia.mem",
     "//sdk/fidl/fuchsia.version",
   ]
+  enable_hlcpp = true
 }

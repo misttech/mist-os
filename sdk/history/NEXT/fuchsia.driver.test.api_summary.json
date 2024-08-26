@@ -98,6 +98,12 @@
         "type": "string"
     },
     {
+        "kind": "table/member",
+        "name": "fuchsia.driver.test/RealmArgs.test_component",
+        "ordinal": "16",
+        "type": "fuchsia.component.resolution/Component"
+    },
+    {
         "kind": "table",
         "name": "fuchsia.driver.test/RealmArgs",
         "resourceness": "resource"

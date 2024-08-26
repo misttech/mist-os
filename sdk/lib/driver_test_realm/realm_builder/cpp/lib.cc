@@ -38,6 +38,31 @@ void Setup(component_testing::RealmBuilder& realm_builder) {
       .targets = {ChildRef{kComponentName}},
   });
   realm_builder.AddRoute(Route{
+      .capabilities = {Protocol{"fuchsia.component.resolution.Resolver-hermetic"}},
+      .source = {ParentRef()},
+      .targets = {ChildRef{kComponentName}},
+  });
+  realm_builder.AddRoute(Route{
+      .capabilities = {Protocol{"fuchsia.pkg.PackageResolver-hermetic"}},
+      .source = {ParentRef()},
+      .targets = {ChildRef{kComponentName}},
+  });
+  realm_builder.AddRoute(Route{
+      .capabilities = {Protocol{"fuchsia.driver.development.Manager"}},
+      .source = {ChildRef{kComponentName}},
+      .targets = {ParentRef()},
+  });
+  realm_builder.AddRoute(Route{
+      .capabilities = {Protocol{"fuchsia.driver.test.Realm"}},
+      .source = {ChildRef{kComponentName}},
+      .targets = {ParentRef()},
+  });
+  realm_builder.AddRoute(Route{
+      .capabilities = {Protocol{"fuchsia.device.manager.Administrator"}},
+      .source = {ChildRef{kComponentName}},
+      .targets = {ParentRef()},
+  });
+  realm_builder.AddRoute(Route{
       .capabilities = {Protocol{"fuchsia.inspect.InspectSink"}},
       .source = {ParentRef()},
       .targets = {ChildRef{kComponentName}},

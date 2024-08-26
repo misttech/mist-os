@@ -59,6 +59,7 @@
             protocol: [
                 "fuchsia.boot.Items",
                 "fuchsia.driver.index.DriverIndex",
+                "fuchsia.driver.test.Internal",
                 "fuchsia.kernel.RootJob",
             ],
         },
@@ -86,14 +87,24 @@
             from: "parent",
             availability: "optional",
         },
+        {
+            protocol: "fuchsia.pkg.PackageResolver-hermetic",
+            from: "parent",
+        },
     ],
 
     // LINT.ThenChange(/sdk/lib/driver_test_realm/realm_builder/rust/src/lib.rs)
     offer: [
         {
+            protocol: "fuchsia.component.resolution.Resolver-hermetic",
+            from: "parent",
+            to: "#realm_builder",
+        },
+        {
             protocol: [
                 "fuchsia.boot.Items",
                 "fuchsia.device.manager.SystemStateTransition",
+                "fuchsia.driver.test.Internal",
                 "fuchsia.kernel.RootJob",
             ],
             from: "self",

@@ -31,6 +31,10 @@
             resolver: "pkg-resolver",
             path: "/svc/fuchsia.component.resolution.Resolver",
         },
+        {
+            resolver: "test-pkg-resolver",
+            path: "/svc/fuchsia.component.resolution.Resolver",
+        },
     ],
     use: [
         {
@@ -43,6 +47,10 @@
             rights: [ "rx*" ],
             path: "/pkg_drivers",
         },
+
+        // Use the test manager's hermetic resolver to service test-pkg-resolver requests.
+        { protocol: "fuchsia.component.resolution.Resolver-hermetic" },
+        { protocol: "fuchsia.driver.test.Internal" },
     ],
     expose: [
         {
@@ -51,6 +59,10 @@
         },
         {
             resolver: "pkg-resolver",
+            from: "self",
+        },
+        {
+            resolver: "test-pkg-resolver",
             from: "self",
         },
         {

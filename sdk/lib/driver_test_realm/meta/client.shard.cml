@@ -27,7 +27,11 @@
     ],
     offer: [
         {
-            protocol: [ "fuchsia.logger.LogSink" ],
+            protocol: [
+                "fuchsia.component.resolution.Resolver-hermetic",
+                "fuchsia.logger.LogSink",
+                "fuchsia.pkg.PackageResolver-hermetic",
+            ],
             from: "parent",
             to: "#driver_test_realm",
         },

@@ -52,18 +52,33 @@ async fn create_realm(options: ftest::RealmOptions) -> Result<InstalledNamespace
 
 #[fuchsia::test]
 async fn test_basic_driver() -> Result<()> {
-    let (pkg_client, pkg_server) = create_endpoints();
-    fuchsia_fs::directory::open_channel_in_namespace(
-        "/pkg",
-        fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_EXECUTABLE,
-        pkg_server,
-    )
-    .expect("Could not open /pkg");
+    // We need to resolve our test component manually. Eventually component framework could provide
+    // an introspection way of resolving your own component.
+    // This isn't exactly correct because if the test is running in ctf, the root package will not
+    // be called "basic-driver-test-latest".
+    let resolved = {
+        let client = fuchsia_component::client::connect_to_protocol_at_path::<
+            fidl_fuchsia_component_resolution::ResolverMarker,
+        >("/svc/fuchsia.component.resolution.Resolver-hermetic")?;
+        let root = client
+            .resolve(
+                "fuchsia-pkg://fuchsia.com/basic-driver-test-latest#meta/basic-driver-test-root.cm",
+            )
+            .await?
+            .expect("Failed to resolve our root component.");
+
+        client
+            .resolve_with_context(
+                "basic-driver-test#meta/test-suite.cm",
+                &root.resolution_context.unwrap(),
+            )
+            .await?
+            .expect("Failed to resolve our own component.")
+    };
 
     let (offers_client, offers_server) = create_endpoints();
     let realm_options = ftest::RealmOptions {
         driver_test_realm_start_args: Some(fdt::RealmArgs {
-            pkg: Some(pkg_client),
             dtr_offers: Some(vec![fidl_fuchsia_component_test::Capability::Protocol(
                 fidl_fuchsia_component_test::Protocol {
                     name: Some(ctf::WaiterMarker::PROTOCOL_NAME.to_string()),
@@ -76,6 +91,7 @@ async fn test_basic_driver() -> Result<()> {
                     ..Default::default()
                 },
             )]),
+            test_component: Some(resolved),
             ..Default::default()
         }),
         offers_client: Some(offers_client),

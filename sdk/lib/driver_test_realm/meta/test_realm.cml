@@ -188,6 +188,14 @@
         },
         {
             protocol: [
+                "fuchsia.component.resolution.Resolver-hermetic",
+                "fuchsia.driver.test.Internal",
+            ],
+            from: "parent",
+            to: [ "#fake-resolver" ],
+        },
+        {
+            protocol: [
                 "fuchsia.driver.index.DevelopmentManager",
                 "fuchsia.driver.index.DriverIndex",
                 "fuchsia.driver.registrar.DriverRegistrar",
@@ -296,6 +304,11 @@
                     resolver: "pkg-resolver",
                     from: "#fake-resolver",
                     scheme: "fuchsia-pkg",
+                },
+                {
+                    resolver: "test-pkg-resolver",
+                    from: "#fake-resolver",
+                    scheme: "dtr-test-pkg",
                 },
             ],
 

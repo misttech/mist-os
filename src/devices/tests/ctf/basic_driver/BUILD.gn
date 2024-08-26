@@ -56,6 +56,12 @@ fuchsia_driver_component("basic-driver-component") {
   info = "meta/info.json"
 }
 
+fuchsia_driver_package("basic-driver-pkg") {
+  testonly = true
+  package_name = "basic-driver-pkg"
+  driver_components = [ ":basic-driver-component" ]
+}
+
 rustc_test("bin") {
   edition = "2021"
   source_root = "src/main.rs"
@@ -63,6 +69,7 @@ rustc_test("bin") {
   name = "basic_driver_test"
   deps = [
     ":fuchsia.basicdriver.ctftest_rust",
+    "//sdk/fidl/fuchsia.component.resolution:fuchsia.component.resolution_rust",
     "//sdk/fidl/fuchsia.component.test:fuchsia.component.test_rust",
     "//sdk/fidl/fuchsia.driver.test:fuchsia.driver.test_rust",
     "//sdk/fidl/fuchsia.io:fuchsia.io_rust",
@@ -91,8 +98,13 @@ fuchsia_component("basic-driver-test-component") {
 ctf_fuchsia_package("basic-driver-test") {
   testonly = true
   package_name = "basic-driver-test"
+
+  # Subpackaged driver works!
+  subpackages = [ ":basic-driver-pkg" ]
+
   deps = [
-    ":basic-driver-component",
+    # Disabling the direct dependency, but this also works!
+    #":basic-driver-component",
     ":basic-driver-test-component",
   ]
 }

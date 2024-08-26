@@ -11,6 +11,7 @@
         binary: "bin/basic_driver_test",
     },
     use: [
+        { protocol: "fuchsia.component.resolution.Resolver-hermetic" },
         { protocol: "fuchsia.driver.testing.RealmFactory" },
     ],
 }

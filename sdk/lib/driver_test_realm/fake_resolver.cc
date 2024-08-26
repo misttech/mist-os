@@ -4,10 +4,12 @@
 
 #include <fidl/fuchsia.component.decl/cpp/fidl.h>
 #include <fidl/fuchsia.component.resolution/cpp/wire.h>
+#include <fidl/fuchsia.driver.test/cpp/fidl.h>
 #include <fidl/fuchsia.io/cpp/wire.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
 #include <lib/component/incoming/cpp/clone.h>
+#include <lib/component/incoming/cpp/protocol.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/fdio/directory.h>
 #include <lib/syslog/cpp/macros.h>
@@ -32,12 +34,14 @@ class FakeComponentResolver final
 
  private:
   void Resolve(ResolveRequestView request, ResolveCompleter::Sync& completer) override {
+    std::string_view kTestPackagePrefix = "dtr-test-pkg://fuchsia.com/";
     std::string_view kBootPrefix = "fuchsia-boot:///";
     std::string_view kPkgPrefix = "fuchsia-pkg://fuchsia.com/";
     std::string_view relative_path = request->component_url.get();
     FX_LOG_KV(DEBUG, "Resolving", FX_KV("url", relative_path));
 
-    if (!cpp20::starts_with(relative_path, kBootPrefix) &&
+    if (!cpp20::starts_with(relative_path, kTestPackagePrefix) &&
+        !cpp20::starts_with(relative_path, kBootPrefix) &&
         !cpp20::starts_with(relative_path, kPkgPrefix)) {
       FX_LOG_KV(ERROR, "FakeComponentResolver request not supported.",
                 FX_KV("url", std::string(relative_path).c_str()));
@@ -45,16 +49,71 @@ class FakeComponentResolver final
       return;
     }
 
-    // FakeComponentResolver looks at the prefix to determine which directory to look in (pkg or
-    // boot), then looks at the path following '#' to find the relative path within that directory.
-    // Note that subpackaging is ignored: it's assumed that the components can be found by the
-    // relative path.
-    bool is_boot = cpp20::starts_with(relative_path, kBootPrefix);
-    size_t pos = relative_path.find('#');
-    std::string_view pkg_url = relative_path.substr(0, pos);
-    relative_path.remove_prefix(pos + 1);
+    std::string_view pkg_url;
+    fidl::ClientEnd<fuchsia_io::Directory> dir_to_use;
 
-    zx::result manifest_vmo = ReadFileToVmo(relative_path, is_boot);
+    // kTestPackagePrefix can resolve items from the test package, whether they are in the
+    // package directly or part of a subpackage.
+    if (cpp20::starts_with(relative_path, kTestPackagePrefix)) {
+      relative_path.remove_prefix(kTestPackagePrefix.length());
+
+      // The internal client is used for both direct and subpackage.
+      auto internal_client = component::Connect<fuchsia_driver_test::Internal>();
+      if (internal_client.is_error()) {
+        FX_LOG_KV(ERROR, "Failed to connect to internal protocol.");
+        completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
+        return;
+      }
+
+      if (!cpp20::starts_with(relative_path, "#")) {
+        // This is a subpackage of the test so we have to use its resolution context to resolve the
+        // subpackage.
+        ResolveSubpackage(relative_path, *internal_client, completer);
+        return;
+      }
+
+      // Remove the "#"
+      relative_path.remove_prefix(1);
+
+      // This is in the test package. Get it from the dtr and set dir_to_use.
+      auto test_pkg_dir = fidl::WireCall(*internal_client)->GetTestPackage();
+      if (!test_pkg_dir.ok() || test_pkg_dir.value().is_error()) {
+        FX_LOG_KV(ERROR, "Failed to get resolution context.");
+        completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
+        return;
+      }
+
+      dir_to_use = std::move(test_pkg_dir->value()->test_pkg_dir);
+    } else {
+      // Legacy resolver logic:
+      // Looks at the prefix to determine which directory to look in (pkg or
+      // boot), then looks at the path following '#' to find the fragment path within that
+      // directory. It's assumed that the components can be found by the fragment path.
+      bool is_boot = cpp20::starts_with(relative_path, kBootPrefix);
+      size_t pos = relative_path.find('#');
+      pkg_url = relative_path.substr(0, pos);
+      relative_path.remove_prefix(pos + 1);
+
+      zx::result<fidl::ClientEnd<fuchsia_io::Directory>> dir_clone_result;
+      if (is_boot) {
+        dir_clone_result = component::Clone(boot_dir_);
+      } else {
+        dir_clone_result = component::Clone(pkg_dir_);
+      }
+
+      if (dir_clone_result.is_error()) {
+        FX_LOG_KV(ERROR, "Failed to clone directory.");
+        completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
+        return;
+      }
+      dir_to_use = std::move(dir_clone_result.value());
+    }
+
+    if (!dir_to_use.is_valid()) {
+      FX_LOG_KV(ERROR, "Failed to set dir_to_use.");
+    }
+
+    zx::result manifest_vmo = ReadFileToVmo(relative_path, dir_to_use.channel().get());
     if (manifest_vmo.is_error()) {
       FX_LOG_KV(ERROR, "Failed to read manifest.",
                 FX_KV("manifest", std::string(relative_path).c_str()));
@@ -96,7 +155,7 @@ class FakeComponentResolver final
     if (declaration->config() &&
         declaration->config()->value_source()->package_path().has_value()) {
       std::string config_path = declaration->config()->value_source()->package_path().value();
-      zx::result config_file = ReadFileToVmo(config_path, is_boot);
+      zx::result config_file = ReadFileToVmo(config_path, dir_to_use.channel().get());
       if (config_file.is_error()) {
         FX_LOG_KV(ERROR, "Failed to read config vmo.", FX_KV("config", config_path.c_str()));
         completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kIo);
@@ -132,23 +191,10 @@ class FakeComponentResolver final
     }
     abi_revision_file.close();
 
-    zx::result<fidl::ClientEnd<fuchsia_io::Directory>> dir_clone_result;
-    if (is_boot) {
-      dir_clone_result = component::Clone(boot_dir_);
-    } else {
-      dir_clone_result = component::Clone(pkg_dir_);
-    }
-
-    if (dir_clone_result.is_error()) {
-      FX_LOG_KV(ERROR, "Failed to clone directory.");
-      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
-      return;
-    }
-
     fidl::Arena arena;
     auto package = fuchsia_component_resolution::wire::Package::Builder(arena)
                        .url(pkg_url)
-                       .directory(std::move(dir_clone_result.value()))
+                       .directory(std::move(dir_to_use))
                        .Build();
 
     auto builder =
@@ -182,12 +228,38 @@ class FakeComponentResolver final
     completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInvalidArgs);
   }
 
-  zx::result<zx::vmo> ReadFileToVmo(std::string_view path, bool is_boot) {
-    zx_handle_t dir = pkg_dir_.channel().get();
-    if (is_boot) {
-      dir = boot_dir_.channel().get();
+  static void ResolveSubpackage(
+      std::string_view relative_path,
+      fidl::UnownedClientEnd<fuchsia_driver_test::Internal> internal_client,
+      ResolveCompleter::Sync& completer) {
+    auto resolution_context = fidl::WireCall(internal_client)->GetTestResolutionContext();
+    if (!resolution_context.ok()) {
+      FX_LOG_KV(ERROR, "Failed to get resolution context.");
+      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
+      return;
     }
 
+    auto resolver = component::Connect<fuchsia_component_resolution::Resolver>(
+        "/svc/fuchsia.component.resolution.Resolver-hermetic");
+    if (resolver.is_error()) {
+      FX_LOG_KV(ERROR, "Failed to connect to resolver protocol.");
+      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
+      return;
+    }
+
+    fidl::Arena arena;
+    auto result = fidl::WireCall(*resolver)->ResolveWithContext(
+        fidl::StringView(arena, relative_path), resolution_context.value().context);
+    if (!result.ok() || result.value().is_error()) {
+      FX_LOG_KV(ERROR, "Failed to resolve.");
+      completer.ReplyError(fuchsia_component_resolution::wire::ResolverError::kInternal);
+      return;
+    }
+
+    completer.ReplySuccess(result->value()->component);
+  }
+
+  static zx::result<zx::vmo> ReadFileToVmo(std::string_view path, zx_handle_t dir) {
     auto file_ep = fidl::CreateEndpoints<fuchsia_io::File>();
     if (file_ep.is_error()) {
       FX_LOG_KV(ERROR, "Failed to create file endpoints");
