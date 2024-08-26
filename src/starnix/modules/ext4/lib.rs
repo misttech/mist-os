@@ -2,22 +2,22 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::memory::MemoryObject;
-use crate::mm::ProtectionFlags;
-use crate::task::CurrentTask;
-use crate::vfs::{
-    default_seek, fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
-    fs_node_impl_not_dir, fs_node_impl_symlink, fs_node_impl_xattr_delegate, CacheConfig,
-    CacheMode, DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle,
-    FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
-    MemoryFileObject, SeekTarget, SymlinkTarget, XattrOp, XattrStorage,
-};
 use ext4_read_only::parser::{Parser as ExtParser, XattrMap as ExtXattrMap};
 use ext4_read_only::readers::VmoReader;
 use ext4_read_only::structs::{EntryType, INode, ROOT_INODE_NUM};
 use fuchsia_zircon as zx;
 use fuchsia_zircon::HandleBased;
 use once_cell::sync::OnceCell;
+use starnix_core::mm::memory::MemoryObject;
+use starnix_core::mm::ProtectionFlags;
+use starnix_core::task::CurrentTask;
+use starnix_core::vfs::{
+    default_seek, fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly,
+    fs_node_impl_not_dir, fs_node_impl_symlink, fs_node_impl_xattr_delegate, CacheConfig,
+    CacheMode, DirectoryEntryType, DirentSink, FileObject, FileOps, FileSystem, FileSystemHandle,
+    FileSystemOps, FileSystemOptions, FsNode, FsNodeHandle, FsNodeInfo, FsNodeOps, FsStr, FsString,
+    MemoryFileObject, SeekTarget, SymlinkTarget, XattrOp, XattrStorage,
+};
 use starnix_logging::{impossible_error, track_stub};
 use starnix_sync::{BeforeFsNodeAppend, DeviceOpen, FileOpsCore, LockBefore, Locked};
 use starnix_uapi::auth::FsCred;

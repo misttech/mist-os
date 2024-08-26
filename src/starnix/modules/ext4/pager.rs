@@ -6,11 +6,11 @@
 //! the target, hence the need for a transfer VMO.  This also uses a static zeroed VMO to transfer
 //! pages that should be zeroed.
 
-use crate::task::CurrentTask;
-use crate::vfs::FsStr;
 use fidl::AsHandleRef;
 use fuchsia_zircon::sys::zx_page_request_command_t::{ZX_PAGER_VMO_COMPLETE, ZX_PAGER_VMO_READ};
 use fuchsia_zircon::{self as zx};
+use starnix_core::task::CurrentTask;
+use starnix_core::vfs::FsStr;
 use starnix_logging::{log_debug, log_error, log_warn};
 use starnix_sync::Mutex;
 use starnix_uapi::errors::Errno;
@@ -334,7 +334,7 @@ impl<'a> SupplyHelper<'a> {
             target_vmo,
             offset,
             pager,
-            page_size: *crate::mm::PAGE_SIZE,
+            page_size: *starnix_core::mm::PAGE_SIZE,
             buf_len: 0,
         }
     }
@@ -428,8 +428,8 @@ impl<'a> SupplyHelper<'a> {
 #[cfg(test)]
 mod tests {
     use super::{Pager, PagerExtent};
-    use crate::testing::*;
     use fuchsia_zircon as zx;
+    use starnix_core::testing::*;
     use std::sync::Arc;
     use std::time::Duration;
 
