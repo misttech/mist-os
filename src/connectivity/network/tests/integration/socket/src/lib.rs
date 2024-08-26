@@ -1832,7 +1832,7 @@ async fn tcp_buffer_size<I: TestIpExt, N: Netstack>(name: &str, which: WhichEnd)
             }
             WhichEnd::Receive => {
                 const RECEIVE_BUFFER_SIZE: usize = 128 * 1024;
-                let receiver_ref = SockRef::from(sender.std());
+                let receiver_ref = SockRef::from(receiver.std());
                 set_size = RECEIVE_BUFFER_SIZE;
                 receiver_ref
                     .set_recv_buffer_size(RECEIVE_BUFFER_SIZE)
