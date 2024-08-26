@@ -252,11 +252,6 @@ static void arm64_install_vbar(VbarFunction* table) {
 }
 
 static void arm64_cpu_early_init() {
-  // Collect the setting that physboot determined.  arch_late_init_percpu()
-  // will call arm64_select_vbar to use it later, when gPhysHandoff may no
-  // longer be available.
-  gAlternateVbar = gPhysHandoff->arch_handoff.alternate_vbar;
-
   // Make sure the per cpu pointer is set up.
   arm64_init_percpu_early();
 
@@ -309,6 +304,12 @@ static void arm64_cpu_early_init() {
 }
 
 void arch_early_init() {
+  // Collect the setting that physboot determined.  arch_late_init_percpu()
+  // will call arm64_select_vbar to use it later, when gPhysHandoff may no
+  // longer be available.
+  DEBUG_ASSERT(gPhysHandoff != nullptr);
+  gAlternateVbar = gPhysHandoff->arch_handoff.alternate_vbar;
+
   // put the cpu in a working state and read the feature flags
   arm64_cpu_early_init();
 }
