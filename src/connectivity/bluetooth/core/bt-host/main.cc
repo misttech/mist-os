@@ -143,8 +143,8 @@ int main() {
     return 1;
   }
 
-  bool initialize_res =
-      host->Initialize(std::move(vendor_client_end_result.value()), init_cb, error_cb);
+  bool initialize_res = host->Initialize(std::move(vendor_client_end_result.value()), init_cb,
+                                         error_cb, /*legacy_pairing_enabled=*/false);
   if (!initialize_res) {
     bt_log(ERROR, "bt-host", "Error initializing bt-host; shutting down...");
     return 1;

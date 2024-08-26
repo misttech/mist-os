@@ -66,6 +66,12 @@ class AdapterId : public Identifier<uint64_t> {
 // supported.
 class Adapter {
  public:
+  struct Config {
+    // When True, BR/EDR pairing may attempt to use legacy pairing if the peer
+    // does not support SSP.
+    bool legacy_pairing_enabled = false;
+  };
+
   static constexpr const char* kMetricsInspectNodeName = "metrics";
 
   // Optionally, a FakeL2cap  may be passed for testing purposes as |l2cap|. If
@@ -75,6 +81,7 @@ class Adapter {
       pw::async::Dispatcher& pw_dispatcher,
       hci::Transport::WeakPtr hci,
       gatt::GATT::WeakPtr gatt,
+      Config config,
       std::unique_ptr<l2cap::ChannelManager> l2cap = nullptr);
   virtual ~Adapter() = default;
 

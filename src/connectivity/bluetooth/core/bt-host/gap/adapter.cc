@@ -59,6 +59,7 @@ class AdapterImpl final : public Adapter {
   explicit AdapterImpl(pw::async::Dispatcher& pw_dispatcher,
                        hci::Transport::WeakPtr hci,
                        gatt::GATT::WeakPtr gatt,
+                       Config config,
                        std::unique_ptr<l2cap::ChannelManager> l2cap);
   ~AdapterImpl() override;
 
@@ -550,6 +551,9 @@ class AdapterImpl final : public Adapter {
   // for service discovery.
   gatt::GATT::WeakPtr gatt_;
 
+  // Contains feature flags based on the product's configuration
+  Config config_;
+
   // Objects that abstract the controller for connection and advertising
   // procedures.
   std::unique_ptr<hci::LowEnergyAdvertiser> hci_le_advertiser_;
@@ -585,6 +589,7 @@ class AdapterImpl final : public Adapter {
 AdapterImpl::AdapterImpl(pw::async::Dispatcher& pw_dispatcher,
                          hci::Transport::WeakPtr hci,
                          gatt::GATT::WeakPtr gatt,
+                         Config config,
                          std::unique_ptr<l2cap::ChannelManager> l2cap)
     : identifier_(Random<AdapterId>()),
       hci_(std::move(hci)),
@@ -592,6 +597,7 @@ AdapterImpl::AdapterImpl(pw::async::Dispatcher& pw_dispatcher,
       peer_cache_(pw_dispatcher),
       l2cap_(std::move(l2cap)),
       gatt_(std::move(gatt)),
+      config_(config),
       dispatcher_(pw_dispatcher),
       weak_self_(this),
       weak_self_adapter_(this) {
@@ -1514,6 +1520,7 @@ void AdapterImpl::InitializeStep4() {
         state_.features.HasBit(/*page=*/0,
                                hci_spec::LMPFeature::kInterlacedPageScan),
         state_.IsLocalSecureConnectionsSupported(),
+        config_.legacy_pairing_enabled,
         dispatcher_);
     bredr_connection_manager_->AttachInspect(
         adapter_node_, kInspectBrEdrConnectionManagerNodeName);
@@ -1784,9 +1791,10 @@ std::unique_ptr<Adapter> Adapter::Create(
     pw::async::Dispatcher& pw_dispatcher,
     hci::Transport::WeakPtr hci,
     gatt::GATT::WeakPtr gatt,
+    Config config,
     std::unique_ptr<l2cap::ChannelManager> l2cap) {
   return std::make_unique<AdapterImpl>(
-      pw_dispatcher, hci, gatt, std::move(l2cap));
+      pw_dispatcher, hci, gatt, config, std::move(l2cap));
 }
 
 }  // namespace bt::gap

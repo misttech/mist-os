@@ -80,7 +80,7 @@ TEST_F(HostComponentTest, InitializeFailsWhenCommandTimesOut) {
           host()->ShutDown();
         }
       },
-      [&]() { error_cb_called = true; });
+      [&]() { error_cb_called = true; }, /*legacy_pairing_enabled=*/false);
   EXPECT_EQ(init_result, true);
 
   constexpr zx::duration kCommandTimeout = zx::sec(15);
