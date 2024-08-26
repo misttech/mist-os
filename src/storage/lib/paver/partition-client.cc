@@ -66,6 +66,14 @@ zx::result<size_t> BlockPartitionClient::GetBlockSize() {
   return zx::ok(block_info.value().get().block_size);
 }
 
+zx::result<size_t> BlockPartitionClient::GetMaxTransferSize() {
+  zx::result block_info = ReadBlockInfo();
+  if (block_info.is_error()) {
+    return block_info.take_error();
+  }
+  return zx::ok(block_info.value().get().max_transfer_size);
+}
+
 zx::result<size_t> BlockPartitionClient::GetPartitionSize() {
   zx::result block_info_result = ReadBlockInfo();
   if (block_info_result.is_error()) {
@@ -128,26 +136,35 @@ zx::result<> BlockPartitionClient::Read(vmoid_t vmoid, size_t vmo_size, size_t d
   if (block_size.is_error()) {
     return block_size.take_error();
   }
-  const uint64_t length = vmo_size / block_size.value();
-  if (length > UINT32_MAX) {
-    ERROR("Error reading partition data: Too large\n");
-    return zx::error(ZX_ERR_OUT_OF_RANGE);
+  zx::result max_transfer_size = GetMaxTransferSize();
+  if (block_size.is_error()) {
+    return max_transfer_size.take_error();
   }
+  uint64_t max_transfer_blocks = max_transfer_size.value() / block_size.value();
+  max_transfer_blocks = std::min(max_transfer_blocks, static_cast<uint64_t>(UINT32_MAX));
 
-  block_fifo_request_t request = {
-      .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
-      .group = 0,
-      .vmoid = vmoid,
-      .length = static_cast<uint32_t>(length),
-      .vmo_offset = vmo_offset,
-      .dev_offset = dev_offset,
-  };
+  uint64_t remaining_transfer_blocks = vmo_size / block_size.value();
+  uint64_t block_offset = 0;
+  while (remaining_transfer_blocks > 0) {
+    const uint64_t transfer_blocks = std::min(remaining_transfer_blocks, max_transfer_blocks);
 
-  if (auto status = zx::make_result(client_->Transaction(&request, 1)); status.is_error()) {
-    ERROR("Error reading partition data: %s\n", status.status_string());
-    return status.take_error();
+    block_fifo_request_t request = {
+        .command = {.opcode = BLOCK_OPCODE_READ, .flags = 0},
+        .group = 0,
+        .vmoid = vmoid,
+        .length = static_cast<uint32_t>(transfer_blocks),
+        .vmo_offset = vmo_offset + block_offset,
+        .dev_offset = dev_offset + block_offset,
+    };
+
+    if (auto status = zx::make_result(client_->Transaction(&request, 1)); status.is_error()) {
+      ERROR("Error reading partition data: %s\n", status.status_string());
+      return status.take_error();
+    }
+
+    remaining_transfer_blocks -= transfer_blocks;
+    block_offset += transfer_blocks;
   }
-
   return zx::ok();
 }
 
@@ -170,24 +187,34 @@ zx::result<> BlockPartitionClient::Write(vmoid_t vmoid, size_t vmo_size, size_t 
   if (block_size.is_error()) {
     return block_size.take_error();
   }
-  uint64_t length = vmo_size / block_size.value();
-  if (length > UINT32_MAX) {
-    ERROR("Error writing partition data: Too large\n");
-    return zx::error(ZX_ERR_OUT_OF_RANGE);
+  zx::result max_transfer_size = GetMaxTransferSize();
+  if (block_size.is_error()) {
+    return max_transfer_size.take_error();
   }
+  uint64_t max_transfer_blocks = max_transfer_size.value() / block_size.value();
+  max_transfer_blocks = std::min(max_transfer_blocks, static_cast<uint64_t>(UINT32_MAX));
 
-  block_fifo_request_t request = {
-      .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
-      .group = 0,
-      .vmoid = vmoid,
-      .length = static_cast<uint32_t>(length),
-      .vmo_offset = vmo_offset,
-      .dev_offset = dev_offset,
-  };
+  uint64_t remaining_transfer_blocks = vmo_size / block_size.value();
+  uint64_t block_offset = 0;
+  while (remaining_transfer_blocks > 0) {
+    const uint64_t transfer_blocks = std::min(remaining_transfer_blocks, max_transfer_blocks);
 
-  if (auto status = zx::make_result(client_->Transaction(&request, 1)); status.is_error()) {
-    ERROR("Error writing partition data: %s\n", status.status_string());
-    return status.take_error();
+    block_fifo_request_t request = {
+        .command = {.opcode = BLOCK_OPCODE_WRITE, .flags = 0},
+        .group = 0,
+        .vmoid = vmoid,
+        .length = static_cast<uint32_t>(transfer_blocks),
+        .vmo_offset = vmo_offset + block_offset,
+        .dev_offset = dev_offset + block_offset,
+    };
+
+    if (auto status = zx::make_result(client_->Transaction(&request, 1)); status.is_error()) {
+      ERROR("Error writing partition data: %s\n", status.status_string());
+      return status.take_error();
+    }
+
+    remaining_transfer_blocks -= transfer_blocks;
+    block_offset += transfer_blocks;
   }
   return zx::ok();
 }
