@@ -8,6 +8,7 @@
 #include <memory>
 #include <optional>
 
+#include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/assert.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/common/macros.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/gap.h"
 #include "src/connectivity/bluetooth/core/bt-host/public/pw_bluetooth_sapphire/internal/host/gap/legacy_pairing_state.h"
@@ -41,6 +42,12 @@ namespace bt::gap {
 // Only one of the two pairing states will ever be instantiated at a time.
 class PairingStateManager final {
  public:
+  enum class PairingStateType : uint8_t {
+    kSecureSimplePairing,
+    kLegacyPairing,
+    kUnknown,
+  };
+
   // Used to report the status of each pairing procedure on this link. |status|
   // will contain HostError::kNotSupported if the pairing procedure does not
   // proceed in the order of events expected.
@@ -83,8 +90,10 @@ class PairingStateManager final {
   // be asked to confirm pairing, even when Core Spec v5.0, Vol 3, Part C,
   // Section 5.2.2.6 indicates "automatic confirmation."
   void SetPairingDelegate(const PairingDelegate::WeakPtr& pairing_delegate) {
-    if (secure_simple_pairing_state_) {
+    if (pairing_state_type_ == PairingStateType::kSecureSimplePairing) {
       secure_simple_pairing_state_->SetPairingDelegate(pairing_delegate);
+    } else if (pairing_state_type_ == PairingStateType::kLegacyPairing) {
+      legacy_pairing_state_->SetPairingDelegate(pairing_delegate);
     }
   }
 
@@ -157,15 +166,38 @@ class PairingStateManager final {
   // Handler for hci::Connection::set_encryption_change_callback.
   void OnEncryptionChange(hci::Result<bool> result);
 
+  // Create a SecureSimplePairingState or LegacyPairingState object based on
+  // |type|. If the object for corresponding |type| has already been created,
+  // this method does nothing.
+  void CreateOrUpdatePairingState(PairingStateType type,
+                                  PairingDelegate::WeakPtr pairing_delegate);
+
+  void LogSspEventInLegacyPairing(const char* function) {
+    bt_log(WARN,
+           "gap",
+           "Received an SSP event for a %s pairing type in %s",
+           pairing_state_type_,
+           function);
+  }
+
   sm::SecurityProperties& security_properties() {
-    return secure_simple_pairing_state_->security_properties();
+    if (pairing_state_type_ == PairingStateType::kSecureSimplePairing) {
+      return secure_simple_pairing_state_->security_properties();
+    }
+    return legacy_pairing_state_->security_properties();
   }
 
   // Sets the BR/EDR Security Mode of the pairing state - see enum definition
   // for details of each mode. If a security upgrade is in-progress, only takes
   // effect on the next security upgrade.
   void set_security_mode(gap::BrEdrSecurityMode mode) {
-    secure_simple_pairing_state_->set_security_mode(mode);
+    if (pairing_state_type_ == PairingStateType::kSecureSimplePairing) {
+      secure_simple_pairing_state_->set_security_mode(mode);
+    }
+  }
+
+  SecureSimplePairingState* secure_simple_pairing_state() {
+    return secure_simple_pairing_state_.get();
   }
 
   LegacyPairingState* legacy_pairing_state() {
@@ -176,6 +208,7 @@ class PairingStateManager final {
   void AttachInspect(inspect::Node& parent, std::string name);
 
  private:
+  PairingStateType pairing_state_type_ = PairingStateType::kUnknown;
   std::unique_ptr<SecureSimplePairingState> secure_simple_pairing_state_;
   std::unique_ptr<LegacyPairingState> legacy_pairing_state_;
 
@@ -183,6 +216,18 @@ class PairingStateManager final {
 
   // The BR/EDR link whose pairing is being driven by this object.
   WeakPtr<hci::BrEdrConnection> link_;
+
+  // True when the BR/EDR |link_| was initiated by local device.
+  bool outgoing_connection_;
+
+  // Stores the auth_cb and status_cb values passed in via the
+  // PairingStateManager constructor when the ACL connection is complete because
+  // before interrogation is complete, we do not know which type of pairing
+  // state to create. These are later used by CreateOrUpdatePairingState to
+  // create/update the appropriate pairing state once the type determined either
+  // via interrogation or encountering a pairing event specific to SSP or LP.
+  fit::closure auth_cb_;
+  StatusCallback status_cb_;
 
   BT_DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(PairingStateManager);
 };
