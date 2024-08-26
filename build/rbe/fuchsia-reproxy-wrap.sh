@@ -324,12 +324,12 @@ fi
 # This also checks for authentication, and prompts the user to
 # re-authenticate if needed.
 _timetrace "Bootstrapping reproxy"
+bootstrap_status=0
 "${bootstrap_env[@]}" \
   "$bootstrap" \
   --re_proxy="$reproxy" \
   --cfg="$bootstrap_reproxy_cfg" \
-  "${bootstrap_options[@]}" > "$reproxy_logdir"/bootstrap.stdout 2>&1
-bootstrap_status="$?"
+  "${bootstrap_options[@]}" > "$reproxy_logdir"/bootstrap.stdout 2>&1 || bootstrap_status="$?"
 # Silence, unless --verbose or there is an error.
 [[ "$bootstrap_status" == 0 && "$verbose" != 1 ]] || {
   cat "$reproxy_logdir"/bootstrap.stdout
@@ -354,13 +354,13 @@ test "$BUILD_METRICS_ENABLED" = 0 || {
 shutdown() {
   _timetrace "Shutting down reproxy"
   # b/188923283 -- added --cfg to shut down properly
+  shutdown_status=0
   "${bootstrap_env[@]}" \
     "$bootstrap" \
     --shutdown \
     --fast_log_collection \
     --async_reproxy_termination \
-    --cfg="$reproxy_cfg" > "$reproxy_logdir"/shutdown.stdout 2>&1
-  shutdown_status="$?"
+    --cfg="$reproxy_cfg" > "$reproxy_logdir"/shutdown.stdout 2>&1 || shutdown_status="$?"
   [[ "$shutdown_status" == 0 && "$verbose" != 1 ]] || {
     cat "$reproxy_logdir"/shutdown.stdout
   }
