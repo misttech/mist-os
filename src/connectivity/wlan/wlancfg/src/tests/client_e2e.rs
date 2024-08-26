@@ -246,6 +246,7 @@ fn test_setup(
         roam_manager.clone(),
         telemetry_sender.clone(),
         recovery_receiver,
+        inspect::Inspector::default().root().create_child("iface_manager"),
     );
     let iface_manager_service = Box::pin(iface_manager_service);
     let scan_manager_service = Box::pin(

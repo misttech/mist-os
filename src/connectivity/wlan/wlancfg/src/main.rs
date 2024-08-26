@@ -351,6 +351,7 @@ async fn run_all_futures() -> Result<(), Error> {
         roam_manager,
         telemetry_sender.clone(),
         recovery_receiver,
+        component::inspector().root().create_child("iface_manager"),
     );
 
     let scanning_service = scan::serve_scanning_loop(
