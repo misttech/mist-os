@@ -91,7 +91,8 @@ pub enum LeaseState {
 pub enum Signal {
     Statecontrol(Admin),
     Sys2Shutdown(
-        // TODO(https://fxbug.dev/332392008): Remove or explain #[allow(dead_code)].
+        // The responder is held here to keep the current request and request stream alive, but is
+        // not actively read, hence the 'dead_code' attribute.
         #[allow(dead_code)] fsys::SystemControllerShutdownResponder,
     ),
     ShutdownControlLease(LeaseState),
