@@ -2,13 +2,16 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::mm::PAGE_SIZE;
-use crate::mutable_state::Guard;
-use crate::task::{CurrentTask, EventHandler, WaitCanceler, WaitQueue, Waiter};
-use crate::vfs::buffers::{
+#![recursion_limit = "512"]
+
+use fuchsia_zircon as zx;
+use starnix_core::mm::PAGE_SIZE;
+use starnix_core::mutable_state::Guard;
+use starnix_core::task::{CurrentTask, EventHandler, Kernel, WaitCanceler, WaitQueue, Waiter};
+use starnix_core::vfs::buffers::{
     Buffer, InputBuffer, InputBufferExt as _, OutputBuffer, OutputBufferCallback,
 };
-use crate::vfs::{
+use starnix_core::vfs::{
     default_eof_offset, default_fcntl, default_ioctl, default_seek, fileops_impl_nonseekable,
     fileops_impl_noop_sync, fs_args, fs_node_impl_dir_readonly, AppendLockGuard, CacheConfig,
     CacheMode, CheckAccessReason, DirEntry, DirEntryOps, DirectoryEntryType, DirentSink,
@@ -17,7 +20,6 @@ use crate::vfs::{
     FsNodeInfo, FsNodeOps, FsStr, FsString, PeekBufferSegmentsCallback, SeekTarget, SimpleFileNode,
     StaticDirectoryBuilder, SymlinkTarget, ValueOrSize, VecDirectory, VecDirectoryEntry, XattrOp,
 };
-use fuchsia_zircon as zx;
 use starnix_lifecycle::AtomicU64Counter;
 use starnix_logging::{log_error, log_trace, log_warn, track_stub};
 use starnix_sync::{
@@ -36,15 +38,16 @@ use starnix_uapi::vfs::{default_statfs, FdEvents};
 use starnix_uapi::{errno, errno_from_code, error, mode, off_t, statfs, uapi, FUSE_SUPER_MAGIC};
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, VecDeque};
+use std::ops::{Deref, DerefMut};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Weak};
 use zerocopy::{AsBytes, FromBytes, FromZeroes, IntoBytes, NoCell};
 
 const FUSE_ROOT_ID_U64: u64 = uapi::FUSE_ROOT_ID as u64;
-const CONFIGURATION_AVAILABLE_EVENT: u64 = u64::MAX;
+const CONFIGURATION_AVAILABLE_EVENT: u64 = std::u64::MAX;
 
 #[derive(Debug)]
-pub struct DevFuse {
+struct DevFuse {
     connection: Arc<FuseConnection>,
 }
 
@@ -55,14 +58,13 @@ pub fn open_fuse_device(
     _node: &FsNode,
     _flags: OpenFlags,
 ) -> Result<Box<dyn FileOps>, Errno> {
-    let fusectl_fs = fusectl_fs(current_task);
-    let connection = fusectl_fs.new_connection(current_task);
+    let connection = fuse_connections(current_task.kernel()).new_connection(current_task);
     Ok(Box::new(DevFuse { connection }))
 }
 
 fn attr_valid_to_duration(attr_valid: u64, attr_valid_nsec: u32) -> Result<zx::Duration, Errno> {
     duration_from_timespec(uapi::timespec {
-        tv_sec: i64::try_from(attr_valid).unwrap_or(i64::MAX),
+        tv_sec: i64::try_from(attr_valid).unwrap_or(std::i64::MAX),
         tv_nsec: attr_valid_nsec.into(),
     })
 }
@@ -124,6 +126,7 @@ impl FileOps for DevFuse {
 }
 
 pub fn new_fuse_fs(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
@@ -147,8 +150,9 @@ pub fn new_fuse_fs(
     )?;
     let fuse_node = FuseNode::new(connection.clone(), FUSE_ROOT_ID_U64, 0);
     fuse_node.state.lock().nlookup += 1;
+    let fuse_node_id = fuse_node.nodeid;
 
-    let mut root_node = FsNode::new_root(fuse_node.clone());
+    let mut root_node = FsNode::new_root(fuse_node);
     root_node.node_id = FUSE_ROOT_ID_U64;
     fs.set_root_node(root_node);
     {
@@ -156,27 +160,23 @@ pub fn new_fuse_fs(
         state.connect();
         state.execute_operation(
             current_task,
-            fuse_node.nodeid,
+            fuse_node_id,
             FuseOperation::Init { fs: Arc::downgrade(&fs) },
         )?;
     }
     Ok(fs)
 }
 
-fn fusectl_fs(current_task: &CurrentTask) -> &Arc<FuseCtlFs> {
-    current_task.kernel().fusectl_fs.get_or_init(|| Default::default())
+fn fuse_connections(kernel: &Arc<Kernel>) -> Arc<FuseConnections> {
+    kernel.expando.get::<FuseConnections>()
 }
 
 pub fn new_fusectl_fs(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {
-    let fs = FileSystem::new(
-        current_task.kernel(),
-        CacheMode::Uncached,
-        Arc::clone(fusectl_fs(current_task)),
-        options,
-    )?;
+    let fs = FileSystem::new(current_task.kernel(), CacheMode::Uncached, FuseCtlFs, options)?;
     let root_node = FsNode::new_root_with_properties(FuseCtlConnectionsDirectory {}, |info| {
         info.chmod(mode!(IFDIR, 0o755));
     });
@@ -263,12 +263,12 @@ impl FileSystemOps for FuseFs {
 }
 
 #[derive(Debug, Default)]
-pub struct FuseCtlFs {
+struct FuseConnections {
     connections: Mutex<Vec<Weak<FuseConnection>>>,
     next_identifier: AtomicU64Counter,
 }
 
-impl FuseCtlFs {
+impl FuseConnections {
     fn new_connection(&self, current_task: &CurrentTask) -> Arc<FuseConnection> {
         let connection = Arc::new(FuseConnection {
             id: self.next_identifier.next(),
@@ -294,7 +294,9 @@ impl FuseCtlFs {
     }
 }
 
-impl FileSystemOps for Arc<FuseCtlFs> {
+struct FuseCtlFs;
+
+impl FileSystemOps for FuseCtlFs {
     fn rename(
         &self,
         _fs: &FileSystem,
@@ -333,9 +335,9 @@ impl FsNodeOps for FuseCtlConnectionsDirectory {
         current_task: &CurrentTask,
         _flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        let fs = fusectl_fs(current_task);
+        let connnections = fuse_connections(current_task.kernel());
         let mut entries = vec![];
-        fs.for_each(|connection| {
+        connnections.for_each(|connection| {
             entries.push(VecDirectoryEntry {
                 entry_type: DirectoryEntryType::DIR,
                 name: connection.id.to_string().into(),
@@ -353,9 +355,9 @@ impl FsNodeOps for FuseCtlConnectionsDirectory {
     ) -> Result<FsNodeHandle, Errno> {
         let name = std::str::from_utf8(name).map_err(|_| errno!(ENOENT))?;
         let id = name.parse::<u64>().map_err(|_| errno!(ENOENT))?;
-        let fs = fusectl_fs(current_task);
+        let connnections = fuse_connections(current_task.kernel());
         let mut connection = None;
-        fs.for_each(|c| {
+        connnections.for_each(|c| {
             if c.id == id {
                 connection = Some(c);
             }
@@ -468,14 +470,14 @@ struct FuseNode {
 }
 
 impl FuseNode {
-    fn new(connection: Arc<FuseConnection>, nodeid: u64, generation: u64) -> Arc<Self> {
-        Arc::new(Self {
+    fn new(connection: Arc<FuseConnection>, nodeid: u64, generation: u64) -> Self {
+        Self {
             connection,
             nodeid,
             generation,
             attributes_valid_until: zx::MonotonicTime::INFINITE_PAST.into(),
             state: Default::default(),
-        })
+        }
     }
 
     /// Downcasts this `node` to a [`FuseNode`].
@@ -483,8 +485,8 @@ impl FuseNode {
     /// # Panics
     ///
     /// Panics if the `node` is not a `FuseNode`.
-    fn from_node(node: &FsNode) -> &Arc<FuseNode> {
-        node.downcast_ops::<Arc<FuseNode>>().expect("FUSE should only handle `FuseNode`s")
+    fn from_node(node: &FsNode) -> &FuseNode {
+        node.downcast_ops::<FuseNode>().expect("FUSE should only handle `FuseNode`s")
     }
 
     fn default_check_access_with_valid_node_attributes(
@@ -638,7 +640,7 @@ struct FuseFileObject {
 
 impl FuseFileObject {
     /// Returns the `FuseNode` associated with the opened file.
-    fn get_fuse_node(file: &FileObject) -> &Arc<FuseNode> {
+    fn get_fuse_node(file: &FileObject) -> &FuseNode {
         FuseNode::from_node(file.node())
     }
 }
@@ -1017,7 +1019,7 @@ impl DirEntryOps for FuseDirEntry {
 // `FuseFs.default_permissions` is not used to synchronize anything.
 const DEFAULT_PERMISSIONS_ATOMIC_ORDERING: Ordering = Ordering::Relaxed;
 
-impl FsNodeOps for Arc<FuseNode> {
+impl FsNodeOps for FuseNode {
     fn check_access(
         &self,
         node: &FsNode,
@@ -1495,11 +1497,27 @@ struct FuseConnection {
     state: Mutex<FuseMutableState>,
 }
 
-type FuseMutableStateGuard<'a> = Guard<'a, FuseConnection, MutexGuard<'a, FuseMutableState>>;
+struct FuseMutableStateGuard<'a>(Guard<'a, FuseConnection, MutexGuard<'a, FuseMutableState>>);
+
+impl<'a> Deref for FuseMutableStateGuard<'a> {
+    type Target = Guard<'a, FuseConnection, MutexGuard<'a, FuseMutableState>>;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a> DerefMut for FuseMutableStateGuard<'a> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
 
 impl FuseConnection {
-    fn lock(&self) -> FuseMutableStateGuard<'_> {
-        FuseMutableStateGuard::new(self, self.state.lock())
+    fn lock<'a>(&'a self) -> FuseMutableStateGuard<'a> {
+        FuseMutableStateGuard(Guard::<'a, FuseConnection, MutexGuard<'a, FuseMutableState>>::new(
+            self,
+            self.state.lock(),
+        ))
     }
 }
 
@@ -1581,7 +1599,9 @@ impl<'a> FuseMutableStateGuard<'a> {
             if let Some(configuration) = self.configuration.as_ref() {
                 return Ok(f(configuration));
             }
-            Self::unlocked(self, || waiter.wait(current_task))?;
+            Guard::<'a, FuseConnection, MutexGuard<'a, FuseMutableState>>::unlocked(self, || {
+                waiter.wait(current_task)
+            })?;
         }
     }
 
@@ -1633,7 +1653,10 @@ impl<'a> FuseMutableStateGuard<'a> {
             if let Some(response) = self.get_response(unique_id) {
                 return response;
             }
-            match Self::unlocked(self, || waiter.wait(current_task)) {
+            match Guard::<'a, FuseConnection, MutexGuard<'a, FuseMutableState>>::unlocked(
+                self,
+                || waiter.wait(current_task),
+            ) {
                 Ok(()) => {}
                 Err(e) if e == EINTR => {
                     // If interrupted by another process, send an interrupt command to the server

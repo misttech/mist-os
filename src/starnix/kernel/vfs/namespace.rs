@@ -16,7 +16,6 @@ use crate::task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, Waiter}
 use crate::time::utc;
 use crate::vfs::buffers::InputBuffer;
 use crate::vfs::fs_registry::FsRegistry;
-use crate::vfs::fuse::{new_fuse_fs, new_fusectl_fs};
 use crate::vfs::socket::{SocketAddress, SocketHandle, UnixSocket};
 use crate::vfs::{
     fileops_impl_dataless, fileops_impl_delegate_read_and_seek, fileops_impl_nonseekable,
@@ -727,8 +726,6 @@ impl CurrentTask {
         match &**fs_type {
             b"devtmpfs" => Ok(dev_tmp_fs(locked, self).clone()),
             b"functionfs" => FunctionFs::new_fs(self, options),
-            b"fuse" => new_fuse_fs(self, options),
-            b"fusectl" => new_fusectl_fs(self, options),
             b"overlay" => OverlayFs::new_fs(locked, self, options),
             b"proc" => Ok(proc_fs(self, options).clone()),
             b"remotefs" => create_remotefs_filesystem(kernel, data_dir()?, options, rights),

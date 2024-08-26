@@ -13,8 +13,8 @@ use starnix_core::fs::nmfs::nmfs;
 use starnix_core::fs::sysfs::DeviceDirectory;
 use starnix_core::task::{CurrentTask, Kernel};
 use starnix_core::vfs::fs_registry::FsRegistry;
-use starnix_core::vfs::fuse::open_fuse_device;
 use starnix_modules_ext4::ExtFilesystem;
+use starnix_modules_fuse::{new_fuse_fs, new_fusectl_fs, open_fuse_device};
 use starnix_modules_loop::{create_loop_control_device, loop_device_init};
 use starnix_modules_tun::DevTun;
 use starnix_modules_zram::zram_device_init;
@@ -95,4 +95,6 @@ pub fn register_common_file_systems(_locked: &mut Locked<'_, Unlocked>, kernel: 
     registry.register(b"devpts".into(), dev_pts_fs);
     registry.register(b"nmfs".into(), nmfs);
     registry.register(b"ext4".into(), ExtFilesystem::new_fs);
+    registry.register(b"fuse".into(), new_fuse_fs);
+    registry.register(b"fusectl".into(), new_fusectl_fs);
 }

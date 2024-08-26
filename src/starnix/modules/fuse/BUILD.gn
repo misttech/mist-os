@@ -4,17 +4,8 @@
 
 import("//build/rust/rustc_library.gni")
 
-group("tests") {
-  testonly = true
-  deps = [
-    "ext4:tests",
-    "input:tests",
-    "loop:tests",
-  ]
-}
-
-rustc_library("modules") {
-  name = "starnix-modules"
+rustc_library("fuse") {
+  name = "starnix-modules-fuse"
   edition = "2021"
   version = "0.1.0"
   source_root = "lib.rs"
@@ -22,13 +13,14 @@ rustc_library("modules") {
   sources = [ "lib.rs" ]
 
   deps = [
+    "//src/lib/zircon/rust:fuchsia-zircon",
     "//src/starnix/kernel:starnix_core",
+    "//src/starnix/kernel:starnix_logging",
+    "//src/starnix/lib/starnix-lifecycle",
     "//src/starnix/lib/starnix-sync",
+    "//src/starnix/lib/starnix-syscalls",
     "//src/starnix/lib/starnix-uapi",
-    "//src/starnix/modules/ext4",
-    "//src/starnix/modules/fuse",
-    "//src/starnix/modules/loop",
-    "//src/starnix/modules/tun",
-    "//src/starnix/modules/zram",
+    "//third_party/rust_crates:bitflags",
+    "//third_party/rust_crates:zerocopy",
   ]
 }
