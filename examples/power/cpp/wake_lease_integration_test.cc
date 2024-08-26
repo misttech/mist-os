@@ -9,7 +9,6 @@
 #include <lib/component/incoming/cpp/protocol.h>
 #include <lib/fidl/cpp/client.h>
 #include <lib/fpromise/result.h>
-#include <lib/syslog/cpp/macros.h>
 #include <lib/zx/time.h>
 
 #include <memory>
@@ -19,11 +18,13 @@
 #include <gtest/gtest.h>
 #include <src/lib/testing/loop_fixture/real_loop_fixture.h>
 
+#include "examples/power/cpp/testing/fidl_test_base_default.h"
 #include "examples/power/cpp/wake_lease.h"
 #include "lib/fidl/cpp/wire/internal/transport.h"
 
 namespace {
 
+using examples::power::testing::FidlTestBaseDefault;
 using fuchsia_power_broker::CurrentLevel;
 using fuchsia_power_broker::DependencyToken;
 using fuchsia_power_broker::DependencyType;
@@ -50,7 +51,7 @@ class WakeLeaseIntegrationTest : public gtest::RealLoopFixture {
   }
 };
 
-class TestActivityGovernorListener : public fidl::testing::TestBase<ActivityGovernorListener> {
+class TestActivityGovernorListener : public FidlTestBaseDefault<ActivityGovernorListener> {
  public:
   explicit TestActivityGovernorListener(async_dispatcher_t* dispatcher,
                                         fidl::ServerEnd<ActivityGovernorListener> server_end)
@@ -67,14 +68,6 @@ class TestActivityGovernorListener : public fidl::testing::TestBase<ActivityGove
 
   // These completers must also reply for expected operation.
   void OnResume(OnResumeCompleter::Sync& completer) override { completer.Reply(); }
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    FAIL() << "Unexpected call: " << name;
-  }
-  void handle_unknown_method(fidl::UnknownMethodMetadata<ActivityGovernorListener> metadata,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {
-    FAIL() << "Encountered unknown method";
-  }
 
   fidl::ServerBinding<ActivityGovernorListener> binding_;
   bool suspend_started_ = false;
