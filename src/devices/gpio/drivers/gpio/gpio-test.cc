@@ -4,7 +4,6 @@
 
 #include "gpio.h"
 
-#include <fidl/fuchsia.hardware.gpioimpl/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.pinimpl/cpp/driver/fidl.h>
 #include <fidl/fuchsia.scheduler/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
@@ -23,7 +22,7 @@ namespace gpio {
 
 namespace {
 
-class MockGpioImpl : public fdf::WireServer<fuchsia_hardware_gpioimpl::GpioImpl> {
+class MockPinImpl : public fdf::WireServer<fuchsia_hardware_pinimpl::PinImpl> {
  public:
   static constexpr uint32_t kMaxInitStepPinIndex = 10;
 
@@ -31,26 +30,26 @@ class MockGpioImpl : public fdf::WireServer<fuchsia_hardware_gpioimpl::GpioImpl>
     enum Mode { kUnknown, kIn, kOut };
 
     Mode mode = kUnknown;
-    uint8_t value = UINT8_MAX;
-    fuchsia_hardware_gpio::GpioFlags flags;
+    bool value = false;
+    fuchsia_hardware_pin::Pull pull;
     uint64_t alt_function = UINT64_MAX;
     uint64_t drive_strength = UINT64_MAX;
-    fuchsia_hardware_gpio::GpioPolarity polarity;
+    fuchsia_hardware_gpio::InterruptMode interrupt_mode;
   };
 
   PinState pin_state(uint32_t index) { return pin_state_internal(index); }
   void set_pin_state(uint32_t index, PinState state) { pin_state_internal(index) = state; }
 
   zx_status_t Serve(fdf::OutgoingDirectory& to_driver_vfs) {
-    fuchsia_hardware_gpioimpl::Service::InstanceHandler instance_handler({
+    fuchsia_hardware_pinimpl::Service::InstanceHandler instance_handler({
         .device =
-            [this](fdf::ServerEnd<fuchsia_hardware_gpioimpl::GpioImpl> server) {
+            [this](fdf::ServerEnd<fuchsia_hardware_pinimpl::PinImpl> server) {
               EXPECT_FALSE(binding_);
               binding_.emplace(fdf::Dispatcher::GetCurrent()->get(), std::move(server), this,
                                fidl::kIgnoreBindingClosure);
             },
     });
-    return to_driver_vfs.AddService<fuchsia_hardware_gpioimpl::Service>(std::move(instance_handler))
+    return to_driver_vfs.AddService<fuchsia_hardware_pinimpl::Service>(std::move(instance_handler))
         .status_value();
   }
 
@@ -63,75 +62,84 @@ class MockGpioImpl : public fdf::WireServer<fuchsia_hardware_gpioimpl::GpioImpl>
   }
 
   void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_hardware_gpioimpl::GpioImpl> metadata,
+      fidl::UnknownMethodMetadata<fuchsia_hardware_pinimpl::PinImpl> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override {}
 
-  void ConfigIn(fuchsia_hardware_gpioimpl::wire::GpioImplConfigInRequest* request,
-                fdf::Arena& arena, ConfigInCompleter::Sync& completer) override {
-    if (request->index > kMaxInitStepPinIndex) {
-      return completer.buffer(arena).ReplyError(ZX_ERR_NOT_FOUND);
-    }
-    pin_state_internal(request->index).mode = PinState::Mode::kIn;
-    pin_state_internal(request->index).flags = request->flags;
-    completer.buffer(arena).ReplySuccess();
-  }
-  void ConfigOut(fuchsia_hardware_gpioimpl::wire::GpioImplConfigOutRequest* request,
-                 fdf::Arena& arena, ConfigOutCompleter::Sync& completer) override {
-    if (request->index > kMaxInitStepPinIndex) {
-      return completer.buffer(arena).ReplyError(ZX_ERR_NOT_FOUND);
-    }
-    pin_state_internal(request->index).mode = PinState::Mode::kOut;
-    pin_state_internal(request->index).value = request->initial_value;
-    completer.buffer(arena).ReplySuccess();
-  }
-  void SetAltFunction(fuchsia_hardware_gpioimpl::wire::GpioImplSetAltFunctionRequest* request,
-                      fdf::Arena& arena, SetAltFunctionCompleter::Sync& completer) override {
-    if (request->index > kMaxInitStepPinIndex) {
-      return completer.buffer(arena).ReplyError(ZX_ERR_NOT_FOUND);
-    }
-    pin_state_internal(request->index).alt_function = request->function;
-    completer.buffer(arena).ReplySuccess();
-  }
-  void Read(fuchsia_hardware_gpioimpl::wire::GpioImplReadRequest* request, fdf::Arena& arena,
+  void Read(fuchsia_hardware_pinimpl::wire::PinImplReadRequest* request, fdf::Arena& arena,
             ReadCompleter::Sync& completer) override {
-    completer.buffer(arena).ReplySuccess(pin_state_internal(request->index).value);
-  }
-  void Write(fuchsia_hardware_gpioimpl::wire::GpioImplWriteRequest* request, fdf::Arena& arena,
-             WriteCompleter::Sync& completer) override {
-    if (request->index > kMaxInitStepPinIndex) {
-      return completer.buffer(arena).ReplyError(ZX_ERR_NOT_FOUND);
-    }
-    pin_state_internal(request->index).value = request->value;
-    completer.buffer(arena).ReplySuccess();
-  }
-  void SetPolarity(fuchsia_hardware_gpioimpl::wire::GpioImplSetPolarityRequest* request,
-                   fdf::Arena& arena, SetPolarityCompleter::Sync& completer) override {
-    pin_state_internal(request->index).polarity = request->polarity;
-    completer.buffer(arena).ReplySuccess();
-  }
-  void SetDriveStrength(fuchsia_hardware_gpioimpl::wire::GpioImplSetDriveStrengthRequest* request,
-                        fdf::Arena& arena, SetDriveStrengthCompleter::Sync& completer) override {
-    if (request->index > kMaxInitStepPinIndex) {
-      return completer.buffer(arena).ReplyError(ZX_ERR_NOT_FOUND);
-    }
-    pin_state_internal(request->index).drive_strength = request->ds_ua;
-    completer.buffer(arena).ReplySuccess(request->ds_ua);
-  }
-  void GetDriveStrength(fuchsia_hardware_gpioimpl::wire::GpioImplGetDriveStrengthRequest* request,
-                        fdf::Arena& arena, GetDriveStrengthCompleter::Sync& completer) override {
-    completer.buffer(arena).ReplySuccess(pin_state_internal(request->index).drive_strength);
-  }
-  void GetInterrupt(fuchsia_hardware_gpioimpl::wire::GpioImplGetInterruptRequest* request,
-                    fdf::Arena& arena, GetInterruptCompleter::Sync& completer) override {}
-  void ReleaseInterrupt(fuchsia_hardware_gpioimpl::wire::GpioImplReleaseInterruptRequest* request,
-                        fdf::Arena& arena, ReleaseInterruptCompleter::Sync& completer) override {}
-  void GetPins(fdf::Arena& arena, GetPinsCompleter::Sync& completer) override {}
-  void GetInitSteps(fdf::Arena& arena, GetInitStepsCompleter::Sync& completer) override {}
-  void GetControllerId(fdf::Arena& arena, GetControllerIdCompleter::Sync& completer) override {
-    completer.buffer(arena).Reply(0);
+    completer.buffer(arena).ReplySuccess(pin_state_internal(request->pin).value);
   }
 
-  std::optional<fdf::ServerBinding<fuchsia_hardware_gpioimpl::GpioImpl>> binding_;
+  void SetBufferMode(fuchsia_hardware_pinimpl::wire::PinImplSetBufferModeRequest* request,
+                     fdf::Arena& arena, SetBufferModeCompleter::Sync& completer) override {
+    if (request->pin > kMaxInitStepPinIndex) {
+      return completer.buffer(arena).ReplyError(ZX_ERR_NOT_FOUND);
+    }
+
+    switch (request->mode) {
+      case fuchsia_hardware_gpio::BufferMode::kOutputLow:
+        pin_state_internal(request->pin).value = false;
+        pin_state_internal(request->pin).mode = PinState::Mode::kOut;
+        break;
+      case fuchsia_hardware_gpio::BufferMode::kOutputHigh:
+        pin_state_internal(request->pin).value = true;
+        pin_state_internal(request->pin).mode = PinState::Mode::kOut;
+        break;
+      case fuchsia_hardware_gpio::BufferMode::kInput:
+        pin_state_internal(request->pin).mode = PinState::Mode::kIn;
+        break;
+      default:
+        completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
+        return;
+    }
+
+    completer.buffer(arena).ReplySuccess();
+  }
+
+  void GetInterrupt(fuchsia_hardware_pinimpl::wire::PinImplGetInterruptRequest* request,
+                    fdf::Arena& arena, GetInterruptCompleter::Sync& completer) override {}
+
+  void ConfigureInterrupt(fuchsia_hardware_pinimpl::wire::PinImplConfigureInterruptRequest* request,
+                          fdf::Arena& arena,
+                          ConfigureInterruptCompleter::Sync& completer) override {
+    if (request->config.has_mode()) {
+      pin_state_internal(request->pin).interrupt_mode = request->config.mode();
+      completer.buffer(arena).ReplySuccess();
+    } else {
+      completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
+    }
+  }
+
+  void ReleaseInterrupt(fuchsia_hardware_pinimpl::wire::PinImplReleaseInterruptRequest* request,
+                        fdf::Arena& arena, ReleaseInterruptCompleter::Sync& completer) override {}
+
+  void Configure(fuchsia_hardware_pinimpl::wire::PinImplConfigureRequest* request,
+                 fdf::Arena& arena, ConfigureCompleter::Sync& completer) override {
+    if (request->pin > kMaxInitStepPinIndex) {
+      return completer.buffer(arena).ReplyError(ZX_ERR_NOT_FOUND);
+    }
+
+    if (request->config.has_pull()) {
+      pin_state_internal(request->pin).pull = request->config.pull();
+    }
+
+    if (request->config.has_function()) {
+      pin_state_internal(request->pin).alt_function = request->config.function();
+    }
+
+    if (request->config.has_drive_strength_ua()) {
+      pin_state_internal(request->pin).drive_strength = request->config.drive_strength_ua();
+    }
+
+    auto new_config = fuchsia_hardware_pin::wire::Configuration::Builder(arena)
+                          .pull(pin_state_internal(request->pin).pull)
+                          .function(pin_state_internal(request->pin).alt_function)
+                          .drive_strength_ua(pin_state_internal(request->pin).drive_strength)
+                          .Build();
+    completer.buffer(arena).ReplySuccess(new_config);
+  }
+
+  std::optional<fdf::ServerBinding<fuchsia_hardware_pinimpl::PinImpl>> binding_;
   std::vector<PinState> pins_;
 };
 
@@ -140,16 +148,16 @@ class GpioTestEnvironment : public fdf_testing::Environment {
   zx::result<> Serve(fdf::OutgoingDirectory& to_driver_vfs) override {
     compat_.Init(component::kDefaultInstance, "root");
     EXPECT_OK(compat_.Serve(fdf::Dispatcher::GetCurrent()->async_dispatcher(), &to_driver_vfs));
-    EXPECT_OK(gpioimpl_.Serve(to_driver_vfs));
+    EXPECT_OK(pinimpl_.Serve(to_driver_vfs));
     return zx::ok();
   }
 
   compat::DeviceServer& compat() { return compat_; }
-  MockGpioImpl& gpioimpl() { return gpioimpl_; }
+  MockPinImpl& pinimpl() { return pinimpl_; }
 
  private:
   compat::DeviceServer compat_;
-  MockGpioImpl gpioimpl_;
+  MockPinImpl pinimpl_;
 };
 
 class FixtureConfig final {
@@ -160,14 +168,14 @@ class FixtureConfig final {
 
 class GpioTest : public ::testing::Test {
  public:
-  MockGpioImpl::PinState pin_state(uint32_t index) {
-    return driver_test().RunInEnvironmentTypeContext<MockGpioImpl::PinState>(
-        [index](GpioTestEnvironment& env) { return env.gpioimpl().pin_state(index); });
+  MockPinImpl::PinState pin_state(uint32_t index) {
+    return driver_test().RunInEnvironmentTypeContext<MockPinImpl::PinState>(
+        [index](GpioTestEnvironment& env) { return env.pinimpl().pin_state(index); });
   }
 
-  void set_pin_state(uint32_t index, MockGpioImpl::PinState state) {
+  void set_pin_state(uint32_t index, MockPinImpl::PinState state) {
     driver_test().RunInEnvironmentTypeContext(
-        [index, state](GpioTestEnvironment& env) { env.gpioimpl().set_pin_state(index, state); });
+        [index, state](GpioTestEnvironment& env) { env.pinimpl().set_pin_state(index, state); });
   }
 
   fdf_testing::ForegroundDriverTest<FixtureConfig>& driver_test() { return driver_test_; }
@@ -196,7 +204,7 @@ TEST_F(GpioTest, TestFidlAll) {
   fidl::WireClient<fuchsia_hardware_gpio::Gpio> gpio_client(
       *std::move(client_end), fdf::Dispatcher::GetCurrent()->async_dispatcher());
 
-  set_pin_state(1, MockGpioImpl::PinState{.value = 20});
+  set_pin_state(1, MockPinImpl::PinState{.value = true});
   gpio_client->Read().ThenExactlyOnce(
       [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::Read>& result) {
         ASSERT_OK(result.status());
@@ -214,7 +222,7 @@ TEST_F(GpioTest, TestFidlAll) {
   driver_test().runtime().Run();
   driver_test().runtime().ResetQuit();
 
-  EXPECT_EQ(pin_state(1).value, 11);
+  EXPECT_TRUE(pin_state(1).value);
 
   gpio_client->ConfigIn(fuchsia_hardware_gpio::GpioFlags::kPullDown)
       .ThenExactlyOnce([&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ConfigIn>& result) {
@@ -224,7 +232,7 @@ TEST_F(GpioTest, TestFidlAll) {
   driver_test().runtime().Run();
   driver_test().runtime().ResetQuit();
 
-  EXPECT_EQ(pin_state(1).flags, fuchsia_hardware_gpio::GpioFlags::kPullDown);
+  EXPECT_EQ(pin_state(1).pull, fuchsia_hardware_pin::Pull::kDown);
 
   gpio_client->ConfigOut(5).ThenExactlyOnce(
       [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ConfigOut>& result) {
@@ -234,7 +242,7 @@ TEST_F(GpioTest, TestFidlAll) {
   driver_test().runtime().Run();
   driver_test().runtime().ResetQuit();
 
-  EXPECT_EQ(pin_state(1).value, 5);
+  EXPECT_TRUE(pin_state(1).value);
 
   gpio_client->SetDriveStrength(2000).ThenExactlyOnce(
       [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::SetDriveStrength>& result) {
@@ -271,7 +279,7 @@ TEST_F(GpioTest, TestFidlAll) {
   driver_test().runtime().Run();
   driver_test().runtime().ResetQuit();
 
-  EXPECT_EQ(pin_state(1).polarity, fuchsia_hardware_gpio::GpioPolarity::kHigh);
+  EXPECT_EQ(pin_state(1).interrupt_mode, fuchsia_hardware_gpio::InterruptMode::kEdgeHigh);
 
   gpio_client->ConfigureInterrupt(interrupt_config(fuchsia_hardware_gpio::InterruptMode::kEdgeLow))
       .ThenExactlyOnce(
@@ -283,7 +291,7 @@ TEST_F(GpioTest, TestFidlAll) {
   driver_test().runtime().Run();
   driver_test().runtime().ResetQuit();
 
-  EXPECT_EQ(pin_state(1).polarity, fuchsia_hardware_gpio::GpioPolarity::kLow);
+  EXPECT_EQ(pin_state(1).interrupt_mode, fuchsia_hardware_gpio::InterruptMode::kEdgeLow);
 
   gpio_client
       ->ConfigureInterrupt(interrupt_config(fuchsia_hardware_gpio::InterruptMode::kLevelHigh))
@@ -296,7 +304,7 @@ TEST_F(GpioTest, TestFidlAll) {
   driver_test().runtime().Run();
   driver_test().runtime().ResetQuit();
 
-  EXPECT_EQ(pin_state(1).polarity, fuchsia_hardware_gpio::GpioPolarity::kHigh);
+  EXPECT_EQ(pin_state(1).interrupt_mode, fuchsia_hardware_gpio::InterruptMode::kLevelHigh);
 
   gpio_client->ConfigureInterrupt(interrupt_config(fuchsia_hardware_gpio::InterruptMode::kLevelLow))
       .ThenExactlyOnce(
@@ -308,7 +316,7 @@ TEST_F(GpioTest, TestFidlAll) {
   driver_test().runtime().Run();
   driver_test().runtime().ResetQuit();
 
-  EXPECT_EQ(pin_state(1).polarity, fuchsia_hardware_gpio::GpioPolarity::kLow);
+  EXPECT_EQ(pin_state(1).interrupt_mode, fuchsia_hardware_gpio::InterruptMode::kLevelLow);
 
   gpio_client->ConfigureInterrupt(interrupt_config(fuchsia_hardware_gpio::InterruptMode::kEdgeBoth))
       .ThenExactlyOnce(
@@ -320,18 +328,19 @@ TEST_F(GpioTest, TestFidlAll) {
   driver_test().runtime().Run();
   driver_test().runtime().ResetQuit();
 
-  EXPECT_EQ(pin_state(1).polarity, fuchsia_hardware_gpio::GpioPolarity::kLow);
+  EXPECT_EQ(pin_state(1).interrupt_mode, fuchsia_hardware_gpio::InterruptMode::kEdgeBoth);
 
   gpio_client->ConfigureInterrupt({}).ThenExactlyOnce(
       [&](fidl::WireUnownedResult<fuchsia_hardware_gpio::Gpio::ConfigureInterrupt>& result) {
         ASSERT_OK(result.status());
+        // The mock pinimpl driver should return an error for the empty interrupt config.
         EXPECT_TRUE(result->is_error());
         driver_test().runtime().Quit();
       });
   driver_test().runtime().Run();
   driver_test().runtime().ResetQuit();
 
-  EXPECT_EQ(pin_state(1).polarity, fuchsia_hardware_gpio::GpioPolarity::kLow);
+  EXPECT_EQ(pin_state(1).interrupt_mode, fuchsia_hardware_gpio::InterruptMode::kEdgeBoth);
 
   EXPECT_TRUE(driver_test().StopDriver().is_ok());
 }
@@ -478,21 +487,21 @@ TEST_F(GpioTest, Init) {
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
   // Validate the final state of the pins with the init steps applied.
-  EXPECT_EQ(pin_state(1).mode, MockGpioImpl::PinState::Mode::kOut);
-  EXPECT_EQ(pin_state(1).flags, fuchsia_hardware_gpio::GpioFlags::kPullUp);
-  EXPECT_EQ(pin_state(1).value, 1);
+  EXPECT_EQ(pin_state(1).mode, MockPinImpl::PinState::Mode::kOut);
+  EXPECT_EQ(pin_state(1).pull, fuchsia_hardware_pin::Pull::kUp);
+  EXPECT_TRUE(pin_state(1).value);
   EXPECT_EQ(pin_state(1).alt_function, 0ul);
   EXPECT_EQ(pin_state(1).drive_strength, 4000ul);
 
-  EXPECT_EQ(pin_state(2).mode, MockGpioImpl::PinState::Mode::kOut);
-  EXPECT_EQ(pin_state(2).flags, fuchsia_hardware_gpio::GpioFlags::kNoPull);
-  EXPECT_EQ(pin_state(2).value, 1);
+  EXPECT_EQ(pin_state(2).mode, MockPinImpl::PinState::Mode::kOut);
+  EXPECT_EQ(pin_state(2).pull, fuchsia_hardware_pin::Pull::kNone);
+  EXPECT_TRUE(pin_state(2).value);
   EXPECT_EQ(pin_state(2).alt_function, 0ul);
   EXPECT_EQ(pin_state(2).drive_strength, 1000ul);
 
-  EXPECT_EQ(pin_state(3).mode, MockGpioImpl::PinState::Mode::kIn);
-  EXPECT_EQ(pin_state(3).flags, fuchsia_hardware_gpio::GpioFlags::kPullUp);
-  EXPECT_EQ(pin_state(3).value, 1);
+  EXPECT_EQ(pin_state(3).mode, MockPinImpl::PinState::Mode::kOut);
+  EXPECT_EQ(pin_state(3).pull, fuchsia_hardware_pin::Pull::kUp);
+  EXPECT_TRUE(pin_state(3).value);
   EXPECT_EQ(pin_state(3).alt_function, 3ul);
   EXPECT_EQ(pin_state(3).drive_strength, 2000ul);
 
@@ -518,7 +527,7 @@ TEST_F(GpioTest, InitWithoutPins) {
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
-  EXPECT_EQ(pin_state(1).flags, fuchsia_hardware_gpio::GpioFlags::kPullDown);
+  EXPECT_EQ(pin_state(1).pull, fuchsia_hardware_pin::Pull::kDown);
 
   driver_test().RunInNodeContext([](fdf_testing::TestNode& node) {
     EXPECT_EQ(node.children().count("gpio"), 1ul);
@@ -558,7 +567,7 @@ TEST_F(GpioTest, InitErrorHandling) {
   steps.push_back(config(2, fhpin::Configuration{{.drive_strength_ua = 2000}}));
 
   // Using an index of 11 should cause the fake pinimpl device to return an error.
-  steps.push_back(mode(MockGpioImpl::kMaxInitStepPinIndex + 1, fhgpio::BufferMode::kOutputLow));
+  steps.push_back(mode(MockPinImpl::kMaxInitStepPinIndex + 1, fhgpio::BufferMode::kOutputLow));
 
   // Processing should not continue after the above error.
 
@@ -578,14 +587,14 @@ TEST_F(GpioTest, InitErrorHandling) {
 
   EXPECT_TRUE(driver_test().StartDriver().is_ok());
 
-  EXPECT_EQ(pin_state(2).mode, MockGpioImpl::PinState::Mode::kIn);
-  EXPECT_EQ(pin_state(2).flags, fuchsia_hardware_gpio::GpioFlags::kNoPull);
+  EXPECT_EQ(pin_state(2).mode, MockPinImpl::PinState::Mode::kUnknown);
+  EXPECT_EQ(pin_state(2).pull, fuchsia_hardware_pin::Pull::kNone);
   EXPECT_EQ(pin_state(2).alt_function, 5ul);
   EXPECT_EQ(pin_state(2).drive_strength, 2000ul);
 
-  EXPECT_EQ(pin_state(4).mode, MockGpioImpl::PinState::Mode::kOut);
-  EXPECT_EQ(pin_state(4).flags, fuchsia_hardware_gpio::GpioFlags::kPullDown);
-  EXPECT_EQ(pin_state(4).value, 1);
+  EXPECT_EQ(pin_state(4).mode, MockPinImpl::PinState::Mode::kOut);
+  EXPECT_EQ(pin_state(4).pull, fuchsia_hardware_pin::Pull::kDown);
+  EXPECT_TRUE(pin_state(4).value);
   EXPECT_EQ(pin_state(4).drive_strength, 4000ul);
 
   // GPIO root device (init device should not be added due to errors).
