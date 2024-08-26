@@ -4,8 +4,8 @@
 {
     children: [
         {
-            name: "sensors_playback",
-            url: "fuchsia-pkg://fuchsia.com/sensors_playback#meta/sensors_playback.cm",
+            name: "sensors",
+            url: "fuchsia-pkg://fuchsia.com/sensors_eng#meta/sensors.cm",
             startup: "eager",
             environment: "#core-env",
         },
@@ -14,16 +14,7 @@
         {
             protocol: [ "fuchsia.logger.LogSink" ],
             from: "parent",
-            to: [ "#sensors_playback" ],
-        },
-    ],
-    expose: [
-        {
-            protocol: [
-                "fuchsia.hardware.sensors.Driver",
-                "fuchsia.hardware.sensors.Playback",
-            ],
-            from: "#sensors_playback",
+            to: [ "#sensors" ],
         },
     ],
 }

@@ -87,7 +87,7 @@ type ConfigurePlaybackError = flexible enum : uint32 {
 /// emit prerecorded or pregenerated data. Those components will also implement
 /// the fuchsia.hardware.sensors.Driver protocol which will be used to actually
 /// control the playback of data. This protocol is used to set up the playback
-/// data source ana playback specific parameters.
+/// data source and playback specific parameters.
 @discoverable
 protocol Playback {
     ConfigurePlayback(struct {

@@ -69,6 +69,11 @@ fuchsia_package("sensors") {
   deps = [ ":component" ]
 }
 
+fuchsia_package("sensors_eng") {
+  deps = [ ":component" ]
+  subpackages = [ "//src/sensors/playback:sensors_playback" ]
+}
+
 fuchsia_component("test-driver-component") {
   component_name = "test-driver"
   testonly = true

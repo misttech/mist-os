@@ -3762,8 +3762,8 @@ assembly_input_bundle("sensors_framework") {
 # features_set_levels: utility, minimal
 # build-types: eng
 #
-assembly_input_bundle("sensors_playback") {
-  base_packages = [ "//src/sensors/playback:sensors_playback" ]
+assembly_input_bundle("sensors_framework_eng") {
+  base_packages = [ "//src/sensors:sensors_eng" ]
 
   compiled_packages = [
     {
@@ -3771,8 +3771,7 @@ assembly_input_bundle("sensors_playback") {
       components = [
         {
           component_name = "core"
-          shards =
-              [ "//src/sensors/playback/meta/sensors_playback.core_shard.cml" ]
+          shards = [ "//src/sensors/meta/sensors_eng.core_shard.cml" ]
         },
       ]
     },
