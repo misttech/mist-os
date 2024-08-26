@@ -12,7 +12,6 @@
 #include <dev/init.h>
 #include <dev/uart/amlogic_s905/init.h>
 #include <dev/uart/dw8250/init.h>
-#include <dev/uart/imx/init.h>
 #include <dev/uart/motmot/init.h>
 #include <dev/uart/pl011/init.h>
 #include <ktl/variant.h>
@@ -42,9 +41,6 @@ void UartInitEarly(uint32_t extra, const zbi_dcfg_simple_t& config) {
     case ZBI_KERNEL_DRIVER_PL011_UART:
       Pl011UartInitEarly(config);
       break;
-    case ZBI_KERNEL_DRIVER_IMX_UART:
-      ImxUartInitEarly(config);
-      break;
   }
 }
 
@@ -63,9 +59,6 @@ void UartInitLate(uint32_t extra) {
       break;
     case ZBI_KERNEL_DRIVER_PL011_UART:
       Pl011UartInitLate();
-      break;
-    case ZBI_KERNEL_DRIVER_IMX_UART:
-      ImxUartInitLate();
       break;
   }
 }
