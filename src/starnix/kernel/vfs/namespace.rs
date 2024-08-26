@@ -4,7 +4,6 @@
 
 use crate::fs::devtmpfs::dev_tmp_fs;
 use crate::fs::fuchsia::create_remotefs_filesystem;
-use crate::fs::functionfs::FunctionFs;
 use crate::fs::overlayfs::OverlayFs;
 use crate::fs::proc::proc_fs;
 use crate::fs::sysfs::sys_fs;
@@ -724,7 +723,6 @@ impl CurrentTask {
 
         match &**fs_type {
             b"devtmpfs" => Ok(dev_tmp_fs(locked, self).clone()),
-            b"functionfs" => FunctionFs::new_fs(self, options),
             b"overlay" => OverlayFs::new_fs(locked, self, options),
             b"proc" => Ok(proc_fs(self, options).clone()),
             b"remotefs" => create_remotefs_filesystem(kernel, data_dir()?, options, rights),

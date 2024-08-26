@@ -5,7 +5,6 @@
 pub mod devpts;
 pub mod devtmpfs;
 pub mod fuchsia;
-pub mod functionfs;
 pub mod layeredfs;
 pub mod nmfs;
 pub mod overlayfs;

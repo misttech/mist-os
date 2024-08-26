@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::CurrentTask;
-use crate::vfs::{
+use starnix_core::task::CurrentTask;
+use starnix_core::vfs::{
     fileops_impl_nonseekable, fileops_impl_noop_sync, fs_args, fs_node_impl_dir_readonly,
     fs_node_impl_not_dir, CacheMode, DirectoryEntryType, FileObject, FileOps, FileSystem,
     FileSystemHandle, FileSystemOps, FileSystemOptions, FsNode, FsNodeInfo, FsNodeOps, FsStr,
     InputBuffer, OutputBuffer, VecDirectory, VecDirectoryEntry,
 };
 use starnix_logging::{log_warn, track_stub};
-use starnix_sync::{FileOpsCore, Locked, Mutex};
+use starnix_sync::{FileOpsCore, Locked, Mutex, Unlocked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::open_flags::OpenFlags;
@@ -48,6 +48,7 @@ type AdbHandle = Arc<fadb::UsbAdbImpl_SynchronousProxy>;
 pub struct FunctionFs;
 impl FunctionFs {
     pub fn new_fs(
+        _locked: &mut Locked<'_, Unlocked>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
@@ -295,7 +296,7 @@ impl FsNodeOps for FunctionFsRootDir {
         node: &FsNode,
         current_task: &CurrentTask,
         name: &FsStr,
-    ) -> Result<crate::vfs::FsNodeHandle, Errno> {
+    ) -> Result<starnix_core::vfs::FsNodeHandle, Errno> {
         let name = std::str::from_utf8(name).map_err(|_| errno!(ENOENT))?;
         match name {
             CONTROL_ENDPOINT => Ok(node.fs().create_node_with_id(
