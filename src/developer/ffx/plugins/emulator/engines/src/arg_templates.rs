@@ -4,6 +4,8 @@
 
 //! Handlebars helper functions for working with an EmulatorConfiguration.
 
+use std::collections::HashMap;
+
 use anyhow::{Context as anyhow_context, Result};
 use emulator_instance::{DataUnits, DiskImage, EmulatorConfiguration, FlagData};
 use handlebars::{
@@ -214,7 +216,67 @@ pub fn process_flag_template(emu_config: &EmulatorConfiguration) -> Result<FlagD
         }
     };
 
-    process_flag_template_inner(&template_text, emu_config)
+    let flag_data = process_flag_template_inner(&template_text, emu_config)?;
+    dedupe_kernel_args(flag_data, &emu_config.runtime.addl_kernel_args)
+}
+
+/// It is possible for kernel args to be passed in on the command line when starting the emulator.
+/// Some of these args may override/duplicate the kernel args included in there template file.
+/// This function prioritizes the command line kernel args, and then adds any from the template
+/// that are not present.
+pub(crate) fn dedupe_kernel_args(
+    data: FlagData,
+    addl_kernel_args: &Vec<String>,
+) -> Result<FlagData> {
+    let mut map: HashMap<&str, &String> = HashMap::new();
+
+    let items: Vec<_> = addl_kernel_args
+        .iter()
+        .filter_map(|a| {
+            if let Some(key) = a.split("=").next() {
+                Some((key, a))
+            } else {
+                tracing::info!("kernel arg {a} does not contain an =, so skipping.");
+                None
+            }
+        })
+        .collect();
+    for (k, v) in items {
+        if !map.contains_key(k) {
+            map.insert(k, v);
+        }
+    }
+
+    // Now add any args from the Flag Data that are not in the map already.
+    let flag_items: Vec<_> = data
+        .kernel_args
+        .iter()
+        .filter_map(|a| {
+            if let Some(key) = a.split("=").next() {
+                Some((key, a))
+            } else {
+                tracing::info!(
+                    "Invalid kernel arg entry: {a}. Kernel args are of the form name=value."
+                );
+                None
+            }
+        })
+        .filter(|(k, _)| !map.contains_key(k))
+        .collect();
+
+    for (k, v) in flag_items {
+        map.insert(k, v);
+    }
+
+    let updated = FlagData {
+        args: data.args,
+        envs: data.envs,
+        features: data.features,
+        kernel_args: map.values().map(|v| v.to_string()).collect(),
+        options: data.options,
+    };
+
+    Ok(updated)
 }
 
 pub(crate) fn process_flags_from_str(
@@ -657,5 +719,91 @@ mod tests {
                 assert!(flags.is_err(), "Processing {}: {:?}", name, flags);
             }
         }
+    }
+
+    #[test]
+    fn test_dedupe_kernel_args() {
+        let data = FlagData {
+            args: vec!["arg1".into(), "arg2".into()],
+            envs: HashMap::new(),
+            features: vec!["feature1".into()],
+            kernel_args: vec![
+                "kernel.lockup-detector.critical-section-threshold-ms=5000".into(),
+                "kernel.lockup-detector.heartbeat-age-fatal-threshold-ms=0".into(),
+                "TERM=dumb".into(),
+                "kernel.entropy-mixin=aaaaaaaaaaaaaaa".into(),
+                "kernel.halt-on-panic=true".into(),
+                "zircon.nodename=node1".into(),
+            ],
+            options: vec!["option1".into()],
+        };
+
+        let addl_kernel_args = vec![
+            "kernel.lockup-detector.critical-section-threshold-ms=0".into(),
+            "TERM=xterm-256color".into(),
+            "kernel.entropy-mixin=42ac2452e99c1c979ebfca03bce0cbb14126e4021a6199ccfeca217999c0aaa0"
+                .into(),
+            "kernel.halt-on-panic=true".into(),
+            "zircon.nodename=node1".into(),
+        ];
+
+        let mut expected: Vec<String> = vec![
+            "TERM=xterm-256color".into(),
+            "kernel.lockup-detector.critical-section-threshold-ms=0".into(),
+            "kernel.lockup-detector.heartbeat-age-fatal-threshold-ms=0".into(),
+            "kernel.entropy-mixin=42ac2452e99c1c979ebfca03bce0cbb14126e4021a6199ccfeca217999c0aaa0"
+                .into(),
+            "kernel.halt-on-panic=true".into(),
+            "zircon.nodename=node1".into(),
+        ];
+        expected.sort();
+
+        let updated = dedupe_kernel_args(data.clone(), &addl_kernel_args).expect("dedupe ok");
+
+        // non-kernel args should be unchanged
+        assert_eq!(updated.args, data.args);
+        assert_eq!(updated.envs, data.envs);
+        assert_eq!(updated.features, data.features);
+        assert_eq!(updated.options, data.options);
+
+        // sort the kernel args for stable comparison
+        let mut sorted_actual = updated.kernel_args.clone();
+        sorted_actual.sort();
+        assert_eq!(sorted_actual, expected);
+    }
+    #[test]
+    fn test_empty_dedupe_kernel_args() {
+        let data = FlagData {
+            args: vec!["arg1".into(), "arg2".into()],
+            envs: HashMap::new(),
+            features: vec!["feature1".into()],
+            kernel_args: vec![
+                "kernel.lockup-detector.critical-section-threshold-ms=5000".into(),
+                "kernel.lockup-detector.heartbeat-age-fatal-threshold-ms=0".into(),
+                "TERM=dumb".into(),
+                "kernel.entropy-mixin=aaaaaaaaaaaaaaa".into(),
+                "kernel.halt-on-panic=true".into(),
+                "zircon.nodename=node1".into(),
+            ],
+            options: vec!["option1".into()],
+        };
+
+        let addl_kernel_args = vec![];
+
+        let mut expected: Vec<String> = data.kernel_args.clone();
+        expected.sort();
+
+        let updated = dedupe_kernel_args(data.clone(), &addl_kernel_args).expect("dedupe ok");
+
+        // non-kernel args should be unchanged
+        assert_eq!(updated.args, data.args);
+        assert_eq!(updated.envs, data.envs);
+        assert_eq!(updated.features, data.features);
+        assert_eq!(updated.options, data.options);
+
+        // sort the kernel args for stable comparison
+        let mut sorted_actual = updated.kernel_args.clone();
+        sorted_actual.sort();
+        assert_eq!(sorted_actual, expected);
     }
 }
