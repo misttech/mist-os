@@ -1,0 +1,43 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/dist/resource.gni")
+import("//build/zbi/kernel_cmdline.gni")
+import("//build/zbi/zbi.gni")
+import("//build/zbi/zbi_input.gni")
+import("//vendor/misttech/src/linux-rt/build/linux_executable.gni")
+import("//vendor/misttech/src/linux-rt/kernel/linux-rt.gni")
+
+kernel_cmdline("cmdline") {
+  args = [
+    "userboot.next.root=/",
+    "userboot.next=linux-rt/cowsay+Moof!",
+  ]
+}
+
+linux_executable("bin") {
+  output_name = "cowsay"
+
+  sources = [ "//examples/cowsay/cowsay.c" ]
+  disable_syslog_backend = true
+}
+
+resource("lib") {
+  sources =
+      [ "//prebuilt/third_party/sysroot/linux/lib64/ld-linux-x86-64.so.2" ]
+  outputs = [ "lib/lib64/ld-linux-x86-64.so.2" ]
+}
+
+zbi("cowsay") {
+  deps = [
+    ":bin",
+    ":cmdline",
+    ":lib",
+    "//zircon/kernel",
+  ]
+
+  output_name = "cowsay"
+  output_dir = root_out_dir
+  output_extension = "zbi"
+}

@@ -1,0 +1,31 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/config/clang/clang.gni")
+import("//build/toolchain/clang_toolchain_suite.gni")
+
+config("musl") {
+  cflags = [ "-nostdlibinc" ]
+  ldflags = [ "-nostdlib" ]
+
+  if (target_cpu == "x64") {
+    clang_arch = "x86_64"
+    bionic_arch = "x86"
+  } else if (target_cpu == "arm64") {
+    clang_arch = "aarch64"
+    bionic_arch = "arm64"
+  } else if (target_cpu == "riscv64") {
+    clang_arch = "riscv64"
+    bionic_arch = "riscv"
+  }
+
+  include_dirs = [
+    "${clang_prefix}/../include/c++/v1",
+    "${clang_prefix}/../include/${clang_arch}-unknown-linux-gnu/c++/v1",
+    "//third_party/android/platform/bionic/libc/include",
+    "//third_party/android/platform/bionic/libc/kernel/uapi",
+    "//third_party/android/platform/bionic/libc/kernel/android/uapi",
+    "//third_party/android/platform/bionic/libc/kernel/uapi/asm-${bionic_arch}",
+  ]
+}

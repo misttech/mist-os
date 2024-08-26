@@ -1,0 +1,48 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/toolchain/clang_toolchain_suite.gni")
+
+config("musl_config") {
+  cflags = [ "-nostdinc" ]
+  ldflags = [ "-nostdlib" ]
+
+  include_dirs = [
+    "//third_party/android/platform/bionic/libc/include",
+    "//third_party/android/platform/bionic/libc/kernel/uapi",
+    "//third_party/android/platform/bionic/libc/kernel/android/uapi",
+  ]
+  if (target_cpu == "x64") {
+    include_dirs +=
+        [ "//third_party/android/platform/bionic/libc/kernel/uapi/asm-x86" ]
+  } else if (target_cpu == "arm64") {
+    include_dirs +=
+        [ "//third_party/android/platform/bionic/libc/kernel/uapi/asm-arm64" ]
+  } else if (target_cpu == "riscv64") {
+    include_dirs +=
+        [ "//third_party/android/platform/bionic/libc/kernel/uapi/asm-riscv" ]
+  }
+}
+
+foreach(arch,
+        [
+          "x64",
+          "arm64",
+          "riscv64",
+        ]) {
+  clang_toolchain_suite("musl_${arch}") {
+    toolchain_cpu = "${arch}"
+    toolchain_os = "linux"
+    use_strip = true
+
+    remove_common_configs = [
+      "//build/config:compiler",
+      "//build/config/linux:compiler",
+    ]
+    prefix_configs = [
+      "//build/config/linux:target",
+      "//vendor/misttech/linux-rt/toolchain/config:musl",
+    ]
+  }
+}
