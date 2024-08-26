@@ -507,7 +507,4 @@ group("core_realm_shards_allowlist") {
   # Used by in-tree tests
   visibility +=
       [ "//src/security/lib/scrutiny/tests/structured_config:core_shard" ]
-
-  # Targets in vendor repos
-  visibility += [ "//vendor/*" ]
 }
