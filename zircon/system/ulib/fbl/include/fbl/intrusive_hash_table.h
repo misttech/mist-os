@@ -9,6 +9,7 @@
 
 #include <cstddef>
 #include <iterator>
+#include <limits>
 #include <utility>
 
 #include <fbl/intrusive_container_utils.h>
@@ -18,15 +19,81 @@
 
 namespace fbl {
 
-// Fwd decl of sanity checker class used by tests.
+// Fwd decl of checker class used by tests.
 namespace tests {
 namespace intrusive_containers {
 class HashTableChecker;
 }  // namespace intrusive_containers
 }  // namespace tests
 
+// A sentinel value which can be used in a HashTable's template arguments to
+// configure the HashTable to use a number of buckets determined at runtime
+// instead of compile time.
+//
+// HashTables configured to use a dynamic bucket count must have their buckets
+// provided to them as a `std::unique_ptr<BucketType[]>` at construction time.
+// Default construction is not an option.
+//
+// Additionally, elements stored in dynamic hash tables do not need to
+// necessarily return a HashValue which is in the range [0, bucket_count).
+// Dynamic hash tables will always perform a div/mod operation on their hash
+// values in order to ensure that an out-of-range bucket index will never be
+// selected.
+//
+inline constexpr size_t kDynamicBucketCount = 0;
+
 namespace internal {
 inline constexpr size_t kDefaultNumBuckets = 37;
+
+template <typename HashType, typename BucketType, size_t NumBuckets>
+class BucketStorage {
+ public:
+  BucketStorage() = default;
+  ~BucketStorage() = default;
+
+  constexpr HashType size() const { return static_cast<HashType>(NumBuckets); }
+  BucketType& operator[](size_t ndx) { return buckets_[ndx]; }
+  const BucketType& operator[](size_t ndx) const { return buckets_[ndx]; }
+
+  // Range based iteration support.
+  BucketType* begin() { return &buckets_[0]; }
+  BucketType* end() { return &buckets_[NumBuckets]; }
+  const BucketType* begin() const { return &buckets_[0]; }
+  const BucketType* end() const { return &buckets_[NumBuckets]; }
+
+ private:
+  static_assert(NumBuckets > 0, "Hash tables must have at least one bucket");
+  static_assert(NumBuckets <= std::numeric_limits<HashType>::max(),
+                "Too many buckets for HashType");
+  BucketType buckets_[NumBuckets];
+};
+
+template <typename HashType, typename BucketType>
+class BucketStorage<HashType, BucketType, kDynamicBucketCount> {
+ public:
+  BucketStorage(std::unique_ptr<BucketType[]> buckets, size_t bucket_count)
+      : buckets_(std::move(buckets)), bucket_count_(static_cast<HashType>(bucket_count)) {
+    ZX_DEBUG_ASSERT(buckets_.get() != nullptr);
+    ZX_DEBUG_ASSERT(bucket_count_ > 0);
+    ZX_DEBUG_ASSERT(bucket_count_ <= std::numeric_limits<HashType>::max());
+  }
+  ~BucketStorage() = default;
+
+  constexpr HashType size() const { return static_cast<HashType>(bucket_count_); }
+  BucketType& operator[](size_t ndx) { return buckets_[ndx]; }
+  const BucketType& operator[](size_t ndx) const { return buckets_[ndx]; }
+
+  // Range based iteration support.
+  BucketType* begin() { return &buckets_[0]; }
+  BucketType* end() { return &buckets_[bucket_count_]; }
+  const BucketType* begin() const { return &buckets_[0]; }
+  const BucketType* end() const { return &buckets_[bucket_count_]; }
+
+ private:
+  std::unique_ptr<BucketType[]> buckets_;
+  const HashType bucket_count_;
+};
+
 }  // namespace internal
 
 // DefaultHashTraits defines a default implementation of traits used to
@@ -37,33 +104,40 @@ inline constexpr size_t kDefaultNumBuckets = 37;
 //
 // GetHash : A static method which take a constant reference to an instance of
 //           the container's KeyType and returns an instance of the container's
-//           HashType representing the hashed value of the key.  The value must
-//           be on the range from [0, Container::kNumBuckets - 1]
+//           HashType representing the hashed value of the key.  If the hash
+//           table is configured to have a compile time number of buckets, then
+//           the value returned must be on the range from
+//           [0, Container::NumBuckets - 1]
 //
 // DefaultHashTraits generates a compliant implementation of hash traits taking
-// its KeyType, ObjType, HashType and NumBuckets from template parameters.
-// Users of DefaultHashTraits only need to implement a static method of ObjType
-// named GetHash which takes a const reference to a KeyType and returns a
-// HashType.  The default implementation will automatically mod by the number of
-// buckets given in the template parameters.  If the user's hash function
-// already automatically guarantees that the returned hash value will be in the
-// proper range, he/she should implement their own hash traits to avoid the
-// extra div/mod operation.
+// its KeyType, ObjType, HashType and NumBuckets from template parameters. Users
+// of DefaultHashTraits only need to implement a static method of ObjType named
+// GetHash which takes a const reference to a KeyType and returns a HashType.
+// For hash tables configured to have a compile time defined number of buckets,
+// the default implementation will automatically mod by the number of buckets
+// given in the template parameters.  If the user's hash function already
+// automatically guarantees that the returned hash value will be in the proper
+// range, they should implement their own hash traits to avoid the extra div/mod
+// operation.
 template <typename KeyType, typename ObjType, typename HashType, HashType kNumBuckets>
 struct DefaultHashTraits {
   static_assert(std::is_unsigned_v<HashType>, "HashTypes must be unsigned integers");
   static HashType GetHash(const KeyType& key) {
-    return static_cast<HashType>(ObjType::GetHash(key) % kNumBuckets);
+    if constexpr (kNumBuckets == kDynamicBucketCount) {
+      return static_cast<HashType>(ObjType::GetHash(key));
+    } else {
+      return static_cast<HashType>(ObjType::GetHash(key)) % kNumBuckets;
+    }
   }
 };
 
 template <typename _KeyType, typename _PtrType, typename _BucketType = SinglyLinkedList<_PtrType>,
-          typename _HashType = size_t, _HashType _NumBuckets = internal::kDefaultNumBuckets,
+          typename _HashType = size_t, _HashType NumBuckets = internal::kDefaultNumBuckets,
           typename _KeyTraits = DefaultKeyedObjectTraits<
               _KeyType, typename internal::ContainerPtrTraits<_PtrType>::ValueType>,
           typename _HashTraits = DefaultHashTraits<
               _KeyType, typename internal::ContainerPtrTraits<_PtrType>::ValueType, _HashType,
-              _NumBuckets>>
+              NumBuckets>>
 class __POINTER(_KeyType) HashTable {
  private:
   // Private fwd decls of the iterator implementation.
@@ -95,15 +169,10 @@ class __POINTER(_KeyType) HashTable {
   using iterator = iterator_impl<iterator_traits>;
   using const_iterator = iterator_impl<const_iterator_traits>;
 
-  // An alias for the type of this specific HashTable<...> and its test sanity checker.
+  // An alias for the type of this specific HashTable<...> and its test's validity checker.
   using ContainerType =
-      HashTable<_KeyType, _PtrType, _BucketType, _HashType, _NumBuckets, _KeyTraits, _HashTraits>;
+      HashTable<_KeyType, _PtrType, _BucketType, _HashType, NumBuckets, _KeyTraits, _HashTraits>;
   using CheckerType = ::fbl::tests::intrusive_containers::HashTableChecker;
-
-  // The number of buckets should be a nice prime such as 37, 211, 389 unless
-  // The hash function is really good. Lots of cheap hash functions have
-  // hidden periods for which the mod with prime above 'mostly' fixes.
-  static constexpr HashType kNumBuckets = _NumBuckets;
 
   // Hash tables only support constant order erase if their underlying bucket
   // type does.
@@ -112,18 +181,40 @@ class __POINTER(_KeyType) HashTable {
   static constexpr bool IsAssociative = true;
   static constexpr bool IsSequenced = false;
 
-  static_assert(kNumBuckets > 0, "Hash tables must have at least one bucket");
   static_assert(std::is_unsigned_v<HashType>, "HashTypes must be unsigned integers");
 
   constexpr HashTable() noexcept {
     using NodeState = internal::node_state_t<NodeTraits, RefType>;
 
+    static_assert(NumBuckets != kDynamicBucketCount,
+                  "Constant HashTable constructor used with dynamic bucket count!");
+
     // Make certain that the type of pointer we are expected to manage matches
     // the type of pointer that our Node type expects to manage.  In theory, our
-    // bucket has already performed this check for us, but extra sanity checks
-    // are always welcome.
+    // bucket has already performed this check for us, but extra checks are
+    // always welcome.
     static_assert(std::is_same_v<PtrType, typename NodeState::PtrType>,
-                  "SinglyLinkedList's pointer type must match its Node's pointerType");
+                  "HashTable's pointer type must match its Node's pointer type");
+
+    // HashTable does not currently support direct remove-from-container (but
+    // could do so if it did not track size)
+    static_assert(!(NodeState::kNodeOptions & NodeOptions::AllowRemoveFromContainer),
+                  "HashTable does not support nodes which allow RemoveFromContainer.");
+  }
+
+  constexpr HashTable(std::unique_ptr<BucketType[]> buckets_storage, size_t bucket_count) noexcept
+      : buckets_{std::move(buckets_storage), bucket_count} {
+    using NodeState = internal::node_state_t<NodeTraits, RefType>;
+
+    static_assert(NumBuckets == kDynamicBucketCount,
+                  "Dynamic HashTable constructor used with template defined bucket count!");
+
+    // Make certain that the type of pointer we are expected to manage matches
+    // the type of pointer that our Node type expects to manage.  In theory, our
+    // bucket has already performed this check for us, but extra checks are
+    // always welcome.
+    static_assert(std::is_same_v<PtrType, typename NodeState::PtrType>,
+                  "HashTable's pointer type must match its Node's pointer type");
 
     // HashTable does not currently support direct remove-from-container (but
     // could do so if it did not track size)
@@ -300,6 +391,7 @@ class __POINTER(_KeyType) HashTable {
     count_ = 0;
   }
 
+  HashType bucket_count() const { return buckets_.size(); }
   size_t size() const { return count_; }
   bool is_empty() const { return count_ == 0; }
 
@@ -314,7 +406,7 @@ class __POINTER(_KeyType) HashTable {
     if (is_empty())
       return PtrType(nullptr);
 
-    for (HashType i = 0; i < kNumBuckets; ++i) {
+    for (HashType i = 0; i < buckets_.size(); ++i) {
       auto& bucket = buckets_[i];
       if (!bucket.is_empty()) {
         PtrType ret = bucket.erase_if(fn);
@@ -450,7 +542,7 @@ class __POINTER(_KeyType) HashTable {
 
       // Looks like we have backed up past the beginning.  Update the
       // bookkeeping to point at the end of the last bucket.
-      bucket_ndx_ = kNumBuckets - 1;
+      bucket_ndx_ = last_bucket_ndx();
       iter_ = IterTraits::BucketEnd(GetBucket(bucket_ndx_));
 
       return *this;
@@ -488,8 +580,8 @@ class __POINTER(_KeyType) HashTable {
 
     iterator_impl(const ContainerType* hash_table, EndTag)
         : hash_table_(hash_table),
-          bucket_ndx_(kNumBuckets - 1),
-          iter_(IterTraits::BucketEnd(GetBucket(kNumBuckets - 1))) {}
+          bucket_ndx_(last_bucket_ndx()),
+          iter_(IterTraits::BucketEnd(GetBucket(last_bucket_ndx()))) {}
 
     iterator_impl(const ContainerType* hash_table, HashType bucket_ndx, const IterType& iter)
         : hash_table_(hash_table), bucket_ndx_(bucket_ndx), iter_(iter) {}
@@ -502,7 +594,7 @@ class __POINTER(_KeyType) HashTable {
       // If the iterator has run off the end of it's current bucket, then
       // check to see if there are nodes in any of the remaining buckets.
       if (!iter_.IsValid()) {
-        while (bucket_ndx_ < (kNumBuckets - 1)) {
+        while (bucket_ndx_ < (last_bucket_ndx())) {
           ++bucket_ndx_;
           auto& bucket = GetBucket(bucket_ndx_);
 
@@ -510,12 +602,14 @@ class __POINTER(_KeyType) HashTable {
             iter_ = IterTraits::BucketBegin(bucket);
             ZX_DEBUG_ASSERT(iter_.IsValid());
             break;
-          } else if (bucket_ndx_ == (kNumBuckets - 1)) {
+          } else if (bucket_ndx_ == (last_bucket_ndx())) {
             iter_ = IterTraits::BucketEnd(bucket);
           }
         }
       }
     }
+
+    HashType last_bucket_ndx() const { return hash_table_->bucket_count() - 1; }
 
     const ContainerType* hash_table_ = nullptr;
     HashType bucket_ndx_ = 0;
@@ -557,14 +651,16 @@ class __POINTER(_KeyType) HashTable {
   BucketType& GetBucket(const KeyType& key) { return buckets_[GetHash(key)]; }
   BucketType& GetBucket(const ValueType& obj) { return GetBucket(KeyTraits::GetKey(obj)); }
 
-  static HashType GetHash(const KeyType& obj) {
-    HashType ret = HashTraits::GetHash(obj);
-    ZX_DEBUG_ASSERT((ret >= 0) && (ret < kNumBuckets));
-    return ret;
+  HashType GetHash(const KeyType& obj) const {
+    if constexpr (NumBuckets == kDynamicBucketCount) {
+      return HashTraits::GetHash(obj) % buckets_.size();
+    } else {
+      return HashTraits::GetHash(obj);
+    }
   }
 
   size_t count_ = 0UL;
-  BucketType buckets_[kNumBuckets];
+  internal::BucketStorage<HashType, BucketType, NumBuckets> buckets_;
 };
 
 // TaggedHashTable<> is intended for use with ContainableBaseClasses<>.
@@ -596,7 +692,6 @@ using TaggedHashTable =
   constexpr _type                                                                       \
       HashTable<KeyType, PtrType, BucketType, HashType, NumBuckets, KeyTraits, HashTraits>::_name
 
-HASH_TABLE_PROP(HashType, kNumBuckets);
 HASH_TABLE_PROP(bool, SupportsConstantOrderErase);
 HASH_TABLE_PROP(bool, SupportsConstantOrderSize);
 HASH_TABLE_PROP(bool, IsAssociative);

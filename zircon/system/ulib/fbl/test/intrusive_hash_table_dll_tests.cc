@@ -76,8 +76,66 @@ class HTDLLTraits {
                                               OtherContainerTraits>;
 
     using TestObjBaseType  = HashedTestObjBase<typename ContainerType::KeyType,
-                                               typename ContainerType::HashType,
-                                               ContainerType::kNumBuckets>;
+                                               typename ContainerType::HashType>;
+  // clang-format on
+
+  struct Tag1 {};
+  struct Tag2 {};
+  struct Tag3 {};
+
+  using TaggedContainableBaseClasses =
+      fbl::ContainableBaseClasses<TaggedDoublyLinkedListable<PtrType, Tag1>,
+                                  TaggedDoublyLinkedListable<PtrType, Tag2>,
+                                  TaggedDoublyLinkedListable<PtrType, Tag3>>;
+
+  using TaggedType1 = HashTable<size_t, PtrType, DoublyLinkedList<PtrType, Tag1>>;
+  using TaggedType2 = HashTable<size_t, PtrType, DoublyLinkedList<PtrType, Tag2>>;
+  using TaggedType3 = HashTable<size_t, PtrType, DoublyLinkedList<PtrType, Tag3>>;
+};
+
+template <typename PtrType, NodeOptions kNodeOptions = NodeOptions::None>
+class DHTDLLTraits {
+ public:
+  template <typename DynamicHashTableType, size_t BucketCount>
+  class DynamicHashTableWrapper : public DynamicHashTableType {
+   public:
+    using BucketType = typename DynamicHashTableType::BucketType;
+    DynamicHashTableWrapper()
+        : DynamicHashTableType{std::unique_ptr<BucketType[]>(new BucketType[BucketCount]),
+                               BucketCount} {}
+    ~DynamicHashTableWrapper() = default;
+  };
+
+  // clang-format off
+  using ObjType = typename ::fbl::internal::ContainerPtrTraits<PtrType>::ValueType;
+
+  using ContainerType           = DynamicHashTableWrapper
+                                    <HashTable<size_t,
+                                               PtrType,
+                                               DoublyLinkedList<PtrType>,
+                                               size_t,
+                                               kDynamicBucketCount>,
+                                     37>;
+  using ContainableBaseClass    = DoublyLinkedListable<PtrType, kNodeOptions>;
+  using ContainerStateType      = DoublyLinkedListNodeState<PtrType, kNodeOptions>;
+  using KeyType                 = typename ContainerType::KeyType;
+  using HashType                = typename ContainerType::HashType;
+
+  using OtherContainerTraits    = OtherHashTraits<PtrType>;
+  using OtherContainerStateType = OtherHashState<PtrType>;
+  using OtherBucketType         = DoublyLinkedListCustomTraits<PtrType, OtherContainerTraits>;
+  using OtherContainerType      = DynamicHashTableWrapper<
+                                    HashTable<OtherKeyType,
+                                              PtrType,
+                                              OtherBucketType,
+                                              OtherHashType,
+                                              kDynamicBucketCount,
+                                              OtherContainerTraits,
+                                              OtherContainerTraits>,
+                                    kOtherNumBuckets>;
+
+  using TestObjBaseType  = HashedTestObjBase<typename ContainerType::KeyType,
+                                             typename ContainerType::HashType>;
   // clang-format on
 
   struct Tag1 {};
@@ -109,12 +167,26 @@ TEST(DoublyLinkedHashTableTest, NoRemoveFromContainer) {
 #endif
 }
 
+// Small helper which will generate tests for both the static and dynamic
+// versions of the HashTable
+#define RUN_HT_ZXTEST(_group, _flavor, _test) \
+  RUN_ZXTEST(_group, _flavor, _test)          \
+  RUN_ZXTEST(_group, D##_flavor, _test)
+
 // clang-format off
+// Statically sized hashtable
 DEFINE_TEST_OBJECTS(HTDLL);
 using UMTE   = DEFINE_TEST_THUNK(Associative, HTDLL, Unmanaged);
 using UPDDTE = DEFINE_TEST_THUNK(Associative, HTDLL, UniquePtrDefaultDeleter);
 using UPCDTE = DEFINE_TEST_THUNK(Associative, HTDLL, UniquePtrCustomDeleter);
 using RPTE   = DEFINE_TEST_THUNK(Associative, HTDLL, RefPtr);
+
+// Dynamically sized hashtable
+DEFINE_TEST_OBJECTS(DHTDLL);
+using DUMTE   = DEFINE_TEST_THUNK(Associative, DHTDLL, Unmanaged);
+using DUPDDTE = DEFINE_TEST_THUNK(Associative, DHTDLL, UniquePtrDefaultDeleter);
+using DUPCDTE = DEFINE_TEST_THUNK(Associative, DHTDLL, UniquePtrCustomDeleter);
+using DRPTE   = DEFINE_TEST_THUNK(Associative, DHTDLL, RefPtr);
 
 // Versions of the test objects which support clear_unsafe.
 template <typename PtrType>
@@ -126,17 +198,17 @@ using CU_UPDDTE = DEFINE_TEST_THUNK(Associative, CU_HTDLL, UniquePtrDefaultDelet
 //////////////////////////////////////////
 // General container specific tests.
 //////////////////////////////////////////
-RUN_ZXTEST(DoublyLinkedHashTableTest, UMTE,     Clear)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   Clear)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   Clear)
-RUN_ZXTEST(DoublyLinkedHashTableTest, RPTE,     Clear)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UMTE,     Clear)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   Clear)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   Clear)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, RPTE,     Clear)
 
 #if TEST_WILL_NOT_COMPILE || 0
 // Won't compile because node lacks AllowClearUnsafe option.
-RUN_ZXTEST(DoublyLinkedHashTableTest, UMTE,     ClearUnsafe)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   ClearUnsafe)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   ClearUnsafe)
-RUN_ZXTEST(DoublyLinkedHashTableTest, RPTE,     ClearUnsafe)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UMTE,     ClearUnsafe)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   ClearUnsafe)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   ClearUnsafe)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, RPTE,     ClearUnsafe)
 #endif
 
 #if TEST_WILL_NOT_COMPILE || 0
@@ -146,118 +218,118 @@ RUN_ZXTEST(DoublyLinkedHashTableTest, CU_UPDDTE,  ClearUnsafe)
 
 RUN_ZXTEST(DoublyLinkedHashTableTest, CU_UMTE,  ClearUnsafe)
 
-RUN_ZXTEST(DoublyLinkedHashTableTest, UMTE,     IsEmpty)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   IsEmpty)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   IsEmpty)
-RUN_ZXTEST(DoublyLinkedHashTableTest, RPTE,     IsEmpty)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UMTE,     IsEmpty)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   IsEmpty)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   IsEmpty)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, RPTE,     IsEmpty)
 
-RUN_ZXTEST(DoublyLinkedHashTableTest, UMTE,     Iterate)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   Iterate)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   Iterate)
-RUN_ZXTEST(DoublyLinkedHashTableTest, RPTE,     Iterate)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UMTE,     Iterate)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   Iterate)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   Iterate)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, RPTE,     Iterate)
 
-RUN_ZXTEST(DoublyLinkedHashTableTest, UMTE,     IterErase)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   IterErase)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   IterErase)
-RUN_ZXTEST(DoublyLinkedHashTableTest, RPTE,     IterErase)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UMTE,     IterErase)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   IterErase)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   IterErase)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, RPTE,     IterErase)
 
-RUN_ZXTEST(DoublyLinkedHashTableTest, UMTE,     DirectErase)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   DirectErase)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   DirectErase)
-RUN_ZXTEST(DoublyLinkedHashTableTest, RPTE,     DirectErase)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UMTE,     DirectErase)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   DirectErase)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   DirectErase)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, RPTE,     DirectErase)
 
-RUN_ZXTEST(DoublyLinkedHashTableTest, UMTE,     MakeIterator)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   MakeIterator)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   MakeIterator)
-RUN_ZXTEST(DoublyLinkedHashTableTest, RPTE,     MakeIterator)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UMTE,     MakeIterator)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   MakeIterator)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   MakeIterator)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, RPTE,     MakeIterator)
 
-RUN_ZXTEST(DoublyLinkedHashTableTest, UMTE,     ReverseIterErase)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   ReverseIterErase)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   ReverseIterErase)
-RUN_ZXTEST(DoublyLinkedHashTableTest, RPTE,     ReverseIterErase)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UMTE,     ReverseIterErase)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   ReverseIterErase)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   ReverseIterErase)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, RPTE,     ReverseIterErase)
 
-RUN_ZXTEST(DoublyLinkedHashTableTest, UMTE,     ReverseIterate)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   ReverseIterate)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   ReverseIterate)
-RUN_ZXTEST(DoublyLinkedHashTableTest, RPTE,     ReverseIterate)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UMTE,     ReverseIterate)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   ReverseIterate)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   ReverseIterate)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, RPTE,     ReverseIterate)
 
 // Hash tables do not support swapping or Rvalue operations (Assignment or
 // construction) as doing so would be an O(n) operation (With 'n' == to the
 // number of buckets in the hashtable)
 #if TEST_WILL_NOT_COMPILE || 0
-RUN_ZXTEST(DoublyLinkedHashTableTest, UMTE,     Swap)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   Swap)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   Swap)
-RUN_ZXTEST(DoublyLinkedHashTableTest, RPTE,     Swap)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UMTE,     Swap)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   Swap)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   Swap)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, RPTE,     Swap)
 
-RUN_ZXTEST(DoublyLinkedHashTableTest, UMTE,     RvalueOps)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   RvalueOps)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   RvalueOps)
-RUN_ZXTEST(DoublyLinkedHashTableTest, RPTE,     RvalueOps)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UMTE,     RvalueOps)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   RvalueOps)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   RvalueOps)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, RPTE,     RvalueOps)
 #endif
 
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   Scope)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   Scope)
-RUN_ZXTEST(DoublyLinkedHashTableTest, RPTE,     Scope)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   Scope)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   Scope)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, RPTE,     Scope)
 
-RUN_ZXTEST(DoublyLinkedHashTableTest, UMTE,     TwoContainer)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UMTE,     TwoContainer)
 #if TEST_WILL_NOT_COMPILE || 0
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   TwoContainer)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   TwoContainer)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   TwoContainer)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   TwoContainer)
 #endif
-RUN_ZXTEST(DoublyLinkedHashTableTest, RPTE,     TwoContainer)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, RPTE,     TwoContainer)
 
-RUN_ZXTEST(DoublyLinkedHashTableTest, UMTE,     ThreeContainerHelper)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UMTE,     ThreeContainerHelper)
 #if TEST_WILL_NOT_COMPILE || 0
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   ThreeContainerHelper)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   ThreeContainerHelper)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   ThreeContainerHelper)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   ThreeContainerHelper)
 #endif
-RUN_ZXTEST(DoublyLinkedHashTableTest, RPTE,     ThreeContainerHelper)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, RPTE,     ThreeContainerHelper)
 
-RUN_ZXTEST(DoublyLinkedHashTableTest, UMTE,     IterCopyPointer)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UMTE,     IterCopyPointer)
 #if TEST_WILL_NOT_COMPILE || 0
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   IterCopyPointer)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   IterCopyPointer)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   IterCopyPointer)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   IterCopyPointer)
 #endif
-RUN_ZXTEST(DoublyLinkedHashTableTest, RPTE,     IterCopyPointer)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, RPTE,     IterCopyPointer)
 
-RUN_ZXTEST(DoublyLinkedHashTableTest, UMTE,     EraseIf)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   EraseIf)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   EraseIf)
-RUN_ZXTEST(DoublyLinkedHashTableTest, RPTE,     EraseIf)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UMTE,     EraseIf)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   EraseIf)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   EraseIf)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, RPTE,     EraseIf)
 
-RUN_ZXTEST(DoublyLinkedHashTableTest, UMTE,     FindIf)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   FindIf)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   FindIf)
-RUN_ZXTEST(DoublyLinkedHashTableTest, RPTE,     FindIf)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UMTE,     FindIf)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   FindIf)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   FindIf)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, RPTE,     FindIf)
 
 //////////////////////////////////////////
 // Associative container specific tests.
 //////////////////////////////////////////
-RUN_ZXTEST(DoublyLinkedHashTableTest, UMTE,     InsertByKey)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   InsertByKey)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   InsertByKey)
-RUN_ZXTEST(DoublyLinkedHashTableTest, RPTE,     InsertByKey)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UMTE,     InsertByKey)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   InsertByKey)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   InsertByKey)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, RPTE,     InsertByKey)
 
-RUN_ZXTEST(DoublyLinkedHashTableTest, UMTE,     FindByKey)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   FindByKey)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   FindByKey)
-RUN_ZXTEST(DoublyLinkedHashTableTest, RPTE,     FindByKey)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UMTE,     FindByKey)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   FindByKey)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   FindByKey)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, RPTE,     FindByKey)
 
-RUN_ZXTEST(DoublyLinkedHashTableTest, UMTE,     EraseByKey)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   EraseByKey)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   EraseByKey)
-RUN_ZXTEST(DoublyLinkedHashTableTest, RPTE,     EraseByKey)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UMTE,     EraseByKey)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   EraseByKey)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   EraseByKey)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, RPTE,     EraseByKey)
 
-RUN_ZXTEST(DoublyLinkedHashTableTest, UMTE,     InsertOrFind)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   InsertOrFind)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   InsertOrFind)
-RUN_ZXTEST(DoublyLinkedHashTableTest, RPTE,     InsertOrFind)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UMTE,     InsertOrFind)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   InsertOrFind)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   InsertOrFind)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, RPTE,     InsertOrFind)
 
-RUN_ZXTEST(DoublyLinkedHashTableTest, UMTE,     InsertOrReplace)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   InsertOrReplace)
-RUN_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   InsertOrReplace)
-RUN_ZXTEST(DoublyLinkedHashTableTest, RPTE,     InsertOrReplace)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UMTE,     InsertOrReplace)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPDDTE,   InsertOrReplace)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, UPCDTE,   InsertOrReplace)
+RUN_HT_ZXTEST(DoublyLinkedHashTableTest, RPTE,     InsertOrReplace)
 // clang-format on
 
 }  // namespace intrusive_containers

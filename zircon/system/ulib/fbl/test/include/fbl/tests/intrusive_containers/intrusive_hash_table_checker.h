@@ -24,23 +24,23 @@ class HashTableChecker {
     using BucketType = typename ContainerType::BucketType;
     using BucketChecker = typename BucketType::CheckerType;
     using HashType = typename ContainerType::HashType;
-    using HashTraits = typename ContainerType::HashTraits;
     using KeyTraits = typename ContainerType::KeyTraits;
 
     // Demand that every bucket pass its sanity check.  Keep a running total
     // of the total size of the HashTable in the process.
     size_t total_size = 0;
-    for (size_t i = 0; i < ContainerType::kNumBuckets; ++i) {
+    for (size_t i = 0; i < container.buckets_.size(); ++i) {
       ASSERT_NO_FATAL_FAILURE(BucketChecker::SanityCheck(container.buckets_[i]));
       total_size += SizeUtils<BucketType>::size(container.buckets_[i]);
 
       // For every element in the bucket, make sure that the bucket index
       // matches the hash of the element.
       for (const auto& obj : container.buckets_[i]) {
-        ASSERT_EQ(HashTraits::GetHash(KeyTraits::GetKey(obj)), static_cast<HashType>(i));
+        ASSERT_EQ(container.GetHash(KeyTraits::GetKey(obj)), static_cast<HashType>(i));
       }
     }
 
+    EXPECT_EQ(container.buckets_.size(), container.bucket_count());
     EXPECT_EQ(container.size(), total_size);
   }
 };
