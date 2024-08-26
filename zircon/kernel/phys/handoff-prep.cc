@@ -30,6 +30,7 @@
 #include <phys/new.h>
 #include <phys/stdio.h>
 #include <phys/symbolize.h>
+#include <phys/uart.h>
 
 #include "log.h"
 #include "physboot.h"
@@ -152,19 +153,9 @@ void HandoffPrep::SetMemory() {
   // providing a PERIPHERAL range that already covers UART MMIO, but there is
   // currently a gap in that coverage.
   if constexpr (kArchHandoffGenerateUartPeripheralRanges) {
-    uart::internal::Visit(
-        [](const auto& uart) {
-          using dcfg_type = ktl::decay_t<decltype(uart.config())>;
-          if constexpr (ktl::is_same_v<dcfg_type, zbi_dcfg_simple_t>) {
-            memalloc::Range uart_mmio = {
-                .addr = fbl::round_down(uart.config().mmio_phys, ZX_PAGE_SIZE),
-                .size = ZX_PAGE_SIZE,
-                .type = memalloc::Type::kPeripheral,
-            };
-            ZX_ASSERT(Allocation::GetPool().MarkAsPeripheral(uart_mmio).is_ok());
-          }
-        },
-        gBootOptions->serial);
+    if (auto uart_mmio = GetUartMmioRange(gBootOptions->serial, ZX_PAGE_SIZE)) {
+      ZX_ASSERT(Allocation::GetPool().MarkAsPeripheral(*uart_mmio).is_ok());
+    }
   }
 
   // Normalizes types so that only those that are of interest to the kernel
