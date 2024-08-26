@@ -51,10 +51,9 @@ don't have a fuchsia device on your desk, then you can just have
 `snapshots/update.success` be a symlink to `snapshots/build.success`, which
 makes it so that new builds are immediately used by new checkouts.
 
-Note2: `./multifuchsia update` still has a hardcoded path in it (basically: the
-path of the package repository to publish to), so it probably doesn't work for
-anyone but me yet. I'll get around to fixing this at some point. Bug me if you
-want it, it should not be hard.
+Note2: `./multifuchsia update` currently always publishes packages to a local
+repository serving "fuchsia.com". It does not yet support arbitrary URLs for
+packages. It also does not support serving multiple repositories.
 
 ### `./multifuchsia checkout $name`
 
@@ -234,7 +233,12 @@ Please let me know if you can help port these to your shell of choice.
 
 1.  Have a btrfs filesystem with plenty of space mounted somewhere. Make sure to
     mount it with the mount option `user_subvol_rm_allowed`, so that the nightly
-    update is allowed to delete the snapshots it makes.
+    update is allowed to delete the snapshots it makes. You also might want to
+    enable compression on the volume. For example:
+
+    ```
+    $ mount -o compress=zstd,user_subvol_rm_allowed /path/to/btrfsBlockDevice /mnt/btrfs
+    ```
 
 2.  Designate some directory in it as `$MULTIFUCHSIA_ROOT` (which doesn't itself
     need to be a subvolume)
@@ -258,10 +262,10 @@ Please let me know if you can help port these to your shell of choice.
     $ mv fuchsia to-delete && mv to-delete/* to-delete/.* ./ && rmdir to-delete
     ```
 
-4.  Symlink multifuchsia:
+4.  Symlink the multifuchsia script to your root work dir:
 
     ```
-    $ ln -s "$MULTIFUCHSIA_ROOT/clean/multifuchsia" "$MULTIFUCHSIA_ROOT/"
+    $ ln -s "$MULTIFUCHSIA_ROOT/clean/tools/multifuchsia/multifuchsia" "$MULTIFUCHSIA_ROOT/"
     ```
 
     Important: When running `multifuchsia`, make sure to run it via this
@@ -272,7 +276,7 @@ Please let me know if you can help port these to your shell of choice.
 
     ```
     $ cp \
-        "$MULTIFUCHSIA_ROOT/clean/multifuchsia/multifuchsia.rc.example" \
+        "$MULTIFUCHSIA_ROOT/clean/tools/multifuchsia/multifuchsia.rc.example" \
         "$MULTIFUCHSIA_ROOT/multifuchsia.rc"
     ```
 
