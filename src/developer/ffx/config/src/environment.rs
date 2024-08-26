@@ -384,7 +384,7 @@ mod test {
             "global": "/tmp/global.json"
         }"#;
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn test_loading_and_saving_environment() {
         let mut test_env = test_init().await.expect("initializing test environment");
         let env: EnvironmentFiles = serde_json::from_str(ENVIRONMENT).unwrap();
@@ -412,12 +412,12 @@ mod test {
         assert_eq!(env, env_save);
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn build_config_autoconfigure() {
         let temp = tempfile::tempdir().expect("temporary build directory");
         let temp_dir = std::fs::canonicalize(temp.path()).expect("canonical temp path");
         let build_dir_path = temp_dir.join("build");
-        let build_dir_config = temp_dir.join("build.json");
+        let build_dir_config = build_dir_path.join("ffx-config.json");
         let env_file_path = temp_dir.join("env.json");
         let context = EnvironmentContext::in_tree(
             ExecutableKind::Test,
@@ -443,7 +443,7 @@ mod test {
         assert_eq!(config, build_dir_config, "build config for {build_dir_path:?}");
     }
 
-    #[fuchsia_async::run_singlethreaded(test)]
+    #[fuchsia::test]
     async fn build_config_manual_configure() {
         let temp = tempfile::tempdir().expect("temporary build directory");
         let temp_dir = std::fs::canonicalize(temp.path()).expect("canonical temp path");
