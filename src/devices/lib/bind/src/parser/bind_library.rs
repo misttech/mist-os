@@ -28,7 +28,7 @@ pub struct Declaration {
     pub values: Vec<Value>,
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
 pub enum ValueType {
     Number,
     Str,

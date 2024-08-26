@@ -95,6 +95,11 @@ void Setup(component_testing::RealmBuilder& realm_builder) {
       .targets = {ParentRef()},
   });
   realm_builder.AddRoute(Route{
+      .capabilities = {Protocol{"fuchsia.driver.framework.CompositeNodeManager"}},
+      .source = {ChildRef{kComponentName}},
+      .targets = {ParentRef()},
+  });
+  realm_builder.AddRoute(Route{
       .capabilities = {Protocol{"fuchsia.driver.registrar.DriverRegistrar"}},
       .source = {ChildRef{kComponentName}},
       .targets = {ParentRef()},

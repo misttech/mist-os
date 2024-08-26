@@ -87,6 +87,7 @@
             config: [
                 "fuchsia.blobfs.CacheEvictionPolicy",
                 "fuchsia.blobfs.WriteCompressionAlgorithm",
+                "fuchsia.driver.index.StopOnIdleTimeoutMillis",
                 "fuchsia.fshost.DisableAutomount",
                 "fuchsia.network.PrimaryInterface",
                 "fuchsia.sysmem.ContiguousGuardPagesUnused",

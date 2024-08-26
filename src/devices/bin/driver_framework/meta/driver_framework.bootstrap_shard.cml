@@ -11,7 +11,9 @@
         {
             name: "driver_index",
             url: "fuchsia-boot:///driver-index#meta/driver-index.cm",
-            on_terminate: "reboot",
+
+            // TODO(https://fxbug.dev/352624082): Use on_terminate: "reboot_on_error".
+            // on_terminate: "reboot",
         },
         {
             // Exists to augment capability graph with information about when #boot-drivers should
@@ -58,6 +60,12 @@
                 "fuchsia.driver.EnableDriverLoadFuzzer",
                 "fuchsia.driver.EnableEphemeralDrivers",
             ],
+        },
+        {
+            from: "parent",
+            to: "#driver_index",
+            config: "fuchsia.driver.index.StopOnIdleTimeoutMillis",
+            availability: "optional",
         },
         {
             from: "parent",

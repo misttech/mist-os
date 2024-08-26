@@ -112,6 +112,32 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
             ),
         )?;
 
+        match driver_framework_config.enable_driver_index_stop_on_idle {
+            Some(true) => {
+                // Explicitly enabled by platform config.
+                // Set to 10 seconds.
+                builder.set_config_capability(
+                    "fuchsia.driver.index.StopOnIdleTimeoutMillis",
+                    Config::new(ConfigValueType::Int64, 10000.into()),
+                )?;
+            }
+            Some(false) => {
+                // Explicitly disabled by platform config.
+                builder.set_config_capability(
+                    "fuchsia.driver.index.StopOnIdleTimeoutMillis",
+                    Config::new_void(),
+                )?;
+            }
+            None => {
+                // Unspecified. Defaults to enabled.
+                // Disabled for soft transition.
+                builder.set_config_capability(
+                    "fuchsia.driver.index.StopOnIdleTimeoutMillis",
+                    Config::new_void(),
+                )?;
+            }
+        };
+
         // Include bus-pci driver through a platform AIB.
         if context.board_info.provides_feature("fuchsia::bus_pci") {
             builder.platform_bundle("bus_pci_driver");

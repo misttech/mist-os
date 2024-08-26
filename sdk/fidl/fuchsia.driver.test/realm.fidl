@@ -137,6 +137,12 @@ type RealmArgs = resource table {
     /// Default: empty
     @available(added=NEXT)
     16: test_component fuchsia.component.resolution.Component;
+
+    /// How long the driver index waits idle before it saves state, escrows its handles
+    /// with the component framework, and shuts down.
+    /// Default: never shuts down
+    @available(added=HEAD)
+    17: driver_index_stop_timeout_millis int64;
 };
 
 /// This protocol is for the DriverTestRealm. It is an integration test

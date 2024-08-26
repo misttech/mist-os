@@ -8,14 +8,22 @@
     program: {
         runner: "elf",
         binary: "bin/driver_index",
+
+        // TODO(https://fxbug.dev/339457865)
+        // We don't really care about the stop event itself, but this is necessary for the
+        // lifecycle startup handle to be present, so that we can use it for escrow purposes.
+        lifecycle: { stop_event: "notify" },
     },
     capabilities: [
         {
             protocol: [
                 "fuchsia.driver.index.DevelopmentManager",
-                "fuchsia.driver.index.DriverIndex",
                 "fuchsia.driver.registrar.DriverRegistrar",
             ],
+        },
+        {
+            protocol: "fuchsia.driver.index.DriverIndex",
+            delivery: "on_readable",
         },
     ],
     use: [
@@ -87,6 +95,13 @@
             },
         },
         {
+            config: "fuchsia.driver.index.StopOnIdleTimeoutMillis",
+            key: "stop_on_idle_timeout_millis",
+            type: "int64",
+            availability: "optional",
+            default: -1,
+        },
+        {
             protocol: [
                 "fuchsia.component.resolution.Resolver-base",
                 "fuchsia.component.resolution.Resolver-boot",
@@ -100,6 +115,15 @@
                 "fuchsia.component.resolution.Resolver-full",
             ],
             availability: "optional",
+        },
+        {
+            protocol: "fuchsia.driver.index.DriverIndex",
+            from: "self",
+            path: "/escrow/fuchsia.driver.index.DriverIndex",
+        },
+        {
+            protocol: "fuchsia.component.sandbox.CapabilityStore",
+            from: "framework",
         },
     ],
     expose: [

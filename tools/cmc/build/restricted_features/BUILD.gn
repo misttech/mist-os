@@ -30,6 +30,7 @@ group("dynamic_dictionaries") {
 group("delivery_type") {
   visibility = [
     "//src/connectivity/policy/http-client/*",
+    "//src/devices/bin/driver-index:*",
     "//src/sys/component_manager/tests/*",
   ]
 }

@@ -7,6 +7,7 @@ use crate::driver_loading_fuzzer::Session;
 use crate::match_common::{node_to_device_property, node_to_device_property_no_autobind};
 use crate::resolved_driver::{DriverPackageType, ResolvedDriver};
 use bind::interpreter::decode_bind_rules::DecodedRules;
+use fidl::endpoints::Proxy;
 use fidl_fuchsia_pkg_ext::BlobId;
 use fuchsia_zircon::Status;
 use futures::StreamExt;
@@ -20,10 +21,12 @@ use {
     fidl_fuchsia_driver_index as fdi, fuchsia_async as fasync,
 };
 
+#[derive(Default)]
 pub enum BaseRepo {
     // We know that Base won't update so we can store these as resolved.
     Resolved(Vec<ResolvedDriver>),
     // If it's not resolved we store the clients waiting for it.
+    #[default]
     NotResolved,
 }
 
@@ -33,6 +36,11 @@ pub struct Indexer {
     // |base_repo| needs to be in a RefCell because it starts out NotResolved,
     // but will eventually resolve when base packages are available.
     pub base_repo: RefCell<BaseRepo>,
+
+    // Contains the ephemeral drivers. This is wrapped in a RefCell since the
+    // ephemeral drivers are added after the driver index server has started
+    // through the FIDL API, fuchsia.driver.registrar.Register.
+    pub ephemeral_drivers: RefCell<HashMap<cm_types::Url, ResolvedDriver>>,
 
     // Manages the specs. This is wrapped in a RefCell since the
     // specs are added after the driver index server has started.
@@ -44,11 +52,6 @@ pub struct Indexer {
     // Used to determine if the indexer should return fallback drivers that match or
     // wait until based packaged drivers are indexed.
     delay_fallback_until_base_drivers_indexed: bool,
-
-    // Contains the ephemeral drivers. This is wrapped in a RefCell since the
-    // ephemeral drivers are added after the driver index server has started
-    // through the FIDL API, fuchsia.driver.registrar.Register.
-    ephemeral_drivers: RefCell<HashMap<cm_types::Url, ResolvedDriver>>,
 }
 
 impl Indexer {
@@ -60,10 +63,10 @@ impl Indexer {
         Indexer {
             boot_repo: RefCell::new(boot_repo),
             base_repo: RefCell::new(base_repo),
+            ephemeral_drivers: RefCell::new(HashMap::new()),
             composite_node_spec_manager: RefCell::new(CompositeNodeSpecManager::new()),
             driver_notifier: RefCell::new(None),
             delay_fallback_until_base_drivers_indexed,
-            ephemeral_drivers: RefCell::new(HashMap::new()),
         }
     }
 
@@ -187,6 +190,17 @@ impl Indexer {
         }
     }
 
+    pub fn take_notifier(&self) -> Option<fidl::endpoints::ClientEnd<fdi::DriverNotifierMarker>> {
+        let notifier = self.driver_notifier.borrow_mut().take();
+        match notifier {
+            Some(notifier) => match notifier.into_client_end() {
+                Ok(client_end) => Some(client_end),
+                Err(_) => None,
+            },
+            None => None,
+        }
+    }
+
     pub async fn handle_add_boot_driver(
         self: Rc<Self>,
         mut receiver: futures::channel::mpsc::UnboundedReceiver<Vec<ResolvedDriver>>,
@@ -212,7 +226,7 @@ impl Indexer {
                 }
             }
             None => {}
-        }
+        };
     }
 
     // Create a list of all drivers (except for disabled drivers) in the following priority:

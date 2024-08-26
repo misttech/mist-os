@@ -72,6 +72,9 @@ impl DriverTestRealmBuilder for RealmBuilder {
                 .capability(Capability::protocol_by_name("fuchsia.device.manager.Administrator"))
                 .capability(Capability::protocol_by_name("fuchsia.driver.development.Manager"))
                 .capability(Capability::protocol_by_name(
+                    "fuchsia.driver.framework.CompositeNodeManager",
+                ))
+                .capability(Capability::protocol_by_name(
                     "fuchsia.driver.registrar.DriverRegistrar",
                 ))
                 .capability(Capability::protocol_by_name("fuchsia.driver.test.Realm"))

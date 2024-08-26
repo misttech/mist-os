@@ -12,7 +12,7 @@ use std::ops::Deref;
 
 pub type SymbolTable = HashMap<CompoundIdentifier, Symbol>;
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize)]
 pub enum Symbol {
     DeprecatedKey(u32),
     Key(String, bind_library::ValueType),
