@@ -25,7 +25,7 @@ use std::process::Command;
 
 use crate::api::Api;
 
-const DEFAULT_ROLLOUT_PATH: &str = "./rollout.json~";
+const DEFAULT_ROLLOUT_PATH: &str = "./rollout.json";
 
 #[derive(Debug, FromArgs)]
 /// Silence rustc and clippy lints with allow attributes and autofixes
