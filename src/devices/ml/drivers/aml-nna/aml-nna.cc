@@ -15,6 +15,7 @@
 
 #include <memory>
 
+#include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/platform/cpp/bind.h>
 #include <bind/fuchsia/verisilicon/platform/cpp/bind.h>
 #include <fbl/alloc_checker.h>
@@ -254,17 +255,18 @@ zx_status_t AmlNnaDevice::Create(void* ctx, zx_device_t* parent) {
     return status;
   }
 
-  zx_device_prop_t props[] = {
-      {BIND_PROTOCOL, 0, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE},
-      {BIND_PLATFORM_DEV_VID, 0,
-       bind_fuchsia_verisilicon_platform::BIND_PLATFORM_DEV_VID_VERISILICON},
-      {BIND_PLATFORM_DEV_PID, 0, bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC},
-      {BIND_PLATFORM_DEV_DID, 0,
-       bind_fuchsia_verisilicon_platform::BIND_PLATFORM_DEV_DID_MAGMA_VIP},
+  zx_device_str_prop_t props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_platform::BIND_PROTOCOL_DEVICE),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                           bind_fuchsia_verisilicon_platform::BIND_PLATFORM_DEV_VID_VERISILICON),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_PID,
+                           bind_fuchsia_platform::BIND_PLATFORM_DEV_PID_GENERIC),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                           bind_fuchsia_verisilicon_platform::BIND_PLATFORM_DEV_DID_MAGMA_VIP),
   };
 
-  status =
-      device->DdkAdd(ddk::DeviceAddArgs("aml-nna").set_props(props).forward_metadata(parent, 0));
+  status = device->DdkAdd(
+      ddk::DeviceAddArgs("aml-nna").set_str_props(props).forward_metadata(parent, 0));
   if (status != ZX_OK) {
     zxlogf(ERROR, "Could not create aml nna device: %d\n", status);
     return status;

@@ -84,6 +84,7 @@ fuchsia_driver("dai-test-driver") {
     ":dai_test-bind",
     "//sdk/banjo/fuchsia.hardware.audio:fuchsia.hardware.audio_banjo_cpp",
     "//sdk/fidl/fuchsia.hardware.audio:fuchsia.hardware.audio_cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/driver",
     "//src/lib/ddk",

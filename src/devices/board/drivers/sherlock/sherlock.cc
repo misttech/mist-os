@@ -79,14 +79,16 @@ zx_status_t Sherlock::Create(void* ctx, zx_device_t* parent) {
     }
   }
 
-  constexpr zx_device_prop_t kBoardDriverProps[] = {
-      {BIND_PLATFORM_DEV_VID, 0, bind_fuchsia_google_platform::BIND_PLATFORM_DEV_VID_GOOGLE},
-      {BIND_PLATFORM_DEV_DID, 0, bind_fuchsia_google_platform::BIND_PLATFORM_DEV_DID_POST_INIT},
+  const zx_device_str_prop_t kBoardDriverProps[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                           bind_fuchsia_google_platform::BIND_PLATFORM_DEV_VID_GOOGLE),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                           bind_fuchsia_google_platform::BIND_PLATFORM_DEV_DID_POST_INIT),
   };
 
   std::array<const char*, 1> fidl_service_offers{fuchsia_hardware_platform_bus::Service::Name};
   status = board->DdkAdd(ddk::DeviceAddArgs("sherlock")
-                             .set_props(kBoardDriverProps)
+                             .set_str_props(kBoardDriverProps)
                              .set_outgoing_dir(directory_endpoints->client.TakeChannel())
                              .set_runtime_service_offers(fidl_service_offers));
   if (status != ZX_OK) {

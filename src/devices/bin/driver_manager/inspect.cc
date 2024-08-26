@@ -20,12 +20,6 @@ const char* BindParamName(uint32_t param_num) {
   switch (param_num) {
     case BIND_PROTOCOL:
       return "Protocol";
-    case BIND_PLATFORM_DEV_VID:
-      return "PlatDev.VID";
-    case BIND_PLATFORM_DEV_PID:
-      return "PlatDev.PID";
-    case BIND_PLATFORM_DEV_DID:
-      return "PlatDev.DID";
     default:
       return NULL;
   }

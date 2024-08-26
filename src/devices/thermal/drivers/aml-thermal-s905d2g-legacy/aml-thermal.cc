@@ -17,6 +17,7 @@
 
 #include <utility>
 
+#include <bind/fuchsia/cpp/bind.h>
 #include <fbl/algorithm.h>
 #include <fbl/alloc_checker.h>
 
@@ -176,10 +177,10 @@ zx_status_t AmlThermal::Create(void* ctx, zx_device_t* device) {
     return status;
   }
 
-  zx_device_prop_t props[] = {
-      {.id = BIND_PLATFORM_DEV_DID, .reserved = 0, .value = device_info.did}};
+  zx_device_str_prop_t props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID, device_info.did)};
   status = thermal_device->DdkAdd(
-      ddk::DeviceAddArgs("thermal").set_props(props).set_proto_id(ZX_PROTOCOL_THERMAL));
+      ddk::DeviceAddArgs("thermal").set_str_props(props).set_proto_id(ZX_PROTOCOL_THERMAL));
   if (status != ZX_OK) {
     zxlogf(ERROR, "aml-thermal: Could not create thermal device: %d", status);
     return status;

@@ -21,6 +21,9 @@
 #include <zircon/syscalls/iommu.h>
 #include <zircon/threads.h>
 
+#include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/goldfish/platform/cpp/bind.h>
+#include <bind/fuchsia/google/platform/cpp/bind.h>
 #include <fbl/auto_lock.h>
 
 #include "src/devices/lib/acpi/client.h"
@@ -86,11 +89,15 @@ zx_status_t PipeDevice::Create(void* ctx, zx_device_t* parent) {
     return status;
   }
 
-  constexpr zx_device_prop_t kControlProps[] = {
-      {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_GOOGLE},
-      {BIND_PLATFORM_DEV_PID, 0, PDEV_PID_GOLDFISH},
-      {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_GOLDFISH_PIPE_CONTROL},
+  const zx_device_str_prop_t kControlProps[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                           bind_fuchsia_google_platform::BIND_PLATFORM_DEV_VID_GOOGLE),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_PID,
+                           bind_fuchsia_goldfish_platform::BIND_PLATFORM_DEV_PID_GOLDFISH),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                           bind_fuchsia_goldfish_platform::BIND_PLATFORM_DEV_DID_PIPE_CONTROL),
   };
+
   constexpr const char* kControlDeviceName = "goldfish-pipe-control";
   status = pipe_device->CreateChildDevice(kControlProps, kControlDeviceName);
   if (status != ZX_OK) {
@@ -98,10 +105,13 @@ zx_status_t PipeDevice::Create(void* ctx, zx_device_t* parent) {
     return status;
   }
 
-  constexpr zx_device_prop_t kSensorProps[] = {
-      {BIND_PLATFORM_DEV_VID, 0, PDEV_VID_GOOGLE},
-      {BIND_PLATFORM_DEV_PID, 0, PDEV_PID_GOLDFISH},
-      {BIND_PLATFORM_DEV_DID, 0, PDEV_DID_GOLDFISH_PIPE_SENSOR},
+  const zx_device_str_prop_t kSensorProps[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID,
+                           bind_fuchsia_google_platform::BIND_PLATFORM_DEV_VID_GOOGLE),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_PID,
+                           bind_fuchsia_goldfish_platform::BIND_PLATFORM_DEV_PID_GOLDFISH),
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_DID,
+                           bind_fuchsia_goldfish_platform::BIND_PLATFORM_DEV_DID_PIPE_SENSOR),
   };
   constexpr const char* kSensorDeviceName = "goldfish-pipe-sensor";
   status = pipe_device->CreateChildDevice(kSensorProps, kSensorDeviceName);
@@ -200,7 +210,7 @@ zx_status_t PipeDevice::Bind() {
   return ZX_OK;
 }
 
-zx_status_t PipeDevice::CreateChildDevice(cpp20::span<const zx_device_prop_t> props,
+zx_status_t PipeDevice::CreateChildDevice(cpp20::span<const zx_device_str_prop_t> props,
                                           const char* dev_name) {
   auto child_device = std::make_unique<PipeChildDevice>(this, dispatcher_);
   zx_status_t status = child_device->Bind(props, dev_name);
@@ -381,7 +391,8 @@ PipeChildDevice::PipeChildDevice(PipeDevice* parent, async_dispatcher_t* dispatc
   ZX_DEBUG_ASSERT(parent_);
 }
 
-zx_status_t PipeChildDevice::Bind(cpp20::span<const zx_device_prop_t> props, const char* dev_name) {
+zx_status_t PipeChildDevice::Bind(cpp20::span<const zx_device_str_prop_t> props,
+                                  const char* dev_name) {
   zx::result result = outgoing_.AddService<fuchsia_hardware_goldfish_pipe::Service>(
       fuchsia_hardware_goldfish_pipe::Service::InstanceHandler({
           .device = pipe_bindings_.CreateHandler(this, dispatcher_, fidl::kIgnoreBindingClosure),
@@ -407,7 +418,7 @@ zx_status_t PipeChildDevice::Bind(cpp20::span<const zx_device_prop_t> props, con
   };
 
   zx_status_t status = DdkAdd(ddk::DeviceAddArgs(dev_name)
-                                  .set_props(props)
+                                  .set_str_props(props)
                                   .set_fidl_service_offers(offers)
                                   .set_outgoing_dir(endpoints->client.TakeChannel())
                                   .set_proto_id(ZX_PROTOCOL_GOLDFISH_PIPE));

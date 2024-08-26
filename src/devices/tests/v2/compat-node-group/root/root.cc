@@ -28,7 +28,7 @@ zx_status_t Root::Bind(void* ctx, zx_device_t* dev) {
 
   const uint32_t node_1_bind_rule_1_values[] = {10, 3};
   const ddk::BindRule node_1_bind_rules[] = {
-      ddk::MakeAcceptBindRuleList(50, node_1_bind_rule_1_values),
+      ddk::MakeAcceptBindRuleList("peep", node_1_bind_rule_1_values),
       ddk::MakeRejectBindRule("sandpiper", true),
   };
 
@@ -56,12 +56,10 @@ zx_status_t Root::Bind(void* ctx, zx_device_t* dev) {
   [[maybe_unused]] auto ptr = root_dev.release();
 
   // Add a child that matches the first node group node.
-  zx_device_prop_t node_props_1[] = {
-      {50, 0, 10},
-  };
+  zx_device_str_prop_t node_props_1[] = {ddk::MakeStrProperty("peep", 10u)};
   auto node_dev_1 = std::make_unique<Root>(dev);
   status = node_dev_1->DdkAdd(ddk::DeviceAddArgs("parent_a")
-                                  .set_props(node_props_1)
+                                  .set_str_props(node_props_1)
                                   .set_proto_id(bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD));
   if (status != ZX_OK) {
     return status;
@@ -69,12 +67,12 @@ zx_status_t Root::Bind(void* ctx, zx_device_t* dev) {
   [[maybe_unused]] auto node_1_ptr = node_dev_1.release();
 
   // Add a child that matches the other node group node.
-  zx_device_prop_t node_props_2[] = {
-      {BIND_PLATFORM_DEV_VID, 0, 88},
+  zx_device_str_prop_t node_props_2[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PLATFORM_DEV_VID, 88u),
   };
   auto node_dev_2 = std::make_unique<Root>(dev);
   status = node_dev_2->DdkAdd(ddk::DeviceAddArgs("parent_b")
-                                  .set_props(node_props_2)
+                                  .set_str_props(node_props_2)
                                   .set_proto_id(bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD));
   if (status != ZX_OK) {
     return status;
