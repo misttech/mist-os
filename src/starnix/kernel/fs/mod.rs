@@ -12,4 +12,3 @@ pub mod overlayfs;
 pub mod proc;
 pub mod sysfs;
 pub mod tmpfs;
-pub mod tracefs;

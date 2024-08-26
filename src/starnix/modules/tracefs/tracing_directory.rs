@@ -2,15 +2,15 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::CurrentTask;
-use crate::vfs::buffers::InputBuffer;
-use crate::vfs::{
-    fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, DynamicFile, DynamicFileBuf,
-    DynamicFileSource, FileObject, FileOps, FsNodeOps, SimpleFileNode,
-};
 use fuchsia_trace::{ArgValue, Scope, TraceCategoryContext};
 use fuchsia_zircon as zx;
 use fuchsia_zircon::sys::zx_ticks_t;
+use starnix_core::task::CurrentTask;
+use starnix_core::vfs::buffers::InputBuffer;
+use starnix_core::vfs::{
+    fileops_impl_delegate_read_and_seek, fileops_impl_noop_sync, DynamicFile, DynamicFileBuf,
+    DynamicFileSource, FileObject, FileOps, FsNodeOps, SimpleFileNode,
+};
 use starnix_logging::CATEGORY_ATRACE;
 use starnix_sync::{FileOpsCore, Locked};
 use starnix_uapi::errors::Errno;

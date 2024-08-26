@@ -3,28 +3,36 @@
 // found in the LICENSE file.
 
 use super::tracing_directory::TraceMarkerFile;
-use crate::task::CurrentTask;
-use crate::vfs::{
+use once_cell::sync::Lazy;
+use starnix_core::task::CurrentTask;
+use starnix_core::vfs::{
     CacheMode, ConstFile, FileSystem, FileSystemHandle, FileSystemOps, FileSystemOptions,
     FsNodeInfo, FsStr, StaticDirectoryBuilder,
 };
-use once_cell::sync::Lazy;
+use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 use starnix_uapi::vfs::default_statfs;
 use starnix_uapi::{statfs, TRACEFS_MAGIC};
-use std::sync::Arc;
 
-pub fn trace_fs(current_task: &CurrentTask, options: FileSystemOptions) -> &FileSystemHandle {
-    current_task.kernel().trace_fs.get_or_init(|| {
-        TraceFs::new_fs(current_task, options).expect("tracefs constructed with valid options")
-    })
+pub fn trace_fs(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    options: FileSystemOptions,
+) -> Result<FileSystemHandle, Errno> {
+    Ok(current_task
+        .kernel()
+        .trace_fs
+        .get_or_init(|| {
+            TraceFs::new_fs(current_task, options).expect("tracefs constructed with valid options")
+        })
+        .clone())
 }
 
 pub struct TraceFs;
 
-impl FileSystemOps for Arc<TraceFs> {
+impl FileSystemOps for TraceFs {
     fn statfs(&self, _fs: &FileSystem, _current_task: &CurrentTask) -> Result<statfs, Errno> {
         Ok(default_statfs(TRACEFS_MAGIC))
     }
@@ -40,7 +48,7 @@ impl TraceFs {
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
         let kernel = current_task.kernel();
-        let fs = FileSystem::new(kernel, CacheMode::Uncached, Arc::new(TraceFs), options)?;
+        let fs = FileSystem::new(kernel, CacheMode::Uncached, TraceFs, options)?;
         let mut dir = StaticDirectoryBuilder::new(&fs);
 
         dir.node(

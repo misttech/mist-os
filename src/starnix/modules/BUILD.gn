@@ -10,6 +10,7 @@ group("tests") {
     "ext4:tests",
     "input:tests",
     "loop:tests",
+    "tracefs:tests",
   ]
 }
 
@@ -28,6 +29,7 @@ rustc_library("modules") {
     "//src/starnix/modules/ext4",
     "//src/starnix/modules/fuse",
     "//src/starnix/modules/loop",
+    "//src/starnix/modules/tracefs",
     "//src/starnix/modules/tun",
     "//src/starnix/modules/zram",
   ]

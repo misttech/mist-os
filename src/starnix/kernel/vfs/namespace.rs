@@ -9,7 +9,6 @@ use crate::fs::overlayfs::OverlayFs;
 use crate::fs::proc::proc_fs;
 use crate::fs::sysfs::sys_fs;
 use crate::fs::tmpfs::TmpFs;
-use crate::fs::tracefs::trace_fs;
 use crate::mutable_state::{state_accessor, state_implementation};
 use crate::security;
 use crate::task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, Waiter};
@@ -732,7 +731,6 @@ impl CurrentTask {
             b"selinuxfs" => security::new_selinux_fs(self, options),
             b"sysfs" => Ok(sys_fs(self, options).clone()),
             b"tmpfs" => TmpFs::new_fs_with_options(kernel, options),
-            b"tracefs" => Ok(trace_fs(self, options).clone()),
             _ => error!(ENODEV, fs_type),
         }
     }
