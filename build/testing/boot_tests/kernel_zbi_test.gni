@@ -21,15 +21,6 @@ declare_args() {
   disable_cuckoo_tests = false
 }
 
-cuckoo_kernel_zbi_test_params = {
-  # List of assembly input groups that the kernel cuckoo zbi will use. Each one may provide
-  # packages, core realm shards, etc.
-  input_groups = [
-    "bootstrap",
-    "network",
-  ]
-}
-
 template("_cuckoo_product_bundle") {
   assert(current_toolchain == default_toolchain)
   assert(defined(invoker.kernel_zbi))
@@ -85,7 +76,7 @@ template("_cuckoo_product_bundle") {
           "//src/testing/fidl/intl_property_manager:fake_intl_services_package",
           ":$stub_test_target",
         ]
-    cmdline_deps = []
+    cmdline_deps = [ "//build/testing:userboot.next-component-manager" ]
     board_config_label = board_configuration_label
     allow_eng_platform_bundle_use = true
 
@@ -107,12 +98,6 @@ template("_cuckoo_product_bundle") {
     }
 
     generate_vbmeta = use_vbmeta
-  }
-
-  foreach(input_group, cuckoo_kernel_zbi_test_params.input_groups) {
-    input_group_label = "//bundles/assembly_input_groups:${input_group}"
-    assembly_input.base_packages += [ "${input_group_label}.base_packages" ]
-    assembly_input.cmdline_deps += [ "${input_group_label}.cmdline_deps" ]
   }
 
   assembled_system(assembled_system_target) {

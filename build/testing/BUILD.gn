@@ -68,3 +68,10 @@ cuckoo_product_assembly_config("cuckoo-product-configuration-minfs") {
     }
   }
 }
+
+# When setting 'userboot.test.next', 'userboot.next' must be set explicitly, to differentiate
+# between running a test, booting or both.
+kernel_cmdline("userboot.next-component-manager") {
+  testonly = true
+  args = [ "userboot.next=bin/component_manager+--boot" ]
+}
