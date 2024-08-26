@@ -66,6 +66,8 @@ def update_version_history(
             )
             f.seek(0)
             json.dump(version_history, f, indent=4)
+            # JSON dump does not include a new line at the end.
+            f.write("\n")
             f.truncate()
             return True
     except FileNotFoundError:
