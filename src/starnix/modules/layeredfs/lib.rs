@@ -2,8 +2,8 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::task::{CurrentTask, Kernel};
-use crate::vfs::{
+use starnix_core::task::{CurrentTask, Kernel};
+use starnix_core::vfs::{
     fileops_impl_directory, fileops_impl_noop_sync, fs_node_impl_dir_readonly, unbounded_seek,
     CacheMode, DirectoryEntryType, DirentSink, FileHandle, FileObject, FileOps, FileSystem,
     FileSystemHandle, FileSystemOps, FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString, MountInfo,
@@ -36,28 +36,36 @@ impl LayeredFs {
     ) -> FileSystemHandle {
         let options = base_fs.options.clone();
         let layered_fs = Arc::new(LayeredFs { base_fs, mappings });
-        let fs = FileSystem::new(kernel, CacheMode::Uncached, layered_fs.clone(), options)
-            .expect("layeredfs constructed with valid options");
-        fs.set_root_node(FsNode::new_root(layered_fs));
+        let fs = FileSystem::new(
+            kernel,
+            CacheMode::Uncached,
+            LayeredFileSystemOps { fs: layered_fs.clone() },
+            options,
+        )
+        .expect("layeredfs constructed with valid options");
+        fs.set_root_node(FsNode::new_root(LayeredNodeOps { fs: layered_fs }));
         fs
     }
 }
 
-pub struct LayeredFsRootNodeOps {
+struct LayeredFileSystemOps {
     fs: Arc<LayeredFs>,
-    root_file: FileHandle,
 }
 
-impl FileSystemOps for Arc<LayeredFs> {
+impl FileSystemOps for LayeredFileSystemOps {
     fn statfs(&self, _fs: &FileSystem, current_task: &CurrentTask) -> Result<statfs, Errno> {
-        self.base_fs.statfs(current_task)
+        self.fs.base_fs.statfs(current_task)
     }
     fn name(&self) -> &'static FsStr {
-        self.base_fs.name()
+        self.fs.base_fs.name()
     }
 }
 
-impl FsNodeOps for Arc<LayeredFs> {
+struct LayeredNodeOps {
+    fs: Arc<LayeredFs>,
+}
+
+impl FsNodeOps for LayeredNodeOps {
     fs_node_impl_dir_readonly!();
 
     fn create_file_ops(
@@ -67,9 +75,9 @@ impl FsNodeOps for Arc<LayeredFs> {
         current_task: &CurrentTask,
         flags: OpenFlags,
     ) -> Result<Box<dyn FileOps>, Errno> {
-        Ok(Box::new(LayeredFsRootNodeOps {
-            fs: self.clone(),
-            root_file: self.base_fs.root().open_anonymous(locked, current_task, flags)?,
+        Ok(Box::new(LayeredFileOps {
+            fs: self.fs.clone(),
+            root_file: self.fs.base_fs.root().open_anonymous(locked, current_task, flags)?,
         }))
     }
 
@@ -79,15 +87,20 @@ impl FsNodeOps for Arc<LayeredFs> {
         current_task: &CurrentTask,
         name: &FsStr,
     ) -> Result<FsNodeHandle, Errno> {
-        if let Some(fs) = self.mappings.get(name) {
+        if let Some(fs) = self.fs.mappings.get(name) {
             Ok(fs.root().node.clone())
         } else {
-            self.base_fs.root().node.lookup(current_task, &MountInfo::detached(), name)
+            self.fs.base_fs.root().node.lookup(current_task, &MountInfo::detached(), name)
         }
     }
 }
 
-impl FileOps for LayeredFsRootNodeOps {
+struct LayeredFileOps {
+    fs: Arc<LayeredFs>,
+    root_file: FileHandle,
+}
+
+impl FileOps for LayeredFileOps {
     fileops_impl_directory!();
     fileops_impl_noop_sync!();
 
@@ -166,8 +179,8 @@ impl FileOps for LayeredFsRootNodeOps {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::fs::tmpfs::TmpFs;
-    use crate::testing::*;
+    use starnix_core::fs::tmpfs::TmpFs;
+    use starnix_core::testing::*;
     use starnix_sync::Unlocked;
 
     fn get_root_entry_names(
@@ -208,8 +221,12 @@ mod test {
     async fn test_remove_duplicates() {
         let (kernel, current_task, mut locked) = create_kernel_task_and_unlocked();
         let base = TmpFs::new_fs(&kernel);
-        base.root().create_dir(&mut locked, &current_task, "d1".into()).expect("create_dir");
-        base.root().create_dir(&mut locked, &current_task, "d2".into()).expect("create_dir");
+        base.root()
+            .create_dir_for_testing(&mut locked, &current_task, "d1".into())
+            .expect("create_dir");
+        base.root()
+            .create_dir_for_testing(&mut locked, &current_task, "d2".into())
+            .expect("create_dir");
         let base_entries = get_root_entry_names(&mut locked, &current_task, &base);
         assert_eq!(base_entries.len(), 4);
         assert!(base_entries.contains(&b".".to_vec()));

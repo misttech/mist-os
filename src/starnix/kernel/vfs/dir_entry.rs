@@ -327,6 +327,20 @@ impl DirEntry {
     where
         L: starnix_sync::LockBefore<starnix_sync::FileOpsCore>,
     {
+        self.create_dir_for_testing(locked, current_task, name)
+    }
+
+    // This function is for testing because it sets the owner/group to root instead of the current
+    // user to save a bit of typing in tests, but this shouldn't happen silently in production.
+    pub fn create_dir_for_testing<L>(
+        self: &DirEntryHandle,
+        locked: &mut starnix_sync::Locked<'_, L>,
+        current_task: &CurrentTask,
+        name: &FsStr,
+    ) -> Result<DirEntryHandle, Errno>
+    where
+        L: starnix_sync::LockBefore<starnix_sync::FileOpsCore>,
+    {
         // TODO: apply_umask
         self.create_entry(current_task, &MountInfo::detached(), name, |dir, mount, name| {
             dir.mknod(

@@ -2,12 +2,14 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::tmpfs::{TmpFs, TmpfsDirectory};
-use crate::mm::memory::MemoryObject;
-use crate::task::{CurrentTask, Kernel};
-use crate::vfs::fs_args::MountParams;
-use crate::vfs::rw_queue::RwQueueReadGuard;
-use crate::vfs::{
+use once_cell::sync::OnceCell;
+use rand::Rng;
+use starnix_core::fs::tmpfs::{TmpFs, TmpfsDirectory};
+use starnix_core::mm::memory::MemoryObject;
+use starnix_core::task::{CurrentTask, Kernel};
+use starnix_core::vfs::fs_args::MountParams;
+use starnix_core::vfs::rw_queue::RwQueueReadGuard;
+use starnix_core::vfs::{
     default_seek, emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync,
     fileops_impl_seekable, AlreadyLockedAppendLockStrategy, AppendLockGuard, CacheMode, DirEntry,
     DirEntryHandle, DirectoryEntryType, DirentSink, FallocMode, FileHandle, FileObject, FileOps,
@@ -15,8 +17,6 @@ use crate::vfs::{
     FsNodeInfo, FsNodeOps, FsStr, FsString, InputBuffer, MountInfo, OutputBuffer, RenameFlags,
     SeekTarget, SymlinkTarget, UnlinkKind, ValueOrSize, VecInputBuffer, VecOutputBuffer, XattrOp,
 };
-use once_cell::sync::OnceCell;
-use rand::Rng;
 use starnix_logging::{log_error, log_warn, track_stub};
 use starnix_sync::{
     BeforeFsNodeAppend, DeviceOpen, FileOpsCore, FsNodeAppend, LockBefore, LockEqualOrBefore,
@@ -209,7 +209,7 @@ impl ActiveEntry {
 }
 
 struct OverlayNode {
-    fs: Arc<OverlayFs>,
+    stack: Arc<OverlayStack>,
 
     // Corresponding `DirEntries` in the lower and the upper filesystems. At least one must be
     // set. Note that we don't care about `NamespaceNode`: overlayfs overlays filesystems
@@ -227,7 +227,7 @@ struct OverlayNode {
 
 impl OverlayNode {
     fn new(
-        fs: Arc<OverlayFs>,
+        stack: Arc<OverlayStack>,
         lower: Option<ActiveEntry>,
         upper: Option<ActiveEntry>,
         parent: Option<Arc<OverlayNode>>,
@@ -239,13 +239,11 @@ impl OverlayNode {
             None => OnceCell::new(),
         };
 
-        let node = OverlayNode { fs, upper, lower, upper_is_opaque: OnceCell::new(), parent };
-
-        Arc::new(node)
+        Arc::new(OverlayNode { stack, upper, lower, upper_is_opaque: OnceCell::new(), parent })
     }
 
     fn from_fs_node(node: &FsNodeHandle) -> Result<&Arc<Self>, Errno> {
-        node.downcast_ops::<Arc<Self>>().ok_or_else(|| errno!(EIO))
+        Ok(&node.downcast_ops::<OverlayNodeOps>().ok_or_else(|| errno!(EIO))?.node)
     }
 
     fn main_entry(&self) -> &ActiveEntry {
@@ -268,7 +266,8 @@ impl OverlayNode {
         // Parent may be needed to initialize `upper`. We don't need to pass it if we have `upper`.
         let parent = if upper.is_some() { None } else { Some(self.clone()) };
 
-        let overlay_node = OverlayNode::new(self.fs.clone(), lower, upper, parent);
+        let overlay_node =
+            OverlayNodeOps { node: OverlayNode::new(self.stack.clone(), lower, upper, parent) };
         FsNode::new_uncached(current_task, overlay_node, &node.fs(), info.ino, info)
     }
 
@@ -324,7 +323,7 @@ impl OverlayNode {
                 })
             } else if info.mode.is_reg() && copy_mode == UpperCopyMode::CopyAll {
                 // Regular files need to be copied from lower FS to upper FS.
-                self.fs.create_upper_entry(
+                self.stack.create_upper_entry(
                     locked,
                     current_task,
                     parent_upper,
@@ -411,7 +410,7 @@ impl OverlayNode {
             Err(e) => return Err(e),
         };
 
-        self.fs.create_upper_entry(
+        self.stack.create_upper_entry(
             locked,
             current_task,
             upper,
@@ -480,7 +479,11 @@ impl OverlayNode {
     }
 }
 
-impl FsNodeOps for Arc<OverlayNode> {
+struct OverlayNodeOps {
+    node: Arc<OverlayNode>,
+}
+
+impl FsNodeOps for OverlayNodeOps {
     fn create_file_ops(
         &self,
         locked: &mut Locked<'_, FileOpsCore>,
@@ -495,13 +498,13 @@ impl FsNodeOps for Arc<OverlayNode> {
             } else {
                 UpperCopyMode::CopyAll
             };
-            self.ensure_upper_maybe_copy(locked, current_task, copy_mode)?;
+            self.node.ensure_upper_maybe_copy(locked, current_task, copy_mode)?;
         }
 
         let ops: Box<dyn FileOps> = if node.is_dir() {
-            Box::new(OverlayDirectory { node: self.clone(), dir_entries: Default::default() })
+            Box::new(OverlayDirectory { node: self.node.clone(), dir_entries: Default::default() })
         } else {
-            let state = match (self.upper.get(), &self.lower) {
+            let state = match (self.node.upper.get(), &self.node.lower) {
                 (Some(upper), _) => OverlayFileState::Upper(upper.entry().open_anonymous(
                     locked,
                     current_task,
@@ -515,7 +518,7 @@ impl FsNodeOps for Arc<OverlayNode> {
                 _ => panic!("Expected either upper or lower node"),
             };
 
-            Box::new(OverlayFile { node: self.clone(), flags, state: RwLock::new(state) })
+            Box::new(OverlayFile { node: self.node.clone(), flags, state: RwLock::new(state) })
         };
 
         Ok(ops)
@@ -540,7 +543,7 @@ impl FsNodeOps for Arc<OverlayNode> {
                 .transpose()
         };
 
-        let upper: Option<ActiveEntry> = resolve_child(self.upper.get())?;
+        let upper: Option<ActiveEntry> = resolve_child(self.node.upper.get())?;
 
         let (upper_is_dir, upper_is_opaque) = match &upper {
             Some(upper) if upper.is_whiteout() => return error!(ENOENT),
@@ -552,12 +555,12 @@ impl FsNodeOps for Arc<OverlayNode> {
             None => (false, false),
         };
 
-        let parent_upper_is_opaque = self.upper_is_opaque.get().is_some();
+        let parent_upper_is_opaque = self.node.upper_is_opaque.get().is_some();
 
         // We don't need to resolve the lower node if we have an opaque node in the upper dir.
         let lookup_lower = !parent_upper_is_opaque && !upper_is_opaque;
         let lower: Option<ActiveEntry> = if lookup_lower {
-            match resolve_child(self.lower.as_ref())? {
+            match resolve_child(self.node.lower.as_ref())? {
                 // If the upper node is a directory and the lower isn't then ignore the lower node.
                 Some(lower) if upper_is_dir && !lower.entry().node.is_dir() => None,
                 Some(lower) if lower.is_whiteout() => None,
@@ -571,7 +574,7 @@ impl FsNodeOps for Arc<OverlayNode> {
             return error!(ENOENT);
         }
 
-        Ok(self.init_fs_node_for_child(current_task, node, lower, upper))
+        Ok(self.node.init_fs_node_for_child(current_task, node, lower, upper))
     }
 
     fn mknod(
@@ -585,12 +588,12 @@ impl FsNodeOps for Arc<OverlayNode> {
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         let new_upper_node =
-            self.create_entry(locked, current_task, name, |locked, dir, temp_name| {
+            self.node.create_entry(locked, current_task, name, |locked, dir, temp_name| {
                 dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
                     dir_node.mknod(locked, current_task, mount, name, mode, dev, owner.clone())
                 })
             })?;
-        Ok(self.init_fs_node_for_child(current_task, node, None, Some(new_upper_node)))
+        Ok(self.node.init_fs_node_for_child(current_task, node, None, Some(new_upper_node)))
     }
 
     fn mkdir(
@@ -603,7 +606,7 @@ impl FsNodeOps for Arc<OverlayNode> {
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         let new_upper_node =
-            self.create_entry(locked, current_task, name, |locked, dir, temp_name| {
+            self.node.create_entry(locked, current_task, name, |locked, dir, temp_name| {
                 let entry =
                     dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
                         dir_node.mknod(
@@ -623,7 +626,7 @@ impl FsNodeOps for Arc<OverlayNode> {
                 Ok(entry)
             })?;
 
-        Ok(self.init_fs_node_for_child(current_task, node, None, Some(new_upper_node)))
+        Ok(self.node.init_fs_node_for_child(current_task, node, None, Some(new_upper_node)))
     }
 
     fn create_symlink(
@@ -636,7 +639,7 @@ impl FsNodeOps for Arc<OverlayNode> {
         owner: FsCred,
     ) -> Result<FsNodeHandle, Errno> {
         let new_upper_node =
-            self.create_entry(locked, current_task, name, |locked, dir, temp_name| {
+            self.node.create_entry(locked, current_task, name, |locked, dir, temp_name| {
                 dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
                     dir_node.create_symlink(
                         locked,
@@ -648,11 +651,11 @@ impl FsNodeOps for Arc<OverlayNode> {
                     )
                 })
             })?;
-        Ok(self.init_fs_node_for_child(current_task, node, None, Some(new_upper_node)))
+        Ok(self.node.init_fs_node_for_child(current_task, node, None, Some(new_upper_node)))
     }
 
     fn readlink(&self, _node: &FsNode, current_task: &CurrentTask) -> Result<SymlinkTarget, Errno> {
-        self.main_entry().entry().node.readlink(current_task)
+        self.node.main_entry().entry().node.readlink(current_task)
     }
 
     fn link(
@@ -665,7 +668,7 @@ impl FsNodeOps for Arc<OverlayNode> {
     ) -> Result<(), Errno> {
         let child_overlay = OverlayNode::from_fs_node(child)?;
         let upper_child = child_overlay.ensure_upper(locked, current_task)?;
-        self.create_entry(locked, current_task, name, |locked, dir, temp_name| {
+        self.node.create_entry(locked, current_task, name, |locked, dir, temp_name| {
             dir.create_entry(current_task, temp_name, |dir_node, mount, name| {
                 dir_node.link(locked, current_task, mount, name, &upper_child.entry().node)
             })
@@ -681,13 +684,13 @@ impl FsNodeOps for Arc<OverlayNode> {
         name: &FsStr,
         child: &FsNodeHandle,
     ) -> Result<(), Errno> {
-        let upper = self.ensure_upper(locked, current_task)?;
+        let upper = self.node.ensure_upper(locked, current_task)?;
         let child_overlay = OverlayNode::from_fs_node(child)?;
         child_overlay.prepare_to_unlink(locked, current_task)?;
 
-        let need_whiteout = self.lower_entry_exists(current_task, name)?;
+        let need_whiteout = self.node.lower_entry_exists(current_task, name)?;
         if need_whiteout {
-            self.fs.create_upper_entry(
+            self.node.stack.create_upper_entry(
                 locked,
                 current_task,
                 &upper,
@@ -714,7 +717,7 @@ impl FsNodeOps for Arc<OverlayNode> {
         info: &'a RwLock<FsNodeInfo>,
     ) -> Result<RwLockReadGuard<'a, FsNodeInfo>, Errno> {
         let mut lock = info.write();
-        *lock = self.main_entry().entry().node.fetch_and_refresh_info(current_task)?.clone();
+        *lock = self.node.main_entry().entry().node.fetch_and_refresh_info(current_task)?.clone();
         Ok(RwLockWriteGuard::downgrade(lock))
     }
 
@@ -725,7 +728,7 @@ impl FsNodeOps for Arc<OverlayNode> {
         new_info: &FsNodeInfo,
         has: zxio_node_attr_has_t,
     ) -> Result<(), Errno> {
-        let upper = self.ensure_upper(locked, current_task)?.entry();
+        let upper = self.node.ensure_upper(locked, current_task)?.entry();
         upper.node.update_attributes(locked, current_task, |info| {
             if has.modification_time {
                 info.time_modify = new_info.time_modify;
@@ -755,7 +758,7 @@ impl FsNodeOps for Arc<OverlayNode> {
         _node: &'a FsNode,
         current_task: &CurrentTask,
     ) -> Result<(RwQueueReadGuard<'a, FsNodeAppend>, Locked<'a, FsNodeAppend>), Errno> {
-        let upper_node = self.ensure_upper(locked, current_task)?.entry.node.as_ref();
+        let upper_node = self.node.ensure_upper(locked, current_task)?.entry.node.as_ref();
         upper_node.ops().append_lock_read(locked, upper_node, current_task)
     }
 
@@ -767,7 +770,7 @@ impl FsNodeOps for Arc<OverlayNode> {
         current_task: &CurrentTask,
         length: u64,
     ) -> Result<(), Errno> {
-        let upper = self.ensure_upper(locked, current_task)?;
+        let upper = self.node.ensure_upper(locked, current_task)?;
 
         upper.entry().node.truncate_with_strategy(
             locked,
@@ -788,7 +791,7 @@ impl FsNodeOps for Arc<OverlayNode> {
         offset: u64,
         length: u64,
     ) -> Result<(), Errno> {
-        self.ensure_upper(locked, current_task)?.entry().node.fallocate_with_strategy(
+        self.node.ensure_upper(locked, current_task)?.entry().node.fallocate_with_strategy(
             locked,
             AlreadyLockedAppendLockStrategy::new(guard),
             current_task,
@@ -972,7 +975,7 @@ impl FileOps for OverlayFile {
         _file: &FileObject,
         current_task: &CurrentTask,
         length: Option<usize>,
-        prot: crate::mm::ProtectionFlags,
+        prot: starnix_core::mm::ProtectionFlags,
     ) -> Result<Arc<MemoryObject>, Errno> {
         // Not that the VMO returned here will not updated if the file is promoted to upper FS
         // later. This is consistent with OveralyFS behavior on Linux, see
@@ -980,7 +983,16 @@ impl FileOps for OverlayFile {
         self.state.read().file().get_memory(locked, current_task, length, prot)
     }
 }
-pub struct OverlayFs {
+
+pub fn new_overlay_fs(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    options: FileSystemOptions,
+) -> Result<FileSystemHandle, Errno> {
+    OverlayStack::new_fs(locked, current_task, options)
+}
+
+pub struct OverlayStack {
     // Keep references to the underlying file systems to ensure they outlive `overlayfs` since
     // they may be unmounted before overlayfs.
     #[allow(unused)]
@@ -990,8 +1002,8 @@ pub struct OverlayFs {
     work: ActiveEntry,
 }
 
-impl OverlayFs {
-    pub fn new_fs<L>(
+impl OverlayStack {
+    fn new_fs<L>(
         locked: &mut Locked<'_, L>,
         current_task: &CurrentTask,
         options: FileSystemOptions,
@@ -1022,10 +1034,15 @@ impl OverlayFs {
             return error!(EINVAL);
         }
 
-        let overlay_fs = Arc::new(OverlayFs { lower_fs, upper_fs, work });
-        let root_node = OverlayNode::new(overlay_fs.clone(), Some(lower), Some(upper), None);
-        let fs = FileSystem::new(current_task.kernel(), CacheMode::Uncached, overlay_fs, options)?;
-        fs.set_root(root_node);
+        let stack = Arc::new(OverlayStack { lower_fs, upper_fs, work });
+        let root_node = OverlayNode::new(stack.clone(), Some(lower), Some(upper), None);
+        let fs = FileSystem::new(
+            current_task.kernel(),
+            CacheMode::Uncached,
+            OverlayFs { stack },
+            options,
+        )?;
+        fs.set_root(OverlayNodeOps { node: root_node });
         Ok(fs)
     }
 
@@ -1050,11 +1067,15 @@ impl OverlayFs {
         let lower_fs = rootfs.clone();
         let upper_fs = invisible_tmp.clone();
 
-        let overlay_fs = Arc::new(OverlayFs { lower_fs, upper_fs, work });
-        let root_node = OverlayNode::new(overlay_fs.clone(), Some(lower), Some(upper), None);
-        let fs =
-            FileSystem::new(kernel, CacheMode::Uncached, overlay_fs, FileSystemOptions::default())?;
-        fs.set_root(root_node);
+        let stack = Arc::new(OverlayStack { lower_fs, upper_fs, work });
+        let root_node = OverlayNode::new(stack.clone(), Some(lower), Some(upper), None);
+        let fs = FileSystem::new(
+            kernel,
+            CacheMode::Uncached,
+            OverlayFs { stack },
+            FileSystemOptions::default(),
+        )?;
+        fs.set_root(OverlayNodeOps { node: root_node });
         Ok(fs)
     }
 
@@ -1125,9 +1146,13 @@ impl OverlayFs {
     }
 }
 
-impl FileSystemOps for Arc<OverlayFs> {
+struct OverlayFs {
+    stack: Arc<OverlayStack>,
+}
+
+impl FileSystemOps for OverlayFs {
     fn statfs(&self, _fs: &FileSystem, current_task: &CurrentTask) -> Result<statfs, Errno> {
-        self.upper_fs.statfs(current_task)
+        self.stack.upper_fs.statfs(current_task)
     }
 
     fn name(&self) -> &'static FsStr {

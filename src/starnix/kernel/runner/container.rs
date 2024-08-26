@@ -25,8 +25,6 @@ use futures::{FutureExt, StreamExt, TryStreamExt};
 use runner::{get_program_string, get_program_strvec};
 use starnix_core::execution::execute_task_with_prerun_result;
 use starnix_core::fs::fuchsia::create_remotefs_filesystem;
-use starnix_core::fs::layeredfs::LayeredFs;
-use starnix_core::fs::overlayfs::OverlayFs;
 use starnix_core::fs::tmpfs::TmpFs;
 use starnix_core::security;
 use starnix_core::task::{set_thread_role, CurrentTask, ExitStatus, Kernel, Task};
@@ -36,7 +34,9 @@ use starnix_logging::{
     log_error, log_info, log_warn, trace_duration, CATEGORY_STARNIX, NAME_CREATE_CONTAINER,
 };
 use starnix_modules::{init_common_devices, register_common_file_systems};
+use starnix_modules_layeredfs::LayeredFs;
 use starnix_modules_magma::get_magma_params;
+use starnix_modules_overlayfs::OverlayStack;
 use starnix_sync::{DeviceOpen, FileOpsCore, LockBefore, Locked, Unlocked};
 use starnix_uapi::errors::{SourceContext, ENOENT};
 use starnix_uapi::open_flags::OpenFlags;
@@ -555,7 +555,7 @@ fn create_fs_context(
         root.fs = LayeredFs::new_fs(kernel, root.fs, mappings.into_iter().collect());
     }
     if features.rootfs_rw {
-        root.fs = OverlayFs::wrap_fs_in_writable_layer(kernel, root.fs)?;
+        root.fs = OverlayStack::wrap_fs_in_writable_layer(kernel, root.fs)?;
     }
     Ok(FsContext::new(Namespace::new_with_flags(root.fs, root.flags)))
 }

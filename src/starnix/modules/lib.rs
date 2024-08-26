@@ -17,6 +17,7 @@ use starnix_modules_ext4::ExtFilesystem;
 use starnix_modules_functionfs::FunctionFs;
 use starnix_modules_fuse::{new_fuse_fs, new_fusectl_fs, open_fuse_device};
 use starnix_modules_loop::{create_loop_control_device, loop_device_init};
+use starnix_modules_overlayfs::new_overlay_fs;
 use starnix_modules_tracefs::trace_fs;
 use starnix_modules_tun::DevTun;
 use starnix_modules_zram::zram_device_init;
@@ -100,5 +101,6 @@ pub fn register_common_file_systems(_locked: &mut Locked<'_, Unlocked>, kernel: 
     registry.register(b"fuse".into(), new_fuse_fs);
     registry.register(b"fusectl".into(), new_fusectl_fs);
     registry.register(b"nmfs".into(), nmfs);
+    registry.register(b"overlay".into(), new_overlay_fs);
     registry.register(b"tracefs".into(), trace_fs);
 }
