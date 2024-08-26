@@ -153,15 +153,10 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                 .map_err(|e| bug!("cannot stage kernel file: {e}"))?;
         }
 
-        // If the kernel is an efi image, skip the zbi processing.
-        let zbi_path = if !emu_config.guest.is_efi() {
-            let zbi_path = instance_root.join(
-                emu_config
-                    .guest
-                    .zbi_image
-                    .file_name()
-                    .ok_or_else(|| bug!("cannot read zbi file name"))?,
-            );
+        // If the kernel is an efi image, or has no zbi, skip the zbi processing.
+        let zbi_path = if let Some(zbi_image_path) = &emu_config.guest.zbi_image {
+            let zbi_path = instance_root
+                .join(zbi_image_path.file_name().ok_or_else(|| bug!("cannot read zbi file name"))?);
 
             if zbi_path.exists() && reuse {
                 tracing::debug!("Using existing file for {:?}", zbi_path.file_name().unwrap());
@@ -172,14 +167,14 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
             } else {
                 // Add the authorized public keys to the zbi image to enable SSH access to
                 // the guest.
-                Self::embed_boot_data(&emu_config.guest.zbi_image, &zbi_path)
+                Self::embed_boot_data(&zbi_image_path, &zbi_path)
                     .await
                     .map_err(|e| bug!("cannot embed boot data: {e}"))?;
             }
-            zbi_path
+            Some(zbi_path)
         } else {
-            tracing::debug!("Skipping zbi staging since this is an efi image");
-            emu_config.guest.zbi_image.clone()
+            tracing::debug!("Skipping zbi staging; no zbi file in product bundle.");
+            None
         };
 
         if let Some(disk_image) = &emu_config.guest.disk_image {
@@ -980,7 +975,7 @@ mod tests {
             .await?;
 
         guest.kernel_image = kernel_path;
-        guest.zbi_image = zbi_path;
+        guest.zbi_image = Some(zbi_path);
         guest.disk_image = Some(disk_image_path);
 
         // Set the paths to use for the SSH keys
@@ -1034,7 +1029,7 @@ mod tests {
         let actual = updated.map_err(|e| bug!("cannot get updated guest config: {e}"))?;
         let expected = GuestConfig {
             kernel_image: root.join(instance_name).join("kernel"),
-            zbi_image: root.join(instance_name).join("zbi"),
+            zbi_image: Some(root.join(instance_name).join("zbi")),
             disk_image: Some(
                 disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
             ),
@@ -1057,7 +1052,7 @@ mod tests {
         let actual = updated.map_err(|e| bug!("cannot get updated guest config, reuse: {e}"))?;
         let expected = GuestConfig {
             kernel_image: root.join(instance_name).join("kernel"),
-            zbi_image: root.join(instance_name).join("zbi"),
+            zbi_image: Some(root.join(instance_name).join("zbi")),
             disk_image: Some(
                 disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
             ),
@@ -1131,7 +1126,7 @@ mod tests {
         let actual = updated.expect("cannot get updated guest config");
         let expected = GuestConfig {
             kernel_image: root.join(instance_name).join("kernel"),
-            zbi_image: root.join(instance_name).join("zbi"),
+            zbi_image: Some(root.join(instance_name).join("zbi")),
             disk_image: Some(
                 disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
             ),
@@ -1155,7 +1150,7 @@ mod tests {
         let actual = updated.expect("cannot get updated guest config, reuse");
         let expected = GuestConfig {
             kernel_image: root.join(instance_name).join("kernel"),
-            zbi_image: root.join(instance_name).join("zbi"),
+            zbi_image: Some(root.join(instance_name).join("zbi")),
             disk_image: Some(
                 disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
             ),
@@ -1235,7 +1230,7 @@ mod tests {
 
         let expected = GuestConfig {
             kernel_image: root.join(instance_name).join("kernel"),
-            zbi_image: root.join(instance_name).join("zbi"),
+            zbi_image: Some(root.join(instance_name).join("zbi")),
             disk_image: Some(DiskImage::Fxfs(root.join(instance_name).join("disk"))),
             ..Default::default()
         };
@@ -1266,7 +1261,7 @@ mod tests {
         let ctx = mock_modules::get_host_tool_context();
         ctx.expect().returning(|_| Ok(PathBuf::from("echo")));
 
-        let src = emu_config.guest.zbi_image;
+        let src = emu_config.guest.zbi_image.expect("zbi image path");
         let dest = root.join("dest.zbi");
 
         <TestEngine as QemuBasedEngine>::embed_boot_data(&src, &dest).await?;

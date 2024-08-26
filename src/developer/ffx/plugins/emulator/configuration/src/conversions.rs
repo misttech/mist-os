@@ -150,17 +150,11 @@ fn convert_v2_bundle_to_configs(
         _ => None,
     });
 
-    // efi kernels do not have separate zbi images.
-    let zbi_image: PathBuf = match kernel_image.extension() {
-        Some(ext) if ext == "efi" => PathBuf::new(),
-        _ => system
-            .iter()
-            .find_map(|i| match i {
-                Image::ZBI { path, .. } => Some(path.clone().into()),
-                _ => None,
-            })
-            .ok_or(anyhow!("No ZBI in the product bundle"))?,
-    };
+    // Some kernels do not have separate zbi images.
+    let zbi_image: Option<PathBuf> = system.iter().find_map(|i| match i {
+        Image::ZBI { path, .. } => Some(path.clone().into()),
+        _ => None,
+    });
 
     emulator_configuration.guest =
         GuestConfig { disk_image, kernel_image, zbi_image, ..Default::default() };
@@ -249,7 +243,7 @@ mod tests {
             DiskImage::Fvm(expected_disk_image_path.into())
         );
         assert_eq!(config.guest.kernel_image, expected_kernel);
-        assert_eq!(config.guest.zbi_image, expected_zbi);
+        assert_eq!(config.guest.zbi_image, Some(expected_zbi.into_std_path_buf()));
 
         assert_eq!(config.host.port_map.len(), 0);
 
@@ -301,7 +295,7 @@ mod tests {
             DiskImage::Fxfs(expected_disk_image_path.into())
         );
         assert_eq!(config.guest.kernel_image, expected_kernel);
-        assert_eq!(config.guest.zbi_image, expected_zbi);
+        assert_eq!(config.guest.zbi_image, Some(expected_zbi.into_std_path_buf()));
 
         assert_eq!(config.host.port_map.len(), 2);
         assert!(config.host.port_map.contains_key("ssh"));
@@ -349,5 +343,59 @@ mod tests {
         let result = parse_device_name_as_path(&Some(path.to_string_lossy().into_owned()));
         assert!(matches!(result, Some(VirtualDevice::V1(_))));
         Ok(())
+    }
+
+    #[test]
+    fn test_efi_product_bundle() {
+        let temp_dir = tempfile::TempDir::new().expect("creating sdk_root temp dir");
+        let sdk_root = temp_dir.path();
+
+        // Set up some test data to pass into the conversion routine.
+        let expected_kernel = Utf8PathBuf::from_path_buf(sdk_root.join("kernel.efi"))
+            .expect("couldn't convert kernel to utf8");
+
+        let pb = ProductBundleV2 {
+            product_name: String::default(),
+            product_version: String::default(),
+            partitions: PartitionsConfig::default(),
+            sdk_version: String::default(),
+            system_a: Some(vec![Image::QemuKernel(expected_kernel.clone())]),
+            system_b: None,
+            system_r: None,
+            repositories: vec![],
+            update_package_hash: None,
+            virtual_devices_path: None,
+        };
+        let device = VirtualDeviceV1 {
+            name: "FakeDevice".to_string(),
+            description: Some("A fake virtual device".to_string()),
+            kind: ElementType::VirtualDevice,
+            hardware: Hardware {
+                cpu: Cpu { arch: CpuArchitecture::X64 },
+                audio: AudioDevice { model: AudioModel::Hda },
+                storage: DataAmount { quantity: 512, units: DataUnits::Megabytes },
+                inputs: InputDevice { pointing_device: PointingDevice::Mouse },
+                memory: DataAmount { quantity: 4, units: DataUnits::Gigabytes },
+                window_size: Screen { height: 480, width: 640, units: ScreenUnits::Pixels },
+            },
+            ports: None,
+        };
+
+        // Run the conversion, then assert everything in the config matches the manifest data.
+        let config =
+            convert_v2_bundle_to_configs(&pb, &device).expect("convert_v2_bundle_to_configs");
+        assert_eq!(config.device.audio, device.hardware.audio);
+        assert_eq!(config.device.cpu.architecture, device.hardware.cpu.arch);
+        assert_eq!(config.device.memory, device.hardware.memory);
+        assert_eq!(config.device.pointing_device, device.hardware.inputs.pointing_device);
+        assert_eq!(config.device.screen, device.hardware.window_size);
+        assert_eq!(config.device.storage, device.hardware.storage);
+
+        assert!(config.guest.disk_image.is_none());
+        assert!(config.guest.zbi_image.is_none());
+
+        assert_eq!(config.guest.kernel_image, expected_kernel);
+
+        assert_eq!(config.host.port_map.len(), 0);
     }
 }

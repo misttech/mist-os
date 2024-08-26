@@ -117,7 +117,7 @@ pub struct GuestConfig {
 
     /// Zircon Boot image, this is Fuchsia's initial ram disk used in the boot process.
     /// Note: This is not used if the kernel image is an efi image.
-    pub zbi_image: PathBuf,
+    pub zbi_image: Option<PathBuf>,
 
     /// Hash of zbi_image or kernel if the kernel is efi. Used to detect changes when reusing
     /// an emulator instance.
@@ -147,11 +147,14 @@ impl GuestConfig {
     }
 
     pub fn get_image_hashes(&self) -> Result<(u64, u64)> {
-        let zbi_hash = match self.kernel_image.extension() {
-            Some(ext) if ext == "efi" => {
+        // If there is an efi kernel, and no zbi, use the kernel to calculate the hash.
+
+        let zbi_hash = match &self.zbi_image {
+            Some(zbi_path) => get_file_hash(zbi_path).context("could not calculate zbi hash")?,
+            None if self.is_efi() => {
                 get_file_hash(&self.kernel_image).context("could not calculate efi hash")?
             }
-            _ => get_file_hash(&self.zbi_image).context("could not calculate zbi hash")?,
+            _ => 0,
         };
 
         let disk_hash = if let Some(disk) = &self.disk_image {
@@ -179,8 +182,8 @@ impl GuestConfig {
             bail!("kernel file {:?} does not exist.", kernel_path);
         }
 
-        if !self.is_efi() {
-            if !zbi_path.exists() {
+        if let Some(file_path) = zbi_path.as_ref() {
+            if !file_path.exists() {
                 bail!("zbi file {:?} does not exist.", zbi_path);
             }
         }
