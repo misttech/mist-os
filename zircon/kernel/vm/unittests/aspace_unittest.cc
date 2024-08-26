@@ -263,7 +263,7 @@ static bool vmaspace_accessed_test(uint8_t tag) {
   pmm_page_queues()->RotateReclaimQueues();
 
   // Read from the mapping to (hopefully) set the accessed bit.
-  asm volatile("" ::"r"(mem->get<int>(0)) : "memory");
+  __asm__ volatile("" ::"r"(mem->get<int>(0)) : "memory");
   // Harvest it to move it in the page queue.
   harvest_access_bits(VmAspace::NonTerminalAction::Retain,
                       VmAspace::TerminalAction::UpdateAgeAndHarvest);
@@ -279,13 +279,13 @@ static bool vmaspace_accessed_test(uint8_t tag) {
 
   // Set the accessed bit again, and make sure it does now harvest.
   pmm_page_queues()->RotateReclaimQueues();
-  asm volatile("" ::"r"(mem->get<int>(0)) : "memory");
+  __asm__ volatile("" ::"r"(mem->get<int>(0)) : "memory");
   harvest_access_bits(VmAspace::NonTerminalAction::Retain,
                       VmAspace::TerminalAction::UpdateAgeAndHarvest);
   EXPECT_NE(current_queue, page->object.get_page_queue_ref().load());
 
   // Set the accessed bit and update age without harvesting.
-  asm volatile("" ::"r"(mem->get<int>(0)) : "memory");
+  __asm__ volatile("" ::"r"(mem->get<int>(0)) : "memory");
   harvest_access_bits(VmAspace::NonTerminalAction::Retain, VmAspace::TerminalAction::UpdateAge);
   current_queue = page->object.get_page_queue_ref().load();
 

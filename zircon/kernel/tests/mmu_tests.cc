@@ -541,7 +541,7 @@ static bool test_large_region_atomic() {
             }
             volatile uint64_t* addr = reinterpret_cast<uint64_t*>(state->va + target_offsets[i]);
             // Force read from the address
-            asm volatile("" ::"r"(*addr));
+            __asm__ volatile("" ::"r"(*addr));
           }
         }
         return 0;

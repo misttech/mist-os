@@ -29,10 +29,10 @@ Registers CallCpuId(uint32_t leaf, uint32_t subleaf = 0) {
   Registers result;
   // Set EAX and ECX to the initial values, call cpuid and copy results into
   // the result object.
-  asm volatile("cpuid"
-               : "=a"(result.reg[Registers::EAX]), "=b"(result.reg[Registers::EBX]),
-                 "=c"(result.reg[Registers::ECX]), "=d"(result.reg[Registers::EDX])
-               : "a"(leaf), "c"(subleaf));
+  __asm__ volatile("cpuid"
+                   : "=a"(result.reg[Registers::EAX]), "=b"(result.reg[Registers::EBX]),
+                     "=c"(result.reg[Registers::ECX]), "=d"(result.reg[Registers::EDX])
+                   : "a"(leaf), "c"(subleaf));
   return result;
 }
 

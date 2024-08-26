@@ -1769,7 +1769,7 @@ void arch_zero_page(void* _ptr) {
   const uintptr_t end_address = reinterpret_cast<uintptr_t>(_ptr) + PAGE_SIZE;
 
   if (gRiscvFeatures[arch::RiscvFeature::kZicboz]) {
-    asm volatile(
+    __asm__ volatile(
         R"""(
       .balign 4
       0:
@@ -1782,7 +1782,7 @@ void arch_zero_page(void* _ptr) {
         : "memory");
 
   } else {
-    asm volatile(
+    __asm__ volatile(
         R"""(
       .balign 4
       0:
