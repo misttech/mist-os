@@ -19,7 +19,7 @@ namespace boot_shim {
 template <typename AllDrivers = uart::all::Driver>
 class UartItem : public boot_shim::ItemBase {
  public:
-  void Init(const uart::all::Driver& uart) { driver_ = uart; }
+  void Init(const AllDrivers& uart) { driver_ = uart; }
 
   constexpr size_t size_bytes() const { return ItemSize(zbi_dcfg_size()); }
 
