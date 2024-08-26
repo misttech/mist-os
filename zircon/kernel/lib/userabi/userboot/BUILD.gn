@@ -115,9 +115,6 @@ if (toolchain_environment == "userboot") {
       "zx_panic.cc",
     ]
     defines = [ "BOOT_TEST_SUCCESS_STRING=\"$boot_test_success_string\"" ]
-    if (is_mistos) {
-      defines += [ "__mist_os__" ]
-    }
 
     # TODO(https://fxbug.dev/374753100): Remove this after soft transition.
     defines += [ "_LIBCPP_VERBOSE_ABORT_NOT_NOEXCEPT" ]
