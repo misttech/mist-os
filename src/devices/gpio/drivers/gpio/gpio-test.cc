@@ -127,7 +127,9 @@ class MockGpioImpl : public fdf::WireServer<fuchsia_hardware_gpioimpl::GpioImpl>
                         fdf::Arena& arena, ReleaseInterruptCompleter::Sync& completer) override {}
   void GetPins(fdf::Arena& arena, GetPinsCompleter::Sync& completer) override {}
   void GetInitSteps(fdf::Arena& arena, GetInitStepsCompleter::Sync& completer) override {}
-  void GetControllerId(fdf::Arena& arena, GetControllerIdCompleter::Sync& completer) override {}
+  void GetControllerId(fdf::Arena& arena, GetControllerIdCompleter::Sync& completer) override {
+    completer.buffer(arena).Reply(0);
+  }
 
   std::optional<fdf::ServerBinding<fuchsia_hardware_gpioimpl::GpioImpl>> binding_;
   std::vector<PinState> pins_;
