@@ -762,6 +762,12 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.component/StoppedPayload.exit_code",
+        "ordinal": "2",
+        "type": "int64"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.component/StoppedPayload.status",
         "ordinal": "1",
         "type": "int32"

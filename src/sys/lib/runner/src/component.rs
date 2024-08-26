@@ -11,6 +11,7 @@ use fuchsia_runtime::{job_default, HandleInfo, HandleType};
 use fuchsia_zircon::{self as zx, HandleBased, Status};
 use futures::future::{BoxFuture, Either};
 use futures::prelude::*;
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 use futures::stream::BoxStream;
 use lazy_static::lazy_static;
 use namespace::Namespace;
@@ -44,6 +45,7 @@ pub trait Controllable {
     }
 
     /// Monitor any escrow requests from the component.
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     fn on_escrow<'a>(&self) -> BoxStream<'a, fcrunner::ComponentControllerOnEscrowRequest> {
         futures::stream::empty().boxed()
     }
@@ -56,6 +58,7 @@ pub struct Controller<C: Controllable> {
     /// manipulate the component
     request_stream: fcrunner::ComponentControllerRequestStream,
 
+    #[allow(dead_code)] // Only needed at HEAD
     control: fcrunner::ComponentControllerControlHandle,
 
     /// Controllable object which controls the underlying component.
@@ -63,6 +66,7 @@ pub struct Controller<C: Controllable> {
     controllable: Option<C>,
 
     /// Task that forwards the `on_escrow` event.
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     on_escrow_monitor: fasync::Task<()>,
 }
 
@@ -94,6 +98,7 @@ impl StopInfo {
     }
 }
 
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 impl From<StopInfo> for fcrunner::ComponentStopInfo {
     fn from(info: StopInfo) -> Self {
         Self {
@@ -104,6 +109,7 @@ impl From<StopInfo> for fcrunner::ComponentStopInfo {
     }
 }
 
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 impl From<fcrunner::ComponentStopInfo> for StopInfo {
     fn from(value: fcrunner::ComponentStopInfo) -> Self {
         Self {
@@ -120,17 +126,23 @@ impl<C: Controllable + 'static> Controller<C> {
         requests: fcrunner::ComponentControllerRequestStream,
         control: fcrunner::ComponentControllerControlHandle,
     ) -> Controller<C> {
-        let on_escrow = controllable.on_escrow();
-        let on_escrow_monitor =
-            fasync::Task::spawn(Self::monitor_events(on_escrow, requests.control_handle()));
-        Controller {
-            controllable: Some(controllable),
-            request_stream: requests,
-            control,
-            on_escrow_monitor,
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+        {
+            let on_escrow = controllable.on_escrow();
+            let on_escrow_monitor =
+                fasync::Task::spawn(Self::monitor_events(on_escrow, requests.control_handle()));
+            Controller {
+                controllable: Some(controllable),
+                request_stream: requests,
+                control,
+                on_escrow_monitor,
+            }
         }
+        #[cfg(fuchsia_api_level_less_than = "HEAD")]
+        Controller { controllable: Some(controllable), request_stream: requests, control }
     }
 
+    #[allow(dead_code)]
     async fn serve_controller(&mut self) -> Result<(), ()> {
         while let Ok(Some(request)) = self.request_stream.try_next().await {
             match request {
@@ -151,6 +163,7 @@ impl<C: Controllable + 'static> Controller<C> {
         Err(())
     }
 
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     async fn monitor_events(
         mut on_escrow: impl Stream<Item = fcrunner::ComponentControllerOnEscrowRequest> + Unpin + Send,
         control_handle: fcrunner::ComponentControllerControlHandle,
@@ -170,6 +183,7 @@ impl<C: Controllable + 'static> Controller<C> {
     /// or the request stream closes. In either case the request stream is
     /// closed once this function returns since the stream itself, which owns
     /// the channel, is dropped.
+    #[allow(dead_code)]
     pub async fn serve(mut self, exit_fut: impl Future<Output = StopInfo> + Unpin) {
         let stop_info = {
             // Pin the server_controller future so we can use it with select
@@ -201,12 +215,17 @@ impl<C: Controllable + 'static> Controller<C> {
         // Drain any escrow events.
         // TODO(https://fxbug.dev/326626515): Drain the escrow requests until no long readable
         // instead of waiting for an unbounded amount of time if `on_escrow` never completes.
-        self.on_escrow_monitor.await;
-        _ = self.control.send_on_stop(stop_info.clone().into());
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
+        {
+            self.on_escrow_monitor.await;
+            _ = self.control.send_on_stop(stop_info.clone().into());
+        }
+        let _ = stop_info; // avoid unused error at stable API level
         self.request_stream.control_handle().shutdown();
     }
 
     /// Kill the job and shutdown control handle supplied to this function.
+    #[allow(dead_code)]
     async fn kill(&mut self) {
         if let Some(mut controllable) = self.controllable.take() {
             controllable.kill().await;

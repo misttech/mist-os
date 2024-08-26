@@ -153,7 +153,7 @@ type StoppedPayload = table {
     /// Many program runtimes have the concept of an exit code. Runners may map
     /// that value to this field when applicable. For example, the ELF runner
     /// will publish the Zircon process return code here.
-    @available(added=HEAD)
+    @available(added=NEXT)
     2: exit_code int64;
 };
 
