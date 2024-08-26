@@ -9,6 +9,7 @@
 
 #include <vm/lz4_compressor.h>
 #include <vm/physmap.h>
+#include <vm/vm.h>
 
 VmLz4Compressor::CompressResult VmLz4Compressor::Compress(const void *src, void *dst,
                                                           size_t dst_limit) {

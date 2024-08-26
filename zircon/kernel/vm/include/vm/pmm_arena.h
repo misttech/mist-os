@@ -11,8 +11,20 @@
 #include <zircon/types.h>
 
 #include <fbl/macros.h>
+#include <vm/page.h>
 #include <vm/phys/arena.h>
-#include <vm/pmm.h>
+
+#define PMM_ARENA_FLAG_LO_MEM \
+  (0x1)  // this arena is contained within architecturally-defined 'low memory'
+
+typedef struct pmm_arena_info {
+  char name[16];
+
+  uint flags;
+
+  paddr_t base;
+  size_t size;
+} pmm_arena_info_t;
 
 class PmmNode;
 

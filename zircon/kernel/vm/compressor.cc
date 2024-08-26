@@ -8,6 +8,7 @@
 
 #include <vm/compression.h>
 #include <vm/physmap.h>
+#include <vm/pmm.h>
 
 VmCompressor::~VmCompressor() {
   // Should not have an in progress compression.

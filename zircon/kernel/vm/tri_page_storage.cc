@@ -5,6 +5,7 @@
 // https://opensource.org/licenses/MIT
 
 #include <vm/physmap.h>
+#include <vm/pmm.h>
 #include <vm/tri_page_storage.h>
 
 namespace {

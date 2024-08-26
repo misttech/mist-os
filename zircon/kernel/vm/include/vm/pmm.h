@@ -11,31 +11,13 @@
 #include <zircon/compiler.h>
 #include <zircon/types.h>
 
-#include <vm/evictor.h>
 #include <vm/page.h>
-#include <vm/page_queues.h>
+#include <vm/pmm_node.h>
 
 // Forward declaration; defined in <lib/memalloc/range.h>
 namespace memalloc {
 struct Range;
 }
-
-// physical allocator
-typedef struct pmm_arena_info {
-  char name[16];
-
-  uint flags;
-
-  paddr_t base;
-  size_t size;
-} pmm_arena_info_t;
-
-class VmCompression;
-class PhysicalPageBorrowingConfig;
-class LoanSweeper;
-
-#define PMM_ARENA_FLAG_LO_MEM \
-  (0x1)  // this arena is contained within architecturally-defined 'low memory'
 
 // Initializes the PMM with the provided, unnormalized and normalized memory
 // ranges. This in particular initializes its arenas and wires any previously
@@ -55,21 +37,6 @@ size_t pmm_num_arenas();
 // Returns ZX_ERR_BUFFER_TOO_SMALL if the buffer is too small.
 zx_status_t pmm_get_arena_info(size_t count, uint64_t i, pmm_arena_info_t* buffer,
                                size_t buffer_size);
-
-// flags for allocation routines below
-#define PMM_ALLOC_FLAG_ANY (0 << 0)     // no restrictions on which arena to allocate from
-#define PMM_ALLOC_FLAG_LO_MEM (1 << 0)  // allocate only from arenas marked LO_MEM
-// The caller is able to wait and retry this allocation and so pmm allocation functions are allowed
-// to return ZX_ERR_SHOULD_WAIT, as opposed to ZX_ERR_NO_MEMORY, to indicate that the caller should
-// wait and try again. This is intended for the PMM to tell callers who are able to wait that memory
-// is low. The caller should not infer anything about memory state if it is told to wait, as the PMM
-// may tell it to wait for any reason.
-#define PMM_ALLOC_FLAG_CAN_WAIT (1 << 1)
-// The default (flag not set) is to not allocate a loaned page, so that we don't end up with loaned
-// pages allocated for arbitrary purposes that prevent us from getting the loaned page back quickly.
-// This flag switches to requiring a loaned page, and will fail if a loaned page isn't available,
-// even if there are other free pages available.
-#define PMM_ALLOC_FLAG_LOANED (1 << 2)
 
 // Allocate count pages of physical memory, adding to the tail of the passed list.
 // The list must be initialized.

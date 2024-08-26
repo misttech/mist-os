@@ -15,8 +15,9 @@
 #include <kernel/mutex.h>
 #include <ktl/span.h>
 #include <vm/compression.h>
+#include <vm/evictor.h>
+#include <vm/page_queues.h>
 #include <vm/physical_page_borrowing_config.h>
-#include <vm/pmm.h>
 #include <vm/pmm_arena.h>
 #include <vm/pmm_checker.h>
 
@@ -24,6 +25,21 @@
 namespace memalloc {
 struct Range;
 }
+
+// flags for allocation routines below
+#define PMM_ALLOC_FLAG_ANY (0 << 0)     // no restrictions on which arena to allocate from
+#define PMM_ALLOC_FLAG_LO_MEM (1 << 0)  // allocate only from arenas marked LO_MEM
+// The caller is able to wait and retry this allocation and so pmm allocation functions are allowed
+// to return ZX_ERR_SHOULD_WAIT, as opposed to ZX_ERR_NO_MEMORY, to indicate that the caller should
+// wait and try again. This is intended for the PMM to tell callers who are able to wait that memory
+// is low. The caller should not infer anything about memory state if it is told to wait, as the PMM
+// may tell it to wait for any reason.
+#define PMM_ALLOC_FLAG_CAN_WAIT (1 << 1)
+// The default (flag not set) is to not allocate a loaned page, so that we don't end up with loaned
+// pages allocated for arbitrary purposes that prevent us from getting the loaned page back quickly.
+// This flag switches to requiring a loaned page, and will fail if a loaned page isn't available,
+// even if there are other free pages available.
+#define PMM_ALLOC_FLAG_LOANED (1 << 2)
 
 // per numa node collection of pmm arenas and worker threads
 class PmmNode {
