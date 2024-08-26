@@ -199,9 +199,10 @@ pub fn check_exec_access(
 }
 
 /// Updates the SELinux thread group state on exec.
+/// Corresponds to the `bprm_committing_creds` and `bprm_committed_creds` hooks.
 pub fn update_state_on_exec(current_task: &CurrentTask, elf_security_state: &ResolvedElfState) {
     run_if_selinux(current_task, |_| {
-        selinux_hooks::update_state_on_exec(current_task, elf_security_state);
+        selinux_hooks::task::update_state_on_exec(current_task, elf_security_state);
     });
 }
 

@@ -14,6 +14,24 @@ use starnix_uapi::errors::Errno;
 use starnix_uapi::signals::{Signal, SIGCHLD, SIGKILL, SIGSTOP};
 use starnix_uapi::{errno, error};
 
+/// Updates the SELinux thread group state on exec, using the security ID associated with the
+/// resolved elf.
+pub fn update_state_on_exec(current_task: &CurrentTask, elf_security_state: &ResolvedElfState) {
+    let task_attrs = &mut current_task.write().security_state.attrs;
+    let previous_sid = task_attrs.current_sid;
+
+    *task_attrs = TaskAttrs {
+        current_sid: elf_security_state
+            .sid
+            .expect("SELinux enabled but missing resolved elf state"),
+        previous_sid,
+        exec_sid: None,
+        fscreate_sid: None,
+        keycreate_sid: None,
+        sockcreate_sid: None,
+    };
+}
+
 /// Returns `TaskAttrs` for a new `Task`, based on the `parent` state, and the specified clone flags.
 pub fn task_alloc(parent: &Task, _clone_flags: u64) -> TaskAttrs {
     parent.read().security_state.attrs.clone()
