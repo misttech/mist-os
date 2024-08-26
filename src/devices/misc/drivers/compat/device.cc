@@ -116,7 +116,9 @@ std::vector<fuchsia_driver_framework::wire::NodeProperty> CreateProperties(
   bool has_protocol = false;
   for (auto [id, _, value] : cpp20::span(zx_args->props, zx_args->prop_count)) {
     properties.emplace_back(fdf::MakeProperty(arena, id, value));
-    if (id == BIND_PROTOCOL) {
+    // TODO(b/361852885): Remove this hard-coded key once support for integer-based
+    // keys is removed.
+    if (id == 0x01 /* BIND_PROTOCOL */) {
       has_protocol = true;
     }
   }

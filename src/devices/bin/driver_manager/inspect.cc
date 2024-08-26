@@ -15,16 +15,6 @@
 #include "src/storage/lib/vfs/cpp/vnode.h"
 
 namespace driver_manager {
-namespace {
-const char* BindParamName(uint32_t param_num) {
-  switch (param_num) {
-    case BIND_PROTOCOL:
-      return "Protocol";
-    default:
-      return NULL;
-  }
-}
-}  // namespace
 
 void InspectSinkForDrivers::Publish(PublishRequest& request, PublishCompleter::Sync& completer) {
   const auto result = external_connection_->Publish(
@@ -147,14 +137,9 @@ void DeviceInspect::SetStaticValues(const std::string& topological_path, uint32_
 
   for (uint32_t i = 0; i < properties.size(); ++i) {
     const zx_device_prop_t* p = &properties[i];
-    const char* param_name = BindParamName(p->id);
     auto property = properties_array.CreateChild(std::to_string(i));
     property.CreateUint("value", p->value, &static_values_);
-    if (param_name) {
-      property.CreateString("id", param_name, &static_values_);
-    } else {
-      property.CreateString("id", std::to_string(p->id), &static_values_);
-    }
+    property.CreateString("id", std::to_string(p->id), &static_values_);
     static_values_.emplace(std::move(property));
   }
 

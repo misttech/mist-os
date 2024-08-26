@@ -1438,7 +1438,9 @@ void Node::SetAndPublishInspect() {
             .id = static_cast<uint16_t>(key),
             .value = value,
         });
-        if (key == BIND_PROTOCOL) {
+        // TODO(b/361852885): Remove this hardcoded value once integer based keys are
+        // removed.
+        if (key == 0x01 /* BIND_PROTOCOL */) {
           protocol_id = value;
         }
       }

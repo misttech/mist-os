@@ -7,7 +7,6 @@
 
 // LINT.IfChange
 // global binding variables at 0x00XX
-#define BIND_PROTOCOL 0x0001  // primary protocol of the device
 
 #define BIND_PCI_TOPO_PACK(bus, dev, func) (((bus) << 8) | (dev << 3) | (func))
 

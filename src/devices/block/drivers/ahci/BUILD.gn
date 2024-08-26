@@ -101,6 +101,7 @@ source_set("shared") {
     "//sdk/lib/driver/compat/cpp",
     "//sdk/lib/driver/runtime:driver_runtime_cpp",
     "//sdk/lib/inspect/component/cpp",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/lib/dma-buffer",
     "//src/devices/lib/mmio",
     "//zircon/system/ulib/fbl",

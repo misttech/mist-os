@@ -61,12 +61,6 @@ args.version = DEVICE_ADD_ARGS_VERSION;
 args.name = "parent";
 args.ops = &dev_ops;
 
-zx_device_prop_t props[] = {
-      {BIND_PROTOCOL, 0,  ZX_PROTOCOL_PCI},
-}
-args.props = props;
-args.prop_count = std::size(props);
-
 zx_device_str_prop_t str_props[] = {
       zx_device_str_prop_t{.key = "ENABLE_TEST",
                            .property_value = str_prop_bool_val(true)}

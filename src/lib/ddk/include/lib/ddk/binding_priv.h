@@ -17,7 +17,7 @@ __BEGIN_CDECLS
 // LINT.IfChange
 // global binding variables at 0x00XX
 // BIND_FLAGS was 0x0000, the value of the flags register
-#define BIND_PROTOCOL 0x0001  // primary protocol of the device
+// #define BIND_PROTOCOL 0x0001  // primary protocol of the device
 // BIND_AUTOBIND was 0x0002, if this is an automated bind/load
 // BIND_COMPOSITE was 0x003, whether this is a composite device
 

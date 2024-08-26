@@ -11,6 +11,7 @@
 #include <lib/driver/legacy-bind-constants/legacy-bind-constants.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
 #include <zircon/errors.h>
+#include <bind/fuchsia/cpp/bind.h>
 
 #include <optional>
 #include <string>
@@ -50,7 +51,7 @@ class RebindParentServer : public fidl::Server<fuchsia_rebind_test::RebindParent
     fidl::Arena arena;
 
     auto properties = fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty>(arena, 1);
-    properties[0] = fdf::MakeProperty(arena, BIND_PROTOCOL, 1234);
+    properties[0] = fdf::MakeProperty(arena, bind_fuchsia::PROTOCOL, 1234u);
 
     auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                     .name(arena, kChildNodeName)

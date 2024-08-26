@@ -9,6 +9,7 @@
 #include <lib/ddk/driver.h>
 
 #include <bind/composite/test/lib/cpp/bind.h>
+#include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/test/cpp/bind.h>
 
 namespace bind_test = bind_composite_test_lib;
@@ -56,13 +57,13 @@ zx_status_t RootDriver::Bind(void* ctx, zx_device_t* dev) {
   [[maybe_unused]] auto fragment_a_ptr = fragment_dev_a.release();
 
   // Add the leaf device.
-  zx_device_prop_t leaf_props[] = {
-      {BIND_PROTOCOL, 0, bind_fuchsia_test::BIND_PROTOCOL_DEVICE},
+  zx_device_str_prop_t leaf_props[] = {
+      ddk::MakeStrProperty(bind_fuchsia::PROTOCOL, bind_fuchsia_test::BIND_PROTOCOL_DEVICE),
   };
 
   auto leaf_dev = std::make_unique<RootDriver>(dev);
   status = leaf_dev->DdkAdd(ddk::DeviceAddArgs("leaf")
-                                .set_props(leaf_props)
+                                .set_str_props(leaf_props)
                                 .set_proto_id(bind_fuchsia_test::BIND_PROTOCOL_DEVICE));
   if (status != ZX_OK) {
     return status;

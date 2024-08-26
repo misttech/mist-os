@@ -18,6 +18,7 @@ fuchsia_driver("driver") {
   sources = [ "parent_driver.cc" ]
   deps = [
     ":parent_driver_bind",
+    "//src/devices/bind/fuchsia:fuchsia_cpp",
     "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
     "//src/devices/lib/driver",
     "//src/lib/ddktl",

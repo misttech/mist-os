@@ -160,6 +160,8 @@ TEST_F(DeviceTest, RemoveChildren) {
   parent.parent().reset();
 }
 
+// TODO(b/361852885): Remove this test once integer based property keys are
+// removed.
 TEST_F(DeviceTest, AddChildWithProtoPropAndProtoId) {
   fdf_testing::TestNode node("root", dispatcher());
   zx::result node_client = node.CreateNodeChannel();
@@ -172,7 +174,7 @@ TEST_F(DeviceTest, AddChildWithProtoPropAndProtoId) {
   parent.Bind({std::move(node_client.value()), dispatcher()});
 
   // Add a child device.
-  zx_device_prop_t prop{.id = BIND_PROTOCOL, .value = ZX_PROTOCOL_I2C};
+  zx_device_prop_t prop{.id = 0x01 /* BIND_PROTOCOL */, .value = ZX_PROTOCOL_I2C};
   device_add_args_t args{
       .name = "child", .props = &prop, .prop_count = 1, .proto_id = ZX_PROTOCOL_BLOCK};
   zx_device_t* child = nullptr;
@@ -190,7 +192,7 @@ TEST_F(DeviceTest, AddChildWithProtoPropAndProtoId) {
   const fdf_testing::TestNode& child_node = node.children().at("child");
   std::vector properties = child_node.GetProperties();
   ASSERT_EQ(1ul, properties.size());
-  ASSERT_EQ(properties[0].key().int_value().value(), static_cast<uint32_t>(BIND_PROTOCOL));
+  ASSERT_EQ(properties[0].key().int_value().value(), 0x01u /* BIND_PROTOCOL */);
   ASSERT_EQ(properties[0].value().int_value().value(), static_cast<uint32_t>(ZX_PROTOCOL_I2C));
 }
 
