@@ -28,6 +28,8 @@ toc:
     path: /docs/concepts/kernel/life_of_a_syscall.md
   - title: "vDSO (libzircon)"
     path: /docs/concepts/kernel/vdso.md
+  - title: "Fuchsia system interface"
+    path: /docs/concepts/kernel/system.md
 - title: "Scheduling"
   section:
   - title: "Zircon scheduling"

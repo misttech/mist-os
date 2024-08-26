@@ -84,6 +84,6 @@ others, including changes initiated by an RFC:
 
 [build-products]: /docs/development/build/build_system/boards_and_products.md#products
 [fec]: /docs/contribute/governance/eng_council.md
-[fuchsia-abi]: /docs/concepts/packages/system.md
+[fuchsia-abi]: /docs/concepts/kernel/system.md
 [fuchsia-sdk]: /docs/development/sdk/index.md
 [rfc-0214]: /docs/contribute/governance/rfcs/0214_fuchsia_churn_policy.md

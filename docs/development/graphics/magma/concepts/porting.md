@@ -337,7 +337,7 @@ the system driver using the Zircon DDK.
 [glossary.bootfs]: /docs/glossary/README.md#bootfs
 [paving]: /docs/development/build/fx.md#what-is-paving
 [boarddriver]: /docs/development/drivers/concepts/device_driver_model/platform-bus.md
-[icdabi]: /docs/concepts/packages/system.md#vulkan-icd
+[icdabi]: /docs/concepts/kernel/system.md#vulkan-icd
 [banjo]: /docs/development/drivers/concepts/device_driver_model/banjo.md
 [sysmem]: /docs/development/graphics/sysmem/concepts/sysmem.md
 [vkreadback]: /src/graphics/tests/vkreadback

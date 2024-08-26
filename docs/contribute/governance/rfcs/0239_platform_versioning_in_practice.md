@@ -183,7 +183,7 @@ more. Conceptually, these are all versioned by API level, but in practice,
 versioning support for FIDL libraries is much farther along than for other
 aspects of the Fuchsia platform surface.
 
-[platform-surface]: /docs/concepts/packages/system.md
+[platform-surface]: /docs/concepts/kernel/system.md
 
 ### Targeting an API level
 

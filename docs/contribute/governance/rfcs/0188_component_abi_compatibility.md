@@ -475,7 +475,7 @@ None considered in this design.
 
 [boot-components]: /docs/concepts/process/everything_between_power_on_and_your_component.md#v2-components
 [boot-resolver-changes]: /docs/contribute/governance/rfcs/0167_early_boot_packages.md#bootresolver_changes
-[fuchsia-system-interface]: /docs/concepts/packages/system.md
+[fuchsia-system-interface]: /docs/concepts/kernel/system.md
 [package-abi-revisions]: /docs/contribute/governance/rfcs/0135_package_abi_revision.md
 [packaging-boot-components]: /docs/contribute/governance/rfcs/0167_early_boot_packages.md
 [platform-versioning]: /docs/contribute/governance/rfcs/0002_platform_versioning.md

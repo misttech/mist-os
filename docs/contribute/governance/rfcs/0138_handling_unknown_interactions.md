@@ -614,7 +614,7 @@ a handler which will go unused.
 As detailed in the [evolution section of
 RFC-0002](0002_platform_versioning.md#evolution), we "change the ABI revision
 whenever the platform makes a _backwards-incompatible_ change to the semantics
-of the [Fuchsia System Interface](/docs/concepts/packages/system.md)".
+of the [Fuchsia System Interface](/docs/concepts/kernel/system.md)".
 
 One metric of how well we achieve our
 [updatable](/docs/concepts/principles/updatable.md) goal is the pace at which we

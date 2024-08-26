@@ -210,9 +210,9 @@ platform interfaces are observed and respected.
 [fidl-reference]: https://fuchsia.dev/reference/fidl/
 [fidl-versioning]: /docs/reference/fidl/language/versioning.md
 [font-provider-fidl]: https://fuchsia.dev/reference/fidl/fuchsia.fonts#Provider
-[fsi-abi-surface]: /docs/concepts/packages/system.md#abi_surfaces
-[fsi-job-policy]: /docs/concepts/packages/system.md#job_policy
-[fsi-package-conventions]: /docs/concepts/packages/system.md#package_conventions
+[fsi-abi-surface]: /docs/concepts/kernel/system.md#abi_surfaces
+[fsi-job-policy]: /docs/concepts/kernel/system.md#job_policy
+[fsi-package-conventions]: /docs/concepts/kernel/system.md#package_conventions
 [fssh]: /docs/reference/tools/sdk/fssh.md
 [fx-mem]: https://fuchsia.dev/reference/tools/fx/cmd/mem
 [fx-snapshot]: https://fuchsia.dev/reference/tools/fx/cmd/snapshot
