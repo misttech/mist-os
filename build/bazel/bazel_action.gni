@@ -793,6 +793,7 @@ template("bazel_action") {
       ":${_all_licenses_spdx_target}",
       ":${_gn_targets_repository_target}",
       ":${_ninja_inputs_target}",
+      "//build/bazel:bazel_action_allowlist",
       "//build/bazel:generate_main_workspace($default_toolchain)",
     ]
 
