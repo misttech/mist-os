@@ -27,6 +27,7 @@ rustc_library("modules") {
     "//src/starnix/lib/starnix-uapi",
     "//src/starnix/modules/ext4",
     "//src/starnix/modules/loop",
+    "//src/starnix/modules/tun",
     "//src/starnix/modules/zram",
   ]
 }

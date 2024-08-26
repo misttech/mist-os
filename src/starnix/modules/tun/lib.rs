@@ -7,11 +7,11 @@
 use std::num::NonZeroU64;
 use std::sync::Arc;
 
-use crate::mm::MemoryAccessorExt;
-use crate::signals::RunState;
-use crate::task::{CurrentTask, WaiterRef};
-use crate::vfs::{default_ioctl, FileObject, FileOps};
 use fidl::endpoints::Proxy as _;
+use starnix_core::mm::MemoryAccessorExt;
+use starnix_core::signals::RunState;
+use starnix_core::task::{CurrentTask, WaiterRef};
+use starnix_core::vfs::{default_ioctl, FileObject, FileOps};
 use starnix_logging::{log_info, log_warn};
 use starnix_sync::{Locked, Mutex, Unlocked};
 use starnix_uapi::errors::Errno;
@@ -329,8 +329,8 @@ struct DevTunInner {
 }
 
 impl FileOps for DevTun {
-    crate::fileops_impl_nonseekable!();
-    crate::fileops_impl_noop_sync!();
+    starnix_core::fileops_impl_nonseekable!();
+    starnix_core::fileops_impl_noop_sync!();
 
     fn write(
         &self,
@@ -338,7 +338,7 @@ impl FileOps for DevTun {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
-        _data: &mut dyn crate::vfs::InputBuffer,
+        _data: &mut dyn starnix_core::vfs::InputBuffer,
     ) -> Result<usize, Errno> {
         // TODO(https://fxbug.dev/332317144): Implement writing to a TUN/TAP
         // device.
@@ -351,7 +351,7 @@ impl FileOps for DevTun {
         _file: &FileObject,
         _current_task: &CurrentTask,
         _offset: usize,
-        _data: &mut dyn crate::vfs::OutputBuffer,
+        _data: &mut dyn starnix_core::vfs::OutputBuffer,
     ) -> Result<usize, Errno> {
         // TODO(https://fxbug.dev/332317144): Implement reading from a TUN/TAP
         // device.

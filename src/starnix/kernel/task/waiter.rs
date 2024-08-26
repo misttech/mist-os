@@ -770,7 +770,7 @@ impl WaiterRef {
         WaiterRef(WaiterKind::Event(Arc::downgrade(event)))
     }
 
-    pub(crate) fn from_abort_handle(handle: &Arc<futures::stream::AbortHandle>) -> WaiterRef {
+    pub fn from_abort_handle(handle: &Arc<futures::stream::AbortHandle>) -> WaiterRef {
         WaiterRef(WaiterKind::AbortHandle(Arc::downgrade(handle)))
     }
 
