@@ -32,6 +32,7 @@
                 "stack_unwinding.unwind_through_signal_frame",
                 "stack_unwinding.unwind_through_signal_frame_SA_SIGINFO",
                 "static_tls_layout.arm",
+                "static_tls_layout_DeathTest.arm",
             ],
         },
     ],
