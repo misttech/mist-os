@@ -17,6 +17,7 @@ source_set("lib") {
     "symbolizer_markup.cc",
     "targets.cc",
     "taskfinder.cc",
+    "test_component.cc",
     "unowned_component.cc",
   ]
 
@@ -25,6 +26,7 @@ source_set("lib") {
     "//sdk/fidl/fuchsia.cpu.profiler:fuchsia.cpu.profiler_cpp",
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/fidl/fuchsia.sys2:fuchsia.sys2_cpp",
+    "//sdk/fidl/fuchsia.test.manager:fuchsia.test.manager_cpp",
     "//sdk/lib/component/incoming/cpp",
     "//sdk/lib/component/outgoing/cpp",
     "//sdk/lib/fidl/cpp",

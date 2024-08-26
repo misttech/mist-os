@@ -10,6 +10,7 @@ fidl("fuchsia.cpu.profiler") {
 
   public_deps = [
     "//sdk/fidl/fuchsia.component",
+    "//sdk/fidl/fuchsia.test.manager",
     "//sdk/fidl/fuchsia.url",
     "//zircon/vdso/zx",
   ]

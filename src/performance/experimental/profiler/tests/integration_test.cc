@@ -115,12 +115,12 @@ TEST(ProfilerIntegrationTest, EndToEnd) {
       std::vector{fuchsia_cpu_profiler::Task::WithThread(info.koid)});
   fuchsia_cpu_profiler::Config config{{
       .configs = std::vector{sampling_config},
-      .target = target_config,
+      .target = std::move(target_config),
   }};
 
   auto config_response = client->Configure({{
       .output = std::move(outgoing_socket),
-      .config = config,
+      .config = std::move(config),
   }});
   ASSERT_TRUE(config_response.is_ok());
 
@@ -174,12 +174,12 @@ TEST(ProfilerIntegrationTest, NewThreads) {
 
   fuchsia_cpu_profiler::Config config{{
       .configs = std::vector{sampling_config},
-      .target = target_config,
+      .target = std::move(target_config),
   }};
 
   auto config_response = client->Configure({{
       .output = std::move(outgoing_socket),
-      .config = config,
+      .config = std::move(config),
   }});
   ASSERT_TRUE(config_response.is_ok());
 
@@ -246,12 +246,12 @@ TEST(ProfilerIntegrationTest, OwnJobId) {
 
   fuchsia_cpu_profiler::Config config{{
       .configs = std::vector{sampling_config},
-      .target = target_config,
+      .target = std::move(target_config),
   }};
 
   auto config_response = client->Configure({{
       .output = std::move(outgoing_socket),
-      .config = config,
+      .config = std::move(config),
   }});
   ASSERT_TRUE(config_response.is_ok());
 
@@ -322,7 +322,7 @@ TEST(ProfilerIntegrationTest, LaunchedProcess) {
 
   fuchsia_cpu_profiler::Config config{{
       .configs = std::vector{sampling_config},
-      .target = target_config,
+      .target = std::move(target_config),
   }};
 
   // Launch an additional process before starting
@@ -337,7 +337,7 @@ TEST(ProfilerIntegrationTest, LaunchedProcess) {
 
   auto config_response = client->Configure({{
       .output = std::move(outgoing_socket),
-      .config = config,
+      .config = std::move(config),
   }});
   ASSERT_TRUE(config_response.is_ok());
 
@@ -422,12 +422,12 @@ TEST(ProfilerIntegrationTest, LaunchedProcessThreadSpawner) {
 
   fuchsia_cpu_profiler::Config config{{
       .configs = std::vector{sampling_config},
-      .target = target_config,
+      .target = std::move(target_config),
   }};
 
   auto config_response = client->Configure({{
       .output = std::move(outgoing_socket),
-      .config = config,
+      .config = std::move(config),
   }});
   ASSERT_TRUE(config_response.is_ok());
 
@@ -486,12 +486,12 @@ TEST(ProfilerIntegrationTest, ComponentByMoniker) {
 
   fuchsia_cpu_profiler::Config demo_target_config{{
       .configs = std::vector{sampling_config},
-      .target = target_config,
+      .target = std::move(target_config),
   }};
 
   auto config_response = client->Configure({{
       .output = std::move(outgoing_socket),
-      .config = demo_target_config,
+      .config = std::move(demo_target_config),
   }});
 
   ASSERT_TRUE(config_response.is_ok());
@@ -544,12 +544,12 @@ TEST(ProfilerIntegrationTest, LaunchedComponent) {
 
   fuchsia_cpu_profiler::Config config{{
       .configs = std::vector{sampling_config},
-      .target = target_config,
+      .target = std::move(target_config),
   }};
 
   auto config_response = client->Configure({{
       .output = std::move(outgoing_socket),
-      .config = config,
+      .config = std::move(config),
   }});
   ASSERT_TRUE(config_response.is_ok());
 
@@ -596,12 +596,12 @@ TEST(ProfilerIntegrationTest, ChildComponents) {
 
   fuchsia_cpu_profiler::Config config{{
       .configs = std::vector{sampling_config},
-      .target = target_config,
+      .target = std::move(target_config),
   }};
 
   auto config_response = client->Configure({{
       .output = std::move(outgoing_socket),
-      .config = config,
+      .config = std::move(config),
   }});
   ASSERT_TRUE(config_response.is_ok());
 
@@ -693,12 +693,12 @@ TEST(ProfilerIntegrationTest, ChildComponentsByMoniker) {
 
   fuchsia_cpu_profiler::Config config{{
       .configs = std::vector{sampling_config},
-      .target = target_config,
+      .target = std::move(target_config),
   }};
 
   auto config_response = client->Configure({{
       .output = std::move(outgoing_socket),
-      .config = config,
+      .config = std::move(config),
   }});
   ASSERT_TRUE(config_response.is_ok());
 
@@ -772,12 +772,12 @@ TEST(ProfilerIntegrationTest, DelayedConnectByMoniker) {
 
   fuchsia_cpu_profiler::Config config{{
       .configs = std::vector{sampling_config},
-      .target = target_config,
+      .target = std::move(target_config),
   }};
 
   auto config_response = client->Configure({{
       .output = std::move(outgoing_socket),
-      .config = config,
+      .config = std::move(config),
   }});
   ASSERT_TRUE(config_response.is_ok());
 
@@ -884,12 +884,12 @@ TEST(ProfilerIntegrationTest, DelayedConnectByUrl) {
 
   fuchsia_cpu_profiler::Config config{{
       .configs = std::vector{sampling_config},
-      .target = target_config,
+      .target = std::move(target_config),
   }};
 
   auto config_response = client->Configure({{
       .output = std::move(outgoing_socket),
-      .config = config,
+      .config = std::move(config),
   }});
   ASSERT_TRUE(config_response.is_ok());
 

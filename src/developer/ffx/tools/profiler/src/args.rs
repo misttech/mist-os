@@ -109,4 +109,12 @@ pub struct Launch {
     /// microseconds. The default is 10,000 microseconds (10 ms).
     #[argh(option, default = "10000")]
     pub sample_period_us: u64,
+
+    /// the package being launched is a test to be launched via test_manager
+    #[argh(switch)]
+    pub test: bool,
+
+    /// test case filters to apply to profiled tests
+    #[argh(option)]
+    pub test_filters: Vec<String>,
 }

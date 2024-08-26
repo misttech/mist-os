@@ -27,6 +27,7 @@ class TaskFinder : TaskEnumerator {
   };
 
   zx::result<FoundTasks> FindHandles();
+  bool Empty() { return jobs_.empty() && processes_.empty() && threads_.empty(); }
   // Each of these methods visits the corresponding task type. If any On*()
   // method returns a value other than ZX_OK, the enumeration stops. See
   // |task_callback_t| for a description of parameters.

@@ -44,7 +44,7 @@ TEST(ComponentControlling, CleanUpFailedLaunch) {
                   ->Configure({{.output = std::move(outgoing_socket),
                                 .config = fuchsia_cpu_profiler::Config{{
                                     .configs = std::vector{sampling_config},
-                                    .target = target_config,
+                                    .target = std::move(target_config),
                                 }}}})
                   .is_error());
 

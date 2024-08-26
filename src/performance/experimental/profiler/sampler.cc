@@ -74,6 +74,7 @@ std::pair<zx::ticks, std::vector<uint64_t>> SampleThread(const zx::unowned_proce
   }
 
   if (observed & ZX_THREAD_TERMINATED) {
+    FX_LOGS(INFO) << "Skipping terminated thread...";
     return {zx::ticks(), std::vector<uint64_t>()};  // Skip this thread.
   }
   unwinder::FuchsiaMemory memory(process->get());
@@ -81,6 +82,7 @@ std::pair<zx::ticks, std::vector<uint64_t>> SampleThread(const zx::unowned_proce
   // Setup registers.
   zx_thread_state_general_regs_t regs;
   if (thread->read_state(ZX_THREAD_STATE_GENERAL_REGS, &regs, sizeof(regs)) != ZX_OK) {
+    FX_LOGS(INFO) << "Can't read state, Skipping thread...";
     return {zx::ticks(), std::vector<uint64_t>()};
   }
   auto registers = unwinder::FromFuchsiaRegisters(regs);
@@ -116,12 +118,15 @@ zx::result<> profiler::Sampler::AddTarget(JobTarget&& target) {
   if (res.is_error()) {
     return res;
   }
+
   return targets_.AddJob(std::move(target));
 }
 
 zx::result<> profiler::Sampler::WatchTarget(const JobTarget& target) {
+  std::vector<zx_koid_t> job_path = target.ancestry;
+  job_path.push_back(target.job_id);
   auto job_watcher = std::make_unique<JobWatcher>(
-      target.job.borrow(), [job_path = target.ancestry, this](zx_koid_t pid, zx::process p) {
+      target.job.borrow(), [job_path = std::move(job_path), this](zx_koid_t pid, zx::process p) {
         // We've intercepted this process before its threads have started, so we don't recursively
         // add them here. We let the watcher handle the thread start exceptions as soon as we
         // acknowledge this process start exception.
@@ -146,7 +151,8 @@ zx::result<> profiler::Sampler::WatchTarget(const JobTarget& target) {
           }
         }
 
-        if (zx::result res = targets_.AddProcess(std::move(process_target)); res.is_error()) {
+        if (zx::result res = targets_.AddProcess(job_path, std::move(process_target));
+            res.is_error()) {
           FX_PLOGS(ERROR, res.status_value()) << "Failed to add process to session: " << pid;
         }
       });
@@ -254,6 +260,7 @@ zx::result<profiler::SymbolizationContext> profiler::Sampler::GetContexts() {
   zx::result<> res =
       targets_.ForEachProcess([&contexts](cpp20::span<const zx_koid_t>,
                                           const ProcessTarget& target) mutable -> zx::result<> {
+        FX_LOGS(INFO) << "Getting modules for: " << target.pid;
         zx::result<std::vector<profiler::Module>> modules =
             profiler::GetProcessModules(target.handle.borrow());
         if (modules.is_error()) {
@@ -262,7 +269,7 @@ zx::result<profiler::SymbolizationContext> profiler::Sampler::GetContexts() {
         contexts[target.pid] = *modules;
         return zx::ok();
       });
-  if (res.is_error()) {
+  if (res.is_error() && contexts.empty()) {
     return res.take_error();
   }
   return zx::ok(profiler::SymbolizationContext{contexts});

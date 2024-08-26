@@ -83,8 +83,6 @@ void profiler::ComponentWatcher::HandleEvent(
       fuchsia_component::EventType event_type = event.header()->event_type().value();
       switch (event_type) {
         case fuchsia_component::EventType::kDebugStarted: {
-          fidl::SyncClient<fuchsia_io::Directory> dir_client{
-              std::move(*event.payload()->debug_started()->runtime_dir())};
           auto moniker_handler = moniker_watchers_.find(moniker);
           if (moniker_handler != moniker_watchers_.end()) {
             moniker_handler->second(moniker, component_url);
