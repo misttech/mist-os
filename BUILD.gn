@@ -136,7 +136,10 @@ group("default") {
     #"//zircon/tools:tests",
 
     # Generate ZBIs used to run on target
-    #"//build/images/mistos",
+    ##"//build/images/mistos",
+
+    # Mist Technologies
+    "//vendor/misttech/src/linux-rt",
   ]
 }
 
