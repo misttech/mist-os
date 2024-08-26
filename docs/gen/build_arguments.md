@@ -3204,14 +3204,6 @@ useful for including verification and other Bazel assembly specific targets.
 
 From //build/images/args.gni:216
 
-### extra_gn_labels_for_bazel_inputs
-
-DEPRECATED, do not use.
-
-**Current value (from the default):** `[]`
-
-From //build/bazel/legacy_ninja_build_outputs.gni:7
-
 ### extra_package_labels
 
 **Current value (from the default):** `[]`
