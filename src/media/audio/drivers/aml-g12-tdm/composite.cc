@@ -207,7 +207,8 @@ zx::result<> Driver::Start() {
 
   server_ = std::make_unique<AudioCompositeServer>(
       std::move(mmios), std::move((*get_bti_result)->bti), dispatcher(), aml_version,
-      std::move(gate_client), std::move(pll_client), std::move(gpio_sclk_clients));
+      std::move(gate_client), std::move(pll_client), std::move(gpio_sclk_clients),
+      inspector().root());
 
   auto result = outgoing()->component().AddUnmanagedProtocol<fuchsia_hardware_audio::Composite>(
       bindings_.CreateHandler(server_.get(), dispatcher(), fidl::kIgnoreBindingClosure),

@@ -613,7 +613,8 @@ TEST_F(AmlG12CompositeTest, ElementsState) {
   ASSERT_TRUE(elements_result.is_ok());
 
   // Able to set element state for all (dai_interconnect) elements with no parameters.
-  for (auto element : elements_result->processing_elements()) {
+  for (fuchsia_hardware_audio_signalprocessing::Element& element :
+       elements_result->processing_elements()) {
     if (element.type() == fuchsia_hardware_audio_signalprocessing::ElementType::kDaiInterconnect) {
       fuchsia_hardware_audio_signalprocessing::SignalProcessingSetElementStateRequest request;
       request.processing_element_id(*element.id());
@@ -1161,31 +1162,31 @@ class AmlG12CompositeRingBufferTest : public AmlG12CompositeTest {
 };
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferProperties) {
-  for (auto& id : kAllValidRingBufferIds) {
+  for (const fuchsia_hardware_audio::ElementId& id : kAllValidRingBufferIds) {
     TestProperties(id);
   }
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferGetVmo) {
-  for (auto& id : kAllValidRingBufferIds) {
+  for (const fuchsia_hardware_audio::ElementId& id : kAllValidRingBufferIds) {
     TestGetVmo(id);
   }
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferGetVmoMultipleTimes) {
-  for (auto& id : kAllValidRingBufferIds) {
+  for (const fuchsia_hardware_audio::ElementId& id : kAllValidRingBufferIds) {
     TestGetVmoMultipleTimes(id);
   }
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBuffersStartStop) {
-  for (auto& id : kAllValidRingBufferIds) {
+  for (const fuchsia_hardware_audio::ElementId& id : kAllValidRingBufferIds) {
     TestCreationAndStartStop(id);
   }
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBuffersClientCloseChannel) {
-  for (auto& id : kAllValidRingBufferIds) {
+  for (const fuchsia_hardware_audio::ElementId& id : kAllValidRingBufferIds) {
     auto endpoints = fidl::CreateEndpoints<fuchsia_hardware_audio::RingBuffer>();
     fuchsia_hardware_audio::CompositeCreateRingBufferRequest request(
         id, GetDefaultRingBufferFormat(), std::move(endpoints->server));
@@ -1197,19 +1198,19 @@ TEST_F(AmlG12CompositeRingBufferTest, RingBuffersClientCloseChannel) {
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferStartStartedRingBuffer) {
-  for (auto& id : kAllValidRingBufferIds) {
+  for (const fuchsia_hardware_audio::ElementId& id : kAllValidRingBufferIds) {
     TestStartStartedRingBuffer(id);
   }
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferStopStoppedRingBuffer) {
-  for (auto& id : kAllValidRingBufferIds) {
+  for (const fuchsia_hardware_audio::ElementId& id : kAllValidRingBufferIds) {
     TestStopStoppedRingBuffer(id);
   }
 }
 
 TEST_F(AmlG12CompositeRingBufferTest, RingBufferGetDelay) {
-  for (auto& id : kAllValidRingBufferIds) {
+  for (const fuchsia_hardware_audio::ElementId& id : kAllValidRingBufferIds) {
     TestGetDelay(id);
   }
 }
