@@ -61,6 +61,10 @@ pub struct ToolsConfig {
     /// Tools for connectivity.
     #[serde(default)]
     pub connectivity: ConnectivityToolsConfig,
+
+    /// Tools for storage.
+    #[serde(default)]
+    pub storage: StorageToolsConfig,
 }
 
 /// Platform-provided tools for development and debugging connectivity.
@@ -81,4 +85,15 @@ pub struct ConnectivityToolsConfig {
     /// Include tools for Thread
     #[serde(default)]
     pub enable_thread: bool,
+}
+
+/// Platform-provided tools for the development and debugging of storage.
+#[derive(Debug, Default, Deserialize, Serialize, PartialEq, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct StorageToolsConfig {
+    /// Include tools used for disk partitioning, such as:
+    ///   - 'mount'
+    ///   - 'install-disk-image'
+    #[serde(default)]
+    pub enable_partitioning_tools: bool,
 }

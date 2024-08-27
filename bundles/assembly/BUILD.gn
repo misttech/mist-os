@@ -737,6 +737,14 @@ assembly_input_bundle("clock_development_tools") {
   bootfs_files_labels = [ "//src/devices/clock/bin/clock:bootfs" ]
 }
 
+# Includes the CLIs necessary for the Fuchsia installer.
+assembly_input_bundle("partitioning_tools") {
+  bootfs_files_labels = [
+    "//src/storage/bin/disk-pave:bootfs",
+    "//src/storage/bin/mount:bootfs",
+  ]
+}
+
 ########
 #
 # The /core realm AIBs

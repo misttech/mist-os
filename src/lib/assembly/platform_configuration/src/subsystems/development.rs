@@ -140,6 +140,19 @@ impl DefineSubsystemConfiguration<DevelopmentSupportConfig> for DevelopmentConfi
             builder.platform_bundle("development_support_tools_connectivity_thread");
         }
 
+        if config.tools.storage.enable_partitioning_tools {
+            context.ensure_build_type_and_feature_set_level(
+                &[BuildType::Eng],
+                &[
+                    FeatureSupportLevel::Bootstrap,
+                    FeatureSupportLevel::Utility,
+                    FeatureSupportLevel::Standard,
+                ],
+                "Partitioning tools",
+            )?;
+            builder.platform_bundle("partitioning_tools");
+        }
+
         Ok(())
     }
 }

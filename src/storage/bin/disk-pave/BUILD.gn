@@ -2,6 +2,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import("//build/assembly/bootfs_files_for_assembly.gni")
 import("//build/components.gni")
 import("//build/test.gni")
 
@@ -50,6 +51,10 @@ executable("install-disk-image") {
     "//zircon/system/ulib/fzl",
     "//zircon/system/ulib/zx",
   ]
+}
+
+bootfs_files_for_assembly("bootfs") {
+  deps = [ ":install-disk-image" ]
 }
 
 test("install-disk-image-test") {

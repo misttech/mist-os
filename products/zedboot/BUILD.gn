@@ -9,6 +9,11 @@ product_assembly_configuration("zedboot") {
     build_type = "eng"
     feature_set_level = "bootstrap"
     development_support = {
+      tools = {
+        storage = {
+          enable_partitioning_tools = true
+        }
+      }
       include_netsvc = true
     }
     storage = {
@@ -28,6 +33,11 @@ product_assembly_configuration("zedboot_with_fvm") {
     feature_set_level = "bootstrap"
     development_support = {
       include_netsvc = true
+      tools = {
+        storage = {
+          enable_partitioning_tools = true
+        }
+      }
     }
     storage = {
       filesystems = {
@@ -54,6 +64,11 @@ product_assembly_configuration("zedboot_with_minfs") {
     feature_set_level = "bootstrap"
     development_support = {
       include_netsvc = true
+      tools = {
+        storage = {
+          enable_partitioning_tools = true
+        }
+      }
     }
     storage = {
       filesystems = {
