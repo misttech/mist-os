@@ -315,13 +315,8 @@ pub(crate) mod testutil {
 
     /// Add a route directly to the routing table, instead of merely
     /// dispatching an event requesting that the route be added.
-    pub fn add_route<
-        I: IpLayerIpExt,
-        BC: IpLayerBindingsContext<I, CC::DeviceId>,
-        CC: IpRouteTablesContext<I, BC>,
-    >(
+    pub fn add_route<I: IpLayerIpExt, CC: IpRouteTablesContext<I>>(
         core_ctx: &mut CC,
-        _bindings_ctx: &mut BC,
         entry: AddableEntry<I::Addr, CC::DeviceId>,
     ) -> Result<(), AddRouteError>
     where
@@ -346,13 +341,8 @@ pub(crate) mod testutil {
     /// and routes that require packets destined to a node within `subnet` to be
     /// routed through some next-hop node.
     // TODO(https://fxbug.dev/42077399): Unify this with other route removal methods.
-    pub fn del_routes_to_subnet<
-        I: IpLayerIpExt,
-        BC: IpLayerBindingsContext<I, CC::DeviceId>,
-        CC: IpRouteTablesContext<I, BC>,
-    >(
+    pub fn del_routes_to_subnet<I: IpLayerIpExt, CC: IpRouteTablesContext<I>>(
         core_ctx: &mut CC,
-        _bindings_ctx: &mut BC,
         del_subnet: Subnet<I::Addr>,
     ) -> Result<(), NotFoundError> {
         core_ctx.with_main_ip_routing_table_mut(|_core_ctx, table| {
@@ -369,13 +359,8 @@ pub(crate) mod testutil {
     }
 
     /// Deletes all routes referencing `del_device` from the routing table.
-    pub fn del_device_routes<
-        I: IpLayerIpExt,
-        CC: IpRouteTablesContext<I, BC>,
-        BC: IpLayerBindingsContext<I, CC::DeviceId>,
-    >(
+    pub fn del_device_routes<I: IpLayerIpExt, CC: IpRouteTablesContext<I>>(
         core_ctx: &mut CC,
-        _bindings_ctx: &mut BC,
         del_device: &CC::DeviceId,
     ) {
         debug!("deleting routes on device: {del_device:?}");

@@ -49,7 +49,7 @@ impl<I: IpExt, BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<
         device_id: &Self::DeviceId,
         remote: Option<SpecifiedAddr<<I as Ip>::Addr>>,
     ) -> Option<NonMappedAddr<SpecifiedAddr<<I as Ip>::Addr>>> {
-        IpDeviceStateContext::<I, BC>::get_local_addr_for_remote(self, device_id, remote)
+        IpDeviceStateContext::<I>::get_local_addr_for_remote(self, device_id, remote)
             .map(|addr| addr.into_inner())
     }
 }

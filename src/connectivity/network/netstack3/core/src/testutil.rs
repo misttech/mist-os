@@ -235,7 +235,7 @@ where
         };
 
         let (core_ctx, _) = self.contexts();
-        let addr_status = IpDeviceStateContext::<A::Version, _>::address_status_for_device(
+        let addr_status = IpDeviceStateContext::<A::Version>::address_status_for_device(
             core_ctx,
             addr.into_specified(),
             device,
@@ -290,14 +290,10 @@ where
         &mut self,
         entry: AddableEntryEither<DeviceId<BC>>,
     ) -> Result<(), AddRouteError> {
-        let (core_ctx, bindings_ctx) = self.contexts();
+        let (core_ctx, _bindings_ctx) = self.contexts();
         match entry {
-            AddableEntryEither::V4(entry) => {
-                ip::testutil::add_route::<Ipv4, _, _>(core_ctx, bindings_ctx, entry)
-            }
-            AddableEntryEither::V6(entry) => {
-                ip::testutil::add_route::<Ipv6, _, _>(core_ctx, bindings_ctx, entry)
-            }
+            AddableEntryEither::V4(entry) => ip::testutil::add_route::<Ipv4, _>(core_ctx, entry),
+            AddableEntryEither::V6(entry) => ip::testutil::add_route::<Ipv6, _>(core_ctx, entry),
         }
     }
 
@@ -307,22 +303,22 @@ where
         &mut self,
         subnet: net_types::ip::SubnetEither,
     ) -> Result<(), NotFoundError> {
-        let (core_ctx, bindings_ctx) = self.contexts();
+        let (core_ctx, _bindings_ctx) = self.contexts();
         match subnet {
             SubnetEither::V4(subnet) => {
-                ip::testutil::del_routes_to_subnet::<Ipv4, _, _>(core_ctx, bindings_ctx, subnet)
+                ip::testutil::del_routes_to_subnet::<Ipv4, _>(core_ctx, subnet)
             }
             SubnetEither::V6(subnet) => {
-                ip::testutil::del_routes_to_subnet::<Ipv6, _, _>(core_ctx, bindings_ctx, subnet)
+                ip::testutil::del_routes_to_subnet::<Ipv6, _>(core_ctx, subnet)
             }
         }
     }
 
     /// Deletes all routes targeting `device`.
     pub fn del_device_routes(&mut self, device: &DeviceId<BC>) {
-        let (core_ctx, bindings_ctx) = self.contexts();
-        ip::testutil::del_device_routes::<Ipv4, _, _>(core_ctx, bindings_ctx, device);
-        ip::testutil::del_device_routes::<Ipv6, _, _>(core_ctx, bindings_ctx, device);
+        let (core_ctx, _bindings_ctx) = self.contexts();
+        ip::testutil::del_device_routes::<Ipv4, _>(core_ctx, device);
+        ip::testutil::del_device_routes::<Ipv6, _>(core_ctx, device);
     }
 
     /// Removes all of the routes through the device, then removes the device.

@@ -225,7 +225,7 @@ impl<BT: BindingsTypes, I: IpLayerIpExt> UnlockedAccess<crate::lock_ordering::Ip
 }
 
 #[netstack3_macros::instantiate_ip_impl_block(I)]
-impl<I, BC, L> IpStateContext<I, BC> for CoreCtx<'_, BC, L>
+impl<I, BC, L> IpStateContext<I> for CoreCtx<'_, BC, L>
 where
     I: IpLayerIpExt,
     BC: BindingsContext,
@@ -260,7 +260,7 @@ where
 }
 
 #[netstack3_macros::instantiate_ip_impl_block(I)]
-impl<I, BC, L> IpRouteTablesContext<I, BC> for CoreCtx<'_, BC, L>
+impl<I, BC, L> IpRouteTablesContext<I> for CoreCtx<'_, BC, L>
 where
     I: IpLayerIpExt,
     BC: BindingsContext,

@@ -330,7 +330,7 @@ where
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv4>>>
-    ip::IpDeviceStateContext<Ipv4, BC> for CoreCtx<'_, BC, L>
+    ip::IpDeviceStateContext<Ipv4> for CoreCtx<'_, BC, L>
 {
     fn with_next_packet_id<O, F: FnOnce(&AtomicU16) -> O>(&self, cb: F) -> O {
         cb(self.unlocked_access::<crate::lock_ordering::Ipv4StateNextPacketId>())
@@ -420,7 +420,7 @@ impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpDeviceConfigurat
 }
 
 impl<BC: BindingsContext, L: LockBefore<crate::lock_ordering::IpState<Ipv6>>>
-    ip::IpDeviceStateContext<Ipv6, BC> for CoreCtx<'_, BC, L>
+    ip::IpDeviceStateContext<Ipv6> for CoreCtx<'_, BC, L>
 {
     fn with_next_packet_id<O, F: FnOnce(&()) -> O>(&self, cb: F) -> O {
         cb(&())
@@ -1374,14 +1374,14 @@ impl<
         Config,
         BC: BindingsContext,
         L: LockBefore<crate::lock_ordering::IpState<I>>,
-    > ip::IpDeviceStateContext<I, BC> for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
+    > ip::IpDeviceStateContext<I> for CoreCtxWithIpDeviceConfiguration<'a, Config, L, BC>
 {
     fn with_next_packet_id<O, F: FnOnce(&<I as IpLayerIpExt>::PacketIdState) -> O>(
         &self,
         cb: F,
     ) -> O {
         let Self { config: _, core_ctx } = self;
-        ip::IpDeviceStateContext::<I, _>::with_next_packet_id(core_ctx, cb)
+        ip::IpDeviceStateContext::<I>::with_next_packet_id(core_ctx, cb)
     }
 
     fn get_local_addr_for_remote(
@@ -1390,12 +1390,12 @@ impl<
         remote: Option<SpecifiedAddr<<I as Ip>::Addr>>,
     ) -> Option<IpDeviceAddr<<I as Ip>::Addr>> {
         let Self { config: _, core_ctx } = self;
-        ip::IpDeviceStateContext::<I, _>::get_local_addr_for_remote(core_ctx, device_id, remote)
+        ip::IpDeviceStateContext::<I>::get_local_addr_for_remote(core_ctx, device_id, remote)
     }
 
     fn get_hop_limit(&mut self, device_id: &Self::DeviceId) -> NonZeroU8 {
         let Self { config: _, core_ctx } = self;
-        ip::IpDeviceStateContext::<I, _>::get_hop_limit(core_ctx, device_id)
+        ip::IpDeviceStateContext::<I>::get_hop_limit(core_ctx, device_id)
     }
 
     fn address_status_for_device(
@@ -1404,7 +1404,7 @@ impl<
         device_id: &Self::DeviceId,
     ) -> AddressStatus<<I as IpLayerIpExt>::AddressStatus> {
         let Self { config: _, core_ctx } = self;
-        ip::IpDeviceStateContext::<I, _>::address_status_for_device(core_ctx, dst_ip, device_id)
+        ip::IpDeviceStateContext::<I>::address_status_for_device(core_ctx, dst_ip, device_id)
     }
 }
 

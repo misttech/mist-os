@@ -112,7 +112,7 @@ impl<I: IpLayerIpExt> IpRoutingDeviceContext<I> for FakeCoreCtx<I> {
     }
 }
 
-impl<I: IpLayerIpExt, BC> IpDeviceStateContext<I, BC> for FakeCoreCtx<I> {
+impl<I: IpLayerIpExt> IpDeviceStateContext<I> for FakeCoreCtx<I> {
     fn with_next_packet_id<O, F: FnOnce(&I::PacketIdState) -> O>(&self, _cb: F) -> O {
         unimplemented!()
     }
@@ -138,7 +138,7 @@ impl<I: IpLayerIpExt, BC> IpDeviceStateContext<I, BC> for FakeCoreCtx<I> {
     }
 }
 
-impl<I: IpLayerIpExt, BC> IpStateContext<I, BC> for FakeCoreCtx<I> {
+impl<I: IpLayerIpExt> IpStateContext<I> for FakeCoreCtx<I> {
     type IpRouteTablesCtx<'a> = Self;
 
     fn with_rules_table<
@@ -166,7 +166,7 @@ impl<I: IpLayerIpExt, BC> IpStateContext<I, BC> for FakeCoreCtx<I> {
     }
 }
 
-impl<I: IpLayerIpExt, BC> IpRouteTablesContext<I, BC> for FakeCoreCtx<I> {
+impl<I: IpLayerIpExt> IpRouteTablesContext<I> for FakeCoreCtx<I> {
     type IpDeviceIdCtx<'a> = Self;
 
     fn main_table_id(&self) -> RoutingTableId<I, Self::DeviceId> {
@@ -227,7 +227,7 @@ fn test_walk_rules<I: IpLayerIpExt + TestIpExt>() {
         .insert(0, Rule { action: RuleAction::Unreachable });
 
     assert_eq!(
-        walk_rules::<_, (), _, _, _, _>(&mut ctx, (), |(), _core_ctx, _table| panic!(
+        walk_rules(&mut ctx, (), |(), _core_ctx, _table| panic!(
             "should not be able to look up tables"
         )),
         ControlFlow::Break(RuleAction::<core::convert::Infallible>::Unreachable)
@@ -240,7 +240,7 @@ fn test_walk_rules<I: IpLayerIpExt + TestIpExt>() {
         Rule { action: RuleAction::Lookup(table_id.clone()) };
     assert_matches!(ctx.state.routing_tables.borrow_mut().insert(table_id, route_table_2), None);
     let _entry = testutil::add_entry(
-        &mut IpRouteTablesContext::<I, ()>::main_table_id(&ctx).get_mut(),
+        &mut IpRouteTablesContext::<I>::main_table_id(&ctx).get_mut(),
         Entry {
             subnet: I::TEST_ADDRS.subnet,
             device: FakeDeviceId,
@@ -251,7 +251,7 @@ fn test_walk_rules<I: IpLayerIpExt + TestIpExt>() {
     .expect("failed to install route entry");
 
     assert_eq!(
-        walk_rules::<_, (), _, _, _, _>(&mut ctx, (), |(), core_ctx, table| {
+        walk_rules(&mut ctx, (), |(), core_ctx, table| {
             match table.lookup(core_ctx, None, I::TEST_ADDRS.remote_ip.get()) {
                 None => ControlFlow::Continue(()),
                 Some(dest) => ControlFlow::Break(dest),

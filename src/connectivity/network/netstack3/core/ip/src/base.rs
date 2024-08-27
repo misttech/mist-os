@@ -411,7 +411,7 @@ impl<
         BC: FilterBindingsContext,
         CC: IpDeviceContext<I, BC>
             + IpSocketHandler<I, BC>
-            + IpStateContext<I, BC>
+            + IpStateContext<I>
             + FilterIpContext<I, BC>
             + UseTransportIpContextBlanket,
     > BaseTransportIpContext<I, BC> for CC
@@ -430,7 +430,7 @@ impl<
     fn get_default_hop_limits(&mut self, device: Option<&Self::DeviceId>) -> HopLimits {
         match device {
             Some(device) => HopLimits {
-                unicast: IpDeviceStateContext::<I, _>::get_hop_limit(self, device),
+                unicast: IpDeviceStateContext::<I>::get_hop_limit(self, device),
                 ..DEFAULT_HOP_LIMITS
             },
             None => DEFAULT_HOP_LIMITS,
@@ -671,9 +671,9 @@ impl IpLayerIpExt for Ipv6 {
 }
 
 /// The state context provided to the IP layer.
-pub trait IpStateContext<I: IpLayerIpExt, BC>: IpRouteTablesContext<I, BC> {
+pub trait IpStateContext<I: IpLayerIpExt>: IpRouteTablesContext<I> {
     /// The context that provides access to the IP routing tables.
-    type IpRouteTablesCtx<'a>: IpRouteTablesContext<I, BC, DeviceId = Self::DeviceId>;
+    type IpRouteTablesCtx<'a>: IpRouteTablesContext<I, DeviceId = Self::DeviceId>;
 
     /// Gets an immutable reference to the rules table.
     fn with_rules_table<
@@ -695,11 +695,11 @@ pub trait IpStateContext<I: IpLayerIpExt, BC>: IpRouteTablesContext<I, BC> {
 }
 
 /// The state context that gives access to routing tables provided to the IP layer.
-pub trait IpRouteTablesContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice> {
+pub trait IpRouteTablesContext<I: IpLayerIpExt>: DeviceIdContext<AnyDevice> {
     /// The inner device id context.
     type IpDeviceIdCtx<'a>: DeviceIdContext<AnyDevice, DeviceId = Self::DeviceId, WeakDeviceId = Self::WeakDeviceId>
         + IpRoutingDeviceContext<I>
-        + IpDeviceStateContext<I, BC>;
+        + IpDeviceStateContext<I>;
 
     /// Gets the main table ID.
     fn main_table_id(&self) -> RoutingTableId<I, Self::DeviceId>;
@@ -768,7 +768,7 @@ pub trait IpRouteTablesContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice> 
 }
 
 /// Provides access to an IP device's state for the IP layer.
-pub trait IpDeviceStateContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice> {
+pub trait IpDeviceStateContext<I: IpLayerIpExt>: DeviceIdContext<AnyDevice> {
     /// Calls the callback with the next packet ID.
     fn with_next_packet_id<O, F: FnOnce(&I::PacketIdState) -> O>(&self, cb: F) -> O;
 
@@ -795,7 +795,7 @@ pub trait IpDeviceStateContext<I: IpLayerIpExt, BC>: DeviceIdContext<AnyDevice> 
 }
 
 /// The IP device context provided to the IP layer.
-pub trait IpDeviceContext<I: IpLayerIpExt, BC>: IpDeviceStateContext<I, BC> {
+pub trait IpDeviceContext<I: IpLayerIpExt, BC>: IpDeviceStateContext<I> {
     /// Is the device enabled?
     fn is_ip_device_enabled(&mut self, device_id: &Self::DeviceId) -> bool;
 
@@ -890,7 +890,7 @@ pub trait IpLayerContext<
     I: IpLayerIpExt,
     BC: IpLayerBindingsContext<I, <Self as DeviceIdContext<AnyDevice>>::DeviceId>,
 >:
-    IpStateContext<I, BC>
+    IpStateContext<I>
     + IpDeviceContext<I, BC>
     + MulticastForwardingStateContext<I>
     + MulticastForwardingDeviceContext<I>
@@ -900,7 +900,7 @@ pub trait IpLayerContext<
 impl<
         I: IpLayerIpExt,
         BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        CC: IpStateContext<I, BC>
+        CC: IpStateContext<I>
             + IpDeviceContext<I, BC>
             + MulticastForwardingStateContext<I>
             + MulticastForwardingDeviceContext<I>,
@@ -930,11 +930,7 @@ fn is_unicast_assigned<I: IpLayerIpExt>(status: &I::AddressStatus) -> bool {
     )
 }
 
-fn is_local_assigned_address<
-    I: Ip + IpLayerIpExt,
-    BC: IpLayerBindingsContext<I, CC::DeviceId>,
-    CC: IpDeviceStateContext<I, BC>,
->(
+fn is_local_assigned_address<I: Ip + IpLayerIpExt, CC: IpDeviceStateContext<I>>(
     core_ctx: &mut CC,
     device: &CC::DeviceId,
     addr: SpecifiedAddr<I::Addr>,
@@ -953,7 +949,7 @@ where
     A: IpAddress,
     A::Version: IpLayerIpExt,
     BC: IpLayerBindingsContext<A::Version, CC::DeviceId>,
-    CC: IpDeviceStateContext<A::Version, BC> + IpDeviceContext<A::Version, BC>,
+    CC: IpDeviceStateContext<A::Version> + IpDeviceContext<A::Version, BC>,
 {
     core_ctx.with_address_statuses(addr, |mut it| {
         it.find_map(|(device, status)| is_unicast_assigned::<A::Version>(&status).then_some(device))
@@ -963,11 +959,7 @@ where
 // Returns the local IP address to use for sending packets from the
 // given device to `addr`, restricting to `local_ip` if it is not
 // `None`.
-fn get_local_addr<
-    I: Ip + IpLayerIpExt,
-    BC: IpLayerBindingsContext<I, CC::DeviceId>,
-    CC: IpDeviceStateContext<I, BC>,
->(
+fn get_local_addr<I: Ip + IpLayerIpExt, CC: IpDeviceStateContext<I>>(
     core_ctx: &mut CC,
     local_ip: Option<IpDeviceAddr<I::Addr>>,
     device: &CC::DeviceId,
@@ -1019,13 +1011,12 @@ pub enum ResolveRouteError {
 /// - `ControlFlow::Continue(_)` if we finished walking the rules table without yielding any result.
 fn walk_rules<
     I: IpLayerIpExt,
-    BC,
-    CC: IpStateContext<I, BC>,
+    CC: IpStateContext<I>,
     O,
     State,
     F: FnMut(
         State,
-        &mut <CC::IpRouteTablesCtx<'_> as IpRouteTablesContext<I, BC>>::IpDeviceIdCtx<'_>,
+        &mut <CC::IpRouteTablesCtx<'_> as IpRouteTablesContext<I>>::IpDeviceIdCtx<'_>,
         &RoutingTable<I, CC::DeviceId>,
     ) -> ControlFlow<O, State>,
 >(
@@ -1278,7 +1269,7 @@ pub trait IpLayerIngressContext<
     BC: IpLayerBindingsContext<I, Self::DeviceId>,
 >:
     IpTransportDispatchContext<I, BC, DeviceId: filter::InterfaceProperties<BC::DeviceClass>>
-    + IpDeviceStateContext<I, BC>
+    + IpDeviceStateContext<I>
     + IpDeviceSendContext<I, BC>
     + IcmpErrorHandler<I, BC>
     + IpLayerContext<I, BC>
@@ -1295,7 +1286,7 @@ impl<
                 I,
                 BC,
                 DeviceId: filter::InterfaceProperties<BC::DeviceClass>,
-            > + IpDeviceStateContext<I, BC>
+            > + IpDeviceStateContext<I>
             + IpDeviceSendContext<I, BC>
             + IcmpErrorHandler<I, BC>
             + IpLayerContext<I, BC>
@@ -1406,7 +1397,7 @@ impl<StrongDeviceId: StrongDeviceIdentifier, BT: IpLayerBindingsTypes>
 /// Generates an IP packet ID.
 ///
 /// This is only meaningful for IPv4, see [`IpLayerIpExt`].
-pub fn gen_ip_packet_id<I: IpLayerIpExt, BC, CC: IpDeviceStateContext<I, BC>>(
+pub fn gen_ip_packet_id<I: IpLayerIpExt, CC: IpDeviceStateContext<I>>(
     core_ctx: &mut CC,
 ) -> I::PacketId {
     core_ctx.with_next_packet_id(|state| I::next_packet_id_from_state(state))
@@ -3358,7 +3349,7 @@ fn receive_ip_packet_action_common<
 }
 
 // Look up the route to a host.
-fn lookup_route_table<I: IpLayerIpExt, BC, CC: IpStateContext<I, BC>>(
+fn lookup_route_table<I: IpLayerIpExt, CC: IpStateContext<I>>(
     core_ctx: &mut CC,
     device: Option<&CC::DeviceId>,
     dst_ip: I::Addr,
@@ -3507,7 +3498,7 @@ pub trait IpLayerHandler<I: IpExt, BC>: DeviceIdContext<AnyDevice> {
 impl<
         I: IpLayerIpExt,
         BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
-        CC: IpLayerEgressContext<I, BC> + IpDeviceStateContext<I, BC>,
+        CC: IpLayerEgressContext<I, BC> + IpDeviceStateContext<I>,
     > IpLayerHandler<I, BC> for CC
 {
     fn send_ip_packet_from_device<S>(
@@ -3565,7 +3556,7 @@ pub(crate) fn send_ip_packet_from_device<I, BC, CC, S>(
 where
     I: IpLayerIpExt,
     BC: IpLayerBindingsContext<I, <CC as DeviceIdContext<AnyDevice>>::DeviceId>,
-    CC: IpLayerEgressContext<I, BC> + IpDeviceStateContext<I, BC>,
+    CC: IpLayerEgressContext<I, BC> + IpDeviceStateContext<I>,
     S: TransportPacketSerializer<I>,
     S::Buffer: BufferMut,
 {

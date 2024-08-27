@@ -1098,7 +1098,7 @@ fn receive_ndp_packet<
     CC: InnerIcmpv6Context<BC>
         + Ipv6DeviceHandler<BC>
         + IpDeviceHandler<Ipv6, BC>
-        + IpDeviceStateContext<Ipv6, BC>
+        + IpDeviceStateContext<Ipv6>
         + NudIpHandler<Ipv6, BC>
         + IpLayerHandler<Ipv6, BC>
         + CounterContext<NdpCounters>,
@@ -1504,7 +1504,7 @@ impl<
             + InnerIcmpContext<Ipv6, BC>
             + Ipv6DeviceHandler<BC>
             + IpDeviceHandler<Ipv6, BC>
-            + IpDeviceStateContext<Ipv6, BC>
+            + IpDeviceStateContext<Ipv6>
             + PmtuHandler<Ipv6, BC>
             + NudIpHandler<Ipv6, BC>
             + IpLayerHandler<Ipv6, BC>
@@ -3264,7 +3264,7 @@ mod tests {
         }
     }
 
-    impl IpDeviceStateContext<Ipv6, FakeIcmpBindingsCtx<Ipv6>> for FakeIcmpCoreCtx<Ipv6> {
+    impl IpDeviceStateContext<Ipv6> for FakeIcmpCoreCtx<Ipv6> {
         fn with_next_packet_id<O, F: FnOnce(&()) -> O>(&self, cb: F) -> O {
             cb(&())
         }

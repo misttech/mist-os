@@ -2089,7 +2089,7 @@ fn loopback_assignment_state_v4(addr: Ipv4Addr, status: Ipv4PresentAddressStatus
 
     let addr = SpecifiedAddr::new(addr).expect("test cases should provide specified addrs");
     assert_eq!(
-        IpDeviceStateContext::<Ipv4, _>::address_status_for_device(
+        IpDeviceStateContext::<Ipv4>::address_status_for_device(
             &mut ctx.core_ctx(),
             addr,
             &loopback_id
