@@ -21,9 +21,15 @@ use {fuchsia_async as fasync, fuchsia_component as app};
 use crate::bluetooth::types::FacadeArg;
 use crate::common_utils::common::macros::with_line;
 
-#[allow(dead_code)] // TODO(https://fxbug.dev/318827209)
 #[derive(Debug)]
-struct Connection(ConnectionProxy, fasync::Task<()>);
+struct Connection {
+    // Note: `_connection` appears unused, but must not be dropped in order to
+    // keep the FIDL connection alive.
+    _connection: ConnectionProxy,
+    // Note: `_task` appears unused, but is polled in the background by the
+    // executor.
+    _task: fasync::Task<()>,
+}
 
 #[derive(Debug)]
 struct InnerBleAdvertiseFacade {
@@ -156,7 +162,10 @@ impl BleAdvertiseFacade {
             inner_clone.write().connections.remove(&peer_id);
         };
         let event_task = fasync::Task::spawn(stream_fut);
-        inner.write().connections.insert(peer_id, Connection(proxy, event_task));
+        inner
+            .write()
+            .connections
+            .insert(peer_id, Connection { _connection: proxy, _task: event_task });
     }
 
     async fn process_advertised_peripheral_stream(
