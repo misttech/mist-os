@@ -183,6 +183,15 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.sysmem2/BufferCollection.CheckAllBuffersAllocated",
+        "strictness": "flexible",
+        "ordinal": "3865775645687782416",
+        "direction": "two_way",
+        "response": "fuchsia.sysmem2/BufferCollection_CheckAllBuffersAllocated_Response",
+        "error": "fuchsia.sysmem2/Error"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.sysmem2/BufferCollection.GetBufferCollectionId",
         "strictness": "flexible",
         "ordinal": "8633851600235444876",
