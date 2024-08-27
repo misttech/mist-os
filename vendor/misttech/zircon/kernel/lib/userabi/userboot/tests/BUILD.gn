@@ -1,0 +1,82 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Copyright 2022 The Fuchsia Authors. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/testing/boot_tests/boot_test.gni")
+import("//build/testing/boot_tests/kernel_zbi_test.gni")
+import("//build/testing/boot_tests/zbi_test_executable.gni")
+import("//zircon/kernel/params.gni")
+
+group("boot_tests") {
+  testonly = true
+  deps = [
+    ":early-boot-multiple-process-test",
+    ":early-boot-single-process-test",
+  ]
+}
+
+if (is_fuchsia || is_mistos) {
+  source_set("helper") {
+    testonly = true
+    visibility = [ ":*" ]
+    defines = [ "BOOT_TEST_SUCCESS_STRING=\"$boot_test_success_string\"" ]
+
+    sources = [ "helper.cc" ]
+    public = [ "helper.h" ]
+    deps = [
+      "//sdk/fidl/fuchsia.boot:fuchsia.boot_cpp",
+      "//sdk/lib/fit",
+      "//src/zircon/testing/standalone-test:headers",
+      "//zircon/system/ulib/async-loop:async-loop-cpp",
+      "//zircon/system/ulib/zx",
+      "//zircon/system/ulib/zxtest",
+    ]
+  }
+
+  # Verify that the '/svc' and svc stash handle work correctly.
+  zbi_test_executable("early-boot-single-process-test-bin") {
+    sources = [ "svc-test.cc" ]
+    deps = [
+      ":helper",
+      "//src/zircon/testing/standalone-test",
+      "//zircon/system/ulib/zx",
+      "//zircon/system/ulib/zxtest",
+    ]
+
+    # This test needs to run as a 'boot' program, such that it is handed the SvcStash handle.
+    userboot_entry_type = "boot"
+  }
+
+  # Verify that the '/svc' and svc stash handle work correctly.
+  zbi_test_executable("early-boot-multiple-process-test-bin") {
+    sources = [ "multiple-svc-test.cc" ]
+    deps = [
+      ":helper",
+      "data-publisher:published-data",
+      "//src/zircon/testing/standalone-test",
+      "//zircon/system/ulib/zx",
+      "//zircon/system/ulib/zxtest",
+    ]
+
+    # This test needs to run as a 'boot' program, such that it is handed the SvcStash handle.
+    userboot_entry_type = "boot"
+  }
+}
+
+if (current_toolchain == default_toolchain) {
+  kernel_zbi_test("early-boot-single-process-test") {
+    generate_cuckoo = false
+    deps = [ ":early-boot-single-process-test-bin" ]
+    environments = kernel_test_environments
+  }
+
+  kernel_zbi_test("early-boot-multiple-process-test") {
+    generate_cuckoo = false
+    deps = [
+      ":early-boot-multiple-process-test-bin",
+      "data-publisher:early-boot-data-publisher-bin",
+    ]
+    environments = kernel_test_environments
+  }
+}
