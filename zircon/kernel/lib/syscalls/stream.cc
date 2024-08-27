@@ -46,6 +46,11 @@ zx_status_t sys_stream_create(uint32_t options, zx_handle_t vmo_handle, zx_off_t
   if (status != ZX_OK)
     return status;
 
+  // Cannot create a stream from a physical or contiguous VMO.
+  if (vmo->vmo()->is_contiguous() || !vmo->vmo()->is_paged()) {
+    return ZX_ERR_WRONG_TYPE;
+  }
+
   // Remember whether this stream can resize the underlying VMO when required. Note that it might be
   // possible for stream writes / appends to proceed by manipulating only the content size, without
   // having to change the VMO size. This flag will be checked only for stream operations that would
