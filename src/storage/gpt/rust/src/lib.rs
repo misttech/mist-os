@@ -25,7 +25,12 @@ impl PartitionInfo {
             type_guid: uuid::Uuid::from_bytes_le(entry.type_guid),
             instance_guid: uuid::Uuid::from_bytes_le(entry.instance_guid),
             start_block: entry.first_lba,
-            num_blocks: entry.last_lba.checked_sub(entry.first_lba).unwrap(),
+            num_blocks: entry
+                .last_lba
+                .checked_add(1)
+                .unwrap()
+                .checked_sub(entry.first_lba)
+                .unwrap(),
         })
     }
 }
@@ -189,6 +194,44 @@ mod tests {
     }
 
     #[fuchsia::test]
+    async fn load_formatted_gpt_with_minimal_size() {
+        const PART_TYPE_GUID: [u8; 16] = [2u8; 16];
+        const PART_INSTANCE_GUID: [u8; 16] = [2u8; 16];
+        const PART_NAME: &str = "part";
+
+        let vmo = zx::Vmo::create(6 * 4096).unwrap();
+        format_gpt(
+            &vmo,
+            4096,
+            vec![PartitionDescriptor {
+                label: PART_NAME.to_string(),
+                type_guid: uuid::Uuid::from_bytes(PART_TYPE_GUID),
+                instance_guid: uuid::Uuid::from_bytes(PART_INSTANCE_GUID),
+                start_block: 3,
+                num_blocks: 1,
+            }],
+        );
+        let server = Arc::new(FakeServer::from_vmo(4096, vmo));
+        let (client, server_end) =
+            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+
+        futures::select!(
+            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
+                unreachable!();
+            },
+            _ = async {
+                let manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                    .await
+                    .expect("load should succeed");
+                let partition = manager.partitions().get(&0).expect("No entry found");
+                assert_eq!(partition.start_block, 3);
+                assert_eq!(partition.num_blocks, 1);
+                assert!(manager.partitions().get(&1).is_none());
+            }.fuse() => {},
+        );
+    }
+
+    #[fuchsia::test]
     async fn load_formatted_gpt_with_one_partition() {
         const PART_TYPE_GUID: [u8; 16] = [2u8; 16];
         const PART_INSTANCE_GUID: [u8; 16] = [2u8; 16];
@@ -218,7 +261,12 @@ mod tests {
                 let manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
                     .await
                     .expect("load should succeed");
-                manager.partitions().get(&0).expect("No entry found");
+                let partition = manager.partitions().get(&0).expect("No entry found");
+                assert_eq!(partition.label, "part");
+                assert_eq!(partition.type_guid.as_bytes(), &PART_TYPE_GUID);
+                assert_eq!(partition.instance_guid.as_bytes(), &PART_INSTANCE_GUID);
+                assert_eq!(partition.start_block, 4);
+                assert_eq!(partition.num_blocks, 1);
                 assert!(manager.partitions().get(&1).is_none());
             }.fuse() => {},
         );
@@ -232,7 +280,7 @@ mod tests {
         const PART_1_NAME: &str = "part1";
         const PART_2_NAME: &str = "part2";
 
-        let vmo = zx::Vmo::create(4096).unwrap();
+        let vmo = zx::Vmo::create(8192).unwrap();
         format_gpt(
             &vmo,
             512,
@@ -248,7 +296,7 @@ mod tests {
                     label: PART_2_NAME.to_string(),
                     type_guid: uuid::Uuid::from_bytes(PART_TYPE_GUID),
                     instance_guid: uuid::Uuid::from_bytes(PART_INSTANCE_2_GUID),
-                    start_block: 4,
+                    start_block: 7,
                     num_blocks: 1,
                 },
             ],
@@ -265,8 +313,18 @@ mod tests {
                 let manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
                     .await
                     .expect("load should succeed");
-                manager.partitions().get(&0).expect("No entry found");
-                manager.partitions().get(&1).expect("No entry found");
+                let partition = manager.partitions().get(&0).expect("No entry found");
+                assert_eq!(partition.label, PART_1_NAME);
+                assert_eq!(partition.type_guid.as_bytes(), &PART_TYPE_GUID);
+                assert_eq!(partition.instance_guid.as_bytes(), &PART_INSTANCE_1_GUID);
+                assert_eq!(partition.start_block, 4);
+                assert_eq!(partition.num_blocks, 1);
+                let partition = manager.partitions().get(&1).expect("No entry found");
+                assert_eq!(partition.label, PART_2_NAME);
+                assert_eq!(partition.type_guid.as_bytes(), &PART_TYPE_GUID);
+                assert_eq!(partition.instance_guid.as_bytes(), &PART_INSTANCE_2_GUID);
+                assert_eq!(partition.start_block, 7);
+                assert_eq!(partition.num_blocks, 1);
                 assert!(manager.partitions().get(&2).is_none());
             }.fuse() => {},
         );
@@ -280,7 +338,7 @@ mod tests {
         const PART_1_NAME: &str = "part1";
         const PART_2_NAME: &str = "part2";
 
-        let vmo = zx::Vmo::create(4096).unwrap();
+        let vmo = zx::Vmo::create(8192).unwrap();
         format_gpt(
             &vmo,
             512,
@@ -296,7 +354,7 @@ mod tests {
                     label: PART_2_NAME.to_string(),
                     type_guid: uuid::Uuid::from_bytes(PART_TYPE_GUID),
                     instance_guid: uuid::Uuid::from_bytes(PART_INSTANCE_2_GUID),
-                    start_block: 4,
+                    start_block: 7,
                     num_blocks: 1,
                 },
             ],
@@ -316,8 +374,18 @@ mod tests {
                 let manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
                     .await
                     .expect("load should succeed");
-                manager.partitions().get(&0).expect("No entry found");
-                manager.partitions().get(&1).expect("No entry found");
+                let partition = manager.partitions().get(&0).expect("No entry found");
+                assert_eq!(partition.label, PART_1_NAME);
+                assert_eq!(partition.type_guid.as_bytes(), &PART_TYPE_GUID);
+                assert_eq!(partition.instance_guid.as_bytes(), &PART_INSTANCE_1_GUID);
+                assert_eq!(partition.start_block, 4);
+                assert_eq!(partition.num_blocks, 1);
+                let partition = manager.partitions().get(&1).expect("No entry found");
+                assert_eq!(partition.label, PART_2_NAME);
+                assert_eq!(partition.type_guid.as_bytes(), &PART_TYPE_GUID);
+                assert_eq!(partition.instance_guid.as_bytes(), &PART_INSTANCE_2_GUID);
+                assert_eq!(partition.start_block, 7);
+                assert_eq!(partition.num_blocks, 1);
                 assert!(manager.partitions().get(&2).is_none());
             }.fuse() => {},
         );
@@ -331,7 +399,7 @@ mod tests {
         const PART_1_NAME: &str = "part1";
         const PART_2_NAME: &str = "part2";
 
-        let vmo = zx::Vmo::create(4096).unwrap();
+        let vmo = zx::Vmo::create(8192).unwrap();
         format_gpt(
             &vmo,
             512,
@@ -347,7 +415,7 @@ mod tests {
                     label: PART_2_NAME.to_string(),
                     type_guid: uuid::Uuid::from_bytes(PART_TYPE_GUID),
                     instance_guid: uuid::Uuid::from_bytes(PART_INSTANCE_2_GUID),
-                    start_block: 4,
+                    start_block: 7,
                     num_blocks: 1,
                 },
             ],
@@ -367,10 +435,43 @@ mod tests {
                 let manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
                     .await
                     .expect("load should succeed");
-                manager.partitions().get(&0).expect("No entry found");
-                manager.partitions().get(&1).expect("No entry found");
+                let partition = manager.partitions().get(&0).expect("No entry found");
+                assert_eq!(partition.label, PART_1_NAME);
+                assert_eq!(partition.type_guid.as_bytes(), &PART_TYPE_GUID);
+                assert_eq!(partition.instance_guid.as_bytes(), &PART_INSTANCE_1_GUID);
+                assert_eq!(partition.start_block, 4);
+                assert_eq!(partition.num_blocks, 1);
+                let partition = manager.partitions().get(&1).expect("No entry found");
+                assert_eq!(partition.label, PART_2_NAME);
+                assert_eq!(partition.type_guid.as_bytes(), &PART_TYPE_GUID);
+                assert_eq!(partition.instance_guid.as_bytes(), &PART_INSTANCE_2_GUID);
+                assert_eq!(partition.start_block, 7);
+                assert_eq!(partition.num_blocks, 1);
                 assert!(manager.partitions().get(&2).is_none());
             }.fuse() => {},
         );
+    }
+
+    #[fuchsia::test]
+    async fn load_golden_gpt() {
+        for path in std::fs::read_dir("/pkg/data/gpt_golden").unwrap() {
+            let path = path.unwrap().path();
+            println!("Trying golden file {path:?}...");
+            let contents = std::fs::read(path).unwrap();
+            let server = Arc::new(FakeServer::new(contents.len() as u64 / 512, 512, &contents));
+            let (client, server_end) =
+                fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+
+            futures::select!(
+                _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
+                    unreachable!();
+                },
+                _ = async {
+                    GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                        .await
+                        .expect("load should succeed");
+                }.fuse() => {},
+            );
+        }
     }
 }
