@@ -243,6 +243,10 @@ class Peer final {
       return *bond_data_;
     }
 
+    bool feature_interrogation_complete() const {
+      return feature_interrogation_complete_;
+    }
+
     // Bit mask of LE features (Core Spec v5.2, Vol 6, Part B, Section 4.6).
     std::optional<hci_spec::LESupportedFeatures> features() const {
       return *features_;
@@ -287,6 +291,10 @@ class Peer final {
     // Removes any stored keys. Does not make the peer temporary, even if it
     // is disconnected. Does not notify listeners.
     void ClearBondData();
+
+    void SetFeatureInterrogationComplete() {
+      feature_interrogation_complete_ = true;
+    }
 
     void SetFeatures(hci_spec::LESupportedFeatures features) {
       features_.Set(features);
@@ -361,6 +369,12 @@ class Peer final {
 
     AutoConnectBehavior auto_conn_behavior_ = AutoConnectBehavior::kAlways;
 
+    bool feature_interrogation_complete_ = false;
+
+    // features_ will be unset if feature interrogation has not been attempted
+    // (in which case feature_interrogation_complete_ will be false) or if
+    // feature interrogation has failed (in which case
+    // feature_interrogation_complete_ will be true).
     StringInspectable<std::optional<hci_spec::LESupportedFeatures>> features_;
 
     // TODO(armansito): Store GATT service UUIDs.
