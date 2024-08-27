@@ -266,7 +266,7 @@ pub(crate) fn make_ga4_event<'a>(
     invoker: Option<&str>,
     event_name: Option<&str>,
 ) -> Event {
-    tracing::debug!(
+    tracing::trace!(
         "Make GA4 ARGS: cat:{:?}, event:{:?}, action:{:?}, label:{:?}",
         category,
         event_name,
