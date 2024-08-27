@@ -12,6 +12,9 @@ assert(is_kernel, current_toolchain)
 
 zx_library("syscalls") {
   visibility = [ "//zircon/kernel/*" ]
+  if (is_mistos) {
+    visibility += [ "//vendor/misttech/zircon/kernel/*" ]
+  }
 
   # This can be used for headers only by the vDSO and test code.
 
@@ -89,6 +92,10 @@ source_set("impl") {
       "//zircon/kernel/platform/pc",
     ]
   }
+  if (is_mistos) {
+    deps -= [ "//zircon/kernel/lib/userabi:headers" ]
+    deps += [ "//vendor/misttech/zircon/kernel/lib/userabi:headers" ]
+  }
 }
 
 # Only this file depends on vdso-valid-sysret.h.
@@ -100,4 +107,8 @@ source_set("dispatch") {
     "//zircon/kernel/lib/ktl",
     "//zircon/kernel/lib/userabi:headers",
   ]
+  if (is_mistos) {
+    deps -= [ "//zircon/kernel/lib/userabi:headers" ]
+    deps += [ "//vendor/misttech/zircon/kernel/lib/userabi:headers" ]
+  }
 }
