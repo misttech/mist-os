@@ -1144,33 +1144,51 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>
         ListenerSharingState{listening: old_listening, sharing: old_sharing}: &ListenerSharingState,
         ListenerSharingState{listening: new_listening, sharing: new_sharing}: &ListenerSharingState,
     ) -> Result<(), UpdateSharingError> {
-        let ListenerAddr { device, ip: ListenerIpAddr { addr: _, identifier } } = addr;
+        let ListenerAddr { device, ip } = addr;
         match (old_listening, new_listening) {
             (true, false) => (), // Changing a listener to bound is always okay.
             (true, true) | (false, false) => (), // No change
             (false, true) => {
-                // Upgrading a bound socket to a listener requires no other
-                // listeners on similar addresses. We can check that by checking
-                // that there are no listeners shadowing the any-listener
-                // address.
-                if socketmap
-                    .descendant_counts(
-                        &ListenerAddr {
-                            device: None,
-                            ip: ListenerIpAddr { addr: None, identifier: *identifier },
+                // Upgrading a bound socket to a listener requires no other listeners on similar
+                // addresses. This boils down to checking for listeners on either
+                //   1. addresses that this address shadows, or
+                //   2. addresses that shadow this address.
+
+                // First, check for condition (1).
+                let addr = AddrVec::Listen(addr.clone());
+                for a in addr.iter_shadows() {
+                    if let Some(s) = socketmap.get(&a) {
+                        match s {
+                            Bound::Conn(c) => {
+                                unreachable!("found conn state {c:?} at listener addr {a:?}")
+                            }
+                            Bound::Listen(l) => match l {
+                                ListenerAddrState::ExclusiveListener(_)
+                                | ListenerAddrState::ExclusiveBound(_) => {
+                                    return Err(UpdateSharingError);
+                                }
+                                ListenerAddrState::Shared { listener, bound: _ } => {
+                                    match listener {
+                                        Some(_) => {
+                                            return Err(UpdateSharingError);
+                                        }
+                                        None => (),
+                                    }
+                                }
+                            },
                         }
-                        .into(),
-                    )
-                    .any(
-                        |(AddrVecTag { state, has_device: _, sharing: _ }, _): &(
-                            _,
-                            NonZeroUsize,
-                        )| match state {
+                    }
+                }
+
+                // Next, check for condition (2).
+                if socketmap.descendant_counts(&ListenerAddr { device: None, ip: *ip }.into()).any(
+                    |(AddrVecTag { state, has_device: _, sharing: _ }, _): &(_, NonZeroUsize)| {
+                        match state {
                             SocketTagState::Conn | SocketTagState::Bound => false,
                             SocketTagState::Listener => true,
-                        },
-                    )
-                {
+                        }
+                    },
+                ) {
                     return Err(UpdateSharingError);
                 }
             }
@@ -1178,8 +1196,8 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>
 
         match (old_sharing, new_sharing) {
             (SharingState::Exclusive, SharingState::Exclusive)
-            | (SharingState::ReuseAddress, SharingState::ReuseAddress) => (),
-            (SharingState::Exclusive, SharingState::ReuseAddress) => (),
+            | (SharingState::ReuseAddress, SharingState::ReuseAddress)
+            | (SharingState::Exclusive, SharingState::ReuseAddress) => (),
             (SharingState::ReuseAddress, SharingState::Exclusive) => {
                 // Linux allows this, but it introduces inconsistent socket
                 // state: if some sockets were allowed to bind because they all
@@ -1188,7 +1206,7 @@ impl<I: DualStackIpExt, D: WeakDeviceIdentifier, BT: TcpBindingsTypes>
                 // if it doesn't introduce inconsistencies.
                 let root_addr = ListenerAddr {
                     device: None,
-                    ip: ListenerIpAddr { addr: None, identifier: *identifier },
+                    ip: ListenerIpAddr { addr: None, identifier: ip.identifier },
                 };
 
                 let conflicts = match device {
@@ -4642,7 +4660,7 @@ pub enum AcceptError {
 }
 
 /// Errors for the listen operation.
-#[derive(Debug, GenericOverIp)]
+#[derive(Debug, GenericOverIp, PartialEq)]
 #[generic_over_ip()]
 pub enum ListenError {
     /// There would be a conflict with another listening socket.
@@ -6485,6 +6503,72 @@ mod tests {
         );
 
         assert_matches!(socket.get().deref().socket_state, TcpSocketStateInner::Bound(_));
+    }
+
+    // This is a regression test for https://fxbug.dev/361402347.
+    #[ip_test(I)]
+    fn bind_listen_on_same_port_different_addrs<I: TcpTestIpExt>()
+    where
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
+            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
+    {
+        set_logger_for_test();
+
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::with_ip_socket_ctx_state(
+            FakeDualStackIpSocketCtx::new(core::iter::once(FakeDeviceConfig {
+                device: FakeDeviceId,
+                local_ips: vec![I::TEST_ADDRS.local_ip, I::TEST_ADDRS.remote_ip],
+                remote_ips: vec![],
+            })),
+        ));
+        let mut api = ctx.tcp_api::<I>();
+
+        let s1 = api.create(Default::default());
+        api.bind(&s1, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.local_ip)), Some(PORT_1)).unwrap();
+        api.listen(&s1, NonZeroUsize::MIN).unwrap();
+
+        let s2 = api.create(Default::default());
+        api.bind(&s2, Some(ZonedAddr::Unzoned(I::TEST_ADDRS.remote_ip)), Some(PORT_1)).unwrap();
+        api.listen(&s2, NonZeroUsize::MIN).unwrap();
+    }
+
+    #[ip_test(I)]
+    #[test_case(None, None; "both any addr")]
+    #[test_case(None, Some(<I as TestIpExt>::TEST_ADDRS.local_ip); "any then specified")]
+    #[test_case(Some(<I as TestIpExt>::TEST_ADDRS.local_ip), None; "specified then any")]
+    #[test_case(
+        Some(<I as TestIpExt>::TEST_ADDRS.local_ip),
+        Some(<I as TestIpExt>::TEST_ADDRS.local_ip);
+        "both specified"
+    )]
+    fn cannot_listen_on_same_port_with_shadowed_address<I: TcpTestIpExt>(
+        first: Option<SpecifiedAddr<I::Addr>>,
+        second: Option<SpecifiedAddr<I::Addr>>,
+    ) where
+        TcpCoreCtx<FakeDeviceId, TcpBindingsCtx<FakeDeviceId>>:
+            TcpContext<I, TcpBindingsCtx<FakeDeviceId>>,
+    {
+        set_logger_for_test();
+
+        let mut ctx = TcpCtx::with_core_ctx(TcpCoreCtx::with_ip_socket_ctx_state(
+            FakeDualStackIpSocketCtx::new(core::iter::once(FakeDeviceConfig {
+                device: FakeDeviceId,
+                local_ips: vec![I::TEST_ADDRS.local_ip],
+                remote_ips: vec![],
+            })),
+        ));
+        let mut api = ctx.tcp_api::<I>();
+
+        let s1 = api.create(Default::default());
+        api.set_reuseaddr(&s1, true).unwrap();
+        api.bind(&s1, first.map(ZonedAddr::Unzoned), Some(PORT_1)).unwrap();
+
+        let s2 = api.create(Default::default());
+        api.set_reuseaddr(&s2, true).unwrap();
+        api.bind(&s2, second.map(ZonedAddr::Unzoned), Some(PORT_1)).unwrap();
+
+        api.listen(&s1, NonZeroUsize::MIN).unwrap();
+        assert_eq!(api.listen(&s2, NonZeroUsize::MIN), Err(ListenError::ListenerExists));
     }
 
     #[test]
