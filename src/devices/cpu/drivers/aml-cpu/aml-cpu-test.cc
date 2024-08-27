@@ -7,6 +7,8 @@
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/testing/cpp/driver_test.h>
 
+#include <optional>
+
 #include <fake-mmio-reg/fake-mmio-reg.h>
 #include <gtest/gtest.h>
 #include <sdk/lib/inspect/testing/cpp/inspect.h>
@@ -46,16 +48,16 @@ const std::vector<amlogic_cpu::perf_domain_t> kTestPerfDomains = {
 };
 
 const std::vector<operating_point_t> kTestOperatingPoints = {
-    {.freq_hz = MHZ(10), .volt_uv = 1500, .pd_id = kPdArmA53},
-    {.freq_hz = MHZ(9), .volt_uv = 1350, .pd_id = kPdArmA53},
-    {.freq_hz = MHZ(8), .volt_uv = 1200, .pd_id = kPdArmA53},
-    {.freq_hz = MHZ(7), .volt_uv = 1050, .pd_id = kPdArmA53},
-    {.freq_hz = MHZ(6), .volt_uv = 900, .pd_id = kPdArmA53},
-    {.freq_hz = MHZ(5), .volt_uv = 750, .pd_id = kPdArmA53},
-    {.freq_hz = MHZ(4), .volt_uv = 600, .pd_id = kPdArmA53},
-    {.freq_hz = MHZ(3), .volt_uv = 450, .pd_id = kPdArmA53},
-    {.freq_hz = MHZ(2), .volt_uv = 300, .pd_id = kPdArmA53},
-    {.freq_hz = MHZ(1), .volt_uv = 150, .pd_id = kPdArmA53},
+    {.freq_hz = MHZ(10), .volt_uv = 15000, .pd_id = kPdArmA53},
+    {.freq_hz = MHZ(9), .volt_uv = 13500, .pd_id = kPdArmA53},
+    {.freq_hz = MHZ(8), .volt_uv = 12000, .pd_id = kPdArmA53},
+    {.freq_hz = MHZ(7), .volt_uv = 10500, .pd_id = kPdArmA53},
+    {.freq_hz = MHZ(6), .volt_uv = 9000, .pd_id = kPdArmA53},
+    {.freq_hz = MHZ(5), .volt_uv = 7500, .pd_id = kPdArmA53},
+    {.freq_hz = MHZ(4), .volt_uv = 6000, .pd_id = kPdArmA53},
+    {.freq_hz = MHZ(3), .volt_uv = 4500, .pd_id = kPdArmA53},
+    {.freq_hz = MHZ(2), .volt_uv = 3000, .pd_id = kPdArmA53},
+    {.freq_hz = MHZ(1), .volt_uv = 1500, .pd_id = kPdArmA53},
 };
 
 class FakeMmio {
@@ -160,6 +162,10 @@ class TestPowerDevice : public fidl::WireServer<fuchsia_hardware_power::Device> 
 
   void RequestVoltage(RequestVoltageRequestView request,
                       RequestVoltageCompleter::Sync& completer) override {
+    if (fault_voltage_) {
+      return completer.ReplySuccess(*fault_voltage_);
+    }
+
     voltage_ = request->voltage;
     completer.ReplySuccess(voltage_);
   }
@@ -184,12 +190,15 @@ class TestPowerDevice : public fidl::WireServer<fuchsia_hardware_power::Device> 
   }
 
   void SetVoltage(uint32_t voltage) { voltage_ = voltage; }
+  void SetFaultVoltage(uint32_t voltage) { fault_voltage_ = voltage; }
+  void ResetFaultVoltage() { fault_voltage_ = std::nullopt; }
 
   uint32_t voltage() const { return voltage_; }
   uint32_t min_needed_voltage() const { return min_needed_voltage_; }
   uint32_t max_supported_voltage() const { return max_supported_voltage_; }
 
  private:
+  std::optional<uint32_t> fault_voltage_ = std::nullopt;
   uint32_t voltage_ = 0;
   uint32_t min_voltage_ = 0;
   uint32_t max_voltage_ = 0;
@@ -479,4 +488,77 @@ TEST_F(AmlCpuTest, TestGetLogicalCoreCount) {
 
   EXPECT_EQ(coreCountResp.value().count, kTestPerfDomains[0].core_count);
 }
+
+// We attempt to lower the voltage and then inject a fault into the parent voltage driver.
+TEST_F(AmlCpuTest, TestVregLowerFail) {
+  StartWithMetadata(kTestPerfDomains, kTestOperatingPoints);
+  ConnectToCpuCtrl(kTestPerfDomains[0]);
+
+  uint32_t initial_rate;
+  driver_test().RunInEnvironmentTypeContext([&initial_rate](AmlCpuEnvironment& env) {
+    auto out_rate = env.clock_cpu_scaler_server_.rate();
+    ASSERT_TRUE(out_rate.has_value());
+    initial_rate = out_rate.value();
+  });
+
+  // Inject a fault into the voltage driver.
+  driver_test().RunInEnvironmentTypeContext(
+      [](AmlCpuEnvironment& env) { env.power_server_.SetFaultVoltage(1); });
+
+  // Scale to the lowest opp.
+  const uint32_t min_opp_index = static_cast<uint32_t>(kTestOperatingPoints.size() - 1);
+
+  auto min_result = cpu_ctrl_->SetCurrentOperatingPoint(min_opp_index);
+  EXPECT_OK(min_result.status());
+
+  // We injected a fault which means that the driver was unable to set the voltate which means that
+  // this call should fail.
+  EXPECT_FALSE(min_result->is_ok());
+
+  // If the change in voltage fails, the frequency should not be changed.
+  driver_test().RunInEnvironmentTypeContext([initial_rate](AmlCpuEnvironment& env) {
+    auto new_rate = env.clock_cpu_scaler_server_.rate();
+    ASSERT_TRUE(new_rate.has_value());
+    EXPECT_EQ(initial_rate, new_rate.value());
+  });
+}
+
+// This test is much like TestVregLowerFail from above but we inject the fault after lowering the
+// voltage and then attempt to raise it which should fail.
+TEST_F(AmlCpuTest, TestVregRaiseFail) {
+  StartWithMetadata(kTestPerfDomains, kTestOperatingPoints);
+  ConnectToCpuCtrl(kTestPerfDomains[0]);
+
+  // Scale to the lowest opp.
+  const uint32_t min_opp_index = static_cast<uint32_t>(kTestOperatingPoints.size() - 1);
+
+  auto min_result = cpu_ctrl_->SetCurrentOperatingPoint(min_opp_index);
+  EXPECT_OK(min_result.status());
+  EXPECT_TRUE(min_result->is_ok());
+
+  // Inject a fault into the voltage driver.
+  driver_test().RunInEnvironmentTypeContext(
+      [](AmlCpuEnvironment& env) { env.power_server_.SetFaultVoltage(1); });
+
+  // Cache the rate of the clocks.
+  uint32_t initial_rate;
+  driver_test().RunInEnvironmentTypeContext([&initial_rate](AmlCpuEnvironment& env) {
+    auto out_rate = env.clock_cpu_scaler_server_.rate();
+    ASSERT_TRUE(out_rate.has_value());
+    initial_rate = out_rate.value();
+  });
+
+  // Raising the voltage after injecting the fault should fail.
+  auto max_result = cpu_ctrl_->SetCurrentOperatingPoint(0);
+  EXPECT_OK(max_result.status());
+  EXPECT_FALSE(max_result->is_ok());
+
+  // If the change in voltage fails, the frequency should not be changed.
+  driver_test().RunInEnvironmentTypeContext([initial_rate](AmlCpuEnvironment& env) {
+    auto new_rate = env.clock_cpu_scaler_server_.rate();
+    ASSERT_TRUE(new_rate.has_value());
+    EXPECT_EQ(initial_rate, new_rate.value());
+  });
+}
+
 }  // namespace amlogic_cpu

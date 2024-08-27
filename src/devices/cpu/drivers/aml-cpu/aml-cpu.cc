@@ -6,6 +6,8 @@
 
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/component/cpp/driver_base.h>
+#include <lib/fit/defer.h>
+#include <lib/fit/function.h>
 #include <lib/mmio/mmio.h>
 #include <zircon/syscalls/smc.h>
 
@@ -138,12 +140,33 @@ zx_status_t AmlCpu::SetCurrentOperatingPointInternal(uint32_t requested_opp, uin
     return ZX_ERR_INVALID_ARGS;
   }
 
+  const operating_point_t& target_opp = operating_points_[requested_opp];
+  const operating_point_t& initial_opp = operating_points_[current_operating_point_];
+
+  // In the event of an error, these are used to attempt to revert the state of the parent
+  // power/clock settings back to their original state.
+  fit::deferred_action<std::function<void(void)>> reset_voltage;
+  fit::deferred_action<std::function<void(void)>> reset_frequency;
+  auto reset_voltage_func = [this, initial_opp]() {
+    auto result = this->pwr_->RequestVoltage(initial_opp.volt_uv);
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "FIDL Call Failed to restore voltage to original setting: %s",
+              result.status_string());
+    }
+    if (result->is_error()) {
+      FDF_LOG(ERROR, "Failed to restore voltage to original setting: %s",
+              zx_status_get_string(result->error_value()));
+    }
+    uint32_t actual_voltage = result->value()->actual_voltage;
+    if (actual_voltage != initial_opp.volt_uv) {
+      FDF_LOG(ERROR, "Restored voltage does not match, requested = %u, got = %u",
+              initial_opp.volt_uv, actual_voltage);
+    }
+  };
+
   // There is no condition under which this function will return ZX_OK but out_opp will not
   // be requested_opp so we're going to go ahead and set that up front.
   *out_opp = requested_opp;
-
-  const operating_point_t& target_opp = operating_points_[requested_opp];
-  const operating_point_t& initial_opp = operating_points_[current_operating_point_];
 
   FDF_LOG(INFO, "Scaling from %u MHz %u mV to %u MHz %u mV", initial_opp.freq_hz / 1000000,
           initial_opp.volt_uv / 1000, target_opp.freq_hz / 1000000, target_opp.volt_uv / 1000);
@@ -173,8 +196,12 @@ zx_status_t AmlCpu::SetCurrentOperatingPointInternal(uint32_t requested_opp, uin
     if (actual_voltage != target_opp.volt_uv) {
       FDF_LOG(ERROR, "Actual voltage does not match, requested = %u, got = %u", target_opp.volt_uv,
               actual_voltage);
-      return ZX_OK;
+      reset_voltage_func();
+      return ZX_ERR_INTERNAL;
     }
+
+    // Setting the voltage was a success, arm the deferred call.
+    reset_voltage = reset_voltage_func;
   }
 
   // Set the frequency next.
@@ -182,26 +209,23 @@ zx_status_t AmlCpu::SetCurrentOperatingPointInternal(uint32_t requested_opp, uin
   if (!result.ok() || result->is_error()) {
     FDF_LOG(ERROR, "Could not set CPU frequency: %s", result.FormatDescription().c_str());
 
-    // Put the voltage back if frequency scaling fails.
-    if (pwr_.is_valid()) {
-      fidl::WireResult result = pwr_->RequestVoltage(initial_opp.volt_uv);
-      if (!result.ok()) {
-        FDF_LOG(ERROR, "Failed to send RequestVoltage request: %s", result.status_string());
-        return result.error().status();
-      }
-
-      if (result->is_error()) {
-        FDF_LOG(ERROR, "Failed to reset CPU voltage, st = %s, Voltage and frequency mismatch!",
-                zx_status_get_string(result->error_value()));
-        return result->error_value();
-      }
-    }
-
     if (!result.ok()) {
       return result.status();
     }
     return result->error_value();
   }
+
+  reset_frequency = [this, initial_opp]() {
+    auto result = this->cpuscaler_->SetRate(initial_opp.freq_hz);
+    if (!result.ok()) {
+      FDF_LOG(ERROR, "FIDL Call Failed to restore frequency to original setting: %s",
+              result.status_string());
+    }
+    if (result->is_error()) {
+      FDF_LOG(ERROR, "Failed to restore frequency to original setting: %s",
+              zx_status_get_string(result->error_value()));
+    }
+  };
 
   // If we're decreasing the voltage, then we do it after the frequency has been
   // reduced to avoid undervolt conditions.
@@ -225,13 +249,18 @@ zx_status_t AmlCpu::SetCurrentOperatingPointInternal(uint32_t requested_opp, uin
               "Failed to set cpu voltage, requested = %u, got = %u. "
               "Voltage and frequency mismatch!",
               target_opp.volt_uv, actual_voltage);
-      return ZX_OK;
+      reset_voltage_func();
+      return ZX_ERR_INTERNAL;
     }
   }
 
   FDF_LOG(INFO, "Success\n");
 
   current_operating_point_ = requested_opp;
+
+  // Cancel any deferred unwind calls.
+  reset_voltage.cancel();
+  reset_frequency.cancel();
 
   return ZX_OK;
 }
