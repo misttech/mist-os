@@ -9,7 +9,7 @@ import("//build/zircon/migrated_targets.gni")
 import("//build/zircon/zircon_cpu.gni")
 import("//zircon/kernel/params.gni")
 
-zx_library("userabi") {
+zx_library("_userabi") {
   sources = []
   public_deps = [
     # <lib/userabi/vdso.h> has #include <lib/fasttime/internal/abi.h>.
