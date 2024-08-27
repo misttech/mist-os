@@ -80,12 +80,12 @@ VmMapping::AttributionCounts VmMapping::GetAttributedMemoryLocked() {
 
   vm_mapping_attribution_queries.Add(1);
 
-  if (!object_->is_paged()) {
+  VmObjectPaged* object_paged = DownCastVmObject<VmObjectPaged>(object_.get());
+  if (!object_paged) {
     return object_->GetAttributedMemoryInRange(object_offset_locked(), size_);
   }
 
   // If |object_| is a VmObjectPaged, check if the previously cached value still holds.
-  auto object_paged = static_cast<VmObjectPaged*>(object_.get());
   uint64_t vmo_gen_count = object_paged->GetHierarchyGenerationCount();
   uint64_t mapping_gen_count = GetMappingGenerationCountLocked();
 
@@ -749,11 +749,10 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
                                              ? ArchVmAspace::ExistingEntryAction::Skip
                                              : ArchVmAspace::ExistingEntryAction::Error);
         const uint64_t vmo_offset = object_offset_locked() + (base - base_);
-        if (likely(object_->is_paged())) {
-          VmObjectPaged* object = static_cast<VmObjectPaged*>(object_.get());
-          AssertHeld(object->lock_ref());
+        if (VmObjectPaged* paged = DownCastVmObject<VmObjectPaged>(object_.get()); likely(paged)) {
+          AssertHeld(paged->lock_ref());
           const bool writing = mmu_flags & ARCH_MMU_FLAG_PERM_WRITE;
-          __UNINITIALIZED auto cursor = object->GetLookupCursorLocked(vmo_offset, len);
+          __UNINITIALIZED auto cursor = paged->GetLookupCursorLocked(vmo_offset, len);
           if (cursor.is_error()) {
             return cursor.error_value();
           }
@@ -799,13 +798,13 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
               }
             }
           }
-        } else {
-          VmObjectPhysical* object = static_cast<VmObjectPhysical*>(object_.get());
-          AssertHeld(object->lock_ref());
+        } else if (VmObjectPhysical* phys = DownCastVmObject<VmObjectPhysical>(object_.get());
+                   phys) {
+          AssertHeld(phys->lock_ref());
 
           // Physical VMOs are always allocated and contiguous, just need to get the paddr.
           paddr_t phys_base = 0;
-          zx_status_t status = object->LookupContiguousLocked(vmo_offset, len, &phys_base);
+          zx_status_t status = phys->LookupContiguousLocked(vmo_offset, len, &phys_base);
           ASSERT(status == ZX_OK);
 
           for (size_t offset = 0; offset < len; offset += PAGE_SIZE) {
@@ -814,6 +813,8 @@ zx_status_t VmMapping::MapRange(size_t offset, size_t len, bool commit, bool ign
               return status;
             }
           }
+        } else {
+          panic("VmObject should be paged or physical");
         }
         return coalescer.Flush();
       });
@@ -982,13 +983,12 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
   __UNINITIALIZED VmMappingCoalescer<kMaxPages> coalescer(
       this, va, range.mmu_flags, ArchVmAspace::ExistingEntryAction::Upgrade);
 
-  if (likely(object_->is_paged())) {
-    VmObjectPaged* object = static_cast<VmObjectPaged*>(object_.get());
-    AssertHeld(object->lock_ref());
+  if (VmObjectPaged* paged = DownCastVmObject<VmObjectPaged>(object_.get()); likely(paged)) {
+    AssertHeld(paged->lock_ref());
 
     // fault in or grab existing pages.
     __UNINITIALIZED auto cursor =
-        object->GetLookupCursorLocked(vmo_offset, max_out_pages * PAGE_SIZE);
+        paged->GetLookupCursorLocked(vmo_offset, max_out_pages * PAGE_SIZE);
     if (cursor.is_error()) {
       return cursor.error_value();
     }
@@ -1006,7 +1006,7 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
     // We looked up in order to write. Mark as modified.
     if (write) {
       DEBUG_ASSERT(result->writable);
-      object->mark_modified_locked();
+      paged->mark_modified_locked();
     }
 
     // if we read faulted, and lookup didn't say that this is always writable, then we map or modify
@@ -1036,15 +1036,14 @@ zx_status_t VmMapping::PageFaultLocked(vaddr_t va, const uint pf_flags,
       coalescer.IncrementCount(num_pages);
     }
 
-  } else {
-    VmObjectPhysical* object = static_cast<VmObjectPhysical*>(object_.get());
-    AssertHeld(object->lock_ref());
+  } else if (VmObjectPhysical* phys = DownCastVmObject<VmObjectPhysical>(object_.get()); phys) {
+    AssertHeld(phys->lock_ref());
 
     // Already validated the size, and since physical VMOs are always allocated, and not resizable,
     // we know we can always retrieve the maximum number of pages without failure.
     uint64_t len = max_out_pages * PAGE_SIZE;
     paddr_t phys_base = 0;
-    zx_status_t status = object->LookupContiguousLocked(vmo_offset, len, &phys_base);
+    zx_status_t status = phys->LookupContiguousLocked(vmo_offset, len, &phys_base);
 
     ASSERT(status == ZX_OK);
 
