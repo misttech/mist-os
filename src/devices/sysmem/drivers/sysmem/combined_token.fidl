@@ -90,7 +90,7 @@ open protocol CombinedBufferCollectionToken {
     @selector("fuchsia.sysmem/BufferCollectionToken.CreateBufferCollectionTokenGroup")
     strict CreateBufferCollectionTokenGroupV1(resource struct {
         // The added=19 is fake - see comment at top of this file.
-        @available(added=19, deprecated=NEXT, note="use fuchsia.sysmem2")
+        @available(added=19, deprecated=23, note="use fuchsia.sysmem2")
         group_request server_end:fuchsia.sysmem.BufferCollectionTokenGroup;
     });
 

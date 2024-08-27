@@ -5,7 +5,7 @@ library fuchsia.sysmem;
 
 using zx;
 
-@available(added=7, deprecated=NEXT, note="use fuchsia.sysmem2")
+@available(added=7, deprecated=23, note="use fuchsia.sysmem2")
 const MAX_COUNT_DUPLICATES uint32 = 64;
 
 /// Actually creating this many children isn't recommended in most typical
@@ -16,14 +16,14 @@ const MAX_COUNT_DUPLICATES uint32 = 64;
 /// settable via these protocols.  The maximum number of total nodes in a sysmem
 /// token tree is limited to a separate maximum that is not settable via these
 /// protocols.
-@available(added=9, deprecated=NEXT, note="use fuchsia.sysmem2")
+@available(added=9, deprecated=23, note="use fuchsia.sysmem2")
 const MAX_COUNT_CREATE_CHILDREN int32 = 64;
 
 // A protocol mixin for all nodes in the tree established by
 // BufferCollectionToken creation and BufferCollectionTokenGroup creation,
 // including BufferCollectionToken(s) which have since been converted to a
 // BufferCollection channel.
-@available(added=9, deprecated=NEXT, note="use fuchsia.sysmem2")
+@available(added=9, deprecated=23, note="use fuchsia.sysmem2")
 closed protocol Node {
     // Sync()
     //
@@ -307,7 +307,7 @@ closed protocol Node {
 // LINT.IfChange
 @available(added=7)
 closed protocol BufferCollectionToken {
-    @available(added=9, deprecated=NEXT, note="use fuchsia.sysmem2")
+    @available(added=9, deprecated=23, note="use fuchsia.sysmem2")
     compose Node;
 
     // See Node for non-deprecated equivalents.  Re-building existing code will
@@ -360,7 +360,7 @@ closed protocol BufferCollectionToken {
     /// participant to gain rights that the participant doesn't already have.
     /// The value ZX_RIGHT_SAME_RIGHTS can be used to specify that no
     /// attenuation should be applied.
-    @available(added=7, deprecated=NEXT, note="use fuchsia.sysmem2")
+    @available(added=7, deprecated=23, note="use fuchsia.sysmem2")
     strict DuplicateSync(struct {
         rights_attenuation_masks vector<zx.Rights>:MAX_COUNT_DUPLICATES;
     }) -> (resource struct {
@@ -408,7 +408,7 @@ closed protocol BufferCollectionToken {
     /// `token_request` is the server end of a BufferCollectionToken channel.
     /// The client end of this channel acts as another participant in creating the
     /// shared BufferCollection.
-    @available(added=7, deprecated=NEXT, note="use fuchsia.sysmem2")
+    @available(added=7, deprecated=23, note="use fuchsia.sysmem2")
     strict Duplicate(resource struct {
         rights_attenuation_mask uint32;
         token_request server_end:BufferCollectionToken;
@@ -467,7 +467,7 @@ closed protocol BufferCollectionToken {
     /// be used to replace the failed dispensable token.
     ///
     /// SetDispensable() on an already-dispensable token is idempotent.
-    @available(added=7, deprecated=NEXT, note="use fuchsia.sysmem2")
+    @available(added=7, deprecated=23, note="use fuchsia.sysmem2")
     strict SetDispensable();
 
     // CreateBufferCollectionTokenGroup()
@@ -491,7 +491,7 @@ closed protocol BufferCollectionToken {
     ///
     /// group_request - the server end of a BufferCollectionTokenGroup channel
     /// to be served by sysmem.
-    @available(added=9, deprecated=NEXT, note="use fuchsia.sysmem2")
+    @available(added=9, deprecated=23, note="use fuchsia.sysmem2")
     strict CreateBufferCollectionTokenGroup(resource struct {
         group_request server_end:BufferCollectionTokenGroup;
     });
@@ -526,7 +526,7 @@ closed protocol BufferCollectionToken {
 /// memory fragmentation and avoid overlap of buffer allocation lifetimes for
 /// the old and new collections. Collections can be large enough that it's worth
 /// avoiding allocation overlap (in time).
-@available(added=7, deprecated=NEXT, note="use fuchsia.sysmem2.BufferCollection")
+@available(added=7, deprecated=23, note="use fuchsia.sysmem2.BufferCollection")
 closed protocol BufferCollection {
     @available(added=9)
     compose Node;
@@ -636,11 +636,11 @@ closed protocol BufferCollection {
     strict CheckSingleBufferAllocated(struct {
         buffer_index uint64;
     });
-    @available(deprecated=9, removed=NEXT)
+    @available(deprecated=9, removed=23)
     strict SetConstraintsAuxBuffers(struct {
         constraints BufferCollectionConstraintsAuxBuffers;
     });
-    @available(deprecated=9, removed=NEXT)
+    @available(deprecated=9, removed=23)
     strict GetAuxBuffers() -> (resource struct {
         status zx.Status;
         buffer_collection_info_aux_buffers BufferCollectionInfo_2;
@@ -862,7 +862,7 @@ closed protocol BufferCollection {
 /// SetDispensable() or AttachToken() and the BufferCollectionTokenGroup is part
 /// of a sub-tree under such a node that doesn't propagate failure to its
 /// parent).
-@available(added=9, deprecated=NEXT, note="use fuchsia.sysmem2")
+@available(added=9, deprecated=23, note="use fuchsia.sysmem2")
 closed protocol BufferCollectionTokenGroup {
     compose Node;
 

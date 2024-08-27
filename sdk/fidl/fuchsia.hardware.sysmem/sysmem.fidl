@@ -39,7 +39,7 @@ service Service {
     sysmem client_end:Sysmem;
 
     // The added=19 is fake - see comments in overview.fidl.
-    @available(added=19, deprecated=NEXT)
+    @available(added=19, deprecated=23)
     allocator_v1 client_end:fuchsia.sysmem.Allocator;
 
     allocator_v2 client_end:fuchsia.sysmem2.Allocator;

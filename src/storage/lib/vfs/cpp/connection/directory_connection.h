@@ -91,7 +91,7 @@ class DirectoryConnection final : public Connection,
   void Link(LinkRequestView request, LinkCompleter::Sync& completer) final;
   void Watch(WatchRequestView request, WatchCompleter::Sync& completer) final;
   void QueryFilesystem(QueryFilesystemCompleter::Sync& completer) final;
-#if FUCHSIA_API_LEVEL_LESS_THAN(NEXT) || FUCHSIA_API_LEVEL_AT_LEAST(PLATFORM)
+#if FUCHSIA_API_LEVEL_LESS_THAN(23) || FUCHSIA_API_LEVEL_AT_LEAST(PLATFORM)
   void Open2(fuchsia_io::wire::Directory2Open2Request* request,
              Open2Completer::Sync& completer) final {
     completer.Close(ZX_ERR_NOT_SUPPORTED);

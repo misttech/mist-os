@@ -135,7 +135,7 @@ type RealmArgs = resource table {
     /// wants to provide to the driver test realm. Drivers can be both in the test
     /// component package, or a subpackage of the test component package.
     /// Default: empty
-    @available(added=NEXT)
+    @available(added=23)
     16: test_component fuchsia.component.resolution.Component;
 
     /// How long the driver index waits idle before it saves state, escrows its handles

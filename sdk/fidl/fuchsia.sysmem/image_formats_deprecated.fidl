@@ -19,20 +19,20 @@ type ImageFormat = struct {
     layers uint32 = 1;
 
     /// Pixel format.
-    @available(added=7, deprecated=NEXT, note="use fuchsia.images2.ImageFormat")
+    @available(added=7, deprecated=23, note="use fuchsia.images2.ImageFormat")
     pixel_format PixelFormat;
 
     /// Color space.
-    @available(added=7, deprecated=NEXT, note="use fuchsia.images2.ImageFormat")
+    @available(added=7, deprecated=23, note="use fuchsia.images2.ImageFormat")
     color_space ColorSpace;
 
-    @available(added=7, deprecated=NEXT, note="use fuchsia.images2.ImageFormat")
+    @available(added=7, deprecated=23, note="use fuchsia.images2.ImageFormat")
     planes array<ImagePlane, 4>;
 };
 
 /// This type is deprecated without a direct replacement (intentionally), as
 /// fuchsia.images2 doesn't require describing each plane separately.
-@available(added=7, deprecated=NEXT, note="use fuchsia.images2.ImageFormat")
+@available(added=7, deprecated=23, note="use fuchsia.images2.ImageFormat")
 type ImagePlane = struct {
     /// Byte offset of the start of the plane from the beginning of the image.
     byte_offset uint32;
@@ -43,7 +43,7 @@ type ImagePlane = struct {
 };
 
 /// Describes constraints for allocating images of some desired form.
-@available(added=7, deprecated=NEXT, note="use fuchsia.sysmem2.ImageFormatConstraints")
+@available(added=7, deprecated=23, note="use fuchsia.sysmem2.ImageFormatConstraints")
 type ImageSpec = struct {
     /// Minimum width in pixels.
     min_width uint32;

@@ -9,7 +9,7 @@ using fuchsia.io;
 /// The maximum number of characters allowed in a FIDL protocol name.
 /// This is set to the maximum length of filesystem node name because
 /// we generally use the filesystem for protocol discovery.
-@available(added=NEXT)
+@available(added=23)
 const MAX_PROTOCOL_LEN uint64 = fuchsia.io.MAX_NAME_LENGTH;
 
 /// This protocol mediates a test suite's access to a component under test.
@@ -29,7 +29,7 @@ const MAX_PROTOCOL_LEN uint64 = fuchsia.io.MAX_NAME_LENGTH;
 ///
 /// WARNING: RealmProxy will soon be deprecated. Prefer to return a
 /// fuchsia.component.sandbox.DictionaryRef and install that into your namespace.
-@available(added=NEXT)
+@available(added=23)
 @discoverable
 closed protocol RealmProxy {
     /// Connects [server_end] to the [protocol] from this proxy's namespace.

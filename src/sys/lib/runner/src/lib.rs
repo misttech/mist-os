@@ -7,7 +7,7 @@ pub mod component;
 use fidl::endpoints::ServerEnd;
 #[cfg(fuchsia_api_level_at_least = "HEAD")]
 use fidl_fuchsia_component_sandbox as fsandbox;
-#[cfg(fuchsia_api_level_at_least = "NEXT")]
+#[cfg(fuchsia_api_level_at_least = "23")]
 use fidl_fuchsia_component_sandbox as _;
 use std::path::Path;
 use thiserror::Error;

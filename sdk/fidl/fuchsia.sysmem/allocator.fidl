@@ -8,7 +8,7 @@ using zx;
 
 /// Allocates system memory buffers.
 ///
-@available(added=7, deprecated=NEXT, note="use fuchsia.sysmem2.Allocator")
+@available(added=7, deprecated=23, note="use fuchsia.sysmem2.Allocator")
 @discoverable(server="platform")
 closed protocol Allocator {
     /// Allocates a BufferCollection on behalf of a single client (aka initiator)
@@ -148,7 +148,7 @@ closed protocol Allocator {
     ///
     /// The info set via `SetDebugClientInfo` (if any) is copied to the sysmem2
     /// `Allocator`.
-    @available(added=20, deprecated=NEXT, note="connect to fuchsia.sysmem2.Allocator directly")
+    @available(added=20, deprecated=23, note="connect to fuchsia.sysmem2.Allocator directly")
     strict ConnectToSysmem2Allocator(resource struct {
         allocator_request server_end:fuchsia.sysmem2.Allocator;
     });
