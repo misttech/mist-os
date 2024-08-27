@@ -169,10 +169,11 @@ pub trait Decode<T: TypeMarker>: 'static + Sized {
 /// out-of-line object counts as one step in the recursion depth.
 pub const MAX_RECURSION: usize = 32;
 
-/// The maximum number of handles allowed in a FIDL message. Note that this
-/// number is one less for large messages for the time being. See
-/// (https://fxbug.dev/42068341) for progress, or to report problems caused by this
-/// specific limitation.
+/// The maximum number of handles allowed in a FIDL message.
+///
+/// Note that this number is one less for large messages for the time being. See
+/// (https://fxbug.dev/42068341) for progress, or to report problems caused by
+/// this specific limitation.
 pub const MAX_HANDLES: usize = 64;
 
 /// Indicates that an optional value is present.
@@ -771,8 +772,9 @@ impl<'a> Decoder<'a> {
 // Ambiguous types
 ////////////////////////////////////////////////////////////////////////////////
 
-/// A fake FIDL type that can encode from and decode into any Rust type. This
-/// exists solely to prevent the compiler from inferring `T: TypeMarker`,
+/// A fake FIDL type that can encode from and decode into any Rust type.
+///
+/// This exists solely to prevent the compiler from inferring `T: TypeMarker`,
 /// allowing us to add new generic impls without source breakage. It also
 /// improves error messages when no suitable `T: TypeMarker` exists, preventing
 /// spurious guesses about what you should do (e.g. implement `HandleBased`).
@@ -2570,9 +2572,11 @@ pub struct GenericMessage<H, E> {
     pub body: E,
 }
 
-/// The owned type for `GenericMessageType` is uninhabited because we never
-/// decode full messages. We decode the header and body separately, as we
-/// usually we don't know the body's type until after we've decoded the header.
+/// The owned type for `GenericMessageType`.
+///
+/// Uninhabited because we never decode full messages. We decode the header and
+/// body separately, as we usually we don't know the body's type until after
+/// we've decoded the header.
 pub enum GenericMessageOwned {}
 
 unsafe impl<H: ValueTypeMarker, T: TypeMarker> TypeMarker for GenericMessageType<H, T> {
