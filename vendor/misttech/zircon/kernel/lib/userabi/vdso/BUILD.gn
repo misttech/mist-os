@@ -72,9 +72,9 @@ if (toolchain_environment == "user.basic") {
     deps = [
       ":syscall-asm",
       "//src/zircon/lib/zircon:headers",
+      "//vendor/misttech/zircon/kernel/lib/userabi:headers",
       "//zircon/kernel/lib/arch:headers",
       "//zircon/kernel/lib/fasttime:headers",
-      "//zircon/kernel/lib/userabi:headers",
       "//zircon/system/ulib/affine",
       "//zircon/vdso:private",
     ]
@@ -107,7 +107,7 @@ if (toolchain_environment == "user.basic") {
     ]
     deps = [
       "//src/zircon/lib/zircon:headers",
-      "//zircon/kernel/lib/userabi:headers",
+      "//vendor/misttech/zircon/kernel/lib/userabi:headers",
       "//zircon/vdso:private",
     ]
   }

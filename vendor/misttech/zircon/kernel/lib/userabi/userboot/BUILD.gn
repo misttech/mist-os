@@ -35,7 +35,7 @@ if (current_toolchain == default_toolchain) {
       }
       environment = "userboot"
       configs = [
-        "//zircon/kernel/lib/userabi/userboot:userboot_config",
+        "//vendor/misttech/zircon/kernel/lib/userabi/userboot:userboot_config",
 
         # TODO(https://fxbug.dev/42125366): This is needed pervasively and not just
         # in the linking target so its compile-time flags can
@@ -120,8 +120,8 @@ if (toolchain_environment == "userboot") {
       "//src/lib/elfldltl",
       "//src/lib/zbitl",
       "//src/zircon/lib/zircon",
+      "//vendor/misttech/zircon/kernel/lib/userabi:headers",
       "//zircon/kernel/lib/boot-options",
-      "//zircon/kernel/lib/userabi:headers",
       "//zircon/system/ulib/c/stdlib:hermetic",
       "//zircon/system/ulib/c/string:hermetic",
       "//zircon/system/ulib/fbl",
@@ -146,7 +146,7 @@ if (toolchain_environment == "userboot") {
 
     # Use the same link_output_rspfile() that lib/userabi uses to embed it,
     # so we're sure to be getting the exact same binary.
-    deps = [ "//zircon/kernel/lib/userabi:vdso.rsp" ]
+    deps = [ "//vendor/misttech/zircon/kernel/lib/userabi:vdso.rsp" ]
     vdso_gen_dir = get_label_info(deps[0], "target_gen_dir")
     sources = [ "$vdso_gen_dir/vdso.rsp" ]
 
@@ -188,8 +188,6 @@ if (toolchain_environment == "userboot") {
   }
 } else {
   group("userboot") {
-    public_deps = [
-      ":userboot(//zircon/kernel/lib/userabi/userboot:userboot_${target_cpu})",
-    ]
+    public_deps = [ ":userboot(//vendor/misttech/zircon/kernel/lib/userabi/userboot:userboot_${target_cpu})" ]
   }
 }
