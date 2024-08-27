@@ -16,6 +16,7 @@ use std::task::{Context, Poll};
 use tracing::error;
 use {fidl_fuchsia_inspect as finspect, fuchsia_async as fasync, fuchsia_zircon as zx};
 
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 pub use finspect::EscrowToken;
 
 pub mod service;
@@ -179,12 +180,14 @@ pub struct PublishedInspectController {
     tree_koid: zx::Koid,
 }
 
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 #[derive(Default)]
 pub struct EscrowOptions {
     name: Option<String>,
     inspect_sink: Option<finspect::InspectSinkProxy>,
 }
 
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 impl EscrowOptions {
     /// Sets the name with which the Inspect handle will be escrowed.
     pub fn name(mut self, name: impl Into<String>) -> Self {
@@ -206,6 +209,7 @@ impl PublishedInspectController {
 
     /// Escrows a frozen copy of the VMO of the associated Inspector replacing the current live
     /// handle in the server.
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     pub async fn escrow_frozen(self, opts: EscrowOptions) -> Option<EscrowToken> {
         let inspect_sink = match opts.inspect_sink {
             Some(proxy) => proxy,
