@@ -159,6 +159,9 @@ if (current_toolchain == default_toolchain) {
 
   group("tests") {
     testonly = true
-    deps = [ ":fuchsia-boot-resolver-integration-tests" ]
+    deps = [
+      # causing OOM in qemu: b/362322143
+      # ":fuchsia-boot-resolver-integration-tests"
+    ]
   }
 }
