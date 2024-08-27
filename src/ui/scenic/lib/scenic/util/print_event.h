@@ -9,6 +9,7 @@
 
 #include <ostream>
 
+#if FUCHSIA_API_LEVEL_AT_MOST(17)
 std::ostream& operator<<(std::ostream& stream, const fuchsia::ui::gfx::Event& event);
 
 std::ostream& operator<<(std::ostream& stream, const fuchsia::ui::gfx::SizeChangeHintEvent& event);
@@ -39,5 +40,6 @@ std::ostream& operator<<(std::ostream& stream,
 
 std::ostream& operator<<(std::ostream& stream,
                          const fuchsia::ui::gfx::ViewStateChangedEvent& event);
+#endif  // FUCHSIA_API_LEVEL_AT_MOST(17)
 
 #endif  // SRC_UI_SCENIC_LIB_SCENIC_UTIL_PRINT_EVENT_H_

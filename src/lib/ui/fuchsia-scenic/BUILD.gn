@@ -13,29 +13,17 @@ rustc_library("fuchsia-scenic") {
   with_unit_tests = true
 
   deps = [
-    "//sdk/fidl/fuchsia.images:fuchsia.images_rust",
     "//sdk/fidl/fuchsia.scenic.scheduling:fuchsia.scenic.scheduling_rust",
-    "//sdk/fidl/fuchsia.sysmem:fuchsia.sysmem_rust",
     "//sdk/fidl/fuchsia.sysmem2:fuchsia.sysmem2_rust",
     "//sdk/fidl/fuchsia.ui.composition:fuchsia.ui.composition_rust",
     "//sdk/fidl/fuchsia.ui.display.color:fuchsia.ui.display.color_rust",
-    "//sdk/fidl/fuchsia.ui.gfx:fuchsia.ui.gfx_rust",
-    "//sdk/fidl/fuchsia.ui.scenic:fuchsia.ui.scenic_rust",
     "//sdk/fidl/fuchsia.ui.views:fuchsia.ui.views_rust",
     "//src/lib/fidl/rust/fidl",
-    "//src/lib/fuchsia-sync",
-    "//src/lib/mapped-vmo",
     "//src/lib/zircon/rust:fuchsia-zircon",
     "//third_party/rust_crates:anyhow",
   ]
 
-  test_deps = [
-    "//src/lib/fuchsia-async",
-    "//third_party/rust_crates:futures",
-  ]
-
   sources = [
-    "src/cmd.rs",
     "src/flatland.rs",
     "src/lib.rs",
     "src/sysmem.rs",
