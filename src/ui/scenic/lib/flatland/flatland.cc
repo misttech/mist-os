@@ -15,6 +15,7 @@
 #include <lib/ui/scenic/cpp/view_identity.h>
 #include <lib/zx/eventpair.h>
 #include <limits.h>
+#include <zircon/errors.h>
 
 #include <cstdint>
 #include <functional>
@@ -31,7 +32,6 @@
 #include "src/ui/scenic/lib/utils/helpers.h"
 #include "src/ui/scenic/lib/utils/logging.h"
 #include "src/ui/scenic/lib/utils/validate_eventpair.h"
-#include "zircon/errors.h"
 
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_access.hpp>
