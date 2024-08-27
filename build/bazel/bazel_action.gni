@@ -517,6 +517,7 @@ template("bazel_action") {
                              "visibility",
                            ])
 
+    mnemonic = "BAZEL"
     script = "//build/bazel/scripts/bazel_action.py"
 
     inputs = [ bazel_launcher ] + _bazel_build_files
