@@ -22,7 +22,7 @@ declare_args() {
 #       This should be an ancestor or the same as the directory of the
 #       default_binary.'
 #   prebuilt_files - list of files to include in the SDK. If this is not
-#       specified, all files in the prebuild_path are included.
+#       specified, all files in the prebuilt_path are included.
 #   sdk_dest_path - relative path for the destination of the companion tool
 #       in the SDK structure. A typical value is
 #       `tools/${current_cpu}/${target_name}`.
@@ -31,7 +31,7 @@ template("emu_companion") {
   assert(defined(invoker.default_binary),
          "Must define the default binary for this companion tool")
   assert(defined(invoker.prebuilt_path),
-         "Must define the prebuild directory path")
+         "Must define the prebuilt directory path")
   assert(defined(invoker.sdk_dest_path),
          "Must define the destination path relative to SDK root")
 
@@ -39,7 +39,7 @@ template("emu_companion") {
   if (defined(invoker.prebuilt_files)) {
     assert(
         invoker.prebuilt_files != [],
-        "prebuild_files is optional, meaning all file in prebuilt_path, or if specified, a non-empty list of files")
+        "prebuilt_files is optional, meaning all file in prebuilt_path, or if specified, a non-empty list of files")
     included_files = []
     foreach(f, invoker.prebuilt_files) {
       included_files += [ rebase_path(f, invoker.prebuilt_path) ]
