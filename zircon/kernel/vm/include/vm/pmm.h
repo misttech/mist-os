@@ -19,6 +19,17 @@ namespace memalloc {
 struct Range;
 }
 
+// Pmm class exists purely to serve as a way to define private storage and public accessor of the
+// global PmmNode.
+class Pmm {
+ public:
+  // Retrieve the global PmmNode.
+  static PmmNode& Node() { return node_; }
+
+ private:
+  static PmmNode node_;
+};
+
 // Initializes the PMM with the provided, unnormalized and normalized memory
 // ranges. This in particular initializes its arenas and wires any previously
 // allocated special subranges or holes.

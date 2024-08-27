@@ -51,7 +51,7 @@
 KCOUNTER(boot_memory_bytes, "boot.memory.post_init_free_bytes")
 
 // The (currently) one and only pmm node
-static PmmNode pmm_node;
+PmmNode Pmm::node_;
 
 // Singleton
 static PhysicalPageBorrowingConfig ppb_config;
@@ -63,29 +63,29 @@ static void pmm_init_alloc_random_should_wait(uint level) {
   if (gBootOptions->pmm_alloc_random_should_wait) {
     ASSERT(DEBUG_ASSERT_IMPLEMENTED);
     printf("pmm: alloc-random-should-wait enabled\n");
-    pmm_node.SeedRandomShouldWait();
+    Pmm::Node().SeedRandomShouldWait();
   }
 }
 LK_INIT_HOOK(pmm_init_alloc_random_should_wait, &pmm_init_alloc_random_should_wait,
              LK_INIT_LEVEL_LAST)
 
-static void pmm_fill_free_pages(uint level) { pmm_node.FillFreePagesAndArm(); }
+static void pmm_fill_free_pages(uint level) { Pmm::Node().FillFreePagesAndArm(); }
 LK_INIT_HOOK(pmm_fill, &pmm_fill_free_pages, LK_INIT_LEVEL_VM)
 
-zx_status_t pmm_init(ktl::span<const memalloc::Range> ranges) { return pmm_node.Init(ranges); }
+zx_status_t pmm_init(ktl::span<const memalloc::Range> ranges) { return Pmm::Node().Init(ranges); }
 
-vm_page_t* paddr_to_vm_page(paddr_t addr) { return pmm_node.PaddrToPage(addr); }
+vm_page_t* paddr_to_vm_page(paddr_t addr) { return Pmm::Node().PaddrToPage(addr); }
 
-size_t pmm_num_arenas() { return pmm_node.NumArenas(); }
+size_t pmm_num_arenas() { return Pmm::Node().NumArenas(); }
 
 zx_status_t pmm_get_arena_info(size_t count, uint64_t i, pmm_arena_info_t* buffer,
                                size_t buffer_size) {
-  return pmm_node.GetArenaInfo(count, i, buffer, buffer_size);
+  return Pmm::Node().GetArenaInfo(count, i, buffer, buffer_size);
 }
 
 zx_status_t pmm_alloc_page(uint alloc_flags, paddr_t* pa) {
   VM_KTRACE_DURATION(3, "pmm_alloc_page", ("count", 1), ("alloc_flags", alloc_flags));
-  zx::result<vm_page_t*> result = pmm_node.AllocPage(alloc_flags);
+  zx::result<vm_page_t*> result = Pmm::Node().AllocPage(alloc_flags);
   if (result.is_ok()) {
     *pa = result.value()->paddr();
   }
@@ -94,7 +94,7 @@ zx_status_t pmm_alloc_page(uint alloc_flags, paddr_t* pa) {
 
 zx_status_t pmm_alloc_page(uint alloc_flags, vm_page_t** page) {
   VM_KTRACE_DURATION(3, "pmm_alloc_page", ("count", 1), ("alloc_flags", alloc_flags));
-  zx::result<vm_page_t*> result = pmm_node.AllocPage(alloc_flags);
+  zx::result<vm_page_t*> result = Pmm::Node().AllocPage(alloc_flags);
   if (result.is_ok()) {
     *page = result.value();
   }
@@ -103,7 +103,7 @@ zx_status_t pmm_alloc_page(uint alloc_flags, vm_page_t** page) {
 
 zx_status_t pmm_alloc_page(uint alloc_flags, vm_page_t** page, paddr_t* pa) {
   VM_KTRACE_DURATION(3, "pmm_alloc_page", ("count", 1), ("alloc_flags", alloc_flags));
-  zx::result<vm_page_t*> result = pmm_node.AllocPage(alloc_flags);
+  zx::result<vm_page_t*> result = Pmm::Node().AllocPage(alloc_flags);
   if (result.is_ok()) {
     *page = result.value();
     *pa = (*page)->paddr();
@@ -113,12 +113,12 @@ zx_status_t pmm_alloc_page(uint alloc_flags, vm_page_t** page, paddr_t* pa) {
 
 zx_status_t pmm_alloc_pages(size_t count, uint alloc_flags, list_node* list) {
   VM_KTRACE_DURATION(3, "pmm_alloc_pages", ("count", count), ("alloc_flags", alloc_flags));
-  return pmm_node.AllocPages(count, alloc_flags, list);
+  return Pmm::Node().AllocPages(count, alloc_flags, list);
 }
 
 zx_status_t pmm_alloc_range(paddr_t address, size_t count, list_node* list) {
   VM_KTRACE_DURATION(3, "pmm_alloc_range", ("address", ktrace::Pointer{address}), ("count", count));
-  return pmm_node.AllocRange(address, count, list);
+  return Pmm::Node().AllocRange(address, count, list);
 }
 
 zx_status_t pmm_alloc_contiguous(size_t count, uint alloc_flags, uint8_t alignment_log2,
@@ -126,7 +126,7 @@ zx_status_t pmm_alloc_contiguous(size_t count, uint alloc_flags, uint8_t alignme
   VM_KTRACE_DURATION(3, "pmm_alloc_contiguous", ("count", count), ("alloc_flags", alloc_flags));
   // if we're called with a single page, just fall through to the regular allocation routine
   if (unlikely(count == 1 && alignment_log2 <= PAGE_SIZE_SHIFT)) {
-    zx::result<vm_page_t*> result = pmm_node.AllocPage(alloc_flags);
+    zx::result<vm_page_t*> result = Pmm::Node().AllocPage(alloc_flags);
     if (result.is_ok()) {
       vm_page_t* page = result.value();
       list_add_tail(list, &page->queue_node);
@@ -135,62 +135,62 @@ zx_status_t pmm_alloc_contiguous(size_t count, uint alloc_flags, uint8_t alignme
     return result.status_value();
   }
 
-  return pmm_node.AllocContiguous(count, alloc_flags, alignment_log2, pa, list);
+  return Pmm::Node().AllocContiguous(count, alloc_flags, alignment_log2, pa, list);
 }
 
-void pmm_unwire_page(vm_page_t* page) { pmm_node.UnwirePage(page); }
+void pmm_unwire_page(vm_page_t* page) { Pmm::Node().UnwirePage(page); }
 
 void pmm_begin_loan(list_node* page_list) {
   VM_KTRACE_DURATION(3, "pmm_begin_loan");
-  pmm_node.BeginLoan(page_list);
+  Pmm::Node().BeginLoan(page_list);
 }
 
 void pmm_cancel_loan(paddr_t address, size_t count) {
   VM_KTRACE_DURATION(3, "pmm_cancel_loan", ("address", ktrace::Pointer{address}), ("count", count));
-  pmm_node.CancelLoan(address, count);
+  Pmm::Node().CancelLoan(address, count);
 }
 
 void pmm_end_loan(paddr_t address, size_t count, list_node* page_list) {
   VM_KTRACE_DURATION(3, "pmm_end_loan", ("address", ktrace::Pointer{address}), ("count", count));
-  pmm_node.EndLoan(address, count, page_list);
+  Pmm::Node().EndLoan(address, count, page_list);
 }
 
 void pmm_delete_lender(paddr_t address, size_t count) {
   VM_KTRACE_DURATION(3, "pmm_delete_lender", ("address", ktrace::Pointer{address}),
                      ("count", count));
-  pmm_node.DeleteLender(address, count);
+  Pmm::Node().DeleteLender(address, count);
 }
 
 void pmm_free(list_node* list) {
   VM_KTRACE_DURATION(3, "pmm_free");
-  pmm_node.FreeList(list);
+  Pmm::Node().FreeList(list);
 }
 
 void pmm_free_page(vm_page* page) {
   VM_KTRACE_DURATION(3, "pmm_free_page");
-  pmm_node.FreePage(page);
+  Pmm::Node().FreePage(page);
 }
 
-uint64_t pmm_count_free_pages() { return pmm_node.CountFreePages(); }
+uint64_t pmm_count_free_pages() { return Pmm::Node().CountFreePages(); }
 
-uint64_t pmm_count_loaned_free_pages() { return pmm_node.CountLoanedFreePages(); }
+uint64_t pmm_count_loaned_free_pages() { return Pmm::Node().CountLoanedFreePages(); }
 
-uint64_t pmm_count_loaned_used_pages() { return pmm_node.CountLoanedNotFreePages(); }
+uint64_t pmm_count_loaned_used_pages() { return Pmm::Node().CountLoanedNotFreePages(); }
 
-uint64_t pmm_count_loaned_pages() { return pmm_node.CountLoanedPages(); }
+uint64_t pmm_count_loaned_pages() { return Pmm::Node().CountLoanedPages(); }
 
-uint64_t pmm_count_loan_cancelled_pages() { return pmm_node.CountLoanCancelledPages(); }
+uint64_t pmm_count_loan_cancelled_pages() { return Pmm::Node().CountLoanCancelledPages(); }
 
-uint64_t pmm_count_total_bytes() { return pmm_node.CountTotalBytes(); }
+uint64_t pmm_count_total_bytes() { return Pmm::Node().CountTotalBytes(); }
 
-PageQueues* pmm_page_queues() { return pmm_node.GetPageQueues(); }
+PageQueues* pmm_page_queues() { return Pmm::Node().GetPageQueues(); }
 
-Evictor* pmm_evictor() { return pmm_node.GetEvictor(); }
+Evictor* pmm_evictor() { return Pmm::Node().GetEvictor(); }
 
-VmCompression* pmm_page_compression() { return pmm_node.GetPageCompression(); }
+VmCompression* pmm_page_compression() { return Pmm::Node().GetPageCompression(); }
 
 zx_status_t pmm_set_page_compression(fbl::RefPtr<VmCompression> compression) {
-  return pmm_node.SetPageCompression(ktl::move(compression));
+  return Pmm::Node().SetPageCompression(ktl::move(compression));
 }
 
 PhysicalPageBorrowingConfig* pmm_physical_page_borrowing_config() {
@@ -200,20 +200,20 @@ PhysicalPageBorrowingConfig* pmm_physical_page_borrowing_config() {
 
 bool pmm_set_free_memory_signal(uint64_t free_lower_bound, uint64_t free_upper_bound,
                                 uint64_t delay_allocations_pages, Event* event) {
-  return pmm_node.SetFreeMemorySignal(free_lower_bound, free_upper_bound, delay_allocations_pages,
-                                      event);
+  return Pmm::Node().SetFreeMemorySignal(free_lower_bound, free_upper_bound,
+                                         delay_allocations_pages, event);
 }
 
 zx_status_t pmm_wait_till_should_retry_single_alloc(const Deadline& deadline) {
-  return pmm_node.WaitTillShouldRetrySingleAlloc(deadline);
+  return Pmm::Node().WaitTillShouldRetrySingleAlloc(deadline);
 }
 
-void pmm_stop_returning_should_wait() { pmm_node.StopReturningShouldWait(); }
+void pmm_stop_returning_should_wait() { Pmm::Node().StopReturningShouldWait(); }
 
-void pmm_checker_check_all_free_pages() { pmm_node.CheckAllFreePages(); }
+void pmm_checker_check_all_free_pages() { Pmm::Node().CheckAllFreePages(); }
 
 #if __has_feature(address_sanitizer)
-void pmm_asan_poison_all_free_pages() { pmm_node.PoisonAllFreePages(); }
+void pmm_asan_poison_all_free_pages() { Pmm::Node().PoisonAllFreePages(); }
 #endif
 
 int64_t pmm_get_alloc_failed_count() { return PmmNode::get_alloc_failed_count(); }
@@ -222,20 +222,20 @@ bool pmm_has_alloc_failed_no_mem() { return PmmNode::has_alloc_failed_no_mem(); 
 
 static void pmm_checker_enable(size_t fill_size, CheckFailAction action) {
   // Enable filling of pages going forward.
-  if (!pmm_node.EnableFreePageFilling(fill_size, action)) {
+  if (!Pmm::Node().EnableFreePageFilling(fill_size, action)) {
     printf("Checker already configured, requested fill size and action ignored.\n");
   }
 
   // From this point on, pages will be filled when they are freed.  However, the free list may still
   // have a lot of unfilled pages so make a pass over them and fill them all.
-  pmm_node.FillFreePagesAndArm();
+  Pmm::Node().FillFreePagesAndArm();
 
   // All free pages have now been filled with |fill_size| and the checker is armed.
 }
 
-static bool pmm_checker_is_enabled() { return pmm_node.Checker()->IsArmed(); }
+static bool pmm_checker_is_enabled() { return Pmm::Node().Checker()->IsArmed(); }
 
-static void pmm_checker_print_status() { pmm_node.Checker()->PrintStatus(stdout); }
+static void pmm_checker_print_status() { Pmm::Node().Checker()->PrintStatus(stdout); }
 
 void pmm_checker_init_from_cmdline() {
   bool enabled = false;
@@ -270,14 +270,14 @@ void pmm_checker_init_from_cmdline() {
       fill_size = PAGE_SIZE;
     }
 
-    pmm_node.EnableFreePageFilling(fill_size, gBootOptions->pmm_checker_action);
+    Pmm::Node().EnableFreePageFilling(fill_size, gBootOptions->pmm_checker_action);
   }
 }
 
 static void pmm_dump_timer(Timer* t, zx_time_t now, void*) {
   zx_time_t deadline = zx_time_add_duration(now, ZX_SEC(1));
   t->SetOneshot(deadline, &pmm_dump_timer, nullptr);
-  pmm_node.DumpFree();
+  Pmm::Node().DumpFree();
 }
 
 LK_INIT_HOOK(
@@ -288,8 +288,8 @@ LK_INIT_HOOK(
       //
       // We record this in a kcounter to be tracked by build infrastructure over time.
       dprintf(INFO, "Free memory after kernel init: %" PRIu64 " bytes.\n",
-              pmm_node.CountFreePages() * PAGE_SIZE);
-      boot_memory_bytes.Set(pmm_node.CountFreePages() * PAGE_SIZE);
+              Pmm::Node().CountFreePages() * PAGE_SIZE);
+      boot_memory_bytes.Set(Pmm::Node().CountFreePages() * PAGE_SIZE);
     },
     LK_INIT_LEVEL_USER - 1)
 
@@ -327,7 +327,7 @@ static int cmd_pmm(int argc, const cmd_args* argv, uint32_t flags) {
   }
 
   if (!strcmp(argv[1].str, "dump")) {
-    pmm_node.Dump(is_panic);
+    Pmm::Node().Dump(is_panic);
   } else if (is_panic) {
     // No other operations will work during a panic.
     printf("Only the \"arenas\" command is available during a panic.\n");
@@ -423,7 +423,7 @@ void pmm_print_physical_page_borrowing_stats() {
       loan_cancelled_pages * PAGE_SIZE / MB, total_bytes / PAGE_SIZE, total_bytes / MB);
 }
 
-void pmm_report_alloc_failure() { pmm_node.ReportAllocFailure(); }
+void pmm_report_alloc_failure() { Pmm::Node().ReportAllocFailure(); }
 
 STATIC_COMMAND_START
 STATIC_COMMAND_MASKED("pmm", "physical memory manager", &cmd_pmm, CMD_AVAIL_ALWAYS)
