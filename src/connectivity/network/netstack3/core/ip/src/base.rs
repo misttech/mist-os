@@ -20,7 +20,8 @@ use explicit::ResultExt as _;
 use lock_order::lock::{OrderedLockAccess, OrderedLockRef};
 use log::{debug, error, trace};
 use net_types::ip::{
-    GenericOverIp, Ip, IpAddress, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu, Subnet,
+    GenericOverIp, Ip, IpAddress, IpInvariant, Ipv4, Ipv4Addr, Ipv6, Ipv6Addr, Ipv6SourceAddr, Mtu,
+    Subnet,
 };
 use net_types::{
     MulticastAddr, MulticastAddress, SpecifiedAddr, SpecifiedAddress as _, UnicastAddr, Witness,
@@ -108,6 +109,25 @@ pub const IPV6_DEFAULT_SUBNET: Subnet<Ipv6Addr> =
 pub enum TransportReceiveError {
     ProtocolUnsupported,
     PortUnreachable,
+}
+
+impl TransportReceiveError {
+    fn into_icmpv4_error(self, header_len: usize) -> Icmpv4Error {
+        let kind = match self {
+            TransportReceiveError::ProtocolUnsupported => Icmpv4ErrorKind::ProtocolUnreachable,
+            TransportReceiveError::PortUnreachable => Icmpv4ErrorKind::PortUnreachable,
+        };
+        Icmpv4Error { kind, header_len }
+    }
+
+    fn into_icmpv6_error(self, header_len: usize) -> Icmpv6ErrorKind {
+        match self {
+            TransportReceiveError::ProtocolUnsupported => {
+                Icmpv6ErrorKind::ProtocolUnreachable { header_len }
+            }
+            TransportReceiveError::PortUnreachable => Icmpv6ErrorKind::PortUnreachable,
+        }
+    }
 }
 
 /// Sidecar metadata passed along with the packet.
@@ -1793,10 +1813,15 @@ where
     }
 }
 
-/// A [`TransportReceiveError`], and the metadata required to handle it.
-struct DispatchIpPacketError<I: IcmpHandlerIpExt> {
-    /// The error that occurred while dispatching to the transport layer.
-    err: TransportReceiveError,
+/// An ICMP error, and the metadata required to send it.
+///
+/// This allows the sending of the ICMP error to be decoupled from the
+/// generation of the error, which is advantageous because sending the error
+/// requires the underlying packet buffer, which cannot be "moved" in certain
+/// contexts.
+struct IcmpErrorSender<'a, I: IcmpHandlerIpExt, D> {
+    /// The ICMP error that should be sent.
+    err: I::IcmpError,
     /// The original source IP address of the packet (before the local-ingress
     /// hook evaluation).
     src_ip: I::SourceAddress,
@@ -1805,59 +1830,30 @@ struct DispatchIpPacketError<I: IcmpHandlerIpExt> {
     dst_ip: SpecifiedAddr<I::Addr>,
     /// The frame destination of the packet.
     frame_dst: Option<FrameDestination>,
+    /// The device out which to send the error.
+    device: &'a D,
     /// The metadata from the packet, allowing the packet's backing buffer to be
     /// returned to it's pre-IP-parse state with [`GrowBuffer::undo_parse`].
     meta: ParseMetadata,
 }
 
-impl<I: IcmpHandlerIpExt> DispatchIpPacketError<I> {
+impl<'a, I: IcmpHandlerIpExt, D> IcmpErrorSender<'a, I, D> {
     /// Generate an send an appropriate ICMP error in response to this error.
     ///
     /// The provided `body` must be the original buffer from which the IP
     /// packet responsible for this error was parsed. It is expected to be in a
     /// state that allows undoing the IP packet parse (e.g. unmodified after the
     /// IP packet was parsed).
-    fn respond_with_icmp_error<B: BufferMut, BC, CC: IcmpErrorHandler<I, BC>>(
+    fn respond_with_icmp_error<B, BC, CC>(
         self,
         core_ctx: &mut CC,
         bindings_ctx: &mut BC,
         mut body: B,
-        device: &CC::DeviceId,
-    ) {
-        fn icmp_error_from_transport_error<I: IcmpHandlerIpExt>(
-            err: TransportReceiveError,
-            header_len: usize,
-        ) -> I::IcmpError {
-            #[derive(GenericOverIp)]
-            #[generic_over_ip(I, Ip)]
-            struct ErrorHolder<I: Ip + IcmpHandlerIpExt>(I::IcmpError);
-
-            let ErrorHolder(err) = match err {
-                TransportReceiveError::ProtocolUnsupported => I::map_ip(
-                    header_len,
-                    |header_len| {
-                        ErrorHolder(Icmpv4Error {
-                            kind: Icmpv4ErrorKind::ProtocolUnreachable,
-                            header_len,
-                        })
-                    },
-                    |header_len| ErrorHolder(Icmpv6ErrorKind::ProtocolUnreachable { header_len }),
-                ),
-                TransportReceiveError::PortUnreachable => I::map_ip(
-                    header_len,
-                    |header_len| {
-                        ErrorHolder(Icmpv4Error {
-                            kind: Icmpv4ErrorKind::PortUnreachable,
-                            header_len,
-                        })
-                    },
-                    |_header_len| ErrorHolder(Icmpv6ErrorKind::PortUnreachable),
-                ),
-            };
-            err
-        }
-
-        let DispatchIpPacketError { err, src_ip, dst_ip, frame_dst, meta } = self;
+    ) where
+        B: BufferMut,
+        CC: IcmpErrorHandler<I, BC, DeviceId = D>,
+    {
+        let IcmpErrorSender { err, src_ip, dst_ip, frame_dst, device, meta } = self;
         // Undo the parsing of the IP Packet, moving the buffer's cursor so that
         // it points at the start of the IP header. This way, the sent ICMP
         // error will contain the entire original IP packet.
@@ -1870,7 +1866,7 @@ impl<I: IcmpHandlerIpExt> DispatchIpPacketError<I> {
             src_ip,
             dst_ip,
             body,
-            icmp_error_from_transport_error::<I>(err, meta.header_len()),
+            err,
         );
     }
 }
@@ -1896,17 +1892,19 @@ impl<I: IcmpHandlerIpExt> DispatchIpPacketError<I> {
 /// coming from a device, i.e., `device` given is `None`,
 /// `dispatch_receive_ip_packet` will also panic.
 fn dispatch_receive_ipv4_packet<
+    'a,
+    'b,
     BC: IpLayerBindingsContext<Ipv4, CC::DeviceId>,
     CC: IpLayerIngressContext<Ipv4, BC> + CounterContext<IpCounters<Ipv4>>,
 >(
-    core_ctx: &mut CC,
-    bindings_ctx: &mut BC,
-    device: &CC::DeviceId,
+    core_ctx: &'a mut CC,
+    bindings_ctx: &'a mut BC,
+    device: &'b CC::DeviceId,
     frame_dst: Option<FrameDestination>,
-    mut packet: Ipv4Packet<&mut [u8]>,
+    mut packet: Ipv4Packet<&'a mut [u8]>,
     mut packet_metadata: IpLayerPacketMetadata<Ipv4, BC>,
     meta: ReceiveIpPacketMeta<Ipv4>,
-) -> Result<(), DispatchIpPacketError<Ipv4>> {
+) -> Result<(), IcmpErrorSender<'b, Ipv4, CC::DeviceId>> {
     core_ctx.increment(|counters| &counters.dispatch_receive_ip_packet);
 
     match frame_dst {
@@ -1957,7 +1955,14 @@ fn dispatch_receive_ipv4_packet<
         .or_else(|err| {
             if let Some(src_ip) = SpecifiedAddr::new(src_ip) {
                 let (_, _, _, meta) = packet.into_metadata();
-                Err(DispatchIpPacketError { err, src_ip, dst_ip, frame_dst, meta })
+                Err(IcmpErrorSender {
+                    err: err.into_icmpv4_error(meta.header_len()),
+                    src_ip,
+                    dst_ip,
+                    frame_dst,
+                    device,
+                    meta,
+                })
             } else {
                 Ok(())
             }
@@ -1969,17 +1974,19 @@ fn dispatch_receive_ipv4_packet<
 /// `dispatch_receive_ipv6_packet` has the same semantics as
 /// `dispatch_receive_ipv4_packet`, but for IPv6.
 fn dispatch_receive_ipv6_packet<
+    'a,
+    'b,
     BC: IpLayerBindingsContext<Ipv6, CC::DeviceId>,
     CC: IpLayerIngressContext<Ipv6, BC> + CounterContext<IpCounters<Ipv6>>,
 >(
-    core_ctx: &mut CC,
-    bindings_ctx: &mut BC,
-    device: &CC::DeviceId,
+    core_ctx: &'a mut CC,
+    bindings_ctx: &'a mut BC,
+    device: &'b CC::DeviceId,
     frame_dst: Option<FrameDestination>,
-    mut packet: Ipv6Packet<&mut [u8]>,
+    mut packet: Ipv6Packet<&'a mut [u8]>,
     mut packet_metadata: IpLayerPacketMetadata<Ipv6, BC>,
     meta: ReceiveIpPacketMeta<Ipv6>,
-) -> Result<(), DispatchIpPacketError<Ipv6>> {
+) -> Result<(), IcmpErrorSender<'b, Ipv6, CC::DeviceId>> {
     // TODO(https://fxbug.dev/42095067): Once we support multiple extension
     // headers in IPv6, we will need to verify that the callers of this
     // function are still sound. In particular, they may accidentally pass a
@@ -2043,13 +2050,286 @@ fn dispatch_receive_ipv6_packet<
         .or_else(|err| {
             if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
                 let (_, _, _, meta) = packet.into_metadata();
-                Err(DispatchIpPacketError { err, src_ip: *src_ip, dst_ip, frame_dst, meta })
+                Err(IcmpErrorSender {
+                    err: err.into_icmpv6_error(meta.header_len()),
+                    src_ip: *src_ip,
+                    dst_ip,
+                    frame_dst,
+                    device,
+                    meta,
+                })
             } else {
                 Ok(())
             }
         });
     packet_metadata.acknowledge_drop();
     result
+}
+
+/// The metadata required to forward an IP Packet.
+///
+/// This allows the forwarding of the packet to be decoupled from the
+/// determination of how to forward. This is advantageous because forwarding
+/// requires the underlying packet buffer, which cannot be "moved" in certain
+/// contexts.
+struct IpPacketForwarder<'a, I: IpLayerIpExt + IcmpHandlerIpExt, D, BT: FilterBindingsTypes> {
+    inbound_device: &'a D,
+    outbound_device: &'a D,
+    packet_meta: IpLayerPacketMetadata<I, BT>,
+    src_ip: I::RecvSrcAddr,
+    dst_ip: SpecifiedAddr<I::Addr>,
+    destination: IpPacketDestination<I, &'a D>,
+    proto: I::Proto,
+    parse_meta: ParseMetadata,
+    frame_dst: Option<FrameDestination>,
+}
+
+impl<'a, I, D, BC> IpPacketForwarder<'a, I, D, BC>
+where
+    I: IpLayerIpExt + IcmpHandlerIpExt,
+    BC: IpLayerBindingsContext<I, D>,
+{
+    // Forward the provided buffer as specified by this [`IpPacketForwarder`].
+    fn forward_with_buffer<CC, B>(self, core_ctx: &mut CC, bindings_ctx: &mut BC, buffer: B)
+    where
+        B: BufferMut,
+        CC: IpLayerIngressContext<I, BC, DeviceId = D> + CounterContext<IpCounters<I>>,
+    {
+        let Self {
+            inbound_device,
+            outbound_device,
+            packet_meta,
+            src_ip,
+            dst_ip,
+            destination,
+            proto,
+            parse_meta,
+            frame_dst,
+        } = self;
+
+        let packet = ForwardedPacket::new(src_ip.into(), dst_ip.get(), proto, parse_meta, buffer);
+
+        trace!("forward_with_buffer: forwarding {} packet", I::NAME);
+
+        match send_ip_frame(
+            core_ctx,
+            bindings_ctx,
+            outbound_device,
+            destination,
+            packet,
+            packet_meta,
+        ) {
+            Ok(()) => (),
+            Err(IpSendFrameError { serializer, error }) => {
+                match error {
+                    IpSendFrameErrorReason::Device(
+                        SendFrameErrorReason::SizeConstraintsViolation,
+                    ) => {
+                        debug!("failed to forward {} packet: MTU exceeded", I::NAME);
+                        core_ctx.increment(|counters: &IpCounters<I>| &counters.mtu_exceeded);
+                        let mtu = core_ctx.get_mtu(inbound_device);
+                        // NB: Ipv6 sends a PacketTooBig error. Ipv4 sends nothing.
+                        let Some(err) = I::new_mtu_exceeded(proto, parse_meta.header_len(), mtu)
+                        else {
+                            return;
+                        };
+                        // NB: Only send an ICMP error if the sender's src
+                        // is specified.
+                        let Some(src_ip) = I::received_source_as_icmp_source(src_ip) else {
+                            return;
+                        };
+                        // TODO(https://fxbug.dev/362489447): Increment the TTL since we
+                        // just decremented it. The fact that we don't do this is
+                        // technically a violation of the ICMP spec (we're not
+                        // encapsulating the original packet that caused the
+                        // issue, but a slightly modified version of it), but
+                        // it's not that big of a deal because it won't affect
+                        // the sender's ability to figure out the minimum path
+                        // MTU. This may break other logic, though, so we should
+                        // still fix it eventually.
+                        core_ctx.send_icmp_error_message(
+                            bindings_ctx,
+                            inbound_device,
+                            frame_dst,
+                            src_ip,
+                            dst_ip,
+                            serializer.into_buffer(),
+                            err,
+                        );
+                    }
+                    IpSendFrameErrorReason::Device(SendFrameErrorReason::QueueFull)
+                    | IpSendFrameErrorReason::Device(SendFrameErrorReason::Alloc)
+                    | IpSendFrameErrorReason::IllegalLoopbackAddress => (),
+                }
+                debug!("failed to forward {} packet: {error:?}", I::NAME);
+            }
+        }
+    }
+}
+
+/// The action to take for a packet that was a candidate for forwarding.
+enum ForwardingAction<'a, I: IpLayerIpExt + IcmpHandlerIpExt, D, BT: FilterBindingsTypes> {
+    /// Drop the packet without forwarding it or generating an ICMP error.
+    SilentlyDrop,
+    /// Forward the packet, as specified by the [`IpPacketForwarder`].
+    Forward(IpPacketForwarder<'a, I, D, BT>),
+    /// Drop the packet without forwarding, and generate an ICMP error as
+    /// specified by the [`IcmpErrorSender`].
+    DropWithIcmpError(IcmpErrorSender<'a, I, D>),
+}
+
+impl<'a, I, D, BC> ForwardingAction<'a, I, D, BC>
+where
+    I: IpLayerIpExt + IcmpHandlerIpExt,
+    BC: IpLayerBindingsContext<I, D>,
+{
+    /// Perform the action prescribed by self, with the provided packet buffer.
+    fn perform_action_with_buffer<CC, B>(self, core_ctx: &mut CC, bindings_ctx: &mut BC, buffer: B)
+    where
+        B: BufferMut,
+        CC: IpLayerIngressContext<I, BC, DeviceId = D> + CounterContext<IpCounters<I>>,
+    {
+        match self {
+            ForwardingAction::SilentlyDrop => {}
+            ForwardingAction::Forward(forwarder) => {
+                forwarder.forward_with_buffer(core_ctx, bindings_ctx, buffer)
+            }
+            ForwardingAction::DropWithIcmpError(icmp_sender) => {
+                icmp_sender.respond_with_icmp_error(core_ctx, bindings_ctx, buffer)
+            }
+        }
+    }
+}
+
+/// Determine which [`ForwardingAction`] should be taken for an IP packet.
+fn determine_ip_packet_forwarding_action<'a, 'b, I, BC, CC, B>(
+    core_ctx: &'a mut CC,
+    mut packet: I::Packet<&'a mut [u8]>,
+    mut packet_meta: IpLayerPacketMetadata<I, BC>,
+    inbound_device: &'b CC::DeviceId,
+    outbound_device: &'b CC::DeviceId,
+    destination: IpPacketDestination<I, &'b CC::DeviceId>,
+    frame_dst: Option<FrameDestination>,
+    src_ip: I::RecvSrcAddr,
+    dst_ip: SpecifiedAddr<I::Addr>,
+) -> ForwardingAction<'b, I, CC::DeviceId, BC>
+where
+    I: IpLayerIpExt + IcmpHandlerIpExt,
+    BC: IpLayerBindingsContext<I, CC::DeviceId>,
+    CC: IpLayerIngressContext<I, BC> + CounterContext<IpCounters<I>>,
+    B: BufferMut,
+    I::Packet<&'a mut [u8]>: netstack3_filter::IpPacket<I>,
+{
+    let ttl = packet.ttl();
+    if ttl <= 1 {
+        // TTL is 0 or would become 0 after decrement.
+        // For IPv4, see "TTL" section, https://tools.ietf.org/html/rfc791#page-14.
+        // For IPv6, see "Hop Limit" section, https://datatracker.ietf.org/doc/html/rfc2460#page-5.
+        core_ctx.increment(|counters: &IpCounters<I>| &counters.ttl_expired);
+        debug!("{} packet not forwarded due to expired TTL", I::NAME);
+
+        // Only send an ICMP error if the src_ip is specified.
+        let Some(src_ip) = I::received_source_as_icmp_source(src_ip) else {
+            core_ctx.increment(|counters: &IpCounters<I>| &counters.unspecified_source);
+            packet_meta.acknowledge_drop();
+            return ForwardingAction::SilentlyDrop;
+        };
+
+        // Construct and send the appropriate ICMP error for the IP version.
+        let version_specific_meta = packet.version_specific_meta();
+        let (_, _, proto, parse_meta): (I::Addr, I::Addr, _, _) = packet.into_metadata();
+        let err = I::new_ttl_expired(proto, parse_meta.header_len(), version_specific_meta);
+        packet_meta.acknowledge_drop();
+        return ForwardingAction::DropWithIcmpError(IcmpErrorSender {
+            err,
+            src_ip,
+            dst_ip,
+            frame_dst,
+            device: inbound_device,
+            meta: parse_meta,
+        });
+    }
+
+    trace!("determine_ip_packet_forwarding_action: adequate TTL");
+
+    // For IPv6 packets, handle extension headers first.
+    //
+    // Any previous handling of extension headers was done under the
+    // assumption that we are the final destination of the packet. Now that
+    // we know we're forwarding, we need to re-examine them.
+    let maybe_ipv6_packet_action = I::map_ip_in(
+        &packet,
+        |_packet| None,
+        |packet| {
+            Some(ipv6::handle_extension_headers(core_ctx, inbound_device, frame_dst, packet, false))
+        },
+    );
+    match maybe_ipv6_packet_action {
+        None => {} // NB: Ipv4 case.
+        Some(Ipv6PacketAction::_Discard) => {
+            core_ctx.increment(|counters: &IpCounters<I>| {
+                #[derive(GenericOverIp)]
+                #[generic_over_ip(I, Ip)]
+                struct InCounters<'a, I: IpLayerIpExt>(&'a I::RxCounters);
+                let IpInvariant(counter) = I::map_ip(
+                    InCounters(&counters.version_rx),
+                    |_counters| {
+                        unreachable!(
+                            "`I` must be `Ipv6` because we're handling IPv6 extension headers"
+                        )
+                    },
+                    |InCounters(counters)| IpInvariant(&counters.extension_header_discard),
+                );
+                counter
+            });
+            trace!(
+                "determine_ip_packet_forwarding_action: handled IPv6 extension headers: \
+                discarding packet"
+            );
+            packet_meta.acknowledge_drop();
+            return ForwardingAction::SilentlyDrop;
+        }
+        Some(Ipv6PacketAction::Continue) => {
+            trace!(
+                "determine_ip_packet_forwarding_action: handled IPv6 extension headers: \
+                forwarding packet"
+            );
+        }
+        Some(Ipv6PacketAction::ProcessFragment) => {
+            unreachable!(
+                "When forwarding packets, we should only ever look at the hop by hop \
+                    options extension header (if present)"
+            )
+        }
+    };
+
+    match core_ctx.filter_handler().forwarding_hook(
+        &mut packet,
+        inbound_device,
+        outbound_device,
+        &mut packet_meta,
+    ) {
+        filter::Verdict::Drop => {
+            packet_meta.acknowledge_drop();
+            trace!("determine_ip_packet_forwarding_action: filter verdict: Drop");
+            return ForwardingAction::SilentlyDrop;
+        }
+        filter::Verdict::Accept => {}
+    }
+
+    packet.set_ttl(ttl - 1);
+    let (_, _, proto, parse_meta): (I::Addr, I::Addr, _, _) = packet.into_metadata();
+    ForwardingAction::Forward(IpPacketForwarder {
+        inbound_device,
+        outbound_device,
+        packet_meta,
+        src_ip,
+        dst_ip,
+        destination,
+        proto,
+        parse_meta,
+        frame_dst,
+    })
 }
 
 pub(crate) fn send_ip_frame<I, CC, BC, S>(
@@ -2140,7 +2420,7 @@ fn process_fragment<'a, I, CC, BC>(
     core_ctx: &mut CC,
     bindings_ctx: &mut BC,
     packet: I::Packet<&'a mut [u8]>,
-) -> Result<ProcessFragmentResult<'a, I>, DispatchIpPacketError<I>>
+) -> ProcessFragmentResult<'a, I>
 where
     I: IpLayerIpExt + IcmpHandlerIpExt,
     for<'b> I::Packet<&'b mut [u8]>: FragmentablePacket,
@@ -2151,7 +2431,7 @@ where
         // Handle the packet right away since reassembly is not needed.
         FragmentProcessingState::NotNeeded(packet) => {
             trace!("receive_ip_packet: not fragmented");
-            Ok(ProcessFragmentResult::NotNeeded(packet))
+            ProcessFragmentResult::NotNeeded(packet)
         }
         // Ready to reassemble a packet.
         FragmentProcessingState::Ready { key, packet_len } => {
@@ -2167,12 +2447,12 @@ where
                 buffer.buffer_view_mut(),
             ) {
                 // Successfully reassembled the packet, handle it.
-                Ok(()) => Ok(ProcessFragmentResult::Reassembled(buffer.into_inner())),
+                Ok(()) => ProcessFragmentResult::Reassembled(buffer.into_inner()),
                 Err(e) => {
                     core_ctx
                         .increment(|counters: &IpCounters<I>| &counters.fragment_reassembly_error);
                     debug!("receive_ip_packet: fragmented, failed to reassemble: {:?}", e);
-                    Ok(ProcessFragmentResult::Done)
+                    ProcessFragmentResult::Done
                 }
             };
             reassemble_result
@@ -2182,18 +2462,18 @@ where
         FragmentProcessingState::NeedMoreFragments => {
             core_ctx.increment(|counters: &IpCounters<I>| &counters.need_more_fragments);
             trace!("receive_ip_packet: fragmented, need more before reassembly");
-            Ok(ProcessFragmentResult::Done)
+            ProcessFragmentResult::Done
         }
         // TODO(ghanan): Handle invalid fragments.
         FragmentProcessingState::InvalidFragment => {
             core_ctx.increment(|counters: &IpCounters<I>| &counters.invalid_fragment);
             trace!("receive_ip_packet: fragmented, invalid");
-            Ok(ProcessFragmentResult::Done)
+            ProcessFragmentResult::Done
         }
         FragmentProcessingState::OutOfMemory => {
             core_ctx.increment(|counters: &IpCounters<I>| &counters.fragment_cache_full);
             trace!("receive_ip_packet: fragmented, dropped because OOM");
-            Ok(ProcessFragmentResult::Done)
+            ProcessFragmentResult::Done
         }
     }
 }
@@ -2346,9 +2626,9 @@ pub fn receive_ipv4_packet<
     // (even if the fragment data has values that implies that the packet is not
     // fragmented).
     let mut packet = match process_fragment(core_ctx, bindings_ctx, packet) {
-        Ok(ProcessFragmentResult::Done) => return,
-        Ok(ProcessFragmentResult::NotNeeded(packet)) => packet,
-        Ok(ProcessFragmentResult::Reassembled(buf)) => {
+        ProcessFragmentResult::Done => return,
+        ProcessFragmentResult::NotNeeded(packet) => packet,
+        ProcessFragmentResult::Reassembled(buf) => {
             let buf = Buf::new(buf, ..);
             buffer = packet::Either::B(buf);
 
@@ -2362,10 +2642,6 @@ pub fn receive_ipv4_packet<
                     return;
                 }
             }
-        }
-        Err(err) => {
-            err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device);
-            return;
         }
     };
 
@@ -2411,9 +2687,7 @@ pub fn receive_ipv4_packet<
                 packet_metadata,
                 meta,
             )
-            .unwrap_or_else(|err| {
-                err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device)
-            });
+            .unwrap_or_else(|err| err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer));
             return;
         }
     }
@@ -2447,94 +2721,25 @@ pub fn receive_ipv4_packet<
                 packet_metadata,
                 meta,
             )
-            .unwrap_or_else(|err| {
-                err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device)
-            });
+            .unwrap_or_else(|err| err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer));
         }
         ReceivePacketAction::Forward {
-            original_dst: dst_ip,
+            original_dst,
             dst: Destination { device: dst_device, next_hop },
         } => {
-            let destination = IpPacketDestination::from_next_hop(next_hop, dst_ip);
-            let ttl = packet.ttl();
-            if ttl > 1 {
-                trace!("receive_ipv4_packet: forwarding");
-
-                match core_ctx.filter_handler().forwarding_hook(
-                    &mut packet,
-                    device,
-                    &dst_device,
-                    &mut packet_metadata,
-                ) {
-                    filter::Verdict::Drop => {
-                        packet_metadata.acknowledge_drop();
-                        return;
-                    }
-                    filter::Verdict::Accept => {}
-                }
-
-                packet.set_ttl(ttl - 1);
-                let (src, dst, proto, meta) = packet.into_metadata();
-                let packet = ForwardedPacket::new(src, dst, proto, meta, buffer);
-
-                match send_ip_frame(
-                    core_ctx,
-                    bindings_ctx,
-                    &dst_device,
-                    destination,
-                    packet,
-                    packet_metadata,
-                ) {
-                    Ok(()) => (),
-                    Err(IpSendFrameError { serializer: _, error }) => {
-                        match error {
-                            IpSendFrameErrorReason::Device(
-                                SendFrameErrorReason::SizeConstraintsViolation,
-                            ) => {
-                                core_ctx.increment(|counters: &IpCounters<Ipv4>| {
-                                    &counters.mtu_exceeded
-                                });
-                            }
-                            IpSendFrameErrorReason::Device(SendFrameErrorReason::QueueFull)
-                            | IpSendFrameErrorReason::Device(SendFrameErrorReason::Alloc)
-                            | IpSendFrameErrorReason::IllegalLoopbackAddress => (),
-                        }
-                        debug!("failed to forward IPv4 packet: {error:?}");
-                    }
-                }
-            } else {
-                // TTL is 0 or would become 0 after decrement; see "TTL"
-                // section, https://tools.ietf.org/html/rfc791#page-14
-                use packet_formats::ipv4::Ipv4Header as _;
-                core_ctx.increment(|counters: &IpCounters<Ipv4>| &counters.ttl_expired);
-                debug!("received IPv4 packet dropped due to expired TTL");
-                let fragment_type = packet.fragment_type();
-                let (src_ip, _, proto, meta): (_, Ipv4Addr, _, _) =
-                    drop_packet_and_undo_parse!(packet, buffer);
-                packet_metadata.acknowledge_drop();
-                let src_ip = match SpecifiedAddr::new(src_ip) {
-                    Some(ip) => ip,
-                    None => {
-                        core_ctx
-                            .increment(|counters: &IpCounters<Ipv4>| &counters.unspecified_source);
-                        trace!("receive_ipv4_packet: Cannot send ICMP error in response to packet with unspecified source IP address");
-                        return;
-                    }
-                };
-                IcmpErrorHandler::<Ipv4, _>::send_icmp_error_message(
-                    core_ctx,
-                    bindings_ctx,
-                    device,
-                    frame_dst,
-                    src_ip,
-                    dst_ip,
-                    buffer,
-                    Icmpv4Error {
-                        kind: Icmpv4ErrorKind::TtlExpired { proto, fragment_type },
-                        header_len: meta.header_len(),
-                    },
-                );
-            }
+            let src_ip = packet.src_ip();
+            determine_ip_packet_forwarding_action::<Ipv4, _, _, B>(
+                core_ctx,
+                packet,
+                packet_metadata,
+                device,
+                &dst_device,
+                IpPacketDestination::from_next_hop(next_hop, original_dst),
+                frame_dst,
+                src_ip,
+                original_dst,
+            )
+            .perform_action_with_buffer(core_ctx, bindings_ctx, buffer);
         }
         ReceivePacketAction::SendNoRouteToDest { dst: dst_ip } => {
             use packet_formats::ipv4::Ipv4Header as _;
@@ -2719,8 +2924,8 @@ pub fn receive_ipv6_packet<
                 // header (even if the fragment data has values that implies
                 // that the packet is not fragmented).
                 match process_fragment(core_ctx, bindings_ctx, packet) {
-                    Ok(ProcessFragmentResult::Done) => return,
-                    Ok(ProcessFragmentResult::NotNeeded(packet)) => {
+                    ProcessFragmentResult::Done => return,
+                    ProcessFragmentResult::NotNeeded(packet) => {
                         // While strange, it's possible for there to be a Fragment
                         // header that says the packet doesn't need defragmentation.
                         // As per RFC 8200 4.5:
@@ -2737,7 +2942,7 @@ pub fn receive_ipv6_packet<
                         // Fragment header.
                         (packet, Some(Ipv6PacketAction::Continue))
                     }
-                    Ok(ProcessFragmentResult::Reassembled(buf)) => {
+                    ProcessFragmentResult::Reassembled(buf) => {
                         let buf = Buf::new(buf, ..);
                         buffer = packet::Either::B(buf);
 
@@ -2754,10 +2959,6 @@ pub fn receive_ipv6_packet<
                                 return;
                             }
                         }
-                    }
-                    Err(err) => {
-                        err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device);
-                        return;
                     }
                 }
             }
@@ -2800,9 +3001,7 @@ pub fn receive_ipv6_packet<
                 packet_metadata,
                 meta,
             )
-            .unwrap_or_else(|err| {
-                err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device)
-            });
+            .unwrap_or_else(|err| err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer));
             return;
         }
     }
@@ -2861,7 +3060,7 @@ pub fn receive_ipv6_packet<
                         ReceiveIpPacketMeta::default(),
                     )
                     .unwrap_or_else(|err| {
-                        err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer, device)
+                        err.respond_with_icmp_error(core_ctx, bindings_ctx, buffer)
                     });
                 }
                 Ipv6PacketAction::ProcessFragment => {
@@ -2871,128 +3070,21 @@ pub fn receive_ipv6_packet<
             }
         }
         ReceivePacketAction::Forward {
-            original_dst: dst_ip,
+            original_dst,
             dst: Destination { device: dst_device, next_hop },
         } => {
-            let ttl = packet.ttl();
-            if ttl > 1 {
-                trace!("receive_ipv6_packet: forwarding");
-
-                // Handle extension headers first.
-                //
-                // We can't reuse delivery_extension_header_action here because
-                // that was parsed under the assumption that we are the final
-                // destination of the packet.
-                match ipv6::handle_extension_headers(core_ctx, device, frame_dst, &packet, false) {
-                    Ipv6PacketAction::_Discard => {
-                        core_ctx.increment(|counters: &IpCounters<Ipv6>| {
-                            &counters.version_rx.extension_header_discard
-                        });
-                        trace!("receive_ipv6_packet: handled IPv6 extension headers: discarding packet");
-                        return;
-                    }
-                    Ipv6PacketAction::Continue => {
-                        trace!("receive_ipv6_packet: handled IPv6 extension headers: forwarding packet");
-                    }
-                    Ipv6PacketAction::ProcessFragment => {
-                        unreachable!(
-                            "When forwarding packets, we should only ever look at the hop by hop \
-                            options extension header (if present)"
-                        )
-                    }
-                }
-
-                match core_ctx.filter_handler().forwarding_hook(
-                    &mut packet,
-                    device,
-                    &dst_device,
-                    &mut packet_metadata,
-                ) {
-                    filter::Verdict::Drop => {
-                        packet_metadata.acknowledge_drop();
-                        return;
-                    }
-                    filter::Verdict::Accept => {}
-                }
-
-                let destination = IpPacketDestination::from_next_hop(next_hop, dst_ip);
-                packet.set_ttl(ttl - 1);
-                let (src, dst, proto, meta) = packet.into_metadata();
-                let packet = ForwardedPacket::new(src, dst, proto, meta, buffer);
-
-                match send_ip_frame(
-                    core_ctx,
-                    bindings_ctx,
-                    &dst_device,
-                    destination,
-                    packet,
-                    packet_metadata,
-                ) {
-                    Ok(()) => (),
-                    Err(IpSendFrameError {
-                        serializer,
-                        error:
-                            IpSendFrameErrorReason::Device(
-                                SendFrameErrorReason::SizeConstraintsViolation,
-                            ),
-                    }) => {
-                        debug!("failed to forward IPv6 packet: MTU exceeded");
-                        core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.mtu_exceeded);
-
-                        if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
-                            trace!("receive_ipv6_packet: Sending ICMPv6 Packet Too Big");
-                            // TODO(joshlf): Increment the TTL since we just
-                            // decremented it. The fact that we don't do this is
-                            // technically a violation of the ICMP spec (we're not
-                            // encapsulating the original packet that caused the
-                            // issue, but a slightly modified version of it), but
-                            // it's not that big of a deal because it won't affect
-                            // the sender's ability to figure out the minimum path
-                            // MTU. This may break other logic, though, so we should
-                            // still fix it eventually.
-                            let mtu = core_ctx.get_mtu(&device);
-                            IcmpErrorHandler::<Ipv6, _>::send_icmp_error_message(
-                                core_ctx,
-                                bindings_ctx,
-                                device,
-                                frame_dst,
-                                *src_ip,
-                                dst_ip,
-                                serializer.into_buffer(),
-                                Icmpv6ErrorKind::PacketTooBig {
-                                    proto,
-                                    header_len: meta.header_len(),
-                                    mtu,
-                                },
-                            );
-                        }
-                    }
-                    Err(IpSendFrameError { serializer: _, error }) => {
-                        debug!("failed to forward IPv6 packet: {error:?}");
-                    }
-                }
-            } else {
-                // Hop Limit is 0 or would become 0 after decrement; see RFC
-                // 2460 Section 3.
-                core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.ttl_expired);
-                debug!("received IPv6 packet dropped due to expired Hop Limit");
-                packet_metadata.acknowledge_drop();
-
-                if let Ipv6SourceAddr::Unicast(src_ip) = src_ip {
-                    let (_, _, proto, meta): (Ipv6Addr, Ipv6Addr, _, _) =
-                        drop_packet_and_undo_parse!(packet, buffer);
-                    IcmpErrorHandler::<Ipv6, _>::send_icmp_error_message(
-                        core_ctx,
-                        bindings_ctx,
-                        device,
-                        frame_dst,
-                        *src_ip,
-                        dst_ip,
-                        buffer,
-                        Icmpv6ErrorKind::TtlExpired { proto, header_len: meta.header_len() },
-                    );
-                }
-            }
+            determine_ip_packet_forwarding_action::<Ipv6, _, _, B>(
+                core_ctx,
+                packet,
+                packet_metadata,
+                device,
+                &dst_device,
+                IpPacketDestination::from_next_hop(next_hop, original_dst),
+                frame_dst,
+                src_ip,
+                original_dst,
+            )
+            .perform_action_with_buffer(core_ctx, bindings_ctx, buffer);
         }
         ReceivePacketAction::SendNoRouteToDest { dst: dst_ip } => {
             core_ctx.increment(|counters: &IpCounters<Ipv6>| &counters.no_route_to_host);

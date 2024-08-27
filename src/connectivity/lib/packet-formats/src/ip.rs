@@ -247,7 +247,7 @@ impl<B: ByteSlice> IpPacket<B, Ipv4> for Ipv4Packet<B> {
     }
 
     fn version_specific_meta(&self) -> Ipv4OnlyMeta {
-        Ipv4OnlyMeta { id: Ipv4Header::id(self) }
+        Ipv4OnlyMeta { id: Ipv4Header::id(self), fragment_type: Ipv4Header::fragment_type(self) }
     }
 
     fn as_ip_addr_ref(&self) -> IpAddr<&'_ Self, &'_ Ipv6Packet<B>> {

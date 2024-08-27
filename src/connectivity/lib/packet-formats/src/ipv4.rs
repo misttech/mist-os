@@ -208,6 +208,8 @@ pub trait Ipv4Header {
 pub struct Ipv4OnlyMeta {
     /// The packet's ID field.
     pub id: u16,
+    /// The packet's fragment type.
+    pub fragment_type: Ipv4FragmentType,
 }
 
 /// An IPv4 packet.

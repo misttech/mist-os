@@ -441,7 +441,7 @@ fn test_send<I: IpSocketIpExt + IpExt>() {
             assert_eq!(packet.dst_ip(), remote_ip);
             assert_eq!(packet.proto(), Ipv4::ICMP_IP_PROTO);
             assert_eq!(packet.ttl(), 1);
-            let Ipv4OnlyMeta { id } = packet.version_specific_meta();
+            let Ipv4OnlyMeta { id, fragment_type: _ } = packet.version_specific_meta();
             assert_eq!(usize::from(id), usize::from(curr_id) + packet_count);
             assert_eq!(body, [0]);
         }
