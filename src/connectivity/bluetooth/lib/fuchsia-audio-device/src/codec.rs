@@ -92,7 +92,7 @@ pub enum CodecRequest {
         format: fidl_fuchsia_hardware_audio::DaiFormat,
         /// Responder to be called when the format has been set with Ok(()) or Err(Status) if
         /// setting the format failed.
-        responder: Box<dyn FnOnce(std::result::Result<(), zx::Status>)>,
+        responder: Box<dyn FnOnce(std::result::Result<(), zx::Status>) + Send>,
     },
     /// Start the codec.
     Start {
@@ -101,14 +101,14 @@ pub enum CodecRequest {
         /// The time is system monotonic when configuring the codec to start completed (it does not
         /// include startup delay time)
         /// Replying Err() to this will close the codec, and it will need to be re-instantiated.
-        responder: Box<dyn FnOnce(std::result::Result<zx::MonotonicTime, zx::Status>)>,
+        responder: Box<dyn FnOnce(std::result::Result<zx::MonotonicTime, zx::Status>) + Send>,
     },
     /// Stop the codec.
     Stop {
         /// Responder to be called when the codec has been configured to stop.
         /// On success, provides the time that the codec was configured, not including delays.
         /// On failuyre, this will close the codec and it will need to be re-instantiated.
-        responder: Box<dyn FnOnce(std::result::Result<zx::MonotonicTime, zx::Status>)>,
+        responder: Box<dyn FnOnce(std::result::Result<zx::MonotonicTime, zx::Status>) + Send>,
     },
 }
 

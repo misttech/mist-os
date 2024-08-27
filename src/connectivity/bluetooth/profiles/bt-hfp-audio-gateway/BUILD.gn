@@ -61,7 +61,9 @@ rustc_binary("bin") {
     "//src/connectivity/bluetooth/testing/test-battery-manager",
     "//src/lib/diagnostics/testing/diagnostics-assertions/rust:diagnostics-assertions",
     "//src/lib/test_util",
+    "//src/lib/testing/fixture",
     "//third_party/rust_crates:assert_matches",
+    "//third_party/rust_crates:futures-test",
     "//third_party/rust_crates:proptest",
   ]
 
