@@ -6,7 +6,6 @@
 // https://opensource.org/licenses/MIT
 
 #include <lib/elfldltl/machine.h>
-#include <lib/fidl/txn_header.h>
 #include <lib/processargs/processargs.h>
 #include <lib/stdcompat/array.h>
 #include <lib/stdcompat/span.h>
@@ -23,7 +22,6 @@
 #include <lib/zx/vmo.h>
 #include <sys/param.h>
 #include <zircon/fidl.h>
-#include <zircon/processargs.h>
 #include <zircon/syscalls.h>
 #include <zircon/syscalls/log.h>
 #include <zircon/syscalls/resource.h>
@@ -41,10 +39,11 @@
 #include <type_traits>
 #include <utility>
 
+#include <fbl/static_vector.h>
+
 #include "bootfs.h"
-#include "fidl.h"
-#include "loader-service.h"
 #include "option.h"
+#include "stack.h"
 #include "userboot-elf.h"
 #include "util.h"
 #include "zbi.h"
@@ -79,48 +78,46 @@ zx::vmar ReserveLowAddressSpace(const zx::debuglog& log, const zx::vmar& root_vm
   return vmar;
 }
 
-void ParseNextProcessArguments(const zx::debuglog& log, std::string_view next, uint32_t& argc,
-                               char* argv) {
-  // Extra byte for null terminator.
+void ParseNextProcessArguments(const zx::debuglog& log, std::string_view next,
+                               fbl::static_vector<std::string_view, kMaxInitArgs>& argv) {
   size_t required_size = next.size() + 1;
   if (required_size > kProcessArgsMaxBytes) {
     fail(log, "required %zu bytes for process arguments, but only %u are available", required_size,
          kProcessArgsMaxBytes);
   }
 
-  // At a minimum, child processes will be passed a single argument containing the binary name.
-  argc++;
-  uint32_t index = 0;
-  for (char c : next) {
-    if (c == '+') {
-      // Argument list is provided as '+' separated, but passed as null separated. Every time
-      // we encounter a '+' we replace it with a null and increment the argument counter.
-      argv[index] = '\0';
-      argc++;
-    } else {
-      argv[index] = c;
-    }
-    index++;
+  std::string_view::size_type start = 0;
+  std::string_view::size_type end = 0;
+  while ((end = next.find('+', start)) != std::string_view::npos) {
+    auto arg = next.substr(start, end - start);
+    printl(log, "arg:%.*s", static_cast<int>(arg.size()), arg.data());
+    argv.push_back(arg);
+    start = end + 1;
   }
 
-  argv[index] = '\0';
+  // Add the last segment
+  if (start < next.size()) {
+    auto arg = next.substr(start);
+    printl(log, "arg:%.*s", static_cast<int>(arg.size()), arg.data());
+    argv.push_back(arg);
+  }
 }
 
 // We don't need our own thread handle, but the child does. In addition we pass on a decompressed
 // BOOTFS VMO, and a debuglog handle (tied to stdout).
 //
 // In total we're passing along three more handles than we got.
-//constexpr uint32_t kThreadSelf = kHandleCount;
-//constexpr uint32_t kBootfsVmo = kHandleCount + 1;
-//constexpr uint32_t kDebugLog = kHandleCount + 2;
+// constexpr uint32_t kThreadSelf = kHandleCount;
+// constexpr uint32_t kBootfsVmo = kHandleCount + 1;
+// constexpr uint32_t kDebugLog = kHandleCount + 2;
 
 // Hand a svc channel to the child process to be launched.
 // Fuchsia C runtime will pull this handle and automatically create the endpoint on process startup.
-//constexpr uint32_t kSvcStub = kHandleCount + 3;
-//constexpr uint32_t kSvcNameIndex = 0;
+// constexpr uint32_t kSvcStub = kHandleCount + 3;
+// constexpr uint32_t kSvcNameIndex = 0;
 
 // A channel containing all the pipelined messages through `fuchsia.boot.Userboot` protocol.
-//constexpr uint32_t kUserbootProtocol = kHandleCount + 4;
+// constexpr uint32_t kUserbootProtocol = kHandleCount + 4;
 
 constexpr uint32_t kChildHandleCount = kHandleCount + 5;
 
@@ -128,62 +125,13 @@ constexpr uint32_t kChildHandleCount = kHandleCount + 5;
 struct ChildMessageLayout {
   zx_proc_args_t header{};
   std::array<char, kProcessArgsMaxBytes> args;
-  // std::array<uint32_t, kChildHandleCount> info;
-  // std::array<char, 5> names = cpp20::to_array("/svc");
 };
 
+/*
 static_assert(alignof(std::array<uint32_t, kChildHandleCount>) ==
               alignof(uint32_t[kChildHandleCount]));
 static_assert(alignof(std::array<char, kChildHandleCount>) == alignof(char[kProcessArgsMaxBytes]));
-
-#if 0
-constexpr std::array<uint32_t, kChildHandleCount> HandleInfoTable() {
-  std::array<uint32_t, kChildHandleCount> info = {};
-  // Fill in the handle info table.
-  info[kBootfsVmo] = PA_HND(PA_VMO_BOOTFS, 0);
-  info[kProcSelf] = PA_HND(PA_PROC_SELF, 0);
-  info[kRootJob] = PA_HND(PA_JOB_DEFAULT, 0);
-  info[kMmioResource] = PA_HND(PA_MMIO_RESOURCE, 0);
-  info[kIrqResource] = PA_HND(PA_IRQ_RESOURCE, 0);
-#if __x86_64__
-  info[kIoportResource] = PA_HND(PA_IOPORT_RESOURCE, 0);
-#elif __aarch64__
-  info[kSmcResource] = PA_HND(PA_SMC_RESOURCE, 0);
-#endif
-  info[kSystemResource] = PA_HND(PA_SYSTEM_RESOURCE, 0);
-  info[kThreadSelf] = PA_HND(PA_THREAD_SELF, 0);
-  info[kVmarRootSelf] = PA_HND(PA_VMAR_ROOT, 0);
-  info[kZbi] = PA_HND(PA_VMO_BOOTDATA, 0);
-  for (uint32_t i = kFirstVdso; i <= kLastVdso; ++i) {
-    info[i] = PA_HND(PA_VMO_VDSO, i - kFirstVdso);
-  }
-  for (uint32_t i = kFirstKernelFile; i < kHandleCount; ++i) {
-    info[i] = PA_HND(PA_VMO_KERNEL_FILE, i - kFirstKernelFile);
-  }
-  info[kDebugLog] = PA_HND(PA_FD, kFdioFlagUseForStdio);
-  info[kSvcStub] = PA_HND(PA_NS_DIR, kSvcNameIndex);
-  info[kUserbootProtocol] = PA_HND(PA_USER0, 0);
-  return info;
-}
-
-constexpr ChildMessageLayout CreateChildMessage() {
-  ChildMessageLayout child_message = {
-      .header =
-          {
-              .protocol = ZX_PROCARGS_PROTOCOL,
-              .version = ZX_PROCARGS_VERSION,
-              .handle_info_off = offsetof(ChildMessageLayout, info),
-              .args_off = offsetof(ChildMessageLayout, args),
-              .names_off = offsetof(ChildMessageLayout, names),
-              .names_num = kSvcNameIndex + 1,
-
-          },
-      .info = HandleInfoTable(),
-  };
-
-  return child_message;
-}
-#endif
+*/
 
 std::array<zx_handle_t, kChildHandleCount> ExtractHandles(zx::channel bootstrap) {
   // Default constructed debuglog will force check/fail to fallback to |zx_debug_write|.
@@ -225,9 +173,6 @@ struct ChildContext {
   zx::vmar reserved_vmar;
   zx::thread thread;
 
-  // zx::channel svc_client;
-  // zx::channel svc_server;
-
   std::array<zx_handle_t, kChildHandleCount> handles = {};
 };
 
@@ -249,67 +194,8 @@ ChildContext CreateChildContext(const zx::debuglog& log, std::string_view name,
   check(log, status, "Failed to create main thread for child process(%.*s).",
         static_cast<int>(name.length()), name.data());
 
-#if 0
-  status = zx::channel::create(0, &child.svc_client, &child.svc_server);
-  check(log, status, "Failed to create svc channels.");
-
-  // Copy all resources that are not explicitly duplicated in SetChildHandles.
-  for (size_t i = 0; i < handles.size() && i < kHandleCount; ++i) {
-    if (i == kProcSelf) {
-      continue;
-    }
-
-    if (i == kVmarRootSelf) {
-      continue;
-    }
-
-    if (handles[i] == ZX_HANDLE_INVALID) {
-      continue;
-    }
-
-    child.handles[i] = RawDuplicateOrDie(log, handles[i]);
-  }
-#endif
   return child;
 }
-
-#if 0
-void SetChildHandles(const zx::debuglog& log, const zx::vmo& bootfs_vmo, ChildContext& child) {
-  child.handles[kBootfsVmo] = DuplicateOrDie(log, bootfs_vmo).release();
-  child.handles[kDebugLog] = DuplicateOrDie(log, log).release();
-  child.handles[kProcSelf] = DuplicateOrDie(log, child.process).release();
-  child.handles[kVmarRootSelf] = DuplicateOrDie(log, child.vmar).release();
-  child.handles[kThreadSelf] = DuplicateOrDie(log, child.thread).release();
-  child.handles[kSvcStub] = child.svc_client.release();
-
-  // Verify all child handles.
-  for (size_t i = 0; i < child.handles.size(); ++i) {
-    // The Userboot protocol handle is only passed to the last process launched by userboot.
-    if (i == kUserbootProtocol) {
-      continue;
-    }
-    auto handle = child.handles[i];
-    zx_info_handle_basic_t info;
-    auto status =
-        zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-    check(log, status, "Failed to obtain handle information. Bad handle at %zu with value %x", i,
-          handle);
-  }
-}
-
-void SetUserbootProtocolHandle(const zx::debuglog& log, zx::channel stash,
-                               cpp20::span<zx_handle_t, kChildHandleCount> handles) {
-  handles[kUserbootProtocol] = stash.release();
-
-  // Check that the handle is valid/alive.
-  zx_info_handle_basic_t info;
-  auto& handle = handles[kUserbootProtocol];
-  auto status =
-      zx_object_get_info(handle, ZX_INFO_HANDLE_BASIC, &info, sizeof(info), nullptr, nullptr);
-  check(log, status, "Failed to obtain handle information. Bad handle at %d with value %x",
-        static_cast<int>(kUserbootProtocol), handle);
-}
-#endif
 
 // Set of resources created in userboot.
 struct Resources {
@@ -334,21 +220,17 @@ Resources CreateResources(const zx::debuglog& log,
   return resources;
 }
 
-zx::channel StartChildProcess(const zx::debuglog& log, const Options::ProgramInfo& elf_entry,
-                              const ChildMessageLayout& child_message, ChildContext& child,
-                              Bootfs& bootfs, size_t handle_count) {
+void StartChildProcess(const zx::debuglog& log, const Options::ProgramInfo& elf_entry,
+                       const fbl::static_vector<std::string_view, kMaxInitArgs>& args,
+                       const fbl::static_vector<std::string_view, kMaxInitEnvs>& envp,
+                       ChildContext& child, Bootfs& bootfs) {
   size_t stack_size = ZIRCON_DEFAULT_STACK_SIZE;
-
-  // zx::channel to_child, bootstrap;
-  // auto status = zx::channel::create(0, &to_child, &bootstrap);
-  // check(log, status, "zx_channel_create failed for child stack");
-
-  zx::channel loader_svc;
+  ElfInfo info;
 
   // Examine the bootfs image and find the requested file in it.
   // This will handle a PT_INTERP by doing a second lookup in bootfs.
   zx_vaddr_t entry = elf_load_bootfs(log, bootfs, elf_entry.root, child.process, child.vmar,
-                                     child.thread, elf_entry.filename(), &stack_size);
+                                     child.thread, elf_entry.filename(), &stack_size, &info);
 
   // Now load the vDSO into the child, so it has access to system calls.
   /*zx_vaddr_t vdso_base =
@@ -370,24 +252,31 @@ zx::channel StartChildProcess(const zx::debuglog& log, const Options::ProgramInf
   printl(log, "stack [%p, %p) sp=%p", reinterpret_cast<void*>(stack_base),
          reinterpret_cast<void*>(stack_base + stack_size), reinterpret_cast<void*>(sp));
 
+  fbl::static_vector<std::pair<uint32_t, uint64_t>, kMaxAuvxSize> auxv;
+  auxv.push_back(std::make_pair(AT_PAGESZ, static_cast<uint64_t>(PAGE_SIZE)));
+  auxv.push_back(std::make_pair(AT_BASE, info.has_interp ? info.interp_elf.base : 0));
+  auxv.push_back(std::make_pair(AT_PHDR, info.main_elf.base + info.main_elf.header.phoff));
+  auxv.push_back(std::make_pair(AT_PHENT, info.main_elf.header.phentsize));
+  auxv.push_back(std::make_pair(AT_PHNUM, info.main_elf.header.phnum));
+  auxv.push_back(std::make_pair(AT_ENTRY, info.main_elf.load_bias + info.main_elf.header.entry));
+  auxv.push_back(std::make_pair(AT_SYSINFO_EHDR, 0));
+  auxv.push_back(std::make_pair(AT_SECURE, 0));
+
+  StackResult stack_info = populate_initial_stack(log, stack_vmo, elf_entry.filename(), args, envp,
+                                                  auxv, stack_base, sp);
+
+  printl(log, "argv [%lx, %lx)", stack_info.argv_start, stack_info.argv_end);
+  printl(log, "envp [%lx, %lx)", stack_info.environ_start, stack_info.environ_end);
+  printl(log, "auxv [%lx, %lx)", stack_info.auxv_start, stack_info.auxv_end);
+
   // We're done doing mappings, so clear out the reservation VMAR.
   check(log, child.reserved_vmar.destroy(), "zx_vmar_destroy failed on reservation VMAR handle");
   child.reserved_vmar.reset();
 
-  /*
-  // Now send the bootstrap message.  This transfers away all the handles
-  // we have left except the process and thread themselves.
-  status = to_child.write(0, &child_message, sizeof(child_message), child.handles.data(),
-                          static_cast<uint32_t>(handle_count));
-  check(log, status, "zx_channel_write to child failed");
-*/
-
   // Start the process going.
-  status = child.process.start(child.thread, entry, sp, zx::resource(), 0);
+  status = child.process.start(child.thread, entry, stack_info.stack_pointer, zx::resource(), 0);
   check(log, status, "zx_process_start failed");
   child.thread.reset();
-
-  return loader_svc;
 }
 
 int64_t WaitForProcessExit(const zx::debuglog& log, const Options::ProgramInfo& entry,
@@ -481,34 +370,21 @@ struct TerminationInfo {
     Bootfs bootfs{vmar_self.borrow(), std::move(bootfs_vmo), std::move(vmex),
                   DuplicateOrDie(log, log)};
     auto launch_process = [&](auto& elf_entry) -> ChildContext {
-      ChildMessageLayout child_message;  // = CreateChildMessage();
-      ChildContext child = CreateChildContext(log, elf_entry.filename(), handles);
-      size_t handle_count = kChildHandleCount - 1;
+      fbl::static_vector<std::string_view, kMaxInitArgs> argv;
+      fbl::static_vector<std::string_view, kMaxInitEnvs> envp;
+      envp.push_back("HOME=/");
+      envp.push_back("TERM=linux");
 
-#if 0
-      SetChildHandles(log, *borrowed_bootfs, child);
-      if (userboot_protocol) {
-        SetUserbootProtocolHandle(log, std::move(userboot_protocol), child.handles);
-        handle_count++;
-      }
-#endif
+      ChildContext child = CreateChildContext(log, elf_entry.filename(), handles);
 
       // Fill in any '+' separated arguments provided by `userboot.next`. If arguments are longer
       // than kProcessArgsMaxBytes, this function will fail process creation.
-      ParseNextProcessArguments(log, elf_entry.next, child_message.header.args_num,
-                                child_message.args.data());
+      ParseNextProcessArguments(log, elf_entry.next, argv);
 
       // Map in the bootfs so we can look for files in it.
-      zx::channel loader_svc =
-          StartChildProcess(log, elf_entry, child_message, child, bootfs, handle_count);
+      StartChildProcess(log, elf_entry, argv, envp, child, bootfs);
       printl(log, "process %.*s started.", static_cast<int>(elf_entry.filename().size()),
              elf_entry.filename().data());
-
-      // Now become the loader service for as long as that's needed.
-      /*if (loader_svc) {
-        LoaderService ldsvc(DuplicateOrDie(log, log), &bootfs, elf_entry.root);
-        ldsvc.Serve(std::move(loader_svc));
-      }*/
 
       return child;
     };
