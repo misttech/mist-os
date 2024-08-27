@@ -47,6 +47,7 @@ config("suppress-warning.config") {
     "//src/performance/lib/fxt/*",
     "//third_party/zstd/*",
     "//vendor/google/*",
+    "//vendor/misttech/*",
     "//zircon/kernel/*",
     "//zircon/system/ulib/*",
     "//zircon/third_party/lib/*",
