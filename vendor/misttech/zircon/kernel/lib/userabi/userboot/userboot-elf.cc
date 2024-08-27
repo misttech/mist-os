@@ -24,14 +24,14 @@
 
 namespace {
 
-#define INTERP_PREFIX ""
+#define INTERP_PREFIX "lib"
 
 constexpr size_t kMaxSegments = 4;
 constexpr size_t kMaxPhdrs = 16;
 
 zx_vaddr_t load(const zx::debuglog& log, std::string_view what, const zx::vmar& vmar,
                 const zx::vmo& vmo, uintptr_t* interp_off, size_t* interp_len,
-                zx::vmar* segments_vmar, size_t* stack_size, bool return_entry) {
+                zx::vmar* segments_vmar, size_t* stack_size, bool return_entry, LoadedElf* info) {
   auto diag = elfldltl::Diagnostics(
       elfldltl::PrintfDiagnosticsReport([&log](auto&&... args) { printl(log, args...); },
                                         "userboot: ", what, ": "),
@@ -79,105 +79,29 @@ zx_vaddr_t load(const zx::debuglog& log, std::string_view what, const zx::vmar& 
 
   printl(log, "userboot: loaded %.*s (%.*s) at %p, entry point %p\n", static_cast<int>(what.size()),
          what.data(), static_cast<int>(sizeof(vmo_name)), vmo_name, (void*)base, (void*)entry);
+
+  if (info) {
+    *info = LoadedElf{ehdr, zx::vmo(), base, loader.load_bias()};
+  }
+
   return return_entry ? entry : base;
 }
-
-#if 0
-enum loader_bootstrap_handle_index {
-  BOOTSTRAP_EXEC_VMO,
-  BOOTSTRAP_LOGGER,
-  BOOTSTRAP_PROC,
-  BOOTSTRAP_ROOT_VMAR,
-  BOOTSTRAP_SEGMENTS_VMAR,
-  BOOTSTRAP_THREAD,
-  BOOTSTRAP_LOADER_SVC,
-  BOOTSTRAP_HANDLES
-};
-
-#define LOADER_BOOTSTRAP_ENVIRON "LD_DEBUG=1"
-#define LOADER_BOOTSTRAP_ENVIRON_NUM 1
-
-struct loader_bootstrap_message {
-  zx_proc_args_t header;
-  uint32_t handle_info[BOOTSTRAP_HANDLES];
-  char env[sizeof(LOADER_BOOTSTRAP_ENVIRON)];
-};
-
-void stuff_loader_bootstrap(const zx::debuglog& log, const zx::process& proc,
-                            const zx::vmar& root_vmar, const zx::thread& thread,
-                            const zx::channel& to_child, zx::vmar segments_vmar, zx::vmo vmo,
-                            zx::channel* loader_svc) {
-#if defined(__clang__)
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wc99-designator"
-#endif
-  struct loader_bootstrap_message msg = {
-      .header =
-          {
-              .protocol = ZX_PROCARGS_PROTOCOL,
-              .version = ZX_PROCARGS_VERSION,
-              .handle_info_off = offsetof(struct loader_bootstrap_message, handle_info),
-              .environ_off = offsetof(struct loader_bootstrap_message, env),
-              .environ_num = LOADER_BOOTSTRAP_ENVIRON_NUM,
-          },
-      .handle_info =
-          {
-              [BOOTSTRAP_EXEC_VMO] = PA_HND(PA_VMO_EXECUTABLE, 0),
-              [BOOTSTRAP_LOGGER] = PA_HND(PA_FD, 0),
-              [BOOTSTRAP_PROC] = PA_HND(PA_PROC_SELF, 0),
-              [BOOTSTRAP_ROOT_VMAR] = PA_HND(PA_VMAR_ROOT, 0),
-              [BOOTSTRAP_SEGMENTS_VMAR] = PA_HND(PA_VMAR_LOADED, 0),
-              [BOOTSTRAP_THREAD] = PA_HND(PA_THREAD_SELF, 0),
-              [BOOTSTRAP_LOADER_SVC] = PA_HND(PA_LDSVC_LOADER, 0),
-          },
-      .env = LOADER_BOOTSTRAP_ENVIRON,
-  };
-  zx_handle_t handles[] = {
-      [BOOTSTRAP_EXEC_VMO] = vmo.release(),
-      [BOOTSTRAP_LOGGER] = ZX_HANDLE_INVALID,
-      [BOOTSTRAP_PROC] = ZX_HANDLE_INVALID,
-      [BOOTSTRAP_ROOT_VMAR] = ZX_HANDLE_INVALID,
-      [BOOTSTRAP_SEGMENTS_VMAR] = segments_vmar.release(),
-      [BOOTSTRAP_THREAD] = ZX_HANDLE_INVALID,
-      [BOOTSTRAP_LOADER_SVC] = ZX_HANDLE_INVALID,
-  };
-#if defined(__clang__)
-#pragma GCC diagnostic pop
-#endif
-  check(log, zx_handle_duplicate(log.get(), ZX_RIGHT_SAME_RIGHTS, &handles[BOOTSTRAP_LOGGER]),
-        "zx_handle_duplicate failed");
-  check(log, zx_handle_duplicate(proc.get(), ZX_RIGHT_SAME_RIGHTS, &handles[BOOTSTRAP_PROC]),
-        "zx_handle_duplicate failed");
-  check(log,
-        zx_handle_duplicate(root_vmar.get(), ZX_RIGHT_SAME_RIGHTS, &handles[BOOTSTRAP_ROOT_VMAR]),
-        "zx_handle_duplicate failed");
-  check(log, zx_handle_duplicate(thread.get(), ZX_RIGHT_SAME_RIGHTS, &handles[BOOTSTRAP_THREAD]),
-        "zx_handle_duplicate failed");
-  check(log,
-        zx_channel_create(0, loader_svc->reset_and_get_address(), &handles[BOOTSTRAP_LOADER_SVC]),
-        "zx_channel_create failed");
-
-  zx_status_t status = to_child.write(0, &msg, sizeof(msg), handles, std::size(handles));
-  check(log, status, "zx_channel_write of loader bootstrap message failed");
-}
-#endif
 
 }  // namespace
 
 zx_vaddr_t elf_load_vdso(const zx::debuglog& log, const zx::vmar& vmar, const zx::vmo& vmo) {
-  return load(log, "vDSO", vmar, vmo, NULL, NULL, NULL, NULL, false);
+  return load(log, "vDSO", vmar, vmo, NULL, NULL, NULL, NULL, false, NULL);
 }
 
 zx_vaddr_t elf_load_bootfs(const zx::debuglog& log, Bootfs& bootfs, std::string_view root,
                            const zx::process& proc, const zx::vmar& vmar, const zx::thread& thread,
-                           std::string_view filename, /*const zx::channel& to_child,*/
-                           size_t* stack_size /*, zx::channel* loader_svc*/) {
+                           std::string_view filename, size_t* stack_size, ElfInfo* info) {
   zx::vmo vmo = bootfs.Open(root, filename, "program");
 
   uintptr_t interp_off = 0;
   size_t interp_len = 0;
-  zx_vaddr_t entry =
-      load(log, filename, vmar, vmo, &interp_off, &interp_len, NULL, stack_size, true);
+  zx_vaddr_t entry = load(log, filename, vmar, vmo, &interp_off, &interp_len, NULL, stack_size,
+                          true, &info->main_elf);
   if (interp_len > 0) {
     // While PT_INTERP names can be arbitrarily large, bootfs entries
     // have names of bounded length.
@@ -209,10 +133,11 @@ zx_vaddr_t elf_load_bootfs(const zx::debuglog& log, Bootfs& bootfs, std::string_
 
     zx::vmo interp_vmo = bootfs.Open(root, interp, "dynamic linker");
     zx::vmar interp_vmar;
-    entry = load(log, interp, vmar, interp_vmo, NULL, NULL, &interp_vmar, NULL, true);
+    entry = load(log, interp, vmar, interp_vmo, NULL, NULL, &interp_vmar, NULL, true,
+                 &info->interp_elf);
 
-    /*stuff_loader_bootstrap(log, proc, vmar, thread, to_child, std::move(interp_vmar),
-                           std::move(vmo), loader_svc);*/
+    // info->main_elf.vmo = std::move(vmo);
+    info->has_interp = true;
   }
   return entry;
 }
