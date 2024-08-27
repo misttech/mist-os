@@ -130,7 +130,7 @@ class ServerBase(object):
                 object=res,
                 library=self.library,
                 txid=txid,
-                type_name=res.__fidl_type__,
+                type_name=res.__fidl_raw_type__,
             )
             self.channel.write(fidl_msg)
         elif info.empty_response:
@@ -170,7 +170,7 @@ class ServerBase(object):
     def _send_event(self, ordinal: int, library: str, msg_obj):
         type_name = None
         if msg_obj is not None:
-            type_name = msg_obj.__fidl_type__
+            type_name = msg_obj.__fidl_raw_type__
         fidl_message = encode_fidl_message(
             ordinal=ordinal,
             object=msg_obj,

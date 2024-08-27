@@ -51,18 +51,21 @@ closed protocol Noop {
     strict DoNoop() -> ();
 };
 
-closed protocol ComposerThing {
+@discoverable
+open protocol ComposerThing {
     strict ReturnPossibleError() -> (struct {
         some_bool_value bool;
     }) error zx.Status;
+
+    flexible ReturnPossibleError2() -> () error zx.Status;
 };
 
-closed protocol OtherComposedProtocol {
+open protocol OtherComposedProtocol {
     compose ComposerThing;
 };
 
 @discoverable
-closed protocol Testing {
+open protocol Testing {
     compose ComposerThing;
 
     strict ReturnUnion() -> (flexible union {

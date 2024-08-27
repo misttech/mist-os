@@ -40,6 +40,7 @@ struct GetPayloadTypeArgs {
   PyObject *library_obj;
 };
 
+namespace {
 std::unique_ptr<fidl_codec::Type> GetPayloadType(GetPayloadTypeArgs args) {
   if (args.obj == Py_None) {
     return std::make_unique<fidl_codec::EmptyPayloadType>();
@@ -59,12 +60,13 @@ std::unique_ptr<fidl_codec::Type> GetPayloadType(GetPayloadTypeArgs args) {
     return nullptr;
   }
   auto type = library->TypeFromIdentifier(false, type_name_str);
-  if (type == nullptr) {
+  if (type == nullptr || !type->IsValid()) {
     PyErr_Format(PyExc_RuntimeError, "Unrecognized type: '%s'", type_name_c_str);
     return nullptr;
   }
   return type;
 }
+}  // namespace
 
 // NOLINTNEXTLINE: similarly typed parameters are unavoidable in Python.
 PyObject *encode_fidl_message(PyObject *self, PyObject *args, PyObject *kwds) {

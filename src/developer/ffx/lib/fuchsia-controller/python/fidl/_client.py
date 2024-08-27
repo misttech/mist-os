@@ -247,7 +247,7 @@ class FidlClient(object):
         """
         type_name = None
         if msg_obj is not None:
-            type_name = msg_obj.__fidl_type__
+            type_name = msg_obj.__fidl_raw_type__
         fidl_message = encode_fidl_message(
             ordinal=ordinal,
             object=msg_obj,

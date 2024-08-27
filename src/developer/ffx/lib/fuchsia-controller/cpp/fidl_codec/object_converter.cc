@@ -7,6 +7,7 @@
 #include <zircon/types.h>
 
 #include <cinttypes>
+#include <sstream>
 
 #include "object.h"
 #include "src/developer/ffx/lib/fuchsia-controller/cpp/abi/convert.h"
@@ -15,6 +16,7 @@
 
 namespace converter {
 
+namespace {
 // Helper func. This attempts to lookup an attribute on an object while not setting an error if the
 // attribute does not exist. Can still return an error generally, and is indicated by returning
 // nullptr. This is just guaranteed not to occur if the attribute doesn't exist.
@@ -40,6 +42,7 @@ PyObject* GetAttr(PyObject* target, std::string_view attr) {
   }
   return child_value;
 }
+}  // namespace
 
 bool ObjectConverter::HandleNone(const fidl_codec::Type* type) {
   if (obj_ != Py_None) {
@@ -194,7 +197,11 @@ void ObjectConverter::VisitUnionType(const fidl_codec::UnionType* type) {
 }
 
 void ObjectConverter::VisitType(const fidl_codec::Type* type) {
-  PyErr_Format(PyExc_TypeError, "Unknown FIDL type: '%s'.", type->Name().c_str());
+  std::stringstream ss;
+  fidl_codec::PrettyPrinter pp(ss, fidl_codec::WithoutColors, true, "", 100, false, 0);
+  type->PrettyPrint(pp);
+  PyErr_Format(PyExc_TypeError, "Unknown FIDL type: '%s'. Full type: %s", type->Name().c_str(),
+               ss.str().c_str());
 }
 
 void ObjectConverter::VisitList(const fidl_codec::ElementSequenceType* type,

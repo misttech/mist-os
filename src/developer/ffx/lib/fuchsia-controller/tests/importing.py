@@ -5,7 +5,12 @@
 import importlib
 import unittest
 
-from fidl_codec import decode_fidl_request, encode_fidl_message, method_ordinal
+from fidl_codec import (
+    decode_fidl_request,
+    decode_standalone,
+    encode_fidl_message,
+    method_ordinal,
+)
 
 
 class Importing(unittest.TestCase):
@@ -103,3 +108,24 @@ class Importing(unittest.TestCase):
         # constructed properly.
         res = mod.ComposerThingReturnPossibleErrorResult()
         res.err = 5
+
+    def test_encode_protocol_return_value(self):
+        """This test covers a problem area with naming protocol methods in IR.
+
+        What happens, in this test, is that if we allocate
+        `ComposerThing.ReturnPossibleError`, we'll have to make sure we're
+        encoding an object like `ComposerThingReturnPossibleError2Result`
+        translates FIDL IR lookup to be
+        `ComposerThing_ReturnPossibleError2_Result` and vice versa.
+
+        It's unclear if this test should be here or encode.py, since it's doing
+        both things, but it's here for now.
+        """
+        mod = importlib.import_module("fidl.fuchsia_controller_test")
+        obj = mod.ComposerThingReturnPossibleError2Result()
+        obj.err = obj.err_type(2)
+        (b, h) = obj.encode()
+        msg = decode_standalone(
+            type_name=obj.__fidl_raw_type__, bytes=b, handles=h
+        )
+        self.assertEqual(msg, {"err": 2})
