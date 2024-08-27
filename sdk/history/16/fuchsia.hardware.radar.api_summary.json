@@ -131,14 +131,6 @@
     },
     {
         "kind": "protocol/member",
-        "name": "fuchsia.hardware.radar/RadarBurstReader.OnBurst2",
-        "strictness": "strict",
-        "ordinal": "6469924000145088208",
-        "direction": "event",
-        "request": "fuchsia.hardware.radar/RadarBurstReaderOnBurst2Request"
-    },
-    {
-        "kind": "protocol/member",
         "name": "fuchsia.hardware.radar/RadarBurstReader.RegisterVmos",
         "strictness": "strict",
         "ordinal": "2154263285602135949",
@@ -200,23 +192,6 @@
     {
         "kind": "struct",
         "name": "fuchsia.hardware.radar/RadarBurstReaderGetBurstPropertiesResponse"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.hardware.radar/RadarBurstReaderOnBurst2Request.burst",
-        "ordinal": "1",
-        "type": "fuchsia.hardware.radar/Burst"
-    },
-    {
-        "kind": "union/member",
-        "name": "fuchsia.hardware.radar/RadarBurstReaderOnBurst2Request.error",
-        "ordinal": "2",
-        "type": "fuchsia.hardware.radar/StatusCode"
-    },
-    {
-        "kind": "union",
-        "name": "fuchsia.hardware.radar/RadarBurstReaderOnBurst2Request",
-        "strictness": "flexible"
     },
     {
         "kind": "union/member",
