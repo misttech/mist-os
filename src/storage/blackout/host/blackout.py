@@ -42,6 +42,9 @@ class BlackoutTest(test_case_revive.TestCaseRevive):
         self.device_label = self.user_params.get("device_label", "default-test")
         self.device_path = self.user_params.get("device_path")
         self.test_duration = self.user_params.get("test_duration", 0)
+        self.destroy_after_test = self.user_params.get(
+            "destroy_after_test", False
+        )
 
         self.create_blackout_component()
 
@@ -76,6 +79,15 @@ class BlackoutTest(test_case_revive.TestCaseRevive):
             )
         )
         asserts.assert_equal(res.err, None, "Failed to run load generation")
+        if self.destroy_after_test:
+            _LOGGER.info("Blackout: destroying test component instance")
+            self.dut.ffx.run(
+                [
+                    "component",
+                    "destroy",
+                    self.component_name,
+                ]
+            )
 
     def create_blackout_component(self) -> None:
         # TODO(https://fxbug.dev/340586785): sometimes this fails. Until it becomes more stable (or
