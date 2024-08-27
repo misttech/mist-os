@@ -100,7 +100,6 @@ if (toolchain_environment == "userboot") {
   executable("userboot") {
     sources = [
       "bootfs.cc",
-      "loader-service.cc",
       "option.cc",
       "start.cc",
       "userboot-elf.cc",
