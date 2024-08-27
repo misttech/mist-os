@@ -51,6 +51,14 @@ developing the Fuchsia platform and for developing on Fuchsia with the SDK.
   additional Fuchsia extensions that may help you as you contribute to
   Fuchsia.
 
+### Disable history graph in Source Control view
+
+VSCode 1.92 modified the [Source Control][source-control] view to attempt to
+graph the history of git repositories.
+This feature does not work well on Fuchsia git repositories with deep and
+complex histories. To disable this feature set the configuration variable
+`scm.showHistoryGraph` to `false`.
+
 ## Other editors
 
 These guides describe configurations and best practices of other editors and IDE
@@ -102,6 +110,7 @@ For installation and usage information see
 [fuchsia-source-ext]: /docs/reference/tools/editors/vscode/extensions.md
 [rust-sublime]: /docs/development/languages/rust/editors.md#sublime-text
 [FIDL-sublime]: /docs/development/languages/fidl/guides/editors.md#sublime
-[vim-editor]: /docs/reference/tools/editors/vim.md 
+[vim-editor]: /docs/reference/tools/editors/vim.md
 [youcompleteme-editor]: /docs/reference/tools/editors/youcompleteme.md
 [kakoune]: /docs/reference/tools/editors/kak.md
+[source-control]: https://code.visualstudio.com/updates/v1_92#_incomingoutgoing-changes-graph
