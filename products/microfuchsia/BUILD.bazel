@@ -130,6 +130,9 @@ fuchsia_product_configuration(
                 "authorized_ssh_keys_path": "LABEL(%s)" % authorized_ssh_keys_label if authorized_ssh_keys_label else None,
                 "vsock_development": True,
             },
+            "driver_framework": {
+                "enable_driver_index_stop_on_idle": True,
+            },
             "storage": {
                 "filesystems": {
                     "image_mode": "no_image",
