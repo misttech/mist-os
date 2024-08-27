@@ -72,7 +72,7 @@ class TestSearchLocations(PreserveEnvAndCaptureOutputTestCase):
 
     def test_success(self) -> None:
         with tempfile.TemporaryDirectory() as dir:
-            os.path.join(dir, ".fx-build-dir")
+            path = os.path.join(dir, ".fx-build-dir")
             with open(os.path.join(dir, ".fx-build-dir"), "w") as f:
                 f.write("out/other")
             os.makedirs(os.path.join(dir, "out", "other"))

@@ -36,7 +36,7 @@ def _copy_file_to(src_path: Path, dst_path: Path) -> None:
     """
     try:
         dst_path.hardlink_to(src_path.resolve())
-    except OSError:
+    except OSError as e:
         shutil.copy2(src_path, dst_path)
 
 

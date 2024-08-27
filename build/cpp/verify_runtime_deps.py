@@ -147,7 +147,7 @@ def check_missing_files(runtime_files, atom_deps):
     errors = DependencyErrors()
 
     for entry in runtime_files:
-        entry["label"]
+        gn_label = entry["label"]
         sdk_id = entry.get("sdk_id")
         source = entry.get("source")
 

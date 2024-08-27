@@ -6,6 +6,10 @@
 From SDK archive manifest."""
 
 import argparse
+import errno
+import json
+import os
+import shutil
 import sys
 
 _HOST_CPUS = ("x64", "arm64")

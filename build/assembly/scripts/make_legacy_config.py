@@ -14,6 +14,7 @@ import logging
 import sys
 from collections import defaultdict
 from dataclasses import dataclass
+from typing import Set
 
 import serialization
 from assembly import (
@@ -249,16 +250,16 @@ def main() -> None:
 if __name__ == "__main__":
     try:
         main()
-    except DuplicatePackageException:
+    except DuplicatePackageException as exc:
         logger.exception(
             "The Legacy Assembly Input Bundle could not be constructed due to \
         a duplicate package declaration in the build"
         )
-    except PackageManifestParsingException:
+    except PackageManifestParsingException as exc:
         logger.exception(
             "A problem occurred attempting to load a PackageManifest"
         )
-    except AssemblyInputBundleCreationException:
+    except AssemblyInputBundleCreationException as exc:
         logger.exception("A problem occured building the legacy bundle")
     finally:
         sys.exit()

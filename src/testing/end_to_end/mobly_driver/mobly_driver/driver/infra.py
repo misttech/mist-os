@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 """Implements BaseDriver for the lab infra execution environment."""
 
+import json
 import os
 from typing import Any, Optional
 
@@ -111,7 +112,7 @@ class InfraDriver(base.BaseDriver):
                 ssh_path=self._ssh_path,
             )
             return yaml.dump(config)
-        except (IOError, OSError):
+        except (IOError, OSError) as e:
             raise common.DriverException("Failed to open file: %")
 
     def teardown(self, *args: Any) -> None:

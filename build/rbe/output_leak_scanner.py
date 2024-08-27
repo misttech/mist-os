@@ -26,7 +26,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Any, Iterable, Sequence
 
 import cl_utils
 import fuchsia

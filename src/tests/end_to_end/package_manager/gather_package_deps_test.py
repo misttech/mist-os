@@ -4,9 +4,11 @@
 # found in the LICENSE file.
 
 import os
+import shutil
 import tarfile
 import tempfile
 import unittest
+from unittest import mock
 
 from gather_package_deps import GatherPackageDeps
 

@@ -24,6 +24,7 @@ from fuchsia_base_test import fuchsia_base_test
 from honeydew.interfaces.device_classes import fuchsia_device
 from mobly import asserts, test_runner
 from perf_publish import publish
+from perf_test_utils import utils
 from trace_processing import trace_importing, trace_metrics, trace_model
 from trace_processing.metrics import cpu
 

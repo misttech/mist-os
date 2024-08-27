@@ -7,6 +7,7 @@ metadata about FHCP tests.
 """
 import argparse
 import json
+import os
 import sys
 from typing import Any
 

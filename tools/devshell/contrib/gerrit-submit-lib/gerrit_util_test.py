@@ -7,7 +7,7 @@
 import http.server
 import threading
 import unittest
-from typing import Optional
+from typing import List, Optional
 from unittest import mock
 
 import gerrit_util

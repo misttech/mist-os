@@ -10,6 +10,7 @@ import mmap
 import os
 import struct
 import sys
+import uuid
 from collections import namedtuple
 from contextlib import contextmanager
 

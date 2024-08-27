@@ -21,6 +21,7 @@
 
 import argparse
 import os
+import subprocess
 import sys
 from datetime import datetime, timezone
 
@@ -100,7 +101,7 @@ def contents_changed(path: str, contents: str):
         with open(path, "r") as file:
             existing_contents = file.read()
             return existing_contents != contents
-    except Exception:
+    except Exception as err:
         pass
     return True
 

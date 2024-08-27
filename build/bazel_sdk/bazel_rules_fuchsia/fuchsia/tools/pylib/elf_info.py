@@ -6,7 +6,8 @@
 import io
 import os
 import struct
-from typing import Callable, Optional, Tuple
+import sys
+from typing import Callable, List, Optional, Tuple
 
 # Standard ELF constants.
 ELFMAG = b"\x7fELF"

@@ -15,6 +15,7 @@ import os
 import re
 import shutil
 import subprocess
+import sys
 
 GENERATED_CONTANTS_TEMPLATE = """# AUTO-GENERATED - DO NOT EDIT!
 

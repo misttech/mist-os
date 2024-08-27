@@ -281,7 +281,7 @@ class CxxLinkRemoteAction(object):
 
     def _linker_invocation(self) -> linker.LinkerInvocation:
         """Creates a model linker invocation, for dep-scanning."""
-        self.cxx_action.libs
+        l_libs = self.cxx_action.libs
         search_paths = list(self.cxx_action.libdirs)
         search_paths.extend(self._expand_sysroot_paths())
         return linker.LinkerInvocation(

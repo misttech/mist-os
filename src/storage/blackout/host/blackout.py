@@ -13,6 +13,7 @@ the block device label (and optionally path) to run on.
 
 import asyncio
 import logging
+import time
 
 import fidl.fuchsia_blackout_test as blackout
 import honeydew.errors

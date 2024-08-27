@@ -14,6 +14,7 @@ a non-zero result.
 """
 
 import argparse
+import io
 import os
 import subprocess
 import sys

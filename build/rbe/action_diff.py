@@ -11,12 +11,25 @@ Usage:
 import argparse
 import dataclasses
 import itertools
+import os
 import sys
 from pathlib import Path
-from typing import AbstractSet, Dict, Iterable, Optional, Sequence
+from typing import (
+    AbstractSet,
+    Callable,
+    Dict,
+    Iterable,
+    Optional,
+    Sequence,
+    Tuple,
+)
 
+import cl_utils
+import fuchsia
+import remote_action
 import remotetool
 import reproxy_logs
+from api.log import log_pb2
 
 _SCRIPT_BASENAME = Path(__file__).name
 

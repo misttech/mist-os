@@ -5,6 +5,7 @@
 """Preprocess and clang-format a single GLSL shader script."""
 
 import argparse
+import os
 import subprocess
 import sys
 

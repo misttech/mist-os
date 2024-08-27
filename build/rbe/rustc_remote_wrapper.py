@@ -17,6 +17,7 @@ For full usage, see `rustc_remote_wrapper.py -h`.
 """
 
 import argparse
+import glob
 import os
 import stat
 import subprocess
@@ -177,6 +178,7 @@ def expand_deps_for_rlib_compile(paths: Iterable[Path]) -> Iterable[Path]:
 
             # .so proc macros already appear as deps in the depfile
             # so there is no need to repeat them here.
+            pass
 
 
 class RemoteInputProcessingError(RuntimeError):

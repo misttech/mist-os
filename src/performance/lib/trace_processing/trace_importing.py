@@ -15,6 +15,7 @@ from collections import defaultdict
 from importlib.resources import as_file, files
 from typing import Any, Dict, List, Optional, Self, TextIO, Tuple
 
+from perf_test_utils import utils
 from trace_processing import data, trace_model, trace_time
 
 _LOGGER: logging.Logger = logging.getLogger("Performance")

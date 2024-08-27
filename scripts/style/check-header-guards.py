@@ -22,6 +22,7 @@ import collections
 import fileinput
 import os.path
 import re
+import string
 import sys
 
 FUCHSIA_ROOT = os.path.dirname(  # $root

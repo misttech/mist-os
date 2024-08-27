@@ -8,9 +8,10 @@
 import dataclasses
 import tempfile
 import unittest
+from collections import defaultdict
 from pathlib import Path
 
-from collector import Collector, CollectorErrorKind
+from collector import Collector, CollectorError, CollectorErrorKind
 from file_access import FileAccess
 from gn_label import GnLabel
 from gn_license_metadata import (

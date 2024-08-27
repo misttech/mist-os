@@ -9,7 +9,9 @@ import os
 import re
 import subprocess
 import sys
-from typing import Any, Dict, Sequence
+from enum import Enum
+from pathlib import Path
+from typing import AbstractSet, Any, Dict, Sequence
 
 _CPP_EXTENSIONS = [".cc", ".c", ".cpp"]
 _OPT_PATTERN = re.compile("[\W]+")

@@ -15,9 +15,11 @@ in the same directory.
 This script will not work on Windows.
 """
 
+import errno
 import optparse
 import os.path
 import shutil
+import subprocess
 import sys
 
 

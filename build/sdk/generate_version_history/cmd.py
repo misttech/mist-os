@@ -8,6 +8,7 @@ import argparse
 import datetime
 import json
 import pathlib
+from typing import Any
 
 import generate_version_history
 

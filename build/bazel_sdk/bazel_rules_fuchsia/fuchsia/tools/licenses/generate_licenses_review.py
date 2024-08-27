@@ -10,7 +10,7 @@ import os
 import shutil
 import zipfile
 from sys import stderr
-from typing import List
+from typing import List, Set
 
 from fuchsia.tools.licenses.classification_types import *
 from fuchsia.tools.licenses.spdx_types import *

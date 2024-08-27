@@ -4,7 +4,8 @@
 
 __all__ = ["STYLES"]
 
-from typing import List
+from dataclasses import dataclass
+from typing import Callable, List, Tuple
 
 from common import *
 

@@ -8,6 +8,7 @@ Tables are just Sequence[Sequence[Any]], where the number of elements
 in each row is required to be the same.
 """
 
+import sys
 from typing import Any, Iterable, Sequence
 
 

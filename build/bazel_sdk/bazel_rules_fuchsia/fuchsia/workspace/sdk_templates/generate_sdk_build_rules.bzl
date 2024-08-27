@@ -398,7 +398,7 @@ def _generate_ffx_subtool_build_rules(
 
     # normalize root to not have trailing slashes so the
     # slice below won't fail if there's a / at the end.
-    meta["root"].rstrip("/")
+    meta_root = meta["root"].rstrip("/")
     relative_files = []
     for file in files_str:
         relative_file = file[len(meta["root"]) + 1:]
@@ -834,7 +834,7 @@ def _generate_cc_prebuilt_library_build_rules(
     prebuilt_select = {}
     dist_select = {}
 
-    _get_target_name(meta["name"])
+    name = _get_target_name(meta["name"])
     prebuilt_variants = []
     if "variants" in meta:
         for variant in meta["variants"]:

@@ -3,9 +3,12 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
+import os
+import sys
 import tempfile
 import unittest
 from pathlib import Path
+from typing import Iterable, Sequence
 from unittest import mock
 
 import cl_utils
@@ -440,7 +443,7 @@ class LinkerInvocationResolveTests(unittest.TestCase):
     def test_resolve_lib_failure(self) -> None:
         libdir = Path("snaz/lib")
         sysroot = Path("bar/root")
-        Path("libfoo.a")
+        lib = Path("libfoo.a")
 
         with tempfile.TemporaryDirectory() as td:
             tdp = Path(td)

@@ -26,7 +26,7 @@ try:
     CGPT_BIN = os.path.join(
         paths.PREBUILT_DIR, "tools/cgpt", paths.PREBUILT_PLATFORM, "cgpt"
     )
-except ImportError:
+except ImportError as e:
     # If we're being run via `fx`, we take paths for cgpt and the Fuchsia images from
     # the `import paths` above. Otherwise, we expect the paths to be provided via
     # command-line arguments. The command-line arguments also override the autodetected

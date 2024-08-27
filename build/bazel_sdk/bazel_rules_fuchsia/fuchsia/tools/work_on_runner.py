@@ -16,7 +16,7 @@ def find_env_file_entry(cwd, key):
     # tomllib was introduced in python 3.11 which is too new for most of our
     # repos. If it is not available fall back to a regex
     try:
-        pass
+        import tomllib
 
         loader = build_config_from_toml
     except ImportError:
@@ -56,7 +56,7 @@ def build_config_from_toml(file, key):
                 return config_path
             else:
                 return os.path.join(os.path.dirname(file), config_path)
-        except Exception:
+        except Exception as e:
             print(
                 f"fuchsia_env.toml file does not contain fuchsia.project.{key} entry"
             )

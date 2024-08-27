@@ -9,7 +9,7 @@ import struct
 import subprocess
 import sys
 import tempfile
-from typing import Iterable, Optional, TypeVar
+from typing import Any, Iterable, Optional, TypeVar
 
 
 def parse_args() -> argparse.Namespace:

@@ -31,7 +31,7 @@ class ActionDifferTests(unittest.TestCase):
         left = reproxy_logs.ReproxyLog(left_log_dump)
         right = reproxy_logs.ReproxyLog(right_log_dump)
         cfg = dict()
-        action_diff.ActionDiffer(left, right, cfg)
+        diff = action_diff.ActionDiffer(left, right, cfg)
 
     def test_trace_output_not_in_record(self):
         left_log_dump = log_pb2.LogDump()

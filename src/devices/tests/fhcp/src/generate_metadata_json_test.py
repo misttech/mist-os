@@ -2,6 +2,9 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.Z
 """Unit tests for generate_metadata_json.py"""
+import json
+import os
+import tempfile
 import unittest
 from typing import Any
 

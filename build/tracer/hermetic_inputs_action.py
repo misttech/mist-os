@@ -5,6 +5,7 @@
 """Launch a command and generate a Ninja depfile for it from an input hermetic inputs file."""
 
 import argparse
+import os
 import subprocess
 import sys
 from pathlib import Path

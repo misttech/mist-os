@@ -18,6 +18,7 @@ artifacts (JSON IR and bindings). This is for use in the FIDL Language Server,
 which uses fidl_project to do dependency resolution.
 """
 
+import glob
 import json
 import os
 import re

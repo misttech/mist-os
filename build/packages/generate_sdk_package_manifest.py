@@ -20,7 +20,7 @@ import json
 import os
 import sys
 from pathlib import Path
-from typing import Any, Dict, Set
+from typing import Any, Dict, List, Set
 
 # SDK directory of blobs across all package manifests,
 # each renamed to their merkle.
@@ -251,7 +251,7 @@ def main():
     depfile_collection = {}
     visited_subpackages = set()
 
-    f"{arch}-api-{api_level}"
+    subtype = f"{arch}-api-{api_level}"
 
     handle_package_manifest(
         args.output,

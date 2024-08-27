@@ -41,6 +41,7 @@ def print_fences():
     print(
         "fxr/1098532 triggers a Bazel error where SDK header changes don't trigger rebuilds, see http://b/356347441"
     )
+    pass
 
 
 def main():

@@ -8,6 +8,7 @@ import contextlib
 import copy
 import io
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
@@ -26,6 +27,8 @@ _HAVE_XATTR = hasattr(os, "setxattr")
 
 class ImmediateExit(Exception):
     """For mocking functions that do not return."""
+
+    pass
 
 
 def _write_file_contents(path: Path, contents: str) -> None:
@@ -1321,7 +1324,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
             set(action.output_files_relative_to_project_root),
         )
         # Ignore the rewrapper portion of the command
-        action.launch_command
+        full_command = action.launch_command
         command_slices = list(
             cl_utils.split_into_subsequences(action.launch_command, "--")
         )
@@ -1459,7 +1462,7 @@ class RemoteActionMainParserTests(unittest.TestCase):
         exec_root = Path("/home/project")
         build_dir = Path("build/out/here")
         working_dir = exec_root / build_dir
-        self._make_main_parser()
+        p = self._make_main_parser()
         action = remote_action.RemoteAction(
             rewrapper=Path("/test-build/rewrapper"),
             command=["sleep", "1h"],
@@ -1493,7 +1496,7 @@ w|{remote_root}/set_by_reclient/a/a/obj/input.o
         exec_root = Path("/home/project")
         build_dir = Path("build/out/here")
         working_dir = exec_root / build_dir
-        self._make_main_parser()
+        p = self._make_main_parser()
         action = remote_action.RemoteAction(
             rewrapper=Path("/test-build/rewrapper"),
             command=["sleep", "1h"],
@@ -3060,7 +3063,7 @@ remote_metadata: {{
             output_files=[Path(output)],
         )
         self.assertEqual(action.local_only_command, command)
-        action.options
+        options = action.options
 
         fake_stub_info = remote_action.DownloadStubInfo(
             path=input_file,
@@ -3109,6 +3112,7 @@ remote_metadata: {{
         self.assertEqual(action.expected_downloads, [])
         options = action.options
         self.assertIn(download_option, options)
+        logdir = "/fake/tmp/rpl/logz.888222"
         fake_log_record = FakeReproxyLogEntry(
             completion_status="STATUS_LOCAL_EXECUTION"
         )
@@ -3160,6 +3164,7 @@ remote_metadata: {{
         self.assertEqual(action.expected_downloads, [])
         options = action.options
         self.assertIn(download_option, options)
+        logdir = "/fake/tmp/rpl/logz.213123"
         fake_log_record = FakeReproxyLogEntry(
             completion_status="STATUS_RACING_LOCAL"
         )
@@ -3210,6 +3215,7 @@ remote_metadata: {{
         self.assertEqual(action.expected_downloads, [])
         options = action.options
         self.assertIn(download_option, options)
+        logdir = "/fake/tmp/rpl/logz.81891"
         fake_log_record = FakeReproxyLogEntry(
             completion_status="STATUS_LOCAL_FALLBACK"
         )
@@ -3263,6 +3269,7 @@ remote_metadata: {{
         self.assertTrue(action.preserve_unchanged_output_mtime)
         options = action.options
         self.assertIn(download_option, options)
+        logdir = "/fake/tmp/rpl/logz.532874"
 
         if output_contents is not None:
             self.working_dir.mkdir(parents=True, exist_ok=True)

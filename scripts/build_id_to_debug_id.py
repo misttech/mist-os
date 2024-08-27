@@ -34,7 +34,7 @@ def main():
             file=sys.stderr,
         )
         return 1
-    sys.argv[1].upper()
+    build_id = sys.argv[1].upper()
 
     # debug id is normally a PDB's guid + an "age". For historical reasons, the build id gets
     # swizzled (in the remap function) but is still 32 characters. Add the trailing 0 for a pseudo

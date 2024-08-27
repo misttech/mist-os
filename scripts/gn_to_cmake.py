@@ -21,6 +21,7 @@ The first is recommended, as it will auto-update.
 
 
 import functools
+import itertools
 import json
 import os
 import posixpath

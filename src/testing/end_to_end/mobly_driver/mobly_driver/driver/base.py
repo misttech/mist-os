@@ -71,7 +71,9 @@ class BaseDriver(ABC):
         Returns:
           A YAML string that represents a Mobly test config.
         """
+        pass
 
     @abstractmethod
     def teardown(self, *args: Any) -> None:
         """Performs any required clean up upon Mobly test completion."""
+        pass

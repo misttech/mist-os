@@ -23,7 +23,17 @@ import shlex
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional, Sequence, Set, Union
+from typing import (
+    Any,
+    Callable,
+    Dict,
+    Iterable,
+    Optional,
+    Sequence,
+    Set,
+    Tuple,
+    Union,
+)
 
 _HAS_FX = None
 

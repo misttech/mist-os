@@ -4,10 +4,12 @@
 # found in the LICENSE file.
 import argparse
 import json
+import os
 import subprocess
 import sys
 import tempfile
 from dataclasses import dataclass
+from typing import List
 
 
 @dataclass
@@ -70,7 +72,7 @@ def main():
         required=True,
     )
     args = parser.parse_args()
-    PlasaDiffer(**vars(args))
+    pd = PlasaDiffer(**vars(args))
 
 
 if __name__ == "__main__":

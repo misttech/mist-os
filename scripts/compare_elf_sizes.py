@@ -8,7 +8,10 @@ Compares two or more elf_sizes.json files.
 """
 
 import argparse
+import csv
 import json
+import os
+import subprocess
 import sys
 
 from tabulate import tabulate

@@ -12,6 +12,7 @@ those access against constraints such as declared inputs and outputs.
 import argparse
 import dataclasses
 import enum
+import itertools
 import os
 import re
 import shlex

@@ -45,7 +45,7 @@ def main():
         shutil.copytree(
             src_dir, dst_dir, copy_function=os.link, dirs_exist_ok=True
         )
-    except OSError:
+    except OSError as error:
         shutil.copytree(src_dir, dst_dir, dirs_exist_ok=True)
 
     return 0

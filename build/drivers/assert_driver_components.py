@@ -5,6 +5,7 @@
 """Assert that drivers aren't included in the build without a driver component"""
 
 import argparse
+import json
 
 
 def main():

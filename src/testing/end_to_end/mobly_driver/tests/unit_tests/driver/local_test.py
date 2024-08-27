@@ -5,6 +5,7 @@
 
 import ipaddress
 import unittest
+from ipaddress import ip_address
 from typing import Any
 from unittest.mock import patch
 
@@ -250,7 +251,7 @@ class LocalDriverTest(unittest.TestCase):
             output_path="output/path",
         )
         with self.assertRaises(common.DriverException):
-            driver.generate_test_config()
+            ret = driver.generate_test_config()
 
     @patch("builtins.print")
     @patch(
@@ -268,7 +269,7 @@ class LocalDriverTest(unittest.TestCase):
             output_path="output/path",
         )
         with self.assertRaises(common.DriverException):
-            driver.generate_test_config()
+            ret = driver.generate_test_config()
 
     @parameterized.expand(
         [
@@ -294,4 +295,4 @@ class LocalDriverTest(unittest.TestCase):
             output_path="output/path",
         )
         with self.assertRaises(common.DriverException):
-            driver.generate_test_config()
+            ret = driver.generate_test_config()

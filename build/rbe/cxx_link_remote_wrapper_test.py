@@ -6,14 +6,16 @@
 import contextlib
 import io
 import os
+import subprocess
 import sys
 import tempfile
 import unittest
 from pathlib import Path
-from typing import Any, Collection, Iterable
+from typing import Any, Collection, Iterable, Sequence
 from unittest import mock
 
 import cl_utils
+import cxx
 import cxx_link_remote_wrapper
 import fuchsia
 import linker
@@ -22,6 +24,8 @@ import remote_action
 
 class ImmediateExit(Exception):
     """For mocking functions that do not return."""
+
+    pass
 
 
 def _strs(items: Collection[Any]) -> Collection[str]:
@@ -410,7 +414,7 @@ class CxxLinkRemoteActionTests(unittest.TestCase):
 
     def test_clang_cxx_link_scandeps(self) -> None:
         with tempfile.TemporaryDirectory() as td:
-            Path(td)
+            tdp = Path(td)
             fake_root = Path("/home/project")
             fake_builddir = Path("out/really-not-default")
             fake_cwd = fake_root / fake_builddir

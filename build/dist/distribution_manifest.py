@@ -13,6 +13,7 @@ import filecmp
 import json
 import os
 from typing import (
+    Any,
     Callable,
     DefaultDict,
     Dict,
@@ -204,6 +205,7 @@ def expand_partial_manifest_items(
             elif "elf_runtime_dir" in extra:
                 dest = extra["destination"]
                 elf_runtime_entries[dest].append(extra)
+                pass
 
             else:
                 # Should not happen unless there is a bug in

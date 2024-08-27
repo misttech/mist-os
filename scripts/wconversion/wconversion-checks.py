@@ -17,6 +17,7 @@
 #   Counter({'-Wshorten-64-to-32': 1144, '-Wimplicit-int-conversion': 1038, ...})
 #   No. of failed targets: 679
 
+import os.path
 import re
 import sys
 

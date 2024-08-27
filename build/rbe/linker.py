@@ -13,9 +13,10 @@ import dataclasses
 import enum
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
-from typing import Iterable, Iterator, Optional, Sequence
+from typing import Iterable, Iterator, Optional, Sequence, Tuple, Union
 
 import cl_utils
 import depfile
@@ -339,6 +340,7 @@ class LinkerInvocation(object):
 
     def _ignore(self, directive: Directive) -> None:
         """Ignored directive."""
+        pass
 
     def _not_implemented(self, directive: Directive) -> Iterable[Path]:
         """Known unimplemented directive."""

@@ -9,7 +9,7 @@ import logging
 import os
 import os.path
 import time
-from typing import Any
+from typing import Any, Callable, Coroutine
 
 import fidl.fuchsia_developer_ffx as ffx
 from fuchsia_controller_py import Context, IsolateDir, ZxStatus

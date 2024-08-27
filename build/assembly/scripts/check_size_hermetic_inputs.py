@@ -8,7 +8,7 @@ import json
 import os
 import sys
 
-from assembly import FilePath, PackageManifest
+from assembly import FileEntry, FilePath, PackageManifest
 from serialization import json_load
 
 

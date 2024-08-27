@@ -94,6 +94,7 @@ def _execute_test(
                         "[Mobly Driver] - After terminating the mobly test, "
                         "it is still running even after waiting for 5 seconds"
                     )
+                    pass
                 driver.teardown()
 
             signal.signal(signal.SIGINT, sigterm_handler)

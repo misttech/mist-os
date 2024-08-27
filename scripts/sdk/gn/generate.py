@@ -29,6 +29,7 @@ PIGZ_PATH = os.path.join(
 )
 
 sys.path += [os.path.join(FUCHSIA_ROOT, "scripts", "sdk", "common")]
+from collections import namedtuple
 
 import template_model as model
 from files import copy_tree

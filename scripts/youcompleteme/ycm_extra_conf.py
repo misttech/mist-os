@@ -8,6 +8,7 @@
 import glob
 import os
 import re
+import stat
 import subprocess
 
 # NOTE: paths.py is a direct copy from //build/gn/paths.py

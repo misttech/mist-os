@@ -8,7 +8,8 @@ import os
 import shutil
 from dataclasses import dataclass
 from functools import total_ordering
-from typing import Iterable, TextIO, Union
+from os import PathLike
+from typing import Dict, Iterable, TextIO, Union
 
 import serialization
 

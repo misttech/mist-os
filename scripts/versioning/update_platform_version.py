@@ -9,8 +9,11 @@ Updates the Fuchsia platform version.
 import argparse
 import json
 import os
+import re
 import secrets
+import shutil
 import sys
+from pathlib import Path
 
 
 def _generate_random_abi_revision(already_used: set[int]) -> int:

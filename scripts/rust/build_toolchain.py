@@ -6,6 +6,7 @@
 import argparse
 import os
 import subprocess
+import sys
 
 FUCHSIA_ROOT = os.path.dirname(  # $root
     os.path.dirname(  # scripts

@@ -8,6 +8,7 @@ import argparse
 import json
 from pathlib import Path
 from sys import stderr
+from typing import Dict, List
 
 from fuchsia.tools.licenses.common_types import *
 from fuchsia.tools.licenses.spdx_types import *

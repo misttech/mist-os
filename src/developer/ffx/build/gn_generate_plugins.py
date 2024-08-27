@@ -7,6 +7,7 @@ import argparse
 import filecmp
 import os
 import shutil
+import string
 import sys
 import tempfile
 

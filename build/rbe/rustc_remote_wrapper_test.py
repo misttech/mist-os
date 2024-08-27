@@ -25,6 +25,8 @@ import rustc_remote_wrapper
 class ImmediateExit(Exception):
     """For mocking functions that do not return."""
 
+    pass
+
 
 def _write_file_contents(path: Path, contents: str) -> None:
     with open(path, "w") as f:
@@ -259,7 +261,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         depfile_contents = [str(d) + ":" for d in deps]
 
         with tempfile.TemporaryDirectory() as td:
-            Path(td)
+            tdp = Path(td)
             command = _strs([compiler, source, "-o", rlib])
             r = rustc_remote_wrapper.RustRemoteAction(
                 ["--", *command],
@@ -519,7 +521,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         rlib = Path("obj/foo.rlib")
         llvm_ir = Path("obj/foo.ll")
         deps = [Path("../foo/src/other.rs")]
-        Path("obj/foo.rlib.d")
+        depfile_path = Path("obj/foo.rlib.d")
         depfile_contents = [str(d) + ":" for d in deps]
         command = _strs([compiler, source, "-o", rlib, f"--emit=llvm-ir"])
         r = rustc_remote_wrapper.RustRemoteAction(
@@ -561,7 +563,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
         rlib = Path("obj/foo.rlib")
         llvm_ir = Path("obj/foo.ll")
         deps = [Path("../foo/src/other.rs")]
-        Path("obj/foo.rlib.d")
+        depfile_path = Path("obj/foo.rlib.d")
         depfile_contents = [str(d) + ":" for d in deps]
         command = _strs(
             [
@@ -1001,7 +1003,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
                     rustc_remote_wrapper.RustRemoteAction,
                     "_remote_rustc_shlibs",
                 ) as mock_shlibs:
-                    r.prepare()
+                    prepare_status = r.prepare()
 
         mock_deps.assert_called_once()
         mock_shlibs.assert_called_once()
@@ -1210,7 +1212,7 @@ class RustRemoteActionPrepareTests(unittest.TestCase):
                 rustc_remote_wrapper.RustRemoteAction,
                 "_rewrite_remote_or_local_depfile",
             ) as mock_rewrite:
-                r.run()
+                run_status = r.run()
             mock_rewrite.assert_called_with()
 
     def test_rewrite_remote_depfile(self) -> None:

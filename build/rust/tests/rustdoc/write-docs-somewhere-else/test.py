@@ -1,9 +1,10 @@
 # Copyright 2024 The Fuchsia Authors. All rights reserved.
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
+import unittest
 from sys import argv
-from unittest import TestCase
-from zipfile import Path
+from unittest import TestCase, main
+from zipfile import Path, ZipFile
 
 _doc_zip = argv.pop()
 

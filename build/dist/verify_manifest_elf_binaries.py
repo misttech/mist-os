@@ -296,7 +296,7 @@ def main():
                 )
                 manifest_entries[target] = source_file
     else:
-        args.input_manifest
+        input = args.input_manifest
         with open(args.partial_manifest) as f:
             partial_entries = json.load(f)
 

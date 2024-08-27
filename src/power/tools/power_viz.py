@@ -3,6 +3,7 @@
 # found in the LICENSE file.
 
 import argparse
+import itertools
 import json
 import os
 import re
@@ -11,7 +12,7 @@ import sys
 import zipfile
 from collections import deque
 from graphlib import TopologicalSorter
-from io import BufferedReader, TextIOWrapper
+from io import BufferedReader, StringIO, TextIOWrapper
 from tempfile import TemporaryDirectory
 from typing import Any
 

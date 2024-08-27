@@ -7,7 +7,9 @@
 """Helper functions for executing SDK Developer workflow tests.
 """
 
+import os
 import subprocess
+from typing import List
 
 
 class _SDKCommand:

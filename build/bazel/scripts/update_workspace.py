@@ -36,7 +36,9 @@ import difflib
 import errno
 import json
 import os
+import shutil
 import stat
+import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Callable, Sequence
@@ -693,7 +695,7 @@ def main() -> int:
     def create_workspace_symlink(path: str, target_path: str) -> None:
         generated.add_symlink(os.path.join("workspace", path), target_path)
 
-    os.path.relpath(__file__, fuchsia_dir)
+    script_path = os.path.relpath(__file__, fuchsia_dir)
 
     templates_dir = os.path.join(fuchsia_dir, "build", "bazel", "templates")
 

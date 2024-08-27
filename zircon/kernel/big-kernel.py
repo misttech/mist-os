@@ -53,7 +53,7 @@ class KernelHeader(namedtuple("ZbiHeader", ["entry", "reserve_memory_size"])):
 def kernel_memory_size(filename):
     with open(filename, "rb") as f:
         container = ZbiHeader(f)
-        ZbiHeader(f)
+        item = ZbiHeader(f)
         kernel = KernelHeader(f)
         load_size = ZBI_HEADER_FORMAT.size + container.length
         return load_size + kernel.reserve_memory_size

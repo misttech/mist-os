@@ -4,6 +4,7 @@
 # found in the LICENSE file.
 
 import argparse
+import collections
 import json
 import os
 import subprocess

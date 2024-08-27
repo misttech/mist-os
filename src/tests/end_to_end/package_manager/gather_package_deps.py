@@ -7,6 +7,8 @@ import argparse
 import io
 import json
 import os
+import re
+import shutil
 import sys
 import tarfile
 from typing import Any
