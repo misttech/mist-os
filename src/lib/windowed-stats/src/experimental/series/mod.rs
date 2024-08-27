@@ -11,7 +11,6 @@ pub mod interpolation;
 pub mod statistic;
 
 use derivative::Derivative;
-use num::{Num, Unsigned};
 use std::convert::Infallible;
 use std::fmt::Debug;
 use std::io;
@@ -91,49 +90,36 @@ pub trait RoundRobinSampler<T>: Sampler<TimedSample<T>, Error = FoldError> {
     ) -> Result<Vec<u8>, Self::Error>;
 }
 
-/// A type constructor that describes the semantics of data sampled from a column in an event.
+/// A type that describes the semantics of data folded by `Sampler`s.
 ///
 /// Data semantics determine how statistics are interpreted and time series are aggregated and
 /// buffered.
-pub trait DataSemantic {
-    /// The type of sample data associated with the data semantic.
-    type Sample: Clone;
-}
-
-/// The associated sample type of a `DataSemantic`.
-pub type Sample<T> = <T as DataSemantic>::Sample;
+pub trait DataSemantic {}
 
 /// A continually increasing value.
 ///
 /// Counters are analogous to an odometer in a vehicle.
-#[derive(Derivative)]
-#[derivative(Debug(bound = ""))]
-pub struct Counter<T>(PhantomData<fn() -> T>, Infallible);
+#[derive(Debug)]
+pub enum Counter {}
 
-impl<T> BufferStrategy<u64, LastAggregation> for Counter<T> {
+impl BufferStrategy<u64, LastAggregation> for Counter {
     type Buffer = DeltaSimple8bRle;
 }
 
-impl<T> BufferStrategy<u64, LastSample> for Counter<T> {
+impl BufferStrategy<u64, LastSample> for Counter {
     type Buffer = DeltaSimple8bRle;
 }
 
-impl<T> DataSemantic for Counter<T>
-where
-    T: Clone + Into<u64> + Unsigned,
-{
-    type Sample = T;
-}
+impl DataSemantic for Counter {}
 
 /// A fluctuating value.
 ///
 /// Gauges are analogous to a speedometer in a vehicle.
-#[derive(Derivative)]
-#[derivative(Debug(bound = ""))]
-pub struct Gauge<T>(PhantomData<fn() -> T>, Infallible);
+#[derive(Debug)]
+pub enum Gauge {}
 
 // Gauge semantics forward this implementation to the aggregation type.
-impl<T, A, P> BufferStrategy<A, P> for Gauge<T>
+impl<A, P> BufferStrategy<A, P> for Gauge
 where
     A: BufferStrategy<A, P>,
     P: Interpolation,
@@ -141,20 +127,16 @@ where
     type Buffer = A::Buffer;
 }
 
-impl<T> DataSemantic for Gauge<T>
-where
-    T: Clone + Num,
-{
-    type Sample = T;
-}
+impl DataSemantic for Gauge {}
 
-/// A set of bool value.
-#[derive(Derivative)]
-#[derivative(Debug(bound = ""))]
-pub struct BitSet<T>(PhantomData<fn() -> T>, Infallible);
+/// A set of Boolean values.
+///
+/// Bit sets are analogous to indicator lamps in a vehicle.
+#[derive(Debug)]
+pub enum BitSet {}
 
-// BitSet semantics forward this implementation to the aggregation type.
-impl<T, A, P> BufferStrategy<A, P> for BitSet<T>
+// Bit set semantics forward this implementation to the aggregation type.
+impl<A, P> BufferStrategy<A, P> for BitSet
 where
     A: BufferStrategy<A, P>,
     P: Interpolation,
@@ -162,12 +144,7 @@ where
     type Buffer = A::Buffer;
 }
 
-impl<T> DataSemantic for BitSet<T>
-where
-    T: Clone + Into<u64>,
-{
-    type Sample = T;
-}
+impl DataSemantic for BitSet {}
 
 /// A buffer of data from a single time series.
 #[derive(Clone, Debug)]
@@ -556,15 +533,14 @@ where
 
 #[cfg(test)]
 mod tests {
+    use fuchsia_async as fasync;
+
     use crate::experimental::clock::{TimedSample, Timestamp};
     use crate::experimental::series::interpolation::{Constant, LastAggregation, LastSample};
     use crate::experimental::series::statistic::{
         ArithmeticMean, LatchMax, Max, PostAggregation, Sum, Transform, Union,
     };
-    use crate::experimental::series::{
-        BitSet, Counter, Gauge, RoundRobinSampler, Sampler, SamplingProfile, TimeMatrix,
-    };
-    use fuchsia_async as fasync;
+    use crate::experimental::series::{RoundRobinSampler, Sampler, SamplingProfile, TimeMatrix};
 
     fn fold_and_interpolate_f32(sampler: &mut impl RoundRobinSampler<f32>) {
         sampler.fold(TimedSample::now(0.0)).unwrap();
@@ -573,30 +549,30 @@ mod tests {
         let _buffers = sampler.interpolate(Timestamp::now()).unwrap();
     }
 
-    // This test is considered successful as long as it builds.
-    // It's to ensure that `TimeMatrix` types operate as expected on a type level.
-    // TODO(https://fxbug.dev/356218503): Remove this unit test once we have unit tests that
-    // actually verify the output of TimeMatrix.
+    // TODO(https://fxbug.dev/356218503): Replace this with meaningful unit tests that assert the
+    //                                    outputs of a `TimeMatrix`.
+    // This "test" is considered successful as long as it builds.
     #[test]
     fn static_test_define_time_matrix() {
+        type Mean<T> = ArithmeticMean<T>;
+        type MeanTransform<T, F> = Transform<Mean<T>, F>;
+
         let _exec = fasync::TestExecutor::new_with_fake_time();
-        type MeanGauge<T> = ArithmeticMean<Gauge<T>>;
-        type MeanGaugeTransform<T, U> = Transform<MeanGauge<T>, U>;
 
         // Arithmetic mean time matrices.
-        let _ = TimeMatrix::<MeanGauge<f32>, Constant>::default();
-        let _ = TimeMatrix::<MeanGauge<f32>, LastSample>::new(
+        let _ = TimeMatrix::<Mean<f32>, Constant>::default();
+        let _ = TimeMatrix::<Mean<f32>, LastSample>::new(
             SamplingProfile::balanced(),
             LastSample::or(0.0f32),
         );
         let _ = TimeMatrix::<_, Constant>::with_statistic(
             SamplingProfile::granular(),
             Constant::default(),
-            MeanGauge::<f32>::default(),
+            Mean::<f32>::default(),
         );
 
         // Discrete arithmetic mean time matrices.
-        let mut matrix = TimeMatrix::<MeanGaugeTransform<f32, i64>, LastSample>::with_transform(
+        let mut matrix = TimeMatrix::<MeanTransform<f32, i64>, LastSample>::with_transform(
             SamplingProfile::highly_granular(),
             LastSample::or(0.0f32),
             |aggregation| aggregation.ceil() as i64,
@@ -607,41 +583,41 @@ mod tests {
         let mut matrix = TimeMatrix::<_, Constant>::with_statistic(
             SamplingProfile::default(),
             Constant::default(),
-            PostAggregation::<ArithmeticMean<Gauge<f32>>, _>::from_transform(|aggregation: f32| {
+            PostAggregation::<ArithmeticMean<f32>, _>::from_transform(|aggregation: f32| {
                 aggregation.ceil() as i64
             }),
         );
         fold_and_interpolate_f32(&mut matrix);
     }
 
-    // This test is considered successful as long as it builds.
-    // It's to ensure that `TimeMatrix` types operate as expected on a type level.
-    // TODO(https://fxbug.dev/356218503): Remove this unit test once we have unit tests that
-    // actually verify the output of TimeMatrix.
+    // TODO(https://fxbug.dev/356218503): Replace this with meaningful unit tests that assert the
+    //                                    outputs of a `TimeMatrix`.
+    // This "test" is considered successful as long as it builds.
     #[test]
     fn static_test_supported_statistic_and_interpolation_combinations() {
         let _exec = fasync::TestExecutor::new_with_fake_time();
-        let _ = TimeMatrix::<LatchMax<Counter<u64>>, LastSample>::default();
-        let _ = TimeMatrix::<LatchMax<Counter<u64>>, LastAggregation>::default();
-        let _ = TimeMatrix::<ArithmeticMean<Gauge<f32>>, Constant>::default();
-        let _ = TimeMatrix::<ArithmeticMean<Gauge<f32>>, LastSample>::default();
-        let _ = TimeMatrix::<ArithmeticMean<Gauge<f32>>, LastAggregation>::default();
-        let _ = TimeMatrix::<Sum<Gauge<u64>>, Constant>::default();
-        let _ = TimeMatrix::<Sum<Gauge<u64>>, LastSample>::default();
-        let _ = TimeMatrix::<Sum<Gauge<u64>>, LastAggregation>::default();
-        let _ = TimeMatrix::<Max<Gauge<u64>>, Constant>::default();
-        let _ = TimeMatrix::<Max<Gauge<u64>>, LastSample>::default();
-        let _ = TimeMatrix::<Max<Gauge<u64>>, LastAggregation>::default();
-        let _ = TimeMatrix::<Union<BitSet<u64>>, Constant>::default();
-        let _ = TimeMatrix::<Union<BitSet<u64>>, LastSample>::default();
-        let _ = TimeMatrix::<Union<BitSet<u64>>, LastAggregation>::default();
+
+        let _ = TimeMatrix::<ArithmeticMean<f32>, Constant>::default();
+        let _ = TimeMatrix::<ArithmeticMean<f32>, LastSample>::default();
+        let _ = TimeMatrix::<ArithmeticMean<f32>, LastAggregation>::default();
+        let _ = TimeMatrix::<LatchMax<u64>, LastSample>::default();
+        let _ = TimeMatrix::<LatchMax<u64>, LastAggregation>::default();
+        let _ = TimeMatrix::<Max<u64>, Constant>::default();
+        let _ = TimeMatrix::<Max<u64>, LastSample>::default();
+        let _ = TimeMatrix::<Max<u64>, LastAggregation>::default();
+        let _ = TimeMatrix::<Sum<u64>, Constant>::default();
+        let _ = TimeMatrix::<Sum<u64>, LastSample>::default();
+        let _ = TimeMatrix::<Sum<u64>, LastAggregation>::default();
+        let _ = TimeMatrix::<Union<u64>, Constant>::default();
+        let _ = TimeMatrix::<Union<u64>, LastSample>::default();
+        let _ = TimeMatrix::<Union<u64>, LastAggregation>::default();
     }
 
     #[test]
     fn time_matrix_with_simple8b_rle_buffer() {
         let exec = fasync::TestExecutor::new_with_fake_time();
         exec.set_fake_time(fasync::Time::from_nanos(3_000_000_000));
-        let mut time_matrix = TimeMatrix::<Max<Gauge<u64>>, Constant>::new(
+        let mut time_matrix = TimeMatrix::<Max<u64>, Constant>::new(
             SamplingProfile::highly_granular(),
             Constant::default(),
         );

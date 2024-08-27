@@ -528,7 +528,7 @@ mod tests {
     }
 
     impl Statistic for MockStatistic {
-        type Semantic = Counter<u64>;
+        type Semantic = Counter;
         type Sample = u64;
         type Aggregation = u64;
 
