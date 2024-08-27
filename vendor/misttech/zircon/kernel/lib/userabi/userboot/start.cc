@@ -1,3 +1,4 @@
+// Copyright 2024 Mist Tecnologia LTDA
 // Copyright 2016 The Fuchsia Authors
 //
 // Use of this source code is governed by a MIT-style
@@ -109,17 +110,17 @@ void ParseNextProcessArguments(const zx::debuglog& log, std::string_view next, u
 // BOOTFS VMO, and a debuglog handle (tied to stdout).
 //
 // In total we're passing along three more handles than we got.
-constexpr uint32_t kThreadSelf = kHandleCount;
-constexpr uint32_t kBootfsVmo = kHandleCount + 1;
-constexpr uint32_t kDebugLog = kHandleCount + 2;
+//constexpr uint32_t kThreadSelf = kHandleCount;
+//constexpr uint32_t kBootfsVmo = kHandleCount + 1;
+//constexpr uint32_t kDebugLog = kHandleCount + 2;
 
 // Hand a svc channel to the child process to be launched.
 // Fuchsia C runtime will pull this handle and automatically create the endpoint on process startup.
-constexpr uint32_t kSvcStub = kHandleCount + 3;
-constexpr uint32_t kSvcNameIndex = 0;
+//constexpr uint32_t kSvcStub = kHandleCount + 3;
+//constexpr uint32_t kSvcNameIndex = 0;
 
 // A channel containing all the pipelined messages through `fuchsia.boot.Userboot` protocol.
-constexpr uint32_t kUserbootProtocol = kHandleCount + 4;
+//constexpr uint32_t kUserbootProtocol = kHandleCount + 4;
 
 constexpr uint32_t kChildHandleCount = kHandleCount + 5;
 
@@ -127,14 +128,15 @@ constexpr uint32_t kChildHandleCount = kHandleCount + 5;
 struct ChildMessageLayout {
   zx_proc_args_t header{};
   std::array<char, kProcessArgsMaxBytes> args;
-  std::array<uint32_t, kChildHandleCount> info;
-  std::array<char, 5> names = cpp20::to_array("/svc");
+  // std::array<uint32_t, kChildHandleCount> info;
+  // std::array<char, 5> names = cpp20::to_array("/svc");
 };
 
 static_assert(alignof(std::array<uint32_t, kChildHandleCount>) ==
               alignof(uint32_t[kChildHandleCount]));
 static_assert(alignof(std::array<char, kChildHandleCount>) == alignof(char[kProcessArgsMaxBytes]));
 
+#if 0
 constexpr std::array<uint32_t, kChildHandleCount> HandleInfoTable() {
   std::array<uint32_t, kChildHandleCount> info = {};
   // Fill in the handle info table.
@@ -181,6 +183,7 @@ constexpr ChildMessageLayout CreateChildMessage() {
 
   return child_message;
 }
+#endif
 
 std::array<zx_handle_t, kChildHandleCount> ExtractHandles(zx::channel bootstrap) {
   // Default constructed debuglog will force check/fail to fallback to |zx_debug_write|.
@@ -222,8 +225,8 @@ struct ChildContext {
   zx::vmar reserved_vmar;
   zx::thread thread;
 
-  zx::channel svc_client;
-  zx::channel svc_server;
+  // zx::channel svc_client;
+  // zx::channel svc_server;
 
   std::array<zx_handle_t, kChildHandleCount> handles = {};
 };
@@ -246,6 +249,7 @@ ChildContext CreateChildContext(const zx::debuglog& log, std::string_view name,
   check(log, status, "Failed to create main thread for child process(%.*s).",
         static_cast<int>(name.length()), name.data());
 
+#if 0
   status = zx::channel::create(0, &child.svc_client, &child.svc_server);
   check(log, status, "Failed to create svc channels.");
 
@@ -265,10 +269,11 @@ ChildContext CreateChildContext(const zx::debuglog& log, std::string_view name,
 
     child.handles[i] = RawDuplicateOrDie(log, handles[i]);
   }
-
+#endif
   return child;
 }
 
+#if 0
 void SetChildHandles(const zx::debuglog& log, const zx::vmo& bootfs_vmo, ChildContext& child) {
   child.handles[kBootfsVmo] = DuplicateOrDie(log, bootfs_vmo).release();
   child.handles[kDebugLog] = DuplicateOrDie(log, log).release();
@@ -304,6 +309,7 @@ void SetUserbootProtocolHandle(const zx::debuglog& log, zx::channel stash,
   check(log, status, "Failed to obtain handle information. Bad handle at %d with value %x",
         static_cast<int>(kUserbootProtocol), handle);
 }
+#endif
 
 // Set of resources created in userboot.
 struct Resources {
@@ -333,26 +339,25 @@ zx::channel StartChildProcess(const zx::debuglog& log, const Options::ProgramInf
                               Bootfs& bootfs, size_t handle_count) {
   size_t stack_size = ZIRCON_DEFAULT_STACK_SIZE;
 
-  zx::channel to_child, bootstrap;
-  auto status = zx::channel::create(0, &to_child, &bootstrap);
-  check(log, status, "zx_channel_create failed for child stack");
+  // zx::channel to_child, bootstrap;
+  // auto status = zx::channel::create(0, &to_child, &bootstrap);
+  // check(log, status, "zx_channel_create failed for child stack");
 
   zx::channel loader_svc;
 
   // Examine the bootfs image and find the requested file in it.
   // This will handle a PT_INTERP by doing a second lookup in bootfs.
-  zx_vaddr_t entry =
-      elf_load_bootfs(log, bootfs, elf_entry.root, child.process, child.vmar, child.thread,
-                      elf_entry.filename(), to_child, &stack_size, &loader_svc);
+  zx_vaddr_t entry = elf_load_bootfs(log, bootfs, elf_entry.root, child.process, child.vmar,
+                                     child.thread, elf_entry.filename(), &stack_size);
 
   // Now load the vDSO into the child, so it has access to system calls.
-  zx_vaddr_t vdso_base =
-      elf_load_vdso(log, child.vmar, *zx::unowned_vmo{child.handles[kFirstVdso]});
+  /*zx_vaddr_t vdso_base =
+      elf_load_vdso(log, child.vmar, *zx::unowned_vmo{child.handles[kFirstVdso]});*/
 
   stack_size = (stack_size + zx_system_get_page_size() - 1) &
                -static_cast<uint64_t>(zx_system_get_page_size());
   zx::vmo stack_vmo;
-  status = zx::vmo::create(stack_size, 0, &stack_vmo);
+  auto status = zx::vmo::create(stack_size, 0, &stack_vmo);
   check(log, status, "zx_vmo_create failed for child stack");
   stack_vmo.set_property(ZX_PROP_NAME, kStackVmoName, sizeof(kStackVmoName) - 1);
   zx_vaddr_t stack_base;
@@ -368,14 +373,17 @@ zx::channel StartChildProcess(const zx::debuglog& log, const Options::ProgramInf
   // We're done doing mappings, so clear out the reservation VMAR.
   check(log, child.reserved_vmar.destroy(), "zx_vmar_destroy failed on reservation VMAR handle");
   child.reserved_vmar.reset();
+
+  /*
   // Now send the bootstrap message.  This transfers away all the handles
   // we have left except the process and thread themselves.
   status = to_child.write(0, &child_message, sizeof(child_message), child.handles.data(),
                           static_cast<uint32_t>(handle_count));
   check(log, status, "zx_channel_write to child failed");
+*/
 
   // Start the process going.
-  status = child.process.start(child.thread, entry, sp, std::move(bootstrap), vdso_base);
+  status = child.process.start(child.thread, entry, sp, zx::resource(), 0);
   check(log, status, "zx_process_start failed");
   child.thread.reset();
 
@@ -455,20 +463,6 @@ struct TerminationInfo {
 
   auto [power, vmex] = CreateResources(log, handles);
 
-  // These channels will speak `fuchsia.boot.Userboot` protocol.
-  zx::channel userboot_server, userboot_client;
-  status = zx::channel::create(0, &userboot_server, &userboot_client);
-  check(log, status, "Failed to create fuchsia.boot.Userboot channel.");
-
-  // These channels will speak `fuchsia.boot.SvcStash` protocol.
-  zx::channel svc_stash_server, svc_stash_client;
-  status = zx::channel::create(0, &svc_stash_server, &svc_stash_client);
-  check(log, status, "Failed to create fuchsia.boot.SvcStash channel.");
-
-  // Immediately stash the SvcStash server handle into the `fuchsia.boot.Userboot protocol` channel.
-  check(log, UserbootPostStashSvc(userboot_client, std::move(svc_stash_server)).status_value(),
-        "UserbootPost of SvcStash handle failed.");
-
   // Locate the ZBI_TYPE_STORAGE_BOOTFS item and decompress it. This will be used to load
   // the binary referenced by userboot.next, as well as libc. Bootfs will be fully parsed
   // and hosted under '/boot' either by bootsvc or component manager.
@@ -486,21 +480,18 @@ struct TerminationInfo {
     auto borrowed_bootfs = bootfs_vmo.borrow();
     Bootfs bootfs{vmar_self.borrow(), std::move(bootfs_vmo), std::move(vmex),
                   DuplicateOrDie(log, log)};
-    auto launch_process = [&](auto& elf_entry,
-                              zx::channel userboot_protocol = zx::channel()) -> ChildContext {
-      ChildMessageLayout child_message = CreateChildMessage();
+    auto launch_process = [&](auto& elf_entry) -> ChildContext {
+      ChildMessageLayout child_message;  // = CreateChildMessage();
       ChildContext child = CreateChildContext(log, elf_entry.filename(), handles);
       size_t handle_count = kChildHandleCount - 1;
 
-      check(log, SvcStashStore(svc_stash_client, std::move(child.svc_server)).status_value(),
-            "Failed to stash svc handle from (%.*s)",
-            static_cast<int>(elf_entry.filename().length()), elf_entry.filename().data());
-
+#if 0
       SetChildHandles(log, *borrowed_bootfs, child);
       if (userboot_protocol) {
         SetUserbootProtocolHandle(log, std::move(userboot_protocol), child.handles);
         handle_count++;
       }
+#endif
 
       // Fill in any '+' separated arguments provided by `userboot.next`. If arguments are longer
       // than kProcessArgsMaxBytes, this function will fail process creation.
@@ -514,10 +505,10 @@ struct TerminationInfo {
              elf_entry.filename().data());
 
       // Now become the loader service for as long as that's needed.
-      if (loader_svc) {
+      /*if (loader_svc) {
         LoaderService ldsvc(DuplicateOrDie(log, log), &bootfs, elf_entry.root);
         ldsvc.Serve(std::move(loader_svc));
-      }
+      }*/
 
       return child;
     };
@@ -532,7 +523,7 @@ struct TerminationInfo {
     }
 
     if (!opts.boot.next.empty()) {
-      [[maybe_unused]] auto boot_context = launch_process(opts.boot, std::move(userboot_server));
+      [[maybe_unused]] auto boot_context = launch_process(opts.boot);
     }
   }
   HandleTermination(log, info);
