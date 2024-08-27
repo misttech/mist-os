@@ -18,6 +18,9 @@
     use: [
         {
             protocol: [
+                // GraphicalPresenter is used only if the `--use-graphical-presenter` arg
+                // is passed to the program.
+                "fuchsia.element.GraphicalPresenter",
                 "fuchsia.sysmem.Allocator",
                 "fuchsia.sysmem2.Allocator",
                 "fuchsia.ui.composition.Allocator",
@@ -27,6 +30,8 @@
     ],
     expose: [
         {
+            // ViewProvider is used only if the `--use-graphical-presenter` arg
+            // is NOT passed to the program.
             protocol: [ "fuchsia.ui.app.ViewProvider" ],
             from: "self",
             to: "parent",
