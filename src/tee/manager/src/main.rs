@@ -20,6 +20,10 @@ use tee_internal::binding::TEE_ERROR_TARGET_DEAD;
 struct TAConfig {
     url: String,
     single_instance: bool,
+    // TODO: Support multiSession functionality.
+    multi_session: bool,
+    // TODO: Support instanceKeepAlive functionality.
+    instance_keep_alive: bool,
     capabilities: Vec<()>,
 }
 
