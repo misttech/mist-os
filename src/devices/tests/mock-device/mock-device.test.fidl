@@ -52,9 +52,6 @@ type AddDeviceAction = resource struct {
     /// debug messages.
     name string:MAX_NAME_LEN;
 
-    /// The properties to attach the newly created device
-    properties vector<uint64>:MAX_PROPERTIES_LEN;
-
     /// The expected return status from device_add()
     expect_status zx.Status;
 };

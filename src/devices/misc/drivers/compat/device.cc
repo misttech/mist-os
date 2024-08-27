@@ -111,18 +111,8 @@ namespace compat {
 std::vector<fuchsia_driver_framework::wire::NodeProperty> CreateProperties(
     fidl::AnyArena& arena, fdf::Logger& logger, device_add_args_t* zx_args) {
   std::vector<fuchsia_driver_framework::wire::NodeProperty> properties;
-  properties.reserve(zx_args->prop_count + zx_args->str_prop_count +
-                     zx_args->fidl_service_offer_count + 1);
+  properties.reserve(zx_args->str_prop_count + zx_args->fidl_service_offer_count + 1);
   bool has_protocol = false;
-  for (auto [id, _, value] : cpp20::span(zx_args->props, zx_args->prop_count)) {
-    properties.emplace_back(fdf::MakeProperty(arena, id, value));
-    // TODO(b/361852885): Remove this hard-coded key once support for integer-based
-    // keys is removed.
-    if (id == 0x01 /* BIND_PROTOCOL */) {
-      has_protocol = true;
-    }
-  }
-
   for (auto [key, value] : cpp20::span(zx_args->str_props, zx_args->str_prop_count)) {
     if (key == bind_fuchsia::PROTOCOL) {
       has_protocol = true;

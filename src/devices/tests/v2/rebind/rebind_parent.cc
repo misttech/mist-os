@@ -11,11 +11,12 @@
 #include <lib/driver/legacy-bind-constants/legacy-bind-constants.h>
 #include <lib/driver/logging/cpp/structured_logger.h>
 #include <zircon/errors.h>
-#include <bind/fuchsia/cpp/bind.h>
 
 #include <optional>
 #include <string>
 #include <unordered_map>
+
+#include <bind/fuchsia/cpp/bind.h>
 
 #include "lib/zx/result.h"
 

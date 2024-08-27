@@ -394,7 +394,7 @@ zx_status_t PlatformDevice::Start() {
   }
 
   ddk::DeviceAddArgs args(name);
-  args.set_props(dev_props).set_str_props(dev_str_props).set_proto_id(ZX_PROTOCOL_PDEV);
+  args.set_str_props(dev_str_props).set_proto_id(ZX_PROTOCOL_PDEV);
 
   std::array fidl_service_offers = {
       fuchsia_hardware_platform_device::Service::Name,

@@ -127,12 +127,6 @@ typedef struct device_add_args {
   // Pointer to device's device protocol operations
   const zx_protocol_device_t* ops;
 
-  // Optional list of device properties.
-  const zx_device_prop_t* props;
-
-  // Number of device properties
-  uint32_t prop_count;
-
   // Optional list of device string properties.
   const zx_device_str_prop_t* str_props;
 

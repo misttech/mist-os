@@ -160,42 +160,6 @@ TEST_F(DeviceTest, RemoveChildren) {
   parent.parent().reset();
 }
 
-// TODO(b/361852885): Remove this test once integer based property keys are
-// removed.
-TEST_F(DeviceTest, AddChildWithProtoPropAndProtoId) {
-  fdf_testing::TestNode node("root", dispatcher());
-  zx::result node_client = node.CreateNodeChannel();
-  ASSERT_EQ(ZX_OK, node_client.status_value());
-
-  // Create a device.
-  zx_protocol_device_t ops{};
-  compat::Device parent(compat::kDefaultDevice, &ops, nullptr, std::nullopt, logger(),
-                        dispatcher());
-  parent.Bind({std::move(node_client.value()), dispatcher()});
-
-  // Add a child device.
-  zx_device_prop_t prop{.id = 0x01 /* BIND_PROTOCOL */, .value = ZX_PROTOCOL_I2C};
-  device_add_args_t args{
-      .name = "child", .props = &prop, .prop_count = 1, .proto_id = ZX_PROTOCOL_BLOCK};
-  zx_device_t* child = nullptr;
-  ASSERT_EQ(ZX_OK, parent.Add(&args, &child));
-  ASSERT_EQ(ZX_OK, child->CreateNode());
-
-  EXPECT_NE(nullptr, child);
-  EXPECT_STREQ("child", child->Name());
-  EXPECT_TRUE(parent.HasChildren());
-
-  ASSERT_TRUE(RunLoopUntilIdle());
-
-  // Check the child was added with the right properties.
-  ASSERT_EQ(node.children().count("child"), 1ul);
-  const fdf_testing::TestNode& child_node = node.children().at("child");
-  std::vector properties = child_node.GetProperties();
-  ASSERT_EQ(1ul, properties.size());
-  ASSERT_EQ(properties[0].key().int_value().value(), 0x01u /* BIND_PROTOCOL */);
-  ASSERT_EQ(properties[0].value().int_value().value(), static_cast<uint32_t>(ZX_PROTOCOL_I2C));
-}
-
 TEST_F(DeviceTest, AddChildWithProtoStrPropAndProtoId) {
   fdf_testing::TestNode node("root", dispatcher());
   zx::result node_client = node.CreateNodeChannel();
@@ -745,12 +709,6 @@ TEST_F(DeviceTest, CreateNodeProperties) {
                                               fidl::WireClient<fuchsia_logger::LogSink>());
   device_add_args_t args = {};
 
-  zx_device_prop_t prop;
-  prop.id = 11;
-  prop.value = 2;
-  args.props = &prop;
-  args.prop_count = 1;
-
   zx_device_str_prop_t str_prop;
   str_prop.key = "test";
   str_prop.property_value = str_prop_int_val(5);
@@ -769,14 +727,11 @@ TEST_F(DeviceTest, CreateNodeProperties) {
 
   auto properties = compat::CreateProperties(arena, *logger, &args);
 
-  ASSERT_EQ(3ul, properties.size());
+  ASSERT_EQ(2ul, properties.size());
 
-  EXPECT_EQ(11u, properties[0].key.int_value());
-  EXPECT_EQ(2u, properties[0].value.int_value());
+  EXPECT_EQ("test", properties[0].key.string_value().get());
+  EXPECT_EQ(5u, properties[0].value.int_value());
 
-  EXPECT_EQ("test", properties[1].key.string_value().get());
-  EXPECT_EQ(5u, properties[1].value.int_value());
-
-  EXPECT_EQ(bind_fuchsia::PROTOCOL, properties[2].key.string_value().get());
-  EXPECT_EQ(10u, properties[2].value.int_value());
+  EXPECT_EQ(bind_fuchsia::PROTOCOL, properties[1].key.string_value().get());
+  EXPECT_EQ(10u, properties[1].value.int_value());
 }

@@ -44,9 +44,6 @@ MockDevice::MockDevice(device_add_args_t* args, MockDevice* parent)
   if (args->proto_id && args->proto_ops) {
     AddProtocol(args->proto_id, args->proto_ops, ctx_);
   }
-  if (args->props) {
-    props_.insert(props_.begin(), args->props, args->props + args->prop_count);
-  }
   if (args->str_props) {
     str_props_.insert(str_props_.begin(), args->str_props, args->str_props + args->str_prop_count);
   }

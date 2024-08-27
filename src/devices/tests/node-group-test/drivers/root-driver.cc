@@ -25,18 +25,13 @@ zx_status_t RootDriver::Bind(void* ctx, zx_device_t* dev) {
   [[maybe_unused]] auto ptr = root_dev.release();
 
   // Add 2 children that matches the first node group node.
-  zx_device_prop_t fragment_props_1[] = {
-      {50, 0, 10},
-  };
-
   zx_device_str_prop_t str_fragment_props_1[] = {
-      ddk::MakeStrProperty(bind_test::FLAG, false),
+      ddk::MakeStrProperty(bind_test::FLAG, true),
   };
 
   auto fragment_dev_a_1 = std::make_unique<RootDriver>(dev);
   status =
       fragment_dev_a_1->DdkAdd(ddk::DeviceAddArgs("node_group_fragment_a_1")
-                                   .set_props(fragment_props_1)
                                    .set_str_props(str_fragment_props_1)
                                    .set_proto_id(bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD));
   if (status != ZX_OK) {
@@ -47,7 +42,6 @@ zx_status_t RootDriver::Bind(void* ctx, zx_device_t* dev) {
   auto fragment_dev_a_2 = std::make_unique<RootDriver>(dev);
   status =
       fragment_dev_a_2->DdkAdd(ddk::DeviceAddArgs("node_group_fragment_a_2")
-                                   .set_props(fragment_props_1)
                                    .set_str_props(str_fragment_props_1)
                                    .set_proto_id(bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD));
   if (status != ZX_OK) {

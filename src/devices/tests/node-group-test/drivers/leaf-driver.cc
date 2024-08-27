@@ -26,10 +26,8 @@ zx_status_t LeafDriver::Bind(void* ctx, zx_device_t* device) {
   }
 
   // Add node group.
-  const uint32_t node_1_bind_rule_1_values[] = {10, 3};
   const ddk::BindRule node_1_bind_rules[] = {
-      ddk::MakeAcceptBindRuleList(50, node_1_bind_rule_1_values),
-      ddk::MakeRejectBindRule(bind_test::FLAG, true),
+      ddk::MakeAcceptBindRule(bind_test::FLAG, true),
   };
 
   const device_bind_prop_t node_1_properties[] = {

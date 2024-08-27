@@ -27,12 +27,8 @@ zx_status_t RootDriver::Bind(void* ctx, zx_device_t* dev) {
   [[maybe_unused]] auto ptr = root_dev.release();
 
   // Add 2 children that matches the first composite node spec node.
-  zx_device_prop_t fragment_props[] = {
-      {50, 0, 10},
-  };
-
   zx_device_str_prop_t str_fragment_props[] = {
-      {bind_test::FLAG.c_str(), str_prop_bool_val(false)},
+      {bind_test::FLAG.c_str(), str_prop_bool_val(true)},
   };
 
   auto dispatcher = fdf::Dispatcher::GetCurrent();
@@ -45,7 +41,6 @@ zx_status_t RootDriver::Bind(void* ctx, zx_device_t* dev) {
       frct::Service::Name,
   };
   status = fragment_dev_a->DdkAdd(ddk::DeviceAddArgs("composite_fragment_a")
-                                      .set_props(fragment_props)
                                       .set_str_props(str_fragment_props)
                                       .set_proto_id(bind_fuchsia_test::BIND_PROTOCOL_COMPAT_CHILD)
                                       .set_runtime_service_offers(offers)

@@ -50,22 +50,14 @@ zx_status_t PlatformInterruptFragment::Add(const char* name, PlatformDevice* pde
       fuchsia_hardware_interrupt::Service::Name,
   };
 
-  std::vector<zx_device_prop_t> props;
   std::vector<zx_device_str_prop_t> str_props;
 
   if (irq.properties().has_value()) {
     for (auto& prop : irq.properties().value()) {
       switch (prop.key().Which()) {
         case fuchsia_driver_framework::NodePropertyKey::Tag::kIntValue:
-          if (prop.value().Which() != fuchsia_driver_framework::NodePropertyValue::Tag::kIntValue) {
-            return ZX_ERR_NOT_SUPPORTED;
-          }
-          props.emplace_back(zx_device_prop_t{
-              .id = static_cast<uint16_t>(prop.key().int_value().value()),
-              .value = prop.value().int_value().value(),
-          });
-          break;
-
+          zxlogf(ERROR, "Integer-based keys no longer supported.");
+          return ZX_ERR_NOT_SUPPORTED;
         case fuchsia_driver_framework::NodePropertyKey::Tag::kStringValue: {
           auto& str_prop = str_props.emplace_back(zx_device_str_prop_t{
               .key = prop.key().string_value()->data(),
@@ -109,7 +101,6 @@ zx_status_t PlatformInterruptFragment::Add(const char* name, PlatformDevice* pde
                     .set_flags(DEVICE_ADD_MUST_ISOLATE)
                     .set_fidl_service_offers(offers)
                     .set_outgoing_dir(endpoints->client.TakeChannel())
-                    .set_props(props)
                     .set_str_props(str_props));
 }
 
