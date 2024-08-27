@@ -43,8 +43,8 @@ zx::result<> TiTca6408aDevice::Start() {
 
   device_ = std::make_unique<TiTca6408a>(std::move(i2c));
 
-  auto result = outgoing()->AddService<fuchsia_hardware_gpioimpl::Service>(
-      fuchsia_hardware_gpioimpl::Service::InstanceHandler({
+  auto result = outgoing()->AddService<fuchsia_hardware_pinimpl::Service>(
+      fuchsia_hardware_pinimpl::Service::InstanceHandler({
           .device = bindings_.CreateHandler(device_.get(), fdf::Dispatcher::GetCurrent()->get(),
                                             fidl::kIgnoreBindingClosure),
       }));
@@ -67,7 +67,7 @@ zx::result<> TiTca6408aDevice::CreateNode() {
   fidl::Arena arena;
   auto offers = compat_server_.CreateOffers2(arena);
   offers.push_back(
-      fdf::MakeOffer2<fuchsia_hardware_gpioimpl::Service>(arena, component::kDefaultInstance));
+      fdf::MakeOffer2<fuchsia_hardware_pinimpl::Service>(arena, component::kDefaultInstance));
 
   auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                   .name(arena, kDeviceName)
@@ -87,60 +87,13 @@ zx::result<> TiTca6408aDevice::CreateNode() {
   return zx::ok();
 }
 
-void TiTca6408a::ConfigIn(ConfigInRequest& request, ConfigInCompleter::Sync& completer) {
-  if (!IsIndexInRange(request.index())) {
-    completer.Reply(fit::error(ZX_ERR_OUT_OF_RANGE));
-    return;
-  }
-
-  if (request.flags() != fuchsia_hardware_gpio::GpioFlags::kNoPull) {
-    completer.Reply(fit::error(ZX_ERR_NOT_SUPPORTED));
-    return;
-  }
-
-  auto result = SetBit(Register::kConfiguration, request.index());
-  if (result.is_error()) {
-    completer.Reply(fit::error(result.error_value()));
-    return;
-  }
-  completer.Reply(fit::ok());
-}
-
-void TiTca6408a::ConfigOut(ConfigOutRequest& request, ConfigOutCompleter::Sync& completer) {
-  if (zx_status_t status = Write(request.index(), request.initial_value()); status != ZX_OK) {
-    completer.Reply(zx::error(status));
-    return;
-  }
-  auto result = ClearBit(Register::kConfiguration, request.index());
-  if (result.is_error()) {
-    completer.Reply(zx::error(result.status_value()));
-    return;
-  }
-  completer.Reply(fit::ok());
-}
-
-void TiTca6408a::SetAltFunction(SetAltFunctionRequest& request,
-                                SetAltFunctionCompleter::Sync& completer) {
-  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-}
-
-void TiTca6408a::SetDriveStrength(SetDriveStrengthRequest& request,
-                                  SetDriveStrengthCompleter::Sync& completer) {
-  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-}
-
-void TiTca6408a::GetDriveStrength(GetDriveStrengthRequest& request,
-                                  GetDriveStrengthCompleter::Sync& completer) {
-  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
-}
-
 void TiTca6408a::Read(ReadRequest& request, ReadCompleter::Sync& completer) {
-  if (!IsIndexInRange(request.index())) {
-    completer.Reply(zx::error(ZX_ERR_OUT_OF_RANGE));
+  if (!IsIndexInRange(request.pin())) {
+    completer.Reply(zx::error(ZX_ERR_NOT_FOUND));
     return;
   }
 
-  zx::result<uint8_t> value = ReadBit(Register::kInputPort, request.index());
+  zx::result<uint8_t> value = ReadBit(Register::kInputPort, request.pin());
   if (value.is_error()) {
     completer.Reply(zx::error(value.error_value()));
     return;
@@ -149,27 +102,36 @@ void TiTca6408a::Read(ReadRequest& request, ReadCompleter::Sync& completer) {
   completer.Reply(fit::ok(value.value()));
 }
 
-void TiTca6408a::Write(WriteRequest& request, WriteCompleter::Sync& completer) {
-  auto status = Write(request.index(), request.value());
-  if (status != ZX_OK) {
-    completer.Reply(fit::error(status));
+void TiTca6408a::SetBufferMode(SetBufferModeRequest& request,
+                               SetBufferModeCompleter::Sync& completer) {
+  if (!IsIndexInRange(request.pin())) {
+    completer.Reply(zx::error(ZX_ERR_NOT_FOUND));
     return;
   }
-  completer.Reply(fit::ok());
-}
 
-zx_status_t TiTca6408a::Write(uint32_t index, uint8_t value) {
-  if (!IsIndexInRange(index)) {
-    return ZX_ERR_OUT_OF_RANGE;
+  if (request.mode() == fuchsia_hardware_gpio::BufferMode::kInput) {
+    completer.Reply(SetBit(Register::kConfiguration, request.pin()));
+    return;
   }
 
-  const zx::result<> status =
-      value ? SetBit(Register::kOutputPort, index) : ClearBit(Register::kOutputPort, index);
-  return status.status_value();
+  zx::result<> status = request.mode() == fuchsia_hardware_gpio::BufferMode::kOutputHigh
+                            ? SetBit(Register::kOutputPort, request.pin())
+                            : ClearBit(Register::kOutputPort, request.pin());
+  if (status.is_error()) {
+    completer.Reply(status);
+    return;
+  }
+
+  completer.Reply(ClearBit(Register::kConfiguration, request.pin()));
 }
 
 void TiTca6408a::GetInterrupt(GetInterruptRequest& request,
                               GetInterruptCompleter::Sync& completer) {
+  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+}
+
+void TiTca6408a::ConfigureInterrupt(ConfigureInterruptRequest& request,
+                                    ConfigureInterruptCompleter::Sync& completer) {
   completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
 }
 
@@ -178,15 +140,15 @@ void TiTca6408a::ReleaseInterrupt(ReleaseInterruptRequest& request,
   completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
 }
 
-void TiTca6408a::SetPolarity(SetPolarityRequest& request, SetPolarityCompleter::Sync& completer) {
-  completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+void TiTca6408a::Configure(ConfigureRequest& request, ConfigureCompleter::Sync& completer) {
+  if (request.config().function() || request.config().drive_strength_ua()) {
+    return completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  }
+  if (request.config().pull() && *request.config().pull() != fuchsia_hardware_pin::Pull::kNone) {
+    return completer.Reply(zx::error(ZX_ERR_NOT_SUPPORTED));
+  }
+  completer.Reply(zx::ok(request.config()));
 }
-
-void TiTca6408a::GetPins(GetPinsCompleter::Sync& completer) {}
-
-void TiTca6408a::GetInitSteps(GetInitStepsCompleter::Sync& completer) {}
-
-void TiTca6408a::GetControllerId(GetControllerIdCompleter::Sync& completer) { completer.Reply(0); }
 
 zx::result<uint8_t> TiTca6408a::ReadBit(Register reg, uint32_t index) {
   const auto bit = static_cast<uint8_t>(1 << index);
