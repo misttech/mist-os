@@ -6,4 +6,10 @@ group("vdso-code-header") {
   _vdso_toolchain = "//zircon/kernel:kernel_${target_cpu}"
   public_deps =
       [ "//zircon/kernel/lib/userabi:vdso-code-header($_vdso_toolchain)" ]
+
+  if (is_mistos) {
+    public_deps -=
+        [ "//zircon/kernel/lib/userabi:vdso-code-header($_vdso_toolchain)" ]
+    public_deps = [ "//vendor/misttech/zircon/kernel/lib/userabi:vdso-code-header($_vdso_toolchain)" ]
+  }
 }

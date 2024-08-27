@@ -167,6 +167,10 @@ if (toolchain_environment == "physmem" ||
       "//zircon/system/ulib/pretty",
       "//zircon/system/ulib/zx",
     ]
+    if (is_mistos) {
+      deps -= [ "//zircon/kernel/lib/userabi:headers" ]
+      deps += [ "//vendor/misttech/zircon/kernel/lib/userabi:headers" ]
+    }
   }
 
   # This is linked into the ZBI kernel, but not the PIE (ELF) kernel.
