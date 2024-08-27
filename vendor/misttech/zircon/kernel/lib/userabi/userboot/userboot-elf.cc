@@ -24,7 +24,7 @@
 
 namespace {
 
-#define INTERP_PREFIX "lib/"
+#define INTERP_PREFIX ""
 
 constexpr size_t kMaxSegments = 4;
 constexpr size_t kMaxPhdrs = 16;
@@ -82,6 +82,7 @@ zx_vaddr_t load(const zx::debuglog& log, std::string_view what, const zx::vmar& 
   return return_entry ? entry : base;
 }
 
+#if 0
 enum loader_bootstrap_handle_index {
   BOOTSTRAP_EXEC_VMO,
   BOOTSTRAP_LOGGER,
@@ -159,6 +160,7 @@ void stuff_loader_bootstrap(const zx::debuglog& log, const zx::process& proc,
   zx_status_t status = to_child.write(0, &msg, sizeof(msg), handles, std::size(handles));
   check(log, status, "zx_channel_write of loader bootstrap message failed");
 }
+#endif
 
 }  // namespace
 
@@ -168,8 +170,8 @@ zx_vaddr_t elf_load_vdso(const zx::debuglog& log, const zx::vmar& vmar, const zx
 
 zx_vaddr_t elf_load_bootfs(const zx::debuglog& log, Bootfs& bootfs, std::string_view root,
                            const zx::process& proc, const zx::vmar& vmar, const zx::thread& thread,
-                           std::string_view filename, const zx::channel& to_child,
-                           size_t* stack_size, zx::channel* loader_svc) {
+                           std::string_view filename, /*const zx::channel& to_child,*/
+                           size_t* stack_size /*, zx::channel* loader_svc*/) {
   zx::vmo vmo = bootfs.Open(root, filename, "program");
 
   uintptr_t interp_off = 0;
@@ -209,8 +211,8 @@ zx_vaddr_t elf_load_bootfs(const zx::debuglog& log, Bootfs& bootfs, std::string_
     zx::vmar interp_vmar;
     entry = load(log, interp, vmar, interp_vmo, NULL, NULL, &interp_vmar, NULL, true);
 
-    stuff_loader_bootstrap(log, proc, vmar, thread, to_child, std::move(interp_vmar),
-                           std::move(vmo), loader_svc);
+    /*stuff_loader_bootstrap(log, proc, vmar, thread, to_child, std::move(interp_vmar),
+                           std::move(vmo), loader_svc);*/
   }
   return entry;
 }
