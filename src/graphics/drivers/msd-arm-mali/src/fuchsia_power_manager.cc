@@ -7,6 +7,7 @@
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <lib/driver/power/cpp/element-description-builder.h>
 #include <lib/driver/power/cpp/power-support.h>
+#include <lib/driver/power/cpp/types.h>
 #include <lib/fit/defer.h>
 
 FuchsiaPowerManager::FuchsiaPowerManager(Owner* owner) : owner_(owner) {}
@@ -20,14 +21,9 @@ bool FuchsiaPowerManager::Initialize(ParentDevice* parent_device, inspect::Node&
   required_power_level_ = node.CreateUint("required_power_level", 0);
   current_power_level_ = node.CreateUint("current_power_level", 0);
 
-  auto result = parent_device->GetPowerConfiguration();
-  if (!result.ok()) {
-    MAGMA_LOG(ERROR, "Call to GetPowerConfiguration failed");
-    return false;
-  }
-
-  if (result->is_error()) {
-    MAGMA_LOG(ERROR, "Call to GetPowerConfiguration returned error %d", result->error_value());
+  zx::result configs = parent_device->GetPowerConfiguration();
+  if (configs.is_error()) {
+    MAGMA_LOG(ERROR, "Failed to get power configuration: %s", configs.status_string());
     return false;
   }
 
@@ -37,15 +33,7 @@ bool FuchsiaPowerManager::Initialize(ParentDevice* parent_device, inspect::Node&
     return false;
   }
 
-  for (auto& config : result->value()->config) {
-    if (!config.has_element()) {
-      continue;
-    }
-    auto& element = config.element();
-    if (!element.has_name()) {
-      continue;
-    }
-    std::string name{element.name().get()};
+  for (const auto& config : configs.value()) {
     auto tokens = fdf_power::GetDependencyTokens(*parent_device->incoming(), config);
     if (tokens.is_error()) {
       MAGMA_LOG(
@@ -68,7 +56,7 @@ bool FuchsiaPowerManager::Initialize(ParentDevice* parent_device, inspect::Node&
     assertive_power_dep_tokens_.push_back(std::move(description.assertive_token));
     opportunistic_power_dep_tokens_.push_back(std::move(description.opportunistic_token));
 
-    if (config.element().name().get() == kHardwarePowerElementName) {
+    if (config.element.name == kHardwarePowerElementName) {
       hardware_power_element_control_client_end_ =
           std::move(description.element_control_client.value());
       hardware_power_lessor_client_ = fidl::WireSyncClient<fuchsia_power_broker::Lessor>(
@@ -81,7 +69,7 @@ bool FuchsiaPowerManager::Initialize(ParentDevice* parent_device, inspect::Node&
           fdf::Dispatcher::GetCurrent()->async_dispatcher());
 
     } else {
-      MAGMA_LOG(INFO, "Got unexpected power element %s", name.c_str());
+      MAGMA_LOG(INFO, "Got unexpected power element %s", config.element.name.c_str());
     }
   }
   if (!hardware_power_lessor_client_.is_valid()) {

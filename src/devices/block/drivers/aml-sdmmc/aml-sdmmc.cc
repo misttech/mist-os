@@ -10,6 +10,7 @@
 #include <inttypes.h>
 #include <lib/ddk/metadata.h>
 #include <lib/ddk/platform-defs.h>  // TODO(b/301003087): Needed for PDEV_DID_AMLOGIC_SDMMC_A, etc.
+#include <lib/driver/logging/cpp/structured_logger.h>
 #include <lib/fit/defer.h>
 #include <lib/fzl/pinned-vmo.h>
 #include <lib/mmio/mmio.h>
@@ -37,6 +38,7 @@
 #include "aml-sdmmc-regs.h"
 #include "sdk/lib/driver/power/cpp/element-description-builder.h"
 #include "sdk/lib/driver/power/cpp/power-support.h"
+#include "src/devices/power/lib/from-fidl/cpp/from-fidl.h"
 
 namespace {
 
@@ -340,7 +342,20 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(
   }
 
   // Register power configs with the Power Broker.
-  for (const auto& config : result->value()->config) {
+  for (const auto& wire_config : result->value()->config) {
+    fdf_power::PowerElementConfiguration config;
+    {
+      fuchsia_hardware_power::PowerElementConfiguration natural_config =
+          fidl::ToNatural(wire_config);
+      zx::result result = power::from_fidl::CreatePowerElementConfiguration(natural_config);
+      if (result.is_error()) {
+        FDF_SLOG(ERROR, "Failed to convert power element config from fidl.",
+                 KV("status", result.status_string()));
+        return result.take_error();
+      }
+      config = std::move(result.value());
+    }
+
     auto tokens = fdf_power::GetDependencyTokens(*incoming(), config);
     if (tokens.is_error()) {
       FDF_LOGL(ERROR, logger(), "Failed to get power dependency tokens: %u",
@@ -357,7 +372,7 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(
       return zx::error(ZX_ERR_INTERNAL);
     }
 
-    if (config.element().name().get() == kHardwarePowerElementName) {
+    if (config.element.name == kHardwarePowerElementName) {
       hardware_power_element_control_client_ =
           fidl::WireSyncClient<fuchsia_power_broker::ElementControl>(
               std::move(description.element_control_client.value()));
@@ -369,7 +384,7 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(
       hardware_power_required_level_client_ = fidl::WireClient<fuchsia_power_broker::RequiredLevel>(
           std::move(description.required_level_client.value()), dispatcher());
       hardware_power_assertive_token_ = std::move(description.assertive_token);
-    } else if (config.element().name().get() == kSystemWakeOnRequestPowerElementName) {
+    } else if (config.element.name == kSystemWakeOnRequestPowerElementName) {
       wake_on_request_element_control_client_ =
           fidl::WireSyncClient<fuchsia_power_broker::ElementControl>(
               std::move(description.element_control_client.value()));
@@ -382,8 +397,7 @@ zx::result<> AmlSdmmc::ConfigurePowerManagement(
           fidl::WireClient<fuchsia_power_broker::RequiredLevel>(
               std::move(description.required_level_client.value()), dispatcher());
     } else {
-      FDF_LOGL(ERROR, logger(), "Unexpected power element: %s",
-               std::string(config.element().name().get()).c_str());
+      FDF_LOGL(ERROR, logger(), "Unexpected power element: %s", config.element.name.c_str());
       return zx::error(ZX_ERR_BAD_STATE);
     }
   }

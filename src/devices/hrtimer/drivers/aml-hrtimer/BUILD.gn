@@ -63,6 +63,7 @@ source_set("common") {
     "//src/devices/bin/driver_runtime",
     "//src/devices/bus/lib/device-protocol-pdev",
     "//src/devices/lib/mmio",
+    "//src/devices/power/lib/from-fidl/cpp",
     "//zircon/system/ulib/hwreg",
     "//zircon/system/ulib/zx",
   ]

@@ -4,14 +4,18 @@
 
 #include "src/devices/serial/drivers/aml-uart/aml-uart-dfv2.h"
 
+#include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/component/cpp/driver_export.h>
 #include <lib/driver/component/cpp/node_add_args.h>
+#include <lib/driver/logging/cpp/structured_logger.h>
 #include <lib/driver/power/cpp/element-description-builder.h>
 #include <lib/driver/power/cpp/power-support.h>
 
 #include <bind/fuchsia/cpp/bind.h>
 #include <bind/fuchsia/serial/cpp/bind.h>
+
+#include "src/devices/power/lib/from-fidl/cpp/from-fidl.h"
 
 namespace serial {
 
@@ -132,6 +136,8 @@ zx_status_t AmlUartV2::GetPowerConfiguration(
     return power_broker.status_value();
   }
 
+  // TODO(b/358361345): Use //sdk/lib/driver/platform-device/cpp to retrieve power configuration
+  // once it supports it.
   const auto result_power_config = pdev->GetPowerConfiguration();
   if (!result_power_config.ok()) {
     FDF_LOG(ERROR, "Call to get power config failed: %s", result_power_config.status_string());
@@ -148,16 +154,24 @@ zx_status_t AmlUartV2::GetPowerConfiguration(
     return ZX_ERR_NOT_SUPPORTED;
   }
 
-  const auto& config = result_power_config->value()->config[0];
-  if (config.element().name().get() != "aml-uart-wake-on-interrupt") {
+  const auto& wire_config = result_power_config->value()->config[0];
+  if (wire_config.element().name().get() != "aml-uart-wake-on-interrupt") {
     FDF_LOG(ERROR, "Unexpected power element: %s",
-            std::string(config.element().name().get()).c_str());
+            std::string(wire_config.element().name().get()).c_str());
     return ZX_ERR_BAD_STATE;
+  }
+
+  fuchsia_hardware_power::PowerElementConfiguration natural_config = fidl::ToNatural(wire_config);
+  zx::result config = power::from_fidl::CreatePowerElementConfiguration(natural_config);
+  if (config.is_error()) {
+    FDF_SLOG(ERROR, "Failed to convert power element configuration from fidl.",
+             KV("stauts", config.status_string()));
+    return config.status_value();
   }
 
   // Get dependency tokens from the config, these tokens represent the dependency from the current
   // element to its parent(s).
-  auto tokens = fdf_power::GetDependencyTokens(*incoming(), config);
+  auto tokens = fdf_power::GetDependencyTokens(*incoming(), config.value());
   if (tokens.is_error()) {
     FDF_LOG(ERROR, "Failed to get power dependency tokens: %u",
             static_cast<uint8_t>(tokens.error_value()));
@@ -165,7 +179,7 @@ zx_status_t AmlUartV2::GetPowerConfiguration(
   }
 
   fdf_power::ElementDesc description =
-      fdf_power::ElementDescBuilder(config, std::move(tokens.value())).Build();
+      fdf_power::ElementDescBuilder(config.value(), std::move(tokens.value())).Build();
   auto result_add_element = fdf_power::AddElement(power_broker.value(), description);
   if (result_add_element.is_error()) {
     FDF_LOG(ERROR, "Failed to add power element: %u",

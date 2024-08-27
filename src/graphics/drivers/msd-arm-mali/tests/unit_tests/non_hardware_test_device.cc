@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 #include <fidl/fuchsia.hardware.gpu.mali/cpp/driver/wire.h>
+#include <lib/driver/power/cpp/types.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
 #include <lib/fdf/testing.h>
 #include <lib/fdio/directory.h>
@@ -98,10 +99,8 @@ class FakeParentDevice : public ParentDevice {
   }
   bool suspend_enabled() override { return false; }
   std::shared_ptr<fdf::Namespace> incoming() override { return nullptr; }
-  fidl::WireResult<fuchsia_hardware_platform_device::Device::GetPowerConfiguration>
-  GetPowerConfiguration() override {
-    return fidl::WireResult<fuchsia_hardware_platform_device::Device::GetPowerConfiguration>(
-        fidl::Status::UnknownMethod());
+  zx::result<std::vector<fdf_power::PowerElementConfiguration>> GetPowerConfiguration() override {
+    return zx::error(ZX_ERR_NOT_SUPPORTED);
   }
 
  private:

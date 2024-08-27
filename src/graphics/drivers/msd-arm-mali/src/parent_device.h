@@ -8,6 +8,7 @@
 #include <fidl/fuchsia.hardware.gpu.mali/cpp/driver/wire.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/wire.h>
 #include <lib/driver/incoming/cpp/namespace.h>
+#include <lib/driver/power/cpp/types.h>
 #include <lib/magma/platform/platform_interrupt.h>
 #include <lib/magma/platform/platform_mmio.h>
 #include <lib/magma/util/dlog.h>
@@ -17,8 +18,6 @@
 
 #include <chrono>
 #include <memory>
-
-#include "fidl/fuchsia.hardware.power/cpp/natural_types.h"
 
 class ParentDevice {
  public:
@@ -43,8 +42,7 @@ class ParentDevice {
 
   virtual std::shared_ptr<fdf::Namespace> incoming() = 0;
 
-  virtual fidl::WireResult<fuchsia_hardware_platform_device::Device::GetPowerConfiguration>
-  GetPowerConfiguration() = 0;
+  virtual zx::result<std::vector<fdf_power::PowerElementConfiguration>> GetPowerConfiguration() = 0;
 };
 
 #endif  // SRC_GRAPHICS_DRIVERS_MSD_ARM_MALI_SRC_PARENT_DEVICE_H_

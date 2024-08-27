@@ -4,10 +4,10 @@
 
 #include "examples/power/cpp/unmanaged_element.h"
 
-#include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <fidl/fuchsia.power.broker/cpp/fidl.h>
 #include <lib/driver/power/cpp/element-description-builder.h>
 #include <lib/driver/power/cpp/power-support.h>
+#include <lib/driver/power/cpp/types.h>
 #include <lib/fit/result.h>
 
 #include <algorithm>
@@ -23,20 +23,18 @@ fit::result<UnmanagedElement::Error, UnmanagedElement> UnmanagedElement::Add(
     const std::vector<fuchsia_power_broker::PowerLevel>& valid_levels,
     fuchsia_power_broker::PowerLevel initial_current_level) {
   // Convert valid_levels from power_broker::PowerLevel to hardware_power::PowerLevel.
-  std::vector<fuchsia_hardware_power::PowerLevel> hw_valid_levels(valid_levels.size());
+  std::vector<fdf_power::PowerLevel> hw_valid_levels(valid_levels.size());
   std::transform(valid_levels.begin(), valid_levels.end(), hw_valid_levels.begin(),
                  [](const fuchsia_power_broker::PowerLevel& broker_level) {
-                   return fuchsia_hardware_power::PowerLevel().level(broker_level);
+                   return fdf_power::PowerLevel{.level = broker_level};
                  });
 
   // Configure the ElementDescription for the new power element.
-  fuchsia_hardware_power::PowerElementConfiguration config{{
-      .element = fuchsia_hardware_power::PowerElement{{.name = name,
-                                                       .levels = std::move(hw_valid_levels)}},
-      .dependencies = std::nullopt,
-  }};
+  fdf_power::PowerElementConfiguration config{
+      .element = fdf_power::PowerElement{.name = name, .levels = std::move(hw_valid_levels)},
+      .dependencies{}};
   fidl::Arena arena;
-  fdf_power::ElementDescBuilder builder(fidl::ToWire(arena, config), fdf_power::TokenMap());
+  fdf_power::ElementDescBuilder builder(config, fdf_power::TokenMap());
 
   // Create the unmanaged element and invalidate its dependency tokens.
   UnmanagedElement element(builder.Build());

@@ -5,11 +5,14 @@
 #include "parent_device_dfv2.h"
 
 #include <fidl/fuchsia.hardware.gpu.mali/cpp/driver/wire.h>
+#include <fidl/fuchsia.hardware.power/cpp/fidl.h>
 #include <lib/magma/platform/zircon/zircon_platform_interrupt.h>
 #include <lib/magma/platform/zircon/zircon_platform_mmio.h>
 #include <lib/scheduler/role.h>
 #include <threads.h>
 #include <zircon/threads.h>
+
+#include "src/devices/power/lib/from-fidl/cpp/from-fidl.h"
 
 ParentDeviceDFv2::ParentDeviceDFv2(
     std::shared_ptr<fdf::Namespace> incoming,
@@ -97,9 +100,34 @@ ParentDeviceDFv2::ConnectToMaliRuntimeProtocol() {
   return mali_protocol;
 }
 
-fidl::WireResult<fuchsia_hardware_platform_device::Device::GetPowerConfiguration>
+zx::result<std::vector<fdf_power::PowerElementConfiguration>>
 ParentDeviceDFv2::GetPowerConfiguration() {
-  return pdev_->GetPowerConfiguration();
+  // TODO(b/358361345): Use //sdk/lib/driver/platform-device/cpp to retrieve power configuration
+  // once it supports it.
+  fidl::WireResult result = pdev_->GetPowerConfiguration();
+  if (!result.ok()) {
+    DMESSAGE("Failed to send GetPowerConfiguration request: %s", result.status_string());
+    return zx::error(result.status());
+  }
+  if (result->is_error()) {
+    DMESSAGE("Failed to get power configuration: %s", zx_status_get_string(result->error_value()));
+    return result->take_error();
+  }
+
+  std::vector<fdf_power::PowerElementConfiguration> configs;
+  for (const auto& wire : result.value()->config) {
+    fuchsia_hardware_power::PowerElementConfiguration natural = fidl::ToNatural(wire);
+
+    zx::result config = power::from_fidl::CreatePowerElementConfiguration(natural);
+    if (config.is_error()) {
+      DMESSAGE("Failed to parse power configuration: %s", config.status_string());
+      return config.take_error();
+    }
+
+    configs.push_back(std::move(config.value()));
+  }
+
+  return zx::ok(std::move(configs));
 }
 
 // static

@@ -44,6 +44,7 @@ source_set("common_non_hardware_tests") {
     "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
     "//sdk/lib/async_patterns/testing/cpp",
+    "//sdk/lib/driver/power/cpp",
     "//sdk/lib/driver/runtime/testing/cpp",
     "//sdk/lib/driver/testing/cpp",
     "//src/devices/bus/testing/fake-pdev",
