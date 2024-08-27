@@ -1270,10 +1270,10 @@ struct Thread {
   cpu_mask_t GetSoftCpuAffinity() const TA_EXCL(lock_);
 
   enum class MigrateStage {
-    // The stage before the thread has migrated. Called from the old CPU.
-    Before,
-    // The stage after the thread has migrated. Called from the new CPU.
-    After,
+    // The stage before the thread has migrated. Called from the old CPU to save state.
+    Save,
+    // The stage after the thread has migrated. Called from the new CPU to restore state.
+    Restore,
     // The Thread is exiting. Can be called from any CPU.
     Exiting,
   };

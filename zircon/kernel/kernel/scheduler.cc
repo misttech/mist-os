@@ -1004,7 +1004,7 @@ Thread* Scheduler::EvaluateNextThread(SchedTime now, Thread* current_thread, boo
     // clearing its transient state in the process.
     if (current_thread != next_thread) {
       queue_guard.CallUnlocked([&] {
-        // Lock the next thread, then call the Before stage its migrate function
+        // Lock the next thread, then call the Save stage its migrate function
         // (if any).  This is its last chance to run on this CPU.
         ChainLockTransaction::AssertActive();
         ChainLockTransaction& active_clt = ChainLockTransaction::ActiveRef();
@@ -1012,7 +1012,7 @@ Thread* Scheduler::EvaluateNextThread(SchedTime now, Thread* current_thread, boo
         active_clt.Restart(CLT_TAG("Scheduler::EvaluateNextThread (restart)"));
         UnconditionalChainLockGuard next_thread_guard{next_thread->get_lock()};
         active_clt.Finalize();
-        next_thread->CallMigrateFnLocked(Thread::MigrateStage::Before);
+        next_thread->CallMigrateFnLocked(Thread::MigrateStage::Save);
 
         const cpu_num_t target_cpu = FindActiveSchedulerForThread(
             next_thread, FindTargetCpuReason::Migrating, [now](Thread* thread, Scheduler* target) {
@@ -1052,12 +1052,12 @@ cpu_num_t Scheduler::FindTargetCpu(Thread* thread, FindTargetCpuReason reason) {
   LOCAL_KTRACE(DETAILED, "target_mask", ("online", mp_get_online_mask()), ("active", active_mask));
 
   // If our thread is unblocking (or coming out of sleep/suspend), and it has
-  // run on a CPU in the past, and it has a migration function whose Before
+  // run on a CPU in the past, and it has a migration function whose Save
   // phase has not been called yet, then we must always send it back to the last
   // CPU it ran on.
   //
   // When the thread is selected to run on its last CPU, if it needs to be
-  // migrated, the Before stage of the migration will be executed, and the
+  // migrated, the Save stage of the migration will be executed, and the
   // scheduler will then immediately re-assign the thread to a different
   // scheduler to complete the migration operation.
   //
@@ -1504,7 +1504,7 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
   active_thread_ = next_thread;
 
   // Handle any pending migration work.
-  next_thread->CallMigrateFnLocked(Thread::MigrateStage::After);
+  next_thread->CallMigrateFnLocked(Thread::MigrateStage::Restore);
 
   // Update the expected runtime of the current thread and the per-CPU total.
   // Only update the thread and aggregate values if the current thread is still
@@ -1689,9 +1689,9 @@ void Scheduler::RescheduleCommon(Thread* const current_thread, SchedTime now,
     // the other CPUs operation cannot complete until after the context switch
     // is finished and we have dropped the current thread's lock.
     if (finish_migrate_current) {
-      // Call the Before stage of the thread's migration function as it leaves
+      // Call the Save stage of the thread's migration function as it leaves
       // this CPU.
-      current_thread->CallMigrateFnLocked(Thread::MigrateStage::Before);
+      current_thread->CallMigrateFnLocked(Thread::MigrateStage::Save);
 
       const cpu_num_t target_cpu =
           FindActiveSchedulerForThread(current_thread, FindTargetCpuReason::Migrating,
@@ -2498,12 +2498,12 @@ void Scheduler::Migrate(Thread* thread) {
 
         // Try find a new CPU to run this thread on. Things are simple if the
         // thread has no migration function, or if the thread has a migration
-        // function, but has already called the Before stage of migration.  We
+        // function, but has already called the Save stage of migration.  We
         // can just remove the thread from this queue, and put it into a
         // different one.
         //
         // If the thread does have a migration function, and does need the
-        // Before stage to be called, we can do that too, but only if we are
+        // Save stage to be called, we can do that too, but only if we are
         // currently running on the last CPU the thread ran on.  Otherwise, the
         // best we can do is to poke the thread's last CPU and have it
         // reschedule.  The next time this thread comes up in the queue, it will
@@ -2528,8 +2528,8 @@ void Scheduler::Migrate(Thread* thread) {
         // Before obtaining any new locks, try to call the thread's migration
         // function.  CallMigrateFnLocked will do nothing if we have no
         // migration function, or if we have already started the migration (eg;
-        // called the Before stage).
-        thread->CallMigrateFnLocked(Thread::MigrateStage::Before);
+        // called the Save stage).
+        thread->CallMigrateFnLocked(Thread::MigrateStage::Save);
 
         // Find a new CPU for this thread and add it to the queue.
         const cpu_num_t target_cpu = FindActiveSchedulerForThread(
@@ -2662,14 +2662,14 @@ void Scheduler::MigrateUnpinnedThreads() {
     SingletonChainLockGuardIrqSave guard{thread->get_lock(),
                                          CLT_TAG("Scheduler::MigrateUnpinnedThreads")};
 
-    // Call the Before stage of the thread's migration function as it leaves
+    // Call the Save stage of the thread's migration function as it leaves
     // this CPU.
-    thread->CallMigrateFnLocked(Thread::MigrateStage::Before);
+    thread->CallMigrateFnLocked(Thread::MigrateStage::Save);
 
     const cpu_num_t target_cpu = FindActiveSchedulerForThread(
         thread, FindTargetCpuReason::Migrating, [current, now](Thread* thread, Scheduler* target) {
           // Finish the transition and add the thread to the new target queue.  The
-          // After stage of the migration function will be called on the new CPU the
+          // Restore stage of the migration function will be called on the new CPU the
           // next time the thread becomes scheduled.
           MarkInFindActiveSchedulerForThreadCbk(*thread, *target);
           (void)current;  // We cannot annotate 'current' with [[maybe_unused]] in the capture list,

@@ -786,7 +786,7 @@ void Vcpu::Migrate(Thread* thread, Thread::MigrateStage stage) {
     // * Perform a VMCLEAR operation on the source logical processor. This
     //   ensures that all VMCS data that may be cached by the processor are
     //   flushed to memory.
-    case Thread::MigrateStage::Before: {
+    case Thread::MigrateStage::Save: {
       vmclear(vmcs_page_.PhysicalAddress());
       // After VMCLEAR, `last_cpu_` can be cleared to indicate this VCPU is both
       // not presently running, and its state is not loaded anywhere.
@@ -798,7 +798,7 @@ void Vcpu::Migrate(Thread* thread, Thread::MigrateStage stage) {
     //   move the VMCS to another system.
     // * Perform a VMPTRLD of the physical address of VMCS region on the
     //   destination processor to establish its current VMCS pointer.
-    case Thread::MigrateStage::After: {
+    case Thread::MigrateStage::Restore: {
       // Volume 3, Section 31.8.2: To migrate a VMCS to another logical
       // processor, a VMM must use the sequence of VMCLEAR, VMPTRLD and
       // VMLAUNCH.
@@ -809,7 +809,7 @@ void Vcpu::Migrate(Thread* thread, Thread::MigrateStage stage) {
 
       // Before performing the VMPTRLD, update the `last_cpu_` for
       // `Vcpu::Interrupt()` and `vmcs_page_` state tracking. It is assumed that
-      // the `Thread::MigrateStage::Before` stage already happened and that a
+      // the `Thread::MigrateStage::Save` stage already happened and that a
       // VMCLEAR has been performed on `last_cpu_`, hence the previous value of
       DEBUG_ASSERT(last_cpu_ == INVALID_CPU);
       last_cpu_ = thread->LastCpuLocked();

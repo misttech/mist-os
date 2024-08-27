@@ -248,10 +248,10 @@ void Vcpu::Migrate(Thread* thread, Thread::MigrateStage stage) {
       thread_->get_lock()) -> auto& { return thread_->get_lock(); }().AssertHeld();
 
   switch (stage) {
-    case Thread::MigrateStage::Before:
+    case Thread::MigrateStage::Save:
       last_cpu_ = INVALID_CPU;
       break;
-    case Thread::MigrateStage::After:
+    case Thread::MigrateStage::Restore:
       // After thread migration, update the |last_cpu_| for Vcpu::Interrupt().
       DEBUG_ASSERT(last_cpu_ == INVALID_CPU);
       last_cpu_ = thread->LastCpuLocked();
