@@ -155,6 +155,7 @@ std::optional<sockaddr_storage> Parse(const std::string& ip_str,
     return std::nullopt;
   }
 
+  struct addrinfo hints = {};
   struct addrinfo* result;
   int s = getaddrinfo(
       ip_str.c_str(),
@@ -164,7 +165,7 @@ std::optional<sockaddr_storage> Parse(const std::string& ip_str,
         }
         return nullptr;
       }(),
-      nullptr, &result);
+      &hints, &result);
   if (s != 0) {
     std::stringstream o;
     o << ip_str;
