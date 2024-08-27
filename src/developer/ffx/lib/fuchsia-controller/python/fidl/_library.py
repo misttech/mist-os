@@ -23,9 +23,7 @@ from typing import (
     Mapping,
     Optional,
     Sequence,
-    Set,
     Tuple,
-    Union,
 )
 
 from fidl_codec import add_ir_path, encode_fidl_object
