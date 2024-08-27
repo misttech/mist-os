@@ -200,6 +200,53 @@ class BatchPQRemove {
   list_node_t* freed_list_ = nullptr;
 };
 
+// Helper class for collecting pages to perform batched calls of |ChangeObjectOffset| on the page
+// queue in order to avoid incurring its spinlock overhead for every single page. Note that pages
+// are not modified until *after* Flush has been called and Flush must be called prior to object
+// destruction.
+//
+// This class has a large internal array and should be marked uninitialized.
+class BatchPQUpdateBacklink {
+ public:
+  explicit BatchPQUpdateBacklink(VmCowPages* object) : object_(object) {}
+  ~BatchPQUpdateBacklink() { DEBUG_ASSERT(count_ == 0); }
+  DISALLOW_COPY_AND_ASSIGN_ALLOW_MOVE(BatchPQUpdateBacklink);
+
+  // Add a page to the batch set. Automatically calls |Flush| if the limit is reached.
+  void Push(vm_page_t* page, uint64_t offset) {
+    DEBUG_ASSERT(page);
+    DEBUG_ASSERT(count_ < kMaxPages);
+
+    pages_[count_] = page;
+    offsets_[count_] = offset;
+    count_++;
+
+    if (count_ == kMaxPages) {
+      Flush();
+    }
+  }
+
+  // Performs |ChangeObjectOffset| on any pending pages.
+  void Flush() {
+    if (count_ > 0) {
+      pmm_page_queues()->ChangeObjectOffsetArray(pages_, object_, offsets_, count_);
+      count_ = 0;
+    }
+  }
+
+ private:
+  // Align the batch size here with the overall PageQueues batch size.
+  // We measured no performance gains from using larger values and this value should be as small as
+  // is reasonable due to this object being stack allocated.
+  static constexpr size_t kMaxPages = PageQueues::kMaxBatchSize;
+
+  VmCowPages* object_ = nullptr;
+
+  size_t count_ = 0;
+  vm_page_t* pages_[kMaxPages];
+  uint64_t offsets_[kMaxPages];
+};
+
 // Allocates a new page and populates it with the data at |parent_paddr|.
 zx_status_t VmCowPages::AllocateCopyPage(paddr_t parent_paddr, list_node_t* alloc_list,
                                          AnonymousPageRequest* request, vm_page_t** clone) {
@@ -1363,53 +1410,40 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_l
     // Although not all pages in page_list_ will end up existing in child, we don't know which ones
     // will get replaced, so we must update all of the backlinks.
     {
-      size_t batch_count{0};
-      PageQueues* pq = pmm_page_queues();
-      VmCompression* compression = pmm_page_compression();
-      Guard<SpinLock, IrqSave> guard{pq->get_lock()};
-
-      page_list_.ForEveryPageMutable([this, pq, &child, &guard, &compression, &batch_count](
-                                         VmPageOrMarkerRef p, uint64_t off) {
+      __UNINITIALIZED BatchPQUpdateBacklink page_backlink_updater(&child);
+      struct {
+        BatchPQUpdateBacklink* page_backlink_updater;
+        VmCompression* compression;
+      } state = {&page_backlink_updater, pmm_page_compression()};
+      page_list_.ForEveryPageMutable([this, &state](VmPageOrMarkerRef p, uint64_t off) {
         // Hidden VMO hierarchies do not support intervals.
         ASSERT(!p->IsInterval());
-        // If we have processed our batch limit, drop the page_queue lock to
-        // give other threads a chance to perform operations, before
-        // re-acquiring the lock and continuing.
-        if (batch_count >= PageQueues::kMaxBatchSize) {
-          batch_count = 0;
-          guard.CallUnlocked([]() {
-            // TODO(johngro): Once our spinlocks have been updated to be more fair
-            // (ticket locks, MCS locks, whatever), come back here and remove this
-            // pessimistic cpu relax.
-            arch::Yield();
-          });
-        }
+
         if (p->IsReference()) {
           // A regular reference we can move, a temporary reference we need to turn back into
-          // its page so we can move it. To determine if we have a temporary reference we can just
-          // attempt to move it, and if it was a temporary reference we will get a page returned.
-          if (auto page = compression->MoveReference(p->Reference())) {
+          // its page so we can move it. To determine if we have a temporary reference we can
+          // just attempt to move it, and if it was a temporary reference we will get a page
+          // returned.
+          if (auto page = state.compression->MoveReference(p->Reference())) {
             InitializeVmPage(*page);
-            // Dropping the page queues lock is inefficient, but this is an unlikely edge case that
-            // can happen exactly once (due to only one temporary reference).
-            guard.CallUnlocked([this, page, off] {
-              AssertHeld(lock_ref());
-              SetNotPinnedLocked(*page, off);
-            });
+            // For simplicity, since this is a very uncommon edge case, just update the page in
+            // place in this page list, then move it as a regular page.
+            AssertHeld(lock_ref());
+            SetNotPinnedLocked(*page, off);
             VmPageOrMarker::ReferenceValue ref = p.SwapReferenceForPage(*page);
-            ASSERT(compression->IsTempReference(ref));
+            ASSERT(state.compression->IsTempReference(ref));
           }
         }
+        // Not an else-if to intentionally perform this if the previous block turned a reference
+        // into a page.
         if (p->IsPage()) {
-          AssertHeld<Lock<SpinLock>, IrqSave>(*pq->get_lock());
-
-          vm_page_t* page = p->Page();
-          pq->ChangeObjectOffsetLocked(page, &child, off);
+          state.page_backlink_updater->Push(p->Page(), off);
         }
 
-        ++batch_count;
         return ZX_ERR_NEXT;
       });
+      // Update backlinks for any last partial batch of pages.
+      page_backlink_updater.Flush();
     }
 
     // Now merge |child|'s pages into |this|, overwriting any pages present in |this|, and
@@ -1435,15 +1469,15 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_l
     list_splice_after(&covered_pages, &freed_pages);
   } else {
     // Merge our page list into the child page list and update all the necessary metadata.
+    __UNINITIALIZED BatchPQUpdateBacklink page_backlink_updater(&child);
     struct {
-      PageQueues* pq;
       bool removed_left;
       uint64_t merge_start_offset;
-      VmCowPages* child;
       BatchPQRemove* page_remover;
+      BatchPQUpdateBacklink* page_backlink_updater;
       VmCompression* compression;
-    } state = {pmm_page_queues(), removed_left,          merge_start_offset, &child,
-               &page_remover,     pmm_page_compression()};
+    } state = {removed_left, merge_start_offset, &page_remover, &page_backlink_updater,
+               pmm_page_compression()};
     child.page_list_.MergeFrom(
         page_list_, merge_start_offset, merge_end_offset,
         [&page_remover](VmPageOrMarker&& p, uint64_t offset) { page_remover.PushContent(&p); },
@@ -1481,11 +1515,13 @@ void VmCowPages::MergeContentWithChildLocked(VmCowPages* removed, bool removed_l
             // Not an else-if to intentionally perform this if the previous block turned a reference
             // into a page.
             if (page_or_marker->IsPage()) {
-              state.pq->ChangeObjectOffset(page_or_marker->Page(), state.child,
-                                           offset - state.merge_start_offset);
+              state.page_backlink_updater->Push(page_or_marker->Page(),
+                                                offset - state.merge_start_offset);
             }
           }
         });
+    // Update backlinks for any last partial batch of pages.
+    page_backlink_updater.Flush();
   }
   DEBUG_ASSERT(page_list_.IsEmpty());
 

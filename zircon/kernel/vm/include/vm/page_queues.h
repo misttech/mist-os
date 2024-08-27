@@ -126,6 +126,8 @@ class PageQueues {
   // Changes the backlink information for a page and should only be called by the page owner under
   // its lock (that is the VMO lock). The page must currently be in a valid page queue.
   void ChangeObjectOffset(vm_page_t* page, VmCowPages* object, uint64_t page_offset);
+  void ChangeObjectOffsetArray(vm_page_t** pages, VmCowPages* object, uint64_t* offsets,
+                               size_t count);
 
   // Externally locked variant of CHangeObjectOffset that can be used for more efficient batch
   // operations. In addition to the annotated lock_, the VMO lock of the owner is also required to
