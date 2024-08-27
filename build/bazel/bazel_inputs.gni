@@ -115,6 +115,7 @@ template("_bazel_input_entry") {
                            [
                              "testonly",
                              "visibility",
+                             "applicable_licenses",
                            ])
 
     deps = [ invoker.generator ]
@@ -207,7 +208,7 @@ template("_bazel_input_entry") {
 #      to Bazel. This argument is required if this target and the generator are
 #      defined in different directories or toolchains.
 #
-#   gn_target_name: Optional. Name of Bazel filegroup() used to expose the
+#   gn_targets_name: Optional. Name of Bazel filegroup() used to expose the
 #      output files. If not provided, this will use the name of the generator
 #      target.
 #

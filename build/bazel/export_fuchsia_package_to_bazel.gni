@@ -7,7 +7,7 @@ import("//build/components/fuchsia_package_archive.gni")
 import("//build/packages/prebuilt_package.gni")
 
 # Exports a fuchsia package built via GN to be used within
-# the Bazel build graph as bazel_input_resource with a .far resource.
+# the Bazel build graph as bazel_input_file with a .far resource.
 #
 # Usage:
 #
@@ -59,10 +59,6 @@ template("export_fuchsia_package_to_bazel") {
     archive_label = "${target_name}.archive"
   }
 
-  files = {
-    bazel_output = "${targets.package_name}.far"
-  }
-
   fuchsia_package_archive(targets.archive_label) {
     forward_variables_from(invoker,
                            [
@@ -74,7 +70,7 @@ template("export_fuchsia_package_to_bazel") {
     package = invoker.package
   }
 
-  bazel_input_resource(target_name) {
+  bazel_input_file(target_name) {
     forward_variables_from(invoker,
                            [
                              "gn_targets_name",
@@ -83,10 +79,8 @@ template("export_fuchsia_package_to_bazel") {
                              "visibility",
                              "applicable_licenses",
                            ])
-    deps = [ ":${targets.archive_label}" ]
-    sources = get_target_outputs(":${targets.archive_label}")
-    outputs = [ files.bazel_output ]
-
+    generator = ":${targets.archive_label}"
+    outputs = get_target_outputs(":${targets.archive_label}")
     if (!defined(gn_targets_name)) {
       gn_targets_name = targets.package_name
     }
