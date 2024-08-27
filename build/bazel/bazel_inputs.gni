@@ -136,6 +136,7 @@ template("_bazel_input_entry") {
         },
       ]
       gn_targets_repository_entries_barrier = []
+      bazel_inputs_barrier = []
     }
   }
 }
