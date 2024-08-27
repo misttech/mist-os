@@ -134,7 +134,10 @@ pub(crate) struct ConfigurationContext<'a> {
 
 impl<'a> ConfigurationContext<'a> {
     /// Ensure that the configuration context matches the given set of
-    /// build-types and feature-set-levels
+    /// build-types and feature-set-levels.
+    ///
+    /// Note that this is not a mechanism to enforce policy; they simply make configuration errors
+    /// more obvious to users by providing a clear error message.
     ///
     /// Returns an error if they do not, and Ok(()) if they do.
     pub fn ensure_build_type_and_feature_set_level(
@@ -156,7 +159,10 @@ impl<'a> ConfigurationContext<'a> {
     }
 
     /// Ensure that the configuration context matches the give set of
-    /// feature-set-levels
+    /// feature-set-levels.
+    ///
+    /// Note that this is not a mechanism to enforce policy; they simply make configuration errors
+    /// more obvious to users by providing a clear error message.
     ///
     /// Returns an error if they do not, and Ok(()) if they do.
     pub fn ensure_feature_set_level(
