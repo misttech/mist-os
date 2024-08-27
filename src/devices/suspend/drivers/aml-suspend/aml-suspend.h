@@ -38,6 +38,9 @@ class AmlSuspend : public fdf::DriverBase,
   virtual zx::result<zx::resource> GetCpuResource();
   virtual zx_status_t SystemSuspendEnter(zx_time_t resume_deadline);
 
+  // Called just at Start(). Used in testing, otherwise a no-op.
+  virtual void AtStart() {}
+
  private:
   void Serve(fidl::ServerEnd<fuchsia_hardware_suspend::Suspender> request);
   zx::result<> CreateDevfsNode();

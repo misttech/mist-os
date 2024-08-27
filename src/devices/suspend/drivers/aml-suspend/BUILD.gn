@@ -6,6 +6,24 @@ import("//build/bind/bind.gni")
 import("//build/components.gni")
 import("//build/drivers.gni")
 
+group("tests") {
+  testonly = true
+  public_deps = [
+    ":aml-suspend-bind",
+    ":aml-suspend-bind-with-fake-syscall",
+    "tests:aml-suspend-test-bin",
+    "tests:aml-suspend-test-package",
+  ]
+}
+
+group("drivers") {
+  testonly = true
+  deps = [
+    ":aml-suspend",
+    ":aml-suspend-with-fake-syscall",
+  ]
+}
+
 driver_bind_rules("aml-suspend-bind") {
   rules = "meta/aml-suspend.bind"
   bind_output = "aml-suspend.bindbc"
@@ -17,32 +35,39 @@ driver_bind_rules("aml-suspend-bind") {
   ]
 }
 
+_DEPS = [
+  "//sdk/fidl/fuchsia.io:fuchsia.io_cpp",
+  "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
+  "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
+  "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
+  "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_cpp",
+  "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
+  "//sdk/lib/driver/compat/cpp",
+  "//sdk/lib/driver/component/cpp:cpp",
+  "//sdk/lib/driver/logging/cpp:cpp",
+  "//sdk/lib/driver/runtime:driver_runtime_cpp",
+  "//sdk/lib/inspect/component/cpp",
+  "//sdk/lib/inspect/contrib/cpp:bounded_list_node",
+  "//src/devices/bin/driver_runtime",
+  "//src/devices/bus/lib/device-protocol-pdev",
+  "//src/devices/lib/driver:driver_runtime",
+  "//src/devices/lib/mmio",
+  "//zircon/system/ulib/fbl",
+  "//zircon/system/ulib/hwreg",
+  "//zircon/system/ulib/inspect",
+  "//zircon/system/ulib/zx",
+]
+
+_SOURCES = [
+  "aml-suspend.cc",
+  "driver-registration.cc",
+]
+
 fuchsia_driver("aml-suspend-driver") {
   output_name = "aml-suspend"
-
-  sources = [ "aml-suspend.cc" ]
-  deps = [
-    ":aml-suspend-bind",
-    "//sdk/fidl/fuchsia.driver.compat:fuchsia.driver.compat_cpp",
-    "//sdk/fidl/fuchsia.hardware.platform.bus:fuchsia.hardware.platform.bus_cpp",
-    "//sdk/fidl/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_cpp",
-    "//sdk/fidl/fuchsia.hardware.suspend:fuchsia.hardware.suspend_cpp",
-    "//sdk/fidl/fuchsia.kernel:fuchsia.kernel_cpp",
-    "//sdk/lib/driver/compat/cpp",
-    "//sdk/lib/driver/component/cpp:cpp",
-    "//sdk/lib/driver/logging/cpp:cpp",
-    "//sdk/lib/driver/runtime:driver_runtime_cpp",
-    "//sdk/lib/inspect/component/cpp",
-    "//sdk/lib/inspect/contrib/cpp:bounded_list_node",
-    "//src/devices/bin/driver_runtime",
-    "//src/devices/bus/lib/device-protocol-pdev",
-    "//src/devices/lib/driver:driver_runtime",
-    "//src/devices/lib/mmio",
-    "//zircon/system/ulib/fbl",
-    "//zircon/system/ulib/hwreg",
-    "//zircon/system/ulib/inspect",
-    "//zircon/system/ulib/zx",
-  ]
+  sources = _SOURCES
+  deps = _DEPS
+  deps += [ ":aml-suspend-bind" ]
 }
 
 fuchsia_driver_component("aml-suspend") {
@@ -55,4 +80,43 @@ fuchsia_driver_component("aml-suspend") {
 fuchsia_driver_package("package") {
   package_name = "aml-suspend"
   driver_components = [ ":aml-suspend" ]
+}
+
+# Test fixtures
+
+driver_bind_rules("aml-suspend-bind-with-fake-syscall") {
+  testonly = true
+  rules = "meta/aml-suspend-with-fake-syscall.bind"
+  bind_output = "aml-suspend-with-fake-syscall.bindbc"
+  tests = "meta/aml-suspend-bind-test-with-fake-syscall.json"
+  deps = [ "//src/devices/bind/fuchsia.test" ]
+}
+
+fuchsia_driver("aml-suspend-driver-with-fake-syscall") {
+  testonly = true
+  output_name = "aml-suspend-with-fake-syscall"
+  sources = _SOURCES
+  sources -= [ "driver-registration.cc" ]
+  sources += [ "tests/aml-suspend-for-tests.cc" ]
+
+  deps = _DEPS
+  deps += [
+    ":aml-suspend-bind-with-fake-syscall",
+
+    # Overrides the default vDSO call to zx_system_suspend_enter.
+    "//src/devices/testing/syscall-intercept:lib",
+  ]
+}
+
+fuchsia_driver_component("aml-suspend-with-fake-syscall") {
+  testonly = true
+  deps = [ ":aml-suspend-driver-with-fake-syscall" ]
+  info = "meta/aml-suspend-info.json"
+  manifest = "meta/aml-suspend-with-fake-syscall.cml"
+}
+
+fuchsia_driver_package("package-with-fake-syscall") {
+  testonly = true
+  package_name = "aml-suspend-with-fake-syscall"
+  driver_components = [ ":aml-suspend-with-fake-syscall" ]
 }
