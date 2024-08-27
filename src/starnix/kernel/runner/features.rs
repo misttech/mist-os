@@ -5,7 +5,6 @@
 use anyhow::{anyhow, Context, Error};
 use bstr::BString;
 use fuchsia_zircon as zx;
-use selinux_core::security_server;
 use starnix_core::device::android::bootloader_message_store::android_bootloader_message_store_init;
 use starnix_core::device::framebuffer::{fb_device_init, AspectRatio};
 use starnix_core::device::remote_block_device::remote_block_device_init;
@@ -37,8 +36,7 @@ use {
 pub struct Features {
     pub kernel: KernelFeatures,
 
-    /// Configures whether SELinux is fully enabled, faked, or unavailable.
-    pub selinux: Option<security_server::Mode>,
+    pub selinux: bool,
 
     pub ashmem: bool,
 
@@ -119,14 +117,7 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
             }
             ("rootfs_rw", _) => features.rootfs_rw = true,
             ("self_profile", _) => features.self_profile = true,
-            ("selinux", mode_arg) => features.selinux = match mode_arg.as_ref() {
-                Some(mode) => if mode == "fake" {
-                    Some(security_server::Mode::Fake)
-                } else {
-                    return Err(anyhow!("Invalid SELinux mode"));
-                },
-                None => Some(security_server::Mode::Enable),
-            },
+            ("selinux", _) => features.selinux = true,
             ("test_data", _) => features.test_data = true,
             (f, _) => {
                 return Err(anyhow!("Unsupported feature: {}", f));

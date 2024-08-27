@@ -9,7 +9,6 @@ use crate::security::selinux_hooks::XATTR_NAME_SELINUX;
 use crate::security::{SecurityId, SecurityServer};
 use crate::testing::AutoReleasableTask;
 use crate::vfs::{FsNode, NamespaceNode, XattrOp};
-use selinux_core::security_server::Mode;
 use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::file_mode::FileMode;
@@ -64,7 +63,7 @@ const HOOKS_TESTS_BINARY_POLICY: &[u8] =
 
 pub fn security_server_with_policy() -> Arc<SecurityServer> {
     let policy_bytes = HOOKS_TESTS_BINARY_POLICY.to_vec();
-    let security_server = SecurityServer::new(Mode::Enable);
+    let security_server = SecurityServer::new();
     security_server.set_enforcing(true);
     security_server.load_policy(policy_bytes).expect("policy load failed");
     security_server

@@ -333,7 +333,6 @@ mod tests {
         create_kernel_and_task_with_selinux, create_kernel_task_and_unlocked_with_selinux,
         create_task,
     };
-    use selinux_core::security_server::Mode;
     use selinux_core::SecurityId;
     use starnix_uapi::signals::SIGTERM;
     use starnix_uapi::{error, CLONE_SIGHAND, CLONE_THREAD, CLONE_VM};
@@ -955,7 +954,7 @@ mod tests {
         const BOUNDED_CONTEXT: &[u8] = b"test_u:test_r:bounded_t:s0";
         const UNBOUNDED_CONTEXT: &[u8] = b"test_u:test_r:unbounded_t:s0";
 
-        let security_server = SecurityServer::new(Mode::Enable);
+        let security_server = SecurityServer::new();
         security_server.set_enforcing(true);
         security_server.load_policy(BINARY_POLICY.to_vec()).expect("policy load failed");
         let unbounded_sid = security_server
