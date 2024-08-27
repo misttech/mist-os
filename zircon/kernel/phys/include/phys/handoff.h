@@ -77,8 +77,9 @@ class PhysBootTimes {
 struct PhysVmo {
   using Name = std::array<char, ZX_MAX_NAME_LEN>;
 
-  // The maximum number of VMOs expected to be in the hand-off.
-  static constexpr size_t kMaxHandoffPhysVmos = 3;
+  // The maximum number of additional VMOs expected to be in the hand-off
+  // beyond the special ones explicitly enumerated.
+  static constexpr size_t kMaxExtraHandoffPhysVmos = 3;
 
   void set_name(std::string_view new_name) { new_name.copy(name.data(), name.size() - 1); }
 
@@ -115,9 +116,9 @@ struct PhysHandoff {
   // TODO(https://fxbug.dev/42164859): This will eventually be made a permanent pointer.
   PhysHandoffTemporaryString version_string;
 
-  // VMOs to be published to userland as is and not otherwise used by the
-  // kernel proper.
-  PhysHandoffTemporarySpan<const PhysVmo> vmos;
+  // Additional VMOs to be published to userland as-is and not otherwise used by
+  // the kernel proper.
+  PhysHandoffTemporarySpan<const PhysVmo> extra_vmos;
 
   // Physical address range of the data ZBI.
   PhysAddressRange zbi;
@@ -204,7 +205,7 @@ struct HandoffEnd {
   // The VMOs deriving from the phys environment. As returned by EndHandoff(),
   // the entirety of the array will be populated by real handles (if only by
   // stub VMOs) (as is convenient for userboot, its intended caller).
-  std::array<Handle*, PhysVmo::kMaxHandoffPhysVmos> phys_vmos;
+  std::array<Handle*, PhysVmo::kMaxExtraHandoffPhysVmos> extra_phys_vmos;
 };
 
 // Formally ends the hand-off phase, unsetting gPhysHandoff and returning the

@@ -191,16 +191,16 @@ void HandoffFromPhys(paddr_t handoff_paddr) {
 HandoffEnd EndHandoff() {
   HandoffEnd end{};
 
-  // If the number of VMOs from physboot is less than the number of VMOs the
-  // userboot protocol expects, fill the rest with empty VMOs.
-  ktl::span<const PhysVmo> phys_vmos = gPhysHandoff->vmos.get();
+  // If the number of extra VMOs from physboot is less than the number of VMOs
+  // the userboot protocol expects, fill the rest with empty VMOs.
+  ktl::span<const PhysVmo> phys_vmos = gPhysHandoff->extra_vmos.get();
   for (size_t i = 0; i < phys_vmos.size(); ++i) {
     ktl::string_view name{phys_vmos[i].name.data(), phys_vmos[i].name.size()};
     name = name.substr(0, name.find_first_of('\0'));
-    end.phys_vmos[i] = CreatePhysVmo(phys_vmos[i]);
+    end.extra_phys_vmos[i] = CreatePhysVmo(phys_vmos[i]);
   }
-  for (size_t i = phys_vmos.size(); i < PhysVmo::kMaxHandoffPhysVmos; ++i) {
-    end.phys_vmos[i] = CreatePhysVmo({});
+  for (size_t i = phys_vmos.size(); i < PhysVmo::kMaxExtraHandoffPhysVmos; ++i) {
+    end.extra_phys_vmos[i] = CreatePhysVmo({});
   }
 
   // Once we create the ZBI VMO, the memory referenced by gPhysHandoff has a new

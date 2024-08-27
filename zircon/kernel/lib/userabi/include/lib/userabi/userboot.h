@@ -62,8 +62,8 @@ enum HandleIndex : uint32_t {
 #endif
 
   kFirstInstrumentationData,
-  kFirstPhysVmo = kFirstInstrumentationData + InstrumentationData::vmo_count(),
-  kHandleCount = kFirstPhysVmo + PhysVmo::kMaxHandoffPhysVmos,
+  kFirstExtraPhysVmo = kFirstInstrumentationData + InstrumentationData::vmo_count(),
+  kHandleCount = kFirstExtraPhysVmo + PhysVmo::kMaxExtraHandoffPhysVmos,
 };
 
 // Copied from sdk/lib/fdio/include/lib/fdio/io.h to avoid the dependency. When this is passed

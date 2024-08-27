@@ -105,14 +105,14 @@ void HandoffPrep::SetInstrumentation() {
                                   ktl::string_view vmo_name_suffix, size_t content_size) {
     PhysVmo::Name phys_vmo_name =
         instrumentation::DebugdataVmoName(sink_name, vmo_name, vmo_name_suffix, /*is_static=*/true);
-    return PublishVmo(VmoNameString(phys_vmo_name), content_size);
+    return PublishExtraVmo(VmoNameString(phys_vmo_name), content_size);
   };
   for (const ElfImage* module : gSymbolize->modules()) {
     module->PublishDebugdata(publish_debugdata);
   }
 }
 
-ktl::span<ktl::byte> HandoffPrep::PublishVmo(ktl::string_view name, size_t content_size) {
+ktl::span<ktl::byte> HandoffPrep::PublishExtraVmo(ktl::string_view name, size_t content_size) {
   if (content_size == 0) {
     return {};
   }
@@ -128,23 +128,23 @@ ktl::span<ktl::byte> HandoffPrep::PublishVmo(ktl::string_view name, size_t conte
                 static_cast<int>(name.size()), name.data());
   ZX_DEBUG_ASSERT(buffer.size() == content_size);
 
-  vmos_.push_front(handoff_vmo);
+  extra_vmos_.push_front(handoff_vmo);
   return buffer;
 }
 
-void HandoffPrep::FinishVmos() {
-  ZX_ASSERT_MSG(vmos_.size() <= PhysVmo::kMaxHandoffPhysVmos,
-                "Too many phys VMOs in hand-off! %zu > max %zu", vmos_.size(),
-                PhysVmo::kMaxHandoffPhysVmos);
+void HandoffPrep::FinishExtraVmos() {
+  ZX_ASSERT_MSG(extra_vmos_.size() <= PhysVmo::kMaxExtraHandoffPhysVmos,
+                "Too many phys VMOs in hand-off! %zu > max %zu", extra_vmos_.size(),
+                PhysVmo::kMaxExtraHandoffPhysVmos);
 
   fbl::AllocChecker ac;
-  ktl::span phys_vmos = New(handoff()->vmos, ac, vmos_.size());
-  ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu * %zu-byte PhysVmo", vmos_.size(),
+  ktl::span extra_phys_vmos = New(handoff()->extra_vmos, ac, extra_vmos_.size());
+  ZX_ASSERT_MSG(ac.check(), "cannot allocate %zu * %zu-byte PhysVmo", extra_vmos_.size(),
                 sizeof(PhysVmo));
-  ZX_DEBUG_ASSERT(phys_vmos.size() == vmos_.size());
+  ZX_DEBUG_ASSERT(extra_phys_vmos.size() == extra_vmos_.size());
 
-  for (PhysVmo& phys_vmo : phys_vmos) {
-    phys_vmo = ktl::move(vmos_.pop_front()->vmo);
+  for (PhysVmo& phys_vmo : extra_phys_vmos) {
+    phys_vmo = ktl::move(extra_vmos_.pop_front()->vmo);
   }
 }
 
@@ -233,7 +233,7 @@ void HandoffPrep::PublishLog(ktl::string_view name, Log&& log) {
   Allocation buffer = ktl::move(log).TakeBuffer();
   ZX_ASSERT(content_size <= buffer.size_bytes());
 
-  ktl::span copy = PublishVmo(name, content_size);
+  ktl::span copy = PublishExtraVmo(name, content_size);
   ZX_ASSERT(copy.size_bytes() == content_size);
   memcpy(copy.data(), buffer.get(), content_size);
 
@@ -317,7 +317,7 @@ void HandoffPrep::SetVersionString(KernelStorage::Bootfs kernel_package) {
   PublishLog("i/llvm-profile/s/physboot.log", ktl::move(*ktl::exchange(gLog, nullptr)));
 
   // Finalize the published VMOs, including the log just published above.
-  FinishVmos();
+  FinishExtraVmos();
 
   SetMemory();
 

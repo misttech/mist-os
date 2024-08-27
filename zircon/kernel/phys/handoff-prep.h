@@ -92,14 +92,14 @@ class HandoffPrep {
                               const ArchPatchInfo& patch_info,
                               fit::inline_function<void(PhysHandoff*)> boot);
 
-  // Add a generic VMO to be simply published to userland.  The kernel proper
-  // won't ever look at it.
+  // Add an additonal, generic VMO to be simply published to userland.  The
+  // kernel proper won't ever look at it.
   //
   // TODO(https://fxbug.dev/42164859): Currently this returns the buffer to copy the
   // contents into.  Later this will require a whole-page allocation that gets
   // handed off.  It can be changed in place hereafter until the moment of
   // handoff.
-  ktl::span<ktl::byte> PublishVmo(ktl::string_view name, size_t content_size);
+  ktl::span<ktl::byte> PublishExtraVmo(ktl::string_view name, size_t content_size);
 
  private:
   using AllocateFunction = trivial_allocator::SingleHeapAllocator;
@@ -147,15 +147,15 @@ class HandoffPrep {
   // Add physboot's own instrumentation data to the handoff.  After this, the
   // live instrumented physboot code is updating the handoff data directly up
   // through the very last compiled basic block that jumps into the kernel.
-  // This calls PublishVmo, so it must come before FinishVmos.
+  // This calls PublishExtraVmo, so it must come before FinishExtraVmos.
   void SetInstrumentation();
 
-  // Do PublishVmo with a Log buffer, which is consumed.
+  // Do PublishExtraVmo with a Log buffer, which is consumed.
   void PublishLog(ktl::string_view vmo_name, Log&& log);
 
-  // Do final handoff of the VMO list.  The contents are already in place,
-  // so this does not invalidate pointers from PublishVmo.
-  void FinishVmos();
+  // Do final handoff of the extra VMO list.  The contents are already in place,
+  // so this does not invalidate pointers from PublishExtraVmo.
+  void FinishExtraVmos();
 
   // Normalizes and publishes RAM and the allocations of interest to the kernel.
   void SetMemory();
@@ -163,7 +163,7 @@ class HandoffPrep {
   Allocator allocator_;
   PhysHandoff* handoff_ = nullptr;
   zbitl::Image<Allocation> mexec_image_;
-  HandoffVmoList vmos_;
+  HandoffVmoList extra_vmos_;
 };
 
 #endif  // ZIRCON_KERNEL_PHYS_HANDOFF_PREP_H_
