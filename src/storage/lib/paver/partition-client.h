@@ -111,7 +111,6 @@ class BlockPartitionClient : public PartitionClient {
 
   zx::result<> RegisterFastBlockIo();
   zx::result<std::reference_wrapper<fuchsia_hardware_block::wire::BlockInfo>> ReadBlockInfo();
-  zx::result<size_t> GetMaxTransferSize();
 
   std::unique_ptr<VolumeConnector> partition_connector_;
   fidl::WireSyncClient<fuchsia_hardware_block::Block> partition_;
