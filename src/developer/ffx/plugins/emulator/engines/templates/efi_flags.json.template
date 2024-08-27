@@ -255,13 +255,9 @@
     {{else}}
         "TERM=dumb",
     {{/if}}
-    "devmgr.suspend-timeout-debug=true",
-    "driver.usb_mass_storage.disable",
-     "driver.usb_cdc.log=debug",
     "kernel.entropy-mixin=de330defe83c3d93556612a133f893892b6b49f96944c3c363197a679a6339b0",
     "kernel.halt-on-panic=true",
     "kernel.experimental.serial_migration=true",
-    "virtcon.disable=true",
     "zircon.nodename={{runtime.name}}"
     {{#each runtime.addl_kernel_args}}
         ,"{{this}}"

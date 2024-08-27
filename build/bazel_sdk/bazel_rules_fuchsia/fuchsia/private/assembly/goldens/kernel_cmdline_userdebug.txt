@@ -20,5 +20,3 @@
 ?netsvc.all-features=true
 ?netsvc.disable=false
 ?netsvc.disable=true
-?virtcon.disable=true
-?virtcon.hide-on-boot

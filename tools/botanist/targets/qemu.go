@@ -442,12 +442,8 @@ func (t *QEMU) Start(ctx context.Context, images []bootserver.Image, args []stri
 
 	// Manually set nodename, since MAC is randomly generated.
 	qemuCmd.AddKernelArg("zircon.nodename=" + DefaultQEMUNodename)
-	// Disable the virtcon.
-	qemuCmd.AddKernelArg("virtcon.disable=true")
 	// The system will halt on a kernel panic instead of rebooting.
 	qemuCmd.AddKernelArg("kernel.halt-on-panic=true")
-	// Print a message if `dm poweroff` times out.
-	qemuCmd.AddKernelArg("devmgr.suspend-timeout-debug=true")
 	// Disable kernel lockup detector in emulated environments to prevent false alarms from
 	// potentially oversubscribed hosts.
 	qemuCmd.AddKernelArg("kernel.lockup-detector.critical-section-threshold-ms=0")

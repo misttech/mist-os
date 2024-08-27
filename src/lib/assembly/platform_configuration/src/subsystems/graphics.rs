@@ -29,8 +29,6 @@ impl DefineSubsystemConfiguration<GraphicsConfig> for GraphicsSubsystemConfig {
         };
         if enable_virtual_console {
             builder.platform_bundle("virtcon");
-        } else {
-            builder.platform_bundle("virtcon_disable");
         }
 
         builder.set_config_capability("fuchsia.virtcon.BootAnimation", Config::new_void())?;
@@ -91,7 +89,7 @@ mod tests {
         let mut builder = ConfigurationBuilderImpl::default();
         GraphicsSubsystemConfig::define_configuration(&context, &config, &mut builder).unwrap();
         let config = builder.build();
-        assert_eq!(config.bundles, ["virtcon_disable".to_string()].into());
+        assert_eq!(config.bundles, [].into());
     }
 
     #[test]
@@ -105,7 +103,7 @@ mod tests {
         let mut builder = ConfigurationBuilderImpl::default();
         GraphicsSubsystemConfig::define_configuration(&context, &config, &mut builder).unwrap();
         let config = builder.build();
-        assert_eq!(config.bundles, ["virtcon_disable".to_string()].into());
+        assert_eq!(config.bundles, [].into());
     }
 
     #[test]

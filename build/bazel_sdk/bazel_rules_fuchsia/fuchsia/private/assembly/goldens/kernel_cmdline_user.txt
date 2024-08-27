@@ -14,5 +14,3 @@
 ?kernel.ppb.replace-on-unloan=true
 ?kernel.render-dlog-to-crashlog=true
 ?netsvc.disable=true
-?virtcon.disable=true
-?virtcon.hide-on-boot

@@ -609,13 +609,6 @@ assembly_input_bundle("virtcon") {
   ]
 }
 
-assembly_input_bundle("virtcon_disable") {
-  kernel_cmdline = [
-    "virtcon.hide-on-boot",
-    "virtcon.disable=true",
-  ]
-}
-
 # The netsvc AIB is included by all eng products.
 #
 assembly_input_bundle("netsvc") {

@@ -52,8 +52,6 @@ if (is_fuchsia) {
     }
     board_config_label = board_configuration_label
 
-    additional_boot_args = [ "virtcon.disable=true" ]
-
     if (custom_signing_script != "") {
       inputs = custom_signing_script_inputs
       generate_signed_zbi = true
@@ -205,6 +203,9 @@ if (is_fuchsia) {
           remote_device_id_provider = true
         }
       }
+      graphics = {
+        enable_virtual_console = false
+      }
       forward_variables_from(_storage_config, "*")
     }
     product = {
@@ -237,6 +238,9 @@ if (is_fuchsia) {
           authorized_ssh_keys_path =
               rebase_path(authorized_ssh_keys_path, root_build_dir)
         }
+      }
+      graphics = {
+        enable_virtual_console = false
       }
       forward_variables_from(_storage_config, "*")
     }
@@ -300,6 +304,9 @@ if (is_fuchsia) {
     platform = {
       build_type = "user"
       feature_set_level = "utility"
+      graphics = {
+        enable_virtual_console = false
+      }
       forward_variables_from(_storage_config, "*")
     }
     product = {
@@ -366,6 +373,9 @@ if (is_fuchsia) {
         mdns = {
           publish_fuchsia_dev_wired_service = false
         }
+      }
+      graphics = {
+        enable_virtual_console = false
       }
       forward_variables_from(_storage_config, "*")
     }

@@ -306,14 +306,6 @@ func (r *RunCommand) setupPackageServer(ctx context.Context) (*botanist.PackageS
 }
 
 func (r *RunCommand) dispatchTests(ctx context.Context, cancel context.CancelFunc, eg *errgroup.Group, baseTargets []targets.Base, fuchsiaTargets []targets.FuchsiaTarget, primaryTarget targets.FuchsiaTarget, testsPath string) {
-	// Disable usb mass storage to determine if it affects NUC stability.
-	// TODO(rudymathu): Remove this once stability is achieved.
-	r.zirconArgs = append(r.zirconArgs, "driver.usb_mass_storage.disable")
-
-	// TODO(https://fxbug.dev/42169595#c74): Remove this once CDC-ether flakiness
-	// has been resolved.
-	r.zirconArgs = append(r.zirconArgs, "driver.usb_cdc.log=debug")
-
 	// Log any failures after running tests.
 	for _, t := range fuchsiaTargets {
 		t := t
