@@ -293,7 +293,7 @@ This command prints output similar to the following:
 
 ```none {:.devsite-disable-click-to-copy}
 $ ffx component doctor fuchsia-pkg://fuchsia.com/driver_transport#meta/driver_transport_child.cm
-Moniker: bootstrap/full-pkg-drivers:dev.driver_transport_parent.driver_transport_child
+Moniker: bootstrap/full-drivers:dev.driver_transport_parent.driver_transport_child
       Used Capability                 Result
  [✓]  fuchsia.logger.LogSink          Success
  [✗]  fuchsia.examples.gizmo.Service  `fuchsia.examples.gizmo.Service` was not offered to `bootstrap/full-pkg-
@@ -302,7 +302,7 @@ Moniker: bootstrap/full-pkg-drivers:dev.driver_transport_parent.driver_transport
 
 For further diagnosis, try:
 
-  $ ffx component route bootstrap/full-pkg-drivers:dev.driver_transport_parent.driver_transport_child fuchsia.examples.gizmo.Service
+  $ ffx component route bootstrap/full-drivers:dev.driver_transport_parent.driver_transport_child fuchsia.examples.gizmo.Service
 ```
 
 To resolve issues related to capability routing, try the following steps:
@@ -320,7 +320,7 @@ If the parent driver does not expose the capability correctly, you may see a
 message like below in the logs:
 
 ```none {:.devsite-disable-click-to-copy}
-[full-pkg-drivers:dev.driver_transport_parent.driver_transport_child] WARN: Required service `fuchsia.examples.gizmo.Service` was not available for target component `bootstrap/full-pkg-drivers:dev.driver_transport_parent.driver_transport_child`: could not find capability: `fuchsia.examples.gizmo.Service` was not exposed to `bootstrap` from child `#full-pkg-drivers:dev.driver_transport_parent`. For more, run `ffx component doctor bootstrap`.
+[full-drivers:dev.driver_transport_parent.driver_transport_child] WARN: Required service `fuchsia.examples.gizmo.Service` was not available for target component `bootstrap/full-drivers:dev.driver_transport_parent.driver_transport_child`: could not find capability: `fuchsia.examples.gizmo.Service` was not exposed to `bootstrap` from child `#full-drivers:dev.driver_transport_parent`. For more, run `ffx component doctor bootstrap`.
 To learn more, see https://fuchsia.dev/go/components/connect-errors
 ```
 
@@ -383,7 +383,7 @@ Also, if the offer is not found in the child node, you may see
 a message like below in the logs:
 
 ```none {:.devsite-disable-click-to-copy}
-[00008.035682][full-pkg-drivers:dev.driver_transport_parent.driver_transport_child] WARN: Required service `fuchsia.examples.gizmo.Service` was not available for target component `bootstrap/full-pkg-drivers:dev.driver_transport_parent.driver_transport_child`: could not find capability: `fuchsia.examples.gizmo.Service` was not offered to `bootstrap/full-pkg-drivers:dev.driver_transport_parent.driver_transport_child` by parent.
+[00008.035682][full-drivers:dev.driver_transport_parent.driver_transport_child] WARN: Required service `fuchsia.examples.gizmo.Service` was not available for target component `bootstrap/full-drivers:dev.driver_transport_parent.driver_transport_child`: could not find capability: `fuchsia.examples.gizmo.Service` was not offered to `bootstrap/full-drivers:dev.driver_transport_parent.driver_transport_child` by parent.
 To learn more, see https://fuchsia.dev/go/components/connect-errors
 ```
 
@@ -408,7 +408,7 @@ If this is not declared correctly, you may see a message like below
 in the logs:
 
 ```none {:.devsite-disable-click-to-copy}
-[00008.631682][full-pkg-drivers:dev.driver_transport_parent.driver_transport_child] WARN: No capability available at path /svc/fuchsia.examples.gizmo.Service/default/device for component bootstrap/full-pkg-drivers:dev.driver_transport_parent.driver_transport_child, verify the component has the proper `use` declaration.
+[00008.631682][full-drivers:dev.driver_transport_parent.driver_transport_child] WARN: No capability available at path /svc/fuchsia.examples.gizmo.Service/default/device for component bootstrap/full-drivers:dev.driver_transport_parent.driver_transport_child, verify the component has the proper `use` declaration.
 ```
 
 To fix this issue, examine how the capability's use is declared in the

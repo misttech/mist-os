@@ -73,9 +73,9 @@
             path: "/boot",
         },
         {
-            directory: "pkg_drivers",
+            directory: "base_drivers",
             rights: [ "rx*" ],
-            path: "/pkg_drivers",
+            path: "/base_drivers",
         },
     ],
 
@@ -120,7 +120,7 @@
             to: "#realm_builder",
         },
         {
-            directory: "pkg_drivers",
+            directory: "base_drivers",
             from: "self",
             to: "#realm_builder",
         },

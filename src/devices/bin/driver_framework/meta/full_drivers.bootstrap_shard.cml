@@ -2,10 +2,19 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 {
+    children: [
+        // TODO(https://fxbug.dev/42180879): Remove need for separate full_resolver component here.
+        // Full resolver clone to be used by the full-drivers collection
+        {
+            name: "full_resolver",
+            url: "fuchsia-pkg://fuchsia.com/full-resolver#meta/full-resolver.cm",
+            environment: "#base-resolver-env",
+        },
+    ],
     collections: [
         {
-            name: "pkg-drivers",
-            environment: "#pkg-driver-env",
+            name: "full-drivers",
+            environment: "#full-pkg-driver-env",
             durability: "single_run",
             allowed_offers: "static_and_dynamic",
             allow_long_names: true,
@@ -14,34 +23,51 @@
     offer: [
         {
             from: "parent",
-            to: "#pkg-drivers",
+            to: "#full-drivers",
             config: [ "fuchsia.power.SuspendEnabled" ],
+        },
+
+        // Full resolver dependencies
+        {
+            protocol: "fuchsia.pkg.PackageResolver",
+            from: "parent",
+            to: "#full_resolver",
+        },
+        {
+            protocol: "fuchsia.logger.LogSink",
+            from: "#archivist",
+            to: "#full_resolver",
+        },
+        {
+            protocol: "fuchsia.inspect.InspectSink",
+            from: "#archivist",
+            to: "#full_resolver",
         },
         {
             protocol: "fuchsia.tracing.provider.Registry",
             from: "parent",
-            to: "#pkg-drivers",
+            to: "#full-drivers",
             availability: "optional",
         },
         {
             protocol: "fuchsia.kernel.InfoResource",
             from: "parent",
-            to: "#pkg-drivers",
+            to: "#full-drivers",
         },
         {
             protocol: "fuchsia.boot.Arguments",
             from: "parent",
-            to: "#pkg-drivers",
+            to: "#full-drivers",
         },
         {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
             from: "#role_manager",
-            to: "#pkg-drivers",
+            to: "#full-drivers",
         },
         {
             protocol: [ "fuchsia.driver.framework.CompositeNodeManager" ],
             from: "#driver_manager",
-            to: "#pkg-drivers",
+            to: "#full-drivers",
         },
         {
             protocol: [
@@ -50,7 +76,7 @@
                 "fuchsia.sysmem2.Allocator",
             ],
             from: "#sysmem",
-            to: "#pkg-drivers",
+            to: "#full-drivers",
 
             // This must be weak because sysmem needs sysmem from devfs, which creates
             // a cycle. sysmem can be made into a non-driver to fix this.
@@ -60,23 +86,23 @@
         {
             protocol: [ "fuchsia.device.manager.SystemStateTransition" ],
             from: "#shutdown_shim",
-            to: "#pkg-drivers",
+            to: "#full-drivers",
             source_availability: "unknown",
         },
         {
             protocol: [ "fuchsia.logger.LogSink" ],
             from: "#archivist",
-            to: "#pkg-drivers",
+            to: "#full-drivers",
         },
         {
             protocol: [ "fuchsia.inspect.InspectSink" ],
             from: "#driver_manager",
-            to: "#pkg-drivers",
+            to: "#full-drivers",
         },
         {
             protocol: [ "fuchsia.power.system.ActivityGovernor" ],
             from: "#system-activity-governor",
-            to: "#pkg-drivers",
+            to: "#full-drivers",
 
             // system-activity-governor depends on the suspend HAL but not all
             // drivers depend on system-activity-governor.
@@ -87,21 +113,18 @@
         {
             protocol: [ "fuchsia.power.broker.Topology" ],
             from: "#power-broker",
-            to: "#pkg-drivers",
+            to: "#full-drivers",
         },
     ],
     expose: [
         {
-            service: [
-                "fuchsia.hardware.rtc.Service",
-                "fuchsia.hardware.sockettunnel.Service",
-            ],
-            from: "#pkg-drivers",
+            service: "fuchsia.hardware.rtc.Service",
+            from: "#full-drivers",
         },
     ],
     environments: [
         {
-            name: "pkg-driver-env",
+            name: "full-pkg-driver-env",
             extends: "none",
             runners: [
                 {
@@ -116,8 +139,8 @@
                     scheme: "fuchsia-boot",
                 },
                 {
-                    resolver: "base_resolver",
-                    from: "#pkg-cache",
+                    resolver: "full-resolver",
+                    from: "#full_resolver",
                     scheme: "fuchsia-pkg",
                 },
             ],

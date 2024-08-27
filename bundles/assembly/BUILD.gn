@@ -794,7 +794,7 @@ assembly_input_bundle("core_realm") {
         {
           component_name = "bootstrap"
           shards = [
-            "//src/devices/bin/driver_framework/meta/package_drivers.bootstrap_shard.cml",
+            "//src/devices/bin/driver_framework/meta/base_drivers.bootstrap_shard.cml",
             "//src/sys/pkg/bin/pkg-cache/meta/pkg-cache.bootstrap_shard.cml",
           ]
         },
@@ -2185,7 +2185,7 @@ assembly_input_bundle("driver_framework") {
 # feature_set_levels: minimal
 # build-types: eng
 #
-assembly_input_bundle("full_package_drivers") {
+assembly_input_bundle("full_drivers") {
   compiled_packages = [
     {
       bootfs_package = true
@@ -2193,7 +2193,7 @@ assembly_input_bundle("full_package_drivers") {
       components = [
         {
           component_name = "bootstrap"
-          shards = [ "//src/devices/bin/driver_framework/meta/full_package_drivers.bootstrap_shard.cml" ]
+          shards = [ "//src/devices/bin/driver_framework/meta/full_drivers.bootstrap_shard.cml" ]
         },
       ]
     },

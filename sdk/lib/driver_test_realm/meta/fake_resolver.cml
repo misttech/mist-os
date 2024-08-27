@@ -43,9 +43,9 @@
             path: "/boot",
         },
         {
-            directory: "pkg_drivers",
+            directory: "base_drivers",
             rights: [ "rx*" ],
-            path: "/pkg_drivers",
+            path: "/base_drivers",
         },
 
         // Use the test manager's hermetic resolver to service test-pkg-resolver requests.

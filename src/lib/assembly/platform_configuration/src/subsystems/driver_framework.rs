@@ -30,7 +30,7 @@ impl DefineSubsystemConfiguration<DriverFrameworkConfig> for DriverFrameworkSubs
 
         let enable_ephemeral_drivers = match (context.build_type, context.feature_set_level) {
             (BuildType::Eng, FeatureSupportLevel::Standard) => {
-                builder.platform_bundle("full_package_drivers");
+                builder.platform_bundle("full_drivers");
                 true
             }
             (_, _) => false,

@@ -355,7 +355,7 @@ eng_only_platform_aib_names =
       "topology_test_daemon",
 
       # Driver development support
-      "full_package_drivers",
+      "full_drivers",
 
       # Audio development/debugging
       "audio_development_support",

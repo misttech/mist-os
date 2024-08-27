@@ -29,8 +29,8 @@ class FakeComponentResolver final
     : public fidl::WireServer<fuchsia_component_resolution::Resolver> {
  public:
   explicit FakeComponentResolver(fidl::ClientEnd<fuchsia_io::Directory> boot_dir,
-                                 fidl::ClientEnd<fuchsia_io::Directory> pkg_dir)
-      : boot_dir_(std::move(boot_dir)), pkg_dir_(std::move(pkg_dir)) {}
+                                 fidl::ClientEnd<fuchsia_io::Directory> base_dir)
+      : boot_dir_(std::move(boot_dir)), base_dir_(std::move(base_dir)) {}
 
  private:
   void Resolve(ResolveRequestView request, ResolveCompleter::Sync& completer) override {
@@ -98,7 +98,7 @@ class FakeComponentResolver final
       if (is_boot) {
         dir_clone_result = component::Clone(boot_dir_);
       } else {
-        dir_clone_result = component::Clone(pkg_dir_);
+        dir_clone_result = component::Clone(base_dir_);
       }
 
       if (dir_clone_result.is_error()) {
@@ -292,7 +292,7 @@ class FakeComponentResolver final
   }
 
   fidl::ClientEnd<fuchsia_io::Directory> boot_dir_;
-  fidl::ClientEnd<fuchsia_io::Directory> pkg_dir_;
+  fidl::ClientEnd<fuchsia_io::Directory> base_dir_;
 };
 
 zx::result<fidl::ClientEnd<fuchsia_io::Directory>> ConnectDir(const char* dir) {
@@ -329,15 +329,15 @@ int main() {
     return connect_boot_result.status_value();
   }
 
-  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> connect_pkg_result =
-      ConnectDir("/pkg_drivers");
-  if (connect_pkg_result.is_error()) {
-    return connect_pkg_result.status_value();
+  zx::result<fidl::ClientEnd<fuchsia_io::Directory>> connect_base_result =
+      ConnectDir("/base_drivers");
+  if (connect_base_result.is_error()) {
+    return connect_base_result.status_value();
   }
 
   zx::result<> add_protocol_result = outgoing.AddProtocol<fuchsia_component_resolution::Resolver>(
       std::make_unique<FakeComponentResolver>(std::move(connect_boot_result.value()),
-                                              std::move(connect_pkg_result.value())));
+                                              std::move(connect_base_result.value())));
   if (add_protocol_result.is_error()) {
     return add_protocol_result.status_value();
   }

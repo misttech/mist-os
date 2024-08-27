@@ -41,14 +41,14 @@
             allow_long_names: true,
         },
         {
-            name: "pkg-drivers",
+            name: "base-drivers",
             environment: "#driver-env",
             durability: "single_run",
             allowed_offers: "static_and_dynamic",
             allow_long_names: true,
         },
         {
-            name: "full-pkg-drivers",
+            name: "full-drivers",
             environment: "#driver-env",
             durability: "single_run",
             allowed_offers: "static_and_dynamic",
@@ -117,9 +117,9 @@
             protocol: [ "fuchsia.driver.framework.CompositeNodeManager" ],
             from: "#driver_manager",
             to: [
+                "#base-drivers",
                 "#boot-drivers",
-                "#full-pkg-drivers",
-                "#pkg-drivers",
+                "#full-drivers",
             ],
         },
         {
@@ -180,10 +180,10 @@
             protocol: [ "fuchsia.device.manager.SystemStateTransition" ],
             from: "parent",
             to: [
+                "#base-drivers",
                 "#boot-drivers",
                 "#driver-hosts",
-                "#full-pkg-drivers",
-                "#pkg-drivers",
+                "#full-drivers",
             ],
         },
         {
@@ -232,7 +232,7 @@
             rights: [ "r*" ],
         },
         {
-            directory: "pkg_drivers",
+            directory: "base_drivers",
             from: "parent",
             to: [ "#fake-resolver" ],
             rights: [ "rx*" ],

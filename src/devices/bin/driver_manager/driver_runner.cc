@@ -135,9 +135,9 @@ fidl::StringView CollectionName(Collection collection) {
     case Collection::kBoot:
       return "boot-drivers";
     case Collection::kPackage:
-      return "pkg-drivers";
+      return "base-drivers";
     case Collection::kFullPackage:
-      return "full-pkg-drivers";
+      return "full-drivers";
   }
 }
 

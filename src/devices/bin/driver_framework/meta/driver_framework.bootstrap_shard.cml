@@ -24,8 +24,8 @@
             environment: "#devfs-env",
         },
         {
-            // Exists to augment capability graph with information about when #pkg-drivers and
-            // #full-pkg-drivers should be stopped. Most components should prefer depending on
+            // Exists to augment capability graph with information about when #base-drivers and
+            // #full-drivers should be stopped. Most components should prefer depending on
             // capabiliites provided by this component over #devfs.
             name: "devfs-with-pkg",
             url: "fuchsia-boot:///devfs#meta/devfs-pkg.cm",
@@ -290,14 +290,14 @@
             to: [ "#devfs" ],
         },
         {
-            service: [ "bootstrap.pkg-drivers" ],
-            from: "#pkg-drivers",
+            service: [ "bootstrap.base-drivers" ],
+            from: "#base-drivers",
             to: [ "#devfs-with-pkg" ],
             source_availability: "unknown",
         },
         {
-            service: [ "bootstrap.full-pkg-drivers" ],
-            from: "#full-pkg-drivers",
+            service: [ "bootstrap.full-drivers" ],
+            from: "#full-drivers",
             to: [ "#devfs-with-pkg" ],
             source_availability: "unknown",
         },
