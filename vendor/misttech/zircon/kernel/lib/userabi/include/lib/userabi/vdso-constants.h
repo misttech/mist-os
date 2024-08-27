@@ -4,8 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#ifndef ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_VDSO_CONSTANTS_H_
-#define ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_VDSO_CONSTANTS_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_VDSO_CONSTANTS_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_VDSO_CONSTANTS_H_
 
 // This file is used both in the kernel and in the vDSO implementation.
 // So it must be compatible with both the kernel and userland header
@@ -84,4 +84,4 @@ static_assert(VDSO_CONSTANTS_ALIGN >= alignof(vdso_constants),
 
 #endif  // __ASSEMBLER__
 
-#endif  // ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_VDSO_CONSTANTS_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_VDSO_CONSTANTS_H_
