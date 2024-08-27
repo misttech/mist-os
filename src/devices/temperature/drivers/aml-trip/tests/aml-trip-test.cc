@@ -14,9 +14,9 @@
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/runtime/testing/cpp/sync_helpers.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fdf/cpp/arena.h>
 #include <lib/fdf/testing.h>
@@ -103,13 +103,15 @@ class TestEnvironmentWrapper {
 
  private:
   fdf_testing::TestNode node_{"root"};
-  fdf_testing::TestEnvironment env_;
+  fdf_testing::internal::TestEnvironment env_;
   fake_pdev::FakePDevFidl pdev_;
   compat::DeviceServer compat_server_;
 };
 
 }  // namespace
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 class AmlTripTest : public zxtest::Test {
  public:
   AmlTripTest()
@@ -138,8 +140,8 @@ class AmlTripTest : public zxtest::Test {
     fdf::DriverStartArgs start_args =
         test_environment_.SyncCall(&TestEnvironmentWrapper::Setup, std::move(config));
 
-    zx::result start_result = runtime_.RunToCompletion(
-        dut_.SyncCall(&fdf_testing::DriverUnderTest<AmlTrip>::Start, std::move(start_args)));
+    zx::result start_result = runtime_.RunToCompletion(dut_.SyncCall(
+        &fdf_testing::internal::DriverUnderTest<AmlTrip>::Start, std::move(start_args)));
     ASSERT_OK(start_result.status_value());
 
     test_environment_.SyncCall([this](TestEnvironmentWrapper* env_wrapper) {
@@ -152,7 +154,7 @@ class AmlTripTest : public zxtest::Test {
 
   void TearDown() override {
     zx::result run_result = runtime_.RunToCompletion(
-        dut_.SyncCall(&fdf_testing::DriverUnderTest<AmlTrip>::PrepareStop));
+        dut_.SyncCall(&fdf_testing::internal::DriverUnderTest<AmlTrip>::PrepareStop));
     ZX_ASSERT(run_result.is_ok());
   }
 
@@ -165,7 +167,7 @@ class AmlTripTest : public zxtest::Test {
   fdf_testing::DriverRuntime runtime_;
   fdf::UnownedSynchronizedDispatcher env_dispatcher_;
   fdf::UnownedSynchronizedDispatcher driver_dispatcher_;
-  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<AmlTrip>> dut_;
+  async_patterns::TestDispatcherBound<fdf_testing::internal::DriverUnderTest<AmlTrip>> dut_;
   async_patterns::TestDispatcherBound<TestEnvironmentWrapper> test_environment_;
 };
 

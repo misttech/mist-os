@@ -5,12 +5,18 @@
 #include <fidl/fuchsia.logger/cpp/fidl.h>
 #include <lib/async/default.h>
 #include <lib/component/incoming/cpp/protocol.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
+#include <zircon/availability.h>
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+namespace fdf_testing::internal {
+const char TestEnvironment::kTestEnvironmentThreadSafetyDescription[] =
+    "|fdf_testing::internal::TestEnvironment| is thread-unsafe.";
+#else
 namespace fdf_testing {
-
 const char TestEnvironment::kTestEnvironmentThreadSafetyDescription[] =
     "|fdf_testing::TestEnvironment| is thread-unsafe.";
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
 
 TestEnvironment::TestEnvironment(fdf_dispatcher_t* dispatcher)
     : dispatcher_(dispatcher ? dispatcher : fdf::Dispatcher::GetCurrent()->get()),
@@ -43,4 +49,8 @@ zx::result<> TestEnvironment::Initialize(
   return zx::ok();
 }
 
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+}  // namespace fdf_testing::internal
+#else
 }  // namespace fdf_testing
+#endif  // FUCHSIA_API_LEVEL_AT_LEAST(NEXT)

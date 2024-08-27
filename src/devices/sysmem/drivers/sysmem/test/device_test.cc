@@ -11,9 +11,9 @@
 #include <lib/async-loop/loop.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fidl/cpp/wire/arena.h>
 #include <lib/sync/completion.h>
@@ -35,6 +35,8 @@
 namespace sysmem_driver {
 namespace {
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 class FakeDdkSysmem : public ::testing::Test {
  public:
   FakeDdkSysmem() {}
@@ -50,8 +52,8 @@ class FakeDdkSysmem : public ::testing::Test {
     start_args_ = std::move(start_args);
     driver_outgoing_ = std::move(outgoing_directory_client);
 
-    auto init_result = test_environment_.SyncCall(&fdf_testing::TestEnvironment::Initialize,
-                                                  std::move(incoming_directory_server));
+    auto init_result = test_environment_.SyncCall(
+        &fdf_testing::internal::TestEnvironment::Initialize, std::move(incoming_directory_server));
     ASSERT_TRUE(init_result.is_ok());
 
     fake_pdev::FakePDevFidl::Config config;
@@ -60,12 +62,13 @@ class FakeDdkSysmem : public ::testing::Test {
 
     auto pdev_instance_handler = fake_pdev_.SyncCall(&fake_pdev::FakePDevFidl::GetInstanceHandler,
                                                      async_patterns::PassDispatcher);
-    test_environment_.SyncCall([&pdev_instance_handler](fdf_testing::TestEnvironment* env) {
-      auto add_service_result =
-          env->incoming_directory().AddService<fuchsia_hardware_platform_device::Service>(
-              std::move(pdev_instance_handler));
-      ASSERT_TRUE(add_service_result.is_ok());
-    });
+    test_environment_.SyncCall(
+        [&pdev_instance_handler](fdf_testing::internal::TestEnvironment* env) {
+          auto add_service_result =
+              env->incoming_directory().AddService<fuchsia_hardware_platform_device::Service>(
+                  std::move(pdev_instance_handler));
+          ASSERT_TRUE(add_service_result.is_ok());
+        });
 
     StartDriver();
   }
@@ -82,16 +85,18 @@ class FakeDdkSysmem : public ::testing::Test {
 
   void StartDriver() {
     zx::result start_result = runtime_.RunToCompletion(wrapped_device_.SyncCall(
-        &fdf_testing::DriverUnderTest<sysmem_driver::Device>::Start, std::move(start_args_)));
+        &fdf_testing::internal::DriverUnderTest<sysmem_driver::Device>::Start,
+        std::move(start_args_)));
     ASSERT_EQ(start_result.status_value(), ZX_OK);
-    wrapped_device_.SyncCall([this](fdf_testing::DriverUnderTest<sysmem_driver::Device>* device) {
-      device_ = **device;
-    });
+    wrapped_device_.SyncCall(
+        [this](fdf_testing::internal::DriverUnderTest<sysmem_driver::Device>* device) {
+          device_ = **device;
+        });
   }
 
   void StopDriver() {
     zx::result stop_result = runtime_.RunToCompletion(wrapped_device_.SyncCall(
-        &fdf_testing::DriverUnderTest<sysmem_driver::Device>::PrepareStop));
+        &fdf_testing::internal::DriverUnderTest<sysmem_driver::Device>::PrepareStop));
     ASSERT_EQ(stop_result.status_value(), ZX_OK);
   }
 
@@ -99,7 +104,7 @@ class FakeDdkSysmem : public ::testing::Test {
     fpromise::bridge<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> bridge;
     wrapped_device_.SyncCall(
         [completer = bridge.completer.bind()](
-            fdf_testing::DriverUnderTest<sysmem_driver::Device>* device) mutable {
+            fdf_testing::internal::DriverUnderTest<sysmem_driver::Device>* device) mutable {
           auto [client, server] = fidl::Endpoints<fuchsia_sysmem2::Allocator>::Create();
           (*device)->PostTask([device = **device, request = std::move(server)]() mutable {
             sysmem_driver::Allocator::CreateOwnedV2(std::move(request), device,
@@ -126,7 +131,8 @@ class FakeDdkSysmem : public ::testing::Test {
   }
 
   fdf_testing::DriverRuntime& runtime() { return runtime_; }
-  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<sysmem_driver::Device>>&
+  async_patterns::TestDispatcherBound<
+      fdf_testing::internal::DriverUnderTest<sysmem_driver::Device>>&
   wrapped_device() {
     return wrapped_device_;
   }
@@ -148,13 +154,13 @@ class FakeDdkSysmem : public ::testing::Test {
       env_async_dispatcher(), std::in_place, std::string("root")};
   async_patterns::TestDispatcherBound<fake_pdev::FakePDevFidl> fake_pdev_{env_async_dispatcher(),
                                                                           std::in_place};
-  async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
+  async_patterns::TestDispatcherBound<fdf_testing::internal::TestEnvironment> test_environment_{
       env_async_dispatcher(), std::in_place};
 
   fuchsia_driver_framework::DriverStartArgs start_args_;
   fidl::ClientEnd<fuchsia_io::Directory> driver_outgoing_;
 
-  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<sysmem_driver::Device>>
+  async_patterns::TestDispatcherBound<fdf_testing::internal::DriverUnderTest<sysmem_driver::Device>>
       wrapped_device_{driver_async_dispatcher(), std::in_place};
 
   sysmem_driver::Device* device_ = nullptr;

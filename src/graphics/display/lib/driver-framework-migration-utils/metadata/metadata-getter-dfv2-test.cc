@@ -10,7 +10,7 @@
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 
 #include <gtest/gtest.h>
@@ -37,10 +37,12 @@ constexpr TestMetadata kTestMetadata = {
 
 struct IncomingNamespace {
   fdf_testing::TestNode node{std::string("root")};
-  fdf_testing::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
+  fdf_testing::internal::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
   compat::DeviceServer compat_server;
 };
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 class MetadataGetterDfv2Test : public testing::Test {
  public:
   // implements `testing::Test`.

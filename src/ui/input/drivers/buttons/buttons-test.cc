@@ -9,7 +9,6 @@
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
 #include <lib/driver/testing/cpp/driver_test.h>
-#include <lib/driver/testing/cpp/test_environment.h>
 
 #include <set>
 

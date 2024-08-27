@@ -6,9 +6,9 @@
 #define SRC_GRAPHICS_DISPLAY_DRIVERS_FAKE_FAKE_SYSMEM_DEVICE_HIERARCHY_H_
 
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
@@ -18,6 +18,8 @@
 
 namespace display {
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 class FakeSysmemDeviceHierarchy : public SysmemServiceProvider {
  public:
   static zx::result<std::unique_ptr<FakeSysmemDeviceHierarchy>> Create();
@@ -40,7 +42,8 @@ class FakeSysmemDeviceHierarchy : public SysmemServiceProvider {
 
  private:
   fdf_testing::DriverRuntime& runtime() { return *runtime_; }
-  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<sysmem_driver::Device>>&
+  async_patterns::TestDispatcherBound<
+      fdf_testing::internal::DriverUnderTest<sysmem_driver::Device>>&
   driver() {
     return device_;
   }
@@ -65,11 +68,11 @@ class FakeSysmemDeviceHierarchy : public SysmemServiceProvider {
       env_async_dispatcher(), std::in_place, std::string("root")};
   async_patterns::TestDispatcherBound<fake_pdev::FakePDevFidl> fake_pdev_{env_async_dispatcher(),
                                                                           std::in_place};
-  async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
+  async_patterns::TestDispatcherBound<fdf_testing::internal::TestEnvironment> test_environment_{
       env_async_dispatcher(), std::in_place};
 
-  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<sysmem_driver::Device>> device_{
-      driver_async_dispatcher(), std::in_place};
+  async_patterns::TestDispatcherBound<fdf_testing::internal::DriverUnderTest<sysmem_driver::Device>>
+      device_{driver_async_dispatcher(), std::in_place};
 
   fuchsia_driver_framework::DriverStartArgs start_args_;
   fidl::ClientEnd<fuchsia_io::Directory> driver_outgoing_;

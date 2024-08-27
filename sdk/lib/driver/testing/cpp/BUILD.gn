@@ -29,20 +29,26 @@ sdk_source_set("cpp") {
   public_configs = [ "//sdk/config" ]
 
   sources = [
-    "driver_lifecycle.cc",
     "driver_lifecycle.h",
     "driver_runtime.cc",
     "driver_runtime.h",
     "driver_test.h",
     "environment_variables.cc",
+    "internal/driver_lifecycle.cc",
+    "internal/driver_lifecycle.h",
     "internal/internals.h",
-    "test_environment.cc",
+    "internal/test_environment.cc",
+    "internal/test_environment.h",
     "test_environment.h",
     "test_node.cc",
     "test_node.h",
   ]
 
-  sdk_headers_for_internal_use = [ "internal/internals.h" ]
+  sdk_headers_for_internal_use = [
+    "internal/driver_lifecycle.h",
+    "internal/internals.h",
+    "internal/test_environment.h",
+  ]
 
   deps = [
     "//sdk/lib/driver/runtime/testing/cpp",

@@ -11,7 +11,7 @@
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 
 #include <gtest/gtest.h>
@@ -77,6 +77,8 @@ class SingleProtocolService : public fidl::Server<test_display_namespace::Echo> 
   fidl::ServerBindingGroup<test_display_namespace::Echo> bindings_;
 };
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 class NamespaceDfv2Test : public testing::Test {
  public:
   // implements `testing::Test`.
@@ -86,11 +88,11 @@ class NamespaceDfv2Test : public testing::Test {
     ASSERT_TRUE(start_args_result.is_ok());
 
     zx::result test_environment_init_result =
-        test_environment_.SyncCall(&fdf_testing::TestEnvironment::Initialize,
+        test_environment_.SyncCall(&fdf_testing::internal::TestEnvironment::Initialize,
                                    std::move(start_args_result->incoming_directory_server));
     ASSERT_TRUE(test_environment_init_result.is_ok());
 
-    test_environment_.SyncCall([&](fdf_testing::TestEnvironment* environment) {
+    test_environment_.SyncCall([&](fdf_testing::internal::TestEnvironment* environment) {
       zx::result<> multi_protocol_add_service_result =
           environment->incoming_directory()
               .AddService<test_display_namespace::MultiProtocolService>(
@@ -127,7 +129,7 @@ class NamespaceDfv2Test : public testing::Test {
 
   async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
       env_dispatcher_->async_dispatcher(), std::in_place, std::string("root")};
-  async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
+  async_patterns::TestDispatcherBound<fdf_testing::internal::TestEnvironment> test_environment_{
       env_dispatcher_->async_dispatcher(), std::in_place};
 
   fdf::Namespace namespace_;

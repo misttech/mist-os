@@ -4,9 +4,9 @@
 
 #include <fidl/fuchsia.kernel/cpp/wire_test_base.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fake-resource/resource.h>
 #include <lib/zx/result.h>
@@ -78,10 +78,12 @@ class TestEnvironmentWrapper {
 
  private:
   fdf_testing::TestNode node_{"root"};
-  fdf_testing::TestEnvironment env_;
+  fdf_testing::internal::TestEnvironment env_;
   fake_pdev::FakePDevFidl pdev_;
 };
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 TEST(MsdArmDFv2, LoadDriver) {
   fdf_testing::DriverRuntime runtime;
 
@@ -157,7 +159,7 @@ TEST(MsdArmDFv2, LoadDriver) {
     start_args.config(fake_config.ToVmo());
   }
 
-  fdf_testing::DriverUnderTest<> driver;
+  fdf_testing::internal::DriverUnderTest<> driver;
 
   zx::result start_result = runtime.RunToCompletion(driver.Start(std::move(start_args)));
   ASSERT_EQ(ZX_OK, start_result.status_value());

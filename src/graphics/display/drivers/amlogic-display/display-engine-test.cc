@@ -14,8 +14,8 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/scoped_global_logger.h>
-#include <lib/driver/testing/cpp/test_environment.h>
 #include <lib/fdf/cpp/dispatcher.h>
 #include <lib/inspect/cpp/inspect.h>
 
@@ -349,6 +349,8 @@ class FakeCanvasProtocol : public fidl::WireServer<fuchsia_hardware_amlogiccanva
   std::optional<fidl::ServerBinding<fuchsia_hardware_amlogiccanvas::Device>> binding_;
 };
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 class FakeSysmemTest : public testing::Test {
  public:
   static constexpr int kWidth = 1024;
@@ -366,7 +368,7 @@ class FakeSysmemTest : public testing::Test {
     incoming_ = std::make_shared<fdf::Namespace>(std::move(namespace_result).value());
 
     zx::result<> test_environment_init_result = test_environment_.SyncCall(
-        &fdf_testing::TestEnvironment::Initialize, std::move(directory_server));
+        &fdf_testing::internal::TestEnvironment::Initialize, std::move(directory_server));
     ASSERT_OK(test_environment_init_result);
   }
 
@@ -430,7 +432,7 @@ class FakeSysmemTest : public testing::Test {
 
   fdf_testing::DriverRuntime runtime_;
   fdf::UnownedSynchronizedDispatcher env_dispatcher_ = runtime_.StartBackgroundDispatcher();
-  async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
+  async_patterns::TestDispatcherBound<fdf_testing::internal::TestEnvironment> test_environment_{
       env_dispatcher_->async_dispatcher(), std::in_place};
 
   std::shared_ptr<fdf::Namespace> incoming_;

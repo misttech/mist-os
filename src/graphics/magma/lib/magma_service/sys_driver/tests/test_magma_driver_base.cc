@@ -4,9 +4,9 @@
 
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/component/cpp/driver_export.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/magma_service/mock/mock_msd.h>
 #include <lib/magma_service/sys_driver/magma_driver_base.h>
@@ -85,6 +85,8 @@ TEST(MagmaDriver, CreateDriver) {
                     fdf::UnownedSynchronizedDispatcher(fdf::Dispatcher::GetCurrent()->get())};
 }
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 class MagmaDriverStarted : public testing::Test {
  public:
   void SetUp() override {
@@ -94,18 +96,19 @@ class MagmaDriverStarted : public testing::Test {
     ASSERT_TRUE(start_args.is_ok());
 
     zx::result result =
-        test_environment_.SyncCall(&fdf_testing::TestEnvironment::Initialize,
+        test_environment_.SyncCall(&fdf_testing::internal::TestEnvironment::Initialize,
                                    std::move(start_args->incoming_directory_server));
     EXPECT_EQ(ZX_OK, result.status_value());
 
-    zx::result start_result = runtime_.RunToCompletion(driver_.SyncCall(
-        &fdf_testing::DriverUnderTest<FakeTestDriver>::Start, std::move(start_args->start_args)));
+    zx::result start_result = runtime_.RunToCompletion(
+        driver_.SyncCall(&fdf_testing::internal::DriverUnderTest<FakeTestDriver>::Start,
+                         std::move(start_args->start_args)));
     ASSERT_EQ(ZX_OK, start_result.status_value());
   }
 
   void TearDown() override {
     zx::result stop_result = runtime_.RunToCompletion(
-        driver_.SyncCall(&fdf_testing::DriverUnderTest<FakeTestDriver>::PrepareStop));
+        driver_.SyncCall(&fdf_testing::internal::DriverUnderTest<FakeTestDriver>::PrepareStop));
     ASSERT_EQ(ZX_OK, stop_result.status_value());
   }
 
@@ -124,11 +127,11 @@ class MagmaDriverStarted : public testing::Test {
 
   async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
       test_env_dispatcher_->async_dispatcher(), std::in_place, std::string("root")};
-  async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
+  async_patterns::TestDispatcherBound<fdf_testing::internal::TestEnvironment> test_environment_{
       test_env_dispatcher_->async_dispatcher(), std::in_place};
 
-  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<FakeTestDriver>> driver_{
-      driver_dispatcher_->async_dispatcher(), std::in_place};
+  async_patterns::TestDispatcherBound<fdf_testing::internal::DriverUnderTest<FakeTestDriver>>
+      driver_{driver_dispatcher_->async_dispatcher(), std::in_place};
 };
 
 TEST_F(MagmaDriverStarted, TestDriver) {}
@@ -195,10 +198,11 @@ TEST_F(MagmaDriverStarted, DependencyInjection) {
                    }).status_value());
 
   MsdMockDevice* mock_device;
-  driver_.SyncCall([&mock_device](fdf_testing::DriverUnderTest<FakeTestDriver>* driver) mutable {
-    std::lock_guard magma_lock((*driver)->magma_mutex());
-    mock_device = static_cast<MsdMockDevice*>((*driver)->magma_system_device()->msd_dev());
-  });
+  driver_.SyncCall(
+      [&mock_device](fdf_testing::internal::DriverUnderTest<FakeTestDriver>* driver) mutable {
+        std::lock_guard magma_lock((*driver)->magma_mutex());
+        mock_device = static_cast<MsdMockDevice*>((*driver)->magma_system_device()->msd_dev());
+      });
   mock_device->WaitForMemoryPressureSignal();
   EXPECT_EQ(msd::MAGMA_MEMORY_PRESSURE_LEVEL_WARNING, mock_device->memory_pressure_level());
 }
@@ -207,5 +211,6 @@ TEST_F(MagmaDriverStarted, DependencyInjection) {
 
 }  // namespace msd
 
-// Export the |FakeTestDriver| for the |fdf_testing::DriverUnderTest<FakeTestDriver>| to use.
+// Export the |FakeTestDriver| for the |fdf_testing::internal::DriverUnderTest<FakeTestDriver>| to
+// use.
 FUCHSIA_DRIVER_EXPORT(msd::FakeTestDriver);

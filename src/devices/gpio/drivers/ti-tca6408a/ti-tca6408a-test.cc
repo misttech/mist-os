@@ -8,9 +8,9 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/metadata.h>
 #include <lib/driver/compat/cpp/device_server.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fake-i2c/fake-i2c.h>
 
@@ -79,11 +79,13 @@ class FakeTiTca6408aDevice : public fake_i2c::FakeI2c {
 
 struct IncomingNamespace {
   fdf_testing::TestNode node_{std::string("root")};
-  fdf_testing::TestEnvironment env_{fdf::Dispatcher::GetCurrent()->get()};
+  fdf_testing::internal::TestEnvironment env_{fdf::Dispatcher::GetCurrent()->get()};
   compat::DeviceServer device_server_;
   FakeTiTca6408aDevice fake_i2c_;
 };
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 class TiTca6408aTest : public zxtest::Test {
  public:
   TiTca6408aTest()
@@ -130,7 +132,7 @@ class TiTca6408aTest : public zxtest::Test {
 
     // Start dut_.
     auto result = runtime_.RunToCompletion(dut_.SyncCall(
-        &fdf_testing::DriverUnderTest<TiTca6408aDevice>::Start, std::move(start_args)));
+        &fdf_testing::internal::DriverUnderTest<TiTca6408aDevice>::Start, std::move(start_args)));
     ASSERT_TRUE(result.is_ok());
 
     // Connect to GpioImpl.
@@ -157,7 +159,8 @@ class TiTca6408aTest : public zxtest::Test {
   fdf_testing::DriverRuntime runtime_;
   fdf::UnownedSynchronizedDispatcher env_dispatcher_;
   fdf::UnownedSynchronizedDispatcher driver_dispatcher_;
-  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<TiTca6408aDevice>> dut_;
+  async_patterns::TestDispatcherBound<fdf_testing::internal::DriverUnderTest<TiTca6408aDevice>>
+      dut_;
 
  protected:
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_;

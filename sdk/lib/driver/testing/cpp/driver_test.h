@@ -44,6 +44,7 @@ class EmptyDriverType {};
 // The EnvironmentType must implement this class.
 class Environment {
  public:
+  virtual ~Environment() = default;
   // This function is called on the dispatcher context of the environment. The class should serve
   // its elements (eg. compat::DeviceServer, FIDL servers, etc...) to the |to_driver_vfs|.
   // This object is serving the incoming directory of the driver under test.
@@ -300,10 +301,10 @@ class BackgroundDriverTest final : public internal::DriverTestCommon<Configurati
   T RunInDriverContext(fit::callback<T(DriverType&)> task) {
     ZX_ASSERT_MSG(dut_.has_value(),
                   "Cannot call RunInDriverContext after |ShutdownAndDestroyDriver|.");
-    return dut_->SyncCall(
-        [driver_task = std::move(task)](fdf_testing::DriverUnderTest<DriverType>* dut_ptr) mutable {
-          return driver_task(***dut_ptr);
-        });
+    return dut_->SyncCall([driver_task = std::move(task)](
+                              fdf_testing::internal::DriverUnderTest<DriverType>* dut_ptr) mutable {
+      return driver_task(***dut_ptr);
+    });
   }
 
   // Runs a task on the dispatcher context of the driver under test. This will be a different
@@ -314,10 +315,10 @@ class BackgroundDriverTest final : public internal::DriverTestCommon<Configurati
   void RunInDriverContext(fit::callback<void(DriverType&)> task) {
     ZX_ASSERT_MSG(dut_.has_value(),
                   "Cannot call RunInDriverContext after |ShutdownAndDestroyDriver|.");
-    dut_->SyncCall(
-        [driver_task = std::move(task)](fdf_testing::DriverUnderTest<DriverType>* dut_ptr) mutable {
-          driver_task(***dut_ptr);
-        });
+    dut_->SyncCall([driver_task = std::move(task)](
+                       fdf_testing::internal::DriverUnderTest<DriverType>* dut_ptr) mutable {
+      driver_task(***dut_ptr);
+    });
   }
 
  private:
@@ -332,13 +333,13 @@ class BackgroundDriverTest final : public internal::DriverTestCommon<Configurati
     dut_dispatcher_ = this->runtime().StartBackgroundDispatcher();
     dut_.emplace(dut_dispatcher_->async_dispatcher(), std::in_place, symbol);
 
-    return this->runtime().RunToCompletion(
-        dut_->SyncCall(&fdf_testing::DriverUnderTest<DriverType>::Start, std::move(start_args)));
+    return this->runtime().RunToCompletion(dut_->SyncCall(
+        &fdf_testing::internal::DriverUnderTest<DriverType>::Start, std::move(start_args)));
   }
 
   zx::result<> StopDriverInner() override {
     return this->runtime().RunToCompletion(
-        dut_->SyncCall(&fdf_testing::DriverUnderTest<DriverType>::PrepareStop));
+        dut_->SyncCall(&fdf_testing::internal::DriverUnderTest<DriverType>::PrepareStop));
   }
 
   bool DriverExists() override { return dut_.has_value(); }
@@ -349,7 +350,9 @@ class BackgroundDriverTest final : public internal::DriverTestCommon<Configurati
   }
 
   fdf::UnownedSynchronizedDispatcher dut_dispatcher_;
-  std::optional<async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<DriverType>>> dut_;
+  std::optional<
+      async_patterns::TestDispatcherBound<fdf_testing::internal::DriverUnderTest<DriverType>>>
+      dut_;
 };
 
 // Foreground driver tests have the driver-under-test executing on the foreground (main) test
@@ -452,7 +455,7 @@ class ForegroundDriverTest final : public internal::DriverTestCommon<Configurati
   }
 
   std::optional<fdf::UnownedSynchronizedDispatcher> bg_task_dispatcher_;
-  std::optional<fdf_testing::DriverUnderTest<DriverType>> dut_;
+  std::optional<fdf_testing::internal::DriverUnderTest<DriverType>> dut_;
 };
 
 }  // namespace fdf_testing

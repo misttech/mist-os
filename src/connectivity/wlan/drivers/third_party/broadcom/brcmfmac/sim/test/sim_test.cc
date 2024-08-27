@@ -9,7 +9,7 @@
 #include <fidl/fuchsia.wlan.phyimpl/cpp/markers.h>
 #include <fuchsia/wlan/ieee80211/cpp/fidl.h>
 #include <lib/driver/outgoing/cpp/outgoing_directory.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/fdf/dispatcher.h>
 #include <lib/fdio/directory.h>
 #include <lib/fidl/cpp/wire/channel.h>
@@ -523,10 +523,11 @@ SimTest::~SimTest() {
   // Make sure to synchronously shut down the device here to avoid any in-flight FIDL calls arriving
   // during the rest of the destruction.
   zx::result prepare_stop_result = runtime().RunToCompletion(
-      dut_.SyncCall(&fdf_testing::DriverUnderTest<brcmfmac::SimDevice>::PrepareStop));
+      dut_.SyncCall(&fdf_testing::internal::DriverUnderTest<brcmfmac::SimDevice>::PrepareStop));
   EXPECT_OK(prepare_stop_result.status_value());
 
-  zx::result stop_result = dut_.SyncCall(&fdf_testing::DriverUnderTest<brcmfmac::Device>::Stop);
+  zx::result stop_result =
+      dut_.SyncCall(&fdf_testing::internal::DriverUnderTest<brcmfmac::Device>::Stop);
   EXPECT_OK(stop_result.status_value());
 }
 
@@ -536,14 +537,15 @@ zx_status_t SimTest::PreInit() {
 
   driver_outgoing_ = std::move(start_args->outgoing_directory_client);
 
-  zx::result init_result = test_environment_.SyncCall(
-      &fdf_testing::TestEnvironment::Initialize, std::move(start_args->incoming_directory_server));
+  zx::result init_result =
+      test_environment_.SyncCall(&fdf_testing::internal::TestEnvironment::Initialize,
+                                 std::move(start_args->incoming_directory_server));
   EXPECT_OK(init_result.status_value());
 
   // Calling SimDevice::Start also allocates the dut. Trying to access the underlying
   // brcmfmac::SimDevice is invalid before this step.
   zx::result start_result = runtime().RunToCompletion(
-      dut_.SyncCall(&fdf_testing::DriverUnderTest<brcmfmac::SimDevice>::Start,
+      dut_.SyncCall(&fdf_testing::internal::DriverUnderTest<brcmfmac::SimDevice>::Start,
                     std::move(start_args->start_args)));
 
   EXPECT_OK(start_result.status_value());
@@ -723,7 +725,7 @@ void SimTest::WaitForDeviceCountWithProperty(const fuchsia_driver_framework::Nod
 
 void SimTest::WithSimDevice(fit::function<void(brcmfmac::SimDevice*)> callback) {
   dut().SyncCall([callback = std::move(callback)](
-                     fdf_testing::DriverUnderTest<brcmfmac::SimDevice>* dut) mutable {
+                     fdf_testing::internal::DriverUnderTest<brcmfmac::SimDevice>* dut) mutable {
     // *dut dereferences the pointer and yields a DriverUnderTest<SimDevice>
     // *(DriverUnderTest<SimDevice>) (i.e., **dut) yields a SimDevice*
     callback(**dut);

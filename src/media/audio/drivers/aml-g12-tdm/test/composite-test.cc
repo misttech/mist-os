@@ -11,9 +11,9 @@
 #include <lib/component/incoming/cpp/service.h>
 #include <lib/ddk/platform-defs.h>
 #include <lib/driver/incoming/cpp/namespace.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/fdio/directory.h>
@@ -248,9 +248,11 @@ class FakeGpio : public fidl::testing::WireTestBase<fuchsia_hardware_gpio::Gpio>
 
 struct IncomingNamespace {
   fdf_testing::TestNode node_{std::string("root")};
-  fdf_testing::TestEnvironment env_{fdf::Dispatcher::GetCurrent()->get()};
+  fdf_testing::internal::TestEnvironment env_{fdf::Dispatcher::GetCurrent()->get()};
 };
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 class AmlG12CompositeTest : public testing::Test {
  public:
   AmlG12CompositeTest()
@@ -304,8 +306,8 @@ class AmlG12CompositeTest : public testing::Test {
       driver_start_args = std::move(start_args_result->start_args);
     });
 
-    zx::result result = runtime_.RunToCompletion(
-        dut_.SyncCall(&fdf_testing::DriverUnderTest<Driver>::Start, std::move(driver_start_args)));
+    zx::result result = runtime_.RunToCompletion(dut_.SyncCall(
+        &fdf_testing::internal::DriverUnderTest<Driver>::Start, std::move(driver_start_args)));
     ASSERT_EQ(ZX_OK, result.status_value());
 
     incoming_.SyncCall([this](IncomingNamespace* incoming) {
@@ -317,8 +319,8 @@ class AmlG12CompositeTest : public testing::Test {
   }
 
   void TearDown() override {
-    zx::result result =
-        runtime_.RunToCompletion(dut_.SyncCall(&fdf_testing::DriverUnderTest<Driver>::PrepareStop));
+    zx::result result = runtime_.RunToCompletion(
+        dut_.SyncCall(&fdf_testing::internal::DriverUnderTest<Driver>::PrepareStop));
     ASSERT_EQ(ZX_OK, result.status_value());
   }
 
@@ -462,7 +464,7 @@ class AmlG12CompositeTest : public testing::Test {
   fdf::UnownedSynchronizedDispatcher env_dispatcher_;
   fdf::UnownedSynchronizedDispatcher driver_dispatcher_;
   // Use dut_ instead of driver_ because driver_ is used by gtest.
-  async_patterns::TestDispatcherBound<fdf_testing::DriverUnderTest<Driver>> dut_{
+  async_patterns::TestDispatcherBound<fdf_testing::internal::DriverUnderTest<Driver>> dut_{
       driver_dispatcher(), std::in_place};
 
  protected:

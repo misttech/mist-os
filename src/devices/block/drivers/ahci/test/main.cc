@@ -5,9 +5,9 @@
 #include <byteswap.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/component/cpp/driver_export.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/inspect/testing/cpp/zxtest/inspect.h>
 #include <lib/zx/clock.h>
@@ -449,9 +449,11 @@ bool TestController::support_native_command_queuing_;
 
 struct IncomingNamespace {
   fdf_testing::TestNode node{"root"};
-  fdf_testing::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
+  fdf_testing::internal::TestEnvironment env{fdf::Dispatcher::GetCurrent()->get()};
 };
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 class AhciTest : public inspect::InspectTestHelper, public zxtest::TestWithParam<bool> {
  public:
   AhciTest()
@@ -498,7 +500,7 @@ class AhciTest : public inspect::InspectTestHelper, public zxtest::TestWithParam
   fdf_testing::DriverRuntime runtime_;
   fdf::UnownedSynchronizedDispatcher env_dispatcher_;
   async_patterns::TestDispatcherBound<IncomingNamespace> incoming_;
-  fdf_testing::DriverUnderTest<TestController> dut_;
+  fdf_testing::internal::DriverUnderTest<TestController> dut_;
   FakeBus* fake_bus_;
   SataDevice* sata_device_;
 };

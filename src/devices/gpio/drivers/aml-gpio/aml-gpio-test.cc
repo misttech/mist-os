@@ -5,9 +5,9 @@
 #include "aml-gpio.h"
 
 #include <lib/ddk/platform-defs.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 
 #include <gtest/gtest.h>
@@ -171,6 +171,8 @@ struct IncomingNamespace {
   FakePlatformDevice<kPid> platform_device;
 };
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 template <uint32_t kPid>
 class AmlGpioTest : public testing::Test {
  public:
@@ -262,8 +264,8 @@ class AmlGpioTest : public testing::Test {
   fdf::UnownedSynchronizedDispatcher background_dispatcher_;
   IncomingNamespace<kPid> incoming_;
   fdf_testing::TestNode node_server_;
-  fdf_testing::TestEnvironment test_environment_;
-  fdf_testing::DriverUnderTest<TestAmlGpioDriver> dut_;
+  fdf_testing::internal::TestEnvironment test_environment_;
+  fdf_testing::internal::DriverUnderTest<TestAmlGpioDriver> dut_;
 };
 
 using A113AmlGpioTest = AmlGpioTest<PDEV_PID_AMLOGIC_A113>;

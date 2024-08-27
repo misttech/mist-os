@@ -9,7 +9,7 @@
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/ddk/platform-defs.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
 #include <lib/syslog/cpp/macros.h>
 #include <lib/zx/result.h>
 #include <zircon/status.h>
@@ -36,7 +36,7 @@ FakeSysmemDeviceHierarchy::FakeSysmemDeviceHierarchy() {
   start_args.config() = sysmem_config::Config{}.ToVmo();
   driver_outgoing_ = std::move(outgoing_directory_client);
 
-  auto init_result = test_environment_.SyncCall(&fdf_testing::TestEnvironment::Initialize,
+  auto init_result = test_environment_.SyncCall(&fdf_testing::internal::TestEnvironment::Initialize,
                                                 std::move(incoming_directory_server));
   ZX_ASSERT_MSG(init_result.is_ok(), "%s", init_result.status_string());
 
@@ -47,28 +47,30 @@ FakeSysmemDeviceHierarchy::FakeSysmemDeviceHierarchy() {
 
   auto pdev_instance_handler = fake_pdev_.SyncCall(&fake_pdev::FakePDevFidl::GetInstanceHandler,
                                                    async_patterns::PassDispatcher);
-  test_environment_.SyncCall([&pdev_instance_handler](fdf_testing::TestEnvironment* env) {
+  test_environment_.SyncCall([&pdev_instance_handler](fdf_testing::internal::TestEnvironment* env) {
     auto add_service_result =
         env->incoming_directory().AddService<fuchsia_hardware_platform_device::Service>(
             std::move(pdev_instance_handler));
     ZX_ASSERT_MSG(add_service_result.is_ok(), "%s", add_service_result.status_string());
   });
 
-  zx::result start_result = runtime_->RunToCompletion(device_.SyncCall(
-      &fdf_testing::DriverUnderTest<sysmem_driver::Device>::Start, std::move(start_args)));
+  zx::result start_result = runtime_->RunToCompletion(
+      device_.SyncCall(&fdf_testing::internal::DriverUnderTest<sysmem_driver::Device>::Start,
+                       std::move(start_args)));
   ZX_ASSERT_MSG(start_result.is_ok(), "%s", start_result.status_string());
 }
 
 zx::result<fidl::ClientEnd<fuchsia_sysmem::Allocator>>
 FakeSysmemDeviceHierarchy::ConnectAllocator() {
   auto [client, server] = fidl::Endpoints<fuchsia_sysmem::Allocator>::Create();
-  device_.SyncCall([request = std::move(server)](
-                       fdf_testing::DriverUnderTest<sysmem_driver::Device>* device) mutable {
-    sysmem_driver::Device* dev = **device;
-    dev->PostTask([request = std::move(request), dev]() mutable {
-      sysmem_driver::Allocator::CreateOwnedV1(std::move(request), dev, dev->v1_allocators());
-    });
-  });
+  device_.SyncCall(
+      [request = std::move(server)](
+          fdf_testing::internal::DriverUnderTest<sysmem_driver::Device>* device) mutable {
+        sysmem_driver::Device* dev = **device;
+        dev->PostTask([request = std::move(request), dev]() mutable {
+          sysmem_driver::Allocator::CreateOwnedV1(std::move(request), dev, dev->v1_allocators());
+        });
+      });
 
   return zx::ok(std::move(client));
 }
@@ -76,13 +78,14 @@ FakeSysmemDeviceHierarchy::ConnectAllocator() {
 zx::result<fidl::ClientEnd<fuchsia_sysmem2::Allocator>>
 FakeSysmemDeviceHierarchy::ConnectAllocator2() {
   auto [client, server] = fidl::Endpoints<fuchsia_sysmem2::Allocator>::Create();
-  device_.SyncCall([request = std::move(server)](
-                       fdf_testing::DriverUnderTest<sysmem_driver::Device>* device) mutable {
-    sysmem_driver::Device* dev = **device;
-    dev->PostTask([request = std::move(request), dev]() mutable {
-      sysmem_driver::Allocator::CreateOwnedV2(std::move(request), dev, dev->v2_allocators());
-    });
-  });
+  device_.SyncCall(
+      [request = std::move(server)](
+          fdf_testing::internal::DriverUnderTest<sysmem_driver::Device>* device) mutable {
+        sysmem_driver::Device* dev = **device;
+        dev->PostTask([request = std::move(request), dev]() mutable {
+          sysmem_driver::Allocator::CreateOwnedV2(std::move(request), dev, dev->v2_allocators());
+        });
+      });
 
   return zx::ok(std::move(client));
 }
@@ -91,24 +94,25 @@ zx::result<fidl::ClientEnd<fuchsia_hardware_sysmem::Sysmem>>
 FakeSysmemDeviceHierarchy::ConnectHardwareSysmem() {
   auto [client, server] = fidl::Endpoints<fuchsia_hardware_sysmem::Sysmem>::Create();
   runtime_->PerformBlockingWork([this, request = std::move(server)]() mutable {
-    device_.SyncCall([request = std::move(request)](
-                         fdf_testing::DriverUnderTest<sysmem_driver::Device>* device) mutable {
-      sysmem_driver::Device* dev = **device;
-      dev->BindingsForTest().AddBinding(dev->loop_dispatcher(), std::move(request), dev,
-                                        fidl::kIgnoreBindingClosure);
-    });
+    device_.SyncCall(
+        [request = std::move(request)](
+            fdf_testing::internal::DriverUnderTest<sysmem_driver::Device>* device) mutable {
+          sysmem_driver::Device* dev = **device;
+          dev->BindingsForTest().AddBinding(dev->loop_dispatcher(), std::move(request), dev,
+                                            fidl::kIgnoreBindingClosure);
+        });
   });
 
   return zx::ok(std::move(client));
 }
 
 FakeSysmemDeviceHierarchy::~FakeSysmemDeviceHierarchy() {
-  zx::result prepare_stop_result = runtime_->RunToCompletion(
-      device_.SyncCall(&fdf_testing::DriverUnderTest<sysmem_driver::Device>::PrepareStop));
+  zx::result prepare_stop_result = runtime_->RunToCompletion(device_.SyncCall(
+      &fdf_testing::internal::DriverUnderTest<sysmem_driver::Device>::PrepareStop));
   ZX_ASSERT_MSG(prepare_stop_result.is_ok(), "%s", prepare_stop_result.status_string());
 
   zx::result stop_result =
-      device_.SyncCall(&fdf_testing::DriverUnderTest<sysmem_driver::Device>::Stop);
+      device_.SyncCall(&fdf_testing::internal::DriverUnderTest<sysmem_driver::Device>::Stop);
   ZX_ASSERT_MSG(stop_result.is_ok(), "%s", stop_result.status_string());
 
   test_environment_.reset();

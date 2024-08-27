@@ -10,9 +10,9 @@
 #include <lib/async-loop/default.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/ddk/metadata.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/zx/clock.h>
 #include <zircon/assert.h>
@@ -258,10 +258,12 @@ class Environment {
  private:
   fdf_testing::TestNode test_node_{"root"};
   FakePDev pdev_server_;
-  fdf_testing::TestEnvironment test_environment_;
+  fdf_testing::internal::TestEnvironment test_environment_;
   compat::DeviceServer compat_server_;
 };
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 class AmlI2cTest : public testing::Test {
  public:
   // Convenience definitions that don't require casting.
@@ -325,7 +327,8 @@ class AmlI2cTest : public testing::Test {
   fdf::UnownedSynchronizedDispatcher env_dispatcher_ = runtime_.StartBackgroundDispatcher();
   async_patterns::TestDispatcherBound<Environment> env_{env_dispatcher_->async_dispatcher(),
                                                         std::in_place};
-  fdf_testing::DriverUnderTest<aml_i2c::TestAmlI2c> dut_{TestAmlI2c::GetDriverRegistration()};
+  fdf_testing::internal::DriverUnderTest<aml_i2c::TestAmlI2c> dut_{
+      TestAmlI2c::GetDriverRegistration()};
   FakeAmlI2cController controller_;
 };
 

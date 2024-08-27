@@ -6,15 +6,25 @@
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/component/cpp/driver_base.h>
 #include <lib/driver/component/cpp/tests/test_driver.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fdf/env.h>
 #include <lib/fdf/testing.h>
 
 #include <gtest/gtest.h>
 
+// WARNING!
+// This test is using the old driver testing libraries. These were verbose and difficult to use
+// directly. We have a new driver testing library that wraps the logic provided by these libraries
+// and moves these into the internal namespace. The new library is in the header:
+// <lib/driver/testing/cpp/driver_test.h>
+// This library is the replacement that should be used from now on. It is also referred to
+// as the driver test fixture library in some places due to historical reasons. See the tests over
+// in fixture_based_tests.cc for example tests using the library.
+
+// SEE WARNING AT TOP. DO NOT COPY INTO NEW TESTS.
 // This is the recommended setup if you have a driver that doesn't need to make synchronous FIDL
 // calls. Everything runs on the main test thread so everything is safe to access directly.
 class TestForegroundDispatcher : public ::testing::Test {
@@ -53,7 +63,7 @@ class TestForegroundDispatcher : public ::testing::Test {
     runtime_.ShutdownAllDispatchers(fdf::Dispatcher::GetCurrent()->get());
   }
 
-  fdf_testing::DriverUnderTest<TestDriver>& driver() { return driver_; }
+  fdf_testing::internal::DriverUnderTest<TestDriver>& driver() { return driver_; }
 
  private:
   // Attaches a foreground dispatcher for us automatically.
@@ -61,9 +71,9 @@ class TestForegroundDispatcher : public ::testing::Test {
 
   // These will use the foreground dispatcher.
   std::optional<fdf_testing::TestNode> node_server_;
-  std::optional<fdf_testing::TestEnvironment> test_environment_;
+  std::optional<fdf_testing::internal::TestEnvironment> test_environment_;
   std::optional<compat::DeviceServer> device_server_;
-  fdf_testing::DriverUnderTest<TestDriver> driver_;
+  fdf_testing::internal::DriverUnderTest<TestDriver> driver_;
 };
 
 TEST_F(TestForegroundDispatcher, CreateChildNodeAsync) {
@@ -84,6 +94,7 @@ TEST_F(TestForegroundDispatcher, CreateChildNodeAsync) {
   }
 }
 
+// SEE WARNING AT TOP. DO NOT COPY INTO NEW TESTS.
 // If the environment needs to run on a background dispatcher (for example if the driver needs
 // to make sync FIDL calls), we need to run the environment on a background dispatcher while keeping
 // the driver on the main thread.
@@ -96,14 +107,14 @@ class TestForegroundDriverBackgroundEnv : public ::testing::Test {
 
     // Start the test environment
     zx::result init_result =
-        test_environment_.SyncCall(&fdf_testing::TestEnvironment::Initialize,
+        test_environment_.SyncCall(&fdf_testing::internal::TestEnvironment::Initialize,
                                    std::move(start_args->incoming_directory_server));
     EXPECT_EQ(ZX_OK, init_result.status_value());
 
     // test_environment_ and device_server live on the same dispatcher so moving the ptr from one
     // to the other is fine to do.
     fdf::OutgoingDirectory* outgoing_ptr;
-    test_environment_.SyncCall([&outgoing_ptr](fdf_testing::TestEnvironment* test_env) {
+    test_environment_.SyncCall([&outgoing_ptr](fdf_testing::internal::TestEnvironment* test_env) {
       outgoing_ptr = &test_env->incoming_directory();
     });
     device_server.SyncCall([outgoing_ptr](compat::DeviceServer* device_server) {
@@ -128,7 +139,7 @@ class TestForegroundDriverBackgroundEnv : public ::testing::Test {
     runtime_.ShutdownAllDispatchers(fdf::Dispatcher::GetCurrent()->get());
   }
 
-  fdf_testing::DriverUnderTest<TestDriver>& driver() { return driver_; }
+  fdf_testing::internal::DriverUnderTest<TestDriver>& driver() { return driver_; }
 
   async_dispatcher_t* env_dispatcher() { return env_dispatcher_->async_dispatcher(); }
 
@@ -142,13 +153,13 @@ class TestForegroundDriverBackgroundEnv : public ::testing::Test {
   async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
       env_dispatcher(), std::in_place, std::string("root")};
 
-  async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment_{
+  async_patterns::TestDispatcherBound<fdf_testing::internal::TestEnvironment> test_environment_{
       env_dispatcher(), std::in_place};
 
   async_patterns::TestDispatcherBound<compat::DeviceServer> device_server{env_dispatcher(),
                                                                           std::in_place};
 
-  fdf_testing::DriverUnderTest<TestDriver> driver_;
+  fdf_testing::internal::DriverUnderTest<TestDriver> driver_;
 };
 
 TEST_F(TestForegroundDriverBackgroundEnv, CreateChildNodeSync) {

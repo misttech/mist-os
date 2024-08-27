@@ -4,9 +4,9 @@
 
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
 #include <lib/driver/incoming/cpp/namespace.h>
-#include <lib/driver/testing/cpp/driver_lifecycle.h>
 #include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/test_environment.h>
+#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
+#include <lib/driver/testing/cpp/internal/test_environment.h>
 #include <lib/driver/testing/cpp/test_node.h>
 #include <lib/magma/platform/zircon/zircon_platform_logger_dfv2.h>
 
@@ -16,6 +16,8 @@
 
 DriverLoggerHarness::~DriverLoggerHarness() {}
 
+// WARNING: Don't use this test as a template for new tests as it uses the old driver testing
+// library.
 class DriverLoggerHarnessDFv2 : public DriverLoggerHarness {
  public:
   void Initialize();
@@ -24,7 +26,7 @@ class DriverLoggerHarnessDFv2 : public DriverLoggerHarness {
  private:
   fdf_testing::DriverRuntime runtime_;
   fdf::UnownedSynchronizedDispatcher test_env_dispatcher_ = runtime_.StartBackgroundDispatcher();
-  async_patterns::TestDispatcherBound<fdf_testing::TestEnvironment> test_environment{
+  async_patterns::TestDispatcherBound<fdf_testing::internal::TestEnvironment> test_environment{
       test_env_dispatcher_->async_dispatcher(), std::in_place};
 
   std::unique_ptr<fdf::Logger> logger_;
@@ -36,7 +38,7 @@ void DriverLoggerHarnessDFv2::Initialize() {
   zx::result incoming_directory_endpoints = fidl::CreateEndpoints<fuchsia_io::Directory>();
 
   ASSERT_TRUE(test_environment
-                  .SyncCall(&fdf_testing::TestEnvironment::Initialize,
+                  .SyncCall(&fdf_testing::internal::TestEnvironment::Initialize,
                             std::move(incoming_directory_endpoints->server))
                   .is_ok());
 
