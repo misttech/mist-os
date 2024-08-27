@@ -342,7 +342,6 @@ constexpr OpCode kWriteClassOfDevice = ControllerAndBasebandOpCode(0x0024);
 
 // =============================================
 // Write Automatic Flush Timeout Command (v1.1) (BR/EDR)
-
 constexpr OpCode kWriteAutomaticFlushTimeout =
     ControllerAndBasebandOpCode(0x0028);
 
@@ -358,14 +357,6 @@ constexpr OpCode kWriteSynchronousFlowControlEnable =
 // ===================================
 // Read Inquiry Scan Type (v1.2) (BR/EDR)
 constexpr OpCode kReadInquiryScanType = ControllerAndBasebandOpCode(0x0042);
-
-struct ReadInquiryScanTypeReturnParams {
-  // See enum StatusCode in hci_constants.h.
-  StatusCode status;
-
-  // See enum class InquiryScanType in hci_constants.h for possible values.
-  InquiryScanType inquiry_scan_type;
-} __attribute__((packed));
 
 // ====================================
 // Write Inquiry Scan Type (v1.2) (BR/EDR)
