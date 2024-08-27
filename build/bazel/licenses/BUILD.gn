@@ -5,7 +5,7 @@
 # These rules aggregate license information for all the GN-built bazel input resources
 # into a licenses SPDX file to be used in bazel build too.
 #
-# The SPDX file is a bazel input resource as well.
+# The SPDX file is a bazel input file as well.
 
 import("//build/bazel/bazel_inputs.gni")
 import("//build/licenses/generated_licenses_spdx.gni")
@@ -13,7 +13,7 @@ import("//build/security.gni")
 import("//tools/check-licenses/build/license_data.gni")
 
 _excluded_bazel_inputs = [
-  # Remove a potential circular dependency on the spdx bazel_input_resource
+  # Remove a potential circular dependency on the spdx bazel_input_file
   # itself. This is added in by some extra_gn_labels_for_bazel_inputs configs.
   "//build/bazel/licenses:legacy_ninja_build_outputs_licenses_spdx",
 ]
