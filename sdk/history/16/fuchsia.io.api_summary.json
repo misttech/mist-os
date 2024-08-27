@@ -246,6 +246,14 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.io/Directory.Open3",
+        "strictness": "strict",
+        "ordinal": "6236883748953765593",
+        "direction": "one_way",
+        "request": "fuchsia.io/Directory2Open3Request"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.io/Directory.Query",
         "strictness": "strict",
         "ordinal": "2763219980499352582",
@@ -646,6 +654,14 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.io/Directory2.Open3",
+        "strictness": "strict",
+        "ordinal": "6236883748953765593",
+        "direction": "one_way",
+        "request": "fuchsia.io/Directory2Open3Request"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.io/Directory2.Query",
         "strictness": "strict",
         "ordinal": "2763219980499352582",
@@ -726,6 +742,35 @@
     {
         "kind": "struct",
         "name": "fuchsia.io/Directory2Open2Request",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.io/Directory2Open3Request.flags",
+        "ordinal": "2",
+        "type": "fuchsia.io/Flags"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.io/Directory2Open3Request.object",
+        "ordinal": "4",
+        "type": "zx/Handle:CHANNEL"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.io/Directory2Open3Request.options",
+        "ordinal": "3",
+        "type": "fuchsia.io/Options"
+    },
+    {
+        "kind": "struct/member",
+        "name": "fuchsia.io/Directory2Open3Request.path",
+        "ordinal": "1",
+        "type": "string:4095"
+    },
+    {
+        "kind": "struct",
+        "name": "fuchsia.io/Directory2Open3Request",
         "resourceness": "resource"
     },
     {
@@ -1302,6 +1347,123 @@
         "name": "fuchsia.io/FilesystemInfo"
     },
     {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.FILE_APPEND",
+        "value": "1048576"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.FILE_TRUNCATE",
+        "value": "262144"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.FLAG_MAYBE_CREATE",
+        "value": "65536"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.FLAG_MUST_CREATE",
+        "value": "131072"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.FLAG_SEND_REPRESENTATION",
+        "value": "1099511627776"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.PERM_CONNECT",
+        "value": "1"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.PERM_ENUMERATE",
+        "value": "64"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.PERM_EXECUTE",
+        "value": "8"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.PERM_GET_ATTRIBUTES",
+        "value": "16"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.PERM_INHERIT_EXECUTE",
+        "value": "16384"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.PERM_INHERIT_WRITE",
+        "value": "8192"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.PERM_MODIFY",
+        "value": "256"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.PERM_READ",
+        "value": "2"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.PERM_SET_ATTRIBUTES",
+        "value": "32"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.PERM_TRAVERSE",
+        "value": "128"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.PERM_WRITE",
+        "value": "4"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.PROTOCOL_DIRECTORY",
+        "value": "524288"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.PROTOCOL_FILE",
+        "value": "8589934592"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.PROTOCOL_NODE",
+        "value": "4194304"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.PROTOCOL_SERVICE",
+        "value": "4294967296"
+    },
+    {
+        "kind": "bits/member",
+        "name": "fuchsia.io/Flags.PROTOCOL_SYMLINK",
+        "value": "17179869184"
+    },
+    {
+        "kind": "bits",
+        "name": "fuchsia.io/Flags",
+        "strictness": "flexible",
+        "type": "uint64"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.io/INHERITED_WRITE_PERMISSIONS",
+        "type": "fuchsia.io/Operations",
+        "value": "356"
+    },
+    {
         "kind": "const",
         "name": "fuchsia.io/INO_UNKNOWN",
         "type": "uint64",
@@ -1346,6 +1508,30 @@
     {
         "kind": "table",
         "name": "fuchsia.io/ImmutableNodeAttributes"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.io/MASK_KNOWN_PERMISSIONS",
+        "type": "fuchsia.io/Flags",
+        "value": "25087"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.io/MASK_KNOWN_PROTOCOLS",
+        "type": "fuchsia.io/Flags",
+        "value": "30069489664"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.io/MASK_PERMISSION_FLAGS",
+        "type": "uint64",
+        "value": "65535"
+    },
+    {
+        "kind": "const",
+        "name": "fuchsia.io/MASK_POSIX_FLAGS",
+        "type": "uint64",
+        "value": "4294967295"
     },
     {
         "kind": "const",
@@ -2312,6 +2498,22 @@
         "name": "fuchsia.io/Operations",
         "strictness": "strict",
         "type": "uint64"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.io/Options.attributes",
+        "ordinal": "1",
+        "type": "fuchsia.io/NodeAttributesQuery"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.io/Options.create_attributes",
+        "ordinal": "2",
+        "type": "fuchsia.io/MutableNodeAttributes"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.io/Options"
     },
     {
         "kind": "const",

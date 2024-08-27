@@ -19,7 +19,6 @@ const DIRECTORY_PROTOCOL_NAME string = "fuchsia.io/Directory";
 ///  * Bits  1-16: Permission flags `PERM_*` (e.g. [`Flags.PERM_READ`]).
 ///  * Bits 17-32: POSIX compatibile `O_*` flags (e.g. [`Flags.FILE_TRUNCATE`] or `O_TRUNC`).
 ///  * Bits 33-64: Fuchsia-specific flags.
-@available(added=HEAD)
 type Flags = flexible bits : uint64 {
     //
     // Permissions
@@ -118,30 +117,24 @@ type Flags = flexible bits : uint64 {
 };
 
 
-@available(added=HEAD)
 const MASK_PERMISSION_FLAGS uint64 = 0x000000000000FFFF;
 
-@available(added=HEAD)
 const MASK_POSIX_FLAGS uint64 = 0x00000000FFFFFFFF;
 
-@available(added=HEAD)
 const MASK_KNOWN_PERMISSIONS Flags
         = Flags.PERM_READ | Flags.PERM_WRITE | Flags.PERM_EXECUTE | Flags.PERM_SET_ATTRIBUTES | Flags.PERM_ENUMERATE | Flags.PERM_MODIFY | Flags.PERM_CONNECT | Flags.PERM_GET_ATTRIBUTES | Flags.PERM_TRAVERSE | Flags.PERM_INHERIT_WRITE | Flags.PERM_INHERIT_EXECUTE;
 
-@available(added=HEAD)
 const MASK_KNOWN_PROTOCOLS Flags
         = Flags.PROTOCOL_DIRECTORY | Flags.PROTOCOL_FILE | Flags.PROTOCOL_NODE | Flags.PROTOCOL_SYMLINK | Flags.PROTOCOL_SERVICE;
 
 /// Set of rights that [`Flags.PERM_INHERIT_WRITE`] will inherit from the parent connection if
 /// specified. Note that if any of these permissions are missing from the connection, none of these
 /// permissions will be inherited.
-@available(added=HEAD)
 const INHERITED_WRITE_PERMISSIONS Operations
         = Operations.WRITE_BYTES | Operations.ENUMERATE | Operations.MODIFY_DIRECTORY | Operations.UPDATE_ATTRIBUTES;
 
 /// Options which can be used with Open3. Unlike [`Flags`], these options are designed for specific
 /// use cases (e.g. to reduce round-trip latency when requesting attributes).
-@available(added=HEAD)
 type Options = table {
     /// Request a set of attributes to be sent with the OnRepresentation response. Has no effect
     /// if `Flags.FLAG_SEND_REPRESENTATION` is not set.
@@ -340,7 +333,6 @@ closed protocol Directory2 {
     /// * `ZX_ERR_BAD_PATH` if `path` is invalid
     /// * See [`Flags`] for other errors which may be communicated based on `flags`
     @selector("fuchsia.io/Directory.Open3")
-    @available(added=HEAD)
     strict Open3(resource struct {
         path Path;
         flags Flags;
