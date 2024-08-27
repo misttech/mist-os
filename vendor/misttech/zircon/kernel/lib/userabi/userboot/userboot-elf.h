@@ -7,6 +7,7 @@
 #ifndef ZIRCON_KERNEL_LIB_USERABI_USERBOOT_USERBOOT_ELF_H_
 #define ZIRCON_KERNEL_LIB_USERABI_USERBOOT_USERBOOT_ELF_H_
 
+#include <lib/elfldltl/layout.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/debuglog.h>
 #include <lib/zx/process.h>
@@ -19,6 +20,19 @@
 #include <string_view>
 
 class Bootfs;
+
+struct LoadedElf {
+  elfldltl::Elf<>::Ehdr header;
+  zx::vmo vmo;
+  zx_vaddr_t base = 0;
+  zx_vaddr_t load_bias = 0;
+};
+
+struct ElfInfo {
+  LoadedElf main_elf;
+  LoadedElf interp_elf;
+  bool has_interp;
+};
 
 // Returns the base address (p_vaddr bias).
 zx_vaddr_t elf_load_vdso(const zx::debuglog& log, const zx::vmar& vmar, const zx::vmo& vmo);
@@ -34,8 +48,6 @@ zx_vaddr_t elf_load_vdso(const zx::debuglog& log, const zx::vmar& vmar, const zx
 // which is returned here.
 zx_vaddr_t elf_load_bootfs(const zx::debuglog& log, Bootfs& bootfs, std::string_view root,
                            const zx::process& proc, const zx::vmar& vmar, const zx::thread& thread,
-                           std::string_view filename, /*const zx::channel& to_child,*/
-                           size_t* stack_size/*,
-                           zx::channel* loader_svc*/);
+                           std::string_view filename, size_t* stack_size, ElfInfo* info);
 
 #endif  // ZIRCON_KERNEL_LIB_USERABI_USERBOOT_USERBOOT_ELF_H_

@@ -12,16 +12,6 @@ import("//build/toolchain/zircon/zircon_toolchain_suite.gni")
 
 import("//build/zircon/c_utils.gni")
 
-source_set("fidl") {
-  public = [ "fidl.h" ]
-  public_deps = [
-    "//sdk/lib/fidl",
-    "//sdk/lib/fidl_base",
-    "//zircon/system/ulib/zircon-internal",
-    "//zircon/system/ulib/zx",
-  ]
-}
-
 # userboot gets its own toolchain for its special build requirements.
 if (current_toolchain == default_toolchain) {
   # Define the special toolchain itself only in the default toolchain.
@@ -69,6 +59,8 @@ if (current_toolchain == default_toolchain) {
 }
 
 if (toolchain_environment == "userboot") {
+  init_env_arg_limit = 32
+
   # Everything in userboot gets compiled this way.
   config("userboot_config") {
     configs = [
@@ -101,20 +93,23 @@ if (toolchain_environment == "userboot") {
     sources = [
       "bootfs.cc",
       "option.cc",
+      "stack.cc",
       "start.cc",
       "userboot-elf.cc",
       "util.cc",
       "zbi.cc",
       "zx_panic.cc",
     ]
-    defines = [ "BOOT_TEST_SUCCESS_STRING=\"$boot_test_success_string\"" ]
+    defines = [
+      "BOOT_TEST_SUCCESS_STRING=\"$boot_test_success_string\"",
+      "CONFIG_INIT_ENV_ARG_LIMIT=$init_env_arg_limit",
+    ]
     ldflags = [
       "-Wl,-e,_start",
       "-nostartfiles",
     ]
     libs = [ vdso_syms_ld ]
     deps = [
-      ":fidl",
       ":gen-vdso-syms-ld",
       "//src/lib/elfldltl",
       "//src/lib/zbitl",
