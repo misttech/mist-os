@@ -30,6 +30,16 @@ static void harvest_access_bits(VmAspace::NonTerminalAction non_terminal_action,
   pmm_page_queues()->EndAccessScan();
 }
 
+// Consume the (scalar) value, ensuring that the operation to calculate the value can not be
+// optimized out/ deemed as unused by the compiler. I.e. this function can be used as a wrapper to a
+// calculation to ensure it will be in the binary.
+template <typename T>
+void ConsumeValue(T value) {
+  // The compiler must materialize the value into a register, since it doesn't
+  // know that the register's value isn't actually used.
+  __asm__ volatile("" : : "r"(value));
+}
+
 // Allocates a region in kernel space, reads/writes it, then destroys it.
 static bool vmm_alloc_smoke_test() {
   BEGIN_TEST;
@@ -263,7 +273,7 @@ static bool vmaspace_accessed_test(uint8_t tag) {
   pmm_page_queues()->RotateReclaimQueues();
 
   // Read from the mapping to (hopefully) set the accessed bit.
-  __asm__ volatile("" ::"r"(mem->get<int>(0)) : "memory");
+  ConsumeValue(mem->get<int>(0));
   // Harvest it to move it in the page queue.
   harvest_access_bits(VmAspace::NonTerminalAction::Retain,
                       VmAspace::TerminalAction::UpdateAgeAndHarvest);
@@ -279,13 +289,13 @@ static bool vmaspace_accessed_test(uint8_t tag) {
 
   // Set the accessed bit again, and make sure it does now harvest.
   pmm_page_queues()->RotateReclaimQueues();
-  __asm__ volatile("" ::"r"(mem->get<int>(0)) : "memory");
+  ConsumeValue(mem->get<int>(0));
   harvest_access_bits(VmAspace::NonTerminalAction::Retain,
                       VmAspace::TerminalAction::UpdateAgeAndHarvest);
   EXPECT_NE(current_queue, page->object.get_page_queue_ref().load());
 
   // Set the accessed bit and update age without harvesting.
-  __asm__ volatile("" ::"r"(mem->get<int>(0)) : "memory");
+  ConsumeValue(mem->get<int>(0));
   harvest_access_bits(VmAspace::NonTerminalAction::Retain, VmAspace::TerminalAction::UpdateAge);
   current_queue = page->object.get_page_queue_ref().load();
 
