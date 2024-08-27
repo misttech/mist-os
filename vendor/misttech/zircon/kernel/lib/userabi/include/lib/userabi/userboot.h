@@ -4,8 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#ifndef ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_USERBOOT_H_
-#define ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_USERBOOT_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_USERBOOT_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_USERBOOT_H_
 
 // This file specifies the private ABI shared between userboot and the kernel.
 // That is, the contents of the message sent on userboot's bootstrap channel.
@@ -79,4 +79,4 @@ constexpr uint32_t kProcessArgsMaxBytes = 128;
 // Called at the end of the boot process in the main kernel initialization sequence.
 void userboot_init();
 
-#endif  // ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_USERBOOT_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_USERBOOT_H_

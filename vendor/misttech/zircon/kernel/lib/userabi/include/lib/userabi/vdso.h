@@ -4,8 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#ifndef ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_VDSO_H_
-#define ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_VDSO_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_VDSO_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_VDSO_H_
 
 #include <lib/fasttime/internal/abi.h>
 #include <lib/instrumentation/kernel-mapped-vmo.h>
@@ -88,4 +88,4 @@ class VDso : public RoDso {
   static const VDso* instance_;
 };
 
-#endif  // ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_VDSO_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_VDSO_H_
