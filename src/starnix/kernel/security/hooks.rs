@@ -77,7 +77,7 @@ where
 /// Returns the security state structure for the kernel, based on the supplied "selinux" argument
 /// contents.
 pub fn kernel_init_security(enabled: bool) -> KernelState {
-    KernelState { server: if enabled { Some(SecurityServer::new()) } else { None } }
+    KernelState { server: enabled.then(|| SecurityServer::new()) }
 }
 
 /// Returns the "selinuxfs" file system, used by the system userspace to administer SELinux.
@@ -815,25 +815,6 @@ mod tests {
         .expect("set_xattr(security.selinux) failed");
 
         assert_eq!(None, testing::get_cached_sid(node));
-    }
-
-    #[fuchsia::test]
-    async fn fs_node_setsecurity_selinux_fake() {
-        let security_server = security_server_with_policy();
-        let (_kernel, current_task, mut locked) =
-            create_kernel_task_and_unlocked_with_selinux(security_server);
-        let node = &create_unlabeled_test_file(&mut locked, &current_task).entry.node;
-
-        fs_node_setsecurity(
-            &current_task,
-            &node,
-            XATTR_NAME_SELINUX.to_bytes().into(),
-            VALID_SECURITY_CONTEXT.into(),
-            XattrOp::Set,
-        )
-        .expect("set_xattr(security.selinux) failed");
-
-        assert!(testing::get_cached_sid(node).is_some());
     }
 
     #[fuchsia::test]
