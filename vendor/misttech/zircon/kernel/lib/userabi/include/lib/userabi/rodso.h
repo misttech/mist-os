@@ -4,8 +4,8 @@
 // license that can be found in the LICENSE file or at
 // https://opensource.org/licenses/MIT
 
-#ifndef ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_RODSO_H_
-#define ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_RODSO_H_
+#ifndef VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_RODSO_H_
+#define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_RODSO_H_
 
 #include <align.h>
 #include <object/handle.h>
@@ -60,4 +60,4 @@ class RoDso : public EmbeddedVmo {
   uintptr_t code_start_;
 };
 
-#endif  // ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_RODSO_H_
+#endif  // VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_USERABI_INCLUDE_LIB_USERABI_RODSO_H_
