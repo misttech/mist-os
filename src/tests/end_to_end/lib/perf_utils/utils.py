@@ -6,7 +6,7 @@ import json
 import os
 import time
 from abc import ABC, abstractmethod
-from typing import Any, Generic, TypeVar
+from typing import Generic, TypeVar
 
 P = TypeVar("P")
 R = TypeVar("R")
@@ -57,7 +57,6 @@ class FuchsiaPerfResults(ABC, Generic[P, R]):
 
         The output of this method will be passed to the action when executing.
         """
-        pass
 
     @abstractmethod
     def action(self, pre_result: P) -> R:
@@ -71,7 +70,6 @@ class FuchsiaPerfResults(ABC, Generic[P, R]):
         Args:
             pre_result: the output of self.pre_action.
         """
-        pass
 
     @abstractmethod
     def post_action(self, step_output: R) -> None:
@@ -82,7 +80,6 @@ class FuchsiaPerfResults(ABC, Generic[P, R]):
         Args:
             step_output: the output of self.action.
         """
-        pass
 
     def _write_to_file(
         self,

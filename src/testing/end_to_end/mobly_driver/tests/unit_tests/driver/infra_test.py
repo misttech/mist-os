@@ -5,7 +5,7 @@
 
 import unittest
 from typing import Any
-from unittest.mock import ANY, call, mock_open, patch
+from unittest.mock import call, mock_open, patch
 
 from mobly_driver.driver import common, infra
 
