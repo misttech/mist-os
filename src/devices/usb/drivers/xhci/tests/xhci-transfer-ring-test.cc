@@ -4,147 +4,81 @@
 
 #include "src/devices/usb/drivers/xhci/xhci-transfer-ring.h"
 
-#include <lib/fpromise/bridge.h>
-#include <lib/fpromise/promise.h>
-#include <zircon/syscalls.h>
-#include <zircon/types.h>
-
-#include <atomic>
-#include <memory>
-#include <thread>
-
 #include <fake-dma-buffer/fake-dma-buffer.h>
-#include <fake-mmio-reg/fake-mmio-reg.h>
-#include <fbl/algorithm.h>
-#include <zxtest/zxtest.h>
 
-#include "src/devices/testing/mock-ddk/mock-device.h"
-#include "src/devices/usb/drivers/xhci/usb-xhci.h"
+#include "src/devices/usb/drivers/xhci/tests/test-env.h"
 #include "src/devices/usb/drivers/xhci/xhci-event-ring.h"
 
 namespace usb_xhci {
 
-class TransferRingHarness : public zxtest::Test {
+class TransferRingHarness : public ::testing::Test {
  public:
-  TransferRingHarness()
-      : trb_context_allocator_(-1, true),
-        hci_(root_.get(), xhci_config::Config({.enable_suspend = false}),
-             ddk_fake::CreateBufferFactory(), loop_.dispatcher()) {}
   void SetUp() override {
-    constexpr auto kOffset = 6 * sizeof(uint32_t);
-    constexpr auto kErdp = 2062 * sizeof(uint32_t);
-
-    region_.emplace(sizeof(uint32_t), 4096);
-    buffer_.emplace(region_->GetMmioBuffer());
-    (*region_)[kOffset].SetReadCallback([=]() { return 0x2000; });
-    (*region_)[kErdp].SetReadCallback([=]() { return erdp_; });
-    (*region_)[kErdp].SetWriteCallback([=](uint64_t value) {
-      ERDP reg;
-      reg.set_reg_value(value);
-      erdp_ = reg.Pointer();
-    });
-    hci_.SetTestHarness(this);
-    ASSERT_OK(hci_.InitThread());
+    ASSERT_TRUE(driver_test()
+                    .StartDriverWithCustomStartArgs([&](fdf::DriverStartArgs& args) {
+                      xhci_config::Config fake_config;
+                      fake_config.enable_suspend() = false;
+                      args.config(fake_config.ToVmo());
+                    })
+                    .is_ok());
+    ASSERT_OK(driver_test().driver()->TestInit(this));
   }
 
-  void TearDown() override {}
+  void TearDown() override { ASSERT_TRUE(driver_test().StopDriver().is_ok()); }
 
-  using TestRequest = usb::CallbackRequest<sizeof(max_align_t)>;
-  template <typename Callback>
-  zx_status_t AllocateRequest(std::optional<TestRequest>* request, uint32_t device_id,
-                              uint64_t data_size, uint8_t endpoint, Callback callback) {
-    return TestRequest::Alloc(request, data_size, endpoint, hci_.UsbHciGetRequestSize(),
-                              std::move(callback));
-  }
-
-  void RequestQueue(usb_request_t* usb_request,
-                    const usb_request_complete_callback_t* complete_cb) {
-    pending_req_ = Request(usb_request, *complete_cb, sizeof(usb_request_t));
-  }
-
-  Request Borrow(TestRequest request) {
-    request.Queue(*this);
-    return std::move(*pending_req_);
-  }
-
+  fdf_testing::ForegroundDriverTest<EmptyTestConfig>& driver_test() { return driver_test_; }
   TransferRing* ring() { return ring_; }
-
   void SetRing(TransferRing* ring) { ring_ = ring; }
-
-  std::unique_ptr<TRBContext> AllocateContext() { return trb_context_allocator_.New(); }
-
   EventRing& event_ring() { return event_ring_; }
 
  private:
-  async::Loop loop_{&kAsyncLoopConfigNeverAttachToThread};
-
-  using AllocatorTraits = fbl::InstancedSlabAllocatorTraits<std::unique_ptr<TRBContext>, 4096U>;
-  using AllocatorType = fbl::SlabAllocator<AllocatorTraits>;
-  AllocatorType trb_context_allocator_;
-
-  std::shared_ptr<MockDevice> root_ = MockDevice::FakeRootParent();
-  std::optional<Request> pending_req_;
-  fbl::DoublyLinkedList<std::unique_ptr<TRBContext>> pending_contexts_;
-  std::optional<fdf::MmioBuffer> buffer_;
-  UsbXhci hci_;
-  TransferRing* ring_;
+  fdf_testing::ForegroundDriverTest<EmptyTestConfig> driver_test_;
   EventRing event_ring_;
-  CommandRing command_ring_;
-  uint64_t erdp_;
-  std::optional<ddk_fake::FakeMmioRegRegion> region_;
+  TransferRing* ring_;
 };
 
-zx_status_t UsbXhci::InitThread() {
+// UsbXhci Methods
+zx::result<> UsbXhci::Init(std::unique_ptr<dma_buffer::BufferFactory> buffer_factory) {
+  buffer_factory_ = std::move(buffer_factory);
+
   fbl::AllocChecker ac;
   interrupters_ = fbl::MakeArray<Interrupter>(&ac, 1);
   if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
   max_slots_ = 32;
   device_state_ = fbl::MakeArray<fbl::RefPtr<DeviceState>>(&ac, max_slots_);
   if (!ac.check()) {
-    return ZX_ERR_NO_MEMORY;
+    return zx::error(ZX_ERR_NO_MEMORY);
   }
   for (size_t i = 0; i < max_slots_; i++) {
     device_state_[i] = fbl::MakeRefCounted<DeviceState>(static_cast<uint32_t>(i), this);
     fbl::AutoLock l(&device_state_[i]->transaction_lock());
     for (size_t c = 0; c < max_slots_; c++) {
       zx_status_t status = device_state_[i]->InitEndpoint(
-          static_cast<uint8_t>(c),
-          &static_cast<TransferRingHarness*>(GetTestHarness())->event_ring(), nullptr);
+          static_cast<uint8_t>(c), &GetTestHarness<TransferRingHarness>()->event_ring(), nullptr);
       if (status != ZX_OK) {
-        return status;
+        return zx::error(status);
       }
     }
   }
-  fbl::AutoLock l(&device_state_[0]->transaction_lock());
-  static_cast<TransferRingHarness*>(GetTestHarness())
-      ->SetRing(&device_state_[0]->GetEndpoint(0).transfer_ring());
-  return ZX_OK;
-}
 
-zx_status_t UsbXhci::UsbHciCancelAll(uint32_t device_id, uint8_t ep_address) {
-  return ZX_ERR_NOT_SUPPORTED;
+  fbl::AutoLock l(&device_state_[0]->transaction_lock());
+  GetTestHarness<TransferRingHarness>()->SetRing(&device_state_[0]->GetEndpoint(0).transfer_ring());
+  return zx::ok();
 }
 
 void UsbXhci::UsbHciRequestQueue(usb_request_t* usb_request,
                                  const usb_request_complete_callback_t* complete_cb) {}
 
+zx_status_t UsbXhci::UsbHciCancelAll(uint32_t device_id, uint8_t ep_address) {
+  return ZX_ERR_NOT_SUPPORTED;
+}
+
+// EventRing Methods
 zx_status_t EventRing::AddSegmentIfNone() { return ZX_OK; }
 
-void UsbXhci::Shutdown(zx_status_t status) {}
-
 void EventRing::RemovePressure() {}
-
-fpromise::promise<void, zx_status_t> UsbXhci::UsbHciDisableEndpoint(uint32_t device_id,
-                                                                    uint8_t ep_addr) {
-  return fpromise::make_error_promise<zx_status_t>(ZX_ERR_NOT_SUPPORTED);
-}
-
-fpromise::promise<void, zx_status_t> EnumerateDevice(UsbXhci* hci, uint8_t port,
-                                                     std::optional<HubInfo> hub_info) {
-  return fpromise::make_error_promise<zx_status_t>(ZX_ERR_NOT_SUPPORTED);
-}
 
 TEST_F(TransferRingHarness, EmptyShortTransferTest) {
   auto ring = this->ring();
@@ -211,8 +145,8 @@ TEST_F(TransferRingHarness, AllocateContiguousFailsIfNotEnoughContiguousPhysical
 
 TEST_F(TransferRingHarness, AllocateContiguousAllocatesContiguousBlocks) {
   auto ring = this->ring();
-  constexpr auto kContiguousCount = 42;
-  constexpr auto kIterationCount = 512;
+  constexpr size_t kContiguousCount = 42;
+  constexpr size_t kIterationCount = 512;
   for (size_t i = 0; i < kIterationCount; i++) {
     auto result = ring->AllocateContiguous(kContiguousCount);
     ASSERT_TRUE(result.is_ok());

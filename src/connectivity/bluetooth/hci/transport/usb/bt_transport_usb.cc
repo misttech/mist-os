@@ -519,6 +519,15 @@ void Device::DdkRelease() {
   delete this;
 }
 
+void Device::DdkSuspend(ddk::SuspendTxn txn) {
+  zxlogf(DEBUG, "%s", __FUNCTION__);
+
+  fbl::AutoLock _(&pending_request_lock_);
+  unbound_ = true;
+
+  txn.Reply(ZX_OK, 0);
+}
+
 void Device::ReadIsocInterfaces(usb_desc_iter_t* config_desc_iter) {
   usb_interface_descriptor_t* intf =
       usb_desc_iter_next_interface(config_desc_iter, /*skip_alt=*/false);

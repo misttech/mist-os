@@ -44,7 +44,7 @@ class ScoConnectionServer : public fidl::Server<fuchsia_hardware_bluetooth::ScoC
 };
 
 // See ddk::Device in ddktl/device.h
-using DeviceType = ddk::Device<Device, ddk::GetProtocolable, ddk::Unbindable>;
+using DeviceType = ddk::Device<Device, ddk::GetProtocolable, ddk::Suspendable, ddk::Unbindable>;
 
 // This driver can be bound to devices requiring the ZX_PROTOCOL_BT_TRANSPORT protocol, but this
 // driver actually implements the ZX_PROTOCOL_BT_HCI protocol. Drivers that bind to
@@ -84,6 +84,7 @@ class Device final : public DeviceType,
   zx_status_t DdkGetProtocol(uint32_t proto_id, void* out);
   void DdkUnbind(ddk::UnbindTxn txn);
   void DdkRelease();
+  void DdkSuspend(ddk::SuspendTxn txn);
 
   // fuchsia_hardware_bluetooth::HciTransport protocol overrides.
   void Send(SendRequest& request, SendCompleter::Sync& completer) override;

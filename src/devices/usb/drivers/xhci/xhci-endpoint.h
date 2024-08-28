@@ -8,7 +8,6 @@
 #include <fidl/fuchsia.hardware.usb.endpoint/cpp/fidl.h>
 #include <fuchsia/hardware/usb/request/c/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
-#include <lib/ddk/debug.h>
 #include <lib/sync/cpp/completion.h>
 
 #include <fbl/ref_ptr.h>

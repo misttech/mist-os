@@ -4,7 +4,6 @@
 
 #include "src/devices/usb/drivers/xhci/xhci-interrupter.h"
 
-#include <lib/async/cpp/irq.h>
 #include <lib/async/cpp/task.h>
 
 #include "src/devices/usb/drivers/xhci/usb-xhci.h"
@@ -52,7 +51,18 @@ zx_status_t Interrupter::Start(const RuntimeRegisterOffset& offset, fdf::MmioVie
   // This enables the interrupter
   ba.set_Pointer(event_ring_.erst()).WriteTo(&mmio_view);
   IMAN::Get(offset, interrupter_).FromValue(0).set_IE(1).WriteTo(&mmio_view);
-  thread_ = std::thread([this]() { IrqThread(); });
+  // TODO(https://fxbug.dev/42105800): See https://fxbug.dev/42105800.  Get rid of this.  For now we
+  // need thread priorities so that realtime transactions use the completer which ends up getting
+  // realtime latency guarantees.
+  auto dispatcher_result = fdf::SynchronizedDispatcher::Create(
+      {}, "xhci-interrupter", [&](fdf_dispatcher_t*) { irq_shutdown_completion_.Signal(); },
+      "fuchsia.devices.usb.drivers.xhci.interrupter");
+  if (dispatcher_result.is_error()) {
+    FDF_LOG(ERROR, "Failed to create new dispatcher %s", dispatcher_result.status_string());
+    return dispatcher_result.error_value();
+  }
+  dispatcher_ = std::move(*dispatcher_result);
+  async::PostTask(dispatcher_.async_dispatcher(), [this]() { StartIrqThread(); });
   active_ = true;
   return ZX_OK;
 }
@@ -60,7 +70,7 @@ zx_status_t Interrupter::Start(const RuntimeRegisterOffset& offset, fdf::MmioVie
 fpromise::promise<void, zx_status_t> Interrupter::Timeout(zx::time deadline) {
   fpromise::bridge<void, zx_status_t> bridge;
   zx_status_t status = async::PostTaskForTime(
-      async_loop_->dispatcher(),
+      dispatcher_.async_dispatcher(),
       [completer = std::move(bridge.completer), this]() mutable {
         completer.complete_ok();
         hci_->RunUntilIdle(interrupter_);
@@ -72,61 +82,36 @@ fpromise::promise<void, zx_status_t> Interrupter::Timeout(zx::time deadline) {
   return bridge.consumer.promise().box();
 }
 
-zx_status_t Interrupter::IrqThread() {
-  // TODO(https://fxbug.dev/42105800): See https://fxbug.dev/42105800.  Get rid of this.  For now we need thread
-  // priorities so that realtime transactions use the completer which ends
-  // up getting realtime latency guarantees.
-  async_loop_config_t config = kAsyncLoopConfigNeverAttachToThread;
-  config.irq_support = true;
-  async_loop_.emplace(&config);
-  async_executor_.emplace(async_loop_->dispatcher());
-
-  {
-    const char* role_name = "fuchsia.devices.usb.drivers.xhci.interrupter";
-    const size_t role_name_size = strlen(role_name);
-    const zx_status_t status =
-        device_set_profile_by_role(hci_->zxdev(), zx_thread_self(), role_name, role_name_size);
-    if (status != ZX_OK) {
-      zxlogf(WARNING,
-             "Failed to apply role \"%s\" to the high priority XHCI completer.  Service will be "
-             "best effort.\n",
-             role_name);
-    }
-  }
-
-  async::Irq irq;
-  irq.set_object(irq_.get());
-  irq.set_handler([&](async_dispatcher_t* dispatcher, async::Irq* irq, zx_status_t status,
-                      const zx_packet_interrupt_t* interrupt) {
+zx_status_t Interrupter::StartIrqThread() {
+  irq_handler_.set_object(irq_.get());
+  irq_handler_.set_handler([&](async_dispatcher_t* dispatcher, async::Irq* irq, zx_status_t status,
+                               const zx_packet_interrupt_t* interrupt) {
     if (!irq_.is_valid()) {
-      async_loop_->Quit();
+      return;
     }
     if (status != ZX_OK) {
-      async_loop_->Quit();
       return;
     }
 
     if (event_ring_.HandleIRQ() != ZX_OK) {
-      zxlogf(ERROR, "Error handling IRQ. Exiting async loop.");
-      async_loop_->Quit();
+      FDF_LOG(ERROR, "Error handling IRQ. Exiting async loop.");
       return;
     }
 
     total_irqs_.Add(1);
     irq_.ack();
   });
-  irq.Begin(async_loop_->dispatcher());
   if (!interrupter_) {
     // Note: We need to run the ring 0 bringup after
     // initializing interrupts, since Qemu initialization
     // code assumes that interrupts are active and simulates
     // a port status changed event.
     if (event_ring_.Ring0Bringup()) {
-      zxlogf(ERROR, "Failed to bring up ring 0");
+      FDF_LOG(ERROR, "Failed to bring up ring 0");
       return ZX_ERR_INTERNAL;
     }
   }
-  async_loop_->Run();
+  irq_handler_.Begin(dispatcher_.async_dispatcher());
   return ZX_OK;
 }
 

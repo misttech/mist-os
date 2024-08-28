@@ -12,28 +12,20 @@
 #include <fuchsia/hardware/usb/phy/cpp/banjo.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async/cpp/executor.h>
-#include <lib/component/outgoing/cpp/outgoing_directory.h>
 #include <lib/device-protocol/pci.h>
 #include <lib/device-protocol/pdev-fidl.h>
 #include <lib/dma-buffer/buffer.h>
+#include <lib/driver/compat/cpp/banjo_server.h>
+#include <lib/driver/compat/cpp/device_server.h>
+#include <lib/driver/component/cpp/driver_base.h>
 #include <lib/fit/function.h>
 #include <lib/fpromise/promise.h>
 #include <lib/fpromise/single_threaded_executor.h>
 #include <lib/inspect/cpp/inspect.h>
 #include <lib/mmio/mmio.h>
-#include <lib/sync/completion.h>
-#include <lib/synchronous-executor/executor.h>
 #include <lib/zx/profile.h>
-#include <threads.h>
 #include <unistd.h>
 
-#include <algorithm>
-#include <atomic>
-#include <cstdint>
-#include <memory>
-#include <thread>
-
-#include <ddktl/device.h>
 #include <fbl/array.h>
 #include <fbl/auto_lock.h>
 #include <fbl/mutex.h>
@@ -58,7 +50,6 @@ inline void InvalidatePageCache(void* addr, uint32_t options) {
 
 // Inspect values for the xHCI driver.
 struct Inspect {
-  inspect::Inspector inspector;
   inspect::Node root;
   inspect::UintProperty hci_version;
   inspect::UintProperty max_device_slots;
@@ -67,50 +58,30 @@ struct Inspect {
   inspect::BoolProperty has_64_bit_addressing;
   inspect::UintProperty context_size_bytes;
 
-  void Init(uint16_t hci_version, HCSPARAMS1& hcs1, HCCPARAMS1& hcc1);
+  void Init(inspect::Node& parent, uint16_t hci_version, HCSPARAMS1& hcs1, HCCPARAMS1& hcc1);
 };
 
 // This is the main class for the USB XHCI host controller driver.
 // Refer to 3.1 for general architectural information on xHCI.
-class UsbXhci;
-using UsbXhciType = ddk::Device<UsbXhci, ddk::Initializable, ddk::Suspendable, ddk::Unbindable>;
-class UsbXhci : public UsbXhciType,
-                public ddk::UsbHciProtocol<UsbXhci, ddk::base_protocol>,
+class UsbXhci : public fdf::DriverBase,
+                public ddk::UsbHciProtocol<UsbXhci>,
                 public fidl::Server<fuchsia_hardware_usb_hci::UsbHci> {
+ private:
+  static constexpr char kDeviceName[] = "xhci";
+
  public:
-  explicit UsbXhci(zx_device_t* parent, const xhci_config::Config& config,
-                   std::unique_ptr<dma_buffer::BufferFactory> buffer_factory,
-                   async_dispatcher_t* dispatcher)
-      : UsbXhciType(parent),
-        config_(config),
-        pci_(parent),
-        pdev_(parent),
-        buffer_factory_(std::move(buffer_factory)),
-        ddk_interaction_loop_(&kAsyncLoopConfigNeverAttachToThread),
-        ddk_interaction_executor_(ddk_interaction_loop_.dispatcher()),
-        dispatcher_(dispatcher),
-        outgoing_(dispatcher) {}
+  UsbXhci(fdf::DriverStartArgs start_args, fdf::UnownedSynchronizedDispatcher driver_dispatcher)
+      : fdf::DriverBase(kDeviceName, std::move(start_args), std::move(driver_dispatcher)),
+        config_(take_config<xhci_config::Config>()),
+        ddk_interaction_executor_(fdf::DriverBase::dispatcher()) {}
 
-  // Constructor for unit testing (to allow interception of MMIO read/write)
-  explicit UsbXhci(zx_device_t* parent, fdf::MmioBuffer buffer, async_dispatcher_t* dispatcher)
-      : UsbXhciType(parent),
-        ddk_interaction_loop_(&kAsyncLoopConfigNeverAttachToThread),
-        ddk_interaction_executor_(ddk_interaction_loop_.dispatcher()),
-        dispatcher_(dispatcher),
-        outgoing_(dispatcher) {}
-
-  // Called by the DDK bind operation.
-  static zx_status_t Create(void* ctx, zx_device_t* parent);
+  zx::result<> Start() override;
+  void Stop() override;
 
   // Forces an immediate shutdown of the HCI
   // This should only be called for critical errors that cannot
   // be recovered from.
   void Shutdown(zx_status_t status);
-  // Device protocol implementation.
-  void DdkInit(ddk::InitTxn txn);
-  void DdkSuspend(ddk::SuspendTxn txn);
-  void DdkUnbind(ddk::UnbindTxn txn);
-  void DdkRelease();
 
   // fuchsia_hardware_usb_new.UsbHciNew protocol implementation.
   void ConnectToEndpoint(ConnectToEndpointRequest& request,
@@ -285,10 +256,8 @@ class UsbXhci : public UsbXhciType,
   // interrupter(uint32_t i): returns the interrupter with the corresponding index
   Interrupter& interrupter(uint16_t i) { return interrupters_[i]; }
 
-  // Initialization thread method. This is invoked from a separate detached thread
-  // when xHCI binds.
-  // Returns thrd_success on success, or a thread error from <threads.h> on failure.
-  int InitThread();
+  zx::result<> Init(std::unique_ptr<dma_buffer::BufferFactory> buffer_factory);
+  zx::result<> TestInit(void* test_harness);
 
   const zx::bti& bti() const { return bti_; }
 
@@ -300,10 +269,10 @@ class UsbXhci : public UsbXhciType,
   TRBPromise SubmitCommand(const TRB& command, std::unique_ptr<TRBContext> trb_context);
 
   // Retrieves the current test harness
-  void* GetTestHarness() const { return test_harness_; }
-
-  // Sets the test harness
-  void SetTestHarness(void* harness) { test_harness_ = harness; }
+  template <class T>
+  T* GetTestHarness() const {
+    return static_cast<T*>(test_harness_);
+  }
 
   dma_buffer::BufferFactory& buffer_factory() const { return *buffer_factory_; }
 
@@ -348,9 +317,7 @@ class UsbXhci : public UsbXhciType,
   // to interrupters.
   fbl::Mutex scheduler_lock_;
 
-  // Performs the initialization sequence defined in section
-  // 4.2 of the xHCI specification.
-  zx_status_t Init();
+  zx_status_t CreateNode();
 
   // PCI protocol client (if x86)
   ddk::Pci pci_;
@@ -441,13 +408,8 @@ class UsbXhci : public UsbXhciType,
   // USB bus protocol client
   ddk::UsbBusInterfaceProtocolClient bus_;
 
-  async::Loop ddk_interaction_loop_;
-
   // Pending DDK callbacks that need to be ran on the dedicated DDK interaction thread
   async::Executor ddk_interaction_executor_;
-
-  // Thread for interacting with the Devhost thread (main event loop)
-  std::optional<thrd_t> ddk_interaction_thread_;
 
   // Whether or not the HCI instance is currently active
   std::atomic_bool running_ = true;
@@ -459,7 +421,7 @@ class UsbXhci : public UsbXhciType,
   // This is an opaque pointer that is managed by the test.
   void* test_harness_;
 
-  // InitThread Helper Functions and Variables
+  // Init Helper Functions and Variables
   // Resets the xHCI controller. This should only be called during initialization.
   void ResetController();
   // Initializes PCI
@@ -475,19 +437,14 @@ class UsbXhci : public UsbXhciType,
   // Complete initialization of host controller.
   // Called after controller is first reset on startup.
   zx_status_t HciFinalize();
-  // Completion event which is signalled when driver initialization finishes
-  sync_completion_t init_complete_;
-  // Completion which is signalled when the bus interface is bound
-  sync_completion_t bus_completion;
   // Completion which is signalled when xHCI enters an operational state
   sync_completion_t bringup_;
-  std::optional<thrd_t> init_thread_;
-  std::optional<ddk::InitTxn> init_txn_;
 
   Inspect inspect_;
 
-  async_dispatcher_t* dispatcher_;
-  component::OutgoingDirectory outgoing_;
+  compat::SyncInitializedDeviceServer compat_server_;
+  compat::BanjoServer banjo_server_{ZX_PROTOCOL_USB_HCI, this, &usb_hci_protocol_ops_};
+  fidl::WireSyncClient<fuchsia_driver_framework::NodeController> controller_;
   fidl::ServerBindingGroup<fuchsia_hardware_usb_hci::UsbHci> bindings_;
 };
 
