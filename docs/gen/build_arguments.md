@@ -7060,7 +7060,7 @@ From //build/board.gni:65
 
 ### recovery_label
 
-Allows a product to specify the recovery image used in the zirconr slot.
+Allows a product to specify the recovery image used in the zircon_r slot.
 Default recovery image is zedboot. Overriding this value will keep zedboot
 in the build but will not include it as the default zirconr image.
 Recovery images can provide an update target by specifying the metadata item
@@ -7891,6 +7891,14 @@ Whether or not high-throughput tracing (e.g. per-syscall) is enabled globally.
 **Current value (from the default):** `true`
 
 From //src/starnix/kernel/args.gni:13
+
+### starnix_enable_wake_locks
+
+Whether or not the kernel manages wake locks internally.
+
+**Current value (from the default):** `false`
+
+From //src/starnix/kernel/args.gni:38
 
 ### starnix_log_dev_null_writes_at_info
 
