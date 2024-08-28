@@ -1090,12 +1090,12 @@ mod tests {
         let (kernel, task, mut locked) = create_kernel_task_and_unlocked();
         tty_device_init(&mut locked, &task);
         let fs = ensure_devpts(&kernel, Default::default()).expect("create dev_pts_fs");
-        let devfs = crate::fs::devtmpfs::dev_tmp_fs(&mut locked, &task);
+        let devfs = crate::fs::devtmpfs::DevTmpFs::from_task(&mut locked, &task);
 
         let ptmx = open_ptmx_and_unlock(&mut locked, &task, &fs).expect("ptmx");
         set_controlling_terminal(&mut locked, &task, &ptmx, false)
             .expect("set_controlling_terminal");
-        let tty = open_file_with_flags(&mut locked, &task, devfs, "tty".into(), OpenFlags::RDWR)
+        let tty = open_file_with_flags(&mut locked, &task, &devfs, "tty".into(), OpenFlags::RDWR)
             .expect("tty");
         // Check that tty is the main terminal by calling the ioctl TIOCGPTN and checking it is
         // has the same result as on ptmx.
@@ -1109,7 +1109,7 @@ mod tests {
         let pts = open_file(&mut locked, &task, &fs, "0".into()).expect("open file");
         set_controlling_terminal(&mut locked, &task, &pts, false)
             .expect("set_controlling_terminal");
-        let tty = open_file_with_flags(&mut locked, &task, devfs, "tty".into(), OpenFlags::RDWR)
+        let tty = open_file_with_flags(&mut locked, &task, &devfs, "tty".into(), OpenFlags::RDWR)
             .expect("tty");
         // TIOCGPTN is not implemented on replica terminals
         assert!(ioctl::<i32>(&mut locked, &task, &tty, TIOCGPTN, &0).is_err());

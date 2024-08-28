@@ -13,6 +13,7 @@ use crate::vfs::{
     FsNodeOps, FsStr, PathBuilder, StaticDirectoryBuilder, StubEmptyFile, SymlinkNode,
 };
 use starnix_logging::bug_ref;
+use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
@@ -105,8 +106,12 @@ impl SysFs {
     }
 }
 
-pub fn sys_fs(current_task: &CurrentTask, options: FileSystemOptions) -> &FileSystemHandle {
-    current_task.kernel().sys_fs.get_or_init(|| SysFs::new_fs(current_task, options))
+pub fn sys_fs(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    options: FileSystemOptions,
+) -> Result<FileSystemHandle, Errno> {
+    Ok(current_task.kernel().sys_fs.get_or_init(|| SysFs::new_fs(current_task, options)).clone())
 }
 
 pub trait SysfsOps: FsNodeOps {

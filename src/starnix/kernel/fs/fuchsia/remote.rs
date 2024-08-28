@@ -54,6 +54,20 @@ use syncio::{
 use vfs::{ProtocolsExt, ToFlags};
 use {fidl_fuchsia_io as fio, fuchsia_zircon as zx};
 
+pub fn new_remote_fs(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    options: FileSystemOptions,
+) -> Result<FileSystemHandle, Errno> {
+    let kernel = current_task.kernel();
+    let data_dir = kernel
+        .container_data_dir
+        .as_ref()
+        .ok_or_else(|| errno!(EPERM, "Missing container data directory"))?;
+    let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
+    return create_remotefs_filesystem(kernel, data_dir, options, rights);
+}
+
 /// Create a filesystem to access the content of the fuchsia directory available at `fs_src` inside
 /// `pkg`.
 pub fn create_remotefs_filesystem(

@@ -2,13 +2,7 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use crate::fs::devtmpfs::dev_tmp_fs;
-use crate::fs::fuchsia::create_remotefs_filesystem;
-use crate::fs::proc::proc_fs;
-use crate::fs::sysfs::sys_fs;
-use crate::fs::tmpfs::TmpFs;
 use crate::mutable_state::{state_accessor, state_implementation};
-use crate::security;
 use crate::task::{CurrentTask, EventHandler, Kernel, Task, WaitCanceler, Waiter};
 use crate::time::utc;
 use crate::vfs::buffers::InputBuffer;
@@ -21,7 +15,6 @@ use crate::vfs::{
     FileSystemHandle, FileSystemOptions, FsNode, FsNodeHandle, FsNodeOps, FsStr, FsString,
     PathBuilder, RenameFlags, SimpleFileNode, SymlinkTarget, UnlinkKind,
 };
-use fidl_fuchsia_io as fio;
 use macro_rules_attribute::apply;
 use ref_cast::RefCast;
 use starnix_logging::log_warn;
@@ -704,31 +697,17 @@ impl CurrentTask {
         fs_type: &FsStr,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
-        let kernel = self.kernel();
-        if let Some(result) =
-            kernel.expando.get::<FsRegistry>().create(locked, self, fs_type, options.clone())
-        {
-            return result;
-        }
-
-        let data_dir = || {
-            kernel
-                .container_data_dir
-                .as_ref()
-                .ok_or_else(|| errno!(EPERM, "Missing container data directory"))
-        };
-
-        let rights = fio::OpenFlags::RIGHT_READABLE | fio::OpenFlags::RIGHT_WRITABLE;
-
-        match &**fs_type {
-            b"devtmpfs" => Ok(dev_tmp_fs(locked, self).clone()),
-            b"proc" => Ok(proc_fs(self, options).clone()),
-            b"remotefs" => create_remotefs_filesystem(kernel, data_dir()?, options, rights),
-            b"selinuxfs" => security::new_selinux_fs(self, options),
-            b"sysfs" => Ok(sys_fs(self, options).clone()),
-            b"tmpfs" => TmpFs::new_fs_with_options(kernel, options),
-            _ => error!(ENODEV, fs_type),
-        }
+        // Please register new file systems via //src/starnix/modules/lib.rs, even if the file
+        // system is implemented inside starnix_core.
+        //
+        // Most file systems should be implemented as modules. The VFS provides various traits that
+        // let starnix_core integrate file systems without needing to depend on the file systems
+        // directly.
+        self.kernel()
+            .expando
+            .get::<FsRegistry>()
+            .create(locked, self, fs_type, options)
+            .ok_or_else(|| errno!(ENODEV, fs_type))?
     }
 }
 

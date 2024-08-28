@@ -12,6 +12,7 @@ use crate::vfs::{
     ValueOrSize, XattrOp,
 };
 use selinux_core::security_server::SecurityServer;
+use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::signals::Signal;
@@ -82,6 +83,7 @@ pub fn kernel_init_security(enabled: bool) -> KernelState {
 
 /// Returns the "selinuxfs" file system, used by the system userspace to administer SELinux.
 pub fn new_selinux_fs(
+    _locked: &mut Locked<'_, Unlocked>,
     current_task: &CurrentTask,
     options: FileSystemOptions,
 ) -> Result<FileSystemHandle, Errno> {

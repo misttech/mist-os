@@ -7,52 +7,62 @@ use crate::device::DeviceMode;
 use crate::fs::tmpfs::TmpFs;
 use crate::task::CurrentTask;
 use crate::vfs::{
-    path, DirEntryHandle, FileSystemHandle, FsStr, LookupContext, MountInfo, NamespaceNode,
+    path, DirEntryHandle, FileSystemHandle, FileSystemOptions, FsStr, LookupContext, MountInfo,
+    NamespaceNode,
 };
-use starnix_sync::{FileOpsCore, LockBefore, Locked};
+use starnix_sync::{FileOpsCore, LockBefore, Locked, Unlocked};
 use starnix_uapi::auth::FsCred;
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
 
-pub fn dev_tmp_fs<'l, L>(
-    locked: &mut Locked<'_, L>,
-    current_task: &'l CurrentTask,
-) -> &'l FileSystemHandle
-where
-    L: LockBefore<FileOpsCore>,
-{
-    current_task.kernel().dev_tmp_fs.get_or_init(|| init_devtmpfs(locked, current_task))
+pub fn dev_tmp_fs(
+    locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    _options: FileSystemOptions,
+) -> Result<FileSystemHandle, Errno> {
+    Ok(DevTmpFs::from_task(locked, current_task))
 }
 
-fn init_devtmpfs<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask) -> FileSystemHandle
-where
-    L: LockBefore<FileOpsCore>,
-{
-    let kernel = current_task.kernel();
-    let fs = TmpFs::new_fs(kernel);
-    let root = fs.root();
+pub struct DevTmpFs(());
 
-    let mkdir = |locked, name| {
-        // This creates content inside the temporary FS. This doesn't depend on the mount
-        // information.
-        root.create_entry(current_task, &MountInfo::detached(), name, |dir, mount, name| {
-            dir.mknod(
-                locked,
-                current_task,
-                mount,
-                name,
-                mode!(IFDIR, 0o755),
-                DeviceType::NONE,
-                FsCred::root(),
-            )
-        })
-        .unwrap();
-    };
+impl DevTmpFs {
+    pub fn from_task<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask) -> FileSystemHandle
+    where
+        L: LockBefore<FileOpsCore>,
+    {
+        current_task.kernel().dev_tmp_fs.get_or_init(|| Self::init(locked, current_task)).clone()
+    }
 
-    mkdir(locked, "shm".into());
-    create_symlink(locked, current_task, root, "fd".into(), "/proc/self/fd".into()).unwrap();
-    fs
+    fn init<L>(locked: &mut Locked<'_, L>, current_task: &CurrentTask) -> FileSystemHandle
+    where
+        L: LockBefore<FileOpsCore>,
+    {
+        let kernel = current_task.kernel();
+        let fs = TmpFs::new_fs(kernel);
+        let root = fs.root();
+
+        let mkdir = |locked, name| {
+            // This creates content inside the temporary FS. This doesn't depend on the mount
+            // information.
+            root.create_entry(current_task, &MountInfo::detached(), name, |dir, mount, name| {
+                dir.mknod(
+                    locked,
+                    current_task,
+                    mount,
+                    name,
+                    mode!(IFDIR, 0o755),
+                    DeviceType::NONE,
+                    FsCred::root(),
+                )
+            })
+            .unwrap();
+        };
+
+        mkdir(locked, "shm".into());
+        create_symlink(locked, current_task, root, "fd".into(), "/proc/self/fd".into()).unwrap();
+        fs
+    }
 }
 
 pub fn devtmpfs_create_device<L>(
@@ -72,9 +82,17 @@ where
         .split(|&c| c == path::SEPARATOR)
         // Avoid EEXIST for 'foo//bar' and the last directory name.
         .filter(|dir_name| dir_name.len() > 0)
-        .try_fold(dev_tmp_fs(locked, current_task).root().clone(), |parent_dir, dir_name| {
-            devtmpfs_get_or_create_directory_at(locked, current_task, parent_dir, dir_name.into())
-        })?;
+        .try_fold(
+            DevTmpFs::from_task(locked, current_task).root().clone(),
+            |parent_dir, dir_name| {
+                devtmpfs_get_or_create_directory_at(
+                    locked,
+                    current_task,
+                    parent_dir,
+                    dir_name.into(),
+                )
+            },
+        )?;
     devtmpfs_create_device_node(
         locked,
         current_task,
@@ -149,7 +167,7 @@ where
 {
     // This creates content inside the temporary FS. This doesn't depend on the mount
     // information.
-    dev_tmp_fs(locked, current_task).root().create_entry(
+    DevTmpFs::from_task(locked, current_task).root().create_entry(
         current_task,
         &MountInfo::detached(),
         name,
@@ -175,7 +193,8 @@ pub fn devtmpfs_remove_node<L>(
 where
     L: LockBefore<FileOpsCore>,
 {
-    let root_node = NamespaceNode::new_anonymous(dev_tmp_fs(locked, current_task).root().clone());
+    let root_node =
+        NamespaceNode::new_anonymous(DevTmpFs::from_task(locked, current_task).root().clone());
     let mut context = LookupContext::default();
     let (parent_node, device_name) = current_task.lookup_parent(&mut context, &root_node, path)?;
     parent_node.entry.remove_child(device_name.into(), &current_task.kernel().mounts);
@@ -191,7 +210,8 @@ pub fn devtmpfs_create_symlink<L>(
 where
     L: LockBefore<FileOpsCore>,
 {
-    let root = dev_tmp_fs(locked, current_task).root();
+    let devfs = DevTmpFs::from_task(locked, current_task);
+    let root = devfs.root();
     create_symlink(locked, current_task, root, name, target)
 }
 
