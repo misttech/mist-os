@@ -13,7 +13,7 @@ use const_unwrap::const_unwrap_option;
 use log::{debug, trace};
 use net_types::ethernet::Mac;
 use net_types::ip::{GenericOverIp, Ip, IpMarked, Ipv4, Ipv6, Mtu};
-use net_types::{BroadcastAddress, MulticastAddr, UnicastAddr, Witness};
+use net_types::{MulticastAddr, UnicastAddr, Witness};
 use netstack3_base::ref_counted_hash_map::{InsertResult, RefCountedHashSet, RemoveResult};
 use netstack3_base::sync::{Mutex, RwLock};
 use netstack3_base::{
@@ -237,18 +237,15 @@ pub struct DynamicEthernetDeviceState {
     /// The value this netstack assumes as the device's maximum frame size.
     max_frame_size: MaxEthernetFrameSize,
 
-    /// A flag indicating whether the device will accept all ethernet frames
-    /// that it receives, regardless of the ethernet frame's destination MAC
-    /// address.
-    promiscuous_mode: bool,
-
     /// Link multicast groups this device has joined.
+    /// TODO(https://fxbug.dev/42136929): Plumb this information down to the
+    /// device driver.
     link_multicast_groups: RefCountedHashSet<MulticastAddr<Mac>>,
 }
 
 impl DynamicEthernetDeviceState {
     fn new(max_frame_size: MaxEthernetFrameSize) -> Self {
-        Self { max_frame_size, promiscuous_mode: false, link_multicast_groups: Default::default() }
+        Self { max_frame_size, link_multicast_groups: Default::default() }
     }
 }
 
@@ -333,30 +330,6 @@ impl<BT: DeviceLayerTypes> OrderedLockAccess<DequeueState<(), Buf<Vec<u8>>>>
     fn ordered_lock_access(&self) -> OrderedLockRef<'_, Self::Lock> {
         OrderedLockRef::new(&self.link.tx_queue.deque)
     }
-}
-
-/// Returns the type of frame if it should be delivered, otherwise `None`.
-fn deliver_as(
-    static_state: &StaticEthernetDeviceState,
-    dynamic_state: &DynamicEthernetDeviceState,
-    dst_mac: &Mac,
-) -> Option<FrameDestination> {
-    if dynamic_state.promiscuous_mode {
-        return Some(FrameDestination::from_dest(*dst_mac, static_state.mac.get()));
-    }
-    UnicastAddr::new(*dst_mac)
-        .and_then(|u| {
-            (static_state.mac == u).then_some(FrameDestination::Individual { local: true })
-        })
-        .or_else(|| dst_mac.is_broadcast().then_some(FrameDestination::Broadcast))
-        .or_else(|| {
-            MulticastAddr::new(*dst_mac).and_then(|a| {
-                dynamic_state
-                    .link_multicast_groups
-                    .contains(&a)
-                    .then_some(FrameDestination::Multicast)
-            })
-        })
 }
 
 /// A timer ID for Ethernet devices.
@@ -511,24 +484,10 @@ where
 
         let dst = ethernet.dst_mac();
 
-        let frame_dest = core_ctx.with_ethernet_state(&device_id, |static_state, dynamic_state| {
-            deliver_as(static_state, dynamic_state, &dst)
+        let frame_dst = core_ctx.with_static_ethernet_device_state(&device_id, |static_state| {
+            FrameDestination::from_dest(dst, static_state.mac.get())
         });
 
-        let frame_dst = match frame_dest {
-            None => {
-                core_ctx.increment(&device_id, |counters: &EthernetDeviceCounters| {
-                    &counters.recv_ethernet_other_dest
-                });
-                trace!(
-                    "ethernet::receive_frame: destination mac {:?} not for device {:?}",
-                    dst,
-                    device_id
-                );
-                return;
-            }
-            Some(frame_dest) => frame_dest,
-        };
         let ethertype = ethernet.ethertype();
 
         core_ctx.handle_frame(
@@ -589,20 +548,6 @@ where
             }
         }
     }
-}
-
-/// Set the promiscuous mode flag on `device_id`.
-pub fn set_promiscuous_mode<
-    BC: EthernetIpLinkDeviceBindingsContext,
-    CC: EthernetIpLinkDeviceDynamicStateContext<BC>,
->(
-    core_ctx: &mut CC,
-    device_id: &CC::DeviceId,
-    enabled: bool,
-) {
-    core_ctx.with_ethernet_state_mut(device_id, |_static_state, dynamic_state| {
-        dynamic_state.promiscuous_mode = enabled
-    })
 }
 
 /// Add `device_id` to a link multicast group `multicast_addr`.
