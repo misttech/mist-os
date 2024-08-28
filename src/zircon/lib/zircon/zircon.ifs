@@ -2,6 +2,554 @@
 IfsVersion:      3.0
 SoName:          libzircon.so
 Symbols:
+  - { Name: _zx_a0000_read, Type: Func }
+  - { Name: _zx_a0001_write, Type: Func }
+  - { Name: _zx_a0002_open, Type: Func }
+  - { Name: _zx_a0003_close, Type: Func }
+  - { Name: _zx_a0004_stat, Type: Func }
+  - { Name: _zx_a0005_fstat, Type: Func }
+  - { Name: _zx_a0006_lstat, Type: Func }
+  - { Name: _zx_a0007_poll, Type: Func }
+  - { Name: _zx_a0008_lseek, Type: Func }
+  - { Name: _zx_a0009_mmap, Type: Func }
+  - { Name: _zx_a0010_mprotect, Type: Func }
+  - { Name: _zx_a0011_munmap, Type: Func }
+  - { Name: _zx_a0012_brk, Type: Func }
+  - { Name: _zx_a0013_rt_sigaction, Type: Func }
+  - { Name: _zx_a0014_rt_sigprocmask, Type: Func }
+  - { Name: _zx_a0015_rt_sigreturn, Type: Func }
+  - { Name: _zx_a0016_ioctl, Type: Func }
+  - { Name: _zx_a0017_pread64, Type: Func }
+  - { Name: _zx_a0018_pwrite64, Type: Func }
+  - { Name: _zx_a0019_readv, Type: Func }
+  - { Name: _zx_a0020_writev, Type: Func }
+  - { Name: _zx_a0021_access, Type: Func }
+  - { Name: _zx_a0022_pipe, Type: Func }
+  - { Name: _zx_a0023_select, Type: Func }
+  - { Name: _zx_a0024_sched_yield, Type: Func }
+  - { Name: _zx_a0025_mremap, Type: Func }
+  - { Name: _zx_a0026_msync, Type: Func }
+  - { Name: _zx_a0027_mincore, Type: Func }
+  - { Name: _zx_a0028_madvise, Type: Func }
+  - { Name: _zx_a0029_shmget, Type: Func }
+  - { Name: _zx_a0030_shmat, Type: Func }
+  - { Name: _zx_a0031_shmctl, Type: Func }
+  - { Name: _zx_a0032_dup, Type: Func }
+  - { Name: _zx_a0033_dup2, Type: Func }
+  - { Name: _zx_a0034_pause, Type: Func }
+  - { Name: _zx_a0035_nanosleep, Type: Func }
+  - { Name: _zx_a0036_getitimer, Type: Func }
+  - { Name: _zx_a0037_alarm, Type: Func }
+  - { Name: _zx_a0038_setitimer, Type: Func }
+  - { Name: _zx_a0039_getpid, Type: Func }
+  - { Name: _zx_a0040_sendfile, Type: Func }
+  - { Name: _zx_a0041_socket, Type: Func }
+  - { Name: _zx_a0042_connect, Type: Func }
+  - { Name: _zx_a0043_accept, Type: Func }
+  - { Name: _zx_a0044_sendto, Type: Func }
+  - { Name: _zx_a0045_recvfrom, Type: Func }
+  - { Name: _zx_a0046_sendmsg, Type: Func }
+  - { Name: _zx_a0047_recvmsg, Type: Func }
+  - { Name: _zx_a0048_shutdown, Type: Func }
+  - { Name: _zx_a0049_bind, Type: Func }
+  - { Name: _zx_a0050_listen, Type: Func }
+  - { Name: _zx_a0051_getsockname, Type: Func }
+  - { Name: _zx_a0052_getpeername, Type: Func }
+  - { Name: _zx_a0053_socketpair, Type: Func }
+  - { Name: _zx_a0054_setsockopt, Type: Func }
+  - { Name: _zx_a0055_getsockopt, Type: Func }
+  - { Name: _zx_a0056_clone, Type: Func }
+  - { Name: _zx_a0057_fork, Type: Func }
+  - { Name: _zx_a0058_vfork, Type: Func }
+  - { Name: _zx_a0059_execve, Type: Func }
+  - { Name: _zx_a0060_exit, Type: Func }
+  - { Name: _zx_a0061_wait4, Type: Func }
+  - { Name: _zx_a0062_kill, Type: Func }
+  - { Name: _zx_a0063_uname, Type: Func }
+  - { Name: _zx_a0064_semget, Type: Func }
+  - { Name: _zx_a0065_semop, Type: Func }
+  - { Name: _zx_a0066_semctl, Type: Func }
+  - { Name: _zx_a0067_shmdt, Type: Func }
+  - { Name: _zx_a0068_msgget, Type: Func }
+  - { Name: _zx_a0069_msgsnd, Type: Func }
+  - { Name: _zx_a0070_msgrcv, Type: Func }
+  - { Name: _zx_a0071_msgctl, Type: Func }
+  - { Name: _zx_a0072_fcntl, Type: Func }
+  - { Name: _zx_a0073_flock, Type: Func }
+  - { Name: _zx_a0074_fsync, Type: Func }
+  - { Name: _zx_a0075_fdatasync, Type: Func }
+  - { Name: _zx_a0076_truncate, Type: Func }
+  - { Name: _zx_a0077_ftruncate, Type: Func }
+  - { Name: _zx_a0078_getdents, Type: Func }
+  - { Name: _zx_a0079_getcwd, Type: Func }
+  - { Name: _zx_a0080_chdir, Type: Func }
+  - { Name: _zx_a0081_fchdir, Type: Func }
+  - { Name: _zx_a0082_rename, Type: Func }
+  - { Name: _zx_a0083_mkdir, Type: Func }
+  - { Name: _zx_a0084_rmdir, Type: Func }
+  - { Name: _zx_a0085_creat, Type: Func }
+  - { Name: _zx_a0086_link, Type: Func }
+  - { Name: _zx_a0087_unlink, Type: Func }
+  - { Name: _zx_a0088_symlink, Type: Func }
+  - { Name: _zx_a0089_readlink, Type: Func }
+  - { Name: _zx_a0090_chmod, Type: Func }
+  - { Name: _zx_a0091_fchmod, Type: Func }
+  - { Name: _zx_a0092_chown, Type: Func }
+  - { Name: _zx_a0093_fchown, Type: Func }
+  - { Name: _zx_a0094_lchown, Type: Func }
+  - { Name: _zx_a0095_umask, Type: Func }
+  - { Name: _zx_a0096_gettimeofday, Type: Func }
+  - { Name: _zx_a0097_getrlimit, Type: Func }
+  - { Name: _zx_a0098_getrusage, Type: Func }
+  - { Name: _zx_a0099_sysinfo, Type: Func }
+  - { Name: _zx_a0100_times, Type: Func }
+  - { Name: _zx_a0101_ptrace, Type: Func }
+  - { Name: _zx_a0102_getuid, Type: Func }
+  - { Name: _zx_a0103_syslog, Type: Func }
+  - { Name: _zx_a0104_getgid, Type: Func }
+  - { Name: _zx_a0105_setuid, Type: Func }
+  - { Name: _zx_a0106_setgid, Type: Func }
+  - { Name: _zx_a0107_geteuid, Type: Func }
+  - { Name: _zx_a0108_getegid, Type: Func }
+  - { Name: _zx_a0109_setpgid, Type: Func }
+  - { Name: _zx_a0110_getppid, Type: Func }
+  - { Name: _zx_a0111_getpgrp, Type: Func }
+  - { Name: _zx_a0112_setsid, Type: Func }
+  - { Name: _zx_a0113_setreuid, Type: Func }
+  - { Name: _zx_a0114_setregid, Type: Func }
+  - { Name: _zx_a0115_getgroups, Type: Func }
+  - { Name: _zx_a0116_setgroups, Type: Func }
+  - { Name: _zx_a0117_setresuid, Type: Func }
+  - { Name: _zx_a0118_getresuid, Type: Func }
+  - { Name: _zx_a0119_setresgid, Type: Func }
+  - { Name: _zx_a0120_getresgid, Type: Func }
+  - { Name: _zx_a0121_getpgid, Type: Func }
+  - { Name: _zx_a0122_setfsuid, Type: Func }
+  - { Name: _zx_a0123_setfsgid, Type: Func }
+  - { Name: _zx_a0124_getsid, Type: Func }
+  - { Name: _zx_a0125_capget, Type: Func }
+  - { Name: _zx_a0126_capset, Type: Func }
+  - { Name: _zx_a0127_rt_sigpending, Type: Func }
+  - { Name: _zx_a0128_rt_sigtimedwait, Type: Func }
+  - { Name: _zx_a0129_rt_sigqueueinfo, Type: Func }
+  - { Name: _zx_a0130_rt_sigsuspend, Type: Func }
+  - { Name: _zx_a0131_sigaltstack, Type: Func }
+  - { Name: _zx_a0132_utime, Type: Func }
+  - { Name: _zx_a0133_mknod, Type: Func }
+  - { Name: _zx_a0134_uselib, Type: Func }
+  - { Name: _zx_a0135_personality, Type: Func }
+  - { Name: _zx_a0136_ustat, Type: Func }
+  - { Name: _zx_a0137_statfs, Type: Func }
+  - { Name: _zx_a0138_fstatfs, Type: Func }
+  - { Name: _zx_a0139_sysfs, Type: Func }
+  - { Name: _zx_a0140_getpriority, Type: Func }
+  - { Name: _zx_a0141_setpriority, Type: Func }
+  - { Name: _zx_a0142_sched_setparam, Type: Func }
+  - { Name: _zx_a0143_sched_getparam, Type: Func }
+  - { Name: _zx_a0144_sched_setscheduler, Type: Func }
+  - { Name: _zx_a0145_sched_getscheduler, Type: Func }
+  - { Name: _zx_a0146_sched_get_priority_max, Type: Func }
+  - { Name: _zx_a0147_sched_get_priority_min, Type: Func }
+  - { Name: _zx_a0148_sched_rr_get_interval, Type: Func }
+  - { Name: _zx_a0149_mlock, Type: Func }
+  - { Name: _zx_a0150_munlock, Type: Func }
+  - { Name: _zx_a0151_mlockall, Type: Func }
+  - { Name: _zx_a0152_munlockall, Type: Func }
+  - { Name: _zx_a0153_vhangup, Type: Func }
+  - { Name: _zx_a0154_modify_ldt, Type: Func }
+  - { Name: _zx_a0155_pivot_root, Type: Func }
+  - { Name: _zx_a0156_not_impl, Type: Func }
+  - { Name: _zx_a0157_prctl, Type: Func }
+  - { Name: _zx_a0158_arch_prctl, Type: Func }
+  - { Name: _zx_a0159_adjtimex, Type: Func }
+  - { Name: _zx_a0160_setrlimit, Type: Func }
+  - { Name: _zx_a0161_chroot, Type: Func }
+  - { Name: _zx_a0162_sync, Type: Func }
+  - { Name: _zx_a0163_acct, Type: Func }
+  - { Name: _zx_a0164_settimeofday, Type: Func }
+  - { Name: _zx_a0165_mount, Type: Func }
+  - { Name: _zx_a0166_umount2, Type: Func }
+  - { Name: _zx_a0167_swapon, Type: Func }
+  - { Name: _zx_a0168_swapoff, Type: Func }
+  - { Name: _zx_a0169_reboot, Type: Func }
+  - { Name: _zx_a0170_sethostname, Type: Func }
+  - { Name: _zx_a0171_setdomainname, Type: Func }
+  - { Name: _zx_a0172_iopl, Type: Func }
+  - { Name: _zx_a0173_ioperm, Type: Func }
+  - { Name: _zx_a0174_create_module, Type: Func }
+  - { Name: _zx_a0175_init_module, Type: Func }
+  - { Name: _zx_a0176_delete_module, Type: Func }
+  - { Name: _zx_a0177_get_kernel_syms, Type: Func }
+  - { Name: _zx_a0178_query_module, Type: Func }
+  - { Name: _zx_a0179_quotactl, Type: Func }
+  - { Name: _zx_a0180_nfsservctl, Type: Func }
+  - { Name: _zx_a0181_getpmsg, Type: Func }
+  - { Name: _zx_a0182_putpmsg, Type: Func }
+  - { Name: _zx_a0183_afs_syscall, Type: Func }
+  - { Name: _zx_a0184_tuxcall, Type: Func }
+  - { Name: _zx_a0185_security, Type: Func }
+  - { Name: _zx_a0186_gettid, Type: Func }
+  - { Name: _zx_a0187_readahead, Type: Func }
+  - { Name: _zx_a0188_setxattr, Type: Func }
+  - { Name: _zx_a0189_lsetxattr, Type: Func }
+  - { Name: _zx_a0190_fsetxattr, Type: Func }
+  - { Name: _zx_a0191_getxattr, Type: Func }
+  - { Name: _zx_a0192_lgetxattr, Type: Func }
+  - { Name: _zx_a0193_fgetxattr, Type: Func }
+  - { Name: _zx_a0194_listxattr, Type: Func }
+  - { Name: _zx_a0195_llistxattr, Type: Func }
+  - { Name: _zx_a0196_flistxattr, Type: Func }
+  - { Name: _zx_a0197_removexattr, Type: Func }
+  - { Name: _zx_a0198_lremovexattr, Type: Func }
+  - { Name: _zx_a0199_fremovexattr, Type: Func }
+  - { Name: _zx_a0200_tkill, Type: Func }
+  - { Name: _zx_a0201_time, Type: Func }
+  - { Name: _zx_a0202_futex, Type: Func }
+  - { Name: _zx_a0203_sched_setaffinity, Type: Func }
+  - { Name: _zx_a0204_sched_getaffinity, Type: Func }
+  - { Name: _zx_a0205_set_thread_area, Type: Func }
+  - { Name: _zx_a0206_io_setup, Type: Func }
+  - { Name: _zx_a0207_io_destroy, Type: Func }
+  - { Name: _zx_a0208_io_getevents, Type: Func }
+  - { Name: _zx_a0209_io_submit, Type: Func }
+  - { Name: _zx_a0210_io_cancel, Type: Func }
+  - { Name: _zx_a0211_get_thread_area, Type: Func }
+  - { Name: _zx_a0212_lookup_dcookie, Type: Func }
+  - { Name: _zx_a0213_epoll_create, Type: Func }
+  - { Name: _zx_a0214_epoll_ctl_old, Type: Func }
+  - { Name: _zx_a0215_epoll_wait_old, Type: Func }
+  - { Name: _zx_a0216_remap_file_pages, Type: Func }
+  - { Name: _zx_a0217_getdents64, Type: Func }
+  - { Name: _zx_a0218_set_tid_address, Type: Func }
+  - { Name: _zx_a0219_restart_syscall, Type: Func }
+  - { Name: _zx_a0220_semtimedop, Type: Func }
+  - { Name: _zx_a0221_fadvise64, Type: Func }
+  - { Name: _zx_a0222_timer_create, Type: Func }
+  - { Name: _zx_a0223_timer_settime, Type: Func }
+  - { Name: _zx_a0224_timer_gettime, Type: Func }
+  - { Name: _zx_a0225_timer_getoverrun, Type: Func }
+  - { Name: _zx_a0226_timer_delete, Type: Func }
+  - { Name: _zx_a0227_clock_settime, Type: Func }
+  - { Name: _zx_a0228_clock_gettime, Type: Func }
+  - { Name: _zx_a0229_clock_getres, Type: Func }
+  - { Name: _zx_a0230_clock_nanosleep, Type: Func }
+  - { Name: _zx_a0231_exit_group, Type: Func }
+  - { Name: _zx_a0232_epoll_wait, Type: Func }
+  - { Name: _zx_a0233_epoll_ctl, Type: Func }
+  - { Name: _zx_a0234_tgkill, Type: Func }
+  - { Name: _zx_a0235_utimes, Type: Func }
+  - { Name: _zx_a0236_vserver, Type: Func }
+  - { Name: _zx_a0237_mbind, Type: Func }
+  - { Name: _zx_a0238_set_mempolicy, Type: Func }
+  - { Name: _zx_a0239_get_mempolicy, Type: Func }
+  - { Name: _zx_a0240_mq_open, Type: Func }
+  - { Name: _zx_a0241_mq_unlink, Type: Func }
+  - { Name: _zx_a0242_mq_timedsend, Type: Func }
+  - { Name: _zx_a0243_mq_timedreceive, Type: Func }
+  - { Name: _zx_a0244_mq_notify, Type: Func }
+  - { Name: _zx_a0245_mq_getsetattr, Type: Func }
+  - { Name: _zx_a0246_kexec_load, Type: Func }
+  - { Name: _zx_a0247_waitid, Type: Func }
+  - { Name: _zx_a0248_add_key, Type: Func }
+  - { Name: _zx_a0249_request_key, Type: Func }
+  - { Name: _zx_a0250_keyctl, Type: Func }
+  - { Name: _zx_a0251_ioprio_set, Type: Func }
+  - { Name: _zx_a0252_ioprio_get, Type: Func }
+  - { Name: _zx_a0253_inotify_init, Type: Func }
+  - { Name: _zx_a0254_inotify_add_watch, Type: Func }
+  - { Name: _zx_a0255_inotify_rm_watch, Type: Func }
+  - { Name: _zx_a0256_migrate_pages, Type: Func }
+  - { Name: _zx_a0257_openat, Type: Func }
+  - { Name: _zx_a0258_mkdirat, Type: Func }
+  - { Name: _zx_a0259_mknodat, Type: Func }
+  - { Name: _zx_a0260_fchownat, Type: Func }
+  - { Name: _zx_a0261_futimesat, Type: Func }
+  - { Name: _zx_a0262_newfstatat, Type: Func }
+  - { Name: _zx_a0263_unlinkat, Type: Func }
+  - { Name: _zx_a0264_renameat, Type: Func }
+  - { Name: _zx_a0265_linkat, Type: Func }
+  - { Name: _zx_a0266_symlinkat, Type: Func }
+  - { Name: _zx_a0267_readlinkat, Type: Func }
+  - { Name: _zx_a0268_fchmodat, Type: Func }
+  - { Name: _zx_a0269_faccessat, Type: Func }
+  - { Name: _zx_a0270_pselect6, Type: Func }
+  - { Name: _zx_a0271_ppoll, Type: Func }
+  - { Name: _zx_a0272_unshare, Type: Func }
+  - { Name: _zx_a0273_set_robust_list, Type: Func }
+  - { Name: _zx_a0274_get_robust_list, Type: Func }
+  - { Name: _zx_a0275_splice, Type: Func }
+  - { Name: _zx_a0276_tee, Type: Func }
+  - { Name: _zx_a0277_sync_file_range, Type: Func }
+  - { Name: _zx_a0278_vmsplice, Type: Func }
+  - { Name: _zx_a0279_move_pages, Type: Func }
+  - { Name: _zx_a0280_utimensat, Type: Func }
+  - { Name: _zx_a0281_epoll_pwait, Type: Func }
+  - { Name: _zx_a0282_signalfd, Type: Func }
+  - { Name: _zx_a0283_timerfd_create, Type: Func }
+  - { Name: _zx_a0284_eventfd, Type: Func }
+  - { Name: _zx_a0285_fallocate, Type: Func }
+  - { Name: _zx_a0286_timerfd_settime, Type: Func }
+  - { Name: _zx_a0287_timerfd_gettime, Type: Func }
+  - { Name: _zx_a0288_accept4, Type: Func }
+  - { Name: _zx_a0289_signalfd4, Type: Func }
+  - { Name: _zx_a0290_eventfd2, Type: Func }
+  - { Name: _zx_a0291_epoll_create1, Type: Func }
+  - { Name: _zx_a0292_dup3, Type: Func }
+  - { Name: _zx_a0293_pipe2, Type: Func }
+  - { Name: _zx_a0294_inotify_init1, Type: Func }
+  - { Name: _zx_a0295_preadv, Type: Func }
+  - { Name: _zx_a0296_pwritev, Type: Func }
+  - { Name: _zx_a0297_rt_tgsigqueueinfo, Type: Func }
+  - { Name: _zx_a0298_perf_event_open, Type: Func }
+  - { Name: _zx_a0299_recvmmsg, Type: Func }
+  - { Name: _zx_a0300_fanotify_init, Type: Func }
+  - { Name: _zx_a0301_fanotify_mark, Type: Func }
+  - { Name: _zx_a0302_prlimit64, Type: Func }
+  - { Name: _zx_a0303_name_to_handle_at, Type: Func }
+  - { Name: _zx_a0304_open_by_handle_at, Type: Func }
+  - { Name: _zx_a0305_clock_adjtime, Type: Func }
+  - { Name: _zx_a0306_syncfs, Type: Func }
+  - { Name: _zx_a0307_sendmmsg, Type: Func }
+  - { Name: _zx_a0308_setns, Type: Func }
+  - { Name: _zx_a0309_getcpu, Type: Func }
+  - { Name: _zx_a0310_process_vm_readv, Type: Func }
+  - { Name: _zx_a0311_process_vm_writev, Type: Func }
+  - { Name: _zx_a0312_kcmp, Type: Func }
+  - { Name: _zx_a0313_finit_module, Type: Func }
+  - { Name: _zx_a0314_sched_setattr, Type: Func }
+  - { Name: _zx_a0315_sched_getattr, Type: Func }
+  - { Name: _zx_a0316_renameat2, Type: Func }
+  - { Name: _zx_a0317_seccomp, Type: Func }
+  - { Name: _zx_a0318_getrandom, Type: Func }
+  - { Name: _zx_a0319_memfd_create, Type: Func }
+  - { Name: _zx_a0320_kexec_file_load, Type: Func }
+  - { Name: _zx_a0321_bpf, Type: Func }
+  - { Name: _zx_a0322_execveat, Type: Func }
+  - { Name: _zx_a0323_userfaultfd, Type: Func }
+  - { Name: _zx_a0324_membarrier, Type: Func }
+  - { Name: _zx_a0325_mlock2, Type: Func }
+  - { Name: _zx_a0326_copy_file_range, Type: Func }
+  - { Name: _zx_a0327_preadv2, Type: Func }
+  - { Name: _zx_a0328_pwritev2, Type: Func }
+  - { Name: _zx_a0329_pkey_mprotect, Type: Func }
+  - { Name: _zx_a0330_pkey_alloc, Type: Func }
+  - { Name: _zx_a0331_pkey_free, Type: Func }
+  - { Name: _zx_a0332_statx, Type: Func }
+  - { Name: _zx_a0333_io_pgetevents, Type: Func }
+  - { Name: _zx_a0334_rseq, Type: Func }
+  - { Name: _zx_a0335_blank, Type: Func }
+  - { Name: _zx_a0336_blank, Type: Func }
+  - { Name: _zx_a0337_blank, Type: Func }
+  - { Name: _zx_a0338_blank, Type: Func }
+  - { Name: _zx_a0339_blank, Type: Func }
+  - { Name: _zx_a0340_blank, Type: Func }
+  - { Name: _zx_a0341_blank, Type: Func }
+  - { Name: _zx_a0342_blank, Type: Func }
+  - { Name: _zx_a0343_blank, Type: Func }
+  - { Name: _zx_a0344_blank, Type: Func }
+  - { Name: _zx_a0345_blank, Type: Func }
+  - { Name: _zx_a0346_blank, Type: Func }
+  - { Name: _zx_a0347_blank, Type: Func }
+  - { Name: _zx_a0348_blank, Type: Func }
+  - { Name: _zx_a0349_blank, Type: Func }
+  - { Name: _zx_a0350_blank, Type: Func }
+  - { Name: _zx_a0351_blank, Type: Func }
+  - { Name: _zx_a0352_blank, Type: Func }
+  - { Name: _zx_a0353_blank, Type: Func }
+  - { Name: _zx_a0354_blank, Type: Func }
+  - { Name: _zx_a0355_blank, Type: Func }
+  - { Name: _zx_a0356_blank, Type: Func }
+  - { Name: _zx_a0357_blank, Type: Func }
+  - { Name: _zx_a0358_blank, Type: Func }
+  - { Name: _zx_a0359_blank, Type: Func }
+  - { Name: _zx_a0360_blank, Type: Func }
+  - { Name: _zx_a0361_blank, Type: Func }
+  - { Name: _zx_a0362_blank, Type: Func }
+  - { Name: _zx_a0363_blank, Type: Func }
+  - { Name: _zx_a0364_blank, Type: Func }
+  - { Name: _zx_a0365_blank, Type: Func }
+  - { Name: _zx_a0366_blank, Type: Func }
+  - { Name: _zx_a0367_blank, Type: Func }
+  - { Name: _zx_a0368_blank, Type: Func }
+  - { Name: _zx_a0369_blank, Type: Func }
+  - { Name: _zx_a0370_blank, Type: Func }
+  - { Name: _zx_a0371_blank, Type: Func }
+  - { Name: _zx_a0372_blank, Type: Func }
+  - { Name: _zx_a0373_blank, Type: Func }
+  - { Name: _zx_a0374_blank, Type: Func }
+  - { Name: _zx_a0375_blank, Type: Func }
+  - { Name: _zx_a0376_blank, Type: Func }
+  - { Name: _zx_a0377_blank, Type: Func }
+  - { Name: _zx_a0378_blank, Type: Func }
+  - { Name: _zx_a0379_blank, Type: Func }
+  - { Name: _zx_a0380_blank, Type: Func }
+  - { Name: _zx_a0381_blank, Type: Func }
+  - { Name: _zx_a0382_blank, Type: Func }
+  - { Name: _zx_a0383_blank, Type: Func }
+  - { Name: _zx_a0384_blank, Type: Func }
+  - { Name: _zx_a0385_blank, Type: Func }
+  - { Name: _zx_a0386_blank, Type: Func }
+  - { Name: _zx_a0387_dont_use, Type: Func }
+  - { Name: _zx_a0388_dont_use, Type: Func }
+  - { Name: _zx_a0389_dont_use, Type: Func }
+  - { Name: _zx_a0390_dont_use, Type: Func }
+  - { Name: _zx_a0391_dont_use, Type: Func }
+  - { Name: _zx_a0392_dont_use, Type: Func }
+  - { Name: _zx_a0393_dont_use, Type: Func }
+  - { Name: _zx_a0394_dont_use, Type: Func }
+  - { Name: _zx_a0395_dont_use, Type: Func }
+  - { Name: _zx_a0396_dont_use, Type: Func }
+  - { Name: _zx_a0397_dont_use, Type: Func }
+  - { Name: _zx_a0398_dont_use, Type: Func }
+  - { Name: _zx_a0399_dont_use, Type: Func }
+  - { Name: _zx_a0400_dont_use, Type: Func }
+  - { Name: _zx_a0401_dont_use, Type: Func }
+  - { Name: _zx_a0402_dont_use, Type: Func }
+  - { Name: _zx_a0403_dont_use, Type: Func }
+  - { Name: _zx_a0404_dont_use, Type: Func }
+  - { Name: _zx_a0405_dont_use, Type: Func }
+  - { Name: _zx_a0406_dont_use, Type: Func }
+  - { Name: _zx_a0407_dont_use, Type: Func }
+  - { Name: _zx_a0408_dont_use, Type: Func }
+  - { Name: _zx_a0409_dont_use, Type: Func }
+  - { Name: _zx_a0410_dont_use, Type: Func }
+  - { Name: _zx_a0411_dont_use, Type: Func }
+  - { Name: _zx_a0412_dont_use, Type: Func }
+  - { Name: _zx_a0413_dont_use, Type: Func }
+  - { Name: _zx_a0414_dont_use, Type: Func }
+  - { Name: _zx_a0415_dont_use, Type: Func }
+  - { Name: _zx_a0416_dont_use, Type: Func }
+  - { Name: _zx_a0417_dont_use, Type: Func }
+  - { Name: _zx_a0418_dont_use, Type: Func }
+  - { Name: _zx_a0419_dont_use, Type: Func }
+  - { Name: _zx_a0420_dont_use, Type: Func }
+  - { Name: _zx_a0421_dont_use, Type: Func }
+  - { Name: _zx_a0422_dont_use, Type: Func }
+  - { Name: _zx_a0423_dont_use, Type: Func }
+  - { Name: _zx_a0424_pidfd_send_signal, Type: Func }
+  - { Name: _zx_a0425_io_uring_setup, Type: Func }
+  - { Name: _zx_a0426_io_uring_enter, Type: Func }
+  - { Name: _zx_a0427_io_uring_register, Type: Func }
+  - { Name: _zx_a0428_open_tree, Type: Func }
+  - { Name: _zx_a0429_move_mount, Type: Func }
+  - { Name: _zx_a0430_fsopen, Type: Func }
+  - { Name: _zx_a0431_fsconfig, Type: Func }
+  - { Name: _zx_a0432_fsmount, Type: Func }
+  - { Name: _zx_a0433_fspick, Type: Func }
+  - { Name: _zx_a0434_pidfd_open, Type: Func }
+  - { Name: _zx_a0435_clone3, Type: Func }
+  - { Name: _zx_a0436_close_range, Type: Func }
+  - { Name: _zx_a0437_openat2, Type: Func }
+  - { Name: _zx_a0438_pidfd_getfd, Type: Func }
+  - { Name: _zx_a0439_faccessat2, Type: Func }
+  - { Name: _zx_a0440_process_madvise, Type: Func }
+  - { Name: _zx_a0441_epoll_pwait2, Type: Func }
+  - { Name: _zx_a0442_mount_setattr, Type: Func }
+  - { Name: _zx_a0443_quotactl_fd, Type: Func }
+  - { Name: _zx_a0444_landlock_create_ruleset, Type: Func }
+  - { Name: _zx_a0445_landlock_add_rule, Type: Func }
+  - { Name: _zx_a0446_landlock_restrict_self, Type: Func }
+  - { Name: _zx_a0447_memfd_secret, Type: Func }
+  - { Name: _zx_a0448_process_mrelease, Type: Func }
+  - { Name: _zx_a0449_futex_waitv, Type: Func }
+  - { Name: _zx_a0450_set_mempolicy_home_node, Type: Func }
+  - { Name: _zx_a0451_cachestat, Type: Func }
+  - { Name: _zx_a0452_fchmodat2, Type: Func }
+  - { Name: _zx_a0453_map_shadow_stack, Type: Func }
+  - { Name: _zx_a0454_blank, Type: Func }
+  - { Name: _zx_a0455_blank, Type: Func }
+  - { Name: _zx_a0456_blank, Type: Func }
+  - { Name: _zx_a0457_blank, Type: Func }
+  - { Name: _zx_a0458_blank, Type: Func }
+  - { Name: _zx_a0459_blank, Type: Func }
+  - { Name: _zx_a0460_blank, Type: Func }
+  - { Name: _zx_a0461_blank, Type: Func }
+  - { Name: _zx_a0462_blank, Type: Func }
+  - { Name: _zx_a0463_blank, Type: Func }
+  - { Name: _zx_a0464_blank, Type: Func }
+  - { Name: _zx_a0465_blank, Type: Func }
+  - { Name: _zx_a0466_blank, Type: Func }
+  - { Name: _zx_a0467_blank, Type: Func }
+  - { Name: _zx_a0468_blank, Type: Func }
+  - { Name: _zx_a0469_blank, Type: Func }
+  - { Name: _zx_a0470_blank, Type: Func }
+  - { Name: _zx_a0471_blank, Type: Func }
+  - { Name: _zx_a0472_blank, Type: Func }
+  - { Name: _zx_a0473_blank, Type: Func }
+  - { Name: _zx_a0474_blank, Type: Func }
+  - { Name: _zx_a0475_blank, Type: Func }
+  - { Name: _zx_a0476_blank, Type: Func }
+  - { Name: _zx_a0477_blank, Type: Func }
+  - { Name: _zx_a0478_blank, Type: Func }
+  - { Name: _zx_a0479_blank, Type: Func }
+  - { Name: _zx_a0480_blank, Type: Func }
+  - { Name: _zx_a0481_blank, Type: Func }
+  - { Name: _zx_a0482_blank, Type: Func }
+  - { Name: _zx_a0483_blank, Type: Func }
+  - { Name: _zx_a0484_blank, Type: Func }
+  - { Name: _zx_a0485_blank, Type: Func }
+  - { Name: _zx_a0486_blank, Type: Func }
+  - { Name: _zx_a0487_blank, Type: Func }
+  - { Name: _zx_a0488_blank, Type: Func }
+  - { Name: _zx_a0489_blank, Type: Func }
+  - { Name: _zx_a0490_blank, Type: Func }
+  - { Name: _zx_a0491_blank, Type: Func }
+  - { Name: _zx_a0492_blank, Type: Func }
+  - { Name: _zx_a0493_blank, Type: Func }
+  - { Name: _zx_a0494_blank, Type: Func }
+  - { Name: _zx_a0495_blank, Type: Func }
+  - { Name: _zx_a0496_blank, Type: Func }
+  - { Name: _zx_a0497_blank, Type: Func }
+  - { Name: _zx_a0498_blank, Type: Func }
+  - { Name: _zx_a0499_blank, Type: Func }
+  - { Name: _zx_a0500_blank, Type: Func }
+  - { Name: _zx_a0501_blank, Type: Func }
+  - { Name: _zx_a0502_blank, Type: Func }
+  - { Name: _zx_a0503_blank, Type: Func }
+  - { Name: _zx_a0504_blank, Type: Func }
+  - { Name: _zx_a0505_blank, Type: Func }
+  - { Name: _zx_a0506_blank, Type: Func }
+  - { Name: _zx_a0507_blank, Type: Func }
+  - { Name: _zx_a0508_blank, Type: Func }
+  - { Name: _zx_a0509_blank, Type: Func }
+  - { Name: _zx_a0510_blank, Type: Func }
+  - { Name: _zx_a0511_blank, Type: Func }
+  - { Name: _zx_a0512_compat_rt_sigaction, Type: Func }
+  - { Name: _zx_a0513_compat_rt_sigreturn, Type: Func }
+  - { Name: _zx_a0514_compat_ioctl, Type: Func }
+  - { Name: _zx_a0515_compat_readv, Type: Func }
+  - { Name: _zx_a0516_compat_writev, Type: Func }
+  - { Name: _zx_a0517_compat_recvfrom, Type: Func }
+  - { Name: _zx_a0518_compat_sendmsg, Type: Func }
+  - { Name: _zx_a0519_compat_recvmsg, Type: Func }
+  - { Name: _zx_a0520_compat_execve, Type: Func }
+  - { Name: _zx_a0521_compat_ptrace, Type: Func }
+  - { Name: _zx_a0522_compat_rt_sigpending, Type: Func }
+  - { Name: _zx_a0523_compat_rt_sigtimedwait, Type: Func }
+  - { Name: _zx_a0524_compat_rt_sigqueueinfo, Type: Func }
+  - { Name: _zx_a0525_compat_sigaltstack, Type: Func }
+  - { Name: _zx_a0526_compat_timer_create, Type: Func }
+  - { Name: _zx_a0527_compat_mq_notify, Type: Func }
+  - { Name: _zx_a0528_compat_kexec_load, Type: Func }
+  - { Name: _zx_a0529_compat_waitid, Type: Func }
+  - { Name: _zx_a0530_compat_set_robust_list, Type: Func }
+  - { Name: _zx_a0531_compat_get_robust_list, Type: Func }
+  - { Name: _zx_a0532_compat_vmsplice, Type: Func }
+  - { Name: _zx_a0533_compat_move_pages, Type: Func }
+  - { Name: _zx_a0534_compat_preadv, Type: Func }
+  - { Name: _zx_a0535_compat_pwritev, Type: Func }
+  - { Name: _zx_a0536_compat_rt_tgsigqueueinfo, Type: Func }
+  - { Name: _zx_a0537_compat_recvmmsg, Type: Func }
+  - { Name: _zx_a0538_compat_sendmmsg, Type: Func }
+  - { Name: _zx_a0539_compat_process_vm_readv, Type: Func }
+  - { Name: _zx_a0540_compat_process_vm_writev, Type: Func }
+  - { Name: _zx_a0541_compat_setsockopt, Type: Func }
+  - { Name: _zx_a0542_compat_getsockopt, Type: Func }
+  - { Name: _zx_a0543_compat_io_setup, Type: Func }
+  - { Name: _zx_a0544_compat_io_submit, Type: Func }
+  - { Name: _zx_a0545_compat_execveat, Type: Func }
+  - { Name: _zx_a0546_compat_preadv2, Type: Func }
+  - { Name: _zx_a0547_compat_pwritev2, Type: Func }
   - { Name: _zx_bti_create, Type: Func }
   - { Name: _zx_bti_pin, Type: Func }
   - { Name: _zx_bti_release_quarantine, Type: Func }
@@ -211,6 +759,554 @@ Symbols:
   - { Name: _zx_vmo_set_stream_size, Type: Func }
   - { Name: _zx_vmo_transfer_data, Type: Func }
   - { Name: _zx_vmo_write, Type: Func }
+  - { Name: zx_a0000_read, Type: Func, Weak: true }
+  - { Name: zx_a0001_write, Type: Func, Weak: true }
+  - { Name: zx_a0002_open, Type: Func, Weak: true }
+  - { Name: zx_a0003_close, Type: Func, Weak: true }
+  - { Name: zx_a0004_stat, Type: Func, Weak: true }
+  - { Name: zx_a0005_fstat, Type: Func, Weak: true }
+  - { Name: zx_a0006_lstat, Type: Func, Weak: true }
+  - { Name: zx_a0007_poll, Type: Func, Weak: true }
+  - { Name: zx_a0008_lseek, Type: Func, Weak: true }
+  - { Name: zx_a0009_mmap, Type: Func, Weak: true }
+  - { Name: zx_a0010_mprotect, Type: Func, Weak: true }
+  - { Name: zx_a0011_munmap, Type: Func, Weak: true }
+  - { Name: zx_a0012_brk, Type: Func, Weak: true }
+  - { Name: zx_a0013_rt_sigaction, Type: Func, Weak: true }
+  - { Name: zx_a0014_rt_sigprocmask, Type: Func, Weak: true }
+  - { Name: zx_a0015_rt_sigreturn, Type: Func, Weak: true }
+  - { Name: zx_a0016_ioctl, Type: Func, Weak: true }
+  - { Name: zx_a0017_pread64, Type: Func, Weak: true }
+  - { Name: zx_a0018_pwrite64, Type: Func, Weak: true }
+  - { Name: zx_a0019_readv, Type: Func, Weak: true }
+  - { Name: zx_a0020_writev, Type: Func, Weak: true }
+  - { Name: zx_a0021_access, Type: Func, Weak: true }
+  - { Name: zx_a0022_pipe, Type: Func, Weak: true }
+  - { Name: zx_a0023_select, Type: Func, Weak: true }
+  - { Name: zx_a0024_sched_yield, Type: Func, Weak: true }
+  - { Name: zx_a0025_mremap, Type: Func, Weak: true }
+  - { Name: zx_a0026_msync, Type: Func, Weak: true }
+  - { Name: zx_a0027_mincore, Type: Func, Weak: true }
+  - { Name: zx_a0028_madvise, Type: Func, Weak: true }
+  - { Name: zx_a0029_shmget, Type: Func, Weak: true }
+  - { Name: zx_a0030_shmat, Type: Func, Weak: true }
+  - { Name: zx_a0031_shmctl, Type: Func, Weak: true }
+  - { Name: zx_a0032_dup, Type: Func, Weak: true }
+  - { Name: zx_a0033_dup2, Type: Func, Weak: true }
+  - { Name: zx_a0034_pause, Type: Func, Weak: true }
+  - { Name: zx_a0035_nanosleep, Type: Func, Weak: true }
+  - { Name: zx_a0036_getitimer, Type: Func, Weak: true }
+  - { Name: zx_a0037_alarm, Type: Func, Weak: true }
+  - { Name: zx_a0038_setitimer, Type: Func, Weak: true }
+  - { Name: zx_a0039_getpid, Type: Func, Weak: true }
+  - { Name: zx_a0040_sendfile, Type: Func, Weak: true }
+  - { Name: zx_a0041_socket, Type: Func, Weak: true }
+  - { Name: zx_a0042_connect, Type: Func, Weak: true }
+  - { Name: zx_a0043_accept, Type: Func, Weak: true }
+  - { Name: zx_a0044_sendto, Type: Func, Weak: true }
+  - { Name: zx_a0045_recvfrom, Type: Func, Weak: true }
+  - { Name: zx_a0046_sendmsg, Type: Func, Weak: true }
+  - { Name: zx_a0047_recvmsg, Type: Func, Weak: true }
+  - { Name: zx_a0048_shutdown, Type: Func, Weak: true }
+  - { Name: zx_a0049_bind, Type: Func, Weak: true }
+  - { Name: zx_a0050_listen, Type: Func, Weak: true }
+  - { Name: zx_a0051_getsockname, Type: Func, Weak: true }
+  - { Name: zx_a0052_getpeername, Type: Func, Weak: true }
+  - { Name: zx_a0053_socketpair, Type: Func, Weak: true }
+  - { Name: zx_a0054_setsockopt, Type: Func, Weak: true }
+  - { Name: zx_a0055_getsockopt, Type: Func, Weak: true }
+  - { Name: zx_a0056_clone, Type: Func, Weak: true }
+  - { Name: zx_a0057_fork, Type: Func, Weak: true }
+  - { Name: zx_a0058_vfork, Type: Func, Weak: true }
+  - { Name: zx_a0059_execve, Type: Func, Weak: true }
+  - { Name: zx_a0060_exit, Type: Func, Weak: true }
+  - { Name: zx_a0061_wait4, Type: Func, Weak: true }
+  - { Name: zx_a0062_kill, Type: Func, Weak: true }
+  - { Name: zx_a0063_uname, Type: Func, Weak: true }
+  - { Name: zx_a0064_semget, Type: Func, Weak: true }
+  - { Name: zx_a0065_semop, Type: Func, Weak: true }
+  - { Name: zx_a0066_semctl, Type: Func, Weak: true }
+  - { Name: zx_a0067_shmdt, Type: Func, Weak: true }
+  - { Name: zx_a0068_msgget, Type: Func, Weak: true }
+  - { Name: zx_a0069_msgsnd, Type: Func, Weak: true }
+  - { Name: zx_a0070_msgrcv, Type: Func, Weak: true }
+  - { Name: zx_a0071_msgctl, Type: Func, Weak: true }
+  - { Name: zx_a0072_fcntl, Type: Func, Weak: true }
+  - { Name: zx_a0073_flock, Type: Func, Weak: true }
+  - { Name: zx_a0074_fsync, Type: Func, Weak: true }
+  - { Name: zx_a0075_fdatasync, Type: Func, Weak: true }
+  - { Name: zx_a0076_truncate, Type: Func, Weak: true }
+  - { Name: zx_a0077_ftruncate, Type: Func, Weak: true }
+  - { Name: zx_a0078_getdents, Type: Func, Weak: true }
+  - { Name: zx_a0079_getcwd, Type: Func, Weak: true }
+  - { Name: zx_a0080_chdir, Type: Func, Weak: true }
+  - { Name: zx_a0081_fchdir, Type: Func, Weak: true }
+  - { Name: zx_a0082_rename, Type: Func, Weak: true }
+  - { Name: zx_a0083_mkdir, Type: Func, Weak: true }
+  - { Name: zx_a0084_rmdir, Type: Func, Weak: true }
+  - { Name: zx_a0085_creat, Type: Func, Weak: true }
+  - { Name: zx_a0086_link, Type: Func, Weak: true }
+  - { Name: zx_a0087_unlink, Type: Func, Weak: true }
+  - { Name: zx_a0088_symlink, Type: Func, Weak: true }
+  - { Name: zx_a0089_readlink, Type: Func, Weak: true }
+  - { Name: zx_a0090_chmod, Type: Func, Weak: true }
+  - { Name: zx_a0091_fchmod, Type: Func, Weak: true }
+  - { Name: zx_a0092_chown, Type: Func, Weak: true }
+  - { Name: zx_a0093_fchown, Type: Func, Weak: true }
+  - { Name: zx_a0094_lchown, Type: Func, Weak: true }
+  - { Name: zx_a0095_umask, Type: Func, Weak: true }
+  - { Name: zx_a0096_gettimeofday, Type: Func, Weak: true }
+  - { Name: zx_a0097_getrlimit, Type: Func, Weak: true }
+  - { Name: zx_a0098_getrusage, Type: Func, Weak: true }
+  - { Name: zx_a0099_sysinfo, Type: Func, Weak: true }
+  - { Name: zx_a0100_times, Type: Func, Weak: true }
+  - { Name: zx_a0101_ptrace, Type: Func, Weak: true }
+  - { Name: zx_a0102_getuid, Type: Func, Weak: true }
+  - { Name: zx_a0103_syslog, Type: Func, Weak: true }
+  - { Name: zx_a0104_getgid, Type: Func, Weak: true }
+  - { Name: zx_a0105_setuid, Type: Func, Weak: true }
+  - { Name: zx_a0106_setgid, Type: Func, Weak: true }
+  - { Name: zx_a0107_geteuid, Type: Func, Weak: true }
+  - { Name: zx_a0108_getegid, Type: Func, Weak: true }
+  - { Name: zx_a0109_setpgid, Type: Func, Weak: true }
+  - { Name: zx_a0110_getppid, Type: Func, Weak: true }
+  - { Name: zx_a0111_getpgrp, Type: Func, Weak: true }
+  - { Name: zx_a0112_setsid, Type: Func, Weak: true }
+  - { Name: zx_a0113_setreuid, Type: Func, Weak: true }
+  - { Name: zx_a0114_setregid, Type: Func, Weak: true }
+  - { Name: zx_a0115_getgroups, Type: Func, Weak: true }
+  - { Name: zx_a0116_setgroups, Type: Func, Weak: true }
+  - { Name: zx_a0117_setresuid, Type: Func, Weak: true }
+  - { Name: zx_a0118_getresuid, Type: Func, Weak: true }
+  - { Name: zx_a0119_setresgid, Type: Func, Weak: true }
+  - { Name: zx_a0120_getresgid, Type: Func, Weak: true }
+  - { Name: zx_a0121_getpgid, Type: Func, Weak: true }
+  - { Name: zx_a0122_setfsuid, Type: Func, Weak: true }
+  - { Name: zx_a0123_setfsgid, Type: Func, Weak: true }
+  - { Name: zx_a0124_getsid, Type: Func, Weak: true }
+  - { Name: zx_a0125_capget, Type: Func, Weak: true }
+  - { Name: zx_a0126_capset, Type: Func, Weak: true }
+  - { Name: zx_a0127_rt_sigpending, Type: Func, Weak: true }
+  - { Name: zx_a0128_rt_sigtimedwait, Type: Func, Weak: true }
+  - { Name: zx_a0129_rt_sigqueueinfo, Type: Func, Weak: true }
+  - { Name: zx_a0130_rt_sigsuspend, Type: Func, Weak: true }
+  - { Name: zx_a0131_sigaltstack, Type: Func, Weak: true }
+  - { Name: zx_a0132_utime, Type: Func, Weak: true }
+  - { Name: zx_a0133_mknod, Type: Func, Weak: true }
+  - { Name: zx_a0134_uselib, Type: Func, Weak: true }
+  - { Name: zx_a0135_personality, Type: Func, Weak: true }
+  - { Name: zx_a0136_ustat, Type: Func, Weak: true }
+  - { Name: zx_a0137_statfs, Type: Func, Weak: true }
+  - { Name: zx_a0138_fstatfs, Type: Func, Weak: true }
+  - { Name: zx_a0139_sysfs, Type: Func, Weak: true }
+  - { Name: zx_a0140_getpriority, Type: Func, Weak: true }
+  - { Name: zx_a0141_setpriority, Type: Func, Weak: true }
+  - { Name: zx_a0142_sched_setparam, Type: Func, Weak: true }
+  - { Name: zx_a0143_sched_getparam, Type: Func, Weak: true }
+  - { Name: zx_a0144_sched_setscheduler, Type: Func, Weak: true }
+  - { Name: zx_a0145_sched_getscheduler, Type: Func, Weak: true }
+  - { Name: zx_a0146_sched_get_priority_max, Type: Func, Weak: true }
+  - { Name: zx_a0147_sched_get_priority_min, Type: Func, Weak: true }
+  - { Name: zx_a0148_sched_rr_get_interval, Type: Func, Weak: true }
+  - { Name: zx_a0149_mlock, Type: Func, Weak: true }
+  - { Name: zx_a0150_munlock, Type: Func, Weak: true }
+  - { Name: zx_a0151_mlockall, Type: Func, Weak: true }
+  - { Name: zx_a0152_munlockall, Type: Func, Weak: true }
+  - { Name: zx_a0153_vhangup, Type: Func, Weak: true }
+  - { Name: zx_a0154_modify_ldt, Type: Func, Weak: true }
+  - { Name: zx_a0155_pivot_root, Type: Func, Weak: true }
+  - { Name: zx_a0156_not_impl, Type: Func, Weak: true }
+  - { Name: zx_a0157_prctl, Type: Func, Weak: true }
+  - { Name: zx_a0158_arch_prctl, Type: Func, Weak: true }
+  - { Name: zx_a0159_adjtimex, Type: Func, Weak: true }
+  - { Name: zx_a0160_setrlimit, Type: Func, Weak: true }
+  - { Name: zx_a0161_chroot, Type: Func, Weak: true }
+  - { Name: zx_a0162_sync, Type: Func, Weak: true }
+  - { Name: zx_a0163_acct, Type: Func, Weak: true }
+  - { Name: zx_a0164_settimeofday, Type: Func, Weak: true }
+  - { Name: zx_a0165_mount, Type: Func, Weak: true }
+  - { Name: zx_a0166_umount2, Type: Func, Weak: true }
+  - { Name: zx_a0167_swapon, Type: Func, Weak: true }
+  - { Name: zx_a0168_swapoff, Type: Func, Weak: true }
+  - { Name: zx_a0169_reboot, Type: Func, Weak: true }
+  - { Name: zx_a0170_sethostname, Type: Func, Weak: true }
+  - { Name: zx_a0171_setdomainname, Type: Func, Weak: true }
+  - { Name: zx_a0172_iopl, Type: Func, Weak: true }
+  - { Name: zx_a0173_ioperm, Type: Func, Weak: true }
+  - { Name: zx_a0174_create_module, Type: Func, Weak: true }
+  - { Name: zx_a0175_init_module, Type: Func, Weak: true }
+  - { Name: zx_a0176_delete_module, Type: Func, Weak: true }
+  - { Name: zx_a0177_get_kernel_syms, Type: Func, Weak: true }
+  - { Name: zx_a0178_query_module, Type: Func, Weak: true }
+  - { Name: zx_a0179_quotactl, Type: Func, Weak: true }
+  - { Name: zx_a0180_nfsservctl, Type: Func, Weak: true }
+  - { Name: zx_a0181_getpmsg, Type: Func, Weak: true }
+  - { Name: zx_a0182_putpmsg, Type: Func, Weak: true }
+  - { Name: zx_a0183_afs_syscall, Type: Func, Weak: true }
+  - { Name: zx_a0184_tuxcall, Type: Func, Weak: true }
+  - { Name: zx_a0185_security, Type: Func, Weak: true }
+  - { Name: zx_a0186_gettid, Type: Func, Weak: true }
+  - { Name: zx_a0187_readahead, Type: Func, Weak: true }
+  - { Name: zx_a0188_setxattr, Type: Func, Weak: true }
+  - { Name: zx_a0189_lsetxattr, Type: Func, Weak: true }
+  - { Name: zx_a0190_fsetxattr, Type: Func, Weak: true }
+  - { Name: zx_a0191_getxattr, Type: Func, Weak: true }
+  - { Name: zx_a0192_lgetxattr, Type: Func, Weak: true }
+  - { Name: zx_a0193_fgetxattr, Type: Func, Weak: true }
+  - { Name: zx_a0194_listxattr, Type: Func, Weak: true }
+  - { Name: zx_a0195_llistxattr, Type: Func, Weak: true }
+  - { Name: zx_a0196_flistxattr, Type: Func, Weak: true }
+  - { Name: zx_a0197_removexattr, Type: Func, Weak: true }
+  - { Name: zx_a0198_lremovexattr, Type: Func, Weak: true }
+  - { Name: zx_a0199_fremovexattr, Type: Func, Weak: true }
+  - { Name: zx_a0200_tkill, Type: Func, Weak: true }
+  - { Name: zx_a0201_time, Type: Func, Weak: true }
+  - { Name: zx_a0202_futex, Type: Func, Weak: true }
+  - { Name: zx_a0203_sched_setaffinity, Type: Func, Weak: true }
+  - { Name: zx_a0204_sched_getaffinity, Type: Func, Weak: true }
+  - { Name: zx_a0205_set_thread_area, Type: Func, Weak: true }
+  - { Name: zx_a0206_io_setup, Type: Func, Weak: true }
+  - { Name: zx_a0207_io_destroy, Type: Func, Weak: true }
+  - { Name: zx_a0208_io_getevents, Type: Func, Weak: true }
+  - { Name: zx_a0209_io_submit, Type: Func, Weak: true }
+  - { Name: zx_a0210_io_cancel, Type: Func, Weak: true }
+  - { Name: zx_a0211_get_thread_area, Type: Func, Weak: true }
+  - { Name: zx_a0212_lookup_dcookie, Type: Func, Weak: true }
+  - { Name: zx_a0213_epoll_create, Type: Func, Weak: true }
+  - { Name: zx_a0214_epoll_ctl_old, Type: Func, Weak: true }
+  - { Name: zx_a0215_epoll_wait_old, Type: Func, Weak: true }
+  - { Name: zx_a0216_remap_file_pages, Type: Func, Weak: true }
+  - { Name: zx_a0217_getdents64, Type: Func, Weak: true }
+  - { Name: zx_a0218_set_tid_address, Type: Func, Weak: true }
+  - { Name: zx_a0219_restart_syscall, Type: Func, Weak: true }
+  - { Name: zx_a0220_semtimedop, Type: Func, Weak: true }
+  - { Name: zx_a0221_fadvise64, Type: Func, Weak: true }
+  - { Name: zx_a0222_timer_create, Type: Func, Weak: true }
+  - { Name: zx_a0223_timer_settime, Type: Func, Weak: true }
+  - { Name: zx_a0224_timer_gettime, Type: Func, Weak: true }
+  - { Name: zx_a0225_timer_getoverrun, Type: Func, Weak: true }
+  - { Name: zx_a0226_timer_delete, Type: Func, Weak: true }
+  - { Name: zx_a0227_clock_settime, Type: Func, Weak: true }
+  - { Name: zx_a0228_clock_gettime, Type: Func, Weak: true }
+  - { Name: zx_a0229_clock_getres, Type: Func, Weak: true }
+  - { Name: zx_a0230_clock_nanosleep, Type: Func, Weak: true }
+  - { Name: zx_a0231_exit_group, Type: Func, Weak: true }
+  - { Name: zx_a0232_epoll_wait, Type: Func, Weak: true }
+  - { Name: zx_a0233_epoll_ctl, Type: Func, Weak: true }
+  - { Name: zx_a0234_tgkill, Type: Func, Weak: true }
+  - { Name: zx_a0235_utimes, Type: Func, Weak: true }
+  - { Name: zx_a0236_vserver, Type: Func, Weak: true }
+  - { Name: zx_a0237_mbind, Type: Func, Weak: true }
+  - { Name: zx_a0238_set_mempolicy, Type: Func, Weak: true }
+  - { Name: zx_a0239_get_mempolicy, Type: Func, Weak: true }
+  - { Name: zx_a0240_mq_open, Type: Func, Weak: true }
+  - { Name: zx_a0241_mq_unlink, Type: Func, Weak: true }
+  - { Name: zx_a0242_mq_timedsend, Type: Func, Weak: true }
+  - { Name: zx_a0243_mq_timedreceive, Type: Func, Weak: true }
+  - { Name: zx_a0244_mq_notify, Type: Func, Weak: true }
+  - { Name: zx_a0245_mq_getsetattr, Type: Func, Weak: true }
+  - { Name: zx_a0246_kexec_load, Type: Func, Weak: true }
+  - { Name: zx_a0247_waitid, Type: Func, Weak: true }
+  - { Name: zx_a0248_add_key, Type: Func, Weak: true }
+  - { Name: zx_a0249_request_key, Type: Func, Weak: true }
+  - { Name: zx_a0250_keyctl, Type: Func, Weak: true }
+  - { Name: zx_a0251_ioprio_set, Type: Func, Weak: true }
+  - { Name: zx_a0252_ioprio_get, Type: Func, Weak: true }
+  - { Name: zx_a0253_inotify_init, Type: Func, Weak: true }
+  - { Name: zx_a0254_inotify_add_watch, Type: Func, Weak: true }
+  - { Name: zx_a0255_inotify_rm_watch, Type: Func, Weak: true }
+  - { Name: zx_a0256_migrate_pages, Type: Func, Weak: true }
+  - { Name: zx_a0257_openat, Type: Func, Weak: true }
+  - { Name: zx_a0258_mkdirat, Type: Func, Weak: true }
+  - { Name: zx_a0259_mknodat, Type: Func, Weak: true }
+  - { Name: zx_a0260_fchownat, Type: Func, Weak: true }
+  - { Name: zx_a0261_futimesat, Type: Func, Weak: true }
+  - { Name: zx_a0262_newfstatat, Type: Func, Weak: true }
+  - { Name: zx_a0263_unlinkat, Type: Func, Weak: true }
+  - { Name: zx_a0264_renameat, Type: Func, Weak: true }
+  - { Name: zx_a0265_linkat, Type: Func, Weak: true }
+  - { Name: zx_a0266_symlinkat, Type: Func, Weak: true }
+  - { Name: zx_a0267_readlinkat, Type: Func, Weak: true }
+  - { Name: zx_a0268_fchmodat, Type: Func, Weak: true }
+  - { Name: zx_a0269_faccessat, Type: Func, Weak: true }
+  - { Name: zx_a0270_pselect6, Type: Func, Weak: true }
+  - { Name: zx_a0271_ppoll, Type: Func, Weak: true }
+  - { Name: zx_a0272_unshare, Type: Func, Weak: true }
+  - { Name: zx_a0273_set_robust_list, Type: Func, Weak: true }
+  - { Name: zx_a0274_get_robust_list, Type: Func, Weak: true }
+  - { Name: zx_a0275_splice, Type: Func, Weak: true }
+  - { Name: zx_a0276_tee, Type: Func, Weak: true }
+  - { Name: zx_a0277_sync_file_range, Type: Func, Weak: true }
+  - { Name: zx_a0278_vmsplice, Type: Func, Weak: true }
+  - { Name: zx_a0279_move_pages, Type: Func, Weak: true }
+  - { Name: zx_a0280_utimensat, Type: Func, Weak: true }
+  - { Name: zx_a0281_epoll_pwait, Type: Func, Weak: true }
+  - { Name: zx_a0282_signalfd, Type: Func, Weak: true }
+  - { Name: zx_a0283_timerfd_create, Type: Func, Weak: true }
+  - { Name: zx_a0284_eventfd, Type: Func, Weak: true }
+  - { Name: zx_a0285_fallocate, Type: Func, Weak: true }
+  - { Name: zx_a0286_timerfd_settime, Type: Func, Weak: true }
+  - { Name: zx_a0287_timerfd_gettime, Type: Func, Weak: true }
+  - { Name: zx_a0288_accept4, Type: Func, Weak: true }
+  - { Name: zx_a0289_signalfd4, Type: Func, Weak: true }
+  - { Name: zx_a0290_eventfd2, Type: Func, Weak: true }
+  - { Name: zx_a0291_epoll_create1, Type: Func, Weak: true }
+  - { Name: zx_a0292_dup3, Type: Func, Weak: true }
+  - { Name: zx_a0293_pipe2, Type: Func, Weak: true }
+  - { Name: zx_a0294_inotify_init1, Type: Func, Weak: true }
+  - { Name: zx_a0295_preadv, Type: Func, Weak: true }
+  - { Name: zx_a0296_pwritev, Type: Func, Weak: true }
+  - { Name: zx_a0297_rt_tgsigqueueinfo, Type: Func, Weak: true }
+  - { Name: zx_a0298_perf_event_open, Type: Func, Weak: true }
+  - { Name: zx_a0299_recvmmsg, Type: Func, Weak: true }
+  - { Name: zx_a0300_fanotify_init, Type: Func, Weak: true }
+  - { Name: zx_a0301_fanotify_mark, Type: Func, Weak: true }
+  - { Name: zx_a0302_prlimit64, Type: Func, Weak: true }
+  - { Name: zx_a0303_name_to_handle_at, Type: Func, Weak: true }
+  - { Name: zx_a0304_open_by_handle_at, Type: Func, Weak: true }
+  - { Name: zx_a0305_clock_adjtime, Type: Func, Weak: true }
+  - { Name: zx_a0306_syncfs, Type: Func, Weak: true }
+  - { Name: zx_a0307_sendmmsg, Type: Func, Weak: true }
+  - { Name: zx_a0308_setns, Type: Func, Weak: true }
+  - { Name: zx_a0309_getcpu, Type: Func, Weak: true }
+  - { Name: zx_a0310_process_vm_readv, Type: Func, Weak: true }
+  - { Name: zx_a0311_process_vm_writev, Type: Func, Weak: true }
+  - { Name: zx_a0312_kcmp, Type: Func, Weak: true }
+  - { Name: zx_a0313_finit_module, Type: Func, Weak: true }
+  - { Name: zx_a0314_sched_setattr, Type: Func, Weak: true }
+  - { Name: zx_a0315_sched_getattr, Type: Func, Weak: true }
+  - { Name: zx_a0316_renameat2, Type: Func, Weak: true }
+  - { Name: zx_a0317_seccomp, Type: Func, Weak: true }
+  - { Name: zx_a0318_getrandom, Type: Func, Weak: true }
+  - { Name: zx_a0319_memfd_create, Type: Func, Weak: true }
+  - { Name: zx_a0320_kexec_file_load, Type: Func, Weak: true }
+  - { Name: zx_a0321_bpf, Type: Func, Weak: true }
+  - { Name: zx_a0322_execveat, Type: Func, Weak: true }
+  - { Name: zx_a0323_userfaultfd, Type: Func, Weak: true }
+  - { Name: zx_a0324_membarrier, Type: Func, Weak: true }
+  - { Name: zx_a0325_mlock2, Type: Func, Weak: true }
+  - { Name: zx_a0326_copy_file_range, Type: Func, Weak: true }
+  - { Name: zx_a0327_preadv2, Type: Func, Weak: true }
+  - { Name: zx_a0328_pwritev2, Type: Func, Weak: true }
+  - { Name: zx_a0329_pkey_mprotect, Type: Func, Weak: true }
+  - { Name: zx_a0330_pkey_alloc, Type: Func, Weak: true }
+  - { Name: zx_a0331_pkey_free, Type: Func, Weak: true }
+  - { Name: zx_a0332_statx, Type: Func, Weak: true }
+  - { Name: zx_a0333_io_pgetevents, Type: Func, Weak: true }
+  - { Name: zx_a0334_rseq, Type: Func, Weak: true }
+  - { Name: zx_a0335_blank, Type: Func, Weak: true }
+  - { Name: zx_a0336_blank, Type: Func, Weak: true }
+  - { Name: zx_a0337_blank, Type: Func, Weak: true }
+  - { Name: zx_a0338_blank, Type: Func, Weak: true }
+  - { Name: zx_a0339_blank, Type: Func, Weak: true }
+  - { Name: zx_a0340_blank, Type: Func, Weak: true }
+  - { Name: zx_a0341_blank, Type: Func, Weak: true }
+  - { Name: zx_a0342_blank, Type: Func, Weak: true }
+  - { Name: zx_a0343_blank, Type: Func, Weak: true }
+  - { Name: zx_a0344_blank, Type: Func, Weak: true }
+  - { Name: zx_a0345_blank, Type: Func, Weak: true }
+  - { Name: zx_a0346_blank, Type: Func, Weak: true }
+  - { Name: zx_a0347_blank, Type: Func, Weak: true }
+  - { Name: zx_a0348_blank, Type: Func, Weak: true }
+  - { Name: zx_a0349_blank, Type: Func, Weak: true }
+  - { Name: zx_a0350_blank, Type: Func, Weak: true }
+  - { Name: zx_a0351_blank, Type: Func, Weak: true }
+  - { Name: zx_a0352_blank, Type: Func, Weak: true }
+  - { Name: zx_a0353_blank, Type: Func, Weak: true }
+  - { Name: zx_a0354_blank, Type: Func, Weak: true }
+  - { Name: zx_a0355_blank, Type: Func, Weak: true }
+  - { Name: zx_a0356_blank, Type: Func, Weak: true }
+  - { Name: zx_a0357_blank, Type: Func, Weak: true }
+  - { Name: zx_a0358_blank, Type: Func, Weak: true }
+  - { Name: zx_a0359_blank, Type: Func, Weak: true }
+  - { Name: zx_a0360_blank, Type: Func, Weak: true }
+  - { Name: zx_a0361_blank, Type: Func, Weak: true }
+  - { Name: zx_a0362_blank, Type: Func, Weak: true }
+  - { Name: zx_a0363_blank, Type: Func, Weak: true }
+  - { Name: zx_a0364_blank, Type: Func, Weak: true }
+  - { Name: zx_a0365_blank, Type: Func, Weak: true }
+  - { Name: zx_a0366_blank, Type: Func, Weak: true }
+  - { Name: zx_a0367_blank, Type: Func, Weak: true }
+  - { Name: zx_a0368_blank, Type: Func, Weak: true }
+  - { Name: zx_a0369_blank, Type: Func, Weak: true }
+  - { Name: zx_a0370_blank, Type: Func, Weak: true }
+  - { Name: zx_a0371_blank, Type: Func, Weak: true }
+  - { Name: zx_a0372_blank, Type: Func, Weak: true }
+  - { Name: zx_a0373_blank, Type: Func, Weak: true }
+  - { Name: zx_a0374_blank, Type: Func, Weak: true }
+  - { Name: zx_a0375_blank, Type: Func, Weak: true }
+  - { Name: zx_a0376_blank, Type: Func, Weak: true }
+  - { Name: zx_a0377_blank, Type: Func, Weak: true }
+  - { Name: zx_a0378_blank, Type: Func, Weak: true }
+  - { Name: zx_a0379_blank, Type: Func, Weak: true }
+  - { Name: zx_a0380_blank, Type: Func, Weak: true }
+  - { Name: zx_a0381_blank, Type: Func, Weak: true }
+  - { Name: zx_a0382_blank, Type: Func, Weak: true }
+  - { Name: zx_a0383_blank, Type: Func, Weak: true }
+  - { Name: zx_a0384_blank, Type: Func, Weak: true }
+  - { Name: zx_a0385_blank, Type: Func, Weak: true }
+  - { Name: zx_a0386_blank, Type: Func, Weak: true }
+  - { Name: zx_a0387_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0388_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0389_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0390_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0391_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0392_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0393_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0394_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0395_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0396_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0397_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0398_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0399_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0400_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0401_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0402_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0403_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0404_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0405_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0406_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0407_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0408_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0409_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0410_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0411_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0412_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0413_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0414_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0415_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0416_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0417_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0418_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0419_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0420_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0421_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0422_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0423_dont_use, Type: Func, Weak: true }
+  - { Name: zx_a0424_pidfd_send_signal, Type: Func, Weak: true }
+  - { Name: zx_a0425_io_uring_setup, Type: Func, Weak: true }
+  - { Name: zx_a0426_io_uring_enter, Type: Func, Weak: true }
+  - { Name: zx_a0427_io_uring_register, Type: Func, Weak: true }
+  - { Name: zx_a0428_open_tree, Type: Func, Weak: true }
+  - { Name: zx_a0429_move_mount, Type: Func, Weak: true }
+  - { Name: zx_a0430_fsopen, Type: Func, Weak: true }
+  - { Name: zx_a0431_fsconfig, Type: Func, Weak: true }
+  - { Name: zx_a0432_fsmount, Type: Func, Weak: true }
+  - { Name: zx_a0433_fspick, Type: Func, Weak: true }
+  - { Name: zx_a0434_pidfd_open, Type: Func, Weak: true }
+  - { Name: zx_a0435_clone3, Type: Func, Weak: true }
+  - { Name: zx_a0436_close_range, Type: Func, Weak: true }
+  - { Name: zx_a0437_openat2, Type: Func, Weak: true }
+  - { Name: zx_a0438_pidfd_getfd, Type: Func, Weak: true }
+  - { Name: zx_a0439_faccessat2, Type: Func, Weak: true }
+  - { Name: zx_a0440_process_madvise, Type: Func, Weak: true }
+  - { Name: zx_a0441_epoll_pwait2, Type: Func, Weak: true }
+  - { Name: zx_a0442_mount_setattr, Type: Func, Weak: true }
+  - { Name: zx_a0443_quotactl_fd, Type: Func, Weak: true }
+  - { Name: zx_a0444_landlock_create_ruleset, Type: Func, Weak: true }
+  - { Name: zx_a0445_landlock_add_rule, Type: Func, Weak: true }
+  - { Name: zx_a0446_landlock_restrict_self, Type: Func, Weak: true }
+  - { Name: zx_a0447_memfd_secret, Type: Func, Weak: true }
+  - { Name: zx_a0448_process_mrelease, Type: Func, Weak: true }
+  - { Name: zx_a0449_futex_waitv, Type: Func, Weak: true }
+  - { Name: zx_a0450_set_mempolicy_home_node, Type: Func, Weak: true }
+  - { Name: zx_a0451_cachestat, Type: Func, Weak: true }
+  - { Name: zx_a0452_fchmodat2, Type: Func, Weak: true }
+  - { Name: zx_a0453_map_shadow_stack, Type: Func, Weak: true }
+  - { Name: zx_a0454_blank, Type: Func, Weak: true }
+  - { Name: zx_a0455_blank, Type: Func, Weak: true }
+  - { Name: zx_a0456_blank, Type: Func, Weak: true }
+  - { Name: zx_a0457_blank, Type: Func, Weak: true }
+  - { Name: zx_a0458_blank, Type: Func, Weak: true }
+  - { Name: zx_a0459_blank, Type: Func, Weak: true }
+  - { Name: zx_a0460_blank, Type: Func, Weak: true }
+  - { Name: zx_a0461_blank, Type: Func, Weak: true }
+  - { Name: zx_a0462_blank, Type: Func, Weak: true }
+  - { Name: zx_a0463_blank, Type: Func, Weak: true }
+  - { Name: zx_a0464_blank, Type: Func, Weak: true }
+  - { Name: zx_a0465_blank, Type: Func, Weak: true }
+  - { Name: zx_a0466_blank, Type: Func, Weak: true }
+  - { Name: zx_a0467_blank, Type: Func, Weak: true }
+  - { Name: zx_a0468_blank, Type: Func, Weak: true }
+  - { Name: zx_a0469_blank, Type: Func, Weak: true }
+  - { Name: zx_a0470_blank, Type: Func, Weak: true }
+  - { Name: zx_a0471_blank, Type: Func, Weak: true }
+  - { Name: zx_a0472_blank, Type: Func, Weak: true }
+  - { Name: zx_a0473_blank, Type: Func, Weak: true }
+  - { Name: zx_a0474_blank, Type: Func, Weak: true }
+  - { Name: zx_a0475_blank, Type: Func, Weak: true }
+  - { Name: zx_a0476_blank, Type: Func, Weak: true }
+  - { Name: zx_a0477_blank, Type: Func, Weak: true }
+  - { Name: zx_a0478_blank, Type: Func, Weak: true }
+  - { Name: zx_a0479_blank, Type: Func, Weak: true }
+  - { Name: zx_a0480_blank, Type: Func, Weak: true }
+  - { Name: zx_a0481_blank, Type: Func, Weak: true }
+  - { Name: zx_a0482_blank, Type: Func, Weak: true }
+  - { Name: zx_a0483_blank, Type: Func, Weak: true }
+  - { Name: zx_a0484_blank, Type: Func, Weak: true }
+  - { Name: zx_a0485_blank, Type: Func, Weak: true }
+  - { Name: zx_a0486_blank, Type: Func, Weak: true }
+  - { Name: zx_a0487_blank, Type: Func, Weak: true }
+  - { Name: zx_a0488_blank, Type: Func, Weak: true }
+  - { Name: zx_a0489_blank, Type: Func, Weak: true }
+  - { Name: zx_a0490_blank, Type: Func, Weak: true }
+  - { Name: zx_a0491_blank, Type: Func, Weak: true }
+  - { Name: zx_a0492_blank, Type: Func, Weak: true }
+  - { Name: zx_a0493_blank, Type: Func, Weak: true }
+  - { Name: zx_a0494_blank, Type: Func, Weak: true }
+  - { Name: zx_a0495_blank, Type: Func, Weak: true }
+  - { Name: zx_a0496_blank, Type: Func, Weak: true }
+  - { Name: zx_a0497_blank, Type: Func, Weak: true }
+  - { Name: zx_a0498_blank, Type: Func, Weak: true }
+  - { Name: zx_a0499_blank, Type: Func, Weak: true }
+  - { Name: zx_a0500_blank, Type: Func, Weak: true }
+  - { Name: zx_a0501_blank, Type: Func, Weak: true }
+  - { Name: zx_a0502_blank, Type: Func, Weak: true }
+  - { Name: zx_a0503_blank, Type: Func, Weak: true }
+  - { Name: zx_a0504_blank, Type: Func, Weak: true }
+  - { Name: zx_a0505_blank, Type: Func, Weak: true }
+  - { Name: zx_a0506_blank, Type: Func, Weak: true }
+  - { Name: zx_a0507_blank, Type: Func, Weak: true }
+  - { Name: zx_a0508_blank, Type: Func, Weak: true }
+  - { Name: zx_a0509_blank, Type: Func, Weak: true }
+  - { Name: zx_a0510_blank, Type: Func, Weak: true }
+  - { Name: zx_a0511_blank, Type: Func, Weak: true }
+  - { Name: zx_a0512_compat_rt_sigaction, Type: Func, Weak: true }
+  - { Name: zx_a0513_compat_rt_sigreturn, Type: Func, Weak: true }
+  - { Name: zx_a0514_compat_ioctl, Type: Func, Weak: true }
+  - { Name: zx_a0515_compat_readv, Type: Func, Weak: true }
+  - { Name: zx_a0516_compat_writev, Type: Func, Weak: true }
+  - { Name: zx_a0517_compat_recvfrom, Type: Func, Weak: true }
+  - { Name: zx_a0518_compat_sendmsg, Type: Func, Weak: true }
+  - { Name: zx_a0519_compat_recvmsg, Type: Func, Weak: true }
+  - { Name: zx_a0520_compat_execve, Type: Func, Weak: true }
+  - { Name: zx_a0521_compat_ptrace, Type: Func, Weak: true }
+  - { Name: zx_a0522_compat_rt_sigpending, Type: Func, Weak: true }
+  - { Name: zx_a0523_compat_rt_sigtimedwait, Type: Func, Weak: true }
+  - { Name: zx_a0524_compat_rt_sigqueueinfo, Type: Func, Weak: true }
+  - { Name: zx_a0525_compat_sigaltstack, Type: Func, Weak: true }
+  - { Name: zx_a0526_compat_timer_create, Type: Func, Weak: true }
+  - { Name: zx_a0527_compat_mq_notify, Type: Func, Weak: true }
+  - { Name: zx_a0528_compat_kexec_load, Type: Func, Weak: true }
+  - { Name: zx_a0529_compat_waitid, Type: Func, Weak: true }
+  - { Name: zx_a0530_compat_set_robust_list, Type: Func, Weak: true }
+  - { Name: zx_a0531_compat_get_robust_list, Type: Func, Weak: true }
+  - { Name: zx_a0532_compat_vmsplice, Type: Func, Weak: true }
+  - { Name: zx_a0533_compat_move_pages, Type: Func, Weak: true }
+  - { Name: zx_a0534_compat_preadv, Type: Func, Weak: true }
+  - { Name: zx_a0535_compat_pwritev, Type: Func, Weak: true }
+  - { Name: zx_a0536_compat_rt_tgsigqueueinfo, Type: Func, Weak: true }
+  - { Name: zx_a0537_compat_recvmmsg, Type: Func, Weak: true }
+  - { Name: zx_a0538_compat_sendmmsg, Type: Func, Weak: true }
+  - { Name: zx_a0539_compat_process_vm_readv, Type: Func, Weak: true }
+  - { Name: zx_a0540_compat_process_vm_writev, Type: Func, Weak: true }
+  - { Name: zx_a0541_compat_setsockopt, Type: Func, Weak: true }
+  - { Name: zx_a0542_compat_getsockopt, Type: Func, Weak: true }
+  - { Name: zx_a0543_compat_io_setup, Type: Func, Weak: true }
+  - { Name: zx_a0544_compat_io_submit, Type: Func, Weak: true }
+  - { Name: zx_a0545_compat_execveat, Type: Func, Weak: true }
+  - { Name: zx_a0546_compat_preadv2, Type: Func, Weak: true }
+  - { Name: zx_a0547_compat_pwritev2, Type: Func, Weak: true }
   - { Name: zx_bti_create, Type: Func, Weak: true }
   - { Name: zx_bti_pin, Type: Func, Weak: true }
   - { Name: zx_bti_release_quarantine, Type: Func, Weak: true }
