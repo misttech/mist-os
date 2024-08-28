@@ -268,7 +268,7 @@ pub(crate) fn dedupe_kernel_args(
         map.insert(k, v);
     }
 
-    let updated = FlagData {
+    let mut updated = FlagData {
         args: data.args,
         envs: data.envs,
         features: data.features,
@@ -276,6 +276,8 @@ pub(crate) fn dedupe_kernel_args(
         options: data.options,
     };
 
+    // Sort the kernel args to make the order stable.
+    updated.kernel_args.sort();
     Ok(updated)
 }
 
@@ -308,7 +310,10 @@ fn process_flag_template_inner(
 
 #[cfg(test)]
 mod tests {
+    use std::path::PathBuf;
+
     use super::*;
+    use emulator_instance::{GuestConfig, HostConfig, NetworkingMode};
     use ffx_emulator_config::AudioModel;
     use serde::Serialize;
 
@@ -805,5 +810,125 @@ mod tests {
         let mut sorted_actual = updated.kernel_args.clone();
         sorted_actual.sort();
         assert_eq!(sorted_actual, expected);
+    }
+
+    #[test]
+    fn test_efi_template_efi_kernel() {
+        let config = EmulatorConfiguration {
+            guest: GuestConfig {
+                disk_image: None,
+                kernel_image: Some(PathBuf::from("/path/to/some.efi")),
+                ovmf_code: "/some/ovmf_code.fd".into(),
+                ovmf_vars: "/some/ovmf_vars.fd".into(),
+                ..Default::default()
+            },
+            host: HostConfig { networking: NetworkingMode::None, ..Default::default() },
+            ..Default::default()
+        };
+
+        let actual = process_flag_template(&config).expect("ok processing");
+        let expected_args: Vec<String> = [
+            "-kernel",
+            "/path/to/some.efi",
+            "-drive",
+            "if=pflash,format=raw,readonly=on,file=/some/ovmf_code.fd",
+            "-drive",
+            "if=pflash,format=raw,snapshot=on,file=/some/ovmf_vars.fd",
+            "-m",
+            "0",
+            "-smp",
+            "4,threads=2",
+            "-qmp-pretty",
+            "unix:/qmp,server,nowait",
+            "-monitor",
+            "unix:/monitor,server,nowait",
+            "-serial",
+            "unix:/serial,server,nowait,logfile=.serial",
+            "--machine",
+            "q35",
+            "-fw_cfg",
+            "name=etc/sercon-port,string=0",
+            "-accel",
+            "tcg,thread=single",
+            "-cpu",
+            "Haswell,+smap,-check,-fsgsbase",
+            "-no-audio",
+            "-nic",
+            "none",
+            "-nodefaults",
+            "-parallel",
+            "none",
+            "-vga",
+            "none",
+            "-device",
+            "virtio-keyboard-pci",
+        ]
+        .iter()
+        .map(|a| a.to_string())
+        .collect();
+
+        assert_eq!(actual.args, expected_args)
+    }
+
+    #[test]
+    fn test_efi_template_bootloader() {
+        let config = EmulatorConfiguration {
+            guest: GuestConfig {
+                disk_image: Some(DiskImage::Fat("/path/to/file.fat".into())),
+                kernel_image: None,
+                ovmf_code: "/some/ovmf_code.fd".into(),
+                ovmf_vars: "/some/ovmf_vars.fd".into(),
+                ..Default::default()
+            },
+            host: HostConfig { networking: NetworkingMode::None, ..Default::default() },
+            ..Default::default()
+        };
+
+        let actual = process_flag_template(&config).expect("ok processing");
+        let expected_args: Vec<String> = [
+            "-drive",
+            "if=pflash,format=raw,readonly=on,file=/some/ovmf_code.fd",
+            "-drive",
+            "if=pflash,format=raw,snapshot=on,file=/some/ovmf_vars.fd",
+            "-drive",
+            "if=none,format=raw,file=/path/to/file.fat,id=uefi",
+            "-device",
+            "nec-usb-xhci,id=xhci0",
+            "-device",
+            "usb-storage,bus=xhci0.0,drive=uefi,removable=on,bootindex=0",
+            "-m",
+            "0",
+            "-smp",
+            "4,threads=2",
+            "-qmp-pretty",
+            "unix:/qmp,server,nowait",
+            "-monitor",
+            "unix:/monitor,server,nowait",
+            "-serial",
+            "unix:/serial,server,nowait,logfile=.serial",
+            "--machine",
+            "q35",
+            "-fw_cfg",
+            "name=etc/sercon-port,string=0",
+            "-accel",
+            "tcg,thread=single",
+            "-cpu",
+            "Haswell,+smap,-check,-fsgsbase",
+            "-no-audio",
+            "-nic",
+            "none",
+            "-nodefaults",
+            "-parallel",
+            "none",
+            "-vga",
+            "none",
+            "-device",
+            "virtio-keyboard-pci",
+        ]
+        .iter()
+        .map(|a| a.to_string())
+        .collect();
+
+        assert_eq!(actual.args, expected_args)
     }
 }

@@ -118,7 +118,6 @@ fn convert_v2_bundle_to_configs(
         storage: virtual_device.hardware.storage.clone(),
     };
 
-    // TODO(wilkinsonclay): Remove start_up_args_template from virtual device.
     emulator_configuration.runtime.template = None;
 
     if let Some(ports) = &virtual_device.ports {
@@ -136,19 +135,25 @@ fn convert_v2_bundle_to_configs(
         .as_ref()
         .ok_or(anyhow!("No systems to boot in the product bundle"))?;
 
-    let kernel_image: PathBuf = system
-        .iter()
-        .find_map(|i| match i {
-            Image::QemuKernel(path) => Some(path.clone().into()),
-            _ => None,
-        })
-        .ok_or(anyhow!("No emulator kernels specified in the product bundle"))?;
+    let kernel_image: Option<PathBuf> = system.iter().find_map(|i| match i {
+        Image::QemuKernel(path) => Some(path.clone().into()),
+        _ => None,
+    });
 
-    let disk_image: Option<DiskImage> = system.iter().find_map(|i| match i {
+    let mut disk_image: Option<DiskImage> = system.iter().find_map(|i| match i {
         Image::FVM(path) => Some(DiskImage::Fvm(path.clone().into())),
         Image::Fxfs { path, .. } => Some(DiskImage::Fxfs(path.clone().into())),
         _ => None,
     });
+
+    // If there is no kernel, and no disk, check for a bootloader file.
+    if disk_image.is_none() && kernel_image.is_none() {
+        if let Some(bootloader) = product_bundle.partitions.bootloader_partitions.iter().next() {
+            disk_image = Some(DiskImage::Fat(bootloader.image.clone().into()));
+        } else {
+            bail!("No kernel or bootloader specified in the configuration.")
+        }
+    }
 
     // Some kernels do not have separate zbi images.
     let zbi_image: Option<PathBuf> = system.iter().find_map(|i| match i {
@@ -166,7 +171,7 @@ fn convert_v2_bundle_to_configs(
 mod tests {
     use super::*;
     use assembly_manifest::BlobfsContents;
-    use assembly_partitions_config::PartitionsConfig;
+    use assembly_partitions_config::{BootloaderPartition, PartitionsConfig};
     use sdk_metadata::virtual_device::{Cpu, Hardware};
     use sdk_metadata::{
         AudioDevice, AudioModel, CpuArchitecture, DataAmount, DataUnits, ElementType, InputDevice,
@@ -242,7 +247,7 @@ mod tests {
             config.guest.disk_image.unwrap(),
             DiskImage::Fvm(expected_disk_image_path.into())
         );
-        assert_eq!(config.guest.kernel_image, expected_kernel);
+        assert_eq!(config.guest.kernel_image, Some(expected_kernel.into()));
         assert_eq!(config.guest.zbi_image, Some(expected_zbi.into_std_path_buf()));
 
         assert_eq!(config.host.port_map.len(), 0);
@@ -294,7 +299,7 @@ mod tests {
             config.guest.disk_image.unwrap(),
             DiskImage::Fxfs(expected_disk_image_path.into())
         );
-        assert_eq!(config.guest.kernel_image, expected_kernel);
+        assert_eq!(config.guest.kernel_image, Some(expected_kernel.into()));
         assert_eq!(config.guest.zbi_image, Some(expected_zbi.into_std_path_buf()));
 
         assert_eq!(config.host.port_map.len(), 2);
@@ -394,7 +399,66 @@ mod tests {
         assert!(config.guest.disk_image.is_none());
         assert!(config.guest.zbi_image.is_none());
 
-        assert_eq!(config.guest.kernel_image, expected_kernel);
+        assert_eq!(config.guest.kernel_image, Some(expected_kernel.into()));
+
+        assert_eq!(config.host.port_map.len(), 0);
+    }
+
+    #[test]
+    fn test_bootloader_fatfs_product_bundle() {
+        let pb = ProductBundleV2 {
+            product_name: String::default(),
+            product_version: String::default(),
+            partitions: PartitionsConfig {
+                bootloader_partitions: vec![BootloaderPartition {
+                    partition_type: "fat".into(),
+                    name: Some("some-efi-shell.fatfs".into()),
+                    image: "partitions/bootloaders/some-efi-shell.fat".into(),
+                }],
+                hardware_revision: "x64".into(),
+                ..Default::default()
+            },
+
+            sdk_version: String::default(),
+            system_a: Some(vec![]),
+            system_b: None,
+            system_r: None,
+            repositories: vec![],
+            update_package_hash: None,
+            virtual_devices_path: None,
+        };
+        let device = VirtualDeviceV1 {
+            name: "FakeDevice".to_string(),
+            description: Some("A fake virtual device".to_string()),
+            kind: ElementType::VirtualDevice,
+            hardware: Hardware {
+                cpu: Cpu { arch: CpuArchitecture::X64 },
+                audio: AudioDevice { model: AudioModel::Hda },
+                storage: DataAmount { quantity: 512, units: DataUnits::Megabytes },
+                inputs: InputDevice { pointing_device: PointingDevice::Mouse },
+                memory: DataAmount { quantity: 4, units: DataUnits::Gigabytes },
+                window_size: Screen { height: 480, width: 640, units: ScreenUnits::Pixels },
+            },
+            ports: None,
+        };
+
+        // Run the conversion, then assert everything in the config matches the manifest data.
+        let config =
+            convert_v2_bundle_to_configs(&pb, &device).expect("convert_v2_bundle_to_configs");
+        assert_eq!(config.device.audio, device.hardware.audio);
+        assert_eq!(config.device.cpu.architecture, device.hardware.cpu.arch);
+        assert_eq!(config.device.memory, device.hardware.memory);
+        assert_eq!(config.device.pointing_device, device.hardware.inputs.pointing_device);
+        assert_eq!(config.device.screen, device.hardware.window_size);
+        assert_eq!(config.device.storage, device.hardware.storage);
+
+        assert_eq!(
+            config.guest.disk_image,
+            Some(DiskImage::Fat("partitions/bootloaders/some-efi-shell.fat".into()))
+        );
+        assert!(config.guest.zbi_image.is_none());
+
+        assert!(config.guest.kernel_image.is_none());
 
         assert_eq!(config.host.port_map.len(), 0);
     }

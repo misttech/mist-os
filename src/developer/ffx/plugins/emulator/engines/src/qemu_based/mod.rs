@@ -142,15 +142,18 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
         fs::create_dir_all(&instance_root)
             .map_err(|e| bug!("Error creating {instance_root:?}: {e}"))?;
 
-        let kernel_name = emu_config.guest.kernel_image.file_name().ok_or_else(|| {
-            bug!("cannot read kernel file name '{:?}'", emu_config.guest.kernel_image)
-        })?;
-        let kernel_path = instance_root.join(kernel_name);
-        if kernel_path.exists() && reuse {
-            tracing::debug!("Using existing file for {:?}", kernel_path.file_name().unwrap());
-        } else {
-            fs::copy(&emu_config.guest.kernel_image, &kernel_path)
-                .map_err(|e| bug!("cannot stage kernel file: {e}"))?;
+        if let Some(kernel_image) = &emu_config.guest.kernel_image {
+            let kernel_name = kernel_image.file_name().ok_or_else(|| {
+                bug!("cannot read kernel file name '{:?}'", emu_config.guest.kernel_image)
+            })?;
+            let kernel_path = instance_root.join(kernel_name);
+            if kernel_path.exists() && reuse {
+                tracing::debug!("Using existing file for {:?}", kernel_path.file_name().unwrap());
+            } else {
+                fs::copy(&kernel_image, &kernel_path)
+                    .map_err(|e| bug!("cannot stage kernel file: {e}"))?;
+            }
+            updated_guest.kernel_image = Some(kernel_path);
         }
 
         // If the kernel is an efi image, or has no zbi, skip the zbi processing.
@@ -234,18 +237,20 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
                             bug!("Failed to persist temp Fxfs image to {dest_path:?}: {e}")
                         })?;
                     }
+                    // FAT does not need to be resized.
+                    DiskImage::Fat(_) => (),
                 };
             }
             // Update the guest config to reference the staged disk image.
             updated_guest.disk_image = match disk_image {
                 DiskImage::Fvm(_) => Some(DiskImage::Fvm(dest_path)),
                 DiskImage::Fxfs(_) => Some(DiskImage::Fxfs(dest_path)),
+                DiskImage::Fat(_) => Some(disk_image.clone()),
             };
         } else {
             updated_guest.disk_image = None;
         }
 
-        updated_guest.kernel_image = kernel_path;
         updated_guest.zbi_image = zbi_path;
         if emu_config.guest.is_efi() {
             let dest = instance_root.join("OVMF_VARS.fd");
@@ -886,6 +891,7 @@ mod tests {
     use ffx_config::ConfigLevel;
     use serde::{Deserialize, Serialize};
     use std::io::Read;
+    use std::os::unix::fs::PermissionsExt as _;
     use std::os::unix::net::UnixListener;
     use tempfile::{tempdir, TempDir};
 
@@ -971,7 +977,7 @@ mod tests {
             .set(json!(root.display().to_string()))
             .await?;
 
-        guest.kernel_image = kernel_path;
+        guest.kernel_image = Some(kernel_path);
         guest.zbi_image = Some(zbi_path);
         guest.disk_image = Some(disk_image_path);
 
@@ -1012,7 +1018,7 @@ mod tests {
         let ctx = mock_modules::get_host_tool_context();
         ctx.expect().returning(|_| Ok(PathBuf::from("echo")));
 
-        write_to(&emu_config.guest.kernel_image, ORIGINAL)
+        write_to(&emu_config.guest.kernel_image.clone().expect("test kernel filename"), ORIGINAL)
             .map_err(|e| bug!("cannot write original value to kernel file: {e}"))?;
         write_to(emu_config.guest.disk_image.as_ref().unwrap(), ORIGINAL)
             .map_err(|e| bug!("cannot write original value to disk image file: {e}"))?;
@@ -1025,7 +1031,7 @@ mod tests {
 
         let actual = updated.map_err(|e| bug!("cannot get updated guest config: {e}"))?;
         let expected = GuestConfig {
-            kernel_image: root.join(instance_name).join("kernel"),
+            kernel_image: Some(root.join(instance_name).join("kernel")),
             zbi_image: Some(root.join(instance_name).join("zbi")),
             disk_image: Some(
                 disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
@@ -1035,7 +1041,7 @@ mod tests {
         assert_eq!(actual, expected);
 
         // Test no reuse when old files exist. The original files should be overwritten.
-        write_to(&emu_config.guest.kernel_image, UPDATED)
+        write_to(&emu_config.guest.kernel_image.clone().expect("kernel image name"), UPDATED)
             .map_err(|e| bug!("cannot write updated value to kernel file: {e}"))?;
         write_to(emu_config.guest.disk_image.as_ref().unwrap(), UPDATED)
             .map_err(|e| bug!("cannot write updated value to disk image file: {e}"))?;
@@ -1048,7 +1054,7 @@ mod tests {
 
         let actual = updated.map_err(|e| bug!("cannot get updated guest config, reuse: {e}"))?;
         let expected = GuestConfig {
-            kernel_image: root.join(instance_name).join("kernel"),
+            kernel_image: Some(root.join(instance_name).join("kernel")),
             zbi_image: Some(root.join(instance_name).join("zbi")),
             disk_image: Some(
                 disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
@@ -1057,9 +1063,12 @@ mod tests {
         };
         assert_eq!(actual, expected);
 
-        eprintln!("Reading contents from {}", actual.kernel_image.display());
+        eprintln!(
+            "Reading contents from {}",
+            actual.kernel_image.clone().expect("kernel file path").display()
+        );
         eprintln!("Reading contents from {}", actual.disk_image.as_ref().unwrap().display());
-        let mut kernel = File::open(&actual.kernel_image)
+        let mut kernel = File::open(&actual.kernel_image.clone().expect("kernel file path"))
             .map_err(|e| bug!("cannot open overwritten kernel file for read: {e}"))?;
         let mut disk_image = File::open(&*actual.disk_image.unwrap())
             .map_err(|e| bug!("cannot open overwritten disk image file for read: {e}"))?;
@@ -1109,7 +1118,7 @@ mod tests {
         ctx.expect().returning(|_| Ok(PathBuf::from("echo")));
 
         // This checks if --reuse is true, but the directory isn't there to reuse; should succeed.
-        write_to(&emu_config.guest.kernel_image, ORIGINAL)
+        write_to(&emu_config.guest.kernel_image.clone().expect("kernel file path"), ORIGINAL)
             .expect("cannot write original value to kernel file");
         write_to(emu_config.guest.disk_image.as_ref().unwrap(), ORIGINAL)
             .expect("cannot write original value to disk image file");
@@ -1122,7 +1131,7 @@ mod tests {
 
         let actual = updated.expect("cannot get updated guest config");
         let expected = GuestConfig {
-            kernel_image: root.join(instance_name).join("kernel"),
+            kernel_image: Some(root.join(instance_name).join("kernel")),
             zbi_image: Some(root.join(instance_name).join("zbi")),
             disk_image: Some(
                 disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
@@ -1133,7 +1142,7 @@ mod tests {
 
         // Test reuse. Note that the ZBI file isn't actually copied in the test, since we replace
         // the ZBI tool with an "echo" command.
-        write_to(&emu_config.guest.kernel_image, UPDATED)
+        write_to(&emu_config.guest.kernel_image.clone().expect("kernel file path"), UPDATED)
             .expect("cannot write updated value to kernel file");
         write_to(emu_config.guest.disk_image.as_ref().unwrap(), UPDATED)
             .expect("cannot write updated value to disk image file");
@@ -1146,7 +1155,7 @@ mod tests {
 
         let actual = updated.expect("cannot get updated guest config, reuse");
         let expected = GuestConfig {
-            kernel_image: root.join(instance_name).join("kernel"),
+            kernel_image: Some(root.join(instance_name).join("kernel")),
             zbi_image: Some(root.join(instance_name).join("zbi")),
             disk_image: Some(
                 disk_image_format.as_disk_image(root.join(instance_name).join("disk")),
@@ -1155,9 +1164,12 @@ mod tests {
         };
         assert_eq!(actual, expected);
 
-        eprintln!("Reading contents from {}", actual.kernel_image.display());
-        let mut kernel =
-            File::open(&actual.kernel_image).expect("cannot open reused kernel file for read");
+        eprintln!(
+            "Reading contents from {}",
+            actual.kernel_image.clone().expect("kernel file path").display()
+        );
+        let mut kernel = File::open(&actual.kernel_image.expect("kernel file path"))
+            .expect("cannot open reused kernel file for read");
         let mut fvm =
             File::open(&*actual.disk_image.unwrap()).expect("cannot open reused fvm file for read");
 
@@ -1207,7 +1219,11 @@ mod tests {
 
         const EXPECTED_DATA: &[u8] = b"hello, world";
 
-        std::fs::write(&emu_config.guest.kernel_image, "whatever").expect("writing kernel image");
+        std::fs::write(
+            &emu_config.guest.kernel_image.as_ref().expect("kernel file path"),
+            "whatever",
+        )
+        .expect("writing kernel image");
         std::fs::write(emu_config.guest.disk_image.as_ref().unwrap(), EXPECTED_DATA)
             .expect("writing guest image");
         // Make the input file read-only to ensure that the staged version is RW.
@@ -1226,7 +1242,7 @@ mod tests {
                 .expect("Failed to get guest config");
 
         let expected = GuestConfig {
-            kernel_image: root.join(instance_name).join("kernel"),
+            kernel_image: Some(root.join(instance_name).join("kernel")),
             zbi_image: Some(root.join(instance_name).join("zbi")),
             disk_image: Some(DiskImage::Fxfs(root.join(instance_name).join("disk"))),
             ..Default::default()
@@ -1255,8 +1271,12 @@ mod tests {
 
         let root = setup(&env.context, &mut emu_config.guest, &temp, DiskImageFormat::Fvm).await?;
 
+        let mock_tool = temp.path().join("echo");
+        fs::write(&mock_tool, "#!/bin/bash\necho ok\n").expect("mock_tool_contents");
+        fs::set_permissions(&mock_tool, fs::Permissions::from_mode(0o770)).unwrap();
+
         let ctx = mock_modules::get_host_tool_context();
-        ctx.expect().returning(|_| Ok(PathBuf::from("echo")));
+        ctx.expect().returning(move |_| Ok(mock_tool.clone()));
 
         let src = emu_config.guest.zbi_image.expect("zbi image path");
         let dest = root.join("dest.zbi");

@@ -134,15 +134,22 @@ impl EmulatorEngine for QemuEngine {
         let mut cmd = Command::new(&self.data.get_emulator_binary());
         let emulator_configuration = self.data.get_emulator_configuration();
         cmd.args(&emulator_configuration.flags.args);
-        let extra_args = emulator_configuration
-            .flags
-            .kernel_args
-            .iter()
-            .map(|x| x.to_string())
-            .collect::<Vec<_>>()
-            .join(" ");
-        if extra_args.len() > 0 {
-            cmd.args(["-append", &extra_args]);
+
+        // Can't have kernel args if there is no kernel, but if there is a custom configuration template,
+        // add them anyway since the configuration and the custom template could be out of sync.
+        if emulator_configuration.guest.kernel_image.is_some()
+            || emulator_configuration.runtime.config_override
+        {
+            let extra_args = emulator_configuration
+                .flags
+                .kernel_args
+                .iter()
+                .map(|x| x.to_string())
+                .collect::<Vec<_>>()
+                .join(" ");
+            if extra_args.len() > 0 {
+                cmd.args(["-append", &extra_args]);
+            }
         }
         if self.data.get_emulator_configuration().flags.envs.len() > 0 {
             // Add environment variables if not already present.
@@ -235,8 +242,12 @@ impl QemuBasedEngine for QemuEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::EngineBuilder;
     use emulator_instance::NetworkingMode;
     use std::ffi::OsStr;
+    use std::fs;
+    use std::os::unix::fs::PermissionsExt as _;
+    use tempfile::tempdir;
 
     #[test]
     fn test_build_emulator_cmd() {
@@ -271,5 +282,58 @@ mod tests {
         let cmd = test_engine.build_emulator_cmd();
         assert_eq!(cmd.get_program(), program_name);
         assert_eq!(cmd.get_envs().collect::<Vec<_>>(), []);
+    }
+
+    #[fuchsia::test]
+    async fn test_build_cmd_with_custom_template() {
+        let temp = tempdir().expect("cannot get tempdir");
+        let emu_instances = EmulatorInstances::new(temp.path().to_owned());
+        let mock_tool = temp.path().join("echo");
+        fs::write(&mock_tool, "#!/bin/bash\necho ok\n").expect("mock_tool_contents");
+        fs::set_permissions(&mock_tool, fs::Permissions::from_mode(0o770)).unwrap();
+
+        let ctx = crate::qemu_based::mock_modules::get_host_tool_context();
+        ctx.expect().returning(move |_| Ok(mock_tool.clone()));
+        let mut cfg = EmulatorConfiguration::default();
+        let template_file = temp.path().join("custom-template.json");
+        fs::write(
+            &template_file,
+            r#"
+         {
+         "args": [
+             "-kernel",
+             "boot-shim.bin",
+             "-initrd",
+             "test.zbi"
+         ],
+         "envs": {},
+         "features": [],
+         "kernel_args": ["zircon.nodename=some-emu","TERM=dumb"],
+         "options": []
+         }"#,
+        )
+        .expect("custom template contents");
+        cfg.runtime.template = Some(template_file);
+        cfg.runtime.config_override = true;
+        let engine = EngineBuilder::new(emu_instances.clone())
+            .config(cfg.clone())
+            .engine_type(EngineType::Qemu)
+            .build()
+            .await
+            .expect("engine built");
+
+        let cmd = engine.build_emulator_cmd();
+        let actual: Vec<_> = cmd.get_args().collect();
+
+        let expected = vec![
+            "-kernel",
+            "boot-shim.bin",
+            "-initrd",
+            "test.zbi",
+            "-append",
+            "TERM=dumb zircon.nodename=some-emu",
+        ];
+
+        assert_eq!(actual, expected)
     }
 }
