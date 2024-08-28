@@ -97,8 +97,8 @@ class FakeLogSink : public fuchsia::logger::LogSink {
 
   /// Send this socket to be drained, using the structured logs format.
   ///
-  /// See //docs/reference/diagnostics/logs/encoding.md for what is expected to
-  /// be received over the socket.
+  /// See https://fuchsia.dev/fuchsia-src/reference/platform-spec/diagnostics/logs-encoding?hl=en
+  /// for what is expected to be received over the socket.
   void ConnectStructured(::zx::socket socket) override {
     Wait* wait = new Wait();
     waits_.push_back(wait);

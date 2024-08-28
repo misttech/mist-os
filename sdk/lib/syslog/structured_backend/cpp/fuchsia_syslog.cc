@@ -175,7 +175,8 @@ struct Field final {
 };
 
 // HeaderField structure for a Record
-// see https://fuchsia.dev/fuchsia-src/reference/diagnostics/logs/encoding?hl=en#header
+// see
+// https://fuchsia.dev/fuchsia-src/reference/platform-spec/diagnostics/logs-encoding?hl=en#header
 struct HeaderFields final {
   using Type = Field<0, 3>;
   using SizeWords = Field<4, 15>;
@@ -184,7 +185,8 @@ struct HeaderFields final {
 };
 
 // ArgumentField structure for an Argument
-// see https://fuchsia.dev/fuchsia-src/reference/diagnostics/logs/encoding?hl=en#arguments
+// see
+// https://fuchsia.dev/fuchsia-src/reference/platform-spec/diagnostics/logs-encoding?hl=en#arguments
 struct ArgumentFields {
   using Type = Field<0, 3>;
   using SizeWords = Field<4, 15>;
