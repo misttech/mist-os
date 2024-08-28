@@ -102,7 +102,6 @@ pub fn parse_features(entries: &Vec<String>) -> Result<Features, Error> {
             ("custom_artifacts", _) => features.custom_artifacts = true,
             ("ashmem", _) => features.ashmem = true,
             ("framebuffer", _) => features.framebuffer = true,
-            ("framebuffer2", _) => features.framebuffer = true,
             ("gralloc", _) => features.gralloc = true,
             ("magma", _) => features.magma = true,
             ("network_manager", _) => features.network_manager = true,
