@@ -148,7 +148,7 @@ class CatapultConverterTest(unittest.TestCase):
                     "fuchsia.suite1: bar\n"
                 )
             with self.assertRaises(ValueError) as context:
-                allowlist = metrics_allowlist.MetricsAllowlist(metrics_file)
+                metrics_allowlist.MetricsAllowlist(metrics_file)
         self.assertIn(
             "[no-summarize-metrics] can only appear at the beginning of the file",
             str(context.exception),
