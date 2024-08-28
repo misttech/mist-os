@@ -289,7 +289,6 @@ class EventHandlerBase(object):
 
     async def _handle_request_helper(self, msg: FidlMessage):
         ordinal = parse_ordinal(msg)
-        txid = parse_txid(msg)
         handles = [x.take() for x in msg[1]]
         decoded_msg = decode_fidl_response(bytes=msg[0], handles=handles)
         method = self.method_map[ordinal]

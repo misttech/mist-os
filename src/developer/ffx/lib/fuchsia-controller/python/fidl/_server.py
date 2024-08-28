@@ -7,13 +7,8 @@ import typing
 from inspect import getframeinfo, stack
 
 import fuchsia_controller_py as fc
-from fidl_codec import (
-    decode_fidl_request,
-    decode_fidl_response,
-    encode_fidl_message,
-)
+from fidl_codec import decode_fidl_request, encode_fidl_message
 
-from ._client import FidlClient
 from ._fidl_common import *
 from ._ipc import GlobalHandleWaker
 

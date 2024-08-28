@@ -372,7 +372,6 @@ def type_annotation(type_ir, root_ir, recurse_guard=None) -> type:
     kind = type_ir["kind"]
     if kind == "identifier":
         ident = type_ir.raw_identifier()
-        ident_kind = get_kind_by_identifier(ident, root_ir)
         ty = get_type_by_identifier(ident, root_ir, recurse_guard)
         return wrap_optional(ty)
     elif kind == "primitive":

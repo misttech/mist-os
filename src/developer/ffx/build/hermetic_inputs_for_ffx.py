@@ -6,7 +6,6 @@
 import argparse
 import json
 import sys
-from typing import List
 
 
 def main() -> int:
