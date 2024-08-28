@@ -20,8 +20,10 @@ pub struct PartitionInfo {
 
 impl PartitionInfo {
     fn from_entry(entry: &format::PartitionTableEntry) -> Result<Self, Error> {
+        let label =
+            String::from_utf16(entry.name.split(|v| *v == 0u16).next().unwrap())?.to_owned();
         Ok(Self {
-            label: String::from_utf16(&entry.name)?.trim_end_matches('\0').to_owned(),
+            label,
             type_guid: uuid::Uuid::from_bytes_le(entry.type_guid),
             instance_guid: uuid::Uuid::from_bytes_le(entry.instance_guid),
             start_block: entry.first_lba,
@@ -326,6 +328,79 @@ mod tests {
                 assert_eq!(partition.start_block, 7);
                 assert_eq!(partition.num_blocks, 1);
                 assert!(manager.partitions().get(&2).is_none());
+            }.fuse() => {},
+        );
+    }
+
+    #[fuchsia::test]
+    async fn load_formatted_gpt_with_extra_bytes_in_partition_name() {
+        const PART_TYPE_GUID: [u8; 16] = [2u8; 16];
+        const PART_INSTANCE_GUID: [u8; 16] = [2u8; 16];
+        const PART_NAME: &str = "part\0extrastuff";
+
+        let vmo = zx::Vmo::create(4096).unwrap();
+        format_gpt(
+            &vmo,
+            512,
+            vec![PartitionDescriptor {
+                label: PART_NAME.to_string(),
+                type_guid: uuid::Uuid::from_bytes(PART_TYPE_GUID),
+                instance_guid: uuid::Uuid::from_bytes(PART_INSTANCE_GUID),
+                start_block: 4,
+                num_blocks: 1,
+            }],
+        );
+        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let (client, server_end) =
+            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+
+        futures::select!(
+            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
+                unreachable!();
+            },
+            _ = async {
+                let manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                    .await
+                    .expect("load should succeed");
+                let partition = manager.partitions().get(&0).expect("No entry found");
+                // The name should have everything after the first nul byte stripped.
+                assert_eq!(partition.label, "part");
+            }.fuse() => {},
+        );
+    }
+
+    #[fuchsia::test]
+    async fn load_formatted_gpt_with_empty_partition_name() {
+        const PART_TYPE_GUID: [u8; 16] = [2u8; 16];
+        const PART_INSTANCE_GUID: [u8; 16] = [2u8; 16];
+        const PART_NAME: &str = "";
+
+        let vmo = zx::Vmo::create(4096).unwrap();
+        format_gpt(
+            &vmo,
+            512,
+            vec![PartitionDescriptor {
+                label: PART_NAME.to_string(),
+                type_guid: uuid::Uuid::from_bytes(PART_TYPE_GUID),
+                instance_guid: uuid::Uuid::from_bytes(PART_INSTANCE_GUID),
+                start_block: 4,
+                num_blocks: 1,
+            }],
+        );
+        let server = Arc::new(FakeServer::from_vmo(512, vmo));
+        let (client, server_end) =
+            fidl::endpoints::create_proxy::<fvolume::VolumeMarker>().unwrap();
+
+        futures::select!(
+            _ = server.serve(server_end.into_stream().unwrap()).fuse() => {
+                unreachable!();
+            },
+            _ = async {
+                let manager = GptManager::open(RemoteBlockClient::new(client).await.unwrap())
+                    .await
+                    .expect("load should succeed");
+                let partition = manager.partitions().get(&0).expect("No entry found");
+                assert_eq!(partition.label, "");
             }.fuse() => {},
         );
     }
