@@ -118,7 +118,10 @@
     ],
     expose: [
         {
-            service: "fuchsia.hardware.rtc.Service",
+            service: [
+                "fuchsia.hardware.rtc.Service",
+                "fuchsia.hardware.sockettunnel.Service",
+            ],
             from: "#full-drivers",
         },
     ],
