@@ -213,7 +213,6 @@ impl Directory for Simple {
             .handle(|object_request| self.open_impl(scope, path, flags, object_request));
     }
 
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     fn open3(
         self: Arc<Self>,
         scope: ExecutionScope,
@@ -367,7 +366,6 @@ impl ToRequestFlags for fio::OpenFlags {
     }
 }
 
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
 impl ToRequestFlags for fio::Flags {
     fn to_request_flags(&self) -> RequestFlags {
         RequestFlags::Open3(*self)

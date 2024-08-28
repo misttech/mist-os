@@ -9,7 +9,6 @@ use crate::directory::dirents_sink;
 use crate::directory::traversal_position::TraversalPosition;
 use crate::execution_scope::ExecutionScope;
 use crate::node::Node;
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
 use crate::object_request::ObjectRequestRef;
 use crate::path::Path;
 use fidl::endpoints::ServerEnd;
@@ -93,7 +92,6 @@ pub trait Directory: Node {
     /// This method is called via either `Open3` or `Reopen` fuchsia.io methods. Any errors returned
     /// during this process will be sent via an epitaph on the `object_request` channel before
     /// closing the channel.
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     fn open3(
         self: Arc<Self>,
         scope: ExecutionScope,

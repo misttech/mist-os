@@ -21,10 +21,8 @@ use fuchsia_zircon_status::Status;
 use std::convert::TryInto as _;
 use storage_trace::{self as trace, TraceFutureExt};
 
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
-use crate::{common::CreationMode, ObjectRequest, ObjectRequestRef, ProtocolsExt};
-#[cfg(not(fuchsia_api_level_at_least = "HEAD"))]
-use fidl::endpoints::ControlHandle as _;
+use crate::common::CreationMode;
+use crate::{ObjectRequest, ObjectRequestRef, ProtocolsExt};
 
 /// Return type for `BaseConnection::handle_request`.
 pub enum ConnectionState {
@@ -252,8 +250,6 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
             fio::DirectoryRequest::CreateSymlink { responder, .. } => {
                 responder.send(Err(Status::NOT_SUPPORTED.into_raw()))?;
             }
-            // TODO(https://fxbug.dev/348698584): Support Open3 at all API levels.
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             fio::DirectoryRequest::Open3 {
                 path,
                 mut flags,
@@ -277,19 +273,6 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
                 // Since open typically spawns a task, yield to the executor now to give that task a
                 // chance to run before we try and process the next request for this directory.
                 yield_to_executor().await;
-            }
-            #[cfg(not(fuchsia_api_level_at_least = "HEAD"))]
-            fio::DirectoryRequest::Open3 {
-                path: _,
-                flags: _,
-                options: _,
-                object,
-                control_handle: _,
-            } => {
-                let (_, control_handle) = ServerEnd::<fio::NodeMarker>::new(object)
-                    .into_stream_and_control_handle()
-                    .unwrap();
-                control_handle.shutdown_with_epitaph(Status::NOT_SUPPORTED);
             }
         }
         Ok(ConnectionState::Alive)
@@ -351,7 +334,6 @@ impl<DirectoryType: Directory> BaseConnection<DirectoryType> {
         directory.open(self.scope.clone(), flags, path, server_end);
     }
 
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     fn handle_open3(
         &self,
         path: String,

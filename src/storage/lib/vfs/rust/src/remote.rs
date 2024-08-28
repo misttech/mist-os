@@ -10,9 +10,7 @@ mod tests;
 use crate::directory::entry::{DirectoryEntry, EntryInfo, GetEntryInfo, OpenRequest};
 use crate::execution_scope::ExecutionScope;
 use crate::path::Path;
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
-use crate::ObjectRequestRef;
-use crate::ToObjectRequest as _;
+use crate::{ObjectRequestRef, ToObjectRequest as _};
 use fidl::endpoints::ServerEnd;
 use fidl_fuchsia_io as fio;
 use fuchsia_zircon_status::Status;
@@ -27,7 +25,6 @@ pub trait RemoteLike {
         server_end: ServerEnd<fio::NodeMarker>,
     );
 
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     fn open3(
         self: Arc<Self>,
         _scope: ExecutionScope,
@@ -102,7 +99,6 @@ impl<T: GetRemoteDir> RemoteLike for T {
         });
     }
 
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     fn open3(
         self: Arc<Self>,
         _scope: ExecutionScope,

@@ -770,7 +770,6 @@ impl VfsDirectory for FxDirectory {
         });
     }
 
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     fn open3(
         self: Arc<Self>,
         _scope: ExecutionScope,
@@ -2091,7 +2090,6 @@ mod tests {
         fixture.close().await;
     }
 
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     #[fuchsia::test]
     async fn test_create_dir_using_flags_and_options() {
         let fixture = TestFixture::new().await;
@@ -2240,7 +2238,6 @@ mod tests {
         fixture.close().await;
     }
 
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     #[fuchsia::test]
     async fn test_create_file_using_flags_and_options() {
         let fixture = TestFixture::new().await;

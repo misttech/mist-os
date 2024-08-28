@@ -100,7 +100,6 @@ pub enum RequestFlags {
     /// fuchsia.io/Directory.Open1 (io1)
     Open1(fio::OpenFlags),
     /// fuchsia.io/Directory.Open3 (io2)
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     Open3(fio::Flags),
 }
 
@@ -110,7 +109,6 @@ impl From<fio::OpenFlags> for RequestFlags {
     }
 }
 
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
 impl From<fio::Flags> for RequestFlags {
     fn from(value: fio::Flags) -> Self {
         RequestFlags::Open3(value)
@@ -173,7 +171,6 @@ impl<'a> OpenRequest<'a> {
                 // tail recursion optimization, but that shouldn't occur in practice.
                 Ok(())
             }
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             OpenRequest {
                 scope,
                 request_flags: RequestFlags::Open3(flags),
@@ -197,7 +194,6 @@ impl<'a> OpenRequest<'a> {
                 }
                 file::serve(file, scope, &flags, object_request)
             }
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             OpenRequest {
                 scope,
                 request_flags: RequestFlags::Open3(flags),
@@ -226,7 +222,6 @@ impl<'a> OpenRequest<'a> {
                 }
                 symlink::serve(service, scope, &flags, object_request)
             }
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             OpenRequest {
                 scope,
                 request_flags: RequestFlags::Open3(flags),
@@ -255,7 +250,6 @@ impl<'a> OpenRequest<'a> {
                 }
                 service::serve(service, scope, &flags, object_request)
             }
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             OpenRequest {
                 scope,
                 request_flags: RequestFlags::Open3(flags),
@@ -295,7 +289,6 @@ impl<'a> OpenRequest<'a> {
                 }
                 Ok(())
             }
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             OpenRequest {
                 scope,
                 request_flags: RequestFlags::Open3(flags),
@@ -337,7 +330,6 @@ impl<'a> OpenRequest<'a> {
                     Err(s) => object_request.shutdown(s),
                 }
             }),
-            #[cfg(fuchsia_api_level_at_least = "HEAD")]
             RequestFlags::Open3(flags) => {
                 scope.clone().spawn(async move {
                     match entry

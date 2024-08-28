@@ -456,7 +456,6 @@ impl VfsDirectory for BlobDirectory {
         });
     }
 
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     fn open3(
         self: Arc<Self>,
         scope: ExecutionScope,

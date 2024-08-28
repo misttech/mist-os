@@ -320,7 +320,6 @@ pub async fn open_dir_checked(
     open_dir(dir, flags, path).await.expect("open_dir failed")
 }
 
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
 pub async fn open3_dir(
     dir: &fio::DirectoryProxy,
     flags: fio::Flags,
@@ -333,7 +332,6 @@ pub async fn open3_dir(
     Ok(proxy)
 }
 
-#[cfg(fuchsia_api_level_at_least = "HEAD")]
 pub async fn open3_dir_checked(
     dir: &fio::DirectoryProxy,
     flags: fio::Flags,

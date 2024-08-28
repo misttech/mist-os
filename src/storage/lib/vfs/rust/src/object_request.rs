@@ -48,7 +48,6 @@ impl ObjectRequest {
         Self { object_request, what_to_send, attributes, create_attributes, truncate }
     }
 
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     pub fn new3(flags: fio::Flags, options: &fio::Options, object_request: fidl::Channel) -> Self {
         ObjectRequest::new(
             object_request,
@@ -75,7 +74,6 @@ impl ObjectRequest {
         self.create_attributes.as_deref()
     }
 
-    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     pub fn options(&self) -> fio::Options {
         fio::Options {
             attributes: (!self.attributes.is_empty()).then_some(self.attributes),
