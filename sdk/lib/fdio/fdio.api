@@ -4,7 +4,7 @@
   "pkg/fdio/include/lib/fdio/fdio.h": "93041254e1fd5bfa15227b8152ffd6a8",
   "pkg/fdio/include/lib/fdio/io.h": "03bf0253ef3cfaff51ce2ecf4cda5cbd",
   "pkg/fdio/include/lib/fdio/limits.h": "1a7820e84cfc3e672169277d64121530",
-  "pkg/fdio/include/lib/fdio/namespace.h": "b4fad68fbb0ebfa078b722397b980731",
+  "pkg/fdio/include/lib/fdio/namespace.h": "79a5d5e306ebf9aadf7690aefba31cc8",
   "pkg/fdio/include/lib/fdio/spawn.h": "0ad1079ef484519acbe8c93ea427a07a",
   "pkg/fdio/include/lib/fdio/unsafe.h": "ea33049c1786741023b31b32a844176c",
   "pkg/fdio/include/lib/fdio/vfs.h": "5a95bbf5166e973a6aff91495c23a9f0",

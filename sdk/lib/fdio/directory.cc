@@ -81,6 +81,17 @@ zx_status_t fdio_open_at(fidl::UnownedClientEnd<fio::Directory> directory, std::
       .status();
 }
 
+zx_status_t fdio_open3_at(fidl::UnownedClientEnd<fio::Directory> directory, std::string_view path,
+                          fuchsia_io::wire::Flags flags, zx::channel object) {
+  if (!directory.is_valid()) {
+    return ZX_ERR_UNAVAILABLE;
+  }
+
+  return fidl::WireCall(directory)
+      ->Open3(fidl::StringView::FromExternal(path), flags, {}, std::move(object))
+      .status();
+}
+
 }  // namespace fdio_internal
 
 __EXPORT

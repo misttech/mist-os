@@ -61,12 +61,20 @@ struct fdio_namespace : public fbl::RefCounted<fdio_namespace> {
   zx::result<fbl::RefPtr<fdio>> Open(fbl::RefPtr<LocalVnode> vn, std::string_view path,
                                      fuchsia_io::wire::OpenFlags flags) const;
 
-  // Connect to a remote object within the namespace.
+  // Connect to a remote object within the namespace via fuchsia.io/Directory.Open1.
   //
   // Returns an error if |path| does not exist.
   // Returns an error if |path| references a non-remote object.
-  zx_status_t Connect(std::string_view path, fuchsia_io::wire::OpenFlags flags,
-                      fidl::ServerEnd<fuchsia_io::Node> server_end) const;
+  // TODO(https://fxbug.dev/324111518): Remove this after all callers are migrated to |Connect|.
+  zx_status_t ConnectDeprecated(std::string_view path, fuchsia_io::wire::OpenFlags flags,
+                                fidl::ServerEnd<fuchsia_io::Node> server_end) const;
+
+  // Connect to a remote object within the namespace via fuchsia.io/Directory.Open3.
+  //
+  // Returns an error if |path| does not exist.
+  // Returns an error if |path| references a non-remote object.
+  zx_status_t Connect(std::string_view path, fuchsia_io::wire::Flags flags,
+                      zx::channel object) const;
 
   // Attaches a local node defined by |on_open| to |path| within the current namespace.
   zx_status_t Bind(std::string_view path, fdio_open_local_func_t on_open, void* context);

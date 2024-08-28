@@ -28,6 +28,7 @@ readonly RAW_LINES="// Copyright 2022 The Fuchsia Authors. All rights reserved.
 #![allow(dead_code)]
 #![allow(non_camel_case_types)]
 #![allow(non_snake_case)]
+#![allow(unused_results)]
 "
 
 readonly OUTPUT="src/fdio_sys.rs"
