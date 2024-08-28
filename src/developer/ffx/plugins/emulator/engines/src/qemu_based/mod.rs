@@ -253,15 +253,18 @@ pub(crate) trait QemuBasedEngine: EmulatorEngine {
 
         updated_guest.zbi_image = zbi_path;
         if emu_config.guest.is_efi() {
+            // Set the OVMF files
+            updated_guest.ovmf_code = get_host_tool(config::OVMF_CODE)
+                .await
+                .map_err(|e| bug!("cannot locate ovmf code: {e}"))?;
+            // vars is copied to the instance directory since it is not read-only.
+            let vars =
+                updated_guest.ovmf_code.parent().expect("ovmf has parent dir").join("OVMF_VARS.fd");
             let dest = instance_root.join("OVMF_VARS.fd");
             if !dest.exists() {
-                fs::copy(&emu_config.guest.ovmf_vars, &dest).map_err(|e| {
-                    bug!(
-                        "cannot copy ovmf vars file  from {:?} to {dest:?}: {e}",
-                        &emu_config.guest.ovmf_vars
-                    )
-                })?;
+                fs::copy(&vars, &dest).map_err(|e| bug!("cannot ovmf vars file: {e}"))?;
             }
+
             updated_guest.ovmf_vars = dest;
         }
         Ok(updated_guest)
