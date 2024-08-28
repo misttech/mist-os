@@ -9,7 +9,6 @@ use crate::arg_templates::process_flag_template;
 use crate::qemu_based::comms::{spawn_pipe_thread, QemuSocket};
 use crate::show_output;
 use async_trait::async_trait;
-use cfg_if::cfg_if;
 use emulator_instance::{
     AccelerationMode, ConsoleType, DiskImage, EmulatorConfiguration, EngineState, GuestConfig,
     NetworkingMode,
@@ -39,62 +38,45 @@ use std::time::{Duration, Instant};
 use std::{env, str};
 use tempfile::NamedTempFile;
 
-#[cfg(test)]
-use mockall::automock;
+pub(crate) async fn get_host_tool(name: &str) -> Result<PathBuf> {
+    let sdk = ffx_config::global_env_context()
+        .ok_or_else(|| bug!("loading global environment context"))?
+        .get_sdk()
+        .await?;
 
-#[cfg_attr(test, automock)]
-#[allow(dead_code)]
-mod modules {
-    use super::*;
+    // Attempts to get a host tool from the SDK manifest. If it fails, falls
+    // back to attempting to derive the path to the host tool binary by simply checking
+    // for its existence in `ffx`'s directory.
+    // TODO(https://fxbug.dev/42181753): When issues around including aemu in the sdk are resolved, this
+    // hack can be removed.
+    match ffx_config::get_host_tool(&sdk, name).await {
+        Ok(path) => Ok(path),
+        Err(error) => {
+            tracing::warn!(
+                "failed to get host tool {} from manifest. Trying local SDK dir: {}",
+                name,
+                error
+            );
+            let mut ffx_path = std::env::current_exe()
+                .map_err(|e| bug!("getting current ffx exe path for host tool {name}: {e}"))?;
+            ffx_path = std::fs::canonicalize(ffx_path.clone())
+                .map_err(|e| bug!("canonicalizing ffx path {ffx_path:?}: {e}"))?;
 
-    pub(crate) async fn get_host_tool(name: &str) -> Result<PathBuf> {
-        let sdk = ffx_config::global_env_context()
-            .ok_or_else(|| bug!("loading global environment context"))?
-            .get_sdk()
-            .await?;
+            let tool_path = ffx_path
+                .parent()
+                .ok_or_else(|| bug!("ffx path missing parent {ffx_path:?}"))?
+                .join(name);
 
-        // Attempts to get a host tool from the SDK manifest. If it fails, falls
-        // back to attempting to derive the path to the host tool binary by simply checking
-        // for its existence in `ffx`'s directory.
-        // TODO(https://fxbug.dev/42181753): When issues around including aemu in the sdk are resolved, this
-        // hack can be removed.
-        match ffx_config::get_host_tool(&sdk, name).await {
-            Ok(path) => Ok(path),
-            Err(error) => {
-                tracing::warn!(
-                    "failed to get host tool {} from manifest. Trying local SDK dir: {}",
-                    name,
-                    error
-                );
-                let mut ffx_path = std::env::current_exe()
-                    .map_err(|e| bug!("getting current ffx exe path for host tool {name}: {e}"))?;
-                ffx_path = std::fs::canonicalize(ffx_path.clone())
-                    .map_err(|e| bug!("canonicalizing ffx path {ffx_path:?}: {e}"))?;
-
-                let tool_path = ffx_path
-                    .parent()
-                    .ok_or_else(|| bug!("ffx path missing parent {ffx_path:?}"))?
-                    .join(name);
-
-                if tool_path.exists() {
-                    Ok(tool_path)
-                } else {
-                    return_bug!("{error}. Host tool '{name}' not found after checking in `ffx` directory as stopgap.")
-                }
+            if tool_path.exists() {
+                Ok(tool_path)
+            } else {
+                return_bug!("{error}. Host tool '{name}' not found after checking in `ffx` directory as stopgap.")
             }
         }
     }
 }
 
 const KNOCK_TARGET_TIMEOUT: Duration = Duration::from_secs(6);
-
-cfg_if! {
-    if #[cfg(test)] {
-        pub(crate) use self::mock_modules::get_host_tool;
-    } else {
-pub(crate) use self::modules::get_host_tool;
-    }
-}
 
 pub(crate) mod comms;
 pub(crate) mod femu;
@@ -891,11 +873,11 @@ mod tests {
         DataAmount, DataUnits, EmulatorInstanceData, EmulatorInstanceInfo, EmulatorInstances,
         EngineType, PortMapping,
     };
-    use ffx_config::ConfigLevel;
+    use ffx_config::{ConfigLevel, TestEnv};
     use serde::{Deserialize, Serialize};
     use std::io::Read;
-    use std::os::unix::fs::PermissionsExt as _;
     use std::os::unix::net::UnixListener;
+    use std::os::unix::prelude::PermissionsExt as _;
     use tempfile::{tempdir, TempDir};
 
     #[derive(Default, Serialize)]
@@ -942,6 +924,74 @@ mod tests {
         }
     }
 
+    pub(crate) async fn make_fake_sdk(env: &TestEnv) {
+        env.context
+            .query("sdk.root")
+            .level(Some(ConfigLevel::User))
+            .set(env.isolate_root.path().to_string_lossy().into())
+            .await
+            .expect("sdk.root setting");
+        let manifest_path = env.isolate_root.path().join("meta/manifest.json");
+        fs::create_dir_all(manifest_path.parent().unwrap()).expect("temp sdk dir");
+        fs::write(
+            &manifest_path,
+            r#"{ "arch": {  "host": "x86_64-linux-gnu",  "target": ["x64" ] },
+            "id": "9999",
+            "parts": [
+                {
+      "meta": "qemu_uefi_internal-meta.json",
+      "type": "companion_host_tool"
+    }],  "root": "..",
+  "schema_version": "1"}"#,
+        )
+        .expect("sdk manifest");
+
+        const ECHO_SCRIPT_CONTENTS: &str = "#!/bin/bash\necho \"$@\"";
+
+        let fake_qemu = env.isolate_root.path().join("fake_qemu");
+        fs::write(&fake_qemu, ECHO_SCRIPT_CONTENTS).expect("fake qemu");
+        fs::set_permissions(&fake_qemu, fs::Permissions::from_mode(0o770))
+            .expect("setting permissions");
+        env.context
+            .query("sdk.overrides.qemu_internal")
+            .level(Some(ConfigLevel::User))
+            .set(fake_qemu.to_string_lossy().into())
+            .await
+            .expect("qemu override");
+
+        let fake_aemu = env.isolate_root.path().join("fake_aemu");
+        fs::write(&fake_aemu, ECHO_SCRIPT_CONTENTS).expect("fake aemu");
+        fs::set_permissions(&fake_aemu, fs::Permissions::from_mode(0o770))
+            .expect("setting permissions");
+        env.context
+            .query("sdk.overrides.aemu_internal")
+            .level(Some(ConfigLevel::User))
+            .set(fake_qemu.to_string_lossy().into())
+            .await
+            .expect("aemu override");
+
+        let fake_fvm = env.isolate_root.path().join("fake_fvm");
+        fs::write(&fake_fvm, ECHO_SCRIPT_CONTENTS).expect("fake fvm");
+        fs::set_permissions(&fake_fvm, fs::Permissions::from_mode(0o770))
+            .expect("setting permissions");
+        env.context
+            .query("sdk.overrides.fvm")
+            .level(Some(ConfigLevel::User))
+            .set(fake_fvm.to_string_lossy().into())
+            .await
+            .expect("fvm override");
+
+        let fake_zbi = env.isolate_root.path().join("fake_zbi");
+        fs::write(&fake_zbi, ECHO_SCRIPT_CONTENTS).expect("fake zbi");
+        fs::set_permissions(&fake_zbi, fs::Permissions::from_mode(0o770))
+            .expect("setting permissions");
+        env.context
+            .query("sdk.overrides.zbi")
+            .level(Some(ConfigLevel::User))
+            .set(fake_zbi.to_string_lossy().into())
+            .await
+            .expect("zbi override");
+    }
     // Note that the caller MUST initialize the ffx_config environment before calling this function
     // since we override config values as part of the test. This looks like:
     //     let env = ffx_config::test_init().await?;
@@ -1011,15 +1061,13 @@ mod tests {
 
     async fn test_staging_no_reuse_common(disk_image_format: DiskImageFormat) -> Result<()> {
         let env = ffx_config::test_init().await?;
+        make_fake_sdk(&env).await;
         let temp = tempdir().map_err(|e| bug!("cannot get tempdir: {e}"))?;
         let instance_name = "test-instance";
         let mut emu_config = EmulatorConfiguration::default();
         emu_config.device.storage = DataAmount { quantity: 32, units: DataUnits::Bytes };
 
         let root = setup(&env.context, &mut emu_config.guest, &temp, disk_image_format).await?;
-
-        let ctx = mock_modules::get_host_tool_context();
-        ctx.expect().returning(|_| Ok(PathBuf::from("echo")));
 
         write_to(&emu_config.guest.kernel_image.clone().expect("test kernel filename"), ORIGINAL)
             .map_err(|e| bug!("cannot write original value to kernel file: {e}"))?;
@@ -1110,15 +1158,13 @@ mod tests {
 
     async fn test_staging_with_reuse_common(disk_image_format: DiskImageFormat) -> Result<()> {
         let env = ffx_config::test_init().await?;
+        make_fake_sdk(&env).await;
         let temp = tempdir().expect("cannot get tempdir");
         let instance_name = "test-instance";
         let mut emu_config = EmulatorConfiguration::default();
         emu_config.device.storage = DataAmount { quantity: 32, units: DataUnits::Bytes };
 
         let root = setup(&env.context, &mut emu_config.guest, &temp, disk_image_format).await?;
-
-        let ctx = mock_modules::get_host_tool_context();
-        ctx.expect().returning(|_| Ok(PathBuf::from("echo")));
 
         // This checks if --reuse is true, but the directory isn't there to reuse; should succeed.
         write_to(&emu_config.guest.kernel_image.clone().expect("kernel file path"), ORIGINAL)
@@ -1209,16 +1255,13 @@ mod tests {
     // There's no equivalent test for FVM for now -- extending FVM images is more complex and
     // depends on an external binary, making testing challenging.
     #[fuchsia::test]
-
     async fn test_staging_resize_fxfs() -> Result<()> {
         let env = ffx_config::test_init().await?;
+        make_fake_sdk(&env).await;
         let temp = tempdir().expect("cannot get tempdir");
         let instance_name = "test-instance";
         let mut emu_config = EmulatorConfiguration::default();
         let root = setup(&env.context, &mut emu_config.guest, &temp, DiskImageFormat::Fxfs).await?;
-
-        let ctx = mock_modules::get_host_tool_context();
-        ctx.expect().returning(|_| Ok(PathBuf::from("echo")));
 
         const EXPECTED_DATA: &[u8] = b"hello, world";
 
@@ -1269,17 +1312,11 @@ mod tests {
     #[fuchsia::test]
     async fn test_embed_boot_data() -> Result<()> {
         let env = ffx_config::test_init().await?;
+        make_fake_sdk(&env).await;
         let temp = tempdir().expect("cannot get tempdir");
         let mut emu_config = EmulatorConfiguration::default();
 
         let root = setup(&env.context, &mut emu_config.guest, &temp, DiskImageFormat::Fvm).await?;
-
-        let mock_tool = temp.path().join("echo");
-        fs::write(&mock_tool, "#!/bin/bash\necho ok\n").expect("mock_tool_contents");
-        fs::set_permissions(&mock_tool, fs::Permissions::from_mode(0o770)).unwrap();
-
-        let ctx = mock_modules::get_host_tool_context();
-        ctx.expect().returning(move |_| Ok(mock_tool.clone()));
 
         let src = emu_config.guest.zbi_image.expect("zbi image path");
         let dest = root.join("dest.zbi");
@@ -1289,7 +1326,7 @@ mod tests {
         Ok(())
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_validate_net() -> Result<()> {
         // User mode doesn't have specific requirements, so it should return OK.
         let engine = TestEngine::default();

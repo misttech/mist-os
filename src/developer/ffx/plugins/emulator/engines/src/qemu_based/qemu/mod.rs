@@ -242,14 +242,14 @@ impl QemuBasedEngine for QemuEngine {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::qemu_based::tests::make_fake_sdk;
     use crate::EngineBuilder;
     use emulator_instance::NetworkingMode;
     use std::ffi::OsStr;
     use std::fs;
-    use std::os::unix::fs::PermissionsExt as _;
     use tempfile::tempdir;
 
-    #[test]
+    #[fuchsia::test]
     fn test_build_emulator_cmd() {
         let program_name = "/test_femu_bin";
         let mut cfg = EmulatorConfiguration::default();
@@ -267,7 +267,7 @@ mod tests {
         );
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_build_emulator_cmd_existing_env() {
         env::set_var("FLAG_NAME_THAT_DOES_EXIST", "preset_value");
         let program_name = "/test_femu_bin";
@@ -286,14 +286,11 @@ mod tests {
 
     #[fuchsia::test]
     async fn test_build_cmd_with_custom_template() {
+        let env = ffx_config::test_init().await.expect("test env");
+        make_fake_sdk(&env).await;
         let temp = tempdir().expect("cannot get tempdir");
         let emu_instances = EmulatorInstances::new(temp.path().to_owned());
-        let mock_tool = temp.path().join("echo");
-        fs::write(&mock_tool, "#!/bin/bash\necho ok\n").expect("mock_tool_contents");
-        fs::set_permissions(&mock_tool, fs::Permissions::from_mode(0o770)).unwrap();
 
-        let ctx = crate::qemu_based::mock_modules::get_host_tool_context();
-        ctx.expect().returning(move |_| Ok(mock_tool.clone()));
         let mut cfg = EmulatorConfiguration::default();
         let template_file = temp.path().join("custom-template.json");
         fs::write(

@@ -812,7 +812,7 @@ mod tests {
         assert_eq!(sorted_actual, expected);
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_efi_template_efi_kernel() {
         let config = EmulatorConfiguration {
             guest: GuestConfig {
@@ -870,7 +870,7 @@ mod tests {
         assert_eq!(actual.args, expected_args)
     }
 
-    #[test]
+    #[fuchsia::test]
     fn test_efi_template_bootloader() {
         let config = EmulatorConfiguration {
             guest: GuestConfig {

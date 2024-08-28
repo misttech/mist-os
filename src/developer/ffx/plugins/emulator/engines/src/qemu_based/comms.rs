@@ -173,7 +173,7 @@ mod tests {
 
     const TEST_CONSOLE: &'static str = "./test";
 
-    #[test]
+    #[fuchsia::test]
     fn test_socket_connect() -> Result<()> {
         // Set up a temporary directory.
         let temp = tempdir().expect("tempdir").path().to_path_buf();
