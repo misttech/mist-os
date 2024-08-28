@@ -3,6 +3,7 @@
 // found in the LICENSE file.
 
 use crate::color_transform_manager::ColorTransformManager;
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 use ::input_pipeline::activity::ActivityManager;
 use ::input_pipeline::input_device::InputDeviceType;
 use ::input_pipeline::light_sensor::Configuration as LightSensorConfiguration;
@@ -43,8 +44,11 @@ use {
     fidl_fuchsia_accessibility_scene as a11y_view, fidl_fuchsia_ui_composition as flatland,
     fidl_fuchsia_ui_composition_internal as fcomp, fidl_fuchsia_ui_display_color as color,
     fidl_fuchsia_ui_display_singleton as singleton_display, fuchsia_async as fasync,
-    fuchsia_inspect as inspect, fuchsia_zircon as zx,
+    fuchsia_inspect as inspect,
 };
+
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
+use fuchsia_zircon as zx;
 
 mod color_transform_manager;
 mod factory_reset_countdown_server;
@@ -178,8 +182,11 @@ async fn inner_main() -> Result<(), Error> {
         display_rotation,
         display_pixel_density,
         viewing_distance,
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
         idle_threshold_ms,
+        #[cfg(fuchsia_api_level_at_least = "HEAD")]
         suspend_enabled,
+        ..
     } = Config::take_from_startup_handle();
 
     let display_pixel_density = match display_pixel_density.trim().parse::<f32>() {
@@ -262,6 +269,7 @@ async fn inner_main() -> Result<(), Error> {
     };
 
     // Create Activity Manager.
+    #[cfg(fuchsia_api_level_at_least = "HEAD")]
     let activity_manager =
         ActivityManager::new(zx::Duration::from_millis(idle_threshold_ms as i64), suspend_enabled)
             .await;
@@ -390,36 +398,52 @@ async fn inner_main() -> Result<(), Error> {
                 }
             }
             ExposedServices::UserInteractionObservation(stream) => {
-                let activity_manager = activity_manager.clone();
-                fasync::Task::local(async move {
-                match activity_manager
-                    .handle_interaction_aggregator_request_stream(stream)
-                    .await
+                #[cfg(fuchsia_api_level_at_least = "HEAD")]
                 {
-                    Ok(()) => (),
-                    Err(e) => {
-                        warn!(
-                      "failure while serving fuchsia.input.interaction.observation.Aggregator: {:?}",
-                      e
-                  );
-                    }}
-                }).detach();
-            }
-            ExposedServices::UserInteraction(stream) => {
-                let activity_manager = activity_manager.clone();
-                fasync::Task::local(async move {
-                    match activity_manager.handle_interaction_notifier_request_stream(stream).await
+                    let activity_manager = activity_manager.clone();
+                    fasync::Task::local(async move {
+                    match activity_manager
+                        .handle_interaction_aggregator_request_stream(stream)
+                        .await
                     {
                         Ok(()) => (),
                         Err(e) => {
                             warn!(
-                                "failure while serving fuchsia.input.interaction.Notifier: {:?}",
-                                e
-                            );
+                        "failure while serving fuchsia.input.interaction.observation.Aggregator: {:?}",
+                        e
+                    );
+                        }}
+                    }).detach();
+                }
+                #[cfg(fuchsia_api_level_less_than = "HEAD")]
+                {
+                    let _ = stream;
+                    error!("scene_manager built without ActivityMonitor due to stable API level.")
+                }
+            }
+            ExposedServices::UserInteraction(stream) => {
+                #[cfg(fuchsia_api_level_at_least = "HEAD")]
+                {
+                    let activity_manager = activity_manager.clone();
+                    fasync::Task::local(async move {
+                        match activity_manager.handle_interaction_notifier_request_stream(stream).await
+                        {
+                            Ok(()) => (),
+                            Err(e) => {
+                                warn!(
+                                    "failure while serving fuchsia.input.interaction.Notifier: {:?}",
+                                    e
+                                );
+                            }
                         }
-                    }
-                })
-                .detach();
+                    })
+                    .detach();
+                }
+                #[cfg(fuchsia_api_level_less_than = "HEAD")]
+                {
+                    let _ = stream;
+                    error!("scene_manager built without ActivityMonitor due to stable API level.")
+                }
             }
             ExposedServices::GraphicalPresenter(stream) => {
                 fasync::Task::local(handle_graphical_presenter_request_stream(

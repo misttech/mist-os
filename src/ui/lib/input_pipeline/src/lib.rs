@@ -34,7 +34,13 @@ pub mod pointer_sensor_scale_handler;
 pub mod text_settings_handler;
 pub mod touch_injector_handler;
 
+#[cfg(fuchsia_api_level_at_least = "HEAD")]
 pub mod activity;
+
+// The following imports prevent unused crate errors when building at a stable API level
+// that is not HEAD.
+use {fidl_fuchsia_input_interaction as _, fidl_fuchsia_power_system as _};
+
 pub mod focus_listener;
 pub mod gestures;
 pub mod input_pipeline;

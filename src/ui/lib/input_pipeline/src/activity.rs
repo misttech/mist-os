@@ -1,7 +1,7 @@
 // Copyright 2022 The Fuchsia Authors. All rights reserved.
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
-
+#![cfg(fuchsia_api_level_at_least = "HEAD")]
 use anyhow::{Context, Error};
 use async_utils::hanging_get::server::{HangingGet, Publisher};
 use fidl_fuchsia_input_interaction::{
