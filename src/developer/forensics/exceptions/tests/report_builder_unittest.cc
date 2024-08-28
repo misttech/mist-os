@@ -165,6 +165,24 @@ TEST_F(CrashReportBuilderTest, ExpiredException) {
   EXPECT_EQ(crash_report.crash_signature(), "fuchsia-no-minidump-exception-expired");
 }
 
+TEST_F(CrashReportBuilderTest, ExceptionReasonOverwritesExceptionExpired) {
+  builder_.SetExceptionExpired();
+  builder_.SetExceptionReason(ExceptionReason::kPageFaultIo);
+
+  auto crash_report = builder_.Consume();
+  ASSERT_TRUE(crash_report.has_crash_signature());
+  EXPECT_EQ(crash_report.crash_signature(), "fuchsia-page_fault-io");
+}
+
+TEST_F(CrashReportBuilderTest, ExceptionReasonOverwritesProcessTerminated) {
+  builder_.SetProcessTerminated();
+  builder_.SetExceptionReason(ExceptionReason::kPageFaultIo);
+
+  auto crash_report = builder_.Consume();
+  ASSERT_TRUE(crash_report.has_crash_signature());
+  EXPECT_EQ(crash_report.crash_signature(), "fuchsia-page_fault-io");
+}
+
 TEST_F(CrashReportBuilderTest, IsFatal) {
   builder_.SetExceptionExpired();
 

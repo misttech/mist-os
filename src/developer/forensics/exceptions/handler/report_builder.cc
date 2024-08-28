@@ -148,7 +148,35 @@ fuchsia::feedback::CrashReport CrashReportBuilder::Consume() {
   }
   AddAnnotation(kCrashProcessStateKey, process_already_terminated_ ? "terminated" : "in exception");
 
-  // Crash signature overwrite on channel/port overflow.
+  // Process and thread names/koids.
+  NativeCrashReport native_crash_report;
+  native_crash_report.set_process_name(process_name_.value());
+  if (process_koid_.has_value()) {
+    native_crash_report.set_process_koid(process_koid_.value());
+  }
+  native_crash_report.set_thread_name(thread_name_.value());
+  if (thread_koid_.has_value()) {
+    native_crash_report.set_thread_koid(thread_koid_.value());
+  }
+
+  // Minidump.
+  FX_CHECK(minidump_.has_value() || exception_expired_ || process_already_terminated_);
+  if (minidump_.has_value()) {
+    fuchsia::mem::Buffer mem_buffer;
+    minidump_.value().get_size(&mem_buffer.size);
+    mem_buffer.vmo = std::move(minidump_.value());
+    minidump_ = std::nullopt;
+    native_crash_report.set_minidump(std::move(mem_buffer));
+  } else if (exception_expired_) {
+    crash_report.set_crash_signature("fuchsia-no-minidump-exception-expired");
+  } else if (process_already_terminated_) {
+    crash_report.set_crash_signature("fuchsia-no-minidump-process-terminated");
+  }
+
+  crash_report.set_specific_report(SpecificCrashReport::WithNative(std::move(native_crash_report)));
+
+  // Crash signature overwrite on channel/port overflow. Overwrite any no-minidump signatures
+  // previously set since these are more informative.
   if (exception_reason_.has_value()) {
     switch (exception_reason_.value()) {
       case ExceptionReason::kChannelOverflow:
@@ -180,33 +208,6 @@ fuchsia::feedback::CrashReport CrashReportBuilder::Consume() {
         break;
     }
   }
-
-  // Process and thread names/koids.
-  NativeCrashReport native_crash_report;
-  native_crash_report.set_process_name(process_name_.value());
-  if (process_koid_.has_value()) {
-    native_crash_report.set_process_koid(process_koid_.value());
-  }
-  native_crash_report.set_thread_name(thread_name_.value());
-  if (thread_koid_.has_value()) {
-    native_crash_report.set_thread_koid(thread_koid_.value());
-  }
-
-  // Minidump.
-  FX_CHECK(minidump_.has_value() || exception_expired_ || process_already_terminated_);
-  if (minidump_.has_value()) {
-    fuchsia::mem::Buffer mem_buffer;
-    minidump_.value().get_size(&mem_buffer.size);
-    mem_buffer.vmo = std::move(minidump_.value());
-    minidump_ = std::nullopt;
-    native_crash_report.set_minidump(std::move(mem_buffer));
-  } else if (exception_expired_) {
-    crash_report.set_crash_signature("fuchsia-no-minidump-exception-expired");
-  } else if (process_already_terminated_) {
-    crash_report.set_crash_signature("fuchsia-no-minidump-process-terminated");
-  }
-
-  crash_report.set_specific_report(SpecificCrashReport::WithNative(std::move(native_crash_report)));
 
   return crash_report;
 }
