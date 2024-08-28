@@ -92,6 +92,7 @@ sdk_fidl_targets = [
   "//sdk/fidl/fuchsia.hardware.sdmmc:fuchsia.hardware.sdmmc",
   "//sdk/fidl/fuchsia.hardware.sharedmemory:fuchsia.hardware.sharedmemory",
   "//sdk/fidl/fuchsia.hardware.spiimpl:fuchsia.hardware.spiimpl",
+  "//sdk/fidl/fuchsia.hardware.spmi:fuchsia.hardware.spmi",
   "//sdk/fidl/fuchsia.hardware.temperature:fuchsia.hardware.temperature",
   "//sdk/fidl/fuchsia.hardware.trippoint:fuchsia.hardware.trippoint",
   "//sdk/fidl/fuchsia.hardware.usb.phy:fuchsia.hardware.usb.phy",
