@@ -226,6 +226,8 @@ async fn run_builtin_controller(
                 // when a stop or kill command is received.
                 drop(builtin_task);
             }
+            #[cfg(fuchsia_api_level_at_least = "NEXT")]
+            fcrunner::ComponentControllerRequest::_UnknownMethod { .. } => (),
         }
     }
 }

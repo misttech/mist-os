@@ -218,7 +218,7 @@ type ComponentStartInfo = resource table {
 ///   of the component runner itself. The component manager may respond to such
 ///   failures by terminating the component runner's job to ensure system
 ///   stability.
-closed protocol ComponentController {
+closed(removed=NEXT) open(added=NEXT) protocol ComponentController {
     /// Request to stop the component instance.
     ///
     /// After stopping the component instance, the server should close this
@@ -261,7 +261,7 @@ closed protocol ComponentController {
     /// Handles escrowed via `OnEscrow` are always delivered to the next
     /// execution of the component.
     @available(added=HEAD)
-    strict -> OnEscrow(resource table {
+    flexible -> OnEscrow(resource table {
         /// Escrow the outgoing directory server endpoint. Whenever the
         /// component is started, the framework will return this channel via
         /// [`ComponentStartInfo.outgoing_dir`].
@@ -291,7 +291,7 @@ closed protocol ComponentController {
     /// Alternatively, a runner may close the controller channel without this event to signal
     /// component stop, but this method is legacy and no longer recommended.
     @available(added=HEAD)
-    strict -> OnStop(@generated_name("ComponentStopInfo") resource table {
+    flexible -> OnStop(@generated_name("ComponentStopInfo") resource table {
         /// The component's termination status, as documented on [ComponentRunner] above.
         ///
         /// The caller should set this field. If it is absent, the framework will assume

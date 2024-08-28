@@ -302,6 +302,10 @@ async fn serve_component_controller(
                     }
                     return;
                 }
+                Ok(ComponentControllerRequest::_UnknownMethod { ordinal, .. }) => {
+                    log_info!("Unknown method received: {ordinal}");
+                    return;
+                }
                 Err(_) => {
                     return;
                 }

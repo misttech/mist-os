@@ -157,6 +157,7 @@ impl<C: Controllable + 'static> Controller<C> {
                     self.kill().await;
                     return Ok(());
                 }
+                fcrunner::ComponentControllerRequest::_UnknownMethod { .. } => (),
             }
         }
         // The channel closed

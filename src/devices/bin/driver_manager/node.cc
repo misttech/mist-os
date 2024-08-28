@@ -473,6 +473,12 @@ void Node::OnBind() const {
   }
 }
 
+void Node::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_component_runner::ComponentController> metadata,
+    fidl::UnknownMethodCompleter::Sync& completer) {
+  LOGF(INFO, "Unknown ComponentController method request received: %lu", metadata.method_ordinal);
+}
+
 void Node::Stop(StopCompleter::Sync& completer) {
   LOGF(DEBUG, "Calling Remove on %s because of Stop() from component framework.", name().c_str());
   Remove(RemovalSet::kAll, nullptr);

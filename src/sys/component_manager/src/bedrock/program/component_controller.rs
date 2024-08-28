@@ -131,6 +131,7 @@ impl<'a> ComponentController {
                         termination_sender.take().map(|sender| sender.send(payload.into()));
                         break;
                     }
+                    fcrunner::ComponentControllerEvent::_UnknownEvent { .. } => (),
                 },
             }
         }

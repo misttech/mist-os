@@ -355,6 +355,9 @@ class Node : public fidl::WireServer<fuchsia_driver_framework::NodeController>,
   void on_fidl_error(fidl::UnbindInfo info) override;
 
   // fidl::WireServer<fuchsia_component_runner::ComponentController>
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_component_runner::ComponentController> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override;
   // We ignore these signals.
   void Stop(StopCompleter::Sync& completer) override;
   void Kill(KillCompleter::Sync& completer) override;

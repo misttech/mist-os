@@ -197,6 +197,9 @@ async fn handle_runner_request(
                         info!("received kill request for component {}", resolved_url);
                         control_handle
                     }
+                    frunner::ComponentControllerRequest::_UnknownMethod { .. } => {
+                        panic!("unexpected unknown component controller method")
+                    }
                 };
                 control_handle.shutdown_with_epitaph(component_epitaph);
                 // TODO(https://fxbug.dev/42161447): remove this once

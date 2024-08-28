@@ -553,6 +553,7 @@ impl MockController {
                             break;
                         }
                     }
+                    fcrunner::ComponentControllerRequest::_UnknownMethod { .. } => (),
                 }
             }
         }
