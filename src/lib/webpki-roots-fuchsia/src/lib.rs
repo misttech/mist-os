@@ -17,7 +17,9 @@ lazy_static! {
     static ref RAW_DATA: String = {
         // I could have an environment variable override this, but i'd want it keyed
         // on being a dev build so you couldn't harm trust in prod
-        std::fs::read_to_string(CERT_PATH).expect("Unable to find root store")
+        std::fs::read_to_string(CERT_PATH)
+            .map_err(|e| tracing::error!("unable to find root certificate store: {}, {:?}", CERT_PATH, e))
+            .unwrap()
     };
     static ref CERT_DERS: Vec<Vec<u8>> = {
         let lines: Vec<&str> = RAW_DATA
