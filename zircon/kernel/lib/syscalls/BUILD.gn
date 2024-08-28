@@ -95,6 +95,7 @@ source_set("impl") {
   if (is_mistos) {
     deps -= [ "//zircon/kernel/lib/userabi:headers" ]
     deps += [ "//vendor/misttech/zircon/kernel/lib/userabi:headers" ]
+    deps += [ "//vendor/misttech/zircon/kernel/lib/syscalls:linux_impl" ]
   }
 }
 

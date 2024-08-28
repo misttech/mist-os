@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 
+# Copyright 2024 Mist Tecnologia LTDA
 # Copyright 2017 The Fuchsia Authors
 #
 # Use of this source code is governed by a MIT-style
@@ -43,6 +44,17 @@ scan() {
   done
 
   for syscall in $syscalls; do
+    # Check if a Linux syscall 'aXXXX_<function>', always return true.
+    case "$syscall" in
+    a*_*)
+      echo "\
+      static bool ${syscall}(uintptr_t offset) {
+          return true;
+      }
+"
+      continue
+    esac
+
     echo "\
     static bool ${syscall}(uintptr_t offset) {
         switch (offset) {\
