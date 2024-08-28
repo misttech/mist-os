@@ -192,18 +192,6 @@ typedef struct device_init_reply_args {
 } device_init_reply_args_t;
 
 typedef struct {
-  // Optional list of device properties.
-  // Memory owned by the caller.
-  zx_device_prop_t* props;
-
-  // Size of the device properties array.
-  // To be filled by the caller.
-  const uint32_t prop_count;
-
-  // Count of properties filled with valid data.
-  // Will be filled by the callee.
-  uint32_t actual_prop_count;
-
   // Optional list of device string properties.
   // Memory owned by the caller.
   zx_device_str_prop_t* str_props;
