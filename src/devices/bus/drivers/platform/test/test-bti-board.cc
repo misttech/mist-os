@@ -56,6 +56,7 @@ zx_status_t TestBoard::Create(void*, zx_device_t* parent) {
         fuchsia_hardware_platform_bus::Bti ret;
         ret.iommu_index() = 0;
         ret.bti_id() = 0;
+        ret.name() = "bti-0";
         return ret;
       }(),
   };

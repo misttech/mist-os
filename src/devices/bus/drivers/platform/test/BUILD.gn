@@ -389,8 +389,12 @@ fuchsia_driver_component("test-bti-board") {
 driver_bind_rules("test-bti-bind") {
   testonly = true
   rules = "meta/test-bti.bind"
-  deps = [ "//src/devices/bind/fuchsia.test.platform" ]
+  deps = [
+    "//src/devices/bind/fuchsia.resource",
+    "//src/devices/bind/fuchsia.test.platform",
+  ]
 }
+
 fuchsia_driver("test-bti-driver") {
   testonly = true
   output_name = "test-bti"

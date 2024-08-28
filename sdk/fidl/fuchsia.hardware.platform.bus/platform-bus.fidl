@@ -11,6 +11,11 @@ using fuchsia.hardware.power;
 const MAX_INFO_STRING_LENGTH uint32 = 32;
 const MAX_POWER_CONFIGS uint32 = 32;
 
+const MAX_MMIO uint32 = 10;
+const MAX_IRQ uint32 = 10;
+const MAX_BTI uint32 = 10;
+const MAX_SMC uint32 = 10;
+
 /// Mode for creating zircon interrupts. In sync with ZX_INTERRUPT_MODE_* values
 /// from //zircon/system/public/zircon/types.h.
 type ZirconInterruptMode = strict enum : uint32 {
@@ -122,13 +127,13 @@ type Node = table {
     /// `BIND_PLATFORM_DEV_INSTANCE_ID`
     5: instance_id uint32;
     /// MMIO regions.
-    6: mmio vector<Mmio>:MAX;
+    6: mmio vector<Mmio>:MAX_MMIO;
     /// Interrupts.
-    7: irq vector<Irq>:MAX;
+    7: irq vector<Irq>:MAX_IRQ;
     /// BTIs.
-    8: bti vector<Bti>:MAX;
+    8: bti vector<Bti>:MAX_BTI;
     /// SMC calls.
-    9: smc vector<Smc>:MAX;
+    9: smc vector<Smc>:MAX_SMC;
     /// Metadata
     10: metadata vector<Metadata>:MAX;
     /// Boot metadata (from ZBI items)

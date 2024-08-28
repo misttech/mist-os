@@ -25,6 +25,7 @@
 #include <unordered_set>
 
 #include <bind/fuchsia/cpp/bind.h>
+#include <bind/fuchsia/resource/cpp/bind.h>
 #include <fbl/string_printf.h>
 
 #include "lib/inspect/component/cpp/component.h"
@@ -393,6 +394,31 @@ zx_status_t PlatformDevice::Start() {
     }
   }
 
+  // Need to keep keys and vals alive until DdkAdd is called.
+  std::vector<std::string> keys_and_vals;
+  auto count_props = [](const auto& r) { return r.has_value() ? r->size() : 0u; };
+  keys_and_vals.reserve(2lu * (count_props(node_.mmio()) + count_props(node_.irq()) +
+                               count_props(node_.bti()) + count_props(node_.smc())));
+
+  auto add_props = [&dev_str_props, &keys_and_vals](const auto& resource,
+                                                    const std::string& count_key,
+                                                    const char* resource_key_prefix) {
+    const uint32_t count = resource.has_value() ? static_cast<uint32_t>(resource->size()) : 0u;
+    dev_str_props.emplace_back(ddk::MakeStrProperty(count_key, count));
+
+    for (uint32_t i = 0; i < count; i++) {
+      const auto& name = resource.value()[i].name();
+      const std::string& key = keys_and_vals.emplace_back(resource_key_prefix + std::to_string(i));
+      const std::string& value =
+          keys_and_vals.emplace_back(name.has_value() ? name.value() : "unknown");
+      dev_str_props.emplace_back(ddk::MakeStrProperty(key, value));
+    }
+  };
+  add_props(node_.mmio(), bind_fuchsia_resource::MMIO_COUNT, "fuchsia.resource.MMIO_");
+  add_props(node_.irq(), bind_fuchsia_resource::INTERRUPT_COUNT, "fuchsia.resource.INTERRUPT_");
+  add_props(node_.bti(), bind_fuchsia_resource::BTI_COUNT, "fuchsia.resource.BTI_");
+  add_props(node_.smc(), bind_fuchsia_resource::SMC_COUNT, "fuchsia.resource.SMC_");
+
   ddk::DeviceAddArgs args(name);
   args.set_str_props(dev_str_props).set_proto_id(ZX_PROTOCOL_PDEV);
 
@@ -460,7 +486,7 @@ zx_status_t PlatformDevice::Start() {
     return result.error_value();
   }
   args.set_outgoing_dir(endpoints->client.TakeChannel());
-  return DdkAdd(std::move(args));
+  return DdkAdd(args);
 }
 
 void PlatformDevice::DdkInit(ddk::InitTxn txn) {
