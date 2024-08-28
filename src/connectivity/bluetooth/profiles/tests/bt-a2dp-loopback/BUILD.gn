@@ -65,7 +65,7 @@ fuchsia_test_package("bt-a2dp-loopback-test") {
 
   test_specs = {
     # The max severity is set to ERROR due to the Cobalt connector ERROR message if the `Logger`
-    # capability is unavailable. This occurs in some cases when the `mock-cobalt` component exits
+    # capability is unavailable. This occurs in some cases when the `fake-cobalt` component exits
     # (because the test has completed) before the A2DP component attempts to connect to it. This is
     # not a bug in the test, and may be fixed if we enforce ordering in component shut down.
     log_settings = {
@@ -92,8 +92,8 @@ fuchsia_test_package("bt-a2dp-loopback-test") {
     # Mock Piconet Server
     "//src/connectivity/bluetooth/testing/mock-piconet-server:component",
 
-    # Mock cobalt component that provides Cobalt services to A2DP.
-    "//src/cobalt/bin/testing/mock_cobalt:component_v2",
+    # Fake cobalt component that provides Cobalt services to A2DP.
+    "//src/cobalt/bin/testing/fake_cobalt:component_v2",
   ]
 }
 

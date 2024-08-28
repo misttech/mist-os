@@ -5,7 +5,7 @@
     include: [ "syslog/client.shard.cml" ],
     program: {
         runner: "elf",
-        binary: "bin/mock_cobalt",
+        binary: "bin/fake_cobalt",
     },
     capabilities: [
         {

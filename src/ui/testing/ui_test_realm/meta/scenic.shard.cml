@@ -16,8 +16,8 @@
             url: "#meta/display-coordinator-connector.cm",
         },
         {
-            name: "mock_cobalt",
-            url: "#meta/mock_cobalt.cm",
+            name: "fake_cobalt",
+            url: "#meta/fake_cobalt.cm",
         },
         {
             name: "scenic",
@@ -28,7 +28,7 @@
         {
             protocol: "fuchsia.logger.LogSink",
             from: "parent",
-            to: [ "#mock_cobalt" ],
+            to: [ "#fake_cobalt" ],
         },
         {
             protocol: [ "fuchsia.hardware.display.Provider" ],
@@ -37,7 +37,7 @@
         },
         {
             protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
-            from: "#mock_cobalt",
+            from: "#fake_cobalt",
             to: [ "#scenic" ],
         },
         {
@@ -45,7 +45,7 @@
             from: "parent",
             to: [
                 "#display-coordinator-connector",
-                "#mock_cobalt",
+                "#fake_cobalt",
                 "#scenic",
             ],
         },
@@ -53,7 +53,7 @@
     expose: [
         {
             protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
-            from: "#mock_cobalt",
+            from: "#fake_cobalt",
         },
 
         // Additional capabilities not exposed from the production ui realm.

@@ -128,8 +128,8 @@ class WebSemanticsTest : public SemanticsIntegrationTestV2 {
   static constexpr auto kBuildInfoProvider = "build_info_provider";
   static constexpr auto kBuildInfoProviderUrl = "#meta/fake_build_info.cm";
 
-  static constexpr auto kMockCobalt = "cobalt";
-  static constexpr auto kMockCobaltUrl = "#meta/mock_cobalt.cm";
+  static constexpr auto kFakeCobalt = "cobalt";
+  static constexpr auto kFakeCobaltUrl = "#meta/fake_cobalt.cm";
 
   WebSemanticsTest() = default;
   ~WebSemanticsTest() override = default;
@@ -144,7 +144,7 @@ class WebSemanticsTest : public SemanticsIntegrationTestV2 {
     realm()->AddChild(kNetstack, kNetstackUrl);
     realm()->AddChild(kWebContextProvider, kWebContextProviderUrl);
     realm()->AddChild(kBuildInfoProvider, kBuildInfoProviderUrl);
-    realm()->AddChild(kMockCobalt, kMockCobaltUrl);
+    realm()->AddChild(kFakeCobalt, kFakeCobaltUrl);
 
     // Second, add all necessary routing.
     realm()->AddRoute(
@@ -182,7 +182,7 @@ class WebSemanticsTest : public SemanticsIntegrationTestV2 {
                        .targets = {ChildRef{kFontsProvider}, ChildRef{kWebContextProvider}}});
     realm()->AddRoute(
         {.capabilities = {Protocol{fuchsia::metrics::MetricEventLoggerFactory::Name_}},
-         .source = ChildRef{kMockCobalt},
+         .source = ChildRef{kFakeCobalt},
          .targets = {ChildRef{kMemoryPressureProvider}}});
     realm()->AddRoute({.capabilities = {Protocol{fuchsia::sysmem::Allocator::Name_},
                                         Protocol{fuchsia::sysmem2::Allocator::Name_}},

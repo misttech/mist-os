@@ -9,7 +9,7 @@ group("tests") {
   testonly = true
   deps = [
     ":mouse-input-test",
-    "//src/cobalt/bin/testing/mock_cobalt",
+    "//src/cobalt/bin/testing/fake_cobalt",
 
     # TODO(https://fxbug.dev/42070261): These should be provided by the Product
     # configurations on which these tests run rather than as deps.
@@ -83,7 +83,7 @@ fuchsia_test_package("mouse-input-test") {
     "//src/chromium:web_context_provider_for_test",
 
     # Launched in the test realm for hermeticity.
-    "//src/cobalt/bin/testing/mock_cobalt",
+    "//src/cobalt/bin/testing/fake_cobalt",
     "//src/connectivity/network:netstack-for-tests",
     "//src/developer/build_info/testing:fake-build-info-component",
     "//src/developer/memory/monitor:component",

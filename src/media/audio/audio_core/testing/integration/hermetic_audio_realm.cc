@@ -339,11 +339,11 @@ HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
       .targets = {ChildRef{kThermalTestControl}},
   });
 
-  // Include a mock cobalt to silence warnings that we can't connect to cobalt.
-  builder.AddChild(kMockCobalt, "#meta/mock_cobalt.cm");
+  // Include a fake cobalt to silence warnings that we can't connect to cobalt.
+  builder.AddChild(kFakeCobalt, "#meta/fake_cobalt.cm");
   builder.AddRoute({
       .capabilities = {Protocol{"fuchsia.metrics.MetricEventLoggerFactory"}},
-      .source = ChildRef{kMockCobalt},
+      .source = ChildRef{kFakeCobalt},
       .targets = {ChildRef{kAudioCore}},
   });
   builder.AddRoute({
@@ -352,7 +352,7 @@ HermeticAudioRealm::CtorArgs HermeticAudioRealm::BuildRealm(Options options,
               Protocol{"fuchsia.logger.LogSink"},
           },
       .source = ParentRef(),
-      .targets = {ChildRef{kMockCobalt}},
+      .targets = {ChildRef{kFakeCobalt}},
   });
 
   // Lastly, allow further customization.

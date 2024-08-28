@@ -50,7 +50,7 @@
         // Non-production dependencies.
         {
             name: "cobalt",
-            url: "#meta/mock_cobalt.cm",
+            url: "#meta/fake_cobalt.cm",
         },
 
         // Production non-package delivery components.

@@ -26,8 +26,8 @@
             url: "#meta/scene_manager_config.cm",
         },
         {
-            name: "mock_cobalt",
-            url: "#meta/mock_cobalt.cm",
+            name: "fake_cobalt",
+            url: "#meta/fake_cobalt.cm",
         },
         {
             name: "input-helper",
@@ -47,7 +47,7 @@
         },
         {
             protocol: [ "fuchsia.metrics.MetricEventLoggerFactory" ],
-            from: "#mock_cobalt",
+            from: "#fake_cobalt",
             to: [ "#scene_manager" ],
         },
         {

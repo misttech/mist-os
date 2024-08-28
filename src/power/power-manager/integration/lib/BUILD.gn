@@ -29,7 +29,7 @@ rustc_library("lib") {
     "//sdk/fidl/fuchsia.ui.activity:fuchsia.ui.activity_rust",
     "//sdk/lib/device-watcher/rust",
     "//sdk/lib/driver_test_realm/realm_builder/rust",
-    "//src/cobalt/bin/testing/mock_cobalt:component_v2",
+    "//src/cobalt/bin/testing/fake_cobalt:component_v2",
     "//src/lib/fake-clock/fidl:fidl_rust",
     "//src/lib/fake-clock/svc",
     "//src/lib/fidl/rust/fidl",

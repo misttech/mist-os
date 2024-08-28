@@ -7,7 +7,7 @@ use fidl_contrib::protocol_connector::ProtocolSender;
 use fidl_fuchsia_metrics::{MetricEvent, MetricEventPayload};
 use futures::channel::mpsc;
 
-pub(crate) fn get_mock_cobalt_sender() -> (ProtocolSender<MetricEvent>, mpsc::Receiver<MetricEvent>)
+pub(crate) fn get_fake_cobalt_sender() -> (ProtocolSender<MetricEvent>, mpsc::Receiver<MetricEvent>)
 {
     let (sender, cobalt_receiver) = mpsc::channel(1);
     (ProtocolSender::new(sender), cobalt_receiver)

@@ -249,9 +249,9 @@ enum IncomingService {
     MetricsQuery(fidl_fuchsia_metrics_test::MetricEventLoggerQuerierRequestStream),
 }
 
-#[fuchsia::main(logging_tags = ["mock-cobalt"])]
+#[fuchsia::main(logging_tags = ["fake-cobalt"])]
 async fn main() -> Result<(), Error> {
-    info!("Starting mock cobalt service...");
+    info!("Starting fake cobalt service...");
 
     let loggers = LoggersHandle::default();
 
@@ -273,7 +273,7 @@ async fn main() -> Result<(), Error> {
         })
         .await;
 
-    info!("Exiting mock cobalt service...");
+    info!("Exiting fake cobalt service...");
 
     Ok(())
 }

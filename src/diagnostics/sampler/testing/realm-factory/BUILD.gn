@@ -61,7 +61,7 @@ fuchsia_package("realm-factory") {
     "../../tests:validation-sampler-resources",
 
     # Mock deps.
-    "//src/cobalt/bin/testing/mock_cobalt:component_v2",
+    "//src/cobalt/bin/testing/fake_cobalt:component_v2",
     "//src/diagnostics/archivist:archivist-for-embedding-bundle",
 
     # Component under test deps.

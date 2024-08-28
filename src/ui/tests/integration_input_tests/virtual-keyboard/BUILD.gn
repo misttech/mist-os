@@ -66,7 +66,7 @@ fuchsia_test_component("virtual-keyboard-test-component") {
 fuchsia_test_package("virtual-keyboard-test") {
   test_components = [ ":virtual-keyboard-test-component" ]
   deps = [
-    "//src/cobalt/bin/testing/mock_cobalt",
+    "//src/cobalt/bin/testing/fake_cobalt",
     "//src/connectivity/network:netstack-for-tests",
     "//src/developer/build_info/testing:fake-build-info-component",
     "//src/developer/memory/monitor:component",

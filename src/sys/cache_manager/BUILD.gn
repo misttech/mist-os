@@ -31,7 +31,7 @@ rustc_binary("bin") {
   ]
 
   test_deps = [
-    "//src/cobalt/bin/testing/mock_cobalt",
+    "//src/cobalt/bin/testing/fake_cobalt",
     "//src/lib/fuchsia-async",
     "//third_party/rust_crates:futures",
   ]

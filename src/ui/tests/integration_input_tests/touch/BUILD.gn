@@ -63,7 +63,7 @@ fuchsia_test_component("touch-input-test-component") {
 fuchsia_test_package("touch-input-test") {
   test_components = [ ":touch-input-test-component" ]
   deps = [
-    "//src/cobalt/bin/testing/mock_cobalt",
+    "//src/cobalt/bin/testing/fake_cobalt",
     "//src/connectivity/network:netstack-for-tests",
     "//src/developer/build_info/testing:fake-build-info-component",
     "//src/developer/memory/monitor:component",
@@ -164,7 +164,7 @@ group("tests") {
     # TODO(https://fxbug.dev/42070261): Should these be deps of the individual test
     # targets above?
     "///src/graphics/display/testing/fake-coordinator-connector",
-    "//src/cobalt/bin/testing/mock_cobalt",
+    "//src/cobalt/bin/testing/fake_cobalt",
     "//src/graphics/bin/vulkan_loader",
     "//src/testing/fidl/intl_property_manager",
     "//src/ui/tests/integration_input_tests/touch/touch-flatland-client",

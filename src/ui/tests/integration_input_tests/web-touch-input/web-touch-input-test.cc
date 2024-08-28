@@ -263,7 +263,7 @@ class WebEngineTest : public ui_testing::PortableUITest,
         std::make_pair(kFontsProvider, kFontsProviderUrl),
         std::make_pair(kIntl, kIntlUrl),
         std::make_pair(kMemoryPressureProvider, kMemoryPressureProviderUrl),
-        std::make_pair(kMockCobalt, kMockCobaltUrl),
+        std::make_pair(kFakeCobalt, kFakeCobaltUrl),
         std::make_pair(kNetstack, kNetstackUrl),
         std::make_pair(kTextManager, kTextManagerUrl),
         std::make_pair(kWebContextProvider, kWebContextProviderUrl),
@@ -326,7 +326,7 @@ class WebEngineTest : public ui_testing::PortableUITest,
                 {
                     target, ChildRef{kFontsProvider}, ChildRef{kMemoryPressureProvider},
                     ChildRef{kBuildInfoProvider}, ChildRef{kWebContextProvider}, ChildRef{kIntl},
-                    ChildRef{kMockCobalt},
+                    ChildRef{kFakeCobalt},
                     // Not including kNetstack here, since it emits spurious
                     // FATAL errors.
                 },
@@ -376,7 +376,7 @@ class WebEngineTest : public ui_testing::PortableUITest,
          .targets = {ChildRef{kFontsProvider}}},
         {.capabilities = {Protocol{
              fidl::DiscoverableProtocolName<fuchsia_metrics::MetricEventLoggerFactory>}},
-         .source = ChildRef{kMockCobalt},
+         .source = ChildRef{kFakeCobalt},
          .targets = {ChildRef{kMemoryPressureProvider}}},
         {.capabilities = {Protocol{fidl::DiscoverableProtocolName<fuchsia_sysmem::Allocator>},
                           Protocol{fidl::DiscoverableProtocolName<fuchsia_sysmem2::Allocator>}},
@@ -480,8 +480,8 @@ class WebEngineTest : public ui_testing::PortableUITest,
   static constexpr auto kBuildInfoProvider = "build_info_provider";
   static constexpr auto kBuildInfoProviderUrl = "#meta/fake_build_info.cm";
 
-  static constexpr auto kMockCobalt = "cobalt";
-  static constexpr auto kMockCobaltUrl = "#meta/mock_cobalt.cm";
+  static constexpr auto kFakeCobalt = "cobalt";
+  static constexpr auto kFakeCobaltUrl = "#meta/fake_cobalt.cm";
 };
 
 INSTANTIATE_TEST_SUITE_P(WebEngineTestParameterized, WebEngineTest,
