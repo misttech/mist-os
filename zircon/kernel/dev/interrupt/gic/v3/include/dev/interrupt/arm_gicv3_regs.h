@@ -138,7 +138,7 @@ static inline void gic_write_ctlr(uint32_t val) {
 static inline void gic_write_pmr(uint32_t val) {
   __asm__ volatile("msr " ICC_PMR_EL1 ", %0" ::"r"((uint64_t)val));
   __isb(ARM_MB_SY);
-  __dsb(ARM_MB_SY);
+  arch::DeviceMemoryBarrier();
 }
 
 static inline void gic_write_igrpen(uint32_t val) {
@@ -170,14 +170,14 @@ static inline void gic_write_dir(uint32_t val) {
 static inline uint32_t gic_read_iar() {
   uint64_t temp;
   __asm__ volatile("mrs %0, " ICC_IAR1_EL1 : "=r"(temp));
-  __dsb(ARM_MB_SY);
+  arch::DeviceMemoryBarrier();
   return (uint32_t)temp;
 }
 
 static inline void gic_write_sgi1r(uint64_t val) {
   __asm__ volatile("msr " ICC_SGI1R_EL1 ", %0" ::"r"((uint64_t)val));
   __isb(ARM_MB_SY);
-  __dsb(ARM_MB_SY);
+  arch::DeviceMemoryBarrier();
 }
 
 #endif  // ZIRCON_KERNEL_DEV_INTERRUPT_GIC_V3_INCLUDE_DEV_INTERRUPT_ARM_GICV3_REGS_H_

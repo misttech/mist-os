@@ -125,7 +125,7 @@ void arch_context_switch(Thread* oldthread, Thread* newthread)
   // DSB here to make sure any pending TLB or cache operations that we may be
   // preempting are complete before the thread switch. This avoids a problem in
   // case the thread is moved to a new cpu.
-  __dsb(ARM_MB_SY);
+  arch::DeviceMemoryBarrier();
 
   // Set the current cpu pointer in the new thread's structure so it can be
   // restored on exception entry.

@@ -181,7 +181,7 @@ inline zx_ticks_t platform_current_raw_ticks_synchronized() {
     // If all stores must be completed and "globally visible" before the TSC is
     // sampled, docs say to put an MFENCE in front of the TSC access.
     if constexpr ((Flags & GetTicksSyncFlag::kAfterPreviousStores) != GetTicksSyncFlag::kNone) {
-      __asm__ __volatile__("mfence" ::: "memory");
+      arch::DeviceMemoryBarrier();
     }
 
     // If all loads must be complete and "globally visible" (meaning that the
