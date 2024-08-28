@@ -18,16 +18,8 @@ import("//src/sys/core/build/core.gni")
 if (is_host) {
   host_test_data("test_data") {
     out_dir = get_label_info(":anything($target_toolchain)", "target_out_dir")
-    sources = [
-      "${out_dir}/recovery-eng/fuchsia.zbi",
-      "${out_dir}/recovery-fdr/fuchsia.zbi",
-      "${out_dir}/recovery-installer/fuchsia.zbi",
-    ]
-    deps = [
-      ":recovery-eng($target_toolchain)",
-      ":recovery-fdr($target_toolchain)",
-      ":recovery-installer($target_toolchain)",
-    ]
+    sources = [ "${out_dir}/recovery-fdr/fuchsia.zbi" ]
+    deps = [ ":recovery-fdr($target_toolchain)" ]
   }
 }
 
@@ -35,90 +27,26 @@ if (is_fuchsia) {
   assert(current_toolchain == default_toolchain,
          "//build/images/* are only valid in the Fuchsia toolchain")
 
-  # Parameters shared between recovery-eng and recovery-installer
-  recovery_base = {
-    testonly = true
-    image_name = "fuchsia"
-    generate_vbmeta = use_vbmeta
-
-    ramdisk_in_zbi = true
-
-    if (!fxfs_blob) {
-      generate_fvm = !bootfs_only
-      generate_fvm_fastboot = generate_fvm && assembly_generate_fvm_fastboot
-      generate_fvm_nand = generate_fvm && assembly_generate_fvm_nand
-    } else {
-      generate_fxfs = !bootfs_only
-    }
-    board_config_label = board_configuration_label
-
-    if (custom_signing_script != "") {
-      inputs = custom_signing_script_inputs
-      generate_signed_zbi = true
-    } else if (use_vboot) {
-      inputs = vboot_action.inputs
-      generate_signed_zbi = true
-    }
-  }
-
   group("recovery") {
     testonly = true
-    public_deps = [
-      ":recovery-eng",
-      ":recovery-fastboot",
-      ":recovery-fdr",
-      ":recovery-installer",
-    ]
+    public_deps = [ ":recovery-fdr" ]
   }
 
-  # These are to temporarily switch back to using the bootstrap level so that the
-  # vendor assemblies can be moved to utility with it being the same as
-  # bootstrap
-  # TODO(122863) Remove use of transitional labels
-  core_realm_aib_pkgs = []
-  core_realm_aib_shards = []
-  core_realm_network_aib_pkgs =
-      [ "//src/security/bin/root_ssl_certificates:for_transition" ]
-  core_realm_eng_aib_pkgs = [
-    # Enable ffx support.
-    "//src/connectivity/network/mdns/bundles:services",  # group for transition
-
-    # Device side of zxdb & fidlcat:
-    "//src/developer/debug/debug_agent",
+  _core_realm_deps = [
+    "//src/diagnostics/realm:core_shard",
+    "//src/firmware/fastboot-tcp:fastboot-tcp-core-shard",
+    "//src/firmware/fastboot-usb:fastboot-usb-core-shard",
+    "//src/recovery/factory_reset:factory_reset_core_shard",
+    "//src/ui/bin/brightness_manager:auto-brightness_core_shard",
   ]
-
-  _core_realm_deps =
-      core_realm_aib_shards + [
-        "//src/diagnostics/realm:core_shard",
-        "//src/firmware/fastboot-tcp:fastboot-tcp-core-shard",
-        "//src/firmware/fastboot-usb:fastboot-usb-core-shard",
-        "//src/recovery/factory_reset:factory_reset_core_shard",
-        "//src/ui/bin/brightness_manager:auto-brightness_core_shard",
-      ]
 
   core_realm_definition("core") {
     deps = _core_realm_deps +
            [ "//src/recovery/system:system_recovery_fdr_core_shard" ]
   }
 
-  core_realm_definition("core-eng") {
-    deps = _core_realm_deps + [
-             # required for SL4F
-             "//src/recovery/system:system_recovery_core_shard",
-             "//src/settings/service:setui_service_core_shard",
-           ]
-  }
-
-  core_realm_definition("core-installer") {
-    deps = _core_realm_deps +
-           [ "//src/recovery/system:system_recovery_installer_core_shard" ]
-  }
-
-  recovery_packages = board_recovery_package_labels + core_realm_aib_pkgs +
-                      core_realm_network_aib_pkgs +
-                      [
+  recovery_packages = board_recovery_package_labels + [
                         "//src/recovery/factory_reset",
-                        "//src/recovery/system:system_recovery",
                         "//src/ui/bin/brightness_manager:auto-brightness",
 
                         # Flattened from //src/sys/pkg:recovery
@@ -131,33 +59,7 @@ if (is_fuchsia) {
                         "//src/sys/pkg/bin/system-update-committer:disable",
                       ]
 
-  recovery_eng_packages =
-      recovery_packages + core_realm_eng_aib_pkgs + [
-        "//src/cobalt/bin/app:cobalt",
-        "//src/cobalt/bin/app:cobalt_registry",
-        "//src/cobalt/bin/app:config",
-
-        # The SWD stack for OTAs.
-        "//src/sys/pkg/lib/isolated-swd:isolated-swd-components",
-
-        # Userspace fastboot for flashing
-        "//src/firmware/fastboot-tcp",
-
-        # Support for hwinfo protocol to read regulatory region from factory.
-        "//src/factory/factory_store_providers",
-
-        # Support privacy switch
-        "//src/settings/service:setui_service",
-      ]
-
-  recovery_installer_packages =
-      recovery_eng_packages - [ "//src/recovery/system:system_recovery" ] + [
-        "//src/recovery/system:system_recovery_installer",
-        "//src/firmware/fastboot-tcp:fastboot_tcp_mdns_config",
-      ]
-
   recovery_fdr_packages = recovery_packages
-  recovery_fdr_packages -= [ "//src/recovery/system:system_recovery" ]
   recovery_fdr_packages += [ "//src/recovery/system:system_recovery_fdr" ]
 
   _storage_config = {
@@ -180,129 +82,10 @@ if (is_fuchsia) {
     }
   }
 
-  product_assembly_configuration("for-eng") {
-    platform = {
-      build_type = "eng"
-      feature_set_level = "utility"
-      if (authorized_ssh_keys_path != false) {
-        development_support = {
-          authorized_ssh_keys_path =
-              rebase_path(authorized_ssh_keys_path, root_build_dir)
-        }
-      }
-      connectivity = {
-        wlan = {
-          legacy_privacy_support = true
-        }
-      }
-      development_support = {
-        include_sl4f = true
-      }
-      forensics = {
-        feedback = {
-          remote_device_id_provider = true
-        }
-      }
-      graphics = {
-        enable_virtual_console = false
-      }
-      forward_variables_from(_storage_config, "*")
-    }
-    product = {
-    }
-  }
-
-  assembled_system("recovery-eng") {
-    forward_variables_from(recovery_base, "*")
-    namespace = "recovery-eng"
-    allow_eng_platform_bundle_use = true
-    base_packages = recovery_eng_packages
-    core_realm_definition = ":core-eng"
-
-    product_assembly_config_label = ":for-eng"
-    board_config_label = recovery_board_configuration_label
-  }
-
-  product_assembly_configuration("for-fastboot") {
-    platform = {
-      build_type = "eng"
-      feature_set_level = "utility"
-      connectivity = {
-        wlan = {
-          legacy_privacy_support = true
-        }
-      }
-      development_support = {
-        include_sl4f = true
-        if (authorized_ssh_keys_path != false) {
-          authorized_ssh_keys_path =
-              rebase_path(authorized_ssh_keys_path, root_build_dir)
-        }
-      }
-      graphics = {
-        enable_virtual_console = false
-      }
-      forward_variables_from(_storage_config, "*")
-    }
-    product = {
-    }
-  }
-
-  # A minimal recovery image that runs userspace fastboot on tcp.
-  assembled_system("recovery-fastboot") {
-    forward_variables_from(recovery_base, "*")
-    namespace = "recovery-fastboot"
-    allow_eng_platform_bundle_use = true
-    base_packages = []
-    core_realm_definition = ":core-eng"
-
-    product_assembly_config_label = ":for-fastboot"
-    board_config_label = recovery_board_configuration_label
-
-    base_packages = core_realm_aib_pkgs + core_realm_eng_aib_pkgs +
-                    core_realm_network_aib_pkgs +
-                    [
-                      "//src/firmware/fastboot-tcp",
-                      "//src/firmware/fastboot-tcp:fastboot_tcp_mdns_config",
-                      "//src/firmware/fastboot-usb",
-                    ]
-
-    if (recovery_is_recovery_fastboot) {
-      image_metadata_overrides = {
-        zbi = {
-          name = "zircon-r"
-          if (zircon_r_partition != "") {
-            fastboot_flash = [ zircon_r_partition ]
-          }
-          bootserver_pave = [ "--zirconr" ]
-        }
-
-        if (sign_zbi) {
-          zbi_signed = {
-            name = "zircon-r.signed"
-            if (zircon_r_partition != "") {
-              fastboot_flash = [ zircon_r_partition ]
-            }
-            bootserver_pave = [ "--zirconr" ]
-          }
-        }
-
-        if (use_vbmeta) {
-          vbmeta = {
-            name = "zircon-r"
-            if (vbmeta_r_partition != "") {
-              fastboot_flash = [ vbmeta_r_partition ]
-            }
-            bootserver_pave = [ "--vbmetar" ]
-          }
-        }
-      }
-    }
-  }
-
   product_assembly_configuration("for-fdr") {
     platform = {
-      build_type = "user"
+      # This uses eng so that the serial console is available for running as a test image.
+      build_type = "eng"
       feature_set_level = "utility"
       graphics = {
         enable_virtual_console = false
@@ -331,7 +114,6 @@ if (is_fuchsia) {
 
     ramdisk_in_zbi = true
 
-    additional_boot_args = [ "virtcon.disable=true" ]
     cmdline = []
 
     product_assembly_config_label = ":for-fdr"
@@ -344,54 +126,5 @@ if (is_fuchsia) {
       inputs = vboot_action.inputs
       generate_signed_zbi = true
     }
-  }
-
-  product_assembly_configuration("for-installer") {
-    platform = {
-      build_type = "eng"
-      feature_set_level = "utility"
-      development_support = {
-        include_sl4f = true
-        if (authorized_ssh_keys_path != false) {
-          authorized_ssh_keys_path =
-              rebase_path(authorized_ssh_keys_path, root_build_dir)
-        }
-      }
-      connectivity = {
-        wlan = {
-          legacy_privacy_support = true
-        }
-
-        # After issuing device reboot when `ffx target flash`, ffx will block
-        # on the first mdns respond from the target as a signal of re-discovery.
-        # It also seems to temporarily stop updating the target according to
-        # later responds that follow. If we are unlucky and this first responds
-        # is _fuchsia._udp instead of _fastboot._tcp, ffx will fail to
-        # recognize the device as being in the fastboot state. For now remove
-        # _fuchsia._udp service as a workaround in favor of _fastboot._tcp
-        # until we need both.
-        mdns = {
-          publish_fuchsia_dev_wired_service = false
-        }
-      }
-      graphics = {
-        enable_virtual_console = false
-      }
-      forward_variables_from(_storage_config, "*")
-    }
-    product = {
-    }
-  }
-
-  assembled_system("recovery-installer") {
-    forward_variables_from(recovery_base, "*")
-    namespace = "recovery-installer"
-    allow_eng_platform_bundle_use = true
-    base_packages = recovery_installer_packages
-
-    product_assembly_config_label = ":for-installer"
-    board_config_label = recovery_board_configuration_label
-
-    core_realm_definition = ":core-installer"
   }
 }

@@ -157,11 +157,7 @@ files = {
   if (use_bazel_images_only) {
     # GN and Bazel assembly should share the same recovery image config, so use
     # GN's recovery_label to determine Bazel's recovery image name.
-    if (recovery_is_recovery_eng || recovery_is_recovery_fastboot) {
-      _recovery_name = "fuchsia"
-    } else {
-      _recovery_name = get_label_info(recovery_label, "name")
-    }
+    _recovery_name = get_label_info(recovery_label, "name")
     _recovery_outdir = _images_outdir + "/system_r"
     recovery_zbi = "${_recovery_outdir}/${_recovery_name}.${_image_suffix}"
     recovery_vbmeta = "${_recovery_outdir}/${_recovery_name}.vbmeta"
@@ -171,14 +167,6 @@ files = {
                                         "target_out_dir") + "/zedboot"
       recovery_zbi = "${_recovery_outdir}/zedboot.${_image_suffix}"
       recovery_vbmeta = "${_recovery_outdir}/zedboot.vbmeta"
-    } else if (recovery_is_recovery_eng) {
-      _recovery_outdir = root_out_dir
-      recovery_zbi = "${root_out_dir}/obj/build/images/recovery/recovery-eng/fuchsia.${_image_suffix}"
-      recovery_vbmeta = "${root_out_dir}/obj/build/images/recovery/recovery-eng/fuchsia.vbmeta"
-    } else if (recovery_is_recovery_fastboot) {
-      _recovery_outdir = root_out_dir
-      recovery_zbi = "${root_out_dir}/obj/build/images/recovery/recovery-fastboot/fuchsia.${_image_suffix}"
-      recovery_vbmeta = "${root_out_dir}/obj/build/images/recovery/recovery-fastboot/fuchsia.vbmeta"
     } else {
       # The standard recovery image and vbmeta locations.
       _recovery_outdir = root_out_dir

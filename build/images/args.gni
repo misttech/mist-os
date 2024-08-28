@@ -159,7 +159,7 @@ declare_args() {
   # room to initialize on boot.
   assembly_generate_fvm_nand = false
 
-  # Allows a product to specify the recovery image used in the zirconr slot.
+  # Allows a product to specify the recovery image used in the zircon_r slot.
   # Default recovery image is zedboot. Overriding this value will keep zedboot
   # in the build but will not include it as the default zirconr image.
   # Recovery images can provide an update target by specifying the metadata item
@@ -219,16 +219,6 @@ declare_args() {
 recovery_is_zedboot =
     get_label_info(recovery_label, "label_with_toolchain") ==
     get_label_info("//build/images/zedboot", "label_with_toolchain")
-
-recovery_is_recovery_eng =
-    get_label_info(recovery_label, "label_with_toolchain") ==
-    get_label_info("//build/images/recovery:recovery-eng",
-                   "label_with_toolchain")
-
-recovery_is_recovery_fastboot =
-    get_label_info(recovery_label, "label_with_toolchain") ==
-    get_label_info("//build/images/recovery:recovery-fastboot",
-                   "label_with_toolchain")
 
 assert(custom_signing_script == "" || !use_vboot,
        "custom_signing_script and use_vboot cannot be used together!")

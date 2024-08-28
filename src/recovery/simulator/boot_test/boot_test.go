@@ -22,7 +22,7 @@ func TestBoot(t *testing.T) {
 	})
 	arch := distro.TargetCPU()
 	device := emulator.DefaultVirtualDevice(string(arch))
-	device.Initrd = "recovery-eng"
+	device.Initrd = "recovery-fdr"
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	i := distro.CreateContext(ctx, device)
