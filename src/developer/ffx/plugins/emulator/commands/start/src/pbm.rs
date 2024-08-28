@@ -10,14 +10,14 @@ use emulator_instance::{
     NetworkingMode, OperatingSystem,
 };
 use ffx_config::EnvironmentContext;
-use ffx_emulator_common::config::{EMU_UPSCRIPT_FILE, KVM_PATH};
+use ffx_emulator_common::config::{EMU_UPSCRIPT_FILE, KVM_PATH, OVMF_CODE};
 use ffx_emulator_common::split_once;
 use ffx_emulator_common::tuntap::tap_available;
 use ffx_emulator_config::convert_bundle_to_configs;
 use ffx_emulator_start_args::StartCommand;
-use fho::user_error;
+use fho::{bug, user_error};
 use pbms::ProductBundle;
-use sdk_metadata::VirtualDeviceManifest;
+use sdk_metadata::{CpuArchitecture, VirtualDeviceManifest};
 use std::collections::hash_map::DefaultHasher;
 use std::collections::HashMap;
 use std::env;
@@ -34,25 +34,54 @@ pub(crate) async fn make_configs(
     product_bundle: Option<ProductBundle>,
     emu_instances: &EmulatorInstances,
 ) -> Result<EmulatorConfiguration> {
-    // Start with a default structure, than fill it in as we go.
-    let mut emu_config = EmulatorConfiguration::default();
-
+    // Start with either the custom config template passed in on the command line,
+    // or from the product bundle.
+    let mut emu_config =
     // If the user specified a path to a flag config file on the command line, use that.
     // This bypasses the rest of the configuration phase, which means the EmulationConfiguration
     // contents don't actually represent the configuration being used to launch the emulator.
     if let Some(template_file) = &cmd.config {
+        let mut emu_config = EmulatorConfiguration::default();
         emu_config.runtime.template = Some(PathBuf::from(env::current_dir()?).join(template_file));
         emu_config.runtime.config_override = true;
+        emu_config
     } else {
-        if let Some(pb) = product_bundle {
-            // Apply the values from the manifest to an emulation configuration.
-            emu_config = convert_bundle_to_configs(&pb, cmd.device().await?, cmd.verbose)
-                .await
-                .context("problem with convert_bundle_to_configs")?;
-        } else {
-            bail!("Product bundle required for configuring the emulator instance.")
+        let pb = product_bundle.ok_or_else(|| user_error!("Product bundle required for configuring the emulator instance."))?;
+        // Apply the values from the manifest to an emulation configuration.
+        let mut emu_config = convert_bundle_to_configs(&pb, cmd.device().await?, cmd.verbose)
+            .await.context("problem with convert_bundle_to_configs")?;
+        // Set OVMF references for non riscv guests (at this time we have no efi support for riscv).
+        if emu_config.device.cpu.architecture != CpuArchitecture::Riscv64 {
+            let sdk = ctx.get_sdk().await?;
+            emu_config.guest.ovmf_code = ffx_config::get_host_tool(&sdk, OVMF_CODE).await
+                .map_err(|e| bug!("cannot locate ovmf code in SDK: {e}"))?;
+
+            tracing::info!("Found ovmf code at {:?}", &emu_config.guest.ovmf_code);
+
+            // Non-fatal error since infra may not always supply the file if it is not needed for the
+            // tests being run.
+            if !emu_config.guest.ovmf_code.exists() {
+                tracing::warn!("cannot find OVMF code at {:?}", emu_config.guest.ovmf_code);
+            }
+
+            // vars is in the same directory with the same basename prefix. ARM64 and x64 have different
+            // filenames.
+            let vars_filename = if let Some(code_name) = emu_config.guest.ovmf_code.file_name() {
+                code_name.to_string_lossy().replace("_CODE.fd", "_VARS.fd")
+            } else {
+                tracing::warn!("unrecognized OVMF code file name {:?}", emu_config.guest.ovmf_code);
+                "OVMF_VARS.fd".to_string()
+            };
+            let vars =
+                emu_config.guest.ovmf_code.parent().expect("ovmf has parent dir").join(vars_filename);
+            if !vars.exists() {
+                tracing::warn!("cannot find OVMF vars at {vars:?}");
+            }
+            emu_config.guest.ovmf_vars = vars;
         }
-    }
+        emu_config
+
+    };
 
     // HostConfig values that come from the OS environment.
     emu_config.host.os = std::env::consts::OS.to_string().into();
