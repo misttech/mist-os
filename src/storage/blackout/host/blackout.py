@@ -50,13 +50,18 @@ class BlackoutTest(test_case_revive.TestCaseRevive):
         self.create_blackout_component()
 
     def teardown_class(self) -> None:
-        self.dut.ffx.run(
-            [
-                "component",
-                "stop",
-                self.component_name,
-            ]
-        )
+        try:
+            self.dut.ffx.run(
+                [
+                    "component",
+                    "stop",
+                    self.component_name,
+                ]
+            )
+        except honeydew.errors.FfxCommandError:
+            _LOGGER.warning(
+                "Blackout: Failed to stop component during teardown"
+            )
         super().teardown_class()
 
     def setup_test(self) -> None:
