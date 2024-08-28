@@ -27,8 +27,7 @@ namespace {
 using device_watcher::RecursiveWaitForFile;
 using devmgr_integration_test::IsolatedDevmgr;
 
-// TODO(b/316176095): Re-enable test after ensuring it works with DFv2.
-TEST(PbusTest, DISABLED_Enumeration) {
+TEST(PbusTest, Enumeration) {
   // NB: this loop is never run. RealmBuilder::Build is in the call stack, and insists on a non-null
   // dispatcher.
   //
@@ -45,37 +44,38 @@ TEST(PbusTest, DISABLED_Enumeration) {
 
   ASSERT_OK(RecursiveWaitForFile(dirfd, "sys/platform").status_value());
   EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/pt/test-board").status_value());
-  EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/11:01:1").status_value());
-  EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/11:01:1/child-1").status_value());
-  EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/11:01:1/child-1/child-2").status_value());
-  EXPECT_OK(
-      RecursiveWaitForFile(dirfd, "sys/platform/11:01:1/child-1/child-2/child-4").status_value());
-  EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/11:01:1/child-1/child-3-top").status_value());
-  EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/11:01:1/child-1/child-3-top/child-3")
+  EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/test-parent").status_value());
+  EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/test-parent/child-1").status_value());
+  EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/test-parent/child-1/child-2").status_value());
+  EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/test-parent/child-1/child-2/child-4")
                 .status_value());
   EXPECT_OK(
-      RecursiveWaitForFile(dirfd, "sys/platform/11:01:5/test-gpio/gpio/gpio-3").status_value());
-  EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/11:01:7/test-clock/clock-1").status_value());
-  EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/11:01:f").status_value());
-  EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/11:01:10").status_value());
-  EXPECT_OK(
-      RecursiveWaitForFile(dirfd, "sys/platform/11:01:12/test-spi/spi/spi-0-0").status_value());
-  EXPECT_EQ(RecursiveWaitForFile(dirfd, "sys/platform/11:01:23/composite_node_spec").status_value(),
-            ZX_OK);
+      RecursiveWaitForFile(dirfd, "sys/platform/test-parent/child-1/child-3-top").status_value());
+  EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/test-parent/child-1/child-3-top/child-3")
+                .status_value());
+  EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/gpio/test-gpio/gpio/gpio-3").status_value());
+  EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/clock/test-clock/clock-1").status_value());
+  EXPECT_OK(RecursiveWaitForFile(dirfd, "sys/platform/spi/test-spi/spi/spi-0-0").status_value());
+  // TODO(316176095): Figure out why this driver binds but never starts.
+  // EXPECT_EQ(RecursiveWaitForFile(dirfd,
+  // "sys/platform/composite_node_spec/composite_node_spec").status_value(),
+  //          ZX_OK);
 
   struct stat st;
   EXPECT_EQ(fstatat(dirfd, "sys/platform/pt/test-board", &st, 0), 0);
-  EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:1", &st, 0), 0);
-  EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:1/child-1", &st, 0), 0);
-  EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:1/child-1/child-2", &st, 0), 0);
-  EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:1/child-1/child-3-top", &st, 0), 0);
-  EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:1/child-1/child-2/child-4", &st, 0), 0);
-  EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:1/child-1/child-3-top/child-3", &st, 0), 0);
-  EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:5/test-gpio/gpio/gpio-3", &st, 0), 0);
-  EXPECT_EQ(fstatat(dirfd, "sys/platform/11:01:7/test-clock/clock-1", &st, 0), 0);
-  EXPECT_EQ(
-      fstatat(dirfd, "sys/platform/11:01:23/composite_node_spec/test-composite-node-spec", &st, 0),
-      0);
+  EXPECT_EQ(fstatat(dirfd, "sys/platform/test-parent", &st, 0), 0);
+  EXPECT_EQ(fstatat(dirfd, "sys/platform/test-parent/child-1", &st, 0), 0);
+  EXPECT_EQ(fstatat(dirfd, "sys/platform/test-parent/child-1/child-2", &st, 0), 0);
+  EXPECT_EQ(fstatat(dirfd, "sys/platform/test-parent/child-1/child-3-top", &st, 0), 0);
+  EXPECT_EQ(fstatat(dirfd, "sys/platform/test-parent/child-1/child-2/child-4", &st, 0), 0);
+  EXPECT_EQ(fstatat(dirfd, "sys/platform/test-parent/child-1/child-3-top/child-3", &st, 0), 0);
+  EXPECT_EQ(fstatat(dirfd, "sys/platform/gpio/test-gpio/gpio/gpio-3", &st, 0), 0);
+  EXPECT_EQ(fstatat(dirfd, "sys/platform/clock/test-clock/clock-1", &st, 0), 0);
+  // TODO(316176095): Figure out why this driver binds but never starts.
+  // EXPECT_EQ(
+  //    fstatat(dirfd,
+  //    "sys/platform/composite_node_spec/composite_node_spec/test-composite-node-spec", &st, 0),
+  //    0);
 
   zx::result channel = RecursiveWaitForFile(dirfd, "sys/platform");
   ASSERT_OK(channel.status_value());

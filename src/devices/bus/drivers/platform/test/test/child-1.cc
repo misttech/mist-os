@@ -35,7 +35,7 @@ class Child1Driver : public fdf::DriverBase {
                                       bind_fuchsia_test_platform::BIND_PLATFORM_DEV_PID_PBUS_TEST),
                     fdf::MakeProperty(bind_fuchsia::PLATFORM_DEV_DID,
                                       bind_fuchsia_test_platform::BIND_PLATFORM_DEV_DID_CHILD_3)};
-    result = AddChild("child-3", child_3_properties, {});
+    result = AddChild("child-3-top", child_3_properties, {});
     if (result.is_error()) {
       return result.take_error();
     }

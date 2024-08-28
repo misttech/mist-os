@@ -251,42 +251,6 @@ fuchsia_driver_component("test-composite-node-spec") {
   manifest = "meta/test-composite-node-spec.cml"
 }
 
-driver_bind_rules("test-composite-bind") {
-  testonly = true
-  rules = "meta/test-composite.bind"
-  deps = [ "//src/devices/bind/fuchsia.test.platform" ]
-}
-
-fuchsia_driver("test-composite-driver") {
-  testonly = true
-  output_name = "test-composite"
-  configs += [ "//build/config:all_source" ]
-  sources = [ "test/composite.cc" ]
-  deps = [
-    ":test-composite-bind",
-    "//sdk/banjo/fuchsia.hardware.platform.device:fuchsia.hardware.platform.device_banjo_cpp",
-    "//sdk/banjo/fuchsia.hardware.test:fuchsia.hardware.test_banjo_cpp",
-    "//sdk/fidl/fuchsia.hardware.gpio:fuchsia.hardware.gpio_cpp",
-    "//sdk/fidl/fuchsia.hardware.spi:fuchsia.hardware.spi_cpp",
-    "//src/devices/bind/fuchsia.test:fuchsia.test_cpp",
-    "//src/devices/lib/driver",
-    "//src/lib/ddk",
-    "//src/lib/ddktl",
-
-    # TODO(https://fxbug.dev/42113849): Migrate to the new bind rules and delete the below
-    "//src/lib/ddk:ddk-deprecated-binding-headers",
-    "//zircon/system/ulib/sync",
-  ]
-}
-
-fuchsia_driver_component("test-composite") {
-  testonly = true
-  component_name = "test-composite"
-  deps = [ ":test-composite-driver" ]
-  info = "meta/test-driver-info.json"
-  manifest = "meta/test-composite.cml"
-}
-
 simple_drivers = [
   "child-1",
   "child-2",
@@ -329,7 +293,6 @@ fuchsia_unittest_package("platform-bus-test") {
     ":platform-bus",
     ":test-board",
     ":test-clock",
-    ":test-composite",
     ":test-composite-node-spec",
     ":test-gpio",
     ":test-power",
