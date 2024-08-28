@@ -30,10 +30,11 @@ use netstack3_base::socket::SocketIpAddrExt as _;
 use netstack3_base::sync::{Mutex, PrimaryRc, RwLock, StrongRc, WeakRc};
 use netstack3_base::{
     AnyDevice, BroadcastIpExt, CoreTimerContext, Counter, CounterContext, DeviceIdContext,
-    DeviceIdentifier as _, ErrorAndSerializer, EventContext, FrameDestination, HandleableTimer,
-    Inspectable, Inspector, InstantContext, IpExt, NestedIntoCoreTimerCtx, NotFoundError,
-    RngContext, SendFrameErrorReason, StrongDeviceIdentifier, TimerBindingsTypes, TimerContext,
-    TimerHandler, TracingContext, WrapBroadcastMarker,
+    DeviceIdentifier as _, DeviceWithName, ErrorAndSerializer, EventContext, FrameDestination,
+    HandleableTimer, Inspectable, Inspector, InstantContext, IpExt, Matcher as _,
+    NestedIntoCoreTimerCtx, NotFoundError, RngContext, SendFrameErrorReason,
+    StrongDeviceIdentifier, TimerBindingsTypes, TimerContext, TimerHandler, TracingContext,
+    WrapBroadcastMarker,
 };
 use netstack3_filter::{
     self as filter, ConntrackConnection, FilterBindingsContext, FilterBindingsTypes,
@@ -74,8 +75,10 @@ use crate::internal::reassembly::{
     FragmentBindingsTypes, FragmentHandler, FragmentProcessingState, FragmentTimerId,
     FragmentablePacket, IpPacketFragmentCache,
 };
-use crate::internal::routing::rules::{Rule, RuleAction, RulesTable};
-use crate::internal::routing::{IpRoutingDeviceContext, RoutingTable};
+use crate::internal::routing::rules::{Rule, RuleAction, RuleInput, RulesTable};
+use crate::internal::routing::{
+    IpRoutingDeviceContext, NonLocalSrcAddrPolicy, PacketOrigin, RoutingTable,
+};
 use crate::internal::socket::{IpSocketBindingsContext, IpSocketContext, IpSocketHandler};
 use crate::internal::types::{self, Destination, NextHop, ResolvedRoute, RoutableIpAddr};
 use crate::internal::{ipv6, multicast_forwarding};
@@ -463,7 +466,13 @@ impl<
         dst: SpecifiedAddr<I::Addr>,
         device: Option<&Self::DeviceId>,
     ) {
-        match lookup_route_table(self, device, dst.get()) {
+        match lookup_route_table(
+            self,
+            dst.get(),
+            // TODO(https://fxbug.dev/361817008): This will be broken by PBRs with custom rules. We
+            // need to make sure we confirm the reachability with the correct neighbor.
+            PacketOrigin::Local { bound_address: None, bound_device: device },
+        ) {
             Some(Destination { next_hop, device }) => {
                 let neighbor = match next_hop {
                     NextHop::RemoteAsNeighbor => dst,
@@ -691,7 +700,9 @@ impl IpLayerIpExt for Ipv6 {
 }
 
 /// The state context provided to the IP layer.
-pub trait IpStateContext<I: IpLayerIpExt>: IpRouteTablesContext<I> {
+pub trait IpStateContext<I: IpLayerIpExt>:
+    IpRouteTablesContext<I, DeviceId: DeviceWithName>
+{
     /// The context that provides access to the IP routing tables.
     type IpRouteTablesCtx<'a>: IpRouteTablesContext<I, DeviceId = Self::DeviceId>;
 
@@ -981,27 +992,24 @@ where
 // `None`.
 fn get_local_addr<I: Ip + IpLayerIpExt, CC: IpDeviceStateContext<I>>(
     core_ctx: &mut CC,
-    local_ip: Option<IpDeviceAddr<I::Addr>>,
+    local_ip_and_policy: Option<(IpDeviceAddr<I::Addr>, NonLocalSrcAddrPolicy)>,
     device: &CC::DeviceId,
     remote_addr: Option<RoutableIpAddr<I::Addr>>,
-    allow_non_local_src: bool,
 ) -> Result<IpDeviceAddr<I::Addr>, ResolveRouteError> {
     // TODO(https://fxbug.dev/360187268): Use a witness type to prevent callers
     // from providing a multicast local ip.
-    let local_ip =
-        if local_ip.is_some_and(|ip| ip.addr().is_multicast()) { None } else { local_ip };
+    let local_ip_and_policy = local_ip_and_policy.filter(|(ip, _policy)| !ip.addr().is_multicast());
 
-    if let Some(local_ip) = local_ip {
-        if allow_non_local_src {
-            return Ok(local_ip);
+    match local_ip_and_policy {
+        Some((local_ip, NonLocalSrcAddrPolicy::Allow)) => Ok(local_ip),
+        Some((local_ip, NonLocalSrcAddrPolicy::Deny)) => {
+            is_local_assigned_address(core_ctx, device, local_ip.into())
+                .then_some(local_ip)
+                .ok_or(ResolveRouteError::NoSrcAddr)
         }
-        is_local_assigned_address(core_ctx, device, local_ip.into())
-            .then_some(local_ip)
-            .ok_or(ResolveRouteError::NoSrcAddr)
-    } else {
-        core_ctx
+        None => core_ctx
             .get_local_addr_for_remote(device, remote_addr.map(Into::into))
-            .ok_or(ResolveRouteError::NoSrcAddr)
+            .ok_or(ResolveRouteError::NoSrcAddr),
     }
 }
 
@@ -1042,40 +1050,48 @@ fn walk_rules<
 >(
     core_ctx: &mut CC,
     init: State,
+    rule_input: &RuleInput<'_, I, CC::DeviceId>,
     mut lookup_table: F,
 ) -> ControlFlow<RuleAction<O>, State> {
     core_ctx.with_rules_table(|core_ctx, rules| {
-        rules.iter().try_fold(init, |state, Rule { action }| match action {
-            RuleAction::Unreachable => return ControlFlow::Break(RuleAction::Unreachable),
-            RuleAction::Lookup(table_id) => {
-                core_ctx.with_ip_routing_table(table_id, |core_ctx, table| {
-                    match lookup_table(state, core_ctx, table) {
-                        ControlFlow::Break(out) => ControlFlow::Break(RuleAction::Lookup(out)),
-                        ControlFlow::Continue(state) => ControlFlow::Continue(state),
-                    }
-                })
+        rules.iter().try_fold(init, |state, Rule { action, matcher }| {
+            if !matcher.matches(rule_input) {
+                return ControlFlow::Continue(state);
+            }
+            match action {
+                RuleAction::Unreachable => return ControlFlow::Break(RuleAction::Unreachable),
+                RuleAction::Lookup(table_id) => {
+                    core_ctx.with_ip_routing_table(table_id, |core_ctx, table| {
+                        match lookup_table(state, core_ctx, table) {
+                            ControlFlow::Break(out) => ControlFlow::Break(RuleAction::Lookup(out)),
+                            ControlFlow::Continue(state) => ControlFlow::Continue(state),
+                        }
+                    })
+                }
             }
         })
     })
 }
 
-/// Returns the forwarding instructions for reaching the given destination.
+/// Returns the outgoing routing instructions for reaching the given destination.
 ///
 /// If a `device` is specified, the resolved route is limited to those that
 /// egress over the device.
 ///
 /// If `src_ip` is specified the resolved route is limited to those that egress
 /// over a device with the address assigned.
-pub fn resolve_route_to_destination<
+///
+/// This function should only be used for calculating a route for an outgoing packet
+/// that is generated by us.
+pub fn resolve_output_route_to_destination<
     I: Ip + IpDeviceStateIpExt + IpDeviceIpExt + IpLayerIpExt,
     BC: IpDeviceBindingsContext<I, CC::DeviceId> + IpLayerBindingsContext<I, CC::DeviceId>,
     CC: IpLayerContext<I, BC> + device::IpDeviceConfigurationContext<I, BC>,
 >(
     core_ctx: &mut CC,
     device: Option<&CC::DeviceId>,
-    src_ip: Option<IpDeviceAddr<I::Addr>>,
+    src_ip_and_policy: Option<(IpDeviceAddr<I::Addr>, NonLocalSrcAddrPolicy)>,
     dst_ip: Option<RoutableIpAddr<I::Addr>>,
-    allow_non_local_src: bool,
 ) -> Result<ResolvedRoute<I, CC::DeviceId>, ResolveRouteError> {
     enum LocalDelivery<A, D> {
         WeakLoopback { dst_ip: A, device: D },
@@ -1111,7 +1127,7 @@ pub fn resolve_route_to_destination<
                     // a zone ID, then use strong host to enforce that the
                     // source and destination addresses are assigned to the
                     // same interface.
-                    if src_ip.is_some_and(|ip| ip.as_ref().must_have_zone())
+                    if src_ip_and_policy.is_some_and(|(ip, _policy)| ip.as_ref().must_have_zone())
                         || dst_ip.as_ref().must_have_zone()
                     {
                         LocalDelivery::StrongForDevice(dst_device)
@@ -1128,20 +1144,19 @@ pub fn resolve_route_to_destination<
 
         let (src_addr, dest_device) = match local_delivery {
             LocalDelivery::WeakLoopback { dst_ip, device } => {
-                let src_ip = match src_ip {
-                    Some(src_ip) => {
-                        if !allow_non_local_src {
-                            let _device = get_device_with_assigned_address(core_ctx, src_ip.into())
-                                .ok_or(ResolveRouteError::NoSrcAddr)?;
-                        }
+                let src_ip = match src_ip_and_policy {
+                    Some((src_ip, NonLocalSrcAddrPolicy::Deny)) => {
+                        let _device = get_device_with_assigned_address(core_ctx, src_ip.into())
+                            .ok_or(ResolveRouteError::NoSrcAddr)?;
                         src_ip
                     }
+                    Some((src_ip, NonLocalSrcAddrPolicy::Allow)) => src_ip,
                     None => dst_ip,
                 };
                 (src_ip, device)
             }
             LocalDelivery::StrongForDevice(device) => {
-                (get_local_addr(core_ctx, src_ip, &device, dst_ip, allow_non_local_src)?, device)
+                (get_local_addr(core_ctx, src_ip_and_policy, &device, dst_ip)?, device)
             }
         };
         return Ok(ResolvedRoute {
@@ -1151,17 +1166,19 @@ pub fn resolve_route_to_destination<
             next_hop: NextHop::RemoteAsNeighbor,
         });
     }
+    let bound_address = src_ip_and_policy.map(|(sock_addr, _policy)| sock_addr.into_inner().get());
+    let rule_input =
+        RuleInput { packet_origin: PacketOrigin::Local { bound_address, bound_device: device } };
     let result = walk_rules(
         core_ctx,
         None, /* first error encountered */
+        &rule_input,
         |first_error, core_ctx, table| {
             let mut matching_with_addr = table.lookup_filter_map(
                 core_ctx,
                 device,
                 dst_ip.map_or(I::UNSPECIFIED_ADDRESS, |a| a.addr()),
-                |core_ctx, d| {
-                    Some(get_local_addr(core_ctx, src_ip, d, dst_ip, allow_non_local_src))
-                },
+                |core_ctx, d| Some(get_local_addr(core_ctx, src_ip_and_policy, d, dst_ip)),
             );
 
             let first_error_in_this_table = match matching_with_addr.next() {
@@ -1239,7 +1256,17 @@ impl<
         addr: RoutableIpAddr<I::Addr>,
         transparent: bool,
     ) -> Result<ResolvedRoute<I, CC::DeviceId>, ResolveRouteError> {
-        resolve_route_to_destination(self, device, local_ip, Some(addr), transparent)
+        let src_ip_and_policy = local_ip.map(|local_ip| {
+            (
+                local_ip,
+                if transparent {
+                    NonLocalSrcAddrPolicy::Allow
+                } else {
+                    NonLocalSrcAddrPolicy::Deny
+                },
+            )
+        });
+        resolve_output_route_to_destination(self, device, src_ip_and_policy, Some(addr))
     }
 
     fn send_ip_packet<S>(
@@ -3175,6 +3202,8 @@ pub enum DropReason {
     Tentative,
     /// Remote packet destined to the unspecified address.
     UnspecifiedDestination,
+    /// Cannot forward a packet with unspecified source address.
+    ForwardUnspecifiedSource,
     /// Packet should be forwarded but packet's inbound interface has forwarding
     /// disabled.
     ForwardingDisabledInboundIface,
@@ -3425,17 +3454,29 @@ fn receive_ip_packet_action_common<
         // to mean that, consistent with IPv4's behavior, we should silently
         // discard the packet in this case.
         core_ctx.increment(|counters| &counters.forwarding_disabled);
-        ReceivePacketAction::Drop { reason: DropReason::ForwardingDisabledInboundIface }
-    } else {
-        match lookup_route_table(core_ctx, None, *dst_ip) {
-            Some(dst) => {
-                core_ctx.increment(|counters| &counters.forward);
-                ReceivePacketAction::Forward { original_dst: dst_ip, dst }
-            }
-            None => {
-                core_ctx.increment(|counters| &counters.no_route_to_host);
-                ReceivePacketAction::SendNoRouteToDest { dst: dst_ip }
-            }
+        return ReceivePacketAction::Drop { reason: DropReason::ForwardingDisabledInboundIface };
+    }
+    // Per https://www.rfc-editor.org/rfc/rfc4291.html#section-2.5.2:
+    //   An IPv6 packet with a source address of unspecified must never be forwarded by an IPv6
+    //   router.
+    // Per https://datatracker.ietf.org/doc/html/rfc1812#section-5.3.7:
+    //   A router SHOULD NOT forward any packet that has an invalid IP source address or a source
+    //   address on network 0
+    let Some(source_address) = SpecifiedAddr::new(packet.src_ip()) else {
+        return ReceivePacketAction::Drop { reason: DropReason::ForwardUnspecifiedSource };
+    };
+    match lookup_route_table(
+        core_ctx,
+        *dst_ip,
+        PacketOrigin::NonLocal { source_address, incoming_device: device_id },
+    ) {
+        Some(dst) => {
+            core_ctx.increment(|counters| &counters.forward);
+            ReceivePacketAction::Forward { original_dst: dst_ip, dst }
+        }
+        None => {
+            core_ctx.increment(|counters| &counters.no_route_to_host);
+            ReceivePacketAction::SendNoRouteToDest { dst: dst_ip }
         }
     }
 }
@@ -3443,11 +3484,16 @@ fn receive_ip_packet_action_common<
 // Look up the route to a host.
 fn lookup_route_table<I: IpLayerIpExt, CC: IpStateContext<I>>(
     core_ctx: &mut CC,
-    device: Option<&CC::DeviceId>,
     dst_ip: I::Addr,
+    packet_origin: PacketOrigin<I, &CC::DeviceId>,
 ) -> Option<Destination<I::Addr, CC::DeviceId>> {
-    match walk_rules(core_ctx, (), |(), core_ctx, table| {
-        match table.lookup(core_ctx, device, dst_ip) {
+    let bound_device = match packet_origin {
+        PacketOrigin::Local { bound_address: _, bound_device } => bound_device,
+        PacketOrigin::NonLocal { source_address: _, incoming_device: _ } => None,
+    };
+    let rule_input = RuleInput { packet_origin };
+    match walk_rules(core_ctx, (), &rule_input, |(), core_ctx, table| {
+        match table.lookup(core_ctx, bound_device, dst_ip) {
             Some(dst) => ControlFlow::Break(Some(dst)),
             None => ControlFlow::Continue(()),
         }

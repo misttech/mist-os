@@ -8,11 +8,12 @@ use core::cell::RefCell;
 use assert_matches::assert_matches;
 use ip_test_macro::ip_test;
 use netstack3_base::socket::SocketIpAddr;
-use netstack3_base::testutil::{FakeDeviceId, TestIpExt};
-use netstack3_base::CtxPair;
+use netstack3_base::testutil::{MultipleDevicesId, TestIpExt};
+use netstack3_base::{CtxPair, SubnetMatcher};
 use packet::InnerPacketBuilder as _;
 use packet_formats::ip::IpProto;
 
+use crate::internal::routing::rules::RuleMatcher;
 use crate::internal::routing::testutil;
 use crate::{Destination, Entry, Metric, NextHop, RawMetric};
 
@@ -20,13 +21,13 @@ use super::*;
 
 struct IpFakeCoreCtx<I: IpLayerIpExt> {
     counters: IpCounters<I>,
-    rules_table: Rc<RefCell<RulesTable<I, FakeDeviceId>>>,
-    main_table_id: RoutingTableId<I, FakeDeviceId>,
+    rules_table: Rc<RefCell<RulesTable<I, MultipleDevicesId>>>,
+    main_table_id: RoutingTableId<I, MultipleDevicesId>,
     routing_tables: Rc<
         RefCell<
             HashMap<
-                RoutingTableId<I, FakeDeviceId>,
-                PrimaryRc<RwLock<RoutingTable<I, FakeDeviceId>>>,
+                RoutingTableId<I, MultipleDevicesId>,
+                PrimaryRc<RwLock<RoutingTable<I, MultipleDevicesId>>>,
             >,
         >,
     >,
@@ -56,8 +57,8 @@ impl<I: IpLayerIpExt> CounterContext<IpCounters<I>> for IpFakeCoreCtx<I> {
 
 type FakeCoreCtx<I> = netstack3_base::testutil::FakeCoreCtx<
     IpFakeCoreCtx<I>,
-    SendIpPacketMeta<I, FakeDeviceId, SpecifiedAddr<<I as Ip>::Addr>>,
-    FakeDeviceId,
+    SendIpPacketMeta<I, MultipleDevicesId, SpecifiedAddr<<I as Ip>::Addr>>,
+    MultipleDevicesId,
 >;
 type FakeBindingsCtx = netstack3_base::testutil::FakeBindingsCtx<(), (), (), ()>;
 type FakeCtx<I> = CtxPair<FakeCoreCtx<I>, FakeBindingsCtx>;
@@ -93,7 +94,7 @@ fn no_loopback_addrs_on_the_wire<I: IpLayerIpExt + TestIpExt>() {
     let result = send_ip_frame(
         core_ctx,
         bindings_ctx,
-        &FakeDeviceId,
+        &MultipleDevicesId::A,
         IpPacketDestination::Neighbor(I::TEST_ADDRS.remote_ip),
         frame,
         IpLayerPacketMetadata::default(),
@@ -220,45 +221,106 @@ fn test_walk_rules<I: IpLayerIpExt + TestIpExt>() {
     let mut ctx = FakeCoreCtx::<I>::default();
 
     // An unreachable rule should short-circuit the lookup.
-    ctx.state
-        .rules_table
-        .borrow_mut()
-        .rules_mut()
-        .insert(0, Rule { action: RuleAction::Unreachable });
+    ctx.state.rules_table.borrow_mut().rules_mut().insert(
+        0,
+        Rule { matcher: RuleMatcher::match_all_packets(), action: RuleAction::Unreachable },
+    );
 
     assert_eq!(
-        walk_rules(&mut ctx, (), |(), _core_ctx, _table| panic!(
-            "should not be able to look up tables"
-        )),
+        walk_rules(
+            &mut ctx,
+            (),
+            &RuleInput {
+                packet_origin: PacketOrigin::Local { bound_address: None, bound_device: None },
+            },
+            |(), _core_ctx, _table| panic!("should not be able to look up tables")
+        ),
         ControlFlow::Break(RuleAction::<core::convert::Infallible>::Unreachable)
     );
 
-    // On the other hand, an empty routing table should not stop the lookup.
-    let route_table_2 = PrimaryRc::new(RwLock::new(RoutingTable::default()));
-    let table_id = RoutingTableId::new(PrimaryRc::clone_strong(&route_table_2));
-    ctx.state.rules_table.borrow_mut().rules_mut()[0] =
-        Rule { action: RuleAction::Lookup(table_id.clone()) };
-    assert_matches!(ctx.state.routing_tables.borrow_mut().insert(table_id, route_table_2), None);
+    // We setup the routing tables and rules as follows:
+    // rule 1: if the source address is from the `I::TEST_ADDRS.subnet`, then lookup route_table_1
+    // rule 2: by default, look up in the main route table.
+    // In route_table_1, we route the packets to `MultipleDevicesId::A`.
+    // In the main route table, we route the packets to `MultipleDevicesId::B`.
+    let route_table_1 = PrimaryRc::new(RwLock::new(RoutingTable::default()));
+    let table_id = RoutingTableId::new(PrimaryRc::clone_strong(&route_table_1));
+    ctx.state.rules_table.borrow_mut().rules_mut()[0] = Rule {
+        matcher: RuleMatcher {
+            source_address_matcher: Some(SubnetMatcher(I::TEST_ADDRS.subnet)),
+            traffic_origin_matcher: None,
+        },
+        action: RuleAction::Lookup(table_id.clone()),
+    };
+    let _entry = testutil::add_entry(
+        &mut table_id.get_mut(),
+        Entry {
+            subnet: I::TEST_ADDRS.subnet,
+            device: MultipleDevicesId::A,
+            gateway: None,
+            metric: Metric::ExplicitMetric(RawMetric(0)),
+        },
+    )
+    .expect("failed to install route entry");
+    assert_matches!(ctx.state.routing_tables.borrow_mut().insert(table_id, route_table_1), None);
+
     let _entry = testutil::add_entry(
         &mut IpRouteTablesContext::<I>::main_table_id(&ctx).get_mut(),
         Entry {
-            subnet: I::TEST_ADDRS.subnet,
-            device: FakeDeviceId,
+            subnet: I::LOOPBACK_SUBNET,
+            device: MultipleDevicesId::B,
             gateway: None,
             metric: Metric::ExplicitMetric(RawMetric(0)),
         },
     )
     .expect("failed to install route entry");
 
+    // We try to walk the rules with a bound address that matches the rule 1's matcher, we should
+    // get a route back with `MultipleDevicesId::A`.
     assert_eq!(
-        walk_rules(&mut ctx, (), |(), core_ctx, table| {
-            match table.lookup(core_ctx, None, I::TEST_ADDRS.remote_ip.get()) {
-                None => ControlFlow::Continue(()),
-                Some(dest) => ControlFlow::Break(dest),
+        walk_rules(
+            &mut ctx,
+            (),
+            &RuleInput {
+                packet_origin: PacketOrigin::Local {
+                    bound_address: Some(I::TEST_ADDRS.local_ip),
+                    bound_device: None
+                },
+            },
+            |(), core_ctx, table| {
+                match table.lookup(core_ctx, None, I::TEST_ADDRS.remote_ip.get()) {
+                    None => ControlFlow::Continue(()),
+                    Some(dest) => ControlFlow::Break(dest),
+                }
             }
-        }),
+        ),
         ControlFlow::Break(RuleAction::Lookup(Destination {
-            device: FakeDeviceId,
+            device: MultipleDevicesId::A,
+            next_hop: NextHop::RemoteAsNeighbor
+        }))
+    );
+
+    // Then we walk the rules with a bound address that does not match rule 1's matcher, we should
+    // skip route table 1 and get a route back with `MultipleDevicesId::B`.
+    assert_eq!(
+        walk_rules(
+            &mut ctx,
+            (),
+            &RuleInput {
+                packet_origin: PacketOrigin::Local {
+                    bound_address: Some(I::LOOPBACK_ADDRESS),
+                    bound_device: None
+                },
+            },
+            |(), core_ctx, table| {
+                match table.lookup(core_ctx, None, *I::LOOPBACK_ADDRESS) {
+                    None => ControlFlow::Continue(()),
+                    Some(dest) => ControlFlow::Break(dest),
+                }
+            }
+        ),
+        ControlFlow::Break(RuleAction::Lookup(Destination {
+            device: MultipleDevicesId::B,
             next_hop: NextHop::RemoteAsNeighbor
         }))
     );

@@ -435,6 +435,18 @@ where
         // available at the time is used for each outgoing packet.
         let resolved_route =
             self.lookup_route(bindings_ctx, device, local_ip, remote_ip, transparent)?;
+        // TODO(https://fxbug.dev/362366411): This second lookup is unnecessary in most cases when
+        // there are no installed rules that has a `from` matcher.
+        let resolved_route = match local_ip {
+            None => self.lookup_route(
+                bindings_ctx,
+                device,
+                Some(resolved_route.src_addr),
+                remote_ip,
+                transparent,
+            )?,
+            Some(_) => resolved_route,
+        };
         Ok(new_ip_socket(device, resolved_route, remote_ip, proto, transparent))
     }
 
