@@ -80,10 +80,8 @@ namespace nelson {
 
 zx_status_t Nelson::OtRadioInit() {
   gpio_init_steps_.push_back(GpioFunction(GPIO_TH_SOC_INT, 0));
-  // TODO(42082459): During the transition from gpioimpl to pinimpl, the GPIO core driver will call
-  // ConfigIn(pull) when a pull configuration is passed in init metadata. After the transition has
-  // been completed, a separate step must be added here to disable GPIO output on the interrupt pin.
   gpio_init_steps_.push_back(GpioPull(GPIO_TH_SOC_INT, fuchsia_hardware_pin::Pull::kNone));
+  gpio_init_steps_.push_back(GpioInput(GPIO_TH_SOC_INT));
   gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_TH_RST_L, 0));  // Reset
   gpio_init_steps_.push_back(GpioOutput(GPIO_SOC_TH_RST_L, true));
   gpio_init_steps_.push_back(GpioFunction(GPIO_SOC_TH_BOOT_MODE_L, 0));  // Boot mode

@@ -14,7 +14,7 @@
 #include <cstdint>
 #include <memory>
 
-#include <bind/fuchsia/hardware/gpioimpl/cpp/bind.h>
+#include <bind/fuchsia/hardware/pinimpl/cpp/bind.h>
 #include <fbl/alloc_checker.h>
 
 #include "a1-blocks.h"
@@ -27,7 +27,6 @@ namespace {
 constexpr int kAltFnMax = 15;
 constexpr int kMaxPinsInDSReg = 16;
 constexpr int kGpioInterruptPolarityShift = 16;
-constexpr int kMaxGpioIndex = 255;
 constexpr int kBitsPerGpioInterrupt = 8;
 constexpr int kBitsPerFilterSelect = 4;
 
@@ -237,7 +236,7 @@ void AmlGpioDriver::AddNode(uint32_t pid, uint32_t irq_count, std::vector<fdf::M
     FDF_LOG(ERROR, "irq_info alloc failed");
     return completer(zx::error(ZX_ERR_NO_MEMORY));
   }
-  std::fill(irq_info.begin(), irq_info.end(), kMaxGpioIndex + 1);  // initialize irq_info
+  std::fill(irq_info.begin(), irq_info.end(), AmlGpio::kMaxGpioIndex + 1);  // initialize irq_info
 
   zx::result pdev_client = incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
   if (pdev_client.is_error()) {
@@ -255,10 +254,10 @@ void AmlGpioDriver::AddNode(uint32_t pid, uint32_t irq_count, std::vector<fdf::M
   }
 
   {
-    fuchsia_hardware_gpioimpl::Service::InstanceHandler handler({
+    fuchsia_hardware_pinimpl::Service::InstanceHandler handler({
         .device = device_->CreateHandler(),
     });
-    auto result = outgoing()->AddService<fuchsia_hardware_gpioimpl::Service>(std::move(handler));
+    auto result = outgoing()->AddService<fuchsia_hardware_pinimpl::Service>(std::move(handler));
     if (result.is_error()) {
       FDF_LOG(ERROR, "AddService failed: %s", result.status_string());
       return completer(zx::error(result.error_value()));
@@ -278,12 +277,12 @@ void AmlGpioDriver::AddNode(uint32_t pid, uint32_t irq_count, std::vector<fdf::M
   fidl::Arena arena;
 
   fidl::VectorView<fuchsia_driver_framework::wire::NodeProperty> properties(arena, 1);
-  properties[0] = fdf::MakeProperty(arena, bind_fuchsia_hardware_gpioimpl::SERVICE,
-                                    bind_fuchsia_hardware_gpioimpl::SERVICE_DRIVERTRANSPORT);
+  properties[0] = fdf::MakeProperty(arena, bind_fuchsia_hardware_pinimpl::SERVICE,
+                                    bind_fuchsia_hardware_pinimpl::SERVICE_DRIVERTRANSPORT);
 
   std::vector offers = compat_server_.CreateOffers2(arena);
   offers.push_back(
-      fdf::MakeOffer2<fuchsia_hardware_gpioimpl::Service>(arena, component::kDefaultInstance));
+      fdf::MakeOffer2<fuchsia_hardware_pinimpl::Service>(arena, component::kDefaultInstance));
 
   const auto args = fuchsia_driver_framework::wire::NodeAddArgs::Builder(arena)
                         .name(arena, name())
@@ -322,119 +321,14 @@ zx_status_t AmlGpio::AmlPinToBlock(const uint32_t pin, const AmlGpioBlock** out_
   return ZX_ERR_NOT_FOUND;
 }
 
-void AmlGpio::ConfigIn(fuchsia_hardware_gpioimpl::wire::GpioImplConfigInRequest* request,
-                       fdf::Arena& arena, ConfigInCompleter::Sync& completer) {
-  zx_status_t status;
-
-  const AmlGpioBlock* block;
-  uint32_t pinindex;
-  if ((status = AmlPinToBlock(request->index, &block, &pinindex)) != ZX_OK) {
-    FDF_LOG(ERROR, "Pin not found %u", request->index);
-    return completer.buffer(arena).ReplyError(status);
-  }
-
-  const uint32_t pinmask = 1 << pinindex;
-
-  uint32_t regval = mmios_[block->mmio_index].Read32(block->oen_offset * sizeof(uint32_t));
-  // Set the GPIO as pull-up or pull-down
-  auto pull = request->flags;
-  uint32_t pull_reg_val = mmios_[block->mmio_index].Read32(block->pull_offset * sizeof(uint32_t));
-  uint32_t pull_en_reg_val =
-      mmios_[block->mmio_index].Read32(block->pull_en_offset * sizeof(uint32_t));
-  if (pull == fuchsia_hardware_gpio::GpioFlags::kNoPull) {
-    pull_en_reg_val &= ~pinmask;
-  } else {
-    if (pull == fuchsia_hardware_gpio::GpioFlags::kPullUp) {
-      pull_reg_val |= pinmask;
-    } else {
-      pull_reg_val &= ~pinmask;
-    }
-    pull_en_reg_val |= pinmask;
-  }
-
-  mmios_[block->mmio_index].Write32(pull_reg_val, block->pull_offset * sizeof(uint32_t));
-  mmios_[block->mmio_index].Write32(pull_en_reg_val, block->pull_en_offset * sizeof(uint32_t));
-  regval |= pinmask;
-  mmios_[block->mmio_index].Write32(regval, block->oen_offset * sizeof(uint32_t));
-
-  completer.buffer(arena).ReplySuccess();
-}
-
-void AmlGpio::ConfigOut(fuchsia_hardware_gpioimpl::wire::GpioImplConfigOutRequest* request,
-                        fdf::Arena& arena, ConfigOutCompleter::Sync& completer) {
-  zx_status_t status;
-
-  const AmlGpioBlock* block;
-  uint32_t pinindex;
-  if ((status = AmlPinToBlock(request->index, &block, &pinindex)) != ZX_OK) {
-    FDF_LOG(ERROR, "Pin not found %u", request->index);
-    return completer.buffer(arena).ReplyError(status);
-  }
-
-  const uint32_t pinmask = 1 << pinindex;
-
-  // Set value before configuring for output
-  uint32_t regval = mmios_[block->mmio_index].Read32(block->output_offset * sizeof(uint32_t));
-  if (request->initial_value) {
-    regval |= pinmask;
-  } else {
-    regval &= ~pinmask;
-  }
-  mmios_[block->mmio_index].Write32(regval, block->output_offset * sizeof(uint32_t));
-
-  regval = mmios_[block->mmio_index].Read32(block->oen_offset * sizeof(uint32_t));
-  regval &= ~pinmask;
-  mmios_[block->mmio_index].Write32(regval, block->oen_offset * sizeof(uint32_t));
-
-  completer.buffer(arena).ReplySuccess();
-}
-
-// Configure a pin for an alternate function specified by fn
-void AmlGpio::SetAltFunction(
-    fuchsia_hardware_gpioimpl::wire::GpioImplSetAltFunctionRequest* request, fdf::Arena& arena,
-    SetAltFunctionCompleter::Sync& completer) {
-  if (request->function > kAltFnMax) {
-    FDF_LOG(ERROR, "Pin mux alt config out of range %lu", request->function);
-    return completer.buffer(arena).ReplyError(ZX_ERR_OUT_OF_RANGE);
-  }
-
-  zx_status_t status;
-
-  const AmlGpioBlock* block;
-  uint32_t pinindex;
-  if ((status = AmlPinToBlock(request->index, &block, &pinindex)) != ZX_OK) {
-    FDF_LOG(ERROR, "Pin not found %u", request->index);
-    return completer.buffer(arena).ReplyError(status);
-  }
-
-  // Sanity Check: pin_to_block must return a block that contains `pin`
-  //               therefore `pin` must be greater than or equal to the first
-  //               pin of the block.
-  ZX_DEBUG_ASSERT(request->index >= block->start_pin);
-
-  // Each Pin Mux is controlled by a 4 bit wide field in `reg`
-  // Compute the offset for this pin.
-  uint32_t pin_shift = (request->index - block->start_pin) * 4;
-  pin_shift += block->output_shift;
-  const uint32_t mux_mask = ~(0x0F << pin_shift);
-  const auto fn_val = static_cast<uint32_t>(request->function << pin_shift);
-
-  uint32_t regval = mmios_[block->mmio_index].Read32(block->mux_offset * sizeof(uint32_t));
-  regval &= mux_mask;  // Remove the previous value for the mux
-  regval |= fn_val;    // Assign the new value to the mux
-  mmios_[block->mmio_index].Write32(regval, block->mux_offset * sizeof(uint32_t));
-
-  completer.buffer(arena).ReplySuccess();
-}
-
-void AmlGpio::Read(fuchsia_hardware_gpioimpl::wire::GpioImplReadRequest* request, fdf::Arena& arena,
+void AmlGpio::Read(fuchsia_hardware_pinimpl::wire::PinImplReadRequest* request, fdf::Arena& arena,
                    ReadCompleter::Sync& completer) {
   zx_status_t status;
 
   const AmlGpioBlock* block;
   uint32_t pinindex;
-  if ((status = AmlPinToBlock(request->index, &block, &pinindex)) != ZX_OK) {
-    FDF_LOG(ERROR, "Pin not found %u", request->index);
+  if ((status = AmlPinToBlock(request->pin, &block, &pinindex)) != ZX_OK) {
+    FDF_LOG(ERROR, "Pin not found %u", request->pin);
     return completer.buffer(arena).ReplyError(status);
   }
 
@@ -444,33 +338,46 @@ void AmlGpio::Read(fuchsia_hardware_gpioimpl::wire::GpioImplReadRequest* request
   completer.buffer(arena).ReplySuccess(regval & readmask ? 1 : 0);
 }
 
-void AmlGpio::Write(fuchsia_hardware_gpioimpl::wire::GpioImplWriteRequest* request,
-                    fdf::Arena& arena, WriteCompleter::Sync& completer) {
+void AmlGpio::SetBufferMode(fuchsia_hardware_pinimpl::wire::PinImplSetBufferModeRequest* request,
+                            fdf::Arena& arena, SetBufferModeCompleter::Sync& completer) {
   zx_status_t status;
 
   const AmlGpioBlock* block;
   uint32_t pinindex;
-  if ((status = AmlPinToBlock(request->index, &block, &pinindex)) != ZX_OK) {
-    FDF_LOG(ERROR, "Pin not found %u", request->index);
+  if ((status = AmlPinToBlock(request->pin, &block, &pinindex)) != ZX_OK) {
+    FDF_LOG(ERROR, "Pin not found %u", request->pin);
     return completer.buffer(arena).ReplyError(status);
   }
 
-  uint32_t regval = mmios_[block->mmio_index].Read32(block->output_offset * sizeof(uint32_t));
-  if (request->value) {
-    regval |= 1 << pinindex;
+  const uint32_t pinmask = 1 << pinindex;
+
+  uint32_t oen_regval = mmios_[block->mmio_index].Read32(block->oen_offset * sizeof(uint32_t));
+
+  if (request->mode == fuchsia_hardware_gpio::BufferMode::kInput) {
+    oen_regval |= pinmask;
   } else {
-    regval &= ~(1 << pinindex);
+    // Set value before configuring for output
+    uint32_t regval = mmios_[block->mmio_index].Read32(block->output_offset * sizeof(uint32_t));
+    if (request->mode == fuchsia_hardware_gpio::BufferMode::kOutputHigh) {
+      regval |= pinmask;
+    } else {
+      regval &= ~pinmask;
+    }
+    mmios_[block->mmio_index].Write32(regval, block->output_offset * sizeof(uint32_t));
+
+    oen_regval &= ~pinmask;
   }
-  mmios_[block->mmio_index].Write32(regval, block->output_offset * sizeof(uint32_t));
+
+  mmios_[block->mmio_index].Write32(oen_regval, block->oen_offset * sizeof(uint32_t));
 
   completer.buffer(arena).ReplySuccess();
 }
 
-void AmlGpio::GetInterrupt(fuchsia_hardware_gpioimpl::wire::GpioImplGetInterruptRequest* request,
+void AmlGpio::GetInterrupt(fuchsia_hardware_pinimpl::wire::PinImplGetInterruptRequest* request,
                            fdf::Arena& arena, GetInterruptCompleter::Sync& completer) {
   zx_status_t status = ZX_OK;
 
-  if (request->index > kMaxGpioIndex) {
+  if (request->pin > kMaxGpioIndex) {
     return completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
   }
 
@@ -481,7 +388,7 @@ void AmlGpio::GetInterrupt(fuchsia_hardware_gpioimpl::wire::GpioImplGetInterrupt
   }
 
   for (uint16_t irq : irq_info_) {
-    if (irq == request->index) {
+    if (irq == request->pin) {
       FDF_LOG(ERROR, "GPIO Interrupt already configured for this pin %u", (int)index);
       return completer.buffer(arena).ReplyError(ZX_ERR_ALREADY_EXISTS);
     }
@@ -489,36 +396,44 @@ void AmlGpio::GetInterrupt(fuchsia_hardware_gpioimpl::wire::GpioImplGetInterrupt
   FDF_LOG(DEBUG, "GPIO Interrupt index %d allocated", (int)index);
   const AmlGpioBlock* block;
   uint32_t pinindex;
-  if ((status = AmlPinToBlock(request->index, &block, &pinindex)) != ZX_OK) {
-    FDF_LOG(ERROR, "Pin not found %u", request->index);
+  if ((status = AmlPinToBlock(request->pin, &block, &pinindex)) != ZX_OK) {
+    FDF_LOG(ERROR, "Pin not found %u", request->pin);
     return completer.buffer(arena).ReplyError(status);
   }
 
-  // Configure GPIO Interrupt EDGE and Polarity
-  uint32_t mode_reg_val =
-      mmio_interrupt_.Read32(gpio_interrupt_->edge_polarity_offset * sizeof(uint32_t));
+  // Create Interrupt Object, removing the requested polarity, since the polarity is managed by
+  // ConfigureInterrupt().
 
-  switch (request->flags & ZX_INTERRUPT_MODE_MASK) {
-    case ZX_INTERRUPT_MODE_EDGE_LOW:
-      mode_reg_val |= (1 << index);
-      mode_reg_val |= ((1 << index) << kGpioInterruptPolarityShift);
-      break;
-    case ZX_INTERRUPT_MODE_EDGE_HIGH:
-      mode_reg_val |= (1 << index);
-      mode_reg_val &= ~((1 << index) << kGpioInterruptPolarityShift);
-      break;
-    case ZX_INTERRUPT_MODE_LEVEL_LOW:
-      mode_reg_val &= ~(1 << index);
-      mode_reg_val |= ((1 << index) << kGpioInterruptPolarityShift);
-      break;
-    case ZX_INTERRUPT_MODE_LEVEL_HIGH:
-      mode_reg_val &= ~(1 << index);
-      mode_reg_val &= ~((1 << index) << kGpioInterruptPolarityShift);
-      break;
-    default:
-      return completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
+  // TODO(361851116): Manually convert options instead of casting.
+  uint32_t flags = static_cast<uint32_t>(request->options);
+  // Remove some options that are not relevant or will be replaced and preserve other values.
+  flags &= ~(ZX_INTERRUPT_MODE_MASK | ZX_INTERRUPT_VIRTUAL);
+
+  if (pin_irq_modes_[request->pin]) {
+    SetInterruptMode(index, *pin_irq_modes_[request->pin]);
+
+    switch (*pin_irq_modes_[request->pin]) {
+      case fuchsia_hardware_gpio::InterruptMode::kEdgeLow:
+      case fuchsia_hardware_gpio::InterruptMode::kEdgeHigh:
+        flags |= ZX_INTERRUPT_MODE_EDGE_HIGH;
+        break;
+      case fuchsia_hardware_gpio::InterruptMode::kLevelLow:
+      case fuchsia_hardware_gpio::InterruptMode::kLevelHigh:
+        flags |= ZX_INTERRUPT_MODE_LEVEL_HIGH;
+        break;
+      default:
+        ZX_DEBUG_ASSERT(false);  // ConfigureInterrupt() should have validated the interrupt mode.
+    }
+
+    pin_irq_modes_[request->pin].reset();
+  } else {
+    // Don't set the interrupt mode, and instead read the mode register to determine whether the
+    // interrupt is edge- or level-triggered.
+    const uint32_t mode_reg_val =
+        mmio_interrupt_.Read32(gpio_interrupt_->edge_polarity_offset * sizeof(uint32_t));
+    flags |=
+        mode_reg_val & (1 << index) ? ZX_INTERRUPT_MODE_EDGE_HIGH : ZX_INTERRUPT_MODE_LEVEL_HIGH;
   }
-  mmio_interrupt_.Write32(mode_reg_val, gpio_interrupt_->edge_polarity_offset * sizeof(uint32_t));
 
   // Configure Interrupt Select Filter
   mmio_interrupt_.SetBits32(0x7 << (index * kBitsPerFilterSelect),
@@ -529,29 +444,16 @@ void AmlGpio::GetInterrupt(fuchsia_hardware_gpioimpl::wire::GpioImplGetInterrupt
   const uint32_t pin_select_offset = gpio_interrupt_->pin_select_offset + (pin_select_bit / 32);
   const uint32_t pin_select_index = pin_select_bit % 32;
   // Select GPIO IRQ(index) and program it to the requested GPIO PIN
-  mmio_interrupt_.ModifyBits32((request->index - block->pin_block) + block->pin_start,
+  mmio_interrupt_.ModifyBits32((request->pin - block->pin_block) + block->pin_start,
                                pin_select_index, kBitsPerGpioInterrupt,
                                pin_select_offset * sizeof(uint32_t));
 
   // Hold this IRQ index while the GetInterrupt call is pending.
   irq_status_ |= static_cast<uint8_t>(1 << index);
-  irq_info_[index] = static_cast<uint16_t>(request->index);
+  irq_info_[index] = static_cast<uint16_t>(request->pin);
 
-  // Create Interrupt Object, removing the requested polarity, since the polarity is managed
-  // by the GPIO HW via MMIO setting above.
-  // Interrupt modes are represented by values (not a bitmask) within the ZX_INTERRUPT_MODE_MASK.
-  // We only change ZX_INTERRUPT_MODE_[EDGE|LEVEL]_LOW values, passing other values in flags
-  // unchanged including values outside ZX_INTERRUPT_MODE_MASK.
-  uint32_t mode = request->flags & ZX_INTERRUPT_MODE_MASK;
-  uint32_t flags = request->flags & ~ZX_INTERRUPT_MODE_MASK;
-  if (mode == ZX_INTERRUPT_MODE_EDGE_LOW) {
-    mode = ZX_INTERRUPT_MODE_EDGE_HIGH;
-  } else if (mode == ZX_INTERRUPT_MODE_LEVEL_LOW) {
-    mode = ZX_INTERRUPT_MODE_LEVEL_HIGH;
-  }
-  flags |= mode;
   pdev_->GetInterruptById(index, flags)
-      .Then([this, index, irq_index = request->index,
+      .Then([this, index, irq_index = request->pin,
              completer = completer.ToAsync()](auto& out_irq) mutable {
         fdf::Arena arena('GPIO');
         // ReleaseInterrupt was called before we got the interrupt from platform bus.
@@ -580,11 +482,40 @@ void AmlGpio::GetInterrupt(fuchsia_hardware_gpioimpl::wire::GpioImplGetInterrupt
       });
 }
 
+void AmlGpio::ConfigureInterrupt(
+    fuchsia_hardware_pinimpl::wire::PinImplConfigureInterruptRequest* request, fdf::Arena& arena,
+    ConfigureInterruptCompleter::Sync& completer) {
+  if (request->pin > kMaxGpioIndex) {
+    return completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
+  }
+  if (!request->config.has_mode()) {
+    return completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
+  }
+  if (request->config.mode() != fuchsia_hardware_gpio::InterruptMode::kEdgeLow &&
+      request->config.mode() != fuchsia_hardware_gpio::InterruptMode::kEdgeHigh &&
+      request->config.mode() != fuchsia_hardware_gpio::InterruptMode::kLevelLow &&
+      request->config.mode() != fuchsia_hardware_gpio::InterruptMode::kLevelHigh) {
+    return completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  // Configure the interrupt for this pin if there is one. If not, the mode is saved and will be
+  // applied when an interrupt is created for this pin.
+  for (uint32_t i = 0; i < irq_info_.size(); i++) {
+    if (irq_info_[i] == request->pin) {
+      SetInterruptMode(i, request->config.mode());
+      return completer.buffer(arena).ReplySuccess();
+    }
+  }
+
+  pin_irq_modes_[request->pin] = request->config.mode();
+  completer.buffer(arena).ReplySuccess();
+}
+
 void AmlGpio::ReleaseInterrupt(
-    fuchsia_hardware_gpioimpl::wire::GpioImplReleaseInterruptRequest* request, fdf::Arena& arena,
+    fuchsia_hardware_pinimpl::wire::PinImplReleaseInterruptRequest* request, fdf::Arena& arena,
     ReleaseInterruptCompleter::Sync& completer) {
   for (uint32_t i = 0; i < irq_info_.size(); i++) {
-    if (irq_info_[i] == request->index) {
+    if (irq_info_[i] == request->pin) {
       irq_status_ &= static_cast<uint8_t>(~(1 << i));
       irq_info_[i] = kMaxGpioIndex + 1;
       return completer.buffer(arena).ReplySuccess();
@@ -593,52 +524,113 @@ void AmlGpio::ReleaseInterrupt(
   return completer.buffer(arena).ReplyError(ZX_ERR_NOT_FOUND);
 }
 
-void AmlGpio::SetPolarity(fuchsia_hardware_gpioimpl::wire::GpioImplSetPolarityRequest* request,
-                          fdf::Arena& arena, SetPolarityCompleter::Sync& completer) {
-  int irq_index = -1;
-  if (request->index > kMaxGpioIndex) {
-    return completer.buffer(arena).ReplyError(ZX_ERR_INVALID_ARGS);
-  }
-
-  for (uint32_t i = 0; i < irq_info_.size(); i++) {
-    if (irq_info_[i] == request->index) {
-      irq_index = i;
-      break;
-    }
-  }
-  if (irq_index == -1) {
-    return completer.buffer(arena).ReplyError(ZX_ERR_NOT_FOUND);
-  }
-
-  // Configure GPIO Interrupt EDGE and Polarity
-  if (request->polarity == fuchsia_hardware_gpio::GpioPolarity::kHigh) {
-    mmio_interrupt_.ClearBits32(((1 << irq_index) << kGpioInterruptPolarityShift),
-                                gpio_interrupt_->edge_polarity_offset * sizeof(uint32_t));
-  } else {
-    mmio_interrupt_.SetBits32(((1 << irq_index) << kGpioInterruptPolarityShift),
-                              gpio_interrupt_->edge_polarity_offset * sizeof(uint32_t));
-  }
-  completer.buffer(arena).ReplySuccess();
-}
-
-void AmlGpio::GetDriveStrength(
-    fuchsia_hardware_gpioimpl::wire::GpioImplGetDriveStrengthRequest* request, fdf::Arena& arena,
-    GetDriveStrengthCompleter::Sync& completer) {
-  zx_status_t st;
-
-  if (pid_ == PDEV_PID_AMLOGIC_A113) {
-    return completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
+void AmlGpio::Configure(fuchsia_hardware_pinimpl::wire::PinImplConfigureRequest* request,
+                        fdf::Arena& arena, ConfigureCompleter::Sync& completer) {
+  zx_status_t status;
 
   const AmlGpioBlock* block;
   uint32_t pinindex;
-
-  if ((st = AmlPinToBlock(request->index, &block, &pinindex)) != ZX_OK) {
-    FDF_LOG(ERROR, "Pin not found %u", request->index);
-    return completer.buffer(arena).ReplyError(st);
+  if ((status = AmlPinToBlock(request->pin, &block, &pinindex)) != ZX_OK) {
+    FDF_LOG(ERROR, "Pin not found %u", request->pin);
+    return completer.buffer(arena).ReplyError(status);
   }
 
-  pinindex = request->index - block->pin_block;
+  if (request->config.has_function() && request->config.function() > kAltFnMax) {
+    FDF_LOG(ERROR, "Pin mux alt config out of range %lu", request->config.function());
+    return completer.buffer(arena).ReplyError(ZX_ERR_OUT_OF_RANGE);
+  }
+  if (request->config.has_drive_strength_ua() && pid_ == PDEV_PID_AMLOGIC_A113) {
+    return completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
+  }
+
+  if (request->config.has_pull()) {
+    SetPull(block, pinindex, request->config.pull());
+  }
+  if (request->config.has_function()) {
+    SetFunction(request->pin, block, request->config.function());
+  }
+  if (request->config.has_drive_strength_ua()) {
+    SetDriveStrength(request->pin, block, request->config.drive_strength_ua());
+  }
+
+  auto new_config = fuchsia_hardware_pin::wire::Configuration::Builder(arena)
+                        .pull(GetPull(block, pinindex))
+                        .function(GetFunction(request->pin, block));
+  if (pid_ != PDEV_PID_AMLOGIC_A113) {
+    new_config.drive_strength_ua(GetDriveStrength(request->pin, block));
+  }
+  completer.buffer(arena).ReplySuccess(new_config.Build());
+}
+
+fuchsia_hardware_pin::Pull AmlGpio::GetPull(const AmlGpioBlock* block, uint32_t pinindex) {
+  const uint32_t pinmask = 1 << pinindex;
+
+  uint32_t pull_en_reg_val =
+      mmios_[block->mmio_index].Read32(block->pull_en_offset * sizeof(uint32_t));
+  if (pull_en_reg_val & pinmask) {
+    uint32_t pull_reg_val = mmios_[block->mmio_index].Read32(block->pull_offset * sizeof(uint32_t));
+    return pull_reg_val & pinmask ? fuchsia_hardware_pin::Pull::kUp
+                                  : fuchsia_hardware_pin::Pull::kDown;
+  } else {
+    return fuchsia_hardware_pin::Pull::kNone;
+  }
+}
+
+void AmlGpio::SetPull(const AmlGpioBlock* block, uint32_t pinindex,
+                      fuchsia_hardware_pin::Pull pull) {
+  const uint32_t pinmask = 1 << pinindex;
+
+  // Set the GPIO as pull-up or pull-down
+  uint32_t pull_reg_val = mmios_[block->mmio_index].Read32(block->pull_offset * sizeof(uint32_t));
+  uint32_t pull_en_reg_val =
+      mmios_[block->mmio_index].Read32(block->pull_en_offset * sizeof(uint32_t));
+  if (pull == fuchsia_hardware_pin::Pull::kNone) {
+    pull_en_reg_val &= ~pinmask;
+  } else {
+    if (pull == fuchsia_hardware_pin::Pull::kUp) {
+      pull_reg_val |= pinmask;
+    } else {
+      pull_reg_val &= ~pinmask;
+    }
+    pull_en_reg_val |= pinmask;
+  }
+
+  mmios_[block->mmio_index].Write32(pull_reg_val, block->pull_offset * sizeof(uint32_t));
+  mmios_[block->mmio_index].Write32(pull_en_reg_val, block->pull_en_offset * sizeof(uint32_t));
+}
+
+uint64_t AmlGpio::GetFunction(uint32_t index, const AmlGpioBlock* block) {
+  // Validity Check: pin_to_block must return a block that contains `pin`
+  //                 therefore `pin` must be greater than or equal to the first
+  //                 pin of the block.
+  ZX_DEBUG_ASSERT(index >= block->start_pin);
+
+  // Each Pin Mux is controlled by a 4 bit wide field in `reg`
+  // Compute the offset for this pin.
+  uint32_t pin_shift = (index - block->start_pin) * 4;
+  pin_shift += block->output_shift;
+
+  uint32_t regval = mmios_[block->mmio_index].Read32(block->mux_offset * sizeof(uint32_t));
+  return (regval >> pin_shift) & 0x0F;
+}
+
+// Configure a pin for an alternate function
+void AmlGpio::SetFunction(uint32_t index, const AmlGpioBlock* block, uint64_t function) {
+  ZX_DEBUG_ASSERT(index >= block->start_pin);
+
+  uint32_t pin_shift = (index - block->start_pin) * 4;
+  pin_shift += block->output_shift;
+  const uint32_t mux_mask = ~(0x0F << pin_shift);
+  const auto fn_val = static_cast<uint32_t>(function << pin_shift);
+
+  uint32_t regval = mmios_[block->mmio_index].Read32(block->mux_offset * sizeof(uint32_t));
+  regval &= mux_mask;  // Remove the previous value for the mux
+  regval |= fn_val;    // Assign the new value to the mux
+  mmios_[block->mmio_index].Write32(regval, block->mux_offset * sizeof(uint32_t));
+}
+
+uint64_t AmlGpio::GetDriveStrength(uint32_t index, const AmlGpioBlock* block) {
+  uint32_t pinindex = index - block->pin_block;
   if (pinindex >= kMaxPinsInDSReg) {
     pinindex = pinindex % kMaxPinsInDSReg;
   }
@@ -648,65 +640,27 @@ void AmlGpio::GetDriveStrength(
   uint32_t regval = mmios_[block->mmio_index].Read32(block->ds_offset * sizeof(uint32_t));
   uint32_t value = (regval >> shift) & 0x3;
 
-  uint64_t out{};
-  switch (value) {
-    case DRV_500UA:
-      out = 500;
-      break;
-    case DRV_2500UA:
-      out = 2500;
-      break;
-    case DRV_3000UA:
-      out = 3000;
-      break;
-    case DRV_4000UA:
-      out = 4000;
-      break;
-    default:
-      FDF_LOG(ERROR, "Unexpected drive strength value: %u", value);
-      return completer.buffer(arena).ReplyError(ZX_ERR_INTERNAL);
-  }
-
-  completer.buffer(arena).ReplySuccess(out);
+  constexpr uint64_t kDriveStrengthValuesUa[] = {500, 2500, 3000, 4000};
+  return kDriveStrengthValuesUa[value];
 }
 
-void AmlGpio::SetDriveStrength(
-    fuchsia_hardware_gpioimpl::wire::GpioImplSetDriveStrengthRequest* request, fdf::Arena& arena,
-    SetDriveStrengthCompleter::Sync& completer) {
-  zx_status_t status;
-
-  if (pid_ == PDEV_PID_AMLOGIC_A113) {
-    return completer.buffer(arena).ReplyError(ZX_ERR_NOT_SUPPORTED);
-  }
-
-  const AmlGpioBlock* block;
-  uint32_t pinindex;
-  if ((status = AmlPinToBlock(request->index, &block, &pinindex)) != ZX_OK) {
-    FDF_LOG(ERROR, "Pin not found %u", request->index);
-    return completer.buffer(arena).ReplyError(status);
-  }
-
+void AmlGpio::SetDriveStrength(uint32_t index, const AmlGpioBlock* block,
+                               uint64_t drive_strength_ua) {
   DriveStrength ds_val = DRV_4000UA;
-  uint64_t ua = request->ds_ua;
-  if (ua <= 500) {
+  if (drive_strength_ua <= 500) {
     ds_val = DRV_500UA;
-    ua = 500;
-  } else if (ua <= 2500) {
+  } else if (drive_strength_ua <= 2500) {
     ds_val = DRV_2500UA;
-    ua = 2500;
-  } else if (ua <= 3000) {
+  } else if (drive_strength_ua <= 3000) {
     ds_val = DRV_3000UA;
-    ua = 3000;
-  } else if (ua <= 4000) {
+  } else if (drive_strength_ua <= 4000) {
     ds_val = DRV_4000UA;
-    ua = 4000;
   } else {
-    FDF_LOG(ERROR, "Invalid drive strength %lu, default to 4000 uA", ua);
+    FDF_LOG(ERROR, "Invalid drive strength %lu, default to 4000 uA", drive_strength_ua);
     ds_val = DRV_4000UA;
-    ua = 4000;
   }
 
-  pinindex = request->index - block->pin_block;
+  uint32_t pinindex = index - block->pin_block;
   if (pinindex >= kMaxPinsInDSReg) {
     pinindex = pinindex % kMaxPinsInDSReg;
   }
@@ -717,16 +671,34 @@ void AmlGpio::SetDriveStrength(
   uint32_t regval = mmios_[block->mmio_index].Read32(block->ds_offset * sizeof(uint32_t));
   regval = (regval & mask) | (ds_val << shift);
   mmios_[block->mmio_index].Write32(regval, block->ds_offset * sizeof(uint32_t));
-
-  completer.buffer(arena).ReplySuccess(ua);
 }
 
-void AmlGpio::GetPins(fdf::Arena& arena, GetPinsCompleter::Sync& completer) {}
+void AmlGpio::SetInterruptMode(uint32_t irq_index, fuchsia_hardware_gpio::InterruptMode mode) {
+  // Configure GPIO Interrupt EDGE and Polarity
+  uint32_t mode_reg_val =
+      mmio_interrupt_.Read32(gpio_interrupt_->edge_polarity_offset * sizeof(uint32_t));
 
-void AmlGpio::GetInitSteps(fdf::Arena& arena, GetInitStepsCompleter::Sync& completer) {}
-
-void AmlGpio::GetControllerId(fdf::Arena& arena, GetControllerIdCompleter::Sync& completer) {
-  completer.buffer(arena).Reply(0);
+  switch (mode) {
+    case fuchsia_hardware_gpio::InterruptMode::kEdgeLow:
+      mode_reg_val |= (1 << irq_index);
+      mode_reg_val |= ((1 << irq_index) << kGpioInterruptPolarityShift);
+      break;
+    case fuchsia_hardware_gpio::InterruptMode::kEdgeHigh:
+      mode_reg_val |= (1 << irq_index);
+      mode_reg_val &= ~((1 << irq_index) << kGpioInterruptPolarityShift);
+      break;
+    case fuchsia_hardware_gpio::InterruptMode::kLevelLow:
+      mode_reg_val &= ~(1 << irq_index);
+      mode_reg_val |= ((1 << irq_index) << kGpioInterruptPolarityShift);
+      break;
+    case fuchsia_hardware_gpio::InterruptMode::kLevelHigh:
+      mode_reg_val &= ~(1 << irq_index);
+      mode_reg_val &= ~((1 << irq_index) << kGpioInterruptPolarityShift);
+      break;
+    default:
+      return;
+  }
+  mmio_interrupt_.Write32(mode_reg_val, gpio_interrupt_->edge_polarity_offset * sizeof(uint32_t));
 }
 
 fpromise::promise<fdf::MmioBuffer, zx_status_t> AmlGpioDriver::MapMmio(

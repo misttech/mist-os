@@ -5,7 +5,7 @@
 #ifndef SRC_DEVICES_GPIO_DRIVERS_AML_GPIO_AML_GPIO_H_
 #define SRC_DEVICES_GPIO_DRIVERS_AML_GPIO_AML_GPIO_H_
 
-#include <fidl/fuchsia.hardware.gpioimpl/cpp/driver/fidl.h>
+#include <fidl/fuchsia.hardware.pinimpl/cpp/driver/fidl.h>
 #include <fidl/fuchsia.hardware.platform.device/cpp/fidl.h>
 #include <lib/async/cpp/executor.h>
 #include <lib/driver/compat/cpp/device_server.h>
@@ -14,7 +14,9 @@
 #include <lib/mmio/mmio.h>
 #include <lib/stdcompat/span.h>
 
+#include <array>
 #include <cstdint>
+#include <optional>
 
 #include <fbl/array.h>
 
@@ -42,7 +44,8 @@ struct AmlGpioInterrupt {
   uint32_t filter_select_offset;
 };
 
-class AmlGpio : public fdf::WireServer<fuchsia_hardware_gpioimpl::GpioImpl> {
+// TODO(42082459): Rename to AmlPin now that it implements the pinimpl protocol.
+class AmlGpio : public fdf::WireServer<fuchsia_hardware_pinimpl::PinImpl> {
  public:
   AmlGpio(fidl::ClientEnd<fuchsia_hardware_platform_device::Device> pdev, fdf::MmioBuffer mmio_gpio,
           fdf::MmioBuffer mmio_gpio_ao, fdf::MmioBuffer mmio_interrupt,
@@ -59,43 +62,45 @@ class AmlGpio : public fdf::WireServer<fuchsia_hardware_gpioimpl::GpioImpl> {
  private:
   friend class AmlGpioDriver;
 
-  fidl::ProtocolHandler<fuchsia_hardware_gpioimpl::GpioImpl> CreateHandler() {
+  static constexpr int kMaxGpioIndex = 255;
+
+  fidl::ProtocolHandler<fuchsia_hardware_pinimpl::PinImpl> CreateHandler() {
     return bindings_.CreateHandler(this, fdf::Dispatcher::GetCurrent()->get(),
                                    fidl::kIgnoreBindingClosure);
   }
 
   void handle_unknown_method(
-      fidl::UnknownMethodMetadata<fuchsia_hardware_gpioimpl::GpioImpl> metadata,
+      fidl::UnknownMethodMetadata<fuchsia_hardware_pinimpl::PinImpl> metadata,
       fidl::UnknownMethodCompleter::Sync& completer) override {
-    FDF_LOG(ERROR, "Unexpected gpioimpl FIDL call: 0x%lx", metadata.method_ordinal);
+    FDF_LOG(ERROR, "Unexpected pinimpl FIDL call: 0x%lx", metadata.method_ordinal);
   }
 
-  void ConfigIn(fuchsia_hardware_gpioimpl::wire::GpioImplConfigInRequest* request,
-                fdf::Arena& arena, ConfigInCompleter::Sync& completer) override;
-  void ConfigOut(fuchsia_hardware_gpioimpl::wire::GpioImplConfigOutRequest* request,
-                 fdf::Arena& arena, ConfigOutCompleter::Sync& completer) override;
-  void SetAltFunction(fuchsia_hardware_gpioimpl::wire::GpioImplSetAltFunctionRequest* request,
-                      fdf::Arena& arena, SetAltFunctionCompleter::Sync& completer) override;
-  void Read(fuchsia_hardware_gpioimpl::wire::GpioImplReadRequest* request, fdf::Arena& arena,
+  void Read(fuchsia_hardware_pinimpl::wire::PinImplReadRequest* request, fdf::Arena& arena,
             ReadCompleter::Sync& completer) override;
-  void Write(fuchsia_hardware_gpioimpl::wire::GpioImplWriteRequest* request, fdf::Arena& arena,
-             WriteCompleter::Sync& completer) override;
-  void SetPolarity(fuchsia_hardware_gpioimpl::wire::GpioImplSetPolarityRequest* request,
-                   fdf::Arena& arena, SetPolarityCompleter::Sync& completer) override;
-  void SetDriveStrength(fuchsia_hardware_gpioimpl::wire::GpioImplSetDriveStrengthRequest* request,
-                        fdf::Arena& arena, SetDriveStrengthCompleter::Sync& completer) override;
-  void GetDriveStrength(fuchsia_hardware_gpioimpl::wire::GpioImplGetDriveStrengthRequest* request,
-                        fdf::Arena& arena, GetDriveStrengthCompleter::Sync& completer) override;
-  void GetInterrupt(fuchsia_hardware_gpioimpl::wire::GpioImplGetInterruptRequest* request,
+  void SetBufferMode(fuchsia_hardware_pinimpl::wire::PinImplSetBufferModeRequest* request,
+                     fdf::Arena& arena, SetBufferModeCompleter::Sync& completer) override;
+  void GetInterrupt(fuchsia_hardware_pinimpl::wire::PinImplGetInterruptRequest* request,
                     fdf::Arena& arena, GetInterruptCompleter::Sync& completer) override;
-  void ReleaseInterrupt(fuchsia_hardware_gpioimpl::wire::GpioImplReleaseInterruptRequest* request,
+  void ConfigureInterrupt(fuchsia_hardware_pinimpl::wire::PinImplConfigureInterruptRequest* request,
+                          fdf::Arena& arena, ConfigureInterruptCompleter::Sync& completer) override;
+  void ReleaseInterrupt(fuchsia_hardware_pinimpl::wire::PinImplReleaseInterruptRequest* request,
                         fdf::Arena& arena, ReleaseInterruptCompleter::Sync& completer) override;
-  void GetPins(fdf::Arena& arena, GetPinsCompleter::Sync& completer) override;
-  void GetInitSteps(fdf::Arena& arena, GetInitStepsCompleter::Sync& completer) override;
-  void GetControllerId(fdf::Arena& arena, GetControllerIdCompleter::Sync& completer) override;
+  void Configure(fuchsia_hardware_pinimpl::wire::PinImplConfigureRequest* request,
+                 fdf::Arena& arena, ConfigureCompleter::Sync& completer) override;
+
+  fuchsia_hardware_pin::Pull GetPull(const AmlGpioBlock* block, uint32_t pinindex);
+  void SetPull(const AmlGpioBlock* block, uint32_t pinindex, fuchsia_hardware_pin::Pull pull);
+
+  uint64_t GetFunction(uint32_t index, const AmlGpioBlock* block);
+  void SetFunction(uint32_t index, const AmlGpioBlock* block, uint64_t function);
+
+  uint64_t GetDriveStrength(uint32_t index, const AmlGpioBlock* block);
+  void SetDriveStrength(uint32_t index, const AmlGpioBlock* block, uint64_t drive_strength_ua);
 
   zx_status_t AmlPinToBlock(uint32_t pin, const AmlGpioBlock** out_block,
                             uint32_t* out_pin_index) const;
+
+  void SetInterruptMode(uint32_t irq_index, fuchsia_hardware_gpio::InterruptMode mode);
 
   fidl::WireClient<fuchsia_hardware_platform_device::Device> pdev_;
   std::array<fdf::MmioBuffer, 2> mmios_;  // separate MMIO for AO domain
@@ -105,7 +110,8 @@ class AmlGpio : public fdf::WireServer<fuchsia_hardware_gpioimpl::GpioImpl> {
   const uint32_t pid_;
   fbl::Array<uint16_t> irq_info_;
   uint8_t irq_status_{};
-  fdf::ServerBindingGroup<fuchsia_hardware_gpioimpl::GpioImpl> bindings_;
+  std::array<std::optional<fuchsia_hardware_gpio::InterruptMode>, kMaxGpioIndex + 1> pin_irq_modes_;
+  fdf::ServerBindingGroup<fuchsia_hardware_pinimpl::PinImpl> bindings_;
 };
 
 class AmlGpioDriver : public fdf::DriverBase {
