@@ -139,17 +139,16 @@ void BeginRecordInternal(LogBuffer* buffer, fuchsia_logging::LogSeverity severit
       msg = modified_msg->data();
     }
   }
-  buffer->raw_severity = severity;
+  buffer->SetRawSeverity(severity);
   if (socket == ZX_HANDLE_INVALID) {
     socket = std::get<0>(log_state->descriptor()).get();
   }
   if (severity == fuchsia_logging::LOG_FATAL) {
-    buffer->maybe_fatal_string = msg->data();
+    buffer->SetFatalErrorString(msg->data());
   }
-  buffer->inner.BeginRecord(severity, file_name, line, msg, zx::unowned_socket(socket), 0, pid,
-                            tid);
+  buffer->BeginRecord(severity, file_name, line, msg, socket, 0, pid, tid);
   for (size_t i = 0; i < log_state->tags().size(); i++) {
-    buffer->inner.WriteKeyValue(kTagFieldName, log_state->tags()[i]);
+    buffer->WriteKeyValue(kTagFieldName, log_state->tags()[i]);
   }
 }
 
@@ -249,34 +248,42 @@ void internal::LogState::Connect() {
   logsink_socket_ = std::move(local);
 }
 
+void LogBuffer::BeginRecord(FuchsiaLogSeverity severity,
+                            cpp17::optional<cpp17::string_view> file_name, unsigned int line,
+                            cpp17::optional<cpp17::string_view> message, zx_handle_t socket,
+                            uint32_t dropped_count, zx_koid_t pid, zx_koid_t tid) {
+  inner_.BeginRecord(severity, file_name, line, message, zx::unowned_socket(socket), dropped_count,
+                     pid, tid);
+}
+
 void LogBuffer::WriteKeyValue(cpp17::string_view key, cpp17::string_view value) {
-  inner.WriteKeyValue(key, value);
+  inner_.WriteKeyValue(key, value);
 }
 
 void LogBuffer::WriteKeyValue(cpp17::string_view key, int64_t value) {
-  inner.WriteKeyValue(key, value);
+  inner_.WriteKeyValue(key, value);
 }
 
 void LogBuffer::WriteKeyValue(cpp17::string_view key, uint64_t value) {
-  inner.WriteKeyValue(key, value);
+  inner_.WriteKeyValue(key, value);
 }
 
 void LogBuffer::WriteKeyValue(cpp17::string_view key, double value) {
-  inner.WriteKeyValue(key, value);
+  inner_.WriteKeyValue(key, value);
 }
 
 void LogBuffer::WriteKeyValue(cpp17::string_view key, bool value) {
-  inner.WriteKeyValue(key, value);
+  inner_.WriteKeyValue(key, value);
 }
 
 bool LogBuffer::Flush() {
   GlobalStateLock log_state;
-  if (raw_severity < log_state->min_severity()) {
+  if (raw_severity_ < log_state->min_severity()) {
     return true;
   }
-  auto ret = inner.FlushRecord();
-  if (raw_severity == fuchsia_logging::LOG_FATAL) {
-    std::cerr << *maybe_fatal_string << std::endl;
+  auto ret = inner_.FlushRecord();
+  if (raw_severity_ == fuchsia_logging::LOG_FATAL) {
+    std::cerr << *maybe_fatal_string_ << std::endl;
     abort();
   }
   return ret;

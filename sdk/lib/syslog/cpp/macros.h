@@ -9,6 +9,8 @@
 #include <lib/stdcompat/string_view.h>
 #include <lib/syslog/cpp/log_level.h>
 #include <zircon/types.h>
+
+#include <cstdint>
 #ifdef __Fuchsia__
 #include <lib/syslog/structured_backend/cpp/fuchsia_syslog.h>
 #endif
@@ -18,7 +20,7 @@
 
 namespace syslog_runtime {
 
-struct LogBuffer;
+class LogBuffer;
 
 /// Constructs a LogBuffer
 class LogBufferBuilder {
@@ -70,41 +72,26 @@ class LogBufferBuilder {
 };
 
 template <typename Key, typename Value>
-struct KeyValue final {
-  Key key;
-  Value value;
-  constexpr KeyValue(Key key, Value value) : key(key), value(value) {}
+class KeyValue final {
+ public:
+  constexpr KeyValue(Key key, Value value) : key_(key), value_(value) {}
+
+  constexpr const Key& key() const { return key_; }
+  constexpr const Value& value() const { return value_; }
+
+ private:
+  Key key_;
+  Value value_;
 };
 
 // Opaque structure representing the backend encode state.
 // This structure only has meaning to the backend and application code shouldn't
 // touch these values.
-struct LogBuffer final {
-#ifdef __Fuchsia__
-  // Message string -- valid if severity is FATAL. For FATAL
-  // logs the caller is responsible for ensuring the string
-  // is valid for the duration of the call (which our macros
-  // will ensure for current users).
-  // This will leak on usage, as the process will crash shortly afterwards.
-  cpp17::optional<cpp17::string_view> maybe_fatal_string;
-
-  // Severity of the log message.
-  FuchsiaLogSeverity raw_severity;
-  // Underlying log buffer.
-  fuchsia_syslog::LogBuffer inner;
-#else
-  // Max size of log buffer. This number may change as additional fields
-  // are added to the internal encoding state. It is based on trial-and-error
-  // and is adjusted when compilation fails due to it not being large enough.
-  static constexpr auto kBufferSize = (1 << 15) / 8;
-  // Additional storage for internal log state.
-  static constexpr auto kStateSize = 18;
-  // Record state (for keeping track of backend-specific details)
-  uint64_t record_state[kStateSize];
-  // Log data (used by the backend to encode the log into). The format
-  // for this is backend-specific.
-  uint64_t data[kBufferSize];
-#endif
+class LogBuffer final {
+ public:
+  void BeginRecord(FuchsiaLogSeverity severity, cpp17::optional<cpp17::string_view> file_name,
+                   unsigned int line, cpp17::optional<cpp17::string_view> message,
+                   zx_handle_t socket, uint32_t dropped_count, zx_koid_t pid, zx_koid_t tid);
 
   void WriteKeyValue(cpp17::string_view key, cpp17::string_view value);
 
@@ -122,72 +109,122 @@ struct LogBuffer final {
 
   // Encodes an int8
   void Encode(KeyValue<const char*, int8_t> value) {
-    Encode(KeyValue<const char*, int64_t>(value.key, value.value));
+    Encode(KeyValue<const char*, int64_t>(value.key(), value.value()));
   }
 
   // Encodes an int16
   void Encode(KeyValue<const char*, int16_t> value) {
-    Encode(KeyValue<const char*, int64_t>(value.key, value.value));
+    Encode(KeyValue<const char*, int64_t>(value.key(), value.value()));
   }
 
   // Encodes an int32
   void Encode(KeyValue<const char*, int32_t> value) {
-    Encode(KeyValue<const char*, int64_t>(value.key, value.value));
+    Encode(KeyValue<const char*, int64_t>(value.key(), value.value()));
   }
 
   // Encodes an int64
-  void Encode(KeyValue<const char*, int64_t> value) { WriteKeyValue(value.key, value.value); }
+  void Encode(KeyValue<const char*, int64_t> value) { WriteKeyValue(value.key(), value.value()); }
 
 #ifdef __APPLE__
   // Encodes a size_t. On Apple Clang, size_t is a special type.
   void Encode(KeyValue<const char*, size_t> value) {
-    WriteKeyValue(value.key, static_cast<int64_t>(value.value));
+    WriteKeyValue(value.key(), static_cast<int64_t>(value.value()));
   }
 #endif
 
   // Encodes an uint8_t
   void Encode(KeyValue<const char*, uint8_t> value) {
-    Encode(KeyValue<const char*, uint64_t>(value.key, value.value));
+    Encode(KeyValue<const char*, uint64_t>(value.key(), value.value()));
   }
 
   // Encodes an uint16_t
   void Encode(KeyValue<const char*, uint16_t> value) {
-    Encode(KeyValue<const char*, uint64_t>(value.key, value.value));
+    Encode(KeyValue<const char*, uint64_t>(value.key(), value.value()));
   }
 
   // Encodes a uint32_t
   void Encode(KeyValue<const char*, uint32_t> value) {
-    Encode(KeyValue<const char*, uint64_t>(value.key, value.value));
+    Encode(KeyValue<const char*, uint64_t>(value.key(), value.value()));
   }
 
   // Encodes an uint64
-  void Encode(KeyValue<const char*, uint64_t> value) { WriteKeyValue(value.key, value.value); }
+  void Encode(KeyValue<const char*, uint64_t> value) { WriteKeyValue(value.key(), value.value()); }
 
   // Encodes a NULL-terminated C-string.
-  void Encode(KeyValue<const char*, const char*> value) { WriteKeyValue(value.key, value.value); }
+  void Encode(KeyValue<const char*, const char*> value) {
+    WriteKeyValue(value.key(), value.value());
+  }
 
   // Encodes a NULL-terminated C-string.
-  void Encode(KeyValue<const char*, char*> value) { WriteKeyValue(value.key, value.value); }
+  void Encode(KeyValue<const char*, char*> value) { WriteKeyValue(value.key(), value.value()); }
 
   // Encodes a C++ std::string.
-  void Encode(KeyValue<const char*, std::string> value) { WriteKeyValue(value.key, value.value); }
+  void Encode(KeyValue<const char*, std::string> value) {
+    WriteKeyValue(value.key(), value.value());
+  }
 
   // Encodes a C++ std::string_view.
   void Encode(KeyValue<const char*, std::string_view> value) {
-    WriteKeyValue(value.key, value.value);
+    WriteKeyValue(value.key(), value.value());
   }
 
   // Encodes a double floating point value
-  void Encode(KeyValue<const char*, double> value) { WriteKeyValue(value.key, value.value); }
+  void Encode(KeyValue<const char*, double> value) { WriteKeyValue(value.key(), value.value()); }
 
   // Encodes a floating point value
-  void Encode(KeyValue<const char*, float> value) { WriteKeyValue(value.key, value.value); }
+  void Encode(KeyValue<const char*, float> value) { WriteKeyValue(value.key(), value.value()); }
 
   // Encodes a boolean value
-  void Encode(KeyValue<const char*, bool> value) { WriteKeyValue(value.key, value.value); }
+  void Encode(KeyValue<const char*, bool> value) { WriteKeyValue(value.key(), value.value()); }
 
   // Writes the log to a socket.
   bool Flush();
+
+#ifdef __Fuchsia__
+  /// Sets the raw severity
+  void SetRawSeverity(fuchsia_logging::LogSeverity severity) { raw_severity_ = severity; }
+
+  /// Sets a fatal error string
+  void SetFatalErrorString(cpp17::string_view fatal_error_string) {
+    maybe_fatal_string_ = fatal_error_string;
+  }
+
+#else
+  uint64_t* data() { return data_; }
+
+  uint64_t* record_state() { return record_state_; }
+
+  static constexpr size_t record_state_size() { return sizeof(record_state_); }
+
+  static constexpr size_t data_size() { return sizeof(data_); }
+#endif
+
+ private:
+#ifdef __Fuchsia__
+  // Message string -- valid if severity is FATAL. For FATAL
+  // logs the caller is responsible for ensuring the string
+  // is valid for the duration of the call (which our macros
+  // will ensure for current users).
+  // This will leak on usage, as the process will crash shortly afterwards.
+  cpp17::optional<cpp17::string_view> maybe_fatal_string_;
+
+  // Severity of the log message.
+  FuchsiaLogSeverity raw_severity_;
+  // Underlying log buffer.
+  fuchsia_syslog::LogBuffer inner_;
+#else
+  // Max size of log buffer. This number may change as additional fields
+  // are added to the internal encoding state. It is based on trial-and-error
+  // and is adjusted when compilation fails due to it not being large enough.
+  static constexpr auto kBufferSize = (1 << 15) / 8;
+  // Additional storage for internal log state.
+  static constexpr auto kStateSize = 18;
+  // Record state (for keeping track of backend-specific details)
+  uint64_t record_state_[kStateSize];
+  // Log data (used by the backend to encode the log into). The format
+  // for this is backend-specific.
+  uint64_t data_[kBufferSize];
+#endif
 };
 
 namespace internal {

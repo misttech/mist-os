@@ -78,7 +78,7 @@ void WriteKeyValueLegacy(LogBuffer* buffer, cpp17::string_view key, cpp17::strin
   if (key == "tag") {
     auto header = internal::MsgHeader::CreatePtr(buffer);
     auto tag_size = value.size() + 1;
-    header->user_tag = (reinterpret_cast<char*>(buffer->data) + sizeof(buffer->data)) - tag_size;
+    header->user_tag = reinterpret_cast<char*>(buffer->data()) + buffer->data_size() - tag_size;
     memcpy(header->user_tag, value.data(), value.size());
     header->user_tag[value.size()] = '\0';
     return;
@@ -221,7 +221,7 @@ bool LogBuffer::Flush() {
     auto tag = header->user_tag;
     std::cerr << "[" << tag << "] ";
   }
-  std::cerr << reinterpret_cast<const char*>(this->data) << std::endl;
+  std::cerr << reinterpret_cast<const char*>(this->data()) << std::endl;
   return true;
 }
 
