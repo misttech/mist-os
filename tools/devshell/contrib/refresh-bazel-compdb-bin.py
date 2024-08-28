@@ -211,7 +211,7 @@ def collect_labels_from_scope(bazel_exe: str, scope: str) -> Sequence[str]:
         return run(
             bazel_exe,
             "query",
-            'kind("_build_fuchsia.*package rule", {})'.format(scope),
+            'kind("_build_fuchsia_package(_test)? rule", {})'.format(scope),
             "--ui_event_filters=-info,-warning",
             "--noshow_loading_progress",
             "--noshow_progress",
