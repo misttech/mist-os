@@ -266,7 +266,7 @@ impl<D: Diagnostics> TimeSourceManager<D, KernelMonotonicProvider> {
                 received_sample: false,
                 first_time_delay_logged: false,
                 time_sample_delay_logged_count: 0,
-                sample_error_logged: false,
+                sample_error_logged_count: 0,
             }),
         };
         TimeSourceManager { manager }
@@ -319,6 +319,9 @@ impl<D: Diagnostics, M: MonotonicProvider> TimeSourceManager<D, M> {
     }
 }
 
+/// Every 100th sample error is logged as actual a warning.
+const SAMPLE_ERROR_COUNT_MOD: u32 = 100;
+
 /// A wrapper that launches a time source component, uses PushSource to obtain time samples,
 /// validates them from the source, and handles relaunching the source in the case of failures.
 struct PullSourceManager<D: Diagnostics, M: MonotonicProvider> {
@@ -348,10 +351,10 @@ struct PullSourceManager<D: Diagnostics, M: MonotonicProvider> {
 
     /// The number of times we logged the time sample delay.
     /// Used to reduce log spam.
-    time_sample_delay_logged_count: u32,
+    time_sample_delay_logged_count: u64,
 
-    /// Set if sample error was already logged.
-    sample_error_logged: bool,
+    /// How many times have we logged the error so far?
+    sample_error_logged_count: u32,
 }
 
 impl<D: Diagnostics, M: MonotonicProvider> PullSourceManager<D, M> {
@@ -372,16 +375,19 @@ impl<D: Diagnostics, M: MonotonicProvider> PullSourceManager<D, M> {
                 match self.time_source.sample(&urgency).await {
                     Ok(sample) => break sample,
                     Err(err) => {
-                        // Logging once, so that `err` gets logged somewhere.
-                        if !self.sample_error_logged {
+                        // Logging loudly once every so often, so that `err` gets logged somewhere,
+                        // and that we have periodic, but not overwhelming logging if the issue
+                        // persists.
+                        if self.sample_error_logged_count % SAMPLE_ERROR_COUNT_MOD == 0 {
                             // This is usually something timekeeper can recover from on its own.
                             // However, there may be knock-on effects for other programs if the
                             // time sample is indefinitely delayed.
                             warn!("Error obtaining time sample on {:?}: {:?}", self.role, err);
-                            self.sample_error_logged = true;
                         } else {
                             debug!("Error obtaining time sample on {:?}: {:?}", self.role, err);
                         }
+                        self.sample_error_logged_count =
+                            self.sample_error_logged_count.wrapping_add(1);
                         self.record_time_source_failure(TimeSourceError::LaunchFailed);
                         if self.delays_enabled {
                             let delay = if self.received_sample {
@@ -529,7 +535,7 @@ mod test {
             received_sample: false,
             first_time_delay_logged: false,
             time_sample_delay_logged_count: 0,
-            sample_error_logged: false,
+            sample_error_logged_count: 0,
         });
         TimeSourceManager { manager }
     }

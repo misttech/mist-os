@@ -243,7 +243,7 @@ where
     }
 }
 
-#[fuchsia::main(logging_tags=["time"])]
+#[fuchsia::main(logging_tags=["time", "source"])]
 async fn main() -> Result<(), Error> {
     let config = httpsdate_config::Config::take_from_startup_handle();
     let time_source_url = config.time_source_endpoint_url.clone();
