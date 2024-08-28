@@ -77,7 +77,6 @@ zx_status_t Traverse(fbl::RefPtr<Vnode>& vndir, std::string_view& path) {
   return ZX_ERR_INVALID_ARGS;
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 constexpr zx::result<CreationType> GetCreationType(fio::Flags flags) {
   // It's an error to specify no protocol or more than one protocol when trying to create an object.
   // We also disallow the node protocol as that is ambiguous.
@@ -96,7 +95,6 @@ constexpr zx::result<CreationType> GetCreationType(fio::Flags flags) {
   }
   return zx::error(ZX_ERR_NOT_SUPPORTED);
 }
-#endif
 
 }  // namespace
 
@@ -187,7 +185,6 @@ Vfs::OpenResult Vfs::Open(fbl::RefPtr<Vnode> vndir, std::string_view path,
   return OpenResult::Ok{.vnode = std::move(vn), .options = options};
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 zx::result<Vfs::Open2Result> Vfs::Open3(fbl::RefPtr<Vnode> vndir, std::string_view path,
                                         fuchsia_io::Flags flags,
                                         const fuchsia_io::wire::Options* options,
@@ -295,7 +292,6 @@ zx::result<Vfs::Open2Result> Vfs::Open3(fbl::RefPtr<Vnode> vndir, std::string_vi
   }
   return opened_node;
 }
-#endif
 
 zx_status_t Vfs::Unlink(fbl::RefPtr<Vnode> vndir, std::string_view name, bool must_be_dir) {
   {

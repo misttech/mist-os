@@ -324,12 +324,10 @@ fuchsia_io::Rights DownscopeRights(fuchsia_io::Rights rights, VnodeProtocol prot
 zx::result<VnodeProtocol> NegotiateProtocol(fuchsia_io::NodeProtocolKinds supported,
                                             fuchsia_io::NodeProtocolKinds requested);
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 // Determines the protocol to use for serving a connection, based on the |supported| protocols for
 // a node, and those which were requested in |flags|.
 zx::result<VnodeProtocol> NegotiateProtocol(fuchsia_io::Flags flags,
                                             fuchsia_io::NodeProtocolKinds supported);
-#endif
 
 // Synthesizes a set of POSIX mode bits using a node's supported protocols and abilities.
 // This implementation mirrors that of |zxio_get_posix_mode|.
@@ -339,7 +337,6 @@ zx::result<VnodeProtocol> NegotiateProtocol(fuchsia_io::Flags flags,
 // an accurate representation of the mode bits.
 uint32_t GetPosixMode(fuchsia_io::NodeProtocolKinds protocols, fuchsia_io::Abilities abilities);
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 constexpr fuchsia_io::NodeProtocolKinds GetProtocols(fuchsia_io::Flags flags) {
   using fuchsia_io::Flags;
   using fuchsia_io::NodeProtocolKinds;
@@ -357,9 +354,11 @@ constexpr fuchsia_io::NodeProtocolKinds GetProtocols(fuchsia_io::Flags flags) {
   if (flags & Flags::kProtocolFile) {
     protocols |= NodeProtocolKinds::kFile;
   }
+#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   if (flags & Flags::kProtocolSymlink) {
     protocols |= NodeProtocolKinds::kSymlink;
   }
+#endif
   return protocols;
 }
 
@@ -396,7 +395,6 @@ constexpr fuchsia_io::Rights FlagsToRights(fuchsia_io::Flags flags) {
   }
   return rights;
 }
-#endif
 
 // Encapsulates the state of a node's wire attributes on the stack. Used by connections for sending
 // an OnRepresentation event or responding to a fuchsia.io/Node.GetAttributes call.
@@ -431,7 +429,6 @@ constexpr CreationMode CreationModeFromFidl(fuchsia_io::OpenFlags flags) {
   return CreationMode::kNever;
 }
 
-#if !defined(__Fuchsia__) || FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 constexpr CreationMode CreationModeFromFidl(fuchsia_io::Flags flags) {
   if (flags & fuchsia_io::Flags::kFlagMustCreate) {
     return CreationMode::kAlways;
@@ -441,7 +438,6 @@ constexpr CreationMode CreationModeFromFidl(fuchsia_io::Flags flags) {
   }
   return CreationMode::kNever;
 }
-#endif
 
 }  // namespace internal
 

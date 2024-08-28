@@ -83,6 +83,8 @@ class DirectoryConnection final : public Connection,
   //
 
   void Open(OpenRequestView request, OpenCompleter::Sync& completer) final;
+  void Open3(fuchsia_io::wire::Directory2Open3Request* request,
+             Open3Completer::Sync& completer) final;
   void Unlink(UnlinkRequestView request, UnlinkCompleter::Sync& completer) final;
   void ReadDirents(ReadDirentsRequestView request, ReadDirentsCompleter::Sync& completer) final;
   void Rewind(RewindCompleter::Sync& completer) final;
@@ -95,19 +97,6 @@ class DirectoryConnection final : public Connection,
   void Open2(fuchsia_io::wire::Directory2Open2Request* request,
              Open2Completer::Sync& completer) final {
     completer.Close(ZX_ERR_NOT_SUPPORTED);
-  }
-#endif
-// TODO(https://fxbug.dev/348698584): Support Open3 at all API levels.
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-  void Open3(fuchsia_io::wire::Directory2Open3Request* request,
-             Open3Completer::Sync& completer) final;
-#else
-  void Open3(fuchsia_io::wire::Directory2Open3Request* request,
-             Open3Completer::Sync& completer) final {
-    if (request->object.is_valid()) {
-      fidl::ServerEnd<fuchsia_io::Node> server_end{std::move(request->object)};
-      server_end.Close(ZX_ERR_NOT_SUPPORTED);
-    }
   }
 #endif
 #if FUCHSIA_API_LEVEL_AT_LEAST(18)

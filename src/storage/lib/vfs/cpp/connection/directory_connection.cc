@@ -31,8 +31,6 @@ namespace fs::internal {
 
 namespace {
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
-
 constexpr zx::result<std::tuple<fio::Rights, fio::Rights>> ValidateRequestRights(
     fio::Flags flags, fio::Rights parent_rights) {
   // If the request will create a new object, ensure this connection allows it.
@@ -70,8 +68,6 @@ void ForwardRequestToRemote(fio::wire::Directory2Open3Request* request,
   }
   open_result.TakeVnode()->OpenRemote(std::move(*request));
 }
-
-#endif
 
 }  // namespace
 
@@ -241,7 +237,6 @@ void DirectoryConnection::Open(OpenRequestView request, OpenCompleter::Sync& com
   }
 }
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
 void DirectoryConnection::Open3(fuchsia_io::wire::Directory2Open3Request* request,
                                 Open3Completer::Sync& completer) {
   FS_PRETTY_TRACE_DEBUG("[DirectoryConnection::Open3] our rights: ", rights(), ", path: '",
@@ -300,7 +295,6 @@ void DirectoryConnection::Open3(fuchsia_io::wire::Directory2Open3Request* reques
     return;
   }
 }
-#endif
 
 void DirectoryConnection::Unlink(UnlinkRequestView request, UnlinkCompleter::Sync& completer) {
   FS_PRETTY_TRACE_DEBUG("[DirectoryUnlink] our rights: ", rights(), ", name: ", request->name);

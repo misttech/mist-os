@@ -165,7 +165,6 @@ class FuchsiaVfs : public Vfs {
   zx_status_t Serve(const fbl::RefPtr<Vnode>& vnode, zx::channel server_end,
                     VnodeConnectionOptions options) __TA_EXCLUDES(vfs_lock_);
 
-#if FUCHSIA_API_LEVEL_AT_LEAST(HEAD)
   // Serve |open_result| using negotiated protocol and specified |rights|. On failure,
   // |object_request| is left in a usable state for the caller to close.
   //
@@ -173,7 +172,6 @@ class FuchsiaVfs : public Vfs {
   zx::result<> Serve3(Open2Result open_result, fuchsia_io::Rights rights,
                       zx::channel& object_request, fuchsia_io::Flags flags,
                       const fuchsia_io::wire::Options& options);
-#endif
 
   // Serves a Vnode over the specified channel (used for creating new filesystems); the Vnode must
   // be a directory.
