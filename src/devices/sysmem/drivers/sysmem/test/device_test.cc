@@ -81,6 +81,24 @@ class FakeDdkSysmem : public ::testing::Test {
     test_environment_.reset();
     fake_pdev_.reset();
     node_server_.reset();
+
+    // fence wrapped_device_.reset() - otherwise ~Device runs async which can flake via the leak
+    // checker
+    {
+      libsync::Completion done;
+      zx_status_t post_status =
+          async::PostTask(driver_async_dispatcher(), [&done] { done.Signal(); });
+      ZX_ASSERT(post_status == ZX_OK);
+      done.Wait();
+    }
+
+    // fence env dispatcher also, just in case
+    {
+      libsync::Completion done;
+      zx_status_t post_status = async::PostTask(env_async_dispatcher(), [&done] { done.Signal(); });
+      ZX_ASSERT(post_status == ZX_OK);
+      done.Wait();
+    }
   }
 
   void StartDriver() {
