@@ -396,9 +396,6 @@ Devfs::Devfs(std::optional<Devnode>& root) : root_(root.emplace(*this)) {
       // TODO(https://fxbug.dev/42065080): Remove.
       "temperature",
 
-      // TODO(https://fxbug.dev/42065079): Remove.
-      "test",
-
       // TODO(https://fxbug.dev/42065080): Remove.
       "thermal",
 
