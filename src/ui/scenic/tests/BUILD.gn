@@ -38,29 +38,32 @@ group("tests") {
 group("ctf-tests") {
   testonly = true
   deps = [
-    ":display-ownership-integration-test-suite_archive",
-    ":flatland-allocation-test-suite_archive",
+    # TODO(https://fxbug.dev/362762825): Re-enable these tests following API stabilization.
+    # ":display-ownership-integration-test-suite_archive",
+    # ":flatland-allocation-test-suite_archive",
+    # ":flatland-pixeltest-flip-and-orientation-suite_archive",
+    # ":flatland-pixeltest-general-suite_archive",
+    # ":flatland-pixeltest-yuv-suite_archive",
+    # ":flatland-protected-memory-integration-test-suite_archive",
+    # ":null-renderer-integration-test-suite_archive",
+    # ":screen-capture-integration-test-suite_archive",
+    # ":screen-capture2-integration-test-suite_archive",
+
     ":flatland-focus-integration-test-suite_archive",
     ":flatland-mouse-integration-test-suite_archive",
-    ":flatland-pixeltest-flip-and-orientation-suite_archive",
-    ":flatland-pixeltest-general-suite_archive",
-    ":flatland-pixeltest-yuv-suite_archive",
-    ":flatland-protected-memory-integration-test-suite_archive",
     ":flatland-touch-integration-test-suite_archive",
     ":flatland-view-integration-test-suite_archive",
     ":flatland-view-ref-installed-integration-test-suite_archive",
-    ":null-renderer-integration-test-suite_archive",
     ":observer-registry-integration-test-suite_archive",
     ":scoped-observer-registry-integration-test-suite_archive",
-    ":screen-capture-integration-test-suite_archive",
-    ":screen-capture2-integration-test-suite_archive",
     ":singleton-display-integration-test-suite_archive",
   ]
 
   # TODO(https://fxbug.dev/42075218): Re-enable this test once zx_cache_flush is implemented on
   # riscv64.
   if (target_cpu != "riscv64") {
-    deps += [ ":cpu-renderer-integration-test-suite_archive" ]
+    # TODO(https://fxbug.dev/362762825): Re-enable this test following API stabilization.
+    # deps += [ ":cpu-renderer-integration-test-suite_archive" ]
   }
 }
 
