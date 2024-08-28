@@ -15,6 +15,7 @@
             from: "#config",
             to: "#core",
             config: [
+                "fuchsia.bluetooth.LegacyPairing",
                 "fuchsia.fonts.FontManifest",
                 "fuchsia.fonts.VerboseLogging",
                 "fuchsia.http-client.StopOnIdleTimeoutMillis",

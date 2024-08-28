@@ -64,6 +64,11 @@
     ],
     offer: [
         {
+            from: "parent",
+            to: [ "#bt-host-collection" ],
+            config: "fuchsia.bluetooth.LegacyPairing",
+        },
+        {
             directory: "dev-bt-hci",
             from: "parent",
             to: [ "#bt-host-collection" ],

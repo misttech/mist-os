@@ -144,7 +144,7 @@ int main() {
   }
 
   bool initialize_res = host->Initialize(std::move(vendor_client_end_result.value()), init_cb,
-                                         error_cb, /*legacy_pairing_enabled=*/false);
+                                         error_cb, config.legacy_pairing_enabled());
   if (!initialize_res) {
     bt_log(ERROR, "bt-host", "Error initializing bt-host; shutting down...");
     return 1;

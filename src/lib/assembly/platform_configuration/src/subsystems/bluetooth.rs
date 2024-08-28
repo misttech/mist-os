@@ -5,6 +5,7 @@
 use anyhow::format_err;
 
 use crate::subsystems::prelude::*;
+use assembly_config_capabilities::{Config, ConfigValueType};
 use assembly_config_schema::platform_config::bluetooth_config::{BluetoothConfig, Snoop};
 
 pub(crate) struct BluetoothSubsystemConfig;
@@ -35,7 +36,7 @@ impl DefineSubsystemConfiguration<BluetoothConfig> for BluetoothSubsystemConfig 
             builder.platform_bundle("bt_transport_uart_driver");
         }
 
-        let BluetoothConfig::Standard { profiles, .. } = config else {
+        let BluetoothConfig::Standard { profiles, core, snoop: _ } = config else {
             return Ok(());
         };
 
@@ -47,6 +48,10 @@ impl DefineSubsystemConfiguration<BluetoothConfig> for BluetoothSubsystemConfig 
             ));
         }
         builder.platform_bundle("bluetooth_core");
+        builder.set_config_capability(
+            "fuchsia.bluetooth.LegacyPairing",
+            Config::new(ConfigValueType::Bool, core.legacy_pairing_enabled.into()),
+        )?;
 
         if profiles.a2dp.enabled {
             builder.platform_bundle("bluetooth_a2dp");
