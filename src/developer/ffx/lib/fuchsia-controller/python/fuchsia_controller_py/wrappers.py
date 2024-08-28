@@ -48,6 +48,13 @@ class AsyncAdapter(object):
         super().__init__(*args, **kwargs)
         self._async_adapter_loop = asyncio.new_event_loop()
 
+    def loop(self) -> asyncio.AbstractEventLoop:
+        """Returns a copy of this class's event loop.
+
+        This is intended for spawning tasks in this class.
+        """
+        return self._async_adapter_loop
+
 
 def asyncmethod(
     func: Callable[[Any], Coroutine[Any, Any, None]],
