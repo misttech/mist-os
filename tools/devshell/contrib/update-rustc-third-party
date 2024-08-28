@@ -125,6 +125,7 @@ fi
 
 export VENDOR_DIR=$FUCHSIA_DIR/third_party/rust_crates/vendor
 export TMP=$(mktemp -d)
+trap "rm -rf ${TMP}" EXIT
 
 # Preserve both OWNERS and LICENSE files.
 (cd $VENDOR_DIR; $(preserve_files $TMP 'OWNERS'))
