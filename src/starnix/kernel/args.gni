@@ -33,4 +33,7 @@ declare_args() {
 
   # Whether to log writes to `/dev/null` at the INFO level.
   starnix_log_dev_null_writes_at_info = false
+
+  # Whether or not the kernel manages wake locks internally.
+  starnix_enable_wake_locks = false
 }
