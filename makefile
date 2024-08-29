@@ -34,7 +34,7 @@ args: ## Set up build dir and arguments file
 	$(NOECHO)echo "rust_incremental = \"incremental\"" >> $(OUTPUT)/args.gn
 	$(NOECHO)echo "host_labels = [ \"//build/rust:cargo_toml_gen\" ]" >> $(OUTPUT)/args.gn
 	$(NOECHO)echo "rbe_mode = \"off\"" >> $(OUTPUT)/args.gn
-	$(NOECHO)echo "platform_enable_user_pci = true" >> $(OUTPUT)/args.gn
+	$(NOECHO)echo "platform_enable_user_pci = false" >> $(OUTPUT)/args.gn
 .PHONY: args
 
 debug: args ## Set debug arguments
