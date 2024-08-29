@@ -795,6 +795,9 @@ config("default_warnings") {
       # one false positive in GCC 14 that was not obvious how to work around
       # locally.  Needs to be pursued upstream.
       "-Wno-maybe-uninitialized",
+
+      # TODO(https://fxbug.dev/362618077): Spuriously fires.
+      "-Wno-alloc-size-larger-than",
     ]
   }
 
