@@ -1194,6 +1194,12 @@ From //build/images/fuchsia/BUILD.gn:25
 
 From //sdk/ctf/build/ctf_api_level.gni:6
 
+### ctf_output_directory
+
+**Current value (from the default):** `"frozen-ctf-artifacts-subbuild"`
+
+From //sdk/ctf/build/ctf_output_directory.gni:6
+
 ### current_build_target_api_level
 
 The target API level of the current build.
@@ -2705,72 +2711,6 @@ These take precedence over `profile_source_files`.
 **Current value (from the default):** `["//prebuilt/*"]`
 
 From //build/config/profile/config.gni:15
-
-### driver_sysmem_contiguous_guard_page_count
-
-**Current value (from the default):** `-1`
-
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:46
-
-### driver_sysmem_contiguous_guard_pages_fatal
-
-**Current value (from the default):** `false`
-
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:44
-
-### driver_sysmem_contiguous_guard_pages_internal
-
-**Current value (from the default):** `false`
-
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:45
-
-### driver_sysmem_contiguous_guard_pages_unused
-
-**Current value (from the default):** `false`
-
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:47
-
-### driver_sysmem_contiguous_guard_pages_unused_cycle_seconds
-
-**Current value (from the default):** `600`
-
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:49
-
-### driver_sysmem_contiguous_guard_pages_unused_fraction_denominator
-
-**Current value (from the default):** `128`
-
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:48
-
-### driver_sysmem_contiguous_memory_size
-
-**Current value (from the default):** `-1`
-
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:40
-
-### driver_sysmem_contiguous_memory_size_percent
-
-**Current value (from the default):** `5`
-
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:41
-
-### driver_sysmem_protected_memory_size
-
-**Current value (from the default):** `0`
-
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:42
-
-### driver_sysmem_protected_memory_size_percent
-
-**Current value (from the default):** `-1`
-
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:43
-
-### driver_sysmem_protected_ranges_disable_dynamic
-
-**Current value (from the default):** `false`
-
-From //src/devices/sysmem/drivers/sysmem/BUILD.gn:50
 
 ### dwarf_version
 
@@ -7931,6 +7871,72 @@ Whether or not tracing is enabled for storage.
 **Current value (from the default):** `false`
 
 From //src/storage/lib/trace/BUILD.gn:11
+
+### sysmem_contiguous_guard_page_count
+
+**Current value (from the default):** `-1`
+
+From //src/devices/sysmem/bin/sysmem_connector/BUILD.gn:26
+
+### sysmem_contiguous_guard_pages_fatal
+
+**Current value (from the default):** `false`
+
+From //src/devices/sysmem/bin/sysmem_connector/BUILD.gn:24
+
+### sysmem_contiguous_guard_pages_internal
+
+**Current value (from the default):** `false`
+
+From //src/devices/sysmem/bin/sysmem_connector/BUILD.gn:25
+
+### sysmem_contiguous_guard_pages_unused
+
+**Current value (from the default):** `false`
+
+From //src/devices/sysmem/bin/sysmem_connector/BUILD.gn:27
+
+### sysmem_contiguous_guard_pages_unused_cycle_seconds
+
+**Current value (from the default):** `600`
+
+From //src/devices/sysmem/bin/sysmem_connector/BUILD.gn:29
+
+### sysmem_contiguous_guard_pages_unused_fraction_denominator
+
+**Current value (from the default):** `128`
+
+From //src/devices/sysmem/bin/sysmem_connector/BUILD.gn:28
+
+### sysmem_contiguous_memory_size
+
+**Current value (from the default):** `-1`
+
+From //src/devices/sysmem/bin/sysmem_connector/BUILD.gn:20
+
+### sysmem_contiguous_memory_size_percent
+
+**Current value (from the default):** `5`
+
+From //src/devices/sysmem/bin/sysmem_connector/BUILD.gn:21
+
+### sysmem_protected_memory_size
+
+**Current value (from the default):** `0`
+
+From //src/devices/sysmem/bin/sysmem_connector/BUILD.gn:22
+
+### sysmem_protected_memory_size_percent
+
+**Current value (from the default):** `-1`
+
+From //src/devices/sysmem/bin/sysmem_connector/BUILD.gn:23
+
+### sysmem_protected_ranges_disable_dynamic
+
+**Current value (from the default):** `false`
+
+From //src/devices/sysmem/bin/sysmem_connector/BUILD.gn:30
 
 ### target_cpu
 
