@@ -16,13 +16,13 @@
 
 TEST(PerfettoBridgeIntegrationTest, Init) {
   async::Loop loop(&kAsyncLoopConfigAttachToCurrentThread);
-  zx::result client_end = component::Connect<fuchsia_tracing_controller::Controller>();
+  zx::result client_end = component::Connect<fuchsia_tracing_controller::Provisioner>();
   ASSERT_TRUE(client_end.is_ok());
   const fidl::SyncClient client{std::move(*client_end)};
 
   // Wait for perfetto bridge to attach
   for (unsigned retries = 0; retries < 5; retries++) {
-    fidl::Result<fuchsia_tracing_controller::Controller::GetProviders> providers =
+    fidl::Result<fuchsia_tracing_controller::Provisioner::GetProviders> providers =
         client->GetProviders();
     ASSERT_TRUE(providers.is_ok());
     if (providers->providers().size() == 1) {
@@ -39,7 +39,7 @@ TEST(PerfettoBridgeIntegrationTest, Init) {
       .buffering_mode = fuchsia_tracing::BufferingMode::kOneshot,
   }};
 
-  fidl::Result<fuchsia_tracing_controller::Controller::GetProviders> providers =
+  fidl::Result<fuchsia_tracing_controller::Provisioner::GetProviders> providers =
       client->GetProviders();
 
   // We should have a single provider: perfetto
@@ -47,12 +47,15 @@ TEST(PerfettoBridgeIntegrationTest, Init) {
   ASSERT_EQ(providers->providers().size(), size_t{1});
   ASSERT_EQ(providers->providers().begin()->name(), "perfetto");
 
-  auto init_response = client->InitializeTracing({config, std::move(outgoing_socket)});
+  auto endpoints = fidl::Endpoints<fuchsia_tracing_controller::Session>::Create();
+  auto init_response =
+      client->InitializeTracing({std::move(endpoints.server), config, std::move(outgoing_socket)});
   ASSERT_TRUE(init_response.is_ok());
+  const fidl::SyncClient controller_client{std::move(endpoints.client)};
 
-  client->StartTracing({});
+  controller_client->StartTracing({});
   loop.Run(zx::deadline_after(zx::sec(1)));
-  client->StopTracing({{{.write_results = true}}});
+  controller_client->StopTracing({{{.write_results = true}}});
 
   size_t num_perfetto_bytes = 0;
   trace::TraceReader::RecordConsumer handle_perfetto_blob =
@@ -92,7 +95,6 @@ TEST(PerfettoBridgeIntegrationTest, Init) {
   }
 
   EXPECT_GT(num_perfetto_bytes, size_t{30000});
-  client->TerminateTracing({});
   loop.RunUntilIdle();
 }
 
