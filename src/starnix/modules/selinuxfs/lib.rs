@@ -2,11 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::{check_permission, fs_node_effective_sid};
-use crate::mm::memory::MemoryObject;
-use crate::task::CurrentTask;
-use crate::vfs::buffers::{InputBuffer, OutputBuffer};
-use crate::vfs::{
+#![recursion_limit = "512"]
+
+use starnix_core::mm::memory::MemoryObject;
+use starnix_core::security;
+use starnix_core::task::CurrentTask;
+use starnix_core::vfs::buffers::{InputBuffer, OutputBuffer};
+use starnix_core::vfs::{
     emit_dotdot, fileops_impl_directory, fileops_impl_noop_sync, fileops_impl_seekable,
     fs_node_impl_dir_readonly, fs_node_impl_not_dir, parse_unsigned_file, unbounded_seek,
     BytesFile, BytesFileOps, CacheMode, DirectoryEntryType, DirentSink, FileObject, FileOps,
@@ -22,7 +24,7 @@ use selinux::SecurityPermission;
 use selinux_core::security_server::SecurityServer;
 use selinux_core::{InitialSid, SecurityId};
 use starnix_logging::{impossible_error, log_error, log_info, track_stub};
-use starnix_sync::{FileOpsCore, Locked};
+use starnix_sync::{FileOpsCore, Locked, Unlocked};
 use starnix_uapi::device_type::DeviceType;
 use starnix_uapi::errors::Errno;
 use starnix_uapi::file_mode::mode;
@@ -51,17 +53,13 @@ impl SeLinuxFs {
         current_task: &CurrentTask,
         options: FileSystemOptions,
     ) -> Result<FileSystemHandle, Errno> {
+        // If SELinux is not enabled then the "selinuxfs" file system does not exist.
+        let security_server = security::selinuxfs_get_admin_api(current_task)
+            .ok_or_else(|| errno!(ENODEV, "selinuxfs"))?;
+
         let kernel = current_task.kernel();
         let fs = FileSystem::new(kernel, CacheMode::Permanent, SeLinuxFs, options)?;
         let mut dir = StaticDirectoryBuilder::new(&fs);
-
-        // There should always be a SecurityServer if SeLinuxFs is active.
-        let security_server = match kernel.security_state.server.as_ref() {
-            Some(security_server) => security_server,
-            None => {
-                return error!(EINVAL);
-            }
-        };
 
         // Read-only files & directories, exposing SELinux internal state.
         dir.entry(current_task, "checkreqprot", CheckReqProtApi::new_node(), mode!(IFREG, 0o644));
@@ -417,17 +415,18 @@ impl FsNodeOps for DeviceFileNode {
     }
 }
 
+#[derive(Clone)]
 struct BooleansDirectory {
     security_server: Arc<SecurityServer>,
 }
 
 impl BooleansDirectory {
-    fn new(security_server: Arc<SecurityServer>) -> Arc<Self> {
-        Arc::new(Self { security_server })
+    fn new(security_server: Arc<SecurityServer>) -> Self {
+        Self { security_server }
     }
 }
 
-impl FsNodeOps for Arc<BooleansDirectory> {
+impl FsNodeOps for BooleansDirectory {
     fs_node_impl_dir_readonly!();
 
     fn create_file_ops(
@@ -560,12 +559,12 @@ struct ClassDirectory {
 }
 
 impl ClassDirectory {
-    fn new(security_server: Arc<SecurityServer>) -> Arc<Self> {
-        Arc::new(Self { security_server })
+    fn new(security_server: Arc<SecurityServer>) -> Self {
+        Self { security_server }
     }
 }
 
-impl FsNodeOps for Arc<ClassDirectory> {
+impl FsNodeOps for ClassDirectory {
     fs_node_impl_dir_readonly!();
 
     /// Returns the set of classes under the "class" directory.
@@ -620,12 +619,12 @@ struct PermsDirectory {
 }
 
 impl PermsDirectory {
-    fn new(security_server: Arc<SecurityServer>, class_name: String) -> Arc<Self> {
-        Arc::new(Self { security_server, class_name })
+    fn new(security_server: Arc<SecurityServer>, class_name: String) -> Self {
+        Self { security_server, class_name }
     }
 }
 
-impl FsNodeOps for Arc<PermsDirectory> {
+impl FsNodeOps for PermsDirectory {
     fs_node_impl_dir_readonly!();
 
     /// Lists all available permissions for the corresponding class.
@@ -671,22 +670,6 @@ impl FsNodeOps for Arc<PermsDirectory> {
             FsNodeInfo::new_factory(mode!(IFREG, 0o444), current_task.as_fscred()),
         ))
     }
-}
-
-fn check_security_permission(
-    current_task: &CurrentTask,
-    node: &FsNode,
-    permission: SecurityPermission,
-) -> Result<(), Errno> {
-    let security_server = current_task.kernel().security_state.server.as_ref().unwrap();
-    if !security_server.has_policy() {
-        return Ok(());
-    }
-    let source_sid = current_task.read().security_state.attrs.current_sid;
-    let target_sid = fs_node_effective_sid(&security_server, current_task, node);
-    let permission_check = security_server.as_permission_check();
-    // TODO: https://fxbug.dev/349117435 - Enable as soon as selinuxfs is labelled (via genfscon).
-    check_permission(&permission_check, source_sid, target_sid, permission).or(Ok(()))
 }
 
 /// File node implementation tailored to the behaviour of the APIs exposed to userspace via the
@@ -756,7 +739,11 @@ impl<T: SeLinuxApiOps + Sync + Send + 'static> FileOps for SeLinuxApi<T> {
         offset: usize,
         data: &mut dyn InputBuffer,
     ) -> Result<usize, Errno> {
-        check_security_permission(current_task, &file.name.entry.node, T::api_write_permission())?;
+        security::selinuxfs_check_access(
+            current_task,
+            &file.name.entry.node,
+            T::api_write_permission(),
+        )?;
         let data = data.read_all()?;
         let data_len = data.len();
         self.ops.api_write(offset, data)?;
@@ -764,11 +751,15 @@ impl<T: SeLinuxApiOps + Sync + Send + 'static> FileOps for SeLinuxApi<T> {
     }
 }
 
-/// # Panics
-///
-/// Will panic if the supplied `kern` is not configured with SELinux enabled.
-pub fn new_fs(current_task: &CurrentTask, options: FileSystemOptions) -> &FileSystemHandle {
-    current_task.kernel().selinux_fs.get_or_init(|| {
-        SeLinuxFs::new_fs(current_task, options).expect("failed to construct selinuxfs")
-    })
+/// Returns the "selinuxfs" file system, used by the system userspace to administer SELinux.
+pub fn selinux_fs(
+    _locked: &mut Locked<'_, Unlocked>,
+    current_task: &CurrentTask,
+    options: FileSystemOptions,
+) -> Result<FileSystemHandle, Errno> {
+    current_task
+        .kernel()
+        .selinux_fs
+        .get_or_try_init(|| SeLinuxFs::new_fs(current_task, options))
+        .cloned()
 }

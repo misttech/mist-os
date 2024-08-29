@@ -2,7 +2,6 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-pub(super) mod selinuxfs;
 pub(super) mod task;
 pub(super) mod testing;
 
@@ -13,7 +12,7 @@ use crate::vfs::{
     FileSystem, FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp,
 };
 use linux_uapi::XATTR_NAME_SELINUX;
-use selinux::{ClassPermission, InitialSid, Permission, ProcessPermission};
+use selinux::{ClassPermission, InitialSid, Permission, ProcessPermission, SecurityPermission};
 use selinux_core::permission_check::PermissionCheck;
 use selinux_core::security_server::SecurityServer;
 use selinux_core::SecurityId;
@@ -271,6 +270,20 @@ pub fn file_system_init_security(
     let mount_options = FileSystemMountOptions { context, def_context, fs_context, root_context };
 
     Ok(FileSystemState { mount_options, label: OnceLock::new() })
+}
+
+/// Used by the "selinuxfs" module to perform checks on SELinux API file accesses.
+pub(super) fn selinuxfs_check_access(
+    security_server: &SecurityServer,
+    current_task: &CurrentTask,
+    node: &FsNode,
+    permission: SecurityPermission,
+) -> Result<(), Errno> {
+    let source_sid = current_task.read().security_state.attrs.current_sid;
+    let target_sid = fs_node_effective_sid(&security_server, current_task, node);
+    let permission_check = security_server.as_permission_check();
+    // TODO: https://fxbug.dev/349117435 - Enable as soon as selinuxfs is labeled (via genfscon).
+    check_permission(&permission_check, source_sid, target_sid, permission).or(Ok(()))
 }
 
 /// The SELinux security structure for `ThreadGroup`.

@@ -2,17 +2,13 @@
 // Use of this source code is governed by a BSD-style license that can be
 // found in the LICENSE file.
 
-use super::selinux_hooks::selinuxfs;
 use super::{selinux_hooks, FileSystemState, ResolvedElfState, TaskState};
 use crate::security::KernelState;
 use crate::task::{CurrentTask, Task};
 use crate::vfs::fs_args::MountParams;
-use crate::vfs::{
-    FileSystemHandle, FileSystemOptions, FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode,
-    ValueOrSize, XattrOp,
-};
+use crate::vfs::{FsNode, FsNodeHandle, FsStr, FsString, NamespaceNode, ValueOrSize, XattrOp};
+use selinux::SecurityPermission;
 use selinux_core::security_server::SecurityServer;
-use starnix_sync::{Locked, Unlocked};
 use starnix_uapi::errors::Errno;
 use starnix_uapi::mount_flags::MountFlags;
 use starnix_uapi::signals::Signal;
@@ -79,19 +75,6 @@ where
 /// contents.
 pub fn kernel_init_security(enabled: bool) -> KernelState {
     KernelState { server: enabled.then(|| SecurityServer::new()) }
-}
-
-/// Returns the "selinuxfs" file system, used by the system userspace to administer SELinux.
-pub fn new_selinux_fs(
-    _locked: &mut Locked<'_, Unlocked>,
-    current_task: &CurrentTask,
-    options: FileSystemOptions,
-) -> Result<FileSystemHandle, Errno> {
-    if current_task.kernel().security_state.server.is_some() {
-        Ok(selinuxfs::new_fs(current_task, options).clone())
-    } else {
-        error!(ENODEV, "selinuxfs")
-    }
 }
 
 /// Return security state to associate with a filesystem based on the supplied mount options.
@@ -468,6 +451,29 @@ pub fn set_procattr(
         },
         // If SELinux is disabled then no writes are accepted.
         || error!(EINVAL),
+    )
+}
+
+/// Used by the "selinuxfs" module to access the SELinux administration API, if enabled.
+// TODO: https://fxbug.dev/335397745 - Return a more restricted API, or ...
+// TODO: https://fxbug.dev/362917997 - Remove this when SELinux LSM is modularized.
+pub fn selinuxfs_get_admin_api(current_task: &CurrentTask) -> Option<Arc<SecurityServer>> {
+    current_task.kernel().security_state.server.clone()
+}
+
+/// Used by the "selinuxfs" module to perform checks on SELinux API file accesses.
+// TODO: https://fxbug.dev/362917997 - Remove this when SELinux LSM is modularized.
+pub fn selinuxfs_check_access(
+    current_task: &CurrentTask,
+    node: &FsNode,
+    permission: SecurityPermission,
+) -> Result<(), Errno> {
+    run_if_selinux_else(
+        current_task,
+        |security_server| {
+            selinux_hooks::selinuxfs_check_access(security_server, current_task, node, permission)
+        },
+        || Ok(()),
     )
 }
 
