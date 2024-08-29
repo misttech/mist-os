@@ -19,14 +19,24 @@ use metrics_registry::*;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::rc::Rc;
-use std::sync::Arc;
+use std::sync::atomic::{AtomicU32, Ordering};
+use std::sync::{Arc, LazyLock};
 use {fidl_fuchsia_io as fio, fuchsia_async as fasync, fuchsia_zircon as zx};
+
+/// Use a self incremental u32 unique id for device_id.
+static NEXT_DEVICE_ID: LazyLock<AtomicU32> = LazyLock::new(|| AtomicU32::new(1));
+
+/// Each time this function is invoked, it returns the current value of its
+/// internal counter (serving as a unique id for device_id) and then increments
+/// that counter in preparation for the next call.
+fn get_next_device_id() -> u32 {
+    NEXT_DEVICE_ID.fetch_add(1, Ordering::SeqCst)
+}
 
 type BoxedInputDeviceBinding = Box<dyn input_device::InputDeviceBinding>;
 
 /// An [`InputDeviceBindingHashMap`] maps an input device to one or more InputDeviceBindings.
-/// It expects filenames of the input devices seen in /dev/class/input-report (ex. "001") or
-/// "injected_device" as keys.
+/// It uses unique device id as key.
 pub type InputDeviceBindingHashMap = Arc<Mutex<HashMap<u32, Vec<BoxedInputDeviceBinding>>>>;
 
 /// An input pipeline assembly.
@@ -477,7 +487,7 @@ impl InputPipeline {
                             device_proxy,
                             &input_event_sender,
                             &bindings,
-                            filename.parse::<u32>().unwrap_or_default(),
+                            get_next_device_id(),
                             input_devices_node,
                             Some(&devices_connected),
                             metrics_logger.clone(),
@@ -511,7 +521,6 @@ impl InputPipeline {
     /// - `device_types`: The types of devices to watch for.
     /// - `input_event_sender`: The channel new InputDeviceBindings will send InputEvents to.
     /// - `bindings`: Holds all the InputDeviceBindings associated with the InputPipeline.
-    /// - `device_id`: The device id of the associated bindings.
     /// - `input_devices_node`: The parent node for all injected devices' inspect nodes.
     /// - `metrics_logger`: The metrics logger.
     pub async fn handle_input_device_registry_request_stream(
@@ -519,7 +528,6 @@ impl InputPipeline {
         device_types: &Vec<input_device::InputDeviceType>,
         input_event_sender: &UnboundedSender<input_device::InputEvent>,
         bindings: &InputDeviceBindingHashMap,
-        device_id: u32,
         input_devices_node: &fuchsia_inspect::Node,
         metrics_logger: metrics::MetricsLogger,
     ) -> Result<(), Error> {
@@ -536,6 +544,8 @@ impl InputPipeline {
                     // Add a binding if the device is a type being tracked
                     let device_proxy = device.into_proxy().expect("Error getting device proxy.");
 
+                    let device_id = get_next_device_id();
+
                     add_device_bindings(
                         device_types,
                         &format!("input-device-registry-{}", device_id),
@@ -549,7 +559,33 @@ impl InputPipeline {
                     )
                     .await;
                 }
-                fidl_fuchsia_input_injection::InputDeviceRegistryRequest::RegisterAndGetDeviceInfo { .. } => {}
+                fidl_fuchsia_input_injection::InputDeviceRegistryRequest::RegisterAndGetDeviceInfo {
+                    device,
+                    responder,
+                    .. } => {
+                    // Add a binding if the device is a type being tracked
+                    let device_proxy = device.into_proxy().expect("Error getting device proxy.");
+
+                    let device_id = get_next_device_id();
+
+                    add_device_bindings(
+                        device_types,
+                        &format!("input-device-registry-{}", device_id),
+                        device_proxy,
+                        input_event_sender,
+                        bindings,
+                        device_id,
+                        input_devices_node,
+                        None,
+                        metrics_logger.clone(),
+                    )
+                    .await;
+
+                    responder.send(fidl_fuchsia_input_injection::InputDeviceRegistryRegisterAndGetDeviceInfoResponse{
+                        device_id: Some(device_id),
+                        ..Default::default()
+                    }).expect("Failed to respond to RegisterAndGetDeviceInfo request");
+                }
             }
         }
 
@@ -927,7 +963,7 @@ mod tests {
         // Create a file in a pseudo directory that represents an input device.
         let mut count: i8 = 0;
         let dir = pseudo_directory! {
-            "001" => pseudo_fs_service::host(
+            "file_name" => pseudo_fs_service::host(
                 move |mut request_stream: fidl_fuchsia_input_report::InputDeviceRequestStream| {
                     async move {
                         while count < 3 {
@@ -1025,7 +1061,7 @@ mod tests {
                 input_devices: {
                     devices_discovered: 1u64,
                     devices_connected: 1u64,
-                    "001_Mouse": contains {
+                    "file_name_Mouse": contains {
                         reports_received_count: 0u64,
                         reports_filtered_count: 0u64,
                         events_generated: 0u64,
@@ -1050,7 +1086,7 @@ mod tests {
         // Create a file in a pseudo directory that represents an input device.
         let mut count: i8 = 0;
         let dir = pseudo_directory! {
-            "001" => pseudo_fs_service::host(
+            "file_name" => pseudo_fs_service::host(
                 move |mut request_stream: fidl_fuchsia_input_report::InputDeviceRequestStream| {
                     async move {
                         while count < 1 {
@@ -1131,7 +1167,7 @@ mod tests {
                 input_devices: {
                     devices_discovered: 1u64,
                     devices_connected: 0u64,
-                    "001_Unsupported": {
+                    "file_name_Unsupported": {
                         "fuchsia.inspect.Health": {
                             status: "UNHEALTHY",
                             message: "Unsupported device type.",
@@ -1189,7 +1225,6 @@ mod tests {
             &device_types,
             &input_event_sender,
             &bindings_clone,
-            0,
             &test_node,
             metrics::MetricsLogger::default(),
         )
