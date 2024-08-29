@@ -395,9 +395,6 @@ Devfs::Devfs(std::optional<Devnode>& root) : root_(root.emplace(*this)) {
 
       // TODO(https://fxbug.dev/42065080): Remove.
       "thermal",
-
-      // TODO(https://fxbug.dev/42065083): Remove.
-      "zxcrypt",
   });
   // Pre-populate the class directories.
   std::random_device rd;
