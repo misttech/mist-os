@@ -12,8 +12,6 @@
 
 #include "util.h"
 
-// constexpr size_t kMaxSegments = 4;
-// constexpr size_t kMaxPhdrs = 16;
 const size_t kRandomSeedBytes = 16;
 
 size_t get_initial_stack_size(
@@ -33,7 +31,7 @@ size_t get_initial_stack_size(
   return stack_size;
 }
 
-StackResult populate_initial_stack(
+zx_mistos_process_stack_t populate_initial_stack(
     const zx::debuglog& log, zx::vmo& stack_vmo, const std::string_view& path,
     const fbl::static_vector<std::string_view, kMaxInitArgs>& argv,
     const fbl::static_vector<std::string_view, kMaxInitEnvs>& envp,
@@ -140,7 +138,7 @@ StackResult populate_initial_stack(
   auto auxv_start = stack_pointer + auxv_start_offset;
   auto auxv_end = stack_pointer + auxv_end_offset;
 
-  return StackResult{
+  return zx_mistos_process_stack_t{
       stack_pointer, auxv_start, auxv_end, argv_start, argv_end, environ_start, environ_end,
   };
 }
