@@ -46,12 +46,8 @@ TEST(HeaderTest, CompileTimeAsserts) {
   static_assert(MultiEquals<int, 4>(fatals));
   constexpr int nones[] = {FX_LOG_NONE, FUCHSIA_LOG_NONE};
   static_assert(MultiEquals<int, 2>(nones));
-  constexpr int severity_steps[] = {FX_LOG_SEVERITY_STEP_SIZE, FUCHSIA_LOG_SEVERITY_STEP_SIZE,
-                                    fuchsia_logging::LogSeverityStepSize};
-  static_assert(MultiEquals<int, 3>(severity_steps));
-  constexpr int verbosity_steps[] = {FX_LOG_VERBOSITY_STEP_SIZE, FUCHSIA_LOG_VERBOSITY_STEP_SIZE,
-                                     fuchsia_logging::LogVerbosityStepSize};
-  static_assert(MultiEquals<int, 3>(verbosity_steps));
+  constexpr int severity_steps[] = {FX_LOG_SEVERITY_STEP_SIZE, FUCHSIA_LOG_SEVERITY_STEP_SIZE};
+  static_assert(MultiEquals<int, 2>(severity_steps));
 }
 
 int main(int argc, char **argv) {

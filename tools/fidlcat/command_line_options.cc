@@ -296,8 +296,7 @@ bool SetLogSettings(const std::string& level, int multiplier, fxl::LogSettings* 
     settings->min_log_level =
         fuchsia_logging::LOG_INFO +
         static_cast<fuchsia_logging::LogSeverity>(
-            (multiplier * (multiplier > 0 ? fuchsia_logging::LogSeverityStepSize
-                                          : fuchsia_logging::LogVerbosityStepSize)));
+            (multiplier * (multiplier > 0 ? FUCHSIA_LOG_SEVERITY_STEP_SIZE : 1)));
 
   } else {
     return false;

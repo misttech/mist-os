@@ -5,6 +5,7 @@
 #include "src/lib/fxl/log_settings_command_line.h"
 
 #include <lib/syslog/cpp/macros.h>
+#include <lib/syslog/structured_backend/fuchsia_syslog.h>
 
 #include "lib/syslog/cpp/log_settings.h"
 #include "src/lib/fxl/command_line.h"
@@ -74,7 +75,7 @@ bool ParseLogSettingsInternal(const fxl::CommandLine& command_line, T* out_setti
     }
     settings.min_log_level =
         fuchsia_logging::LOG_INFO +
-        static_cast<fuchsia_logging::LogSeverity>(level * fuchsia_logging::LogSeverityStepSize);
+        static_cast<fuchsia_logging::LogSeverity>(level * FUCHSIA_LOG_SEVERITY_STEP_SIZE);
   }
 
   *out_settings = settings;
