@@ -33,7 +33,7 @@ pub use aliases::{
 pub use api::query::{BuildOverride, ConfigQuery, SelectMode};
 pub use config_macros::FfxConfigBacked;
 
-pub use environment::{test_init, Environment, EnvironmentContext, TestEnv};
+pub use environment::{test_init, test_init_in_tree, Environment, EnvironmentContext, TestEnv};
 pub use sdk::{self, Sdk, SdkRoot};
 pub use storage::ConfigMap;
 
