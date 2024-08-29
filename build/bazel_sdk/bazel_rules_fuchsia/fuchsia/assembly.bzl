@@ -9,8 +9,8 @@ load(
     _fuchsia_prebuilt_package = "fuchsia_prebuilt_package",
 )
 load(
-    "//fuchsia/private/assembly:fuchsia_assemble_package.bzl",
-    _fuchsia_assemble_package = "fuchsia_assemble_package",
+    "//fuchsia/private/assembly:fuchsia_package_with_configs.bzl",
+    _fuchsia_package_with_configs = "fuchsia_package_with_configs",
 )
 load(
     "//fuchsia/private/assembly:fuchsia_assembly_developer_overrides.bzl",
@@ -132,7 +132,7 @@ fuchsia_legacy_bundle = _fuchsia_legacy_bundle
 fuchsia_platform_artifacts = _fuchsia_platform_artifacts
 fuchsia_prebuilt_package = _fuchsia_prebuilt_package
 fuchsia_package_directory = _fuchsia_package_directory
-fuchsia_package_with_configs = _fuchsia_assemble_package
+fuchsia_package_with_configs = _fuchsia_package_with_configs
 fuchsia_product_configuration = _fuchsia_product_configuration
 fuchsia_prebuilt_product_configuration = _fuchsia_prebuilt_product_configuration
 fuchsia_product_ota_config = _fuchsia_product_ota_config
@@ -155,11 +155,6 @@ fuchsia_update_package = _fuchsia_update_package
 fuchsia_repository_keys = _fuchsia_repository_keys
 fuchsia_task_flash = _fuchsia_task_flash
 fuchsia_scrutiny_config = _fuchsia_scrutiny_config
-
-# Deprecated rules
-assembly_bundle = _fuchsia_legacy_bundle
-fuchsia_assemble_package = _fuchsia_assemble_package
-fuchsia_product_image = _fuchsia_product
 
 fuchsia_bootstrap_partition = _fuchsia_bootstrap_partition
 fuchsia_bootloader_partition = _fuchsia_bootloader_partition

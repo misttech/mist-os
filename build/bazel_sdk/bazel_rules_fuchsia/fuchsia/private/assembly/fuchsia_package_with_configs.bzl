@@ -7,7 +7,7 @@
 load("//fuchsia/private:providers.bzl", "FuchsiaPackageInfo")
 load(":providers.bzl", "FuchsiaAssembledPackageInfo", "FuchsiaConfigDataInfo")
 
-def _fuchsia_assemble_package_impl(ctx):
+def _fuchsia_package_with_configs_impl(ctx):
     configs = []
     files = []
     for config_file in ctx.attr.configs:
@@ -30,9 +30,9 @@ def _fuchsia_assemble_package_impl(ctx):
         ),
     ]
 
-fuchsia_assemble_package = rule(
+fuchsia_package_with_configs = rule(
     doc = """Declares a target to attach configs to package for assembly.""",
-    implementation = _fuchsia_assemble_package_impl,
+    implementation = _fuchsia_package_with_configs_impl,
     provides = [FuchsiaAssembledPackageInfo],
     attrs = {
         "package": attr.label(

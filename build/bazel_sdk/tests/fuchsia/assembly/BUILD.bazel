@@ -6,11 +6,11 @@ load(
     "@fuchsia_sdk//fuchsia:assembly.bzl",
     "PARTITION_TYPE",
     "SLOT",
-    "fuchsia_assemble_package",
     "fuchsia_board_configuration",
     "fuchsia_board_input_bundle",
     "fuchsia_bootloader_partition",
     "fuchsia_bootstrap_partition",
+    "fuchsia_package_with_configs",
     "fuchsia_partition",
     "fuchsia_partitions_configuration",
     "fuchsia_post_processing_script",
@@ -131,7 +131,7 @@ fuchsia_board_configuration_test(
     visibility = ["//visibility:public"],
 )
 
-fuchsia_assemble_package(
+fuchsia_package_with_configs(
     name = "assembled_ams_light",
     configs = {
         ":test_data/config_data.json": "config_data.json",
