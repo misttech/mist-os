@@ -54,7 +54,7 @@ use netstack3_base::{
     CtxPair, DeferredResourceRemovalContext, DeviceIdContext, EitherDeviceId, ExistsError,
     HandleableTimer, IcmpErrorCode, Inspector, InspectorDeviceExt, InstantBindingsTypes, IpExt,
     LocalAddressError, Mss, OwnedOrRefsBidirectionalConverter, PortAllocImpl,
-    ReferenceNotifiersExt as _, RemoveResourceResult, RngContext, Segment, SendPayload, SeqNum,
+    ReferenceNotifiersExt as _, RemoveResourceResult, RngContext, Segment, SeqNum,
     StrongDeviceIdentifier as _, TimerBindingsTypes, TimerContext, TracingContext,
     WeakDeviceIdentifier, ZonedAddressError,
 };
@@ -4478,7 +4478,14 @@ fn close_pending_socket<WireI, SockI, DC, BC>(
     debug!("aborting pending socket {sock_id:?}");
     if let Some(reset) = core_ctx.with_counters(|counters| state.abort(counters)) {
         let ConnAddr { ip, device: _ } = conn_addr;
-        send_tcp_segment(core_ctx, bindings_ctx, Some(sock_id), Some(ip_sock), *ip, reset.into());
+        send_tcp_segment(
+            core_ctx,
+            bindings_ctx,
+            Some(sock_id),
+            Some(ip_sock),
+            *ip,
+            reset.into_empty(),
+        );
     }
 }
 
@@ -5017,7 +5024,7 @@ where
         Some(&sock_id),
         Some(&ip_sock),
         conn_addr.ip,
-        syn.into(),
+        syn.into_empty(),
     );
 
     let mut timer = bindings_ctx.new_timer(convert_timer(sock_id.downgrade()));
@@ -5167,7 +5174,7 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
     socket_id: Option<&TcpSocketId<SockI, D, BC>>,
     ip_sock: Option<&IpSock<WireI, D>>,
     conn_addr: ConnIpAddr<WireI::Addr, NonZeroU16, NonZeroU16>,
-    segment: Segment<SendPayload<'a>>,
+    segment: Segment<<BC::SendBuffer as SendBuffer>::Payload<'a>>,
 ) where
     WireI: IpExt,
     SockI: IpExt + DualStackIpExt,
@@ -5213,7 +5220,7 @@ fn send_tcp_segment<'a, WireI, SockI, CC, BC, D>(
             core_ctx.increment(|counters| &counters.segment_send_errors);
             match socket_id {
                 Some(socket_id) => debug!("{:?}: failed to send segment: {:?}", socket_id, err),
-                None => debug!("TCP: failed to send segment: {:?}, {:?}", err, segment),
+                None => debug!("TCP: failed to send segment: {:?}", err),
             }
         }
     }

@@ -156,6 +156,10 @@ impl Payload for SendPayload<'_> {
             }
         }
     }
+
+    fn new_empty() -> Self {
+        Self::Contiguous(&[])
+    }
 }
 
 impl InnerPacketBuilder for SendPayload<'_> {

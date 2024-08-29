@@ -15,6 +15,7 @@ use core::fmt::Debug;
 use core::num::NonZeroUsize;
 use core::ops::Range;
 use either::Either;
+use packet::InnerPacketBuilder;
 
 use crate::internal::base::BufferSizes;
 use crate::internal::state::Takeable;
@@ -70,6 +71,9 @@ pub trait ReceiveBuffer: Buffer {
 
 /// A buffer supporting TCP sending operations.
 pub trait SendBuffer: Buffer {
+    /// The payload type given to `peek_with`.
+    type Payload<'a>: InnerPacketBuilder + Payload + Debug + 'a;
+
     /// Removes `count` bytes from the beginning of the buffer as already read.
     ///
     /// # Panics
@@ -85,16 +89,9 @@ pub trait SendBuffer: Buffer {
     ///
     /// Panics if more bytes are peeked than are available, i.e.,
     /// `offset > self.len`
-    // Note: This trait is tied closely to a ring buffer, that's why we use
-    // the `SendPayload` rather than `&[&[u8]]` as in the Rx path. Currently
-    // the language isn't flexible enough to allow its implementors to decide
-    // the shape of readable region. It is theoretically possible and ideal
-    // for this trait to have an associated type that describes the shape of
-    // the borrowed readable region but is currently impossible because GATs
-    // are not implemented yet.
     fn peek_with<'a, F, R>(&'a mut self, offset: usize, f: F) -> R
     where
-        F: FnOnce(SendPayload<'a>) -> R;
+        F: FnOnce(Self::Payload<'a>) -> R;
 }
 
 /// Information about the number of bytes in a [`Buffer`].
@@ -394,6 +391,8 @@ impl ReceiveBuffer for RingBuffer {
 }
 
 impl SendBuffer for RingBuffer {
+    type Payload<'a> = SendPayload<'a>;
+
     fn mark_read(&mut self, count: usize) {
         let Self { storage, head, len, shrink: _ } = self;
         assert!(count <= *len);
@@ -673,6 +672,8 @@ pub(crate) mod testutil {
     }
 
     impl SendBuffer for TestSendBuffer {
+        type Payload<'a> = SendPayload<'a>;
+
         fn mark_read(&mut self, count: usize) {
             let Self { fake_stream: _, ring } = self;
             ring.mark_read(count)

@@ -409,6 +409,8 @@ impl SendBufferWithZirconSocket {
 }
 
 impl SendBuffer for SendBufferWithZirconSocket {
+    type Payload<'a> = SendPayload<'a>;
+
     fn mark_read(&mut self, count: usize) {
         self.ready_to_send.mark_read(count);
         self.poll()
