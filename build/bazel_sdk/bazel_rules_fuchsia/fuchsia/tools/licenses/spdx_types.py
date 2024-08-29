@@ -9,7 +9,7 @@ import hashlib
 import json
 import re
 from collections import defaultdict
-from typing import Any, ClassVar, Dict, List, Set, Tuple, Type, Union
+from typing import Any, Dict, List, Set, Tuple, Union
 
 try:
     # Bazel build uses fully-qualified package names.

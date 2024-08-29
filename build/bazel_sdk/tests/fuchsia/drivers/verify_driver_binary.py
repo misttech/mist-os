@@ -4,10 +4,8 @@
 """Tool to check that the driver binary was built correctly."""
 
 import argparse
-import json
 import subprocess
 import sys
-import tempfile
 
 
 def parse_args():

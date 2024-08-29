@@ -31,7 +31,7 @@ def main():
     if args.compression_level:
         try:
             compression_level = int(args.compression_level)
-        except ValueError as e:
+        except ValueError:
             compression_level = -1
         if compression_level < 0 or compression_level > 9:
             parser.error(

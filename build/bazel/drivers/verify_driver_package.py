@@ -9,7 +9,7 @@ import json
 import sys
 from enum import Enum
 from pathlib import Path
-from typing import AbstractSet, Any, Dict, Sequence
+from typing import AbstractSet, Dict, Sequence
 
 SizeCheckMode = Enum("SizeCheckMode", ["EQUAL", "BAZEL_SMALLER"])
 
@@ -25,7 +25,6 @@ class Package:
 
         for blob in pkg.get("blobs", []):
             path = blob["path"]
-            merkle = blob["merkle"]
             # Special case the meta/ blob
             if path == "meta/":
                 self.meta_merkle = blob

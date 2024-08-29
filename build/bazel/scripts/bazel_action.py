@@ -9,7 +9,6 @@ import argparse
 import dataclasses
 import errno
 import filecmp
-import json
 import os
 import shlex
 import shutil
@@ -901,7 +900,6 @@ def main() -> int:
     )
     parser.add_argument(
         "--ninja-inputs-manifest",
-        required=True,
         help="Path to the manifest file describing bazel_input_xxx() dependencies.",
     )
     parser.add_argument(
@@ -980,9 +978,6 @@ def main() -> int:
         return parser.error(
             "Bazel launcher does not exist: %s" % args.bazel_launcher
         )
-
-    with open(args.ninja_inputs_manifest) as f:
-        ninja_inputs_manifest = json.load(f)
 
     current_dir = os.getcwd()
     bazel_output_base_dir = find_bazel_output_base(args.workspace_dir)
