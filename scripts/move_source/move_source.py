@@ -200,7 +200,6 @@ def generate_forwarding_target(target, source, dest):
     build_file_path = os.path.join(
         fuchsia_root, containing_directory, "BUILD.gn"
     )
-    imports = set()
     # compute label relative to directory. This will be the same in the
     # source and destination
     relative_label = os.path.relpath(containing_directory, source)
@@ -303,7 +302,6 @@ def append_to_gn_file(directory, contents):
             write_copyright_header(f, "#")
     with open(dest_path, "a") as f:
         f.write(contents)
-    dry_run = False
     run_command(["git", "add", dest_path], False)
 
 
@@ -593,9 +591,7 @@ def main():
         logging.getLogger().setLevel(logging.DEBUG)
 
     source = os.path.normpath(args.source)
-    source_abs = os.path.join(fuchsia_root, source)
     dest = os.path.normpath(args.dest)
-    dest_abs = os.path.join(fuchsia_root, args.dest)
 
     if not os.path.exists(source):
         print("Source path %s does not exist within source tree" % source)

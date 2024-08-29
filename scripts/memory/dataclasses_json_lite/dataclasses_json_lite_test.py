@@ -4,7 +4,7 @@
 
 import unittest
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import Any, List, Optional
 
 from dataclasses_json_lite import config, dataclass_json
 
