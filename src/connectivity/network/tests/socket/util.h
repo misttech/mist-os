@@ -287,6 +287,55 @@ constexpr std::string_view socketTypeToString(const SocketType& socket_type) {
 std::pair<sockaddr_storage, socklen_t> LoopbackSockaddrAndSocklenForDomain(
     const SocketDomain& domain);
 
+// Returns a sockaddr and its length holding the any address for the provided
+// socket domain.
+std::pair<sockaddr_storage, socklen_t> AnySockaddrAndSocklenForDomain(const SocketDomain& domain);
+
+class SocketAddr {
+ public:
+  constexpr static SocketAddr IPv4Any() {
+    const auto& [addr, addr_len] = AnySockaddrAndSocklenForDomain(SocketDomain::IPv4());
+    return SocketAddr{SocketDomain::IPv4(), addr, addr_len, "V4Any"};
+  }
+  constexpr static SocketAddr IPv4Loopback() {
+    const auto& [addr, addr_len] = LoopbackSockaddrAndSocklenForDomain(SocketDomain::IPv4());
+    return SocketAddr{SocketDomain::IPv4(), addr, addr_len, "V4Loopback"};
+  }
+  constexpr static SocketAddr IPv6Any() {
+    const auto& [addr, addr_len] = AnySockaddrAndSocklenForDomain(SocketDomain::IPv6());
+    return SocketAddr{SocketDomain::IPv6(), addr, addr_len, "V6Any"};
+  }
+  constexpr static SocketAddr IPv6Loopback() {
+    const auto& [addr, addr_len] = LoopbackSockaddrAndSocklenForDomain(SocketDomain::IPv6());
+    return SocketAddr{SocketDomain::IPv6(), addr, addr_len, "V6Loopback"};
+  }
+
+  uint16_t GetPort() const {
+    switch (domain.which()) {
+      case SocketDomain::Which::IPv4:
+        return static_cast<uint16_t>(reinterpret_cast<sockaddr_in const*>(&addr)->sin_port);
+      case SocketDomain::Which::IPv6:
+        return static_cast<uint16_t>(reinterpret_cast<sockaddr_in6 const*>(&addr)->sin6_port);
+    }
+  }
+
+  void SetPort(uint16_t port) {
+    switch (domain.which()) {
+      case SocketDomain::Which::IPv4:
+        reinterpret_cast<sockaddr_in*>(&addr)->sin_port = port;
+        return;
+      case SocketDomain::Which::IPv6:
+        reinterpret_cast<sockaddr_in6*>(&addr)->sin6_port = port;
+        return;
+    }
+  }
+
+  SocketDomain domain;
+  sockaddr_storage addr;
+  socklen_t addr_len;
+  const char* description;
+};
+
 #if defined(__linux__)
 #define SKIP_IF_CANT_ACCESS_RAW_SOCKETS()                                              \
   do {                                                                                 \

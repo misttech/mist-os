@@ -5,6 +5,7 @@
 #include "util.h"
 
 #include <arpa/inet.h>
+#include <netinet/in.h>
 #include <sys/ioctl.h>
 #include <sys/socket.h>
 
@@ -157,8 +158,8 @@ void fill_stream_send_buf(int fd, int peer_fd, ssize_t* out_bytes_written) {
     // We'll arbitrarily select a larger size which will allow us to fill both zircon sockets
     // faster.
     //
-    // TODO(https://fxbug.dev/42138506): We can use the minimum buffer size once zircon sockets are not
-    // artificially increasing the buffer sizes.
+    // TODO(https://fxbug.dev/42138506): We can use the minimum buffer size once zircon sockets are
+    // not artificially increasing the buffer sizes.
     constexpr int bufsize = 64 << 10;
 #else
     // We're about to fill the send buffer; shrink it and the other side's receive buffer to the
@@ -654,6 +655,24 @@ std::pair<sockaddr_storage, socklen_t> LoopbackSockaddrAndSocklenForDomain(
     case SocketDomain::Which::IPv6: {
       auto& sin6 = *reinterpret_cast<sockaddr_in6*>(&addr);
       sin6.sin6_addr = IN6ADDR_LOOPBACK_INIT;
+      return std::make_pair(addr, sizeof(sin6));
+    }
+  }
+}
+
+std::pair<sockaddr_storage, socklen_t> AnySockaddrAndSocklenForDomain(const SocketDomain& domain) {
+  sockaddr_storage addr{
+      .ss_family = domain.Get(),
+  };
+  switch (domain.which()) {
+    case SocketDomain::Which::IPv4: {
+      auto& sin = *reinterpret_cast<sockaddr_in*>(&addr);
+      sin.sin_addr.s_addr = htonl(INADDR_ANY);
+      return std::make_pair(addr, sizeof(sin));
+    }
+    case SocketDomain::Which::IPv6: {
+      auto& sin6 = *reinterpret_cast<sockaddr_in6*>(&addr);
+      sin6.sin6_addr = IN6ADDR_ANY_INIT;
       return std::make_pair(addr, sizeof(sin6));
     }
   }
