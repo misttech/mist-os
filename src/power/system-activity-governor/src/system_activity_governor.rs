@@ -13,9 +13,11 @@ use fidl_fuchsia_power_system::{
     self as fsystem, ApplicationActivityLevel, ExecutionStateLevel, FullWakeHandlingLevel,
     WakeHandlingLevel,
 };
+use fuchsia_async::{self as fasync, DurationExt, TimeoutExt};
 use fuchsia_component::server::ServiceFs;
 use fuchsia_inspect::{
-    ArrayProperty, IntProperty as IInt, Node as INode, Property, UintProperty as IUint,
+    ArrayProperty, IntProperty as IInt, Node as INode, NumericProperty, Property,
+    UintProperty as IUint,
 };
 use fuchsia_inspect_contrib::nodes::{BoundedListNode as IRingBuffer, NodeExt};
 use fuchsia_zircon::{self as zx, AsHandleRef, HandleBased};
@@ -28,10 +30,9 @@ use power_broker_client::{
 use std::cell::{OnceCell, RefCell};
 use std::rc::Rc;
 use std::sync::Arc;
-use {
-    fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_suspend as fsuspend,
-    fuchsia_async as fasync,
-};
+use {fidl_fuchsia_power_broker as fbroker, fidl_fuchsia_power_suspend as fsuspend};
+
+const SUSPEND_FAILURE_RETRY_DELAY: zx::Duration = zx::Duration::from_seconds(1);
 
 type NotifyFn = Box<dyn Fn(&fsuspend::SuspendStats, fsuspend::StatsWatchResponder) -> bool>;
 type StatsHangingGet = HangingGet<fsuspend::SuspendStats, fsuspend::StatsWatchResponder, NotifyFn>;
@@ -47,6 +48,17 @@ enum IncomingRequest {
 enum BootControlLevel {
     Inactive,
     Active,
+}
+
+/// The result of a suspend request.
+#[derive(PartialEq)]
+enum SuspendResult {
+    /// Suspend request succeeded.
+    Success,
+    /// Suspend request was not allowed at the time it was triggered.
+    NotAllowed,
+    /// Suspend request failed.
+    Fail,
 }
 
 impl From<BootControlLevel> for fbroker::PowerLevel {
@@ -140,6 +152,12 @@ impl ExecutionStateManager {
         self.inner.lock().await.suspend_state_index = suspend_state_index;
     }
 
+    /// Gets the value that indicates whether suspend is allowed.
+    async fn is_suspend_allowed(&self) -> bool {
+        tracing::debug!("is_suspend_allowed: acquiring inner lock");
+        self.inner.lock().await.suspend_allowed
+    }
+
     /// Updates the power level of the execution state power element.
     ///
     /// Returns a Result that indicates whether the system should suspend or not.
@@ -178,7 +196,9 @@ impl ExecutionStateManager {
     }
 
     /// Attempts to suspend the system.
-    async fn trigger_suspend(&self) {
+    ///
+    /// Returns an enum representing the result of the suspend attempt.
+    async fn trigger_suspend(&self) -> SuspendResult {
         let listener = self.suspend_resume_listener.get().unwrap();
         let mut suspend_failed = false;
         {
@@ -186,7 +206,7 @@ impl ExecutionStateManager {
             let inner = self.inner.lock().await;
             if !inner.suspend_allowed {
                 tracing::info!("Suspend not allowed");
-                return;
+                return SuspendResult::NotAllowed;
             }
 
             self._inspect_node.borrow_mut().add_entry(|node| {
@@ -268,10 +288,12 @@ impl ExecutionStateManager {
             // This is needed in order to allow listener to request power level changes when they
             // process the suspend failure.
             listener.on_suspend_fail().await;
+            SuspendResult::Fail
         } else {
             // This is needed in order to allow listeners to request power level changes when they
             // get the `ActivityGovernorListener::OnResume` call.
             listener.on_resume().await;
+            SuspendResult::Success
         }
     }
 }
@@ -717,13 +739,40 @@ impl SystemActivityGovernor {
         let this = self.clone();
 
         fasync::Task::local(async move {
+            let unhandled_suspend_failures_node =
+                this.inspect_root.create_uint("unhandled_suspend_failures", 0);
+            let mut suspend_result = SuspendResult::Success;
             loop {
                 tracing::debug!("awaiting suspend signals");
-                let _ = execution_state_suspend_signal.next().await;
+                if suspend_result != SuspendResult::Fail {
+                    execution_state_suspend_signal.next().await;
+                } else {
+                    let mut timed_out = false;
+                    execution_state_suspend_signal
+                        .next()
+                        .on_timeout(SUSPEND_FAILURE_RETRY_DELAY.after_now(), || {
+                            timed_out = true;
+                            None
+                        })
+                        .await;
+
+                    if timed_out && this.execution_state_manager.is_suspend_allowed().await {
+                        tracing::warn!("!!! Failure to suspend was not handled !!!");
+                        unhandled_suspend_failures_node.add(1);
+
+                        // Loop again without attempting to suspend.
+                        // On products that don't handle a suspend failure by retrying or raising
+                        // Execution State, we'll timeout waiting for a new signal and log/inspect
+                        // without triggering a suspension. This covers the minimum required
+                        // behavior defined by RFC-0255: System Activity Governor.
+                        continue;
+                    }
+                }
 
                 // Check that the conditions to suspend are still satisfied.
                 tracing::debug!("attempting to suspend");
-                this.execution_state_manager.trigger_suspend().await;
+
+                suspend_result = this.execution_state_manager.trigger_suspend().await;
             }
         })
         .detach();
