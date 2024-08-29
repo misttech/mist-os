@@ -27,9 +27,9 @@
             path: "/data",
         },
         {
-            directory: "dev-topological",
+            directory: "dev-class",
             rights: [ "r*" ],
-            path: "/dev",
+            path: "/dev/class",
         },
         {
             protocol: [ "fuchsia.ui.scenic.Scenic" ],
