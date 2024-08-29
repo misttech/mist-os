@@ -88,15 +88,7 @@ It will be set below and passed to other toolchains through toolchain_args
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2120
-
-### allow_tear_off_abi_breakage
-
-Allow breakage in tear-off protocols.
-
-**Current value (from the default):** `true`
-
-From //tools/fidl/abi-compat/BUILD.gn:17
+From //build/config/BUILDCONFIG.gn:2123
 
 ### allowed_test_device_types
 
@@ -906,7 +898,7 @@ Check external to external IPC ABI compatibility
 
 **Current value (from the default):** `false`
 
-From //tools/fidl/abi-compat/BUILD.gn:20
+From //tools/fidl/abi-compat/BUILD.gn:17
 
 ### check_output_dir_leaks
 
@@ -3175,7 +3167,7 @@ This is just added to [`known_variants`](#known_variants).
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:1842
+From //build/config/BUILDCONFIG.gn:1845
 
 ### extra_vbmeta_descriptors
 
@@ -4303,7 +4295,7 @@ Each element of the list is one variant, which is a scope defining:
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1650
+From //build/config/BUILDCONFIG.gn:1653
 
 ### legacy_base_package_labels
 
@@ -7587,7 +7579,7 @@ is satisfied if any of the strings matches against the candidate string.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2110
+From //build/config/BUILDCONFIG.gn:2113
 
 ### select_variant_canonical
 
@@ -7597,7 +7589,7 @@ See //build/toolchain/clang_toolchain.gni for details.
 
 **Current value (from the default):** `[]`
 
-From //build/config/BUILDCONFIG.gn:2115
+From //build/config/BUILDCONFIG.gn:2118
 
 ### select_variant_shortcuts
 
@@ -7656,7 +7648,7 @@ a list that can be spliced into [`select_variant`](#select_variant).
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1888
+From //build/config/BUILDCONFIG.gn:1891
 
 ### size_checker_input
 
@@ -8221,7 +8213,7 @@ From //build/config/sanitizers/sanitizer_default_options.gni:49
 }]
 ```
 
-From //build/config/BUILDCONFIG.gn:1872
+From //build/config/BUILDCONFIG.gn:1875
 
 ### universe_package_labels
 
