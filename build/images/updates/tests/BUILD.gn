@@ -202,7 +202,15 @@ if (is_host) {
 
   populate_fx_publish_working_dir("fx_publish_bazel_assembly_working_dir") {
     package_manifest_list = bazel_assembly_cache_packages_list
-    deps = [ ":bazel_assembly_cache_packages.list($default_toolchain)" ]
+    deps = [
+      ":bazel_assembly_cache_packages.list($default_toolchain)",
+
+      # NOTE: It's necessary to claim bazel assembly directly as a dependency.
+      # Without this, if there are no changes in images_assembly.json, this
+      # target won't correctly rebuild, even if the content of the packages it
+      # reference have changed.
+      ":bazel_pb($default_toolchain)",
+    ]
     output = bazel_assembled_test_dir
     testonly = true
   }
