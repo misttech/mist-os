@@ -7,13 +7,18 @@ import("//build/subbuild.gni")
 import("//build/testing/golden_files.gni")
 import("//sdk/ctf/build/ctf.gni")
 import("//sdk/ctf/build/ctf_api_level.gni")
+import("//sdk/ctf/build/ctf_output_directory.gni")
 
 # Generates a manifest of CTF release artifacts to upload to remote storage.
 build_api_module("ctf_artifacts") {
   testonly = true
   data_keys = [ "ctf_artifacts" ]
   walk_keys = [ "ctf_barrier" ]
-  deps = [ ":ctf" ]
+  deps = [
+    ":ctf_subbuild",
+    ":host_test_manifest",
+    "tests:e2e_tests",
+  ]
 }
 
 group("ctf") {
@@ -38,14 +43,17 @@ subbuild("ctf_subbuild") {
   testonly = true
 
   # TODO(https://fxbug.dev/42070336): Change this to build manifest when it builds cleanly
-  target = "//sdk/ctf:package_archive_manifest_new_for_migration"
+  target = "//sdk/ctf:package_archive_manifest"
   outputs = [ "/cts/package_archives.json" ]
   api_level = ctf_api_level
   target_cpu = target_cpu
-  build_dir_prefix = "frozen-ctf-artifacts"
+  build_dir_prefix = ctf_output_directory
   extra_deps = [
     "//sdk/ctf/tests:ctf-tests",  # Catch changes in source tests.
   ]
+  metadata = {
+    ctf_artifacts = [ "${ctf_output_directory}/cts/package_archives.json" ]
+  }
 }
 
 group("tests") {
@@ -59,18 +67,6 @@ group("tests") {
 }
 
 generated_file("package_archive_manifest") {
-  testonly = true
-  outputs = [ "$root_out_dir/cts/package_archives.json" ]
-  output_conversion = "json"
-  data_keys = [ "package_archives" ]
-  walk_keys = [ "ctf_barrier" ]
-  deps = [ "tests" ]
-  metadata = {
-    ctf_artifacts = rebase_path(outputs, root_build_dir)
-  }
-}
-
-generated_file("package_archive_manifest_new_for_migration") {
   testonly = true
   outputs = [ "$root_out_dir/cts/package_archives.json" ]
   output_conversion = "json"

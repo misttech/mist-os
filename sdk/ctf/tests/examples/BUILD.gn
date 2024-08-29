@@ -5,19 +5,20 @@ import("//sdk/ctf/build/ctf.gni")
 
 group("tests") {
   testonly = true
-  assert_no_deps = e2e_test_libs
 
   deps = [ "fidl:tests" ]
+}
+
+group("ctf-tests") {
+  testonly = true
+  assert_no_deps = e2e_test_libs
+
+  deps = [ "fidl:ctf-tests" ]
 
   # Don't release examples in CTF
   metadata = {
     ctf_barrier = []
   }
-}
-
-group("ctf-tests") {
-  testonly = true
-  deps = [ "fidl:ctf-tests" ]
 }
 
 group("e2e_tests") {

@@ -44,8 +44,6 @@ group("ctf-tests") {
     "//src/ui/scenic/tests:ctf-tests",
     "//src/ui/tests/conformance_input_tests:ctf-tests",
 
-    # "//src/ui/scenic/tests:ctf-tests",
-
     # TODO(https://fxbug.dev/361846433): Enable when WLAN Softmac can be stabilized.
     # "//src/connectivity/wlan/testing/hw-sim/test:ctf-tests",
   ]
