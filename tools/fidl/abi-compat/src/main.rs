@@ -34,6 +34,10 @@ struct Args {
     #[argh(switch, short = 't')]
     tear_off: bool,
 
+    /// treat discoverable context contradictions as errors
+    #[argh(switch)]
+    fatal_contradictions: bool,
+
     /// paths to a JSON files with ABI surface definitions.
     #[argh(positional)]
     json: Vec<PathBuf>,
@@ -41,17 +45,18 @@ struct Args {
 
 pub struct Configuration {
     pub tear_off: bool,
+    pub fatal_contradictions: bool,
 }
 
 impl Configuration {
     fn new(args: &Args) -> Self {
-        Self { tear_off: args.tear_off }
+        Self { tear_off: args.tear_off, fatal_contradictions: args.fatal_contradictions }
     }
 }
 
 impl Default for Configuration {
     fn default() -> Self {
-        Self { tear_off: true }
+        Self { tear_off: true, fatal_contradictions: false }
     }
 }
 

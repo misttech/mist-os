@@ -163,18 +163,14 @@ pub struct CompatibilityProblems(Vec<CompatibilityProblem>);
 
 impl CompatibilityProblems {
     pub fn error(&mut self, paths: [&Path; 2], message: String) {
-        self.push(CompatibilityProblem {
-            paths: ProblemPath::new(paths),
-            warning: false,
-            message: message,
-        });
+        self.push(CompatibilityProblem { paths: ProblemPath::new(paths), warning: false, message });
     }
     pub fn warning(&mut self, paths: [&Path; 2], message: String) {
-        self.push(CompatibilityProblem {
-            paths: ProblemPath::new(paths),
-            warning: true,
-            message: message,
-        });
+        self.push(CompatibilityProblem { paths: ProblemPath::new(paths), warning: true, message });
+    }
+
+    pub fn add(&mut self, warning: bool, paths: [&Path; 2], message: String) {
+        self.push(CompatibilityProblem { paths: ProblemPath::new(paths), warning, message });
     }
 
     pub fn append(&mut self, mut other: CompatibilityProblems) {
