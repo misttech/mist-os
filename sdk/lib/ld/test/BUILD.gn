@@ -8,8 +8,6 @@ import("//build/test.gni")
 import("//build/toolchain/zircon/user_basic_redirect.gni")
 import("//build/zircon/c_utils.gni")
 
-is_elf = current_os != "mac" && current_os != "win"
-
 group("tests") {
   testonly = true
 

@@ -284,6 +284,9 @@ is_ubsan =
 is_fuzzer = toolchain_variant.tags + [ "fuzzer" ] - [ "fuzzer" ] !=
             toolchain_variant.tags
 
+# Whether we are building an ELF target.
+is_elf = !is_mac && !is_win
+
 # Very unfortunately, GN never sets `current_toolchain` when executing
 # BUILDCONFIG.gn, so the logic below is used to detect when this file
 # is executed in the context of the default toolchain.

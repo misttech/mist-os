@@ -5,8 +5,6 @@
 import("//build/cpp/library_headers.gni")
 import("//build/toolchain/zircon/user_basic_redirect.gni")
 
-is_elf = current_os != "mac" && current_os != "win"
-
 has_fd = !is_kernel && toolchain_variant.tags + [ "standalone" ] -
                        [ "standalone" ] == toolchain_variant.tags
 

@@ -10,8 +10,6 @@ import("//build/testing/boot_tests/zbi_test.gni")
 import("//build/testing/host_test_data.gni")
 import("//build/toolchain/zircon/user_basic_redirect.gni")
 
-is_elf = current_os != "mac" && current_os != "win"
-
 test("elfldltl-unittests") {
   sources = [
     "abi-ptr-tests.cc",
