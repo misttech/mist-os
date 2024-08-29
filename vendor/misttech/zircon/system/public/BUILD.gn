@@ -1,0 +1,25 @@
+# Copyright 2024 Mist Tecnologia LTDA. All rights reserved.
+# Use of this source code is governed by a BSD-style license that can be
+# found in the LICENSE file.
+
+import("//build/cpp/sdk_source_set.gni")
+
+# If not building for Fuchsia|mistos-os (e.g., linux, macos) then binaries need to get
+# zircon headers directly from source. Otherwise they come from sysroot.
+config("public_config") {
+  include_dirs = [ "." ]
+  visibility = [ ":*" ]
+}
+
+# These headers are exported for use in building non-fuchsia-host binaries.
+sdk_source_set("public") {
+  category = "internal"
+
+  public = [ "zircon/mistos/syscalls/object.h" ]
+
+  # Since this doesn't actually compile any code, don't let it contribute any
+  # implicit link inputs from default configs.
+  configs = []
+
+  public_configs = [ ":public_config" ]
+}
