@@ -382,8 +382,38 @@ def _clang_sanitizer_share_files(
         yield versioned_share_dir / "msan_ignorelist.txt"
 
 
+def _force_target_runtime_libdirs_b354016617(
+    clang_path_rel: Path,
+    target: str,
+) -> Iterable[Path]:
+    """Force target runlib libdirs to exist remotely.
+
+    See b/354016617.  Pick an arbitrary lib from each
+    wanted directory to force that directory to exist remotely.
+    The presence of these directories influences the compiler
+    driver (unfortunately).
+
+    This workaround can be removed once the referenced bug is fixed.
+    """
+    clang_root = clang_path_rel.parent.parent
+    libclang_versioned = _versioned_libclang_dir(clang_path_rel)
+    target_libdir = clang_target_to_libdir(target)
+    libclang_target_dir = libclang_versioned / "lib" / target_libdir
+    stdlibs_dir = clang_root / "lib" / target_libdir
+    if "-windows-" in target:
+        clangrt_lib = "clang_rt.builtins.lib"
+        cxx_lib = "libc++.lib"
+    else:
+        clangrt_lib = "clang_rt.builtins.a"
+        cxx_lib = "libc++.a"
+
+    yield libclang_target_dir / clangrt_lib
+    yield from stdlibs_dir.glob(f"*/{cxx_lib}")
+
+
 def remote_clang_compiler_toolchain_inputs(
     clang_path_rel: Path,
+    target: str,
     sanitizers: FrozenSet[str],
 ) -> Iterable[Path]:
     """List compiler support files.
@@ -397,6 +427,11 @@ def remote_clang_compiler_toolchain_inputs(
     libclang_versioned = _versioned_libclang_dir(clang_path_rel)
     versioned_share_dir = libclang_versioned / "share"
     yield from _clang_sanitizer_share_files(versioned_share_dir, sanitizers)
+    # Workaround b/354016617: create target/variant dirs remotely
+    yield from _force_target_runtime_libdirs_b354016617(
+        clang_path_rel=clang_path_rel,
+        target=target,
+    )
 
 
 def remote_clang_linker_toolchain_inputs(
