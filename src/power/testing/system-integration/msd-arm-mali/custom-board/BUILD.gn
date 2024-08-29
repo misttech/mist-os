@@ -75,11 +75,6 @@ board_configuration("power_testing_msd_arm_mali_vim3") {
 board_input_bundle("drivers") {
   drivers = [
     {
-      package_target = "//src/devices/block/drivers/aml-sdmmc:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/aml-sdmmc.cm" ]
-    },
-    {
       package_target = "//src/devices/block/drivers/bootpart:package"
       package_set = "bootfs"
       driver_components = [ "meta/bootpart.cm" ]
@@ -163,21 +158,6 @@ board_input_bundle("drivers") {
       package_target = "//src/devices/usb/drivers/aml-usb-phy:bazel_package"
       package_set = "bootfs"
       driver_components = [ "meta/aml-usb-phy.cm" ]
-    },
-    {
-      package_target = "//src/ui/backlight/drivers/vim3-pwm-backlight:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/vim3-pwm-backlight.cm" ]
-    },
-    {
-      package_target = "//src/ui/input/drivers/adc-buttons:bazel_package"
-      package_set = "bootfs"
-      driver_components = [ "meta/adc-buttons.cm" ]
-    },
-    {
-      package_target = "//src/ui/input/drivers/focaltech:package"
-      package_set = "bootfs"
-      driver_components = [ "meta/focaltech.cm" ]
     },
     {
       package_target = "//src/graphics/drivers/aml-gpu:aml-gpu-package"
