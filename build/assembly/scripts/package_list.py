@@ -42,7 +42,7 @@ def main() -> int:
     manifest_path = os.path.dirname(args.images_manifest.name)
 
     manifest_paths = []
-    for image in images_manifest:
+    for image in images_manifest["images"]:
         contents = image.get("contents", dict())
         if "packages" in contents:
             for package in contents["packages"][args.package_set]:

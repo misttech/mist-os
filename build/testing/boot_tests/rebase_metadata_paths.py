@@ -47,8 +47,12 @@ def main():
         path = os.path.join(args.root_build_dir, metadata[idx]["path"])
         metadata[idx]["path"] = os.path.relpath(path, args.new_base)
 
+    # wrap the image vector to a map
+    contents = {}
+    contents["images"] = metadata
+    contents["board_name"] = "boot_test"
     with open(args.output, "w") as f:
-        json.dump(metadata, f, indent=4)
+        json.dump(contents, f, indent=4)
 
     return 0
 

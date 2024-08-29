@@ -467,6 +467,7 @@ mod tests {
 
         builder.add_slot_images(Slot::Primary(AssemblyManifest {
             images: vec![Image::ZBI { path: fake_zbi.to_path_buf(), signed: true }],
+            board_name: "my_board".into(),
         }));
 
         builder.set_repository(RepositoryUrl::parse_host("test.com".to_string()).unwrap());
@@ -619,6 +620,7 @@ mod tests {
 
         builder.add_slot_images(Slot::Primary(AssemblyManifest {
             images: vec![Image::ZBI { path: fake_zbi.to_path_buf(), signed: true }],
+            board_name: "my_board".into(),
         }));
 
         // Add a Recovery ZBI/VBMeta to the update.
@@ -633,6 +635,7 @@ mod tests {
                 Image::ZBI { path: fake_recovery_zbi.to_path_buf(), signed: true },
                 Image::VBMeta(fake_recovery_vbmeta.to_path_buf()),
             ],
+            board_name: "my_board".into(),
         }));
 
         // Build and ensure the output is correct.

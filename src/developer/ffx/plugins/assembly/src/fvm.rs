@@ -358,7 +358,8 @@ mod tests {
 
         let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel");
 
-        let mut assembly_manifest = AssemblyManifest::default();
+        let mut assembly_manifest =
+            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
         let base_package = BasePackage {
             merkle: [0u8; 32].into(),
             contents: BTreeMap::new(),
@@ -395,7 +396,8 @@ mod tests {
 
         let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel");
 
-        let mut assembly_manifest = AssemblyManifest::default();
+        let mut assembly_manifest =
+            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
         let base_package = BasePackage {
             merkle: [0u8; 32].into(),
             contents: BTreeMap::new(),
@@ -450,7 +452,8 @@ mod tests {
 
         let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel");
 
-        let mut assembly_manifest = AssemblyManifest::default();
+        let mut assembly_manifest =
+            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
         let base_package = BasePackage {
             merkle: [0u8; 32].into(),
             contents: BTreeMap::new(),
@@ -562,7 +565,8 @@ mod tests {
 
         let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel");
 
-        let mut assembly_manifest = AssemblyManifest::default();
+        let mut assembly_manifest =
+            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
 
         let base_package_path = dir.join("base.far");
         let mut base_package_file = File::create(&base_package_path).unwrap();
@@ -665,7 +669,8 @@ mod tests {
 
         let assembly_config = ImageAssemblyConfig::new_for_testing("path/to/kernel");
 
-        let mut assembly_manifest = AssemblyManifest::default();
+        let mut assembly_manifest =
+            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
 
         let base_package_path = dir.join("base.far");
         let mut base_package_file = File::create(&base_package_path).unwrap();

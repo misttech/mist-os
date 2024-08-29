@@ -108,7 +108,8 @@ mod tests {
         product_config.cache.push(cache_manifest);
 
         // Construct the base package.
-        let mut assembly_manifest = AssemblyManifest::default();
+        let mut assembly_manifest =
+            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
         let base_package = construct_base_package(
             &mut assembly_manifest,
             dir,
@@ -152,7 +153,8 @@ mod tests {
         product_config.cache.push(cache_manifest);
 
         // Construct the base package.
-        let mut assembly_manifest = AssemblyManifest::default();
+        let mut assembly_manifest =
+            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
         let base_package = construct_base_package(
             &mut assembly_manifest,
             dir,

@@ -125,7 +125,8 @@ mod tests {
         let zbi_path = dir.join("fuchsia.zbi");
         std::fs::write(&zbi_path, "fake zbi").unwrap();
 
-        let mut assembly_manifest = AssemblyManifest::default();
+        let mut assembly_manifest =
+            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
         let vbmeta_path =
             construct_vbmeta(&mut assembly_manifest, dir, &vbmeta_config, zbi_path).unwrap();
         assert_eq!(

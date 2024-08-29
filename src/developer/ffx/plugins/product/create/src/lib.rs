@@ -5,7 +5,7 @@
 //! FFX plugin for constructing product bundles, which are distributable containers for a product's
 //! images and packages, and can be used to emulate, flash, or update a product.
 
-use anyhow::{bail, Context, Result};
+use anyhow::{bail, ensure, Context, Result};
 use assembly_manifest::{AssemblyManifest, BlobfsContents, Image, PackagesMetadata};
 use assembly_partitions_config::{PartitionImageMapper, PartitionsConfig, Slot as PartitionSlot};
 use assembly_tool::{SdkToolProvider, ToolProvider};
@@ -101,17 +101,35 @@ pub async fn pb_create_with_sdk_version(
     let (system_r, packages_r) =
         load_assembly_manifest(&cmd.system_r, &cmd.out_dir.join("system_r"))?;
 
+    // We must assert that the board_name for the system of images matches the hardware_revision in
+    // the partitions config, otherwise OTAs may not work.
+    let ensure_system_board = |system: &AssemblyManifest| -> Result<()> {
+        if partitions.hardware_revision != "" {
+            ensure!(
+                &system.board_name == &partitions.hardware_revision,
+                format!(
+                    "The system board_name ({}) must match the partitions.hardware_revision ({})",
+                    &system.board_name, &partitions.hardware_revision
+                )
+            );
+        }
+        Ok(())
+    };
+
     // Generate a size report for the images after mapping them to partitions.
     if let Some(size_report) = cmd.gerrit_size_report {
         let mut mapper = PartitionImageMapper::new(partitions.clone());
         if let Some(system) = &system_a {
             mapper.map_images_to_slot(&system.images, PartitionSlot::A);
+            ensure_system_board(system)?;
         }
         if let Some(system) = &system_b {
             mapper.map_images_to_slot(&system.images, PartitionSlot::B);
+            ensure_system_board(system)?;
         }
         if let Some(system) = &system_r {
             mapper.map_images_to_slot(&system.images, PartitionSlot::R);
+            ensure_system_board(system)?;
         }
         mapper
             .generate_gerrit_size_report(&size_report, &cmd.product_name)
@@ -395,7 +413,10 @@ fn load_assembly_manifest(
             new_images.push(image);
         }
 
-        Ok((Some(AssemblyManifest { images: new_images }), packages))
+        Ok((
+            Some(AssemblyManifest { images: new_images, board_name: manifest.board_name }),
+            packages,
+        ))
     } else {
         Ok((None, vec![]))
     }
@@ -483,7 +504,9 @@ mod test {
         let pb_dir = tempdir.join("pb");
 
         let manifest_path = tempdir.join("manifest.json");
-        AssemblyManifest::default().write(&manifest_path).unwrap();
+        AssemblyManifest { images: Default::default(), board_name: "my_board".into() }
+            .write(&manifest_path)
+            .unwrap();
 
         let error_path = tempdir.join("error.json");
         let mut error_file = File::create(&error_path).unwrap();
@@ -569,7 +592,9 @@ mod test {
         serde_json::to_writer(&partitions_file, &PartitionsConfig::default()).unwrap();
 
         let system_path = tempdir.join("system.json");
-        AssemblyManifest::default().write(&system_path).unwrap();
+        AssemblyManifest { images: Default::default(), board_name: "my_board".into() }
+            .write(&system_path)
+            .unwrap();
 
         let tool_provider = Box::new(FakeToolProvider::new_with_side_effect(blobfs_side_effect));
 
@@ -628,7 +653,8 @@ mod test {
         serde_json::to_writer(&partitions_file, &PartitionsConfig::default()).unwrap();
 
         let system_path = tempdir.join("system.json");
-        let mut manifest = AssemblyManifest::default();
+        let mut manifest =
+            AssemblyManifest { images: Default::default(), board_name: "my_board".into() };
         manifest.images = vec![
             Image::ZBI { path: Utf8PathBuf::from("path1"), signed: false },
             Image::ZBI { path: Utf8PathBuf::from("path2"), signed: true },
@@ -675,7 +701,9 @@ mod test {
         serde_json::to_writer(&partitions_file, &PartitionsConfig::default()).unwrap();
 
         let system_path = tempdir.join("system.json");
-        AssemblyManifest::default().write(&system_path).unwrap();
+        AssemblyManifest { images: Default::default(), board_name: "my_board".into() }
+            .write(&system_path)
+            .unwrap();
 
         let tuf_keys = tempdir.join("keys");
         test_utils::make_repo_keys_dir(&tuf_keys);
@@ -714,9 +742,9 @@ mod test {
                 product_version: String::default(),
                 partitions: PartitionsConfig::default(),
                 sdk_version: String::default(),
-                system_a: Some(AssemblyManifest::default().images),
+                system_a: Some(vec![]),
                 system_b: None,
-                system_r: Some(AssemblyManifest::default().images),
+                system_r: Some(vec![]),
                 repositories: vec![Repository {
                     name: "fuchsia.com".into(),
                     metadata_path: pb_dir.join("repository"),

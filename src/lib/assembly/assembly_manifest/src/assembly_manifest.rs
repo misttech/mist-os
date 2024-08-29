@@ -27,23 +27,30 @@ use utf8_path::path_relative_from;
 ///         Image::FVM("path/to/fvm.blk"),
 ///         Image::FVMSparse("path/to/fvm.sparse.blk"),
 ///     ],
+///     board_name: "my_board".into(),
 /// };
 /// println!("{:?}", serde_json::to_value(manifest).unwrap());
 /// ```
 ///
-#[derive(Clone, Debug, Default, Eq, Hash, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct AssemblyManifest {
     /// List of images in the manifest.
     pub images: Vec<Image>,
+    /// The board name that these images can be OTA'd to, which will be used to create an update
+    /// package. OTAs will fail if this board_name changes across builds.
+    ///
+    /// The images contain this name inside build_info, and the software delivery code asserts that
+    /// build_info.board.name == update_package.board_name.
+    pub board_name: String,
 }
 
 /// Private helper for serializing the AssemblyManifest. An AssemblyManifest cannot be deserialized
 /// without going through `try_from_path` in order to require that we use this helper
 /// which ensure that the paths get relativized/derelativized properly
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-#[serde(transparent)]
 struct SerializationHelper {
     images: Vec<Image>,
+    board_name: String,
 }
 
 /// An item in the AssemblyManifest.
@@ -245,12 +252,20 @@ impl AssemblyManifest {
     /// Load an AssemblyManifest from a path on disk, handling path
     /// relativization
     pub fn try_load_from(path: impl AsRef<Utf8Path>) -> Result<Self> {
-        let deserialized: SerializationHelper = assembly_util::read_config(path.as_ref())?;
-        let manifest = AssemblyManifest { images: deserialized.images };
+        // We need to support the old AssemblyManifest format which is simply a Vec<Image>.
+        let value: serde_json::Value = assembly_util::read_config(path.as_ref())?;
+        let deserialized = if value.is_array() {
+            let images: Vec<Image> = serde_json::from_value(value)?;
+            SerializationHelper { images, board_name: "".to_string() }
+        } else {
+            serde_json::from_value(value)?
+        };
+        let manifest =
+            AssemblyManifest { images: deserialized.images, board_name: deserialized.board_name };
         manifest.derelativize(path.as_ref().parent().context("Invalid path")?)
     }
 
-    /// Write a product bundle to a directory on disk at `path`.
+    /// Write an assembly manifest to a directory on disk at `path`.
     /// Make the paths recorded in the file relative to the file's location
     /// so it is portable.
     pub fn write(self, path: impl AsRef<Utf8Path>) -> Result<()> {
@@ -263,9 +278,28 @@ impl AssemblyManifest {
         let images_json = File::create(path).context("Creating assembly manifest")?;
         serde_json::to_writer_pretty(
             images_json,
-            &SerializationHelper { images: assembly_manifest.images },
+            &SerializationHelper {
+                images: assembly_manifest.images,
+                board_name: assembly_manifest.board_name,
+            },
         )
         .context("Writing assembly manifest")?;
+        Ok(())
+    }
+
+    /// Write an assembly manifest to a directory on disk at `path` using the 'old' format.
+    /// Make the paths recorded in the file relative to the file's location
+    /// so it is portable.
+    pub fn write_old(self, path: impl AsRef<Utf8Path>) -> Result<()> {
+        let path = path.as_ref();
+        // Relativize the paths in the Assembly Manifest
+        let assembly_manifest =
+            self.relativize(path.parent().with_context(|| format!("Invalid output path {path}"))?)?;
+
+        // Write the images manifest.
+        let images_json = File::create(path).context("Creating assembly manifest")?;
+        serde_json::to_writer_pretty(images_json, &assembly_manifest.images)
+            .context("Writing assembly manifest")?;
         Ok(())
     }
 }
@@ -626,6 +660,7 @@ mod tests {
                 Image::FVMFastboot("fvm.fastboot.blk".into()),
                 Image::QemuKernel("qemu/kernel".into()),
             ],
+            board_name: "my_board".into(),
         };
 
         let relativized_manifest =
@@ -644,6 +679,7 @@ mod tests {
                 Image::FxfsSparse { path: "fxfs.sparse.blk".into(), contents: Default::default() },
                 Image::QemuKernel("qemu/kernel".into()),
             ],
+            board_name: "my_board".into(),
         };
 
         let relativized_manifest =
@@ -664,6 +700,7 @@ mod tests {
                 Image::FVMFastboot("fvm.fastboot.blk".into()),
                 Image::QemuKernel("qemu/kernel".into()),
             ],
+            board_name: "my_board".into(),
         };
 
         let derelativized_manifest = manifest.derelativize(Utf8PathBuf::from("path/to")).unwrap();
@@ -682,6 +719,7 @@ mod tests {
                 Image::FxfsSparse { path: "fxfs.sparse.blk".into(), contents: Default::default() },
                 Image::QemuKernel("qemu/kernel".into()),
             ],
+            board_name: "my_board".into(),
         };
 
         let derelativized_manifest = manifest.derelativize(Utf8PathBuf::from("path/to")).unwrap();
@@ -702,11 +740,16 @@ mod tests {
                 Image::FVMFastboot("path/to/fvm.fastboot.blk".into()),
                 Image::QemuKernel("path/to/qemu/kernel".into()),
             ],
+            board_name: "my_board".into(),
         };
 
         assert_eq!(
             generate_test_value(),
-            serde_json::to_value(SerializationHelper { images: manifest.images }).unwrap()
+            serde_json::to_value(SerializationHelper {
+                images: manifest.images,
+                board_name: "my_board".into()
+            })
+            .unwrap()
         );
     }
 
@@ -724,11 +767,16 @@ mod tests {
                 },
                 Image::QemuKernel("path/to/qemu/kernel".into()),
             ],
+            board_name: "my_board".into(),
         };
 
         assert_eq!(
             generate_test_value_fxfs(),
-            serde_json::to_value(SerializationHelper { images: manifest.images }).unwrap()
+            serde_json::to_value(SerializationHelper {
+                images: manifest.images,
+                board_name: "my_board".into()
+            })
+            .unwrap()
         );
     }
 
@@ -736,25 +784,34 @@ mod tests {
     fn serialize_unsigned_zbi() {
         let manifest = AssemblyManifest {
             images: vec![Image::ZBI { path: "path/to/fuchsia.zbi".into(), signed: false }],
+            board_name: "my_board".into(),
         };
 
-        let value = json!([
-            {
-                "type": "zbi",
-                "name": "zircon-a",
-                "path": "path/to/fuchsia.zbi",
-                "signed": false,
-            }
-        ]);
+        let value = json!({
+            "images": [
+                {
+                    "type": "zbi",
+                    "name": "zircon-a",
+                    "path": "path/to/fuchsia.zbi",
+                    "signed": false,
+                }
+            ],
+            "board_name": "my_board",
+        });
         assert_eq!(
             value,
-            serde_json::to_value(SerializationHelper { images: manifest.images }).unwrap()
+            serde_json::to_value(SerializationHelper {
+                images: manifest.images,
+                board_name: manifest.board_name
+            })
+            .unwrap()
         );
     }
 
     #[test]
     fn deserialize() {
         let manifest: AssemblyManifest = generate_test_manifest();
+        assert_eq!(manifest.board_name, "my_board".to_string());
         assert_eq!(manifest.images.len(), 8);
 
         for image in &manifest.images {
@@ -780,8 +837,19 @@ mod tests {
     }
 
     #[test]
+    fn deserialize_old() {
+        let (manifest_file, manifest_path) = NamedTempFile::new().unwrap().into_parts();
+        serde_json::to_writer(manifest_file, &generate_old_test_value()).unwrap();
+        let manifest_path = Utf8PathBuf::from_path_buf(manifest_path.to_path_buf()).unwrap();
+        let manifest = AssemblyManifest::try_load_from(manifest_path).unwrap();
+        assert_eq!(manifest.board_name, "".to_string());
+        assert_eq!(manifest.images.len(), 8);
+    }
+
+    #[test]
     fn deserialize_fxfs() {
         let manifest: AssemblyManifest = generate_test_manifest_fxfs();
+        assert_eq!(manifest.board_name, "my_board".to_string());
         assert_eq!(manifest.images.len(), 6);
 
         for image in &manifest.images {
@@ -809,70 +877,96 @@ mod tests {
 
     #[test]
     fn deserialize_invalid() {
-        let invalid = json!([
-            {
-                "type": "far-invalid",
-                "name": "base-package",
-                "path": "path/to/base.far",
-            },
-        ]);
+        let invalid = json!({
+            "images": [
+                {
+                    "type": "far-invalid",
+                    "name": "base-package",
+                    "path": "path/to/base.far",
+                },
+            ],
+            "board_name": "my_board",
+        });
         let result: Result<SerializationHelper, _> = serde_json::from_value(invalid);
         assert!(result.unwrap_err().is_data());
     }
 
     #[test]
     fn deserialize_zbi_with_arbitrary_name() {
-        let value = json!([
-            {
-                "type": "zbi",
-                "name": "my-zbi",
-                "path": "path/to/my.zbi",
-            }
-        ]);
+        let value = json!({
+            "images": [
+                {
+                    "type": "zbi",
+                    "name": "my-zbi",
+                    "path": "path/to/my.zbi",
+                }
+            ],
+            "board_name": "my_board",
+        });
 
         let expected = AssemblyManifest {
             images: vec![Image::ZBI { path: "path/to/my.zbi".into(), signed: false }],
+            board_name: "my_board".into(),
         };
 
         let result: Result<SerializationHelper, _> = serde_json::from_value(value);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), SerializationHelper { images: expected.images });
+        assert_eq!(
+            result.unwrap(),
+            SerializationHelper { images: expected.images, board_name: "my_board".into() }
+        );
     }
 
     #[test]
     fn deserialize_vbmeta_with_arbitrary_name() {
-        let value = json!([
-            {
-                "type": "vbmeta",
-                "name": "my-vbmeta",
-                "path": "path/to/my.vbmeta",
-            }
-        ]);
-
-        let expected = AssemblyManifest { images: vec![Image::VBMeta("path/to/my.vbmeta".into())] };
-
-        let result: Result<SerializationHelper, _> = serde_json::from_value(value);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), SerializationHelper { images: expected.images });
-    }
-
-    #[test]
-    fn deserialize_qemu_kernel_with_arbitrary_name() {
-        let value = json!([
-            {
-                "type": "kernel",
-                "name": "my-qemu-kernel",
-                "path": "path/to/my-qemu-kernel.bin",
-            }
-        ]);
+        let value = json!({
+            "images": [
+                {
+                    "type": "vbmeta",
+                    "name": "my-vbmeta",
+                    "path": "path/to/my.vbmeta",
+                }
+            ],
+            "board_name": "my_board",
+        });
 
         let expected = AssemblyManifest {
-            images: vec![Image::QemuKernel("path/to/my-qemu-kernel.bin".into())],
+            images: vec![Image::VBMeta("path/to/my.vbmeta".into())],
+            board_name: "my_board".into(),
         };
 
         let result: Result<SerializationHelper, _> = serde_json::from_value(value);
         assert!(result.is_ok());
-        assert_eq!(result.unwrap(), SerializationHelper { images: expected.images });
+        assert_eq!(
+            result.unwrap(),
+            SerializationHelper { images: expected.images, board_name: "my_board".into() }
+        );
+    }
+
+    #[test]
+    fn deserialize_qemu_kernel_with_arbitrary_name() {
+        let value = json!({
+            "images": [
+                {
+                    "type": "kernel",
+                    "name": "my-qemu-kernel",
+                    "path": "path/to/my-qemu-kernel.bin",
+                }
+            ],
+            "board_name": "my_board",
+        });
+
+        let expected = AssemblyManifest {
+            images: vec![Image::QemuKernel("path/to/my-qemu-kernel.bin".into())],
+            board_name: "my_board".into(),
+        };
+
+        let result: Result<SerializationHelper, _> = serde_json::from_value(value);
+        assert!(result.is_ok());
+        assert_eq!(
+            result.unwrap(),
+            SerializationHelper { images: expected.images, board_name: "my_board".into() }
+        );
     }
 
     #[test]
@@ -1027,6 +1121,7 @@ mod tests {
             images: serde_json::from_value::<SerializationHelper>(generate_test_value())
                 .unwrap()
                 .images,
+            board_name: "my_board".into(),
         }
     }
 
@@ -1035,10 +1130,67 @@ mod tests {
             images: serde_json::from_value::<SerializationHelper>(generate_test_value_fxfs())
                 .unwrap()
                 .images,
+            board_name: "my_board".into(),
         }
     }
 
     fn generate_test_value() -> Value {
+        json!({
+            "images": [
+                {
+                    "type": "far",
+                    "name": "base-package",
+                    "path": "path/to/base.far",
+                },
+                {
+                    "type": "zbi",
+                    "name": "zircon-a",
+                    "path": "path/to/fuchsia.zbi",
+                    "signed": true,
+                },
+                {
+                    "type": "vbmeta",
+                    "name": "zircon-a",
+                    "path": "path/to/fuchsia.vbmeta",
+                },
+                {
+                    "type": "blk",
+                    "name": "blob",
+                    "path": "path/to/blob.blk",
+                    "contents": {
+                        "packages": {
+                            "base": [],
+                            "cache": [],
+                        },
+                        "maximum_contents_size": None::<u64>
+                    },
+                },
+                {
+                    "type": "blk",
+                    "name": "storage-full",
+                    "path": "path/to/fvm.blk",
+                },
+                {
+                    "type": "blk",
+                    "name": "storage-sparse",
+                    "path": "path/to/fvm.sparse.blk",
+                },
+                {
+                    "type": "blk",
+                    "name": "fvm.fastboot",
+                    "path": "path/to/fvm.fastboot.blk",
+                },
+                {
+                    "type": "kernel",
+                    "name": "qemu-kernel",
+                    "path": "path/to/qemu/kernel",
+                },
+            ],
+            "board_name": "my_board",
+        })
+    }
+
+    fn generate_old_test_value() -> Value {
         json!([
             {
                 "type": "far",
@@ -1092,52 +1244,55 @@ mod tests {
     }
 
     fn generate_test_value_fxfs() -> Value {
-        json!([
-            {
-                "type": "far",
-                "name": "base-package",
-                "path": "path/to/base.far",
-            },
-            {
-                "type": "zbi",
-                "name": "zircon-a",
-                "path": "path/to/fuchsia.zbi",
-                "signed": true,
-            },
-            {
-                "type": "vbmeta",
-                "name": "zircon-a",
-                "path": "path/to/fuchsia.vbmeta",
-            },
-            {
-                "type": "fxfs-blk",
-                "name": "storage-full",
-                "path": "path/to/fxfs.blk",
-                "contents": {
-                    "packages": {
-                        "base": [],
-                        "cache": [],
-                    },
-                    "maximum_contents_size": None::<u64>
+        json!({
+            "images": [
+                {
+                    "type": "far",
+                    "name": "base-package",
+                    "path": "path/to/base.far",
                 },
-            },
-            {
-                "type": "blk",
-                "name": "fxfs.fastboot",
-                "path": "path/to/fxfs.sparse.blk",
-                "contents": {
-                    "packages": {
-                        "base": [],
-                        "cache": [],
-                    },
-                    "maximum_contents_size": None::<u64>
+                {
+                    "type": "zbi",
+                    "name": "zircon-a",
+                    "path": "path/to/fuchsia.zbi",
+                    "signed": true,
                 },
-            },
-            {
-                "type": "kernel",
-                "name": "qemu-kernel",
-                "path": "path/to/qemu/kernel",
-            },
-        ])
+                {
+                    "type": "vbmeta",
+                    "name": "zircon-a",
+                    "path": "path/to/fuchsia.vbmeta",
+                },
+                {
+                    "type": "fxfs-blk",
+                    "name": "storage-full",
+                    "path": "path/to/fxfs.blk",
+                    "contents": {
+                        "packages": {
+                            "base": [],
+                            "cache": [],
+                        },
+                        "maximum_contents_size": None::<u64>
+                    },
+                },
+                {
+                    "type": "blk",
+                    "name": "fxfs.fastboot",
+                    "path": "path/to/fxfs.sparse.blk",
+                    "contents": {
+                        "packages": {
+                            "base": [],
+                            "cache": [],
+                        },
+                        "maximum_contents_size": None::<u64>
+                    },
+                },
+                {
+                    "type": "kernel",
+                    "name": "qemu-kernel",
+                    "path": "path/to/qemu/kernel",
+                },
+            ],
+            "board_name": "my_board",
+        })
     }
 }

@@ -61,6 +61,9 @@ pub struct ImageAssemblyConfig {
     #[serde(default)]
     pub images_config: ImagesConfig,
 
+    /// The name of the board that these images can be flashed to.
+    pub board_name: String,
+
     /// Optionally-provided data to pass to the board's Board Driver via a ZBI
     /// item.
     pub board_driver_arguments: Option<BoardDriverArguments>,
@@ -88,6 +91,7 @@ impl ImageAssemblyConfig {
             kernel: KernelConfig { path: kernel_path.as_ref().into(), args: Vec::default() },
             qemu_kernel: "path/to/qemu/kernel".into(),
             images_config: ImagesConfig::default(),
+            board_name: "my_board".into(),
             board_driver_arguments: None,
             devicetree: Some("path/to/devicetree/binary".into()),
             netboot_mode: false,
@@ -169,7 +173,8 @@ mod tests {
                     "destination": "path/to/destination"
                 }
               ],
-              "bootfs_packages": ["package5", "package6"]
+              "bootfs_packages": ["package5", "package6"],
+              "board_name": "my_board"
             }
         "#;
 
@@ -205,6 +210,7 @@ mod tests {
                 }
               ],
               bootfs_packages: ["package5", "package6"],
+              board_name: "my_board",
             }
         "#;
 

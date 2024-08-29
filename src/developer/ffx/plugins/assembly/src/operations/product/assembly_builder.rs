@@ -45,6 +45,9 @@ pub struct ImageAssemblyConfigBuilder {
     /// The RFC-0115 Build Type of the assembled product + platform.
     build_type: BuildType,
 
+    /// The name of the board that these images can be OTA'd to.
+    board_name: String,
+
     /// All of the packages, in all package sets.
     packages: Packages,
 
@@ -89,9 +92,10 @@ pub struct ImageAssemblyConfigBuilder {
 }
 
 impl ImageAssemblyConfigBuilder {
-    pub fn new(build_type: BuildType) -> Self {
+    pub fn new(build_type: BuildType, board_name: String) -> Self {
         Self {
             build_type,
+            board_name,
             packages: Packages::default(),
             base_drivers: NamedMap::new("base_drivers"),
             boot_drivers: NamedMap::new("boot_drivers"),
@@ -684,6 +688,7 @@ impl ImageAssemblyConfigBuilder {
         // image assembly configuration.
         let Self {
             build_type: _,
+            board_name,
             package_configs,
             domain_configs,
             mut packages,
@@ -916,6 +921,7 @@ impl ImageAssemblyConfigBuilder {
             boot_args: boot_args.into_iter().collect(),
             bootfs_files,
             images_config: Default::default(),
+            board_name,
             board_driver_arguments,
             devicetree,
             netboot_mode,
@@ -1238,7 +1244,7 @@ mod tests {
             bootfs_files_package: None,
             ..AssemblyInputBundle::default()
         };
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng);
+        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng, "my_board".into());
         builder.add_parsed_bundle(outdir.as_ref().join("minimum_bundle"), minimum_bundle).unwrap();
         builder
     }
@@ -1248,7 +1254,7 @@ mod tests {
         let vars = TempdirPathsForTest::new();
         let tools = FakeToolProvider::default();
 
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng);
+        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng, "my_board".into());
         builder
             .add_parsed_bundle(
                 &vars.outdir,
@@ -1301,7 +1307,7 @@ mod tests {
         let vars = TempdirPathsForTest::new();
         let tools = FakeToolProvider::default();
 
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::UserDebug);
+        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::UserDebug, "my_board".into());
         builder
             .add_parsed_bundle(
                 &vars.outdir,
@@ -1349,7 +1355,7 @@ mod tests {
         let vars = TempdirPathsForTest::new();
         let tools = FakeToolProvider::default();
 
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::User);
+        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::User, "my_board".into());
         builder
             .add_parsed_bundle(
                 &vars.outdir,
@@ -1396,7 +1402,7 @@ mod tests {
         vars: &TempdirPathsForTest,
         bundles: Vec<AssemblyInputBundle>,
     ) -> ImageAssemblyConfigBuilder {
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng);
+        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng, "my_board".into());
 
         // Write a file to the temp dir for use with config_data.
         std::fs::create_dir_all(&vars.config_data_target_package_dir).unwrap();
@@ -1838,7 +1844,7 @@ mod tests {
         let mut aib = make_test_assembly_bundle(root, root);
         duplicate_first(&mut aib.packages);
 
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng);
+        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng, "my_board".into());
         assert!(builder.add_parsed_bundle(root, aib).is_err());
     }
 
@@ -1862,7 +1868,7 @@ mod tests {
         let value = first_list.first().unwrap();
         second_list.push(value.clone());
 
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng);
+        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng, "my_board".into());
         builder.add_parsed_bundle(outdir, aib).unwrap();
         assert!(builder.add_parsed_bundle(outdir.join("second"), second_aib).is_err());
     }
@@ -1896,7 +1902,7 @@ mod tests {
             ],
             ..Default::default()
         };
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng);
+        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng, "my_board".into());
         assert!(builder.add_parsed_bundle(outdir, aib).is_err());
     }
 
@@ -1936,7 +1942,7 @@ mod tests {
             ..Default::default()
         };
 
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng);
+        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng, "my_board".into());
         builder.add_parsed_bundle(outdir, aib).ok();
         builder.add_parsed_bundle(outdir, aib2).ok();
         assert!(builder.build(outdir, &tools).is_err());
@@ -1976,7 +1982,7 @@ mod tests {
             }],
             ..Default::default()
         };
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng);
+        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng, "my_board".into());
         builder.add_parsed_bundle(outdir, aib).ok();
         assert!(builder.add_parsed_bundle(outdir, aib2).is_err());
     }
@@ -2006,7 +2012,7 @@ mod tests {
         first_aib.config_data.insert("base_package0".into(), vec![config_data_file_entry.clone()]);
         second_aib.config_data.insert("base_package0".into(), vec![config_data_file_entry]);
 
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng);
+        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng, "my_board".into());
         builder.add_parsed_bundle(root, first_aib).unwrap();
         assert!(builder.add_parsed_bundle(root.join("second"), second_aib).is_err());
     }
@@ -2015,7 +2021,7 @@ mod tests {
     fn test_builder_allows_duplicate_packages_if_added_by_board_first() {
         let temp = TempDir::new().unwrap();
         let root = Utf8Path::from_path(temp.path()).unwrap();
-        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng);
+        let mut builder = ImageAssemblyConfigBuilder::new(BuildType::Eng, "my_board".into());
 
         let board_package_path = root.join("board");
         let product_package_path = root.join("product");

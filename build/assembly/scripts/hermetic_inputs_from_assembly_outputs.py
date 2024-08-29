@@ -123,7 +123,7 @@ def main() -> int:
     for image_manifest_file in args.system:
         image_manifest = json.load(image_manifest_file)
         manifest_path = os.path.dirname(image_manifest_file.name)
-        for image in image_manifest:
+        for image in image_manifest["images"]:
             inputs.append(os.path.join(manifest_path, image["path"]))
 
             # Collect the package manifests from the blobfs/Fxblob image.

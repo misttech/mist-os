@@ -13,6 +13,7 @@ assert(
     "The power_testing_storage_vim3 board can only be defined in an arm64 toolchain.")
 
 board_configuration("power_testing_storage_vim3") {
+  name = "vim3"
   provided_features = [
     "fuchsia::driver_framework_v2_support",
     "fuchsia::pmm_checker",
