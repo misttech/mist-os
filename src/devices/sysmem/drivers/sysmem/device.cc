@@ -11,13 +11,9 @@
 #include <fidl/fuchsia.sysmem/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <inttypes.h>
+#include <lib/async-loop/loop.h>
 #include <lib/async/dispatcher.h>
-#include <lib/ddk/device.h>
-#include <lib/ddk/platform-defs.h>
-#include <lib/driver/component/cpp/driver_export.h>
-#include <lib/driver/component/cpp/node_add_args.h>
 #include <lib/fidl/cpp/wire/arena.h>
-#include <lib/fidl_driver/cpp/transport.h>
 #include <lib/sync/cpp/completion.h>
 #include <lib/sysmem-version/sysmem-version.h>
 #include <lib/zx/channel.h>
@@ -27,6 +23,8 @@
 #include <unistd.h>
 #include <zircon/assert.h>
 #include <zircon/errors.h>
+#include <zircon/processargs.h>
+#include <zircon/syscalls/iommu.h>
 #include <zircon/threads.h>
 
 #include <algorithm>
@@ -49,9 +47,8 @@
 #include "src/devices/sysmem/metrics/metrics.cb.h"
 #include "zircon/status.h"
 
-using sysmem_driver::MemoryAllocator;
+namespace sysmem_service {
 
-namespace sysmem_driver {
 namespace {
 
 constexpr bool kLogAllCollectionsPeriodically = false;
@@ -206,28 +203,21 @@ class ContiguousSystemRamMemoryAllocator : public MemoryAllocator {
 
 }  // namespace
 
-Device::Device(fdf::DriverStartArgs start_args,
-               fdf::UnownedSynchronizedDispatcher incoming_driver_dispatcher)
-    : fdf::DriverBase("sysmem-device", std::move(start_args),
-                      std::move(incoming_driver_dispatcher)),
-      driver_checker_(async::synchronization_checker(driver_dispatcher())) {
+Device::Device(async_dispatcher_t* client_dispatcher)
+    : client_dispatcher_(client_dispatcher), loop_(&kAsyncLoopConfigNeverAttachToThread) {
   LOG(DEBUG, "Device::Device");
-  std::lock_guard checker(*driver_checker_);
+  std::lock_guard checker(client_checker_);
 
-  auto loop_result = fdf::SynchronizedDispatcher::Create(
-      fdf::SynchronizedDispatcher::Options::kAllowSyncCalls, "sysmem-loop",
-      [this](fdf_dispatcher_t*) { loop_shut_down_.Signal(); });
-  ZX_ASSERT_MSG(loop_result.is_ok(), "%s", loop_result.status_string());
-  loop_ = std::move(loop_result).value();
-
-  RunSyncOnLoop(
-      [this] { loop_checker_.emplace(async::synchronization_checker(loop_.async_dispatcher())); });
+  zx_status_t start_thread_status = loop_.StartThread("sysmem-loop", &loop_thrd_);
+  ZX_ASSERT_MSG(start_thread_status == ZX_OK, "loop start_thread_status: %s",
+                zx_status_get_string(start_thread_status));
+  RunSyncOnLoop([this] { loop_checker_.emplace(); });
 }
 
 Device::~Device() {
-  std::lock_guard checker(*driver_checker_);
-  DdkUnbindInternal();
-  LOG(DEBUG, "Finished DdkUnbindInternal");
+  std::lock_guard checker(client_checker_);
+  Shutdown();
+  LOG(DEBUG, "Finished Shutdown");
 }
 
 zx_status_t Device::GetContiguousGuardParameters(const std::optional<sysmem_config::Config>& config,
@@ -273,29 +263,25 @@ zx_status_t Device::GetContiguousGuardParameters(const std::optional<sysmem_conf
   return ZX_OK;
 }
 
-void Device::DdkUnbindInternal() {
-  ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent()->async_dispatcher() == driver_dispatcher());
-
+void Device::Shutdown() {
   // disconnect existing connections from drivers
   bindings_.RemoveAll();
 
   // Try to ensure there are no outstanding VMOS before shutting down the loop.
   PostTask([this]() mutable {
-    ZX_ASSERT(loop_checker_.has_value());
     std::lock_guard checker(*loop_checker_);
 
-    // stop sysmem-connector from reconnecting (not that it'll try)
-    devfs_connector_.RemoveAll();
-    // disconnect sysmem-connector connection(s), preventing non-drivers from
-    // connecting (drivers were prevented above)
-    driver_connectors_.RemoveAll();
+    // stop serving outgoing_ to prevent new connections
+    outgoing_.reset();
 
     // disconnect existing allocators
     v1_allocators_.RemoveAll();
     v2_allocators_.RemoveAll();
 
-    snapshot_annotation_register_->UnsetServiceDirectory();
-    snapshot_annotation_register_.reset();
+    if (snapshot_annotation_register_.has_value()) {
+      snapshot_annotation_register_->UnsetServiceDirectory();
+      snapshot_annotation_register_.reset();
+    }
 
     // Force-fail all LogicalBufferCollection(s) - this doesn't force them to all immediately
     // delete, but does get them headed toward deleting. The Fail() call may or may not delete a
@@ -322,9 +308,10 @@ void Device::DdkUnbindInternal() {
 
   // If a test is stuck waiting here, ensure that the test is dropping its sysmem VMO handles before
   // ~Device.
-  loop_shut_down_.Wait();
+  loop_.JoinThreads();
+  loop_.Shutdown();
 
-  LOG(DEBUG, "Finished DdkUnbindInternal.");
+  LOG(DEBUG, "Finished Shutdown");
 }
 
 void Device::CheckForUnbind() {
@@ -350,8 +337,8 @@ void Device::CheckForUnbind() {
     }
   }
 
-  // This will cause the loop to exit and will allow DdkUnbind to continue.
-  loop_.ShutdownAsync();
+  // This will cause the loop thread to exit and will allow ~Device to continue.
+  loop_.Quit();
 }
 
 std::optional<SnapshotAnnotationRegister>& Device::snapshot_annotation_register() {
@@ -461,38 +448,41 @@ void Device::SecureMemControl::ZeroProtectedSubRange(bool is_covering_range_expl
                 result.error_value().FormatDescription().c_str());
 }
 
-zx::result<> Device::Start() {
-  LOG(DEBUG, "SysmemDriver::Start()");
-  std::lock_guard checker(*driver_checker_);
+zx::result<std::unique_ptr<Device>> Device::Create(async_dispatcher_t* client_dispatcher,
+                                                   const Device::CreateArgs& create_args) {
+  LOG(DEBUG, "Create()");
+  auto device = std::make_unique<Device>(client_dispatcher);
 
-  zx_status_t status = Initialize();
-  if (status != ZX_OK) {
-    LOG(ERROR, "Initialize() failed: %s\n", zx_status_get_string(status));
-    return zx::error(status);
+  std::lock_guard checker(device->client_checker_);
+
+  auto init_result = device->Initialize(create_args);
+  if (!init_result.is_ok()) {
+    LOG(ERROR, "Initialize() failed: %s\n", init_result.status_string());
+    return init_result.take_error();
   }
 
-  return zx::ok();
+  return zx::ok(std::move(device));
 }
 
-zx_status_t Device::Initialize() {
-  ZX_DEBUG_ASSERT(fdf::Dispatcher::GetCurrent()->async_dispatcher() == driver_dispatcher());
-
+zx::result<> Device::Initialize(const CreateArgs& create_args) {
   // Put everything under a node called "sysmem" because there's currently there's not a simple way
   // to distinguish (using a selector) which driver inspect information is coming from.
   sysmem_root_ = inspector_.GetRoot().CreateChild("sysmem");
   heaps_ = sysmem_root_.CreateChild("heaps");
   collections_node_ = sysmem_root_.CreateChild("collections");
 
-  zx::result<fidl::ClientEnd<fuchsia_hardware_platform_device::Device>> pdev_client_result =
-      incoming()->Connect<fuchsia_hardware_platform_device::Service::Device>();
-  if (pdev_client_result.is_error()) {
-    LOG(ERROR,
-        "Failed device_connect_fidl_protocol() for fuchsia.hardware.platform.device - status: %d",
-        pdev_client_result.status_value());
-    return pdev_client_result.status_value();
+  // this is always true outside of unit tests
+  if (create_args.create_bti) {
+    auto create_bti_result = CreateBti();
+    if (!create_bti_result.is_ok()) {
+      LOG(ERROR, "CreateBti() failed: %s", create_bti_result.status_string());
+      return create_bti_result.take_error();
+    }
+    bti_ = std::move(create_bti_result.value());
+    ZX_DEBUG_ASSERT(bti_.is_valid());
+  } else {
+    ZX_DEBUG_ASSERT(!bti_.is_valid());
   }
-
-  pdev_.Bind(std::move(*pdev_client_result));
 
   auto config_from_file_result = GetConfigFromFile();
   if (!config_from_file_result.is_ok()) {
@@ -514,25 +504,35 @@ zx_status_t Device::Initialize() {
   int64_t protected_memory_size = kDefaultProtectedMemorySize;
   int64_t contiguous_memory_size = kDefaultContiguousMemorySize;
 
-  sysmem_config::Config config = take_config<sysmem_config::Config>();
-  if (config.contiguous_memory_size() >= 0) {
-    contiguous_memory_size = config.contiguous_memory_size();
-  } else if (config.contiguous_memory_size_percent() >= 0 &&
-             config.contiguous_memory_size_percent() <= 99) {
-    // the negation is un-done below
-    contiguous_memory_size = -config.contiguous_memory_size_percent();
+  if (!create_args.create_bti) {
+    protected_memory_size = 0;
+    contiguous_memory_size = 0;
   }
-  if (config.protected_memory_size() >= 0) {
-    protected_memory_size = config.protected_memory_size();
-  } else if (config.protected_memory_size_percent() >= 0 &&
-             config.protected_memory_size_percent() <= 99) {
-    // the negation is un-done below
-    protected_memory_size = -config.protected_memory_size_percent();
+
+  std::optional<sysmem_config::Config> maybe_config;
+  // this is always true outside of unit tests
+  if (create_args.expect_structured_config) {
+    sysmem_config::Config config = sysmem_config::Config::TakeFromStartupHandle();
+    if (config.contiguous_memory_size() >= 0) {
+      contiguous_memory_size = config.contiguous_memory_size();
+    } else if (config.contiguous_memory_size_percent() >= 0 &&
+               config.contiguous_memory_size_percent() <= 99) {
+      // the negation is un-done below
+      contiguous_memory_size = -config.contiguous_memory_size_percent();
+    }
+    if (config.protected_memory_size() >= 0) {
+      protected_memory_size = config.protected_memory_size();
+    } else if (config.protected_memory_size_percent() >= 0 &&
+               config.protected_memory_size_percent() <= 99) {
+      // the negation is un-done below
+      protected_memory_size = -config.protected_memory_size_percent();
+    }
+    RunSyncOnLoop([this, &config] {
+      std::lock_guard thread_checker(*loop_checker_);
+      protected_ranges_disable_dynamic_ = config.protected_ranges_disable_dynamic();
+    });
+    maybe_config = std::move(config);
   }
-  RunSyncOnLoop([this, &config] {
-    std::lock_guard thread_checker(*loop_checker_);
-    protected_ranges_disable_dynamic_ = config.protected_ranges_disable_dynamic();
-  });
 
   // Negative values are interpreted as a percentage of physical RAM.
   if (contiguous_memory_size < 0) {
@@ -557,28 +557,11 @@ zx_status_t Device::Initialize() {
     std::lock_guard thread_checker(*loop_checker_);
     allocators_[std::move(heap)] = std::make_unique<SystemRamMemoryAllocator>(this);
     snapshot_annotation_register_.emplace(loop_dispatcher());
+    auto service_directory = sys::ServiceDirectory::CreateFromNamespace();
+    snapshot_annotation_register_->SetServiceDirectory(service_directory, loop_dispatcher());
+    metrics_.metrics_buffer().SetServiceDirectory(service_directory);
+    metrics_.LogUnusedPageCheck(sysmem_metrics::UnusedPageCheckMetricDimensionEvent_Connectivity);
   });
-
-  auto result = pdev_->GetBtiById(0);
-  if (!result.ok()) {
-    LOG(ERROR, "Transport error for PDev::GetBtiById() - status: %s", result.status_string());
-    return result.status();
-  }
-
-  if (result->is_error()) {
-    LOG(ERROR, "Failed PDev::GetBtiById() - status: %s",
-        zx_status_get_string(result->error_value()));
-    return result->error_value();
-  }
-
-  bti_ = std::move(result->value()->bti);
-
-  zx::bti bti_copy;
-  zx_status_t status = bti_.duplicate(ZX_RIGHT_SAME_RIGHTS, &bti_copy);
-  if (status != ZX_OK) {
-    LOG(ERROR, "BTI duplicate failed: %d", status);
-    return status;
-  }
 
   if (contiguous_memory_size) {
     constexpr bool kIsAlwaysCpuAccessible = true;
@@ -593,7 +576,7 @@ zx_status_t Device::Initialize() {
         kCanBeTornDown, loop_dispatcher());
     if (pooled_allocator->Init() != ZX_OK) {
       LOG(ERROR, "Contiguous system ram allocator initialization failed");
-      return ZX_ERR_NO_MEMORY;
+      return zx::error(ZX_ERR_NO_MEMORY);
     }
     uint64_t guard_region_size;
     bool unused_pages_guarded;
@@ -601,9 +584,10 @@ zx_status_t Device::Initialize() {
     zx::duration unused_page_check_cycle_period;
     bool internal_guard_regions;
     bool crash_on_guard;
-    if (GetContiguousGuardParameters(
-            config, &guard_region_size, &unused_pages_guarded, &unused_guard_pattern_period_bytes,
-            &unused_page_check_cycle_period, &internal_guard_regions, &crash_on_guard) == ZX_OK) {
+    if (GetContiguousGuardParameters(maybe_config, &guard_region_size, &unused_pages_guarded,
+                                     &unused_guard_pattern_period_bytes,
+                                     &unused_page_check_cycle_period, &internal_guard_regions,
+                                     &crash_on_guard) == ZX_OK) {
       pooled_allocator->InitGuardRegion(guard_region_size, unused_pages_guarded,
                                         unused_guard_pattern_period_bytes,
                                         unused_page_check_cycle_period, internal_guard_regions,
@@ -637,35 +621,25 @@ zx_status_t Device::Initialize() {
         kCanBeTornDown, loop_dispatcher());
     // Request 64kB alignment because the hardware can only modify protections along 64kB
     // boundaries.
-    status = protected_allocator->Init(16);
+    zx_status_t status = protected_allocator->Init(16);
     if (status != ZX_OK) {
       LOG(ERROR, "Failed to init allocator for protected/secure (DRM) memory: %d", status);
-      return status;
+      return zx::error(status);
     }
 
     pending_protected_allocator_ = std::move(protected_allocator);
   }
 
-  auto [devfs_connector_client, devfs_connector_server] =
-      fidl::Endpoints<fuchsia_device_fs::Connector>::Create();
-
-  // devfs node
-  fuchsia_driver_framework::DevfsAddArgs devfs_args;
-  devfs_args.class_name() = "sysmem";
-  devfs_args.connector() = std::move(devfs_connector_client);
-  devfs_args.inspect() = inspector_.DuplicateVmo();
-  auto add_owned_child_result = AddOwnedChild("sysmem-devfs", devfs_args);
-  if (!add_owned_child_result.is_ok()) {
-    LOG(ERROR, "AddOwnedChild failed: %s", add_owned_child_result.status_string());
-    return add_owned_child_result.status_value();
+  if (create_args.serve_outgoing) {
+    auto begin_serving_result = SyncCall([this] {
+      std::lock_guard lock(*loop_checker_);
+      return BeginServing();
+    });
+    if (!begin_serving_result.is_ok()) {
+      LOG(ERROR, "BeginServing() failed: %s", begin_serving_result.status_string());
+      return begin_serving_result.take_error();
+    }
   }
-  devfs_owned_child_node_ = std::move(add_owned_child_result).value();
-
-  RunSyncOnLoop([this, devfs_connector_server = std::move(devfs_connector_server)]() mutable {
-    devfs_connector_.AddBinding(
-        loop_dispatcher(), std::move(devfs_connector_server), this,
-        [](fidl::UnbindInfo unbind_info) { LOG(WARNING, "unexpected devfs connector unbind"); });
-  });
 
   if constexpr (kLogAllCollectionsPeriodically) {
     ZX_ASSERT(ZX_OK ==
@@ -674,54 +648,85 @@ zx_status_t Device::Initialize() {
 
   LOG(INFO, "sysmem finished initialization");
 
-  return ZX_OK;
+  return zx::ok();
 }
 
-void Device::Connect(ConnectRequest& request, ConnectCompleter::Sync& completer) {
-  if (!request.server().is_valid()) {
-    LOG(ERROR, "!request.server().is_valid()");
-    return;
+zx::result<zx::bti> Device::CreateBti() {
+  auto iommu_client_result = component::Connect<fuchsia_kernel::IommuResource>();
+  if (!iommu_client_result.is_ok()) {
+    LOG(ERROR, "component::Connect<fuchsia_kernel::IommuResource>() failed: %s",
+        iommu_client_result.status_string());
+    return iommu_client_result.take_error();
   }
-  fidl::ServerEnd<fuchsia_hardware_sysmem::DriverConnector> server_end(std::move(request.server()));
-  PostTask([this, server_end = std::move(server_end)]() mutable {
-    driver_connectors_.AddBinding(
-        loop_dispatcher(), std::move(server_end), this,
-        [](fidl::UnbindInfo info) { LOG(DEBUG, "unexpected DriverConnector disconnect"); });
-  });
+  auto iommu_sync_client = fidl::SyncClient(std::move(iommu_client_result.value()));
+  auto iommu_result = iommu_sync_client->Get();
+  if (!iommu_result.is_ok()) {
+    LOG(ERROR, "mmio_sync_client->Get() failed: %s",
+        iommu_result.error_value().FormatDescription().c_str());
+    return zx::error(iommu_result.error_value().status());
+  }
+  auto iommu_resource = std::move(iommu_result.value().resource());
+  zx_iommu_desc_dummy_t dummy_iommu_desc{};
+  zx::iommu iommu;
+  zx_status_t iommu_create_status = zx::iommu::create(
+      iommu_resource, ZX_IOMMU_TYPE_DUMMY, &dummy_iommu_desc, sizeof(dummy_iommu_desc), &iommu);
+  if (iommu_create_status != ZX_OK) {
+    LOG(ERROR, "zx::iommu::create() failed: %s", zx_status_get_string(iommu_create_status));
+    return zx::error(iommu_create_status);
+  }
+  zx::bti bti;
+  zx_status_t bti_create_status = zx::bti::create(iommu, 0, /*bti_id=*/0, &bti);
+  if (bti_create_status != ZX_OK) {
+    LOG(ERROR, "zx::bti::create() failed: %s", zx_status_get_string(bti_create_status));
+    return zx::error(bti_create_status);
+  }
+  return zx::ok(std::move(bti));
 }
 
-void Device::ConnectV1(ConnectV1Request& request, ConnectV1Completer::Sync& completer) {
-  PostTask([this, request = std::move(request.allocator_request())]() mutable {
-    Allocator::CreateOwnedV1(std::move(request), this, v1_allocators());
-  });
-}
+zx::result<> Device::BeginServing() {
+  // While outgoing_ is on loop_dispatcher(), the fuchsia_hardware_sysmem::Sysmem protocol is served
+  // on client_dispatcher().
+  outgoing_ = component::OutgoingDirectory(loop_dispatcher());
 
-void Device::ConnectV2(ConnectV2Request& request, ConnectV2Completer::Sync& completer) {
-  PostTask([this, request = std::move(request.allocator_request())]() mutable {
-    Allocator::CreateOwnedV2(std::move(request), this, v2_allocators());
-  });
-}
-
-void Device::ConnectSysmem(ConnectSysmemRequest& request, ConnectSysmemCompleter::Sync& completer) {
-  zx_status_t status = async::PostTask(
-      driver_dispatcher(), [request = std::move(request.sysmem_request()), this]() mutable {
-        bindings_.AddBinding(driver_dispatcher(), std::move(request), this,
-                             fidl::kIgnoreBindingClosure);
+  auto add_allocator1_result = outgoing_->AddUnmanagedProtocol<fuchsia_sysmem::Allocator>(
+      [this](fidl::ServerEnd<fuchsia_sysmem::Allocator> server_end) {
+        Allocator::CreateOwnedV1(std::move(server_end), this, v1_allocators());
       });
-  ZX_DEBUG_ASSERT_MSG(status == ZX_OK, "Failed to post task to connect to Sysmem protocol: %s",
-                      zx_status_get_string(status));
-}
+  if (!add_allocator1_result.is_ok()) {
+    LOG(ERROR, "AddUnmanagedProtocol<fuchsia_sysmem::Allocator>() failed: %s",
+        add_allocator1_result.status_string());
+    return add_allocator1_result.take_error();
+  }
 
-void Device::SetAuxServiceDirectory(SetAuxServiceDirectoryRequest& request,
-                                    SetAuxServiceDirectoryCompleter::Sync& completer) {
-  PostTask([this, aux_service_directory = std::make_shared<sys::ServiceDirectory>(
-                      request.service_directory().TakeChannel())] {
-    // Should the need arise in future, it'd be fine to stash a shared_ptr<aux_service_directory>
-    // here if we need it for anything else.
-    snapshot_annotation_register_->SetServiceDirectory(aux_service_directory, loop_dispatcher());
-    metrics_.metrics_buffer().SetServiceDirectory(aux_service_directory);
-    metrics_.LogUnusedPageCheck(sysmem_metrics::UnusedPageCheckMetricDimensionEvent_Connectivity);
-  });
+  auto add_allocator2_result = outgoing_->AddUnmanagedProtocol<fuchsia_sysmem2::Allocator>(
+      [this](fidl::ServerEnd<fuchsia_sysmem2::Allocator> server_end) {
+        Allocator::CreateOwnedV2(std::move(server_end), this, v2_allocators());
+      });
+  if (!add_allocator2_result.is_ok()) {
+    LOG(ERROR, "AddUnmanagedProtocol<fuchsia_sysmem2::Allocator>() failed: %s",
+        add_allocator2_result.status_string());
+    return add_allocator2_result.take_error();
+  }
+
+  auto add_sysmem_result = outgoing_->AddUnmanagedProtocol<fuchsia_hardware_sysmem::Sysmem>(
+      [this](fidl::ServerEnd<fuchsia_hardware_sysmem::Sysmem> server_end) {
+        PostTaskToClientDispatcher([this, server_end = std::move(server_end)]() mutable {
+          bindings_.AddBinding(client_dispatcher(), std::move(server_end), this,
+                               fidl::kIgnoreBindingClosure);
+        });
+      });
+  if (!add_sysmem_result.is_ok()) {
+    LOG(ERROR, "AddUnmanagedProtocol<fuchsia_hardware_sysmem::Sysmem>() failed: %s",
+        add_sysmem_result.status_string());
+    return add_sysmem_result.take_error();
+  }
+
+  auto serve_result = outgoing_->ServeFromStartupInfo();
+  if (!serve_result.is_ok()) {
+    LOG(ERROR, "outgoing_->ServeFromStartupInfo() failed: %s", serve_result.status_string());
+    return serve_result.take_error();
+  }
+  return zx::ok();
 }
 
 zx_status_t Device::RegisterHeapInternal(
@@ -1019,7 +1024,7 @@ const zx::bti& Device::bti() { return bti_; }
 // specify a specific physical range.
 zx::result<zx::vmo> Device::CreatePhysicalVmo(uint64_t base, uint64_t size) {
   // This isn't called much, so get the mmio resource each time rather than caching it.
-  zx::result resource_result = incoming()->Connect<fuchsia_kernel::MmioResource>();
+  zx::result resource_result = component::Connect<fuchsia_kernel::MmioResource>();
   if (resource_result.is_error()) {
     LOG(ERROR, "Connect<fuchsia_kernel::MmioResource>() failed: %s",
         resource_result.status_string());
@@ -1191,9 +1196,9 @@ void Device::LogCollectionsTimer(async_dispatcher_t* loop_dispatcher, async::Tas
 }
 
 void Device::RegisterHeap(RegisterHeapRequest& request, RegisterHeapCompleter::Sync& completer) {
+  std::lock_guard checker(client_checker_);
   // TODO(b/316646315): Change RegisterHeap to specify fuchsia_sysmem2::Heap, and remove the
   // conversion here.
-  std::lock_guard checker(*driver_checker_);
   auto v2_heap_type_result =
       sysmem::V2CopyFromV1HeapType(static_cast<fuchsia_sysmem::HeapType>(request.heap()));
   if (!v2_heap_type_result.is_ok()) {
@@ -1213,7 +1218,7 @@ void Device::RegisterHeap(RegisterHeapRequest& request, RegisterHeapCompleter::S
 
 void Device::RegisterSecureMem(RegisterSecureMemRequest& request,
                                RegisterSecureMemCompleter::Sync& completer) {
-  std::lock_guard checker(*driver_checker_);
+  std::lock_guard checker(client_checker_);
   zx_status_t status = RegisterSecureMemInternal(std::move(request.secure_mem_connection()));
   if (status != ZX_OK) {
     completer.Close(status);
@@ -1222,7 +1227,7 @@ void Device::RegisterSecureMem(RegisterSecureMemRequest& request,
 }
 
 void Device::UnregisterSecureMem(UnregisterSecureMemCompleter::Sync& completer) {
-  std::lock_guard checker(*driver_checker_);
+  std::lock_guard checker(client_checker_);
   zx_status_t status = UnregisterSecureMemInternal();
   if (status == ZX_OK) {
     completer.Reply(fit::ok());
@@ -1232,47 +1237,37 @@ void Device::UnregisterSecureMem(UnregisterSecureMemCompleter::Sync& completer) 
 }
 
 zx::result<fuchsia_sysmem2::Config> Device::GetConfigFromFile() {
-  std::vector<uint8_t> sysmem_config_vec;
-  auto config_file_as_protocol_result = incoming()->Open<fuchsia_io::File>(
-      kSysmemConfigFilename,
-      fuchsia_io::OpenFlags::kNotDirectory | fuchsia_io::OpenFlags::kRightReadable);
-  if (!config_file_as_protocol_result.is_ok()) {
-    LOG(WARNING, "incoming()->Open<fuchsia_io::File>(kSysmemConfigFilename, ...) failed: %s",
-        config_file_as_protocol_result.status_string());
-    return config_file_as_protocol_result.take_error();
-  }
-  auto config_file = fidl::SyncClient(std::move(config_file_as_protocol_result.value()));
-  // This relies on GetBackingMemory working for the sysmem config file; this is more direct than
-  // using an FD etc, but if this needs to stop assuming GetBackingMemory for whatever reason,
-  // feel free to reach out.
-  fuchsia_io::FileGetBackingMemoryRequest get_backing_request;
-  get_backing_request.flags() = fuchsia_io::VmoFlags::kRead;
-  auto backing_result = config_file->GetBackingMemory(std::move(get_backing_request));
-  if (!backing_result.is_ok()) {
-    LOG(WARNING, "sysmem config file GetBackingMemory failed: %s",
-        backing_result.error_value().FormatDescription().c_str());
+  int config_fd = open(kSysmemConfigFilename, O_RDONLY);
+  if (config_fd == -1) {
+    int local_errno = errno;
+    LOG(WARNING, "open(kSysmemConfigFilename) failed: %d", local_errno);
     return zx::error(ZX_ERR_INTERNAL);
   }
-  auto backing_vmo = std::move(backing_result->vmo());
-
-  // Get the size of the VMO
-  uint64_t content_size_prop = 0;
-  zx_status_t status = backing_vmo.get_prop_content_size(&content_size_prop);
-  ZX_ASSERT_MSG(status == ZX_OK, "get_prop_content_size failed: %s", zx_status_get_string(status));
-  size_t vmo_content_size = static_cast<size_t>(content_size_prop);
-
-  std::vector<uint8_t> config_bytes(vmo_content_size);
-  status = backing_vmo.read(config_bytes.data(), 0, config_bytes.size());
-  ZX_ASSERT_MSG(status == ZX_OK, "Could not read config from config VMO");
-
+  auto close_config_fd = fit::defer([&config_fd] { close(config_fd); });
+  struct stat config_stat;
+  int fstat_result = fstat(config_fd, &config_stat);
+  if (fstat_result != 0) {
+    int local_errno = errno;
+    LOG(WARNING, "fstat(config_fd) failed: %d", local_errno);
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  off_t size = config_stat.st_size;
+  std::vector<uint8_t> config_bytes(size);
+  ssize_t read_result = read(config_fd, config_bytes.data(), config_bytes.size());
+  if (read_result < 0) {
+    int local_errno = errno;
+    LOG(WARNING, "read(config_fd) failed: %d", local_errno);
+    return zx::error(ZX_ERR_INTERNAL);
+  }
+  if (static_cast<size_t>(read_result) != config_bytes.size()) {
+    LOG(WARNING, "read(config_fd) didn't read exact size");
+    return zx::error(ZX_ERR_INTERNAL);
+  }
   // Decode the FIDL struct
   fit::result result = fidl::Unpersist<fuchsia_sysmem2::Config>(config_bytes);
   ZX_ASSERT_MSG(result.is_ok(), "Could not decode fuchsia.sysmem2.Config FIDL structure");
   fuchsia_sysmem2::Config fidl_config = std::move(result.value());
-
   return zx::ok(fidl_config);
 }
 
-}  // namespace sysmem_driver
-
-FUCHSIA_DRIVER_EXPORT(sysmem_driver::Device);
+}  // namespace sysmem_service

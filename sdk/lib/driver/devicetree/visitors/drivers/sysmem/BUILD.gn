@@ -12,6 +12,7 @@ group("tests") {
   testonly = true
 }
 
+# TODO(b/362587923): Remove along with sysmem deprecated_device.cc.
 devicetree_visitor("sysmem-visitor") {
   deps = [ ":sysmem-visitor-impl" ]
 }

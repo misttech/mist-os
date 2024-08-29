@@ -10,7 +10,6 @@
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <inttypes.h>
 #include <lib/async_patterns/cpp/task_scope.h>
-#include <lib/ddk/trace/event.h>
 #include <lib/fidl/cpp/wire/arena.h>
 #include <lib/fidl/cpp/wire/status.h>
 #include <lib/fidl/cpp/wire/vector_view.h>
@@ -18,6 +17,7 @@
 #include <lib/fpromise/result.h>
 #include <lib/image-format/image_format.h>
 #include <lib/sysmem-version/sysmem-version.h>
+#include <lib/trace/event.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/clock.h>
 #include <stdio.h>
@@ -57,7 +57,7 @@ using safemath::CheckDiv;
 using safemath::CheckMul;
 using safemath::CheckSub;
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 namespace {
 
@@ -1032,7 +1032,8 @@ void LogicalBufferCollection::LogAndFailRootNode(Location location, Error error,
   ZX_DEBUG_ASSERT(format);
   va_list args;
   va_start(args, format);
-  vLog(true, location.file(), location.line(), "LogicalBufferCollection", "fail", format, args);
+  vLog(::fuchsia_logging::LOG_WARNING, location.file(), location.line(), "LogicalBufferCollection",
+       format, args);
   va_end(args);
   FailRootNode(error);
 }
@@ -1051,9 +1052,10 @@ void LogicalBufferCollection::LogAndFailDownFrom(Location location, NodeProperti
   ZX_DEBUG_ASSERT(format);
   va_list args;
   va_start(args, format);
-  bool is_error = (tree_to_fail == root_.get());
-  vLog(is_error, location.file(), location.line(), "LogicalBufferCollection",
-       is_error ? "root fail" : "sub-tree fail", format, args);
+  bool is_root = (tree_to_fail == root_.get());
+  vLog(::fuchsia_logging::LOG_INFO, location.file(), location.line(),
+       is_root ? "LogicalBufferCollection root fail" : "LogicalBufferCollection sub-tree fail",
+       format, args);
   va_end(args);
   FailDownFrom(tree_to_fail, error);
 }
@@ -1094,9 +1096,10 @@ void LogicalBufferCollection::LogAndFailNode(Location location, NodeProperties* 
   auto tree_to_fail = FindTreeToFail(member_node);
   va_list args;
   va_start(args, format);
-  bool is_error = (tree_to_fail == root_.get());
-  vLog(is_error, location.file(), location.line(), "LogicalBufferCollection",
-       is_error ? "root fail" : "sub-tree fail", format, args);
+  bool is_root = (tree_to_fail == root_.get());
+  vLog(::fuchsia_logging::LOG_INFO, location.file(), location.line(),
+       is_root ? "LogicalBufferCollection root fail" : "LogicalBufferCollection sub-tree fail",
+       format, args);
   va_end(args);
   FailDownFrom(tree_to_fail, error);
 }
@@ -1113,8 +1116,7 @@ void LogErrorInternal(Location location, const char* format, ...) {
   va_list args;
   va_start(args, format);
 
-  fdf::Logger::GlobalInstance()->logvf(FUCHSIA_LOG_ERROR, nullptr, location.file(), location.line(),
-                                       format, args);
+  vLog(::fuchsia_logging::LOG_ERROR, location.file(), location.line(), nullptr, format, args);
 
   va_end(args);
 }
@@ -1124,14 +1126,14 @@ void LogicalBufferCollection::LogInfo(Location location, const char* format, ...
   va_list args;
   va_start(args, format);
 
-  FuchsiaLogSeverity severity;
+  ::fuchsia_logging::LogSeverity severity;
   if (is_verbose_logging()) {
-    severity = FUCHSIA_LOG_INFO;
+    severity = ::fuchsia_logging::LOG_INFO;
   } else {
-    severity = FUCHSIA_LOG_DEBUG;
+    severity = ::fuchsia_logging::LOG_DEBUG;
   }
-  fdf::Logger::GlobalInstance()->logvf(severity, nullptr, location.file(), location.line(), format,
-                                       args);
+
+  vLog(severity, location.file(), location.line(), nullptr, format, args);
 
   va_end(args);
 }
@@ -5214,4 +5216,4 @@ LogicalBufferCollection& LogicalBuffer::logical_buffer_collection() {
 
 uint32_t LogicalBuffer::buffer_index() { return buffer_index_; }
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service

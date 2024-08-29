@@ -4,8 +4,6 @@
 
 #include "src/devices/sysmem/drivers/sysmem/protected_ranges.h"
 
-#include <lib/ddk/debug.h>
-#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fit/defer.h>
 
 #include <limits>
@@ -163,8 +161,6 @@ class ProtectedRangesTest : public ::testing::Test,
   void IncrementalOptimization();
 
   bool TestRangesOverlap(const TestRange& a, const TestRange& b);
-
-  fdf_testing::ScopedGlobalLogger logger_;
 
   std::optional<protected_ranges::ProtectedRanges> protected_ranges_;
 

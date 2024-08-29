@@ -32,7 +32,7 @@
 #include "src/devices/sysmem/drivers/sysmem/utils.h"
 #include "src/devices/sysmem/drivers/sysmem/versions.h"
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 class BufferCollectionToken;
 class BufferCollectionTokenGroup;
@@ -939,6 +939,6 @@ class LogicalBufferCollection : public fbl::RefCounted<LogicalBufferCollection> 
   const zx::time create_time_monotonic_ = zx::time::infinite_past();
 };
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service
 
 #endif  // SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_LOGICAL_BUFFER_COLLECTION_H_

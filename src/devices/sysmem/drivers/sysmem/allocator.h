@@ -13,7 +13,7 @@
 #include "logging.h"
 #include "logical_buffer_collection.h"
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 // An instance of this class serves an Allocator connection.  The lifetime of
 // the instance is 1:1 with the Allocator channel.
@@ -94,6 +94,6 @@ class Allocator : public LoggingMixin {
   std::optional<ClientDebugInfo> client_debug_info_;
 };
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service
 
 #endif  // SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_ALLOCATOR_H_

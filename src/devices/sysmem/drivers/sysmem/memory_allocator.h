@@ -20,7 +20,7 @@
 class SnapshotAnnotationRegister;
 class SysmemMetrics;
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 class MemoryAllocator {
  public:
@@ -116,6 +116,6 @@ class MemoryAllocator {
   fuchsia_hardware_sysmem::HeapProperties heap_properties_;
 };
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service
 
 #endif  // SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_MEMORY_ALLOCATOR_H_

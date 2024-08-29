@@ -10,7 +10,7 @@
 #include "koid_util.h"
 #include "logical_buffer_collection.h"
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 using Error = fuchsia_sysmem2::Error;
 
@@ -95,8 +95,6 @@ void Node::SetErrorHandler(fit::function<void(zx_status_t)> error_handler) {
 void Node::Fail(Error error) { CloseChannel(error); }
 
 void Node::SetDebugClientInfoInternal(ClientDebugInfo debug_info) {
-  ZX_ASSERT(logical_buffer_collection().parent_device()->loop_dispatcher() ==
-            fdf::Dispatcher::GetCurrent()->async_dispatcher());
   if (!node_properties().client_debug_info().name.empty()) {
     debug_info.name = debug_info.name + " (was " + node_properties().client_debug_info().name + ")";
     if (debug_info.name.size() > kMaxDebugNameSize) {
@@ -174,4 +172,4 @@ void Node::CloseChannel(Error error) {
   CloseServerBinding(epitaph);
 }
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service

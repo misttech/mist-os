@@ -5,9 +5,9 @@
 #include "contiguous_pooled_memory_allocator.h"
 
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-#include <lib/ddk/trace/event.h>
 #include <lib/fidl/cpp/wire/arena.h>
 #include <lib/fit/defer.h>
+#include <lib/trace/event.h>
 #include <lib/zx/clock.h>
 #include <stdlib.h>
 #include <zircon/errors.h>
@@ -26,10 +26,11 @@
 #include "src/devices/sysmem/metrics/metrics.cb.h"
 #include "utils.h"
 
-namespace sysmem_driver {
+namespace sysmem_service {
+
+namespace {
 
 zx::duration kGuardCheckInterval = zx::sec(5);
-namespace {
 
 constexpr uint64_t kMiB = 1024ull * 1024;
 
@@ -1572,4 +1573,4 @@ void ContiguousPooledMemoryAllocator::RangesControl::UnUseRange(
   parent_->OnRegionUnused(region);
 }
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service

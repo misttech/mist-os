@@ -6,13 +6,6 @@
         {
             name: "sysmem",
             url: "fuchsia-boot:///sysmem_connector#meta/sysmem_connector.cm",
-
-            // Until there is something analogous to on_terminate: "reboot" for drivers, we need
-            // sysmem_connector to terminate and trigger a reboot on behalf of sysmem if the sysmem
-            // driver terminates.
-            //
-            // TODO(https://fxbug.dev/42178137): Once we have something like on_terminate: "reboot" for drivers
-            // we can remove both "eager" and "reboot" here.
             startup: "eager",
             on_terminate: "reboot",
         },
@@ -21,6 +14,9 @@
         {
             protocol: [
                 "fuchsia.feedback.ComponentDataRegister",
+                "fuchsia.kernel.InfoResource",
+                "fuchsia.kernel.IommuResource",
+                "fuchsia.kernel.MmioResource",
                 "fuchsia.metrics.MetricEventLoggerFactory",
             ],
             from: "parent",
@@ -33,18 +29,22 @@
             availability: "optional",
         },
         {
-            directory: "dev-class",
-            from: "#devfs",
-            as: "dev-sysmem",
+            from: "parent",
             to: "#sysmem",
-            subdir: "sysmem",
-
-            // This must be weak because sysmem's exposed protocols are routed back to drivers which creates
-            // a cycle. We need the sysmem_connector to outlive drivers which depend on it.
-            dependency: "weak",
+            config: [
+                "fuchsia.sysmem.ContiguousGuardPagesUnused",
+                "fuchsia.sysmem.FixedContiguousMemorySize",
+                "fuchsia.sysmem.FixedProtectedMemorySize",
+                "fuchsia.sysmem.PercentContiguousMemorySize",
+                "fuchsia.sysmem.PercentProtectedMemorySize",
+            ],
+            availability: "optional",
         },
         {
-            protocol: "fuchsia.logger.LogSink",
+            protocol: [
+                "fuchsia.inspect.InspectSink",
+                "fuchsia.logger.LogSink",
+            ],
             from: "#archivist",
             to: "#sysmem",
         },

@@ -11,128 +11,68 @@
 #include <lib/async-loop/loop.h>
 #include <lib/async/cpp/task.h>
 #include <lib/async_patterns/testing/cpp/dispatcher_bound.h>
-#include <lib/driver/testing/cpp/driver_runtime.h>
-#include <lib/driver/testing/cpp/internal/driver_lifecycle.h>
-#include <lib/driver/testing/cpp/internal/test_environment.h>
-#include <lib/driver/testing/cpp/test_node.h>
 #include <lib/fidl/cpp/wire/arena.h>
 #include <lib/sync/completion.h>
 #include <lib/zx/bti.h>
 #include <stdlib.h>
 #include <zircon/errors.h>
 
-#include <ddktl/device.h>
-#include <ddktl/unbind-txn.h>
 #include <gtest/gtest.h>
 
 #include "src/devices/bus/testing/fake-pdev/fake-pdev.h"
+#include "src/devices/sysmem/bin/sysmem_connector/sysmem_config.h"
 #include "src/devices/sysmem/drivers/sysmem/allocator.h"
 #include "src/devices/sysmem/drivers/sysmem/buffer_collection.h"
 #include "src/devices/sysmem/drivers/sysmem/device.h"
 #include "src/devices/sysmem/drivers/sysmem/logical_buffer_collection.h"
-#include "src/devices/sysmem/drivers/sysmem/sysmem_config.h"
 
-namespace sysmem_driver {
+namespace sysmem_service {
+
 namespace {
 
 // WARNING: Don't use this test as a template for new tests as it uses the old driver testing
 // library.
 class FakeDdkSysmem : public ::testing::Test {
  public:
-  FakeDdkSysmem() {}
+  FakeDdkSysmem() : loop_(&kAsyncLoopConfigNeverAttachToThread) {}
 
   void SetUp() override {
-    zx::result<fdf_testing::TestNode::CreateStartArgsResult> create_start_args_result =
-        node_server_.SyncCall(&fdf_testing::TestNode::CreateStartArgsAndServe);
-    ASSERT_TRUE(create_start_args_result.is_ok());
+    zx_status_t start_status = loop_.StartThread("FakeDdkSysmem");
+    ZX_ASSERT_MSG(start_status == ZX_OK, "loop_.StartThread() failed: %s",
+                  zx_status_get_string(start_status));
 
-    auto [start_args, incoming_directory_server, outgoing_directory_client] =
-        std::move(create_start_args_result).value();
-    start_args.config() = sysmem_config::Config{}.ToVmo();
-    start_args_ = std::move(start_args);
-    driver_outgoing_ = std::move(outgoing_directory_client);
-
-    auto init_result = test_environment_.SyncCall(
-        &fdf_testing::internal::TestEnvironment::Initialize, std::move(incoming_directory_server));
-    ASSERT_TRUE(init_result.is_ok());
-
-    fake_pdev::FakePDevFidl::Config config;
-    config.use_fake_bti = true;
-    fake_pdev_.SyncCall(&fake_pdev::FakePDevFidl::SetConfig, std::move(config));
-
-    auto pdev_instance_handler = fake_pdev_.SyncCall(&fake_pdev::FakePDevFidl::GetInstanceHandler,
-                                                     async_patterns::PassDispatcher);
-    test_environment_.SyncCall(
-        [&pdev_instance_handler](fdf_testing::internal::TestEnvironment* env) {
-          auto add_service_result =
-              env->incoming_directory().AddService<fuchsia_hardware_platform_device::Service>(
-                  std::move(pdev_instance_handler));
-          ASSERT_TRUE(add_service_result.is_ok());
-        });
-
-    StartDriver();
+    libsync::Completion done;
+    zx_status_t post_status = async::PostTask(loop_.dispatcher(), [this, &done]() mutable {
+      sysmem_service::Device::CreateArgs create_args;
+      auto create_result = sysmem_service::Device::Create(loop_.dispatcher(), create_args);
+      ZX_ASSERT_MSG(create_result.is_ok(), "sysmem_service::Device::Create() failed: %s",
+                    create_result.status_string());
+      device_ = std::move(create_result.value());
+      done.Signal();
+    });
+    ZX_ASSERT_MSG(post_status == ZX_OK, "async::PostTask() failed: %s",
+                  zx_status_get_string(post_status));
+    done.Wait();
   }
 
   void TearDown() override {
-    StopDriver();
-
-    device_ = nullptr;
-    wrapped_device_.reset();
-    test_environment_.reset();
-    fake_pdev_.reset();
-    node_server_.reset();
-
-    // fence wrapped_device_.reset() - otherwise ~Device runs async which can flake via the leak
-    // checker
-    {
-      libsync::Completion done;
-      zx_status_t post_status =
-          async::PostTask(driver_async_dispatcher(), [&done] { done.Signal(); });
-      ZX_ASSERT(post_status == ZX_OK);
-      done.Wait();
-    }
-
-    // fence env dispatcher also, just in case
-    {
-      libsync::Completion done;
-      zx_status_t post_status = async::PostTask(env_async_dispatcher(), [&done] { done.Signal(); });
-      ZX_ASSERT(post_status == ZX_OK);
-      done.Wait();
-    }
-  }
-
-  void StartDriver() {
-    zx::result start_result = runtime_.RunToCompletion(wrapped_device_.SyncCall(
-        &fdf_testing::internal::DriverUnderTest<sysmem_driver::Device>::Start,
-        std::move(start_args_)));
-    ASSERT_EQ(start_result.status_value(), ZX_OK);
-    wrapped_device_.SyncCall(
-        [this](fdf_testing::internal::DriverUnderTest<sysmem_driver::Device>* device) {
-          device_ = **device;
-        });
-  }
-
-  void StopDriver() {
-    zx::result stop_result = runtime_.RunToCompletion(wrapped_device_.SyncCall(
-        &fdf_testing::internal::DriverUnderTest<sysmem_driver::Device>::PrepareStop));
-    ASSERT_EQ(stop_result.status_value(), ZX_OK);
+    libsync::Completion done;
+    zx_status_t post_status = async::PostTask(loop_.dispatcher(), [this, &done]() mutable {
+      device_.reset();
+      done.Signal();
+    });
+    ZX_ASSERT_MSG(post_status == ZX_OK, "async::PostTask() failed: %s",
+                  zx_status_get_string(post_status));
+    done.Wait();
   }
 
   fidl::ClientEnd<fuchsia_sysmem2::Allocator> Connect() {
-    fpromise::bridge<fidl::ClientEnd<fuchsia_sysmem2::Allocator>> bridge;
-    wrapped_device_.SyncCall(
-        [completer = bridge.completer.bind()](
-            fdf_testing::internal::DriverUnderTest<sysmem_driver::Device>* device) mutable {
-          auto [client, server] = fidl::Endpoints<fuchsia_sysmem2::Allocator>::Create();
-          (*device)->PostTask([device = **device, request = std::move(server)]() mutable {
-            sysmem_driver::Allocator::CreateOwnedV2(std::move(request), device,
-                                                    device->v2_allocators());
-          });
-          completer(std::move(client));
-        });
-    return runtime_.RunToCompletion(
-        fdf_testing::DriverRuntime::AsyncTask<fidl::ClientEnd<fuchsia_sysmem2::Allocator>>(
-            bridge.consumer.promise()));
+    auto [client, server] = fidl::Endpoints<fuchsia_sysmem2::Allocator>::Create();
+    device_->SyncCall([this, server = std::move(server)]() mutable {
+      sysmem_service::Allocator::CreateOwnedV2(std::move(server), device_.get(),
+                                               device_->v2_allocators());
+    });
+    return std::move(client);
   }
 
   fidl::ClientEnd<fuchsia_sysmem2::BufferCollection> AllocateNonSharedCollection() {
@@ -148,40 +88,9 @@ class FakeDdkSysmem : public ::testing::Test {
     return std::move(collection_client_end);
   }
 
-  fdf_testing::DriverRuntime& runtime() { return runtime_; }
-  async_patterns::TestDispatcherBound<
-      fdf_testing::internal::DriverUnderTest<sysmem_driver::Device>>&
-  wrapped_device() {
-    return wrapped_device_;
-  }
-
-  async_dispatcher_t* driver_async_dispatcher() { return driver_dispatcher_->async_dispatcher(); }
-  async_dispatcher_t* env_async_dispatcher() { return env_dispatcher_->async_dispatcher(); }
-
  protected:
-  // Attaches a foreground dispatcher for us automatically.
-  fdf_testing::DriverRuntime runtime_;
-
-  // Env dispatcher and driver dispatchers run separately in the background because we need to make
-  // sync calls from driver dispatcher to env dispatcher, and from test thread to driver dispatcher
-  // (in Connect).
-  fdf::UnownedSynchronizedDispatcher driver_dispatcher_ = runtime_.StartBackgroundDispatcher();
-  fdf::UnownedSynchronizedDispatcher env_dispatcher_ = runtime_.StartBackgroundDispatcher();
-
-  async_patterns::TestDispatcherBound<fdf_testing::TestNode> node_server_{
-      env_async_dispatcher(), std::in_place, std::string("root")};
-  async_patterns::TestDispatcherBound<fake_pdev::FakePDevFidl> fake_pdev_{env_async_dispatcher(),
-                                                                          std::in_place};
-  async_patterns::TestDispatcherBound<fdf_testing::internal::TestEnvironment> test_environment_{
-      env_async_dispatcher(), std::in_place};
-
-  fuchsia_driver_framework::DriverStartArgs start_args_;
-  fidl::ClientEnd<fuchsia_io::Directory> driver_outgoing_;
-
-  async_patterns::TestDispatcherBound<fdf_testing::internal::DriverUnderTest<sysmem_driver::Device>>
-      wrapped_device_{driver_async_dispatcher(), std::in_place};
-
-  sysmem_driver::Device* device_ = nullptr;
+  async::Loop loop_;
+  std::unique_ptr<sysmem_service::Device> device_;
 };
 
 TEST_F(FakeDdkSysmem, Lifecycle) {
@@ -193,13 +102,24 @@ TEST_F(FakeDdkSysmem, Lifecycle) {
 // Test that creating and tearing down a SecureMem connection works correctly.
 TEST_F(FakeDdkSysmem, DummySecureMem) {
   auto [client, server] = fidl::Endpoints<fuchsia_sysmem2::SecureMem>::Create();
-  ASSERT_EQ(device_->RegisterSecureMemInternal(std::move(client)), ZX_OK);
 
-  // This shouldn't deadlock waiting for a message on the channel.
-  ASSERT_EQ(device_->UnregisterSecureMemInternal(), ZX_OK);
+  device_->RunSyncOnClientDispatcher([this, client = std::move(client)]() mutable {
+    std::lock_guard lock(device_->client_checker_);
+    zx_status_t register_status = device_->RegisterSecureMemInternal(std::move(client));
+    ZX_ASSERT_MSG(register_status == ZX_OK, "device_->RegisterSecureMemInternal() failed: %s",
+                  zx_status_get_string(register_status));
+  });
+
+  device_->RunSyncOnClientDispatcher([this]() mutable {
+    std::lock_guard lock(device_->client_checker_);
+    // This shouldn't deadlock waiting for a message on the channel.
+    zx_status_t unregister_status = device_->UnregisterSecureMemInternal();
+    ZX_ASSERT_MSG(unregister_status == ZX_OK, "device_->UnregisterSecureMemInternal() failed: %s",
+                  zx_status_get_string(unregister_status));
+  });
 
   // This shouldn't cause a panic due to receiving peer closed.
-  client.reset();
+  server.reset();
 }
 
 TEST_F(FakeDdkSysmem, NamedToken) {
@@ -337,7 +257,6 @@ TEST_F(FakeDdkSysmem, NamedAllocatorToken) {
   // token messages before applyign the allocator's debug info to the token.
   while (true) {
     bool found_collection = device_->SyncCall([&]() {
-      ZX_ASSERT(fdf::Dispatcher::GetCurrent()->async_dispatcher() == device_->loop_dispatcher());
       if (device_->logical_buffer_collections().size() == 1) {
         const auto* logical_collection = *device_->logical_buffer_collections().begin();
         auto collection_views = logical_collection->collection_views();
@@ -360,7 +279,7 @@ TEST_F(FakeDdkSysmem, NamedAllocatorToken) {
 }
 
 TEST_F(FakeDdkSysmem, MaxSize) {
-  device_->set_settings(sysmem_driver::Settings{.max_allocation_size = zx_system_get_page_size()});
+  device_->set_settings(sysmem_service::Settings{.max_allocation_size = zx_system_get_page_size()});
 
   auto collection_client = AllocateNonSharedCollection();
 
@@ -446,4 +365,4 @@ TEST_F(FakeDdkSysmem, BufferLeak) {
 }
 
 }  // namespace
-}  // namespace sysmem_driver
+}  // namespace sysmem_service

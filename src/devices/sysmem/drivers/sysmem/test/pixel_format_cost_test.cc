@@ -5,7 +5,6 @@
 #include <fcntl.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire.h>
-#include <lib/ddk/platform-defs.h>
 #include <sys/stat.h>
 #include <unistd.h>
 
@@ -13,7 +12,8 @@
 
 #include "src/devices/sysmem/drivers/sysmem/usage_pixel_format_cost.h"
 
-namespace sysmem_driver {
+namespace sysmem_service {
+
 namespace {
 
 std::vector<uint8_t> LoadFile(const char* filename) {
@@ -269,4 +269,4 @@ TEST(PixelFormatCost, AfbcWithFlags) {
 }
 
 }  // namespace
-}  // namespace sysmem_driver
+}  // namespace sysmem_service

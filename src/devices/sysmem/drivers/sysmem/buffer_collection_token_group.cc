@@ -4,8 +4,8 @@
 
 #include "buffer_collection_token_group.h"
 
-#include <lib/ddk/trace/event.h>
 #include <lib/fidl/cpp/wire/channel.h>
+#include <lib/trace/event.h>
 #include <zircon/errors.h>
 #include <zircon/rights.h>
 
@@ -13,7 +13,7 @@
 #include "node.h"
 #include "src/devices/sysmem/drivers/sysmem/node_properties.h"
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 void BufferCollectionTokenGroup::V1::Sync(SyncCompleter::Sync& completer) {
   parent_.SyncImpl(ConnectionVersion::kVersion1, completer);
@@ -446,4 +446,4 @@ ConnectionVersion BufferCollectionTokenGroup::connection_version() const {
   return ConnectionVersion::kNoConnection;
 }
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service

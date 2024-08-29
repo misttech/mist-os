@@ -72,6 +72,7 @@
                 capability: "protocol",
                 target_monikers: [
                     "/bootstrap",
+                    "/bootstrap/sysmem",
                     "/bootstrap/boot-drivers:**",
                     "/bootstrap/console-launcher",
                 ],
@@ -83,6 +84,7 @@
                 capability: "protocol",
                 target_monikers: [
                     "/bootstrap",
+                    "/bootstrap/sysmem",
                     "/bootstrap/boot-drivers:**",
                 ],
             },
@@ -146,6 +148,7 @@
                 capability: "protocol",
                 target_monikers: [
                     "/bootstrap",
+                    "/bootstrap/sysmem",
                     "/bootstrap/boot-drivers:**",
                 ],
             },

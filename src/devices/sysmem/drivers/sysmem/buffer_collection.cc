@@ -8,10 +8,10 @@
 #include <fidl/fuchsia.sysmem2/cpp/common_types.h>
 #include <fidl/fuchsia.sysmem2/cpp/fidl.h>
 #include <fidl/fuchsia.sysmem2/cpp/wire_types.h>
-#include <lib/ddk/trace/event.h>
 #include <lib/fidl/cpp/wire/vector_view.h>
 #include <lib/fidl/cpp/wire_natural_conversions.h>
 #include <lib/sysmem-version/sysmem-version.h>
+#include <lib/trace/event.h>
 #include <lib/zx/channel.h>
 #include <lib/zx/object.h>
 #include <zircon/compiler.h>
@@ -26,7 +26,7 @@
 #include "node_properties.h"
 #include "utils.h"
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 namespace {
 
@@ -980,4 +980,4 @@ ConnectionVersion BufferCollection::connection_version() const {
   return ConnectionVersion::kNoConnection;
 }
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service

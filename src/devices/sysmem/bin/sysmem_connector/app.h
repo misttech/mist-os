@@ -5,16 +5,11 @@
 #ifndef SRC_DEVICES_SYSMEM_BIN_SYSMEM_CONNECTOR_APP_H_
 #define SRC_DEVICES_SYSMEM_BIN_SYSMEM_CONNECTOR_APP_H_
 
-#include <fuchsia/sysmem/cpp/fidl.h>
-#include <fuchsia/sysmem2/cpp/fidl.h>
-#include <lib/sys/cpp/component_context.h>
-#include <lib/sysmem-connector/sysmem-connector.h>
-
 #include <memory>
 
+#include "src/devices/sysmem/drivers/sysmem/device.h"
 #include "src/lib/fxl/macros.h"
 
-// sysmem_connector's app
 class App {
  public:
   explicit App(async_dispatcher_t* dispatcher);
@@ -22,12 +17,8 @@ class App {
 
  private:
   async_dispatcher_t* dispatcher_ = nullptr;
-  std::unique_ptr<sys::ComponentContext> component_context_;
 
-  sysmem_connector_t* sysmem_connector_ = nullptr;
-
-  sys::OutgoingDirectory outgoing_aux_service_directory_parent_;
-  vfs::PseudoDir* outgoing_aux_service_directory_ = nullptr;
+  std::unique_ptr<sysmem_service::Device> device_;
 
   FXL_DISALLOW_COPY_AND_ASSIGN(App);
 };

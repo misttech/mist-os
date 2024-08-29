@@ -6,8 +6,6 @@
 
 #include <lib/async-loop/loop.h>
 #include <lib/async-testing/test_loop.h>
-#include <lib/ddk/platform-defs.h>
-#include <lib/driver/testing/cpp/scoped_global_logger.h>
 #include <lib/fake-bti/bti.h>
 #include <lib/inspect/cpp/reader.h>
 #include <lib/sysmem-version/sysmem-version.h>
@@ -22,7 +20,8 @@
 
 #include "src/lib/testing/predicates/status.h"
 
-namespace sysmem_driver {
+namespace sysmem_service {
+
 namespace {
 
 class FakeOwner : public MemoryAllocator::Owner {
@@ -87,7 +86,6 @@ class ContiguousPooledSystem : public ::testing::Test {
   static constexpr uint64_t kBufferCollectionId = 12;
   static constexpr uint32_t kBufferIndex = 24;
 
-  fdf_testing::ScopedGlobalLogger logger_;
   inspect::Inspector inspector_;
   FakeOwner fake_owner_{&inspector_.GetRoot()};
   ContiguousPooledMemoryAllocator allocator_;
@@ -492,4 +490,4 @@ TEST_F(ContiguousPooledSystem, FreeRegionReporting) {
 }
 
 }  // namespace
-}  // namespace sysmem_driver
+}  // namespace sysmem_service

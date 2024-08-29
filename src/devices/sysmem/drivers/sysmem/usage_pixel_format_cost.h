@@ -10,7 +10,7 @@
 
 #include <cstdint>
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 // This class effectively breaks ties in a platform-specific way among the list
 // of PixelFormat(s) that a set of participants are all able to support.
@@ -44,6 +44,6 @@ class UsagePixelFormatCost {
   const std::vector<fuchsia_sysmem2::FormatCostEntry> entries_;
 };
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service
 
 #endif  // SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_USAGE_PIXEL_FORMAT_COST_H_

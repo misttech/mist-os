@@ -40,7 +40,7 @@ using GroupServerEnd = std::variant<GroupServerEndV1, GroupServerEndV2, EmptyCom
 // avoid templates that likely would generate more code.
 using NodeServerEnd = std::variant<zx::channel, zx::channel, zx::channel>;
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 namespace internal {
 
@@ -180,6 +180,6 @@ NodeServerEnd TakeNodeServerEnd(T server_end) {
   return internal::TakeNodeServerEndImpl<T>::take_node_server_end(std::move(server_end));
 }
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service
 
 #endif  // SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_VERSIONS_H_

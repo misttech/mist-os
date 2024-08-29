@@ -7,7 +7,7 @@
 
 #include "node.h"
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 // An OrphanedNode keeps the place of a former BufferCollectionToken or BufferCollection in the
 // hierarchical failure domain tree.  This way we don't need to adjust the tree due to disappearing
@@ -59,6 +59,6 @@ class OrphanedNode : public Node {
   bool is_done() const = delete;
 };
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service
 
 #endif  // SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_ORPHANED_NODE_H_

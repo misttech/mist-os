@@ -20,7 +20,7 @@
 #include "protected_ranges.h"
 #include "utils.h"
 
-namespace sysmem_driver {
+namespace sysmem_service {
 
 class ContiguousPooledMemoryAllocator : public MemoryAllocator {
  public:
@@ -401,6 +401,6 @@ class ContiguousPooledMemoryAllocator : public MemoryAllocator {
   protected_ranges::ProtectedRangesCoreControl* protected_ranges_core_control_ = nullptr;
 };
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service
 
 #endif  // SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_CONTIGUOUS_POOLED_MEMORY_ALLOCATOR_H_

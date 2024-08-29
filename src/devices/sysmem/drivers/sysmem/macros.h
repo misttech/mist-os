@@ -5,8 +5,10 @@
 #ifndef SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_MACROS_H_
 #define SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_MACROS_H_
 
-#include <lib/driver/logging/cpp/logger.h>
+#include "src/devices/sysmem/drivers/sysmem/logging.h"
 
-#define LOG(severity, fmt, ...) FDF_LOG(severity, fmt, ##__VA_ARGS__)
+#define LOG(severity, fmt, ...)                                                              \
+  ::sysmem_service::Log(::fuchsia_logging::LOG_##severity, __FILE__, __LINE__, nullptr, fmt, \
+                        ##__VA_ARGS__)
 
 #endif  // SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_MACROS_H_

@@ -12,7 +12,8 @@
 
 #include "allocator.h"
 
-namespace sysmem_driver {
+namespace sysmem_service {
+
 class ExternalMemoryAllocator : public MemoryAllocator {
  public:
   ExternalMemoryAllocator(MemoryAllocator::Owner* owner,
@@ -41,6 +42,6 @@ class ExternalMemoryAllocator : public MemoryAllocator {
   inspect::ValueList properties_;
 };
 
-}  // namespace sysmem_driver
+}  // namespace sysmem_service
 
 #endif  // SRC_DEVICES_SYSMEM_DRIVERS_SYSMEM_EXTERNAL_MEMORY_ALLOCATOR_H_
