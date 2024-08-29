@@ -25,13 +25,13 @@
 #include <lib/mistos/starnix_uapi/errors.h>
 #include <lib/mistos/starnix_uapi/file_mode.h>
 #include <lib/mistos/starnix_uapi/user_address.h>
-#include <lib/mistos/userloader/start.h>
-#include <lib/mistos/userloader/userloader.h>
+// #include <lib/mistos/userloader/start.h>
+// #include <lib/mistos/userloader/userloader.h>
 #include <lib/mistos/util/strings/split_string.h>
 #include <lib/mistos/util/weak_wrapper.h>
-#include <lib/mistos/zbi_parser/bootfs.h>
-#include <lib/mistos/zbi_parser/option.h>
-#include <lib/mistos/zbi_parser/zbi.h>
+// #include <lib/mistos/zbi_parser/bootfs.h>
+// #include <lib/mistos/zbi_parser/option.h>
+// #include <lib/mistos/zbi_parser/zbi.h>
 #include <lib/user_copy/user_ptr.h>
 #include <trace.h>
 #include <zircon/errors.h>
@@ -537,7 +537,7 @@ fit::result<Errno> CurrentTask::finish_exec(const fbl::String& path,
 // We just return the "file" VMO
 fit::result<Errno, FileHandle> CurrentTask::open_file_bootfs(const fbl::String& path) {
   LTRACEF_LEVEL(2, "path=%s\n", path.c_str());
-
+#if 0
   ktl::array<zx_handle_t, userloader::kHandleCount> handles = ExtractHandles(userloader::gHandles);
 
   zx::unowned_vmar vmar_self = zx::vmar::root_self();
@@ -569,6 +569,8 @@ fit::result<Errno, FileHandle> CurrentTask::open_file_bootfs(const fbl::String& 
   }
 
   return fit::ok(ktl::move(fh));
+#endif
+  return fit::error(errno(from_status_like_fdio(ZX_ERR_NO_MEMORY)));
 }
 
 fit::result<Errno, ktl::pair<NamespaceNode, FsStr>> CurrentTask::resolve_dir_fd(

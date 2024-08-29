@@ -9,10 +9,10 @@ zx_library("elfldltl") {
     "mapped-vmo-file.cc",
     "vmar-loader.cc",
   ]
-  deps = [ "//zircon/kernel/lib/mistos/util" ]
+  deps = [ "//vendor/misttech/zircon/kernel/lib/mistos/util" ]
   public_deps = [
     "//src/lib/elfldltl:headers",
-    "//zircon/kernel/lib/mistos/zx",
+    "//vendor/misttech/zircon/kernel/lib/mistos/zx",
     "//zircon/kernel/vm",
   ]
 }

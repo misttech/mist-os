@@ -15,8 +15,8 @@ zx_library("zbitl") {
   deps = []
   public_deps = [
     "//src/lib/zbitl:headers",
-    "//zircon/kernel/lib/mistos/util",
-    "//zircon/kernel/lib/mistos/zx",
+    "//vendor/misttech/zircon/kernel/lib/mistos/util",
+    "//vendor/misttech/zircon/kernel/lib/mistos/zx",
   ]
 }
 
