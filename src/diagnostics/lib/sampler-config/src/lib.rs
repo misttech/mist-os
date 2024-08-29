@@ -359,13 +359,15 @@ impl MetricConfig {
                 .iter_mut()
                 .map::<Result<_, anyhow::Error>, _>(|s| {
                     match Self::interpolate_template(s, &component) {
-                        Ok(filled_template) => Ok(match selector_list::parse_selector::<
-                            serde::de::value::Error,
-                        >(&filled_template)
-                        {
-                            Ok(selector) => Ok(Some(selector)),
-                            Err(err) => Err(err),
-                        }?),
+                        Ok(Some(filled_template)) => {
+                            Ok(match selector_list::parse_selector::<serde::de::value::Error>(
+                                &filled_template,
+                            ) {
+                                Ok(selector) => Ok(Some(selector)),
+                                Err(err) => Err(err),
+                            }?)
+                        }
+                        Ok(None) => Ok(None),
                         Err(err) => {
                             warn!(?err, "Couldn't fill selector template");
                             Ok(None)
@@ -384,10 +386,12 @@ impl MetricConfig {
         Ok(MetricConfig { event_codes, selectors, metric_id, metric_type, upload_once, project_id })
     }
 
+    /// Returns Ok(None) if the template needs a component ID and there's none available for
+    /// the component. This is not an error and should be handled silently.
     fn interpolate_template(
         template: &str,
         component_info: &ComponentIdInfo,
-    ) -> Result<String, Error> {
+    ) -> Result<Option<String>, Error> {
         let moniker_position = template.find(MONIKER_INTERPOLATION);
         let instance_id_position = template.find(INSTANCE_ID_INTERPOLATION);
         let separator_position = template.find(":");
@@ -402,17 +406,15 @@ impl MetricConfig {
             instance_id_position,
             &component_info.instance_id,
         ) {
-            (Some(i), Some(s), _, _) if i < s => {
-                Ok(template.replace(MONIKER_INTERPOLATION, &component_info.moniker.to_string()))
-            }
-            (Some(_), Some(_), _, _) => Ok(template.replace(
+            (Some(i), Some(s), _, _) if i < s => Ok(Some(
+                template.replace(MONIKER_INTERPOLATION, &component_info.moniker.to_string()),
+            )),
+            (Some(_), Some(_), _, _) => Ok(Some(template.replace(
                 MONIKER_INTERPOLATION,
                 &selectors::sanitize_string_for_selectors(&component_info.moniker.to_string()),
-            )),
-            (_, _, Some(_), Some(id)) => Ok(template.replace(INSTANCE_ID_INTERPOLATION, &id)),
-            (_, _, Some(_), None) => {
-                bail!("Component ID not available for {}", component_info.moniker)
-            }
+            ))),
+            (_, _, Some(_), Some(id)) => Ok(Some(template.replace(INSTANCE_ID_INTERPOLATION, &id))),
+            (_, _, Some(_), None) => Ok(None),
             (None, _, None, _) => {
                 bail!(
                     "{} and {} not found in selector template {}",
@@ -991,16 +993,16 @@ mod tests {
         let moniker_template = "fizz/buzz:root/info/{MONIKER}/data";
         let id_template = "fizz/buzz:root/info/{INSTANCE_ID}/data";
         assert_eq!(
-            MetricConfig::interpolate_template(moniker_template, &components[0]).unwrap(),
+            MetricConfig::interpolate_template(moniker_template, &components[0]).unwrap().unwrap(),
             "fizz/buzz:root/info/baz\\/quux/data".to_string()
         );
         assert_eq!(
-            MetricConfig::interpolate_template(moniker_template, &components[1]).unwrap(),
+            MetricConfig::interpolate_template(moniker_template, &components[1]).unwrap().unwrap(),
             "fizz/buzz:root/info/foo\\/bar/data".to_string()
         );
-        assert!(MetricConfig::interpolate_template(id_template, &components[0]).is_err());
+        assert_eq!(MetricConfig::interpolate_template(id_template, &components[0]).unwrap(), None);
         assert_eq!(
-            MetricConfig::interpolate_template(id_template, &components[1]).unwrap(),
+            MetricConfig::interpolate_template(id_template, &components[1]).unwrap().unwrap(),
             "fizz/buzz:root/info/1234123412341234123412341234123412341234123412341234123412341234/data".to_string()
         );
     }
