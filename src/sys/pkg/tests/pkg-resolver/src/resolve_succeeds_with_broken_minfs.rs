@@ -312,6 +312,7 @@ impl FailingWriteFileStreamHandler {
                             .send_on_representation(payload)
                             .expect("send on open to fake file");
                     }
+                    fio::FileEvent::_UnknownEvent { .. } => (),
                 }
             }
 

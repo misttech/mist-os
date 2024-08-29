@@ -1216,6 +1216,7 @@ mod tests {
             let representation = match event {
                 fio::NodeEvent::OnRepresentation { payload } => payload,
                 fio::NodeEvent::OnOpen_ { .. } => panic!("unexpected OnOpen representation"),
+                fio::NodeEvent::_UnknownEvent { ordinal, .. } => panic!("unknown event {ordinal}"),
             };
             assert_matches!(representation,
                 fio::Representation::Connector(fio::ConnectorInfo {

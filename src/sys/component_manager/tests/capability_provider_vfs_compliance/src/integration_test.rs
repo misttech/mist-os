@@ -85,6 +85,9 @@ async fn validate_open_with_node_reference_and_describe(path: &str) -> Result<()
         event @ fio::NodeEvent::OnRepresentation { payload: _ } => {
             panic!("Compliance test got unexpected event: {:?}", event)
         }
+        fio::NodeEvent::_UnknownEvent { ordinal, .. } => {
+            panic!("Compliance test got unexpected unknown: {ordinal:?}")
+        }
     }
 
     Ok(())

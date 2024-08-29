@@ -536,6 +536,9 @@ async fn verify_directory_opened(node: fio::NodeProxy, flag: fio::OpenFlags) -> 
             event @ fio::NodeEvent::OnRepresentation { .. } => {
                 return Err(anyhow!("unexpected event returned: {:?}", event));
             }
+            fio::NodeEvent::_UnknownEvent { ordinal, .. } => {
+                return Err(anyhow!("unknown event returned: {:?}", ordinal))
+            }
         }
     };
     Ok(())
@@ -578,6 +581,9 @@ async fn verify_content_file_opened(
                 event @ fio::NodeEvent::OnRepresentation { .. } => {
                     return Err(anyhow!("unexpected event returned: {:?}", event));
                 }
+                fio::NodeEvent::_UnknownEvent { ordinal, .. } => {
+                    return Err(anyhow!("unknown event returned: {:?}", ordinal))
+                }
             }
         }
     } else {
@@ -619,6 +625,9 @@ async fn verify_content_file_opened(
                 event @ fio::NodeEvent::OnRepresentation { .. } => {
                     return Err(anyhow!("unexpected event returned: {:?}", event));
                 }
+                fio::NodeEvent::_UnknownEvent { ordinal, .. } => {
+                    return Err(anyhow!("unknown event returned: {:?}", ordinal))
+                }
             }
         }
     }
@@ -654,6 +663,9 @@ async fn verify_meta_as_file_opened(
             }
             event @ fio::NodeEvent::OnRepresentation { .. } => {
                 return Err(anyhow!("unexpected event returned: {:?}", event));
+            }
+            fio::NodeEvent::_UnknownEvent { ordinal, .. } => {
+                return Err(anyhow!("unknown event returned: {:?}", ordinal))
             }
         }
     }

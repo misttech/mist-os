@@ -71,11 +71,8 @@ const FILE_PROTOCOL_NAME string = "fuchsia.io/File";
 ///
 /// NOTE: cloned connections do not share their seek offset with their source
 /// connection.
-// TODO(https://fxbug.dev/324932108): This should be marked as discoverable for both platform and
-// external servers. Annotating this correctly breaks our binary compatibility checks, since
-// fuchsia.io/Node and File are closed protocols. This should be fixed when we make them open.
-@discoverable(server="platform")
-closed protocol File {
+@discoverable
+closed(removed=NEXT) open(added=NEXT) protocol File {
     compose AdvisoryLocking;
     @available(added=18)
     compose Linkable;
@@ -241,7 +238,7 @@ closed protocol File {
     /// Pre-allocate on-disk space for this file.
     @available(added=HEAD)
     @selector("fuchsia.io/File.Allocate")
-    strict Allocate(resource struct {
+    flexible Allocate(resource struct {
         offset uint64;
         length uint64;
 
@@ -272,7 +269,7 @@ closed protocol File {
     /// such as `ZX_ERR_IO`.
     @selector("fuchsia.io/File.EnableVerity")
     @available(added=HEAD)
-    strict EnableVerity(resource struct {
+    flexible EnableVerity(resource struct {
         options VerificationOptions;
     }) -> () error zx.Status;
 };

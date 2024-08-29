@@ -373,6 +373,7 @@ async fn read_file(dir: &fio::DirectoryProxy, path: &str) -> Result<Vec<u8>, Ver
                     panic!("ConnectionInfo from fio::FileEventStream to be File variant with event: {other:?}")
                 }
             },
+            fio::FileEvent::_UnknownEvent { ordinal, .. } => panic!("unknown file event {ordinal}"),
         };
 
         // Files served by the package will either provide an event in its describe info (if that

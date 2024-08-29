@@ -1396,6 +1396,7 @@ fn directory_open(
         fio::NodeEvent::OnRepresentation { payload } => {
             Ok(DescribedNode { node, kind: NodeKind::from2(&payload) })
         }
+        fio::NodeEvent::_UnknownEvent { .. } => Err(zx::Status::NOT_SUPPORTED),
     }
 }
 

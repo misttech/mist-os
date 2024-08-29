@@ -90,7 +90,7 @@ class TestRealm : public fidl::testing::TestBase<fuchsia_component::Realm> {
   std::vector<fdecl::ChildRef> destroyed_children_;
 };
 
-class TestDirectory : public fidl::testing::TestBase<fio::Directory> {
+class TestDirectory final : public fidl::testing::TestBase<fio::Directory> {
  public:
   using OpenHandler =
       fit::function<void(const std::string& path, fidl::ServerEnd<fio::Node> object)>;
@@ -105,6 +105,9 @@ class TestDirectory : public fidl::testing::TestBase<fio::Directory> {
   void Clone(CloneRequest& request, CloneCompleter::Sync& completer) override;
 
   void Open(OpenRequest& request, OpenCompleter::Sync& completer) override;
+
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fio::Directory>,
+                             fidl::UnknownMethodCompleter::Sync&) override;
 
   void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
     printf("Not implemented: Directory::%s\n", name.c_str());

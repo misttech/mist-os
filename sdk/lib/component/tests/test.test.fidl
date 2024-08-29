@@ -19,7 +19,7 @@ closed protocol Echo {
 
 closed protocol Empty {};
 
-closed protocol EmptyCloneableNode {
+open protocol EmptyCloneableNode {
     compose fuchsia.unknown.Cloneable;
     compose fuchsia.io.Node;
 };

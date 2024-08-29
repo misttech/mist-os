@@ -101,7 +101,13 @@ fn test_cmp_prefixes_later() {
     assert_eq!(Less, cmp_prefixes_later("foo.bar", "foo"));
 }
 
-static ALLOW_LIST: &'static [(&'static [u32], &'static str)] = &[];
+static ALLOW_LIST: &'static [(&'static [u32], &'static str)] = &[
+    // fuchsia.io has some changes at HEAD, but this causes problems for closed protocols.
+    // File and Directory are open at NEXT, but we need to ignore the errors from older levels.
+    (&[19, 20, 21, 22, 23], "fuchsia.io/Directory.Open3"),
+    (&[19, 20, 21, 22, 23], "fuchsia.io/File.Allocate"),
+    (&[19, 20, 21, 22, 23], "fuchsia.io/File.EnableVerity"),
+];
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CompatibilityProblem {

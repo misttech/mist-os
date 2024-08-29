@@ -448,6 +448,7 @@ impl Client {
                             }) => event,
                             _ => return false,
                         },
+                        fio::FileEvent::_UnknownEvent { .. } => return false,
                     },
                 },
             };

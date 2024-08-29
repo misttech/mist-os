@@ -531,6 +531,7 @@ impl BlockServer {
             VolumeAndNodeRequest::GetTopologicalPath { responder } => {
                 responder.send(Err(zx::sys::ZX_ERR_NOT_SUPPORTED))?;
             }
+            VolumeAndNodeRequest::_UnknownMethod { .. } => (),
         }
         Ok(())
     }

@@ -647,6 +647,7 @@ async fn serve_failing_blobfs(
             fio::DirectoryRequest::CreateSymlink { responder, .. } => {
                 responder.send(Err(zx::Status::NOT_SUPPORTED.into_raw()))?
             }
+            fio::DirectoryRequest::_UnknownMethod { .. } => (),
         };
     }
 

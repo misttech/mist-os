@@ -126,7 +126,7 @@ std::filesystem::path GetPathFromRawMemory(void* mem, size_t max_size) {
 //
 // This is useful for synchronously awaiting the result of an `Open` request.
 zx_status_t AwaitIoOnOpenStatus(fidl::UnownedClientEnd<fuchsia_io::Node> node) {
-  class EventHandler : public fidl::WireSyncEventHandler<fuchsia_io::Node> {
+  class EventHandler final : public fidl::WireSyncEventHandler<fuchsia_io::Node> {
    public:
     EventHandler() = default;
 
@@ -141,6 +141,10 @@ zx_status_t AwaitIoOnOpenStatus(fidl::UnownedClientEnd<fuchsia_io::Node> node) {
     void OnRepresentation(fidl::WireEvent<fuchsia_io::Node::OnRepresentation>* event) override {
       status_ = ZX_ERR_NOT_SUPPORTED;
       LOG(ERROR, "OnRepresentation is not supported");
+    }
+
+    void handle_unknown_event(fidl::UnknownEventMetadata<fuchsia_io::Node> metadata) override {
+      LOG(ERROR, "Unknown Node event: %lu", metadata.event_ordinal);
     }
 
     bool call_was_successful_ = false;

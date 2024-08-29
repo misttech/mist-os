@@ -109,7 +109,7 @@ zx::result<fdio_ptr> fdio::create(fidl::ClientEnd<fio::Node> node,
 }
 
 zx::result<fdio_ptr> fdio::create_with_on_open(fidl::ClientEnd<fio::Node> node) {
-  class EventHandler : public fidl::WireSyncEventHandler<fio::Node> {
+  class EventHandler final : public fidl::WireSyncEventHandler<fio::Node> {
    public:
     explicit EventHandler(fidl::ClientEnd<fio::Node> client_end)
         : client_end_(std::move(client_end)) {}
@@ -134,6 +134,10 @@ zx::result<fdio_ptr> fdio::create_with_on_open(fidl::ClientEnd<fio::Node> node) 
     void OnRepresentation(fidl::WireEvent<fio::Node::OnRepresentation>* event) override {
       result_ = zx::error(ZX_ERR_NOT_SUPPORTED);
     }
+
+#if FUCHSIA_API_LEVEL_AT_LEAST(NEXT)
+    void handle_unknown_event(fidl::UnknownEventMetadata<fio::Node> metadata) override {}
+#endif
 
    private:
     fidl::ClientEnd<fio::Node> client_end_;

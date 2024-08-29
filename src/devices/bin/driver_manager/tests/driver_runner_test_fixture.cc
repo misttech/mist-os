@@ -475,6 +475,8 @@ void TestDirectory::Clone(CloneRequest& request, CloneCompleter::Sync& completer
 void TestDirectory::Open(OpenRequest& request, OpenCompleter::Sync& completer) {
   open_handler_(request.path(), std::move(request.object()));
 }
+void TestDirectory::handle_unknown_method(fidl::UnknownMethodMetadata<fio::Directory>,
+                                          fidl::UnknownMethodCompleter::Sync&) {}
 void TestDriver::Stop(StopCompleter::Sync& completer) {
   stop_handler_();
   if (!dont_close_binding_in_stop_) {
