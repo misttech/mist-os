@@ -39,6 +39,8 @@ class PosixMmap {
     assert(result == 0);
   }
 
+  void Release(Capability capability, void* ptr, size_t size) {}
+
   void Seal(Capability capability, void* ptr, size_t size) {
     [[maybe_unused]] int result = mprotect(ptr, size, PROT_READ);
     assert(result == 0);

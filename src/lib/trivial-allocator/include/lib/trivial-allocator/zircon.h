@@ -10,6 +10,7 @@
 #include <zircon/syscalls.h>
 
 #include <cassert>
+#include <tuple>
 #include <utility>
 
 namespace trivial_allocator {
@@ -61,6 +62,8 @@ class ZirconVmar {
     [[maybe_unused]] zx_status_t status = sub_vmar.destroy();
     assert(status == ZX_OK);
   }
+
+  void Release(zx::vmar sub_vmar, void* ptr, size_t size) { std::ignore = sub_vmar.release(); }
 
   // The VMAR handle is consumed here, so there will no longer be any way to
   // "unseal" this allocation (that is, change page protections on the memory).
