@@ -15,8 +15,8 @@ zx_library("starnix_uapi") {
     "vfs.cc",
   ]
   public_deps = [
-    "//zircon/kernel/lib/mistos/linux_uapi",
-    "//zircon/kernel/lib/mistos/util",
+    "//vendor/misttech/third_party/linux_uapi",
+    "//vendor/misttech/zircon/kernel/lib/mistos/util",
   ]
   deps = []
   public_configs = []

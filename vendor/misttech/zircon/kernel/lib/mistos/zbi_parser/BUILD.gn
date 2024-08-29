@@ -12,8 +12,8 @@ zx_library("zbi_parser") {
   ]
 
   public_deps = [
-    "//zircon/kernel/lib/mistos/zbitl",
-    "//zircon/kernel/lib/mistos/zx",
+    "//vendor/misttech/zircon/kernel/lib/mistos/zbitl",
+    "//vendor/misttech/zircon/kernel/lib/mistos/zx",
   ]
 
   deps = [
