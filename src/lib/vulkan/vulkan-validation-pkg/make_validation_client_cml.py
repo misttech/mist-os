@@ -4,7 +4,6 @@
 """ This script generates the component manifest used by the validation-client component."""
 
 import argparse
-import json
 
 from assembly import PackageManifest
 from serialization import json_load
