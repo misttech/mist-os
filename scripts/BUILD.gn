@@ -25,6 +25,7 @@ group("tests") {
     "fxtest:tests",
     "fxutils:tests",
     "lib:tests",
+    "memory:tests",
     "versioning:tests($host_toolchain)",
   ]
 }

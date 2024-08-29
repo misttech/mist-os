@@ -8,6 +8,9 @@ import("//build/python/python_library.gni")
 if (is_host) {
   python_host_test("mem_digest_test") {
     main_source = "mem_digest_test.py"
+
+    #TODO(b/361301238): Either delete these scripts or add type annotation.
+    enable_mypy = false
     sources = [
       "digest.py",
       "mem_digest.py",
