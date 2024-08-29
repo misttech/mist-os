@@ -28,5 +28,6 @@ group("tests") {
   public_deps = [
     ":mem_digest_test($host_toolchain)",
     "dataclasses_json_lite:tests",
+    "multidict:tests",
   ]
 }
