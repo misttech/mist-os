@@ -114,7 +114,9 @@ impl CompatibilityProblem {
     fn allowed(&self) -> bool {
         ALLOW_LIST.iter().any(|(versions, path)| {
             &self.paths.for_display == path && versions.iter().any(|v| v == &self.paths.version)
-        })
+        }) ||
+        // special rule to deal with Open2 removal.
+        self.message.ends_with("missing method fuchsia.io/Directory.Open2")
     }
 }
 
