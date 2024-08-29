@@ -8,11 +8,12 @@ zx_library("kernel") {
   sources = [
     "arch/${current_cpu}/loader.cc",
     "arch/${current_cpu}/syscalls.cc",
-    "debugcommands.cc",
-    "execution/executor.cc",
+
+    #"debugcommands.cc",
+    #"execution/executor.cc",
     "fs/mistos/syslog.cc",
     "fs/tmpfs.cc",
-    "loader.cc",
+    #"loader.cc",
     "logging/logging.cc",
     "mm/memory_accessor.cc",
     "mm/memory_manager.cc",
@@ -44,22 +45,23 @@ zx_library("kernel") {
     "vfs/syscalls.cc",
     "vfs/vmo_file.cc",
     "vfs/xattr.cc",
-    "zircon/task_dispatcher.cc",
+    #"zircon/task_dispatcher.cc",
   ]
 
   public_deps = [
-    "//zircon/kernel/lib/mistos/linux_uapi",
-    "//zircon/kernel/lib/mistos/starnix_syscalls",
-    "//zircon/kernel/lib/mistos/starnix_uapi",
-    "//zircon/kernel/lib/mistos/zx",
+    "//vendor/misttech/third_party/linux_uapi",
+    "//vendor/misttech/zircon/kernel/lib/mistos/starnix_syscalls",
+    "//vendor/misttech/zircon/kernel/lib/mistos/starnix_uapi",
+    "//vendor/misttech/zircon/kernel/lib/mistos/zx",
     "//zircon/system/ulib/zxtest:prod",
   ]
 
   deps = [
+    "//vendor/misttech/zircon/kernel/lib/mistos/elfldltl",
+
+    #"//vendor/misttech/zircon/kernel/lib/mistos/userloader",
+    "//vendor/misttech/zircon/kernel/lib/mistos/zx_syscalls",
     "//zircon/kernel/lib/console",
-    "//zircon/kernel/lib/mistos/elfldltl",
-    "//zircon/kernel/lib/mistos/userloader",
-    "//zircon/kernel/lib/mistos/zx_syscalls",
   ]
 }
 

@@ -102,8 +102,8 @@ zx_status_t vmar_map_common(zx_vm_option_t options, fbl::RefPtr<VmAddressRegionD
                             uint64_t vmar_offset, zx_rights_t vmar_rights,
                             fbl::RefPtr<VmObject> vmo, uint64_t vmo_offset, zx_rights_t vmo_rights,
                             uint64_t len, zx_vaddr_t* mapped_addr) {
-  bool is_user_vmar =
-      (vmar->base_arch_mmu_flags() & ARCH_MMU_FLAG_PERM_USER) == ARCH_MMU_FLAG_PERM_USER;
+  bool is_user_vmar = true;
+  //(vmar->base_arch_mmu_flags() & ARCH_MMU_FLAG_PERM_USER) == ARCH_MMU_FLAG_PERM_USER;
 
   LTRACEF("options 0x%x is_user_vmar %s\n", options, is_user_vmar ? "true" : "false");
 

@@ -12,7 +12,10 @@ import("//zircon/kernel/params.gni")
 assert(is_kernel, current_toolchain)
 
 zx_library("zx_syscalls") {
-  visibility = [ "//zircon/kernel/*" ]
+  visibility = [
+    "//vendor/misttech/zircon/kernel/*",
+    "//zircon/kernel/*",
+  ]
 
   # This can be used for headers only by the vDSO and test code.
 
