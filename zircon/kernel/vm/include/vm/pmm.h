@@ -35,6 +35,13 @@ class Pmm {
 // allocated special subranges or holes.
 zx_status_t pmm_init(ktl::span<const memalloc::Range> ranges);
 
+// Ends the PMM's role within the context of phys handoff: it frees all physical
+// memory temporarily used for the hand-off from physboot. Since this memory
+// includes that backing the hand-off struct itself (accessible via
+// gPhysHandoff), this call is intended to be the last thing done in the process
+// of ending the hand-off.
+void pmm_end_handoff();
+
 // Returns the number of arenas.
 size_t pmm_num_arenas();
 

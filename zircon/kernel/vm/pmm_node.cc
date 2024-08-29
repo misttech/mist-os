@@ -170,6 +170,8 @@ zx_status_t PmmNode::Init(ktl::span<const memalloc::Range> ranges) TA_NO_THREAD_
   return ZX_OK;
 }
 
+void PmmNode::EndHandoff() { FreeList(&phys_handoff_temporary_list_); }
+
 zx_status_t PmmNode::GetArenaInfo(size_t count, uint64_t i, pmm_arena_info_t* buffer,
                                   size_t buffer_size) {
   Guard<Mutex> guard{&lock_};
@@ -642,10 +644,14 @@ void PmmNode::InitReservedRange(const memalloc::Range& range) {
   list_for_every_entry (&reserved, p, vm_page_t, queue_node) {
     p->set_state(vm_page_state::WIRED);
   }
-  if (list_is_empty(&reserved_list_)) {
-    list_move(&reserved, &reserved_list_);
+
+  list_node_t* list = range.type == memalloc::Type::kTemporaryPhysHandoff
+                          ? &phys_handoff_temporary_list_
+                          : &permanently_reserved_list_;
+  if (list_is_empty(list)) {
+    list_move(&reserved, list);
   } else {
-    list_splice_after(&reserved, list_peek_tail(&reserved_list_));
+    list_splice_after(&reserved, list_peek_tail(list));
   }
 }
 
@@ -799,8 +805,8 @@ void PmmNode::FreeList(list_node* list) {
 }
 
 void PmmNode::UnwirePage(vm_page* page) {
-  ASSERT(page->state() == vm_page_state::WIRED);
   Guard<Mutex> guard{&lock_};
+  ASSERT(page->state() == vm_page_state::WIRED);
   list_delete(&page->queue_node);
   page->set_state(vm_page_state::ALLOC);
 }

@@ -52,6 +52,8 @@ std::string_view ToString(Type type) {
       return "decompressed kernel payload"sv;
     case Type::kDataZbi:
       return "data ZBI"sv;
+    case Type::kTemporaryPhysHandoff:
+      return "phys hand-off data (temporary)"sv;
     case Type::kTrampolineStagingKernel:
       return "trampoline staging kernel image"sv;
     case Type::kTrampolineStagingDataZbi:

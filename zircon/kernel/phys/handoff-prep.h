@@ -10,7 +10,7 @@
 #include <lib/fit/function.h>
 #include <lib/trivial-allocator/basic-leaky-allocator.h>
 #include <lib/trivial-allocator/new.h>
-#include <lib/trivial-allocator/single-heap-allocator.h>
+#include <lib/trivial-allocator/page-allocator.h>
 #include <lib/zbi-format/zbi.h>
 #include <lib/zbitl/image.h>
 
@@ -19,7 +19,9 @@
 #include <ktl/byte.h>
 #include <ktl/initializer_list.h>
 #include <ktl/move.h>
+#include <ktl/pair.h>
 #include <ktl/span.h>
+#include <ktl/tuple.h>
 #include <phys/handoff-ptr.h>
 #include <phys/handoff.h>
 #include <phys/kernel-package.h>
@@ -34,12 +36,8 @@ class Log;
 
 class HandoffPrep {
  public:
-  // TODO(https://fxbug.dev/42164859): The first argument is the space inside the data ZBI
-  // where the ZBI_TYPE_STORAGE_KERNEL was, the only safe space to reuse for
-  // now.  Eventually this function will just allocate from the memalloc::Pool
-  // using a type designated for handoff data so the kernel can decide if it
-  // wants to reuse the space after consuming all the data.
-  void Init(ktl::span<ktl::byte> handoff_payload);
+  // This must be called first.
+  void Init();
 
   // This is the main structure.  After Init has been called the pointer is
   // valid but the data is in default-constructed state.
@@ -49,7 +47,7 @@ class HandoffPrep {
   // fills in the handoff_ptr to point to it.
   template <typename T, typename... Args>
   T* New(PhysHandoffTemporaryPtr<const T>& handoff_ptr, fbl::AllocChecker& ac, Args&&... args) {
-    T* ptr = new (allocator(), ac) T(ktl::forward<Args>(args)...);
+    T* ptr = new (temporary_allocator_, ac) T(ktl::forward<Args>(args)...);
     if (ptr) {
       void* generic_ptr = static_cast<void*>(ptr);
       handoff_ptr.ptr_ = reinterpret_cast<uintptr_t>(generic_ptr);
@@ -61,7 +59,7 @@ class HandoffPrep {
   template <typename T>
   ktl::span<T> New(PhysHandoffTemporarySpan<const T>& handoff_span, fbl::AllocChecker& ac,
                    size_t n) {
-    T* ptr = new (allocator(), ac) T[n];
+    T* ptr = new (temporary_allocator_, ac) T[n];
     if (ptr) {
       void* generic_ptr = static_cast<void*>(ptr);
       handoff_span.ptr_.ptr_ = reinterpret_cast<uintptr_t>(generic_ptr);
@@ -102,8 +100,44 @@ class HandoffPrep {
   ktl::span<ktl::byte> PublishExtraVmo(ktl::string_view name, size_t content_size);
 
  private:
-  using AllocateFunction = trivial_allocator::SingleHeapAllocator;
-  using Allocator = trivial_allocator::BasicLeakyAllocator<AllocateFunction>;
+  template <memalloc::Type Type>
+  class PhysPages {
+   public:
+    using Capability = Allocation;
+
+    size_t page_size() const { return ZX_PAGE_SIZE; }
+
+    [[nodiscard]] ktl::pair<void*, Capability> Allocate(size_t size) {
+      fbl::AllocChecker ac;
+      Allocation pages = Allocation::New(ac, Type, size, ZX_PAGE_SIZE);
+      if (!ac.check()) {
+        return {};
+      }
+      return {pages.get(), ktl::move(pages)};
+    }
+
+    void Deallocate(Capability allocation, void* ptr, size_t size) {
+      ZX_DEBUG_ASSERT(ptr == allocation.get());
+      ZX_DEBUG_ASSERT(size == allocation.size_bytes());
+      allocation.reset();
+    }
+
+    void Release(Capability allocation, void* ptr, size_t size) {
+      ZX_DEBUG_ASSERT(ptr == allocation.get());
+      ZX_DEBUG_ASSERT(size == allocation.size_bytes());
+      ktl::ignore = allocation.release();
+    }
+
+    void Seal(Capability, void*, size_t) { ZX_PANIC("Unexpected call to Seal::Capability"); }
+  };
+
+  template <memalloc::Type Type>
+  using PageAllocationFunction = trivial_allocator::PageAllocator<PhysPages<Type>>;
+
+  template <memalloc::Type Type>
+  using Allocator = trivial_allocator::BasicLeakyAllocator<PageAllocationFunction<Type>>;
+
+  using TemporaryAllocator = Allocator<memalloc::Type::kTemporaryPhysHandoff>;
 
   // A list in scratch memory of the pending PhysVmo structs so they
   // can be packed into a single array at the end.
@@ -117,9 +151,7 @@ class HandoffPrep {
     size_t size_bytes = 0;
   };
 
-  // TODO(https://fxbug.dev/42164859): Later this will just return
-  // gPhysNew<memalloc::Type::kPhysHandoff>.
-  Allocator& allocator() { return allocator_; }
+  inline static TemporaryAllocator temporary_allocator_;
 
   void SaveForMexec(const zbi_header_t& header, ktl::span<const ktl::byte> payload);
 
@@ -158,9 +190,10 @@ class HandoffPrep {
   void FinishExtraVmos();
 
   // Normalizes and publishes RAM and the allocations of interest to the kernel.
+  //
+  // This must be the very last set-up routine called within DoHandoff().
   void SetMemory();
 
-  Allocator allocator_;
   PhysHandoff* handoff_ = nullptr;
   zbitl::Image<Allocation> mexec_image_;
   HandoffVmoList extra_vmos_;

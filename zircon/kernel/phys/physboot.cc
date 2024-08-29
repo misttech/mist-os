@@ -207,7 +207,7 @@ void FreeDataZbi(BootZbi& boot) {
 
   // Prepare the handoff data structures.
   HandoffPrep prep;
-  prep.Init(handoff_item->payload);
+  prep.Init();
 
   prep.DoHandoff(uart, zbi, package, patch_info, [&boot](PhysHandoff* handoff) {
     // Even though the kernel is still a ZBI and mostly using the ZBI protocol

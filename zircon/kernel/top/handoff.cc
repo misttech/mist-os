@@ -113,7 +113,7 @@ Handle* CreateVmoHandle(fbl::RefPtr<VmObjectPaged> vmo, size_t content_size, boo
 }
 
 void LogVmo(ktl::string_view name, zx_paddr_t paddr, size_t size) {
-  dprintf(INFO, "Handing off VMO from phys: %.*s @ [%#" PRIx64 ", %#" PRIx64 ")\n",
+  dprintf(INFO, "handing off VMO from phys: %.*s @ [%#" PRIx64 ", %#" PRIx64 ")\n",
           static_cast<int>(name.size()), name.data(), paddr, paddr + size);
 }
 
@@ -189,7 +189,12 @@ void HandoffFromPhys(paddr_t handoff_paddr) {
 }
 
 HandoffEnd EndHandoff() {
-  HandoffEnd end{};
+  ASSERT(gPhysHandoff->zbi.addr != 0);
+  HandoffEnd end{
+      // Userboot expects the ZBI as writable.
+      .zbi = CreateVmoFromWiredPages(gPhysHandoff->zbi.addr, gPhysHandoff->zbi.size, "zbi"sv,
+                                     /*readonly=*/false),
+  };
 
   // If the number of extra VMOs from physboot is less than the number of VMOs
   // the userboot protocol expects, fill the rest with empty VMOs.
@@ -203,12 +208,11 @@ HandoffEnd EndHandoff() {
     end.extra_phys_vmos[i] = CreatePhysVmo({});
   }
 
-  // Once we create the ZBI VMO, the memory referenced by gPhysHandoff has a new
-  // owner and should be regarded as freed and unusable.
-  ASSERT(gPhysHandoff->zbi.addr != 0);
-  // Userboot expects the ZBI as writable.
-  end.zbi = CreateVmoFromWiredPages(gPhysHandoff->zbi.addr, gPhysHandoff->zbi.size, "zbi"sv,
-                                    /*readonly=*/false);
+  // Point of temporary hand-off memory expiration. The PMM maintains the list
+  // of such memory and will free it on this call. Since the memory backing
+  // gPhysHandoff itself is in that list, we immediately unset immediately unset
+  // the pointer afterward.
+  pmm_end_handoff();
   gPhysHandoff = nullptr;
 
   return end;

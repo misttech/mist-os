@@ -94,6 +94,8 @@ static_assert(std::is_default_constructible_v<PhysVmo>);
 
 // A physical address range.
 struct PhysAddressRange {
+  constexpr uintptr_t end() const { return addr + size; }
+
   uintptr_t addr = 0;
   size_t size = 0;
 };
@@ -209,7 +211,8 @@ struct HandoffEnd {
 };
 
 // Formally ends the hand-off phase, unsetting gPhysHandoff and returning the
-// remaining hand-off data left to be consumed (in a userboot-friendly way).
+// remaining hand-off data left to be consumed (in a userboot-friendly way), and
+// freeing temporary hand-off memory (see PhysHandoff::temporary_memory).
 //
 // After the end of hand-off, all pointers previously referenced by gPhysHandoff
 // should be regarded as freed and unusable.

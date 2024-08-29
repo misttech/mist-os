@@ -122,7 +122,7 @@ PhysBootTimes gBootTimes;
          kernel_storage.item()->payload.data(),
          kernel_storage.item()->payload.data() + kernel_storage.item()->payload.size());
   HandoffPrep prep;
-  prep.Init(kernel_storage.item()->payload);
+  prep.Init();
 
   // For now we're loading an ELF kernel in physical address mode at an
   // arbitrary load address, even though it's been relocated for its final

@@ -74,6 +74,8 @@ LK_INIT_HOOK(pmm_fill, &pmm_fill_free_pages, LK_INIT_LEVEL_VM)
 
 zx_status_t pmm_init(ktl::span<const memalloc::Range> ranges) { return Pmm::Node().Init(ranges); }
 
+void pmm_end_handoff() { Pmm::Node().EndHandoff(); }
+
 vm_page_t* paddr_to_vm_page(paddr_t addr) { return Pmm::Node().PaddrToPage(addr); }
 
 size_t pmm_num_arenas() { return Pmm::Node().NumArenas(); }

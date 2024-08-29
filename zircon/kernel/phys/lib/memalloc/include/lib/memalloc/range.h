@@ -65,6 +65,10 @@ enum class Type : uint64_t {
   // The data ZBI, as placed by the bootloader.
   kDataZbi,
 
+  // Memory intended to remain allocated until the end of the phys hand-off
+  // phase.
+  kTemporaryPhysHandoff,
+
   // The intermediate kernel memory image used to trampoline into the same image
   // loaded at a fixed address (i.e., as used by TrampolineBoot).
   kTrampolineStagingKernel,

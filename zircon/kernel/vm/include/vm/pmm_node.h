@@ -53,6 +53,9 @@ class PmmNode {
 
   zx_status_t Init(ktl::span<const memalloc::Range> ranges);
 
+  // See pmm_end_handoff().
+  void EndHandoff();
+
   paddr_t PageToPaddr(const vm_page_t* page) TA_NO_THREAD_SAFETY_ANALYSIS;
   vm_page_t* PaddrToPage(paddr_t addr) TA_NO_THREAD_SAFETY_ANALYSIS;
 
@@ -268,8 +271,20 @@ class PmmNode {
   list_node free_list_ TA_GUARDED(lock_) = LIST_INITIAL_VALUE(free_list_);
   // Free pages where loaned && !loan_cancelled.
   list_node free_loaned_list_ TA_GUARDED(lock_) = LIST_INITIAL_VALUE(free_loaned_list_);
-  // Reserved pages.
-  list_node reserved_list_ TA_GUARDED(lock_) = LIST_INITIAL_VALUE(reserved_list_);
+
+  // The pages comprising the memory temporarily used during phys hand-off,
+  // populated on Init(). It is the responsibility of EndHandoff() to free this
+  // list.
+  list_node phys_handoff_temporary_list_ TA_GUARDED(lock_) =
+      LIST_INITIAL_VALUE(phys_handoff_temporary_list_);
+
+  // The pages intended to be permanently reserved.
+  //
+  // TODO(https://fxbug.dev/42164859): Well, this list also currently includes
+  // pages we're guaranteed to unwire (e.g., the vDSO and userboot). But that
+  // soon won't be the case.
+  list_node permanently_reserved_list_ TA_GUARDED(lock_) =
+      LIST_INITIAL_VALUE(permanently_reserved_list_);
 
   // Controls the behavior of requests that have the PMM_ALLOC_FLAG_CAN_WAIT.
   enum class ShouldWaitState {
