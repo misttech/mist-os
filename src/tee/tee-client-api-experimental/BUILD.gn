@@ -6,7 +6,7 @@ import("//build/cpp/library_headers.gni")
 
 library_headers("tee-client-api-headers") {
   headers = [
-    "tee-client-api/tee_client_api.h",
+    "tee_client_api.h",
     "tee-client-api/tee-client-types.h",
   ]
 }

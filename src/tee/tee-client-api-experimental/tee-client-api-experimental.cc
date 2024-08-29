@@ -12,6 +12,7 @@
 #include <lib/zx/channel.h>
 #include <lib/zx/vmar.h>
 #include <lib/zx/vmo.h>
+#include <tee_client_api.h>
 #include <unistd.h>
 #include <zircon/assert.h>
 #include <zircon/process.h>
@@ -23,8 +24,6 @@
 #include <utility>
 #include <variant>
 #include <vector>
-
-#include <tee-client-api/tee_client_api.h>
 
 #include "src/lib/fxl/strings/string_printf.h"
 
