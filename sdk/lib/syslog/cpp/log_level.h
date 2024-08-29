@@ -21,7 +21,11 @@ constexpr LogSeverity LOG_WARNING = FUCHSIA_LOG_WARNING;
 constexpr LogSeverity LOG_ERROR = FUCHSIA_LOG_ERROR;
 constexpr LogSeverity LOG_FATAL = FUCHSIA_LOG_FATAL;
 
+// TODO(b/299996898): Remove this once all users
+// have been migrated.
 constexpr LogSeverity DefaultLogLevel = LOG_INFO;
+
+constexpr LogSeverity kDefaultLogLevel = LOG_INFO;
 
 }  // namespace fuchsia_logging
 
