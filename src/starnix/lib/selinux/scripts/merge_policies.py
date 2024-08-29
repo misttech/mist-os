@@ -16,7 +16,6 @@
 #   also allowed.
 
 import argparse
-import os
 import pathlib
 import re
 import subprocess

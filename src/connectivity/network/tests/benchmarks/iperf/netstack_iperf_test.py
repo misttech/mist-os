@@ -9,7 +9,6 @@ import json
 import logging
 import os
 import pathlib
-import shutil
 import stat
 import statistics
 import subprocess
@@ -24,7 +23,6 @@ from fuchsia_base_test import fuchsia_base_test
 from honeydew.interfaces.device_classes import fuchsia_device
 from mobly import asserts, test_runner
 from perf_publish import publish
-from perf_test_utils import utils
 from trace_processing import trace_importing, trace_metrics, trace_model
 from trace_processing.metrics import cpu
 
@@ -442,7 +440,6 @@ class NetstackIperfTest(fuchsia_base_test.FuchsiaBaseTest):
         message_size: int,
         output_dir: str | os.PathLike[str],
     ) -> list[str]:
-        loop = asyncio.get_running_loop()
         protocol_option: str = "--udp" if self._protocol == Protocol.UDP else ""
         dir_option: str = (
             "--reverse" if self._direction == Direction.DEVICE_TO_HOST else ""
