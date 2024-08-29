@@ -139,7 +139,7 @@ group("default") {
     ##"//build/images/mistos",
 
     # Mist Technologies
-    "//vendor/misttech/src/linux-rt",
+    "//vendor/misttech/zircon/kernel/lib/linux-rt",
   ]
 }
 
