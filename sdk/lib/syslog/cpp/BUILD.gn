@@ -81,11 +81,6 @@ group("backend") {
   ]
 }
 
-# TODO(b/300157652): Transitional no-op target
-group("backend_host") {
-  deps = [ ":cpp" ]
-}
-
 sdk_shared_library("backend_fuchsia_globals") {
   category = "partner"
 
