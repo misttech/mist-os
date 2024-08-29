@@ -343,16 +343,29 @@ struct Driver : public DriverBase<Driver, ZBI_KERNEL_DRIVER_GENI_UART, zbi_dcfg_
     // The bootloader has configured the UART serial engine prior to Fuchsia
     // boot. It has configured the RX and RX RFR (Ready for Receive)
     // watermark registers and started the secondary (read) command on the
-    // engine. Changing these watermark values while the secondary command
-    // is still running may cause hardware failures.
+    // engine. The FIFO configuration was later reset (?), leaving the serial
+    // engine in an unstable state when this driver loads.
     //
-    // // Setup RX watermark and RFR (Ready for Receive) watermark for future
-    // // interrupt use.
-    // auto rx_wm = RxWatermarkRegister::Get().FromValue(0);
-    // rx_wm.set_length(kRxFifoWatermark).WriteTo(io.io());
+    // We have to set the watermark registers with their previous values
+    // to make it work properly.
     //
-    // auto rfr_wm = RxReadyForReceiveWatermarkRegister::Get().FromValue(0);
-    // rfr_wm.set_length(kRxRfrFifoWatermark).WriteTo(io.io());
+    // TODO(https://fxbug.dev/362847591): Instead of relying on the following
+    // reinitialization logic, the driver should reset the serial engine
+    // and start the RX procedure from a fresh hardware state.
+
+    // Previous RFR (Ready for Receive) and RX watermark values set by the
+    // bootloader driver. Their previous values were not stored in any
+    // registers so we have to hard code them.
+    static constexpr uint32_t kRxRfrFifoWatermark = kRxFifoDepth - 4;
+    static constexpr uint32_t kRxFifoWatermark = kRxFifoDepth - 8;
+
+    // Setup RFR (Ready for Receive) watermark and RX watermark for future
+    // interrupt use.
+    auto rfr_wm = RxReadyForReceiveWatermarkRegister::Get().FromValue(0);
+    rfr_wm.set_length(kRxRfrFifoWatermark).WriteTo(io.io());
+
+    auto rx_wm = RxWatermarkRegister::Get().FromValue(0);
+    rx_wm.set_length(kRxFifoWatermark).WriteTo(io.io());
 
     // Setup TX watermark for future interrupt use.
     auto tx_wm = TxWatermarkRegister::Get().FromValue(0);
