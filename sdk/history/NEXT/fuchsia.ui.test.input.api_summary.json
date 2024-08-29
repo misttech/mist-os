@@ -347,11 +347,29 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.ui.test.input/Registry.RegisterKeyboardAndGetDeviceInfo",
+        "strictness": "strict",
+        "ordinal": "2183925227192495230",
+        "direction": "two_way",
+        "request": "fuchsia.ui.test.input/RegistryRegisterKeyboardAndGetDeviceInfoRequest",
+        "response": "fuchsia.ui.test.input/RegistryRegisterKeyboardAndGetDeviceInfoResponse"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.ui.test.input/Registry.RegisterMediaButtonsDevice",
         "strictness": "strict",
         "ordinal": "4182475053739185705",
         "direction": "two_way",
         "request": "fuchsia.ui.test.input/RegistryRegisterMediaButtonsDeviceRequest"
+    },
+    {
+        "kind": "protocol/member",
+        "name": "fuchsia.ui.test.input/Registry.RegisterMediaButtonsDeviceAndGetDeviceInfo",
+        "strictness": "strict",
+        "ordinal": "1583967983381691763",
+        "direction": "two_way",
+        "request": "fuchsia.ui.test.input/RegistryRegisterMediaButtonsDeviceAndGetDeviceInfoRequest",
+        "response": "fuchsia.ui.test.input/RegistryRegisterMediaButtonsDeviceAndGetDeviceInfoResponse"
     },
     {
         "kind": "protocol/member",
@@ -363,6 +381,15 @@
     },
     {
         "kind": "protocol/member",
+        "name": "fuchsia.ui.test.input/Registry.RegisterMouseAndGetDeviceInfo",
+        "strictness": "strict",
+        "ordinal": "3794986882198908457",
+        "direction": "two_way",
+        "request": "fuchsia.ui.test.input/RegistryRegisterMouseAndGetDeviceInfoRequest",
+        "response": "fuchsia.ui.test.input/RegistryRegisterMouseAndGetDeviceInfoResponse"
+    },
+    {
+        "kind": "protocol/member",
         "name": "fuchsia.ui.test.input/Registry.RegisterTouchScreen",
         "strictness": "strict",
         "ordinal": "4643127998283697011",
@@ -370,10 +397,41 @@
         "request": "fuchsia.ui.test.input/RegistryRegisterTouchScreenRequest"
     },
     {
+        "kind": "protocol/member",
+        "name": "fuchsia.ui.test.input/Registry.RegisterTouchScreenAndGetDeviceInfo",
+        "strictness": "strict",
+        "ordinal": "3354601492241837355",
+        "direction": "two_way",
+        "request": "fuchsia.ui.test.input/RegistryRegisterTouchScreenAndGetDeviceInfoRequest",
+        "response": "fuchsia.ui.test.input/RegistryRegisterTouchScreenAndGetDeviceInfoResponse"
+    },
+    {
         "kind": "protocol",
         "name": "fuchsia.ui.test.input/Registry",
         "openness": "closed",
         "transport": "channel"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.ui.test.input/RegistryRegisterKeyboardAndGetDeviceInfoRequest.device",
+        "ordinal": "1",
+        "type": "server_end:fuchsia.ui.test.input/Keyboard"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.ui.test.input/RegistryRegisterKeyboardAndGetDeviceInfoRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.ui.test.input/RegistryRegisterKeyboardAndGetDeviceInfoResponse.device_id",
+        "ordinal": "1",
+        "type": "uint32"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.ui.test.input/RegistryRegisterKeyboardAndGetDeviceInfoResponse",
+        "resourceness": "resource"
     },
     {
         "kind": "table/member",
@@ -384,6 +442,28 @@
     {
         "kind": "table",
         "name": "fuchsia.ui.test.input/RegistryRegisterKeyboardRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.ui.test.input/RegistryRegisterMediaButtonsDeviceAndGetDeviceInfoRequest.device",
+        "ordinal": "1",
+        "type": "server_end:fuchsia.ui.test.input/MediaButtonsDevice"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.ui.test.input/RegistryRegisterMediaButtonsDeviceAndGetDeviceInfoRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.ui.test.input/RegistryRegisterMediaButtonsDeviceAndGetDeviceInfoResponse.device_id",
+        "ordinal": "1",
+        "type": "uint32"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.ui.test.input/RegistryRegisterMediaButtonsDeviceAndGetDeviceInfoResponse",
         "resourceness": "resource"
     },
     {
@@ -399,6 +479,28 @@
     },
     {
         "kind": "table/member",
+        "name": "fuchsia.ui.test.input/RegistryRegisterMouseAndGetDeviceInfoRequest.device",
+        "ordinal": "1",
+        "type": "server_end:fuchsia.ui.test.input/Mouse"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.ui.test.input/RegistryRegisterMouseAndGetDeviceInfoRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.ui.test.input/RegistryRegisterMouseAndGetDeviceInfoResponse.device_id",
+        "ordinal": "1",
+        "type": "uint32"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.ui.test.input/RegistryRegisterMouseAndGetDeviceInfoResponse",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "table/member",
         "name": "fuchsia.ui.test.input/RegistryRegisterMouseRequest.device",
         "ordinal": "1",
         "type": "server_end:fuchsia.ui.test.input/Mouse"
@@ -406,6 +508,34 @@
     {
         "kind": "table",
         "name": "fuchsia.ui.test.input/RegistryRegisterMouseRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.ui.test.input/RegistryRegisterTouchScreenAndGetDeviceInfoRequest.coordinate_unit",
+        "ordinal": "2",
+        "type": "fuchsia.ui.test.input/CoordinateUnit"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.ui.test.input/RegistryRegisterTouchScreenAndGetDeviceInfoRequest.device",
+        "ordinal": "1",
+        "type": "server_end:fuchsia.ui.test.input/TouchScreen"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.ui.test.input/RegistryRegisterTouchScreenAndGetDeviceInfoRequest",
+        "resourceness": "resource"
+    },
+    {
+        "kind": "table/member",
+        "name": "fuchsia.ui.test.input/RegistryRegisterTouchScreenAndGetDeviceInfoResponse.device_id",
+        "ordinal": "1",
+        "type": "uint32"
+    },
+    {
+        "kind": "table",
+        "name": "fuchsia.ui.test.input/RegistryRegisterTouchScreenAndGetDeviceInfoResponse",
         "resourceness": "resource"
     },
     {
