@@ -15,6 +15,7 @@ use std::pin::pin;
 use tracing::{error, info, trace, warn};
 
 mod fidl_service;
+mod message_access_service;
 mod messaging_client;
 mod profile;
 

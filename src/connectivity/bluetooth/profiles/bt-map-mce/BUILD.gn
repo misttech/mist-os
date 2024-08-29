@@ -25,11 +25,20 @@ rustc_binary("bin") {
     "//third_party/rust_crates:anyhow",
     "//third_party/rust_crates:futures",
     "//third_party/rust_crates:tracing",
+    "//third_party/rust_crates:uuid",
+  ]
+
+  test_deps = [
+    "//src/connectivity/bluetooth/lib/async-helpers:async-test-helpers",
+    "//src/connectivity/bluetooth/lib/packet-encoding",
+    "//src/lib/async-utils",
+    "//src/lib/fuchsia-async",
   ]
 
   sources = [
     "src/fidl_service.rs",
     "src/main.rs",
+    "src/message_access_service.rs",
     "src/messaging_client.rs",
     "src/profile.rs",
   ]

@@ -113,6 +113,10 @@ impl ObexTransportManager {
         self.channel.try_borrow_mut().map_err(|_| Error::OperationInProgress)
     }
 
+    pub fn is_transport_closed(&self) -> bool {
+        self.channel.try_borrow().map_or(false, |chan| chan.is_closed())
+    }
+
     pub fn try_new_operation(&self) -> Result<ObexTransport<'_>, Error> {
         // Only one operation can be outstanding at a time.
         let channel = self.new_permit()?;
@@ -301,6 +305,26 @@ mod tests {
         // Trying again is still an Error.
         let send_result = transport.send(data.clone());
         assert_matches!(send_result, Err(Error::IOError(_)));
+    }
+
+    #[fuchsia::test]
+    async fn is_transport_closed() {
+        let (manager, remote) = new_manager(/* srm_supported */ false);
+        assert!(!manager.is_transport_closed());
+
+        {
+            let _transport = manager.try_new_operation().expect("can start operation");
+            assert!(!manager.is_transport_closed());
+
+            // Even when the remote end is dropped, transport is deemed
+            // as active since there is currently an ongoing operation.
+            drop(remote);
+            assert!(!manager.is_transport_closed());
+        }
+
+        // When transport goes out of scope, finally transport is
+        // considered fully closed.
+        assert!(manager.is_transport_closed());
     }
 
     #[fuchsia::test]
