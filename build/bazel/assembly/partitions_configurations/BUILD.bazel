@@ -142,3 +142,15 @@ fuchsia_partitions_configuration(
     name = "riscv64",
     hardware_revision = "riscv64",
 )
+
+fuchsia_partitions_configuration(
+    name = "pkvm-x64",
+    hardware_revision = "pkvm-x64",
+    partitions = [],
+)
+
+fuchsia_partitions_configuration(
+    name = "pkvm-arm64",
+    hardware_revision = "pkvm-arm64",
+    partitions = [],
+)
