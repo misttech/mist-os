@@ -84,9 +84,17 @@ class WlanPolicy(AsyncAdapter, wlan_policy.WlanPolicy):
         This needs to be called on test class teardown otherwise the device may
         be left in an inoperable state where no other components or tests can
         access state-changing WLAN Policy APIs.
+
+        This is idempotent and irreversible. No other methods should be called
+        after this one.
         """
         if self._client_controller:
             self._client_controller.client_state_updates_server_task.cancel()
+
+        if not self.loop().is_closed():
+            self.loop().stop()
+            self.loop().run_forever()  # Handle pending tasks
+            self.loop().close()
 
     def _verify_supported(self, device: str, ffx: ffx_transport.FFX) -> None:
         """Check if WLAN Policy is supported on the DUT.

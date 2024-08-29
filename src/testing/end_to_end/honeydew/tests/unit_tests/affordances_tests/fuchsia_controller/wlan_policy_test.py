@@ -120,11 +120,13 @@ class WlanPolicyFCTests(unittest.TestCase):
                 self.wlan_policy_obj._client_controller.updates.qsize(), 0
             )
 
-            self.client_state_updates_proxy.on_client_state_update(
-                summary=f_wlan_policy.ClientStateSummary(
-                    state=f_wlan_policy.WlanClientState.CONNECTIONS_ENABLED,
-                    networks=[],
-                ),
+            self.wlan_policy_obj.loop().run_until_complete(
+                self.client_state_updates_proxy.on_client_state_update(
+                    summary=f_wlan_policy.ClientStateSummary(
+                        state=f_wlan_policy.WlanClientState.CONNECTIONS_ENABLED,
+                        networks=[],
+                    ),
+                )
             )
 
             update = (

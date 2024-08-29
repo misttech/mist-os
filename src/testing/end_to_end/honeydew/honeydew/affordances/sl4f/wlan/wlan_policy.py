@@ -64,6 +64,9 @@ class WlanPolicy(wlan_policy.WlanPolicy):
         This needs to be called on test class teardown otherwise the device may
         be left in an inoperable state where no other components or tests can
         access state-changing WLAN Policy APIs.
+
+        This is idempotent and irreversible. No other methods should be called
+        after this one.
         """
         pass  # SL4F handles client controller lifetime
 
