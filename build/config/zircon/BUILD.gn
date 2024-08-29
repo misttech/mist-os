@@ -30,7 +30,9 @@ config("clang_defaults") {
       "-fembed-bitcode=all",
     ]
   }
-  if (current_cpu == "x64") {
+
+  # Set relax relocations flag only for x64 ELF targets.
+  if (current_cpu == "x64" && is_elf) {
     asmflags = [ "-Wa,--mrelax-relocations=yes" ]
   }
   if (current_os == "linux") {

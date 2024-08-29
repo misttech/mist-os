@@ -161,7 +161,8 @@ config("cpu_baseline") {
 # These flags are enabled by default in Fuchsia's Clang toolchain, but we set
 # them explicitly to support other Clang toolchains and Clang-based tools.
 config("clang_defaults") {
-  if (current_cpu == "x64") {
+  # Set relax relocations flag only for x64 ELF targets.
+  if (current_cpu == "x64" && is_elf) {
     asmflags = [ "-Wa,--mrelax-relocations=yes" ]
   }
 }
