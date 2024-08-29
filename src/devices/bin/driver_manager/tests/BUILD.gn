@@ -222,7 +222,11 @@ fuchsia_unittest_component("driver-host-loader-service-test") {
 }
 
 test("driver_host_runner_test") {
-  sources = [ "driver_host_runner_test.cc" ]
+  sources = [
+    "driver_host_runner_test.cc",
+    "test_pkg.cc",
+    "test_pkg.h",
+  ]
   deps = [
     ":driver_runner_test_fixture",
     "//src/devices/bin/driver_loader:driver_loader",
