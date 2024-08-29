@@ -19,7 +19,7 @@ zx_library("util") {
   ]
 
   deps = [
-    "//zircon/kernel/lib/mistos/zx_syscalls",
+    "//vendor/misttech/zircon/kernel/lib/mistos/zx_syscalls",
     "//zircon/kernel/object",
     "//zircon/system/ulib/explicit-memory",
   ]

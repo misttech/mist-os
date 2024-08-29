@@ -230,7 +230,7 @@ fit::result<Errno, FileHandle> new_memfd(const CurrentTask& current_task, FsStri
 
   // In /proc/[pid]/fd, the target of this memfd's symbolic link is "/memfd:[name]".
   auto local_name = FsString("/memfd:");
-  local_name += name;
+  //local_name += name;
 
   auto namespace_node = NamespaceNode::new_anonymous(DirEntry::New(node, {}, local_name));
 

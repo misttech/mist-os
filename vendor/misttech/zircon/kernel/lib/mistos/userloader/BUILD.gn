@@ -5,7 +5,7 @@
 import("//build/testing/boot_tests/boot_test.gni")
 import("//build/zircon/migrated_targets.gni")
 
-zx_library("userloader") {
+zx_library("_userloader") {
   sources = [
     "debugcommands.cc",
     "elf.cc",
@@ -17,27 +17,27 @@ zx_library("userloader") {
 
   public_deps = [
     "//src/lib/elfldltl",
-    "//zircon/kernel/lib/mistos/zx",
+    "//vendor/misttech/zircon/kernel/lib/mistos/zbi_parser",
+    "//vendor/misttech/zircon/kernel/lib/mistos/zx",
 
     # <lib/userabi/userboot.h> has #include <lib/instrumentation/vmo.h>.
     "//zircon/kernel/lib/instrumentation:headers",
-    "//zircon/kernel/lib/mistos/zbi_parser",
   ]
 
   defines = [ "BOOT_TEST_SUCCESS_STRING=\"$boot_test_success_string\"" ]
 
   deps = [
+    "//vendor/misttech/third_party/linux_uapi",
+    "//vendor/misttech/zircon/kernel/lib/mistos/elfldltl",
+    "//vendor/misttech/zircon/kernel/lib/mistos/util",
+    "//vendor/misttech/zircon/kernel/lib/mistos/zbitl",
+    "//vendor/misttech/zircon/kernel/lib/mistos/zx_syscalls",
     "//zircon/kernel/lib/boot-options",
     "//zircon/kernel/lib/console",
     "//zircon/kernel/lib/counters",
     "//zircon/kernel/lib/crashlog",
     "//zircon/kernel/lib/debuglog",
     "//zircon/kernel/lib/init",
-    "//zircon/kernel/lib/mistos/elfldltl",
-    "//zircon/kernel/lib/mistos/linux_uapi",
-    "//zircon/kernel/lib/mistos/util",
-    "//zircon/kernel/lib/mistos/zbitl",
-    "//zircon/kernel/lib/mistos/zx_syscalls",
     "//zircon/kernel/lib/persistent-debuglog",
     "//zircon/kernel/phys:handoff",
     "//zircon/kernel/vm",
