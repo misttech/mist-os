@@ -1321,6 +1321,15 @@ zx_status_t UsbXhci::InitMmio() {
       return status;
     }
   }
+  if (config_.enable_suspend()) {
+    zx::result activity_governer = incoming()->Connect<fuchsia_power_system::ActivityGovernor>();
+    if (activity_governer.is_error() || !activity_governer->is_valid()) {
+      FDF_LOG(WARNING, "Failed to connect to power system: %s, continuing without it",
+              activity_governer.status_string());
+    } else {
+      activity_governer_.Bind(std::move(activity_governer.value()));
+    }
+  }
   return ZX_OK;
 }
 

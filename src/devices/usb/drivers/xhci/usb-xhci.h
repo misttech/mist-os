@@ -6,6 +6,7 @@
 #define SRC_DEVICES_USB_DRIVERS_XHCI_USB_XHCI_H_
 
 #include <fidl/fuchsia.hardware.usb.hci/cpp/fidl.h>
+#include <fidl/fuchsia.power.system/cpp/fidl.h>
 #include <fuchsia/hardware/platform/device/cpp/banjo.h>
 #include <fuchsia/hardware/usb/bus/cpp/banjo.h>
 #include <fuchsia/hardware/usb/hci/cpp/banjo.h>
@@ -280,6 +281,10 @@ class UsbXhci : public fdf::DriverBase,
 
   void RingDoorbell(uint8_t slot, uint8_t target);
 
+  fidl::SyncClient<fuchsia_power_system::ActivityGovernor>& activity_governer() {
+    return activity_governer_;
+  }
+
  private:
   DISALLOW_COPY_ASSIGN_AND_MOVE(UsbXhci);
 
@@ -318,6 +323,8 @@ class UsbXhci : public fdf::DriverBase,
   fbl::Mutex scheduler_lock_;
 
   zx_status_t CreateNode();
+
+  fidl::SyncClient<fuchsia_power_system::ActivityGovernor> activity_governer_;
 
   // PCI protocol client (if x86)
   ddk::Pci pci_;
