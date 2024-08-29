@@ -12,6 +12,10 @@ use crate::packets::*;
 use crate::peer_manager::TargetDelegate;
 use crate::types::PeerError;
 
+/// According to AVRCP v1.6.2 Section 6.10.3.1, Database Unaware Players shall always
+/// return UIDcounter=0
+const UID_COUNTER: u16 = 0x00;
+
 #[derive(Debug)]
 pub struct BrowseChannelHandler {
     target_delegate: Arc<TargetDelegate>,
@@ -73,9 +77,11 @@ impl BrowseChannelHandler {
                     .map_err(|_| StatusCode::InvalidParameter)?;
                 trace!("Received GetFolderItems Command {:?}", get_folder_items_cmd);
 
-                // Currently, for GetFolderItems, we only support MediaPlayerList scope.
+                // TODO(fxbug.dev/332331774): currently, we only support
+                // MediaPlayerList scope since none of the players are
+                // browsable for folder items.
                 if get_folder_items_cmd.scope() != Scope::MediaPlayerList {
-                    return Err(StatusCode::InvalidParameter);
+                    return Err(StatusCode::InvalidScope);
                 }
 
                 // Get the media player items from the TargetDelegate.
@@ -84,11 +90,8 @@ impl BrowseChannelHandler {
                     .await
                     .map_err(StatusCode::from)?;
 
-                // Use an arbitrary uid_counter for creating the response. Don't support
-                // multiple players, so this value is irrelevant.
-                let uid_counter: u16 = 0x1234;
                 let media_player_items = folder_items.into_iter().map(Into::into).collect();
-                let resp = GetFolderItemsResponse::new_success(uid_counter, media_player_items);
+                let resp = GetFolderItemsResponse::new_success(UID_COUNTER, media_player_items);
 
                 // Encode the result into the output buffer.
                 let mut buf = vec![0; resp.encoded_len()];
@@ -101,15 +104,43 @@ impl BrowseChannelHandler {
                     .map_err(|_| StatusCode::InvalidParameter)?;
                 trace!("Received GetTotalNumberOfItems Command {:?}", get_total_items_cmd);
 
-                // Currently, for GetTotalNumberOfItems, we only support MediaPlayerList scope.
+                // TODO(b/343223304): currently, we only support
+                // MediaPlayerList scope since none of the players are
+                // browsable for folder items.
                 if get_total_items_cmd.scope() != Scope::MediaPlayerList {
-                    return Err(StatusCode::InvalidParameter);
+                    return Err(StatusCode::InvalidScope);
                 }
 
                 // Use an arbitrary uid_counter for creating the response. Don't support
                 // multiple players, so this value is irrelevant.
                 let uid_counter: u16 = 0x1234;
                 let resp = GetTotalNumberOfItemsResponse::new(StatusCode::Success, uid_counter, 1);
+
+                // Encode the result into the output buffer.
+                let mut buf = vec![0; resp.encoded_len()];
+                resp.encode(&mut buf[..]).map_err(|_| StatusCode::ParameterContentError)?;
+
+                Ok(buf)
+            }
+            PduId::GetItemAttributes => {
+                let get_item_attrs_cmd = GetItemAttributesCommand::decode(&parameters)
+                    .map_err(|_| StatusCode::InvalidParameter)?;
+                if get_item_attrs_cmd.scope() != Scope::NowPlaying {
+                    // TODO(b/343223304): Return an error here since we don't
+                    // support any browsable players and we only support
+                    // now playing scope for this command.
+                    return Err(StatusCode::InvalidScope);
+                }
+                if get_item_attrs_cmd.uid() == 0x0 {
+                    // From AVRCP 1.6.2 section 6.10.4.3, UID of 0 is not allowed.
+                    return Err(StatusCode::InvalidParameter);
+                }
+                let media_attrs = target_delegate
+                    .send_get_media_attributes_command()
+                    .await
+                    .map_err(StatusCode::from)?;
+
+                let resp = GetItemAttributesResponse::Success(media_attrs.into());
 
                 // Encode the result into the output buffer.
                 let mut buf = vec![0; resp.encoded_len()];
@@ -192,8 +223,14 @@ fn send_general_reject(command: AvctpCommand, status_code: StatusCode) -> Result
 mod tests {
     use super::*;
     use assert_matches::assert_matches;
+    use async_utils::PollExt;
     use fuchsia_bluetooth::types::Channel;
-    use futures::StreamExt;
+    use futures::{pin_mut, StreamExt, TryStreamExt};
+
+    use fidl_fuchsia_bluetooth_avrcp::{
+        MediaAttributes, TargetHandlerMarker, TargetHandlerRequest,
+    };
+    use fuchsia_async as fasync;
 
     #[fuchsia::test]
     /// Tests handling an invalid browse channel PDU returns an error.
@@ -280,7 +317,7 @@ mod tests {
     }
 
     #[fuchsia::test]
-    async fn handle_implemented_valid_browse_channel_command() {
+    async fn handle_get_total_number_of_items_command() {
         let (handler, _local_peer, mut local_stream, remote_peer) =
             setup_handler_with_remote_peer();
 
@@ -304,6 +341,112 @@ mod tests {
             remote_response_stream.next().await.unwrap().expect("should receive response");
         let payload = BrowsePreamble::decode(response.body()).expect("valid response");
         assert_eq!(payload.pdu_id, u8::from(&PduId::GetTotalNumberOfItems));
+    }
+
+    #[fuchsia::test]
+    fn handle_get_item_attribues_command() {
+        let mut exec = fasync::TestExecutor::new();
+
+        let (handler, _local_peer, mut local_stream, remote_peer) =
+            setup_handler_with_remote_peer();
+
+        let (target_proxy, mut target_stream) =
+            fidl::endpoints::create_proxy_and_stream::<TargetHandlerMarker>()
+                .expect("Error creating TargetHandler endpoint");
+        handler.target_delegate.set_target_handler(target_proxy).expect("should not fail");
+        let delegator_request_fut = target_stream.select_next_some();
+        pin_mut!(delegator_request_fut);
+
+        // Remote peer sends us a GetItemAttributes command.
+        let cmd = GetItemAttributesCommand::from_now_playing_list(1, 1, vec![]);
+        let mut cmd_buf = vec![0; cmd.encoded_len()];
+        let _ = cmd.encode(&mut cmd_buf[..]).expect("valid command");
+        let total_command = BrowsePreamble::new(u8::from(&PduId::GetItemAttributes), cmd_buf);
+        let mut total_buf = vec![0; total_command.encoded_len()];
+        total_command.encode(&mut total_buf[..]).expect("Encoding should work");
+        let mut remote_response_stream =
+            remote_peer.send_command(&total_buf).expect("can send command");
+
+        // `bt-avrcp` (e.g local) should receive the command.
+        let received_command = exec
+            .run_until_stalled(&mut local_stream.try_next())
+            .expect("should be ready")
+            .unwrap()
+            .expect("has valid command");
+        exec.run_until_stalled(&mut delegator_request_fut).expect_pending("should be pending");
+
+        let handle_fut = handler.handle_command(received_command);
+        pin_mut!(handle_fut);
+        exec.run_until_stalled(&mut handle_fut).expect_pending("should be pending");
+        match exec.run_until_stalled(&mut delegator_request_fut).expect("should be ready") {
+            Ok(TargetHandlerRequest::GetMediaAttributes { responder }) => {
+                responder.send(Ok(&MediaAttributes::default())).expect("should be ok");
+            }
+            _ => panic!("unexpected stream state"),
+        }
+
+        // Should handle okay.
+        exec.run_until_stalled(&mut handle_fut)
+            .expect("should be ok")
+            .expect("should have succeeded");
+
+        // Response should be received by remote.
+        let response = exec
+            .run_until_stalled(&mut remote_response_stream.try_next())
+            .expect("should be ready")
+            .unwrap()
+            .expect("has valid command");
+        let payload = BrowsePreamble::decode(response.body()).expect("valid response");
+        assert_eq!(payload.pdu_id, u8::from(&PduId::GetItemAttributes));
+    }
+
+    #[fuchsia::test]
+    fn handle_get_item_attribues_command_reject() {
+        let mut exec = fasync::TestExecutor::new();
+
+        let (handler, _local_peer, mut local_stream, remote_peer) =
+            setup_handler_with_remote_peer();
+
+        let (target_proxy, mut target_stream) =
+            fidl::endpoints::create_proxy_and_stream::<TargetHandlerMarker>()
+                .expect("Error creating TargetHandler endpoint");
+        handler.target_delegate.set_target_handler(target_proxy).expect("should not fail");
+        let delegator_request_fut = target_stream.select_next_some();
+        pin_mut!(delegator_request_fut);
+
+        // Send GetItemAttributes command with unsupported scope, which should be rejected.
+        let cmd = GetItemAttributesCommand::new(Scope::MediaPlayerVirtualFilesystem, 1, 1, vec![]);
+        let mut cmd_buf = vec![0; cmd.encoded_len()];
+        let _ = cmd.encode(&mut cmd_buf[..]).expect("valid command");
+        let total_command = BrowsePreamble::new(u8::from(&PduId::GetItemAttributes), cmd_buf);
+        let mut total_buf = vec![0; total_command.encoded_len()];
+        total_command.encode(&mut total_buf[..]).expect("Encoding should work");
+        let mut remote_response_stream =
+            remote_peer.send_command(&total_buf).expect("can send command");
+
+        // `bt-avrcp` (e.g local) should receive the command.
+        let received_command = exec
+            .run_until_stalled(&mut local_stream.try_next())
+            .expect("should be ready")
+            .unwrap()
+            .expect("has valid command");
+        exec.run_until_stalled(&mut delegator_request_fut).expect_pending("should be pending");
+
+        // Once handled, we expect the outgoing general reject. Even though it's an invalid command,
+        // we don't expect to Error.
+        let handle_fut = handler.handle_command(received_command);
+        pin_mut!(handle_fut);
+        let res = exec.run_until_stalled(&mut handle_fut).expect("should be pending");
+        assert_matches!(res, Ok(_));
+
+        // The general reject should be received by the remote.
+        let response = exec
+            .run_until_stalled(&mut remote_response_stream.try_next())
+            .expect("should be ready")
+            .unwrap()
+            .expect("should receive response");
+        let payload = BrowsePreamble::decode(response.body()).expect("valid response");
+        assert_eq!(payload.pdu_id, u8::from(&PduId::GeneralReject));
     }
 
     #[fuchsia::test]

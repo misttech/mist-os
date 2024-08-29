@@ -22,6 +22,7 @@ mod decoders;
 
 use crate::packets::{Error as PacketError, *};
 use crate::peer_manager::TargetDelegate;
+use crate::profile::AvrcpService;
 use crate::types::PeerError as Error;
 use decoders::*;
 
@@ -65,6 +66,9 @@ impl IncomingTargetCommand for AvcCommand {
 /// registered notifications by the peer.
 #[derive(Debug)]
 pub struct ControlChannelHandler {
+    // Peer's offered capabilities as CT role.
+    controller_descriptor: Option<AvrcpService>,
+
     inner: Arc<ControlChannelHandlerInner>,
 }
 
@@ -131,7 +135,12 @@ impl ControlChannelHandler {
                 target_delegate,
                 continuations: Arc::new(Continuations::new()),
             }),
+            controller_descriptor: None,
         }
+    }
+
+    pub fn set_controller_descriptor(&mut self, service: AvrcpService) {
+        self.controller_descriptor = Some(service);
     }
 
     // we don't want to make IncomingTargetCommand trait pub.
@@ -142,6 +151,8 @@ impl ControlChannelHandler {
         trace!("handle_command {:#?}", command);
         let inner = self.inner.clone();
 
+        let supports_browsing =
+            self.controller_descriptor.map_or(false, |desc| desc.supports_browsing());
         async move {
             // Step 1. Decode the command
             let decoded_command = match Command::decode_command(
@@ -165,7 +176,7 @@ impl ControlChannelHandler {
                 }
                 Command::VendorSpecific(cmd) => match cmd {
                     VendorSpecificCommand::Notify(cmd) => {
-                        handle_notify_command(delegate, command, cmd).await
+                        handle_notify_command(delegate, command, cmd, supports_browsing).await
                     }
                     VendorSpecificCommand::Status(cmd) => {
                         handle_status_command(delegate, continuations, command, cmd).await
@@ -278,6 +289,7 @@ fn send_avc_reject(
 fn notification_response(
     notification: &Notification,
     notify_event_id: &NotificationEventId,
+    is_browsing_supported: bool,
 ) -> Result<Box<dyn PacketEncodable>, StatusCode> {
     // Unsupported events:
     // Probably never: TrackReachedEnd, TrackReachedStart,
@@ -291,9 +303,15 @@ fn notification_response(
                 notification.status.ok_or(StatusCode::InternalError)?.into(),
             ))
         }
-        &NotificationEventId::EventTrackChanged => Box::new(TrackChangedNotificationResponse::new(
-            notification.track_id.ok_or(StatusCode::InternalError)?,
-        )),
+        &NotificationEventId::EventTrackChanged => {
+            let mut track_id = notification.track_id.ok_or(StatusCode::InternalError)?;
+            // According to AVRCP 1.6.2 Section 6.7.2, Table 6.32, if Browsing is
+            // supported, then 0x0 is not allowed.
+            if is_browsing_supported && track_id == 0 {
+                track_id = 1;
+            }
+            Box::new(TrackChangedNotificationResponse::new(track_id))
+        }
         &NotificationEventId::EventAddressedPlayerChanged => {
             // uid_counter is zero until we implement a uid database
             Box::new(AddressedPlayerChangedNotificationResponse::new(
@@ -325,8 +343,9 @@ fn send_notification(
     notify_event_id: &NotificationEventId,
     notification: &Notification,
     success_response_type: AvcResponseType,
+    is_browsing_supported: bool,
 ) -> Result<(), Error> {
-    match notification_response(&notification, notify_event_id) {
+    match notification_response(&notification, notify_event_id, is_browsing_supported) {
         Ok(encoder) => match encoder.encode_packet() {
             Ok(packet) => command
                 .send_response(success_response_type, &packet[..])
@@ -353,6 +372,7 @@ async fn handle_notify_command(
     delegate: Arc<TargetDelegate>,
     command: impl IncomingTargetCommand,
     notify_command: RegisterNotificationCommand,
+    is_browsing_supported: bool,
 ) -> Result<(), Error> {
     let pdu_id = notify_command.raw_pdu_id();
 
@@ -380,13 +400,13 @@ async fn handle_notify_command(
            }
         }
     };
-
     // send interim value
     send_notification(
         &command,
         notify_command.event_id(),
         &notification,
         AvcResponseType::Interim,
+        is_browsing_supported,
     )?;
 
     let notification = match delegate
@@ -404,7 +424,13 @@ async fn handle_notify_command(
     };
 
     // send changed value
-    send_notification(&command, notify_command.event_id(), &notification, AvcResponseType::Changed)
+    send_notification(
+        &command,
+        notify_command.event_id(),
+        &notification,
+        AvcResponseType::Changed,
+        is_browsing_supported,
+    )
 }
 
 async fn handle_get_capabilities(
@@ -838,6 +864,8 @@ async fn handle_control_command(
 
 #[cfg(test)]
 mod test {
+    use crate::profile::{AvrcpControllerFeatures, AvrcpProtocolVersion};
+
     use super::*;
 
     use bt_avctp::AvcCommandType;
@@ -847,6 +875,7 @@ mod test {
         AbsoluteVolumeHandlerRequest, MediaAttributes, TargetAvcError, TargetHandlerMarker,
         TargetHandlerProxy, TargetHandlerRequest,
     };
+    use fuchsia_bluetooth::profile::Psm;
     use futures::stream::StreamExt;
 
     #[derive(Debug)]
@@ -973,6 +1002,23 @@ mod test {
         }
     }
 
+    fn test_notification(
+        event_id: fidl_fuchsia_bluetooth_avrcp::NotificationEvent,
+    ) -> Notification {
+        match event_id {
+            fidl_fuchsia_bluetooth_avrcp::NotificationEvent::PlaybackStatusChanged => {
+                Notification {
+                    status: Some(fidl_fuchsia_bluetooth_avrcp::PlaybackStatus::Stopped),
+                    ..Default::default()
+                }
+            }
+            fidl_fuchsia_bluetooth_avrcp::NotificationEvent::TrackChanged => {
+                Notification { track_id: Some(0x00), ..Default::default() }
+            }
+            other => panic!("unexpected get notification {other:?}"),
+        }
+    }
+
     /// Creates a simple target handler that responds with error and basic values for most commands.
     fn create_dummy_target_handler(stall_responses: bool) -> TargetHandlerProxy {
         let (target_proxy, mut target_stream) = create_proxy_and_stream::<TargetHandlerMarker>()
@@ -1020,20 +1066,15 @@ mod test {
                         requested_settings: _,
                         responder,
                     } => responder.send(Ok(&fidl_avrcp::PlayerApplicationSettings::default())),
-                    TargetHandlerRequest::GetNotification { event_id: _, responder } => responder
-                        .send(Ok(&Notification {
-                            status: Some(fidl_fuchsia_bluetooth_avrcp::PlaybackStatus::Playing),
-                            ..Default::default()
-                        })),
+                    TargetHandlerRequest::GetNotification { event_id, responder } => {
+                        responder.send(Ok(&test_notification(event_id)))
+                    }
                     TargetHandlerRequest::WatchNotification {
-                        event_id: _,
+                        event_id,
                         current: _,
                         pos_change_interval: _,
                         responder,
-                    } => responder.send(Ok(&Notification {
-                        status: Some(fidl_fuchsia_bluetooth_avrcp::PlaybackStatus::Stopped),
-                        ..Default::default()
-                    })),
+                    } => responder.send(Ok(&test_notification(event_id))),
                     TargetHandlerRequest::SetAddressedPlayer { responder, .. } => {
                         responder.send(Ok(()))
                     }
@@ -1784,7 +1825,7 @@ mod test {
         let packet_body: Vec<u8> = [
             0x31, // RegisterNotification
             0x00, // single packet
-            0x00, 0x05, // param len, 4 bytes
+            0x00, 0x05, // param len, 5 bytes
             0x01, 0x00, 0x00, 0x00, 0x00, // playback status change event
         ]
         .to_vec();
@@ -1798,6 +1839,89 @@ mod test {
         .expect_changed();
 
         cmd_handler.handle_command_internal(command).await
+    }
+
+    /// Test notifications on target handler for track changed.
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn handle_register_notification_target_track_changed() {
+        let target_proxy = create_dummy_target_handler(false);
+        let cmd_handler = create_command_handler(Some(target_proxy), None);
+
+        let packet_body: Vec<u8> = [
+            0x31, // RegisterNotification
+            0x00, // single packet
+            0x00, 0x05, // param len, 5 bytes
+            0x02, 0x00, 0x00, 0x00, 0x00, // track changed event
+        ]
+        .to_vec();
+
+        let command = MockAvcCommand::new(
+            AvcPacketType::Command(AvcCommandType::Notify),
+            AvcOpCode::VendorDependent,
+            packet_body,
+        )
+        .expect_interim()
+        .expect_changed();
+
+        let response = command.response();
+        let _ = cmd_handler.handle_command_internal(command).await.expect("should be success");
+        let response_lock = response.lock();
+        assert!(response_lock.send_called);
+        assert_eq!(
+            response_lock.data,
+            Some(vec![
+                0x31, // RegisterNotification
+                0x00, // single packet
+                0x00, 0x09, // param len, 9 bytes
+                0x02, // track changed event
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0,
+            ])
+        );
+    }
+
+    /// Test notifications on target handler for track changed.
+    #[fuchsia_async::run_singlethreaded(test)]
+    async fn handle_register_notification_target_track_changed_supports_browsing() {
+        let target_proxy = create_dummy_target_handler(false);
+        let mut cmd_handler = create_command_handler(Some(target_proxy), None);
+        // Supports browsing.
+        cmd_handler.set_controller_descriptor(AvrcpService::Controller {
+            features: AvrcpControllerFeatures::SUPPORTSBROWSING,
+            psm: Psm::AVCTP,
+            protocol_version: AvrcpProtocolVersion(1, 4),
+        });
+
+        let packet_body: Vec<u8> = [
+            0x31, // RegisterNotification
+            0x00, // single packet
+            0x00, 0x05, // param len, 5 bytes
+            0x02, 0x00, 0x00, 0x00, 0x00, // track changed event
+        ]
+        .to_vec();
+
+        let command = MockAvcCommand::new(
+            AvcPacketType::Command(AvcCommandType::Notify),
+            AvcOpCode::VendorDependent,
+            packet_body,
+        )
+        .expect_interim()
+        .expect_changed();
+
+        let response = command.response();
+        let _ = cmd_handler.handle_command_internal(command).await.expect("should be success");
+        let response_lock = response.lock();
+        assert!(response_lock.send_called);
+        assert_eq!(
+            response_lock.data,
+            Some(vec![
+                0x31, // RegisterNotification
+                0x00, // single packet
+                0x00, 0x09, // param len, 9 bytes
+                0x02, // track changed event
+                // Browsing doesn't support UID of 0x00, so we return 0x01 instead.
+                0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x01,
+            ])
+        );
     }
 
     /// test we get a command and it responds as expected.

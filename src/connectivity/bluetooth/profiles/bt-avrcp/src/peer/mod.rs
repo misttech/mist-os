@@ -601,6 +601,7 @@ impl RemotePeer {
     fn set_controller_descriptor(&mut self, service: AvrcpService) {
         trace!("Set controller descriptor for {}", self.peer_id);
         self.controller_descriptor = Some(service);
+        self.control_command_handler.set_controller_descriptor(service);
         self.attempt_control_connection = true;
         // Record inspect controller features.
         self.inspect.record_controller_features(service);
