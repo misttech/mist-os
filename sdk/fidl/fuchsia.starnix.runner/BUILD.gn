@@ -8,4 +8,5 @@ fidl("fuchsia.starnix.runner") {
   sdk_category = "partner_internal"
   sdk_area = "Unknown"
   sources = [ "manager.fidl" ]
+  public_deps = [ "//zircon/vdso/zx" ]
 }

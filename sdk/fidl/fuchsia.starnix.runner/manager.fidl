@@ -4,6 +4,8 @@
 @available(added=HEAD)
 library fuchsia.starnix.runner;
 
+using zx;
+
 @discoverable
 open protocol Manager {
     /// Suspends all the running Starnix kernels.
@@ -12,4 +14,21 @@ open protocol Manager {
 
     /// Resumes all suspended Starnix kernels.
     flexible Resume(table {});
+
+    /// Suspends the container running in `job`.
+    flexible SuspendContainer(resource table {
+        // The job of the container to suspend.
+        1: container_job zx.Handle:JOB;
+        // The event that is used to signal whether or not there are any active wake locks in the container.
+        2: wake_locks zx.Handle:EVENTPAIR;
+        // The event that will be signaled when the container should resume.
+        3: wake_event zx.Handle:EVENTPAIR;
+    }) -> () error SuspendError;
+};
+
+type SuspendError = flexible enum {
+    // A wake lock was acquired during the suspend operation.
+    WAKE_LOCKS_EXIST = 1;
+    // Failed to suspend all the processes in the provided container's job.
+    SUSPEND_FAILURE = 2;
 };
