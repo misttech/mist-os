@@ -15,24 +15,20 @@
 #include <optional>
 #include <string>
 #include <string_view>
-#include <variant>
 
 #include <ddk/metadata/gpio.h>
 
 namespace gpio {
 
 class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio> {
- private:
-  using PinClient = fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl>;
-  using ImplType = std::variant<std::monostate, PinClient>;
-
  public:
-  GpioDevice(ImplType impl, uint32_t pin, uint32_t controller_id, std::string_view name)
+  GpioDevice(fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl> pinimpl, uint32_t pin,
+             uint32_t controller_id, std::string_view name)
       : fidl_dispatcher_(fdf::Dispatcher::GetCurrent()->async_dispatcher()),
         pin_(pin),
         controller_id_(controller_id),
         name_(name),
-        impl_(std::move(impl)),
+        pinimpl_(std::move(pinimpl)),
         devfs_connector_(fit::bind_member<&GpioDevice::DevfsConnect>(this)) {}
 
   zx::result<> AddServices(const std::shared_ptr<fdf::Namespace>& incoming,
@@ -76,7 +72,7 @@ class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio> {
   const uint32_t controller_id_;
   const std::string name_;
 
-  ImplType impl_;
+  fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl> pinimpl_;
   fidl::ServerBindingGroup<fuchsia_hardware_gpio::Gpio> bindings_;
   compat::SyncInitializedDeviceServer compat_server_;
   fidl::ClientEnd<fuchsia_driver_framework::NodeController> controller_;
