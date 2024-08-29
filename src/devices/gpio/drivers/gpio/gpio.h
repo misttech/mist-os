@@ -6,7 +6,6 @@
 #define SRC_DEVICES_GPIO_DRIVERS_GPIO_GPIO_H_
 
 #include <fidl/fuchsia.hardware.gpio/cpp/wire.h>
-#include <fidl/fuchsia.hardware.gpioimpl/cpp/driver/wire.h>
 #include <fidl/fuchsia.hardware.pinimpl/cpp/driver/wire.h>
 #include <lib/driver/compat/cpp/compat.h>
 #include <lib/driver/component/cpp/driver_base.h>
@@ -24,9 +23,8 @@ namespace gpio {
 
 class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio> {
  private:
-  using GpioClient = fdf::WireSharedClient<fuchsia_hardware_gpioimpl::GpioImpl>;
   using PinClient = fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl>;
-  using ImplType = std::variant<std::monostate, GpioClient, PinClient>;
+  using ImplType = std::variant<std::monostate, PinClient>;
 
  public:
   GpioDevice(ImplType impl, uint32_t pin, uint32_t controller_id, std::string_view name)
@@ -87,17 +85,12 @@ class GpioDevice : public fidl::WireServer<fuchsia_hardware_gpio::Gpio> {
 
 class GpioInitDevice {
  public:
-  template <typename T>
   static std::unique_ptr<GpioInitDevice> Create(
       const std::shared_ptr<fdf::Namespace>& incoming,
       fidl::UnownedClientEnd<fuchsia_driver_framework::Node> node, fdf::Logger& logger,
-      uint32_t controller_id, fdf::WireSharedClient<T>& impl);
+      uint32_t controller_id, fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl>& pinimpl);
 
  private:
-  static zx_status_t ConfigureGpios(
-      const fidl::VectorView<fuchsia_hardware_pinimpl::wire::InitStep>& init_steps,
-      fdf::WireSharedClient<fuchsia_hardware_gpioimpl::GpioImpl>& gpio);
-
   static zx_status_t ConfigureGpios(
       const fidl::VectorView<fuchsia_hardware_pinimpl::wire::InitStep>& init_steps,
       fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl>& pinimpl);
@@ -144,7 +137,6 @@ class GpioRootDevice : public fdf::DriverBase {
 
   std::optional<fdf::PrepareStopCompleter> stop_completer_;
   std::optional<fdf::SynchronizedDispatcher> fidl_dispatcher_;
-  fdf::WireSharedClient<fuchsia_hardware_gpioimpl::GpioImpl> gpio_;
   fdf::WireSharedClient<fuchsia_hardware_pinimpl::PinImpl> pinimpl_;
   std::vector<std::unique_ptr<GpioDevice>> children_;
   std::unique_ptr<GpioInitDevice> init_device_;

@@ -22,7 +22,6 @@
         {
             protocol: [ "fuchsia.scheduler.RoleManager" ],
         },
-        { service: 'fuchsia.hardware.gpioimpl.Service' },
         { service: 'fuchsia.hardware.pinimpl.Service' },
     ],
     expose: [

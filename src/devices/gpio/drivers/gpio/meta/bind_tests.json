@@ -8,13 +8,6 @@
     },
     {
         "device": {
-            "fuchsia.hardware.gpioimpl.Service": "fuchsia.hardware.gpioimpl.Service.DriverTransport"
-        },
-        "expected": "match",
-        "name": "Correct_Protocol"
-    },
-    {
-        "device": {
             "fuchsia.hardware.pinimpl.Service": "fuchsia.hardware.pinimpl.Service.DriverTransport"
         },
         "expected": "match",
