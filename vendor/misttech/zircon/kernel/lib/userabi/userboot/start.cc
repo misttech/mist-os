@@ -262,8 +262,8 @@ void StartChildProcess(const zx::debuglog& log, const Options::ProgramInfo& elf_
   auxv.push_back(std::make_pair(AT_SYSINFO_EHDR, 0));
   auxv.push_back(std::make_pair(AT_SECURE, 0));
 
-  StackResult stack_info = populate_initial_stack(log, stack_vmo, elf_entry.filename(), args, envp,
-                                                  auxv, stack_base, sp);
+  zx_mistos_process_stack_t stack_info = populate_initial_stack(
+      log, stack_vmo, elf_entry.filename(), args, envp, auxv, stack_base, sp);
 
   printl(log, "argv [%lx, %lx)", stack_info.argv_start, stack_info.argv_end);
   printl(log, "envp [%lx, %lx)", stack_info.environ_start, stack_info.environ_end);
@@ -273,8 +273,14 @@ void StartChildProcess(const zx::debuglog& log, const Options::ProgramInfo& elf_
   check(log, child.reserved_vmar.destroy(), "zx_vmar_destroy failed on reservation VMAR handle");
   child.reserved_vmar.reset();
 
+  // Set the process stack information.
+  status = child.process.set_property(ZX_PROP_MISTOS_PROCESS_STACK, &stack_info,
+                                      sizeof(zx_mistos_process_stack_t));
+  check(log, status, "zx_object_set_property failed");
+
   // Start the process going.
-  status = child.process.start(child.thread, entry, stack_info.stack_pointer, zx::resource(), 0);
+  status =
+      child.process.start(child.thread, entry, stack_info.stack_pointer, std::move(child.vmar), 0);
   check(log, status, "zx_process_start failed");
   child.thread.reset();
 }

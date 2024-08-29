@@ -7,6 +7,7 @@
 #define VENDOR_MISTTECH_ZIRCON_KERNEL_LIB_USERABI_USERBOOT_STACK_H_
 
 #include <lib/zx/vmo.h>
+#include <zircon/mistos/syscalls/object.h>
 #include <zircon/types.h>
 
 #include <string_view>
@@ -60,22 +61,12 @@ constexpr int kMaxInitEnvs = CONFIG_INIT_ENV_ARG_LIMIT + 2;
 
 constexpr int kMaxAuvxSize = (2 * (AT_VECTOR_SIZE_ARCH + AT_VECTOR_SIZE_BASE + 1));
 
-struct StackResult {
-  zx_vaddr_t stack_pointer;
-  zx_vaddr_t auxv_start;
-  zx_vaddr_t auxv_end;
-  zx_vaddr_t argv_start;
-  zx_vaddr_t argv_end;
-  zx_vaddr_t environ_start;
-  zx_vaddr_t environ_end;
-};
-
 size_t get_initial_stack_size(
     const std::string_view& path, const fbl::static_vector<std::string_view, kMaxInitArgs>& argv,
     const fbl::static_vector<std::string_view, kMaxInitArgs>& environ,
     const fbl::static_vector<std::pair<uint32_t, uint64_t>, kMaxAuvxSize>& auxv);
 
-StackResult populate_initial_stack(
+zx_mistos_process_stack_t populate_initial_stack(
     const zx::debuglog& log, zx::vmo& stack_vmo, const std::string_view& path,
     const fbl::static_vector<std::string_view, kMaxInitArgs>& argv,
     const fbl::static_vector<std::string_view, kMaxInitEnvs>& envp,
