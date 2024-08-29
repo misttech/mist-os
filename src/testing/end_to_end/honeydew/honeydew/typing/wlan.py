@@ -12,6 +12,7 @@ from typing import Protocol
 import fidl.fuchsia_wlan_common as f_wlan_common
 import fidl.fuchsia_wlan_device_service as f_wlan_device_service
 import fidl.fuchsia_wlan_internal as f_wlan_internal
+import fidl.fuchsia_wlan_policy as f_wlan_policy
 import fidl.fuchsia_wlan_sme as f_wlan_sme
 
 
@@ -25,6 +26,14 @@ class MacAddress:
 
     mac: str
     """MAC address in the form "xx:xx:xx:xx:xx:xx"."""
+
+    @staticmethod
+    def from_bytes(b: bytes) -> "MacAddress":
+        """Create a MacAddress from bytes."""
+        if len(b) != 6:
+            raise ValueError(f"Expected 6 bytes, got {len(b)}")
+        mac = ":".join([f"{octet:0>2x}" for octet in b])
+        return MacAddress(mac)
 
     def __str__(self) -> str:
         """Return MAC address in the form "xx:xx:xx:xx:xx:xx"."""
@@ -68,6 +77,22 @@ class SecurityType(enum.StrEnum):
     WPA2 = "wpa2"
     WPA3 = "wpa3"
 
+    @staticmethod
+    def from_fidl(fidl: f_wlan_policy.SecurityType) -> "SecurityType":
+        match int(fidl):
+            case f_wlan_policy.SecurityType.NONE:
+                return SecurityType.NONE
+            case f_wlan_policy.SecurityType.WEP:
+                return SecurityType.WEP
+            case f_wlan_policy.SecurityType.WPA:
+                return SecurityType.WPA
+            case f_wlan_policy.SecurityType.WPA2:
+                return SecurityType.WPA2
+            case f_wlan_policy.SecurityType.WPA3:
+                return SecurityType.WPA3
+            case _:
+                raise TypeError(f"Unknown SecurityType: {fidl}")
+
 
 class WlanClientState(enum.StrEnum):
     """Wlan operating state for client connections.
@@ -77,6 +102,16 @@ class WlanClientState(enum.StrEnum):
 
     CONNECTIONS_DISABLED = "ConnectionsDisabled"
     CONNECTIONS_ENABLED = "ConnectionsEnabled"
+
+    @staticmethod
+    def from_fidl(fidl: f_wlan_policy.WlanClientState) -> "WlanClientState":
+        match int(fidl):
+            case f_wlan_policy.WlanClientState.CONNECTIONS_DISABLED:
+                return WlanClientState.CONNECTIONS_DISABLED
+            case f_wlan_policy.WlanClientState.CONNECTIONS_ENABLED:
+                return WlanClientState.CONNECTIONS_ENABLED
+            case _:
+                raise TypeError(f"Unknown WlanClientState: {fidl}")
 
 
 class ConnectionState(enum.StrEnum):
@@ -90,6 +125,20 @@ class ConnectionState(enum.StrEnum):
     CONNECTING = "Connecting"
     CONNECTED = "Connected"
 
+    @staticmethod
+    def from_fidl(fidl: f_wlan_policy.ConnectionState) -> "ConnectionState":
+        match int(fidl):
+            case f_wlan_policy.ConnectionState.FAILED:
+                return ConnectionState.FAILED
+            case f_wlan_policy.ConnectionState.DISCONNECTED:
+                return ConnectionState.DISCONNECTED
+            case f_wlan_policy.ConnectionState.CONNECTING:
+                return ConnectionState.CONNECTING
+            case f_wlan_policy.ConnectionState.CONNECTED:
+                return ConnectionState.CONNECTED
+            case _:
+                raise TypeError(f"Unknown ConnectionState: {fidl}")
+
 
 class DisconnectStatus(enum.StrEnum):
     """Disconnect and connection attempt failure status codes.
@@ -101,6 +150,20 @@ class DisconnectStatus(enum.StrEnum):
     CREDENTIALS_FAILED = "CredentialsFailed"
     CONNECTION_STOPPED = "ConnectionStopped"
     CONNECTION_FAILED = "ConnectionFailed"
+
+    @staticmethod
+    def from_fidl(fidl: f_wlan_policy.DisconnectStatus) -> "DisconnectStatus":
+        match int(fidl):
+            case f_wlan_policy.DisconnectStatus.TIMED_OUT:
+                return DisconnectStatus.TIMED_OUT
+            case f_wlan_policy.DisconnectStatus.CREDENTIALS_FAILED:
+                return DisconnectStatus.CREDENTIALS_FAILED
+            case f_wlan_policy.DisconnectStatus.CONNECTION_STOPPED:
+                return DisconnectStatus.CONNECTION_STOPPED
+            case f_wlan_policy.DisconnectStatus.CONNECTION_FAILED:
+                return DisconnectStatus.CONNECTION_FAILED
+            case _:
+                raise TypeError(f"Unknown DisconnectStatus: {fidl}")
 
 
 class RequestStatus(enum.StrEnum):
@@ -114,6 +177,22 @@ class RequestStatus(enum.StrEnum):
     REJECTED_INCOMPATIBLE_MODE = "RejectedIncompatibleMode"
     REJECTED_ALREADY_IN_USE = "RejectedAlreadyInUse"
     REJECTED_DUPLICATE_REQUEST = "RejectedDuplicateRequest"
+
+    @staticmethod
+    def from_fidl(fidl: f_wlan_common.RequestStatus) -> "RequestStatus":
+        match int(fidl):
+            case f_wlan_common.RequestStatus.ACKNOWLEDGED:
+                return RequestStatus.ACKNOWLEDGED
+            case f_wlan_common.RequestStatus.REJECTED_NOT_SUPPORTED:
+                return RequestStatus.REJECTED_NOT_SUPPORTED
+            case f_wlan_common.RequestStatus.REJECTED_INCOMPATIBLE_MODE:
+                return RequestStatus.REJECTED_INCOMPATIBLE_MODE
+            case f_wlan_common.RequestStatus.REJECTED_ALREADY_IN_USE:
+                return RequestStatus.REJECTED_ALREADY_IN_USE
+            case f_wlan_common.RequestStatus.REJECTED_DUPLICATE_REQUEST:
+                return RequestStatus.REJECTED_DUPLICATE_REQUEST
+            case _:
+                raise TypeError(f"Unknown DisconnectStatus: {fidl}")
 
 
 # TODO(http://b/346424966): Only necessary because Python does not have static
@@ -311,6 +390,13 @@ class NetworkIdentifier:
     ssid: str
     security_type: SecurityType
 
+    @staticmethod
+    def from_fidl(fidl: f_wlan_policy.NetworkIdentifier) -> "NetworkIdentifier":
+        return NetworkIdentifier(
+            ssid=str(MacAddress.from_bytes(fidl.ssid)),
+            security_type=SecurityType.from_fidl(fidl.type),
+        )
+
     def __lt__(self, other: NetworkIdentifier) -> bool:
         return self.ssid < other.ssid
 
@@ -325,6 +411,14 @@ class NetworkState:
     network_identifier: NetworkIdentifier
     connection_state: ConnectionState
     disconnect_status: DisconnectStatus
+
+    @staticmethod
+    def from_fidl(fidl: f_wlan_policy.NetworkState) -> "NetworkState":
+        return NetworkState(
+            network_identifier=NetworkIdentifier.from_fidl(fidl.id),
+            connection_state=ConnectionState.from_fidl(fidl.state),
+            disconnect_status=DisconnectStatus.from_fidl(fidl.status),
+        )
 
     def __lt__(self, other: NetworkState) -> bool:
         return self.network_identifier < other.network_identifier
@@ -342,6 +436,15 @@ class ClientStateSummary:
 
     state: WlanClientState
     networks: list[NetworkState]
+
+    @staticmethod
+    def from_fidl(
+        fidl: f_wlan_policy.ClientStateSummary,
+    ) -> "ClientStateSummary":
+        return ClientStateSummary(
+            state=WlanClientState.from_fidl(fidl.state),
+            networks=[NetworkState.from_fidl(n) for n in fidl.networks],
+        )
 
     def __eq__(self, other: object) -> bool:
         if not isinstance(other, ClientStateSummary):

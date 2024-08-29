@@ -4,14 +4,23 @@
 """Unit tests for honeydew.affordances.fuchsia_controller.wlan.wlan_policy."""
 
 import unittest
+from collections.abc import Iterator
+from contextlib import contextmanager
 from unittest import mock
+
+import fidl.fuchsia_wlan_policy as f_wlan_policy
+from fuchsia_controller_py import Channel
 
 from honeydew.affordances.fuchsia_controller.wlan import wlan_policy
 from honeydew.errors import NotSupportedError
 from honeydew.interfaces.device_classes import affordances_capable
 from honeydew.transports import ffx as ffx_transport
 from honeydew.transports import fuchsia_controller as fc_transport
-from honeydew.typing.wlan import SecurityType
+from honeydew.typing.wlan import (
+    ClientStateSummary,
+    SecurityType,
+    WlanClientState,
+)
 
 
 # pylint: disable=protected-access
@@ -44,10 +53,42 @@ class WlanPolicyFCTests(unittest.TestCase):
             fuchsia_controller=self.fc_transport_obj,
             reboot_affordance=self.reboot_affordance_obj,
         )
+        self.client_state_updates_proxy: (
+            f_wlan_policy.ClientStateUpdatesClient | None
+        ) = None
+
+    def tearDown(self) -> None:
+        self.wlan_policy_obj.close()
+        return super().tearDown()
+
+    @contextmanager
+    def _mock_create_client_controller(self) -> Iterator[mock.MagicMock]:
+        """Mock the creation of a fuchsia.wlan.policy/ClientController."""
+
+        # Create a FIDL client to the ClientStateUpdates server.
+        # pylint: disable-next=unused-argument
+        def get_controller(requests: Channel, updates: Channel) -> None:
+            self.client_state_updates_proxy = (
+                f_wlan_policy.ClientStateUpdates.Client(updates)
+            )
+
+        self.wlan_policy_obj._client_provider_proxy.get_controller = mock.Mock(
+            wraps=get_controller
+        )
+
+        client_controller_proxy = mock.MagicMock(
+            spec=f_wlan_policy.ClientController.Client
+        )
+        with mock.patch(
+            "fidl.fuchsia_wlan_policy.ClientController", autospec=True
+        ) as f_client_controller:
+            f_client_controller.Client.return_value = client_controller_proxy
+            yield client_controller_proxy
 
     def test_verify_supported(self) -> None:
         """Test if _verify_supported works."""
         self.ffx_transport_obj.run.return_value = ""
+
         with self.assertRaises(NotSupportedError):
             self.wlan_policy_obj = wlan_policy.WlanPolicy(
                 device_name="fuchsia-emulator",
@@ -56,6 +97,10 @@ class WlanPolicyFCTests(unittest.TestCase):
                 reboot_affordance=self.reboot_affordance_obj,
             )
 
+    def test_init_connect_proxy(self) -> None:
+        """Test if WlanPolicy connects to WLAN Policy proxies."""
+        self.assertIsNotNone(self.wlan_policy_obj._client_provider_proxy)
+
     def test_connect(self) -> None:
         """Test if connect works."""
         with self.assertRaises(NotImplementedError):
@@ -63,8 +108,36 @@ class WlanPolicyFCTests(unittest.TestCase):
 
     def test_create_client_controller(self) -> None:
         """Test if create_client_controller works."""
-        with self.assertRaises(NotImplementedError):
+        with self._mock_create_client_controller():
             self.wlan_policy_obj.create_client_controller()
+
+            self.assertIsNotNone(self.client_state_updates_proxy)
+            self.assertIsNotNone(self.wlan_policy_obj._client_controller)
+            assert self.client_state_updates_proxy is not None
+            assert self.wlan_policy_obj._client_controller is not None
+
+            self.assertEqual(
+                self.wlan_policy_obj._client_controller.updates.qsize(), 0
+            )
+
+            self.client_state_updates_proxy.on_client_state_update(
+                summary=f_wlan_policy.ClientStateSummary(
+                    state=f_wlan_policy.WlanClientState.CONNECTIONS_ENABLED,
+                    networks=[],
+                ),
+            )
+
+            update = (
+                self.wlan_policy_obj._async_adapter_loop.run_until_complete(
+                    self.wlan_policy_obj._client_controller.updates.get()
+                )
+            )
+            self.assertEqual(
+                update,
+                ClientStateSummary(
+                    state=WlanClientState.CONNECTIONS_ENABLED, networks=[]
+                ),
+            )
 
     def test_get_saved_networks(self) -> None:
         """Test if get_saved_networks works."""

@@ -189,11 +189,7 @@ class WlanPolicyTests(fuchsia_base_test.FuchsiaBaseTest):
         """
         super().setup_class()
         self.device: fuchsia_device.FuchsiaDevice = self.fuchsia_devices[0]
-
-        if not isinstance(self.device.wlan_policy, wlan_policy_fc.WlanPolicy):
-            # TODO(http://b/361562197): Remove this if statement once WLAN
-            # Policy FC affordance is implemented
-            self.device.wlan_policy.create_client_controller()
+        self.device.wlan_policy.create_client_controller()
 
         self.access_points: list[
             access_point.AccessPoint
@@ -205,6 +201,10 @@ class WlanPolicyTests(fuchsia_base_test.FuchsiaBaseTest):
             )
 
         self.access_point: access_point.AccessPoint = self.access_points[0]
+
+    def teardown_class(self) -> None:
+        self.device.wlan_policy.close()
+        return super().teardown_class()
 
     def test_client_methods(self) -> None:
         """Test case for wlan_policy client methods.
