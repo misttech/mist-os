@@ -12,7 +12,7 @@ const MAX_INFO_STRING_LENGTH uint32 = 32;
 const MAX_POWER_CONFIGS uint32 = 32;
 
 const MAX_MMIO uint32 = 10;
-const MAX_IRQ uint32 = 10;
+const MAX_IRQ uint32 = 32;
 const MAX_BTI uint32 = 10;
 const MAX_SMC uint32 = 10;
 
