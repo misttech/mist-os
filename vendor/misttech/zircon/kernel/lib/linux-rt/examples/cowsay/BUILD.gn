@@ -6,8 +6,9 @@ import("//build/dist/resource.gni")
 import("//build/zbi/kernel_cmdline.gni")
 import("//build/zbi/zbi.gni")
 import("//build/zbi/zbi_input.gni")
-import("//vendor/misttech/src/linux-rt/build/linux_executable.gni")
-import("//vendor/misttech/src/linux-rt/kernel/linux-rt.gni")
+import(
+    "//vendor/misttech/zircon/kernel/lib/linux-rt/build/linux_executable.gni")
+import("//vendor/misttech/zircon/kernel/lib/linux-rt/kernel/linux-rt.gni")
 
 kernel_cmdline("cmdline") {
   args = [
