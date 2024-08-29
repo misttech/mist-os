@@ -16,42 +16,6 @@
 
 namespace driver_manager {
 
-void InspectSinkForDrivers::Publish(PublishRequest& request, PublishCompleter::Sync& completer) {
-  const auto result = external_connection_->Publish(
-      {{.tree = std::move(request.tree().value()),
-        .name = request.name().has_value() ? std::optional{std::move(request.name().value())}
-                                           : "driver-unknown"}});
-  ZX_ASSERT(result.is_ok());
-}
-
-void InspectSinkForDrivers::Escrow(EscrowRequest& request, EscrowCompleter::Sync& completer) {
-  const auto result = external_connection_->Escrow(std::move(request));
-  ZX_ASSERT(result.is_ok());
-}
-
-void InspectSinkForDrivers::FetchEscrow(FetchEscrowRequest& request,
-                                        FetchEscrowCompleter::Sync& completer) {
-  external_connection_->FetchEscrow(std::move(request))
-      .ThenExactlyOnce([&](fidl::Result<fuchsia_inspect::InspectSink::FetchEscrow>& result) {
-        ZX_ASSERT(result.is_ok());
-        completer.Reply(fidl::Response<fuchsia_inspect::InspectSink::FetchEscrow>{
-            {std::move(result.value().vmo())}});
-      });
-}
-
-void InspectSinkForDrivers::handle_unknown_method(
-    fidl::UnknownMethodMetadata<fuchsia_inspect::InspectSink> metadata,
-    fidl::UnknownMethodCompleter::Sync& completer) {}
-
-void InspectSinkForDrivers::BindSelfManagedServer(
-    async_dispatcher_t* dispatcher, fidl::ServerEnd<fuchsia_inspect::InspectSink> server_end) {
-  std::unique_ptr<InspectSinkForDrivers> impl{new InspectSinkForDrivers(dispatcher)};
-  auto* impl_ptr = impl.get();
-  fidl::ServerBindingRef binding_ref =
-      fidl::BindServer(dispatcher, std::move(server_end), std::move(impl));
-  impl_ptr->binding_ref_.emplace(std::move(binding_ref));
-}
-
 zx::result<InspectDevfs> InspectDevfs::Create(async_dispatcher_t* dispatcher) {
   InspectDevfs devfs(dispatcher);
 

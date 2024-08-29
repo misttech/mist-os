@@ -26,7 +26,7 @@ TEST_F(PowerSystemIntegration, StorageSuspendResumeTest) {
 
   auto result = component::Connect<fuchsia_diagnostics::ArchiveAccessor>();
   ASSERT_EQ(ZX_OK, result.status_value());
-  diagnostics::reader::ArchiveReader reader(dispatcher());
+  diagnostics::reader::ArchiveReader reader(dispatcher(), {}, std::move(result.value()));
 
   const std::string sag_moniker = "bootstrap/system-activity-governor/system-activity-governor";
   const std::vector<std::string> sag_exec_state_level = {"root", "power_elements",
@@ -58,15 +58,15 @@ TEST_F(PowerSystemIntegration, StorageSuspendResumeTest) {
       "topology", core_sdmmc_element_id.value(),
       "meta",     "current_level"};
 
-  // All drivers expose their Inspect under driver manager
+  // Driver monikers are unstable, so wildcard the moniker and use a tree name
   const std::string aml_sdmmc_inspect_tree_name = "aml-sd-emmc";
-  const std::string aml_sdmmc_moniker = "bootstrap/driver_manager";
+  const std::string aml_sdmmc_moniker = "bootstrap/*-drivers*";
   // TODO(b/344044167): Fix inspect node names in aml-sdmmc driver.
   const std::vector<std::string> aml_sdmmc_suspended = {"root", "aml-sdmmc-port-unknown",
                                                         "power_suspended"};
 
-  // All drivers expose their Inspect under driver manager
-  const std::string core_sdmmc_moniker = "bootstrap/driver_manager";
+  // Driver monikers are unstable, so wildcard the moniker and use a tree name
+  const std::string core_sdmmc_moniker = "bootstrap/*-drivers*";
   const std::string sdmmc_root_device_inspect_tree_name = "sdmmc";
   const std::vector<std::string> core_sdmmc_suspended = {"root", "sdmmc_core", "power_suspended"};
 

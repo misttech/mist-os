@@ -245,7 +245,6 @@
                 "fuchsia.device.manager.Administrator",
                 "fuchsia.driver.development.Manager",
                 "fuchsia.driver.framework.CompositeNodeManager",
-                "fuchsia.inspect.InspectSink",
             ],
             from: "#driver_manager",
         },

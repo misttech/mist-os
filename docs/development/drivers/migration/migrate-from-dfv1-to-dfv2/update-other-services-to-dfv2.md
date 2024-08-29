@@ -393,28 +393,25 @@ before accessing the `inspector()` method.
 
 DFv2 inspect does not require passing the VMO of `inspect::Inspector` to the driver framework.
 
-Under DFv2, Inspect from drivers and nodes will be under `bootstrap/driver_manager` and the name
-provided to `fdf::DriverBase`. For example, if a driver did:
+DFv2 drivers' Inspect will show up attributed to the driver (since it is a "normal" component).
+The monikers of DFv2 drivers are not stable, however, so when writing privacy selectors against
+a driver you should use wildcards and name filters to refer to a specific driver. For example,
 
-```cpp
-// Driver constructor
-MyDriver(...) : fdf::DriverBase("example", ...) {
-  inspector().root().RecordString("my_driver", "is_awesome");
-}
+```
+bootstrap/*-drivers*:[name=sysmem]root
 ```
 
-The matching selector for the property in the Inspect hierarchy would be
-`bootstrap/driver_manager:[name=example]root:my_driver`.
+To access a driver's Inspect during debugging, you can use all the normal tools, such as
 
-`bootstrap/driver_manager:[...]root:my_driver` would also work, but also snapshots every other
-driver and Driver Manager. It is less efficient and should only be used as needed.
+```
+ffx inspect show "bootstrap/*-drivers*:[name=sysmem]root
+```
 
-<!-- TODO(https://fxbug.dev/355732696): Remove this comment about the soft transition -->
+or
 
-Today, `bootstrap/driver_manager:root:my_driver` is equivalent to
-`bootstrap/driver_manager:[...]root:my_driver`. However, this behavior is changing in a soft
-transition. When writing new selectors, use one of the more explicit spellings.
-
+```
+ffx inspect show --manifiest sysmem.cm
+```
 
 ## (Optional) Implement your own load_firmware method {:#implement-your-own-load-firmware-method}
 

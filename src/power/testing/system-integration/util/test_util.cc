@@ -90,8 +90,7 @@ void TestLoopBase::MatchInspectData(diagnostics::reader::ArchiveReader& reader,
 
   bool match = false;
   do {
-    auto result =
-        RunPromise(reader.SetSelectors({selector}).SnapshotInspectUntilPresent({moniker}));
+    auto result = RunPromise(reader.SetSelectors({selector}).GetInspectSnapshot());
     auto data = result.take_value();
     for (const auto& datum : data) {
       bool* bool_value = std::get_if<bool>(&value);
