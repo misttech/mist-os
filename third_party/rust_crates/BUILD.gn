@@ -7755,6 +7755,7 @@ rust_library("log-v0_4_22") {
     "--edition=2021",
     "-Cmetadata=70ad1c5e24df7c26",
     "-Cextra-filename=-70ad1c5e24df7c26",
+    "--cfg=feature=\"kv\"",
     "--cfg=feature=\"std\"",
   ]
 
