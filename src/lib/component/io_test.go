@@ -52,6 +52,27 @@ func TestHandleClosedOnOpenFailure(t *testing.T) {
 	}
 }
 
+func TestHandleClosedOnOpen3Failure(t *testing.T) {
+	dir := component.DirectoryWrapper{
+		Directory: &mockDirImpl{},
+	}
+	req, proxy, err := io.NewNodeWithCtxInterfaceRequest()
+	if err != nil {
+		t.Fatalf("io.NewNodeWithCtxInterfaceRequest() = %s", err)
+	}
+	defer func() {
+		if err := proxy.Channel.Close(); err != nil {
+			t.Fatalf("proxy.Channel.Close() = %s", err)
+		}
+	}()
+	if err := dir.GetDirectory().Open3(context.Background(), "non-existing node", io.Flags(0), io.Options{}, req.ToChannel()); err != nil {
+		t.Fatalf("dir.GetDirecory.Open3(...) = %s", err)
+	}
+	if status := zx.Sys_object_wait_one(*proxy.Channel.Handle(), zx.SignalChannelPeerClosed, 0, nil); status != zx.ErrOk {
+		t.Fatalf("zx.Sys_object_wait_one(_, zx.SignalChannelPeerClosed, 0, _) = %s", status)
+	}
+}
+
 var _ component.File = (*vmoFileImpl)(nil)
 
 type vmoFileImpl struct {
