@@ -39,6 +39,7 @@ source_set("top") {
   if (is_mistos) {
     deps -= [ "//zircon/kernel/lib/userabi" ]
     deps += [ "//vendor/misttech/zircon/kernel/lib/userabi" ]
+    deps += [ "//vendor/misttech/zircon/kernel/lib/starnix" ]
   }
 
   # TODO(https://fxbug.dev/374753100): Remove this after soft transition.
