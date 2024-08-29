@@ -18,7 +18,7 @@ use tracing::{info, warn};
 // TODO(https://fxbug.dev/42083292): Replace this with a well-formatted OPP type.
 const EXAMPLE_DATA: [u8; 10] = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9];
 
-async fn write_example_data(id: PeerId, mut client: ObexClient) -> Result<(), Error> {
+async fn write_example_data(id: PeerId, client: ObexClient) -> Result<(), Error> {
     // An OPP client write requires sending Connect, Put, Disconnect.
     info!(%id, "Attempting to initiate OBEX session");
     let input = HeaderSet::from_header(Header::Description("example OPP client service".into()));
