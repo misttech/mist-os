@@ -14,10 +14,12 @@ assert(is_kernel, current_toolchain)
 source_set("linux_impl") {
   visibility = [ "//zircon/kernel/lib/syscalls:*" ]
   sources = [
+    "mm/mmap.cc",
     "not_implemented.cc",
     "static_assert.cc",
   ]
   deps = [
+    "//vendor/misttech/third_party/linux_uapi",
     "//zircon/kernel/lib/syscalls:headers",
     "//zircon/kernel/object",
   ]
