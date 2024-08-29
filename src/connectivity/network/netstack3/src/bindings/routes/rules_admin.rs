@@ -10,7 +10,7 @@ use std::pin::pin;
 use assert_matches::assert_matches;
 use fidl::endpoints::{ControlHandle as _, ProtocolMarker as _};
 use fnet_routes_ext::rules::{
-    FidlRuleAdminIpExt, InstalledRule, MarkSelector, RuleAction, RuleIndex, RuleSelector,
+    FidlRuleAdminIpExt, InstalledRule, MarkMatcher, RuleAction, RuleIndex, RuleMatcher,
     RuleSetPriority, RuleSetRequest, RuleTableRequest,
 };
 use fnet_routes_ext::Responder;
@@ -26,43 +26,31 @@ use crate::bindings::util::TaskWaitGroupSpawner;
 use crate::bindings::{routes, Ctx};
 
 #[derive(Debug, Clone)]
-pub(super) struct AddableSelector<I: Ip> {
+pub(super) struct AddableMatcher<I: Ip> {
     /// Matches whether the source address of the packet is from the subnet.
     from: Option<Subnet<I::Addr>>,
     /// Matches the packet iff the packet was locally generated.
     locally_generated: Option<bool>,
     /// Matches the packet iff the socket that was bound to the device using
     /// `SO_BINDTODEVICE`.
-    bound_device: Option<fnet_routes_ext::rules::InterfaceSelector>,
-    /// The selector for the MARK_1 domain.
-    mark_1_selector: Option<MarkSelector>,
-    /// The selector for the MARK_2 domain.
-    mark_2_selector: Option<MarkSelector>,
+    bound_device: Option<fnet_routes_ext::rules::InterfaceMatcher>,
+    /// The matcher for the MARK_1 domain.
+    mark_1: Option<MarkMatcher>,
+    /// The matcher for the MARK_2 domain.
+    mark_2: Option<MarkMatcher>,
 }
 
-impl<I: Ip> From<RuleSelector<I>> for AddableSelector<I> {
-    fn from(selector: RuleSelector<I>) -> Self {
-        let RuleSelector {
-            from,
-            locally_generated,
-            bound_device,
-            mark_1_selector,
-            mark_2_selector,
-        } = selector;
-        Self { from, locally_generated, bound_device, mark_1_selector, mark_2_selector }
+impl<I: Ip> From<RuleMatcher<I>> for AddableMatcher<I> {
+    fn from(matcher: RuleMatcher<I>) -> Self {
+        let RuleMatcher { from, locally_generated, bound_device, mark_1, mark_2 } = matcher;
+        Self { from, locally_generated, bound_device, mark_1, mark_2 }
     }
 }
 
-impl<I: Ip> From<AddableSelector<I>> for RuleSelector<I> {
-    fn from(selector: AddableSelector<I>) -> Self {
-        let AddableSelector {
-            from,
-            locally_generated,
-            bound_device,
-            mark_1_selector,
-            mark_2_selector,
-        } = selector;
-        Self { from, locally_generated, bound_device, mark_1_selector, mark_2_selector }
+impl<I: Ip> From<AddableMatcher<I>> for RuleMatcher<I> {
+    fn from(matcher: AddableMatcher<I>) -> Self {
+        let AddableMatcher { from, locally_generated, bound_device, mark_1, mark_2 } = matcher;
+        Self { from, locally_generated, bound_device, mark_1, mark_2 }
     }
 }
 
@@ -70,7 +58,7 @@ pub(super) enum RuleOp<I: Ip> {
     Add {
         priority: RuleSetPriority,
         index: RuleIndex,
-        selector: AddableSelector<I>,
+        matcher: AddableMatcher<I>,
         action: RuleAction,
     },
     Remove {
@@ -102,7 +90,7 @@ pub(super) enum RuleWorkItem<I: Ip> {
 
 #[derive(Debug)]
 struct Rule<I: Ip> {
-    selector: AddableSelector<I>,
+    matcher: AddableMatcher<I>,
     action: RuleAction,
 }
 
@@ -151,9 +139,9 @@ impl<I: Ip> RuleTable<I> {
     ) -> impl Iterator<Item = InstalledRule<I>> + 'c {
         let removed = self.rule_sets.remove(&priority);
         removed.into_iter().flat_map(move |rule_set| {
-            rule_set.rules.into_iter().map(move |(index, Rule { selector, action })| {
-                let selector = selector.into();
-                InstalledRule { priority, index, selector, action }
+            rule_set.rules.into_iter().map(move |(index, Rule { matcher, action })| {
+                let matcher = matcher.into();
+                InstalledRule { priority, index, matcher, action }
             })
         })
     }
@@ -162,13 +150,13 @@ impl<I: Ip> RuleTable<I> {
         &mut self,
         priority: RuleSetPriority,
         index: RuleIndex,
-        selector: AddableSelector<I>,
+        matcher: AddableMatcher<I>,
         action: RuleAction,
     ) -> Result<(), fnet_routes_admin::RuleSetError> {
         let mut set = self.get_rule_set_entry(priority);
         match set.get_mut().rules.entry(index) {
             BTreeEntry::Vacant(entry) => {
-                let _: &mut Rule<I> = entry.insert(Rule { selector, action });
+                let _: &mut Rule<I> = entry.insert(Rule { matcher, action });
                 Ok(())
             }
             BTreeEntry::Occupied(_entry) => Err(fnet_routes_admin::RuleSetError::RuleAlreadyExists),
@@ -183,9 +171,9 @@ impl<I: Ip> RuleTable<I> {
         let mut set = self.get_rule_set_entry(priority);
         match set.get_mut().rules.entry(index) {
             BTreeEntry::Occupied(entry) => {
-                let Rule { selector, action } = entry.remove();
-                let selector = selector.into();
-                Ok(InstalledRule { priority, index, selector, action })
+                let Rule { matcher, action } = entry.remove();
+                let matcher = matcher.into();
+                Ok(InstalledRule { priority, index, matcher, action })
             }
             BTreeEntry::Vacant(_entry) => Err(fnet_routes_admin::RuleSetError::RuleDoesNotExist),
         }
@@ -232,10 +220,10 @@ impl<I: Ip + FidlRuleAdminIpExt> UserRuleSet<I> {
         &self,
         priority: RuleSetPriority,
         index: RuleIndex,
-        selector: RuleSelector<I>,
+        matcher: RuleMatcher<I>,
         action: RuleAction,
     ) -> Result<(), ApplyRuleWorkError<fnet_routes_admin::RuleSetError>> {
-        let selector = AddableSelector::from(selector);
+        let matcher = AddableMatcher::from(matcher);
         if let RuleAction::Lookup(table_id) = action {
             let table_id = routes::TableId::new(table_id)
                 .ok_or(fnet_routes_admin::RuleSetError::Unauthenticated)?;
@@ -243,7 +231,7 @@ impl<I: Ip + FidlRuleAdminIpExt> UserRuleSet<I> {
                 Err(fnet_routes_admin::RuleSetError::Unauthenticated)?;
             }
         }
-        self.apply_rule_op(RuleOp::Add { priority, index, selector, action }).await
+        self.apply_rule_op(RuleOp::Add { priority, index, matcher, action }).await
     }
 
     async fn authenticate_for_route_table(
@@ -270,17 +258,17 @@ impl<I: Ip + FidlRuleAdminIpExt> UserRuleSet<I> {
         request: RuleSetRequest<I>,
     ) -> Result<ControlFlow<I::RuleSetControlHandle>, fidl::Error> {
         match request {
-            RuleSetRequest::AddRule { index, selector, action, responder } => {
-                let selector = match selector {
-                    Ok(selector) => selector,
+            RuleSetRequest::AddRule { index, matcher, action, responder } => {
+                let matcher = match matcher {
+                    Ok(matcher) => matcher,
                     Err(err) => {
                         log::warn!("error addding a rule: {err:?}");
                         return responder
-                            .send(Err(fnet_routes_admin::RuleSetError::BaseSelectorMissing))
+                            .send(Err(fnet_routes_admin::RuleSetError::BaseMatcherMissing))
                             .map(ControlFlow::Continue);
                     }
                 };
-                let result = self.add_fidl_rule(self.priority, index, selector, action).await;
+                let result = self.add_fidl_rule(self.priority, index, matcher, action).await;
                 ApplyRuleWorkError::respond_result_with(result, responder)
             }
             RuleSetRequest::RemoveRule { index, responder } => {

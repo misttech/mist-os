@@ -657,13 +657,13 @@ where
                 }
                 Ok(())
             }
-            RuleOp::Add { priority, index, selector, action } => {
-                rule_table.add_rule(priority, index, selector.clone(), action)?;
+            RuleOp::Add { priority, index, matcher, action } => {
+                rule_table.add_rule(priority, index, matcher.clone(), action)?;
                 rules_update_dispatcher
                     .notify(watcher::Update::Added(InstalledRule {
                         priority,
                         index,
-                        selector: selector.into(),
+                        matcher: matcher.into(),
                         action,
                     }))
                     .expect("failed to notify an added rule");

@@ -20,7 +20,7 @@ alias RuleSetPriority = uint32;
 @available(added=HEAD)
 alias RuleIndex = uint32;
 
-/// Actions of a rule if the selector matches.
+/// Actions of a rule if the matcher matches.
 @available(added=HEAD)
 type RuleAction = flexible union {
     /// Look for a route in the indicated route table. If there is no matching
@@ -33,9 +33,9 @@ type RuleAction = flexible union {
     2: unreachable struct {};
 };
 
-/// A selector to be used against the mark value.
+/// Matches the mark value of a packet.
 @available(added=HEAD)
-type MarkSelector = flexible union {
+type MarkMatcher = flexible union {
     /// This mark domain does not have a mark.
     1: unmarked struct {};
     2: marked struct {
@@ -51,9 +51,9 @@ type MarkSelector = flexible union {
     };
 };
 
-/// Selector that matches on the originating interface of the outgoing packet.
+/// Matches on the originating interface of the outgoing packet.
 @available(added=HEAD)
-type InterfaceSelector = flexible union {
+type InterfaceMatcher = flexible union {
     /// Matches the device iff the names match.
     ///
     /// The name is not a pattern or regex, it needs to be an exact match for
@@ -62,21 +62,21 @@ type InterfaceSelector = flexible union {
     // TODO(https://fxbug.dev/351015513): Introduce a variant that matches on the ID.
 };
 
-/// The common selector that can be applied to both IPv4 and IPv6 packets.
+/// The common matcher that can be matched to both IPv4 and IPv6 packets.
 ///
-/// A selector matches a packet if all of the present fields match the
+/// A matcher matches a packet if all of the present fields match the
 /// corresponding properties.
 @available(added=HEAD)
-type BaseSelector = table {
+type BaseMatcher = table {
     /// Matches the packet iff the packet was locally generated.
     1: locally_generated bool;
 
     /// Matches the packet iff the packet is sent with `SO_BINDTODEVICE`.
-    2: bound_device InterfaceSelector;
+    2: bound_device InterfaceMatcher;
 
-    /// The selector for the MARK_1 domain.
-    3: mark_1_selector MarkSelector;
+    /// Matches the MARK_1 domain.
+    3: mark_1 MarkMatcher;
 
-    /// The selector for the MARK_2 domain.
-    4: mark_2_selector MarkSelector;
+    /// Matches for the MARK_2 domain.
+    4: mark_2 MarkMatcher;
 };

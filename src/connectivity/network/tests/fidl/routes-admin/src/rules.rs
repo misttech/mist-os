@@ -8,7 +8,7 @@ use fidl::HandleBased;
 use fidl_fuchsia_net_routes_ext::admin::FidlRouteAdminIpExt;
 use fidl_fuchsia_net_routes_ext::rules::FidlRuleAdminIpExt;
 use fidl_fuchsia_net_routes_ext::FidlRouteIpExt;
-use fnet_routes_ext::rules::{RuleAction, RuleIndex, RuleSelector};
+use fnet_routes_ext::rules::{RuleAction, RuleIndex, RuleMatcher};
 use futures::StreamExt as _;
 use net_types::ip::{GenericOverIp, Ip, IpInvariant};
 use netstack_testing_common::realms::Netstack3;
@@ -68,7 +68,7 @@ async fn add_remove_rules<I: FidlRuleAdminIpExt + FidlRouteAdminIpExt + FidlRout
     fnet_routes_ext::rules::add_rule::<I>(
         &rule_set,
         RULE_INDEX_0,
-        RuleSelector::default(),
+        RuleMatcher::default(),
         RuleAction::Unreachable,
     )
     .await
@@ -79,7 +79,7 @@ async fn add_remove_rules<I: FidlRuleAdminIpExt + FidlRouteAdminIpExt + FidlRout
         fnet_routes_ext::rules::add_rule::<I>(
             &rule_set,
             RULE_INDEX_0,
-            RuleSelector::default(),
+            RuleMatcher::default(),
             RuleAction::Unreachable
         )
         .await,
@@ -91,7 +91,7 @@ async fn add_remove_rules<I: FidlRuleAdminIpExt + FidlRouteAdminIpExt + FidlRout
     fnet_routes_ext::rules::add_rule::<I>(
         &rule_set,
         RULE_INDEX_1,
-        RuleSelector::default(),
+        RuleMatcher::default(),
         RuleAction::Unreachable,
     )
     .await
@@ -116,7 +116,7 @@ async fn add_remove_rules<I: FidlRuleAdminIpExt + FidlRouteAdminIpExt + FidlRout
     fnet_routes_ext::rules::add_rule::<I>(
         &rule_set,
         RULE_INDEX_0,
-        RuleSelector::default(),
+        RuleMatcher::default(),
         RuleAction::Unreachable,
     )
     .await
@@ -151,7 +151,7 @@ async fn add_remove_rules<I: FidlRuleAdminIpExt + FidlRouteAdminIpExt + FidlRout
         fnet_routes_ext::rules::add_rule::<I>(
             &new_rule_set,
             RULE_INDEX_0,
-            RuleSelector::default(),
+            RuleMatcher::default(),
             RuleAction::Lookup(table_id),
         )
         .await,
@@ -167,7 +167,7 @@ async fn add_remove_rules<I: FidlRuleAdminIpExt + FidlRouteAdminIpExt + FidlRout
     fnet_routes_ext::rules::add_rule::<I>(
         &new_rule_set,
         RULE_INDEX_0,
-        RuleSelector::default(),
+        RuleMatcher::default(),
         RuleAction::Lookup(table_id),
     )
     .await
