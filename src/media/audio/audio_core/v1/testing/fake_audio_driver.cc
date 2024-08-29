@@ -227,7 +227,8 @@ void FakeAudioDriver::WatchDelayInfo(
     info.set_external_delay(external_delay_->to_nsecs());
   }
 
-  callback(std::move(info));
+  callback(fuchsia::hardware::audio::RingBuffer_WatchDelayInfo_Result::WithResponse(
+      fuchsia::hardware::audio::RingBuffer_WatchDelayInfo_Response(std::move(info))));
 }
 
 }  // namespace media::audio::testing

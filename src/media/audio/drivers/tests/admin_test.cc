@@ -347,9 +347,10 @@ void AdminTest::PositionNotificationCallback(
 }
 
 void AdminTest::WatchDelayAndExpectUpdate() {
-  ring_buffer_->WatchDelayInfo(
-      AddCallback("WatchDelayInfo", [this](fuchsia::hardware::audio::DelayInfo delay_info) {
-        delay_info_ = std::move(delay_info);
+  ring_buffer_->WatchDelayInfo(AddCallback(
+      "WatchDelayInfo", [this](fuchsia::hardware::audio::RingBuffer_WatchDelayInfo_Result result) {
+        ASSERT_TRUE(result.is_response());
+        delay_info_ = std::move(result.response().delay_info);
       }));
   ExpectCallbacks();
 
@@ -357,9 +358,10 @@ void AdminTest::WatchDelayAndExpectUpdate() {
 }
 
 void AdminTest::WatchDelayAndExpectNoUpdate() {
-  ring_buffer_->WatchDelayInfo([](fuchsia::hardware::audio::DelayInfo delay_info) {
-    FAIL() << "Unexpected delay update received";
-  });
+  ring_buffer_->WatchDelayInfo(
+      [](fuchsia::hardware::audio::RingBuffer_WatchDelayInfo_Result result) {
+        FAIL() << "Unexpected delay update received";
+      });
 }
 
 // We've already validated that we received an overall response.

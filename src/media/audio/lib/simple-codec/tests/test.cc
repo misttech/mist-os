@@ -84,8 +84,8 @@ class TestCodec : public SimpleCodecServer {
   GainState gain_state_ = {};
 };
 
-class TestCodecWithSignalProcessing : public SimpleCodecServer,
-                                      public signal_fidl::SignalProcessing {
+class TestCodecWithSignalProcessing final : public SimpleCodecServer,
+                                            public signal_fidl::SignalProcessing {
  public:
   explicit TestCodecWithSignalProcessing(zx_device_t* parent) : SimpleCodecServer(parent) {}
 
@@ -168,6 +168,8 @@ class TestCodecWithSignalProcessing : public SimpleCodecServer,
   GainFormat GetGainFormat() override { return {}; }
   GainState GetGainState() override { return gain_state_; }
   void SetGainState(GainState state) override { gain_state_ = state; }
+
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {}
 
   bool agl_mode() { return agl_mode_; }
   inspect::Inspector& inspect() { return SimpleCodecServer::inspect(); }

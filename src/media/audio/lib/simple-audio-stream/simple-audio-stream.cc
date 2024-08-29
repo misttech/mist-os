@@ -201,7 +201,8 @@ void SimpleAudioStream::DdkRelease() {
 }
 
 void SimpleAudioStream::DdkSuspend(ddk::SuspendTxn txn) {
-  // TODO(https://fxbug.dev/42118826): Implement proper power management based on the requested state.
+  // TODO(https://fxbug.dev/42118826): Implement proper power management based on the requested
+  // state.
   Shutdown();
   txn.Reply(ZX_OK, txn.requested_state());
 }
@@ -534,6 +535,9 @@ void SimpleAudioStream::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer)
     delay_completer_ = completer.ToAsync();
   }
 }
+
+void SimpleAudioStream::handle_unknown_method(fidl::UnknownMethodMetadata<audio_fidl::RingBuffer>,
+                                              fidl::UnknownMethodCompleter::Sync&) {}
 
 void SimpleAudioStream::SetGain(audio_fidl::wire::GainState target_state,
                                 StreamChannel::SetGainCompleter::Sync& completer) {

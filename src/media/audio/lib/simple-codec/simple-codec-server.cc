@@ -490,7 +490,8 @@ void SimpleCodecServerInternal<T>::WatchTopology(
     SimpleCodecServerInstance<T>* instance) {
   if (!instance->responded_to_watch_topology_) {
     instance->responded_to_watch_topology_ = true;
-    callback(kTopologyId);
+    callback(signal_fidl::Reader_WatchTopology_Result::WithResponse(
+        signal_fidl::Reader_WatchTopology_Response(kTopologyId)));
   } else if (!instance->topology_callback_) {
     instance->topology_callback_ = std::move(callback);
   } else {

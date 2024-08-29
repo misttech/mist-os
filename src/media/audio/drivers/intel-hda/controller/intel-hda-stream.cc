@@ -637,6 +637,10 @@ void IntelHDAStream::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) {
   delay_completer_ = completer.ToAsync();
 }
 
+void IntelHDAStream::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
+    fidl::UnknownMethodCompleter::Sync&) {}
+
 void IntelHDAStream::ReleaseRingBufferLocked() {
   pinned_ring_buffer_.Unpin();
   memset(bdl_cpu_mem_.start(), 0, bdl_cpu_mem_.size());

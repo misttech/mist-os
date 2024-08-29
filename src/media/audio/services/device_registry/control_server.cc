@@ -900,4 +900,8 @@ void ControlServer::MaybeCompleteWatchElementState(ElementId element_id) {
   }
 }
 
+void ControlServer::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_audio_device::Control>,
+    fidl::UnknownMethodCompleter::Sync&) {}
+
 }  // namespace media_audio

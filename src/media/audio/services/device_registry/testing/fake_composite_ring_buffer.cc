@@ -185,4 +185,8 @@ void FakeCompositeRingBuffer::WatchClockRecoveryPositionInfo(
   NotImplemented_("WatchClockRecoveryPositionInfo", completer);
 }
 
+void FakeCompositeRingBuffer::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
+    fidl::UnknownMethodCompleter::Sync&) {}
+
 }  // namespace media_audio

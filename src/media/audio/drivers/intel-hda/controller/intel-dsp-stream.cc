@@ -137,9 +137,13 @@ void IntelDspStream::WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) {
   completer.Reply(result.value().delay_info);
 }
 
+void IntelDspStream::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
+    fidl::UnknownMethodCompleter::Sync&) {}
+
 void IntelDspStream::OnResetLocked() {
-  // TODO(https://fxbug.dev/42165215): As part of redesign SST implement the ability to recover via a
-  // reset.
+  // TODO(https://fxbug.dev/42165215): As part of redesign SST implement the ability to recover via
+  // a reset.
 }
 
 zx_status_t IntelDspStream::OnActivateLocked() {

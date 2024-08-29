@@ -84,6 +84,7 @@ class AmlG12TdmDai : public AmlG12TdmDaiDeviceType,
                          SetActiveChannelsCallback callback) override {
     callback(fpromise::error(ZX_ERR_NOT_SUPPORTED));
   }
+  void handle_unknown_method(uint64_t ordinal, bool method_has_response) override {}
 
   zx_status_t InitBuffer(size_t size);
   void ProcessRingNotification();

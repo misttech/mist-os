@@ -538,10 +538,13 @@ TEST_F(AmlG12TdmDaiRingBufferTest, RingBufferProperties) {
 
 TEST_F(AmlG12TdmDaiRingBufferTest, RingBufferDelayState) {
   ::fuchsia::hardware::audio::DelayInfo delay_info;
-  ASSERT_OK(ring_buffer_->WatchDelayInfo(&delay_info));
+  auto result = ::fuchsia::hardware::audio::RingBuffer_WatchDelayInfo_Result::WithResponse(
+      ::fuchsia::hardware::audio::RingBuffer_WatchDelayInfo_Response(std::move(delay_info)));
+  ASSERT_OK(ring_buffer_->WatchDelayInfo(&result));
 
-  EXPECT_FALSE(delay_info.has_external_delay());
-  EXPECT_EQ(delay_info.internal_delay(), 0);
+  EXPECT_FALSE(result.response().delay_info.has_external_delay());
+  ASSERT_TRUE(result.response().delay_info.has_internal_delay());
+  EXPECT_EQ(result.response().delay_info.internal_delay(), 0);
 }
 
 TEST_F(AmlG12TdmDaiRingBufferTest, RingBufferGetVmo) {
@@ -715,7 +718,9 @@ TEST_F(AmlG12TdmDaiRingBufferTest, GetDelayForMultipleRingBuffers) {
   // Get delay state for a first ring buffer.
   {
     ::fuchsia::hardware::audio::DelayInfo delay_info;
-    ASSERT_OK(ring_buffer_->WatchDelayInfo(&delay_info));
+    auto result = fuchsia::hardware::audio::RingBuffer_WatchDelayInfo_Result::WithResponse(
+        ::fuchsia::hardware::audio::RingBuffer_WatchDelayInfo_Response(std::move(delay_info)));
+    ASSERT_OK(ring_buffer_->WatchDelayInfo(&result));
   }
 
   // Get delay state for a second ring buffer.
@@ -733,7 +738,9 @@ TEST_F(AmlG12TdmDaiRingBufferTest, GetDelayForMultipleRingBuffers) {
 
     ::fuchsia::hardware::audio::RingBuffer_SyncProxy ring_buffer(ring_buffer_client.TakeChannel());
     ::fuchsia::hardware::audio::DelayInfo delay_info;
-    ASSERT_OK(ring_buffer.WatchDelayInfo(&delay_info));
+    auto result = fuchsia::hardware::audio::RingBuffer_WatchDelayInfo_Result::WithResponse(
+        ::fuchsia::hardware::audio::RingBuffer_WatchDelayInfo_Response(std::move(delay_info)));
+    ASSERT_OK(ring_buffer.WatchDelayInfo(&result));
   }
 }
 

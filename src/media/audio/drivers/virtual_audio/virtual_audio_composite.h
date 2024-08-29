@@ -25,7 +25,7 @@ using VirtualAudioCompositeDeviceType =
                 ddk::Messageable<fuchsia_hardware_audio::CompositeConnector>::Mixin>;
 
 // One ring buffer and one DAI interconnect only are supported by this driver.
-class VirtualAudioComposite
+class VirtualAudioComposite final
     : public VirtualAudioCompositeDeviceType,
       public ddk::internal::base_protocol,
       public fidl::Server<fuchsia_hardware_audio::Composite>,
@@ -83,6 +83,8 @@ class VirtualAudioComposite
   void WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) override;
   void SetActiveChannels(fuchsia_hardware_audio::RingBufferSetActiveChannelsRequest& request,
                          SetActiveChannelsCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
+                             fidl::UnknownMethodCompleter::Sync&) override;
 
   // FIDL natural C++ methods for fuchsia.hardware.audio.signalprocessing.SignalProcessing.
   void GetElements(GetElementsCompleter::Sync& completer) override;
@@ -93,6 +95,9 @@ class VirtualAudioComposite
   void GetTopologies(GetTopologiesCompleter::Sync& completer) override;
   void WatchTopology(WatchTopologyCompleter::Sync& completer) override;
   void SetTopology(SetTopologyRequest& request, SetTopologyCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing>,
+      fidl::UnknownMethodCompleter::Sync&) override;
 
  private:
   static constexpr fuchsia_hardware_audio::TopologyId kTopologyId = 789;

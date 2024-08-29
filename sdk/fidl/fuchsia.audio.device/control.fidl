@@ -106,7 +106,7 @@ type ControlCreatorError = flexible enum {
 /// client and device. Each `Control` is associated with an initialized audio
 /// device; conversely each device is associated with either zero or one
 /// `Control` at any time.
-closed protocol Control {
+open protocol Control {
     /// Change the processing topology (via `SetTopology`) or the state of a
     /// single processing node (via `SetElementState`).
     compose fuchsia.hardware.audio.signalprocessing.SignalProcessing;

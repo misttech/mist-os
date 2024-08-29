@@ -31,7 +31,7 @@ static constexpr bool kLogFakeComposite = false;
 class FakeCompositeRingBuffer;
 
 // This driver implements the audio driver interface and is configurable to simulate audio hardware.
-class FakeComposite
+class FakeComposite final
     : public std::enable_shared_from_this<FakeComposite>,
       public fidl::testing::TestBase<fuchsia_hardware_audio::Composite>,
       public fidl::testing::TestBase<fuchsia_hardware_audio_signalprocessing::SignalProcessing> {
@@ -320,6 +320,9 @@ class FakeComposite
   void SetElementState(SetElementStateRequest& request,
                        SetElementStateCompleter::Sync& completer) final;
   void SetTopology(SetTopologyRequest& request, SetTopologyCompleter::Sync& completer) final;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_audio_signalprocessing::SignalProcessing>,
+      fidl::UnknownMethodCompleter::Sync&) final;
 
   // Internal implementation methods/members
   static bool DaiFormatIsSupported(ElementId element_id,

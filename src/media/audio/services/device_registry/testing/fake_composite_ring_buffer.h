@@ -22,7 +22,8 @@ static constexpr bool kLogFakeCompositeRingBuffer = false;
 
 class FakeComposite;
 
-class FakeCompositeRingBuffer : public fidl::testing::TestBase<fuchsia_hardware_audio::RingBuffer> {
+class FakeCompositeRingBuffer final
+    : public fidl::testing::TestBase<fuchsia_hardware_audio::RingBuffer> {
   static inline const std::string_view kClassName = "FakeCompositeRingBuffer";
 
  public:
@@ -51,6 +52,8 @@ class FakeCompositeRingBuffer : public fidl::testing::TestBase<fuchsia_hardware_
   void WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) override;
   void WatchClockRecoveryPositionInfo(
       WatchClockRecoveryPositionInfoCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
+                             fidl::UnknownMethodCompleter::Sync&) override;
 
   void NotImplemented_(const std::string& name, ::fidl::CompleterBase& completer) override;
 

@@ -108,8 +108,8 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
     return std::make_unique<TestServerAndNaturalAsyncClient<ProviderServer>>(
         test_loop(), std::move(server), std::move(client));
   }
-  class ProviderFidlHandler : public fidl::AsyncEventHandler<fuchsia_audio_device::Provider>,
-                              public FidlHandler {
+  class ProviderFidlHandler final : public fidl::AsyncEventHandler<fuchsia_audio_device::Provider>,
+                                    public FidlHandler {
    public:
     explicit ProviderFidlHandler(AudioDeviceRegistryServerTestBase* parent) : FidlHandler(parent) {}
     void on_fidl_error(fidl::UnbindInfo error) override {
@@ -129,8 +129,8 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
     return std::make_unique<TestServerAndNaturalAsyncClient<RegistryServer>>(
         test_loop(), std::move(server), std::move(client));
   }
-  class RegistryFidlHandler : public fidl::AsyncEventHandler<fuchsia_audio_device::Registry>,
-                              public FidlHandler {
+  class RegistryFidlHandler final : public fidl::AsyncEventHandler<fuchsia_audio_device::Registry>,
+                                    public FidlHandler {
    public:
     explicit RegistryFidlHandler(AudioDeviceRegistryServerTestBase* parent) : FidlHandler(parent) {}
     void on_fidl_error(fidl::UnbindInfo error) override {
@@ -141,7 +141,7 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
   std::optional<zx_status_t>& registry_fidl_error_status() { return registry_fidl_error_status_; }
 
   // ControlCreator support
-  class ControlCreatorFidlHandler
+  class ControlCreatorFidlHandler final
       : public fidl::AsyncEventHandler<fuchsia_audio_device::ControlCreator>,
         public FidlHandler {
    public:
@@ -178,14 +178,16 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
     return std::make_unique<TestServerAndNaturalAsyncClient<ObserverServer>>(
         test_loop(), std::move(server), std::move(client));
   }
-  class ObserverFidlHandler : public fidl::AsyncEventHandler<fuchsia_audio_device::Observer>,
-                              public FidlHandler {
+  class ObserverFidlHandler final : public fidl::AsyncEventHandler<fuchsia_audio_device::Observer>,
+                                    public FidlHandler {
    public:
     explicit ObserverFidlHandler(AudioDeviceRegistryServerTestBase* parent) : FidlHandler(parent) {}
     // Invoked when the underlying driver disconnects its Codec/StreamConfig.
     void on_fidl_error(fidl::UnbindInfo error) override {
       LogFidlClientError(error, "Observer");
       parent()->observer_fidl_error_status_ = error.status();
+    }
+    void handle_unknown_event(fidl::UnknownEventMetadata<fuchsia_audio_device::Observer>) override {
     }
   };
   const std::unique_ptr<ObserverFidlHandler>& observer_fidl_handler() {
@@ -205,14 +207,15 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
     return std::make_unique<TestServerAndNaturalAsyncClient<ControlServer>>(
         test_loop(), std::move(server), std::move(client));
   }
-  class ControlFidlHandler : public fidl::AsyncEventHandler<fuchsia_audio_device::Control>,
-                             public FidlHandler {
+  class ControlFidlHandler final : public fidl::AsyncEventHandler<fuchsia_audio_device::Control>,
+                                   public FidlHandler {
    public:
     explicit ControlFidlHandler(AudioDeviceRegistryServerTestBase* parent) : FidlHandler(parent) {}
     void on_fidl_error(fidl::UnbindInfo error) override {
       LogFidlClientError(error, "Control");
       parent()->control_fidl_error_status_ = error.status();
     }
+    void handle_unknown_event(fidl::UnknownEventMetadata<fuchsia_audio_device::Control>) override {}
   };
   const std::unique_ptr<ControlFidlHandler>& control_fidl_handler() {
     return control_fidl_handler_;
@@ -220,8 +223,9 @@ class AudioDeviceRegistryServerTestBase : public gtest::TestLoopFixture {
   std::optional<zx_status_t>& control_fidl_error_status() { return control_fidl_error_status_; }
 
   // RingBuffer support
-  class RingBufferFidlHandler : public fidl::AsyncEventHandler<fuchsia_audio_device::RingBuffer>,
-                                public FidlHandler {
+  class RingBufferFidlHandler final
+      : public fidl::AsyncEventHandler<fuchsia_audio_device::RingBuffer>,
+        public FidlHandler {
    public:
     explicit RingBufferFidlHandler(AudioDeviceRegistryServerTestBase* parent)
         : FidlHandler(parent) {}

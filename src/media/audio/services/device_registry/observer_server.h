@@ -42,6 +42,8 @@ class ObserverServer
   void WatchGainState(WatchGainStateCompleter::Sync& completer) final;
   void WatchPlugState(WatchPlugStateCompleter::Sync& completer) final;
   void GetReferenceClock(GetReferenceClockCompleter::Sync& completer) final;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_audio_device::Observer>,
+                             fidl::UnknownMethodCompleter::Sync&) final {}
 
   // fuchsia.hardware.audio.signal_processing.Reader implementation
   void GetElements(GetElementsCompleter::Sync& completer) final;

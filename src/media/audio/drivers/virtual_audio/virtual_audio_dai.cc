@@ -387,4 +387,7 @@ void VirtualAudioDai::SetActiveChannels(
   completer.Reply(zx::ok(active_channel_set_time_.get()));
 }
 
+void VirtualAudioDai::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
+    fidl::UnknownMethodCompleter::Sync&) {}
 }  // namespace virtual_audio

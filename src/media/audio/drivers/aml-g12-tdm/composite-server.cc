@@ -973,6 +973,10 @@ void RingBufferServer::SetActiveChannels(
                            owner_.last_stopped_time_.get());
 }
 
+void RingBufferServer::handle_unknown_method(
+    fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
+    fidl::UnknownMethodCompleter::Sync&) {}
+
 void AudioCompositeServer::GetElements(GetElementsCompleter::Sync& completer) {
   std::vector<fuchsia_hardware_audio_signalprocessing::Element> elements;
 
@@ -1116,4 +1120,7 @@ void AudioCompositeServer::SetTopology(SetTopologyRequest& request,
   }
 }
 
+void AudioCompositeServer::handle_unknown_method(
+    fidl::UnknownMethodMetadata<typename fuchsia_hardware_audio_signalprocessing::SignalProcessing>,
+    fidl::UnknownMethodCompleter::Sync&) {}
 }  // namespace audio::aml_g12

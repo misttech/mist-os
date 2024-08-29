@@ -247,7 +247,7 @@ type RegistryCreateObserverError = flexible enum {
 /// audio device, and to stay informed as its state changes over time. Each
 /// `Observer` is associated with an initialized audio device. An audio device
 /// may be observed by multiple `Observer` instances.
-closed protocol Observer {
+open protocol Observer {
     /// Query the device's available processing topologies and individual
     /// elements, and watch for changes to those elements.
     ///

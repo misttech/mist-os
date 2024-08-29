@@ -1106,7 +1106,10 @@ void TestBase::RequestTopology() {
   if (!topology_id_.has_value()) {
     sp_->WatchTopology(AddCallback(
         "signalprocessing::Reader::WatchTopology",
-        [this](fuchsia::hardware::audio::TopologyId topology_id) { topology_id_ = topology_id; }));
+        [this](fuchsia::hardware::audio::signalprocessing::Reader_WatchTopology_Result result) {
+          ASSERT_TRUE(result.is_response());
+          topology_id_ = result.response().topology_id;
+        }));
     ExpectCallbacks();
   }
 

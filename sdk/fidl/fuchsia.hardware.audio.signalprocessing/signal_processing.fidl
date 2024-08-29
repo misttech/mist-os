@@ -375,7 +375,7 @@ type Topology = table {
 
 /// For an overview see
 /// [[Signal Processing Interface]](https://fuchsia.dev/fuchsia-src/concepts/drivers/driver_architectures/audio_drivers/audio_signal_processing).
-closed protocol SignalProcessing {
+closed(removed=NEXT) open(added=NEXT) protocol SignalProcessing {
     /// Exposes read-only signal processing properties.
     compose Reader;
 
@@ -435,7 +435,7 @@ closed protocol SignalProcessing {
 
 /// For an overview see
 /// [[Signal Processing Interface]](https://fuchsia.dev/fuchsia-src/concepts/drivers/driver_architectures/audio_drivers/audio_signal_processing).
-closed protocol Reader {
+closed(removed=NEXT) open(added=NEXT) protocol Reader {
     /// Returns a vector of supported processing elements.
     /// Must return one or more processing elements, or `ZX_ERR_NOT_SUPPORTED`.
     /// If `GetTopologies` returns one or more topologies, then `GetElements` must return one or
@@ -480,7 +480,7 @@ closed protocol Reader {
     /// The driver will close the protocol channel with an error of `ZX_ERR_BAD_STATE`, if this
     /// method is called again while there is already a pending `WatchTopology` for this client.
     @available(added=HEAD)
-    strict WatchTopology() -> (struct {
+    flexible WatchTopology() -> (struct {
         topology_id TopologyId;
     });
 };

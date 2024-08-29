@@ -32,7 +32,7 @@ struct Engine {
   metadata::AmlConfig config;
 };
 
-class RingBufferServer : public fidl::Server<fuchsia_hardware_audio::RingBuffer> {
+class RingBufferServer final : public fidl::Server<fuchsia_hardware_audio::RingBuffer> {
  public:
   static std::unique_ptr<RingBufferServer> CreateRingBufferServer(
       async_dispatcher_t* dispatcher, AudioCompositeServer& owner, size_t engine_index,
@@ -55,6 +55,8 @@ class RingBufferServer : public fidl::Server<fuchsia_hardware_audio::RingBuffer>
   void WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) override;
   void SetActiveChannels(fuchsia_hardware_audio::RingBufferSetActiveChannelsRequest& request,
                          SetActiveChannelsCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
+                             fidl::UnknownMethodCompleter::Sync&) override;
 
  private:
   void OnRingBufferClosed(fidl::UnbindInfo info);
@@ -157,7 +159,7 @@ class RingBufferServer : public fidl::Server<fuchsia_hardware_audio::RingBuffer>
   inspect::IntProperty destroyed_at_;
 };
 
-class AudioCompositeServer
+class AudioCompositeServer final
     : public fidl::Server<fuchsia_hardware_audio::Composite>,
       public fidl::Server<fuchsia_hardware_audio_signalprocessing::SignalProcessing> {
   friend class RingBufferServer;
@@ -205,6 +207,10 @@ class AudioCompositeServer
   void GetTopologies(GetTopologiesCompleter::Sync& completer) override;
   void WatchTopology(WatchTopologyCompleter::Sync& completer) override;
   void SetTopology(SetTopologyRequest& request, SetTopologyCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<
+          typename fuchsia_hardware_audio_signalprocessing::SignalProcessing>,
+      fidl::UnknownMethodCompleter::Sync&) override;
 
  private:
   static constexpr std::array<fuchsia_hardware_audio::ElementId, kNumberOfPipelines> kDaiIds = {

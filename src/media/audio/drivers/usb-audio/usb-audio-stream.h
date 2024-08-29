@@ -53,11 +53,11 @@ using UsbAudioStreamBase =
 
 // UsbAudioStream implements WireServer<Device> and WireServer<RingBuffer>.
 // All this is serialized in the single threaded UsbAudioStream's dispatcher() in loop_.
-class UsbAudioStream : public UsbAudioStreamBase,
-                       public AudioStreamProtocol,
-                       public fbl::RefCounted<UsbAudioStream>,
-                       public fbl::DoublyLinkedListable<fbl::RefPtr<UsbAudioStream>>,
-                       public fidl::WireServer<fuchsia_hardware_audio::RingBuffer> {
+class UsbAudioStream final : public UsbAudioStreamBase,
+                             public AudioStreamProtocol,
+                             public fbl::RefCounted<UsbAudioStream>,
+                             public fbl::DoublyLinkedListable<fbl::RefPtr<UsbAudioStream>>,
+                             public fidl::WireServer<fuchsia_hardware_audio::RingBuffer> {
  public:
   class Channel : public fbl::RefCounted<Channel> {
    public:
@@ -216,6 +216,9 @@ class UsbAudioStream : public UsbAudioStreamBase,
   void WatchClockRecoveryPositionInfo(
       WatchClockRecoveryPositionInfoCompleter::Sync& completer) override;
   void WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) override;
+  void handle_unknown_method(
+      fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer> metadata,
+      fidl::UnknownMethodCompleter::Sync& completer) override {}
 
   // fuchsia hardware audio Stream Interface (forwarded from StreamChannel)
   void GetProperties(StreamChannel::GetPropertiesCompleter::Sync& completer);
@@ -311,8 +314,8 @@ class UsbAudioStream : public UsbAudioStreamBase,
 
   std::optional<StartCompleter::Async> start_completer_ __TA_GUARDED(req_lock_);
   std::optional<StopCompleter::Async> stop_completer_ __TA_GUARDED(req_lock_);
-  std::optional<WatchClockRecoveryPositionInfoCompleter::Async> position_completer_ __TA_GUARDED(
-      req_lock_);
+  std::optional<WatchClockRecoveryPositionInfoCompleter::Async> position_completer_
+      __TA_GUARDED(req_lock_);
   // We won't ever actually Reply on this Async completer (we don't dynamically change delays),
   // but WatchDelayInfo can't just call completer.ToAsync and immediately let it drop.
   std::optional<WatchDelayInfoCompleter::Async> delay_completer_;

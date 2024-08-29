@@ -430,7 +430,8 @@ void AmlG12TdmDai::WatchDelayInfo(WatchDelayInfoCallback callback) {
   fuchsia::hardware::audio::DelayInfo delay_info = {};
   // No external delay information is provided by this driver.
   delay_info.set_internal_delay(internal_delay_nsec_);
-  callback(std::move(delay_info));
+  callback(fuchsia::hardware::audio::RingBuffer_WatchDelayInfo_Result::WithResponse(
+      ::fuchsia::hardware::audio::RingBuffer_WatchDelayInfo_Response(std::move(delay_info))));
 }
 
 static zx_status_t dai_bind(void* ctx, zx_device_t* device) {

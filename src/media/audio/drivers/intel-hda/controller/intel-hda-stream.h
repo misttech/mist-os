@@ -27,9 +27,9 @@
 namespace audio {
 namespace intel_hda {
 
-class IntelHDAStream : public fbl::RefCounted<IntelHDAStream>,
-                       public fbl::WAVLTreeContainable<fbl::RefPtr<IntelHDAStream>>,
-                       public fidl::WireServer<fuchsia_hardware_audio::RingBuffer> {
+class IntelHDAStream final : public fbl::RefCounted<IntelHDAStream>,
+                             public fbl::WAVLTreeContainable<fbl::RefPtr<IntelHDAStream>>,
+                             public fidl::WireServer<fuchsia_hardware_audio::RingBuffer> {
  public:
   using RefPtr = fbl::RefPtr<IntelHDAStream>;
   using Tree = fbl::WAVLTree<uint16_t, RefPtr>;
@@ -93,6 +93,8 @@ class IntelHDAStream : public fbl::RefCounted<IntelHDAStream>,
     completer.ReplyError(ZX_ERR_NOT_SUPPORTED);
   }
   void WatchDelayInfo(WatchDelayInfoCompleter::Sync& completer) override;
+  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_hardware_audio::RingBuffer>,
+                             fidl::UnknownMethodCompleter::Sync&) override;
 
   // Release the client ring buffer (if one has been assigned)
   void ReleaseRingBufferLocked() TA_REQ(channel_lock_);
