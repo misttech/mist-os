@@ -10,12 +10,11 @@
 #include <fidl/fuchsia.power.system/cpp/test_base.h>
 #include <lib/async-loop/cpp/loop.h>
 #include <lib/async-loop/default.h>
-#include <lib/async/cpp/task.h>
+#include <lib/async/cpp/executor.h>
 #include <lib/async/default.h>
 #include <lib/driver/incoming/cpp/namespace.h>
 #include <lib/driver/power/cpp/element-description-builder.h>
 #include <lib/fidl/cpp/client.h>
-#include <lib/fidl/cpp/wire/arena.h>
 #include <lib/fidl/cpp/wire/channel.h>
 #include <lib/fidl/cpp/wire/internal/transport_channel.h>
 #include <lib/fidl/cpp/wire/status.h>
@@ -28,9 +27,12 @@
 #include <zircon/syscalls/object.h>
 
 #include <optional>
+#include <vector>
 
 #include <fbl/ref_ptr.h>
 #include <gtest/gtest.h>
+#include <sdk/lib/driver/power/cpp/testing/fake_topology.h>
+#include <sdk/lib/driver/power/cpp/testing/scoped_background_loop.h>
 #include <sdk/lib/sys/component/cpp/testing/realm_builder.h>
 #include <src/lib/testing/loop_fixture/real_loop_fixture.h>
 #include <src/storage/lib/vfs/cpp/pseudo_dir.h>
@@ -40,6 +42,9 @@
 #include "sdk/lib/driver/power/cpp/power-support.h"
 
 namespace power_lib_test {
+
+using fdf_power::testing::FakeTopology;
+
 class PowerLibTest : public gtest::RealLoopFixture {};
 
 class FakeTokenServer : public fidl::WireServer<fuchsia_hardware_power::PowerTokenProvider> {
@@ -59,66 +64,6 @@ class FakeTokenServer : public fidl::WireServer<fuchsia_hardware_power::PowerTok
 
  private:
   zx::event event_;
-};
-
-class PowerElement {
- public:
-  explicit PowerElement(
-      std::optional<fidl::ServerEnd<fuchsia_power_broker::ElementControl>> ec,
-      std::optional<fidl::ServerEnd<fuchsia_power_broker::Lessor>> lessor,
-      std::optional<fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>> current_level,
-      std::optional<fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>> required_level)
-      : element_control_(std::move(ec)),
-        lessor_(std::move(lessor)),
-        current_level_(std::move(current_level)),
-        required_level_(std::move(required_level)) {}
-
- private:
-  std::optional<fidl::ServerEnd<fuchsia_power_broker::ElementControl>> element_control_;
-  std::optional<fidl::ServerEnd<fuchsia_power_broker::Lessor>> lessor_;
-  std::optional<fidl::ServerEnd<fuchsia_power_broker::CurrentLevel>> current_level_;
-  std::optional<fidl::ServerEnd<fuchsia_power_broker::RequiredLevel>> required_level_;
-};
-
-class TopologyServer : public fidl::Server<fuchsia_power_broker::Topology> {
- public:
-  void AddElement(fuchsia_power_broker::ElementSchema& req,
-                  AddElementCompleter::Sync& completer) override {
-    // Store a copy of the dependencies represented in this request
-    for (auto& it : req.dependencies().value()) {
-      zx::event token_copy;
-      it.requires_token().duplicate(ZX_RIGHT_SAME_RIGHTS, &token_copy);
-
-      fuchsia_power_broker::LevelDependency dep = {{
-          .dependency_type = it.dependency_type(),
-          .dependent_level = it.dependent_level(),
-          .requires_token = std::move(token_copy),
-          .requires_level_by_preference = it.requires_level_by_preference(),
-      }};
-      received_deps_.emplace_back(std::move(dep));
-    }
-
-    // Make channels to return to client
-    if (req.level_control_channels().has_value()) {
-      PowerElement element{std::move(req.element_control()), std::move(req.lessor_channel()),
-                           std::move(req.level_control_channels().value().current()),
-                           std::move(req.level_control_channels().value().required())};
-
-      clients_.emplace_back(std::move(element));
-    } else {
-      PowerElement element{std::move(req.element_control()), std::move(req.lessor_channel()),
-                           std::nullopt, std::nullopt};
-
-      clients_.emplace_back(std::move(element));
-    }
-    completer.Reply(fit::success());
-  }
-  void handle_unknown_method(fidl::UnknownMethodMetadata<fuchsia_power_broker::Topology> md,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {}
-  std::vector<fuchsia_power_broker::LevelDependency> received_deps_;
-
- private:
-  std::vector<PowerElement> clients_;
 };
 
 class AddInstanceResult {
@@ -533,29 +478,23 @@ TEST_F(PowerLibTest, AddElementNoDep) {
   std::unordered_map<fdf_power::ParentElement, zx::event> tokens;
 
   // Make the fake power broker
-  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  loop.StartThread();
-  std::unique_ptr<TopologyServer> fake_power_broker = std::make_unique<TopologyServer>();
+  fdf_power::testing::ScopedBackgroundLoop loop;
   fidl::Endpoints<fuchsia_power_broker::Topology> endpoints =
       fidl::CreateEndpoints<fuchsia_power_broker::Topology>().value();
+  FakeTopology fake_power_broker(loop.dispatcher(), std::move(endpoints.server));
+  loop.executor().schedule_task(fake_power_broker.TakeSchemaPromise().then(
+      [](fpromise::result<fuchsia_power_broker::ElementSchema, void>& result) {
+        EXPECT_TRUE(result.is_ok());
+        EXPECT_TRUE(result.value().dependencies().has_value());
+        ASSERT_EQ(result.value().dependencies()->size(), static_cast<size_t>(0));
+      }));
 
-  fidl::ServerBindingRef<fuchsia_power_broker::Topology> bindings =
-      fidl::BindServer<fuchsia_power_broker::Topology>(
-          loop.dispatcher(), std::move(endpoints.server), std::move(fake_power_broker),
-          [](TopologyServer* impl, fidl::UnbindInfo info,
-             fidl::ServerEnd<fuchsia_power_broker::Topology> chan) {
-            // Check that we have the right number of dependencies received
-            ASSERT_EQ(static_cast<size_t>(0), impl->received_deps_.size());
-          });
   // Call add element
-  fidl::Arena arena;
   zx::event invalid, invalid2;
   auto call_result =
       fdf_power::AddElement(endpoints.client, df_config, std::move(tokens), invalid.borrow(),
                             invalid2.borrow(), std::nullopt, std::nullopt, std::nullopt);
   ASSERT_TRUE(call_result.is_ok());
-  loop.Shutdown();
-  loop.JoinThreads();
 }
 
 /// Add an element which has a has multiple level dependencies on a single
@@ -608,49 +547,39 @@ TEST_F(PowerLibTest, AddElementSingleDep) {
                                std::move(token_copy)));
 
   // Make the fake power broker
-  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  loop.StartThread();
-  std::unique_ptr<TopologyServer> fake_power_broker = std::make_unique<TopologyServer>();
+  fdf_power::testing::ScopedBackgroundLoop loop;
   fidl::Endpoints<fuchsia_power_broker::Topology> endpoints =
       fidl::CreateEndpoints<fuchsia_power_broker::Topology>().value();
+  FakeTopology fake_power_broker(loop.dispatcher(), std::move(endpoints.server));
+  loop.executor().schedule_task(fake_power_broker.TakeSchemaPromise().then(
+      [parent_token = std::move(parent_token),
+       child_to_parent_levels = std::move(child_to_parent_levels)](
+          fpromise::result<fuchsia_power_broker::ElementSchema, void>& result) mutable {
+        EXPECT_TRUE(result.is_ok());
+        EXPECT_TRUE(result.value().dependencies().has_value());
+        ASSERT_EQ(result.value().dependencies()->size(), static_cast<size_t>(2));
 
-  fidl::ServerBindingRef<fuchsia_power_broker::Topology> bindings =
-      fidl::BindServer<fuchsia_power_broker::Topology>(
-          loop.dispatcher(), std::move(endpoints.server), std::move(fake_power_broker),
-
-          [parent_token = std::move(parent_token),
-           child_to_parent_levels = std::move(child_to_parent_levels)](
-              TopologyServer* impl, fidl::UnbindInfo info,
-              fidl::ServerEnd<fuchsia_power_broker::Topology> chan) mutable {
-            // Check that we have the right number of dependencies received
-            ASSERT_EQ(impl->received_deps_.size(), static_cast<size_t>(2));
-
-            // Since both power levels dependended on the same parent power element
-            // that both access tokens match the one we made in the test
-            zx_info_handle_basic_t orig_info, copy_info;
-            parent_token.get_info(ZX_INFO_HANDLE_BASIC, &orig_info, sizeof(zx_info_handle_basic_t),
-                                  nullptr, nullptr);
-            for (fuchsia_power_broker::LevelDependency& dep : impl->received_deps_) {
-              dep.requires_token().get_info(ZX_INFO_HANDLE_BASIC, &copy_info,
-                                            sizeof(zx_info_handle_basic_t), nullptr, nullptr);
-              auto entry = child_to_parent_levels.extract(dep.dependent_level());
-              ASSERT_EQ(entry.mapped(), dep.requires_level_by_preference().front());
-              ASSERT_EQ(copy_info.koid, orig_info.koid);
-            }
-            ASSERT_EQ(child_to_parent_levels.size(), static_cast<size_t>(0));
-          });
+        // Since both power levels dependended on the same parent power element
+        // that both access tokens match the one we made in the test.
+        zx_info_handle_basic_t orig_info, copy_info;
+        parent_token.get_info(ZX_INFO_HANDLE_BASIC, &orig_info, sizeof(zx_info_handle_basic_t),
+                              nullptr, nullptr);
+        for (fuchsia_power_broker::LevelDependency& dep : result.value().dependencies().value()) {
+          dep.requires_token().get_info(ZX_INFO_HANDLE_BASIC, &copy_info,
+                                        sizeof(zx_info_handle_basic_t), nullptr, nullptr);
+          auto entry = child_to_parent_levels.extract(dep.dependent_level());
+          ASSERT_EQ(entry.mapped(), dep.requires_level_by_preference().front());
+          ASSERT_EQ(copy_info.koid, orig_info.koid);
+        }
+        ASSERT_EQ(child_to_parent_levels.size(), static_cast<size_t>(0));
+      }));
 
   // Call add element
-  fidl::Arena arena;
   zx::event invalid1, invalid2;
   auto call_result =
       fdf_power::AddElement(endpoints.client, df_config, std::move(tokens), invalid1.borrow(),
                             invalid2.borrow(), std::nullopt, std::nullopt, std::nullopt);
-
   ASSERT_TRUE(call_result.is_ok());
-
-  loop.Shutdown();
-  loop.JoinThreads();
 }
 
 /// Add an element that has dependencies on two different parent elements.
@@ -726,59 +655,50 @@ TEST_F(PowerLibTest, AddElementDoubleDep) {
   }
 
   // Make the fake power broker
-  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  loop.StartThread();
-  std::unique_ptr<TopologyServer> fake_power_broker = std::make_unique<TopologyServer>();
+  fdf_power::testing::ScopedBackgroundLoop loop;
   fidl::Endpoints<fuchsia_power_broker::Topology> endpoints =
       fidl::CreateEndpoints<fuchsia_power_broker::Topology>().value();
+  FakeTopology fake_power_broker(loop.dispatcher(), std::move(endpoints.server));
+  loop.executor().schedule_task(fake_power_broker.TakeSchemaPromise().then(
+      [parent_token_one = std::move(parent_token_one),
+       parent_token_two = std::move(parent_token_two),
+       child_to_parent_levels = std::move(child_to_parent_levels), dep_one_level = dep_one_level](
+          fpromise::result<fuchsia_power_broker::ElementSchema, void>& result) mutable {
+        EXPECT_TRUE(result.is_ok());
+        EXPECT_TRUE(result.value().dependencies().has_value());
+        ASSERT_EQ(result.value().dependencies()->size(), static_cast<size_t>(2));
 
-  fidl::ServerBindingRef<fuchsia_power_broker::Topology> bindings =
-      fidl::BindServer<fuchsia_power_broker::Topology>(
-          loop.dispatcher(), std::move(endpoints.server), std::move(fake_power_broker),
-          [parent_token_one = std::move(parent_token_one),
-           parent_token_two = std::move(parent_token_two),
-           child_to_parent_levels = std::move(child_to_parent_levels),
-           dep_one_level = dep_one_level](TopologyServer* impl, fidl::UnbindInfo info,
-                                          fidl::ServerEnd<fuchsia_power_broker::Topology>) mutable {
-            // Check that we have the right number of dependencies received
-            ASSERT_EQ(impl->received_deps_.size(), static_cast<size_t>(2));
+        // Since both power levels dependended on the same parent power element
+        // that both access tokens match the one we made in the test
+        zx_info_handle_basic_t parent_one_info, parent_two_info, copy_info;
+        parent_token_one.get_info(ZX_INFO_HANDLE_BASIC, &parent_one_info,
+                                  sizeof(zx_info_handle_basic_t), nullptr, nullptr);
+        parent_token_two.get_info(ZX_INFO_HANDLE_BASIC, &parent_two_info,
+                                  sizeof(zx_info_handle_basic_t), nullptr, nullptr);
+        for (fuchsia_power_broker::LevelDependency& dep : result.value().dependencies().value()) {
+          dep.requires_token().get_info(ZX_INFO_HANDLE_BASIC, &copy_info,
+                                        sizeof(zx_info_handle_basic_t), nullptr, nullptr);
+          // Since each dependency has a different dependent level, use the dependent
+          // level to differentiate which access token to check against. Delightfully
+          // basic since we know we only have two dependencies.
+          if (dep.dependent_level() == dep_one_level) {
+            ASSERT_EQ(copy_info.koid, parent_one_info.koid);
+          } else {
+            ASSERT_EQ(copy_info.koid, parent_two_info.koid);
+          }
+          auto entry = child_to_parent_levels.extract(dep.dependent_level());
+          ASSERT_EQ(entry.mapped(), dep.requires_level_by_preference().front());
+        }
 
-            // Since both power levels dependended on the same parent power element
-            // that both access tokens match the one we made in the test
-            zx_info_handle_basic_t parent_one_info, parent_two_info, copy_info;
-            parent_token_one.get_info(ZX_INFO_HANDLE_BASIC, &parent_one_info,
-                                      sizeof(zx_info_handle_basic_t), nullptr, nullptr);
-            parent_token_two.get_info(ZX_INFO_HANDLE_BASIC, &parent_two_info,
-                                      sizeof(zx_info_handle_basic_t), nullptr, nullptr);
-            for (fuchsia_power_broker::LevelDependency& dep : impl->received_deps_) {
-              dep.requires_token().get_info(ZX_INFO_HANDLE_BASIC, &copy_info,
-                                            sizeof(zx_info_handle_basic_t), nullptr, nullptr);
-              // Since each dependency has a different dependent level, use the dependent
-              // level to differentiate which access token to check against. Delightfully
-              // basic since we know we only have two dependencies.
-              if (dep.dependent_level() == dep_one_level) {
-                ASSERT_EQ(copy_info.koid, parent_one_info.koid);
-              } else {
-                ASSERT_EQ(copy_info.koid, parent_two_info.koid);
-              }
-              auto entry = child_to_parent_levels.extract(dep.dependent_level());
-              ASSERT_EQ(entry.mapped(), dep.requires_level_by_preference().front());
-            }
-
-            ASSERT_EQ(child_to_parent_levels.size(), static_cast<size_t>(0));
-          });
+        ASSERT_EQ(child_to_parent_levels.size(), static_cast<size_t>(0));
+      }));
 
   // Call add element
-  fidl::Arena arena;
   zx::event invalid1, invalid2;
   auto call_result =
       fdf_power::AddElement(endpoints.client, df_config, std::move(tokens), invalid1.borrow(),
                             invalid2.borrow(), std::nullopt, std::nullopt, std::nullopt);
-
   ASSERT_TRUE(call_result.is_ok());
-
-  loop.Shutdown();
-  loop.JoinThreads();
 }
 
 /// Check that a power element with two levels, dependent on two different
@@ -867,8 +787,7 @@ TEST_F(PowerLibTest, ExtractPowerLevelsFromConfig) {
 /// Get the dependency tokens for an element that has no dependencies.
 /// This should result in no tokens and no errors.
 TEST_F(PowerLibTest, GetTokensNoTokens) {
-  async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
-  loop.StartThread();
+  fdf_power::testing::ScopedBackgroundLoop loop;
 
   // create a namespace that has a directory for the PowerTokenService, but
   // no entries
@@ -895,8 +814,6 @@ TEST_F(PowerLibTest, GetTokensNoTokens) {
 
   // Should be no tokens, but also no errors
   ASSERT_EQ(result.value().size(), static_cast<size_t>(0));
-  loop.Shutdown();
-  loop.JoinThreads();
 }
 
 /// Get the tokens for an element that has one level dependent on one other
@@ -1168,6 +1085,7 @@ TEST_F(PowerLibTest, GetTokensTwoDepTwoLevels) {
 TEST_F(PowerLibTest, ApplyPowerConfiguration) {
   async::Loop loop(&kAsyncLoopConfigNoAttachToCurrentThread);
   loop.StartThread();
+
   // Create the dependency configuration
   fdf_power::ParentElement parent_name_first =
       fdf_power::ParentElement::WithInstanceName("element_first_parent");
@@ -1225,18 +1143,19 @@ TEST_F(PowerLibTest, ApplyPowerConfiguration) {
       ZX_OK);
 
   // Make the fake power broker
-  std::unique_ptr<TopologyServer> fake_power_broker = std::make_unique<TopologyServer>();
-
-  fidl::ServerBindingGroup<fuchsia_power_broker::Topology> topo_bindings;
+  std::vector<FakeTopology> fake_power_brokers;
+  async::Executor executor(loop.dispatcher());
   fbl::RefPtr<fs::Service> topology = fbl::MakeRefCounted<fs::Service>(
-      [&topo_bindings, &fake_power_broker, &loop, &instance_one_data,
+      [&fake_power_brokers, &loop, &executor, &instance_one_data,
        &instance_two_data](fidl::ServerEnd<fuchsia_power_broker::Topology> chan) -> int {
-        topo_bindings.AddBinding(
-            loop.dispatcher(), std::move(chan), &*fake_power_broker,
-            [&instance_one_data, &instance_two_data](TopologyServer* impl,
-                                                     fidl::UnbindInfo info) mutable {
-              // Validate that we got a call with two dependencies
-              ASSERT_EQ(impl->received_deps_.size(), static_cast<size_t>(2));
+        fake_power_brokers.emplace_back(loop.dispatcher(), std::move(chan));
+        executor.schedule_task(fake_power_brokers.back().TakeSchemaPromise().then(
+            [&instance_one_data, &instance_two_data](
+                fpromise::result<fuchsia_power_broker::ElementSchema, void>& result) {
+              EXPECT_TRUE(result.is_ok());
+              auto& received_deps = result.value().dependencies();
+              EXPECT_TRUE(received_deps.has_value());
+              ASSERT_EQ(received_deps->size(), static_cast<size_t>(2));
 
               // Get handle info for the dependency tokens of the service instances
               zx_info_handle_basic_t dep_token_one_info, dep_token_two_info;
@@ -1247,15 +1166,15 @@ TEST_F(PowerLibTest, ApplyPowerConfiguration) {
 
               // Get handle info for the dependency tokens sent to the topology server
               zx_info_handle_basic_t received_token_one_info, received_token_two_info;
-              impl->received_deps_.at(0).requires_token().get_info(
+              received_deps->at(0).requires_token().get_info(
                   ZX_INFO_HANDLE_BASIC, &received_token_one_info, sizeof(zx_info_handle_basic_t),
                   nullptr, nullptr);
-              impl->received_deps_.at(1).requires_token().get_info(
+              received_deps->at(1).requires_token().get_info(
                   ZX_INFO_HANDLE_BASIC, &received_token_two_info, sizeof(zx_info_handle_basic_t),
                   nullptr, nullptr);
 
               // Check that the two dep tokens weren't the same token
-              ASSERT_NE(dep_token_one_info.koid, dep_token_two_info.koid);
+              EXPECT_NE(dep_token_one_info.koid, dep_token_two_info.koid);
 
               // Check that the first service instance token is the same as one
               // of the received tokens
@@ -1270,11 +1189,12 @@ TEST_F(PowerLibTest, ApplyPowerConfiguration) {
                   dep_token_two_info.koid != received_token_two_info.koid) {
                 FAIL() << "created dependency token TWO was not received";
               }
-            });
+            }));
+
         return ZX_OK;
       });
 
-  // Add the topology server to services
+  // Add the topology service to services dir
   fbl::RefPtr<fs::PseudoDir> svcs_dir = fbl::MakeRefCounted<fs::PseudoDir>();
   svcs_dir->AddEntry("fuchsia.power.broker.Topology", topology);
   svcs_dir->AddEntry(fuchsia_hardware_power::PowerTokenService::Name, svc_instances_dir);
@@ -1293,8 +1213,12 @@ TEST_F(PowerLibTest, ApplyPowerConfiguration) {
 
   // Now we've done all that, do the call and check that we get one thing back
   ASSERT_EQ(fdf_power::ApplyPowerConfiguration(ns, configs).value().size(), static_cast<size_t>(1));
+
   loop.Shutdown();
   loop.JoinThreads();
+
+  // Only one power broker topology instance should exist.
+  ASSERT_EQ(fake_power_brokers.size(), static_cast<size_t>(1));
 }
 
 /// Check GetTokens with a power elements with a single level which depends

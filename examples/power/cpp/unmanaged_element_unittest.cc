@@ -14,16 +14,18 @@
 #include <lib/fpromise/bridge.h>
 
 #include <gtest/gtest.h>
+#include <sdk/lib/driver/power/cpp/testing/fake_current_level.h>
+#include <sdk/lib/driver/power/cpp/testing/fake_topology.h>
+#include <sdk/lib/driver/power/cpp/testing/scoped_background_loop.h>
 #include <src/lib/testing/loop_fixture/real_loop_fixture.h>
-
-#include "examples/power/cpp/testing/scoped_background_loop.h"
 
 namespace {
 
 using examples::power::UnmanagedElement;
-using examples::power::testing::ScopedBackgroundLoop;
+using fdf_power::testing::FakeCurrentLevel;
+using fdf_power::testing::FakeTopology;
+using fdf_power::testing::ScopedBackgroundLoop;
 using fuchsia_power_broker::BinaryPowerLevel;
-using fuchsia_power_broker::CurrentLevel;
 using fuchsia_power_broker::ElementSchema;
 using fuchsia_power_broker::PowerLevel;
 using fuchsia_power_broker::Topology;
@@ -32,66 +34,6 @@ const std::vector<PowerLevel> kBinaryPowerLevels = {fidl::ToUnderlying(BinaryPow
                                                     fidl::ToUnderlying(BinaryPowerLevel::kOn)};
 
 class UnmanagedElementTest : public gtest::RealLoopFixture {};
-
-class FakeTopology : public fidl::testing::TestBase<Topology> {
- public:
-  FakeTopology(async_dispatcher_t* dispatcher, fidl::ServerEnd<Topology> server_end)
-      : binding_(
-            fidl::BindServer(dispatcher, std::move(server_end), this,
-                             [](FakeTopology*, fidl::UnbindInfo, fidl::ServerEnd<Topology>) {})) {}
-
-  fpromise::promise<ElementSchema, void> PromiseSchema() {
-    return schema_bridge_.consumer.promise();
-  }
-
- private:
-  void AddElement(ElementSchema& schema, AddElementCompleter::Sync& completer) override {
-    schema_bridge_.completer.complete_ok(std::move(schema));
-    completer.Reply(fit::ok());
-  }
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    FAIL() << "Unexpected call: " << name;
-  }
-  void handle_unknown_method(fidl::UnknownMethodMetadata<Topology> metadata,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {
-    FAIL() << "Encountered unknown method";
-  }
-
-  fidl::ServerBindingRef<Topology> binding_;
-  fpromise::bridge<ElementSchema, void> schema_bridge_;
-};
-
-// Must run on a single sequence or single thread.
-class FakeCurrentLevel : public fidl::testing::TestBase<CurrentLevel> {
- public:
-  FakeCurrentLevel(async_dispatcher_t* dispatcher, fidl::ServerEnd<CurrentLevel> server_end,
-                   PowerLevel initial_level)
-      : binding_(fidl::BindServer(
-            dispatcher, std::move(server_end), this,
-            [](FakeCurrentLevel*, fidl::UnbindInfo, fidl::ServerEnd<CurrentLevel>) {})),
-        current_level_(initial_level) {}
-
-  // This function can be made const, but then it doesn't work with DispatcherBound::AsyncCall().
-  PowerLevel current_level() { return current_level_; }
-
- private:
-  void Update(UpdateRequest& request, UpdateCompleter::Sync& completer) override {
-    current_level_ = request.current_level();
-    completer.Reply(fit::ok());
-  }
-
-  void NotImplemented_(const std::string& name, fidl::CompleterBase& completer) override {
-    FAIL() << "Unexpected call: " << name;
-  }
-  void handle_unknown_method(fidl::UnknownMethodMetadata<CurrentLevel> metadata,
-                             fidl::UnknownMethodCompleter::Sync& completer) override {
-    FAIL() << "Encountered unknown method";
-  }
-
-  fidl::ServerBindingRef<CurrentLevel> binding_;
-  PowerLevel current_level_;
-};
 
 TEST_F(UnmanagedElementTest, AddToPowerTopologySendsCorrectSchema) {
   ScopedBackgroundLoop background;
@@ -107,7 +49,7 @@ TEST_F(UnmanagedElementTest, AddToPowerTopologySendsCorrectSchema) {
 
   // Check the ElementSchema received by the Topology server. Run this task on the foreground loop.
   async::Executor executor(dispatcher());
-  executor.schedule_task(topology.PromiseSchema().then(
+  executor.schedule_task(topology.TakeSchemaPromise().then(
       [quit = QuitLoopClosure(), &element_name](fpromise::result<ElementSchema, void>& result) {
         EXPECT_TRUE(result.is_ok());
         ElementSchema schema = result.take_value();
@@ -136,7 +78,7 @@ TEST_F(UnmanagedElementTest, SetLevelChangesTopologyCurrentLevel) {
   // Get the CurrentLevel server end from the ElementSchema received via Topology.
   async::Executor executor(dispatcher());
   ElementSchema schema;
-  executor.schedule_task(topology.PromiseSchema().then(
+  executor.schedule_task(topology.TakeSchemaPromise().then(
       [quit = QuitLoopClosure(), &schema](fpromise::result<ElementSchema, void>& result) {
         EXPECT_TRUE(result.is_ok());
         schema = result.take_value();

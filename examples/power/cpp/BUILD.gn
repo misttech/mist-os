@@ -27,9 +27,9 @@ executable("unmanaged_element_unittest_cpp") {
   sources = [ "unmanaged_element_unittest.cc" ]
   deps = [
     ":unmanaged_element_cpp",
-    "testing",
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
     "//sdk/lib/async_patterns/cpp",
+    "//sdk/lib/driver/power/cpp/testing",
     "//sdk/lib/fit",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture:gtest",
@@ -45,9 +45,9 @@ executable("unmanaged_element_integration_test_cpp") {
   sources = [ "unmanaged_element_integration_test.cc" ]
   deps = [
     ":unmanaged_element_cpp",
-    "testing",
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
     "//sdk/lib/diagnostics/reader/cpp",
+    "//sdk/lib/driver/power/cpp/testing",
     "//sdk/lib/sys/component/cpp/testing:cpp",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture:gtest",
@@ -73,10 +73,10 @@ executable("wake_lease_integration_test_cpp") {
   sources = [ "wake_lease_integration_test.cc" ]
   deps = [
     ":wake_lease_cpp",
-    "testing",
     "//sdk/fidl/fuchsia.power.broker:fuchsia.power.broker_cpp",
     "//sdk/fidl/fuchsia.power.system:fuchsia.power.system_cpp",
     "//sdk/lib/component/incoming/cpp",
+    "//sdk/lib/driver/power/cpp/testing",
     "//sdk/lib/fit",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture:gtest",
@@ -88,6 +88,7 @@ executable("wake_lease_unittest_cpp") {
   sources = [ "wake_lease_unittest.cc" ]
   deps = [
     ":wake_lease_cpp",
+    "//sdk/lib/driver/power/cpp/testing",
     "//sdk/lib/fit",
     "//src/lib/fxl/test:gtest_main",
     "//src/lib/testing/loop_fixture:gtest",
