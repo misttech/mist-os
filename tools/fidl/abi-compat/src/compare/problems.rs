@@ -13,12 +13,16 @@ fn common_prefix<'a, 'b>(a: &'a str, b: &'b str) -> (&'a str, &'a str, &'b str) 
 
 #[derive(Clone, Debug, Eq)]
 struct ProblemPath {
+    version: u32,
     for_display: String,
     for_comparison: String,
 }
 
 impl ProblemPath {
     fn new(paths: [&Path; 2]) -> Self {
+        let version =
+            paths.iter().filter_map(|p| p.api_level().parse::<u32>().ok()).min().unwrap_or(0);
+
         let [a, b] = paths.map(|p| p.string());
 
         let for_display: String = if a == b {
@@ -36,7 +40,7 @@ impl ProblemPath {
 
         let for_comparison = std::cmp::min(a, b).to_owned();
 
-        Self { for_display, for_comparison }
+        Self { version, for_display, for_comparison }
     }
 }
 
@@ -97,11 +101,21 @@ fn test_cmp_prefixes_later() {
     assert_eq!(Less, cmp_prefixes_later("foo.bar", "foo"));
 }
 
+static ALLOW_LIST: &'static [(&'static [u32], &'static str)] = &[];
+
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct CompatibilityProblem {
     warning: bool,
     paths: ProblemPath,
     message: String,
+}
+
+impl CompatibilityProblem {
+    fn allowed(&self) -> bool {
+        ALLOW_LIST.iter().any(|(versions, path)| {
+            &self.paths.for_display == path && versions.iter().any(|v| v == &self.paths.version)
+        })
+    }
 }
 
 impl Display for CompatibilityProblem {
@@ -147,14 +161,14 @@ pub struct CompatibilityProblems(Vec<CompatibilityProblem>);
 
 impl CompatibilityProblems {
     pub fn error(&mut self, paths: [&Path; 2], message: String) {
-        self.0.push(CompatibilityProblem {
+        self.push(CompatibilityProblem {
             paths: ProblemPath::new(paths),
             warning: false,
             message: message,
         });
     }
     pub fn warning(&mut self, paths: [&Path; 2], message: String) {
-        self.0.push(CompatibilityProblem {
+        self.push(CompatibilityProblem {
             paths: ProblemPath::new(paths),
             warning: true,
             message: message,
@@ -163,6 +177,12 @@ impl CompatibilityProblems {
 
     pub fn append(&mut self, mut other: CompatibilityProblems) {
         self.0.append(&mut other.0);
+    }
+
+    fn push(&mut self, problem: CompatibilityProblem) {
+        if !problem.allowed() {
+            self.0.push(problem);
+        }
     }
 
     pub fn is_incompatible(&self) -> bool {
