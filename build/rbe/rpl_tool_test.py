@@ -11,7 +11,6 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
-import cl_utils
 import remotetool
 import reproxy_logs
 import rpl_tool

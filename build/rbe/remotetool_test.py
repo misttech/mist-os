@@ -319,7 +319,6 @@ class RemotetoolRunTests(unittest.TestCase):
         mock_exists.assert_called_once_with()
 
     def test_show_action_cached(self) -> None:
-        exit_code = 0
         action_result = remotetool.ShowActionResult(
             command=[], platform=dict(), inputs=dict(), output_files=dict()
         )

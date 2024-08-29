@@ -3,12 +3,8 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import os
-import sys
 import unittest
-from pathlib import Path
 from typing import Iterable, Sequence
-from unittest import mock
 
 import textpb
 

@@ -3,10 +3,7 @@
 # Use of this source code is governed by a BSD-style license that can be
 # found in the LICENSE file.
 
-import os
 import subprocess
-import sys
-import tempfile
 import unittest
 from pathlib import Path
 from typing import Tuple
@@ -132,7 +129,6 @@ class DownloadArtifactsTests(unittest.TestCase):
 
 class MainTests(unittest.TestCase):
     def test_dry_run(self) -> None:
-        path = "dir/file.o"
         exec_root = Path("/exec/root")
         working_dir = exec_root / "work"
         with mock.patch.object(
@@ -148,7 +144,6 @@ class MainTests(unittest.TestCase):
         mock_run.assert_not_called()
 
     def test_download_fail(self) -> None:
-        path = "dir/file.o"
         exec_root = Path("/exec/root")
         working_dir = exec_root / "work"
         with mock.patch.object(
@@ -165,7 +160,6 @@ class MainTests(unittest.TestCase):
         mock_run.assert_not_called()
 
     def test_no_command(self) -> None:
-        path = "dir/file.o"
         exec_root = Path("/exec/root")
         working_dir = exec_root / "work"
         with mock.patch.object(
@@ -181,7 +175,6 @@ class MainTests(unittest.TestCase):
         mock_run.assert_not_called()
 
     def test_success(self) -> None:
-        path = "dir/file.o"
         exec_root = Path("/exec/root")
         working_dir = exec_root / "work"
         with mock.patch.object(
@@ -224,7 +217,6 @@ class MainTests(unittest.TestCase):
         mock_run.assert_called_with(["cat", "foo"])
 
     def test_undownload(self) -> None:
-        path = "dir/file.o"
         exec_root = Path("/exec/root")
         working_dir = exec_root / "work"
         with mock.patch.object(

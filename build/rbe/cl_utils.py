@@ -13,7 +13,6 @@ import dataclasses
 import datetime
 import fcntl
 import filecmp
-import io
 import os
 import platform
 import re

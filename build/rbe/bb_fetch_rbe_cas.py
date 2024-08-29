@@ -10,12 +10,10 @@ Note: permissions are not set, so the caller might need to set executable bits.
 """
 
 import argparse
-import json
 import os
 import sys
-import tempfile
 from pathlib import Path
-from typing import Any, Dict, Optional, Sequence, Tuple
+from typing import Sequence
 
 import bbtool
 import cl_utils

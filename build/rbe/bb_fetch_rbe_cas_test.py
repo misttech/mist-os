@@ -205,7 +205,6 @@ class MainTests(unittest.TestCase):
         )
 
     def test_e2e_using_reproxy_log_success(self):
-        bb = bbtool._BB_TOOL
         artifact_path = Path("foo/bar/baz.rlib")
         cfg = bb_fetch_rbe_cas._REPROXY_CFG
         reproxy_log_path = Path("use/me.rrpl")
