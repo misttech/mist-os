@@ -6,7 +6,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-import atexit
 from collections import defaultdict
 from dataclasses import dataclass
 from dataclasses import field
