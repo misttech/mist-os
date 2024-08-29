@@ -309,6 +309,9 @@ template("fidl_library") {
 
     api_levels += [ _in_development_api_level ]
 
+    # build at the unstable HEAD level.
+    api_levels += [ "HEAD" ]
+
     foreach(level, api_levels) {
       fidl_ir_target_name = "${main_target_name}_compile_$level"
       fidl_ir(fidl_ir_target_name) {
@@ -338,7 +341,7 @@ template("fidl_library") {
       # It's needed because we use the goldens as action.inputs so the build
       # expects them to exist, but APIs outside the "fuchsia" namespace aren't
       # compatibility tested and don't have goldens.
-      if (in_fuchsia_namespace) {
+      if (in_fuchsia_namespace && level != "HEAD") {
         test_target = "${target_name}_${level}_compatibility_test"
         fidl_api_compatibility_test(test_target) {
           forward_variables_from(invoker, [ "testonly" ])

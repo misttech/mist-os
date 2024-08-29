@@ -90,8 +90,8 @@ impl Version {
         assert!(!api_levels.is_empty());
         if api_levels.len() == 1 {
             let api_level = api_levels[0].as_ref();
-            assert!(api_level == "NEXT" || !api_level.chars().any(|c| !c.is_digit(10)),
-                "External API levels must either be NEXT or a single decimal integer. Got: {api_level:?}");
+            assert!(api_level == "NEXT" || api_level == "HEAD" || !api_level.chars().any(|c| !c.is_digit(10)),
+                "External API levels must either be HEAD, NEXT or a single decimal integer. Got: {api_level:?}");
             Self { scope: Scope::External, version: FlyStr::new(api_level) }
         } else {
             assert!(

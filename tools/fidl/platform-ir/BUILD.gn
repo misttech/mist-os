@@ -21,7 +21,7 @@ template("platform_ir") {
       api_level = invoker.api_level
       platform_ir = "${root_build_dir}/platform-ir-${api_level}.json"
     } else {
-      platform_ir = "${root_build_dir}/platform-ir-HEAD.json"
+      platform_ir = "${root_build_dir}/platform-ir-PLATFORM.json"
       not_needed([ "invoker" ])
     }
 
@@ -52,12 +52,16 @@ template("platform_ir") {
   }
 }
 
-platform_ir("platform_ir_head") {
+platform_ir("platform_ir_platform") {
 }
 
-platform_ir_deps = [ ":platform_ir_head" ]
+platform_ir_deps = [ ":platform_ir_platform" ]
 
-foreach(supported_level, platform_version.frozen_api_levels + [ "NEXT" ]) {
+foreach(supported_level,
+        platform_version.frozen_api_levels + [
+              "NEXT",
+              "HEAD",
+            ]) {
   label = "platform_ir_${supported_level}"
   platform_ir_deps += [ ":${label}" ]
   platform_ir(label) {
